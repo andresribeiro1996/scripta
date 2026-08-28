@@ -1,0 +1,1194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kobo Library Viewer</title>
+<style>
+  :root {
+    --bg: #f5f4f2;
+    --surface: #ffffff;
+    --surface-hover: #fbfaf8;
+    --text: #201e1c;
+    --text-dim: #6b6560;
+    --border: #e4e0da;
+    --accent: #a85c32;
+    --accent-soft: #f1e2d8;
+    --progress-track: #e9e5df;
+    --danger: #b3432f;
+    --shadow: 0 1px 2px rgba(30, 25, 20, 0.06), 0 1px 6px rgba(30, 25, 20, 0.05);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1815;
+      --surface: #242220;
+      --surface-hover: #2b2926;
+      --text: #ece8e3;
+      --text-dim: #a39c93;
+      --border: #38342f;
+      --accent: #e08a52;
+      --accent-soft: #3a2c22;
+      --progress-track: #3a352f;
+      --danger: #e08072;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 8px rgba(0, 0, 0, 0.25);
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.4;
+  }
+
+  .wrap {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2rem 1.25rem 4rem;
+  }
+
+  h1 {
+    font-size: 1.4rem;
+    margin: 0 0 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  /* --- Drop zone --- */
+
+  #dropzone {
+    border: 2px dashed var(--border);
+    border-radius: 14px;
+    padding: 4rem 2rem;
+    text-align: center;
+    color: var(--text-dim);
+    transition: border-color 0.15s, background 0.15s;
+    margin-top: 3rem;
+  }
+
+  #dropzone.drag-over {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  #dropzone p { margin: 0.4rem 0; }
+
+  #dropzone .big { font-size: 1.1rem; color: var(--text); }
+
+  #choose-btn {
+    margin-top: 1rem;
+    padding: 0.55rem 1.2rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 0.95rem;
+    cursor: pointer;
+  }
+
+  #choose-btn:hover { background: var(--surface-hover); }
+
+  #status-msg {
+    display: none;
+    margin-top: 1rem;
+    color: var(--text-dim);
+    font-size: 0.9rem;
+  }
+
+  #error-msg {
+    display: none;
+    margin-top: 1rem;
+    color: var(--danger);
+    font-size: 0.9rem;
+  }
+
+  /* --- Stats bar --- */
+
+  #stats {
+    display: none;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
+  }
+
+  .stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.75rem 1.1rem;
+    box-shadow: var(--shadow);
+    min-width: 110px;
+  }
+
+  .stat .num { font-size: 1.3rem; font-weight: 600; }
+  .stat .label { font-size: 0.78rem; color: var(--text-dim); }
+
+  /* --- Controls --- */
+
+  #controls {
+    display: none;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 1.25rem;
+  }
+
+  #controls input[type="text"],
+  #controls select {
+    padding: 0.5rem 0.7rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 0.9rem;
+  }
+
+  #search { flex: 1 1 220px; min-width: 160px; }
+
+  #download-btn {
+    padding: 0.5rem 0.8rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+  #download-btn:hover { background: var(--surface-hover); }
+
+  label.toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.9rem;
+    color: var(--text-dim);
+    cursor: pointer;
+  }
+
+  #result-count {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    margin-bottom: 1rem;
+    display: none;
+  }
+
+  /* --- Grid --- */
+
+  #grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 1rem;
+  }
+
+  /* Poster-overlay card: full-bleed cover art with everything else
+     floating on top. Starts in "fallback" appearance (no cover yet);
+     loadCoverInto() swaps it to the "has cover" appearance once an
+     image successfully loads. */
+  .card {
+    position: relative;
+    aspect-ratio: 2 / 3;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+    background: linear-gradient(160deg, var(--accent-soft), var(--progress-track));
+  }
+
+  .card:hover {
+    transform: translateY(-3px) scale(1.01);
+    box-shadow: 0 10px 28px rgba(10, 8, 6, 0.28);
+  }
+
+  .card-cover-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .card-scrim {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(10, 8, 6, 0.88) 0%, rgba(10, 8, 6, 0.55) 32%, rgba(10, 8, 6, 0) 62%);
+  }
+
+  .card-pill {
+    position: absolute;
+    top: 10px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(10, 8, 6, 0.72);
+    backdrop-filter: blur(3px);
+    border-radius: 999px;
+    padding: 4px 9px;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: #fff;
+  }
+  .card-pill.status { left: 10px; padding-left: 7px; }
+  .card-pill.highlights { right: 10px; }
+
+  .card-pill .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  /* Content area: bottom-aligned white overlay once a cover has loaded */
+  .card-content {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 14px;
+  }
+
+  .card-content h3 {
+    margin: 0 0 2px;
+    font-size: 15px;
+    line-height: 1.3;
+    color: #fff;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  }
+
+  .card-content .author {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.82);
+    margin-bottom: 8px;
+  }
+
+  .card-content .progress-track {
+    height: 4px;
+    background: rgba(255, 255, 255, 0.25);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .card-content .progress-fill {
+    height: 100%;
+    background: #fff;
+  }
+
+  /* Fallback appearance: no cover found (yet, or ever) — centered,
+     dark-on-tint instead of white-on-image. */
+  .card-content.fallback {
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 20px;
+  }
+
+  .card-content.fallback svg {
+    margin-bottom: 10px;
+  }
+
+  .card-content.fallback h3 {
+    color: var(--text);
+    text-shadow: none;
+    font-size: 14px;
+  }
+
+  .card-content.fallback .author {
+    color: var(--text-dim);
+  }
+
+  .card-content.fallback .progress-track {
+    width: 70%;
+    background: var(--surface);
+    margin: 12px auto 0;
+  }
+
+  .card-content.fallback .progress-fill {
+    background: var(--accent);
+  }
+
+  /* --- Modal --- */
+
+  #modal-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 17, 14, 0.45);
+    align-items: flex-start;
+    justify-content: center;
+    padding: 4vh 1rem;
+    overflow-y: auto;
+    z-index: 10;
+  }
+
+  #modal {
+    background: var(--surface);
+    border-radius: 14px;
+    max-width: 640px;
+    width: 100%;
+    padding: 1.5rem 1.75rem 1.75rem;
+    box-shadow: var(--shadow);
+  }
+
+  #modal .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+  }
+
+  #modal h2 { margin: 0 0 0.2rem; font-size: 1.15rem; }
+  #modal .modal-author { color: var(--text-dim); font-size: 0.9rem; }
+
+  #modal-close {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 1.3rem;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0.2rem 0.4rem;
+  }
+
+  .highlight-item {
+    border-left: 3px solid var(--accent);
+    padding: 0.5rem 0 0.5rem 0.85rem;
+    margin-bottom: 0.9rem;
+  }
+
+  .highlight-text {
+    font-size: 0.92rem;
+    font-style: italic;
+  }
+
+  .highlight-annotation {
+    margin-top: 0.35rem;
+    font-size: 0.87rem;
+    color: var(--text-dim);
+  }
+
+  .highlight-date {
+    margin-top: 0.3rem;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+  }
+
+  .no-highlights {
+    color: var(--text-dim);
+    font-size: 0.9rem;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>📚 Kobo Library Viewer</h1>
+
+  <div id="dropzone">
+    <p class="big">Drop your <code>library.json</code>, <code>KoboReader.sqlite</code>, or a Goodreads export <code>.csv</code> here</p>
+    <p>or</p>
+    <button id="choose-btn" type="button">Choose file…</button>
+    <input id="file-input" type="file" accept=".json,.sqlite,.db,.sqlite3,.csv,application/json,text/csv" hidden>
+    <p id="status-msg"></p>
+    <p id="error-msg"></p>
+  </div>
+
+  <div id="stats">
+    <div class="stat"><div class="num" id="stat-total">0</div><div class="label">Books</div></div>
+    <div class="stat"><div class="num" id="stat-finished">0</div><div class="label">Finished</div></div>
+    <div class="stat"><div class="num" id="stat-reading">0</div><div class="label">Reading</div></div>
+    <div class="stat"><div class="num" id="stat-unread">0</div><div class="label">Unread</div></div>
+    <div class="stat"><div class="num" id="stat-highlights">0</div><div class="label">Highlights</div></div>
+  </div>
+
+  <div id="controls">
+    <input id="search" type="text" placeholder="Search title or author…">
+    <select id="filter-status">
+      <option value="all">All statuses</option>
+      <option value="2">Finished</option>
+      <option value="1">Reading</option>
+      <option value="0">Unread</option>
+    </select>
+    <label class="toggle">
+      <input type="checkbox" id="filter-highlights">
+      Has highlights
+    </label>
+    <select id="sort-by">
+      <option value="title">Sort: Title (A–Z)</option>
+      <option value="author">Sort: Author (A–Z)</option>
+      <option value="lastread">Sort: Last read (newest)</option>
+      <option value="progress">Sort: Progress (highest)</option>
+    </select>
+    <button id="download-btn" type="button">⬇ Download JSON</button>
+  </div>
+
+  <div id="result-count"></div>
+  <div id="grid"></div>
+</div>
+
+<div id="modal-backdrop">
+  <div id="modal">
+    <div class="modal-header">
+      <div>
+        <h2 id="modal-title"></h2>
+        <div class="modal-author" id="modal-author"></div>
+      </div>
+      <button id="modal-close" type="button" aria-label="Close">✕</button>
+    </div>
+    <div id="modal-highlights"></div>
+  </div>
+</div>
+
+<!-- Vendored sql.js (SQLite compiled to WebAssembly), with the WASM binary inlined
+     as base64 so this loads from a plain file:// double-click with no fetch()/CORS
+     issues and no internet access. See viewer/vendor/kobo-sqljs-bundle.js. -->
+<script src="vendor/kobo-sqljs-bundle.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  // Column lists mirror exporter/export.py's BOOK_COLUMNS / BOOKMARK_COLUMNS,
+  // so a SQLite file converted here produces the same JSON shape as the CLI.
+  var BOOK_COLUMNS = [
+    "ContentID", "Title", "Attribution", "Series", "SeriesNumber", "ISBN",
+    "Publisher", "Language", "___PercentRead", "ReadStatus", "DateLastRead",
+    "DateCreated", "Rating", "TimeSpentReading", "WordCount", "MimeType", "ImageId"
+  ];
+  var BOOKMARK_COLUMNS = [
+    "BookmarkID", "VolumeID", "Text", "Annotation", "Type",
+    "DateCreated", "DateModified", "ChapterProgress"
+  ];
+
+  var state = { books: [], raw: null };
+
+  var dropzone = document.getElementById("dropzone");
+  var fileInput = document.getElementById("file-input");
+  var chooseBtn = document.getElementById("choose-btn");
+  var statusMsg = document.getElementById("status-msg");
+  var errorMsg = document.getElementById("error-msg");
+  var statsEl = document.getElementById("stats");
+  var controlsEl = document.getElementById("controls");
+  var resultCountEl = document.getElementById("result-count");
+  var grid = document.getElementById("grid");
+  var searchInput = document.getElementById("search");
+  var filterStatus = document.getElementById("filter-status");
+  var filterHighlights = document.getElementById("filter-highlights");
+  var sortBy = document.getElementById("sort-by");
+  var downloadBtn = document.getElementById("download-btn");
+  var modalBackdrop = document.getElementById("modal-backdrop");
+  var modalTitle = document.getElementById("modal-title");
+  var modalAuthor = document.getElementById("modal-author");
+  var modalHighlights = document.getElementById("modal-highlights");
+  var modalClose = document.getElementById("modal-close");
+
+  chooseBtn.addEventListener("click", function () { fileInput.click(); });
+  fileInput.addEventListener("change", function (e) {
+    if (e.target.files && e.target.files[0]) readFile(e.target.files[0]);
+  });
+
+  ["dragenter", "dragover"].forEach(function (evt) {
+    dropzone.addEventListener(evt, function (e) {
+      e.preventDefault();
+      dropzone.classList.add("drag-over");
+    });
+  });
+  ["dragleave", "drop"].forEach(function (evt) {
+    dropzone.addEventListener(evt, function (e) {
+      e.preventDefault();
+      dropzone.classList.remove("drag-over");
+    });
+  });
+  dropzone.addEventListener("drop", function (e) {
+    var files = e.dataTransfer.files;
+    if (files && files[0]) readFile(files[0]);
+  });
+
+  // The SQLite file header is "SQLite format 3" followed by a NUL terminator
+  // byte (16 bytes total). The NUL is checked separately as a byte value
+  // rather than embedded in this string literal: the HTML parser's input
+  // preprocessing step replaces any literal NUL byte in the source (even
+  // inside <script>) with U+FFFD before the JS engine sees it, which would
+  // silently break a charCodeAt-based comparison against it.
+  var SQLITE_MAGIC = "SQLite format 3";
+
+  function isSqliteBytes(bytes) {
+    if (bytes.length < 16) return false;
+    for (var i = 0; i < SQLITE_MAGIC.length; i++) {
+      if (bytes[i] !== SQLITE_MAGIC.charCodeAt(i)) return false;
+    }
+    return bytes[15] === 0;
+  }
+
+  function readFile(file) {
+    hideError();
+    hideStatus();
+    var reader = new FileReader();
+    reader.onload = function () {
+      var bytes = new Uint8Array(reader.result);
+      if (isSqliteBytes(bytes)) {
+        handleSqliteBytes(bytes);
+      } else {
+        handleTextBytes(bytes);
+      }
+    };
+    reader.onerror = function () {
+      showError("Couldn't read that file.");
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  // Text-based inputs: a kobo-export library JSON, or a Goodreads CSV
+  // export. Tried in that order — JSON first since it's unambiguous
+  // (valid JSON with a "books" array can't also be a CSV), then a
+  // Goodreads-shaped CSV as the fallback.
+  function handleTextBytes(bytes) {
+    var text;
+    try {
+      text = new TextDecoder("utf-8").decode(bytes);
+    } catch (err) {
+      showError("Couldn't decode that file as text, and it's not a SQLite database.");
+      return;
+    }
+
+    var parsedJson = tryParseJson(text);
+    if (parsedJson) {
+      if (!Array.isArray(parsedJson.books)) {
+        showError("That JSON doesn't look like a kobo-export library file (missing a \"books\" array).");
+        return;
+      }
+      loadData(parsedJson);
+      return;
+    }
+
+    if (looksLikeGoodreadsCsv(text)) {
+      try {
+        loadData(goodreadsCsvToLibraryJson(text));
+      } catch (err) {
+        showError(err.message);
+      }
+      return;
+    }
+
+    showError("Didn't recognize that file — it's not a KoboReader.sqlite database, a kobo-export library JSON, or a Goodreads library CSV export.");
+  }
+
+  function tryParseJson(text) {
+    try {
+      return JSON.parse(text);
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function handleSqliteBytes(bytes) {
+    showStatus("Reading SQLite database…");
+    getSqlJs().then(function (SQL) {
+      var db;
+      try {
+        db = new SQL.Database(bytes);
+      } catch (err) {
+        hideStatus();
+        showError("Couldn't open that as a SQLite database (" + err.message + ").");
+        return;
+      }
+      try {
+        var data = sqliteToLibraryJson(db);
+        hideStatus();
+        loadData(data);
+      } catch (err) {
+        hideStatus();
+        showError(err.message);
+      } finally {
+        db.close();
+      }
+    }).catch(function (err) {
+      hideStatus();
+      showError("Failed to start the SQLite engine: " + err.message);
+    });
+  }
+
+  // --- SQLite -> library JSON, mirroring exporter/export.py's logic ---
+
+  var sqlJsPromise = null;
+  function getSqlJs() {
+    if (!sqlJsPromise) {
+      var binary = atob(SQL_WASM_BASE64);
+      var wasmBytes = new Uint8Array(binary.length);
+      for (var i = 0; i < binary.length; i++) wasmBytes[i] = binary.charCodeAt(i);
+      sqlJsPromise = initSqlJs({ wasmBinary: wasmBytes.buffer });
+    }
+    return sqlJsPromise;
+  }
+
+  function tableColumns(db, table) {
+    var res = db.exec("PRAGMA table_info(" + table + ")");
+    if (!res.length) return [];
+    var nameIdx = res[0].columns.indexOf("name");
+    return res[0].values.map(function (row) { return row[nameIdx]; });
+  }
+
+  function runQuery(db, sql) {
+    var res = db.exec(sql);
+    if (!res.length) return [];
+    var cols = res[0].columns;
+    return res[0].values.map(function (row) {
+      var obj = {};
+      cols.forEach(function (c, i) { obj[c] = row[i]; });
+      return obj;
+    });
+  }
+
+  function sqliteToLibraryJson(db) {
+    var haveContentCols = tableColumns(db, "content");
+    var bookCols = BOOK_COLUMNS.filter(function (c) { return haveContentCols.indexOf(c) !== -1; });
+    if (!bookCols.length) {
+      throw new Error("`content` table has none of the expected columns — unexpected schema.");
+    }
+    var haveBookmarkCols = tableColumns(db, "Bookmark");
+    var bookmarkCols = BOOKMARK_COLUMNS.filter(function (c) { return haveBookmarkCols.indexOf(c) !== -1; });
+
+    // ContentType 6 alone isn't enough: Kobo's Nickel software also caches
+    // store/recommendation catalog entries into this same table for offline
+    // browsing — books you've merely seen, not ones you own or have on the
+    // device. Those show up with IsDownloaded='false' and ___FileSize=0.
+    // Without this extra filter, a device with a few dozen real books can
+    // report several hundred.
+    var filterCols = ["IsDownloaded", "___FileSize"].filter(function (c) { return haveContentCols.indexOf(c) !== -1; });
+    var extraWhere = "";
+    if (filterCols.indexOf("IsDownloaded") !== -1) extraWhere += " AND IsDownloaded = 'true'";
+    if (filterCols.indexOf("___FileSize") !== -1) extraWhere += " AND ___FileSize > 0";
+
+    var books = runQuery(
+      db,
+      "SELECT " + bookCols.join(", ") + " FROM content " +
+      "WHERE ContentType = '6' AND (BookID IS NULL OR BookID = '')" + extraWhere
+    );
+
+    var highlightsByVolume = {};
+    if (bookmarkCols.length && bookmarkCols.indexOf("VolumeID") !== -1) {
+      var bookmarks = runQuery(db, "SELECT " + bookmarkCols.join(", ") + " FROM Bookmark");
+      bookmarks.forEach(function (b) {
+        if (!b.VolumeID) return;
+        (highlightsByVolume[b.VolumeID] = highlightsByVolume[b.VolumeID] || []).push(b);
+      });
+    }
+
+    books.forEach(function (b) {
+      b.highlights = highlightsByVolume[b.ContentID] || [];
+    });
+
+    return {
+      source: "kobo-export (browser)",
+      schema_version: 1,
+      book_count: books.length,
+      books: books
+    };
+  }
+
+  // --- Goodreads CSV -> library JSON ---
+  //
+  // Get this file from goodreads.com: My Books -> Tools (left sidebar) ->
+  // Import/Export -> Export Library. No API key, no scraping — Goodreads
+  // emails/generates a download link for a CSV of your whole library.
+  //
+  // Mapped onto the same book shape the Kobo paths produce, so it renders
+  // in the same grid: title/author/ISBN/rating carry over directly,
+  // "Exclusive Shelf" becomes ReadStatus, and a non-empty "My Review" is
+  // surfaced as a single highlight-like entry (Goodreads has no per-passage
+  // highlights the way Kobo does). There's no cover-lookup key equivalent
+  // to Kobo's ImageId, so cover art for Goodreads-sourced books relies on
+  // the ISBN and title+author search tiers only.
+  //
+  // Known limitation: Goodreads' standard export has no dedicated series
+  // column — series info is sometimes embedded in the title text itself
+  // (e.g. "Book Title (Series, #2)") but isn't parsed out here.
+
+  function looksLikeGoodreadsCsv(text) {
+    var firstLine = (text.split(/\r?\n/, 1)[0] || "");
+    return firstLine.indexOf("Book Id") !== -1 &&
+      firstLine.indexOf("Title") !== -1 &&
+      firstLine.indexOf("Author") !== -1 &&
+      firstLine.indexOf("Exclusive Shelf") !== -1;
+  }
+
+  // Minimal RFC4180-ish CSV parser: handles quoted fields, commas and
+  // newlines inside quotes, and "" as an escaped quote. Goodreads' export
+  // needs all of this — review text routinely contains commas and line
+  // breaks.
+  function parseCsv(text) {
+    var rows = [];
+    var row = [];
+    var field = "";
+    var inQuotes = false;
+    var i = 0;
+    var len = text.length;
+
+    function pushField() { row.push(field); field = ""; }
+    function pushRow() { pushField(); rows.push(row); row = []; }
+
+    while (i < len) {
+      var c = text.charAt(i);
+      if (inQuotes) {
+        if (c === '"') {
+          if (text.charAt(i + 1) === '"') { field += '"'; i += 2; continue; }
+          inQuotes = false; i++; continue;
+        }
+        field += c; i++; continue;
+      }
+      if (c === '"') { inQuotes = true; i++; continue; }
+      if (c === ',') { pushField(); i++; continue; }
+      if (c === '\r') { i++; continue; }
+      if (c === '\n') { pushRow(); i++; continue; }
+      field += c; i++; continue;
+    }
+    if (field.length > 0 || row.length > 0) pushRow();
+
+    return rows;
+  }
+
+  function csvRowsToObjects(rows) {
+    if (!rows.length) return [];
+    var header = rows[0];
+    return rows.slice(1)
+      .filter(function (r) { return !(r.length === 1 && r[0] === ""); })
+      .map(function (r) {
+        var obj = {};
+        header.forEach(function (h, i) { obj[h] = r[i] !== undefined ? r[i] : ""; });
+        return obj;
+      });
+  }
+
+  // Goodreads wraps ISBN/ISBN13 fields as ="1234567890" to stop spreadsheet
+  // apps from mangling them (dropping leading zeros, scientific notation).
+  function stripGoodreadsIsbnWrapper(raw) {
+    var v = (raw || "").trim();
+    var m = /^="?([^"]*)"?$/.exec(v);
+    return m ? m[1].trim() : v;
+  }
+
+  function goodreadsShelfToStatus(shelf) {
+    var s = (shelf || "").trim().toLowerCase();
+    if (s === "read") return 2;
+    if (s === "currently-reading") return 1;
+    return 0; // "to-read", or any custom shelf
+  }
+
+  function goodreadsCsvToLibraryJson(text) {
+    var rows = csvRowsToObjects(parseCsv(text));
+    if (!rows.length) {
+      throw new Error("That Goodreads CSV doesn't have any books in it.");
+    }
+
+    var books = rows.map(function (row, i) {
+      var isbn13 = stripGoodreadsIsbnWrapper(row["ISBN13"]);
+      var isbn10 = stripGoodreadsIsbnWrapper(row["ISBN"]);
+      var status = goodreadsShelfToStatus(row["Exclusive Shelf"]);
+      var rating = parseInt(row["My Rating"], 10);
+      var review = (row["My Review"] || "").trim();
+      var contentId = "goodreads:" + (row["Book Id"] || i);
+
+      var book = {
+        ContentID: contentId,
+        Title: row["Title"] || "",
+        Attribution: row["Author"] || "",
+        Series: null,
+        SeriesNumber: null,
+        ISBN: isbn13 || isbn10 || "",
+        Publisher: row["Publisher"] || null,
+        Language: null,
+        ___PercentRead: status === 2 ? 100 : 0,
+        ReadStatus: status,
+        DateLastRead: row["Date Read"] || null,
+        DateCreated: row["Date Added"] || null,
+        Rating: (rating > 0) ? rating : null,
+        TimeSpentReading: null,
+        WordCount: -1,
+        MimeType: null,
+        ImageId: null,
+        highlights: []
+      };
+
+      if (review) {
+        book.highlights.push({
+          BookmarkID: "goodreads-review:" + contentId,
+          VolumeID: contentId,
+          Text: review,
+          Annotation: "",
+          Type: "review",
+          DateCreated: row["Date Read"] || row["Date Added"] || null,
+          DateModified: null,
+          ChapterProgress: null
+        });
+      }
+
+      return book;
+    });
+
+    return {
+      source: "goodreads-export (browser)",
+      schema_version: 1,
+      book_count: books.length,
+      books: books
+    };
+  }
+
+  function loadData(fullJson) {
+    state.raw = fullJson;
+    state.books = fullJson.books;
+    onLoaded();
+  }
+
+  function showStatus(msg) {
+    statusMsg.textContent = msg;
+    statusMsg.style.display = "block";
+  }
+  function hideStatus() {
+    statusMsg.style.display = "none";
+  }
+
+  function showError(msg) {
+    errorMsg.textContent = msg;
+    errorMsg.style.display = "block";
+  }
+  function hideError() {
+    errorMsg.style.display = "none";
+  }
+
+  downloadBtn.addEventListener("click", function () {
+    var payload = JSON.stringify(state.raw, null, 2);
+    var blob = new Blob([payload], { type: "application/json" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "library.json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+
+  function onLoaded() {
+    dropzone.style.display = "none";
+    statsEl.style.display = "flex";
+    controlsEl.style.display = "flex";
+    resultCountEl.style.display = "block";
+    renderStats();
+    renderGrid();
+  }
+
+  function renderStats() {
+    var total = state.books.length;
+    var finished = 0, reading = 0, unread = 0, highlights = 0;
+    state.books.forEach(function (b) {
+      var status = b.ReadStatus;
+      if (status === 2) finished++;
+      else if (status === 1) reading++;
+      else unread++;
+      highlights += (b.highlights || []).length;
+    });
+    document.getElementById("stat-total").textContent = total;
+    document.getElementById("stat-finished").textContent = finished;
+    document.getElementById("stat-reading").textContent = reading;
+    document.getElementById("stat-unread").textContent = unread;
+    document.getElementById("stat-highlights").textContent = highlights;
+  }
+
+  function getFiltered() {
+    var q = searchInput.value.trim().toLowerCase();
+    var statusFilter = filterStatus.value;
+    var onlyHighlights = filterHighlights.checked;
+
+    var list = state.books.filter(function (b) {
+      if (q) {
+        var title = (b.Title || "").toLowerCase();
+        var author = (b.Attribution || "").toLowerCase();
+        if (title.indexOf(q) === -1 && author.indexOf(q) === -1) return false;
+      }
+      if (statusFilter !== "all") {
+        var wantStatus = parseInt(statusFilter, 10);
+        var actual = b.ReadStatus === 2 ? 2 : (b.ReadStatus === 1 ? 1 : 0);
+        if (actual !== wantStatus) return false;
+      }
+      if (onlyHighlights && (!b.highlights || b.highlights.length === 0)) return false;
+      return true;
+    });
+
+    var mode = sortBy.value;
+    list.sort(function (a, b) {
+      if (mode === "author") {
+        return (a.Attribution || "").localeCompare(b.Attribution || "");
+      }
+      if (mode === "lastread") {
+        var da = a.DateLastRead || "";
+        var db = b.DateLastRead || "";
+        return db.localeCompare(da);
+      }
+      if (mode === "progress") {
+        return (b.___PercentRead || 0) - (a.___PercentRead || 0);
+      }
+      return (a.Title || "").localeCompare(b.Title || "");
+    });
+
+    return list;
+  }
+
+  function renderGrid() {
+    var list = getFiltered();
+    resultCountEl.textContent = list.length + " of " + state.books.length + " books";
+
+    grid.innerHTML = "";
+    var frag = document.createDocumentFragment();
+
+    list.forEach(function (book) {
+      var card = document.createElement("div");
+      card.className = "card";
+
+      var status = book.ReadStatus === 2 ? 2 : (book.ReadStatus === 1 ? 1 : 0);
+      var pct = book.___PercentRead || 0;
+      var hlCount = (book.highlights || []).length;
+
+      card.innerHTML =
+        '<div class="card-pill status"><span class="dot" style="background:' + statusDotColor(status) + '"></span>' + statusLabel(status) + '</div>' +
+        (hlCount > 0 ? '<div class="card-pill highlights">' + hlCount + ' highlight' + (hlCount === 1 ? "" : "s") + '</div>' : '') +
+        fallbackContentHtml(book, pct);
+
+      card.addEventListener("click", function () { openModal(book); });
+      loadCoverInto(card, book);
+      frag.appendChild(card);
+    });
+
+    grid.appendChild(frag);
+  }
+
+  // Kobo's ISBN field sometimes holds a "urn:uuid:..." fallback identifier
+  // instead of a real ISBN (for books it can't otherwise identify). Only
+  // pass through values that actually look like an ISBN-10/13, so we don't
+  // send a bogus lookup — or someone's internal UUID — out to a cover CDN.
+  function normalizeIsbn(raw) {
+    var cleaned = (raw || "").trim().replace(/[-\s]/g, "");
+    return /^(?:\d{9}[\dXx]|\d{13})$/.test(cleaned) ? cleaned : "";
+  }
+
+  // Sideloaded (non-Kobo-store) books get a mangled file path stuffed into
+  // ImageId instead of a real GUID (e.g. a sideloaded EPUB's file:// path).
+  // Only pass through values that actually look like a GUID.
+  function normalizeImageId(raw) {
+    var v = (raw || "").trim();
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v) ? v : "";
+  }
+
+  // Kobo's own cover CDN, keyed by the book's ImageId — the store this book
+  // was bought/downloaded from, so coverage is excellent for anything that
+  // isn't sideloaded. Also arguably more private than a third-party lookup:
+  // Kobo already has this purchase on record.
+  function koboCoverUrl(imageId) {
+    return "https://cdn.kobo.com/book-images/" + encodeURIComponent(imageId) + "/353/569/False/image.jpg";
+  }
+
+  // Open Library's cover CDN, keyed by ISBN — used as a fallback for books
+  // Kobo doesn't have a cover for (or sideloaded books with no ImageId).
+  // `default=false` makes it return a real 404 for unknown covers (instead
+  // of a blank placeholder image), so the <img> error handler can move on.
+  function openLibraryCoverUrl(isbn) {
+    return "https://covers.openlibrary.org/b/isbn/" + encodeURIComponent(isbn) + "-M.jpg?default=false";
+  }
+
+  // Ordered list of cover URLs to try for a book, most-likely-to-hit first.
+  // The <img> error handler advances through this list on each failure.
+  function coverCandidates(book) {
+    var candidates = [];
+    var imageId = normalizeImageId(book.ImageId);
+    if (imageId) candidates.push(koboCoverUrl(imageId));
+    var isbn = normalizeIsbn(book.ISBN);
+    if (isbn) candidates.push(openLibraryCoverUrl(isbn));
+    return candidates;
+  }
+
+  // Last-resort fallback for books with no ImageId/ISBN at all (mostly
+  // sideloaded files): fuzzy title+author search against Open Library.
+  // Unlike the ImageId/ISBN lookups above, this isn't an exact-identifier
+  // match — for an ambiguous or very common title it can occasionally
+  // return the wrong edition's cover, or the wrong book. Only called after
+  // the exact-match candidates are exhausted.
+  function searchOpenLibraryCover(title, author) {
+    var params = new URLSearchParams();
+    params.set("title", title);
+    if (author) params.set("author", author);
+    params.set("limit", "1");
+    params.set("fields", "cover_i");
+    return fetch("https://openlibrary.org/search.json?" + params.toString())
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        var doc = data && data.docs && data.docs[0];
+        return doc && doc.cover_i
+          ? "https://covers.openlibrary.org/b/id/" + doc.cover_i + "-M.jpg"
+          : null;
+      })
+      .catch(function () { return null; });
+  }
+
+  // Loads a cover into a poster card, trying (in order): Kobo CDN, Open
+  // Library by ISBN, then Open Library by title+author search. On success,
+  // swaps the card from its fallback appearance (centered icon, dark text)
+  // to the cover appearance (full-bleed image, scrim, white bottom
+  // overlay). Leaves the fallback appearance in place — untouched — if
+  // every source fails.
+  //
+  // A single <img> is reused across attempts (its src just changes) and
+  // stays hidden (display:none) until one actually loads, so a failed or
+  // in-flight attempt never shows a broken-image icon peeking out from
+  // behind the fallback content.
+  function loadCoverInto(card, book) {
+    var pct = book.___PercentRead || 0;
+    var contentEl = card.querySelector(".card-content");
+    var direct = coverCandidates(book);
+    var idx = 0;
+    var img = null;
+
+    function ensureImg() {
+      if (!img) {
+        img = document.createElement("img");
+        img.className = "card-cover-img";
+        img.alt = "";
+        // Deliberately no loading="lazy": it proved unreliable here — the
+        // browser's intersection-based lazy-load trigger sometimes just
+        // never fires, even for cards already in the viewport, leaving
+        // every card stuck on its fallback appearance. For a personal
+        // library (at most a few hundred covers) eager-loading is a fine
+        // trade-off, and it's the one that actually and reliably works.
+        img.style.opacity = "0";
+        img.addEventListener("load", onImgLoad, { once: true });
+        card.insertBefore(img, card.firstChild);
+      }
+      return img;
+    }
+
+    function onImgLoad() {
+      img.style.opacity = "1";
+      var scrim = document.createElement("div");
+      scrim.className = "card-scrim";
+      card.insertBefore(scrim, img.nextSibling);
+      contentEl.outerHTML = coverContentHtml(book, pct);
+    }
+
+    function cleanupIfUnused() {
+      if (img && img.style.opacity === "0") { img.remove(); img = null; }
+    }
+
+    function tryNextDirect() {
+      if (idx < direct.length) {
+        var el = ensureImg();
+        el.addEventListener("error", tryNextDirect, { once: true });
+        el.src = direct[idx++];
+      } else {
+        trySearchFallback();
+      }
+    }
+
+    function trySearchFallback() {
+      var title = (book.Title || "").trim();
+      if (!title) { cleanupIfUnused(); return; }
+      searchOpenLibraryCover(title, book.Attribution).then(function (url) {
+        if (!url) { cleanupIfUnused(); return; }
+        var el = ensureImg();
+        el.addEventListener("error", cleanupIfUnused, { once: true });
+        el.src = url;
+      });
+    }
+
+    tryNextDirect();
+  }
+
+  var BOOK_ICON_SVG =
+    '<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5">' +
+      '<path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H6.5A2.5 2.5 0 0 1 4 17.5v-13Z"/>' +
+      '<path d="M4 17.5A2.5 2.5 0 0 1 6.5 15H20"/>' +
+    '</svg>';
+
+  // No-cover appearance: centered icon, dark-on-tint title/author/progress.
+  function fallbackContentHtml(book, pct) {
+    return '<div class="card-content fallback">' +
+      BOOK_ICON_SVG +
+      '<h3>' + escapeHtml(book.Title || "Untitled") + '</h3>' +
+      '<div class="author">' + escapeHtml(book.Attribution || "Unknown author") + '</div>' +
+      '<div class="progress-track"><div class="progress-fill" style="width:' + pct + '%"></div></div>' +
+    '</div>';
+  }
+
+  // Has-cover appearance: bottom-aligned white overlay on the scrim.
+  function coverContentHtml(book, pct) {
+    return '<div class="card-content">' +
+      '<h3>' + escapeHtml(book.Title || "Untitled") + '</h3>' +
+      '<div class="author">' + escapeHtml(book.Attribution || "Unknown author") + '</div>' +
+      '<div class="progress-track"><div class="progress-fill" style="width:' + pct + '%"></div></div>' +
+    '</div>';
+  }
+
+  function statusDotColor(status) {
+    return status === 2 ? "#4a8f5c" : (status === 1 ? "var(--accent)" : "var(--text-dim)");
+  }
+
+  function statusLabel(status) {
+    return status === 2 ? "Finished" : (status === 1 ? "Reading" : "Unread");
+  }
+
+  function escapeHtml(str) {
+    var div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function openModal(book) {
+    modalTitle.textContent = book.Title || "Untitled";
+    modalAuthor.textContent = book.Attribution || "Unknown author";
+
+    var highlights = book.highlights || [];
+    if (highlights.length === 0) {
+      modalHighlights.innerHTML = '<p class="no-highlights">No highlights or notes for this book.</p>';
+    } else {
+      modalHighlights.innerHTML = "";
+      highlights.forEach(function (h) {
+        var item = document.createElement("div");
+        item.className = "highlight-item";
+        var annotationHtml = h.Annotation
+          ? '<div class="highlight-annotation">' + escapeHtml(h.Annotation) + '</div>'
+          : "";
+        var dateHtml = h.DateCreated
+          ? '<div class="highlight-date">' + escapeHtml(h.DateCreated) + '</div>'
+          : "";
+        item.innerHTML =
+          '<div class="highlight-text">“' + escapeHtml(h.Text || "") + '”</div>' +
+          annotationHtml + dateHtml;
+        modalHighlights.appendChild(item);
+      });
+    }
+
+    modalBackdrop.style.display = "flex";
+  }
+
+  function closeModal() {
+    modalBackdrop.style.display = "none";
+  }
+
+  modalClose.addEventListener("click", closeModal);
+  modalBackdrop.addEventListener("click", function (e) {
+    if (e.target === modalBackdrop) closeModal();
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") closeModal();
+  });
+
+  searchInput.addEventListener("input", renderGrid);
+  filterStatus.addEventListener("change", renderGrid);
+  filterHighlights.addEventListener("change", renderGrid);
+  sortBy.addEventListener("change", renderGrid);
+})();
+</script>
+</body>
+</html>

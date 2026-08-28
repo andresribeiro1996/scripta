@@ -1,0 +1,125 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    a { color: #a85c32; } a:hover { color: #8a4a28; }
+    .poster-card:hover { transform: translateY(-3px) scale(1.01); box-shadow: 0 10px 28px rgba(10,8,6,0.28); }
+  </style>
+</helmet>
+
+<div style="padding: 28px; background: {{t.bg}}; min-height: 100%;">
+  <div style="margin-bottom: 20px;">
+    <div style="font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: {{t.accent}};">Direction D</div>
+    <div style="font-size: 18px; font-weight: 700; color: {{t.text}}; margin-top: 2px;">Poster overlay</div>
+    <div style="font-size: 12.5px; color: {{t.textDim}}; margin-top: 2px;">Full-bleed art, gallery style — everything else floats on top of the cover.</div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px;">
+    <sc-for list="{{books}}" as="b" hint-placeholder-count="4">
+      <div style="position: relative; aspect-ratio: 2/3; border-radius: 14px; overflow: hidden; box-shadow: {{t.shadow}}; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; background: {{b.cardBg}};" class="poster-card">
+
+        <sc-if value="{{b.hasCover}}" hint-placeholder-val="{{true}}">
+          <img src="{{b.coverFile}}" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;">
+          <div style="position: absolute; inset: 0; background: linear-gradient(to top, rgba(10,8,6,0.88) 0%, rgba(10,8,6,0.55) 32%, rgba(10,8,6,0) 62%);"></div>
+        </sc-if>
+
+        <div style="position: absolute; top: 10px; left: 10px; display: flex; align-items: center; gap: 5px; background: rgba(10,8,6,0.72); backdrop-filter: blur(3px); border-radius: 999px; padding: 4px 9px 4px 7px;">
+          <span style="width: 6px; height: 6px; border-radius: 50%; background: {{b.statusColor}}; display: inline-block;"></span>
+          <span style="font-size: 10.5px; font-weight: 600; color: #fff;">{{b.statusLabel}}</span>
+        </div>
+
+        <sc-if value="{{b.hasHighlights}}" hint-placeholder-val="{{true}}">
+          <div style="position: absolute; top: 10px; right: 10px; background: rgba(10,8,6,0.72); backdrop-filter: blur(3px); border-radius: 999px; padding: 4px 9px; font-size: 10.5px; font-weight: 600; color: #fff;">{{b.hl}} ✎</div>
+        </sc-if>
+
+        <sc-if value="{{b.hasCover}}" hint-placeholder-val="{{true}}">
+          <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 14px;">
+            <h3 style="margin: 0 0 2px; font-size: 15px; line-height: 1.3; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.4);">{{b.title}}</h3>
+            <div style="font-size: 12px; color: rgba(255,255,255,0.82); margin-bottom: 8px;">{{b.author}}</div>
+            <div style="height: 4px; background: rgba(255,255,255,0.25); border-radius: 3px; overflow: hidden;">
+              <div style="height: 100%; width: {{b.pct}}%; background: #fff;"></div>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{b.hasCover}}" hint-placeholder-val="{{false}}">
+          <div style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px;">
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="{{t.accent}}" stroke-width="1.5" style="margin-bottom: 10px;">
+              <path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H6.5A2.5 2.5 0 0 1 4 17.5v-13Z"/>
+              <path d="M4 17.5A2.5 2.5 0 0 1 6.5 15H20"/>
+            </svg>
+            <h3 style="margin: 0 0 3px; font-size: 14px; line-height: 1.3; color: {{t.text}};">{{b.title}}</h3>
+            <div style="font-size: 12px; color: {{t.textDim}};">{{b.author}}</div>
+            <div style="width: 70%; height: 4px; background: {{t.surface}}; border-radius: 3px; overflow: hidden; margin-top: 12px;">
+              <div style="height: 100%; width: {{b.pct}}%; background: {{t.accent}};"></div>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+    </sc-for>
+  </div>
+</div>
+
+<script data-dc-script data-props='{
+  "darkMode": {"editor": "boolean", "default": false, "section": "Theme"},
+  "accent": {"editor": "color", "default": "#a85c32", "section": "Theme"}
+}'>
+function buildTokens(dark, accentOverride) {
+  return dark ? {
+    bg: "#1a1815", surface: "#242220", text: "#ece8e3", textDim: "#a39c93",
+    border: "#38342f", accent: accentOverride || "#e08a52", accentSoft: "#3a2c22",
+    track: "#3a352f", shadow: "0 1px 2px rgba(0,0,0,.3), 0 1px 8px rgba(0,0,0,.25)"
+  } : {
+    bg: "#f5f4f2", surface: "#ffffff", text: "#201e1c", textDim: "#6b6560",
+    border: "#e4e0da", accent: accentOverride || "#a85c32", accentSoft: "#f1e2d8",
+    track: "#e9e5df", shadow: "0 1px 2px rgba(30,25,20,.06), 0 1px 6px rgba(30,25,20,.05)"
+  };
+}
+
+var GREEN = "#4a8f5c";
+
+function statusOf(status, t) {
+  if (status === 2) return { label: "Finished", color: GREEN };
+  if (status === 1) return { label: "Reading", color: t.accent };
+  return { label: "Unread", color: t.textDim };
+}
+
+function sampleBooks(t) {
+  var raw = [
+    { title: "A Soul of Ash and Blood", author: "Jennifer L. Armentrout", series: "Blood and Ash #5", pct: 0, status: 0, hl: 0, coverFile: "cover1_soul_of_ash_small.jpg" },
+    { title: "Stoner", author: "John Williams", series: null, pct: 100, status: 2, hl: 3, coverFile: "cover2_stoner_small.jpg" },
+    { title: "Neuromancer", author: "William Gibson", series: null, pct: 62, status: 1, hl: 12, coverFile: "cover3_neuromancer_small.jpg" },
+    { title: "Encyclopedia of Beasts and Monsters in Myth, Legend and Folklore", author: "Theresa Bane", series: null, pct: 7, status: 1, hl: 23, coverFile: null }
+  ];
+  return raw.map(function (b) {
+    var s = statusOf(b.status, t);
+    var hasCover = !!b.coverFile;
+    return {
+      title: b.title, author: b.author,
+      pct: b.pct, statusLabel: s.label, statusColor: s.color,
+      hl: b.hl, hasHighlights: b.hl > 0,
+      hasCover: hasCover, coverFile: b.coverFile,
+      cardBg: hasCover ? t.track : "linear-gradient(160deg, " + t.accentSoft + ", " + t.track + ")"
+    };
+  });
+}
+
+class Component extends DCLogic {
+  renderVals() {
+    var dark = this.props.darkMode ?? false;
+    var t = buildTokens(dark, this.props.accent);
+    return { t: t, books: sampleBooks(t) };
+  }
+}
+</script>
+</x-dc>
+</body>
+</html>

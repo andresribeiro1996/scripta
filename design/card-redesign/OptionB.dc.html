@@ -1,0 +1,115 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    a { color: #a85c32; } a:hover { color: #8a4a28; }
+    .row:hover { background: var(--hover-bg); }
+  </style>
+</helmet>
+
+<div style="padding: 28px; background: {{t.bg}}; min-height: 100%;">
+  <div style="margin-bottom: 20px;">
+    <div style="font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: {{t.accent}};">Direction B</div>
+    <div style="font-size: 18px; font-weight: 700; color: {{t.text}}; margin-top: 2px;">Text-forward compact</div>
+    <div style="font-size: 12.5px; color: {{t.textDim}}; margin-top: 2px;">Dense scannable rows — status by color stripe, progress as a ring, more titles per screen.</div>
+  </div>
+
+  <div style="background: {{t.surface}}; border: 1px solid {{t.border}}; border-radius: 12px; box-shadow: {{t.shadow}}; overflow: hidden;">
+    <sc-for list="{{books}}" as="b" hint-placeholder-count="4">
+      <div style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid {{t.border}}; cursor: pointer; --hover-bg: {{t.surfaceHover}};" class="row">
+        <div style="width: 4px; align-self: stretch; border-radius: 3px; background: {{b.statusColor}}; flex: none;"></div>
+
+        <sc-if value="{{b.hasCover}}" hint-placeholder-val="{{true}}">
+          <img src="{{b.coverFile}}" style="width: 36px; height: 36px; border-radius: 8px; object-fit: cover; flex: none;">
+        </sc-if>
+        <sc-if value="{{b.hasCover}}" hint-placeholder-val="{{false}}">
+          <div style="width: 36px; height: 36px; border-radius: 8px; background: {{b.monoBg}}; color: {{b.monoFg}}; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; flex: none;">{{b.initial}}</div>
+        </sc-if>
+
+        <div style="flex: 1; min-width: 0;">
+          <div style="font-size: 14px; font-weight: 600; color: {{t.text}}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{b.title}}</div>
+          <div style="font-size: 12px; color: {{t.textDim}}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px;">{{b.metaLine}} · {{b.statusLabel}}</div>
+        </div>
+
+        <sc-if value="{{b.hasHighlights}}" hint-placeholder-val="{{true}}">
+          <div style="font-size: 11.5px; color: {{t.textDim}}; flex: none; text-align: right;">{{b.hl}}<br>highlights</div>
+        </sc-if>
+
+        <div style="width: 34px; height: 34px; border-radius: 50%; flex: none; position: relative; background: conic-gradient({{b.statusColor}} {{b.pctDeg}}deg, {{t.track}} 0deg);">
+          <div style="position: absolute; inset: 4px; border-radius: 50%; background: {{t.surface}}; display: flex; align-items: center; justify-content: center; font-size: 9.5px; font-weight: 700; color: {{t.text}};">{{b.pct}}</div>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+</div>
+
+<script data-dc-script data-props='{
+  "darkMode": {"editor": "boolean", "default": false, "section": "Theme"},
+  "accent": {"editor": "color", "default": "#a85c32", "section": "Theme"}
+}'>
+function buildTokens(dark, accentOverride) {
+  return dark ? {
+    bg: "#1a1815", surface: "#242220", surfaceHover: "#2b2926", text: "#ece8e3", textDim: "#a39c93",
+    border: "#38342f", accent: accentOverride || "#e08a52", accentSoft: "#3a2c22",
+    track: "#3a352f", shadow: "0 1px 2px rgba(0,0,0,.3), 0 1px 8px rgba(0,0,0,.25)"
+  } : {
+    bg: "#f5f4f2", surface: "#ffffff", surfaceHover: "#fbfaf8", text: "#201e1c", textDim: "#6b6560",
+    border: "#e4e0da", accent: accentOverride || "#a85c32", accentSoft: "#f1e2d8",
+    track: "#e9e5df", shadow: "0 1px 2px rgba(30,25,20,.06), 0 1px 6px rgba(30,25,20,.05)"
+  };
+}
+
+var GREEN = "#4a8f5c";
+var MONO_PALETTE = [
+  { bg: "#f1e2d8", fg: "#a85c32" },
+  { bg: "#dce8e0", fg: "#3f7a5c" },
+  { bg: "#e3dcf1", fg: "#6a4fa8" },
+  { bg: "#f1dcdc", fg: "#a84040" }
+];
+
+function statusOf(status, t) {
+  if (status === 2) return { label: "Finished", color: GREEN };
+  if (status === 1) return { label: "Reading", color: t.accent };
+  return { label: "Unread", color: t.textDim };
+}
+
+function sampleBooks(t) {
+  var raw = [
+    { title: "A Soul of Ash and Blood", author: "Jennifer L. Armentrout", series: "Blood and Ash #5", pct: 0, status: 0, hl: 0, coverFile: "cover1_soul_of_ash_small.jpg" },
+    { title: "Stoner", author: "John Williams", series: null, pct: 100, status: 2, hl: 3, coverFile: "cover2_stoner_small.jpg" },
+    { title: "Neuromancer", author: "William Gibson", series: null, pct: 62, status: 1, hl: 12, coverFile: "cover3_neuromancer_small.jpg" },
+    { title: "Encyclopedia of Beasts and Monsters in Myth, Legend and Folklore", author: "Theresa Bane", series: null, pct: 7, status: 1, hl: 23, coverFile: null }
+  ];
+  return raw.map(function (b, i) {
+    var s = statusOf(b.status, t);
+    var mono = MONO_PALETTE[i % MONO_PALETTE.length];
+    return {
+      title: b.title, metaLine: b.author + (b.series ? " · " + b.series : ""),
+      pct: b.pct, pctDeg: b.pct * 3.6,
+      statusLabel: s.label, statusColor: s.color,
+      hl: b.hl, hasHighlights: b.hl > 0,
+      hasCover: !!b.coverFile, coverFile: b.coverFile,
+      initial: b.author.charAt(0), monoBg: mono.bg, monoFg: mono.fg
+    };
+  });
+}
+
+class Component extends DCLogic {
+  renderVals() {
+    var dark = this.props.darkMode ?? false;
+    var t = buildTokens(dark, this.props.accent);
+    return { t: t, books: sampleBooks(t) };
+  }
+}
+</script>
+</x-dc>
+</body>
+</html>

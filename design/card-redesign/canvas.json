@@ -1,0 +1,9 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 680, "h": 1450, "title": "A — Cover-forward" },
+    { "file": "OptionB.dc.html", "x": 770, "y": 0, "w": 680, "h": 460, "title": "B — Text-forward compact" },
+    { "file": "OptionC.dc.html", "x": 1540, "y": 0, "w": 680, "h": 650, "title": "C — Refined horizontal" },
+    { "file": "OptionD.dc.html", "x": 2310, "y": 0, "w": 680, "h": 1150, "title": "D — Poster overlay" }
+  ],
+  "launch": { "view": "canvas" }
+}

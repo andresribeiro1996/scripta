@@ -1,0 +1,122 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    a { color: #a85c32; } a:hover { color: #8a4a28; }
+    .rh-card:hover { transform: translateY(-2px); box-shadow: 0 5px 18px rgba(20,15,10,0.13); border-color: var(--hover-accent); }
+  </style>
+</helmet>
+
+<div style="padding: 28px; background: {{t.bg}}; min-height: 100%;">
+  <div style="margin-bottom: 20px;">
+    <div style="font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: {{t.accent}};">Direction C</div>
+    <div style="font-size: 18px; font-weight: 700; color: {{t.text}}; margin-top: 2px;">Refined horizontal</div>
+    <div style="font-size: 12.5px; color: {{t.textDim}}; margin-top: 2px;">Same layout you have today, polished: bigger cover, status pill, percentage label, hover lift.</div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px;">
+    <sc-for list="{{books}}" as="b" hint-placeholder-count="4">
+      <div style="display: flex; gap: 14px; background: {{t.surface}}; border: 1px solid {{t.border}}; border-radius: 14px; padding: 14px; box-shadow: {{t.shadow}}; transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s; cursor: pointer; --hover-accent: {{t.accent}};" class="rh-card">
+        <sc-if value="{{b.hasCover}}" hint-placeholder-val="{{true}}">
+          <img src="{{b.coverFile}}" style="width: 72px; aspect-ratio: 2/3; object-fit: cover; border-radius: 8px; flex: none;">
+        </sc-if>
+        <sc-if value="{{b.hasCover}}" hint-placeholder-val="{{false}}">
+          <div style="width: 72px; aspect-ratio: 2/3; border-radius: 8px; background: {{t.track}}; display: flex; align-items: center; justify-content: center; flex: none;">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="{{t.textDim}}" stroke-width="1.5">
+              <path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H6.5A2.5 2.5 0 0 1 4 17.5v-13Z"/>
+              <path d="M4 17.5A2.5 2.5 0 0 1 6.5 15H20"/>
+            </svg>
+          </div>
+        </sc-if>
+
+        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column;">
+          <h3 style="margin: 0 0 3px; font-size: 15px; line-height: 1.3; color: {{t.text}}; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">{{b.title}}</h3>
+          <div style="font-size: 13px; color: {{t.textDim}}; margin-bottom: 2px;">{{b.author}}</div>
+          <sc-if value="{{b.hasSeries}}" hint-placeholder-val="{{true}}">
+            <div style="font-size: 12px; color: {{t.textDim}}; margin-bottom: 6px;">{{b.series}}</div>
+          </sc-if>
+          <div style="flex: 1;"></div>
+
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+            <div style="flex: 1; height: 6px; background: {{t.track}}; border-radius: 4px; overflow: hidden;">
+              <div style="height: 100%; width: {{b.pct}}%; background: {{t.accent}}; border-radius: 4px;"></div>
+            </div>
+            <span style="font-size: 11px; font-weight: 600; color: {{t.textDim}}; flex: none;">{{b.pct}}%</span>
+          </div>
+
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <span style="font-size: 11.5px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: {{b.statusBg}}; color: {{b.statusColor}};">{{b.statusLabel}}</span>
+            <sc-if value="{{b.hasHighlights}}" hint-placeholder-val="{{true}}">
+              <span style="display: flex; align-items: center; gap: 4px; font-size: 11.5px; color: {{t.textDim}};">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="{{t.accent}}" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                {{b.hl}}
+              </span>
+            </sc-if>
+          </div>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+</div>
+
+<script data-dc-script data-props='{
+  "darkMode": {"editor": "boolean", "default": false, "section": "Theme"},
+  "accent": {"editor": "color", "default": "#a85c32", "section": "Theme"}
+}'>
+function buildTokens(dark, accentOverride) {
+  return dark ? {
+    bg: "#1a1815", surface: "#242220", text: "#ece8e3", textDim: "#a39c93",
+    border: "#38342f", accent: accentOverride || "#e08a52", accentSoft: "#3a2c22",
+    track: "#3a352f", shadow: "0 1px 2px rgba(0,0,0,.3), 0 1px 8px rgba(0,0,0,.25)",
+    green: "#4a8f5c", greenSoft: "#20301f"
+  } : {
+    bg: "#f5f4f2", surface: "#ffffff", text: "#201e1c", textDim: "#6b6560",
+    border: "#e4e0da", accent: accentOverride || "#a85c32", accentSoft: "#f1e2d8",
+    track: "#e9e5df", shadow: "0 1px 2px rgba(30,25,20,.06), 0 1px 6px rgba(30,25,20,.05)",
+    green: "#4a8f5c", greenSoft: "#e2ede2"
+  };
+}
+
+function statusOf(status, t) {
+  if (status === 2) return { label: "Finished", color: t.green, bg: t.greenSoft };
+  if (status === 1) return { label: "Reading", color: t.accent, bg: t.accentSoft };
+  return { label: "Unread", color: t.textDim, bg: t.track };
+}
+
+function sampleBooks(t) {
+  var raw = [
+    { title: "A Soul of Ash and Blood", author: "Jennifer L. Armentrout", series: "Blood and Ash #5", pct: 0, status: 0, hl: 0, coverFile: "cover1_soul_of_ash_small.jpg" },
+    { title: "Stoner", author: "John Williams", series: null, pct: 100, status: 2, hl: 3, coverFile: "cover2_stoner_small.jpg" },
+    { title: "Neuromancer", author: "William Gibson", series: null, pct: 62, status: 1, hl: 12, coverFile: "cover3_neuromancer_small.jpg" },
+    { title: "Encyclopedia of Beasts and Monsters in Myth, Legend and Folklore", author: "Theresa Bane", series: null, pct: 7, status: 1, hl: 23, coverFile: null }
+  ];
+  return raw.map(function (b) {
+    var s = statusOf(b.status, t);
+    return {
+      title: b.title, author: b.author, series: b.series, hasSeries: !!b.series,
+      pct: b.pct, statusLabel: s.label, statusColor: s.color, statusBg: s.bg,
+      hl: b.hl, hasHighlights: b.hl > 0,
+      hasCover: !!b.coverFile, coverFile: b.coverFile
+    };
+  });
+}
+
+class Component extends DCLogic {
+  renderVals() {
+    var dark = this.props.darkMode ?? false;
+    var t = buildTokens(dark, this.props.accent);
+    return { t: t, books: sampleBooks(t) };
+  }
+}
+</script>
+</x-dc>
+</body>
+</html>

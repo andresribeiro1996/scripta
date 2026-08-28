@@ -1,0 +1,23 @@
+# backend/.gitignore and frontend/.gitignore already handle node_modules/,
+# dist/, .env, and backend's runtime data/ (SQLite files + uploaded/cached
+# blobs) within those two directories. This file only covers what's
+# outside them.
+
+# Python (exporter/)
+__pycache__/
+*.pyc
+
+# OS cruft
+.DS_Store
+Thumbs.db
+
+# Claude Code launch config — hardcoded to this machine's own absolute
+# paths (see .claude/launch.json), meaningless on anyone else's checkout.
+.claude/
+
+# The exporter's own output against a real device — an actual person's
+# reading history and highlights/annotations, not source code or a
+# fixture. Deliberately not committed by default; drop it back in
+# (git add -f exporter/library.json) if you want a sample library.json
+# checked in.
+exporter/library.json

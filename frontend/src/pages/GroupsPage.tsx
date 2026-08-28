@@ -1,0 +1,443 @@
+import { useMemo, useState } from "react";
+import type { GalleryImage } from "../api/gallery";
+import { BookCard } from "../components/BookCard";
+import { BookGrid } from "../components/BookGrid";
+import { useConfirm } from "../components/ConfirmDialog";
+import { CoverPickerModal } from "../components/CoverPickerModal";
+import { OptionsMenu } from "../components/OptionsMenu";
+import { PageContainer } from "../components/PageContainer";
+import { PerCardStylePanel } from "../components/PerCardStylePanel";
+import { useLibrary } from "../hooks/useLibrary";
+import { clearBookCover, setBookCover } from "../lib/bookCovers";
+import {
+  addBookToGroup,
+  createGroup,
+  deleteGroup,
+  orderedGroupBooks,
+  removeBooksFromAllGroups,
+  removeBookFromGroup,
+  renameGroup,
+  setGroupStyle,
+  type Group,
+  type GroupType
+} from "../lib/groups";
+import { seriesGroupByBookKey } from "../lib/libraryOrder";
+import { effectiveCardStyle, resolveLibraryStyle, type PerCardStyle } from "../lib/libraryStyle";
+import { bookKey } from "../lib/merge";
+import { scrubBooksFromMurals } from "../lib/murals";
+
+const COPY: Record<GroupType, { title: string; noun: string; empty: string; createPlaceholder: string }> = {
+  series: {
+    title: "Series",
+    noun: "series",
+    empty:
+      "No series yet. Series are picked up automatically from your books' Series field on import — or add one by hand below.",
+    createPlaceholder: "New series name…"
+  },
+  collection: {
+    title: "Collections",
+    noun: "collection",
+    empty: "No collections yet. Create one to start organizing your books your own way.",
+    createPlaceholder: "New collection name…"
+  }
+};
+
+/** Backs both /dashboard/series and /dashboard/collections — the two are
+ *  the same underlying resource (see lib/groups.ts), differing only in
+ *  copy and in that series also get auto-seeded from book metadata. */
+export function GroupsPage({ type }: { type: GroupType }) {
+  const { data: library, isLoading, updateLibrary } = useLibrary();
+  const copy = COPY[type];
+  const confirm = useConfirm();
+
+  const [newName, setNewName] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState("");
+  const [pickerGroupId, setPickerGroupId] = useState<string | null>(null);
+  const [styleGroupId, setStyleGroupId] = useState<string | null>(null);
+  const [styleBookKey, setStyleBookKey] = useState<string | null>(null);
+  const [coverBookKey, setCoverBookKey] = useState<string | null>(null);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+
+  const books = library?.data.books ?? [];
+  const groups = useMemo(
+    () => (library?.data.groups ?? []).filter((g) => g.type === type).sort((a, b) => a.name.localeCompare(b.name)),
+    [library, type]
+  );
+  // Which series (if any) each book actually belongs to, regardless of
+  // which page this is (Series or Collections) — `groups` above is
+  // filtered to just this page's type, so on Collections it never
+  // contains the series a book might be in. A book's true effective
+  // style (library < series < book) doesn't change depending on which
+  // page happens to be showing it, so this always resolves against the
+  // FULL group list, same as LibraryPage.tsx's identical lookup.
+  const bookSeriesGroup = useMemo(() => seriesGroupByBookKey(library?.data.books ?? [], library?.data.groups ?? []), [library]);
+
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault();
+    const name = newName.trim();
+    if (!name) return;
+    setCreating(true);
+    try {
+      await updateLibrary((data) => ({ ...data, groups: createGroup(data.groups ?? [], type, name) }));
+      setNewName("");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function handleRename(id: string) {
+    const name = editingName.trim();
+    setEditingId(null);
+    if (!name) return;
+    await updateLibrary((data) => ({ ...data, groups: renameGroup(data.groups ?? [], id, name) }));
+  }
+
+  async function handleDelete(group: Group) {
+    if (!(await confirm({ title: `Delete "${group.name}"?`, body: "The books in it stay in your library either way." }))) return;
+    await updateLibrary((data) => ({ ...data, groups: deleteGroup(data.groups ?? [], group.id) }));
+  }
+
+  async function handleToggleBook(groupId: string, book: Record<string, unknown>, inGroup: boolean) {
+    await updateLibrary((data) => ({
+      ...data,
+      groups: inGroup ? removeBookFromGroup(data.groups ?? [], groupId, book) : addBookToGroup(data.groups ?? [], groupId, book)
+    }));
+  }
+
+  async function handleSaveGroupStyle(groupId: string, groupStyle: PerCardStyle | undefined) {
+    await updateLibrary((data) => ({ ...data, groups: setGroupStyle(data.groups ?? [], groupId, groupStyle) }));
+  }
+
+  // A book's own style override — highest priority, takes effect
+  // everywhere that book renders (this page, Library, the other
+  // GroupsPage instance). See BookCard.tsx's "Style" button and
+  // lib/libraryStyle.ts's effectiveCardStyle for the full priority chain.
+  async function handleSaveBookStyle(book: Record<string, unknown>, bookStyle: PerCardStyle | undefined) {
+    const key = bookKey(book);
+    await updateLibrary((data) => ({
+      ...data,
+      books: data.books.map((b) => (bookKey(b) === key ? { ...b, _style: bookStyle } : b))
+    }));
+  }
+
+  // Assigning/clearing a gallery image as a book's cover — see
+  // lib/bookCovers.ts. CoverPickerModal.tsx itself owns the gallery-side
+  // upload/delete calls; these two only ever touch this one book's fields.
+  async function handleSaveBookCover(book: Record<string, unknown>, image: GalleryImage) {
+    const key = bookKey(book);
+    await updateLibrary((data) => ({
+      ...data,
+      books: data.books.map((b) => (bookKey(b) === key ? setBookCover(b, image.id, image.url) : b))
+    }));
+  }
+
+  async function handleRemoveBookCover(book: Record<string, unknown>) {
+    const key = bookKey(book);
+    await updateLibrary((data) => ({
+      ...data,
+      books: data.books.map((b) => (bookKey(b) === key ? clearBookCover(b) : b))
+    }));
+  }
+
+  // Select mode: turn it on, tap books across any of this page's group
+  // sections to build up a selection, then delete them all in one go —
+  // same pattern as LibraryPage.tsx. A book deleted from here is removed
+  // from the library entirely, not just from the group it was clicked in.
+  function handleToggleSelect(book: Record<string, unknown>) {
+    const key = bookKey(book);
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  function handleToggleSelectionMode() {
+    setSelectionMode((prev) => !prev);
+    setSelectedKeys(new Set());
+  }
+
+  // Scrubs every selected book's key out of every group's bookKeys too
+  // (lib/groups.ts's removeBooksFromAllGroups) in the same save, so a
+  // deleted book doesn't linger as a dangling reference in any series or
+  // collection it was in.
+  async function handleDeleteSelected() {
+    if (selectedKeys.size === 0) return;
+    if (
+      !(await confirm({
+        title: `Delete ${selectedKeys.size} book${selectedKeys.size === 1 ? "" : "s"} from your library?`,
+        body: "This can't be undone."
+      }))
+    ) {
+      return;
+    }
+    await updateLibrary((data) => ({
+      ...data,
+      books: data.books.filter((b) => !selectedKeys.has(bookKey(b))),
+      groups: removeBooksFromAllGroups(data.groups ?? [], selectedKeys),
+      murals: scrubBooksFromMurals(data.murals ?? [], selectedKeys)
+    }));
+    setSelectedKeys(new Set());
+    setSelectionMode(false);
+  }
+
+  const pickerGroup = groups.find((g) => g.id === pickerGroupId) ?? null;
+  const styleGroup = groups.find((g) => g.id === styleGroupId) ?? null;
+  const style = resolveLibraryStyle(library?.data.style);
+  const styleBook = styleBookKey ? books.find((b) => bookKey(b) === styleBookKey) : null;
+  const coverBook = coverBookKey ? books.find((b) => bookKey(b) === coverBookKey) : null;
+
+  return (
+    <PageContainer style={style}>
+      <header className="mb-6 flex items-center justify-between gap-4">
+        <h2 className="text-lg font-bold">{copy.title}</h2>
+        {books.length > 0 &&
+          (selectionMode ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-(--color-text-dim)">{selectedKeys.size} selected</span>
+              <button
+                onClick={() => void handleDeleteSelected()}
+                disabled={selectedKeys.size === 0}
+                className="rounded-lg bg-(--color-danger) px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+              >
+                Delete selected
+              </button>
+              <button
+                onClick={handleToggleSelectionMode}
+                className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm hover:bg-(--color-surface-hover)"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={handleToggleSelectionMode}
+              className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm hover:bg-(--color-surface-hover)"
+            >
+              Select…
+            </button>
+          ))}
+      </header>
+
+      <form onSubmit={handleCreate} className="mb-6 flex gap-2">
+        <input
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          placeholder={copy.createPlaceholder}
+          className="w-64 max-w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
+        />
+        <button
+          type="submit"
+          disabled={creating || !newName.trim()}
+          className="rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
+        >
+          Add {copy.noun}
+        </button>
+      </form>
+
+      {isLoading && <p className="text-sm text-(--color-text-dim)">Loading…</p>}
+
+      {!isLoading && groups.length === 0 && <p className="text-sm text-(--color-text-dim)">{copy.empty}</p>}
+
+      <div className="flex flex-col gap-6">
+        {groups.map((group) => {
+          const members = orderedGroupBooks(group, books);
+          return (
+            <section key={group.id} className="rounded-xl border border-(--color-border) bg-(--color-surface) p-4">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                {editingId === group.id ? (
+                  <input
+                    autoFocus
+                    value={editingName}
+                    onChange={(e) => setEditingName(e.target.value)}
+                    onBlur={() => handleRename(group.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleRename(group.id);
+                      if (e.key === "Escape") setEditingId(null);
+                    }}
+                    className="rounded-lg border border-(--color-border) bg-(--color-surface) px-2 py-1 text-sm font-semibold"
+                  />
+                ) : (
+                  <button
+                    onClick={() => {
+                      setEditingId(group.id);
+                      setEditingName(group.name);
+                    }}
+                    className="text-left text-sm font-semibold transition-colors hover:text-(--color-accent)"
+                    title="Rename"
+                  >
+                    {group.name}
+                    {group.style && (
+                      <span className="ml-1.5 rounded-full bg-(--color-accent-soft) px-1.5 py-0.5 align-middle text-[10px] font-semibold text-(--color-accent)">
+                        custom style
+                      </span>
+                    )}
+                  </button>
+                )}
+                <div className="flex shrink-0 items-center gap-3 text-xs text-(--color-text-dim)">
+                  <span>
+                    {members.length} book{members.length === 1 ? "" : "s"}
+                  </span>
+                  <OptionsMenu
+                    title={`${copy.noun[0].toUpperCase()}${copy.noun.slice(1)} settings`}
+                    triggerClassName="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"
+                    items={[
+                      // Collections don't get their own style override —
+                      // same reason there's no "Style" button on a
+                      // collection's card at all before this change.
+                      ...(type === "series" ? [{ label: "Style", onClick: () => setStyleGroupId(group.id) }] : []),
+                      { label: "Manage books", onClick: () => setPickerGroupId(group.id) },
+                      { label: "Delete", onClick: () => handleDelete(group), danger: true }
+                    ]}
+                  />
+                </div>
+              </div>
+
+              {members.length === 0 ? (
+                <p className="text-sm text-(--color-text-dim)">No books here yet — use "Manage books" to add some.</p>
+              ) : (
+                // Layout (BookGrid's own style prop) is always the plain
+                // library style — series/book overrides never touch
+                // layout fields (see PerCardStyle's type), so there's
+                // nothing to resolve here regardless of which group this is.
+                <BookGrid style={style}>
+                  {members.map((book, i) => (
+                    <BookCard
+                      key={String(book.ContentID ?? i)}
+                      book={book}
+                      onClick={() => {}}
+                      style={effectiveCardStyle(style, bookSeriesGroup.get(bookKey(book))?.style, book._style as PerCardStyle | undefined)}
+                      onOpenStyle={selectionMode ? undefined : () => setStyleBookKey(bookKey(book))}
+                      onOpenCoverPicker={selectionMode ? undefined : () => setCoverBookKey(bookKey(book))}
+                      selectable={selectionMode}
+                      selected={selectedKeys.has(bookKey(book))}
+                      onToggleSelect={handleToggleSelect}
+                    />
+                  ))}
+                </BookGrid>
+              )}
+            </section>
+          );
+        })}
+      </div>
+
+      {pickerGroup && (
+        <BookPickerModal
+          group={pickerGroup}
+          allBooks={books}
+          onToggle={(book, inGroup) => handleToggleBook(pickerGroup.id, book, inGroup)}
+          onClose={() => setPickerGroupId(null)}
+        />
+      )}
+
+      {styleGroup && (
+        <PerCardStylePanel
+          idPrefix="series"
+          name={styleGroup.name}
+          priorityText="the library-wide"
+          currentOverride={styleGroup.style}
+          seedStyle={style}
+          onSave={(groupStyle) => handleSaveGroupStyle(styleGroup.id, groupStyle)}
+          onClose={() => setStyleGroupId(null)}
+        />
+      )}
+
+      {styleBook && (
+        <PerCardStylePanel
+          idPrefix="book"
+          name={String(styleBook.Title ?? "Untitled")}
+          priorityText="the series and library-wide"
+          currentOverride={styleBook._style as PerCardStyle | undefined}
+          // Seed from what this book currently looks like one level up the
+          // chain — its series' style if it's in a customized one
+          // (regardless of whether this happens to be the Series or
+          // Collections page — bookSeriesGroup resolves the same either
+          // way), not from a blank slate.
+          seedStyle={effectiveCardStyle(style, bookSeriesGroup.get(styleBookKey ?? "")?.style)}
+          onSave={(bookStyle) => handleSaveBookStyle(styleBook, bookStyle)}
+          onClose={() => setStyleBookKey(null)}
+        />
+      )}
+
+      {coverBook && (
+        <CoverPickerModal
+          title={String(coverBook.Title ?? "Untitled")}
+          currentImageId={typeof coverBook._coverImageId === "string" ? coverBook._coverImageId : null}
+          removeCoverLabel="Remove custom cover — go back to the normal auto-detected one"
+          onSelect={(image) => void handleSaveBookCover(coverBook, image)}
+          onRemoveCover={() => void handleRemoveBookCover(coverBook)}
+          onClose={() => setCoverBookKey(null)}
+        />
+      )}
+    </PageContainer>
+  );
+}
+
+function BookPickerModal({
+  group,
+  allBooks,
+  onToggle,
+  onClose
+}: {
+  group: Group;
+  allBooks: Array<Record<string, unknown>>;
+  onToggle: (book: Record<string, unknown>, inGroup: boolean) => void;
+  onClose: () => void;
+}) {
+  const [search, setSearch] = useState("");
+  const memberKeys = useMemo(() => new Set(group.bookKeys), [group]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return allBooks;
+    return allBooks.filter((b) => String(b.Title ?? "").toLowerCase().includes(q) || String(b.Attribution ?? "").toLowerCase().includes(q));
+  }, [allBooks, search]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div
+        className="flex max-h-[80vh] w-full max-w-md flex-col rounded-xl border border-(--color-border) bg-(--color-surface) shadow-lg"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-(--color-border) p-4">
+          <h3 className="text-sm font-semibold">Books in "{group.name}"</h3>
+          <button onClick={onClose} className="text-sm text-(--color-text-dim) hover:text-(--color-text)">
+            Close
+          </button>
+        </div>
+        <div className="border-b border-(--color-border) p-3">
+          <input
+            autoFocus
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search your library…"
+            className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-1.5 text-sm"
+          />
+        </div>
+        <div className="flex-1 overflow-y-auto p-2">
+          {filtered.length === 0 && <p className="p-3 text-sm text-(--color-text-dim)">No books match.</p>}
+          {filtered.map((book, i) => {
+            const key = bookKey(book);
+            const inGroup = memberKeys.has(key);
+            return (
+              <label
+                key={String(book.ContentID ?? i)}
+                className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 text-sm hover:bg-(--color-surface-hover)"
+              >
+                <input type="checkbox" checked={inGroup} onChange={() => onToggle(book, inGroup)} />
+                <span className="min-w-0 flex-1 truncate">
+                  {String(book.Title ?? "Untitled")}
+                  <span className="text-(--color-text-dim)"> — {String(book.Attribution ?? "Unknown author")}</span>
+                </span>
+              </label>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}

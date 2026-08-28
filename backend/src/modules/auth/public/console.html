@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Auth Console</title>
+<style>
+  :root {
+    --bg: #f5f4f2;
+    --surface: #ffffff;
+    --surface-hover: #fbfaf8;
+    --text: #201e1c;
+    --text-dim: #6b6560;
+    --border: #e4e0da;
+    --accent: #a85c32;
+    --accent-soft: #f1e2d8;
+    --danger: #b3432f;
+    --danger-soft: #f6dfda;
+    --ok: #3f7a5c;
+    --ok-soft: #dce8e0;
+    --shadow: 0 1px 2px rgba(30, 25, 20, 0.06), 0 1px 6px rgba(30, 25, 20, 0.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1815;
+      --surface: #242220;
+      --surface-hover: #2b2926;
+      --text: #ece8e3;
+      --text-dim: #a39c93;
+      --border: #38342f;
+      --accent: #e08a52;
+      --accent-soft: #3a2c22;
+      --danger: #e08072;
+      --danger-soft: #3a2420;
+      --ok: #6cb890;
+      --ok-soft: #1f2e26;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 8px rgba(0, 0, 0, 0.25);
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.4;
+  }
+  .wrap { max-width: 480px; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+  h1 { font-size: 1.3rem; margin: 0 0 0.3rem; }
+  .subtitle { font-size: 0.85rem; color: var(--text-dim); margin-bottom: 1.75rem; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: var(--shadow);
+    margin-bottom: 1.25rem;
+  }
+
+  .tabs { display: flex; gap: 0.5rem; margin-bottom: 1.25rem; }
+  .tab {
+    flex: 1;
+    padding: 0.5rem;
+    text-align: center;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 0.9rem;
+  }
+  .tab.active { background: var(--accent-soft); color: var(--accent); border-color: var(--accent-soft); font-weight: 600; }
+
+  label { display: block; font-size: 0.82rem; color: var(--text-dim); margin: 0.9rem 0 0.3rem; }
+  input {
+    width: 100%;
+    padding: 0.55rem 0.7rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 0.92rem;
+  }
+
+  button {
+    cursor: pointer;
+    font-size: 0.9rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    padding: 0.55rem 1rem;
+  }
+  button:hover { background: var(--surface-hover); }
+  button.primary {
+    width: 100%;
+    margin-top: 1.25rem;
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    font-weight: 600;
+    padding: 0.65rem;
+  }
+  button.primary:hover { opacity: 0.92; }
+  button.danger { color: var(--danger); border-color: var(--danger-soft); }
+  button.danger:hover { background: var(--danger-soft); }
+
+  .row { display: flex; gap: 0.5rem; margin-top: 0.6rem; }
+  .row button { flex: 1; }
+
+  #google-btn {
+    display: none;
+    width: 100%;
+    margin-top: 0.75rem;
+    text-align: center;
+    text-decoration: none;
+    box-sizing: border-box;
+  }
+
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin: 1rem 0 0;
+    color: var(--text-dim);
+    font-size: 0.78rem;
+  }
+  .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+
+  .msg { font-size: 0.85rem; padding: 0.6rem 0.8rem; border-radius: 8px; margin-bottom: 1rem; display: none; word-break: break-word; }
+  .msg.error { display: block; background: var(--danger-soft); color: var(--danger); }
+  .msg.ok { display: block; background: var(--ok-soft); color: var(--ok); }
+
+  .session { display: none; }
+  .kv { font-size: 0.85rem; margin-bottom: 0.5rem; }
+  .kv .k { color: var(--text-dim); }
+  .token-box {
+    font-family: ui-monospace, monospace;
+    font-size: 0.72rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.5rem 0.6rem;
+    word-break: break-all;
+    color: var(--text-dim);
+    margin-bottom: 0.6rem;
+    max-height: 4.5em;
+    overflow: auto;
+  }
+
+  #login-card.hidden, .session.hidden { display: none; }
+  .session:not(.hidden) { display: block; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🔐 Auth Console</h1>
+  <div class="subtitle">Test console for the Kobo Library backend's auth module — not a real app screen.</div>
+
+  <div id="msg" class="msg"></div>
+
+  <div id="login-card" class="card">
+    <div class="tabs">
+      <div id="tab-login" class="tab active">Log in</div>
+      <div id="tab-signup" class="tab">Sign up</div>
+    </div>
+
+    <form id="auth-form">
+      <label id="identifier-label" for="identifier">Email or username</label>
+      <input id="identifier" type="text" required autocomplete="username">
+      <div id="signup-username-row" class="hidden">
+        <label for="username">Username</label>
+        <input id="username" type="text" autocomplete="username" minlength="3" maxlength="30" pattern="[a-zA-Z0-9_.]+">
+      </div>
+      <label for="password">Password</label>
+      <input id="password" type="password" required autocomplete="current-password" minlength="8">
+      <button id="submit-btn" class="primary" type="submit">Log in</button>
+    </form>
+
+    <div class="divider">or</div>
+    <a id="google-btn" href="/auth/google">Sign in with Google</a>
+  </div>
+
+  <div id="session" class="session hidden">
+    <div id="choose-username-card" class="card hidden">
+      <div class="kv">This account (Google sign-in) doesn't have a username yet.</div>
+      <label for="new-username">Choose a username</label>
+      <input id="new-username" type="text" minlength="3" maxlength="30" pattern="[a-zA-Z0-9_.]+">
+      <button id="claim-username-btn" class="primary" type="button">Claim username</button>
+    </div>
+    <div class="card">
+      <div class="kv"><span class="k">Signed in as</span><br><strong id="session-email"></strong></div>
+      <div class="kv"><span class="k">Username</span><br><span id="session-username"></span></div>
+      <div class="kv"><span class="k">User ID</span><br><span id="session-id"></span></div>
+
+      <label>Access token</label>
+      <div id="access-token-box" class="token-box"></div>
+      <label>Refresh token</label>
+      <div id="refresh-token-box" class="token-box"></div>
+
+      <div class="row">
+        <button id="me-btn">Call /auth/me</button>
+        <button id="refresh-btn">Refresh token</button>
+      </div>
+      <div class="row">
+        <button id="logout-btn" class="danger">Log out</button>
+        <button id="logout-everywhere-btn" class="danger">Log out everywhere</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var STORAGE_KEY = "kobo_auth_console_session";
+
+  var msgEl = document.getElementById("msg");
+  var loginCard = document.getElementById("login-card");
+  var sessionEl = document.getElementById("session");
+  var tabLogin = document.getElementById("tab-login");
+  var tabSignup = document.getElementById("tab-signup");
+  var form = document.getElementById("auth-form");
+  var submitBtn = document.getElementById("submit-btn");
+  var googleBtn = document.getElementById("google-btn");
+
+  var mode = "login"; // or "signup"
+  var session = null; // { user, accessToken, refreshToken }
+
+  function showMessage(text, isError) {
+    msgEl.textContent = text;
+    msgEl.className = "msg " + (isError ? "error" : "ok");
+  }
+  function clearMessage() {
+    msgEl.className = "msg";
+  }
+
+  var identifierInput = document.getElementById("identifier");
+  var identifierLabel = document.getElementById("identifier-label");
+  var signupUsernameRow = document.getElementById("signup-username-row");
+
+  function setMode(next) {
+    mode = next;
+    tabLogin.classList.toggle("active", mode === "login");
+    tabSignup.classList.toggle("active", mode === "signup");
+    submitBtn.textContent = mode === "login" ? "Log in" : "Sign up";
+    document.getElementById("password").autocomplete = mode === "login" ? "current-password" : "new-password";
+    if (mode === "login") {
+      identifierLabel.textContent = "Email or username";
+      identifierInput.type = "text";
+      signupUsernameRow.classList.add("hidden");
+      document.getElementById("username").required = false;
+    } else {
+      identifierLabel.textContent = "Email";
+      identifierInput.type = "email";
+      signupUsernameRow.classList.remove("hidden");
+      document.getElementById("username").required = true;
+    }
+  }
+  tabLogin.addEventListener("click", function () { setMode("login"); });
+  tabSignup.addEventListener("click", function () { setMode("signup"); });
+
+  function saveSession() {
+    if (session) localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+    else localStorage.removeItem(STORAGE_KEY);
+  }
+
+  function renderSession() {
+    if (!session) {
+      loginCard.classList.remove("hidden");
+      sessionEl.classList.add("hidden");
+      return;
+    }
+    loginCard.classList.add("hidden");
+    sessionEl.classList.remove("hidden");
+    document.getElementById("session-email").textContent = session.user.email;
+    document.getElementById("session-username").textContent = session.user.username || "(none yet)";
+    document.getElementById("session-id").textContent = session.user.id;
+    document.getElementById("access-token-box").textContent = session.accessToken;
+    document.getElementById("refresh-token-box").textContent = session.refreshToken;
+    document.getElementById("choose-username-card").classList.toggle("hidden", !!session.user.username);
+  }
+
+  async function api(path, options) {
+    var res = await fetch(path, options);
+    var body = null;
+    try { body = await res.json(); } catch (e) { /* no body, e.g. 204 */ }
+    if (!res.ok) {
+      throw new Error((body && body.error) || (res.status + " " + res.statusText));
+    }
+    return body;
+  }
+
+  form.addEventListener("submit", async function (e) {
+    e.preventDefault();
+    clearMessage();
+    var password = document.getElementById("password").value;
+    submitBtn.disabled = true;
+    try {
+      var path, payload;
+      if (mode === "login") {
+        path = "/auth/login";
+        payload = { identifier: identifierInput.value.trim(), password: password };
+      } else {
+        path = "/auth/signup";
+        payload = {
+          email: identifierInput.value.trim(),
+          username: document.getElementById("username").value.trim(),
+          password: password
+        };
+      }
+      var body = await api(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      session = body;
+      saveSession();
+      renderSession();
+      showMessage(mode === "login" ? "Logged in." : "Account created.", false);
+    } catch (err) {
+      showMessage(err.message, true);
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+
+  document.getElementById("claim-username-btn").addEventListener("click", async function () {
+    clearMessage();
+    try {
+      var newUsername = document.getElementById("new-username").value.trim();
+      var body = await api("/auth/username", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.accessToken },
+        body: JSON.stringify({ username: newUsername })
+      });
+      session = { user: body.user, accessToken: session.accessToken, refreshToken: session.refreshToken };
+      saveSession();
+      renderSession();
+      showMessage("Username claimed.", false);
+    } catch (err) {
+      showMessage(err.message, true);
+    }
+  });
+
+  document.getElementById("me-btn").addEventListener("click", async function () {
+    clearMessage();
+    try {
+      var body = await api("/auth/me", { headers: { Authorization: "Bearer " + session.accessToken } });
+      showMessage("GET /auth/me -> " + JSON.stringify(body), false);
+    } catch (err) {
+      showMessage(err.message, true);
+    }
+  });
+
+  document.getElementById("refresh-btn").addEventListener("click", async function () {
+    clearMessage();
+    try {
+      var body = await api("/auth/refresh", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken: session.refreshToken })
+      });
+      session = { user: session.user, accessToken: body.accessToken, refreshToken: body.refreshToken };
+      saveSession();
+      renderSession();
+      showMessage("Tokens rotated.", false);
+    } catch (err) {
+      showMessage(err.message, true);
+    }
+  });
+
+  document.getElementById("logout-btn").addEventListener("click", async function () {
+    clearMessage();
+    try {
+      await api("/auth/logout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken: session.refreshToken })
+      });
+      session = null;
+      saveSession();
+      renderSession();
+      showMessage("Logged out.", false);
+    } catch (err) {
+      showMessage(err.message, true);
+    }
+  });
+
+  document.getElementById("logout-everywhere-btn").addEventListener("click", async function () {
+    clearMessage();
+    try {
+      await api("/auth/logout-everywhere", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + session.accessToken }
+      });
+      session = null;
+      saveSession();
+      renderSession();
+      showMessage("Logged out everywhere.", false);
+    } catch (err) {
+      showMessage(err.message, true);
+    }
+  });
+
+  // Show the Google button only if the backend has it configured.
+  fetch("/auth/providers")
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (data && data.google) googleBtn.style.display = "block";
+    })
+    .catch(function () { /* backend too old / route missing — just hide it */ });
+
+  // After a Google OAuth redirect back here, tokens ride the URL fragment
+  // (see backend/src/modules/auth/plugin.ts). Pick them up once, then
+  // scrub the fragment so a reload/copy-paste of the URL doesn't leak them.
+  function consumeOAuthFragment() {
+    if (!location.hash || location.hash.indexOf("access_token=") === -1) return false;
+    var params = new URLSearchParams(location.hash.slice(1));
+    var accessToken = params.get("access_token");
+    var refreshToken = params.get("refresh_token");
+    if (!accessToken || !refreshToken) return false;
+    history.replaceState(null, "", location.pathname + location.search);
+    // The token carries the user id/email as JWT claims; decode the
+    // payload locally rather than making an extra /auth/me round trip
+    // just to render the console.
+    var claims = JSON.parse(atob(accessToken.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+    session = { user: { id: claims.sub, email: claims.email, username: claims.username || null }, accessToken: accessToken, refreshToken: refreshToken };
+    saveSession();
+    return true;
+  }
+
+  if (consumeOAuthFragment()) {
+    showMessage("Signed in with Google.", false);
+  } else {
+    var stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      try { session = JSON.parse(stored); } catch (e) { session = null; }
+    }
+  }
+  setMode("login");
+  renderSession();
+})();
+</script>
+</body>
+</html>

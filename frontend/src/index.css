@@ -1,0 +1,229 @@
+@import "tailwindcss";
+
+/* Self-hosted (not linked live from fonts.googleapis.com) — same
+   offline-friendly, self-hosted-app reasoning as everywhere else in this
+   codebase that touches fonts (see lib/libraryStyle.ts's
+   BlockFontFamily/CardFontFamily comments): downloaded once, served from
+   this app's own origin, no runtime dependency on Google's CDN, works
+   with no network at all once the app itself is loaded. Only the Latin
+   subset of each (unicode-range below matches what Google's own CSS API
+   serves as the "latin" block) — this app has no i18n, no reason to ship
+   Cyrillic/Greek/Vietnamese glyph data nobody will ever render. Regular
+   weight only, for the same file-count-vs-benefit reason PerCardStyle's/
+   BlockStyle's new `bold` toggle uses the browser's synthesized bold
+   (`font-synthesis`, on by default) instead of a second downloaded file
+   per family — three real, distinctive typefaces beats twelve files for
+   marginally crisper bold/italic on a personal app. */
+@font-face {
+  font-family: "Playfair Display";
+  src: url("/fonts/playfair-display-regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+2000-206F, U+2122;
+}
+@font-face {
+  font-family: "Inter";
+  src: url("/fonts/inter-regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+2000-206F, U+2122;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/fonts/jetbrains-mono-regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+2000-206F, U+2122;
+}
+
+@theme {
+  --color-bg: #f5f4f2;
+  --color-surface: #ffffff;
+  --color-surface-hover: #fbfaf8;
+  --color-text: #201e1c;
+  --color-text-dim: #6b6560;
+  --color-border: #e4e0da;
+  --color-accent: #a85c32;
+  --color-accent-soft: #f1e2d8;
+  --color-danger: #b3432f;
+  --color-danger-soft: #f6dfda;
+}
+
+@media (prefers-color-scheme: dark) {
+  @theme {
+    --color-bg: #1a1815;
+    --color-surface: #242220;
+    --color-surface-hover: #2b2926;
+    --color-text: #ece8e3;
+    --color-text-dim: #a39c93;
+    --color-border: #38342f;
+    --color-accent: #e08a52;
+    --color-accent-soft: #3a2c22;
+    --color-danger: #e08072;
+    --color-danger-soft: #3a2420;
+  }
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Themed scrollbars — every scrollable area in the app (the page itself,
+   a modal's overflow-y-auto list, a mural Shelf block's horizontal book
+   row) otherwise gets the OS/browser's own default scrollbar, which on
+   this app's dark theme renders as a stark white bar with no relation to
+   the surrounding palette. Two mechanisms, both needed: `scrollbar-color`/
+   `scrollbar-width` is the standard (Firefox, and newer Chromium too),
+   the `::-webkit-scrollbar-*` pseudo-elements are what Chrome/Safari/Edge
+   actually render today regardless. Both read the same `--color-*`
+   custom properties the rest of the theme uses, so light/dark mode (and
+   the light<->dark toggle) carry the scrollbar along automatically,
+   with no separate light/dark scrollbar rules to maintain. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background-color: var(--color-border);
+  border-radius: 999px;
+  /* A transparent border + padding-box clip is the standard trick for a
+     thumb that doesn't touch the track's edges, without needing a
+     separately-colored track to fake the same inset look. */
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-text-dim);
+}
+
+/* Themed focus ring and text-selection highlight — same "the browser's
+   own default doesn't know about this app's palette" problem the
+   scrollbar rule above fixes, just for two different UI signals.
+   :focus-visible (not plain :focus) so the ring only shows for
+   keyboard/programmatic focus — a mouse click landing on a button
+   shouldn't flash a ring, only Tab-ing to it should. A universal `*`
+   selector, same convention the scrollbar rule already uses, so every
+   focusable element in the app (inputs, selects, buttons, links, and
+   this app's own role="button" cards/tiles with a real tabIndex) gets it
+   for free — no per-component styling to keep in sync. */
+*:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--color-accent-soft);
+  color: var(--color-text);
+}
+
+/* Themed <select> dropdown list — the CLOSED select already picks up the
+   theme via each usage's own bg-(--color-surface)/text-(--color-text)
+   Tailwind classes, but the OPEN popup listing its options is a
+   separately-rendered, OS-native piece of UI that ignores those classes
+   entirely and falls back to a stark white list with black text
+   regardless of the app's theme. `background-color`/`color` on `option`
+   (and `select`, as a fallback for wherever a call site hasn't set its
+   own) are the one part of that native popup real CSS can actually
+   reach in every major browser — reused here rather than duplicated at
+   each of the app's two <select> usages (MuralsListPage.tsx's sort
+   control, StyleControls.tsx's several dropdowns). What CSS can't reach:
+   the highlight color for the currently-hovered/keyboard-selected row
+   inside the open list is drawn by the OS/browser itself and stays
+   whatever blue-ish default the platform uses — no cross-browser CSS
+   property overrides it, so this is a background+text theme, not a
+   pixel-perfect custom dropdown. */
+select,
+option {
+  background-color: var(--color-surface);
+  color: var(--color-text);
+}
+
+/* Themed checkboxes and range sliders — the last two native controls
+   still rendering in the browser's own stock blue regardless of theme
+   (every style panel's toggles and "px"/"%" sliders — Card layout, Card
+   border, a mural block's own style, all of it). `accent-color` alone is
+   enough for checkboxes: native checkbox rendering is already about as
+   minimal as it gets, it only needed the right color, not a rebuild.
+   Range sliders get a fuller treatment — the native thumb+track combo
+   (a thick track, a large beveled thumb) reads noticeably heavier than
+   the rest of this app's thin-bordered, flat aesthetic, so it's
+   `appearance: none` and hand-drawn from here: a slim 4px track and a
+   small flat 14px thumb with no border/shadow, not just the existing OS
+   shape recolored. Both `::-webkit-*` (Chrome/Safari/Edge) and
+   `::-moz-*` (Firefox) pseudo-elements are needed — there's no
+   standard, engine-agnostic way to restyle a native range thumb/track. */
+:root {
+  accent-color: var(--color-accent);
+}
+
+input[type="range"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--color-border);
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--color-border);
+}
+input[type="range"]::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--color-border);
+}
+input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  border: none;
+  box-shadow: none;
+  cursor: pointer;
+  /* Centers the 14px thumb over the 4px track: (trackHeight - thumbHeight) / 2. */
+  margin-top: -5px;
+}
+input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  border: none;
+  box-shadow: none;
+  cursor: pointer;
+}
+/* Overrides the plain full-box *:focus-visible rule above specifically
+   for range inputs — with a 4px-tall track, a rectangular outline
+   wrapped around the whole element reads as a stray thin bar rather
+   than a focus ring. The ring belongs on the thumb, where the user's
+   actual attention is. */
+input[type="range"]:focus-visible {
+  outline: none;
+}
+input[type="range"]:focus-visible::-webkit-slider-thumb {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+input[type="range"]:focus-visible::-moz-range-thumb {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
