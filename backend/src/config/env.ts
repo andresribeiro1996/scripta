@@ -42,6 +42,9 @@ const envSchema = z.object({
   // modules/socials' own SQLite file — same one-file-per-module isolation
   // as every other module's *_DB_PATH above.
   SOCIALS_DB_PATH: z.string().min(1).default("./data/socials.sqlite"),
+  // modules/arena's own SQLite file — same one-file-per-module isolation
+  // as every other module's *_DB_PATH above.
+  ARENA_DB_PATH: z.string().min(1).default("./data/arena.sqlite"),
   // This API's own externally-reachable base URL — needed to build
   // absolute image URLs (GET /gallery/:id/file) that resolve correctly
   // from the frontend's own origin, which a relative path wouldn't (see
