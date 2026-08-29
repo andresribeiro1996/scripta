@@ -24,13 +24,17 @@ export function BlockRenderer({
   books,
   images,
   editMode,
-  onUpdateBlock
+  onUpdateBlock,
+  statsOverride
 }: {
   block: MuralBlock;
   books: Array<Record<string, unknown>>;
   images: GalleryImage[];
   editMode?: boolean;
   onUpdateBlock?: (block: MuralBlock) => void;
+  /** See MuralCanvas.tsx's own comment — threaded straight through to
+   *  StatsBlockView, ignored by every other case. */
+  statsOverride?: Record<string, number>;
 }) {
   switch (block.type) {
     case "spotlight":
@@ -48,7 +52,7 @@ export function BlockRenderer({
     case "currentlyReading":
       return <CurrentlyReadingBlockView books={books} />;
     case "stats":
-      return <StatsBlockView block={block} books={books} />;
+      return <StatsBlockView block={block} books={books} statsOverride={statsOverride} />;
     case "tierlist":
       return <TierListBlockView block={block} books={books} editMode={editMode} onUpdateBlock={onUpdateBlock} />;
     case "empty":

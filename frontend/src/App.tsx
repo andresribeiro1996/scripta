@@ -13,12 +13,21 @@ import { MuralsListPage } from "./pages/MuralsListPage";
 import { OAuthSuccessPage } from "./pages/OAuthSuccessPage";
 import { SeriesPage } from "./pages/SeriesPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { SharedLibraryPage } from "./pages/SharedLibraryPage";
+import { SharedMuralPage } from "./pages/SharedMuralPage";
 
 export function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/oauth-success" element={<OAuthSuccessPage />} />
+      {/* Public share-viewer pages — no session at all, so these must sit
+          outside every RequireAuth/RequireUsername wrapper below, same as
+          /login. The token itself is the access control (see each public
+          backend route's own comment); a stranger with the link never
+          needs — and never gets asked for — an account. */}
+      <Route path="/shared/murals/:token" element={<SharedMuralPage />} />
+      <Route path="/shared/library/:token" element={<SharedLibraryPage />} />
 
       {/* RequireAuth: must be signed in at all. RequireUsername, nested
           inside it: must also have finished setup (a username) — a

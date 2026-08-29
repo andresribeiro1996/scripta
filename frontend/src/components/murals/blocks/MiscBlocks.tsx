@@ -50,8 +50,30 @@ export function ImageBlockView({ block, images }: { block: Extract<MuralBlock, {
 /** Small auto-computed numbers, laid out as a strip — see
  *  lib/muralStats.ts for what each metric actually counts. No picker: the
  *  only configurable thing is WHICH metrics show (StatsBlockEditor.tsx),
- *  never their values. */
-export function StatsBlockView({ block, books }: { block: Extract<MuralBlock, { type: "stats" }>; books: Array<Record<string, unknown>> }) {
+ *  never their values.
+ *
+ *  `statsOverride` — when present (pages/SharedMuralPage.tsx only, via
+ *  MuralCanvas.tsx/BlockRenderer.tsx) — is preferred over live-computing
+ *  each metric from `books`: the public share page only ever gets a
+ *  deliberately incomplete `books` list (just what the mural's OTHER
+ *  blocks reference, see api/sharedMurals.ts), so computeStat(metric,
+ *  books) there would silently produce wrong numbers for e.g. totalBooks.
+ *  The backend's public GET /murals/shared/:token response precomputes
+ *  every requested metric against the owner's FULL private library
+ *  instead (backend/src/modules/library/publicResolver.ts) and hands
+ *  back just the numbers. A metric absent from the override (the
+ *  backend's own copy of computeStat not recognizing it — see that
+ *  file's own comment) falls back to the live computation same as the
+ *  authenticated editor, which never passes this prop at all. */
+export function StatsBlockView({
+  block,
+  books,
+  statsOverride
+}: {
+  block: Extract<MuralBlock, { type: "stats" }>;
+  books: Array<Record<string, unknown>>;
+  statsOverride?: Record<string, number>;
+}) {
   if (block.metrics.length === 0) {
     return <EmptyBlockState message="Pick which numbers to show." />;
   }
@@ -62,7 +84,9 @@ export function StatsBlockView({ block, books }: { block: Extract<MuralBlock, { 
           {/* Deliberately always accent-colored, not `textColor` — same
               "this is a badge, not body content" reasoning as
               BookCard.tsx's highlight-count badge. */}
-          <div className="text-[1.6em] font-bold text-(--color-accent)">{computeStat(metric, books)}</div>
+          <div className="text-[1.6em] font-bold text-(--color-accent)">
+            {statsOverride && metric in statsOverride ? statsOverride[metric] : computeStat(metric, books)}
+          </div>
           <div className="text-[0.75em] text-(--color-text-dim)">{STAT_METRIC_LABELS[metric]}</div>
         </div>
       ))}
