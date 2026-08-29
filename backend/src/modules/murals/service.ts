@@ -3,7 +3,6 @@
 // module's service.ts.
 
 import { randomUUID } from "node:crypto";
-import { MuralNotFoundError } from "./domain/errors.js";
 import type { MuralsRepository } from "./domain/ports.js";
 import type { Mural, MuralRow } from "./domain/types.js";
 
@@ -26,18 +25,20 @@ function toMural(row: MuralRow): Mural {
 export interface MuralsService {
   listMurals(userId: string): Mural[];
   createMural(userId: string, name: string): Mural;
-  /** Throws MuralNotFoundError if no mural with that id is owned by
-   *  userId. */
-  getMural(userId: string, id: string): Mural;
+  /** undefined if no mural with that id is owned by userId — a
+   *  caller-facing 404, not a server error. Same convention as
+   *  modules/gallery/service.ts's getImageFile. */
+  getMural(userId: string, id: string): Mural | undefined;
   /** Partial merge onto the existing row — only the keys present in
-   *  `patch` change. Throws MuralNotFoundError if not owned. */
-  updateMural(userId: string, id: string, patch: { name?: string; blocks?: unknown[] }): Mural;
-  /** Throws MuralNotFoundError if not owned. */
-  deleteMural(userId: string, id: string): void;
-  /** Throws MuralNotFoundError if not owned. */
-  setCover(userId: string, id: string, imageId: string, url: string): Mural;
-  /** Throws MuralNotFoundError if not owned. */
-  clearCover(userId: string, id: string): Mural;
+   *  `patch` change. undefined if not owned. */
+  updateMural(userId: string, id: string, patch: { name?: string; blocks?: unknown[] }): Mural | undefined;
+  /** Returns false if no mural with that id was owned by userId — same
+   *  convention as modules/gallery/service.ts's deleteImage. */
+  deleteMural(userId: string, id: string): boolean;
+  /** undefined if not owned. */
+  setCover(userId: string, id: string, imageId: string, url: string): Mural | undefined;
+  /** undefined if not owned. */
+  clearCover(userId: string, id: string): Mural | undefined;
 }
 
 export function createMuralsService(repo: MuralsRepository): MuralsService {
@@ -65,8 +66,7 @@ export function createMuralsService(repo: MuralsRepository): MuralsService {
 
     getMural(userId, id) {
       const row = repo.getOwned(id, userId);
-      if (!row) throw new MuralNotFoundError();
-      return toMural(row);
+      return row ? toMural(row) : undefined;
     },
 
     updateMural(userId, id, patch) {
@@ -74,25 +74,21 @@ export function createMuralsService(repo: MuralsRepository): MuralsService {
         ...(patch.name !== undefined ? { name: patch.name } : {}),
         ...(patch.blocks !== undefined ? { blocks: JSON.stringify(patch.blocks) } : {})
       });
-      if (!row) throw new MuralNotFoundError();
-      return toMural(row);
+      return row ? toMural(row) : undefined;
     },
 
     deleteMural(userId, id) {
-      const deleted = repo.delete(id, userId);
-      if (!deleted) throw new MuralNotFoundError();
+      return repo.delete(id, userId);
     },
 
     setCover(userId, id, imageId, url) {
       const row = repo.update(id, userId, { cover_image_id: imageId, cover_image_url: url });
-      if (!row) throw new MuralNotFoundError();
-      return toMural(row);
+      return row ? toMural(row) : undefined;
     },
 
     clearCover(userId, id) {
       const row = repo.update(id, userId, { cover_image_id: null, cover_image_url: null });
-      if (!row) throw new MuralNotFoundError();
-      return toMural(row);
+      return row ? toMural(row) : undefined;
     }
   };
 }

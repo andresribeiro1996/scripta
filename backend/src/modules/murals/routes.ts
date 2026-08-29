@@ -4,17 +4,21 @@
 // Cross-module dependency in action, same as modules/library/routes.ts
 // and modules/gallery/routes.ts: authGuard comes from auth's PUBLIC
 // interface only.
+//
+// "Not found or not owned" is a plain undefined/boolean check here, same
+// convention as modules/gallery/routes.ts's DELETE /gallery/:id and
+// modules/library/routes.ts's GET /library — not a caught exception (see
+// domain/errors.ts for why this module doesn't use one for that case).
 
-import type { FastifyInstance, FastifyReply } from "fastify";
+import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { authGuard } from "../auth/index.js";
-import { MuralNotFoundError } from "./domain/errors.js";
 import type { MuralsService } from "./service.js";
 
 const idParamSchema = z.object({ id: z.string().uuid() });
 
 const createMuralSchema = z.object({
-  name: z.string().min(1)
+  name: z.string().min(1, "name is required and must be non-empty.")
 });
 
 // Deliberately light-touch, same treatment modules/library/routes.ts
@@ -34,13 +38,6 @@ const setCoverSchema = z.object({
   url: z.string().min(1)
 });
 
-function replyToMuralError(reply: FastifyReply, err: unknown) {
-  if (err instanceof MuralNotFoundError) {
-    return reply.code(404).send({ error: err.message });
-  }
-  throw err;
-}
-
 export function buildMuralRoutes(service: MuralsService) {
   return async function muralRoutes(app: FastifyInstance) {
     app.get("/murals", { preHandler: authGuard }, async (request, reply) => {
@@ -50,7 +47,7 @@ export function buildMuralRoutes(service: MuralsService) {
     app.post("/murals", { preHandler: authGuard }, async (request, reply) => {
       const parsed = createMuralSchema.safeParse(request.body);
       if (!parsed.success) {
-        return reply.code(400).send({ error: "name is required and must be non-empty." });
+        return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? "Invalid request." });
       }
       const mural = service.createMural(request.user.id, parsed.data.name);
       return reply.code(201).send(mural);
@@ -61,11 +58,11 @@ export function buildMuralRoutes(service: MuralsService) {
       if (!params.success) {
         return reply.code(400).send({ error: "Invalid mural id." });
       }
-      try {
-        return reply.send(service.getMural(request.user.id, params.data.id));
-      } catch (err) {
-        return replyToMuralError(reply, err);
+      const mural = service.getMural(request.user.id, params.data.id);
+      if (!mural) {
+        return reply.code(404).send({ error: "No mural with that id." });
       }
+      return reply.send(mural);
     });
 
     app.put("/murals/:id", { preHandler: authGuard }, async (request, reply) => {
@@ -75,13 +72,13 @@ export function buildMuralRoutes(service: MuralsService) {
       }
       const body = updateMuralSchema.safeParse(request.body);
       if (!body.success) {
-        return reply.code(400).send({ error: body.error.issues[0]?.message ?? "Invalid request body." });
+        return reply.code(400).send({ error: body.error.issues[0]?.message ?? "Invalid request." });
       }
-      try {
-        return reply.send(service.updateMural(request.user.id, params.data.id, body.data));
-      } catch (err) {
-        return replyToMuralError(reply, err);
+      const mural = service.updateMural(request.user.id, params.data.id, body.data);
+      if (!mural) {
+        return reply.code(404).send({ error: "No mural with that id." });
       }
+      return reply.send(mural);
     });
 
     app.delete("/murals/:id", { preHandler: authGuard }, async (request, reply) => {
@@ -89,10 +86,9 @@ export function buildMuralRoutes(service: MuralsService) {
       if (!params.success) {
         return reply.code(400).send({ error: "Invalid mural id." });
       }
-      try {
-        service.deleteMural(request.user.id, params.data.id);
-      } catch (err) {
-        return replyToMuralError(reply, err);
+      const deleted = service.deleteMural(request.user.id, params.data.id);
+      if (!deleted) {
+        return reply.code(404).send({ error: "No mural with that id." });
       }
       return reply.code(204).send();
     });
@@ -106,11 +102,11 @@ export function buildMuralRoutes(service: MuralsService) {
       if (!body.success) {
         return reply.code(400).send({ error: 'Expected {"imageId": string, "url": string}.' });
       }
-      try {
-        return reply.send(service.setCover(request.user.id, params.data.id, body.data.imageId, body.data.url));
-      } catch (err) {
-        return replyToMuralError(reply, err);
+      const mural = service.setCover(request.user.id, params.data.id, body.data.imageId, body.data.url);
+      if (!mural) {
+        return reply.code(404).send({ error: "No mural with that id." });
       }
+      return reply.send(mural);
     });
 
     app.delete("/murals/:id/cover", { preHandler: authGuard }, async (request, reply) => {
@@ -118,11 +114,11 @@ export function buildMuralRoutes(service: MuralsService) {
       if (!params.success) {
         return reply.code(400).send({ error: "Invalid mural id." });
       }
-      try {
-        return reply.send(service.clearCover(request.user.id, params.data.id));
-      } catch (err) {
-        return replyToMuralError(reply, err);
+      const mural = service.clearCover(request.user.id, params.data.id);
+      if (!mural) {
+        return reply.code(404).send({ error: "No mural with that id." });
       }
+      return reply.send(mural);
     });
   };
 }
