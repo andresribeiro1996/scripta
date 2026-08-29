@@ -15,6 +15,7 @@ import { registerAuthModule } from "./modules/auth/index.js";
 import { registerCoversModule } from "./modules/covers/index.js";
 import { registerGalleryModule } from "./modules/gallery/index.js";
 import { registerLibraryModule } from "./modules/library/index.js";
+import { registerMuralsModule } from "./modules/murals/index.js";
 import { registerSocialsModule } from "./modules/socials/index.js";
 
 export function buildApp() {
@@ -36,6 +37,7 @@ export function buildApp() {
   app.register(registerGalleryModule);
   app.register(registerCoversModule);
   app.register(registerSocialsModule);
+  app.register(registerMuralsModule);
 
   return app;
 }

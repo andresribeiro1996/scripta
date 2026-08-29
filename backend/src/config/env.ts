@@ -30,6 +30,10 @@ const envSchema = z.object({
   // per account — see modules/gallery/adapters/fs/fsImageBlobStore.ts.
   GALLERY_STORAGE_PATH: z.string().min(1),
 
+  // modules/murals' own SQLite file — same one-file-per-module isolation as
+  // every other module's *_DB_PATH above.
+  MURALS_DB_PATH: z.string().min(1).default("./data/murals.sqlite"),
+
   // The auto-resolved cover cache (modules/covers) — a GLOBAL store, one
   // row per book identifier (isbn/imageId) shared across every account,
   // unlike gallery's own per-account images. Not optional/key-gated the
