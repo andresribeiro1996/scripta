@@ -1,6 +1,6 @@
 # Kobo Library Backend
 
-A Node.js/Fastify/TypeScript backend, structured as a **modular monolith**: one deployable service, internally split into self-contained modules that only talk to each other through explicit public interfaces. Five modules so far — `auth`, `library`, `gallery`, `covers`, and `socials` — with more expected as the project grows. Consumed by the [frontend](../frontend/README.md), which replaces the old static, drag-your-own-file [viewer](../viewer/README.md).
+A Node.js/Fastify/TypeScript backend, structured as a **modular monolith**: one deployable service, internally split into self-contained modules that only talk to each other through explicit public interfaces. Six modules so far — `auth`, `library`, `gallery`, `covers`, `socials`, and `arena` — with more expected as the project grows. Consumed by the [frontend](../frontend/README.md), which replaces the old static, drag-your-own-file [viewer](../viewer/README.md).
 
 Every module with a persistence dependency follows **hexagonal architecture** (ports & adapters): the module's business logic depends only on a repository *interface* it defines, never on a concrete database. See "Hexagonal architecture" below — this is a standing convention for this backend, not just how `auth` happened to be built.
 
@@ -118,6 +118,13 @@ Rate-limited (30 requests/minute, scoped to this module's routes only) and given
 | POST | `/socials/bluesky/connect` | ✓ | `{handle, appPassword}` → verifies against Bluesky's own API and stores the session on success; `401` on a rejected handle/password, `503` if `SOCIALS_ENCRYPTION_KEY` isn't set |
 | DELETE | `/socials/:provider` | ✓ | Deletes the caller's stored connection for that platform (a no-op, not an error, if it wasn't connected) → `{socials: SocialStatus[]}` |
 
+### `arena`
+
+- **BookArena**: an owner-created, single-elimination book bracket tournament that anyone with the link can vote on, no account required — the account's library seeds the bracket (random-fill or manual per-slot assignment), and once started, duels settle on a timer (a background sweep, checked every 30s) or via the owner's early-settle action; a tied duel (equal votes) waits for the owner to break it by hand rather than auto-deciding.
+- **Its own SQLite file** (`ARENA_DB_PATH`), same one-module-one-database isolation as every other module — `tournaments`/`tournament_slots`/`duels`/`votes`, with seeded books denormalized as a snapshot (title/author/cover) rather than referencing a shared Book table, since none exists anywhere in this app (see `library`'s own section above).
+- **The first background timer in this codebase** — a plain `setInterval` sweep, no job queue: the simplest thing that could work at this app's scale, same "no new dependency for something this small" instinct as `node:sqlite` itself.
+- **This repository's first automated test suite** (`backend/src/modules/arena/service.test.ts`, via Node's built-in `node:test` — zero new dependencies) exercises the bracket/duel/round state machine against a hand-written in-memory fake of `ArenaRepository`, finally using the "seam is there" testability this hexagonal split has always had (see "Not built," below).
+
 ## Hexagonal architecture — the standing convention for dependencies like a database
 
 Every module that needs persistence (or, in principle, any other "the outside world" dependency — an email provider, a payment processor, etc.) is split into three layers:
@@ -158,7 +165,7 @@ const authRepository = createSqliteAuthRepository(db);  // concrete adapter
 const authService = createAuthService(authRepository);  // domain, sees only the port
 ```
 
-`modules/library` follows the identical shape. This is also what makes each module's business logic unit-testable without a real database — hand `createAuthService`/`createLibraryService` an in-memory object implementing the port instead of a SQLite-backed one, no test database required (not set up yet, but the seam is there).
+`modules/library` follows the identical shape. This is also what makes each module's business logic unit-testable without a real database — hand `createAuthService`/`createLibraryService` an in-memory object implementing the port instead of a SQLite-backed one, no test database required (not set up yet for the other modules, but the seam is there — see `arena`'s own `service.test.ts` for the first module to actually use it).
 
 ## The module boundary — how it's actually enforced, not just named
 
@@ -182,6 +189,7 @@ Adding a third module means repeating both shapes: its own `domain/ports.ts` + `
 - Refresh token rotation + replay detection (above).
 - Every `library` route requires a valid access token, and only ever reads/writes the row for `request.user.id` — confirmed in testing that a second account cannot see the first's document.
 - `gallery` uploads are validated by actual file content (magic bytes via `sharp`), not client-supplied MIME type/extension; re-encoded (stripping EXIF/GPS/ICC metadata) rather than stored as-is; capped per-file and per-account; and stored under server-generated ids rather than user-supplied filenames — see the `gallery` section above for the full pipeline. `GET /gallery/:id/file` is the one intentionally unauthenticated route in this app, by design (see that section) — everything else in `gallery` is scoped to `request.user.id` the same as `library`.
+- `arena` deliberately breaks this app's usual "everything requires a session" pattern: `GET /arenas/:id`, `GET /arenas/public`, and `POST /arenas/:id/duels/:duelId/vote` are all unauthenticated by design — the whole point of BookArena is that anyone with a tournament's link can view and vote with no account. The vote route is this app's first anonymous WRITE endpoint, and carries its own tighter, separately-scoped rate limit (20/min) for exactly that reason. Every OTHER `arena` route (create/seed/start/settle/tiebreak/delete/mine) requires `authGuard`, and each additionally re-checks ownership server-side via `getOwnedTournament` inside the service layer — not just at the route's `preHandler` — so even a route that someday forgot its `authGuard` couldn't act on someone else's tournament.
 - `socials`' platform tokens are the one genuinely reversible secret this backend stores (AES-256-GCM, gated behind `SOCIALS_ENCRYPTION_KEY` — see that section above for why a hash, like passwords get, can't be used here). The OAuth connect flow binds a redirect back to the right user via a short-lived, single-use link session layered on top of `@fastify/oauth2`'s own signed-cookie CSRF state check, not in place of it.
 
 ## Not built (flagged, not silently skipped)
@@ -191,7 +199,7 @@ Adding a third module means repeating both shapes: its own `domain/ports.ts` + `
 - Google sign-in is implemented and unit-verified in isolation (correctly skipped when unconfigured, correctly issues `username: null` for a new account), but the live end-to-end flow with real Google credentials hasn't been exercised yet — that needs an actual `GOOGLE_CLIENT_ID`/`SECRET` from Google Cloud Console, which only the person deploying this can obtain.
 - Same story for `covers`/Hardcover: verified live that the route correctly doesn't exist (`404`) with no key configured, and that the frontend's own fallback chain degrades cleanly through that — but the actual Hardcover GraphQL call (query shape, response parsing) hasn't been exercised against a real API key yet, since that also needs an account/key only the person deploying this can obtain.
 - No migration framework — each module's `schema.sql` runs via `CREATE TABLE IF NOT EXISTS` on every boot. Fine for additive schema changes; would need a real migration tool before making breaking ones against real data.
-- No test-double/fake repository actually written yet — the hexagonal split makes one easy to add (implement `AuthRepository`/`LibraryRepository`/`GalleryRepository` in-memory), but there's no test suite exercising it yet, just the two manual scripts under "Trying it out".
+- No test-double/fake repository written for `auth`/`library`/`gallery`/`covers`/`socials` yet — the hexagonal split makes one easy to add, but there's no test suite exercising any of THOSE yet, just the manual scripts under "Trying it out". `arena` is the first exception: `service.test.ts` hands `createArenaService` exactly this kind of in-memory fake, using the seam every other module has had all along.
 - `gallery` has no separate thumbnail size — the same re-encoded (already capped at 1600px) image is served for both a gallery grid thumbnail and a full book cover. Fine at this app's scale; a real thumbnail variant would mean a second re-encode + a second file on disk per upload.
 - No image editing (crop/rotate-by-hand/etc.) — re-encoding auto-applies EXIF orientation and downsizes, but there's no way to crop a cover to a different aspect ratio after upload; re-uploading is the only option.
 - `socials` connect/disconnect and the Bluesky app-password flow are what's built and verified — the actual *use* of a connection (posting, reading, anything that would call an X/Instagram/Threads/TikTok/Bluesky API on the user's behalf) is intentionally not built yet; that was scoped out explicitly, not an oversight.

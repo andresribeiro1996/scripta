@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { to: "/dashboard/collections", label: "Collections", end: false },
   { to: "/dashboard/gallery", label: "Gallery", end: false },
   { to: "/dashboard/murals", label: "Murals", end: false },
+  { to: "/dashboard/arena", label: "Arena", end: false },
   { to: "/dashboard/style", label: "Library style", end: false },
   { to: "/dashboard/settings", label: "Settings", end: false }
 ];

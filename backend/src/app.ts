@@ -12,6 +12,7 @@ import fastifyCors from "@fastify/cors";
 import Fastify from "fastify";
 import { env } from "./config/env.js";
 import { registerAuthModule } from "./modules/auth/index.js";
+import { registerArenaModule } from "./modules/arena/index.js";
 import { registerCoversModule } from "./modules/covers/index.js";
 import { registerGalleryModule } from "./modules/gallery/index.js";
 import { registerLibraryModule } from "./modules/library/index.js";
@@ -32,6 +33,7 @@ export function buildApp() {
   app.get("/health", async () => ({ status: "ok" }));
 
   app.register(registerAuthModule);
+  app.register(registerArenaModule);
   app.register(registerLibraryModule);
   app.register(registerGalleryModule);
   app.register(registerCoversModule);
