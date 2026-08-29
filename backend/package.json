@@ -30,5 +30,10 @@
   },
   "engines": {
     "node": ">=22.5.0"
+  },
+  "allowScripts": {
+    "argon2@0.40.3": true,
+    "esbuild@0.28.2": true,
+    "fsevents@2.3.3": true
   }
 }
