@@ -82,14 +82,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 // stop matching the mural's own spotlight/shelf/quote/tierlist
 // references, so this must track that file exactly, not approximately.
 
-function normalizeIsbn(raw: unknown): string {
+// Exported — service.ts's own getPublicByToken (GET /library/shared/:token)
+// reuses these exact two normalizers for the same peekCachedCoverUrl-backed
+// auto-cover fallback below, rather than reimplementing them a second time.
+export function normalizeIsbn(raw: unknown): string {
   const cleaned = String(raw ?? "")
     .trim()
     .replace(/[-\s]/g, "");
   return /^(?:\d{9}[\dXx]|\d{13})$/.test(cleaned) ? cleaned : "";
 }
 
-function normalizeImageId(raw: unknown): string {
+export function normalizeImageId(raw: unknown): string {
   const v = String(raw ?? "").trim();
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v) ? v : "";
 }

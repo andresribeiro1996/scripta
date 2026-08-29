@@ -1,12 +1,15 @@
 // /shared/library/:token — the page a link recipient lands on for a
 // shared whole library (see App.tsx: OUTSIDE every RequireAuth/
-// RequireUsername wrapper, no session at all). Unlike a shared mural
-// (SharedMuralPage.tsx), the backend's GET /library/shared/:token
-// (backend/src/modules/library/routes.ts) returns the FULL, unredacted
-// stored document — sharing a whole library is an all-or-nothing choice,
-// not a per-block redaction — so no book-object reconstruction is needed
-// here: `data.books` is already in the exact private shape BookCard.tsx/
-// lib/merge.ts's bookKey() expect.
+// RequireUsername wrapper, no session at all). The backend's
+// GET /library/shared/:token (backend/src/modules/library/routes.ts) has
+// already redacted each book down to a public-safe field subset before
+// this ever runs (see backend/src/modules/library/service.ts's
+// toPublicLibraryData/toPublicLibraryBook — highlights and other private
+// per-book data are dropped server-side) — no further reconstruction is
+// needed here: `data.books` is already in the same field NAMES (Title,
+// Attribution, ISBN, ImageId, _coverUrl, etc.) BookCard.tsx/
+// lib/merge.ts's bookKey() expect, just trimmed down to what this
+// read-only view actually renders.
 //
 // Reuses LibraryPage.tsx's own grid/BookCard rendering pattern (read-only:
 // no onOpenStyle/onOpenCoverPicker/selectable passed — see BookCard.tsx's
