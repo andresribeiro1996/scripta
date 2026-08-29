@@ -1,13 +1,14 @@
 // The murals module's Fastify plugin and composition root — mirrors
-// modules/library/plugin.ts's shape, plus modules/gallery/plugin.ts's
-// pattern of registering a plugin-scoped rate limiter.
+// modules/library/plugin.ts's shape, plus modules/covers/plugin.ts's
+// pattern of registering EACH route builder in its own Fastify
+// encapsulation scope so each can carry its own independent rate limit.
 
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
 import { env } from "../../config/env.js";
 import { createSqliteMuralsRepository } from "./adapters/sqlite/sqliteMuralsRepository.js";
 import { openMuralsDb } from "./adapters/sqlite/connection.js";
-import { buildMuralRoutes } from "./routes.js";
+import { buildMuralRoutes, buildPublicMuralRoutes } from "./routes.js";
 import { createMuralsService } from "./service.js";
 
 export async function muralsPlugin(app: FastifyInstance) {
@@ -21,14 +22,21 @@ export async function muralsPlugin(app: FastifyInstance) {
   const muralsService = createMuralsService(muralsRepository, publicUrlFor);
   // -----------------------------------------------------------------------
 
-  // Registered now, ahead of any route actually needing it, so it
-  // already covers the public share route Task 4 adds on top of these —
-  // same reasoning and same config as gallery's own rate-limit
-  // registration (modules/gallery/plugin.ts).
-  await app.register(fastifyRateLimit, {
-    max: 30,
-    timeWindow: "1 minute"
-  });
-
+  // Two SEPARATE registrations, each its own Fastify encapsulation scope,
+  // same trick modules/covers/plugin.ts uses (see that file's own
+  // comment for the full reasoning): a single rate limit shared across
+  // the WHOLE plugin used to also cover ordinary authenticated editing
+  // (one PUT per drag-end/resize-end/block-add/rename), which trivially
+  // blew through 30/min and 429'd even plain GET /murals — the entire
+  // Murals section going dark with no error shown. The public share
+  // route is the one that actually needs a tight limit; the authenticated
+  // CRUD surface below gets none at all, matching modules/library's own
+  // (unlimited) CRUD routes — an authenticated user hammering their own
+  // mural isn't the threat model this ever protected against.
   await app.register(buildMuralRoutes(muralsService));
+
+  await app.register(async (scoped) => {
+    await scoped.register(fastifyRateLimit, { max: 30, timeWindow: "1 minute" });
+    await scoped.register(buildPublicMuralRoutes(muralsService));
+  });
 }

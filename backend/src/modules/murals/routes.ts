@@ -9,6 +9,16 @@
 // convention as modules/gallery/routes.ts's DELETE /gallery/:id and
 // modules/library/routes.ts's GET /library — not a caught exception (see
 // domain/errors.ts for why this module doesn't use one for that case).
+//
+// Two separate builder functions, not one — plugin.ts registers each in
+// its OWN Fastify encapsulation scope specifically so they can carry
+// DIFFERENT rate limits, same reasoning and same split as
+// modules/covers/routes.ts's buildResolveRoute/buildCachedFileRoute: the
+// authenticated CRUD routes below back ordinary mural editing (one PUT
+// per drag-end/resize-end/block-add/rename), which can easily fire well
+// over 30 requests/minute during a normal editing session; the public
+// GET /murals/shared/:token route is the one that actually needs a tight
+// limit, same as it always did.
 
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
@@ -46,6 +56,11 @@ const setCoverSchema = z.object({
   url: z.string().min(1)
 });
 
+/** The authenticated CRUD + share/unshare surface — everything that needs
+ *  a signed-in user, and that a normal editing session can call at real
+ *  volume. Registered in plugin.ts either with no rate limit at all
+ *  (matching modules/library's own CRUD routes) or a generous ceiling —
+ *  see plugin.ts's own comment for which. */
 export function buildMuralRoutes(service: MuralsService) {
   return async function muralRoutes(app: FastifyInstance) {
     app.get("/murals", { preHandler: authGuard }, async (request, reply) => {
@@ -152,7 +167,14 @@ export function buildMuralRoutes(service: MuralsService) {
       }
       return reply.send(mural);
     });
+  };
+}
 
+/** The public, unauthenticated surface — just GET /murals/shared/:token.
+ *  Registered in plugin.ts in its OWN scope, carrying its own tight rate
+ *  limit — see this module's own top comment and plugin.ts. */
+export function buildPublicMuralRoutes(service: MuralsService) {
+  return async function publicMuralRoutes(app: FastifyInstance) {
     // Deliberately NOT behind authGuard — same trust model as
     // modules/library/routes.ts's own GET /library/shared/:token: the
     // token is an unguessable UUID, not a session check. A LIVE view of
@@ -167,7 +189,16 @@ export function buildMuralRoutes(service: MuralsService) {
         return reply.code(404).send({ error: "No shared mural at that link." });
       }
 
-      const blocks = JSON.parse(row.blocks);
+      // A corrupted/malformed row (shouldn't happen via normal writes,
+      // but defensive: this is public, unauthenticated input on the read
+      // path) — treat exactly like "no such token" rather than 500ing.
+      let blocks: unknown;
+      try {
+        blocks = JSON.parse(row.blocks);
+      } catch {
+        return reply.code(404).send({ error: "No shared mural at that link." });
+      }
+
       // extractReferences/resolvePublicLibraryData below are the whole
       // privacy boundary this route exists to enforce — see their own
       // top comments (murals/domain/blockRefs.ts,

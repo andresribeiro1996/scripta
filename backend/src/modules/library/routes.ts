@@ -5,6 +5,15 @@
 // PUBLIC interface (modules/auth/index.js), never from anything inside
 // modules/auth/domain, /adapters, or /service.ts. This module has no path
 // to auth's database or token secrets — only to this one preHandler.
+//
+// Two separate builder functions, not one — plugin.ts registers each in
+// its OWN Fastify encapsulation scope, same split (and same reasoning) as
+// modules/murals/routes.ts's buildMuralRoutes/buildPublicLibraryRoutes:
+// the authenticated CRUD routes below get no rate limit at all (ordinary
+// library editing/saving shouldn't be throttled), while the public
+// GET /library/shared/:token route gets its own tight limit — previously
+// this module had NO rate limit anywhere, leaving that public,
+// unauthenticated, DB-querying route wide open.
 
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
@@ -25,6 +34,8 @@ const saveLibrarySchema = z.object({
     .passthrough()
 });
 
+/** The authenticated surface — get/save/share/unshare, all behind
+ *  authGuard. Registered in plugin.ts with no rate limit, same as before. */
 export function buildLibraryRoutes(service: LibraryService) {
   return async function libraryRoutes(app: FastifyInstance) {
     app.get("/library", { preHandler: authGuard }, async (request, reply) => {
@@ -66,7 +77,14 @@ export function buildLibraryRoutes(service: LibraryService) {
       }
       return reply.send(library);
     });
+  };
+}
 
+/** The public, unauthenticated surface — just GET /library/shared/:token.
+ *  Registered in plugin.ts in its OWN scope, carrying its own rate limit —
+ *  see this module's own top comment and plugin.ts. */
+export function buildPublicLibraryRoutes(service: LibraryService) {
+  return async function publicLibraryRoutes(app: FastifyInstance) {
     // Deliberately NOT behind authGuard — same trust model as
     // modules/gallery/routes.ts's GET /gallery/:id/file: the token is an
     // unguessable UUID, not a session check. Unlike that route's
