@@ -6,17 +6,15 @@ import { randomUUID } from "node:crypto";
 import type { MuralsRepository } from "./domain/ports.js";
 import type { Mural, MuralRow } from "./domain/types.js";
 
-function toMural(row: MuralRow): Mural {
+function toMural(row: MuralRow, publicUrlFor: (token: string) => string): Mural {
   return {
     id: row.id,
     name: row.name,
     blocks: JSON.parse(row.blocks),
     coverImageId: row.cover_image_id,
     coverImageUrl: row.cover_image_url,
-    // Always null from this task, regardless of what's in the row —
-    // Task 4 adds the share/unshare routes and starts surfacing these.
-    shareToken: null,
-    shareUrl: null,
+    shareToken: row.share_token,
+    shareUrl: row.share_token ? publicUrlFor(row.share_token) : null,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -39,12 +37,26 @@ export interface MuralsService {
   setCover(userId: string, id: string, imageId: string, url: string): Mural | undefined;
   /** undefined if not owned. */
   clearCover(userId: string, id: string): Mural | undefined;
+  /** Idempotent: a mural that's already shared keeps its existing token
+   *  rather than minting a new one, so a re-opened share modal (or a
+   *  retried request) never invalidates a link someone already has.
+   *  undefined if not owned. */
+  share(userId: string, id: string): Mural | undefined;
+  /** undefined if not owned. */
+  unshare(userId: string, id: string): Mural | undefined;
+  /** Backs the public GET /murals/shared/:token route. Returns the RAW
+   *  row (with `user_id` and the raw `blocks` string) — deliberately NOT
+   *  the owner-scoped `Mural` DTO the rest of this service returns, since
+   *  routes.ts needs `user_id` (to resolve library data) and unparsed
+   *  `blocks` (to feed extractReferences) that every other method here
+   *  intentionally hides from callers. Used only by that one route. */
+  getRowByShareToken(token: string): MuralRow | undefined;
 }
 
-export function createMuralsService(repo: MuralsRepository): MuralsService {
+export function createMuralsService(repo: MuralsRepository, publicUrlFor: (token: string) => string): MuralsService {
   return {
     listMurals(userId) {
-      return repo.listByUser(userId).map(toMural);
+      return repo.listByUser(userId).map((row) => toMural(row, publicUrlFor));
     },
 
     createMural(userId, name) {
@@ -61,12 +73,12 @@ export function createMuralsService(repo: MuralsRepository): MuralsService {
         updated_at: now
       };
       repo.insert(row);
-      return toMural(row);
+      return toMural(row, publicUrlFor);
     },
 
     getMural(userId, id) {
       const row = repo.getOwned(id, userId);
-      return row ? toMural(row) : undefined;
+      return row ? toMural(row, publicUrlFor) : undefined;
     },
 
     updateMural(userId, id, patch) {
@@ -74,7 +86,7 @@ export function createMuralsService(repo: MuralsRepository): MuralsService {
         ...(patch.name !== undefined ? { name: patch.name } : {}),
         ...(patch.blocks !== undefined ? { blocks: JSON.stringify(patch.blocks) } : {})
       });
-      return row ? toMural(row) : undefined;
+      return row ? toMural(row, publicUrlFor) : undefined;
     },
 
     deleteMural(userId, id) {
@@ -83,12 +95,35 @@ export function createMuralsService(repo: MuralsRepository): MuralsService {
 
     setCover(userId, id, imageId, url) {
       const row = repo.update(id, userId, { cover_image_id: imageId, cover_image_url: url });
-      return row ? toMural(row) : undefined;
+      return row ? toMural(row, publicUrlFor) : undefined;
     },
 
     clearCover(userId, id) {
       const row = repo.update(id, userId, { cover_image_id: null, cover_image_url: null });
-      return row ? toMural(row) : undefined;
+      return row ? toMural(row, publicUrlFor) : undefined;
+    },
+
+    share(userId, id) {
+      const existing = repo.getOwned(id, userId);
+      if (!existing) return undefined;
+      if (existing.share_token) return toMural(existing, publicUrlFor);
+
+      const row = repo.setShareToken(id, userId, randomUUID());
+      // Can only be undefined if the row vanished between the getOwned
+      // above and here — nothing in this module deletes murals out from
+      // under a concurrent request in practice, but keeps the return
+      // type honest rather than asserting non-null (same reasoning as
+      // modules/library/service.ts's own share()).
+      return row ? toMural(row, publicUrlFor) : undefined;
+    },
+
+    unshare(userId, id) {
+      const row = repo.setShareToken(id, userId, null);
+      return row ? toMural(row, publicUrlFor) : undefined;
+    },
+
+    getRowByShareToken(token) {
+      return repo.getByShareToken(token);
     }
   };
 }

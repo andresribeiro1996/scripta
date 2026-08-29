@@ -25,4 +25,16 @@ export interface MuralsRepository {
   /** Returns true if a row was actually deleted (i.e. it existed AND was
    *  owned by userId). */
   delete(id: string, userId: string): boolean;
+  /** Ownership-checked: sets (or, with `token: null`, clears) the
+   *  share_token on this mural. Returns undefined if no row with that id
+   *  was owned by userId — service.ts turns that into the same 404 every
+   *  other `/murals/:id/*` route gives for an unowned/missing mural. */
+  setShareToken(id: string, userId: string, token: string | null): MuralRow | undefined;
+  /** Looks up a mural by its live share token — backs the public
+   *  GET /murals/shared/:token route. No ownership/userId involved: the
+   *  token itself is the credential, same trust model as
+   *  modules/library's getByShareToken/modules/gallery's getImageById.
+   *  Returns the RAW row (including user_id) — callers of this one
+   *  method are trusted to keep user_id server-side only. */
+  getByShareToken(token: string): MuralRow | undefined;
 }

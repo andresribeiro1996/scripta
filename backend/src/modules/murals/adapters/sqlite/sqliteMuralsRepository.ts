@@ -22,6 +22,8 @@ export function createSqliteMuralsRepository(db: DatabaseSync): MuralsRepository
     WHERE id = $id AND user_id = $user_id
   `);
   const deleteStmt = db.prepare(`DELETE FROM murals WHERE id = ? AND user_id = ?`);
+  const setShareTokenStmt = db.prepare(`UPDATE murals SET share_token = $share_token, updated_at = $updated_at WHERE id = $id AND user_id = $user_id`);
+  const getByShareTokenStmt = db.prepare(`SELECT * FROM murals WHERE share_token = ?`);
 
   return {
     listByUser(userId) {
@@ -67,6 +69,19 @@ export function createSqliteMuralsRepository(db: DatabaseSync): MuralsRepository
     delete(id, userId) {
       const result = deleteStmt.run(id, userId);
       return result.changes > 0;
+    },
+
+    setShareToken(id, userId, token) {
+      const existing = getOwnedStmt.get(id, userId) as MuralRow | undefined;
+      if (!existing) return undefined;
+
+      const updatedAt = new Date().toISOString();
+      setShareTokenStmt.run({ $id: id, $user_id: userId, $share_token: token, $updated_at: updatedAt });
+      return { ...existing, share_token: token, updated_at: updatedAt };
+    },
+
+    getByShareToken(token) {
+      return getByShareTokenStmt.get(token) as MuralRow | undefined;
     }
   };
 }

@@ -12,7 +12,15 @@
 
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { env } from "../../config/env.js";
 import { authGuard } from "../auth/index.js";
+// Cross-module dependency, same as authGuard above: resolvePublicLibraryData
+// is library's own PUBLIC surface for exactly this — see
+// modules/library/publicResolver.ts's top comment for the privacy
+// boundary it enforces. Never reach into modules/library's internals
+// (service.ts, adapters/, domain/) from here.
+import { resolvePublicLibraryData } from "../library/index.js";
+import { extractReferences } from "./domain/blockRefs.js";
 import type { MuralsService } from "./service.js";
 
 const idParamSchema = z.object({ id: z.string().uuid() });
@@ -119,6 +127,83 @@ export function buildMuralRoutes(service: MuralsService) {
         return reply.code(404).send({ error: "No mural with that id." });
       }
       return reply.send(mural);
+    });
+
+    app.post("/murals/:id/share", { preHandler: authGuard }, async (request, reply) => {
+      const params = idParamSchema.safeParse(request.params);
+      if (!params.success) {
+        return reply.code(400).send({ error: "Invalid mural id." });
+      }
+      const mural = service.share(request.user.id, params.data.id);
+      if (!mural) {
+        return reply.code(404).send({ error: "No mural with that id." });
+      }
+      return reply.send(mural);
+    });
+
+    app.post("/murals/:id/unshare", { preHandler: authGuard }, async (request, reply) => {
+      const params = idParamSchema.safeParse(request.params);
+      if (!params.success) {
+        return reply.code(400).send({ error: "Invalid mural id." });
+      }
+      const mural = service.unshare(request.user.id, params.data.id);
+      if (!mural) {
+        return reply.code(404).send({ error: "No mural with that id." });
+      }
+      return reply.send(mural);
+    });
+
+    // Deliberately NOT behind authGuard — same trust model as
+    // modules/library/routes.ts's own GET /library/shared/:token: the
+    // token is an unguessable UUID, not a session check. A LIVE view of
+    // whatever the owner's mural currently holds (and can be unshared at
+    // any moment), so it must never be cached. Note this route has TWO
+    // path segments ("/murals/shared/:token") vs. GET /murals/:id's ONE —
+    // Fastify's router never confuses the two, "shared" is just a literal
+    // segment there, not a mural id.
+    app.get<{ Params: { token: string } }>("/murals/shared/:token", async (request, reply) => {
+      const row = service.getRowByShareToken(request.params.token);
+      if (!row) {
+        return reply.code(404).send({ error: "No shared mural at that link." });
+      }
+
+      const blocks = JSON.parse(row.blocks);
+      // extractReferences/resolvePublicLibraryData below are the whole
+      // privacy boundary this route exists to enforce — see their own
+      // top comments (murals/domain/blockRefs.ts,
+      // modules/library/publicResolver.ts) for exactly what is and isn't
+      // safe to include in the response built from them.
+      const refs = extractReferences(blocks);
+      const libraryData = resolvePublicLibraryData(row.user_id, {
+        bookKeys: [...refs.bookKeys],
+        highlightRefs: refs.highlightRefs,
+        needsCurrentlyReading: refs.needsCurrentlyReading,
+        statsMetrics: [...refs.statsMetrics]
+      });
+
+      // Gallery images: no second cross-module resolver — GET
+      // /gallery/:id/file (modules/gallery/routes.ts) is already public
+      // and unauthenticated, so a referenced image id is just templated
+      // directly into that URL, with no existence check here. A deleted
+      // image's id simply 404s on load client-side, matching that
+      // route's own documented intended behavior.
+      const imageIds = [...refs.imageIds, ...(row.cover_image_id ? [row.cover_image_id] : [])];
+      const imageUrls = Object.fromEntries(imageIds.map((id) => [id, `${env.PUBLIC_API_URL}/gallery/${id}/file`]));
+
+      reply.header("Cache-Control", "no-store");
+      return reply.send({
+        mural: {
+          id: row.id,
+          name: row.name,
+          blocks,
+          coverImageUrl: row.cover_image_id ? imageUrls[row.cover_image_id] : row.cover_image_url
+        },
+        books: libraryData.books,
+        highlights: libraryData.highlights,
+        currentlyReading: libraryData.currentlyReading,
+        stats: libraryData.stats,
+        imageUrls
+      });
     });
   };
 }
