@@ -9,13 +9,13 @@ import { useConfirm } from "../components/ConfirmDialog";
 import { CoverPickerModal } from "../components/CoverPickerModal";
 import { PageContainer } from "../components/PageContainer";
 import { PerCardStylePanel } from "../components/PerCardStylePanel";
+import { useMurals } from "../hooks/useMurals";
 import { clearBookCover, setBookCover } from "../lib/bookCovers";
 import { deriveSeriesGroups, removeBooksFromAllGroups } from "../lib/groups";
 import { parseImportedFile } from "../lib/fileImport";
 import { assignBookOrder, orderLibraryBooks, reorderOnDrop, seriesGroupByBookKey } from "../lib/libraryOrder";
 import { effectiveCardStyle, resolveLibraryStyle, type PerCardStyle } from "../lib/libraryStyle";
 import { bookKey, mergeLibraryData } from "../lib/merge";
-import { scrubBooksFromMurals } from "../lib/murals";
 
 /** Applies a React state update wrapped in the View Transitions API when
  *  the browser supports it, so a drag-to-reorder visibly animates cards
@@ -52,6 +52,7 @@ function updateWithViewTransition(applyUpdate: () => void) {
 
 export function LibraryPage() {
   const queryClient = useQueryClient();
+  const { scrubBooks } = useMurals();
   const confirm = useConfirm();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -214,10 +215,14 @@ export function LibraryPage() {
     const saved = await saveLibrary({
       ...current.data,
       books: current.data.books.filter((b) => !selectedKeys.has(bookKey(b))),
-      groups: removeBooksFromAllGroups(current.data.groups ?? [], selectedKeys),
-      murals: scrubBooksFromMurals(current.data.murals ?? [], selectedKeys)
+      groups: removeBooksFromAllGroups(current.data.groups ?? [], selectedKeys)
     });
     queryClient.setQueryData(["library"], saved);
+    // Independent of the library save above — murals live on their own
+    // backend rows now (modules/murals), not on this document, so
+    // scrubbing them out of any mural that referenced a deleted book is a
+    // separate call rather than a field riding along in `saved`.
+    await scrubBooks(selectedKeys);
     setSelectedKeys(new Set());
     setSelectionMode(false);
   }

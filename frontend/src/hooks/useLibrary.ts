@@ -5,7 +5,7 @@
 // rather than routing through this).
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchLibrary, saveLibrary, type LibraryData, type LibraryDocument } from "../api/library";
+import { fetchLibrary, saveLibrary, shareLibrary, unshareLibrary, type LibraryData, type LibraryDocument } from "../api/library";
 
 export function useLibrary() {
   const queryClient = useQueryClient();
@@ -21,5 +21,17 @@ export function useLibrary() {
     return saved;
   }
 
-  return { ...query, updateLibrary };
+  async function share(): Promise<LibraryDocument> {
+    const updated = await shareLibrary();
+    queryClient.setQueryData(["library"], updated);
+    return updated;
+  }
+
+  async function unshare(): Promise<LibraryDocument> {
+    const updated = await unshareLibrary();
+    queryClient.setQueryData(["library"], updated);
+    return updated;
+  }
+
+  return { ...query, updateLibrary, share, unshare };
 }

@@ -6,7 +6,8 @@ import { CoverPickerModal } from "../components/CoverPickerModal";
 import { OptionsMenu } from "../components/OptionsMenu";
 import { PageContainer } from "../components/PageContainer";
 import { useLibrary } from "../hooks/useLibrary";
-import { clearMuralCover, createMural, deleteMural, renameMural, setMuralCover, type Mural } from "../lib/murals";
+import { useMurals } from "../hooks/useMurals";
+import type { Mural } from "../lib/murals";
 import { resolveLibraryStyle } from "../lib/libraryStyle";
 
 // Field + direction combined into one option each, rather than two
@@ -31,11 +32,12 @@ const SORT_OPTIONS: Array<{ value: SortBy; label: string }> = [
  *  its own full page rather than an inline expandable section — a
  *  freeform canvas needs real room. */
 export function MuralsListPage() {
-  const { data: library, isLoading, updateLibrary } = useLibrary();
+  const { data: library } = useLibrary();
+  const { data: muralsData, isLoading, create, rename, remove, setCover, clearCover } = useMurals();
   const navigate = useNavigate();
   const confirm = useConfirm();
   const style = resolveLibraryStyle(library?.data.style);
-  const murals = library?.data.murals ?? [];
+  const murals = muralsData ?? [];
 
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -71,9 +73,8 @@ export function MuralsListPage() {
       // uses. Straight into the new mural afterward, same as before:
       // creating one with nothing to build on isn't useful on its own, so
       // skip the extra click back here.
-      const saved = await updateLibrary((data) => ({ ...data, murals: createMural(data.murals ?? [], "Untitled mural") }));
-      const created = saved.data.murals?.[saved.data.murals.length - 1] as Mural | undefined;
-      if (created) navigate(`/dashboard/murals/${created.id}`);
+      const created = await create("Untitled mural");
+      navigate(`/dashboard/murals/${created.id}`);
     } finally {
       setCreating(false);
     }
@@ -83,20 +84,20 @@ export function MuralsListPage() {
     const name = editingName.trim();
     setEditingId(null);
     if (!name) return;
-    await updateLibrary((data) => ({ ...data, murals: renameMural(data.murals ?? [], id, name) }));
+    await rename(id, name);
   }
 
   async function handleDelete(mural: Mural) {
     if (!(await confirm({ title: `Delete "${mural.name}"?`, body: "This can't be undone." }))) return;
-    await updateLibrary((data) => ({ ...data, murals: deleteMural(data.murals ?? [], mural.id) }));
+    await remove(mural.id);
   }
 
   async function handleSaveMuralCover(muralId: string, image: GalleryImage) {
-    await updateLibrary((data) => ({ ...data, murals: setMuralCover(data.murals ?? [], muralId, image.id, image.url) }));
+    await setCover(muralId, image.id, image.url);
   }
 
   async function handleRemoveMuralCover(muralId: string) {
-    await updateLibrary((data) => ({ ...data, murals: clearMuralCover(data.murals ?? [], muralId) }));
+    await clearCover(muralId);
   }
 
   const coverMural = coverMuralId ? murals.find((m) => m.id === coverMuralId) : null;

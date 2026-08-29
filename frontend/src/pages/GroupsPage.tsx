@@ -8,6 +8,7 @@ import { OptionsMenu } from "../components/OptionsMenu";
 import { PageContainer } from "../components/PageContainer";
 import { PerCardStylePanel } from "../components/PerCardStylePanel";
 import { useLibrary } from "../hooks/useLibrary";
+import { useMurals } from "../hooks/useMurals";
 import { clearBookCover, setBookCover } from "../lib/bookCovers";
 import {
   addBookToGroup,
@@ -24,7 +25,6 @@ import {
 import { seriesGroupByBookKey } from "../lib/libraryOrder";
 import { effectiveCardStyle, resolveLibraryStyle, type PerCardStyle } from "../lib/libraryStyle";
 import { bookKey } from "../lib/merge";
-import { scrubBooksFromMurals } from "../lib/murals";
 
 const COPY: Record<GroupType, { title: string; noun: string; empty: string; createPlaceholder: string }> = {
   series: {
@@ -47,6 +47,7 @@ const COPY: Record<GroupType, { title: string; noun: string; empty: string; crea
  *  copy and in that series also get auto-seeded from book metadata. */
 export function GroupsPage({ type }: { type: GroupType }) {
   const { data: library, isLoading, updateLibrary } = useLibrary();
+  const { scrubBooks } = useMurals();
   const copy = COPY[type];
   const confirm = useConfirm();
 
@@ -178,9 +179,12 @@ export function GroupsPage({ type }: { type: GroupType }) {
     await updateLibrary((data) => ({
       ...data,
       books: data.books.filter((b) => !selectedKeys.has(bookKey(b))),
-      groups: removeBooksFromAllGroups(data.groups ?? [], selectedKeys),
-      murals: scrubBooksFromMurals(data.murals ?? [], selectedKeys)
+      groups: removeBooksFromAllGroups(data.groups ?? [], selectedKeys)
     }));
+    // Independent of the library save above — see LibraryPage.tsx's own
+    // handleDeleteSelected for why murals are scrubbed via a separate
+    // call rather than a field on that save.
+    await scrubBooks(selectedKeys);
     setSelectedKeys(new Set());
     setSelectionMode(false);
   }
