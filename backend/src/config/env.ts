@@ -18,9 +18,15 @@ const durationString = z
 const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
 
-  // The frontend's origin, for CORS — see app.ts. A dev Vite server
-  // defaults to 5173; change this once the frontend is actually deployed
-  // somewhere else.
+  // The frontend's origin, for CORS — see app.ts. Also the base every
+  // share link is built on top of — modules/murals/plugin.ts's and
+  // modules/library/plugin.ts's own publicUrlFor both template a share
+  // token onto this (e.g. `${FRONTEND_URL}/shared/murals/:token`), and
+  // those are the exact links postToSocial (modules/socials) posts out to
+  // X/Threads/etc. A dev Vite server defaults to 5173; change this once
+  // the frontend is actually deployed somewhere else — getting this wrong
+  // in production means share links (and anything posted to social) point
+  // at localhost.
   FRONTEND_URL: z.string().url().default("http://localhost:5173"),
 
   AUTH_DB_PATH: z.string().min(1),

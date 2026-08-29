@@ -56,7 +56,8 @@ export function MuralsListPage() {
   // on every render to matter, and `murals` itself is a fresh `?? []`
   // fallback array most renders anyway (nothing for a memo to actually
   // key off). `.filter()` returns a fresh array, so `.sort()`-ing it in
-  // place afterward never mutates `murals`/`library.data.murals` itself.
+  // place afterward never mutates `murals`/the `["murals"]` query cache
+  // itself (useMurals.ts).
   const needle = search.trim().toLowerCase();
   const sortField = sortBy.startsWith("created") ? "createdAt" : "updatedAt";
   const sortDirection = sortBy.endsWith("Desc") ? -1 : 1;
