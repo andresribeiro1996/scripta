@@ -54,7 +54,9 @@ export function ShareModal({
   const [sharing, setSharing] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
   const [unsharing, setUnsharing] = useState(false);
+  const [unshareError, setUnshareError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState<string | null>(null);
   const copiedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [composing, setComposing] = useState<Platform | null>(null);
@@ -92,10 +94,15 @@ export function ShareModal({
 
   async function handleCopy() {
     if (!current) return;
-    await navigator.clipboard.writeText(current.shareUrl);
-    setCopied(true);
-    if (copiedTimeoutRef.current) clearTimeout(copiedTimeoutRef.current);
-    copiedTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
+    setCopyError(null);
+    try {
+      await navigator.clipboard.writeText(current.shareUrl);
+      setCopied(true);
+      if (copiedTimeoutRef.current) clearTimeout(copiedTimeoutRef.current);
+      copiedTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      setCopyError(err instanceof Error ? err.message : "Couldn't copy that — try selecting and copying the link manually.");
+    }
   }
 
   function handleNativeShare() {
@@ -142,10 +149,13 @@ export function ShareModal({
     ) {
       return;
     }
+    setUnshareError(null);
     setUnsharing(true);
     try {
       await onUnshare();
       setCurrent(null);
+    } catch (err) {
+      setUnshareError(err instanceof ApiError ? err.message : "Couldn't stop sharing — try again.");
     } finally {
       setUnsharing(false);
     }
@@ -199,6 +209,7 @@ export function ShareModal({
               </button>
             </div>
             {copied && <p className="mt-1.5 text-xs text-(--color-accent)">Copied!</p>}
+            {copyError && <p className="mt-1.5 text-xs text-(--color-danger)">{copyError}</p>}
 
             {canNativeShare && (
               <button
@@ -277,6 +288,7 @@ export function ShareModal({
               >
                 {unsharing ? "Stopping…" : "Stop sharing"}
               </button>
+              {unshareError && <p className="mt-1.5 text-xs text-(--color-danger)">{unshareError}</p>}
             </div>
           </div>
         )}
