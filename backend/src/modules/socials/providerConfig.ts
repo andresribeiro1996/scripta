@@ -106,7 +106,15 @@ export const OAUTH_PROVIDERS: readonly OAuthProviderConfig[] = [
     clientId: env.THREADS_CLIENT_ID,
     clientSecret: env.THREADS_CLIENT_SECRET,
     callbackUrl: env.THREADS_CALLBACK_URL,
-    scope: ["threads_basic"],
+    // threads_content_publish is required for the two-step create+publish
+    // posting flow (see service.ts's postToSocial) — threads_basic alone
+    // only covers profile lookup. Accounts connected before this scope
+    // was added only carry the old scope on their stored token; their
+    // first post attempt will 401, which surfaces via postToSocial's
+    // error mapping as a "reconnect Threads in Settings" style message.
+    // The existing disconnect/reconnect flow in Settings already fixes
+    // that — no extra migration code needed here.
+    scope: ["threads_basic", "threads_content_publish"],
     auth: {
       authorizeHost: "https://threads.net",
       authorizePath: "/oauth/authorize",
