@@ -5,6 +5,7 @@ import { useConfirm } from "../components/ConfirmDialog";
 import { CoverPickerModal } from "../components/CoverPickerModal";
 import { OptionsMenu } from "../components/OptionsMenu";
 import { PageContainer } from "../components/PageContainer";
+import { ShareModal } from "../components/ShareModal";
 import { useLibrary } from "../hooks/useLibrary";
 import { useMurals } from "../hooks/useMurals";
 import type { Mural } from "../lib/murals";
@@ -33,7 +34,7 @@ const SORT_OPTIONS: Array<{ value: SortBy; label: string }> = [
  *  freeform canvas needs real room. */
 export function MuralsListPage() {
   const { data: library } = useLibrary();
-  const { data: muralsData, isLoading, create, rename, remove, setCover, clearCover } = useMurals();
+  const { data: muralsData, isLoading, create, rename, remove, setCover, clearCover, share, unshare } = useMurals();
   const navigate = useNavigate();
   const confirm = useConfirm();
   const style = resolveLibraryStyle(library?.data.style);
@@ -43,6 +44,7 @@ export function MuralsListPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
   const [coverMuralId, setCoverMuralId] = useState<string | null>(null);
+  const [sharingMuralId, setSharingMuralId] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<SortBy>("updatedDesc");
@@ -101,6 +103,7 @@ export function MuralsListPage() {
   }
 
   const coverMural = coverMuralId ? murals.find((m) => m.id === coverMuralId) : null;
+  const sharingMural = sharingMuralId ? murals.find((m) => m.id === sharingMuralId) : null;
 
   return (
     <PageContainer style={style}>
@@ -297,6 +300,7 @@ export function MuralsListPage() {
                         }
                       },
                       { label: hasCover ? "Change cover" : "Add cover", onClick: () => setCoverMuralId(mural.id) },
+                      { label: "Share", onClick: () => setSharingMuralId(mural.id) },
                       { label: "Delete", onClick: () => handleDelete(mural), danger: true }
                     ]}
                   />
@@ -318,6 +322,23 @@ export function MuralsListPage() {
           onSelect={(image) => void handleSaveMuralCover(coverMural.id, image)}
           onRemoveCover={() => void handleRemoveMuralCover(coverMural.id)}
           onClose={() => setCoverMuralId(null)}
+        />
+      )}
+
+      {sharingMural && (
+        <ShareModal
+          title={sharingMural.name}
+          shareToken={sharingMural.shareToken}
+          shareUrl={sharingMural.shareUrl}
+          defaultCaption={sharingMural.name}
+          onShare={async () => {
+            const updated = await share(sharingMural.id);
+            return { shareToken: updated.shareToken as string, shareUrl: updated.shareUrl as string };
+          }}
+          onUnshare={async () => {
+            await unshare(sharingMural.id);
+          }}
+          onClose={() => setSharingMuralId(null)}
         />
       )}
     </PageContainer>

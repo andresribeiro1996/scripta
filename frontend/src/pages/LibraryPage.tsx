@@ -9,6 +9,8 @@ import { useConfirm } from "../components/ConfirmDialog";
 import { CoverPickerModal } from "../components/CoverPickerModal";
 import { PageContainer } from "../components/PageContainer";
 import { PerCardStylePanel } from "../components/PerCardStylePanel";
+import { ShareModal } from "../components/ShareModal";
+import { useLibrary } from "../hooks/useLibrary";
 import { useMurals } from "../hooks/useMurals";
 import { clearBookCover, setBookCover } from "../lib/bookCovers";
 import { deriveSeriesGroups, removeBooksFromAllGroups } from "../lib/groups";
@@ -53,6 +55,7 @@ function updateWithViewTransition(applyUpdate: () => void) {
 export function LibraryPage() {
   const queryClient = useQueryClient();
   const { scrubBooks } = useMurals();
+  const { share: shareLibraryDoc, unshare: unshareLibraryDoc } = useLibrary();
   const confirm = useConfirm();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -69,6 +72,7 @@ export function LibraryPage() {
   const [coverBookKey, setCoverBookKey] = useState<string | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  const [sharing, setSharing] = useState(false);
 
   async function handleRenameLibrary() {
     const name = nameDraft.trim();
@@ -304,6 +308,12 @@ export function LibraryPage() {
               </button>
             ))}
           <button
+            onClick={() => setSharing(true)}
+            className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm hover:bg-(--color-surface-hover)"
+          >
+            Share
+          </button>
+          <button
             onClick={() => fileInputRef.current?.click()}
             disabled={importing}
             title={books.length > 0 ? "Matching books are merged with what's already here, not duplicated." : undefined}
@@ -399,6 +409,23 @@ export function LibraryPage() {
           onSelect={(image) => void handleSaveBookCover(coverBook, image)}
           onRemoveCover={() => void handleRemoveBookCover(coverBook)}
           onClose={() => setCoverBookKey(null)}
+        />
+      )}
+
+      {sharing && (
+        <ShareModal
+          title={library?.data.name || "Library"}
+          shareToken={library?.shareToken ?? null}
+          shareUrl={library?.shareUrl ?? null}
+          defaultCaption={library?.data.name ?? "My library"}
+          onShare={async () => {
+            const updated = await shareLibraryDoc();
+            return { shareToken: updated.shareToken as string, shareUrl: updated.shareUrl as string };
+          }}
+          onUnshare={async () => {
+            await unshareLibraryDoc();
+          }}
+          onClose={() => setSharing(false)}
         />
       )}
     </PageContainer>

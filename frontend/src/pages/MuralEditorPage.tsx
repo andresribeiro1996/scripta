@@ -5,6 +5,7 @@ import { BlockConfigPanel } from "../components/murals/BlockConfigPanel";
 import { BlockStylePanel } from "../components/murals/BlockStylePanel";
 import { MuralCanvas } from "../components/murals/MuralCanvas";
 import { PageContainer } from "../components/PageContainer";
+import { ShareModal } from "../components/ShareModal";
 import { useGalleryImages } from "../hooks/useGalleryImages";
 import { useLibrary } from "../hooks/useLibrary";
 import { useMurals } from "../hooks/useMurals";
@@ -20,7 +21,7 @@ import { addBlock, duplicateBlock, removeBlock, updateBlock, type BlockLayout, t
 export function MuralEditorPage() {
   const { muralId } = useParams<{ muralId: string }>();
   const { data: library } = useLibrary();
-  const { data: muralsData, isLoading, rename, saveBlocks } = useMurals();
+  const { data: muralsData, isLoading, rename, saveBlocks, share, unshare } = useMurals();
   const { images } = useGalleryImages();
   const style = resolveLibraryStyle(library?.data.style);
   const books = library?.data.books ?? [];
@@ -32,6 +33,7 @@ export function MuralEditorPage() {
   const [stylingBlockId, setStylingBlockId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
+  const [sharing, setSharing] = useState(false);
 
   async function handleRename() {
     if (!mural) return;
@@ -154,6 +156,12 @@ export function MuralEditorPage() {
         <div className="flex items-center gap-2">
           {editMode && <AddBlockMenu onAdd={(type) => void handleAddBlock(type)} />}
           <button
+            onClick={() => setSharing(true)}
+            className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm font-semibold hover:bg-(--color-surface-hover)"
+          >
+            Share
+          </button>
+          <button
             onClick={() => setEditMode((e) => !e)}
             className={`rounded-lg px-3 py-2 text-sm font-semibold ${
               editMode ? "bg-(--color-accent) text-white" : "border border-(--color-border) bg-(--color-surface) hover:bg-(--color-surface-hover)"
@@ -213,6 +221,23 @@ export function MuralEditorPage() {
           block={stylingBlock}
           onSave={(blockStyle) => void handleSaveBlockStyle(stylingBlock.id, blockStyle)}
           onClose={() => setStylingBlockId(null)}
+        />
+      )}
+
+      {sharing && (
+        <ShareModal
+          title={mural.name}
+          shareToken={mural.shareToken}
+          shareUrl={mural.shareUrl}
+          defaultCaption={mural.name}
+          onShare={async () => {
+            const updated = await share(mural.id);
+            return { shareToken: updated.shareToken as string, shareUrl: updated.shareUrl as string };
+          }}
+          onUnshare={async () => {
+            await unshare(mural.id);
+          }}
+          onClose={() => setSharing(false)}
         />
       )}
     </PageContainer>
