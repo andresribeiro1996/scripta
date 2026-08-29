@@ -1,0 +1,85 @@
+// The seeding step for one tournament: SeedSlotGrid for picking books,
+// then "Start" once every slot is filled. Redirects away if the current
+// session isn't this tournament's owner, or if it's already started
+// (seeding is a one-time step).
+
+import { useEffect, useState } from "react";
+import { Navigate, useNavigate, useParams } from "react-router-dom";
+import { setTournamentSlots, startTournament, type SeedBook } from "../api/arena";
+import { useAuth } from "../auth/AuthContext";
+import { SeedSlotGrid } from "../components/arena/SeedSlotGrid";
+import { useArena } from "../hooks/useArena";
+
+export function ArenaSeedPage() {
+  const { id } = useParams<{ id: string }>();
+  const { session } = useAuth();
+  const navigate = useNavigate();
+  const { tournament, isLoading, refetch } = useArena(id!);
+  const [slots, setSlots] = useState<Array<SeedBook | null>>([]);
+  const [starting, setStarting] = useState(false);
+
+  useEffect(() => {
+    if (!tournament) return;
+    // Seed local slot state from whatever's already saved (e.g. reopening
+    // this page after a partial manual seed).
+    const bySlotIndex = new Map(tournament.slots.map((s) => [s.slotIndex, s]));
+    setSlots(Array.from({ length: tournament.bracketSize }, (_, i) => bySlotIndex.get(i) ?? null));
+  }, [tournament]);
+
+  if (isLoading) {
+    return (
+      <div className="mx-auto max-w-5xl px-5 py-8">
+        <p className="text-sm text-(--color-text-dim)">Loading…</p>
+      </div>
+    );
+  }
+  if (!tournament) return <Navigate to="/dashboard/arena" replace />;
+  if (tournament.ownerUserId !== session?.user.id) return <Navigate to="/dashboard/arena" replace />;
+  if (tournament.status !== "seeding") return <Navigate to={`/arena/${tournament.id}`} replace />;
+
+  const filledCount = slots.filter(Boolean).length;
+  const canStart = filledCount === tournament.bracketSize;
+
+  async function handleStart() {
+    setStarting(true);
+    try {
+      const filled = slots.filter((s): s is SeedBook => s !== null);
+      await setTournamentSlots(
+        tournament!.id,
+        filled.map((book, i) => ({ slotIndex: i, book }))
+      );
+      await startTournament(tournament!.id);
+      navigate(`/arena/${tournament!.id}`);
+    } finally {
+      setStarting(false);
+    }
+  }
+
+  return (
+    <div className="mx-auto max-w-5xl px-5 py-8">
+      <h2 className="mb-6 text-lg font-bold">Seed &quot;{tournament.name}&quot;</h2>
+      <SeedSlotGrid bracketSize={tournament.bracketSize} slots={slots} onChange={setSlots} />
+
+      <div className="mt-6 flex items-center justify-between">
+        <button
+          onClick={() =>
+            void setTournamentSlots(
+              tournament.id,
+              slots.filter((s): s is SeedBook => s !== null).map((book, i) => ({ slotIndex: i, book }))
+            ).then(() => refetch())
+          }
+          className="rounded-lg border border-(--color-border) px-3 py-1.5 text-sm"
+        >
+          Save progress
+        </button>
+        <button
+          onClick={() => void handleStart()}
+          disabled={!canStart || starting}
+          className="rounded-lg bg-(--color-accent) px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+        >
+          {starting ? "Starting…" : "Start tournament"}
+        </button>
+      </div>
+    </div>
+  );
+}

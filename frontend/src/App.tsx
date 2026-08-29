@@ -3,6 +3,7 @@ import { RequireAuth } from "./auth/RequireAuth";
 import { RequireUsername } from "./auth/RequireUsername";
 import { DashboardLayout } from "./layouts/DashboardLayout";
 import { ArenaListPage } from "./pages/ArenaListPage";
+import { ArenaSeedPage } from "./pages/ArenaSeedPage";
 import { ChooseUsernamePage } from "./pages/ChooseUsernamePage";
 import { CollectionsPage } from "./pages/CollectionsPage";
 import { GalleryPage } from "./pages/GalleryPage";
@@ -38,6 +39,7 @@ export function App() {
             <Route path="/dashboard/murals" element={<MuralsListPage />} />
             <Route path="/dashboard/murals/:muralId" element={<MuralEditorPage />} />
             <Route path="/dashboard/arena" element={<ArenaListPage />} />
+            <Route path="/dashboard/arena/:id/seed" element={<ArenaSeedPage />} />
             <Route path="/dashboard/style" element={<LibraryStylePage />} />
             <Route path="/dashboard/settings" element={<SettingsPage />} />
           </Route>
