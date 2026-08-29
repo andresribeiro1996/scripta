@@ -8,6 +8,11 @@ export interface LibraryDocumentRow {
   user_id: string;
   data: string;
   updated_at: string;
+  /** NULL until the user shares their library; set back to NULL on
+   *  unshare. Unique among non-null values — see
+   *  adapters/sqlite/connection.ts's partial unique index for why a plain
+   *  column-level UNIQUE couldn't be used here. */
+  share_token: string | null;
 }
 
 /** What the service hands back to routes.ts — `data` here is the parsed
@@ -16,4 +21,9 @@ export interface LibraryDocumentRow {
 export interface LibraryDocument {
   data: unknown;
   updatedAt: string;
+  shareToken: string | null;
+  /** The absolute, externally-reachable URL for GET /library/shared/:token
+   *  — null whenever shareToken is null. Same "compute at the edge, off a
+   *  publicUrlFor closure" pattern as modules/gallery's GalleryImage.url. */
+  shareUrl: string | null;
 }

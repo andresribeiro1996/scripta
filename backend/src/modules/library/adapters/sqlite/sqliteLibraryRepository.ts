@@ -15,6 +15,11 @@ export function createSqliteLibraryRepository(db: DatabaseSync): LibraryReposito
     VALUES ($user_id, $data, $updated_at)
     ON CONFLICT(user_id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at
   `);
+  // Deliberately leaves share_token untouched on conflict — re-saving a
+  // library document (a normal, frequent PUT /library) must never disturb
+  // an existing share link.
+  const setShareTokenStmt = db.prepare(`UPDATE library_documents SET share_token = ? WHERE user_id = ?`);
+  const getByShareTokenStmt = db.prepare(`SELECT * FROM library_documents WHERE share_token = ?`);
 
   return {
     getDocument(userId) {
@@ -24,7 +29,17 @@ export function createSqliteLibraryRepository(db: DatabaseSync): LibraryReposito
     upsertDocument(userId, dataJson) {
       const updatedAt = new Date().toISOString();
       upsertStmt.run({ $user_id: userId, $data: dataJson, $updated_at: updatedAt });
-      return { user_id: userId, data: dataJson, updated_at: updatedAt };
+      return (getStmt.get(userId) as LibraryDocumentRow | undefined)!;
+    },
+
+    setShareToken(userId, token) {
+      const result = setShareTokenStmt.run(token, userId);
+      if (result.changes === 0) return undefined;
+      return getStmt.get(userId) as LibraryDocumentRow | undefined;
+    },
+
+    getByShareToken(token) {
+      return getByShareTokenStmt.get(token) as LibraryDocumentRow | undefined;
     }
   };
 }
