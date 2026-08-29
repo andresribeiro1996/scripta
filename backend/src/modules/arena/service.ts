@@ -23,6 +23,7 @@ import {
   InvalidBracketSizeError,
   InvalidSlotIndexError,
   NotEnoughBooksError,
+  TournamentAlreadyStartedError,
   TournamentNotFoundError
 } from "./domain/errors.js";
 import type { ArenaRepository } from "./domain/ports.js";
@@ -241,6 +242,7 @@ export function createArenaService(repo: ArenaRepository): ArenaService {
     setSlotsManual(tournamentId, ownerUserId, entries) {
       const tournament = repo.getOwnedTournament(tournamentId, ownerUserId);
       if (!tournament) throw new TournamentNotFoundError();
+      if (tournament.status !== "seeding") throw new TournamentAlreadyStartedError();
 
       const indices = new Set(entries.map((e) => e.slotIndex));
       if (indices.size !== entries.length) throw new DuplicateSlotError();
@@ -266,6 +268,7 @@ export function createArenaService(repo: ArenaRepository): ArenaService {
     randomFill(tournamentId, ownerUserId, pool) {
       const tournament = repo.getOwnedTournament(tournamentId, ownerUserId);
       if (!tournament) throw new TournamentNotFoundError();
+      if (tournament.status !== "seeding") throw new TournamentAlreadyStartedError();
       if (pool.length < tournament.bracket_size) throw new NotEnoughBooksError(tournament.bracket_size, pool.length);
 
       // Fisher-Yates.
@@ -289,6 +292,7 @@ export function createArenaService(repo: ArenaRepository): ArenaService {
     start(tournamentId, ownerUserId) {
       const tournament = repo.getOwnedTournament(tournamentId, ownerUserId);
       if (!tournament) throw new TournamentNotFoundError();
+      if (tournament.status !== "seeding") throw new TournamentAlreadyStartedError();
       const slots = repo.getSlots(tournamentId).sort((a, b) => a.slot_index - b.slot_index);
       if (slots.length !== tournament.bracket_size) throw new IncompleteSeedError(tournament.bracket_size, slots.length);
 

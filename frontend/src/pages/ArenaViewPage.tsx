@@ -17,6 +17,7 @@ export function ArenaViewPage() {
   const { session } = useAuth();
   const { tournament, isLoading, vote, refetch } = useArena(id!);
   const [voteError, setVoteError] = useState<string | null>(null);
+  const [ownerActionError, setOwnerActionError] = useState<string | null>(null);
   const [busyDuelId, setBusyDuelId] = useState<string | null>(null);
 
   if (isLoading) {
@@ -47,9 +48,12 @@ export function ArenaViewPage() {
 
   async function handleSettle(duelId: string) {
     setBusyDuelId(duelId);
+    setOwnerActionError(null);
     try {
       await settleDuelEarly(tournament!.id, duelId);
       await refetch();
+    } catch (err) {
+      setOwnerActionError(err instanceof Error ? err.message : "Couldn't settle that duel.");
     } finally {
       setBusyDuelId(null);
     }
@@ -57,9 +61,12 @@ export function ArenaViewPage() {
 
   async function handleTiebreak(duelId: string, winnerBookKey: string) {
     setBusyDuelId(duelId);
+    setOwnerActionError(null);
     try {
       await resolveTiebreak(tournament!.id, duelId, winnerBookKey);
       await refetch();
+    } catch (err) {
+      setOwnerActionError(err instanceof Error ? err.message : "Couldn't resolve that tie.");
     } finally {
       setBusyDuelId(null);
     }
@@ -72,6 +79,7 @@ export function ArenaViewPage() {
         {tournament.bracketSize}-book bracket · {tournament.status === "completed" ? "Completed" : `Round ${tournament.currentRound}`}
       </p>
       {voteError && <p className="mb-4 text-sm text-(--color-danger)">{voteError}</p>}
+      {ownerActionError && <p className="mb-4 text-sm text-(--color-danger)">{ownerActionError}</p>}
 
       <BracketTree
         tournament={tournament}

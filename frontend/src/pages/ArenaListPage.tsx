@@ -17,14 +17,18 @@ export function ArenaListPage() {
   const [bracketSize, setBracketSize] = useState(16);
   const [roundHours, setRoundHours] = useState(24);
   const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   async function handleCreate() {
     if (!name.trim()) return;
     setCreating(true);
+    setCreateError(null);
     try {
       const tournament = await createTournament({ name: name.trim(), bracketSize, roundDurationMinutes: roundHours * 60 });
       await refetch();
       navigate(`/dashboard/arena/${tournament.id}/seed`);
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : "Couldn't create that tournament.");
     } finally {
       setCreating(false);
     }
@@ -70,6 +74,8 @@ export function ArenaListPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="mb-4 text-sm font-semibold">New tournament</h3>
+
+            {createError && <p className="mb-3 text-sm text-(--color-danger)">{createError}</p>}
 
             <label className="mb-3 block text-sm">
               Name

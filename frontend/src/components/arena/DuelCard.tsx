@@ -2,15 +2,16 @@
 // button on each, a live tally bar, and a countdown to closes_at.
 // Reuses CoverImage (components/BookCard.tsx) rather than reimplementing
 // cover rendering — it takes a `book: Record<string, unknown>`, so each
-// duel side is adapted into that shape via toCoverImageBook below.
+// duel side is adapted into that shape below. The adapted object is
+// memoized (useMemo) because CoverImage resets its own resolved-cover
+// state whenever it's handed a NEW object reference (see BookCard.tsx's
+// own effect deps) — without memoizing here, DuelCard's own 1-second
+// countdown re-render (and useArena's 5s poll) would re-trigger a fresh
+// cover lookup/flicker on every tick.
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Duel, DuelSide } from "../../api/arena";
 import { CoverImage } from "../BookCard";
-
-function toCoverImageBook(side: DuelSide): Record<string, unknown> {
-  return { Title: side.title, Attribution: side.author, _coverUrl: side.cover ?? undefined };
-}
 
 function useCountdown(closesAt: string): string {
   const [label, setLabel] = useState("");
@@ -48,6 +49,10 @@ function DuelSideCard({
   onVote: () => void;
 }) {
   const pct = totalVotes > 0 ? Math.round((side.votes / totalVotes) * 100) : 0;
+  const coverImageBook = useMemo(
+    () => ({ Title: side.title, Attribution: side.author, _coverUrl: side.cover ?? undefined }),
+    [side.title, side.author, side.cover]
+  );
   return (
     <button
       onClick={onVote}
@@ -57,7 +62,7 @@ function DuelSideCard({
       } ${canVote ? "cursor-pointer hover:border-(--color-accent)" : "cursor-default"}`}
     >
       <div className="relative aspect-2/3 w-full bg-(--color-border)">
-        <CoverImage book={toCoverImageBook(side)} />
+        <CoverImage book={coverImageBook} />
       </div>
       <div className="p-3">
         <h4 className="truncate text-sm font-semibold">{side.title}</h4>

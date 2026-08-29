@@ -4,12 +4,19 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { authGuard } from "../auth/index.js";
-import { AlreadyVotedError, ArenaError, DuelNotFoundError, TournamentNotFoundError } from "./domain/errors.js";
+import {
+  AlreadyVotedError,
+  ArenaError,
+  DuelNotFoundError,
+  TournamentAlreadyStartedError,
+  TournamentNotFoundError
+} from "./domain/errors.js";
 import type { ArenaService } from "./service.js";
 
 function statusForArenaError(err: ArenaError): number {
   if (err instanceof TournamentNotFoundError || err instanceof DuelNotFoundError) return 404;
   if (err instanceof AlreadyVotedError) return 409;
+  if (err instanceof TournamentAlreadyStartedError) return 409;
   return 400;
 }
 
@@ -35,7 +42,7 @@ const setSlotsSchema = z.object({
 
 const randomFillSchema = z.object({ pool: z.array(seedBookSchema).min(1) });
 
-const voteSchema = z.object({ voterToken: z.string().uuid(), bookKey: z.string().min(1) });
+const voteSchema = z.object({ voterToken: z.string().min(1).max(100), bookKey: z.string().min(1) });
 
 const tiebreakSchema = z.object({ winnerBookKey: z.string().min(1) });
 
@@ -44,7 +51,7 @@ const listPublicQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0)
 });
 
-const getTournamentQuerySchema = z.object({ voterToken: z.string().uuid().optional() });
+const getTournamentQuerySchema = z.object({ voterToken: z.string().min(1).max(100).optional() });
 
 export function buildArenaRoutes(service: ArenaService) {
   return async function arenaRoutes(app: FastifyInstance) {

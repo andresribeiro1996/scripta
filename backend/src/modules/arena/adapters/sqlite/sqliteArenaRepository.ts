@@ -14,7 +14,7 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
   const getTournamentStmt = db.prepare(`SELECT * FROM tournaments WHERE id = ?`);
   const getOwnedTournamentStmt = db.prepare(`SELECT * FROM tournaments WHERE id = ? AND owner_user_id = ?`);
   const listByOwnerStmt = db.prepare(`SELECT * FROM tournaments WHERE owner_user_id = ? ORDER BY created_at DESC`);
-  const listPublicStmt = db.prepare(`SELECT * FROM tournaments ORDER BY created_at DESC LIMIT ? OFFSET ?`);
+  const listPublicStmt = db.prepare(`SELECT * FROM tournaments WHERE status != 'seeding' ORDER BY created_at DESC LIMIT ? OFFSET ?`);
   const updateStatusStmt = db.prepare(`
     UPDATE tournaments SET status = $status, current_round = $current_round, updated_at = $updated_at WHERE id = $id
   `);

@@ -14,6 +14,7 @@ import {
   InvalidBookError,
   InvalidBracketSizeError,
   NotEnoughBooksError,
+  TournamentAlreadyStartedError,
   TournamentNotFoundError
 } from "./domain/errors.js";
 import type { ArenaRepository } from "./domain/ports.js";
@@ -266,4 +267,24 @@ test("a settled or already-completed duel can't be voted on", () => {
   service.settleEarly(tournament.id, "owner-1", duel.id);
 
   assert.throws(() => service.vote(tournament.id, duel.id, "voter-2", "book-1"), DuelNotVotableError);
+});
+
+test("start, setSlotsManual, and randomFill all reject a tournament that isn't in seeding", () => {
+  const service = createArenaService(createInMemoryArenaRepository());
+  const tournament = service.createTournament("owner-1", { name: "Test", bracketSize: 2, roundDurationMinutes: 60 });
+  service.setSlotsManual(tournament.id, "owner-1", [
+    { slotIndex: 0, book: makeBook(1) },
+    { slotIndex: 1, book: makeBook(2) }
+  ]);
+  service.start(tournament.id, "owner-1");
+
+  assert.throws(() => service.start(tournament.id, "owner-1"), TournamentAlreadyStartedError);
+  assert.throws(
+    () => service.setSlotsManual(tournament.id, "owner-1", [{ slotIndex: 0, book: makeBook(3) }]),
+    TournamentAlreadyStartedError
+  );
+  assert.throws(
+    () => service.randomFill(tournament.id, "owner-1", [makeBook(1), makeBook(2)]),
+    TournamentAlreadyStartedError
+  );
 });
