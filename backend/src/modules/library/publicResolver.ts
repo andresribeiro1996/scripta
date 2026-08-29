@@ -27,6 +27,15 @@
 // plugin can be reworked without this file needing to change at all.
 
 import type { DatabaseSync } from "node:sqlite";
+// Cross-module dependency, same discipline as murals/routes.ts importing
+// this very file only from library/index.ts: peekCachedCoverUrl is
+// covers' own public surface for a synchronous, cache-only cover lookup —
+// never covers' internals (service.ts, adapters/, domain/). See that
+// file's own top comment for why a public, unauthenticated resolver may
+// use this but not the authGuard'd, network-calling GET /covers/resolve
+// path. The module registration order in backend/src/app.ts (library
+// before covers) doesn't matter here — see that file's own note.
+import { peekCachedCoverUrl } from "../covers/index.js";
 import { openLibraryDb } from "./adapters/sqlite/connection.js";
 
 export interface PublicBookData {
@@ -151,34 +160,56 @@ function computeStat(metric: string, books: Array<Record<string, unknown>>, now:
  *  response. Maps to exactly these six fields and nothing else — never
  *  the full private book object, never any field not listed here
  *  (rating, notes, reading progress/percentage, Kobo-internal ids,
- *  `_order`, groups membership, etc.). */
+ *  `_order`, groups membership, etc.).
+ *
+ *  `coverUrl` prefers `book._coverUrl` — a genuine manual gallery-cover
+ *  assignment or legacy pre-cache data (see frontend/src/lib/bookCovers.ts's
+ *  own comment: "auto-resolved covers no longer touch `_coverUrl` at all")
+ *  — but that field is ABSENT for the common case of a book whose cover
+ *  was only ever auto-resolved through the normal (authGuard'd,
+ *  network-calling) GET /covers/resolve flow. Falling back to
+ *  peekCachedCoverUrl (covers' cache-only, synchronous, network-free
+ *  lookup) covers that common case too: if the mural owner has ever
+ *  viewed this book in their own library, that resolve call already ran
+ *  and cached a real cover row, keyed the same way service.ts's own
+ *  resolveCover keys it (isbn first, else Kobo's own imageId) — so the
+ *  cache row already exists by the time a stranger opens the public
+ *  mural link, with zero new network calls made from this handler. */
 function toPublicBookData(book: Record<string, unknown>): PublicBookData {
+  const isbn = normalizeIsbn(book.ISBN) || null;
+  const imageId = normalizeImageId(book.ImageId) || null;
+  const manualCoverUrl = typeof book._coverUrl === "string" ? book._coverUrl : null;
   return {
     title: typeof book.Title === "string" && book.Title ? book.Title : "Untitled",
     author: typeof book.Attribution === "string" && book.Attribution ? book.Attribution : "Unknown author",
-    isbn: normalizeIsbn(book.ISBN) || null,
-    imageId: normalizeImageId(book.ImageId) || null,
-    coverUrl: typeof book._coverUrl === "string" ? book._coverUrl : null,
+    isbn,
+    imageId,
+    coverUrl: manualCoverUrl ?? peekCachedCoverUrl({ isbn, imageId }),
     readStatus: typeof book.ReadStatus === "number" ? book.ReadStatus : null
   };
 }
 
-// Lazily opened, module-scoped — one extra connection for the lifetime of
-// the process, opened on first actual use rather than at import time
-// (harmless either way since openLibraryDb() is idempotent/safe to call
-// more than once across the process, but lazy avoids paying for it in
-// any process that imports this module without ever serving a public
-// mural request).
-let dbInstance: DatabaseSync | null = null;
-function getDb(): DatabaseSync {
-  if (!dbInstance) dbInstance = openLibraryDb();
-  return dbInstance;
+// Lazily opened, module-scoped — one extra connection (and its one
+// prepared statement, prepared once rather than on every call, matching
+// the prepared-statement-per-adapter convention every other module's
+// SQLite adapter already follows, e.g.
+// murals/adapters/sqlite/sqliteMuralsRepository.ts) for the lifetime of
+// the process, opened on first actual use rather than at import time —
+// lazy avoids paying for it in any process that imports this module
+// without ever serving a public mural request.
+let cached: { db: DatabaseSync; getDocumentStmt: ReturnType<DatabaseSync["prepare"]> } | null = null;
+function getStatements() {
+  if (!cached) {
+    const db = openLibraryDb();
+    cached = { db, getDocumentStmt: db.prepare(`SELECT data FROM library_documents WHERE user_id = ?`) };
+  }
+  return cached;
 }
 
 const EMPTY_RESULT: ResolvedPublicData = { books: [], highlights: [], currentlyReading: [], stats: {} };
 
 export function resolvePublicLibraryData(userId: string, req: PublicDataRequest): ResolvedPublicData {
-  const row = getDb().prepare(`SELECT data FROM library_documents WHERE user_id = ?`).get(userId) as { data: string } | undefined;
+  const row = getStatements().getDocumentStmt.get(userId) as { data: string } | undefined;
   if (!row) return EMPTY_RESULT;
 
   let parsed: unknown;
