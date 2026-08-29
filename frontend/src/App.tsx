@@ -4,6 +4,7 @@ import { RequireUsername } from "./auth/RequireUsername";
 import { DashboardLayout } from "./layouts/DashboardLayout";
 import { ArenaListPage } from "./pages/ArenaListPage";
 import { ArenaSeedPage } from "./pages/ArenaSeedPage";
+import { ArenaViewPage } from "./pages/ArenaViewPage";
 import { ChooseUsernamePage } from "./pages/ChooseUsernamePage";
 import { CollectionsPage } from "./pages/CollectionsPage";
 import { GalleryPage } from "./pages/GalleryPage";
@@ -21,6 +22,7 @@ export function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/oauth-success" element={<OAuthSuccessPage />} />
+      <Route path="/arena/:id" element={<ArenaViewPage />} />
 
       {/* RequireAuth: must be signed in at all. RequireUsername, nested
           inside it: must also have finished setup (a username) — a
