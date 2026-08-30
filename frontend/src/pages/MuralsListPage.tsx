@@ -5,8 +5,10 @@ import { useConfirm } from "../components/ConfirmDialog";
 import { CoverPickerModal } from "../components/CoverPickerModal";
 import { OptionsMenu } from "../components/OptionsMenu";
 import { PageContainer } from "../components/PageContainer";
+import { ShareModal } from "../components/ShareModal";
 import { useLibrary } from "../hooks/useLibrary";
-import { clearMuralCover, createMural, deleteMural, renameMural, setMuralCover, type Mural } from "../lib/murals";
+import { useMurals } from "../hooks/useMurals";
+import type { Mural } from "../lib/murals";
 import { resolveLibraryStyle } from "../lib/libraryStyle";
 
 // Field + direction combined into one option each, rather than two
@@ -31,16 +33,18 @@ const SORT_OPTIONS: Array<{ value: SortBy; label: string }> = [
  *  its own full page rather than an inline expandable section — a
  *  freeform canvas needs real room. */
 export function MuralsListPage() {
-  const { data: library, isLoading, updateLibrary } = useLibrary();
+  const { data: library } = useLibrary();
+  const { data: muralsData, isLoading, create, rename, remove, setCover, clearCover, share, unshare } = useMurals();
   const navigate = useNavigate();
   const confirm = useConfirm();
   const style = resolveLibraryStyle(library?.data.style);
-  const murals = library?.data.murals ?? [];
+  const murals = muralsData ?? [];
 
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
   const [coverMuralId, setCoverMuralId] = useState<string | null>(null);
+  const [sharingMuralId, setSharingMuralId] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<SortBy>("updatedDesc");
@@ -52,7 +56,8 @@ export function MuralsListPage() {
   // on every render to matter, and `murals` itself is a fresh `?? []`
   // fallback array most renders anyway (nothing for a memo to actually
   // key off). `.filter()` returns a fresh array, so `.sort()`-ing it in
-  // place afterward never mutates `murals`/`library.data.murals` itself.
+  // place afterward never mutates `murals`/the `["murals"]` query cache
+  // itself (useMurals.ts).
   const needle = search.trim().toLowerCase();
   const sortField = sortBy.startsWith("created") ? "createdAt" : "updatedAt";
   const sortDirection = sortBy.endsWith("Desc") ? -1 : 1;
@@ -71,9 +76,8 @@ export function MuralsListPage() {
       // uses. Straight into the new mural afterward, same as before:
       // creating one with nothing to build on isn't useful on its own, so
       // skip the extra click back here.
-      const saved = await updateLibrary((data) => ({ ...data, murals: createMural(data.murals ?? [], "Untitled mural") }));
-      const created = saved.data.murals?.[saved.data.murals.length - 1] as Mural | undefined;
-      if (created) navigate(`/dashboard/murals/${created.id}`);
+      const created = await create("Untitled mural");
+      navigate(`/dashboard/murals/${created.id}`);
     } finally {
       setCreating(false);
     }
@@ -83,23 +87,24 @@ export function MuralsListPage() {
     const name = editingName.trim();
     setEditingId(null);
     if (!name) return;
-    await updateLibrary((data) => ({ ...data, murals: renameMural(data.murals ?? [], id, name) }));
+    await rename(id, name);
   }
 
   async function handleDelete(mural: Mural) {
     if (!(await confirm({ title: `Delete "${mural.name}"?`, body: "This can't be undone." }))) return;
-    await updateLibrary((data) => ({ ...data, murals: deleteMural(data.murals ?? [], mural.id) }));
+    await remove(mural.id);
   }
 
   async function handleSaveMuralCover(muralId: string, image: GalleryImage) {
-    await updateLibrary((data) => ({ ...data, murals: setMuralCover(data.murals ?? [], muralId, image.id, image.url) }));
+    await setCover(muralId, image.id, image.url);
   }
 
   async function handleRemoveMuralCover(muralId: string) {
-    await updateLibrary((data) => ({ ...data, murals: clearMuralCover(data.murals ?? [], muralId) }));
+    await clearCover(muralId);
   }
 
   const coverMural = coverMuralId ? murals.find((m) => m.id === coverMuralId) : null;
+  const sharingMural = sharingMuralId ? murals.find((m) => m.id === sharingMuralId) : null;
 
   return (
     <PageContainer style={style}>
@@ -296,6 +301,7 @@ export function MuralsListPage() {
                         }
                       },
                       { label: hasCover ? "Change cover" : "Add cover", onClick: () => setCoverMuralId(mural.id) },
+                      { label: "Share", onClick: () => setSharingMuralId(mural.id) },
                       { label: "Delete", onClick: () => handleDelete(mural), danger: true }
                     ]}
                   />
@@ -317,6 +323,23 @@ export function MuralsListPage() {
           onSelect={(image) => void handleSaveMuralCover(coverMural.id, image)}
           onRemoveCover={() => void handleRemoveMuralCover(coverMural.id)}
           onClose={() => setCoverMuralId(null)}
+        />
+      )}
+
+      {sharingMural && (
+        <ShareModal
+          title={sharingMural.name}
+          shareToken={sharingMural.shareToken}
+          shareUrl={sharingMural.shareUrl}
+          defaultCaption={sharingMural.name}
+          onShare={async () => {
+            const updated = await share(sharingMural.id);
+            return { shareToken: updated.shareToken as string, shareUrl: updated.shareUrl as string };
+          }}
+          onUnshare={async () => {
+            await unshare(sharingMural.id);
+          }}
+          onClose={() => setSharingMuralId(null)}
         />
       )}
     </PageContainer>

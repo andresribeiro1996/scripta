@@ -18,9 +18,15 @@ const durationString = z
 const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
 
-  // The frontend's origin, for CORS — see app.ts. A dev Vite server
-  // defaults to 5173; change this once the frontend is actually deployed
-  // somewhere else.
+  // The frontend's origin, for CORS — see app.ts. Also the base every
+  // share link is built on top of — modules/murals/plugin.ts's and
+  // modules/library/plugin.ts's own publicUrlFor both template a share
+  // token onto this (e.g. `${FRONTEND_URL}/shared/murals/:token`), and
+  // those are the exact links postToSocial (modules/socials) posts out to
+  // X/Threads/etc. A dev Vite server defaults to 5173; change this once
+  // the frontend is actually deployed somewhere else — getting this wrong
+  // in production means share links (and anything posted to social) point
+  // at localhost.
   FRONTEND_URL: z.string().url().default("http://localhost:5173"),
 
   AUTH_DB_PATH: z.string().min(1),
@@ -29,6 +35,10 @@ const envSchema = z.object({
   // Where uploaded images are actually stored on disk, one subdirectory
   // per account — see modules/gallery/adapters/fs/fsImageBlobStore.ts.
   GALLERY_STORAGE_PATH: z.string().min(1),
+
+  // modules/murals' own SQLite file — same one-file-per-module isolation as
+  // every other module's *_DB_PATH above.
+  MURALS_DB_PATH: z.string().min(1).default("./data/murals.sqlite"),
 
   // The auto-resolved cover cache (modules/covers) — a GLOBAL store, one
   // row per book identifier (isbn/imageId) shared across every account,

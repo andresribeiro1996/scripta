@@ -9,13 +9,15 @@ import { useConfirm } from "../components/ConfirmDialog";
 import { CoverPickerModal } from "../components/CoverPickerModal";
 import { PageContainer } from "../components/PageContainer";
 import { PerCardStylePanel } from "../components/PerCardStylePanel";
+import { ShareModal } from "../components/ShareModal";
+import { useLibrary } from "../hooks/useLibrary";
+import { useMurals } from "../hooks/useMurals";
 import { clearBookCover, setBookCover } from "../lib/bookCovers";
 import { deriveSeriesGroups, removeBooksFromAllGroups } from "../lib/groups";
 import { parseImportedFile } from "../lib/fileImport";
 import { assignBookOrder, orderLibraryBooks, reorderOnDrop, seriesGroupByBookKey } from "../lib/libraryOrder";
 import { effectiveCardStyle, resolveLibraryStyle, type PerCardStyle } from "../lib/libraryStyle";
 import { bookKey, mergeLibraryData } from "../lib/merge";
-import { scrubBooksFromMurals } from "../lib/murals";
 
 /** Applies a React state update wrapped in the View Transitions API when
  *  the browser supports it, so a drag-to-reorder visibly animates cards
@@ -52,6 +54,8 @@ function updateWithViewTransition(applyUpdate: () => void) {
 
 export function LibraryPage() {
   const queryClient = useQueryClient();
+  const { scrubBooks } = useMurals();
+  const { share: shareLibraryDoc, unshare: unshareLibraryDoc } = useLibrary();
   const confirm = useConfirm();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -68,6 +72,7 @@ export function LibraryPage() {
   const [coverBookKey, setCoverBookKey] = useState<string | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  const [sharing, setSharing] = useState(false);
 
   async function handleRenameLibrary() {
     const name = nameDraft.trim();
@@ -214,10 +219,14 @@ export function LibraryPage() {
     const saved = await saveLibrary({
       ...current.data,
       books: current.data.books.filter((b) => !selectedKeys.has(bookKey(b))),
-      groups: removeBooksFromAllGroups(current.data.groups ?? [], selectedKeys),
-      murals: scrubBooksFromMurals(current.data.murals ?? [], selectedKeys)
+      groups: removeBooksFromAllGroups(current.data.groups ?? [], selectedKeys)
     });
     queryClient.setQueryData(["library"], saved);
+    // Independent of the library save above — murals live on their own
+    // backend rows now (modules/murals), not on this document, so
+    // scrubbing them out of any mural that referenced a deleted book is a
+    // separate call rather than a field riding along in `saved`.
+    await scrubBooks(selectedKeys);
     setSelectedKeys(new Set());
     setSelectionMode(false);
   }
@@ -298,6 +307,12 @@ export function LibraryPage() {
                 Select…
               </button>
             ))}
+          <button
+            onClick={() => setSharing(true)}
+            className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm hover:bg-(--color-surface-hover)"
+          >
+            Share
+          </button>
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={importing}
@@ -394,6 +409,23 @@ export function LibraryPage() {
           onSelect={(image) => void handleSaveBookCover(coverBook, image)}
           onRemoveCover={() => void handleRemoveBookCover(coverBook)}
           onClose={() => setCoverBookKey(null)}
+        />
+      )}
+
+      {sharing && (
+        <ShareModal
+          title={library?.data.name || "Library"}
+          shareToken={library?.shareToken ?? null}
+          shareUrl={library?.shareUrl ?? null}
+          defaultCaption={library?.data.name ?? "My library"}
+          onShare={async () => {
+            const updated = await shareLibraryDoc();
+            return { shareToken: updated.shareToken as string, shareUrl: updated.shareUrl as string };
+          }}
+          onUnshare={async () => {
+            await unshareLibraryDoc();
+          }}
+          onClose={() => setSharing(false)}
         />
       )}
     </PageContainer>

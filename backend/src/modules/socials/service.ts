@@ -4,7 +4,7 @@
 // service.ts. Nothing here knows about HTTP or Fastify; see routes.ts.
 
 import { decryptSecret, encryptSecret } from "./crypto.js";
-import { BlueskyAuthError, SocialsNotConfiguredError } from "./domain/errors.js";
+import { BlueskyAuthError, SocialNotConnectedError, SocialPostRejectedError, SocialsNotConfiguredError } from "./domain/errors.js";
 import type { SocialsRepository } from "./domain/ports.js";
 import { SOCIAL_PROVIDERS, type SocialProvider, type SocialStatus } from "./domain/types.js";
 
@@ -27,6 +27,11 @@ export interface DecryptedConnection {
   accessToken: string;
   refreshToken: string | null;
   expiresAt: string | null;
+  /** The platform's own id for the connected account — e.g. Threads'
+   *  numeric user id, needed as a path segment for its posting
+   *  endpoints. Null for providers/rows where the OAuth callback never
+   *  recorded one. */
+  accountId: string | null;
   handle: string | null;
 }
 
@@ -41,11 +46,33 @@ export interface SocialsService {
    *  the encryption key isn't set. */
   connectBluesky(userId: string, handle: string, appPassword: string): Promise<void>;
   getDecryptedConnection(userId: string, provider: SocialProvider): DecryptedConnection | null;
+  /** Posts `text` on the user's behalf to a platform this module can
+   *  actually publish to today (X, Threads — see the per-platform notes
+   *  on postToSocial's implementation for why the others aren't here
+   *  yet). Throws SocialNotConnectedError if the user hasn't connected
+   *  that platform, SocialPostRejectedError if the platform's API itself
+   *  rejected the post (bad/expired token, malformed request, or any
+   *  other non-ok response) — never throws a raw fetch/network error out
+   *  to the caller uncategorized. */
+  postToSocial(userId: string, provider: SocialProvider, input: { text: string }): Promise<{ postUrl?: string }>;
 }
 
 export function createSocialsService(repo: SocialsRepository, encryptionKey: string): SocialsService {
   function requireEncryptionKey(): void {
     if (!encryptionKey) throw new SocialsNotConfiguredError();
+  }
+
+  function getDecryptedConnection(userId: string, provider: SocialProvider): DecryptedConnection | null {
+    const row = repo.getConnection(userId, provider);
+    if (!row) return null;
+    return {
+      provider,
+      accessToken: decryptSecret(row.access_token_enc, encryptionKey),
+      refreshToken: row.refresh_token_enc ? decryptSecret(row.refresh_token_enc, encryptionKey) : null,
+      expiresAt: row.expires_at,
+      accountId: row.provider_account_id,
+      handle: row.handle
+    };
   }
 
   return {
@@ -114,16 +141,68 @@ export function createSocialsService(repo: SocialsRepository, encryptionKey: str
       });
     },
 
-    getDecryptedConnection(userId, provider) {
-      const row = repo.getConnection(userId, provider);
-      if (!row) return null;
-      return {
-        provider,
-        accessToken: decryptSecret(row.access_token_enc, encryptionKey),
-        refreshToken: row.refresh_token_enc ? decryptSecret(row.refresh_token_enc, encryptionKey) : null,
-        expiresAt: row.expires_at,
-        handle: row.handle
-      };
+    getDecryptedConnection,
+
+    async postToSocial(userId, provider, input) {
+      if (provider !== "x" && provider !== "threads") {
+        throw new SocialsNotConfiguredError(`Posting isn't supported for "${provider}" yet.`);
+      }
+
+      const conn = getDecryptedConnection(userId, provider);
+      if (!conn) throw new SocialNotConnectedError(provider);
+
+      if (provider === "x") {
+        const res = await fetch("https://api.x.com/2/tweets", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${conn.accessToken}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ text: input.text })
+        });
+
+        if (!res.ok) {
+          if (res.status === 401 || res.status === 403) throw new SocialPostRejectedError("X");
+          throw new SocialPostRejectedError("X", `HTTP ${res.status}`);
+        }
+
+        const body = (await res.json()) as { data: { id: string } };
+        return { postUrl: `https://x.com/i/web/status/${body.data.id}` };
+      }
+
+      // provider === "threads" — a two-step Graph API flow: create a
+      // (unpublished) media container, then publish it. Threads has no
+      // single "post this text" endpoint like X's.
+      if (!conn.accountId) {
+        throw new SocialPostRejectedError("Threads", "missing linked account id");
+      }
+
+      const createRes = await fetch(`https://graph.threads.net/v1.0/${conn.accountId}/threads`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ media_type: "TEXT", text: input.text, access_token: conn.accessToken })
+      });
+
+      if (!createRes.ok) {
+        if (createRes.status === 401) throw new SocialPostRejectedError("Threads");
+        throw new SocialPostRejectedError("Threads", `create step: HTTP ${createRes.status}`);
+      }
+
+      const { id: creationId } = (await createRes.json()) as { id: string };
+
+      const publishRes = await fetch(`https://graph.threads.net/v1.0/${conn.accountId}/threads_publish`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ creation_id: creationId, access_token: conn.accessToken })
+      });
+
+      if (!publishRes.ok) {
+        if (publishRes.status === 401) throw new SocialPostRejectedError("Threads");
+        throw new SocialPostRejectedError("Threads", `publish step: HTTP ${publishRes.status}`);
+      }
+
+      // Threads' publish response carries no browsable permalink.
+      return {};
     }
   };
 }

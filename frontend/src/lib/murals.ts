@@ -157,6 +157,12 @@ export interface Mural {
    *  rendered, so the card doesn't need a separate fetch to resolve it. */
   coverImageId?: string;
   coverImageUrl?: string;
+  /** Public share link state — same idempotent-share/plain-unshare shape
+   *  as the library document's own shareToken/shareUrl (api/library.ts's
+   *  LibraryDocument). null until shared; see hooks/useMurals.ts's
+   *  share()/unshare(). */
+  shareToken: string | null;
+  shareUrl: string | null;
 }
 
 /** Assigns one of the account's uploaded gallery images as this mural's
@@ -248,23 +254,6 @@ export function compactBlocksVertically(blocks: MuralBlock[]): MuralBlock[] {
     placed.push({ ...block, layout: { ...block.layout, y } });
   }
   return placed;
-}
-
-export function createMural(murals: Mural[], name: string): Mural[] {
-  const now = new Date().toISOString();
-  const mural: Mural = { id: newId(), name: name.trim(), blocks: [], createdAt: now, updatedAt: now };
-  return [...murals, mural];
-}
-
-export function renameMural(murals: Mural[], id: string, name: string): Mural[] {
-  const trimmed = name.trim();
-  if (!trimmed) return murals;
-  const now = new Date().toISOString();
-  return murals.map((m) => (m.id === id ? { ...m, name: trimmed, updatedAt: now } : m));
-}
-
-export function deleteMural(murals: Mural[], id: string): Mural[] {
-  return murals.filter((m) => m.id !== id);
 }
 
 /** Adds a new block of `type` (with default config for that type — the

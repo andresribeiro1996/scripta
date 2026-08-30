@@ -9,7 +9,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { authGuard } from "../auth/index.js";
 import { instagramOAuthConfigured, socialsEncryptionConfigured, threadsOAuthConfigured, tiktokOAuthConfigured, xOAuthConfigured } from "../../config/env.js";
-import { BlueskyAuthError, SocialsNotConfiguredError } from "./domain/errors.js";
+import { BlueskyAuthError, SocialNotConnectedError, SocialPostRejectedError, SocialsNotConfiguredError } from "./domain/errors.js";
 import { SOCIAL_PROVIDERS, type SocialProvider } from "./domain/types.js";
 import { createLinkSession } from "./linkSessions.js";
 import type { SocialsService } from "./service.js";
@@ -34,6 +34,8 @@ const blueskyConnectSchema = z.object({
   handle: z.string().min(1, "Handle is required."),
   appPassword: z.string().min(1, "App password is required.")
 });
+
+const postSchema = z.object({ text: z.string().min(1).max(2000) });
 
 export function buildSocialsRoutes(service: SocialsService) {
   return async function socialsRoutes(app: FastifyInstance) {
@@ -66,6 +68,22 @@ export function buildSocialsRoutes(service: SocialsService) {
         throw err;
       }
       reply.send({ socials: service.listStatuses(request.user.id, enabledByProvider) });
+    });
+
+    app.post<{ Params: { provider: string } }>("/socials/:provider/post", { preHandler: authGuard }, async (request, reply) => {
+      const { provider } = request.params;
+      if (provider !== "x" && provider !== "threads") {
+        return reply.code(400).send({ error: `Posting isn't supported for "${provider}" yet.` });
+      }
+      const parsed = postSchema.safeParse(request.body);
+      if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? "Invalid request." });
+      try {
+        return reply.send(await service.postToSocial(request.user.id, provider, { text: parsed.data.text }));
+      } catch (err) {
+        if (err instanceof SocialNotConnectedError) return reply.code(409).send({ error: err.message });
+        if (err instanceof SocialPostRejectedError) return reply.code(502).send({ error: err.message });
+        throw err;
+      }
     });
 
     app.delete<{ Params: { provider: string } }>("/socials/:provider", { preHandler: authGuard }, async (request, reply) => {

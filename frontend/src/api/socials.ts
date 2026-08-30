@@ -50,4 +50,13 @@ export async function disconnectSocial(provider: SocialProvider): Promise<Social
   return body.socials;
 }
 
+/** ShareModal.tsx's compose step — posts to the account's already-connected
+ *  X/Threads account (see backend's modules/socials/routes.ts POST
+ *  /socials/:provider/post). Thrown ApiError messages (409 not connected,
+ *  502 rejected by the platform) are already human-readable, meant to be
+ *  shown directly. */
+export async function postToSocial(provider: "x" | "threads", text: string): Promise<{ postUrl?: string }> {
+  return (await apiFetch(`/socials/${provider}/post`, { method: "POST", body: JSON.stringify({ text }) })) as { postUrl?: string };
+}
+
 export { ApiError };

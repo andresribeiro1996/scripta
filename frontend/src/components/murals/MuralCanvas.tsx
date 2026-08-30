@@ -36,17 +36,24 @@ export function MuralCanvas({
   onStyleBlock,
   onDuplicateBlock,
   onDeleteBlock,
-  onUpdateBlock
+  onUpdateBlock,
+  statsOverride
 }: {
   mural: Mural;
   editMode: boolean;
   books: Array<Record<string, unknown>>;
   images: GalleryImage[];
-  onLayoutChange: (blockId: string, layout: BlockLayout) => void;
-  onConfigureBlock: (block: MuralBlock) => void;
-  onStyleBlock: (block: MuralBlock) => void;
-  onDuplicateBlock: (blockId: string) => void;
-  onDeleteBlock: (blockId: string) => void;
+  // All five of these are only ever invoked from inside the `editMode &&`
+  // controls block below, or (onLayoutChange) from a drag/resize gesture
+  // that `isDraggable`/`isResizable` (both gated on `editMode`) make
+  // possible in the first place — so they're all optional here purely for
+  // the read-only public share pages (pages/SharedMuralPage.tsx), which
+  // always render with `editMode={false}` and have nothing to persist to.
+  onLayoutChange?: (blockId: string, layout: BlockLayout) => void;
+  onConfigureBlock?: (block: MuralBlock) => void;
+  onStyleBlock?: (block: MuralBlock) => void;
+  onDuplicateBlock?: (blockId: string) => void;
+  onDeleteBlock?: (blockId: string) => void;
   // Optional: only the tier list block type has live, in-place edits (its
   // own drag-and-drop ranking board — see BlockRenderer.tsx/
   // BookBlocks.tsx's TierListBlockView) that need to persist immediately
@@ -55,6 +62,15 @@ export function MuralCanvas({
   // that modal's own Save, so this is threaded straight through to
   // BlockRenderer and ignored by every other case.
   onUpdateBlock?: (block: MuralBlock) => void;
+  // Optional: the public share page (pages/SharedMuralPage.tsx) has no
+  // live library to compute stats from — the mural owner's public GET
+  // /murals/shared/:token response already carries precomputed numbers
+  // (see backend/src/modules/library/publicResolver.ts), threaded straight
+  // through to StatsBlockView, which prefers this over its own
+  // computeStat(metric, books) when present. `undefined` everywhere else
+  // (the authenticated editor never passes this) preserves the existing
+  // live-computed behavior exactly.
+  statsOverride?: Record<string, number>;
 }) {
   const layout = mural.blocks.map((b) => ({ i: b.id, x: b.layout.x, y: b.layout.y, w: b.layout.w, h: b.layout.h }));
 
@@ -68,7 +84,7 @@ export function MuralCanvas({
   // controlled prop to keep up in real time — only the FINAL position,
   // once the gesture ends, needs to make it back to the saved document.
   function handleGestureEnd(_layout: unknown, _oldItem: unknown, newItem: { i: string; x: number; y: number; w: number; h: number }) {
-    onLayoutChange(newItem.i, { x: newItem.x, y: newItem.y, w: newItem.w, h: newItem.h });
+    onLayoutChange?.(newItem.i, { x: newItem.x, y: newItem.y, w: newItem.w, h: newItem.h });
   }
 
   return (
@@ -141,21 +157,21 @@ export function MuralCanvas({
               color: style.textColor ?? undefined
             }}
           >
-            <BlockRenderer block={block} books={books} images={images} editMode={editMode} onUpdateBlock={onUpdateBlock} />
+            <BlockRenderer block={block} books={books} images={images} editMode={editMode} onUpdateBlock={onUpdateBlock} statsOverride={statsOverride} />
             {editMode && (
               <div className="mural-block-controls absolute top-1.5 right-1.5 opacity-0 transition-opacity group-hover:opacity-100">
                 <OptionsMenu
                   title="Block settings"
                   items={[
-                    { label: "Style", onClick: () => onStyleBlock(block) },
-                    { label: "Configure", onClick: () => onConfigureBlock(block) },
-                    { label: "Duplicate", onClick: () => onDuplicateBlock(block.id) },
+                    { label: "Style", onClick: () => onStyleBlock?.(block) },
+                    { label: "Configure", onClick: () => onConfigureBlock?.(block) },
+                    { label: "Duplicate", onClick: () => onDuplicateBlock?.(block.id) },
                     // No confirmation on this one, unlike every other
                     // delete in the app — composing a mural means
                     // adding/removing blocks constantly, and re-adding
                     // one is cheap, unlike deleting a book/image/mural
                     // itself.
-                    { label: "Delete", onClick: () => onDeleteBlock(block.id), danger: true }
+                    { label: "Delete", onClick: () => onDeleteBlock?.(block.id), danger: true }
                   ]}
                 />
               </div>

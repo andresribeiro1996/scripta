@@ -11,14 +11,24 @@
 import fastifyCors from "@fastify/cors";
 import Fastify from "fastify";
 import { env } from "./config/env.js";
+import { runStartupMigrations } from "./migrations/runStartupMigrations.js";
 import { registerAuthModule } from "./modules/auth/index.js";
 import { registerArenaModule } from "./modules/arena/index.js";
 import { registerCoversModule } from "./modules/covers/index.js";
 import { registerGalleryModule } from "./modules/gallery/index.js";
 import { registerLibraryModule } from "./modules/library/index.js";
+import { registerMuralsModule } from "./modules/murals/index.js";
 import { registerSocialsModule } from "./modules/socials/index.js";
 
 export function buildApp() {
+  // Moves any still-embedded library.murals[] into the new murals table
+  // before any module's routes come online — see
+  // migrations/runStartupMigrations.ts for why this is safe to run on
+  // every boot. Deliberately before Fastify/app.register: this only
+  // touches the two modules' own SQLite files directly, nothing about
+  // the app instance itself.
+  runStartupMigrations();
+
   const app = Fastify({ logger: true });
 
   // Genuinely app-wide (unlike each module's own rate limiter) — the
@@ -38,6 +48,7 @@ export function buildApp() {
   app.register(registerGalleryModule);
   app.register(registerCoversModule);
   app.register(registerSocialsModule);
+  app.register(registerMuralsModule);
 
   return app;
 }
