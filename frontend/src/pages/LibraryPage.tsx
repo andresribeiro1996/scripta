@@ -4,6 +4,7 @@ import { flushSync } from "react-dom";
 import type { GalleryImage } from "../api/gallery";
 import { fetchLibrary, saveLibrary, type LibraryDocument } from "../api/library";
 import { BookCard } from "../components/BookCard";
+import { BookDetailSheet } from "../components/BookDetailSheet";
 import { BookGrid } from "../components/BookGrid";
 import { useConfirm } from "../components/ConfirmDialog";
 import { CoverPickerModal } from "../components/CoverPickerModal";
@@ -18,7 +19,7 @@ import { deriveSeriesGroups, removeBooksFromAllGroups } from "../lib/groups";
 import { parseImportedFile } from "../lib/fileImport";
 import { assignBookOrder, orderLibraryBooks, reorderOnDrop, seriesGroupByBookKey } from "../lib/libraryOrder";
 import { effectiveCardStyle, resolveLibraryStyle, type PerCardStyle } from "../lib/libraryStyle";
-import { filterBooks, sortBooks, type SortKey, type StatusFilter } from "../lib/libraryView";
+import { filterBooks, nextReadStatus, sortBooks, type SortKey, type StatusFilter } from "../lib/libraryView";
 import { bookKey, mergeLibraryData } from "../lib/merge";
 
 /** Applies a React state update wrapped in the View Transitions API when
@@ -72,6 +73,7 @@ export function LibraryPage() {
   const [nameDraft, setNameDraft] = useState("");
   const [styleBookKey, setStyleBookKey] = useState<string | null>(null);
   const [coverBookKey, setCoverBookKey] = useState<string | null>(null);
+  const [detailBookKey, setDetailBookKey] = useState<string | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [sharing, setSharing] = useState(false);
@@ -158,6 +160,15 @@ export function LibraryPage() {
     if (!current) return;
     const key = bookKey(book);
     const updatedBooks = current.data.books.map((b) => (bookKey(b) === key ? { ...b, _style: bookStyle } : b));
+    const saved = await saveLibrary({ ...current.data, books: updatedBooks });
+    queryClient.setQueryData(["library"], saved);
+  }
+
+  async function handleSetBookStatus(book: Record<string, unknown>) {
+    const current = queryClient.getQueryData<LibraryDocument>(["library"]);
+    if (!current) return;
+    const key = bookKey(book);
+    const updatedBooks = current.data.books.map((b) => (bookKey(b) === key ? { ...b, ReadStatus: nextReadStatus(b.ReadStatus) } : b));
     const saved = await saveLibrary({ ...current.data, books: updatedBooks });
     queryClient.setQueryData(["library"], saved);
   }
@@ -261,6 +272,7 @@ export function LibraryPage() {
   const bookSeriesGroup = useMemo(() => seriesGroupByBookKey(library?.data.books ?? [], library?.data.groups ?? []), [library]);
   const styleBook = styleBookKey ? books.find((b) => bookKey(b) === styleBookKey) : null;
   const coverBook = coverBookKey ? books.find((b) => bookKey(b) === coverBookKey) : null;
+  const detailBook = detailBookKey ? books.find((b) => bookKey(b) === detailBookKey) : null;
 
   return (
     <PageContainer style={style}>
@@ -410,7 +422,7 @@ export function LibraryPage() {
               <BookCard
                 key={String(book.ContentID ?? i)}
                 book={book}
-                onClick={() => {}}
+                onClick={() => setDetailBookKey(bookKey(book))}
                 style={cardStyle}
                 draggable={!selectionMode}
                 onReorder={handleReorder}
@@ -423,6 +435,16 @@ export function LibraryPage() {
             );
           })}
         </BookGrid>
+      )}
+
+      {detailBook && (
+        <BookDetailSheet
+          book={detailBook}
+          onOpenStyle={(b) => setStyleBookKey(bookKey(b))}
+          onOpenCoverPicker={(b) => setCoverBookKey(bookKey(b))}
+          onSetStatus={(b) => void handleSetBookStatus(b)}
+          onClose={() => setDetailBookKey(null)}
+        />
       )}
 
       {styleBook && (
