@@ -69,11 +69,13 @@ function coverParamsFor(book: Record<string, unknown>): ResolveCoverParams {
 export function CoverImage({
   book,
   onHasCoverChange,
-  fit = "cover"
+  fit = "cover",
+  alt = ""
 }: {
   book: Record<string, unknown>;
   onHasCoverChange?: (hasCover: boolean) => void;
   fit?: "cover" | "contain";
+  alt?: string;
 }) {
   const confirmedUrl = typeof book._coverUrl === "string" ? book._coverUrl : null;
   const [confirmedFailed, setConfirmedFailed] = useState(false);
@@ -125,7 +127,7 @@ export function CoverImage({
       {currentSrc ? (
         <img
           src={currentSrc}
-          alt=""
+          alt={alt}
           // Deliberately no loading="lazy" — proven unreliable for this
           // app already (see viewer's cover-loading fix): the browser's
           // intersection-based trigger sometimes just never fires, even
@@ -251,6 +253,15 @@ export function BookCard({
     <div
       ref={setRefs}
       {...(dragEnabled ? { ...attributes, ...listeners } : {})}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || (e.key === " " && !dragEnabled)) {
+          e.preventDefault();
+          if (selectable) onToggleSelect?.(book);
+          else onClick();
+        }
+      }}
       onClick={selectable ? () => onToggleSelect?.(book) : onClick}
       style={{
         aspectRatio: style.cardAspectRatio,
@@ -283,18 +294,29 @@ export function BookCard({
       }}
       className={`group relative cursor-pointer overflow-hidden bg-(--color-border) transition-transform ${style.cardShadow ? "shadow-sm" : ""} ${style.cardHoverEffect && !selectable ? "hover:-translate-y-0.5 hover:scale-[1.01] hover:shadow-lg" : ""} ${dragEnabled ? "select-none" : ""} ${isDragging ? "touch-none opacity-60" : ""}`}
     >
-      <CoverImage book={book} onHasCoverChange={setHasCover} />
+      <CoverImage book={book} onHasCoverChange={setHasCover} alt={showOverlayText ? "" : String(book.Title ?? "Book cover")} />
 
       {selectable && (
-        <div
-          className={`absolute top-2.5 left-2.5 flex h-6 w-6 items-center justify-center rounded-full border-2 backdrop-blur-xs ${selected ? "border-(--color-accent) bg-(--color-accent)" : "border-white/70 bg-[rgba(10,8,6,0.4)]"}`}
-        >
-          {selected && (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-          )}
-        </div>
+        <>
+          <div
+            aria-hidden="true"
+            className={`pointer-events-none absolute top-2.5 left-2.5 flex h-6 w-6 items-center justify-center rounded-full border-2 backdrop-blur-xs ${selected ? "border-(--color-accent) bg-(--color-accent)" : "border-white/70 bg-[rgba(10,8,6,0.4)]"}`}
+          >
+            {selected && (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            )}
+          </div>
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={() => onToggleSelect?.(book)}
+            onClick={(e) => e.stopPropagation()}
+            aria-label={`Select ${String(book.Title ?? "this book")}`}
+            className="absolute top-2.5 left-2.5 h-6 w-6 cursor-pointer appearance-none bg-transparent"
+          />
+        </>
       )}
 
       {((onOpenStyle || onOpenCoverPicker) && !selectable) && (
