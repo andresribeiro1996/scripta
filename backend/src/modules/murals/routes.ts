@@ -31,12 +31,14 @@ import { authGuard } from "../auth/index.js";
 // (service.ts, adapters/, domain/) from here.
 import { resolvePublicLibraryData } from "../library/index.js";
 import { extractReferences } from "./domain/blockRefs.js";
+import { FolderCycleError, InvalidFolderReferenceError } from "./domain/errors.js";
 import type { MuralsService } from "./service.js";
 
 const idParamSchema = z.object({ id: z.string().uuid() });
 
 const createMuralSchema = z.object({
-  name: z.string().min(1, "name is required and must be non-empty.")
+  name: z.string().min(1, "name is required and must be non-empty."),
+  folderId: z.string().uuid().nullable().optional()
 });
 
 // Deliberately light-touch, same treatment modules/library/routes.ts
@@ -45,16 +47,31 @@ const createMuralSchema = z.object({
 const updateMuralSchema = z
   .object({
     name: z.string().min(1).optional(),
-    blocks: z.array(z.unknown()).optional()
+    blocks: z.array(z.unknown()).optional(),
+    folderId: z.string().uuid().nullable().optional()
   })
-  .refine((body) => body.name !== undefined || body.blocks !== undefined, {
-    message: "At least one of name or blocks must be provided."
+  .refine((body) => body.name !== undefined || body.blocks !== undefined || body.folderId !== undefined, {
+    message: "At least one of name, blocks, or folderId must be provided."
   });
 
 const setCoverSchema = z.object({
   imageId: z.string().min(1),
   url: z.string().min(1)
 });
+
+const createFolderSchema = z.object({
+  name: z.string().min(1, "name is required and must be non-empty."),
+  parentId: z.string().uuid().nullable().optional()
+});
+
+const updateFolderSchema = z
+  .object({
+    name: z.string().min(1).optional(),
+    parentId: z.string().uuid().nullable().optional()
+  })
+  .refine((body) => body.name !== undefined || body.parentId !== undefined, {
+    message: "At least one of name or parentId must be provided."
+  });
 
 /** The authenticated CRUD + share/unshare surface — everything that needs
  *  a signed-in user, and that a normal editing session can call at real
@@ -72,8 +89,13 @@ export function buildMuralRoutes(service: MuralsService) {
       if (!parsed.success) {
         return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? "Invalid request." });
       }
-      const mural = service.createMural(request.user.id, parsed.data.name);
-      return reply.code(201).send(mural);
+      try {
+        const mural = service.createMural(request.user.id, parsed.data.name, parsed.data.folderId ?? null);
+        return reply.code(201).send(mural);
+      } catch (err) {
+        if (err instanceof InvalidFolderReferenceError) return reply.code(400).send({ error: err.message });
+        throw err;
+      }
     });
 
     app.get("/murals/:id", { preHandler: authGuard }, async (request, reply) => {
@@ -97,11 +119,16 @@ export function buildMuralRoutes(service: MuralsService) {
       if (!body.success) {
         return reply.code(400).send({ error: body.error.issues[0]?.message ?? "Invalid request." });
       }
-      const mural = service.updateMural(request.user.id, params.data.id, body.data);
-      if (!mural) {
-        return reply.code(404).send({ error: "No mural with that id." });
+      try {
+        const mural = service.updateMural(request.user.id, params.data.id, body.data);
+        if (!mural) {
+          return reply.code(404).send({ error: "No mural with that id." });
+        }
+        return reply.send(mural);
+      } catch (err) {
+        if (err instanceof InvalidFolderReferenceError) return reply.code(400).send({ error: err.message });
+        throw err;
       }
-      return reply.send(mural);
     });
 
     app.delete("/murals/:id", { preHandler: authGuard }, async (request, reply) => {
@@ -166,6 +193,65 @@ export function buildMuralRoutes(service: MuralsService) {
         return reply.code(404).send({ error: "No mural with that id." });
       }
       return reply.send(mural);
+    });
+
+    app.get("/murals/folders", { preHandler: authGuard }, async (request, reply) => {
+      return reply.send({ folders: service.listFolders(request.user.id) });
+    });
+
+    app.post("/murals/folders", { preHandler: authGuard }, async (request, reply) => {
+      const parsed = createFolderSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? "Invalid request." });
+      }
+      try {
+        const folder = service.createFolder(request.user.id, parsed.data.name, parsed.data.parentId ?? null);
+        return reply.code(201).send(folder);
+      } catch (err) {
+        if (err instanceof InvalidFolderReferenceError) return reply.code(400).send({ error: err.message });
+        throw err;
+      }
+    });
+
+    app.put("/murals/folders/:id", { preHandler: authGuard }, async (request, reply) => {
+      const params = idParamSchema.safeParse(request.params);
+      if (!params.success) {
+        return reply.code(400).send({ error: "Invalid folder id." });
+      }
+      const body = updateFolderSchema.safeParse(request.body);
+      if (!body.success) {
+        return reply.code(400).send({ error: body.error.issues[0]?.message ?? "Invalid request." });
+      }
+      let folder;
+      try {
+        if (body.data.name !== undefined) {
+          folder = service.renameFolder(request.user.id, params.data.id, body.data.name);
+        }
+        if (body.data.parentId !== undefined) {
+          folder = service.moveFolder(request.user.id, params.data.id, body.data.parentId);
+        }
+      } catch (err) {
+        if (err instanceof InvalidFolderReferenceError || err instanceof FolderCycleError) {
+          return reply.code(400).send({ error: err.message });
+        }
+        throw err;
+      }
+      if (!folder) {
+        return reply.code(404).send({ error: "No folder with that id." });
+      }
+      return reply.send(folder);
+    });
+
+    app.delete("/murals/folders/:id", { preHandler: authGuard }, async (request, reply) => {
+      const params = idParamSchema.safeParse(request.params);
+      if (!params.success) {
+        return reply.code(400).send({ error: "Invalid folder id." });
+      }
+      const deleted = service.deleteFolder(request.user.id, params.data.id);
+      if (!deleted) {
+        return reply.code(404).send({ error: "No folder with that id." });
+      }
+      return reply.code(204).send();
     });
   };
 }

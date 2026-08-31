@@ -147,6 +147,7 @@ Rate-limited (30 requests/minute, scoped to this module's routes only) and given
 - **Per-account freeform dashboards** — the backend half of the frontend's Murals feature (see the [frontend README](../frontend/README.md)'s "Murals" section for what a mural *is*: ten block types, the snap-to-grid canvas, tier lists, the lot). A `Mural` is `{id, name, blocks, coverImageId?, coverImageUrl?, shareToken, shareUrl, createdAt, updatedAt}`; each mural's `blocks` are stored as one opaque JSON blob, the same "the module stores and returns the document without understanding its internals" stance `library` takes — all block-type semantics live in the frontend's `lib/murals.ts`.
 - **Cover assignment from the gallery pool** — `PUT`/`DELETE /murals/:id/cover` set/clear a mural's card cover the same way `setBookCover` does for a book, so the same gallery-image deletion scrubbing applies (`scrubImageFromMurals` on the frontend; the cover fields just clear here).
 - **Public share links, same shape as `library`'s** — `POST /murals/:id/share` mints an unguessable UUID token (idempotent, like `library`'s); `POST /murals/:id/unshare` revokes it. `GET /murals/shared/:token` is the public, unauthenticated view — registered in its own scope with its own tight rate limit, `Cache-Control: no-store` (a live view, unshareable at any moment), and block/book references resolved server-side into redacted public shapes (no highlights, no private book fields).
+- **Nested mural folders** — a `mural_folders` adjacency list (`parent_id`) plus a nullable `folder_id` on each mural. Deleting a folder splices its children and murals up one level (never deletes content); moving a folder into itself/descendants is rejected. Folders never surface on the public share view.
 - **Its own SQLite file** (`MURALS_DB_PATH`), same one-module-one-database isolation as every other module.
 
 | Method | Path | Auth required | Notes |
@@ -161,6 +162,10 @@ Rate-limited (30 requests/minute, scoped to this module's routes only) and given
 | POST | `/murals/:id/share` | ✓ | mints/reuses the share token → `{mural}` carrying `shareUrl` |
 | POST | `/murals/:id/unshare` | ✓ | revokes it → `{mural}` |
 | GET | `/murals/shared/:token` | — | the redacted public view (see above); `404` for unknown OR unshared tokens, indistinguishably |
+| GET | `/murals/folders` | ✓ | `{folders: MuralFolder[]}` for the caller's account |
+| POST | `/murals/folders` | ✓ | `{name, parentId?}` → `{muralFolder}`, `201` (400 if parentId isn't yours) |
+| PUT | `/murals/folders/:id` | ✓ | `{name? \| parentId?}` at least one (`parentId: null` = root) → `{muralFolder}` (400 on cycle) |
+| DELETE | `/murals/folders/:id` | ✓ | children/murals splice up one level → `204`, or `404` |
 
 ## Hexagonal architecture — the standing convention for dependencies like a database
 
