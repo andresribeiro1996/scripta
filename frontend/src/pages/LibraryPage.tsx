@@ -7,6 +7,7 @@ import { BookCard } from "../components/BookCard";
 import { BookGrid } from "../components/BookGrid";
 import { useConfirm } from "../components/ConfirmDialog";
 import { CoverPickerModal } from "../components/CoverPickerModal";
+import { LibraryToolbar } from "../components/LibraryToolbar";
 import { PageContainer } from "../components/PageContainer";
 import { PerCardStylePanel } from "../components/PerCardStylePanel";
 import { ShareModal } from "../components/ShareModal";
@@ -17,6 +18,7 @@ import { deriveSeriesGroups, removeBooksFromAllGroups } from "../lib/groups";
 import { parseImportedFile } from "../lib/fileImport";
 import { assignBookOrder, orderLibraryBooks, reorderOnDrop, seriesGroupByBookKey } from "../lib/libraryOrder";
 import { effectiveCardStyle, resolveLibraryStyle, type PerCardStyle } from "../lib/libraryStyle";
+import { filterBooks, sortBooks, type SortKey, type StatusFilter } from "../lib/libraryView";
 import { bookKey, mergeLibraryData } from "../lib/merge";
 
 /** Applies a React state update wrapped in the View Transitions API when
@@ -73,6 +75,9 @@ export function LibraryPage() {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [sharing, setSharing] = useState(false);
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [sortKey, setSortKey] = useState<SortKey>("manual");
 
   async function handleRenameLibrary() {
     const name = nameDraft.trim();
@@ -242,7 +247,12 @@ export function LibraryPage() {
   // reference stable across re-renders that don't actually change the
   // data, where the `?? []` fallbacks above would look "new" to useMemo
   // every time.
-  const displayBooks = useMemo(() => orderLibraryBooks(library?.data.books ?? [], library?.data.groups ?? []), [library]);
+  const ordered = useMemo(() => orderLibraryBooks(library?.data.books ?? [], library?.data.groups ?? []), [library]);
+  const displayBooks = useMemo(
+    () => sortBooks(filterBooks(ordered, query, statusFilter), sortKey),
+    [ordered, query, statusFilter, sortKey]
+  );
+  const toolbarActive = query.trim() !== "" || statusFilter !== "all" || sortKey !== "manual";
   // Which series (if any) each book belongs to, for style priority — a
   // series' own style panel (GroupsPage.tsx, series only) overrides the
   // library-wide one for its cards. Built from the exact same clustering
@@ -342,6 +352,17 @@ export function LibraryPage() {
         <div className="mb-5 rounded-lg bg-(--color-danger-soft) px-3 py-2 text-sm text-(--color-danger)">{importError}</div>
       )}
 
+      {books.length > 0 && (
+        <LibraryToolbar
+          query={query}
+          onQueryChange={setQuery}
+          status={statusFilter}
+          onStatusChange={setStatusFilter}
+          sort={sortKey}
+          onSortChange={setSortKey}
+        />
+      )}
+
       {isLoading && <p className="text-sm text-(--color-text-dim)">Loading your library…</p>}
 
       {!isLoading && books.length === 0 && (
@@ -362,7 +383,25 @@ export function LibraryPage() {
         </div>
       )}
 
-      {books.length > 0 && (
+      {books.length > 0 && displayBooks.length === 0 && (
+        <div className="rounded-xl border-2 border-dashed border-(--color-border) py-12 text-center">
+          <p className="mb-3 text-(--color-text)">No books match.</p>
+          {toolbarActive && (
+            <button
+              onClick={() => {
+                setQuery("");
+                setStatusFilter("all");
+                setSortKey("manual");
+              }}
+              className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover)"
+            >
+              Clear search and filters
+            </button>
+          )}
+        </div>
+      )}
+
+      {books.length > 0 && displayBooks.length > 0 && (
         <BookGrid style={style}>
           {displayBooks.map((book, i) => {
             const seriesGroup = bookSeriesGroup.get(bookKey(book));
