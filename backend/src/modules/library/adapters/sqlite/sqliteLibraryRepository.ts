@@ -442,7 +442,7 @@ export function createSqliteLibraryRepository(db: DatabaseSync): LibraryReposito
       const now = new Date().toISOString();
       db.exec("BEGIN IMMEDIATE");
       try {
-        updateBlockLayoutStmt.run({
+        const result = updateBlockLayoutStmt.run({
           $x: layout.x,
           $y: layout.y,
           $w: layout.w,
@@ -451,9 +451,19 @@ export function createSqliteLibraryRepository(db: DatabaseSync): LibraryReposito
           $mural_id: muralId,
           $user_id: userId
         });
-        touchMuralStmt.run(now, muralId, userId);
-        bumpVersionStmt.run(now, userId);
+        const updated = Number(result.changes) > 0;
+
+        // Don't bump the version for a write that changed nothing —
+        // otherwise a request naming a block that no longer exists would
+        // invalidate every other device's version for no reason.
+        if (updated) {
+          touchMuralStmt.run(now, muralId, userId);
+          bumpVersionStmt.run(now, userId);
+        }
         db.exec("COMMIT");
+
+        const row = selectVersion.get(userId) as Record<string, unknown> | undefined;
+        return { updated, version: intOrNull(row?.version) ?? 0 };
       } catch (err) {
         db.exec("ROLLBACK");
         throw err;

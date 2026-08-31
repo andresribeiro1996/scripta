@@ -1,6 +1,6 @@
 import type { Group } from "../lib/groups";
 import type { LibraryStyleSettings } from "../lib/libraryStyle";
-import type { Mural } from "../lib/murals";
+import type { BlockLayout, Mural } from "../lib/murals";
 import { ApiError, apiFetch } from "./client";
 
 export interface LibraryData {
@@ -29,6 +29,25 @@ export interface LibraryData {
 export interface LibraryDocument {
   data: LibraryData;
   updatedAt: string;
+  /** Bumped by the server on every write. Quote it back on a save and the
+   *  server refuses the write if someone else (usually this same person
+   *  on another device) saved in between — see hooks/useLibrary.ts, which
+   *  turns that refusal into a re-apply rather than an error. */
+  version: number;
+}
+
+/** Thrown when a save was refused because the library moved on
+ *  underneath it. Carries the server's current document so the caller can
+ *  re-apply its change on top without a second round trip. */
+export class LibraryConflictError extends ApiError {
+  currentVersion: number;
+  current: LibraryDocument | null;
+
+  constructor(currentVersion: number, current: LibraryDocument | null) {
+    super(409, "This library was changed elsewhere.");
+    this.currentVersion = currentVersion;
+    this.current = current;
+  }
 }
 
 /** null means "no library saved yet" (backend 404s, not an error case here) */
@@ -41,6 +60,32 @@ export async function fetchLibrary(): Promise<LibraryDocument | null> {
   }
 }
 
-export async function saveLibrary(data: LibraryData): Promise<LibraryDocument> {
-  return (await apiFetch("/library", { method: "PUT", body: JSON.stringify({ data }) })) as LibraryDocument;
+export async function saveLibrary(data: LibraryData, expectedVersion?: number): Promise<LibraryDocument> {
+  try {
+    return (await apiFetch("/library", {
+      method: "PUT",
+      body: JSON.stringify({ data, expectedVersion })
+    })) as LibraryDocument;
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 409) {
+      const body = err.body as { currentVersion?: number; current?: LibraryDocument | null } | undefined;
+      throw new LibraryConflictError(body?.currentVersion ?? 0, body?.current ?? null);
+    }
+    throw err;
+  }
+}
+
+/** Moves one block on one mural, instead of re-sending the whole library.
+ *  Dragging a block used to rewrite every book, group and mural the
+ *  account had, once per drop. */
+export async function saveMuralBlockLayout(
+  muralId: string,
+  blockId: string,
+  layout: BlockLayout,
+  expectedVersion?: number
+): Promise<{ version: number }> {
+  return (await apiFetch(`/library/murals/${encodeURIComponent(muralId)}/blocks/${encodeURIComponent(blockId)}/layout`, {
+    method: "PUT",
+    body: JSON.stringify({ layout, expectedVersion })
+  })) as { version: number };
 }

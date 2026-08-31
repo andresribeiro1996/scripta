@@ -7,6 +7,7 @@ import { MuralCanvas } from "../components/murals/MuralCanvas";
 import { PageContainer } from "../components/PageContainer";
 import { useGalleryImages } from "../hooks/useGalleryImages";
 import { useLibrary } from "../hooks/useLibrary";
+import { useMuralBlockLayout } from "../hooks/useMuralBlockLayout";
 import { resolveLibraryStyle, type BlockStyle } from "../lib/libraryStyle";
 import { addBlock, duplicateBlock, removeBlock, renameMural, updateBlock, type BlockLayout, type BlockType, type MuralBlock } from "../lib/murals";
 
@@ -20,6 +21,9 @@ export function MuralEditorPage() {
   const { muralId } = useParams<{ muralId: string }>();
   const { data: library, isLoading, updateLibrary } = useLibrary();
   const { images } = useGalleryImages();
+  // Moving a block goes through its own endpoint, not a whole-library
+  // save — see hooks/useMuralBlockLayout.ts.
+  const saveBlockLayout = useMuralBlockLayout(muralId);
   const style = resolveLibraryStyle(library?.data.style);
   const books = library?.data.books ?? [];
   const murals = library?.data.murals ?? [];
@@ -77,11 +81,10 @@ export function MuralEditorPage() {
     await updateLibrary((data) => ({ ...data, murals: removeBlock(data.murals ?? [], mural.id, blockId) }));
   }
 
-  async function handleLayoutChange(blockId: string, layout: BlockLayout) {
+  function handleLayoutChange(blockId: string, layout: BlockLayout) {
     if (!mural) return;
-    const current = mural.blocks.find((b) => b.id === blockId);
-    if (!current) return;
-    await updateLibrary((data) => ({ ...data, murals: updateBlock(data.murals ?? [], mural.id, { ...current, layout }) }));
+    if (!mural.blocks.some((b) => b.id === blockId)) return;
+    saveBlockLayout(blockId, layout);
   }
 
   const configuringBlock = configuringBlockId ? mural?.blocks.find((b) => b.id === configuringBlockId) : null;
@@ -168,7 +171,7 @@ export function MuralEditorPage() {
           editMode={editMode}
           books={books}
           images={images}
-          onLayoutChange={(blockId, layout) => void handleLayoutChange(blockId, layout)}
+          onLayoutChange={handleLayoutChange}
           onConfigureBlock={(block) => setConfiguringBlockId(block.id)}
           onStyleBlock={(block) => setStylingBlockId(block.id)}
           onDuplicateBlock={(blockId) => void handleDuplicateBlock(blockId)}

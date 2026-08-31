@@ -117,9 +117,27 @@ Shipped in three slices so nothing breaks at any point:
   remembering as the shape of bug this rework exists to surface: invisible
   with one user, unavoidable with many.
 
-- **Slice 2 — per-entity endpoints.** Add granular routes, move the frontend onto
-  them, add optimistic concurrency (`409` on a stale version) and debounce the
-  mural layout saves.
+- **Slice 2 — optimistic concurrency + the first per-entity endpoint.** *(done)*
+  Every write now quotes the version it edited; a stale write is refused with
+  `409` carrying the server's current document, and `updateLibrary` re-applies
+  its updater to that document rather than losing the edit — the updater is a
+  pure `(current) => next`, so re-running it against fresh state *is* the merge.
+  All nine call sites that previously issued raw unconditional `saveLibrary`
+  calls (LibraryPage's seven, the gallery-image scrub) were routed through that
+  funnel, so the protection is account-wide rather than partial.
+
+  `PUT /library/murals/:muralId/blocks/:blockId/layout` is the first per-entity
+  route, backing a debounced `useMuralBlockLayout` hook: dropping a block is now
+  a ~56-byte request instead of re-sending every book, highlight, group and
+  mural the account has.
+
+  **Still on the document endpoint:** every other write (book style, covers,
+  reorder, delete, groups CRUD, mural CRUD, library style/name, import). They are
+  correct and now conflict-safe, just not yet proportional in size. Moving them
+  needs one route per entity plus a frontend change per call site, and the
+  repository port already exposes `upsertBook`/`upsertGroup`/`upsertMural`/
+  `delete*` for exactly that — deliberately left unrouted rather than shipped as
+  unused endpoints.
 - **Slice 3 — retire the blob.** Delete the document endpoint and the legacy
   table once nothing reads them.
 

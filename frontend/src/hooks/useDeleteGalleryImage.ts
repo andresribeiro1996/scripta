@@ -8,14 +8,18 @@
 // remember which one applies.
 
 import { useQueryClient } from "@tanstack/react-query";
-import { saveLibrary, type LibraryDocument } from "../api/library";
+import { type LibraryDocument } from "../api/library";
 import { scrubImageFromBooks } from "../lib/bookCovers";
 import { scrubImageFromMurals } from "../lib/murals";
 import { useGalleryImages } from "./useGalleryImages";
+import { useLibrary } from "./useLibrary";
 
 export function useDeleteGalleryImage() {
   const queryClient = useQueryClient();
   const { remove } = useGalleryImages();
+  // Through updateLibrary rather than a raw saveLibrary so the scrub
+  // can't overwrite a save made on another device — see hooks/useLibrary.ts.
+  const { updateLibrary } = useLibrary();
 
   return async function deleteGalleryImageAndScrub(id: string): Promise<void> {
     await remove(id);
@@ -29,7 +33,10 @@ export function useDeleteGalleryImage() {
     const scrubbedMurals = scrubImageFromMurals(murals, id);
     if (scrubbedBooks === current.data.books && scrubbedMurals === murals) return; // nothing referenced it — nothing to save
 
-    const saved = await saveLibrary({ ...current.data, books: scrubbedBooks, murals: scrubbedMurals });
-    queryClient.setQueryData(["library"], saved);
+    await updateLibrary((data) => ({
+      ...data,
+      books: scrubImageFromBooks(data.books, id),
+      murals: scrubImageFromMurals(data.murals ?? [], id)
+    }));
   };
 }

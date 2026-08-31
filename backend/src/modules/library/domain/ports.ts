@@ -39,6 +39,16 @@ export interface LibraryRepository {
   deleteMural(userId: string, muralId: string): void;
 
   /** The write that `MuralEditorPage`'s drag handler should be making:
-   *  one block's position, not the entire library. */
-  saveMuralBlockLayout(userId: string, muralId: string, blockId: string, layout: BlockLayout): void;
+   *  one block's position, not the entire library.
+   *
+   *  Reports whether a row was actually updated, so the caller can tell
+   *  "moved it" from "that block isn't there any more" (deleted on
+   *  another device) rather than silently succeeding — and the resulting
+   *  version, so the client can stay in step without a re-read. */
+  saveMuralBlockLayout(
+    userId: string,
+    muralId: string,
+    blockId: string,
+    layout: BlockLayout
+  ): { updated: boolean; version: number };
 }
