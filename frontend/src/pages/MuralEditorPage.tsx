@@ -28,6 +28,9 @@ export function MuralEditorPage() {
   const murals = muralsData ?? [];
   const mural = murals.find((m) => m.id === muralId);
 
+  const [touchOnly] = useState(
+    () => typeof window !== "undefined" && Boolean(window.matchMedia?.("(pointer: coarse)").matches)
+  );
   const [editMode, setEditMode] = useState(false);
   const [configuringBlockId, setConfiguringBlockId] = useState<string | null>(null);
   const [stylingBlockId, setStylingBlockId] = useState<string | null>(null);
@@ -161,22 +164,30 @@ export function MuralEditorPage() {
           >
             Share
           </button>
-          <button
-            onClick={() => setEditMode((e) => !e)}
-            className={`rounded-lg px-3 py-2 text-sm font-semibold ${
-              editMode ? "bg-(--color-accent) text-white" : "border border-(--color-border) bg-(--color-surface) hover:bg-(--color-surface-hover)"
-            }`}
-          >
-            {editMode ? "Done editing" : "Edit"}
-          </button>
+          {!touchOnly && (
+            <button
+              onClick={() => setEditMode((e) => !e)}
+              className={`rounded-lg px-3 py-2 text-sm font-semibold ${
+                editMode ? "bg-(--color-accent) text-white" : "border border-(--color-border) bg-(--color-surface) hover:bg-(--color-surface-hover)"
+              }`}
+            >
+              {editMode ? "Done editing" : "Edit"}
+            </button>
+          )}
         </div>
       </header>
+
+      {touchOnly && (
+        <p className="mb-4 rounded-lg bg-(--color-accent-soft) px-3 py-2 text-sm text-(--color-accent)">
+          Editing murals works best on a desktop — this is a read-only view.
+        </p>
+      )}
 
       {mural.blocks.length === 0 && (
         <div className="rounded-xl border-2 border-dashed border-(--color-border) py-16 text-center">
           <p className="mb-1 text-(--color-text)">This mural is empty.</p>
           <p className="mb-4 text-sm text-(--color-text-dim)">Turn on editing and add your first block.</p>
-          {!editMode && (
+          {!editMode && !touchOnly && (
             <button onClick={() => setEditMode(true)} className="rounded-lg bg-(--color-accent) px-4 py-2 font-semibold text-white">
               Start building
             </button>
