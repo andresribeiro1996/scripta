@@ -1,3 +1,5 @@
+import { useDraggable, useDroppable } from "@dnd-kit/core";
+import { CSS } from "@dnd-kit/utilities";
 import { useEffect, useState } from "react";
 import { forgetResolvedCover, peekResolvedCover, resolveCover, type ResolveCoverParams } from "../api/covers";
 import { normalizeImageId, normalizeIsbn, statusLabel } from "../lib/covers";
@@ -159,8 +161,7 @@ export function BookCard({
   // grew a `style` prop, for the handful of call sites (if any) that
   // don't pass one explicitly.
   style = DEFAULT_LIBRARY_STYLE,
-  draggable = false,
-  onReorder,
+  reorderable = false,
   onOpenStyle,
   onOpenCoverPicker,
   selectable = false,
@@ -177,12 +178,7 @@ export function BookCard({
   /** Enables drag-to-reorder (LibraryPage.tsx only — Series/Collections
    *  detail views and the style-page preview don't pass this). Ignored
    *  while `selectable` — selecting and dragging don't mix. */
-  draggable?: boolean;
-  /** Fired on the card something got dropped ONTO, with the dragged
-   *  card's bookKey and this card's own book — see lib/libraryOrder.ts's
-   *  reorderOnDrop() for what actually moves (a whole series if the
-   *  dragged card belongs to one, otherwise just itself). */
-  onReorder?: (draggedKey: string, targetBook: Record<string, unknown>) => void;
+  reorderable?: boolean;
   /** Shows a small "Style" button (top-left, visible on hover) opening
    *  this book's own style override — see PerCardStylePanel.tsx and
    *  book._style. Omitted entirely (no button rendered) wherever editing
@@ -214,7 +210,15 @@ export function BookCard({
   const label = statusLabel(book.ReadStatus);
   const highlights = Array.isArray(book.highlights) ? book.highlights.length : 0;
   const [hasCover, setHasCover] = useState(false);
-  const [dragOver, setDragOver] = useState(false);
+  const key = bookKey(book);
+  const dragEnabled = reorderable && !selectable;
+  const { attributes, listeners, setNodeRef: setDragNodeRef, transform, isDragging } = useDraggable({ id: key, disabled: !dragEnabled });
+  const { setNodeRef: setDropNodeRef, isOver } = useDroppable({ id: key, disabled: !reorderable });
+  const dropTarget = isOver && !isDragging;
+  const setRefs = (el: HTMLDivElement | null) => {
+    setDragNodeRef(el);
+    setDropNodeRef(el);
+  };
   const showOverlayText = style.showTitleAuthor || !hasCover;
 
   // Same ratio between the gradient's near-stop and mid-stop the old
@@ -241,41 +245,13 @@ export function BookCard({
   // scoping it there avoids ever having two simultaneously-rendered cards
   // for the same book (e.g. across different Series/Collections group
   // blocks) fight over the same name.
-  const viewTransitionName = draggable ? `book-${bookKey(book).replace(/[^a-zA-Z0-9_-]/g, "_")}` : undefined;
+  const viewTransitionName = reorderable ? `book-${key.replace(/[^a-zA-Z0-9_-]/g, "_")}` : undefined;
 
   return (
     <div
+      ref={setRefs}
+      {...(dragEnabled ? { ...attributes, ...listeners } : {})}
       onClick={selectable ? () => onToggleSelect?.(book) : onClick}
-      draggable={draggable && !selectable}
-      onDragStart={
-        draggable && !selectable
-          ? (e) => {
-              e.dataTransfer.setData("text/plain", bookKey(book));
-              e.dataTransfer.effectAllowed = "move";
-            }
-          : undefined
-      }
-      onDragOver={
-        draggable && !selectable
-          ? (e) => {
-              // Required for onDrop to ever fire — browsers don't allow
-              // dropping on an element by default.
-              e.preventDefault();
-              setDragOver(true);
-            }
-          : undefined
-      }
-      onDragLeave={draggable && !selectable ? () => setDragOver(false) : undefined}
-      onDrop={
-        draggable && !selectable
-          ? (e) => {
-              e.preventDefault();
-              setDragOver(false);
-              const draggedKey = e.dataTransfer.getData("text/plain");
-              if (draggedKey) onReorder?.(draggedKey, book);
-            }
-          : undefined
-      }
       style={{
         aspectRatio: style.cardAspectRatio,
         borderRadius: `${style.cardRadius}px`,
@@ -289,9 +265,11 @@ export function BookCard({
         borderLeftWidth: `${style.cardBorderSides.left ? style.cardBorderWidth : 0}px`,
         borderStyle: style.cardBorderWidth > 0 ? style.cardBorderStyle : "none",
         borderColor: resolveBorderColor(style.cardBorderColor, style.cardBorderOpacity),
-        outline: selected ? "3px solid var(--color-accent)" : dragOver ? "2px solid var(--color-accent)" : undefined,
+        outline: selected ? "3px solid var(--color-accent)" : dropTarget ? "2px solid var(--color-accent)" : undefined,
         outlineOffset: 2,
         viewTransitionName,
+        transform: isDragging ? CSS.Translate.toString(transform) : undefined,
+        zIndex: isDragging ? 10 : undefined,
         // Sets the base for the title/author/status overlay text below —
         // sized in `em` specifically so it responds to this (see
         // components/murals/MuralCanvas.tsx's identical reasoning for
@@ -303,7 +281,7 @@ export function BookCard({
         fontFamily: cardFontFamilyCss(style.cardFontFamily),
         fontSize: `${style.cardFontSize}px`
       }}
-      className={`group relative cursor-pointer overflow-hidden bg-(--color-border) transition-transform ${style.cardShadow ? "shadow-sm" : ""} ${style.cardHoverEffect && !selectable ? "hover:-translate-y-0.5 hover:scale-[1.01] hover:shadow-lg" : ""}`}
+      className={`group relative cursor-pointer overflow-hidden bg-(--color-border) transition-transform ${style.cardShadow ? "shadow-sm" : ""} ${style.cardHoverEffect && !selectable ? "hover:-translate-y-0.5 hover:scale-[1.01] hover:shadow-lg" : ""} ${dragEnabled ? "select-none" : ""} ${isDragging ? "touch-none opacity-60" : ""}`}
     >
       <CoverImage book={book} onHasCoverChange={setHasCover} />
 

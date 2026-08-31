@@ -1,3 +1,4 @@
+import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
@@ -61,6 +62,11 @@ export function LibraryPage() {
   const { share: shareLibraryDoc, unshare: unshareLibraryDoc } = useLibrary();
   const confirm = useConfirm();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const suppressClickAfterDragRef = useRef(false);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { delay: 150, tolerance: 5 } }),
+    useSensor(KeyboardSensor)
+  );
   const [importError, setImportError] = useState<string | null>(null);
   const [importStatus, setImportStatus] = useState<string | null>(null);
 
@@ -132,10 +138,9 @@ export function LibraryPage() {
   // shifts out of the way right away, not after a network round trip.
   // The save happens in the background; a failure rolls the local state
   // back rather than leaving the UI showing an order that didn't persist.
-  function handleReorder(draggedKey: string, targetBook: Record<string, unknown>) {
+  function handleReorder(draggedKey: string, targetKey: string) {
     const current = queryClient.getQueryData<LibraryDocument>(["library"]);
     if (!current) return;
-    const targetKey = bookKey(targetBook);
     if (draggedKey === targetKey) return;
     const reordered = reorderOnDrop(current.data.books, current.data.groups ?? [], draggedKey, targetKey);
     if (reordered === current.data.books) return; // no-op (e.g. dropped within the same series)
@@ -149,6 +154,13 @@ export function LibraryPage() {
         console.error("Failed to persist new book order:", err);
         queryClient.setQueryData(["library"], current); // roll back the optimistic update
       });
+  }
+
+  function handleDragEnd(e: DragEndEvent) {
+    if (e.over && String(e.over.id) !== String(e.active.id)) {
+      handleReorder(String(e.active.id), String(e.over.id));
+    }
+    if (e.activatorEvent instanceof KeyboardEvent) suppressClickAfterDragRef.current = true;
   }
 
   // A book's own style override — highest priority, takes effect
@@ -414,27 +426,41 @@ export function LibraryPage() {
       )}
 
       {books.length > 0 && displayBooks.length > 0 && (
-        <BookGrid style={style}>
-          {displayBooks.map((book, i) => {
-            const seriesGroup = bookSeriesGroup.get(bookKey(book));
-            const cardStyle = effectiveCardStyle(style, seriesGroup?.style, book._style as PerCardStyle | undefined);
-            return (
-              <BookCard
-                key={String(book.ContentID ?? i)}
-                book={book}
-                onClick={() => setDetailBookKey(bookKey(book))}
-                style={cardStyle}
-                draggable={!selectionMode}
-                onReorder={handleReorder}
-                onOpenStyle={selectionMode ? undefined : () => setStyleBookKey(bookKey(book))}
-                onOpenCoverPicker={selectionMode ? undefined : () => setCoverBookKey(bookKey(book))}
-                selectable={selectionMode}
-                selected={selectedKeys.has(bookKey(book))}
-                onToggleSelect={handleToggleSelect}
-              />
-            );
-          })}
-        </BookGrid>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+          onDragCancel={() => {
+            suppressClickAfterDragRef.current = true;
+          }}
+        >
+          <BookGrid style={style}>
+            {displayBooks.map((book, i) => {
+              const seriesGroup = bookSeriesGroup.get(bookKey(book));
+              const cardStyle = effectiveCardStyle(style, seriesGroup?.style, book._style as PerCardStyle | undefined);
+              return (
+                <BookCard
+                  key={String(book.ContentID ?? i)}
+                  book={book}
+                  onClick={() => {
+                    if (suppressClickAfterDragRef.current) {
+                      suppressClickAfterDragRef.current = false;
+                      return;
+                    }
+                    setDetailBookKey(bookKey(book));
+                  }}
+                  style={cardStyle}
+                  reorderable={!selectionMode}
+                  onOpenStyle={selectionMode ? undefined : () => setStyleBookKey(bookKey(book))}
+                  onOpenCoverPicker={selectionMode ? undefined : () => setCoverBookKey(bookKey(book))}
+                  selectable={selectionMode}
+                  selected={selectedKeys.has(bookKey(book))}
+                  onToggleSelect={handleToggleSelect}
+                />
+              );
+            })}
+          </BookGrid>
+        </DndContext>
       )}
 
       {detailBook && (
