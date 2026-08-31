@@ -135,7 +135,8 @@ export function MuralFolderTree({
         })}
 
       <button
-        onClick={() => onCreateFolder(selectedFolderId)}
+        onClick={() => onCreateFolder(selectedFolderId === null ? null : (folders.find((f) => f.id === selectedFolderId)?.parentId ?? null))}
+        title="Create a folder next to the current selection"
         className="mt-2 rounded-lg border border-dashed border-(--color-border) px-2 py-1.5 text-left text-xs text-(--color-text-dim) transition-colors hover:border-(--color-accent) hover:text-(--color-accent)"
       >
         + New folder
