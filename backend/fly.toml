@@ -1,0 +1,75 @@
+# Fly.io configuration for the Scripta API.
+#
+# Referenced by .github/workflows/deploy.yml, which is inert until you opt
+# in — see that file. If you host somewhere else, this file is unused.
+#
+# Create the app and its volume once, before the first deploy:
+#   fly apps create scripta-api
+#   fly volumes create scripta_data --size 3 --region <region>
+#   fly secrets set JWT_ACCESS_SECRET=... JWT_REFRESH_SECRET=... \
+#                   SOCIALS_ENCRYPTION_KEY=... \
+#                   FRONTEND_URL=https://your-domain \
+#                   PUBLIC_API_URL=https://api.your-domain
+#
+# Generate each secret fresh and keep a copy in a password manager, not
+# only here: losing SOCIALS_ENCRYPTION_KEY makes every stored social token
+# permanently undecryptable, and rotating the JWT secrets signs everyone
+# out.
+
+app = "scripta-api"
+primary_region = "lhr"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "3000"
+  NODE_ENV = "production"
+  # Fly terminates TLS and proxies to the app, so request.ip is the
+  # proxy's address unless this is set — and every rate limiter in the app
+  # keys on request.ip. See backend/src/config/env.ts.
+  TRUST_PROXY = "true"
+
+# The five SQLite files and both blob directories live here. This is the
+# whole account database: without this mount, every signup, library and
+# uploaded image disappears when the machine is replaced.
+[[mounts]]
+  source = "scripta_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+
+  # ONE MACHINE, ALWAYS ON. Both halves matter:
+  #
+  # A SQLite file on a volume can only be attached to a single machine, so
+  # two instances would each get their own copy of the database and
+  # silently diverge — this is the constraint that has to hold until the
+  # app moves to Postgres (docs/DEPLOYMENT-PLAN.md phase 3).
+  #
+  # And auto-stop would make the first request after an idle period pay a
+  # cold start, on an app whose users arrive in ones and twos.
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 50
+    hard_limit = 100
+
+  # Fly won't route to a machine that fails this, and a deploy whose new
+  # machine never passes is rolled back instead of taking traffic.
+  [[http_service.checks]]
+    interval = "15s"
+    timeout = "3s"
+    grace_period = "10s"
+    method = "GET"
+    path = "/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  # sharp decodes and re-encodes uploads in-process; 512 MB is tight for
+  # that once a few requests overlap.
+  memory = "1gb"

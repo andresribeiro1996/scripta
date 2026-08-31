@@ -1,0 +1,12 @@
+# Everything the image builds for itself, plus anything that would
+# invalidate the layer cache or leak local state into the image.
+node_modules
+dist
+data
+.env
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+.test-tmp
+test
+README.md

@@ -1,0 +1,106 @@
+# Deploys main. INERT UNTIL YOU TURN IT ON.
+#
+# Nothing here runs until the repository variable DEPLOY_ENABLED is set to
+# "true" (Settings → Secrets and variables → Actions → Variables). That
+# guard exists so adding a secret doesn't silently start deploying, and so
+# this file can live in the repo before any hosting account exists.
+#
+# The API job assumes Fly.io, which is what docs/DEPLOYMENT-PLAN.md
+# recommends — one always-on machine with a volume, because the app writes
+# SQLite files and uploaded images to local disk. If you pick Render or
+# Railway instead, delete the api job entirely: both deploy from a Git
+# push on their own and need no workflow at all.
+#
+# Required to actually deploy:
+#   variable DEPLOY_ENABLED   = true
+#   secret   FLY_API_TOKEN    = flyctl tokens create deploy
+#   variable API_URL          = https://api.your-domain  (baked into the frontend)
+#   secret   CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID (frontend only)
+
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  api:
+    name: API
+    if: vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      # Deploys the Dockerfile in backend/. Fly runs the release with the
+      # app's own /health check; a machine that never becomes healthy is
+      # rolled back rather than taking traffic.
+      #
+      # NOTE ON MIGRATIONS: the library module migrates its own schema at
+      # boot (see modules/library/adapters/sqlite/migrateFromDocuments.ts),
+      # which is safe here only because this app runs a SINGLE machine.
+      # Once it runs more than one — which is what moving to Postgres
+      # unlocks — a migration that isn't backward-compatible with the
+      # still-running old version will break requests mid-deploy, and it
+      # needs to become an explicit ordered step before the rollout rather
+      # than something every instance races to do at startup.
+      - name: Deploy to Fly
+        run: flyctl deploy --config fly.toml --remote-only
+        working-directory: backend
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+  frontend:
+    name: Frontend
+    if: vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.22.2"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+        working-directory: frontend
+
+      # VITE_API_URL is substituted into the bundle here and cannot be
+      # changed afterwards without rebuilding — this is the only place the
+      # deployed frontend learns where its API lives.
+      - name: Build
+        env:
+          VITE_API_URL: ${{ vars.API_URL }}
+        run: |
+          if [ -z "$VITE_API_URL" ]; then
+            echo "The API_URL repository variable is not set. The API URL is baked into the bundle at build time, so this must be set before deploying."
+            exit 1
+          fi
+          npm run build
+        working-directory: frontend
+
+      # Cloudflare Pages. Two things this deployment needs that aren't in
+      # the build itself, and which belong in the Pages project settings
+      # rather than here:
+      #   - an SPA fallback rewriting unmatched paths to /index.html, or
+      #     refreshing on /dashboard/settings returns a 404;
+      #   - short cache TTLs on index.html, the manifest and the service
+      #     worker, or the PWA's autoUpdate keeps handing people a stale
+      #     build from cache.
+      - name: Publish to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=scripta
+          workingDirectory: frontend
