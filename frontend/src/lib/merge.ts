@@ -2,13 +2,13 @@
 // account. Only kicks in from the SECOND import onward — the first import
 // has nothing to merge against, so it's saved as-is (see DashboardPage).
 //
-// This intentionally lives entirely on the frontend, not the backend: the
-// `library` module was built to treat the document as an opaque blob (see
-// backend/README.md's hexagonal-architecture section) — it doesn't
-// understand book shape, and shouldn't have to just for this. The
-// frontend already understands book shape (it's what parses every import
-// format), so it merges locally and PUTs the result through the same
-// unchanged `saveLibrary` call.
+// This intentionally lives entirely on the frontend, not the backend. The
+// backend stores books as rows now, but it still doesn't interpret a
+// book's fields — the frontend is what parses every import format, so it
+// merges locally and PUTs the result. bookKey() below is the one piece
+// the backend DOES duplicate (in domain/document.ts), because groups and
+// mural blocks reference books by it; the two must stay byte-identical or
+// every one of those references is silently orphaned.
 
 import type { LibraryData } from "../api/library";
 import { normalizeIsbn } from "./covers";

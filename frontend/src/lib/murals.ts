@@ -3,9 +3,11 @@
 // gallery image, etc. — dragged/resized on a snap-to-grid canvas (see
 // components/murals/MuralCanvas.tsx, which wraps react-grid-layout).
 //
-// Lives entirely on the frontend, same reasoning as lib/groups.ts: the
-// backend's `library` module treats the whole document as an opaque blob
-// — `murals` is just another field on it, no backend change needed.
+// Lives entirely on the frontend, same reasoning as lib/groups.ts. The
+// backend stores murals and their blocks as real rows now, but mural
+// *logic* stays here; the backend persists the result. One exception:
+// a block's LAYOUT has its own endpoint, because dragging a block used to
+// re-send the whole library — see hooks/useMuralBlockLayout.ts.
 //
 // Every block references its content by key (bookKey(), a highlight's
 // BookmarkID, a gallery image id) rather than embedding a copy of it, same

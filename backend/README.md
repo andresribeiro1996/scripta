@@ -53,8 +53,13 @@ curl -X PUT http://localhost:3000/library \
 `user` in every response above is `{id, email, username}` — `username` is `null` only for a Google-signed-in account that hasn't claimed one yet.
 
 ### `library`
-- **One JSON document per account** — the same shape the [exporter](../exporter/export.py) produces (`{source, schema_version, book_count, books}`). Full replace, not a merge: saving overwrites whatever was there before, same mental model as the old viewer's drag-and-drop.
-- Validation is deliberately light: the body must be `{"data": {"books": [...], ...}}` — an object with a `books` array. What's *inside* each book isn't checked; this module treats the document as an opaque blob it stores and returns, not something it understands the internals of.
+- **Normalised into entities** — `library_settings`, `books`, `highlights`, `groups`/`group_books`, `murals`/`mural_blocks`. This module used to store the whole library as one JSON blob per account, which meant every change rewrote everything: a save was capped by the request body limit, a large library blocked the event loop, and moving one mural block re-sent every book on the account. See [docs/DEPLOYMENT-PLAN.md](../docs/DEPLOYMENT-PLAN.md).
+- It is a **hybrid**, not a column per field, and deliberately so: a book record has no fixed schema (the exporter emits whatever columns the device actually had, a Goodreads CSV carries a different set, the app adds its own `_`-prefixed fields). Real columns cover what the app queries, sorts or joins on; everything else rides in a JSON column and is round-tripped verbatim. Normalising the *structure* is what removed the rewrite-everything problem — the leaf attributes genuinely have no fixed shape.
+- Book identity is `bookKey()` (`isbn:<isbn>`, falling back to `ta:<title>|<author>`), mirroring `frontend/src/lib/merge.ts`. Groups and mural blocks reference books by that key, never by a row id, so it survives a re-import.
+- **`GET`/`PUT /library` still speak the whole-document shape** — the same JSON the exporter produces — assembled from and decomposed into those rows. That is a compatibility layer, not the storage model; most of the frontend still uses it. Per-entity routes are replacing it one at a time.
+- **Writes are versioned.** Every response carries a `version`; quote it back as `expectedVersion` and a save made from a stale version is refused with `409` (carrying the server's current document) instead of silently overwriting whatever another device just saved. Omit it and the write is unconditional, which is what the first-ever save needs.
+- Validation of the document body stays deliberately light: it must be `{"data": {"books": [...], ...}}`. What's inside each book still isn't checked.
+- **Two storage adapters, one port.** SQLite by default; set `DATABASE_URL` and the same module runs on Postgres (`adapters/postgres/`) with no change to `service.ts` or `domain/`. Migrate an existing deployment with `scripts/sqlite-to-postgres.mjs`.
 
 | Method | Path | Auth required | Notes |
 |---|---|---|---|
@@ -67,7 +72,7 @@ Each account only ever sees its own document — verified in testing with two se
 
 ### `gallery`
 - **A per-account pool of uploaded images**, primarily meant to be assignable as custom book covers by the [frontend](../frontend/README.md#gallery-and-custom-book-covers) — but the module itself is generic; it doesn't know anything about books.
-- Unlike `library`, this module does NOT treat uploads as an opaque blob it just stores — every upload goes through a real validation/normalization pipeline before anything is trusted:
+- Unlike `library`, which accepts whatever book fields an importer supplies, this module does NOT trust uploads as-is — every upload goes through a real validation/normalization pipeline first:
   1. **Size cap** (20 MB) — checked twice: `@fastify/multipart`'s own `fileSize` limit aborts an oversized upload stream before it's even fully buffered, and `service.ts` re-checks the buffered size as a backstop.
   2. **Real-format sniff, not the client's word for it** — `sharp(buffer).metadata()` reads the file's actual header. The client-supplied MIME type and the original filename's extension are never trusted; a non-image or corrupt file fails here with `422`.
   3. **Input dimension cap** (8000×8000) — guards against a decompression-bomb-style file: small on disk, huge once decoded, which would otherwise be an easy way to spike server memory/CPU with one request.

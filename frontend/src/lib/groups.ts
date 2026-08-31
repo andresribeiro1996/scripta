@@ -7,10 +7,12 @@
 // hand, same as a collection. See deriveSeriesGroups below for the
 // auto-seed step, and DashboardPage/LibraryPage for where it's called.
 //
-// Lives entirely on the frontend, same reasoning as lib/merge.ts: the
-// backend's `library` module treats the whole document as an opaque blob
-// (hexagonal design, see backend/README.md) — `groups` is just another
-// field on that blob, no backend change needed at all.
+// Lives entirely on the frontend. The backend now stores groups as real
+// rows (backend/src/modules/library/adapters/*/schema.sql), but its
+// document endpoint still accepts and returns them as a field on the
+// library document, so this file needs no backend change. Group *logic*
+// — naming, membership, the series auto-seed — stays here; the backend
+// only persists the result.
 
 import type { PerCardStyle } from "./libraryStyle";
 import { bookKey } from "./merge";
