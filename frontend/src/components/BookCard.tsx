@@ -80,6 +80,7 @@ export function CoverImage({
   const confirmedUrl = typeof book._coverUrl === "string" ? book._coverUrl : null;
   const [confirmedFailed, setConfirmedFailed] = useState(false);
   const [autoUrl, setAutoUrl] = useState<string | null>(() => peekResolvedCover(coverParamsFor(book)) ?? null);
+  const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
   const useAuto = !confirmedUrl || confirmedFailed;
 
   // Book identity (or the confirmed URL specifically) changed — reset
@@ -134,7 +135,8 @@ export function CoverImage({
           // for cards already in the viewport. Eager loading is a fine
           // trade-off for a personal library (at most a few hundred
           // covers).
-          className={`absolute inset-0 h-full w-full ${fit === "contain" ? "object-contain" : "object-cover"}`}
+          className={`absolute inset-0 h-full w-full ${fit === "contain" ? "object-contain" : "object-cover"} transition-opacity duration-200 ${loadedSrc === currentSrc ? "opacity-100" : "opacity-0"}`}
+          onLoad={() => setLoadedSrc(currentSrc)}
           onError={() => {
             if (!useAuto) setConfirmedFailed(true); // the confirmed/legacy URL broke — fall through to a fresh backend lookup
             else {
