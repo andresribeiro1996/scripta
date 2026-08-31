@@ -40,10 +40,6 @@ link — same content, easier to read).
   it has been live for zero minutes. Deleting the compatibility layer and the
   rollback path before either has seen production would remove the safety net
   precisely when it is most needed.
-- **The remaining per-entity routes.** The document endpoint is still correct
-  and now conflict-safe; the rest is a size optimisation, and doing ~25 call
-  sites blind against a frontend with no test suite was a worse trade than
-  leaving them.
 
 ---
 
@@ -165,13 +161,18 @@ Shipped in three slices so nothing breaks at any point:
   a ~56-byte request instead of re-sending every book, highlight, group and
   mural the account has.
 
-  **Still on the document endpoint:** every other write (book style, covers,
-  reorder, delete, groups CRUD, mural CRUD, library style/name, import). They are
-  correct and now conflict-safe, just not yet proportional in size. Moving them
-  needs one route per entity plus a frontend change per call site, and the
-  repository port already exposes `upsertBook`/`upsertGroup`/`upsertMural`/
-  `delete*` for exactly that — deliberately left unrouted rather than shipped as
-  unused endpoints.
+  **All six per-entity routes now exist** (`PUT`/`DELETE` for books, groups and
+  murals), and every single-entity write on the frontend uses them: group CRUD
+  and membership, mural CRUD and block editing, per-book style and covers.
+  Renaming a group is a ~156-byte request instead of the whole library.
+
+  **Deliberately still on the document endpoint**, because these genuinely span
+  the whole document rather than one entity: the import merge, the drag reorder
+  (which can renumber every book), the library-wide name and style, and the
+  multi-book delete that must also scrub those books out of every group and
+  mural in the same write. Splitting those would mean several requests that must
+  either all land or all roll back — a transaction the document endpoint already
+  gives for free.
 - **Slice 3 — retire the blob.** Delete the document endpoint and the legacy
   table once nothing reads them.
 

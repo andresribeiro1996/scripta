@@ -10,9 +10,9 @@
 // operation to have a route in front of it — it is the hot path, fired on
 // every drag. See docs/DEPLOYMENT-PLAN.md.
 
-import { toContents, toDocument } from "./domain/document.js";
+import { toBookEntity, toContents, toDocument, toGroupEntity, toMuralEntity } from "./domain/document.js";
 import { LibraryEntityNotFoundError, LibraryVersionConflictError } from "./domain/errors.js";
-import type { BlockLayout, LibraryDocument } from "./domain/types.js";
+import type { BlockLayout, BookRecord, LibraryDocument } from "./domain/types.js";
 import type { LibraryRepository } from "./domain/ports.js";
 
 export interface LibraryService {
@@ -30,6 +30,20 @@ export interface LibraryService {
     layout: BlockLayout,
     expectedVersion?: number
   ): Promise<{ version: number }>;
+
+  // --- per-entity writes -------------------------------------------------
+  //
+  // Each of these replaces a whole-document PUT for an operation that only
+  // ever touches ONE entity: renaming a group, restyling a book, editing a
+  // mural's blocks. The document endpoint stays for genuinely cross-cutting
+  // work — an import that merges everything, or deleting books that must
+  // also be scrubbed out of every group and mural in the same write.
+  saveBook(userId: string, book: BookRecord, expectedVersion?: number): Promise<{ version: number; bookKey: string }>;
+  deleteBook(userId: string, bookKey: string, expectedVersion?: number): Promise<{ version: number }>;
+  saveGroup(userId: string, group: unknown, expectedVersion?: number): Promise<{ version: number }>;
+  deleteGroup(userId: string, groupId: string, expectedVersion?: number): Promise<{ version: number }>;
+  saveMural(userId: string, mural: unknown, expectedVersion?: number): Promise<{ version: number }>;
+  deleteMural(userId: string, muralId: string, expectedVersion?: number): Promise<{ version: number }>;
 }
 
 export function createLibraryService(repo: LibraryRepository): LibraryService {
@@ -70,6 +84,47 @@ export function createLibraryService(repo: LibraryRepository): LibraryService {
       const { updated, version } = await repo.saveMuralBlockLayout(userId, muralId, blockId, layout);
       if (!updated) throw new LibraryEntityNotFoundError("That block");
       return { version };
+    },
+
+    async saveBook(userId, book, expectedVersion) {
+      const current = await assertVersion(userId, expectedVersion);
+      // The key is derived server-side rather than taken from the caller:
+      // it is what groups and mural blocks reference, so letting a client
+      // supply one that disagrees with the book's own fields would orphan
+      // those references. Same function the document path uses.
+      const entity = toBookEntity(book);
+      await repo.upsertBook(userId, entity);
+      return { version: current + 1, bookKey: entity.bookKey };
+    },
+
+    async deleteBook(userId, bookKey, expectedVersion) {
+      const current = await assertVersion(userId, expectedVersion);
+      await repo.deleteBook(userId, bookKey);
+      return { version: current + 1 };
+    },
+
+    async saveGroup(userId, group, expectedVersion) {
+      const current = await assertVersion(userId, expectedVersion);
+      await repo.upsertGroup(userId, toGroupEntity(group));
+      return { version: current + 1 };
+    },
+
+    async deleteGroup(userId, groupId, expectedVersion) {
+      const current = await assertVersion(userId, expectedVersion);
+      await repo.deleteGroup(userId, groupId);
+      return { version: current + 1 };
+    },
+
+    async saveMural(userId, mural, expectedVersion) {
+      const current = await assertVersion(userId, expectedVersion);
+      await repo.upsertMural(userId, toMuralEntity(mural));
+      return { version: current + 1 };
+    },
+
+    async deleteMural(userId, muralId, expectedVersion) {
+      const current = await assertVersion(userId, expectedVersion);
+      await repo.deleteMural(userId, muralId);
+      return { version: current + 1 };
     }
   };
 }

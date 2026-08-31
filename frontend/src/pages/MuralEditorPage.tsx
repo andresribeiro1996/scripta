@@ -19,7 +19,7 @@ import { addBlock, duplicateBlock, removeBlock, renameMural, updateBlock, type B
  *  corners, and each block's configure/delete controls. */
 export function MuralEditorPage() {
   const { muralId } = useParams<{ muralId: string }>();
-  const { data: library, isLoading, updateLibrary } = useLibrary();
+  const { data: library, isLoading, saveMural } = useLibrary();
   const { images } = useGalleryImages();
   // Moving a block goes through its own endpoint, not a whole-library
   // save — see hooks/useMuralBlockLayout.ts.
@@ -40,13 +40,16 @@ export function MuralEditorPage() {
     const name = nameDraft.trim();
     setEditingName(false);
     if (!name) return;
-    await updateLibrary((data) => ({ ...data, murals: renameMural(data.murals ?? [], mural.id, name) }));
+    await saveMural(mural.id, (murals) => renameMural(murals, mural.id, name));
   }
 
   async function handleAddBlock(type: BlockType) {
     if (!mural) return;
-    const { murals: updated, blockId } = addBlock(murals, mural.id, type);
-    await updateLibrary((data) => ({ ...data, murals: updated }));
+    const { blockId } = addBlock(murals, mural.id, type);
+    // Recomputed inside the transform rather than reusing `updated`, so a
+    // retry after a conflict adds the block to the CURRENT mural instead
+    // of re-sending a stale snapshot of it.
+    await saveMural(mural.id, (current) => addBlock(current, mural.id, type, blockId).murals);
     // "currentlyReading" and "empty" have nothing to configure at all —
     // skip straight to them just sitting on the canvas. Every other type
     // opens its config panel right away, same "add then configure" flow
@@ -56,19 +59,19 @@ export function MuralEditorPage() {
 
   async function handleSaveBlockConfig(block: MuralBlock) {
     if (!mural) return;
-    await updateLibrary((data) => ({ ...data, murals: updateBlock(data.murals ?? [], mural.id, block) }));
+    await saveMural(mural.id, (murals) => updateBlock(murals, mural.id, block));
   }
 
   async function handleSaveBlockStyle(blockId: string, blockStyle: BlockStyle) {
     if (!mural) return;
     const current = mural.blocks.find((b) => b.id === blockId);
     if (!current) return;
-    await updateLibrary((data) => ({ ...data, murals: updateBlock(data.murals ?? [], mural.id, { ...current, style: blockStyle }) }));
+    await saveMural(mural.id, (murals) => updateBlock(murals, mural.id, { ...current, style: blockStyle }));
   }
 
   async function handleDuplicateBlock(blockId: string) {
     if (!mural) return;
-    await updateLibrary((data) => ({ ...data, murals: duplicateBlock(data.murals ?? [], mural.id, blockId) }));
+    await saveMural(mural.id, (murals) => duplicateBlock(murals, mural.id, blockId));
   }
 
   // Deliberately no confirm() here, unlike deleting a book/image/mural —
@@ -78,7 +81,7 @@ export function MuralEditorPage() {
   // confirmation on every removal would just be editing friction.
   async function handleDeleteBlock(blockId: string) {
     if (!mural) return;
-    await updateLibrary((data) => ({ ...data, murals: removeBlock(data.murals ?? [], mural.id, blockId) }));
+    await saveMural(mural.id, (murals) => removeBlock(murals, mural.id, blockId));
   }
 
   function handleLayoutChange(blockId: string, layout: BlockLayout) {

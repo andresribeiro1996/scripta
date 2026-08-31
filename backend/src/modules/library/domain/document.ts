@@ -209,6 +209,24 @@ export function toContents(data: unknown, version: number, updatedAt: string): L
   };
 }
 
+/** Single-entity entry points, for the per-entity write path in
+ *  service.ts. The same functions the whole-document path uses, so a book
+ *  saved on its own and a book saved as part of a document decompose
+ *  identically — including how its key is derived. */
+export function toBookEntity(raw: unknown): Book {
+  return toBook(raw);
+}
+
+export function toGroupEntity(raw: unknown): Group {
+  // Index 0 is only a fallback for a group arriving without an id, which
+  // the routes reject before this is reached.
+  return toGroup(raw, 0);
+}
+
+export function toMuralEntity(raw: unknown): Mural {
+  return toMural(raw, 0);
+}
+
 // --- entities -> document -------------------------------------------------
 
 function fromBook(book: Book): BookRecord {

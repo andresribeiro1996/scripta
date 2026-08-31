@@ -6,7 +6,7 @@
 // modules/auth/domain, /adapters, or /service.ts. This module has no path
 // to auth's database or token secrets — only to this one preHandler.
 
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
 import { authGuard } from "../auth/index.js";
 import { LibraryEntityNotFoundError, LibraryVersionConflictError } from "./domain/errors.js";
@@ -51,6 +51,54 @@ const muralBlockParamsSchema = z.object({
   muralId: z.string().min(1),
   blockId: z.string().min(1)
 });
+
+const idParamSchema = z.object({ id: z.string().min(1) });
+
+/** DELETE bodies carry only the precondition, and may be absent entirely. */
+const versionOnlySchema = z.object({ expectedVersion: z.number().int().nonnegative().optional() });
+
+// A book record is open-ended by design (see domain/document.ts), so this
+// only asserts it is an object. The KEY is never taken from the caller —
+// it is derived from the record server-side, because groups and mural
+// blocks reference books by it and a client-supplied key that disagreed
+// with the record's own fields would orphan them.
+const bookBodySchema = z.object({
+  book: z.record(z.unknown()),
+  expectedVersion: z.number().int().nonnegative().optional()
+});
+
+// The key travels in the BODY rather than the path: it contains ':' and
+// '|' and, for a title like "AC/DC", a literal '/'. Percent-encoded
+// slashes in a path are handled inconsistently across proxies, so this
+// sidesteps the question entirely.
+const bookKeyBodySchema = z.object({
+  bookKey: z.string().min(1),
+  expectedVersion: z.number().int().nonnegative().optional()
+});
+
+const groupBodySchema = z.object({
+  group: z.object({ id: z.string().min(1) }).passthrough(),
+  expectedVersion: z.number().int().nonnegative().optional()
+});
+
+const muralBodySchema = z.object({
+  mural: z.object({ id: z.string().min(1) }).passthrough(),
+  expectedVersion: z.number().int().nonnegative().optional()
+});
+
+/** Every per-entity route maps the same two domain errors the same way,
+ *  so the mapping lives here rather than being repeated six times.
+ *  Anything else is rethrown — an unexpected failure must stay a 500, not
+ *  be flattened into a client error. */
+function sendDomainError(reply: FastifyReply, err: unknown): FastifyReply {
+  if (err instanceof LibraryVersionConflictError) {
+    return reply.code(409).send({ error: err.message, currentVersion: err.currentVersion });
+  }
+  if (err instanceof LibraryEntityNotFoundError) {
+    return reply.code(404).send({ error: err.message });
+  }
+  throw err;
+}
 
 export function buildLibraryRoutes(service: LibraryService) {
   return async function libraryRoutes(app: FastifyInstance) {
@@ -128,15 +176,100 @@ export function buildLibraryRoutes(service: LibraryService) {
           );
           return reply.send(result);
         } catch (err) {
-          if (err instanceof LibraryVersionConflictError) {
-            return reply.code(409).send({ error: err.message, currentVersion: err.currentVersion });
-          }
-          if (err instanceof LibraryEntityNotFoundError) {
-            return reply.code(404).send({ error: err.message });
-          }
-          throw err;
+          return sendDomainError(reply, err);
         }
       }
     );
+
+    // --- per-entity writes -----------------------------------------------
+    //
+    // Each of these exists because the operation behind it only ever
+    // touches one entity, and routing it through PUT /library meant
+    // re-sending the account's whole library to rename a group or restyle
+    // a book. The document endpoint above stays for genuinely
+    // cross-cutting work (an import that merges everything; deleting books
+    // that must also be scrubbed from every group and mural at once).
+
+    app.put("/library/books", { preHandler: authGuard }, async (request, reply) => {
+      const body = bookBodySchema.safeParse(request.body);
+      if (!body.success) return reply.code(400).send({ error: 'Expected {"book": { ... }}.' });
+
+      try {
+        return reply.send(await service.saveBook(request.user.id, body.data.book, body.data.expectedVersion));
+      } catch (err) {
+        return sendDomainError(reply, err);
+      }
+    });
+
+    app.delete("/library/books", { preHandler: authGuard }, async (request, reply) => {
+      const body = bookKeyBodySchema.safeParse(request.body);
+      if (!body.success) return reply.code(400).send({ error: 'Expected {"bookKey": "..."}.' });
+
+      try {
+        return reply.send(await service.deleteBook(request.user.id, body.data.bookKey, body.data.expectedVersion));
+      } catch (err) {
+        return sendDomainError(reply, err);
+      }
+    });
+
+    app.put("/library/groups/:id", { preHandler: authGuard }, async (request, reply) => {
+      const params = idParamSchema.safeParse(request.params);
+      const body = groupBodySchema.safeParse(request.body);
+      if (!params.success || !body.success) return reply.code(400).send({ error: 'Expected {"group": {"id": "...", ...}}.' });
+      // The path id is the authority; a body disagreeing with it is a bug
+      // in the caller, not something to silently pick a winner for.
+      if (params.data.id !== body.data.group.id) {
+        return reply.code(400).send({ error: "The group id in the path and the body must match." });
+      }
+
+      try {
+        return reply.send(await service.saveGroup(request.user.id, body.data.group, body.data.expectedVersion));
+      } catch (err) {
+        return sendDomainError(reply, err);
+      }
+    });
+
+    app.delete("/library/groups/:id", { preHandler: authGuard }, async (request, reply) => {
+      const params = idParamSchema.safeParse(request.params);
+      if (!params.success) return reply.code(400).send({ error: "Invalid group id." });
+      const expectedVersion = versionOnlySchema.safeParse(request.body ?? {});
+
+      try {
+        return reply.send(
+          await service.deleteGroup(request.user.id, params.data.id, expectedVersion.success ? expectedVersion.data.expectedVersion : undefined)
+        );
+      } catch (err) {
+        return sendDomainError(reply, err);
+      }
+    });
+
+    app.put("/library/murals/:id", { preHandler: authGuard }, async (request, reply) => {
+      const params = idParamSchema.safeParse(request.params);
+      const body = muralBodySchema.safeParse(request.body);
+      if (!params.success || !body.success) return reply.code(400).send({ error: 'Expected {"mural": {"id": "...", ...}}.' });
+      if (params.data.id !== body.data.mural.id) {
+        return reply.code(400).send({ error: "The mural id in the path and the body must match." });
+      }
+
+      try {
+        return reply.send(await service.saveMural(request.user.id, body.data.mural, body.data.expectedVersion));
+      } catch (err) {
+        return sendDomainError(reply, err);
+      }
+    });
+
+    app.delete("/library/murals/:id", { preHandler: authGuard }, async (request, reply) => {
+      const params = idParamSchema.safeParse(request.params);
+      if (!params.success) return reply.code(400).send({ error: "Invalid mural id." });
+      const expectedVersion = versionOnlySchema.safeParse(request.body ?? {});
+
+      try {
+        return reply.send(
+          await service.deleteMural(request.user.id, params.data.id, expectedVersion.success ? expectedVersion.data.expectedVersion : undefined)
+        );
+      } catch (err) {
+        return sendDomainError(reply, err);
+      }
+    });
   };
 }

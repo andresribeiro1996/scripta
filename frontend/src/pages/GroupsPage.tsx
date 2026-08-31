@@ -12,7 +12,7 @@ import { clearBookCover, setBookCover } from "../lib/bookCovers";
 import {
   addBookToGroup,
   createGroup,
-  deleteGroup,
+  
   orderedGroupBooks,
   removeBooksFromAllGroups,
   removeBookFromGroup,
@@ -46,7 +46,10 @@ const COPY: Record<GroupType, { title: string; noun: string; empty: string; crea
  *  the same underlying resource (see lib/groups.ts), differing only in
  *  copy and in that series also get auto-seeded from book metadata. */
 export function GroupsPage({ type }: { type: GroupType }) {
-  const { data: library, isLoading, updateLibrary } = useLibrary();
+  // Per-entity writes for anything touching a single group or book; the
+  // whole-document updateLibrary only for the multi-book delete below,
+  // which genuinely spans books, groups and murals at once.
+  const { data: library, isLoading, updateLibrary, addGroup, saveGroup, removeGroup, saveBook } = useLibrary();
   const copy = COPY[type];
   const confirm = useConfirm();
 
@@ -81,7 +84,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
     if (!name) return;
     setCreating(true);
     try {
-      await updateLibrary((data) => ({ ...data, groups: createGroup(data.groups ?? [], type, name) }));
+      await addGroup((groups) => createGroup(groups, type, name));
       setNewName("");
     } finally {
       setCreating(false);
@@ -92,23 +95,22 @@ export function GroupsPage({ type }: { type: GroupType }) {
     const name = editingName.trim();
     setEditingId(null);
     if (!name) return;
-    await updateLibrary((data) => ({ ...data, groups: renameGroup(data.groups ?? [], id, name) }));
+    await saveGroup(id, (groups) => renameGroup(groups, id, name));
   }
 
   async function handleDelete(group: Group) {
     if (!(await confirm({ title: `Delete "${group.name}"?`, body: "The books in it stay in your library either way." }))) return;
-    await updateLibrary((data) => ({ ...data, groups: deleteGroup(data.groups ?? [], group.id) }));
+    await removeGroup(group.id);
   }
 
   async function handleToggleBook(groupId: string, book: Record<string, unknown>, inGroup: boolean) {
-    await updateLibrary((data) => ({
-      ...data,
-      groups: inGroup ? removeBookFromGroup(data.groups ?? [], groupId, book) : addBookToGroup(data.groups ?? [], groupId, book)
-    }));
+    await saveGroup(groupId, (groups) =>
+      inGroup ? removeBookFromGroup(groups, groupId, book) : addBookToGroup(groups, groupId, book)
+    );
   }
 
   async function handleSaveGroupStyle(groupId: string, groupStyle: PerCardStyle | undefined) {
-    await updateLibrary((data) => ({ ...data, groups: setGroupStyle(data.groups ?? [], groupId, groupStyle) }));
+    await saveGroup(groupId, (groups) => setGroupStyle(groups, groupId, groupStyle));
   }
 
   // A book's own style override — highest priority, takes effect
@@ -117,10 +119,10 @@ export function GroupsPage({ type }: { type: GroupType }) {
   // lib/libraryStyle.ts's effectiveCardStyle for the full priority chain.
   async function handleSaveBookStyle(book: Record<string, unknown>, bookStyle: PerCardStyle | undefined) {
     const key = bookKey(book);
-    await updateLibrary((data) => ({
-      ...data,
-      books: data.books.map((b) => (bookKey(b) === key ? { ...b, _style: bookStyle } : b))
-    }));
+    await saveBook(
+      (b) => bookKey(b) === key,
+      (books) => books.map((b) => (bookKey(b) === key ? { ...b, _style: bookStyle } : b))
+    );
   }
 
   // Assigning/clearing a gallery image as a book's cover — see
@@ -128,18 +130,18 @@ export function GroupsPage({ type }: { type: GroupType }) {
   // upload/delete calls; these two only ever touch this one book's fields.
   async function handleSaveBookCover(book: Record<string, unknown>, image: GalleryImage) {
     const key = bookKey(book);
-    await updateLibrary((data) => ({
-      ...data,
-      books: data.books.map((b) => (bookKey(b) === key ? setBookCover(b, image.id, image.url) : b))
-    }));
+    await saveBook(
+      (b) => bookKey(b) === key,
+      (books) => books.map((b) => (bookKey(b) === key ? setBookCover(b, image.id, image.url) : b))
+    );
   }
 
   async function handleRemoveBookCover(book: Record<string, unknown>) {
     const key = bookKey(book);
-    await updateLibrary((data) => ({
-      ...data,
-      books: data.books.map((b) => (bookKey(b) === key ? clearBookCover(b) : b))
-    }));
+    await saveBook(
+      (b) => bookKey(b) === key,
+      (books) => books.map((b) => (bookKey(b) === key ? clearBookCover(b) : b))
+    );
   }
 
   // Select mode: turn it on, tap books across any of this page's group

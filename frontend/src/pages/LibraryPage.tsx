@@ -58,12 +58,13 @@ export function LibraryPage() {
   const [importError, setImportError] = useState<string | null>(null);
   const [importStatus, setImportStatus] = useState<string | null>(null);
 
-  // Every write on this page goes through updateLibrary rather than a
-  // raw saveLibrary: it quotes the version it edited, so a save from
-  // another device can't be silently overwritten, and re-applies the
-  // change to the newer document instead of losing it. See
-  // hooks/useLibrary.ts.
-  const { data: library, isLoading, updateLibrary } = useLibrary();
+  // Single-book edits (style, covers) go through saveBook — one book per
+  // request. updateLibrary stays for the operations that genuinely span
+  // the whole document: the import merge, the drag reorder (which can
+  // renumber every book), the library rename, and the multi-book delete
+  // that must also scrub those books out of every group and mural in the
+  // same write. See hooks/useLibrary.ts.
+  const { data: library, isLoading, updateLibrary, saveBook } = useLibrary();
 
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
@@ -151,10 +152,10 @@ export function LibraryPage() {
     const current = queryClient.getQueryData<LibraryDocument>(["library"]);
     if (!current) return;
     const key = bookKey(book);
-    await updateLibrary((data) => ({
-      ...data,
-      books: data.books.map((b) => (bookKey(b) === key ? { ...b, _style: bookStyle } : b))
-    }));
+    await saveBook(
+      (b) => bookKey(b) === key,
+      (books) => books.map((b) => (bookKey(b) === key ? { ...b, _style: bookStyle } : b))
+    );
   }
 
   // Assigning/clearing a gallery image as a book's cover — see
@@ -167,20 +168,20 @@ export function LibraryPage() {
     const current = queryClient.getQueryData<LibraryDocument>(["library"]);
     if (!current) return;
     const key = bookKey(book);
-    await updateLibrary((data) => ({
-      ...data,
-      books: data.books.map((b) => (bookKey(b) === key ? setBookCover(b, image.id, image.url) : b))
-    }));
+    await saveBook(
+      (b) => bookKey(b) === key,
+      (books) => books.map((b) => (bookKey(b) === key ? setBookCover(b, image.id, image.url) : b))
+    );
   }
 
   async function handleRemoveBookCover(book: Record<string, unknown>) {
     const current = queryClient.getQueryData<LibraryDocument>(["library"]);
     if (!current) return;
     const key = bookKey(book);
-    await updateLibrary((data) => ({
-      ...data,
-      books: data.books.map((b) => (bookKey(b) === key ? clearBookCover(b) : b))
-    }));
+    await saveBook(
+      (b) => bookKey(b) === key,
+      (books) => books.map((b) => (bookKey(b) === key ? clearBookCover(b) : b))
+    );
   }
 
   // Select mode: turn it on, tap cards to build up a selection, then

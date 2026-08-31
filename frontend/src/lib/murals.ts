@@ -252,10 +252,22 @@ export function compactBlocksVertically(blocks: MuralBlock[]): MuralBlock[] {
   return placed;
 }
 
-export function createMural(murals: Mural[], name: string): Mural[] {
+/** `existingId` lets the caller decide the id up front — MuralsListPage
+ *  navigates straight into the new mural, so it needs to know it, and a
+ *  fixed id also makes the create idempotent if a version conflict forces
+ *  a retry. */
+export function createMural(murals: Mural[], name: string, existingId?: string): Mural[] {
   const now = new Date().toISOString();
-  const mural: Mural = { id: newId(), name: name.trim(), blocks: [], createdAt: now, updatedAt: now };
+  const id = existingId ?? newId();
+  if (murals.some((m) => m.id === id)) return murals;
+  const mural: Mural = { id, name: name.trim(), blocks: [], createdAt: now, updatedAt: now };
   return [...murals, mural];
+}
+
+/** Exposed so a caller that must know a mural's id before creating it can
+ *  generate one with the same scheme (see createMural's `existingId`). */
+export function newMuralId(): string {
+  return newId();
 }
 
 export function renameMural(murals: Mural[], id: string, name: string): Mural[] {
@@ -275,12 +287,23 @@ export function deleteMural(murals: Mural[], id: string): Mural[] {
  *  free spot on the canvas. Returns the new block's id alongside the
  *  updated murals list, since the caller (AddBlockMenu.tsx) needs it to
  *  immediately open that block's config panel. */
-export function addBlock(murals: Mural[], muralId: string, type: BlockType): { murals: Mural[]; blockId: string } {
-  const blockId = newId();
+/** `existingBlockId` lets a caller keep the SAME id across a retry — a
+ *  per-entity save that loses a version race is re-applied to the fresh
+ *  mural, and generating a new id on that second attempt would add the
+ *  block twice if the first attempt had in fact landed. */
+export function addBlock(
+  murals: Mural[],
+  muralId: string,
+  type: BlockType,
+  existingBlockId?: string
+): { murals: Mural[]; blockId: string } {
+  const blockId = existingBlockId ?? newId();
   const now = new Date().toISOString();
   const updated = murals.map((m) => {
     if (m.id !== muralId) return m;
     const layout = nextBlockLayout(m.blocks, type);
+    // Idempotent on a retry: if this id is already present, leave it be.
+    if (m.blocks.some((b) => b.id === blockId)) return m;
     const block = defaultBlockForType(blockId, type, layout);
     return { ...m, blocks: [...m.blocks, block], updatedAt: now };
   });

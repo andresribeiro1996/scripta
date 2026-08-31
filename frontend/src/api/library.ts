@@ -75,6 +75,66 @@ export async function saveLibrary(data: LibraryData, expectedVersion?: number): 
   }
 }
 
+// --- per-entity writes ---------------------------------------------------
+//
+// Each of these replaces a whole-library PUT for an operation that only
+// touches one entity. saveLibrary above stays for genuinely cross-cutting
+// work: an import that merges everything, or a multi-book delete that must
+// also scrub those books out of every group and mural in the same write.
+//
+// All of them return the resulting version so the caller can keep the
+// cached document in step without a re-read.
+
+/** The book's key is derived server-side from the record, not sent — it is
+ *  what groups and mural blocks reference, so a key that disagreed with the
+ *  record's own fields would orphan them. */
+export async function saveBook(
+  book: Record<string, unknown>,
+  expectedVersion?: number
+): Promise<{ version: number; bookKey: string }> {
+  return (await apiFetch("/library/books", {
+    method: "PUT",
+    body: JSON.stringify({ book, expectedVersion })
+  })) as { version: number; bookKey: string };
+}
+
+/** The key travels in the body, not the path: it contains ':' and '|', and
+ *  for a title like "AC/DC" a literal '/'. */
+export async function deleteBook(bookKey: string, expectedVersion?: number): Promise<{ version: number }> {
+  return (await apiFetch("/library/books", {
+    method: "DELETE",
+    body: JSON.stringify({ bookKey, expectedVersion })
+  })) as { version: number };
+}
+
+export async function saveGroup(group: Group, expectedVersion?: number): Promise<{ version: number }> {
+  return (await apiFetch(`/library/groups/${encodeURIComponent(group.id)}`, {
+    method: "PUT",
+    body: JSON.stringify({ group, expectedVersion })
+  })) as { version: number };
+}
+
+export async function deleteGroup(groupId: string, expectedVersion?: number): Promise<{ version: number }> {
+  return (await apiFetch(`/library/groups/${encodeURIComponent(groupId)}`, {
+    method: "DELETE",
+    body: JSON.stringify({ expectedVersion })
+  })) as { version: number };
+}
+
+export async function saveMural(mural: Mural, expectedVersion?: number): Promise<{ version: number }> {
+  return (await apiFetch(`/library/murals/${encodeURIComponent(mural.id)}`, {
+    method: "PUT",
+    body: JSON.stringify({ mural, expectedVersion })
+  })) as { version: number };
+}
+
+export async function deleteMural(muralId: string, expectedVersion?: number): Promise<{ version: number }> {
+  return (await apiFetch(`/library/murals/${encodeURIComponent(muralId)}`, {
+    method: "DELETE",
+    body: JSON.stringify({ expectedVersion })
+  })) as { version: number };
+}
+
 /** Moves one block on one mural, instead of re-sending the whole library.
  *  Dragging a block used to rewrite every book, group and mural the
  *  account had, once per drop. */
