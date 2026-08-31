@@ -1,22 +1,41 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { fetchLibrary } from "../api/library";
 import { useAuth } from "../auth/AuthContext";
 import { OfflineBanner } from "../components/OfflineBanner";
 
-const NAV_ITEMS = [
-  { to: "/dashboard", label: "Library", end: true },
-  { to: "/dashboard/series", label: "Series", end: false },
-  { to: "/dashboard/collections", label: "Collections", end: false },
-  { to: "/dashboard/gallery", label: "Gallery", end: false },
-  { to: "/dashboard/murals", label: "Murals", end: false },
-  { to: "/dashboard/arena", label: "Arena", end: false },
-  { to: "/dashboard/style", label: "Library style", end: false },
-  { to: "/dashboard/settings", label: "Settings", end: false }
+interface NavItem {
+  to: string;
+  label: string;
+  end: boolean;
+  description?: string;
+}
+
+const NAV_GROUPS: Array<{ items: NavItem[] }> = [
+  {
+    items: [
+      { to: "/dashboard", label: "Library", end: true },
+      { to: "/dashboard/series", label: "Series", end: false },
+      { to: "/dashboard/collections", label: "Collections", end: false }
+    ]
+  },
+  {
+    items: [
+      { to: "/dashboard/gallery", label: "Gallery", end: false },
+      { to: "/dashboard/murals", label: "Murals", end: false, description: "Freeform dashboard pages" },
+      { to: "/dashboard/arena", label: "Arena", end: false, description: "Book-bracket tournaments" }
+    ]
+  },
+  {
+    items: [
+      { to: "/dashboard/style", label: "Library style", end: false },
+      { to: "/dashboard/settings", label: "Settings", end: false }
+    ]
+  }
 ];
 
-const TAB_ITEMS = NAV_ITEMS.slice(0, 3);
+const TAB_ITEMS = NAV_GROUPS[0].items;
 
 /** Persistent left-hand nav wrapping every signed-in page (Library, Series,
  *  Collections, Settings) — one shared shell instead of each page
@@ -55,10 +74,15 @@ export function DashboardLayout() {
           <span className="text-lg font-bold">Scripta</span>
         </div>
         <nav className="flex flex-1 flex-col gap-1">
-          {NAV_ITEMS.map((item) => (
-            <NavLink key={item.to} to={item.to} end={item.end} className={navLinkClass}>
-              {item.label}
-            </NavLink>
+          {NAV_GROUPS.map((group, groupIndex) => (
+            <Fragment key={groupIndex}>
+              {groupIndex > 0 && <div className="my-3 border-t border-(--color-border)" />}
+              {group.items.map((item) => (
+                <NavLink key={item.to} to={item.to} end={item.end} title={item.description} className={navLinkClass}>
+                  {item.label}
+                </NavLink>
+              ))}
+            </Fragment>
           ))}
         </nav>
         <div className="mt-auto border-t border-(--color-border) pt-3">
@@ -112,10 +136,24 @@ export function DashboardLayout() {
               <span className="text-lg font-bold">Scripta</span>
             </div>
             <nav className="flex flex-1 flex-col gap-1">
-              {NAV_ITEMS.map((item) => (
-                <NavLink key={item.to} to={item.to} end={item.end} className={navLinkClass} onClick={() => setDrawerOpen(false)}>
-                  {item.label}
-                </NavLink>
+              {NAV_GROUPS.map((group, groupIndex) => (
+                <Fragment key={groupIndex}>
+                  {groupIndex > 0 && <div className="my-3 border-t border-(--color-border)" />}
+                  {group.items.map((item) => (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      end={item.end}
+                      className={navLinkClass}
+                      onClick={() => setDrawerOpen(false)}
+                    >
+                      {item.label}
+                      {item.description && (
+                        <span className="block text-xs font-normal text-(--color-text-dim)">{item.description}</span>
+                      )}
+                    </NavLink>
+                  ))}
+                </Fragment>
               ))}
             </nav>
             <div className="mt-6 border-t border-(--color-border) pt-3">
