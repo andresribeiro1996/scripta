@@ -11,6 +11,41 @@ link — same content, easier to read).
 > install, because that is how the READMEs describe it. It is not: it is meant
 > to be distributed and used by other people. Everything below assumes that.
 
+## Status
+
+| Phase | State |
+|---|---|
+| 1 — Normalise the library | **Done** (slices 1 & 2). Slice 3 deliberately deferred, see below. |
+| 2 — Correctness gaps | **Done.** |
+| 3 — State off the instance | **Postgres done; object storage not done.** |
+| 4 — Domain, hosting, pipeline | **Pipeline and container done. Domain and hosting are yours to choose.** |
+| 5 — Reconsider the frontend | Not started; a product decision, not a technical blocker. |
+
+**What still needs a human, not a commit:**
+
+- Buy the domain and decide the two hostnames. Nothing else in phase 4 can be
+  finalised first — the OAuth redirect URIs depend on it.
+- Choose and create the hosting accounts, then set `DEPLOY_ENABLED`, `API_URL`
+  and the deploy secrets. The deploy workflow is inert until you do.
+- Generate the three production secrets and store them in a password manager.
+- Register the OAuth apps, one platform at a time. Google sign-in and the
+  Hardcover lookup have still never run against real credentials.
+- Turn on backups. Nothing here can do that for you, and it is the one item on
+  this list whose absence loses other people's data.
+
+**Deliberately not done, with reasons:**
+
+- **Slice 3 (retire the document endpoint and the legacy table).** The plan
+  itself said "once the per-entity API has been live long enough to trust" —
+  it has been live for zero minutes. Deleting the compatibility layer and the
+  rollback path before either has seen production would remove the safety net
+  precisely when it is most needed.
+- **Object storage adapter.** See phase 3.
+- **The remaining per-entity routes.** The document endpoint is still correct
+  and now conflict-safe; the rest is a size optimisation, and doing ~25 call
+  sites blind against a frontend with no test suite was a worse trade than
+  leaving them.
+
 ---
 
 ## The headline finding
