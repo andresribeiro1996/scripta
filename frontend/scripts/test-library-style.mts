@@ -30,6 +30,7 @@ import {
   cardFontFamilyCss,
   effectiveCardStyle,
   extractPerCardStyle,
+  gridColumnsCss,
   resolveBlockStyle,
   resolveBorderColor,
   resolveLibraryStyle,
@@ -304,6 +305,12 @@ console.log("\n13. Text formatting — cardBold/cardItalic (cards) and bold/ital
     "codeStyle has no PerCardStyle equivalent — cards only ever get cardBold/cardItalic, never a card 'code style'",
     !("codeStyle" in DEFAULT_LIBRARY_STYLE) && !(PER_CARD_STYLE_KEYS as readonly string[]).includes("codeStyle" as never)
   );
+}
+
+console.log("\n14. gridColumnsCss — clamps the grid column floor to the available width");
+{
+  check("default floor (200) is clamped with min()", gridColumnsCss(200) === "min(200px, 100%)");
+  check("smallest slider value (120) is clamped the same way", gridColumnsCss(120) === "min(120px, 100%)");
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

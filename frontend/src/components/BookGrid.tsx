@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { LibraryStyleSettings } from "../lib/libraryStyle";
+import { gridColumnsCss } from "../lib/libraryStyle";
 
 /** Shared grid wrapper for every book-card grid in the app (Library,
  *  Series, Collections) so they all respect the same user-configured
@@ -13,7 +14,7 @@ export function BookGrid({ style, children }: { style: LibraryStyleSettings; chi
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: `repeat(auto-fill, minmax(${style.cardMinWidth}px, 1fr))`,
+        gridTemplateColumns: `repeat(auto-fill, minmax(${gridColumnsCss(style.cardMinWidth)}, 1fr))`,
         columnGap: `${style.cardGap}px`,
         rowGap: `${style.rowGap}px`
       }}

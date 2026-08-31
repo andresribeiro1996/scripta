@@ -463,3 +463,7 @@ export function resolveBorderColor(color: string | null, opacityPercent: number)
   const b = n & 255;
   return `rgba(${r}, ${g}, ${b}, ${opacityPercent / 100})`;
 }
+
+export function gridColumnsCss(cardMinWidth: number): string {
+  return `min(${cardMinWidth}px, 100%)`;
+}
