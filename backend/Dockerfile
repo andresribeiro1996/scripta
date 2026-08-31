@@ -45,14 +45,15 @@ ENV NODE_ENV=production
 ENV TRUST_PROXY=true
 ENV PORT=3000
 
-# The five SQLite files and the two blob directories live here. Mount a
-# persistent volume at /data or the account data is gone with the
+# The SQLite files and the two blob directories live here. MOUNT A
+# PERSISTENT VOLUME AT /data or the account data is gone with the
 # container.
 #
-# These are the fallbacks. Set DATABASE_URL and S3_BUCKET and the library
-# module and both blob stores move off local disk entirely — at which
-# point the container is stateless and needs no volume at all. Until BOTH
-# are set, it does.
+# Still required even with DATABASE_URL and S3_BUCKET set: those move the
+# `library` module to Postgres and the blobs to object storage, but auth
+# (accounts, refresh tokens), gallery metadata, the cover-cache rows and
+# socials (encrypted platform tokens) still write SQLite here. Only
+# `library` has a Postgres adapter today.
 ENV AUTH_DB_PATH=/data/auth.sqlite \
     LIBRARY_DB_PATH=/data/library.sqlite \
     GALLERY_DB_PATH=/data/gallery.sqlite \

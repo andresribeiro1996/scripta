@@ -17,7 +17,7 @@ link — same content, easier to read).
 |---|---|
 | 1 — Normalise the library | **Done** (slices 1 & 2). Slice 3 deliberately deferred, see below. |
 | 2 — Correctness gaps | **Done.** |
-| 3 — State off the instance | **Done.** Postgres and object storage both behind their existing ports. |
+| 3 — State off the instance | **Partial.** Postgres and object storage exist, but only `library` has a Postgres adapter — four modules are still SQLite, so the volume is still required. |
 | 4 — Domain, hosting, pipeline | **Pipeline and container done. Domain and hosting are yours to choose.** |
 | 5 — Reconsider the frontend | Not started; a product decision, not a technical blocker. |
 
@@ -30,10 +30,15 @@ link — same content, easier to read).
 - Generate the three production secrets and store them in a password manager.
 - Register the OAuth apps, one platform at a time. Google sign-in and the
   Hardcover lookup have still never run against real credentials.
-- Turn on backups. Nothing here can do that for you, and it is the one item on
-  this list whose absence loses other people's data.
+- Schedule the backup (below) and store the three secrets somewhere that is not
+  the backup.
 
 **Deliberately not done, with reasons:**
+
+- **Postgres adapters for `auth`, `gallery`, `covers` and `socials`.** Until
+  these exist the API cannot run more than one instance, so replicas and
+  zero-downtime deploys are still out of reach. `auth` is the one to do first —
+  it is the smallest and the one whose loss is unrecoverable.
 
 - **Slice 3 (retire the document endpoint and the legacy table).** The plan
   itself said "once the per-entity API has been live long enough to trust" —
@@ -222,9 +227,18 @@ move off local disk. Written against the S3 API, so R2, B2, MinIO and AWS all
 work — R2 is the recommendation (zero egress, and covers are served on every page
 view). Both ports had to become async for the same reason the library port did.
 
-**With Postgres AND object storage set, the API is finally stateless** — no
-volume, so replicas and rolling deploys become possible. Until *both* are set it
-is still pinned to one machine, which is why Postgres alone did not unlock them.
+**The API is NOT stateless, and an earlier draft of this plan wrongly said it
+would be.** `DATABASE_URL` moves only the `library` module to Postgres, and
+`S3_BUCKET` moves only the blobs. `auth` (accounts and refresh tokens),
+`gallery` metadata, the `covers` cache rows and `socials` (encrypted platform
+tokens) all still open SQLite files on local disk — only `library` has a
+Postgres adapter today.
+
+So **the volume is still required**, and the app still cannot run more than one
+instance: two would each get their own copy of the accounts table and silently
+diverge. Getting to replicas and rolling deploys needs Postgres adapters for the
+other four modules too. `auth` is the one that matters most and is the smallest
+(two tables); `covers` is a pure cache and could arguably be left behind.
 
 Migrating existing local files: `scripts/files-to-object-storage.mjs`, run with
 the app stopped. It writes through the same adapters the app uses, so the keys
@@ -248,6 +262,51 @@ terabyte — priced very differently as a block volume than as object storage.
 Do it before there is other people's data. With three users it is an afternoon;
 with three thousand it is a dual-write period, a migration window, and a rollback
 plan.
+
+### Backups *(done)*
+
+`scripts/backup.mjs` (`npm run backup`) takes a consistent, verified snapshot of
+everything this deployment stores:
+
+- **All four-or-five SQLite databases**, via SQLite's online `backup()` API
+  rather than a file copy — a plain copy of a live database can capture a torn
+  page, and copying the `.sqlite` without its `-wal` silently loses the most
+  recent writes. Each snapshot is then opened, taken out of WAL mode (so it is
+  one self-contained file, not three that must travel together) and checked with
+  `PRAGMA integrity_check` before being counted as good.
+- **Postgres**, via `pg_dump`, when `DATABASE_URL` is set.
+- **Blob directories**, tarred, when they are on local disk. When they are in
+  object storage they are deliberately *not* copied: R2/S3 already replicate, and
+  the real risk is an accidental delete, which a nightly copy doesn't protect
+  against either — **enable bucket versioning** instead.
+- A **manifest** recording what was captured and, importantly, what was not:
+  `SOCIALS_ENCRYPTION_KEY` (without which every social token in the snapshot is
+  undecryptable) and the JWT secrets. Keep those in a password manager, not in
+  the backup.
+
+`--upload` pushes the snapshot to the bucket under `backups/<timestamp>/`;
+`--keep N` prunes old local snapshots. The script exits non-zero if any target
+fails, so a scheduled run surfaces as a failure rather than a green tick over a
+partial backup.
+
+**Verified by actually restoring**: the test suite snapshots live WAL databases
+and reads the data back, and a full disaster drill was run by hand — wipe the
+volume, drop the Postgres database, restore from the snapshot, and confirm all
+five modules' data came back intact.
+
+Scheduling it is host-specific and is yours to set up:
+
+```
+# Fly: a scheduled machine, separate from the one serving traffic
+fly machine run --schedule daily --volume scripta_data:/data \
+  <image> npm run backup -- --upload --keep 7
+
+# Anywhere with cron
+0 3 * * *  cd /app && npm run backup -- --upload --keep 7
+```
+
+Whatever you choose, **test a restore before you need one**. An untested backup
+is a guess.
 
 ### Phase 4 — Domain, hosting, pipeline
 

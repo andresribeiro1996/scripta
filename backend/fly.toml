@@ -30,13 +30,17 @@ primary_region = "lhr"
   # keys on request.ip. See backend/src/config/env.ts.
   TRUST_PROXY = "true"
 
-# The five SQLite files and both blob directories live here. This is the
-# whole account database: without this mount, every signup, library and
-# uploaded image disappears when the machine is replaced.
+# The SQLite files and (unless S3_BUCKET is set) both blob directories
+# live here. This is the account database: without this mount, every
+# signup, library and uploaded image disappears when the machine is
+# replaced.
 #
-# DELETE THIS BLOCK once DATABASE_URL and S3_BUCKET are both set — at that
-# point nothing durable is written to local disk and the volume is what is
-# still forcing a single machine.
+# THIS MOUNT IS ALWAYS REQUIRED. Setting DATABASE_URL moves the LIBRARY
+# module to Postgres and S3_BUCKET moves the blobs to object storage, but
+# auth (accounts and refresh tokens), gallery metadata, the cover-cache
+# rows and socials (encrypted platform tokens) still open SQLite files
+# here — only `library` has a Postgres adapter today. Deleting this block
+# would destroy every user account.
 [[mounts]]
   source = "scripta_data"
   destination = "/data"
@@ -45,14 +49,15 @@ primary_region = "lhr"
   internal_port = 3000
   force_https = true
 
-  # ONE MACHINE while any state is local.
+  # ONE MACHINE. Not negotiable while any module still uses SQLite, which
+  # today is four of the five: a SQLite file on a volume can only attach to
+  # a single machine, so two instances would each get their own copy of the
+  # accounts table and silently diverge.
   #
-  # A SQLite file on a volume can only attach to a single machine, and so
-  # can uploaded images — two instances would each get their own copy and
-  # silently diverge. That constraint holds until BOTH DATABASE_URL and
-  # S3_BUCKET are set (docs/DEPLOYMENT-PLAN.md phase 3); with both, the
-  # app is stateless, the [[mounts]] block above can be deleted, and
-  # min_machines_running can go to 2 for rolling deploys.
+  # Raising this to 2 for rolling deploys requires Postgres adapters for
+  # auth, gallery, covers and socials as well — see
+  # docs/DEPLOYMENT-PLAN.md. DATABASE_URL and S3_BUCKET alone are NOT
+  # enough, however much they look like they should be.
   #
   # auto-stop stays off either way: it would make the first request after
   # an idle period pay a cold start, on an app whose users arrive in ones
