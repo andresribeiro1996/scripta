@@ -34,7 +34,7 @@ type Mode = "login" | "signup";
 // reads as "gold foil on a dark cover").
 const INK = "#0d0c0b";
 const PAPER = "#f2ede6";
-const PAPER_DIM = "rgba(242, 237, 230, 0.45)";
+const PAPER_DIM = "rgba(242, 237, 230, 0.65)";
 const PAPER_FAINT = "rgba(242, 237, 230, 0.18)";
 const GOLD = "#e08a52";
 
@@ -130,7 +130,7 @@ export function LoginPage() {
   // card away: let the wordmark above carry all the visual weight, and
   // keep everything below it as quiet as a colophon page.
   const fieldClass =
-    "w-full border-0 border-b bg-transparent px-0 py-2 text-[15px] outline-none transition-colors";
+    "w-full border-0 border-b bg-transparent px-0 py-2 text-[15px] focus-visible:outline-2 focus-visible:outline-[#e08a52] transition-colors";
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-5 py-16" style={{ backgroundColor: INK, color: PAPER }}>
