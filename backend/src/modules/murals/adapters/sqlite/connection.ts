@@ -20,5 +20,10 @@ export function openMuralsDb(): DatabaseSync {
   const schema = readFileSync(`${adapterDir}/schema.sql`, "utf8");
   db.exec(schema);
 
+  const columns = db.prepare(`PRAGMA table_info(murals)`).all() as { name: string }[];
+  if (!columns.some((c) => c.name === "folder_id")) {
+    db.exec(`ALTER TABLE murals ADD COLUMN folder_id TEXT`);
+  }
+
   return db;
 }

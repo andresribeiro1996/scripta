@@ -16,6 +16,7 @@ export interface MuralRow {
    *  schema.sql, but nothing in this task ever sets it — Task 4 adds the
    *  share/unshare routes that do. */
   share_token: string | null;
+  folder_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -32,6 +33,24 @@ export interface Mural {
   coverImageUrl: string | null;
   shareToken: string | null;
   shareUrl: string | null;
+  folderId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MuralFolderRow {
+  id: string;
+  user_id: string;
+  name: string;
+  parent_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MuralFolder {
+  id: string;
+  name: string;
+  parentId: string | null;
   createdAt: string;
   updatedAt: string;
 }

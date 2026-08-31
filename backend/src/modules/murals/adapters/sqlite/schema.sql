@@ -18,7 +18,17 @@ CREATE TABLE IF NOT EXISTS murals (
   cover_image_id   TEXT,
   cover_image_url  TEXT,
   share_token      TEXT UNIQUE,
+  folder_id        TEXT,
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 CREATE INDEX IF NOT EXISTS idx_murals_user_id ON murals(user_id);
+CREATE TABLE IF NOT EXISTS mural_folders (
+  id         TEXT PRIMARY KEY,
+  user_id    TEXT NOT NULL,
+  name       TEXT NOT NULL,
+  parent_id  TEXT,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+CREATE INDEX IF NOT EXISTS idx_mural_folders_user_id ON mural_folders(user_id);

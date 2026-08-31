@@ -4,7 +4,7 @@
 // this interface only, with no idea whether SQLite, Postgres, or an
 // in-memory fake is on the other side.
 
-import type { MuralRow } from "./types.js";
+import type { MuralFolderRow, MuralRow } from "./types.js";
 
 export interface MuralsRepository {
   listByUser(userId: string): MuralRow[];
@@ -20,7 +20,7 @@ export interface MuralsRepository {
   update(
     id: string,
     userId: string,
-    patch: Partial<Pick<MuralRow, "name" | "blocks" | "cover_image_id" | "cover_image_url">>
+    patch: Partial<Pick<MuralRow, "name" | "blocks" | "cover_image_id" | "cover_image_url" | "folder_id">>
   ): MuralRow | undefined;
   /** Returns true if a row was actually deleted (i.e. it existed AND was
    *  owned by userId). */
@@ -37,4 +37,14 @@ export interface MuralsRepository {
    *  Returns the RAW row (including user_id) — callers of this one
    *  method are trusted to keep user_id server-side only. */
   getByShareToken(token: string): MuralRow | undefined;
+  listFoldersByUser(userId: string): MuralFolderRow[];
+  getOwnedFolder(id: string, userId: string): MuralFolderRow | undefined;
+  insertFolder(row: MuralFolderRow): void;
+  updateFolder(
+    id: string,
+    userId: string,
+    patch: Partial<Pick<MuralFolderRow, "name" | "parent_id">>
+  ): MuralFolderRow | undefined;
+  reparentFolderChildren(folderId: string, userId: string, parentId: string | null): void;
+  deleteFolder(id: string, userId: string): boolean;
 }
