@@ -2,11 +2,11 @@ import { useMemo, useState } from "react";
 import type { GalleryImage } from "../api/gallery";
 import { BookCard } from "../components/BookCard";
 import { BookGrid } from "../components/BookGrid";
-import { useConfirm } from "../components/ConfirmDialog";
 import { CoverPickerModal } from "../components/CoverPickerModal";
 import { OptionsMenu } from "../components/OptionsMenu";
 import { PageContainer } from "../components/PageContainer";
 import { PerCardStylePanel } from "../components/PerCardStylePanel";
+import { useToast } from "../components/Toaster";
 import { useLibrary } from "../hooks/useLibrary";
 import { useMurals } from "../hooks/useMurals";
 import { clearBookCover, setBookCover } from "../lib/bookCovers";
@@ -49,7 +49,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
   const { data: library, isLoading, updateLibrary } = useLibrary();
   const { scrubBooks } = useMurals();
   const copy = COPY[type];
-  const confirm = useConfirm();
+  const toast = useToast();
 
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
@@ -84,6 +84,8 @@ export function GroupsPage({ type }: { type: GroupType }) {
     try {
       await updateLibrary((data) => ({ ...data, groups: createGroup(data.groups ?? [], type, name) }));
       setNewName("");
+    } catch {
+      toast({ message: "Couldn't save — check your connection.", kind: "error" });
     } finally {
       setCreating(false);
     }
@@ -93,23 +95,58 @@ export function GroupsPage({ type }: { type: GroupType }) {
     const name = editingName.trim();
     setEditingId(null);
     if (!name) return;
-    await updateLibrary((data) => ({ ...data, groups: renameGroup(data.groups ?? [], id, name) }));
+    try {
+      await updateLibrary((data) => ({ ...data, groups: renameGroup(data.groups ?? [], id, name) }));
+    } catch {
+      toast({ message: "Couldn't save — check your connection.", kind: "error" });
+    }
   }
 
   async function handleDelete(group: Group) {
-    if (!(await confirm({ title: `Delete "${group.name}"?`, body: "The books in it stay in your library either way." }))) return;
-    await updateLibrary((data) => ({ ...data, groups: deleteGroup(data.groups ?? [], group.id) }));
+    const snapshot = library?.data;
+    if (!snapshot) return;
+    try {
+      await updateLibrary((data) => ({ ...data, groups: deleteGroup(data.groups ?? [], group.id) }));
+    } catch {
+      toast({ message: "Couldn't delete — nothing was changed.", kind: "error" });
+      return;
+    }
+    toast({
+      message: `Deleted "${group.name}".`,
+      action: {
+        label: "Undo",
+        onClick: () => {
+          void (async () => {
+            try {
+              await updateLibrary(() => snapshot);
+              toast({ message: "Restored." });
+            } catch {
+              toast({ message: "Couldn't restore — check your connection.", kind: "error" });
+            }
+          })();
+        }
+      },
+      duration: 6000
+    });
   }
 
   async function handleToggleBook(groupId: string, book: Record<string, unknown>, inGroup: boolean) {
-    await updateLibrary((data) => ({
-      ...data,
-      groups: inGroup ? removeBookFromGroup(data.groups ?? [], groupId, book) : addBookToGroup(data.groups ?? [], groupId, book)
-    }));
+    try {
+      await updateLibrary((data) => ({
+        ...data,
+        groups: inGroup ? removeBookFromGroup(data.groups ?? [], groupId, book) : addBookToGroup(data.groups ?? [], groupId, book)
+      }));
+    } catch {
+      toast({ message: "Couldn't save — check your connection.", kind: "error" });
+    }
   }
 
   async function handleSaveGroupStyle(groupId: string, groupStyle: PerCardStyle | undefined) {
-    await updateLibrary((data) => ({ ...data, groups: setGroupStyle(data.groups ?? [], groupId, groupStyle) }));
+    try {
+      await updateLibrary((data) => ({ ...data, groups: setGroupStyle(data.groups ?? [], groupId, groupStyle) }));
+    } catch {
+      toast({ message: "Couldn't save — check your connection.", kind: "error" });
+    }
   }
 
   // A book's own style override — highest priority, takes effect
@@ -118,10 +155,14 @@ export function GroupsPage({ type }: { type: GroupType }) {
   // lib/libraryStyle.ts's effectiveCardStyle for the full priority chain.
   async function handleSaveBookStyle(book: Record<string, unknown>, bookStyle: PerCardStyle | undefined) {
     const key = bookKey(book);
-    await updateLibrary((data) => ({
-      ...data,
-      books: data.books.map((b) => (bookKey(b) === key ? { ...b, _style: bookStyle } : b))
-    }));
+    try {
+      await updateLibrary((data) => ({
+        ...data,
+        books: data.books.map((b) => (bookKey(b) === key ? { ...b, _style: bookStyle } : b))
+      }));
+    } catch {
+      toast({ message: "Couldn't save — check your connection.", kind: "error" });
+    }
   }
 
   // Assigning/clearing a gallery image as a book's cover — see
@@ -129,18 +170,26 @@ export function GroupsPage({ type }: { type: GroupType }) {
   // upload/delete calls; these two only ever touch this one book's fields.
   async function handleSaveBookCover(book: Record<string, unknown>, image: GalleryImage) {
     const key = bookKey(book);
-    await updateLibrary((data) => ({
-      ...data,
-      books: data.books.map((b) => (bookKey(b) === key ? setBookCover(b, image.id, image.url) : b))
-    }));
+    try {
+      await updateLibrary((data) => ({
+        ...data,
+        books: data.books.map((b) => (bookKey(b) === key ? setBookCover(b, image.id, image.url) : b))
+      }));
+    } catch {
+      toast({ message: "Couldn't save — check your connection.", kind: "error" });
+    }
   }
 
   async function handleRemoveBookCover(book: Record<string, unknown>) {
     const key = bookKey(book);
-    await updateLibrary((data) => ({
-      ...data,
-      books: data.books.map((b) => (bookKey(b) === key ? clearBookCover(b) : b))
-    }));
+    try {
+      await updateLibrary((data) => ({
+        ...data,
+        books: data.books.map((b) => (bookKey(b) === key ? clearBookCover(b) : b))
+      }));
+    } catch {
+      toast({ message: "Couldn't save — check your connection.", kind: "error" });
+    }
   }
 
   // Select mode: turn it on, tap books across any of this page's group
@@ -168,25 +217,43 @@ export function GroupsPage({ type }: { type: GroupType }) {
   // collection it was in.
   async function handleDeleteSelected() {
     if (selectedKeys.size === 0) return;
-    if (
-      !(await confirm({
-        title: `Delete ${selectedKeys.size} book${selectedKeys.size === 1 ? "" : "s"} from your library?`,
-        body: "This can't be undone."
-      }))
-    ) {
+    const snapshot = library?.data;
+    if (!snapshot) return;
+    const keys = selectedKeys;
+    try {
+      await updateLibrary((data) => ({
+        ...data,
+        books: data.books.filter((b) => !keys.has(bookKey(b))),
+        groups: removeBooksFromAllGroups(data.groups ?? [], keys)
+      }));
+    } catch {
+      toast({ message: "Couldn't delete — nothing was changed.", kind: "error" });
       return;
     }
-    await updateLibrary((data) => ({
-      ...data,
-      books: data.books.filter((b) => !selectedKeys.has(bookKey(b))),
-      groups: removeBooksFromAllGroups(data.groups ?? [], selectedKeys)
-    }));
+    setSelectedKeys(new Set());
+    setSelectionMode(false);
     // Independent of the library save above — see LibraryPage.tsx's own
     // handleDeleteSelected for why murals are scrubbed via a separate
     // call rather than a field on that save.
-    await scrubBooks(selectedKeys);
-    setSelectedKeys(new Set());
-    setSelectionMode(false);
+    const scrubTimer = setTimeout(() => void scrubBooks(keys), 6500);
+    toast({
+      message: `Deleted ${keys.size} book${keys.size === 1 ? "" : "s"}.`,
+      action: {
+        label: "Undo",
+        onClick: () => {
+          clearTimeout(scrubTimer);
+          void (async () => {
+            try {
+              await updateLibrary(() => snapshot);
+              toast({ message: "Restored." });
+            } catch {
+              toast({ message: "Couldn't restore — check your connection.", kind: "error" });
+            }
+          })();
+        }
+      },
+      duration: 6000
+    });
   }
 
   const pickerGroup = groups.find((g) => g.id === pickerGroupId) ?? null;
