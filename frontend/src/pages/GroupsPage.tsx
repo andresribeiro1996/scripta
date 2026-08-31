@@ -206,13 +206,13 @@ export function GroupsPage({ type }: { type: GroupType }) {
               <button
                 onClick={() => void handleDeleteSelected()}
                 disabled={selectedKeys.size === 0}
-                className="rounded-lg bg-(--color-danger) px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+                className="rounded-lg bg-(--color-danger) px-3.5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
               >
                 Delete selected
               </button>
               <button
                 onClick={handleToggleSelectionMode}
-                className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm hover:bg-(--color-surface-hover)"
+                className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover)"
               >
                 Cancel
               </button>
@@ -220,7 +220,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
           ) : (
             <button
               onClick={handleToggleSelectionMode}
-              className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm hover:bg-(--color-surface-hover)"
+              className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover)"
             >
               Select…
             </button>
@@ -237,7 +237,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
         <button
           type="submit"
           disabled={creating || !newName.trim()}
-          className="rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
+          className="rounded-lg bg-(--color-accent) px-3.5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
         >
           Add {copy.noun}
         </button>
