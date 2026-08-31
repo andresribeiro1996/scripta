@@ -12,6 +12,7 @@
     "test": "node --env-file=test/.env.test --import tsx --test test/*.test.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1123.0",
     "@fastify/cors": "^11.3.0",
     "@fastify/multipart": "^10.1.1",
     "@fastify/oauth2": "^8.3.0",
@@ -28,6 +29,7 @@
   "devDependencies": {
     "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^22.15.0",
+    "s3rver": "^3.7.1",
     "tsx": "^4.19.1",
     "typescript": "^5.6.2"
   },

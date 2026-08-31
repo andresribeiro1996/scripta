@@ -33,6 +33,10 @@ primary_region = "lhr"
 # The five SQLite files and both blob directories live here. This is the
 # whole account database: without this mount, every signup, library and
 # uploaded image disappears when the machine is replaced.
+#
+# DELETE THIS BLOCK once DATABASE_URL and S3_BUCKET are both set — at that
+# point nothing durable is written to local disk and the volume is what is
+# still forcing a single machine.
 [[mounts]]
   source = "scripta_data"
   destination = "/data"
@@ -41,15 +45,18 @@ primary_region = "lhr"
   internal_port = 3000
   force_https = true
 
-  # ONE MACHINE, ALWAYS ON. Both halves matter:
+  # ONE MACHINE while any state is local.
   #
-  # A SQLite file on a volume can only be attached to a single machine, so
-  # two instances would each get their own copy of the database and
-  # silently diverge — this is the constraint that has to hold until the
-  # app moves to Postgres (docs/DEPLOYMENT-PLAN.md phase 3).
+  # A SQLite file on a volume can only attach to a single machine, and so
+  # can uploaded images — two instances would each get their own copy and
+  # silently diverge. That constraint holds until BOTH DATABASE_URL and
+  # S3_BUCKET are set (docs/DEPLOYMENT-PLAN.md phase 3); with both, the
+  # app is stateless, the [[mounts]] block above can be deleted, and
+  # min_machines_running can go to 2 for rolling deploys.
   #
-  # And auto-stop would make the first request after an idle period pay a
-  # cold start, on an app whose users arrive in ones and twos.
+  # auto-stop stays off either way: it would make the first request after
+  # an idle period pay a cold start, on an app whose users arrive in ones
+  # and twos.
   auto_stop_machines = false
   auto_start_machines = true
   min_machines_running = 1

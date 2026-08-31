@@ -61,7 +61,7 @@ export function buildGalleryRoutes(service: GalleryService) {
       if (!parsed.success) {
         return reply.code(400).send({ error: "Invalid image id." });
       }
-      const deleted = service.deleteImage(request.user.id, parsed.data.id);
+      const deleted = await service.deleteImage(request.user.id, parsed.data.id);
       if (!deleted) {
         return reply.code(404).send({ error: "No image with that id in your gallery." });
       }
@@ -78,7 +78,7 @@ export function buildGalleryRoutes(service: GalleryService) {
       if (!parsed.success) {
         return reply.code(400).send({ error: "Invalid image id." });
       }
-      const file = service.getImageFile(parsed.data.id);
+      const file = await service.getImageFile(parsed.data.id);
       if (!file) {
         return reply.code(404).send({ error: "No such image." });
       }

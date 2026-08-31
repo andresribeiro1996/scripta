@@ -60,7 +60,7 @@ export function buildCachedFileRoute(service: CoversService) {
       if (!parsed.success) {
         return reply.code(400).send({ error: "Invalid cover id." });
       }
-      const file = service.getCachedCoverFile(parsed.data.id);
+      const file = await service.getCachedCoverFile(parsed.data.id);
       if (!file) {
         return reply.code(404).send({ error: "No such cached cover." });
       }

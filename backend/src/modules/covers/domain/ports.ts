@@ -32,7 +32,9 @@ export interface CoverCacheRepository {
   insert(row: CachedCoverRow): boolean;
 }
 
+// Async for the same reason gallery's own ImageBlobStore is — see that
+// port's comment.
 export interface CoverBlobStore {
-  save(id: string, extension: string, bytes: Buffer): void;
-  read(id: string, extension: string): Buffer | null;
+  save(id: string, extension: string, bytes: Buffer): Promise<void>;
+  read(id: string, extension: string): Promise<Buffer | null>;
 }

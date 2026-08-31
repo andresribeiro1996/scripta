@@ -73,6 +73,32 @@ const envSchema = z.object({
   DATABASE_SSL: z.enum(["on", "no-verify", "off"]).default("on"),
   DATABASE_POOL_MAX: z.coerce.number().int().positive().max(100).default(10),
 
+  // --- blob storage: object storage when set, local disk otherwise -----
+  //
+  // Gallery uploads and the resolved-cover cache. Set S3_BUCKET and both
+  // move to object storage; leave it blank and nothing changes.
+  //
+  // This is the OTHER thing pinning the API to one machine — Postgres
+  // alone does not free it, because blobs on local disk mean the container
+  // can only run in one place. Written against the S3 API, so Cloudflare
+  // R2 (recommended: zero egress, and covers are served on every page
+  // view), Backblaze B2, MinIO or AWS S3 all work.
+  S3_BUCKET: z.string().optional().default(""),
+  // R2 and MinIO need an explicit endpoint; real AWS S3 infers one from
+  // the region, so leave this blank there.
+  S3_ENDPOINT: z.string().optional().default(""),
+  // R2 ignores the region but the SDK requires one; "auto" is what
+  // Cloudflare's own documentation uses.
+  S3_REGION: z.string().default("auto"),
+  S3_ACCESS_KEY_ID: z.string().optional().default(""),
+  S3_SECRET_ACCESS_KEY: z.string().optional().default(""),
+  // Bucket in the path rather than the hostname. Required by R2 and
+  // MinIO; harmless on AWS.
+  S3_FORCE_PATH_STYLE: z
+    .string()
+    .default("true")
+    .transform((v) => v.toLowerCase() !== "false"),
+
   AUTH_DB_PATH: z.string().min(1),
   // Ignored when DATABASE_URL is set. Still required, so that switching
   // to Postgres and back doesn't need config archaeology.
@@ -183,6 +209,21 @@ export const isProduction = env.NODE_ENV === "production";
 /** Whether the library module should use Postgres rather than SQLite.
  *  One variable, one decision — see modules/library/plugin.ts. */
 export const usePostgresLibrary = env.DATABASE_URL !== "";
+
+/** Whether gallery uploads and the cover cache live in object storage
+ *  rather than on local disk. One variable, one decision — see each
+ *  module's plugin.ts. Credentials are checked alongside the bucket so a
+ *  half-configured deployment fails at boot rather than on the first
+ *  upload. */
+export const useObjectStorage = env.S3_BUCKET !== "";
+
+if (useObjectStorage && (env.S3_ACCESS_KEY_ID === "" || env.S3_SECRET_ACCESS_KEY === "")) {
+  // Deliberately fatal rather than a warning: a bucket configured without
+  // credentials would fail on the first upload a real user attempted,
+  // which is a far worse place to discover it than boot.
+  console.error("S3_BUCKET is set but S3_ACCESS_KEY_ID/S3_SECRET_ACCESS_KEY are not — object storage cannot be used without credentials.");
+  process.exit(1);
+}
 
 /** Parses TRUST_PROXY into the shape Fastify's own `trustProxy` option
  *  expects: a boolean, or a list of trusted IPs/CIDRs. Exported separately

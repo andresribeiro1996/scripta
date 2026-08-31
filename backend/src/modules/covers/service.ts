@@ -43,7 +43,7 @@ export interface ResolveCoverParams {
 
 export interface CoversService {
   resolveCover(params: ResolveCoverParams): Promise<{ url: string | null }>;
-  getCachedCoverFile(id: string): { buffer: Buffer; mimeType: string } | null;
+  getCachedCoverFile(id: string): Promise<{ buffer: Buffer; mimeType: string } | null>;
 }
 
 interface Candidate {
@@ -149,7 +149,7 @@ export function createCoversService(
           byte_size: reencoded.data.byteLength,
           created_at: new Date().toISOString()
         };
-        blobStore.save(id, OUTPUT_EXTENSION, reencoded.data);
+        await blobStore.save(id, OUTPUT_EXTENSION, reencoded.data);
         const wonRace = cacheRepo.insert(row);
         // Lost a race to a concurrent request resolving this exact same
         // book (see the SQLite adapter's own comment) — the blob we just
@@ -167,13 +167,13 @@ export function createCoversService(
       return { url: null };
     },
 
-    getCachedCoverFile(id) {
+    async getCachedCoverFile(id) {
       // No metadata lookup needed first (unlike gallery's getImageFile,
       // which reads the row for its user_id/extension) — every cached
       // cover here is written with the same fixed OUTPUT_EXTENSION/
       // OUTPUT_MIME_TYPE, so the file's own existence is the only real
       // question.
-      const buffer = blobStore.read(id, OUTPUT_EXTENSION);
+      const buffer = await blobStore.read(id, OUTPUT_EXTENSION);
       if (!buffer) return null;
       return { buffer, mimeType: OUTPUT_MIME_TYPE };
     }

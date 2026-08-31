@@ -6,8 +6,9 @@
 import fastifyMultipart from "@fastify/multipart";
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
-import { env } from "../../config/env.js";
+import { env, useObjectStorage } from "../../config/env.js";
 import { createFsImageBlobStore } from "./adapters/fs/fsImageBlobStore.js";
+import { createS3ImageBlobStore } from "./adapters/s3/s3ImageBlobStore.js";
 import { createSqliteGalleryRepository } from "./adapters/sqlite/sqliteGalleryRepository.js";
 import { openGalleryDb } from "./adapters/sqlite/connection.js";
 import { buildGalleryRoutes } from "./routes.js";
@@ -17,7 +18,11 @@ export async function galleryPlugin(app: FastifyInstance) {
   // --- composition: swap either block to change storage technology ---
   const db = openGalleryDb();
   const galleryRepository = createSqliteGalleryRepository(db);
-  const blobStore = createFsImageBlobStore(env.GALLERY_STORAGE_PATH);
+  // Object storage when a bucket is configured, local disk otherwise —
+  // the same one-variable decision modules/library makes for its database.
+  // Uploads on local disk are what pin this API to a single machine.
+  const blobStore = useObjectStorage ? createS3ImageBlobStore() : createFsImageBlobStore(env.GALLERY_STORAGE_PATH);
+  app.log.info(`[gallery] image blobs: ${useObjectStorage ? `object storage (${env.S3_BUCKET})` : env.GALLERY_STORAGE_PATH}`);
   const publicUrlFor = (id: string) => `${env.PUBLIC_API_URL}/gallery/${id}/file`;
   const galleryService = createGalleryService(galleryRepository, blobStore, publicUrlFor);
   // -----------------------------------------------------------------------

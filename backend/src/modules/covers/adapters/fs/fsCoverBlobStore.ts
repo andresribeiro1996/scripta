@@ -17,15 +17,17 @@ function pathFor(root: string, id: string, extension: string): string {
   return join(root, `${id}.${extension}`);
 }
 
+// Declared async to satisfy the port; nothing here awaits. See
+// domain/ports.ts.
 export function createFsCoverBlobStore(root: string): CoverBlobStore {
   mkdirSync(root, { recursive: true });
 
   return {
-    save(id, extension, bytes) {
+    async save(id, extension, bytes) {
       writeFileSync(pathFor(root, id, extension), bytes);
     },
 
-    read(id, extension) {
+    async read(id, extension) {
       const path = pathFor(root, id, extension);
       if (!existsSync(path)) return null;
       return readFileSync(path);

@@ -54,10 +54,10 @@ export interface GalleryService {
   uploadImage(userId: string, buffer: Buffer, originalFilename: string): Promise<GalleryImage>;
   /** Returns false if no image with that id was owned by this user (a
    *  caller-facing 404, not a server error). */
-  deleteImage(userId: string, id: string): boolean;
+  deleteImage(userId: string, id: string): Promise<boolean>;
   /** No ownership check — see domain/ports.ts's getImageById for why:
    *  this backs the public GET /gallery/:id/file route. */
-  getImageFile(id: string): { buffer: Buffer; mimeType: string } | null;
+  getImageFile(id: string): Promise<{ buffer: Buffer; mimeType: string } | null>;
 }
 
 export function createGalleryService(repo: GalleryRepository, blobStore: ImageBlobStore, publicUrlFor: (id: string) => string): GalleryService {
@@ -122,23 +122,23 @@ export function createGalleryService(repo: GalleryRepository, blobStore: ImageBl
         created_at: new Date().toISOString()
       };
 
-      blobStore.save(userId, id, OUTPUT_EXTENSION, encoded.data);
+      await blobStore.save(userId, id, OUTPUT_EXTENSION, encoded.data);
       repo.insertImage(row);
       return toGalleryImage(row, publicUrlFor);
     },
 
-    deleteImage(userId, id) {
+    async deleteImage(userId, id) {
       const row = repo.getOwnedImage(id, userId);
       if (!row) return false;
       repo.deleteImage(id, userId);
-      blobStore.delete(row.user_id, row.id, row.extension);
+      await blobStore.delete(row.user_id, row.id, row.extension);
       return true;
     },
 
-    getImageFile(id) {
+    async getImageFile(id) {
       const row = repo.getImageById(id);
       if (!row) return null;
-      const buffer = blobStore.read(row.user_id, row.id, row.extension);
+      const buffer = await blobStore.read(row.user_id, row.id, row.extension);
       if (!buffer) return null;
       return { buffer, mimeType: row.mime_type };
     }

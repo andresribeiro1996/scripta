@@ -17,7 +17,7 @@ link — same content, easier to read).
 |---|---|
 | 1 — Normalise the library | **Done** (slices 1 & 2). Slice 3 deliberately deferred, see below. |
 | 2 — Correctness gaps | **Done.** |
-| 3 — State off the instance | **Postgres done; object storage not done.** |
+| 3 — State off the instance | **Done.** Postgres and object storage both behind their existing ports. |
 | 4 — Domain, hosting, pipeline | **Pipeline and container done. Domain and hosting are yours to choose.** |
 | 5 — Reconsider the frontend | Not started; a product decision, not a technical blocker. |
 
@@ -40,7 +40,6 @@ link — same content, easier to read).
   it has been live for zero minutes. Deleting the compatibility layer and the
   rollback path before either has seen production would remove the safety net
   precisely when it is most needed.
-- **Object storage adapter.** See phase 3.
 - **The remaining per-entity routes.** The document endpoint is still correct
   and now conflict-safe; the rest is a size optimisation, and doing ~25 call
   sites blind against a frontend with no test suite was a worse trade than
@@ -216,16 +215,30 @@ re-runnable. Verified here against a seeded 3-account / 400-book / 1,197-highlig
 database, and the app was then booted against Postgres and round-tripped over
 HTTP.
 
-**Object storage: not done.** Gallery uploads and the cover cache still write to
-local disk (`GALLERY_STORAGE_PATH`, `COVERS_STORAGE_PATH`), which pins the API to
-one machine just as surely as the database did — so Postgres alone does *not*
-yet unlock replicas. Both blob stores are already behind ports
-(`ImageBlobStore`, `CoverBlobStore` in their modules' `domain/ports.ts`), so this
-is a new adapter, not a refactor. It was deliberately not written blind: no
-S3-compatible endpoint was reachable from the environment this was built in, and
-an unverified storage adapter handling user uploads is worse than none. Do it
-against a real R2/S3 bucket (or MinIO) with the same
-same-behaviour-through-one-port tests the Postgres adapter has.
+**Object storage: done.** `adapters/s3/` in both `gallery` and `covers` implement
+the existing `ImageBlobStore` / `CoverBlobStore` ports; set `S3_BUCKET` and both
+move off local disk. Written against the S3 API, so R2, B2, MinIO and AWS all
+work — R2 is the recommendation (zero egress, and covers are served on every page
+view). Both ports had to become async for the same reason the library port did.
+
+**With Postgres AND object storage set, the API is finally stateless** — no
+volume, so replicas and rolling deploys become possible. Until *both* are set it
+is still pinned to one machine, which is why Postgres alone did not unlock them.
+
+Migrating existing local files: `scripts/files-to-object-storage.mjs`, run with
+the app stopped. It writes through the same adapters the app uses, so the keys
+are guaranteed to be the ones the app will later look for, and verifies each file
+by reading the object back and comparing bytes. It never deletes local files —
+verify the app serves images from the bucket before removing them, because
+gallery uploads are user-supplied and exist nowhere else.
+
+**Residual gap worth knowing:** the adapters are tested against `s3rver`, a real
+S3-protocol server, so request signing, path-style addressing, content types,
+missing-key handling and body streaming are genuinely exercised — but `s3rver` is
+not R2. Providers differ in how they report a missing key (AWS returns 403 rather
+than 404 without ListBucket permission, which `shared/s3/client.ts` handles). Do
+one real upload/read/delete against the actual bucket before launch; that is now
+a smoke test rather than the code's first ever run.
 
 Storage sizing is its own argument: the gallery quota is **500 MB per account**
 (`modules/gallery/service.ts`), so a thousand users is potentially half a

@@ -47,8 +47,12 @@ ENV PORT=3000
 
 # The five SQLite files and the two blob directories live here. Mount a
 # persistent volume at /data or the account data is gone with the
-# container — this is the whole reason the API can't run on an ephemeral
-# filesystem. Overridden per deployment if the paths differ.
+# container.
+#
+# These are the fallbacks. Set DATABASE_URL and S3_BUCKET and the library
+# module and both blob stores move off local disk entirely — at which
+# point the container is stateless and needs no volume at all. Until BOTH
+# are set, it does.
 ENV AUTH_DB_PATH=/data/auth.sqlite \
     LIBRARY_DB_PATH=/data/library.sqlite \
     GALLERY_DB_PATH=/data/gallery.sqlite \

@@ -28,8 +28,14 @@ export interface GalleryRepository {
   totalBytesForUser(userId: string): number;
 }
 
+// Async for the same reason modules/library's own repository port is:
+// object storage (see adapters/s3/) is a network call and cannot answer
+// synchronously. The filesystem adapter resolves immediately. Keeping the
+// port synchronous would have made moving blobs off local disk a rewrite
+// of service.ts rather than a new adapter — and blobs on local disk are
+// what pin this API to a single machine.
 export interface ImageBlobStore {
-  save(userId: string, id: string, extension: string, bytes: Buffer): void;
-  read(userId: string, id: string, extension: string): Buffer | null;
-  delete(userId: string, id: string, extension: string): void;
+  save(userId: string, id: string, extension: string, bytes: Buffer): Promise<void>;
+  read(userId: string, id: string, extension: string): Promise<Buffer | null>;
+  delete(userId: string, id: string, extension: string): Promise<void>;
 }
