@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { resolveCover } from "../api/covers";
+import { forgetResolvedCover, peekResolvedCover, resolveCover, type ResolveCoverParams } from "../api/covers";
 import { normalizeImageId, normalizeIsbn, statusLabel } from "../lib/covers";
 import { DEFAULT_LIBRARY_STYLE, cardFontFamilyCss, resolveBorderColor, type LibraryStyleSettings } from "../lib/libraryStyle";
 import { bookKey } from "../lib/merge";
@@ -52,6 +52,18 @@ const BookIcon = () => (
  *  than cropped, at the cost of not filling every pixel of a
  *  mismatched-ratio box — the right trade for a small preview tile where
  *  seeing the whole cover matters more than a flush edge-to-edge fill. */
+function coverParamsFor(book: Record<string, unknown>): ResolveCoverParams {
+  const isbn = normalizeIsbn(book.ISBN);
+  const imageId = normalizeImageId(book.ImageId);
+  const title = String(book.Title ?? "").trim();
+  return {
+    isbn: isbn || undefined,
+    imageId: imageId || undefined,
+    title: title || undefined,
+    author: book.Attribution ? String(book.Attribution) : undefined
+  };
+}
+
 export function CoverImage({
   book,
   onHasCoverChange,
@@ -63,7 +75,7 @@ export function CoverImage({
 }) {
   const confirmedUrl = typeof book._coverUrl === "string" ? book._coverUrl : null;
   const [confirmedFailed, setConfirmedFailed] = useState(false);
-  const [autoUrl, setAutoUrl] = useState<string | null>(null);
+  const [autoUrl, setAutoUrl] = useState<string | null>(() => peekResolvedCover(coverParamsFor(book)) ?? null);
   const useAuto = !confirmedUrl || confirmedFailed;
 
   // Book identity (or the confirmed URL specifically) changed — reset
@@ -71,22 +83,20 @@ export function CoverImage({
   // for this one while the fresh lookup below is still in flight.
   useEffect(() => {
     setConfirmedFailed(false);
-    setAutoUrl(null);
+    setAutoUrl(peekResolvedCover(coverParamsFor(book)) ?? null);
   }, [book, confirmedUrl]);
 
   useEffect(() => {
     if (!useAuto) return;
-    const isbn = normalizeIsbn(book.ISBN);
-    const imageId = normalizeImageId(book.ImageId);
-    const title = String(book.Title ?? "").trim();
-    if (!isbn && !imageId && !title) return; // nothing to even ask the backend about
+    const params = coverParamsFor(book);
+    if (!params.isbn && !params.imageId && !params.title) return; // nothing to even ask the backend about
+    const cached = peekResolvedCover(params);
+    if (cached !== undefined) {
+      setAutoUrl(cached);
+      return;
+    }
     let cancelled = false;
-    resolveCover({
-      isbn: isbn || undefined,
-      imageId: imageId || undefined,
-      title: title || undefined,
-      author: book.Attribution ? String(book.Attribution) : undefined
-    })
+    resolveCover(params)
       .then((url) => {
         if (!cancelled) setAutoUrl(url);
       })
@@ -123,7 +133,11 @@ export function CoverImage({
           className={`absolute inset-0 h-full w-full ${fit === "contain" ? "object-contain" : "object-cover"}`}
           onError={() => {
             if (!useAuto) setConfirmedFailed(true); // the confirmed/legacy URL broke — fall through to a fresh backend lookup
-            else setAutoUrl(null); // the resolved URL itself broke somehow — give up, show the placeholder
+            else {
+              // the resolved URL itself broke — drop it from the local cache so the next mount retries, then give up for now
+              forgetResolvedCover(coverParamsFor(book));
+              setAutoUrl(null);
+            }
           }}
         />
       ) : (

@@ -1,8 +1,22 @@
 # Kobo Library Backend
 
-A Node.js/Fastify/TypeScript backend, structured as a **modular monolith**: one deployable service, internally split into self-contained modules that only talk to each other through explicit public interfaces. Six modules so far — `auth`, `library`, `gallery`, `covers`, `socials`, and `arena` — with more expected as the project grows. Consumed by the [frontend](../frontend/README.md), which replaces the old static, drag-your-own-file [viewer](../viewer/README.md).
+A Node.js/Fastify/TypeScript backend, structured as a **modular monolith**: one deployable service, internally split into self-contained modules that only talk to each other through explicit public interfaces. Seven modules so far — `auth`, `library`, `gallery`, `covers`, `socials`, `arena`, and `murals` — with more expected as the project grows. Consumed by the [frontend](../frontend/README.md), which replaces the old static, drag-your-own-file [viewer](../viewer/README.md).
 
 Every module with a persistence dependency follows **hexagonal architecture** (ports & adapters): the module's business logic depends only on a repository *interface* it defines, never on a concrete database. See "Hexagonal architecture" below — this is a standing convention for this backend, not just how `auth` happened to be built.
+
+## Modules at a glance
+
+Skim layer over the detailed sections below — each module's own section has the full per-route table, decisions, and verification notes. "✓" means `Authorization: Bearer <accessToken>`.
+
+| Module | What it owns | Routes |
+|---|---|---|
+| `auth` | Accounts and sessions — signup/login, JWT access + rotating refresh tokens, Google sign-in, username claim | `/auth/*` — mostly open; `me`/`logout-everywhere`/`username` ✓ |
+| `library` | The account's single library document (opaque blob) plus a public share link | `GET`/`PUT /library` ✓; `POST /library/share`/`unshare` ✓; `GET /library/shared/:token` |
+| `gallery` | Per-account uploaded-image pool — validated by real content, re-encoded to WebP, size/quota-capped | `GET`/`POST`/`DELETE /gallery*` ✓; `GET /gallery/:id/file` |
+| `covers` | The whole cover-resolution chain (Kobo/Open Library/Google Books/Hardcover) behind a global byte-level cache | `GET /covers/resolve` ✓; `GET /covers/cached/:id/file` |
+| `socials` | Platform connections (X/Instagram/Threads/TikTok OAuth, Bluesky app password), tokens encrypted at rest | `GET /socials`, link-session, bluesky, `DELETE` ✓; `connect`/`callback` open |
+| `arena` | Anonymous-vote book bracket tournaments; duels settled by a 30s background sweep | create/seed/start/settle/tiebreak/delete/mine ✓; view/public-list/vote open |
+| `murals` | Per-account freeform dashboard documents (block semantics live in the frontend) plus public share links | all `/murals*` ✓ except `GET /murals/shared/:token` |
 
 ## Running it
 
@@ -58,8 +72,11 @@ curl -X PUT http://localhost:3000/library \
 
 | Method | Path | Auth required | Notes |
 |---|---|---|---|
-| GET | `/library` | ✓ | `{data, updatedAt}`, or `404` if this account hasn't saved one yet |
-| PUT | `/library` | ✓ | `{data: {...}}` → stores it (replacing any previous document) and echoes back `{data, updatedAt}` |
+| GET | `/library` | ✓ | `{data, updatedAt, shareToken, shareUrl}`, or `404` if this account hasn't saved one yet |
+| PUT | `/library` | ✓ | `{data: {...}}` → stores it (replacing any previous document) and echoes back `{data, updatedAt, ...}` |
+| POST | `/library/share` | ✓ | Mints a share token (idempotent — an already-shared library keeps its existing token, so retries never invalidate a link someone already has) and returns the document with `shareUrl` pointing at the frontend's `/shared/library/:token` page. `404` if nothing's saved yet |
+| POST | `/library/unshare` | ✓ | Revokes the token; the shared route immediately `404`s for it |
+| GET | `/library/shared/:token` | — | The public, redacted view (`toPublicLibraryData` — highlights and other private per-book data never leave the server). A LIVE view of whatever the owner currently holds, so `Cache-Control: no-store`, and its own tight rate limit in a separate scope. Same "unguessable random UUID" trust model as `gallery`'s file route |
 
 Each account only ever sees its own document — verified in testing with two separate accounts. One cosmetic thing worth knowing: the top-level key *order* of what you `PUT` isn't guaranteed to match what a later `GET` returns (the validation library reorders keys during parsing). The values are always identical — this only affects raw string/byte comparison of the JSON, never anything that actually parses it.
 
@@ -124,6 +141,26 @@ Rate-limited (30 requests/minute, scoped to this module's routes only) and given
 - **Its own SQLite file** (`ARENA_DB_PATH`), same one-module-one-database isolation as every other module — `tournaments`/`tournament_slots`/`duels`/`votes`, with seeded books denormalized as a snapshot (title/author/cover) rather than referencing a shared Book table, since none exists anywhere in this app (see `library`'s own section above).
 - **The first background timer in this codebase** — a plain `setInterval` sweep, no job queue: the simplest thing that could work at this app's scale, same "no new dependency for something this small" instinct as `node:sqlite` itself.
 - **This repository's first automated test suite** (`backend/src/modules/arena/service.test.ts`, via Node's built-in `node:test` — zero new dependencies) exercises the bracket/duel/round state machine against a hand-written in-memory fake of `ArenaRepository`, finally using the "seam is there" testability this hexagonal split has always had (see "Not built," below).
+
+### `murals`
+
+- **Per-account freeform dashboards** — the backend half of the frontend's Murals feature (see the [frontend README](../frontend/README.md)'s "Murals" section for what a mural *is*: ten block types, the snap-to-grid canvas, tier lists, the lot). A `Mural` is `{id, name, blocks, coverImageId?, coverImageUrl?, shareToken, shareUrl, createdAt, updatedAt}`; each mural's `blocks` are stored as one opaque JSON blob, the same "the module stores and returns the document without understanding its internals" stance `library` takes — all block-type semantics live in the frontend's `lib/murals.ts`.
+- **Cover assignment from the gallery pool** — `PUT`/`DELETE /murals/:id/cover` set/clear a mural's card cover the same way `setBookCover` does for a book, so the same gallery-image deletion scrubbing applies (`scrubImageFromMurals` on the frontend; the cover fields just clear here).
+- **Public share links, same shape as `library`'s** — `POST /murals/:id/share` mints an unguessable UUID token (idempotent, like `library`'s); `POST /murals/:id/unshare` revokes it. `GET /murals/shared/:token` is the public, unauthenticated view — registered in its own scope with its own tight rate limit, `Cache-Control: no-store` (a live view, unshareable at any moment), and block/book references resolved server-side into redacted public shapes (no highlights, no private book fields).
+- **Its own SQLite file** (`MURALS_DB_PATH`), same one-module-one-database isolation as every other module.
+
+| Method | Path | Auth required | Notes |
+|---|---|---|---|
+| GET | `/murals` | ✓ | `{murals: Mural[]}` for the caller's account |
+| POST | `/murals` | ✓ | `{name}` → `{mural}`, `201` |
+| GET | `/murals/:id` | ✓ | `{mural}`, or `404` |
+| PUT | `/murals/:id` | ✓ | `{name?, blocks?}` (at least one) → `{mural}` |
+| DELETE | `/murals/:id` | ✓ | `204`, or `404` |
+| PUT | `/murals/:id/cover` | ✓ | `{imageId, url}` (a gallery image and its served URL) → `{mural}` |
+| DELETE | `/murals/:id/cover` | ✓ | clears the cover → `{mural}` |
+| POST | `/murals/:id/share` | ✓ | mints/reuses the share token → `{mural}` carrying `shareUrl` |
+| POST | `/murals/:id/unshare` | ✓ | revokes it → `{mural}` |
+| GET | `/murals/shared/:token` | — | the redacted public view (see above); `404` for unknown OR unshared tokens, indistinguishably |
 
 ## Hexagonal architecture — the standing convention for dependencies like a database
 

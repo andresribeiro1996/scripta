@@ -5,7 +5,7 @@
 // auth primitive needed on the (deliberately unauthenticated) GET route.
 
 import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { resolveTiebreak, settleDuelEarly } from "../api/arena";
 import { useAuth } from "../auth/AuthContext";
 import { BracketTree } from "../components/arena/BracketTree";
@@ -74,6 +74,9 @@ export function ArenaViewPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-8">
+      <Link to="/arena" className="mb-2 inline-block text-xs text-(--color-text-dim) hover:text-(--color-text)">
+        ← All tournaments
+      </Link>
       <h2 className="mb-1 text-lg font-bold">{tournament.name}</h2>
       <p className="mb-4 text-sm text-(--color-text-dim)">
         {tournament.bracketSize}-book bracket · {tournament.status === "completed" ? "Completed" : `Round ${tournament.currentRound}`}

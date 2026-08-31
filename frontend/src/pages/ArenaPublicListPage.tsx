@@ -3,6 +3,7 @@
 // design spec). No auth, no PageContainer's dashboard chrome (this route
 // lives outside DashboardLayout entirely) — just a minimal standalone page.
 
+import { Link } from "react-router-dom";
 import { usePublicTournaments } from "../hooks/usePublicTournaments";
 
 export function ArenaPublicListPage() {
@@ -10,6 +11,9 @@ export function ArenaPublicListPage() {
 
   return (
     <div className="mx-auto max-w-3xl p-6">
+      <Link to="/dashboard" className="mb-2 inline-block text-xs text-(--color-text-dim) hover:text-(--color-text)">
+        ← Back to app
+      </Link>
       <h1 className="mb-1 text-xl font-bold">BookArena</h1>
       <p className="mb-6 text-sm text-(--color-text-dim)">Vote in book bracket tournaments — no account needed.</p>
 

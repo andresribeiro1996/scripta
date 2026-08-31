@@ -1,6 +1,25 @@
 # Scripta (frontend)
 
-The real app, branded "Scripta": React + Vite + TypeScript, Tailwind CSS, TanStack Query, React Router, installable as a PWA. Talks to the [backend](../backend/README.md)'s `auth` and `library` modules. Replaces the old static, drag-your-own-file [viewer](../viewer/README.md) — accounts now, one library per signed-in user instead of a local file each time.
+The real app, branded "Scripta": React + Vite + TypeScript, Tailwind CSS, TanStack Query, React Router, installable as a PWA. Talks to all seven of the [backend](../backend/README.md)'s modules — `auth`, `library`, `gallery`, `covers`, `socials`, `arena`, and `murals` (its own "Modules at a glance" table is the skim layer for those). Replaces the old static, drag-your-own-file [viewer](../viewer/README.md) — accounts now, one library per signed-in user instead of a local file each time.
+
+## Pages at a glance
+
+Skim layer over the detailed sections below. Everything under `/dashboard/*` sits behind `RequireAuth` (plus `RequireUsername`) and the shared `DashboardLayout.tsx` sidebar.
+
+| Route | Page | What |
+|---|---|---|
+| `/login` | `LoginPage.tsx` | signup / login (email or username), Google sign-in if configured |
+| `/oauth-success` | `OAuthSuccessPage.tsx` | where Google's login flow lands back |
+| `/choose-username` | `ChooseUsernamePage.tsx` | first-login username claim for Google sign-ins |
+| `/dashboard` | `LibraryPage.tsx` | the book grid — import (3 formats, merged), reorder, select-delete |
+| `/dashboard/series`, `/dashboard/collections` | `GroupsPage.tsx` | grouped views over the same books |
+| `/dashboard/gallery` | `GalleryPage.tsx` | the account's uploaded-image pool |
+| `/dashboard/murals`, `/dashboard/murals/:muralId` | `MuralsListPage.tsx` / `MuralEditorPage.tsx` | freeform dashboards built from blocks |
+| `/dashboard/arena`, `/dashboard/arena/:id/seed` | `ArenaListPage.tsx` / `ArenaSeedPage.tsx` | book-bracket tournaments (owner side) |
+| `/arena`, `/arena/:id` | `ArenaPublicListPage.tsx` / `ArenaViewPage.tsx` | tournaments, public and accountless |
+| `/dashboard/style` | `LibraryStylePage.tsx` | card/page styling for the three book-grid pages |
+| `/dashboard/settings` | `SettingsPage.tsx` | account + username + socials connections |
+| `/shared/library/:token`, `/shared/murals/:token` | `SharedLibraryPage.tsx` / `SharedMuralPage.tsx` | public share-link views, no account needed |
 
 ## Running it
 
@@ -21,12 +40,15 @@ If you change the frontend's port or domain, update the backend's `FRONTEND_URL`
 - **`/login`** — signup collects email + username + password; login takes one field (either email or username) + password. Toggle between the two modes. Also a "Sign in with Google" link if the backend reports it's configured (`GET /auth/providers`).
 - **`/oauth-success`** — where Google's login flow lands back; reads the tokens out of the URL fragment (see `backend/src/modules/auth/plugin.ts` for why they ride there instead of a request body) and decodes the access token's own claims locally rather than spending a `/auth/me` round trip.
 - **`/choose-username`** — where a Google sign-in without a username yet gets routed on its first login (Google doesn't hand you one the way a signup form does). `RequireUsername` (nested inside `RequireAuth`, see `App.tsx`) is what redirects there — a password-signup account never sees this screen, since it picks a username at signup time.
-- Everything past that point (`RequireAuth` *and* `RequireUsername`, so: `/login` if not signed in, `/choose-username` if signed in but without one) sits inside `src/layouts/DashboardLayout.tsx` — a persistent left sidebar (Library / Series / Collections / Library style / Settings, plus account name and "Log out") wrapping a routed `<Outlet>`. Five pages live in it:
+- Everything past that point (`RequireAuth` *and* `RequireUsername`, so: `/login` if not signed in, `/choose-username` if signed in but without one) sits inside `src/layouts/DashboardLayout.tsx` — a persistent left sidebar (Library / Series / Collections / Gallery / Murals / Arena / Library style / Settings, plus account name and "Log out") wrapping a routed `<Outlet>`. The pages (see "Pages at a glance" above), each with its own section or bullet here:
   - **`/dashboard`** (`LibraryPage.tsx`) — loads the account's saved library via `GET /library`. Import accepts the same three formats the old viewer did — a `library.json` from the [exporter](../exporter/export.py), a `KoboReader.sqlite` straight off the device's USB drive, or a Goodreads library CSV export — auto-detected by content (magic bytes / header shape), never by filename. See `src/lib/fileImport.ts`, `sqlite.ts`, `goodreads.ts` — direct ports of the viewer's identical logic, kept in sync by hand since the viewer is being retired rather than shared as a common module. The first import for an account is saved as-is; every import after that is **merged** into what's already saved rather than replacing it (see below).
   - **`/dashboard/series`** and **`/dashboard/collections`** (`SeriesPage.tsx` / `CollectionsPage.tsx`, both thin wrappers around the shared `GroupsPage.tsx`) — see "Series and collections" below.
   - **`/dashboard/style`** (`LibraryStylePage.tsx`) — see "Library style" below.
   - **`/dashboard/settings`** (`SettingsPage.tsx`) — account email (read-only) and username, with a "Change" action that reuses the same `setUsername` call `/choose-username` uses. Also renders `SocialsSection.tsx` — see "Socials" below.
-- **Book cards** — a direct port of the viewer's poster-overlay design and its three-tier cover resolution (Kobo CDN → Open Library by ISBN → Open Library title/author search → plain fallback panel), now in `src/components/BookCard.tsx` / `src/lib/covers.ts` instead of vanilla JS. Ran into, and fixed, the exact same `loading="lazy"` bug the viewer hit — see the comment at the top of `BookCard.tsx`'s `<img>`. No progress bar or colored status pill — read status shows as a plain text label under the title/author (`statusLabel()` in `lib/covers.ts`: "Not read" / "Reading" / "Finished"), and the highlight count badge (top-right, only when a book has highlights) is the only other overlay left.
+  - **`/dashboard/gallery`** (`GalleryPage.tsx`) — the account's image pool — see "Gallery and custom book covers" below.
+  - **`/dashboard/murals`** and **`/dashboard/murals/:muralId`** (`MuralsListPage.tsx` / `MuralEditorPage.tsx`) — see "Murals" below.
+  - **`/dashboard/arena`** and **`/dashboard/arena/:id/seed`** (`ArenaListPage.tsx` / `ArenaSeedPage.tsx`, plus the accountless public `/arena` pages) — book-bracket tournaments; the backend README's `arena` section covers the model and its routes.
+- **Book cards** — a direct port of the viewer's poster-overlay design (`src/components/BookCard.tsx`), now resolving covers with exactly one backend call (`GET /covers/resolve` — the old client-side Kobo CDN → Open Library chain moved server-side behind a global cache; see "Auto cover resolution" below) plus a plain fallback panel. Ran into, and fixed, the exact same `loading="lazy"` bug the viewer hit — see the comment at the top of `BookCard.tsx`'s `<img>`. No progress bar or colored status pill — read status shows as a plain text label under the title/author (`statusLabel()` in `lib/covers.ts`: "Not read" / "Reading" / "Finished"), and the highlight count badge (top-right, only when a book has highlights) is the only other overlay left.
 - **PWA**: a manifest + service worker (`vite-plugin-pwa`) make this installable to a phone's home screen — icon, splash screen, offline asset caching. The icon is the "Scripta" logo, provided as a source JPEG (`scriptaimg.jfif`, project root) and processed into `public/favicon-48.png` (browser tab), `icon-192.png` (manifest, and `apple-touch-icon`), and `icon-512.png` (manifest, `purpose: "any maskable"`) — center-cropped to square from the 992×1070 source, since it wasn't quite square to begin with. The PWA manifest only actually gets injected in a production build (`npm run build`), not `npm run dev` — that's `vite-plugin-pwa` default behavior, not a bug, confirmed by inspecting `dist/manifest.webmanifest` after a build.
 
 ### Merging multiple library sources
