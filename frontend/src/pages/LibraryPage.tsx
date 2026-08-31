@@ -7,12 +7,12 @@ import { fetchLibrary, saveLibrary, type LibraryDocument } from "../api/library"
 import { BookCard } from "../components/BookCard";
 import { BookDetailSheet } from "../components/BookDetailSheet";
 import { BookGrid } from "../components/BookGrid";
-import { useConfirm } from "../components/ConfirmDialog";
 import { CoverPickerModal } from "../components/CoverPickerModal";
 import { LibraryToolbar } from "../components/LibraryToolbar";
 import { PageContainer } from "../components/PageContainer";
 import { PerCardStylePanel } from "../components/PerCardStylePanel";
 import { ShareModal } from "../components/ShareModal";
+import { useToast } from "../components/Toaster";
 import { useLibrary } from "../hooks/useLibrary";
 import { useMurals } from "../hooks/useMurals";
 import { clearBookCover, setBookCover } from "../lib/bookCovers";
@@ -60,7 +60,7 @@ export function LibraryPage() {
   const queryClient = useQueryClient();
   const { scrubBooks } = useMurals();
   const { share: shareLibraryDoc, unshare: unshareLibraryDoc } = useLibrary();
-  const confirm = useConfirm();
+  const toast = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const suppressClickAfterDragRef = useRef(false);
   const sensors = useSensors(
@@ -96,8 +96,12 @@ export function LibraryPage() {
     const current = queryClient.getQueryData<LibraryDocument>(["library"]);
     const base = current?.data ?? library?.data ?? { books: [] };
     if ((base.name ?? "") === name) return; // unchanged — nothing to save
-    const saved = await saveLibrary({ ...base, name });
-    queryClient.setQueryData(["library"], saved);
+    try {
+      const saved = await saveLibrary({ ...base, name });
+      queryClient.setQueryData(["library"], saved);
+    } catch {
+      toast({ message: "Couldn't save the new name.", kind: "error" });
+    }
   }
 
   async function handleFileChosen(file: File) {
@@ -152,6 +156,7 @@ export function LibraryPage() {
       .then((saved) => queryClient.setQueryData(["library"], saved))
       .catch((err) => {
         console.error("Failed to persist new book order:", err);
+        toast({ message: "Couldn't save the new order — moved back.", kind: "error" });
         queryClient.setQueryData(["library"], current); // roll back the optimistic update
       });
   }
@@ -172,8 +177,12 @@ export function LibraryPage() {
     if (!current) return;
     const key = bookKey(book);
     const updatedBooks = current.data.books.map((b) => (bookKey(b) === key ? { ...b, _style: bookStyle } : b));
-    const saved = await saveLibrary({ ...current.data, books: updatedBooks });
-    queryClient.setQueryData(["library"], saved);
+    try {
+      const saved = await saveLibrary({ ...current.data, books: updatedBooks });
+      queryClient.setQueryData(["library"], saved);
+    } catch {
+      toast({ message: "Couldn't save the style change.", kind: "error" });
+    }
   }
 
   async function handleSetBookStatus(book: Record<string, unknown>) {
@@ -181,8 +190,12 @@ export function LibraryPage() {
     if (!current) return;
     const key = bookKey(book);
     const updatedBooks = current.data.books.map((b) => (bookKey(b) === key ? { ...b, ReadStatus: nextReadStatus(b.ReadStatus) } : b));
-    const saved = await saveLibrary({ ...current.data, books: updatedBooks });
-    queryClient.setQueryData(["library"], saved);
+    try {
+      const saved = await saveLibrary({ ...current.data, books: updatedBooks });
+      queryClient.setQueryData(["library"], saved);
+    } catch {
+      toast({ message: "Couldn't save the status change.", kind: "error" });
+    }
   }
 
   // Assigning/clearing a gallery image as a book's cover — see
@@ -196,8 +209,12 @@ export function LibraryPage() {
     if (!current) return;
     const key = bookKey(book);
     const updatedBooks = current.data.books.map((b) => (bookKey(b) === key ? setBookCover(b, image.id, image.url) : b));
-    const saved = await saveLibrary({ ...current.data, books: updatedBooks });
-    queryClient.setQueryData(["library"], saved);
+    try {
+      const saved = await saveLibrary({ ...current.data, books: updatedBooks });
+      queryClient.setQueryData(["library"], saved);
+    } catch {
+      toast({ message: "Couldn't save the cover change.", kind: "error" });
+    }
   }
 
   async function handleRemoveBookCover(book: Record<string, unknown>) {
@@ -205,8 +222,12 @@ export function LibraryPage() {
     if (!current) return;
     const key = bookKey(book);
     const updatedBooks = current.data.books.map((b) => (bookKey(b) === key ? clearBookCover(b) : b));
-    const saved = await saveLibrary({ ...current.data, books: updatedBooks });
-    queryClient.setQueryData(["library"], saved);
+    try {
+      const saved = await saveLibrary({ ...current.data, books: updatedBooks });
+      queryClient.setQueryData(["library"], saved);
+    } catch {
+      toast({ message: "Couldn't save the cover change.", kind: "error" });
+    }
   }
 
   // Select mode: turn it on, tap cards to build up a selection, then
@@ -234,29 +255,42 @@ export function LibraryPage() {
   // collection it was in.
   async function handleDeleteSelected() {
     if (selectedKeys.size === 0) return;
-    if (
-      !(await confirm({
-        title: `Delete ${selectedKeys.size} book${selectedKeys.size === 1 ? "" : "s"} from your library?`,
-        body: "This can't be undone."
-      }))
-    ) {
-      return;
-    }
     const current = queryClient.getQueryData<LibraryDocument>(["library"]);
     if (!current) return;
-    const saved = await saveLibrary({
-      ...current.data,
-      books: current.data.books.filter((b) => !selectedKeys.has(bookKey(b))),
-      groups: removeBooksFromAllGroups(current.data.groups ?? [], selectedKeys)
-    });
-    queryClient.setQueryData(["library"], saved);
-    // Independent of the library save above — murals live on their own
-    // backend rows now (modules/murals), not on this document, so
-    // scrubbing them out of any mural that referenced a deleted book is a
-    // separate call rather than a field riding along in `saved`.
-    await scrubBooks(selectedKeys);
+    const keys = selectedKeys;
+    try {
+      const saved = await saveLibrary({
+        ...current.data,
+        books: current.data.books.filter((b) => !keys.has(bookKey(b))),
+        groups: removeBooksFromAllGroups(current.data.groups ?? [], keys)
+      });
+      queryClient.setQueryData(["library"], saved);
+    } catch {
+      toast({ message: "Couldn't delete — nothing was changed.", kind: "error" });
+      return;
+    }
     setSelectedKeys(new Set());
     setSelectionMode(false);
+    const scrubTimer = setTimeout(() => void scrubBooks(keys), 6500);
+    toast({
+      message: `Deleted ${keys.size} book${keys.size === 1 ? "" : "s"}.`,
+      action: {
+        label: "Undo",
+        onClick: () => {
+          clearTimeout(scrubTimer);
+          void (async () => {
+            try {
+              const restored = await saveLibrary(current.data);
+              queryClient.setQueryData(["library"], restored);
+              toast({ message: "Restored." });
+            } catch {
+              toast({ message: "Couldn't restore — check your connection.", kind: "error" });
+            }
+          })();
+        }
+      },
+      duration: 6000
+    });
   }
 
   const books = library?.data.books ?? [];
