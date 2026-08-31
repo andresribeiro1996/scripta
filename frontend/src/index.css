@@ -152,6 +152,14 @@ option {
   color: var(--color-text);
 }
 
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
 /* Themed checkboxes and range sliders — the last two native controls
    still rendering in the browser's own stock blue regardless of theme
    (every style panel's toggles and "px"/"%" sliders — Card layout, Card
