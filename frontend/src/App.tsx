@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Route, Routes } from "react-router-dom";
 import { RequireAuth } from "./auth/RequireAuth";
 import { RequireUsername } from "./auth/RequireUsername";
 import { DashboardLayout } from "./layouts/DashboardLayout";
@@ -14,6 +14,7 @@ import { LibraryStylePage } from "./pages/LibraryStylePage";
 import { LoginPage } from "./pages/LoginPage";
 import { MuralEditorPage } from "./pages/MuralEditorPage";
 import { MuralsListPage } from "./pages/MuralsListPage";
+import { NotFoundPage } from "./pages/NotFoundPage";
 import { OAuthSuccessPage } from "./pages/OAuthSuccessPage";
 import { SeriesPage } from "./pages/SeriesPage";
 import { SettingsPage } from "./pages/SettingsPage";
@@ -59,7 +60,7 @@ export function App() {
         </Route>
       </Route>
 
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
 }
