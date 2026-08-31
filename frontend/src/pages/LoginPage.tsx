@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { publicFetch } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
-
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
+import { API_URL } from "../config";
 
 // Google's own official "G" mark (Identity branding guidelines) — inlined
 // rather than fetched from Google's asset host, same offline-friendly

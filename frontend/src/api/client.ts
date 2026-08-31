@@ -5,8 +5,7 @@
 // single in-flight refresh instead of each firing their own.
 
 import { getSession, setSession } from "../auth/tokenStore";
-
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
+import { API_URL } from "../config";
 
 export class ApiError extends Error {
   status: number;

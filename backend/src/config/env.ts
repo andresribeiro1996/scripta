@@ -18,6 +18,40 @@ const durationString = z
 const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
 
+  // Gates anything that must not exist on a public deployment — currently
+  // auth's browser test console (see modules/auth/plugin.ts). Defaults to
+  // development so a contributor's checkout keeps the dev affordances
+  // without configuring anything; a deployment sets this to "production".
+  NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+
+  // Whether to believe X-Forwarded-For, and how far. Every managed host
+  // puts a proxy in front of the app, and without this `request.ip` is the
+  // PROXY's address for every request — so all four per-module rate
+  // limiters collapse into one shared bucket and the login brute-force
+  // protection stops protecting anything.
+  //
+  // Deliberately NOT hardcoded to true: trusting the header when there is
+  // NO proxy in front is the mirror-image bug, letting any client spoof
+  // its own IP and skip the rate limiter by setting X-Forwarded-For
+  // itself. So this is explicit per deployment. Accepted values:
+  //   "false" (default)  — direct exposure, use the socket address
+  //   "true"             — behind a trusted proxy that sets the header
+  //   "10.0.0.0/8,..."   — comma-separated trusted IPs/CIDRs (strictest)
+  //
+  // A bare hop COUNT is deliberately not offered: Fastify treats a numeric
+  // trustProxy as fail-closed (it cannot validate the immediate peer, so it
+  // trusts nothing), which would silently leave a deployment that set
+  // TRUST_PROXY=1 with no proxy trust at all — the exact bug this variable
+  // exists to prevent, now harder to spot. A digits-only value is rejected
+  // at boot rather than quietly misbehaving.
+  TRUST_PROXY: z
+    .string()
+    .default("false")
+    .refine(
+      (v) => !/^\d+$/.test(v.trim()),
+      'a proxy hop count is not supported — use "true", or a comma-separated list of trusted proxy IPs/CIDRs'
+    ),
+
   // The frontend's origin, for CORS — see app.ts. A dev Vite server
   // defaults to 5173; change this once the frontend is actually deployed
   // somewhere else.
@@ -125,6 +159,25 @@ if (!parsed.success) {
 }
 
 export const env = parsed.data;
+
+export const isProduction = env.NODE_ENV === "production";
+
+/** Parses TRUST_PROXY into the shape Fastify's own `trustProxy` option
+ *  expects: a boolean, or a list of trusted IPs/CIDRs. Exported separately
+ *  from the resolved value below so it can be tested against real Fastify
+ *  behaviour without re-importing this module under a different
+ *  environment. See the variable's own comment above. */
+export function parseTrustProxy(raw: string): boolean | string[] {
+  const trimmed = raw.trim();
+  if (trimmed === "" || trimmed.toLowerCase() === "false") return false;
+  if (trimmed.toLowerCase() === "true") return true;
+  return trimmed
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry !== "");
+}
+
+export const trustProxy = parseTrustProxy(env.TRUST_PROXY);
 
 // Google OAuth is optional — the module runs fine as email/password-only
 // if these are left blank, it just skips registering the Google routes.
