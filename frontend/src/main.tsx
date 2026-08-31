@@ -5,6 +5,7 @@ import { BrowserRouter } from "react-router-dom";
 import { App } from "./App.tsx";
 import { AuthProvider } from "./auth/AuthContext.tsx";
 import { ConfirmProvider } from "./components/ConfirmDialog.tsx";
+import { ToastProvider } from "./components/Toaster.tsx";
 import "./index.css";
 
 const queryClient = new QueryClient();
@@ -14,9 +15,11 @@ createRoot(document.getElementById("root")!).render(
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <AuthProvider>
-          <ConfirmProvider>
-            <App />
-          </ConfirmProvider>
+          <ToastProvider>
+            <ConfirmProvider>
+              <App />
+            </ConfirmProvider>
+          </ToastProvider>
         </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>
