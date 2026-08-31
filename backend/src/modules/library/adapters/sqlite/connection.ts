@@ -27,7 +27,7 @@ export function takeMigrationResult(): MigrationResult | null {
  *  open database. Split out from openLibraryDb so tests can drive the
  *  exact same setup against an in-memory database without touching
  *  env/filesystem. */
-export function initLibrarySchema(db: DatabaseSync): void {
+export async function initLibrarySchema(db: DatabaseSync): Promise<void> {
   db.exec("PRAGMA journal_mode = WAL");
   // The group_books -> groups and mural_blocks -> murals cascades in
   // schema.sql only fire with this on; SQLite defaults it OFF per
@@ -37,14 +37,14 @@ export function initLibrarySchema(db: DatabaseSync): void {
   const schema = readFileSync(`${adapterDir}/schema.sql`, "utf8");
   db.exec(schema);
 
-  lastMigrationResult = migrateDocumentsToEntities(db);
+  lastMigrationResult = await migrateDocumentsToEntities(db);
 }
 
-export function openLibraryDb(): DatabaseSync {
+export async function openLibraryDb(): Promise<DatabaseSync> {
   mkdirSync(dirname(env.LIBRARY_DB_PATH), { recursive: true });
 
   const db = new DatabaseSync(env.LIBRARY_DB_PATH);
-  initLibrarySchema(db);
+  await initLibrarySchema(db);
 
   return db;
 }

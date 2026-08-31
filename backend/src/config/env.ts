@@ -57,7 +57,25 @@ const envSchema = z.object({
   // somewhere else.
   FRONTEND_URL: z.string().url().default("http://localhost:5173"),
 
+  // --- library storage: Postgres when set, SQLite otherwise -------------
+  //
+  // The library module picks its adapter on this alone (see
+  // modules/library/plugin.ts). Everything else — auth, gallery, covers,
+  // socials — is still SQLite-only; library went first because it is the
+  // one whose data model made a single machine a hard ceiling. See
+  // docs/DEPLOYMENT-PLAN.md phase 3.
+  //
+  // Migrating an existing SQLite deployment: scripts/sqlite-to-postgres.mjs.
+  DATABASE_URL: z.string().optional().default(""),
+  // "on" (default, verify the certificate) | "no-verify" (encrypted but
+  // unverified — some managed providers present a chain the container has
+  // no root for) | "off" (no TLS at all; local development only).
+  DATABASE_SSL: z.enum(["on", "no-verify", "off"]).default("on"),
+  DATABASE_POOL_MAX: z.coerce.number().int().positive().max(100).default(10),
+
   AUTH_DB_PATH: z.string().min(1),
+  // Ignored when DATABASE_URL is set. Still required, so that switching
+  // to Postgres and back doesn't need config archaeology.
   LIBRARY_DB_PATH: z.string().min(1),
   GALLERY_DB_PATH: z.string().min(1),
   // Where uploaded images are actually stored on disk, one subdirectory
@@ -161,6 +179,10 @@ if (!parsed.success) {
 export const env = parsed.data;
 
 export const isProduction = env.NODE_ENV === "production";
+
+/** Whether the library module should use Postgres rather than SQLite.
+ *  One variable, one decision — see modules/library/plugin.ts. */
+export const usePostgresLibrary = env.DATABASE_URL !== "";
 
 /** Parses TRUST_PROXY into the shape Fastify's own `trustProxy` option
  *  expects: a boolean, or a list of trusted IPs/CIDRs. Exported separately

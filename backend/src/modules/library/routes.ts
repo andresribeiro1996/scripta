@@ -55,7 +55,7 @@ const muralBlockParamsSchema = z.object({
 export function buildLibraryRoutes(service: LibraryService) {
   return async function libraryRoutes(app: FastifyInstance) {
     app.get("/library", { preHandler: authGuard }, async (request, reply) => {
-      const library = service.getLibrary(request.user.id);
+      const library = await service.getLibrary(request.user.id);
       if (!library) {
         return reply.code(404).send({ error: "No library saved yet." });
       }
@@ -80,7 +80,7 @@ export function buildLibraryRoutes(service: LibraryService) {
       }
 
       try {
-        const library = service.saveLibrary(request.user.id, parsed.data.data, parsed.data.expectedVersion);
+        const library = await service.saveLibrary(request.user.id, parsed.data.data, parsed.data.expectedVersion);
         return reply.send(library);
       } catch (err) {
         if (err instanceof LibraryVersionConflictError) {
@@ -91,7 +91,7 @@ export function buildLibraryRoutes(service: LibraryService) {
           return reply.code(409).send({
             error: err.message,
             currentVersion: err.currentVersion,
-            current: service.getLibrary(request.user.id)
+            current: await service.getLibrary(request.user.id)
           });
         }
         throw err;
@@ -119,7 +119,7 @@ export function buildLibraryRoutes(service: LibraryService) {
         }
 
         try {
-          const result = service.saveMuralBlockLayout(
+          const result = await service.saveMuralBlockLayout(
             request.user.id,
             params.data.muralId,
             params.data.blockId,

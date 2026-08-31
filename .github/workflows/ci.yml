@@ -26,6 +26,25 @@ jobs:
   backend:
     name: Backend
     runs-on: ubuntu-latest
+
+    # The library module has two adapters behind one port, and they are
+    # only interchangeable if both are actually exercised — so the suite
+    # runs against a real Postgres here rather than skipping those tests.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: scripta
+          POSTGRES_PASSWORD: scripta
+          POSTGRES_DB: scripta_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U scripta"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     steps:
       - uses: actions/checkout@v4
 
@@ -48,6 +67,9 @@ jobs:
       - name: Test
         run: npm test
         working-directory: backend
+        env:
+          # Present, so the Postgres adapter tests run rather than skip.
+          TEST_DATABASE_URL: postgres://scripta:scripta@127.0.0.1:5432/scripta_test
 
       - name: Build
         run: npm run build

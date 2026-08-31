@@ -25,7 +25,7 @@ export interface MigrationResult {
   failed: Array<{ userId: string; reason: string }>;
 }
 
-export function migrateDocumentsToEntities(db: DatabaseSync): MigrationResult {
+export async function migrateDocumentsToEntities(db: DatabaseSync): Promise<MigrationResult> {
   const already = db.prepare(`SELECT name FROM schema_migrations WHERE name = ?`).get(MIGRATION_NAME);
   if (already) return { ran: false, migrated: 0, skipped: 0, failed: [] };
 
@@ -52,7 +52,7 @@ export function migrateDocumentsToEntities(db: DatabaseSync): MigrationResult {
       const updatedAt = typeof row.updated_at === "string" ? row.updated_at : new Date().toISOString();
       // Version 1: this is the first normalised write for this user, and
       // nothing has had a chance to make a conflicting one yet.
-      repository.replaceContents(userId, toContents(data, 1, updatedAt));
+      await repository.replaceContents(userId, toContents(data, 1, updatedAt));
       migrated++;
     } catch (err) {
       // One malformed document must not stop every other user from being

@@ -27,6 +27,10 @@ function parseJson(value: unknown, fallback: unknown): unknown {
   }
 }
 
+// Every method here is declared `async` to satisfy the port, but nothing
+// inside actually awaits: node:sqlite is a synchronous API, so this
+// adapter resolves immediately. The port is async because a
+// network-backed store cannot be — see domain/ports.ts.
 export function createSqliteLibraryRepository(db: DatabaseSync): LibraryRepository {
   const selectSettings = db.prepare(`SELECT * FROM library_settings WHERE user_id = ?`);
   const selectVersion = db.prepare(`SELECT version FROM library_settings WHERE user_id = ?`);
@@ -219,7 +223,7 @@ export function createSqliteLibraryRepository(db: DatabaseSync): LibraryReposito
   }
 
   return {
-    getContents(userId) {
+    async getContents(userId) {
       const settingsRow = selectSettings.get(userId) as Record<string, unknown> | undefined;
       if (!settingsRow) return undefined;
 
@@ -313,12 +317,12 @@ export function createSqliteLibraryRepository(db: DatabaseSync): LibraryReposito
       return { settings, books, groups, murals };
     },
 
-    getVersion(userId) {
+    async getVersion(userId) {
       const row = selectVersion.get(userId) as Record<string, unknown> | undefined;
       return row ? (intOrNull(row.version) ?? 1) : undefined;
     },
 
-    replaceContents(userId, contents) {
+    async replaceContents(userId, contents) {
       // One transaction: a library half-written because the process died
       // mid-loop would be worse than the blob this replaces.
       db.exec("BEGIN IMMEDIATE");
@@ -343,7 +347,7 @@ export function createSqliteLibraryRepository(db: DatabaseSync): LibraryReposito
       return contents;
     },
 
-    upsertBook(userId, book) {
+    async upsertBook(userId, book) {
       const now = new Date().toISOString();
       db.exec("BEGIN IMMEDIATE");
       try {
@@ -356,7 +360,7 @@ export function createSqliteLibraryRepository(db: DatabaseSync): LibraryReposito
       }
     },
 
-    deleteBook(userId, bookKey) {
+    async deleteBook(userId, bookKey) {
       const now = new Date().toISOString();
       db.exec("BEGIN IMMEDIATE");
       try {
@@ -370,7 +374,7 @@ export function createSqliteLibraryRepository(db: DatabaseSync): LibraryReposito
       }
     },
 
-    upsertGroup(userId, group) {
+    async upsertGroup(userId, group) {
       const now = new Date().toISOString();
       db.exec("BEGIN IMMEDIATE");
       try {
@@ -390,7 +394,7 @@ export function createSqliteLibraryRepository(db: DatabaseSync): LibraryReposito
       }
     },
 
-    deleteGroup(userId, groupId) {
+    async deleteGroup(userId, groupId) {
       const now = new Date().toISOString();
       db.exec("BEGIN IMMEDIATE");
       try {
@@ -403,7 +407,7 @@ export function createSqliteLibraryRepository(db: DatabaseSync): LibraryReposito
       }
     },
 
-    upsertMural(userId, mural) {
+    async upsertMural(userId, mural) {
       const now = new Date().toISOString();
       db.exec("BEGIN IMMEDIATE");
       try {
@@ -423,7 +427,7 @@ export function createSqliteLibraryRepository(db: DatabaseSync): LibraryReposito
       }
     },
 
-    deleteMural(userId, muralId) {
+    async deleteMural(userId, muralId) {
       const now = new Date().toISOString();
       db.exec("BEGIN IMMEDIATE");
       try {
@@ -436,7 +440,7 @@ export function createSqliteLibraryRepository(db: DatabaseSync): LibraryReposito
       }
     },
 
-    saveMuralBlockLayout(userId, muralId, blockId, layout: BlockLayout) {
+    async saveMuralBlockLayout(userId, muralId, blockId, layout: BlockLayout) {
       // The whole point of the rework, in one statement: moving a block
       // touches one row, not the account's entire library.
       const now = new Date().toISOString();

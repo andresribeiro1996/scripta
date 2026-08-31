@@ -113,35 +113,35 @@ function sampleDocument() {
 }
 
 describe("bookKey", () => {
-  it("matches the frontend's ISBN-first identity", () => {
+  it("matches the frontend's ISBN-first identity", async () => {
     assert.equal(bookKey({ ISBN: "978-0-441-01359-3", Title: "Dune" }), "isbn:9780441013593");
   });
 
-  it("falls back to normalized title+author when there is no usable ISBN", () => {
+  it("falls back to normalized title+author when there is no usable ISBN", async () => {
     assert.equal(bookKey({ Title: "  Some   Indie Book ", Attribution: "A. Writer" }), "ta:some indie book|a. writer");
   });
 
-  it("ignores a malformed ISBN rather than trusting it", () => {
+  it("ignores a malformed ISBN rather than trusting it", async () => {
     assert.equal(bookKey({ ISBN: "not-an-isbn", Title: "X", Attribution: "Y" }), "ta:x|y");
   });
 });
 
 describe("document round trip", () => {
-  it("preserves every field, including ones the backend doesn't model", () => {
+  it("preserves every field, including ones the backend doesn't model", async () => {
     const original = sampleDocument();
     const restored = toDocument(toContents(original, 1, "2026-03-01T00:00:00.000Z"));
 
     assert.deepEqual(restored, original);
   });
 
-  it("keeps unknown top-level fields a future importer might add", () => {
+  it("keeps unknown top-level fields a future importer might add", async () => {
     const original = { ...sampleDocument(), someFutureTopLevelField: { nested: true } };
     const restored = toDocument(toContents(original, 1, "2026-03-01T00:00:00.000Z"));
 
     assert.deepEqual(restored.someFutureTopLevelField, { nested: true });
   });
 
-  it("does not invent a highlights array for a book that never had one", () => {
+  it("does not invent a highlights array for a book that never had one", async () => {
     const restored = toDocument(
       toContents({ books: [{ Title: "No highlights", Attribution: "X" }] }, 1, "2026-03-01T00:00:00.000Z")
     );
@@ -150,7 +150,7 @@ describe("document round trip", () => {
     assert.equal("highlights" in books[0]!, false);
   });
 
-  it("keeps a highlight that arrived without a BookmarkID instead of dropping it", () => {
+  it("keeps a highlight that arrived without a BookmarkID instead of dropping it", async () => {
     // The schema makes bookmark_id part of the primary key, so a missing
     // one has to be synthesized — losing a user's annotation to a
     // constraint would be the worst possible failure mode here.
@@ -165,7 +165,7 @@ describe("document round trip", () => {
     assert.equal(new Set(ids).size, 2, "synthesized ids must be unique");
   });
 
-  it("survives an empty library", () => {
+  it("survives an empty library", async () => {
     const restored = toDocument(toContents({ books: [] }, 1, "2026-03-01T00:00:00.000Z"));
     assert.deepEqual(restored, { books: [], book_count: 0 });
   });
@@ -178,61 +178,61 @@ describe("repository", () => {
     db = freshDb();
   });
 
-  it("stores and reassembles a library unchanged", () => {
+  it("stores and reassembles a library unchanged", async () => {
     const repo = createSqliteLibraryRepository(db);
     const original = sampleDocument();
 
-    repo.replaceContents("user-1", toContents(original, 1, "2026-03-01T00:00:00.000Z"));
-    const restored = toDocument(repo.getContents("user-1")!);
+    await repo.replaceContents("user-1", toContents(original, 1, "2026-03-01T00:00:00.000Z"));
+    const restored = toDocument((await repo.getContents("user-1"))!);
 
     assert.deepEqual(restored, original);
   });
 
-  it("keeps one user's library entirely separate from another's", () => {
+  it("keeps one user's library entirely separate from another's", async () => {
     const repo = createSqliteLibraryRepository(db);
-    repo.replaceContents("user-1", toContents(sampleDocument(), 1, "2026-03-01T00:00:00.000Z"));
-    repo.replaceContents(
+    await repo.replaceContents("user-1", toContents(sampleDocument(), 1, "2026-03-01T00:00:00.000Z"));
+    await repo.replaceContents(
       "user-2",
       toContents({ books: [{ Title: "Only mine", Attribution: "B" }] }, 1, "2026-03-01T00:00:00.000Z")
     );
 
-    const one = toDocument(repo.getContents("user-1")!);
-    const two = toDocument(repo.getContents("user-2")!);
+    const one = toDocument((await repo.getContents("user-1"))!);
+    const two = toDocument((await repo.getContents("user-2"))!);
 
     assert.equal((one.books as unknown[]).length, 2);
     assert.equal((two.books as unknown[]).length, 1);
     assert.equal(two.groups, undefined);
   });
 
-  it("replaces rather than accumulates on a second save", () => {
+  it("replaces rather than accumulates on a second save", async () => {
     const repo = createSqliteLibraryRepository(db);
-    repo.replaceContents("user-1", toContents(sampleDocument(), 1, "2026-03-01T00:00:00.000Z"));
-    repo.replaceContents(
+    await repo.replaceContents("user-1", toContents(sampleDocument(), 1, "2026-03-01T00:00:00.000Z"));
+    await repo.replaceContents(
       "user-1",
       toContents({ books: [{ Title: "Replaced", Attribution: "C" }] }, 2, "2026-03-02T00:00:00.000Z")
     );
 
-    const restored = toDocument(repo.getContents("user-1")!);
+    const restored = toDocument((await repo.getContents("user-1"))!);
     assert.equal((restored.books as unknown[]).length, 1);
     assert.equal(restored.groups, undefined, "old groups must not survive a replace");
     assert.equal(restored.murals, undefined, "old murals must not survive a replace");
   });
 
-  it("returns undefined for a user who has never saved", () => {
+  it("returns undefined for a user who has never saved", async () => {
     const repo = createSqliteLibraryRepository(db);
-    assert.equal(repo.getContents("nobody"), undefined);
-    assert.equal(repo.getVersion("nobody"), undefined);
+    assert.equal(await repo.getContents("nobody"), undefined);
+    assert.equal(await repo.getVersion("nobody"), undefined);
   });
 
-  it("moves one mural block without touching anything else", () => {
+  it("moves one mural block without touching anything else", async () => {
     // This is the write MuralEditorPage's drag handler should be making —
     // the whole reason for the normalisation.
     const repo = createSqliteLibraryRepository(db);
-    repo.replaceContents("user-1", toContents(sampleDocument(), 1, "2026-03-01T00:00:00.000Z"));
+    await repo.replaceContents("user-1", toContents(sampleDocument(), 1, "2026-03-01T00:00:00.000Z"));
 
-    repo.saveMuralBlockLayout("user-1", "m-1", "b-1", { x: 5, y: 6, w: 1, h: 2 });
+    await repo.saveMuralBlockLayout("user-1", "m-1", "b-1", { x: 5, y: 6, w: 1, h: 2 });
 
-    const contents = repo.getContents("user-1")!;
+    const contents = (await repo.getContents("user-1"))!;
     const mural = contents.murals[0]!;
     assert.deepEqual(mural.blocks.find((b) => b.id === "b-1")!.layout, { x: 5, y: 6, w: 1, h: 2 });
     // The neighbouring block, the books and the groups are all untouched.
@@ -242,31 +242,31 @@ describe("repository", () => {
     assert.equal(contents.settings.version, 2, "a write bumps the version");
   });
 
-  it("will not let one user move another user's block", () => {
+  it("will not let one user move another user's block", async () => {
     const repo = createSqliteLibraryRepository(db);
-    repo.replaceContents("user-1", toContents(sampleDocument(), 1, "2026-03-01T00:00:00.000Z"));
+    await repo.replaceContents("user-1", toContents(sampleDocument(), 1, "2026-03-01T00:00:00.000Z"));
 
-    repo.saveMuralBlockLayout("attacker", "m-1", "b-1", { x: 99, y: 99, w: 9, h: 9 });
+    await repo.saveMuralBlockLayout("attacker", "m-1", "b-1", { x: 99, y: 99, w: 9, h: 9 });
 
-    const mural = repo.getContents("user-1")!.murals[0]!;
+    const mural = (await repo.getContents("user-1"))!.murals[0]!;
     assert.deepEqual(mural.blocks.find((b) => b.id === "b-1")!.layout, { x: 0, y: 0, w: 2, h: 3 });
   });
 
-  it("cascades a mural's blocks away when the mural is deleted", () => {
+  it("cascades a mural's blocks away when the mural is deleted", async () => {
     const repo = createSqliteLibraryRepository(db);
-    repo.replaceContents("user-1", toContents(sampleDocument(), 1, "2026-03-01T00:00:00.000Z"));
+    await repo.replaceContents("user-1", toContents(sampleDocument(), 1, "2026-03-01T00:00:00.000Z"));
 
-    repo.deleteMural("user-1", "m-1");
+    await repo.deleteMural("user-1", "m-1");
 
     const orphans = db.prepare(`SELECT COUNT(*) AS n FROM mural_blocks`).get() as Record<string, unknown>;
     assert.equal(orphans.n, 0);
   });
 
-  it("deletes a book's highlights along with the book", () => {
+  it("deletes a book's highlights along with the book", async () => {
     const repo = createSqliteLibraryRepository(db);
-    repo.replaceContents("user-1", toContents(sampleDocument(), 1, "2026-03-01T00:00:00.000Z"));
+    await repo.replaceContents("user-1", toContents(sampleDocument(), 1, "2026-03-01T00:00:00.000Z"));
 
-    repo.deleteBook("user-1", "isbn:9780441013593");
+    await repo.deleteBook("user-1", "isbn:9780441013593");
 
     const remaining = db.prepare(`SELECT COUNT(*) AS n FROM highlights WHERE user_id = ?`).get("user-1") as Record<
       string,
@@ -291,22 +291,22 @@ describe("migration from blob documents", () => {
     );
   }
 
-  it("migrates an existing blob into entities without losing anything", () => {
+  it("migrates an existing blob into entities without losing anything", async () => {
     const original = sampleDocument();
     seedBlob("user-1", original);
 
-    const result = migrateDocumentsToEntities(db);
+    const result = await migrateDocumentsToEntities(db);
     assert.equal(result.ran, true);
     assert.equal(result.migrated, 1);
     assert.deepEqual(result.failed, []);
 
     const repo = createSqliteLibraryRepository(db);
-    assert.deepEqual(toDocument(repo.getContents("user-1")!), original);
+    assert.deepEqual(toDocument((await repo.getContents("user-1"))!), original);
   });
 
-  it("leaves the original blob row untouched, so a rollback is possible", () => {
+  it("leaves the original blob row untouched, so a rollback is possible", async () => {
     seedBlob("user-1", sampleDocument());
-    migrateDocumentsToEntities(db);
+    await migrateDocumentsToEntities(db);
 
     const row = db.prepare(`SELECT data FROM library_documents WHERE user_id = ?`).get("user-1") as Record<
       string,
@@ -315,34 +315,34 @@ describe("migration from blob documents", () => {
     assert.deepEqual(JSON.parse(String(row.data)), sampleDocument());
   });
 
-  it("is idempotent — a second boot does not re-run or duplicate", () => {
+  it("is idempotent — a second boot does not re-run or duplicate", async () => {
     seedBlob("user-1", sampleDocument());
-    migrateDocumentsToEntities(db);
+    await migrateDocumentsToEntities(db);
 
-    const second = migrateDocumentsToEntities(db);
+    const second = await migrateDocumentsToEntities(db);
     assert.equal(second.ran, false);
     assert.equal(second.migrated, 0);
 
     const repo = createSqliteLibraryRepository(db);
-    assert.equal(repo.getContents("user-1")!.books.length, 2);
+    assert.equal((await repo.getContents("user-1"))!.books.length, 2);
   });
 
-  it("does not clobber a user already written by the new code path", () => {
+  it("does not clobber a user already written by the new code path", async () => {
     // The blob is the stale copy in this case, not the source of truth.
     seedBlob("user-1", sampleDocument());
     const repo = createSqliteLibraryRepository(db);
-    repo.replaceContents("user-1", toContents({ books: [{ Title: "Newer", Attribution: "N" }] }, 5, "2026-06-01T00:00:00.000Z"));
+    await repo.replaceContents("user-1", toContents({ books: [{ Title: "Newer", Attribution: "N" }] }, 5, "2026-06-01T00:00:00.000Z"));
 
-    const result = migrateDocumentsToEntities(db);
+    const result = await migrateDocumentsToEntities(db);
 
     assert.equal(result.skipped, 1);
     assert.equal(result.migrated, 0);
-    const contents = repo.getContents("user-1")!;
+    const contents = (await repo.getContents("user-1"))!;
     assert.equal(contents.books.length, 1);
     assert.equal(contents.settings.version, 5);
   });
 
-  it("reports a malformed document instead of failing every other user", () => {
+  it("reports a malformed document instead of failing every other user", async () => {
     db.prepare(`INSERT INTO library_documents (user_id, data, updated_at) VALUES (?, ?, ?)`).run(
       "broken",
       "{not valid json",
@@ -350,53 +350,53 @@ describe("migration from blob documents", () => {
     );
     seedBlob("fine", sampleDocument());
 
-    const result = migrateDocumentsToEntities(db);
+    const result = await migrateDocumentsToEntities(db);
 
     assert.equal(result.migrated, 1);
     assert.equal(result.failed.length, 1);
     assert.equal(result.failed[0]!.userId, "broken");
 
     const repo = createSqliteLibraryRepository(db);
-    assert.ok(repo.getContents("fine"), "a broken row must not block a healthy one");
+    assert.ok(await repo.getContents("fine"), "a broken row must not block a healthy one");
   });
 
-  it("migrates many users in one pass", () => {
+  it("migrates many users in one pass", async () => {
     for (let i = 0; i < 25; i++) {
       seedBlob(`user-${i}`, { books: [{ Title: `Book ${i}`, Attribution: "A" }] });
     }
 
-    const result = migrateDocumentsToEntities(db);
+    const result = await migrateDocumentsToEntities(db);
 
     assert.equal(result.migrated, 25);
     const repo = createSqliteLibraryRepository(db);
-    assert.equal(repo.getContents("user-24")!.books.length, 1);
+    assert.equal((await repo.getContents("user-24"))!.books.length, 1);
   });
 });
 
 describe("service (document compatibility layer)", () => {
-  it("round-trips through the same API the frontend already calls", () => {
+  it("round-trips through the same API the frontend already calls", async () => {
     const db = freshDb();
     const service = createLibraryService(createSqliteLibraryRepository(db));
     const original = sampleDocument();
 
-    assert.equal(service.getLibrary("user-1"), null);
+    assert.equal(await service.getLibrary("user-1"), null);
 
-    const saved = service.saveLibrary("user-1", original);
+    const saved = await service.saveLibrary("user-1", original);
     assert.deepEqual(saved.data, original);
     assert.equal(saved.version, 1);
 
-    const read = service.getLibrary("user-1")!;
+    const read = (await service.getLibrary("user-1"))!;
     assert.deepEqual(read.data, original);
     assert.equal(read.version, 1);
   });
 
-  it("increments the version on each save, for the concurrency check in slice 2", () => {
+  it("increments the version on each save, for the concurrency check in slice 2", async () => {
     const db = freshDb();
     const service = createLibraryService(createSqliteLibraryRepository(db));
 
-    assert.equal(service.saveLibrary("user-1", { books: [] }).version, 1);
-    assert.equal(service.saveLibrary("user-1", { books: [] }).version, 2);
-    assert.equal(service.saveLibrary("user-1", { books: [] }).version, 3);
+    assert.equal((await service.saveLibrary("user-1", { books: [] })).version, 1);
+    assert.equal((await service.saveLibrary("user-1", { books: [] })).version, 2);
+    assert.equal((await service.saveLibrary("user-1", { books: [] })).version, 3);
   });
 });
 
@@ -414,22 +414,22 @@ describe("tenant isolation", () => {
     db = freshDb();
   });
 
-  it("keeps two users' identically-id'd groups and murals separate", () => {
+  it("keeps two users' identically-id'd groups and murals separate", async () => {
     const repo = createSqliteLibraryRepository(db);
 
     // Both users save a group "g-1" and a mural "m-1" with block "b-1" —
     // exactly what two clients generating ids independently can produce.
-    repo.replaceContents("alice", toContents(sampleDocument(), 1, "2026-03-01T00:00:00.000Z"));
+    await repo.replaceContents("alice", toContents(sampleDocument(), 1, "2026-03-01T00:00:00.000Z"));
 
     const bobs = sampleDocument();
     bobs.name = "Bob's Library";
     bobs.groups[0]!.name = "Bob's series";
     bobs.murals[0]!.name = "Bob's board";
     bobs.murals[0]!.blocks[0]!.layout = { x: 9, y: 9, w: 1, h: 1 };
-    repo.replaceContents("bob", toContents(bobs, 1, "2026-03-01T00:00:00.000Z"));
+    await repo.replaceContents("bob", toContents(bobs, 1, "2026-03-01T00:00:00.000Z"));
 
-    const alice = repo.getContents("alice")!;
-    const bob = repo.getContents("bob")!;
+    const alice = (await repo.getContents("alice"))!;
+    const bob = (await repo.getContents("bob"))!;
 
     assert.equal(alice.settings.name, "Andre's Library");
     assert.equal(alice.groups[0]!.name, "Dune", "Bob's save must not rename Alice's group");
@@ -441,27 +441,27 @@ describe("tenant isolation", () => {
     assert.deepEqual(bob.murals[0]!.blocks.find((b) => b.id === "b-1")!.layout, { x: 9, y: 9, w: 1, h: 1 });
   });
 
-  it("does not let deleting one user's mural touch another's with the same id", () => {
+  it("does not let deleting one user's mural touch another's with the same id", async () => {
     const repo = createSqliteLibraryRepository(db);
-    repo.replaceContents("alice", toContents(sampleDocument(), 1, "2026-03-01T00:00:00.000Z"));
-    repo.replaceContents("bob", toContents(sampleDocument(), 1, "2026-03-01T00:00:00.000Z"));
+    await repo.replaceContents("alice", toContents(sampleDocument(), 1, "2026-03-01T00:00:00.000Z"));
+    await repo.replaceContents("bob", toContents(sampleDocument(), 1, "2026-03-01T00:00:00.000Z"));
 
-    repo.deleteMural("bob", "m-1");
+    await repo.deleteMural("bob", "m-1");
 
-    assert.equal(repo.getContents("alice")!.murals.length, 1, "Alice's mural must survive");
-    assert.equal(repo.getContents("bob")!.murals.length, 0);
+    assert.equal((await repo.getContents("alice"))!.murals.length, 1, "Alice's mural must survive");
+    assert.equal((await repo.getContents("bob"))!.murals.length, 0);
     // ...and Alice's blocks must not have been cascaded away with Bob's.
-    assert.equal(repo.getContents("alice")!.murals[0]!.blocks.length, 2);
+    assert.equal((await repo.getContents("alice"))!.murals[0]!.blocks.length, 2);
   });
 
-  it("does not let deleting one user's group empty another's membership list", () => {
+  it("does not let deleting one user's group empty another's membership list", async () => {
     const repo = createSqliteLibraryRepository(db);
-    repo.replaceContents("alice", toContents(sampleDocument(), 1, "2026-03-01T00:00:00.000Z"));
-    repo.replaceContents("bob", toContents(sampleDocument(), 1, "2026-03-01T00:00:00.000Z"));
+    await repo.replaceContents("alice", toContents(sampleDocument(), 1, "2026-03-01T00:00:00.000Z"));
+    await repo.replaceContents("bob", toContents(sampleDocument(), 1, "2026-03-01T00:00:00.000Z"));
 
-    repo.deleteGroup("bob", "g-1");
+    await repo.deleteGroup("bob", "g-1");
 
-    const alice = repo.getContents("alice")!;
+    const alice = (await repo.getContents("alice"))!;
     assert.equal(alice.groups.length, 2);
     assert.deepEqual(alice.groups.find((g) => g.id === "g-1")!.bookKeys, ["isbn:9780441013593"]);
   });

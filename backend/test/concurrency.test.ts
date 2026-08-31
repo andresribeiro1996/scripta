@@ -54,36 +54,36 @@ describe("optimistic concurrency on the document write", () => {
     service = freshService();
   });
 
-  it("accepts a write quoting the current version", () => {
-    const first = service.saveLibrary("u", libraryWith(["A"]));
-    const second = service.saveLibrary("u", libraryWith(["A", "B"]), first.version);
+  it("accepts a write quoting the current version", async () => {
+    const first = await service.saveLibrary("u", libraryWith(["A"]));
+    const second = await service.saveLibrary("u", libraryWith(["A", "B"]), first.version);
 
     assert.equal(second.version, first.version + 1);
-    assert.equal((service.getLibrary("u")!.data as { books: unknown[] }).books.length, 2);
+    assert.equal(((await service.getLibrary("u"))!.data as { books: unknown[] }).books.length, 2);
   });
 
-  it("rejects a write quoting a stale version", () => {
-    const first = service.saveLibrary("u", libraryWith(["A"]));
+  it("rejects a write quoting a stale version", async () => {
+    const first = await service.saveLibrary("u", libraryWith(["A"]));
     // Another device saves in between.
-    service.saveLibrary("u", libraryWith(["A", "from-phone"]), first.version);
+    await service.saveLibrary("u", libraryWith(["A", "from-phone"]), first.version);
 
-    assert.throws(
-      () => service.saveLibrary("u", libraryWith(["A", "from-laptop"]), first.version),
+    await assert.rejects(
+      async () => service.saveLibrary("u", libraryWith(["A", "from-laptop"]), first.version),
       LibraryVersionConflictError
     );
   });
 
-  it("does not apply the losing write — this is the data loss being fixed", () => {
-    const first = service.saveLibrary("u", libraryWith(["A"]));
-    service.saveLibrary("u", libraryWith(["A", "from-phone"]), first.version);
+  it("does not apply the losing write — this is the data loss being fixed", async () => {
+    const first = await service.saveLibrary("u", libraryWith(["A"]));
+    await service.saveLibrary("u", libraryWith(["A", "from-phone"]), first.version);
 
     try {
-      service.saveLibrary("u", libraryWith(["A", "from-laptop"]), first.version);
+      await service.saveLibrary("u", libraryWith(["A", "from-laptop"]), first.version);
     } catch {
       // expected
     }
 
-    const books = (service.getLibrary("u")!.data as { books: Array<{ Title: string }> }).books;
+    const books = ((await service.getLibrary("u"))!.data as { books: Array<{ Title: string }> }).books;
     assert.deepEqual(
       books.map((b) => b.Title),
       ["A", "from-phone"],
@@ -91,12 +91,12 @@ describe("optimistic concurrency on the document write", () => {
     );
   });
 
-  it("reports both versions so the client can re-apply", () => {
-    const first = service.saveLibrary("u", libraryWith(["A"]));
-    service.saveLibrary("u", libraryWith(["A", "B"]), first.version);
+  it("reports both versions so the client can re-apply", async () => {
+    const first = await service.saveLibrary("u", libraryWith(["A"]));
+    await service.saveLibrary("u", libraryWith(["A", "B"]), first.version);
 
     try {
-      service.saveLibrary("u", libraryWith(["C"]), first.version);
+      await service.saveLibrary("u", libraryWith(["C"]), first.version);
       assert.fail("should have conflicted");
     } catch (err) {
       assert.ok(err instanceof LibraryVersionConflictError);
@@ -105,29 +105,29 @@ describe("optimistic concurrency on the document write", () => {
     }
   });
 
-  it("still allows an unconditional write when no version is quoted", () => {
+  it("still allows an unconditional write when no version is quoted", async () => {
     // The first-ever save has no version to quote, and "replace whatever
     // is there" stays expressible on purpose.
-    const first = service.saveLibrary("u", libraryWith(["A"]));
-    const forced = service.saveLibrary("u", libraryWith(["replaced"]));
+    const first = await service.saveLibrary("u", libraryWith(["A"]));
+    const forced = await service.saveLibrary("u", libraryWith(["replaced"]));
 
     assert.equal(forced.version, first.version + 1);
-    assert.equal((service.getLibrary("u")!.data as { books: unknown[] }).books.length, 1);
+    assert.equal(((await service.getLibrary("u"))!.data as { books: unknown[] }).books.length, 1);
   });
 
-  it("does not conflict on the very first save of a library", () => {
+  it("does not conflict on the very first save of a library", async () => {
     // A client that has never read can quote nothing; a client that read a
     // 404 may quote 0. Neither should be a conflict.
-    assert.doesNotThrow(() => service.saveLibrary("new-user", libraryWith(["A"]), 0));
+    await assert.doesNotReject(async () => service.saveLibrary("new-user", libraryWith(["A"]), 0));
   });
 
-  it("keeps versions independent per user", () => {
-    const alice = service.saveLibrary("alice", libraryWith(["A"]));
-    service.saveLibrary("bob", libraryWith(["B"]));
-    service.saveLibrary("bob", libraryWith(["B", "B2"]), 1);
+  it("keeps versions independent per user", async () => {
+    const alice = await service.saveLibrary("alice", libraryWith(["A"]));
+    await service.saveLibrary("bob", libraryWith(["B"]));
+    await service.saveLibrary("bob", libraryWith(["B", "B2"]), 1);
 
     // Bob's activity must not invalidate Alice's version.
-    assert.doesNotThrow(() => service.saveLibrary("alice", libraryWith(["A", "A2"]), alice.version));
+    await assert.doesNotReject(async () => service.saveLibrary("alice", libraryWith(["A", "A2"]), alice.version));
   });
 });
 
@@ -138,66 +138,66 @@ describe("per-entity block layout write", () => {
     service = freshService();
   });
 
-  it("moves one block and bumps the version", () => {
-    const saved = service.saveLibrary("u", muralDocument(0));
-    const result = service.saveMuralBlockLayout("u", "m-1", "b-1", { x: 4, y: 5, w: 2, h: 2 }, saved.version);
+  it("moves one block and bumps the version", async () => {
+    const saved = await service.saveLibrary("u", muralDocument(0));
+    const result = await service.saveMuralBlockLayout("u", "m-1", "b-1", { x: 4, y: 5, w: 2, h: 2 }, saved.version);
 
     assert.equal(result.version, saved.version + 1);
-    const data = service.getLibrary("u")!.data as { murals: Array<{ blocks: Array<{ layout: unknown }> }> };
+    const data = (await service.getLibrary("u"))!.data as { murals: Array<{ blocks: Array<{ layout: unknown }> }> };
     assert.deepEqual(data.murals[0]!.blocks[0]!.layout, { x: 4, y: 5, w: 2, h: 2 });
   });
 
-  it("leaves the rest of the library alone", () => {
-    service.saveLibrary("u", {
+  it("leaves the rest of the library alone", async () => {
+    await service.saveLibrary("u", {
       ...muralDocument(0),
       books: [{ Title: "Untouched", Attribution: "A" }],
       name: "My Library"
     });
-    service.saveMuralBlockLayout("u", "m-1", "b-1", { x: 7, y: 7, w: 1, h: 1 });
+    await service.saveMuralBlockLayout("u", "m-1", "b-1", { x: 7, y: 7, w: 1, h: 1 });
 
-    const data = service.getLibrary("u")!.data as { books: Array<{ Title: string }>; name: string };
+    const data = (await service.getLibrary("u"))!.data as { books: Array<{ Title: string }>; name: string };
     assert.equal(data.books[0]!.Title, "Untouched");
     assert.equal(data.name, "My Library");
   });
 
-  it("404s for a block that no longer exists rather than silently succeeding", () => {
-    service.saveLibrary("u", muralDocument(0));
-    assert.throws(
-      () => service.saveMuralBlockLayout("u", "m-1", "gone", { x: 1, y: 1, w: 1, h: 1 }),
+  it("404s for a block that no longer exists rather than silently succeeding", async () => {
+    await service.saveLibrary("u", muralDocument(0));
+    await assert.rejects(
+      async () => service.saveMuralBlockLayout("u", "m-1", "gone", { x: 1, y: 1, w: 1, h: 1 }),
       LibraryEntityNotFoundError
     );
   });
 
-  it("does not bump the version when nothing was updated", () => {
-    const saved = service.saveLibrary("u", muralDocument(0));
+  it("does not bump the version when nothing was updated", async () => {
+    const saved = await service.saveLibrary("u", muralDocument(0));
     try {
-      service.saveMuralBlockLayout("u", "m-1", "gone", { x: 1, y: 1, w: 1, h: 1 });
+      await service.saveMuralBlockLayout("u", "m-1", "gone", { x: 1, y: 1, w: 1, h: 1 });
     } catch {
       // expected
     }
-    assert.equal(service.getLibrary("u")!.version, saved.version);
+    assert.equal((await service.getLibrary("u"))!.version, saved.version);
   });
 
-  it("refuses a stale layout write", () => {
-    const first = service.saveLibrary("u", muralDocument(0));
-    service.saveLibrary("u", muralDocument(1), first.version);
+  it("refuses a stale layout write", async () => {
+    const first = await service.saveLibrary("u", muralDocument(0));
+    await service.saveLibrary("u", muralDocument(1), first.version);
 
-    assert.throws(
-      () => service.saveMuralBlockLayout("u", "m-1", "b-1", { x: 9, y: 9, w: 1, h: 1 }, first.version),
+    await assert.rejects(
+      async () => service.saveMuralBlockLayout("u", "m-1", "b-1", { x: 9, y: 9, w: 1, h: 1 }, first.version),
       LibraryVersionConflictError
     );
   });
 
-  it("will not move another user's block", () => {
-    service.saveLibrary("alice", muralDocument(0));
-    service.saveLibrary("bob", muralDocument(0));
+  it("will not move another user's block", async () => {
+    await service.saveLibrary("alice", muralDocument(0));
+    await service.saveLibrary("bob", muralDocument(0));
 
-    assert.throws(
-      () => service.saveMuralBlockLayout("mallory", "m-1", "b-1", { x: 9, y: 9, w: 1, h: 1 }),
+    await assert.rejects(
+      async () => service.saveMuralBlockLayout("mallory", "m-1", "b-1", { x: 9, y: 9, w: 1, h: 1 }),
       LibraryEntityNotFoundError
     );
 
-    const alice = service.getLibrary("alice")!.data as { murals: Array<{ blocks: Array<{ layout: { x: number } }> }> };
+    const alice = (await service.getLibrary("alice"))!.data as { murals: Array<{ blocks: Array<{ layout: { x: number } }> }> };
     assert.equal(alice.murals[0]!.blocks[0]!.layout.x, 0);
   });
 });

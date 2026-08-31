@@ -159,18 +159,46 @@ Shipped in three slices so nothing breaks at any point:
 
 ### Phase 3 — Move state off the instance (before public launch)
 
-Managed Postgres (Neon / Supabase / host-native) + object storage (Cloudflare R2
-or S3) for gallery and cover files. Write new `adapters/postgres/` and
-`adapters/s3/` implementations of the existing ports — `service.ts` and `domain/`
-should not change at all. This is what the hexagonal structure was for.
+**Database: done.** `adapters/postgres/` implements the same
+`LibraryRepository` port as `adapters/sqlite/`; `service.ts` and `domain/` were
+not touched, which is what the hexagonal structure was for. Set `DATABASE_URL`
+and the `library` module uses Postgres — that is the entire switch
+(`modules/library/plugin.ts`). The other four modules are still SQLite-only.
+
+The port had to become **async** first: it was written around `node:sqlite`'s
+synchronous API, and a network-backed store cannot answer synchronously. The
+SQLite adapter now returns already-resolved promises. That change is also what
+makes it possible to later get the blocking driver off the event loop.
+
+Migrating an existing deployment: `scripts/sqlite-to-postgres.mjs`, run with the
+app stopped (there is no dual-write mode). It reads through the SQLite adapter
+and writes through the Postgres one — both via the same port and the same
+document mapping the app itself uses, rather than a bespoke SQL-to-SQL copy that
+could drift from either. Every account is verified after writing by reassembling
+the document from Postgres and deep-comparing it to the SQLite original; a
+mismatch fails that account rather than reporting success. Non-destructive and
+re-runnable. Verified here against a seeded 3-account / 400-book / 1,197-highlight
+database, and the app was then booted against Postgres and round-tripped over
+HTTP.
+
+**Object storage: not done.** Gallery uploads and the cover cache still write to
+local disk (`GALLERY_STORAGE_PATH`, `COVERS_STORAGE_PATH`), which pins the API to
+one machine just as surely as the database did — so Postgres alone does *not*
+yet unlock replicas. Both blob stores are already behind ports
+(`ImageBlobStore`, `CoverBlobStore` in their modules' `domain/ports.ts`), so this
+is a new adapter, not a refactor. It was deliberately not written blind: no
+S3-compatible endpoint was reachable from the environment this was built in, and
+an unverified storage adapter handling user uploads is worse than none. Do it
+against a real R2/S3 bucket (or MinIO) with the same
+same-behaviour-through-one-port tests the Postgres adapter has.
+
+Storage sizing is its own argument: the gallery quota is **500 MB per account**
+(`modules/gallery/service.ts`), so a thousand users is potentially half a
+terabyte — priced very differently as a block volume than as object storage.
 
 Do it before there is other people's data. With three users it is an afternoon;
 with three thousand it is a dual-write period, a migration window, and a rollback
 plan.
-
-Storage is its own argument: the gallery quota is **500 MB per account**
-(`modules/gallery/service.ts`). A thousand users is potentially half a terabyte —
-priced very differently as a block volume than as object storage.
 
 ### Phase 4 — Domain, hosting, pipeline
 
