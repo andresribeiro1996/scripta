@@ -88,7 +88,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
               <button
                 ref={cancelButtonRef}
                 onClick={() => settle(false)}
-                className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-1.5 text-sm font-semibold hover:bg-(--color-surface-hover)"
+                className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2.5 text-sm font-semibold hover:bg-(--color-surface-hover)"
               >
                 Cancel
               </button>
@@ -96,8 +96,8 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                 onClick={() => settle(true)}
                 className={
                   pending.danger === false
-                    ? "rounded-lg bg-(--color-accent) px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90"
-                    : "rounded-lg bg-(--color-danger) px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90"
+                    ? "rounded-lg bg-(--color-accent) px-3 py-2.5 text-sm font-semibold text-white hover:opacity-90"
+                    : "rounded-lg bg-(--color-danger) px-3 py-2.5 text-sm font-semibold text-white hover:opacity-90"
                 }
               >
                 {pending.confirmLabel ?? "Delete"}

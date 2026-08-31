@@ -288,13 +288,13 @@ export function LibraryPage() {
                 <button
                   onClick={() => void handleDeleteSelected()}
                   disabled={selectedKeys.size === 0}
-                  className="rounded-lg bg-(--color-danger) px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+                  className="rounded-lg bg-(--color-danger) px-3.5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
                 >
                   Delete selected
                 </button>
                 <button
                   onClick={handleToggleSelectionMode}
-                  className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm hover:bg-(--color-surface-hover)"
+                  className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover)"
                 >
                   Cancel
                 </button>
@@ -302,14 +302,14 @@ export function LibraryPage() {
             ) : (
               <button
                 onClick={handleToggleSelectionMode}
-                className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm hover:bg-(--color-surface-hover)"
+                className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover)"
               >
                 Select…
               </button>
             ))}
           <button
             onClick={() => setSharing(true)}
-            className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm hover:bg-(--color-surface-hover)"
+            className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover)"
           >
             Share
           </button>
@@ -317,7 +317,7 @@ export function LibraryPage() {
             onClick={() => fileInputRef.current?.click()}
             disabled={importing}
             title={books.length > 0 ? "Matching books are merged with what's already here, not duplicated." : undefined}
-            className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm hover:bg-(--color-surface-hover) disabled:opacity-60"
+            className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover) disabled:opacity-60"
           >
             {importing ? "Importing…" : books.length > 0 ? "Import more…" : "Import library…"}
           </button>
@@ -355,7 +355,7 @@ export function LibraryPage() {
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={importing}
-            className="rounded-lg bg-(--color-accent) px-4 py-2 font-semibold text-white disabled:opacity-60"
+            className="rounded-lg bg-(--color-accent) px-4 py-2.5 font-semibold text-white disabled:opacity-60"
           >
             {importing ? "Importing…" : "Choose a file"}
           </button>
