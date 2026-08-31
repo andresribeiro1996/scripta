@@ -163,6 +163,7 @@ export interface Mural {
    *  share()/unshare(). */
   shareToken: string | null;
   shareUrl: string | null;
+  folderId: string | null;
 }
 
 /** Assigns one of the account's uploaded gallery images as this mural's
@@ -498,4 +499,12 @@ export function resolveQuoteCollection(
     if (found) resolved.push(found);
   }
   return resolved;
+}
+
+export interface MuralFolder {
+  id: string;
+  name: string;
+  parentId: string | null;
+  createdAt: string;
+  updatedAt: string;
 }

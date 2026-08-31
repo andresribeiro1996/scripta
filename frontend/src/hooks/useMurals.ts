@@ -44,8 +44,8 @@ export function useMurals() {
     setMurals(current().map((m) => (m.id === updated.id ? updated : m)));
   }
 
-  async function create(name: string): Promise<Mural> {
-    const created = await createMuralApi(name);
+  async function create(name: string, folderId: string | null = null): Promise<Mural> {
+    const created = await createMuralApi(name, folderId);
     setMurals([...current(), created]);
     return created;
   }
@@ -87,6 +87,12 @@ export function useMurals() {
 
   async function unshare(id: string): Promise<Mural> {
     const updated = await unshareMuralApi(id);
+    replaceOne(updated);
+    return updated;
+  }
+
+  async function move(id: string, folderId: string | null): Promise<Mural> {
+    const updated = await updateMuralApi(id, { folderId });
     replaceOne(updated);
     return updated;
   }
@@ -135,5 +141,5 @@ export function useMurals() {
     setMurals(results);
   }
 
-  return { ...query, create, rename, saveBlocks, remove, setCover, clearCover, share, unshare, scrubBooks, scrubImage };
+  return { ...query, create, rename, saveBlocks, remove, setCover, clearCover, share, unshare, move, scrubBooks, scrubImage };
 }

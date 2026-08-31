@@ -118,7 +118,8 @@ export function SharedMuralPage() {
     updatedAt: "",
     coverImageUrl: data.mural.coverImageUrl ?? undefined,
     shareToken: null,
-    shareUrl: null
+    shareUrl: null,
+    folderId: null
   };
 
   return (
