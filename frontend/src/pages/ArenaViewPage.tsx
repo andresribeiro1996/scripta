@@ -96,7 +96,7 @@ export function ArenaViewPage() {
                 <button
                   onClick={() => void handleSettle(duel.id)}
                   disabled={busyDuelId === duel.id}
-                  className="mt-2 w-full rounded-lg border border-(--color-border) py-1 text-xs text-(--color-text-dim) hover:bg-(--color-surface-hover)"
+                  className="mt-2 w-full rounded-lg border border-(--color-border) py-2 text-xs text-(--color-text-dim) hover:bg-(--color-surface-hover)"
                 >
                   Settle now
                 </button>
@@ -106,14 +106,14 @@ export function ArenaViewPage() {
                   <button
                     onClick={() => void handleTiebreak(duel.id, duel.bookA.key)}
                     disabled={busyDuelId === duel.id}
-                    className="flex-1 rounded-lg bg-(--color-accent) py-1 text-xs font-medium text-white"
+                    className="flex-1 rounded-lg bg-(--color-accent) py-2 text-xs font-medium text-white"
                   >
                     {duel.bookA.title} wins
                   </button>
                   <button
                     onClick={() => void handleTiebreak(duel.id, duel.bookB.key)}
                     disabled={busyDuelId === duel.id}
-                    className="flex-1 rounded-lg bg-(--color-accent) py-1 text-xs font-medium text-white"
+                    className="flex-1 rounded-lg bg-(--color-accent) py-2 text-xs font-medium text-white"
                   >
                     {duel.bookB.title} wins
                   </button>

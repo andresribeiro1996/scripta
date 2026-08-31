@@ -18,7 +18,7 @@ export function ArenaPublicListPage() {
       <p className="mb-6 text-sm text-(--color-text-dim)">Vote in book bracket tournaments — no account needed.</p>
 
       {isLoading && <p className="text-sm text-(--color-text-dim)">Loading…</p>}
-      {!isLoading && tournaments.length === 0 && <p className="text-sm text-(--color-text-dim)">No tournaments yet.</p>}
+      {!isLoading && tournaments.length === 0 && <p className="text-sm text-(--color-text-dim)">No tournaments yet. A tournament is a bracket where friends vote books head-to-head — check back soon.</p>}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {tournaments.map((t) => (
