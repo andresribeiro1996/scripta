@@ -6,9 +6,13 @@
 import fastifyMultipart from "@fastify/multipart";
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
-import { env, useObjectStorage } from "../../config/env.js";
+import { env, useObjectStorage, usePostgres } from "../../config/env.js";
 import { createFsImageBlobStore } from "./adapters/fs/fsImageBlobStore.js";
 import { createS3ImageBlobStore } from "./adapters/s3/s3ImageBlobStore.js";
+import { createPgGalleryRepository } from "./adapters/postgres/pgGalleryRepository.js";
+import { initGallerySchema } from "./adapters/postgres/connection.js";
+import { getPool } from "../../shared/postgres/pool.js";
+import type { GalleryRepository } from "./domain/ports.js";
 import { createSqliteGalleryRepository } from "./adapters/sqlite/sqliteGalleryRepository.js";
 import { openGalleryDb } from "./adapters/sqlite/connection.js";
 import { buildGalleryRoutes } from "./routes.js";
@@ -16,8 +20,21 @@ import { createGalleryService, MAX_UPLOAD_BYTES } from "./service.js";
 
 export async function galleryPlugin(app: FastifyInstance) {
   // --- composition: swap either block to change storage technology ---
-  const db = openGalleryDb();
-  const galleryRepository = createSqliteGalleryRepository(db);
+  let galleryRepository: GalleryRepository;
+
+  if (usePostgres) {
+    app.log.info("[gallery] using Postgres (DATABASE_URL is set)");
+    const pool = getPool();
+    await initGallerySchema(pool);
+    galleryRepository = createPgGalleryRepository(pool);
+  } else {
+    const db = openGalleryDb();
+    galleryRepository = createSqliteGalleryRepository(db);
+    app.addHook("onClose", async () => {
+      db.close();
+    });
+  }
+
   // Object storage when a bucket is configured, local disk otherwise —
   // the same one-variable decision modules/library makes for its database.
   // Uploads on local disk are what pin this API to a single machine.

@@ -38,7 +38,7 @@ const blueskyConnectSchema = z.object({
 export function buildSocialsRoutes(service: SocialsService) {
   return async function socialsRoutes(app: FastifyInstance) {
     app.get("/socials", { preHandler: authGuard }, async (request, reply) => {
-      reply.send({ socials: service.listStatuses(request.user.id, enabledByProvider) });
+      reply.send({ socials: await service.listStatuses(request.user.id, enabledByProvider) });
     });
 
     app.post<{ Params: { provider: string } }>("/socials/:provider/link-session", { preHandler: authGuard }, async (request, reply) => {
@@ -65,7 +65,7 @@ export function buildSocialsRoutes(service: SocialsService) {
         if (err instanceof SocialsNotConfiguredError) return reply.code(503).send({ error: err.message });
         throw err;
       }
-      reply.send({ socials: service.listStatuses(request.user.id, enabledByProvider) });
+      reply.send({ socials: await service.listStatuses(request.user.id, enabledByProvider) });
     });
 
     app.delete<{ Params: { provider: string } }>("/socials/:provider", { preHandler: authGuard }, async (request, reply) => {
@@ -73,8 +73,8 @@ export function buildSocialsRoutes(service: SocialsService) {
       if (!isSocialProvider(provider)) {
         return reply.code(400).send({ error: `Unknown provider "${provider}".` });
       }
-      service.disconnect(request.user.id, provider);
-      reply.send({ socials: service.listStatuses(request.user.id, enabledByProvider) });
+      await service.disconnect(request.user.id, provider);
+      reply.send({ socials: await service.listStatuses(request.user.id, enabledByProvider) });
     });
   };
 }

@@ -25,11 +25,11 @@ export function createSqliteCoverCacheRepository(db: DatabaseSync): CoverCacheRe
   `);
 
   return {
-    getByCacheKey(cacheKey) {
+    async getByCacheKey(cacheKey) {
       return getStmt.get(cacheKey) as CachedCoverRow | undefined;
     },
 
-    insert(row) {
+    async insert(row) {
       const result = insertStmt.run({
         $id: row.id,
         $cache_key: row.cache_key,

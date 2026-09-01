@@ -11,8 +11,12 @@
 import fastifyOauth2 from "@fastify/oauth2";
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance, FastifyRequest } from "fastify";
-import { env, socialsEncryptionConfigured } from "../../config/env.js";
+import { env, socialsEncryptionConfigured, usePostgres } from "../../config/env.js";
 import { openSocialsDb } from "./adapters/sqlite/connection.js";
+import { createPgSocialsRepository } from "./adapters/postgres/pgSocialsRepository.js";
+import { initSocialsSchema } from "./adapters/postgres/connection.js";
+import { getPool } from "../../shared/postgres/pool.js";
+import type { SocialsRepository } from "./domain/ports.js";
 import { createSqliteSocialsRepository } from "./adapters/sqlite/sqliteSocialsRepository.js";
 import { OAUTH_PROVIDERS, type OAuthProviderConfig } from "./providerConfig.js";
 import { consumeLinkSession, peekLinkSession } from "./linkSessions.js";
@@ -101,7 +105,7 @@ async function registerOAuthProvider(app: FastifyInstance, config: OAuthProvider
       const { token } = await oauthNamespace.getAccessTokenFromAuthorizationCodeFlow(request);
       const profile = await config.fetchProfile(token.access_token);
 
-      service.saveConnection({
+      await service.saveConnection({
         userId,
         provider: config.provider,
         accessToken: token.access_token,
@@ -121,8 +125,20 @@ async function registerOAuthProvider(app: FastifyInstance, config: OAuthProvider
 
 export async function socialsPlugin(app: FastifyInstance) {
   // --- composition: swap this block to change storage technology ---
-  const db = openSocialsDb();
-  const socialsRepository = createSqliteSocialsRepository(db);
+  let socialsRepository: SocialsRepository;
+
+  if (usePostgres) {
+    app.log.info("[socials] using Postgres (DATABASE_URL is set)");
+    const pool = getPool();
+    await initSocialsSchema(pool);
+    socialsRepository = createPgSocialsRepository(pool);
+  } else {
+    const db = openSocialsDb();
+    socialsRepository = createSqliteSocialsRepository(db);
+    app.addHook("onClose", async () => {
+      db.close();
+    });
+  }
   const socialsService = createSocialsService(socialsRepository, env.SOCIALS_ENCRYPTION_KEY);
   // -------------------------------------------------------------------
 

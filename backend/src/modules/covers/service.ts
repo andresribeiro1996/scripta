@@ -105,7 +105,7 @@ export function createCoversService(
       const cacheKey = isbn ? `isbn:${isbn}` : imageId ? `kobo:${imageId}` : null;
 
       if (cacheKey) {
-        const cached = cacheRepo.getByCacheKey(cacheKey);
+        const cached = await cacheRepo.getByCacheKey(cacheKey);
         if (cached) return { url: publicUrlFor(cached.id) };
       }
 
@@ -150,7 +150,7 @@ export function createCoversService(
           created_at: new Date().toISOString()
         };
         await blobStore.save(id, OUTPUT_EXTENSION, reencoded.data);
-        const wonRace = cacheRepo.insert(row);
+        const wonRace = await cacheRepo.insert(row);
         // Lost a race to a concurrent request resolving this exact same
         // book (see the SQLite adapter's own comment) — the blob we just
         // saved under OUR OWN id is now a harmless orphan (no DB row
@@ -160,7 +160,7 @@ export function createCoversService(
         // Every caller needs to converge on the SAME served URL
         // regardless of which concurrent request happened to finish
         // first, so read back whichever row actually won.
-        const winningId = wonRace ? id : cacheRepo.getByCacheKey(cacheKey)!.id;
+        const winningId = wonRace ? id : (await cacheRepo.getByCacheKey(cacheKey))!.id;
         return { url: publicUrlFor(winningId) };
       }
 

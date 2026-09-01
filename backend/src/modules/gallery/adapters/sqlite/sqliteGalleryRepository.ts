@@ -18,11 +18,11 @@ export function createSqliteGalleryRepository(db: DatabaseSync): GalleryReposito
   const totalBytesStmt = db.prepare(`SELECT COALESCE(SUM(byte_size), 0) AS total FROM gallery_images WHERE user_id = ?`);
 
   return {
-    listImages(userId) {
+    async listImages(userId) {
       return listStmt.all(userId) as unknown as GalleryImageRow[];
     },
 
-    insertImage(row) {
+    async insertImage(row) {
       insertStmt.run({
         $id: row.id,
         $user_id: row.user_id,
@@ -36,20 +36,20 @@ export function createSqliteGalleryRepository(db: DatabaseSync): GalleryReposito
       });
     },
 
-    getImageById(id) {
+    async getImageById(id) {
       return getByIdStmt.get(id) as GalleryImageRow | undefined;
     },
 
-    getOwnedImage(id, userId) {
+    async getOwnedImage(id, userId) {
       return getOwnedStmt.get(id, userId) as GalleryImageRow | undefined;
     },
 
-    deleteImage(id, userId) {
+    async deleteImage(id, userId) {
       const result = deleteStmt.run(id, userId);
       return result.changes > 0;
     },
 
-    totalBytesForUser(userId) {
+    async totalBytesForUser(userId) {
       const row = totalBytesStmt.get(userId) as { total: number };
       return row.total;
     }

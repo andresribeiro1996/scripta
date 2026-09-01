@@ -17,7 +17,7 @@ link — same content, easier to read).
 |---|---|
 | 1 — Normalise the library | **Done** (slices 1 & 2). Slice 3 deliberately deferred, see below. |
 | 2 — Correctness gaps | **Done.** |
-| 3 — State off the instance | **Partial.** `library` and `auth` are on Postgres and blobs are on object storage; `gallery`, `covers` and `socials` are still SQLite, so the volume is still required. |
+| 3 — State off the instance | **Done.** All five modules have a Postgres adapter and blobs are on object storage, so with both configured the app is stateless. |
 | 4 — Domain, hosting, pipeline | **Pipeline and container done. Domain and hosting are yours to choose.** |
 | 5 — Reconsider the frontend | Not started; a product decision, not a technical blocker. |
 
@@ -35,9 +35,6 @@ link — same content, easier to read).
 
 **Deliberately not done, with reasons:**
 
-- **Postgres adapters for `gallery`, `covers` and `socials`.** Until these
-  exist the API cannot run more than one instance, so replicas and zero-downtime
-  deploys are still out of reach. `auth` and `library` are done.
 
 - **Slice 3 (retire the document endpoint and the legacy table).** The plan
   itself said "once the per-entity API has been live long enough to trust" —
@@ -210,7 +207,11 @@ SQLite adapter now returns already-resolved promises. That change is also what
 makes it possible to later get the blocking driver off the event loop.
 
 Migrating an existing deployment: `scripts/sqlite-to-postgres.mjs --sqlite
-<library.sqlite> --auth-sqlite <auth.sqlite>`, run with the app stopped (there is
+<library.sqlite> --auth-sqlite <auth.sqlite>`. **Note it does not yet carry
+`gallery` metadata, the `covers` cache or `socials` across** — an existing
+deployment with images or connected accounts needs those copied too before the
+volume is removed. The covers cache is disposable (it re-resolves), but gallery
+metadata and social connections are not. run with the app stopped (there is
 no dual-write mode). Accounts are copied row-for-row rather than through the
 repository port — `createUser` would mint fresh ids, breaking every foreign key
 and every library row keyed on the old one. Live refresh tokens come across so
@@ -231,21 +232,22 @@ move off local disk. Written against the S3 API, so R2, B2, MinIO and AWS all
 work — R2 is the recommendation (zero egress, and covers are served on every page
 view). Both ports had to become async for the same reason the library port did.
 
-**The API is not stateless yet**, though it is closer. `DATABASE_URL` now
-switches **`library` and `auth`** to Postgres, and `S3_BUCKET` moves the blobs.
-Still SQLite-only: `gallery` metadata, the `covers` cache rows, and `socials`
-(encrypted platform tokens).
+**All five modules now have a Postgres adapter.** With `DATABASE_URL` and
+`S3_BUCKET` both set, the app writes nothing durable to local disk — verified by
+booting it with both configured and confirming zero `.sqlite` files are created,
+then exercising every module over HTTP.
 
-So **the volume is still required** and the app still cannot run more than one
-instance. But the nature of what's left changed: `auth` was the one whose loss
-was unrecoverable and whose divergence across two instances would have been
-catastrophic. What remains is one cache (`covers`, genuinely disposable),
-image metadata, and social connections.
+**So the volume can go, and more than one instance becomes possible** — which is
+what unlocks replicas and zero-downtime deploys. On Fly that means deleting the
+`[[mounts]]` block and raising `min_machines_running` to 2. Do that only with
+both variables set; with either missing the app still writes to disk and two
+instances would silently diverge.
 
 An earlier draft of this plan claimed setting `DATABASE_URL` and `S3_BUCKET`
-made the app stateless. It did not, and `fly.toml`/`Dockerfile` had turned that
-into an instruction to delete the volume — which would have destroyed every
-account. Both are fixed.
+alone made the app stateless, back when only `library` had an adapter. It did
+not, and `fly.toml`/`Dockerfile` had turned that into an instruction to delete
+the volume — which would then have destroyed every account. It is true now, but
+it wasn't then, and the conditions are spelled out above for that reason.
 
 Migrating existing local files: `scripts/files-to-object-storage.mjs`, run with
 the app stopped. It writes through the same adapters the app uses, so the keys

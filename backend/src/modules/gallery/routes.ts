@@ -25,7 +25,7 @@ const idParamSchema = z.object({ id: z.string().uuid() });
 export function buildGalleryRoutes(service: GalleryService) {
   return async function galleryRoutes(app: FastifyInstance) {
     app.get("/gallery", { preHandler: authGuard }, async (request, reply) => {
-      return reply.send({ images: service.listImages(request.user.id) });
+      return reply.send({ images: await service.listImages(request.user.id) });
     });
 
     app.post(

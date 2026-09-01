@@ -35,12 +35,13 @@ primary_region = "lhr"
 # signup, library and uploaded image disappears when the machine is
 # replaced.
 #
-# THIS MOUNT IS ALWAYS REQUIRED. Setting DATABASE_URL moves the LIBRARY
-# module to Postgres and S3_BUCKET moves the blobs to object storage, but
-# auth (accounts and refresh tokens), gallery metadata, the cover-cache
-# rows and socials (encrypted platform tokens) still open SQLite files
-# here — only `library` has a Postgres adapter today. Deleting this block
-# would destroy every user account.
+# REQUIRED unless BOTH DATABASE_URL and S3_BUCKET are set. All five
+# modules now have a Postgres adapter, so with both configured the app
+# writes nothing durable here and this block can be deleted.
+#
+# With EITHER missing it still writes to disk, and deleting this mount
+# destroys whatever is left on it — accounts included. Check both are set
+# before removing it.
 [[mounts]]
   source = "scripta_data"
   destination = "/data"
@@ -49,15 +50,13 @@ primary_region = "lhr"
   internal_port = 3000
   force_https = true
 
-  # ONE MACHINE. Not negotiable while any module still uses SQLite, which
-  # today is four of the five: a SQLite file on a volume can only attach to
-  # a single machine, so two instances would each get their own copy of the
-  # accounts table and silently diverge.
+  # ONE MACHINE while any state is local, which is the case unless BOTH
+  # DATABASE_URL and S3_BUCKET are set: a SQLite file on a volume can only
+  # attach to a single machine, so two instances would each get their own
+  # copy of the accounts table and silently diverge.
   #
-  # Raising this to 2 for rolling deploys requires Postgres adapters for
-  # auth, gallery, covers and socials as well — see
-  # docs/DEPLOYMENT-PLAN.md. DATABASE_URL and S3_BUCKET alone are NOT
-  # enough, however much they look like they should be.
+  # With both set the app is stateless and this can go to 2 for rolling
+  # deploys — delete the [[mounts]] block above at the same time.
   #
   # auto-stop stays off either way: it would make the first request after
   # an idle period pay a cold start, on an app whose users arrive in ones
