@@ -18,7 +18,7 @@ link — same content, easier to read).
 | 1 — Normalise the library | **Done** (slices 1 & 2). Slice 3 deliberately deferred, see below. |
 | 2 — Correctness gaps | **Done.** |
 | 3 — State off the instance | **Done.** All five modules have a Postgres adapter and blobs are on object storage, so with both configured the app is stateless. |
-| 4 — Domain, hosting, pipeline | **Pipeline, container and domain done. Hosting is yours to choose.** |
+| 4 — Domain, hosting, pipeline | **Done as code.** Domain bought, host chosen (Fly + Cloudflare Pages + Neon + R2), pipeline and container built. What remains is account setup, not commits. |
 | 5 — Reconsider the frontend | Not started; a product decision, not a technical blocker. |
 
 **Domain: `atmyshelf.com`, bought.** The app is named AtMyShelf throughout the
@@ -32,8 +32,12 @@ persisted cover URLs in phase 4).
 
 - Point DNS at the hosts once they exist: `atmyshelf.com` → the frontend host,
   `api.atmyshelf.com` → the API, `www` redirecting to the apex.
-- Choose and create the hosting accounts, then set `DEPLOY_ENABLED`, `API_URL`
-  and the deploy secrets. The deploy workflow is inert until you do.
+- Create the four accounts — Fly, Cloudflare (Pages + R2), Neon — and run the
+  first deploy by hand, following the runbook at the top of `backend/fly.toml`.
+  The first deploy cannot come from CI: the Fly app and its secrets have to
+  exist before `flyctl deploy` has anything to deploy to.
+- Then set `DEPLOY_ENABLED`, `API_URL` and the deploy secrets so every later
+  push to `main` deploys itself. The workflow is inert until you do.
 - Generate the three production secrets and store them in a password manager.
 - Register the OAuth apps, one platform at a time. Google sign-in and the
   Hardcover lookup have still never run against real credentials.
@@ -366,18 +370,41 @@ Google sign-in and the Hardcover lookup have **never run against real
 credentials** (per `backend/README.md`) — budget for the first live attempt at
 each to need a fix.
 
-**Hosting.**
+**Hosting — settled.**
 
-| Piece | Recommendation | Roughly |
-|---|---|---|
-| Frontend | Cloudflare Pages / Netlify / Vercel. Needs SPA fallback to `index.html`, and short cache TTLs on `index.html`, the manifest and the service worker so the PWA's `autoUpdate` doesn't pin people to a stale build. | free |
-| API | Fly.io or Render. Once stateless, ≥2 machines for rolling deploys. `GET /health` already exists. | ~$10–15/mo |
-| Database | Neon or Supabase — usable free tiers, and point-in-time restore rather than snapshot-and-pray. | free → ~$20/mo |
-| Blobs | Cloudflare R2 — zero egress, which matters when serving cover images on every page view. | ~$0.015/GB/mo |
+| Piece | Chosen | Why | Roughly |
+|---|---|---|---|
+| API | **Fly.io** | Deploys the repo's own `Dockerfile` rather than guessing a buildpack, and `GET /health` already exists for its rollback-on-unhealthy release check. Configured in `backend/fly.toml`. | ~$10–15/mo |
+| Frontend | **Cloudflare Pages** | Static bundle, and it is where the DNS will already be. Needs two things set in the Pages project, not in the build: an SPA fallback to `index.html`, or refreshing on `/dashboard/settings` 404s; and short cache TTLs on `index.html`, the manifest and the service worker, or the PWA's `autoUpdate` pins people to a stale build. | free |
+| Database | **Neon** | Point-in-time restore rather than snapshot-and-pray, and a free tier that comfortably covers a first beta. | free → ~$20/mo |
+| Blobs | **Cloudflare R2** | Zero egress, which is the whole argument when a cover image is served on every page view. Same account as Pages. | ~$0.015/GB/mo |
 
 Roughly $15–35/month all-in at small scale, against ~$8 for the single-volume
 version. The difference buys deploys without downtime and a database you can
 rewind.
+
+Nothing in the app is Fly-specific — it is a Dockerfile, a `PORT`, and a health
+check — so this is a reversible decision. What is *not* cheaply reversible is
+the hostname, which is why that was settled first.
+
+**Order of operations for the first deploy.** The runbook with the actual
+commands is at the top of `backend/fly.toml`; the order matters more than the
+commands do:
+
+1. Create the Neon database and the R2 bucket, so their credentials exist.
+2. Generate the three secrets into a password manager (below), then
+   `fly apps create` and `fly secrets set` — all of them, in one call, before
+   the first deploy. The app validates its whole environment at boot and exits
+   on anything missing, so a half-configured deploy fails loudly rather than
+   starting up broken.
+3. Delete the `[[mounts]]` block from `fly.toml` if you set `DATABASE_URL` and
+   `S3_BUCKET`. Fly will not start a machine whose declared mount has no volume.
+4. `fly deploy` by hand once, and `fly certs create api.atmyshelf.com`. CI
+   cannot do this first one — `flyctl deploy` needs the app to already exist.
+5. Point DNS, deploy the frontend, then set `DEPLOY_ENABLED` so every later push
+   to `main` deploys itself.
+6. Do one real upload/read/delete against the R2 bucket, and one signup, before
+   telling anyone the URL.
 
 **Pipeline.**
 

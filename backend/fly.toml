@@ -1,22 +1,61 @@
 # Fly.io configuration for the AtMyShelf API.
 #
-# Referenced by .github/workflows/deploy.yml, which is inert until you opt
-# in — see that file. If you host somewhere else, this file is unused.
+# Fly is the settled host. Referenced by .github/workflows/deploy.yml,
+# which stays inert until the DEPLOY_ENABLED repository variable is set —
+# see that file.
 #
-# Create the app and its volume once, before the first deploy:
+# ---------------------------------------------------------------------
+# FIRST DEPLOY — the managed-state path (Neon + R2), which is the one
+# docs/DEPLOYMENT-PLAN.md recommends. Run from backend/.
+#
 #   fly apps create atmyshelf-api
-#   fly volumes create atmyshelf_data --size 3 --region <region>
-#   fly secrets set JWT_ACCESS_SECRET=... JWT_REFRESH_SECRET=... \
-#                   SOCIALS_ENCRYPTION_KEY=... \
-#                   FRONTEND_URL=https://atmyshelf.com \
-#                   PUBLIC_API_URL=https://api.atmyshelf.com
 #
-# Generate each secret fresh and keep a copy in a password manager, not
-# only here: losing SOCIALS_ENCRYPTION_KEY makes every stored social token
-# permanently undecryptable, and rotating the JWT secrets signs everyone
-# out.
+#   fly secrets set \
+#     JWT_ACCESS_SECRET=... \
+#     JWT_REFRESH_SECRET=... \
+#     SOCIALS_ENCRYPTION_KEY=... \
+#     FRONTEND_URL=https://atmyshelf.com \
+#     PUBLIC_API_URL=https://api.atmyshelf.com \
+#     DATABASE_URL='postgres://...neon.tech/atmyshelf?sslmode=require' \
+#     S3_BUCKET=atmyshelf \
+#     S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com \
+#     S3_ACCESS_KEY_ID=... \
+#     S3_SECRET_ACCESS_KEY=...
+#
+#   # Delete the [[mounts]] block below FIRST — see its own warning.
+#   # A machine with a mount but no volume will not start.
+#   fly deploy
+#   fly certs create api.atmyshelf.com
+#
+# ---------------------------------------------------------------------
+# FIRST DEPLOY — the local-disk path, if you want to launch before
+# setting up Neon and R2. Same as above minus DATABASE_URL and the four
+# S3_* secrets, plus a volume, and keep the [[mounts]] block:
+#
+#   fly volumes create atmyshelf_data --size 3 --region lhr
+#
+# That is a real deployment, not a lesser one — it just cannot run more
+# than one machine, and the database is only as safe as the backup
+# schedule (see docs/DEPLOYMENT-PLAN.md, "Backups").
+#
+# ---------------------------------------------------------------------
+# Generate each of the three secrets fresh and keep a copy in a password
+# manager, not only here: losing SOCIALS_ENCRYPTION_KEY makes every
+# stored social token permanently undecryptable, and rotating the JWT
+# secrets signs everyone out. `fly secrets list` shows only digests, so
+# Fly is not a place you can read them back from.
+#
+# The OAuth credentials (GOOGLE_*, X_*, INSTAGRAM_*, THREADS_*,
+# TIKTOK_*, HARDCOVER_API_KEY) are all optional and go in the same way,
+# one platform at a time — each is quietly skipped while unset.
 
 app = "atmyshelf-api"
+
+# London. Change this before the first deploy if your users are not in
+# Europe — with a single machine, every request pays the round trip. It
+# must match the region the volume is created in (local-disk path), and
+# ideally the region the Neon database is in (managed path), since every
+# request makes several database round trips.
 primary_region = "lhr"
 
 [build]
@@ -37,11 +76,12 @@ primary_region = "lhr"
 #
 # REQUIRED unless BOTH DATABASE_URL and S3_BUCKET are set. All five
 # modules now have a Postgres adapter, so with both configured the app
-# writes nothing durable here and this block can be deleted.
+# writes nothing durable here and this block SHOULD be deleted — Fly will
+# not start a machine whose declared mount has no volume behind it.
 #
 # With EITHER missing it still writes to disk, and deleting this mount
 # destroys whatever is left on it — accounts included. Check both are set
-# before removing it.
+# before removing it, and take a backup first if the app has ever run.
 [[mounts]]
   source = "atmyshelf_data"
   destination = "/data"

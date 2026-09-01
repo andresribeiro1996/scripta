@@ -59,11 +59,11 @@ const envSchema = z.object({
 
   // --- database: Postgres when set, SQLite otherwise --------------------
   //
-  // Every module that HAS a Postgres adapter picks it on this variable
-  // alone. `library` and `auth` do; `gallery`, `covers` and `socials` are
-  // still SQLite-only, so a deployment with this set STILL needs a volume
-  // for those three and still cannot run more than one instance. See
-  // docs/DEPLOYMENT-PLAN.md.
+  // All five modules have a Postgres adapter and pick it on this variable
+  // alone. With this AND S3_BUCKET set the app writes nothing durable to
+  // local disk, so it needs no volume and can run more than one instance.
+  // With EITHER missing it still writes to disk — see
+  // docs/DEPLOYMENT-PLAN.md, and the [[mounts]] warning in fly.toml.
   //
   // Migrating an existing SQLite deployment: scripts/sqlite-to-postgres.mjs.
   DATABASE_URL: z.string().optional().default(""),
@@ -206,11 +206,11 @@ export const env = parsed.data;
 
 export const isProduction = env.NODE_ENV === "production";
 
-/** Whether the modules that HAVE a Postgres adapter should use it rather
- *  than SQLite. One variable, one decision, applied by each module's own
- *  plugin.ts. Not every module has one yet — see docs/DEPLOYMENT-PLAN.md
- *  for which are still SQLite-only, because that is what decides whether
- *  the deployment still needs a volume. */
+/** Whether the five modules use Postgres rather than SQLite. One
+ *  variable, one decision, applied by each module's own plugin.ts. All
+ *  five have an adapter, so this alone moves every table off local disk;
+ *  blobs need S3_BUCKET as well before the deployment can drop its
+ *  volume. */
 export const usePostgres = env.DATABASE_URL !== "";
 
 /** Whether gallery uploads and the cover cache live in object storage

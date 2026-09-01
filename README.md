@@ -2,7 +2,7 @@
 
 A multi-user Kobo/Goodreads e-book library app — import your reading history, browse it as a styled card grid, organize it into series/collections, build freeform "mural" dashboards out of it, and (optionally) connect social accounts. Started as a small script to get data off a Kobo e-reader; grew into a full accounts-based web app, one library per signed-in user.
 
-Deployment target: **atmyshelf.com** (frontend) and **api.atmyshelf.com** (API). See [`docs/DEPLOYMENT-PLAN.md`](docs/DEPLOYMENT-PLAN.md) for what is done and what still needs a human.
+Deployment target: **atmyshelf.com** (frontend, Cloudflare Pages) and **api.atmyshelf.com** (API, Fly.io), with Neon for Postgres and Cloudflare R2 for images. Nothing is deployed yet — see [`docs/DEPLOYMENT-PLAN.md`](docs/DEPLOYMENT-PLAN.md) for what is built and what still needs a human.
 
 ## Layout
 
