@@ -17,7 +17,7 @@ link — same content, easier to read).
 |---|---|
 | 1 — Normalise the library | **Done** (slices 1 & 2). Slice 3 deliberately deferred, see below. |
 | 2 — Correctness gaps | **Done.** |
-| 3 — State off the instance | **Partial.** Postgres and object storage exist, but only `library` has a Postgres adapter — four modules are still SQLite, so the volume is still required. |
+| 3 — State off the instance | **Partial.** `library` and `auth` are on Postgres and blobs are on object storage; `gallery`, `covers` and `socials` are still SQLite, so the volume is still required. |
 | 4 — Domain, hosting, pipeline | **Pipeline and container done. Domain and hosting are yours to choose.** |
 | 5 — Reconsider the frontend | Not started; a product decision, not a technical blocker. |
 
@@ -35,10 +35,9 @@ link — same content, easier to read).
 
 **Deliberately not done, with reasons:**
 
-- **Postgres adapters for `auth`, `gallery`, `covers` and `socials`.** Until
-  these exist the API cannot run more than one instance, so replicas and
-  zero-downtime deploys are still out of reach. `auth` is the one to do first —
-  it is the smallest and the one whose loss is unrecoverable.
+- **Postgres adapters for `gallery`, `covers` and `socials`.** Until these
+  exist the API cannot run more than one instance, so replicas and zero-downtime
+  deploys are still out of reach. `auth` and `library` are done.
 
 - **Slice 3 (retire the document endpoint and the legacy table).** The plan
   itself said "once the per-entity API has been live long enough to trust" —
@@ -210,8 +209,13 @@ synchronous API, and a network-backed store cannot answer synchronously. The
 SQLite adapter now returns already-resolved promises. That change is also what
 makes it possible to later get the blocking driver off the event loop.
 
-Migrating an existing deployment: `scripts/sqlite-to-postgres.mjs`, run with the
-app stopped (there is no dual-write mode). It reads through the SQLite adapter
+Migrating an existing deployment: `scripts/sqlite-to-postgres.mjs --sqlite
+<library.sqlite> --auth-sqlite <auth.sqlite>`, run with the app stopped (there is
+no dual-write mode). Accounts are copied row-for-row rather than through the
+repository port — `createUser` would mint fresh ids, breaking every foreign key
+and every library row keyed on the old one. Live refresh tokens come across so
+the migration doesn't sign everyone out; expired and revoked ones are left
+behind, since they grant nothing. It reads through the SQLite adapter
 and writes through the Postgres one — both via the same port and the same
 document mapping the app itself uses, rather than a bespoke SQL-to-SQL copy that
 could drift from either. Every account is verified after writing by reassembling
@@ -227,18 +231,21 @@ move off local disk. Written against the S3 API, so R2, B2, MinIO and AWS all
 work — R2 is the recommendation (zero egress, and covers are served on every page
 view). Both ports had to become async for the same reason the library port did.
 
-**The API is NOT stateless, and an earlier draft of this plan wrongly said it
-would be.** `DATABASE_URL` moves only the `library` module to Postgres, and
-`S3_BUCKET` moves only the blobs. `auth` (accounts and refresh tokens),
-`gallery` metadata, the `covers` cache rows and `socials` (encrypted platform
-tokens) all still open SQLite files on local disk — only `library` has a
-Postgres adapter today.
+**The API is not stateless yet**, though it is closer. `DATABASE_URL` now
+switches **`library` and `auth`** to Postgres, and `S3_BUCKET` moves the blobs.
+Still SQLite-only: `gallery` metadata, the `covers` cache rows, and `socials`
+(encrypted platform tokens).
 
-So **the volume is still required**, and the app still cannot run more than one
-instance: two would each get their own copy of the accounts table and silently
-diverge. Getting to replicas and rolling deploys needs Postgres adapters for the
-other four modules too. `auth` is the one that matters most and is the smallest
-(two tables); `covers` is a pure cache and could arguably be left behind.
+So **the volume is still required** and the app still cannot run more than one
+instance. But the nature of what's left changed: `auth` was the one whose loss
+was unrecoverable and whose divergence across two instances would have been
+catastrophic. What remains is one cache (`covers`, genuinely disposable),
+image metadata, and social connections.
+
+An earlier draft of this plan claimed setting `DATABASE_URL` and `S3_BUCKET`
+made the app stateless. It did not, and `fly.toml`/`Dockerfile` had turned that
+into an instruction to delete the volume — which would have destroyed every
+account. Both are fixed.
 
 Migrating existing local files: `scripts/files-to-object-storage.mjs`, run with
 the app stopped. It writes through the same adapters the app uses, so the keys

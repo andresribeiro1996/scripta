@@ -1,4 +1,6 @@
-// Copies every account's library from a SQLite deployment into Postgres.
+// Copies a SQLite deployment's data into Postgres, for every module that
+// has a Postgres adapter — currently `auth` (accounts and refresh tokens)
+// and `library`.
 //
 //   node --import tsx scripts/sqlite-to-postgres.mjs \
 //     --sqlite ./data/library.sqlite \
@@ -39,12 +41,17 @@ function arg(name) {
 }
 
 const sqlitePath = arg("sqlite");
+// auth lives in its own SQLite file; --auth-sqlite points at it. Optional,
+// so a deployment that only wants the library moved can omit it.
+const authSqlitePath = arg("auth-sqlite");
 const postgresUrl = arg("postgres") ?? process.env.DATABASE_URL;
 const dryRun = process.argv.includes("--dry-run");
 const force = process.argv.includes("--force");
 
 if (!sqlitePath || !postgresUrl) {
-  console.error("Usage: node --import tsx scripts/sqlite-to-postgres.mjs --sqlite <path> --postgres <url> [--dry-run] [--force]");
+  console.error(
+    "Usage: node --import tsx scripts/sqlite-to-postgres.mjs --sqlite <library.sqlite> [--auth-sqlite <auth.sqlite>] --postgres <url> [--dry-run] [--force]"
+  );
   process.exit(1);
 }
 
@@ -115,6 +122,63 @@ for (const userId of userIds) {
     console.error(`  FAILED ${userId}: ${err instanceof Error ? err.message : String(err)}`);
     failed.push(userId);
   }
+}
+
+// --- auth -----------------------------------------------------------------
+//
+// Rows are copied straight across rather than going through the
+// repository port, because AuthRepository has no "insert this exact row"
+// operation — createUser generates a fresh id, which would break every
+// foreign key and every library row keyed on the old one. The columns are
+// few and fixed, so a direct copy is honest here in a way it would not be
+// for library's open-ended book records.
+let authCopied = 0;
+if (authSqlitePath) {
+  const { readFileSync: readAuthSchema } = await import("node:fs");
+  await pool.query(readAuthSchema(join(scriptDir, "../src/modules/auth/adapters/postgres/schema.sql"), "utf8"));
+
+  const authDb = new DatabaseSync(authSqlitePath, { readOnly: true });
+  const users = authDb.prepare("SELECT * FROM users").all();
+  const tokens = authDb.prepare("SELECT * FROM refresh_tokens WHERE revoked_at IS NULL AND expires_at > ?").all(
+    new Date().toISOString()
+  );
+
+  console.log(`\nauth: ${users.length} account(s), ${tokens.length} live refresh token(s) in ${authSqlitePath}`);
+
+  if (!dryRun) {
+    for (const user of users) {
+      // ON CONFLICT DO NOTHING so a re-run is safe; --force is not offered
+      // here because overwriting an account row is never the right repair.
+      await pool.query(
+        `INSERT INTO users (id, email, username, password_hash, google_id, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO NOTHING`,
+        [user.id, user.email, user.username, user.password_hash, user.google_id, user.created_at]
+      );
+      authCopied++;
+    }
+    // Expired and revoked tokens are deliberately left behind: they grant
+    // nothing, and carrying them over just imports clutter. Live ones are
+    // copied so the migration doesn't sign everybody out.
+    for (const token of tokens) {
+      await pool.query(
+        `INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at, revoked_at, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO NOTHING`,
+        [token.id, token.user_id, token.token_hash, token.expires_at, token.revoked_at, token.created_at]
+      );
+    }
+
+    const { rows } = await pool.query("SELECT COUNT(*)::int AS n FROM users");
+    if (rows[0].n < users.length) {
+      failed.push(`auth: only ${rows[0].n} of ${users.length} accounts are present after the copy`);
+    }
+    console.log(`  copied ${authCopied} account(s) and ${tokens.length} live token(s)`);
+  } else {
+    console.log(`  would copy ${users.length} account(s) and ${tokens.length} live token(s)`);
+  }
+
+  authDb.close();
+} else {
+  console.log("\nauth: --auth-sqlite not given, skipping (accounts stay in SQLite)");
 }
 
 sqlite.close();

@@ -8,11 +8,12 @@
 // Postgres was a new folder rather than a rewrite.
 
 import type { FastifyInstance } from "fastify";
-import { usePostgresLibrary } from "../../config/env.js";
+import { usePostgres } from "../../config/env.js";
 import { createSqliteLibraryRepository } from "./adapters/sqlite/sqliteLibraryRepository.js";
 import { openLibraryDb, takeMigrationResult } from "./adapters/sqlite/connection.js";
 import { createPgLibraryRepository } from "./adapters/postgres/pgLibraryRepository.js";
-import { openLibraryPool } from "./adapters/postgres/connection.js";
+import { initLibrarySchema } from "./adapters/postgres/connection.js";
+import { getPool } from "../../shared/postgres/pool.js";
 import type { LibraryRepository } from "./domain/ports.js";
 import { buildLibraryRoutes } from "./routes.js";
 import { createLibraryService } from "./service.js";
@@ -21,15 +22,13 @@ export async function libraryPlugin(app: FastifyInstance) {
   // --- composition: swap this one block to change storage technology ---
   let libraryRepository: LibraryRepository;
 
-  if (usePostgresLibrary) {
-    const pool = await openLibraryPool();
+  if (usePostgres) {
+    // The pool is shared with every other Postgres-backed module and is
+    // closed once, in app.ts — not here, or the second module to shut
+    // down would be closing an already-closed pool.
+    const pool = getPool();
+    await initLibrarySchema(pool);
     libraryRepository = createPgLibraryRepository(pool);
-    // Closing the pool on shutdown matters more than it looks: without
-    // it a rolling deploy leaves connections held until the provider
-    // times them out, and a small managed Postgres has few to spare.
-    app.addHook("onClose", async () => {
-      await pool.end();
-    });
     app.log.info("[library] using Postgres (DATABASE_URL is set)");
   } else {
     const db = await openLibraryDb();

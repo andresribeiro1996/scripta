@@ -24,8 +24,8 @@ export interface AuthService {
    *  logs in the same account. */
   login(identifier: string, password: string): Promise<{ user: AuthenticatedUser; tokens: TokenPair }>;
   refresh(refreshToken: string): Promise<TokenPair>;
-  logout(refreshToken: string): void;
-  logoutEverywhere(userId: string): void;
+  logout(refreshToken: string): Promise<void>;
+  logoutEverywhere(userId: string): Promise<void>;
   loginWithGoogle(profile: { googleId: string; email: string }): Promise<{ user: AuthenticatedUser; tokens: TokenPair }>;
   /** Claims a username for an already-authenticated user — the path a
    *  Google sign-in without one yet uses on its first login. Works
@@ -46,7 +46,7 @@ export function createAuthService(repo: AuthRepository): AuthService {
   async function issueTokenPair(user: UserRow): Promise<TokenPair> {
     const accessToken = signAccessToken(user);
     const refreshToken = generateRefreshToken();
-    repo.insertRefreshToken({
+    await repo.insertRefreshToken({
       userId: user.id,
       tokenHash: hashRefreshToken(refreshToken),
       expiresAt: refreshTokenExpiry()
@@ -58,21 +58,21 @@ export function createAuthService(repo: AuthRepository): AuthService {
     async signup(email, username, password) {
       const normalizedEmail = email.trim().toLowerCase();
       const normalizedUsername = normalizeUsername(username);
-      if (repo.findUserByEmail(normalizedEmail)) {
+      if (await repo.findUserByEmail(normalizedEmail)) {
         throw new EmailInUseError(normalizedEmail);
       }
-      if (repo.findUserByUsername(normalizedUsername)) {
+      if (await repo.findUserByUsername(normalizedUsername)) {
         throw new UsernameInUseError(normalizedUsername);
       }
       const passwordHash = await argon2.hash(password);
-      const user = repo.createUser({ email: normalizedEmail, username: normalizedUsername, passwordHash, googleId: null });
+      const user = await repo.createUser({ email: normalizedEmail, username: normalizedUsername, passwordHash, googleId: null });
       const tokens = await issueTokenPair(user);
       return { user: toAuthenticatedUser(user), tokens };
     },
 
     async login(identifier, password) {
       const normalized = identifier.trim().toLowerCase();
-      const user = repo.findUserByEmail(normalized) ?? repo.findUserByUsername(normalized);
+      const user = await repo.findUserByEmail(normalized) ?? await repo.findUserByUsername(normalized);
       // Same error for "no such user" and "wrong password" — don't leak
       // which one it was, that's an account-enumeration side channel.
       if (!user || !user.password_hash) {
@@ -94,29 +94,29 @@ export function createAuthService(repo: AuthRepository): AuthService {
      *  everywhere. */
     async refresh(refreshToken) {
       const tokenHash = hashRefreshToken(refreshToken);
-      const row = repo.findRefreshTokenByHash(tokenHash);
+      const row = await repo.findRefreshTokenByHash(tokenHash);
 
       if (!row) throw new InvalidRefreshTokenError();
 
       if (row.revoked_at || new Date(row.expires_at) < new Date()) {
-        if (row.revoked_at) repo.revokeAllRefreshTokensForUser(row.user_id);
+        if (row.revoked_at) await repo.revokeAllRefreshTokensForUser(row.user_id);
         throw new InvalidRefreshTokenError();
       }
 
-      const user = repo.findUserById(row.user_id);
+      const user = await repo.findUserById(row.user_id);
       if (!user) throw new InvalidRefreshTokenError();
 
-      repo.revokeRefreshToken(row.id);
+      await repo.revokeRefreshToken(row.id);
       return issueTokenPair(user);
     },
 
-    logout(refreshToken) {
-      const row = repo.findRefreshTokenByHash(hashRefreshToken(refreshToken));
-      if (row) repo.revokeRefreshToken(row.id);
+    async logout(refreshToken) {
+      const row = await repo.findRefreshTokenByHash(hashRefreshToken(refreshToken));
+      if (row) await repo.revokeRefreshToken(row.id);
     },
 
-    logoutEverywhere(userId) {
-      repo.revokeAllRefreshTokensForUser(userId);
+    async logoutEverywhere(userId) {
+      await repo.revokeAllRefreshTokensForUser(userId);
     },
 
     /** Find-or-create for a Google profile. If the email already has a
@@ -130,18 +130,18 @@ export function createAuthService(repo: AuthRepository): AuthService {
     async loginWithGoogle(profile) {
       const normalizedEmail = profile.email.trim().toLowerCase();
 
-      let user = repo.findUserByGoogleId(profile.googleId);
+      let user = await repo.findUserByGoogleId(profile.googleId);
 
       if (!user) {
-        const byEmail = repo.findUserByEmail(normalizedEmail);
+        const byEmail = await repo.findUserByEmail(normalizedEmail);
         if (byEmail) {
           if (byEmail.google_id && byEmail.google_id !== profile.googleId) {
             throw new OAuthAccountConflictError(normalizedEmail);
           }
-          repo.linkGoogleId(byEmail.id, profile.googleId);
+          await repo.linkGoogleId(byEmail.id, profile.googleId);
           user = { ...byEmail, google_id: profile.googleId };
         } else {
-          user = repo.createUser({ email: normalizedEmail, username: null, passwordHash: null, googleId: profile.googleId });
+          user = await repo.createUser({ email: normalizedEmail, username: null, passwordHash: null, googleId: profile.googleId });
         }
       }
 
@@ -151,12 +151,12 @@ export function createAuthService(repo: AuthRepository): AuthService {
 
     async setUsername(userId, username) {
       const normalizedUsername = normalizeUsername(username);
-      const existing = repo.findUserByUsername(normalizedUsername);
+      const existing = await repo.findUserByUsername(normalizedUsername);
       if (existing && existing.id !== userId) {
         throw new UsernameInUseError(normalizedUsername);
       }
-      repo.setUsername(userId, normalizedUsername);
-      const user = repo.findUserById(userId);
+      await repo.setUsername(userId, normalizedUsername);
+      const user = await repo.findUserById(userId);
       // Shouldn't happen — this is only reachable via authGuard, which
       // already proved the caller's id exists — but fail loudly rather
       // than silently return something wrong if it ever does.

@@ -15,8 +15,12 @@ import type { FastifyInstance } from "fastify";
 import { readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { env, googleOAuthConfigured, isProduction } from "../../config/env.js";
+import { env, googleOAuthConfigured, isProduction, usePostgres } from "../../config/env.js";
 import { createSqliteAuthRepository } from "./adapters/sqlite/sqliteAuthRepository.js";
+import { createPgAuthRepository } from "./adapters/postgres/pgAuthRepository.js";
+import { initAuthSchema } from "./adapters/postgres/connection.js";
+import { getPool } from "../../shared/postgres/pool.js";
+import type { AuthRepository } from "./domain/ports.js";
 import { openAuthDb } from "./adapters/sqlite/connection.js";
 import { buildAuthRoutes } from "./routes.js";
 import { createAuthService } from "./service.js";
@@ -38,8 +42,25 @@ const GOOGLE_OAUTH_ENDPOINTS = {
 
 export async function authPlugin(app: FastifyInstance) {
   // --- composition: swap this one block to change storage technology ---
-  const db = openAuthDb();
-  const authRepository = createSqliteAuthRepository(db);
+  //
+  // Postgres when DATABASE_URL is set, SQLite otherwise — the same single
+  // decision every other module makes. Accounts and refresh tokens were
+  // the last thing keeping user data on local disk.
+  let authRepository: AuthRepository;
+
+  if (usePostgres) {
+    const pool = getPool();
+    await initAuthSchema(pool);
+    authRepository = createPgAuthRepository(pool);
+    app.log.info("[auth] using Postgres (DATABASE_URL is set)");
+  } else {
+    const db = openAuthDb();
+    authRepository = createSqliteAuthRepository(db);
+    app.addHook("onClose", async () => {
+      db.close();
+    });
+  }
+
   const authService = createAuthService(authRepository);
   // -----------------------------------------------------------------------
 

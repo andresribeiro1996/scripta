@@ -57,13 +57,13 @@ const envSchema = z.object({
   // somewhere else.
   FRONTEND_URL: z.string().url().default("http://localhost:5173"),
 
-  // --- library storage: Postgres when set, SQLite otherwise -------------
+  // --- database: Postgres when set, SQLite otherwise --------------------
   //
-  // The library module picks its adapter on this alone (see
-  // modules/library/plugin.ts). Everything else — auth, gallery, covers,
-  // socials — is still SQLite-only; library went first because it is the
-  // one whose data model made a single machine a hard ceiling. See
-  // docs/DEPLOYMENT-PLAN.md phase 3.
+  // Every module that HAS a Postgres adapter picks it on this variable
+  // alone. `library` and `auth` do; `gallery`, `covers` and `socials` are
+  // still SQLite-only, so a deployment with this set STILL needs a volume
+  // for those three and still cannot run more than one instance. See
+  // docs/DEPLOYMENT-PLAN.md.
   //
   // Migrating an existing SQLite deployment: scripts/sqlite-to-postgres.mjs.
   DATABASE_URL: z.string().optional().default(""),
@@ -206,9 +206,12 @@ export const env = parsed.data;
 
 export const isProduction = env.NODE_ENV === "production";
 
-/** Whether the library module should use Postgres rather than SQLite.
- *  One variable, one decision — see modules/library/plugin.ts. */
-export const usePostgresLibrary = env.DATABASE_URL !== "";
+/** Whether the modules that HAVE a Postgres adapter should use it rather
+ *  than SQLite. One variable, one decision, applied by each module's own
+ *  plugin.ts. Not every module has one yet — see docs/DEPLOYMENT-PLAN.md
+ *  for which are still SQLite-only, because that is what decides whether
+ *  the deployment still needs a volume. */
+export const usePostgres = env.DATABASE_URL !== "";
 
 /** Whether gallery uploads and the cover cache live in object storage
  *  rather than on local disk. One variable, one decision — see each
