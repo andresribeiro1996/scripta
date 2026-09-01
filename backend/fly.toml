@@ -32,7 +32,7 @@
 # setting up Neon and R2. Same as above minus DATABASE_URL and the four
 # S3_* secrets, plus a volume, and keep the [[mounts]] block:
 #
-#   fly volumes create atmyshelf_data --size 3 --region lhr
+#   fly volumes create atmyshelf_data --size 3 --region fra
 #
 # That is a real deployment, not a lesser one — it just cannot run more
 # than one machine, and the database is only as safe as the backup
@@ -51,12 +51,21 @@
 
 app = "atmyshelf-api"
 
-# London. Change this before the first deploy if your users are not in
-# Europe — with a single machine, every request pays the round trip. It
-# must match the region the volume is created in (local-disk path), and
-# ideally the region the Neon database is in (managed path), since every
-# request makes several database round trips.
-primary_region = "lhr"
+# Frankfurt. Users are in Europe, and within Europe the choice is about
+# jurisdiction rather than latency: fra/ams/cdg are all within a few ms
+# of each other, but London is outside the EU, so keeping the machine in
+# an EU region avoids ever having to reason about UK adequacy for what
+# is, legally, other people's personal data.
+#
+# Keep the database and the bucket in the same place — Neon's
+# aws-eu-central-1 is Frankfurt too, and R2 buckets take an EU
+# jurisdiction that can only be set when the bucket is CREATED. Every
+# request makes several database round trips, so a database on another
+# continent is felt on every page.
+#
+# On the local-disk path this must match the volume's region exactly:
+# a volume in one region cannot attach to a machine in another.
+primary_region = "fra"
 
 [build]
   dockerfile = "Dockerfile"

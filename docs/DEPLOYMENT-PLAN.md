@@ -391,7 +391,13 @@ the hostname, which is why that was settled first.
 commands is at the top of `backend/fly.toml`; the order matters more than the
 commands do:
 
-1. Create the Neon database and the R2 bucket, so their credentials exist.
+1. Create the Neon database and the R2 bucket, so their credentials exist. Put
+   both in the EU, alongside the Fly machine (`primary_region = "fra"`): Neon's
+   `aws-eu-central-1` is Frankfurt, and R2 takes an EU jurisdiction that can
+   only be chosen **when the bucket is created** — moving a bucket afterwards
+   means copying every object. Users are in Europe, and within Europe this is a
+   jurisdiction choice rather than a latency one; London would work just as fast
+   but sits outside the EU.
 2. Generate the three secrets into a password manager (below), then
    `fly apps create` and `fly secrets set` — all of them, in one call, before
    the first deploy. The app validates its whole environment at boot and exits
