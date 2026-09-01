@@ -24,15 +24,17 @@ export interface CoverLookupPort {
 // reason: SQLite backing the former and the filesystem backing the
 // latter shouldn't have to pretend to be the same port.
 export interface CoverCacheRepository {
-  getByCacheKey(cacheKey: string): CachedCoverRow | undefined;
+  getByCacheKey(cacheKey: string): Promise<CachedCoverRow | undefined>;
   /** Returns `true` if this call actually inserted the row, `false` if a
    *  concurrent call for the same `cache_key` already won that race —
    *  see the SQLite adapter's own comment for why this can genuinely
    *  happen and isn't a bug when it does. */
-  insert(row: CachedCoverRow): boolean;
+  insert(row: CachedCoverRow): Promise<boolean>;
 }
 
+// Async for the same reason gallery's own ImageBlobStore is — see that
+// port's comment.
 export interface CoverBlobStore {
-  save(id: string, extension: string, bytes: Buffer): void;
-  read(id: string, extension: string): Buffer | null;
+  save(id: string, extension: string, bytes: Buffer): Promise<void>;
+  read(id: string, extension: string): Promise<Buffer | null>;
 }

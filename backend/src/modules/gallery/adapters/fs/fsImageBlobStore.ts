@@ -16,21 +16,23 @@ function pathFor(root: string, userId: string, id: string, extension: string): s
   return join(root, userId, `${id}.${extension}`);
 }
 
+// Declared async to satisfy the port; nothing here awaits, since node:fs's
+// sync API is what this adapter uses. See domain/ports.ts.
 export function createFsImageBlobStore(root: string): ImageBlobStore {
   return {
-    save(userId, id, extension, bytes) {
+    async save(userId, id, extension, bytes) {
       const path = pathFor(root, userId, id, extension);
       mkdirSync(join(root, userId), { recursive: true });
       writeFileSync(path, bytes);
     },
 
-    read(userId, id, extension) {
+    async read(userId, id, extension) {
       const path = pathFor(root, userId, id, extension);
       if (!existsSync(path)) return null;
       return readFileSync(path);
     },
 
-    delete(userId, id, extension) {
+    async delete(userId, id, extension) {
       const path = pathFor(root, userId, id, extension);
       // force: true — deleting a row whose file is already gone (e.g. a
       // previous delete that saved the DB write but crashed before this)

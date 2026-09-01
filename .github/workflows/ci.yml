@@ -1,0 +1,177 @@
+# The gate. Runs on every push and pull request.
+#
+# This exists because nothing previously stopped a type error — or a build
+# that produces an unbootable dist/ — from reaching main. The build step is
+# not redundant with typecheck: `tsc` compiling cleanly says nothing about
+# whether the runtime assets each module reads from disk made it into
+# dist/, which is exactly the failure that made `npm start` impossible
+# before scripts/copy-assets.mjs existed.
+
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+# A newer push to the same branch makes the in-flight run pointless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend
+    runs-on: ubuntu-latest
+
+    # The library module has two adapters behind one port, and they are
+    # only interchangeable if both are actually exercised — so the suite
+    # runs against a real Postgres here rather than skipping those tests.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: atmyshelf
+          POSTGRES_PASSWORD: atmyshelf
+          POSTGRES_DB: atmyshelf_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U atmyshelf"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Pinned to the same minor the Dockerfile runs, because
+          # node:sqlite is still experimental — testing on a different
+          # Node than production ships is testing a different database
+          # layer.
+          node-version: "22.22.2"
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - run: npm ci
+        working-directory: backend
+
+      - run: npm run typecheck
+        working-directory: backend
+
+      - name: Test
+        run: npm test
+        working-directory: backend
+        env:
+          # Present, so the Postgres adapter tests run rather than skip.
+          TEST_DATABASE_URL: postgres://atmyshelf:atmyshelf@127.0.0.1:5432/atmyshelf_test
+
+      - name: Build
+        run: npm run build
+        working-directory: backend
+
+      - name: Verify the compiled output actually boots
+        # The build succeeding is not the same as the artifact being
+        # runnable — the whole class of bug this guards is "dist/ compiled
+        # fine and then died at boot on a missing schema.sql".
+        working-directory: backend
+        env:
+          PORT: "3000"
+          NODE_ENV: production
+          AUTH_DB_PATH: ./ci-data/auth.sqlite
+          LIBRARY_DB_PATH: ./ci-data/library.sqlite
+          GALLERY_DB_PATH: ./ci-data/gallery.sqlite
+          COVERS_DB_PATH: ./ci-data/covers.sqlite
+          SOCIALS_DB_PATH: ./ci-data/socials.sqlite
+          GALLERY_STORAGE_PATH: ./ci-data/gallery-files
+          COVERS_STORAGE_PATH: ./ci-data/covers-files
+          JWT_ACCESS_SECRET: ci-only-access-secret-not-a-real-credential-000000
+          JWT_REFRESH_SECRET: ci-only-refresh-secret-not-a-real-credential-00000
+        run: |
+          node dist/server.js &
+          SERVER_PID=$!
+          for _ in $(seq 1 40); do
+            curl -sf http://127.0.0.1:3000/health && break
+            sleep 0.5
+          done
+          curl -sf http://127.0.0.1:3000/health || { echo "server never became healthy"; kill $SERVER_PID; exit 1; }
+          # Production build must not expose the auth test console.
+          STATUS=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/auth/console)
+          kill $SERVER_PID
+          if [ "$STATUS" != "404" ]; then
+            echo "/auth/console returned $STATUS in a production build — it must not be registered"
+            exit 1
+          fi
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.22.2"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+        working-directory: frontend
+
+      - run: npm run lint
+        working-directory: frontend
+
+      - run: npm run typecheck
+        working-directory: frontend
+
+      - name: Build
+        # VITE_API_URL is baked into the bundle at build time, and the
+        # build fails without it by design (see vite.config.ts) — a
+        # placeholder is enough to prove the build works; the deploy
+        # workflow supplies the real one.
+        env:
+          VITE_API_URL: https://api.example.invalid
+        run: npm run build
+        working-directory: frontend
+
+  docker:
+    name: Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build the API image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          push: false
+          load: true
+          tags: atmyshelf-api:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verify the image boots and serves /health
+        # sharp ships platform-specific native binaries, so "it compiled"
+        # and "it runs in this image" are genuinely different claims.
+        run: |
+          docker run -d --name atmyshelf-ci -p 3000:3000 \
+            -e JWT_ACCESS_SECRET=ci-only-access-secret-not-a-real-credential-000000 \
+            -e JWT_REFRESH_SECRET=ci-only-refresh-secret-not-a-real-credential-00000 \
+            atmyshelf-api:ci
+          for _ in $(seq 1 60); do
+            curl -sf http://127.0.0.1:3000/health && break
+            sleep 1
+          done
+          if ! curl -sf http://127.0.0.1:3000/health; then
+            echo "--- container logs ---"
+            docker logs atmyshelf-ci
+            exit 1
+          fi
+          docker rm -f atmyshelf-ci

@@ -18,12 +18,90 @@ const durationString = z
 const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
 
+  // Gates anything that must not exist on a public deployment — currently
+  // auth's browser test console (see modules/auth/plugin.ts). Defaults to
+  // development so a contributor's checkout keeps the dev affordances
+  // without configuring anything; a deployment sets this to "production".
+  NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+
+  // Whether to believe X-Forwarded-For, and how far. Every managed host
+  // puts a proxy in front of the app, and without this `request.ip` is the
+  // PROXY's address for every request — so all four per-module rate
+  // limiters collapse into one shared bucket and the login brute-force
+  // protection stops protecting anything.
+  //
+  // Deliberately NOT hardcoded to true: trusting the header when there is
+  // NO proxy in front is the mirror-image bug, letting any client spoof
+  // its own IP and skip the rate limiter by setting X-Forwarded-For
+  // itself. So this is explicit per deployment. Accepted values:
+  //   "false" (default)  — direct exposure, use the socket address
+  //   "true"             — behind a trusted proxy that sets the header
+  //   "10.0.0.0/8,..."   — comma-separated trusted IPs/CIDRs (strictest)
+  //
+  // A bare hop COUNT is deliberately not offered: Fastify treats a numeric
+  // trustProxy as fail-closed (it cannot validate the immediate peer, so it
+  // trusts nothing), which would silently leave a deployment that set
+  // TRUST_PROXY=1 with no proxy trust at all — the exact bug this variable
+  // exists to prevent, now harder to spot. A digits-only value is rejected
+  // at boot rather than quietly misbehaving.
+  TRUST_PROXY: z
+    .string()
+    .default("false")
+    .refine(
+      (v) => !/^\d+$/.test(v.trim()),
+      'a proxy hop count is not supported — use "true", or a comma-separated list of trusted proxy IPs/CIDRs'
+    ),
+
   // The frontend's origin, for CORS — see app.ts. A dev Vite server
   // defaults to 5173; change this once the frontend is actually deployed
   // somewhere else.
   FRONTEND_URL: z.string().url().default("http://localhost:5173"),
 
+  // --- database: Postgres when set, SQLite otherwise --------------------
+  //
+  // All five modules have a Postgres adapter and pick it on this variable
+  // alone. With this AND S3_BUCKET set the app writes nothing durable to
+  // local disk, so it needs no volume and can run more than one instance.
+  // With EITHER missing it still writes to disk — see
+  // docs/DEPLOYMENT-PLAN.md, and the [[mounts]] warning in fly.toml.
+  //
+  // Migrating an existing SQLite deployment: scripts/sqlite-to-postgres.mjs.
+  DATABASE_URL: z.string().optional().default(""),
+  // "on" (default, verify the certificate) | "no-verify" (encrypted but
+  // unverified — some managed providers present a chain the container has
+  // no root for) | "off" (no TLS at all; local development only).
+  DATABASE_SSL: z.enum(["on", "no-verify", "off"]).default("on"),
+  DATABASE_POOL_MAX: z.coerce.number().int().positive().max(100).default(10),
+
+  // --- blob storage: object storage when set, local disk otherwise -----
+  //
+  // Gallery uploads and the resolved-cover cache. Set S3_BUCKET and both
+  // move to object storage; leave it blank and nothing changes.
+  //
+  // This is the OTHER thing pinning the API to one machine — Postgres
+  // alone does not free it, because blobs on local disk mean the container
+  // can only run in one place. Written against the S3 API, so Cloudflare
+  // R2 (recommended: zero egress, and covers are served on every page
+  // view), Backblaze B2, MinIO or AWS S3 all work.
+  S3_BUCKET: z.string().optional().default(""),
+  // R2 and MinIO need an explicit endpoint; real AWS S3 infers one from
+  // the region, so leave this blank there.
+  S3_ENDPOINT: z.string().optional().default(""),
+  // R2 ignores the region but the SDK requires one; "auto" is what
+  // Cloudflare's own documentation uses.
+  S3_REGION: z.string().default("auto"),
+  S3_ACCESS_KEY_ID: z.string().optional().default(""),
+  S3_SECRET_ACCESS_KEY: z.string().optional().default(""),
+  // Bucket in the path rather than the hostname. Required by R2 and
+  // MinIO; harmless on AWS.
+  S3_FORCE_PATH_STYLE: z
+    .string()
+    .default("true")
+    .transform((v) => v.toLowerCase() !== "false"),
+
   AUTH_DB_PATH: z.string().min(1),
+  // Ignored when DATABASE_URL is set. Still required, so that switching
+  // to Postgres and back doesn't need config archaeology.
   LIBRARY_DB_PATH: z.string().min(1),
   GALLERY_DB_PATH: z.string().min(1),
   // Where uploaded images are actually stored on disk, one subdirectory
@@ -125,6 +203,47 @@ if (!parsed.success) {
 }
 
 export const env = parsed.data;
+
+export const isProduction = env.NODE_ENV === "production";
+
+/** Whether the five modules use Postgres rather than SQLite. One
+ *  variable, one decision, applied by each module's own plugin.ts. All
+ *  five have an adapter, so this alone moves every table off local disk;
+ *  blobs need S3_BUCKET as well before the deployment can drop its
+ *  volume. */
+export const usePostgres = env.DATABASE_URL !== "";
+
+/** Whether gallery uploads and the cover cache live in object storage
+ *  rather than on local disk. One variable, one decision — see each
+ *  module's plugin.ts. Credentials are checked alongside the bucket so a
+ *  half-configured deployment fails at boot rather than on the first
+ *  upload. */
+export const useObjectStorage = env.S3_BUCKET !== "";
+
+if (useObjectStorage && (env.S3_ACCESS_KEY_ID === "" || env.S3_SECRET_ACCESS_KEY === "")) {
+  // Deliberately fatal rather than a warning: a bucket configured without
+  // credentials would fail on the first upload a real user attempted,
+  // which is a far worse place to discover it than boot.
+  console.error("S3_BUCKET is set but S3_ACCESS_KEY_ID/S3_SECRET_ACCESS_KEY are not — object storage cannot be used without credentials.");
+  process.exit(1);
+}
+
+/** Parses TRUST_PROXY into the shape Fastify's own `trustProxy` option
+ *  expects: a boolean, or a list of trusted IPs/CIDRs. Exported separately
+ *  from the resolved value below so it can be tested against real Fastify
+ *  behaviour without re-importing this module under a different
+ *  environment. See the variable's own comment above. */
+export function parseTrustProxy(raw: string): boolean | string[] {
+  const trimmed = raw.trim();
+  if (trimmed === "" || trimmed.toLowerCase() === "false") return false;
+  if (trimmed.toLowerCase() === "true") return true;
+  return trimmed
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry !== "");
+}
+
+export const trustProxy = parseTrustProxy(env.TRUST_PROXY);
 
 // Google OAuth is optional — the module runs fine as email/password-only
 // if these are left blank, it just skips registering the Google routes.

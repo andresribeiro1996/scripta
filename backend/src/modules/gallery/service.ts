@@ -50,20 +50,21 @@ function toGalleryImage(row: GalleryImageRow, publicUrlFor: (id: string) => stri
 }
 
 export interface GalleryService {
-  listImages(userId: string): GalleryImage[];
+  listImages(userId: string): Promise<GalleryImage[]>;
   uploadImage(userId: string, buffer: Buffer, originalFilename: string): Promise<GalleryImage>;
   /** Returns false if no image with that id was owned by this user (a
    *  caller-facing 404, not a server error). */
-  deleteImage(userId: string, id: string): boolean;
+  deleteImage(userId: string, id: string): Promise<boolean>;
   /** No ownership check — see domain/ports.ts's getImageById for why:
    *  this backs the public GET /gallery/:id/file route. */
-  getImageFile(id: string): { buffer: Buffer; mimeType: string } | null;
+  getImageFile(id: string): Promise<{ buffer: Buffer; mimeType: string } | null>;
 }
 
 export function createGalleryService(repo: GalleryRepository, blobStore: ImageBlobStore, publicUrlFor: (id: string) => string): GalleryService {
   return {
-    listImages(userId) {
-      return repo.listImages(userId).map((row) => toGalleryImage(row, publicUrlFor));
+    async listImages(userId) {
+      const rows = await repo.listImages(userId);
+      return rows.map((row) => toGalleryImage(row, publicUrlFor));
     },
 
     async uploadImage(userId, buffer, originalFilename) {
@@ -93,7 +94,7 @@ export function createGalleryService(repo: GalleryRepository, blobStore: ImageBl
       // already-over-quota account fails fast. Re-checked against the
       // real output size right after, since the re-encoded size isn't
       // known until the encode actually runs.
-      const usedBytes = repo.totalBytesForUser(userId);
+      const usedBytes = await repo.totalBytesForUser(userId);
       if (usedBytes >= MAX_USER_QUOTA_BYTES) throw new QuotaExceededError(MAX_USER_QUOTA_BYTES);
 
       // .rotate() with no args applies the EXIF orientation tag before
@@ -122,23 +123,23 @@ export function createGalleryService(repo: GalleryRepository, blobStore: ImageBl
         created_at: new Date().toISOString()
       };
 
-      blobStore.save(userId, id, OUTPUT_EXTENSION, encoded.data);
-      repo.insertImage(row);
+      await blobStore.save(userId, id, OUTPUT_EXTENSION, encoded.data);
+      await repo.insertImage(row);
       return toGalleryImage(row, publicUrlFor);
     },
 
-    deleteImage(userId, id) {
-      const row = repo.getOwnedImage(id, userId);
+    async deleteImage(userId, id) {
+      const row = await repo.getOwnedImage(id, userId);
       if (!row) return false;
-      repo.deleteImage(id, userId);
-      blobStore.delete(row.user_id, row.id, row.extension);
+      await repo.deleteImage(id, userId);
+      await blobStore.delete(row.user_id, row.id, row.extension);
       return true;
     },
 
-    getImageFile(id) {
-      const row = repo.getImageById(id);
+    async getImageFile(id) {
+      const row = await repo.getImageById(id);
       if (!row) return null;
-      const buffer = blobStore.read(row.user_id, row.id, row.extension);
+      const buffer = await blobStore.read(row.user_id, row.id, row.extension);
       if (!buffer) return null;
       return { buffer, mimeType: row.mime_type };
     }

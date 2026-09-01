@@ -43,7 +43,7 @@ export interface ResolveCoverParams {
 
 export interface CoversService {
   resolveCover(params: ResolveCoverParams): Promise<{ url: string | null }>;
-  getCachedCoverFile(id: string): { buffer: Buffer; mimeType: string } | null;
+  getCachedCoverFile(id: string): Promise<{ buffer: Buffer; mimeType: string } | null>;
 }
 
 interface Candidate {
@@ -105,7 +105,7 @@ export function createCoversService(
       const cacheKey = isbn ? `isbn:${isbn}` : imageId ? `kobo:${imageId}` : null;
 
       if (cacheKey) {
-        const cached = cacheRepo.getByCacheKey(cacheKey);
+        const cached = await cacheRepo.getByCacheKey(cacheKey);
         if (cached) return { url: publicUrlFor(cached.id) };
       }
 
@@ -149,8 +149,8 @@ export function createCoversService(
           byte_size: reencoded.data.byteLength,
           created_at: new Date().toISOString()
         };
-        blobStore.save(id, OUTPUT_EXTENSION, reencoded.data);
-        const wonRace = cacheRepo.insert(row);
+        await blobStore.save(id, OUTPUT_EXTENSION, reencoded.data);
+        const wonRace = await cacheRepo.insert(row);
         // Lost a race to a concurrent request resolving this exact same
         // book (see the SQLite adapter's own comment) — the blob we just
         // saved under OUR OWN id is now a harmless orphan (no DB row
@@ -160,20 +160,20 @@ export function createCoversService(
         // Every caller needs to converge on the SAME served URL
         // regardless of which concurrent request happened to finish
         // first, so read back whichever row actually won.
-        const winningId = wonRace ? id : cacheRepo.getByCacheKey(cacheKey)!.id;
+        const winningId = wonRace ? id : (await cacheRepo.getByCacheKey(cacheKey))!.id;
         return { url: publicUrlFor(winningId) };
       }
 
       return { url: null };
     },
 
-    getCachedCoverFile(id) {
+    async getCachedCoverFile(id) {
       // No metadata lookup needed first (unlike gallery's getImageFile,
       // which reads the row for its user_id/extension) — every cached
       // cover here is written with the same fixed OUTPUT_EXTENSION/
       // OUTPUT_MIME_TYPE, so the file's own existence is the only real
       // question.
-      const buffer = blobStore.read(id, OUTPUT_EXTENSION);
+      const buffer = await blobStore.read(id, OUTPUT_EXTENSION);
       if (!buffer) return null;
       return { buffer, mimeType: OUTPUT_MIME_TYPE };
     }

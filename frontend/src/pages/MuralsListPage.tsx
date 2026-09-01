@@ -6,7 +6,7 @@ import { CoverPickerModal } from "../components/CoverPickerModal";
 import { OptionsMenu } from "../components/OptionsMenu";
 import { PageContainer } from "../components/PageContainer";
 import { useLibrary } from "../hooks/useLibrary";
-import { clearMuralCover, createMural, deleteMural, renameMural, setMuralCover, type Mural } from "../lib/murals";
+import { clearMuralCover, createMural, renameMural, setMuralCover, type Mural, newMuralId } from "../lib/murals";
 import { resolveLibraryStyle } from "../lib/libraryStyle";
 
 // Field + direction combined into one option each, rather than two
@@ -31,7 +31,7 @@ const SORT_OPTIONS: Array<{ value: SortBy; label: string }> = [
  *  its own full page rather than an inline expandable section — a
  *  freeform canvas needs real room. */
 export function MuralsListPage() {
-  const { data: library, isLoading, updateLibrary } = useLibrary();
+  const { data: library, isLoading, addMural, saveMural, removeMural } = useLibrary();
   const navigate = useNavigate();
   const confirm = useConfirm();
   const style = resolveLibraryStyle(library?.data.style);
@@ -71,9 +71,13 @@ export function MuralsListPage() {
       // uses. Straight into the new mural afterward, same as before:
       // creating one with nothing to build on isn't useful on its own, so
       // skip the extra click back here.
-      const saved = await updateLibrary((data) => ({ ...data, murals: createMural(data.murals ?? [], "Untitled mural") }));
-      const created = saved.data.murals?.[saved.data.murals.length - 1] as Mural | undefined;
-      if (created) navigate(`/dashboard/murals/${created.id}`);
+      // The id has to be known here to navigate into the new mural, so
+      // it is generated up front rather than read back off the response —
+      // which also makes the create idempotent if a version conflict
+      // forces a retry.
+      const createdId = newMuralId();
+      await addMural((murals) => createMural(murals, "Untitled mural", createdId));
+      navigate(`/dashboard/murals/${createdId}`);
     } finally {
       setCreating(false);
     }
@@ -83,20 +87,20 @@ export function MuralsListPage() {
     const name = editingName.trim();
     setEditingId(null);
     if (!name) return;
-    await updateLibrary((data) => ({ ...data, murals: renameMural(data.murals ?? [], id, name) }));
+    await saveMural(id, (murals) => renameMural(murals, id, name));
   }
 
   async function handleDelete(mural: Mural) {
     if (!(await confirm({ title: `Delete "${mural.name}"?`, body: "This can't be undone." }))) return;
-    await updateLibrary((data) => ({ ...data, murals: deleteMural(data.murals ?? [], mural.id) }));
+    await removeMural(mural.id);
   }
 
   async function handleSaveMuralCover(muralId: string, image: GalleryImage) {
-    await updateLibrary((data) => ({ ...data, murals: setMuralCover(data.murals ?? [], muralId, image.id, image.url) }));
+    await saveMural(muralId, (murals) => setMuralCover(murals, muralId, image.id, image.url));
   }
 
   async function handleRemoveMuralCover(muralId: string) {
-    await updateLibrary((data) => ({ ...data, murals: clearMuralCover(data.murals ?? [], muralId) }));
+    await saveMural(muralId, (murals) => clearMuralCover(murals, muralId));
   }
 
   const coverMural = coverMuralId ? murals.find((m) => m.id === coverMuralId) : null;

@@ -10,7 +10,8 @@
 
 import fastifyCors from "@fastify/cors";
 import Fastify from "fastify";
-import { env } from "./config/env.js";
+import { env, trustProxy, usePostgres } from "./config/env.js";
+import { closePool } from "./shared/postgres/pool.js";
 import { registerAuthModule } from "./modules/auth/index.js";
 import { registerCoversModule } from "./modules/covers/index.js";
 import { registerGalleryModule } from "./modules/gallery/index.js";
@@ -18,7 +19,10 @@ import { registerLibraryModule } from "./modules/library/index.js";
 import { registerSocialsModule } from "./modules/socials/index.js";
 
 export function buildApp() {
-  const app = Fastify({ logger: true });
+  // trustProxy decides what `request.ip` means, which is what every
+  // module's rate limiter keys on — see config/env.ts's TRUST_PROXY for
+  // why it is configured per deployment rather than hardcoded either way.
+  const app = Fastify({ logger: true, trustProxy });
 
   // Genuinely app-wide (unlike each module's own rate limiter) — the
   // frontend is a separate origin from this API in dev (Vite on 5173,
@@ -30,6 +34,17 @@ export function buildApp() {
   });
 
   app.get("/health", async () => ({ status: "ok" }));
+
+  // One pool serves every Postgres-backed module (see
+  // shared/postgres/pool.ts), so it is closed once here rather than by
+  // each module. Without this a rolling deploy leaves connections held
+  // until the provider times them out, and a small managed Postgres has
+  // few to spare.
+  if (usePostgres) {
+    app.addHook("onClose", async () => {
+      await closePool();
+    });
+  }
 
   app.register(registerAuthModule);
   app.register(registerLibraryModule);

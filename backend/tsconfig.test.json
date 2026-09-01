@@ -1,0 +1,18 @@
+{
+  // The main tsconfig compiles src/ into dist/ and deliberately excludes
+  // test/ — test files must not ship in the build output. But that left
+  // the test suite completely untypechecked, which hid real errors (a
+  // missing `await` still "compiles" when nothing is looking).
+  //
+  // This config typechecks both, emitting nothing. `npm run typecheck`
+  // runs it; the build still uses tsconfig.json alone.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    // The base config sets rootDir to src/ so dist/ mirrors it exactly.
+    // Widening it here (rather than emitting) lets test/ join the program
+    // without changing what the build produces.
+    "rootDir": "."
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts"]
+}

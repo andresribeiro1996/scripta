@@ -8,6 +8,8 @@ import type { DatabaseSync } from "node:sqlite";
 import type { AuthRepository } from "../../domain/ports.js";
 import type { RefreshTokenRow, UserRow } from "../../domain/types.js";
 
+// Every method is declared async to satisfy the port; nothing here
+// awaits, since node:sqlite is a synchronous API. See domain/ports.ts.
 export function createSqliteAuthRepository(db: DatabaseSync): AuthRepository {
   const insertUserStmt = db.prepare(
     `INSERT INTO users (id, email, username, password_hash, google_id) VALUES ($id, $email, $username, $password_hash, $google_id)`
@@ -23,13 +25,21 @@ export function createSqliteAuthRepository(db: DatabaseSync): AuthRepository {
     `INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at) VALUES ($id, $user_id, $token_hash, $expires_at)`
   );
   const findRefreshTokenByHashStmt = db.prepare(`SELECT * FROM refresh_tokens WHERE token_hash = ?`);
-  const revokeRefreshTokenStmt = db.prepare(`UPDATE refresh_tokens SET revoked_at = $revoked_at WHERE id = $id`);
+  // `AND revoked_at IS NULL` so a second revoke of the same token leaves
+  // the ORIGINAL timestamp alone. service.ts treats "already revoked" as
+  // evidence of a stolen-and-replayed token; overwriting the timestamp
+  // would keep that signal but lose when the token was first revoked,
+  // which is exactly what an incident review needs. Matches the Postgres
+  // adapter, which had the guard from the start.
+  const revokeRefreshTokenStmt = db.prepare(
+    `UPDATE refresh_tokens SET revoked_at = $revoked_at WHERE id = $id AND revoked_at IS NULL`
+  );
   const revokeAllForUserStmt = db.prepare(
     `UPDATE refresh_tokens SET revoked_at = $revoked_at WHERE user_id = $user_id AND revoked_at IS NULL`
   );
 
   return {
-    createUser(input) {
+    async createUser(input) {
       const row: UserRow = {
         id: randomUUID(),
         email: input.email,
@@ -48,31 +58,31 @@ export function createSqliteAuthRepository(db: DatabaseSync): AuthRepository {
       return row;
     },
 
-    findUserByEmail(email) {
+    async findUserByEmail(email) {
       return findByEmailStmt.get(email) as UserRow | undefined;
     },
 
-    findUserByUsername(username) {
+    async findUserByUsername(username) {
       return findByUsernameStmt.get(username) as UserRow | undefined;
     },
 
-    findUserById(id) {
+    async findUserById(id) {
       return findByIdStmt.get(id) as UserRow | undefined;
     },
 
-    findUserByGoogleId(googleId) {
+    async findUserByGoogleId(googleId) {
       return findByGoogleIdStmt.get(googleId) as UserRow | undefined;
     },
 
-    linkGoogleId(userId, googleId) {
+    async linkGoogleId(userId, googleId) {
       linkGoogleIdStmt.run(googleId, userId);
     },
 
-    setUsername(userId, username) {
+    async setUsername(userId, username) {
       setUsernameStmt.run(username, userId);
     },
 
-    insertRefreshToken(input) {
+    async insertRefreshToken(input) {
       const id = randomUUID();
       insertRefreshTokenStmt.run({
         $id: id,
@@ -83,15 +93,15 @@ export function createSqliteAuthRepository(db: DatabaseSync): AuthRepository {
       return id;
     },
 
-    findRefreshTokenByHash(tokenHash) {
+    async findRefreshTokenByHash(tokenHash) {
       return findRefreshTokenByHashStmt.get(tokenHash) as RefreshTokenRow | undefined;
     },
 
-    revokeRefreshToken(id) {
+    async revokeRefreshToken(id) {
       revokeRefreshTokenStmt.run({ $id: id, $revoked_at: new Date().toISOString() });
     },
 
-    revokeAllRefreshTokensForUser(userId) {
+    async revokeAllRefreshTokensForUser(userId) {
       revokeAllForUserStmt.run({ $user_id: userId, $revoked_at: new Date().toISOString() });
     }
   };

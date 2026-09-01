@@ -1,11 +1,12 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import type { GalleryImage } from "../api/gallery";
-import { fetchLibrary, saveLibrary, type LibraryDocument } from "../api/library";
+import { type LibraryDocument } from "../api/library";
 import { BookCard } from "../components/BookCard";
 import { BookGrid } from "../components/BookGrid";
 import { useConfirm } from "../components/ConfirmDialog";
+import { useLibrary } from "../hooks/useLibrary";
 import { CoverPickerModal } from "../components/CoverPickerModal";
 import { PageContainer } from "../components/PageContainer";
 import { PerCardStylePanel } from "../components/PerCardStylePanel";
@@ -57,10 +58,13 @@ export function LibraryPage() {
   const [importError, setImportError] = useState<string | null>(null);
   const [importStatus, setImportStatus] = useState<string | null>(null);
 
-  const { data: library, isLoading } = useQuery({
-    queryKey: ["library"],
-    queryFn: fetchLibrary
-  });
+  // Single-book edits (style, covers) go through saveBook — one book per
+  // request. updateLibrary stays for the operations that genuinely span
+  // the whole document: the import merge, the drag reorder (which can
+  // renumber every book), the library rename, and the multi-book delete
+  // that must also scrub those books out of every group and mural in the
+  // same write. See hooks/useLibrary.ts.
+  const { data: library, isLoading, updateLibrary, saveBook } = useLibrary();
 
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
@@ -78,8 +82,7 @@ export function LibraryPage() {
     const current = queryClient.getQueryData<LibraryDocument>(["library"]);
     const base = current?.data ?? library?.data ?? { books: [] };
     if ((base.name ?? "") === name) return; // unchanged — nothing to save
-    const saved = await saveLibrary({ ...base, name });
-    queryClient.setQueryData(["library"], saved);
+    await updateLibrary((data) => ({ ...data, name }));
   }
 
   async function handleFileChosen(file: File) {
@@ -93,17 +96,21 @@ export function LibraryPage() {
       // after that merges into whatever's already saved — see lib/merge.ts
       // for the actual rules (book identity across sources, the
       // keep-whichever-has-a-cover rule, highlight union, ...).
-      const merged = library ? mergeLibraryData(library.data, parsed) : parsed;
-      // Every book gets a stable `_order` the first time it's seen — the
-      // backbone of the Library grid's display order (lib/libraryOrder.ts).
-      // A book that already has one (survived a prior merge) keeps it.
-      const ordered = { ...merged, books: assignBookOrder(merged.books) };
-      // Additive series auto-seed (see lib/groups.ts) — never touches a
-      // series the user has already renamed/deleted/hand-edited, only
-      // fills in newly-appeared Series values from this import.
-      const withSeries = { ...ordered, groups: deriveSeriesGroups(ordered.books, ordered.groups ?? []) };
-      const saved = await saveLibrary(withSeries);
-      queryClient.setQueryData(["library"], saved);
+      const hasExistingLibrary = library !== null && library !== undefined;
+      // Merges against whatever the server has at save time, not a
+      // snapshot from when the file was picked — so an import that races
+      // another device's edit re-merges rather than clobbering it.
+      await updateLibrary((existing) => {
+        const merged = hasExistingLibrary ? mergeLibraryData(existing, parsed) : parsed;
+        // Every book gets a stable `_order` the first time it's seen — the
+        // backbone of the Library grid's display order (lib/libraryOrder.ts).
+        // A book that already has one (survived a prior merge) keeps it.
+        const ordered = { ...merged, books: assignBookOrder(merged.books) };
+        // Additive series auto-seed (see lib/groups.ts) — never touches a
+        // series the user has already renamed/deleted/hand-edited, only
+        // fills in newly-appeared Series values from this import.
+        return { ...ordered, groups: deriveSeriesGroups(ordered.books, ordered.groups ?? []) };
+      });
     } catch (err) {
       setImportError(err instanceof Error ? err.message : "Couldn't import that file.");
     } finally {
@@ -131,12 +138,10 @@ export function LibraryPage() {
     const optimistic: LibraryDocument = { ...current, data: { ...current.data, books: reordered } };
     updateWithViewTransition(() => queryClient.setQueryData(["library"], optimistic));
 
-    saveLibrary({ ...current.data, books: reordered })
-      .then((saved) => queryClient.setQueryData(["library"], saved))
-      .catch((err) => {
-        console.error("Failed to persist new book order:", err);
-        queryClient.setQueryData(["library"], current); // roll back the optimistic update
-      });
+    updateLibrary((data) => ({ ...data, books: reordered })).catch((err: unknown) => {
+      console.error("Failed to persist new book order:", err);
+      queryClient.setQueryData(["library"], current); // roll back the optimistic update
+    });
   }
 
   // A book's own style override — highest priority, takes effect
@@ -147,9 +152,10 @@ export function LibraryPage() {
     const current = queryClient.getQueryData<LibraryDocument>(["library"]);
     if (!current) return;
     const key = bookKey(book);
-    const updatedBooks = current.data.books.map((b) => (bookKey(b) === key ? { ...b, _style: bookStyle } : b));
-    const saved = await saveLibrary({ ...current.data, books: updatedBooks });
-    queryClient.setQueryData(["library"], saved);
+    await saveBook(
+      (b) => bookKey(b) === key,
+      (books) => books.map((b) => (bookKey(b) === key ? { ...b, _style: bookStyle } : b))
+    );
   }
 
   // Assigning/clearing a gallery image as a book's cover — see
@@ -162,18 +168,20 @@ export function LibraryPage() {
     const current = queryClient.getQueryData<LibraryDocument>(["library"]);
     if (!current) return;
     const key = bookKey(book);
-    const updatedBooks = current.data.books.map((b) => (bookKey(b) === key ? setBookCover(b, image.id, image.url) : b));
-    const saved = await saveLibrary({ ...current.data, books: updatedBooks });
-    queryClient.setQueryData(["library"], saved);
+    await saveBook(
+      (b) => bookKey(b) === key,
+      (books) => books.map((b) => (bookKey(b) === key ? setBookCover(b, image.id, image.url) : b))
+    );
   }
 
   async function handleRemoveBookCover(book: Record<string, unknown>) {
     const current = queryClient.getQueryData<LibraryDocument>(["library"]);
     if (!current) return;
     const key = bookKey(book);
-    const updatedBooks = current.data.books.map((b) => (bookKey(b) === key ? clearBookCover(b) : b));
-    const saved = await saveLibrary({ ...current.data, books: updatedBooks });
-    queryClient.setQueryData(["library"], saved);
+    await saveBook(
+      (b) => bookKey(b) === key,
+      (books) => books.map((b) => (bookKey(b) === key ? clearBookCover(b) : b))
+    );
   }
 
   // Select mode: turn it on, tap cards to build up a selection, then
@@ -209,15 +217,12 @@ export function LibraryPage() {
     ) {
       return;
     }
-    const current = queryClient.getQueryData<LibraryDocument>(["library"]);
-    if (!current) return;
-    const saved = await saveLibrary({
-      ...current.data,
-      books: current.data.books.filter((b) => !selectedKeys.has(bookKey(b))),
-      groups: removeBooksFromAllGroups(current.data.groups ?? [], selectedKeys),
-      murals: scrubBooksFromMurals(current.data.murals ?? [], selectedKeys)
-    });
-    queryClient.setQueryData(["library"], saved);
+    await updateLibrary((data) => ({
+      ...data,
+      books: data.books.filter((b) => !selectedKeys.has(bookKey(b))),
+      groups: removeBooksFromAllGroups(data.groups ?? [], selectedKeys),
+      murals: scrubBooksFromMurals(data.murals ?? [], selectedKeys)
+    }));
     setSelectedKeys(new Set());
     setSelectionMode(false);
   }

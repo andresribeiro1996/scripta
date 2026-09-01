@@ -93,7 +93,7 @@ export function buildAuthRoutes(service: AuthService) {
       if (!parsed.success) {
         return reply.code(400).send({ error: "refreshToken is required." });
       }
-      service.logout(parsed.data.refreshToken);
+      await service.logout(parsed.data.refreshToken);
       return reply.code(204).send();
     });
 
@@ -101,7 +101,7 @@ export function buildAuthRoutes(service: AuthService) {
     // user, not just the one presenting this request ("sign out
     // everywhere").
     app.post("/auth/logout-everywhere", { preHandler: authGuard }, async (request, reply) => {
-      service.logoutEverywhere(request.user.id);
+      await service.logoutEverywhere(request.user.id);
       return reply.code(204).send();
     });
 

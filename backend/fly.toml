@@ -1,0 +1,135 @@
+# Fly.io configuration for the AtMyShelf API.
+#
+# Fly is the settled host. Referenced by .github/workflows/deploy.yml,
+# which stays inert until the DEPLOY_ENABLED repository variable is set —
+# see that file.
+#
+# ---------------------------------------------------------------------
+# FIRST DEPLOY — the managed-state path (Neon + R2), which is the one
+# docs/DEPLOYMENT-PLAN.md recommends. Run from backend/.
+#
+#   fly apps create atmyshelf-api
+#
+#   fly secrets set \
+#     JWT_ACCESS_SECRET=... \
+#     JWT_REFRESH_SECRET=... \
+#     SOCIALS_ENCRYPTION_KEY=... \
+#     FRONTEND_URL=https://atmyshelf.com \
+#     PUBLIC_API_URL=https://api.atmyshelf.com \
+#     DATABASE_URL='postgres://...neon.tech/atmyshelf?sslmode=require' \
+#     S3_BUCKET=atmyshelf \
+#     S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com \
+#     S3_ACCESS_KEY_ID=... \
+#     S3_SECRET_ACCESS_KEY=...
+#
+#   # Delete the [[mounts]] block below FIRST — see its own warning.
+#   # A machine with a mount but no volume will not start.
+#   fly deploy
+#   fly certs create api.atmyshelf.com
+#
+# ---------------------------------------------------------------------
+# FIRST DEPLOY — the local-disk path, if you want to launch before
+# setting up Neon and R2. Same as above minus DATABASE_URL and the four
+# S3_* secrets, plus a volume, and keep the [[mounts]] block:
+#
+#   fly volumes create atmyshelf_data --size 3 --region fra
+#
+# That is a real deployment, not a lesser one — it just cannot run more
+# than one machine, and the database is only as safe as the backup
+# schedule (see docs/DEPLOYMENT-PLAN.md, "Backups").
+#
+# ---------------------------------------------------------------------
+# Generate each of the three secrets fresh and keep a copy in a password
+# manager, not only here: losing SOCIALS_ENCRYPTION_KEY makes every
+# stored social token permanently undecryptable, and rotating the JWT
+# secrets signs everyone out. `fly secrets list` shows only digests, so
+# Fly is not a place you can read them back from.
+#
+# The OAuth credentials (GOOGLE_*, X_*, INSTAGRAM_*, THREADS_*,
+# TIKTOK_*, HARDCOVER_API_KEY) are all optional and go in the same way,
+# one platform at a time — each is quietly skipped while unset.
+
+app = "atmyshelf-api"
+
+# Frankfurt. Users are in Europe, and within Europe the choice is about
+# jurisdiction rather than latency: fra/ams/cdg are all within a few ms
+# of each other, but London is outside the EU, so keeping the machine in
+# an EU region avoids ever having to reason about UK adequacy for what
+# is, legally, other people's personal data.
+#
+# Keep the database and the bucket in the same place — Neon's
+# aws-eu-central-1 is Frankfurt too, and R2 buckets take an EU
+# jurisdiction that can only be set when the bucket is CREATED. Every
+# request makes several database round trips, so a database on another
+# continent is felt on every page.
+#
+# On the local-disk path this must match the volume's region exactly:
+# a volume in one region cannot attach to a machine in another.
+primary_region = "fra"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "3000"
+  NODE_ENV = "production"
+  # Fly terminates TLS and proxies to the app, so request.ip is the
+  # proxy's address unless this is set — and every rate limiter in the app
+  # keys on request.ip. See backend/src/config/env.ts.
+  TRUST_PROXY = "true"
+
+# The SQLite files and (unless S3_BUCKET is set) both blob directories
+# live here. This is the account database: without this mount, every
+# signup, library and uploaded image disappears when the machine is
+# replaced.
+#
+# REQUIRED unless BOTH DATABASE_URL and S3_BUCKET are set. All five
+# modules now have a Postgres adapter, so with both configured the app
+# writes nothing durable here and this block SHOULD be deleted — Fly will
+# not start a machine whose declared mount has no volume behind it.
+#
+# With EITHER missing it still writes to disk, and deleting this mount
+# destroys whatever is left on it — accounts included. Check both are set
+# before removing it, and take a backup first if the app has ever run.
+[[mounts]]
+  source = "atmyshelf_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+
+  # ONE MACHINE while any state is local, which is the case unless BOTH
+  # DATABASE_URL and S3_BUCKET are set: a SQLite file on a volume can only
+  # attach to a single machine, so two instances would each get their own
+  # copy of the accounts table and silently diverge.
+  #
+  # With both set the app is stateless and this can go to 2 for rolling
+  # deploys — delete the [[mounts]] block above at the same time.
+  #
+  # auto-stop stays off either way: it would make the first request after
+  # an idle period pay a cold start, on an app whose users arrive in ones
+  # and twos.
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 50
+    hard_limit = 100
+
+  # Fly won't route to a machine that fails this, and a deploy whose new
+  # machine never passes is rolled back instead of taking traffic.
+  [[http_service.checks]]
+    interval = "15s"
+    timeout = "3s"
+    grace_period = "10s"
+    method = "GET"
+    path = "/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  # sharp decodes and re-encodes uploads in-process; 512 MB is tight for
+  # that once a few requests overlap.
+  memory = "1gb"

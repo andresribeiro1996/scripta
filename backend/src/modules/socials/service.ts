@@ -31,16 +31,16 @@ export interface DecryptedConnection {
 }
 
 export interface SocialsService {
-  listStatuses(userId: string, enabledByProvider: Record<SocialProvider, boolean>): SocialStatus[];
-  saveConnection(input: SaveConnectionInput): void;
-  disconnect(userId: string, provider: SocialProvider): void;
+  listStatuses(userId: string, enabledByProvider: Record<SocialProvider, boolean>): Promise<SocialStatus[]>;
+  saveConnection(input: SaveConnectionInput): Promise<void>;
+  disconnect(userId: string, provider: SocialProvider): Promise<void>;
   /** Verifies a Bluesky handle + app password against Bluesky's own
    *  createSession endpoint and, on success, stores the resulting
    *  session tokens exactly like an OAuth connection. Throws
    *  BlueskyAuthError on bad credentials, SocialsNotConfiguredError if
    *  the encryption key isn't set. */
   connectBluesky(userId: string, handle: string, appPassword: string): Promise<void>;
-  getDecryptedConnection(userId: string, provider: SocialProvider): DecryptedConnection | null;
+  getDecryptedConnection(userId: string, provider: SocialProvider): Promise<DecryptedConnection | null>;
 }
 
 export function createSocialsService(repo: SocialsRepository, encryptionKey: string): SocialsService {
@@ -49,8 +49,9 @@ export function createSocialsService(repo: SocialsRepository, encryptionKey: str
   }
 
   return {
-    listStatuses(userId, enabledByProvider) {
-      const rows = new Map(repo.listConnections(userId).map((row) => [row.provider, row]));
+    async listStatuses(userId, enabledByProvider) {
+      const connections = await repo.listConnections(userId);
+      const rows = new Map(connections.map((row) => [row.provider, row] as const));
       return SOCIAL_PROVIDERS.map((provider) => {
         const row = rows.get(provider);
         return {
@@ -63,9 +64,9 @@ export function createSocialsService(repo: SocialsRepository, encryptionKey: str
       });
     },
 
-    saveConnection(input) {
+    async saveConnection(input) {
       requireEncryptionKey();
-      repo.upsertConnection({
+      await repo.upsertConnection({
         userId: input.userId,
         provider: input.provider,
         handle: input.handle,
@@ -76,8 +77,8 @@ export function createSocialsService(repo: SocialsRepository, encryptionKey: str
       });
     },
 
-    disconnect(userId, provider) {
-      repo.deleteConnection(userId, provider);
+    async disconnect(userId, provider) {
+      await repo.deleteConnection(userId, provider);
     },
 
     async connectBluesky(userId, handle, appPassword) {
@@ -103,7 +104,7 @@ export function createSocialsService(repo: SocialsRepository, encryptionKey: str
 
       const body = (await res.json()) as { accessJwt: string; refreshJwt: string; did: string; handle: string };
 
-      repo.upsertConnection({
+      await repo.upsertConnection({
         userId,
         provider: "bluesky",
         handle: `@${body.handle}`,
@@ -114,8 +115,8 @@ export function createSocialsService(repo: SocialsRepository, encryptionKey: str
       });
     },
 
-    getDecryptedConnection(userId, provider) {
-      const row = repo.getConnection(userId, provider);
+    async getDecryptedConnection(userId, provider) {
+      const row = await repo.getConnection(userId, provider);
       if (!row) return null;
       return {
         provider,

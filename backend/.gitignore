@@ -4,3 +4,5 @@ dist/
 data/
 *.sqlite
 *.sqlite-journal
+backend/.test-tmp/
+backups/

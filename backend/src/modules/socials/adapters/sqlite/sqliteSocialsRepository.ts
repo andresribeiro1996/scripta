@@ -25,15 +25,15 @@ export function createSqliteSocialsRepository(db: DatabaseSync): SocialsReposito
   const deleteStmt = db.prepare(`DELETE FROM social_connections WHERE user_id = ? AND provider = ?`);
 
   return {
-    listConnections(userId) {
+    async listConnections(userId) {
       return listStmt.all(userId) as unknown as SocialConnectionRow[];
     },
 
-    getConnection(userId, provider) {
+    async getConnection(userId, provider) {
       return getStmt.get(userId, provider) as SocialConnectionRow | undefined;
     },
 
-    upsertConnection(input: UpsertConnectionInput) {
+    async upsertConnection(input: UpsertConnectionInput) {
       const connectedAt = new Date().toISOString();
       upsertStmt.run({
         $user_id: input.userId,
@@ -57,7 +57,7 @@ export function createSqliteSocialsRepository(db: DatabaseSync): SocialsReposito
       };
     },
 
-    deleteConnection(userId, provider) {
+    async deleteConnection(userId, provider) {
       deleteStmt.run(userId, provider);
     }
   } satisfies SocialsRepository;

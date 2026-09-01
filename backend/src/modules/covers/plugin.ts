@@ -11,19 +11,38 @@
 
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
-import { env, hardcoverConfigured } from "../../config/env.js";
+import { env, hardcoverConfigured, useObjectStorage, usePostgres } from "../../config/env.js";
 import { createFsCoverBlobStore } from "./adapters/fs/fsCoverBlobStore.js";
+import { createS3CoverBlobStore } from "./adapters/s3/s3CoverBlobStore.js";
 import { createHardcoverCoverLookup } from "./adapters/hardcover/hardcoverCoverLookup.js";
 import { openCoversDb } from "./adapters/sqlite/connection.js";
+import { createPgCoverCacheRepository } from "./adapters/postgres/pgCoverCacheRepository.js";
+import { initCoversSchema } from "./adapters/postgres/connection.js";
+import { getPool } from "../../shared/postgres/pool.js";
+import type { CoverCacheRepository } from "./domain/ports.js";
 import { createSqliteCoverCacheRepository } from "./adapters/sqlite/sqliteCoverCacheRepository.js";
 import { buildCachedFileRoute, buildResolveRoute } from "./routes.js";
 import { createCoversService } from "./service.js";
 
 export async function coversPlugin(app: FastifyInstance) {
   // --- composition: swap any of these to change storage/lookup technology ---
-  const db = openCoversDb();
-  const cacheRepo = createSqliteCoverCacheRepository(db);
-  const blobStore = createFsCoverBlobStore(env.COVERS_STORAGE_PATH);
+  let cacheRepo: CoverCacheRepository;
+
+  if (usePostgres) {
+    app.log.info("[covers] using Postgres (DATABASE_URL is set)");
+    const pool = getPool();
+    await initCoversSchema(pool);
+    cacheRepo = createPgCoverCacheRepository(pool);
+  } else {
+    const db = openCoversDb();
+    cacheRepo = createSqliteCoverCacheRepository(db);
+    app.addHook("onClose", async () => {
+      db.close();
+    });
+  }
+  // Same one-variable decision as gallery's own blob store.
+  const blobStore = useObjectStorage ? createS3CoverBlobStore() : createFsCoverBlobStore(env.COVERS_STORAGE_PATH);
+  app.log.info(`[covers] cover blobs: ${useObjectStorage ? `object storage (${env.S3_BUCKET})` : env.COVERS_STORAGE_PATH}`);
   const hardcoverLookup = hardcoverConfigured ? createHardcoverCoverLookup(env.HARDCOVER_API_KEY) : null;
   const publicUrlFor = (id: string) => `${env.PUBLIC_API_URL}/covers/cached/${id}/file`;
   const coversService = createCoversService(cacheRepo, blobStore, hardcoverLookup, publicUrlFor);

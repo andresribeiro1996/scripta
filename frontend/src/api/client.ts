@@ -5,14 +5,19 @@
 // single in-flight refresh instead of each firing their own.
 
 import { getSession, setSession } from "../auth/tokenStore";
-
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
+import { API_URL } from "../config";
 
 export class ApiError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  /** The parsed error response, when there was one. Some failures carry
+   *  data the caller needs rather than just a message — a 409 from the
+   *  library save returns the server's current document so the client can
+   *  re-apply its change (see api/library.ts). */
+  body: unknown;
+  constructor(status: number, message: string, body?: unknown) {
     super(message);
     this.status = status;
+    this.body = body;
   }
 }
 
@@ -39,7 +44,7 @@ async function parseOrThrow(res: Response): Promise<unknown> {
       body && typeof body === "object" && "error" in body && typeof (body as { error?: unknown }).error === "string"
         ? (body as { error: string }).error
         : res.statusText;
-    throw new ApiError(res.status, message);
+    throw new ApiError(res.status, message, body);
   }
   return body;
 }

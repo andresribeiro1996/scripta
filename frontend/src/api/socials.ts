@@ -1,6 +1,5 @@
 import { apiFetch, ApiError } from "./client";
-
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
+import { API_URL } from "../config";
 
 /** The five platforms Settings' "Socials" section lists — mirrors the
  *  backend's SocialProvider (backend/src/modules/socials/domain/types.ts). */
