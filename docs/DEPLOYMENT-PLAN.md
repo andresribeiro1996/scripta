@@ -55,6 +55,78 @@ persisted cover URLs in phase 4).
 
 ---
 
+## Architecture, as deployed
+
+```mermaid
+flowchart TB
+    browser["Browser"]
+
+    subgraph eu["Frankfurt / EU"]
+        pages["Cloudflare Pages<br/>atmyshelf.com<br/>static frontend bundle"]
+        api["Fly.io — fra<br/>api.atmyshelf.com<br/>the API container"]
+        neon[("Neon Postgres<br/>eu-central-1<br/>ALL domain rows")]
+        r2[("Cloudflare R2<br/>jurisdiction: EU<br/>image BYTES only")]
+    end
+
+    subgraph miss["cover sources — only on a cache miss, all free"]
+        direction LR
+        kobo["Kobo CDN"]
+        ol["Open Library"]
+        hc["Hardcover<br/>(optional key)"]
+    end
+
+    subgraph oauth["OAuth providers — one registration per hostname"]
+        direction LR
+        goog["Google"]
+        x["X"]
+        ig["Instagram"]
+        th["Threads"]
+        tt["TikTok"]
+        bsky["Bluesky<br/>(app password, no registration)"]
+    end
+
+    browser -->|static bundle| pages
+    browser -->|JSON over HTTPS| api
+    pages -.->|VITE_API_URL,<br/>baked in at build| api
+
+    api -->|accounts, library,<br/>gallery/cover METADATA,<br/>encrypted social tokens| neon
+    api -->|gallery uploads +<br/>cached cover WebP files| r2
+    r2 -->|served via Cloudflare's<br/>own edge, zero egress| browser
+
+    api -.->|cache miss: resolve once,<br/>store in neon + r2 forever| miss
+    api -->|sign-in / connect| oauth
+```
+
+Two different databases doing two different jobs, not two databases for the
+same job:
+
+- **Neon holds every row** — the thing you'd ever query. Accounts, sessions,
+  books, highlights, groups, murals, gallery/cover *metadata* (dimensions,
+  mime type, owner, cache key), encrypted social tokens. All five modules'
+  Postgres adapters write here.
+- **R2 holds only bytes** — gallery uploads and cached cover images, looked
+  up by the key Neon's row already gave the app. No query engine, no schema;
+  it answers exactly one question, "here are the bytes for this key."
+
+The cover cache in Neon+R2 is **global, keyed on the book, not the account**
+— one row and one file per distinct book, shared across every user. It is
+what makes provider load and storage roughly flat as users grow: the first
+account to import a given book pays one resolve against Kobo/Open
+Library/Hardcover, and every account after that is served straight from R2.
+`gallery` is the pool that genuinely scales with users, at 500 MB/account —
+see Phase 3 below.
+
+"Frankfurt" and "EU jurisdiction" are two different kinds of region choice.
+Fly and Neon each pin compute/storage to one named data center — chosen here
+so a database round trip and the machine serving it are a few ms apart, and
+so both sit inside the EU for the personal data this app stores. R2 has no
+equivalent single-region setting: it is served through Cloudflare's global
+edge (that's what makes egress free), and the closest thing it has to a
+region is *jurisdiction* — a legal constraint on where the underlying bytes
+are allowed to live, set once at bucket creation and not changeable after.
+
+---
+
 ## The headline finding
 
 Each user's **entire library is a single JSON blob** in one row:
