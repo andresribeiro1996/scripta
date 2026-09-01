@@ -1,13 +1,13 @@
-# Scripta — deployment plan
+# AtMyShelf — deployment plan
 
-Working plan for taking Scripta from a local dev setup to a public, multi-user
+Working plan for taking AtMyShelf from a local dev setup to a public, multi-user
 web app. Written against commit `97077cf`.
 
 A rendered version of this plan lives at
 <https://claude.ai/code/artifact/aa90e665-d96c-475b-8fe4-8a5e8870242c> (private
 link — same content, easier to read).
 
-> **Scope note.** An earlier draft of this plan assumed Scripta was a personal
+> **Scope note.** An earlier draft of this plan assumed AtMyShelf was a personal
 > install, because that is how the READMEs describe it. It is not: it is meant
 > to be distributed and used by other people. Everything below assumes that.
 
@@ -18,13 +18,20 @@ link — same content, easier to read).
 | 1 — Normalise the library | **Done** (slices 1 & 2). Slice 3 deliberately deferred, see below. |
 | 2 — Correctness gaps | **Done.** |
 | 3 — State off the instance | **Done.** All five modules have a Postgres adapter and blobs are on object storage, so with both configured the app is stateless. |
-| 4 — Domain, hosting, pipeline | **Pipeline and container done. Domain and hosting are yours to choose.** |
+| 4 — Domain, hosting, pipeline | **Pipeline, container and domain done. Hosting is yours to choose.** |
 | 5 — Reconsider the frontend | Not started; a product decision, not a technical blocker. |
+
+**Domain: `atmyshelf.com`, bought.** The app is named AtMyShelf throughout the
+repo, and the two hostnames below are now written into `backend/fly.toml` and
+`.github/workflows/deploy.yml` rather than left as placeholders. Nothing is
+deployed and no OAuth app is registered yet, which is why the rename was done
+now — after either, a name change costs a data migration (see the note on
+persisted cover URLs in phase 4).
 
 **What still needs a human, not a commit:**
 
-- Buy the domain and decide the two hostnames. Nothing else in phase 4 can be
-  finalised first — the OAuth redirect URIs depend on it.
+- Point DNS at the hosts once they exist: `atmyshelf.com` → the frontend host,
+  `api.atmyshelf.com` → the API, `www` redirecting to the apex.
 - Choose and create the hosting accounts, then set `DEPLOY_ENABLED`, `API_URL`
   and the deploy secrets. The deploy workflow is inert until you do.
 - Generate the three production secrets and store them in a password manager.
@@ -324,7 +331,7 @@ Scheduling it is host-specific and is yours to set up:
 
 ```
 # Fly: a scheduled machine, separate from the one serving traffic
-fly machine run --schedule daily --volume scripta_data:/data \
+fly machine run --schedule daily --volume atmyshelf_data:/data \
   <image> npm run backup -- --upload --keep 7
 
 # Anywhere with cron
@@ -336,12 +343,22 @@ is a guess.
 
 ### Phase 4 — Domain, hosting, pipeline
 
-**Domain.** One apex, two hostnames: `scripta.app` (frontend) and
-`api.scripta.app` (API), `www` redirecting to the apex. Settle this *first* —
-Google, X, Instagram, Threads and TikTok each require an exact redirect URI
-registered in their developer console before OAuth works, and several review the
-app. Registering against a temporary URL means redoing all of it. Bluesky is the
-exception (app password, no registration).
+**Domain — settled.** `atmyshelf.com` is bought. One apex, two hostnames:
+`atmyshelf.com` (frontend) and `api.atmyshelf.com` (API), `www` redirecting to
+the apex.
+
+This had to be settled first, and now is: Google, X, Instagram, Threads and
+TikTok each require an exact redirect URI registered in their developer console
+before OAuth works, and several review the app, so registering against a
+temporary URL would mean redoing all of it. Bluesky is the exception (app
+password, no registration).
+
+Changing the name after launch would cost more than those six re-registrations.
+`gallery/plugin.ts` builds absolute URLs from `PUBLIC_API_URL` and those get
+**persisted into user data** — `_coverUrl` on books (`bookCovers.ts`) and
+`coverImageUrl` on murals (`murals.ts`) — so a later hostname change needs a
+data migration over every user's library on top of the re-registrations and a
+frontend rebuild.
 
 Every optional integration degrades cleanly when unconfigured and logs which ones
 it skipped at boot, so launch with none and add them one at a time. Note that

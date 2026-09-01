@@ -1,8 +1,8 @@
 {
-  "name": "kobo-library-backend",
+  "name": "atmyshelf-backend",
   "version": "0.1.0",
   "private": true,
-  "description": "Backend for the Kobo Library Viewer — currently just the isolated auth module.",
+  "description": "Backend for AtMyShelf — auth, library, gallery, covers and social connections.",
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",

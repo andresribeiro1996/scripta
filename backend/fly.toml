@@ -1,22 +1,22 @@
-# Fly.io configuration for the Scripta API.
+# Fly.io configuration for the AtMyShelf API.
 #
 # Referenced by .github/workflows/deploy.yml, which is inert until you opt
 # in — see that file. If you host somewhere else, this file is unused.
 #
 # Create the app and its volume once, before the first deploy:
-#   fly apps create scripta-api
-#   fly volumes create scripta_data --size 3 --region <region>
+#   fly apps create atmyshelf-api
+#   fly volumes create atmyshelf_data --size 3 --region <region>
 #   fly secrets set JWT_ACCESS_SECRET=... JWT_REFRESH_SECRET=... \
 #                   SOCIALS_ENCRYPTION_KEY=... \
-#                   FRONTEND_URL=https://your-domain \
-#                   PUBLIC_API_URL=https://api.your-domain
+#                   FRONTEND_URL=https://atmyshelf.com \
+#                   PUBLIC_API_URL=https://api.atmyshelf.com
 #
 # Generate each secret fresh and keep a copy in a password manager, not
 # only here: losing SOCIALS_ENCRYPTION_KEY makes every stored social token
 # permanently undecryptable, and rotating the JWT secrets signs everyone
 # out.
 
-app = "scripta-api"
+app = "atmyshelf-api"
 primary_region = "lhr"
 
 [build]
@@ -43,7 +43,7 @@ primary_region = "lhr"
 # destroys whatever is left on it — accounts included. Check both are set
 # before removing it.
 [[mounts]]
-  source = "scripta_data"
+  source = "atmyshelf_data"
   destination = "/data"
 
 [http_service]

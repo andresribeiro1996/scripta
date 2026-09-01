@@ -67,7 +67,7 @@ export function SocialsSection() {
     const meta = PROVIDER_META[status.provider];
     const confirmed = await confirm({
       title: `Disconnect ${meta.label}?`,
-      body: `Scripta will delete the ${meta.label} access token it has stored. You'll need to reconnect and re-authorize to use it again.`,
+      body: `AtMyShelf will delete the ${meta.label} access token it has stored. You'll need to reconnect and re-authorize to use it again.`,
       confirmLabel: "Disconnect"
     });
     if (!confirmed) return;
@@ -87,7 +87,7 @@ export function SocialsSection() {
     <section className="mt-6 rounded-xl border border-(--color-border) bg-(--color-surface) p-5">
       <h3 className="mb-1 text-sm font-semibold">Socials</h3>
       <p className="mb-4 text-xs text-(--color-text-dim)">
-        Connect social platforms so Scripta can act on your behalf. Enabling one requires signing in and authorizing access; the key it
+        Connect social platforms so AtMyShelf can act on your behalf. Enabling one requires signing in and authorizing access; the key it
         gets is stored only to make that possible.
       </p>
 
@@ -217,7 +217,7 @@ function BlueskyConnectModal({
       >
         <h3 className="mb-1 text-sm font-semibold">Connect Bluesky</h3>
         <p className="mb-4 text-xs text-(--color-text-dim)">
-          Use an app password, not your real one — generate one from Bluesky at Settings → App Passwords. Scripta never sees your
+          Use an app password, not your real one — generate one from Bluesky at Settings → App Passwords. AtMyShelf never sees your
           actual account password.
         </p>
 

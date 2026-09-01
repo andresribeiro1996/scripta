@@ -165,7 +165,7 @@ export function LoginPage() {
       <div className="relative z-10 w-full max-w-[360px]">
         <div className="mb-12 flex flex-col items-center text-center">
           <h1 className="text-2xl tracking-[0.2em] uppercase" style={{ color: PAPER, fontFamily: "ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif" }}>
-            Scripta
+            AtMyShelf
           </h1>
           <p className="mt-4 text-[11px] tracking-[0.25em] uppercase" style={{ color: PAPER_DIM }}>
             Your books, wherever you left off

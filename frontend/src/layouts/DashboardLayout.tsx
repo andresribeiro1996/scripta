@@ -30,7 +30,7 @@ export function DashboardLayout() {
       <aside className="flex w-56 shrink-0 flex-col border-r border-(--color-border) bg-(--color-surface) px-3 py-5">
         <div className="mb-6 flex items-center gap-2 px-2">
           <img src="/icon-192.png" alt="" className="h-7 w-7 rounded-md" />
-          <span className="text-lg font-bold">Scripta</span>
+          <span className="text-lg font-bold">AtMyShelf</span>
         </div>
 
         <nav className="flex flex-1 flex-col gap-1">

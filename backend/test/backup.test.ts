@@ -21,7 +21,7 @@ const backendDir = dirname(dirname(fileURLToPath(import.meta.url)));
 let work: string;
 
 beforeEach(() => {
-  work = mkdtempSync(join(tmpdir(), "scripta-backup-"));
+  work = mkdtempSync(join(tmpdir(), "atmyshelf-backup-"));
 });
 
 afterEach(() => {

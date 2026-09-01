@@ -1,4 +1,4 @@
-# Scripta API.
+# AtMyShelf API.
 #
 # Pinned to an exact Node 22 minor on purpose: this app reads its data
 # through `node:sqlite`, which is still flagged experimental, so a silent

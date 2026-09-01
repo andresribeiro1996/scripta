@@ -21,5 +21,5 @@ if (import.meta.env.PROD && !configured) {
   );
 }
 
-/** Base URL of the Scripta API, without a trailing slash. */
+/** Base URL of the AtMyShelf API, without a trailing slash. */
 export const API_URL: string = (configured ?? "http://localhost:3000").replace(/\/+$/, "");

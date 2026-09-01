@@ -14,7 +14,7 @@
 # Required to actually deploy:
 #   variable DEPLOY_ENABLED   = true
 #   secret   FLY_API_TOKEN    = flyctl tokens create deploy
-#   variable API_URL          = https://api.your-domain  (baked into the frontend)
+#   variable API_URL          = https://api.atmyshelf.com  (baked into the frontend)
 #   secret   CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID (frontend only)
 
 name: Deploy
@@ -102,5 +102,5 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist --project-name=scripta
+          command: pages deploy dist --project-name=atmyshelf
           workingDirectory: frontend

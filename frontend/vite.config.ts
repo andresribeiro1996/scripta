@@ -25,8 +25,8 @@ export default defineConfig(({ command, mode }) => {
       VitePWA({
         registerType: 'autoUpdate',
         manifest: {
-          name: 'Scripta',
-          short_name: 'Scripta',
+          name: 'AtMyShelf',
+          short_name: 'AtMyShelf',
           description: 'Your book library, wherever you left off.',
           theme_color: '#a85c32',
           background_color: '#f5f4f2',

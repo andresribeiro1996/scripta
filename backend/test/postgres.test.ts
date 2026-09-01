@@ -7,7 +7,7 @@
 // leave it unset and they skip, so `npm test` still works on a checkout
 // with no database. CI sets it via a service container.
 //
-//   TEST_DATABASE_URL=postgres://scripta:scripta@127.0.0.1:5432/scripta_test npm test
+//   TEST_DATABASE_URL=postgres://atmyshelf:atmyshelf@127.0.0.1:5432/atmyshelf_test npm test
 
 import assert from "node:assert/strict";
 import { after, before, beforeEach, describe, it } from "node:test";

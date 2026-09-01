@@ -21,7 +21,7 @@ import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
 import S3rver from "s3rver";
 
-const BUCKET = "scripta-test";
+const BUCKET = "atmyshelf-test";
 const PORT = 4569;
 
 let dataDir: string;
