@@ -1,6 +1,5 @@
 // Copies a SQLite deployment's data into Postgres, for every module that
-// has a Postgres adapter — currently `auth` (accounts and refresh tokens)
-// and `library`.
+// has a Postgres adapter — which is now all five.
 //
 //   node --import tsx scripts/sqlite-to-postgres.mjs \
 //     --sqlite ./data/library.sqlite \
@@ -44,13 +43,18 @@ const sqlitePath = arg("sqlite");
 // auth lives in its own SQLite file; --auth-sqlite points at it. Optional,
 // so a deployment that only wants the library moved can omit it.
 const authSqlitePath = arg("auth-sqlite");
+const gallerySqlitePath = arg("gallery-sqlite");
+const socialsSqlitePath = arg("socials-sqlite");
+// `covers` is deliberately not offered: it is a cache keyed on public book
+// identifiers, and every row re-resolves on next view. Copying it would
+// carry clutter across for no recovery value.
 const postgresUrl = arg("postgres") ?? process.env.DATABASE_URL;
 const dryRun = process.argv.includes("--dry-run");
 const force = process.argv.includes("--force");
 
 if (!sqlitePath || !postgresUrl) {
   console.error(
-    "Usage: node --import tsx scripts/sqlite-to-postgres.mjs --sqlite <library.sqlite> [--auth-sqlite <auth.sqlite>] --postgres <url> [--dry-run] [--force]"
+    "Usage: node --import tsx scripts/sqlite-to-postgres.mjs --sqlite <library.sqlite> [--auth-sqlite <auth.sqlite>] [--gallery-sqlite <gallery.sqlite>] [--socials-sqlite <socials.sqlite>] --postgres <url> [--dry-run] [--force]"
   );
   process.exit(1);
 }
@@ -180,6 +184,80 @@ if (authSqlitePath) {
 } else {
   console.log("\nauth: --auth-sqlite not given, skipping (accounts stay in SQLite)");
 }
+
+// --- gallery and socials --------------------------------------------------
+//
+// Row-for-row, same reasoning as auth: these ports have no "insert this
+// exact row" operation, and regenerating ids would orphan every blob in
+// object storage (which is keyed on the image id) and every mural block
+// referencing an image.
+//
+// The blobs themselves are moved separately, by
+// scripts/files-to-object-storage.mjs. Metadata without blobs renders
+// broken images; blobs without metadata are invisible. Run both.
+async function copyTable({ label, path, schemaPath, table, columns }) {
+  if (!path) {
+    console.log(`\n${label}: --${label}-sqlite not given, skipping`);
+    return;
+  }
+
+  await pool.query(readFileSync(join(scriptDir, schemaPath), "utf8"));
+
+  const db = new DatabaseSync(path, { readOnly: true });
+  const rows = db.prepare(`SELECT * FROM ${table}`).all();
+  console.log(`\n${label}: ${rows.length} row(s) in ${path}`);
+
+  if (dryRun) {
+    console.log(`  would copy ${rows.length} row(s)`);
+    db.close();
+    return;
+  }
+
+  const placeholders = columns.map((_, index) => `$${index + 1}`).join(", ");
+  for (const row of rows) {
+    // DO NOTHING so a re-run is safe. A conflict here means the row is
+    // already there, which is the desired end state either way.
+    await pool.query(
+      `INSERT INTO ${table} (${columns.join(", ")}) VALUES (${placeholders}) ON CONFLICT DO NOTHING`,
+      columns.map((column) => row[column])
+    );
+  }
+
+  const { rows: counted } = await pool.query(`SELECT COUNT(*)::int AS n FROM ${table}`);
+  if (counted[0].n < rows.length) {
+    failed.push(`${label}: only ${counted[0].n} of ${rows.length} rows are present after the copy`);
+  }
+  console.log(`  copied ${rows.length} row(s)`);
+  db.close();
+}
+
+await copyTable({
+  label: "gallery",
+  path: gallerySqlitePath,
+  schemaPath: "../src/modules/gallery/adapters/postgres/schema.sql",
+  table: "gallery_images",
+  columns: ["id", "user_id", "filename", "mime_type", "extension", "width", "height", "byte_size", "created_at"]
+});
+
+await copyTable({
+  label: "socials",
+  path: socialsSqlitePath,
+  schemaPath: "../src/modules/socials/adapters/postgres/schema.sql",
+  table: "social_connections",
+  columns: [
+    "user_id",
+    "provider",
+    "handle",
+    "provider_account_id",
+    "access_token_enc",
+    "refresh_token_enc",
+    "expires_at",
+    "connected_at"
+  ]
+});
+
+console.log("\ncovers: skipped on purpose — it is a cache and re-resolves on next view.");
+console.log("Blobs move separately: scripts/files-to-object-storage.mjs");
 
 sqlite.close();
 await pool.end();

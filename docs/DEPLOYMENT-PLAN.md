@@ -206,12 +206,29 @@ synchronous API, and a network-backed store cannot answer synchronously. The
 SQLite adapter now returns already-resolved promises. That change is also what
 makes it possible to later get the blocking driver off the event loop.
 
-Migrating an existing deployment: `scripts/sqlite-to-postgres.mjs --sqlite
-<library.sqlite> --auth-sqlite <auth.sqlite>`. **Note it does not yet carry
-`gallery` metadata, the `covers` cache or `socials` across** — an existing
-deployment with images or connected accounts needs those copied too before the
-volume is removed. The covers cache is disposable (it re-resolves), but gallery
-metadata and social connections are not. run with the app stopped (there is
+Migrating an existing deployment:
+
+```
+node --import tsx scripts/sqlite-to-postgres.mjs \
+  --sqlite ./data/library.sqlite \
+  --auth-sqlite ./data/auth.sqlite \
+  --gallery-sqlite ./data/gallery.sqlite \
+  --socials-sqlite ./data/socials.sqlite \
+  --postgres "$DATABASE_URL" --dry-run
+```
+
+`covers` is skipped on purpose: it is a cache keyed on public book identifiers
+and every row re-resolves on next view, so copying it carries clutter across for
+no recovery value.
+
+**Run `scripts/files-to-object-storage.mjs` as well.** Metadata without blobs
+renders broken images; blobs without metadata are invisible. Neither script
+deletes anything, so the order doesn't matter, but skipping one does.
+
+Accounts, images and connections are copied row-for-row rather than through
+their ports, because regenerating ids would orphan every blob in object storage
+(keyed on the image id) and every mural block referencing an image. Re-running
+is safe. run with the app stopped (there is
 no dual-write mode). Accounts are copied row-for-row rather than through the
 repository port — `createUser` would mint fresh ids, breaking every foreign key
 and every library row keyed on the old one. Live refresh tokens come across so
