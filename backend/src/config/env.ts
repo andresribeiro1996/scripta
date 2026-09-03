@@ -40,6 +40,19 @@ const envSchema = z.object({
     .default("false")
     .transform((value) => value === "true"),
 
+  // Absolute paths to a TLS cert/key pair — set together or not at all
+  // (config/devCerts.ts only trusts the pair, never one alone). When
+  // both resolve to real files, app.ts serves the API over https instead
+  // of http. Needed for testing "Add to Home Screen"/offline caching on
+  // a phone: a service worker only runs in a secure context, and a LAN
+  // address over plain http isn't one. `npm run dev:mobile` sets these
+  // itself once you've run `node scripts/gen-mobile-certs.mjs` at the
+  // repo root (see that script and frontend/vite.config.ts, which reads
+  // the same pair for the frontend's own dev/preview servers) — nothing
+  // to set here by hand, and blank in every real deployment.
+  DEV_HTTPS_CERT_PATH: z.string().optional().default(""),
+  DEV_HTTPS_KEY_PATH: z.string().optional().default(""),
+
   AUTH_DB_PATH: z.string().min(1),
   LIBRARY_DB_PATH: z.string().min(1),
   GALLERY_DB_PATH: z.string().min(1),

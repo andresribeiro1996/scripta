@@ -21,3 +21,9 @@ Thumbs.db
 # (git add -f exporter/library.json) if you want a sample library.json
 # checked in.
 exporter/library.json
+
+# scripts/gen-mobile-certs.mjs's own output — a TLS cert/key for this
+# machine's current LAN address, used only to test the PWA install/
+# offline flow on a phone (see root README's "Testing on a phone").
+# Machine-specific and regenerable; never meant to be shared or committed.
+.certs/

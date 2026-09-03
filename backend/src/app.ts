@@ -9,8 +9,9 @@
 // imports between modules at all."
 
 import fastifyCors from "@fastify/cors";
-import Fastify from "fastify";
+import Fastify, { type FastifyInstance } from "fastify";
 import { isAllowedOrigin } from "./config/corsOrigin.js";
+import { devHttps } from "./config/devCerts.js";
 import { runStartupMigrations } from "./migrations/runStartupMigrations.js";
 import { registerAuthModule } from "./modules/auth/index.js";
 import { registerArenaModule } from "./modules/arena/index.js";
@@ -29,7 +30,17 @@ export function buildApp() {
   // the app instance itself.
   runStartupMigrations();
 
-  const app = Fastify({ logger: true });
+  // https only when devCerts.ts found a cert/key pair (see its own
+  // comment). Two separate calls, not `https: devHttps`, because
+  // Fastify's own overloads pick the http-vs-https server type off the
+  // literal shape of this options object — an `https: X | undefined`
+  // property defeats that and TS falls back to the http-only overload.
+  // The `as FastifyInstance` on the https branch just tells TS to treat
+  // both branches as the same instance type it already infers for the
+  // plain-http one — this app never touches request.raw/reply.raw (the
+  // only APIs that would actually differ between an http.Server and an
+  // https.Server), so nothing downstream needs the more specific type.
+  const app: FastifyInstance = devHttps ? (Fastify({ logger: true, https: devHttps }) as FastifyInstance) : Fastify({ logger: true });
 
   // Genuinely app-wide (unlike each module's own rate limiter) — the
   // frontend is a separate origin from this API in dev (Vite on 5173,

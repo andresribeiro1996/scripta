@@ -9,7 +9,8 @@
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b --noEmit",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "preview:mobile": "node scripts/build-mobile.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
