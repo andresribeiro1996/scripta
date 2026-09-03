@@ -18,6 +18,9 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
   const updateStatusStmt = db.prepare(`
     UPDATE tournaments SET status = $status, current_round = $current_round, updated_at = $updated_at WHERE id = $id
   `);
+  const renameTournamentStmt = db.prepare(`
+    UPDATE tournaments SET name = $name, updated_at = $updated_at WHERE id = $id
+  `);
   const deleteTournamentStmt = db.prepare(`DELETE FROM tournaments WHERE id = ?`);
 
   const deleteSlotsStmt = db.prepare(`DELETE FROM tournament_slots WHERE tournament_id = ?`);
@@ -81,6 +84,9 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
     },
     updateTournamentStatus(id, status, currentRound) {
       updateStatusStmt.run({ $id: id, $status: status, $current_round: currentRound, $updated_at: new Date().toISOString() });
+    },
+    renameTournament(id, name) {
+      renameTournamentStmt.run({ $id: id, $name: name, $updated_at: new Date().toISOString() });
     },
     deleteTournament(id) {
       deleteTournamentStmt.run(id); // ON DELETE CASCADE removes its slots/duels/votes too

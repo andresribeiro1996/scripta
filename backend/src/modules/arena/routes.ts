@@ -36,6 +36,12 @@ const createTournamentSchema = z.object({
   roundDurationMinutes: z.number().int().min(1).max(60 * 24 * 30)
 });
 
+// Name only. Everything else about a tournament is fixed at creation:
+// `bracketSize` lays out the slots and duels, so changing it would mean
+// rebuilding both, and `roundDurationMinutes` drives deadlines already
+// written onto live duels.
+const renameTournamentSchema = z.object({ name: z.string().trim().min(1).max(200) });
+
 const setSlotsSchema = z.object({
   slots: z.array(z.object({ slotIndex: z.number().int().min(0), book: seedBookSchema }))
 });
@@ -126,6 +132,20 @@ export function buildArenaRoutes(service: ArenaService) {
       if (!params.success) return reply.code(400).send({ error: "Invalid tournament id." });
       try {
         service.start(params.data.id, request.user.id);
+        return reply.code(204).send();
+      } catch (err) {
+        if (err instanceof ArenaError) return reply.code(statusForArenaError(err)).send({ error: err.message });
+        throw err;
+      }
+    });
+
+    app.patch("/arenas/:id", { preHandler: authGuard }, async (request, reply) => {
+      const params = idParamSchema.safeParse(request.params);
+      if (!params.success) return reply.code(400).send({ error: "Invalid tournament id." });
+      const parsed = renameTournamentSchema.safeParse(request.body);
+      if (!parsed.success) return reply.code(400).send({ error: "Expected {name}." });
+      try {
+        service.renameTournament(params.data.id, request.user.id, parsed.data.name);
         return reply.code(204).send();
       } catch (err) {
         if (err instanceof ArenaError) return reply.code(statusForArenaError(err)).send({ error: err.message });

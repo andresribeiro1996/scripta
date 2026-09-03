@@ -52,6 +52,10 @@ function createInMemoryArenaRepository(): ArenaRepository {
         t.current_round = currentRound;
       }
     },
+    renameTournament(id, name) {
+      const t = tournaments.get(id);
+      if (t) t.name = name;
+    },
     deleteTournament(id) {
       tournaments.delete(id);
       slots.delete(id);
@@ -109,6 +113,29 @@ function createInMemoryArenaRepository(): ArenaRepository {
 function makeBook(n: number) {
   return { key: `book-${n}`, title: `Book ${n}`, author: `Author ${n}`, cover: null };
 }
+
+test("renameTournament changes the name and leaves the bracket alone", () => {
+  const service = createArenaService(createInMemoryArenaRepository());
+  const tournament = service.createTournament("owner-1", { name: "Untitled tournament", bracketSize: 4, roundDurationMinutes: 60 });
+
+  service.renameTournament(tournament.id, "owner-1", "Best of 2026");
+
+  const renamed = service.listMine("owner-1")[0];
+  assert.ok(renamed);
+  assert.equal(renamed.name, "Best of 2026");
+  // The whole reason rename is name-only: bracketSize is structural,
+  // and slots/duels are laid out from it.
+  assert.equal(renamed.bracketSize, 4);
+  assert.equal(renamed.status, "seeding");
+});
+
+test("renameTournament refuses someone else's tournament", () => {
+  const service = createArenaService(createInMemoryArenaRepository());
+  const tournament = service.createTournament("owner-1", { name: "Mine", bracketSize: 4, roundDurationMinutes: 60 });
+
+  assert.throws(() => service.renameTournament(tournament.id, "owner-2", "Hijacked"), TournamentNotFoundError);
+  assert.equal(service.listMine("owner-1")[0]?.name, "Mine");
+});
 
 test("createTournament rejects a non-power-of-two bracket size", () => {
   const service = createArenaService(createInMemoryArenaRepository());

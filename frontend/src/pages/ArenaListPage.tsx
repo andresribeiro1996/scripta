@@ -1,32 +1,48 @@
-// "My tournaments" — list + create form. Same list/detail split as
+// "My tournaments" — list + a "+" tile. Same list/detail split as
 // MuralsListPage.tsx → MuralEditorPage.tsx: this page only creates and
 // lists; seeding happens on ArenaSeedPage.tsx once a tournament exists.
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { createTournament } from "../api/arena";
+import { PlusIcon } from "../components/Toolbar";
 import { useMyTournaments } from "../hooks/useMyTournaments";
 
-const BRACKET_SIZES = [4, 8, 16, 32, 64];
+// Defaults for a tournament created from the "+" tile. Both were the
+// create form's own defaults before that form went away — 16 books is a
+// bracket most libraries can actually fill, and a day per round suits a
+// tournament people vote in over time rather than in one sitting.
+const DEFAULT_NAME = "Untitled tournament";
+const DEFAULT_BRACKET_SIZE = 16;
+const DEFAULT_ROUND_HOURS = 24;
 
 export function ArenaListPage() {
-  const { tournaments, isLoading, refetch } = useMyTournaments();
+  const { tournaments, isLoading } = useMyTournaments();
   const navigate = useNavigate();
-  const [showCreate, setShowCreate] = useState(false);
-  const [name, setName] = useState("");
-  const [bracketSize, setBracketSize] = useState(16);
-  const [roundHours, setRoundHours] = useState(24);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
   async function handleCreate() {
-    if (!name.trim()) return;
+    if (creating) return;
     setCreating(true);
     setCreateError(null);
     try {
-      const tournament = await createTournament({ name: name.trim(), bracketSize, roundDurationMinutes: roundHours * 60 });
-      await refetch();
-      navigate(`/dashboard/arena/${tournament.id}/seed`);
+      // No settings dialog: the "+" tile creates on click, like a new
+      // mural. The two things that genuinely can't change later
+      // (bracketSize lays out the slots and duels; roundDurationMinutes
+      // is stamped onto live duel deadlines) take their previous form
+      // defaults, and getting them wrong costs a delete and one more
+      // click — nothing has been seeded yet at this point, which is
+      // exactly why this is a safe moment to default them.
+      const created = await createTournament({
+        name: DEFAULT_NAME,
+        bracketSize: DEFAULT_BRACKET_SIZE,
+        roundDurationMinutes: DEFAULT_ROUND_HOURS * 60
+      });
+      // Straight to seeding, same as a new mural opens itself: an empty
+      // bracket sitting in a list isn't useful, and the seed page is
+      // where the name can be edited too.
+      navigate(`/dashboard/arena/${created.id}/seed`);
     } catch (err) {
       setCreateError(err instanceof Error ? err.message : "Couldn't create that tournament.");
     } finally {
@@ -37,22 +53,33 @@ export function ArenaListPage() {
   return (
     <div className="mx-auto max-w-5xl px-5 py-8">
       <h2 className="mb-6 text-lg font-bold">Arena</h2>
-      <div className="mb-4 flex items-center justify-between">
-        <p className="text-sm text-(--color-text-dim)">
-          Bracket tournaments from your library —{" "}
-          <a href="/arena" className="text-(--color-accent) underline">
-            browse public tournaments
-          </a>
-          .
-        </p>
-        <button onClick={() => setShowCreate(true)} className="rounded-lg bg-(--color-accent) px-3 py-1.5 text-sm font-medium text-white">
-          New tournament
-        </button>
-      </div>
+      <p className="mb-4 text-sm text-(--color-text-dim)">
+        Bracket tournaments from your library —{" "}
+        <a href="/arena" className="text-(--color-accent) underline">
+          browse public tournaments
+        </a>
+        .
+      </p>
+
+      {createError && <p className="mb-4 text-sm text-(--color-danger)">{createError}</p>}
 
       {isLoading && <p className="text-sm text-(--color-text-dim)">Loading…</p>}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {/* Always first, always present — deliberately outside the map
+            so creating never disappears when the list is empty, the same
+            way the mural grid's "+" tile works. Creates on click with
+            defaults and goes straight to seeding; the name is editable
+            there. */}
+        <button
+          onClick={() => void handleCreate()}
+          disabled={creating}
+          className="flex min-h-14 items-center justify-center gap-2 rounded-xl border-2 border-dashed border-(--color-border) p-4 text-(--color-text-dim) transition-colors hover:border-(--color-accent) hover:text-(--color-accent) disabled:opacity-60"
+        >
+          <PlusIcon />
+          <span className="text-sm font-semibold">{creating ? "Creating…" : "New tournament"}</span>
+        </button>
+
         {tournaments.map((t) => (
           <a
             key={t.id}
@@ -67,67 +94,6 @@ export function ArenaListPage() {
         ))}
       </div>
 
-      {showCreate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setShowCreate(false)}>
-          <div
-            className="w-full max-w-sm rounded-xl border border-(--color-border) bg-(--color-surface) p-5 shadow-lg"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="mb-4 text-sm font-semibold">New tournament</h3>
-
-            {createError && <p className="mb-3 text-sm text-(--color-danger)">{createError}</p>}
-
-            <label className="mb-3 block text-sm">
-              Name
-              <input
-                autoFocus
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-1.5 text-sm"
-              />
-            </label>
-
-            <label className="mb-3 block text-sm">
-              Bracket size
-              <select
-                value={bracketSize}
-                onChange={(e) => setBracketSize(Number(e.target.value))}
-                className="mt-1 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-1.5 text-sm"
-              >
-                {BRACKET_SIZES.map((size) => (
-                  <option key={size} value={size}>
-                    {size} books
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="mb-4 block text-sm">
-              Round length (hours)
-              <input
-                type="number"
-                min={1}
-                value={roundHours}
-                onChange={(e) => setRoundHours(Number(e.target.value))}
-                className="mt-1 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-1.5 text-sm"
-              />
-            </label>
-
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setShowCreate(false)} className="rounded-lg px-3 py-1.5 text-sm text-(--color-text-dim)">
-                Cancel
-              </button>
-              <button
-                onClick={() => void handleCreate()}
-                disabled={creating || !name.trim()}
-                className="rounded-lg bg-(--color-accent) px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
-              >
-                {creating ? "Creating…" : "Create & seed"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

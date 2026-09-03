@@ -15,6 +15,11 @@ export interface ArenaRepository {
   listTournamentsByOwner(ownerUserId: string): TournamentRow[];
   listPublicTournaments(limit: number, offset: number): TournamentRow[];
   updateTournamentStatus(id: string, status: TournamentRow["status"], currentRound: number): void;
+  /** Renames only — nothing else about a tournament is editable after
+   *  creation. `bracket_size` in particular is structural: slots and
+   *  duels are laid out from it, so changing it would mean rebuilding
+   *  both, which is a different (and much larger) operation than this. */
+  renameTournament(id: string, name: string): void;
   /** Cascades to this tournament's slots/duels/votes (ON DELETE CASCADE
    *  in schema.sql) — see connection.ts's PRAGMA foreign_keys = ON. */
   deleteTournament(id: string): void;

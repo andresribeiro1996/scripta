@@ -73,6 +73,11 @@ export interface ArenaService {
   vote(tournamentId: string, duelId: string, voterToken: string, bookKey: string): void;
   settleEarly(tournamentId: string, ownerUserId: string, duelId: string): void;
   tiebreak(tournamentId: string, ownerUserId: string, duelId: string, winnerBookKey: string): void;
+  /** Renames a tournament. Allowed at ANY status, unlike seeding or
+   *  starting: a name is a label, not part of the bracket, so there's no
+   *  reason a running or finished tournament should be stuck with a
+   *  placeholder. */
+  renameTournament(tournamentId: string, ownerUserId: string, name: string): void;
   deleteTournament(tournamentId: string, ownerUserId: string): void;
   runScheduledSweep(nowIso?: string): void;
 }
@@ -340,6 +345,11 @@ export function createArenaService(repo: ArenaRepository): ArenaService {
       maybeAdvanceRound(tournament, duel.round_number, nowIso);
     },
 
+    renameTournament(tournamentId, ownerUserId, name) {
+      const tournament = repo.getOwnedTournament(tournamentId, ownerUserId);
+      if (!tournament) throw new TournamentNotFoundError();
+      repo.renameTournament(tournamentId, name);
+    },
     deleteTournament(tournamentId, ownerUserId) {
       const tournament = repo.getOwnedTournament(tournamentId, ownerUserId);
       if (!tournament) throw new TournamentNotFoundError();

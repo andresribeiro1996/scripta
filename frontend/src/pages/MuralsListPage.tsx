@@ -6,7 +6,7 @@ import { CoverPickerModal } from "../components/CoverPickerModal";
 import { OptionsMenu } from "../components/OptionsMenu";
 import { PageContainer } from "../components/PageContainer";
 import { OptionSheet } from "../components/Sheet";
-import { FolderIcon, SortIcon, TOOLBAR_CONTROL_CLASS, TOOLBAR_ICON_BUTTON_CLASS, ToolbarRow } from "../components/Toolbar";
+import { FolderIcon, PlusIcon, SortIcon, TOOLBAR_CONTROL_CLASS, TOOLBAR_ICON_BUTTON_CLASS, ToolbarRow } from "../components/Toolbar";
 import { ShareModal } from "../components/ShareModal";
 import { MoveToFolderModal } from "../components/murals/MoveToFolderModal";
 import { MuralFolderTree } from "../components/murals/MuralFolderTree";
@@ -303,24 +303,39 @@ export function MuralsListPage() {
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {/* Replaces the old "New mural name…" input + "Create mural"
-                button — same tile shape/size as a real mural card (so it
-                sits naturally among them, always the first one) rather than
-                a separate form row above the grid. Creates immediately on
-                click with a placeholder name ("Untitled mural," see
-                handleCreate) instead of asking for a name up front — there's
-                no text field left to type one into before creating. Stays
-                visible regardless of the search/filter controls above (it's
-                not part of `filteredMurals`), since the ability to create a
-                new mural shouldn't disappear just because a filter currently
-                matches nothing. */}
+                button, always the first thing in the grid rather than a
+                separate form row above it. Creates immediately on click
+                with a placeholder name ("Untitled mural," see
+                handleCreate) instead of asking for a name up front —
+                there's no text field left to type one into before
+                creating. Stays visible regardless of the search/filter
+                controls above (it's not part of `filteredMurals`), since
+                the ability to create a new mural shouldn't disappear just
+                because a filter currently matches nothing.
+
+                Deliberately SHORTER than a real mural card (min-h-14, not
+                the cards' min-h-40). It matched their full height at
+                first, on the theory that it should sit among them as a
+                peer — but a full-size dashed rectangle is the largest
+                thing on an empty page and reads as more important than
+                the murals themselves, and on a phone, where the grid is
+                one column, it filled a third of the viewport before any
+                real content. A single compact row still reads as "add
+                one" from the dashed border and the "+". */}
             <button
               onClick={() => void handleCreate()}
               disabled={creating}
               title="Create a new mural"
-              className="flex min-h-40 flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-(--color-border) p-4 text-(--color-text-dim) transition-colors hover:border-(--color-accent) hover:text-(--color-accent) disabled:opacity-60"
+              className="flex min-h-14 items-center justify-center gap-2 rounded-xl border-2 border-dashed border-(--color-border) p-4 text-(--color-text-dim) transition-colors hover:border-(--color-accent) hover:text-(--color-accent) disabled:opacity-60"
             >
-              <span className="text-2xl leading-none">{creating ? "…" : "+"}</span>
-              <span className="text-sm font-semibold">New mural</span>
+              {creating ? (
+                <span className="text-sm font-semibold">Creating…</span>
+              ) : (
+                <>
+                  <PlusIcon />
+                  <span className="text-sm font-semibold">New mural</span>
+                </>
+              )}
             </button>
 
             {filteredMurals.map((mural) => {

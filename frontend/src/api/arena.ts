@@ -93,6 +93,16 @@ export async function resolveTiebreak(tournamentId: string, duelId: string, winn
   await apiFetch(`/arenas/${tournamentId}/duels/${duelId}/tiebreak`, { method: "POST", body: JSON.stringify({ winnerBookKey }) });
 }
 
+/** Name only — everything else about a tournament is fixed at creation.
+ *  `bracketSize` lays out the slots and duels, and `roundDurationMinutes`
+ *  drives deadlines already written onto live duels, so neither can be
+ *  changed after the fact. Exists so a tournament can be created without
+ *  a name up front (see ArenaListPage's "+" tile) and named afterwards,
+ *  the way a mural is. */
+export async function renameTournament(id: string, name: string): Promise<void> {
+  await apiFetch(`/arenas/${id}`, { method: "PATCH", body: JSON.stringify({ name }) });
+}
+
 export async function deleteTournament(id: string): Promise<void> {
   await apiFetch(`/arenas/${id}`, { method: "DELETE" });
 }
