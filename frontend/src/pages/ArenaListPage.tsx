@@ -2,10 +2,10 @@
 // MuralsListPage.tsx → MuralEditorPage.tsx: this page only creates and
 // lists; seeding happens on ArenaSeedPage.tsx once a tournament exists.
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { createTournament } from "../api/arena";
-import { PlusIcon } from "../components/Toolbar";
+import { PlusIcon, TOOLBAR_CONTROL_CLASS, ToolbarRow } from "../components/Toolbar";
 import { useMyTournaments } from "../hooks/useMyTournaments";
 
 // Defaults for a tournament created from the "+" tile. Both were the
@@ -21,6 +21,13 @@ export function ArenaListPage() {
   const navigate = useNavigate();
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+
+  const visibleTournaments = useMemo(() => {
+    const needle = search.trim().toLowerCase();
+    if (!needle) return tournaments;
+    return tournaments.filter((t) => t.name.toLowerCase().includes(needle));
+  }, [tournaments, search]);
 
   async function handleCreate() {
     if (creating) return;
@@ -52,7 +59,10 @@ export function ArenaListPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-8">
-      <h2 className="mb-6 text-lg font-bold">Arena</h2>
+      {/* Desktop-only title, like the other list pages — the bottom tab
+          bar already says where you are, and the search row below is
+          what a phone actually needs at the top. */}
+      <h2 className="mb-6 hidden text-lg font-bold sm:block">Arena</h2>
       <p className="mb-4 text-sm text-(--color-text-dim)">
         Bracket tournaments from your library —{" "}
         <a href="/arena" className="text-(--color-accent) underline">
@@ -60,6 +70,18 @@ export function ArenaListPage() {
         </a>
         .
       </p>
+
+      {tournaments.length > 0 && (
+        <ToolbarRow>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search"
+            aria-label="Search tournaments by name"
+            className={`${TOOLBAR_CONTROL_CLASS} w-full sm:max-w-xs`}
+          />
+        </ToolbarRow>
+      )}
 
       {createError && <p className="mb-4 text-sm text-(--color-danger)">{createError}</p>}
 
@@ -80,7 +102,7 @@ export function ArenaListPage() {
           <span className="text-sm font-semibold">{creating ? "Creating…" : "New tournament"}</span>
         </button>
 
-        {tournaments.map((t) => (
+        {visibleTournaments.map((t) => (
           <a
             key={t.id}
             href={t.status === "seeding" ? `/dashboard/arena/${t.id}/seed` : `/arena/${t.id}`}
@@ -93,6 +115,10 @@ export function ArenaListPage() {
           </a>
         ))}
       </div>
+
+      {tournaments.length > 0 && visibleTournaments.length === 0 && (
+        <p className="mt-4 text-sm text-(--color-text-dim)">Nothing matches “{search.trim()}”.</p>
+      )}
 
     </div>
   );

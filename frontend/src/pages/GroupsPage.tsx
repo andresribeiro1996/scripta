@@ -4,7 +4,7 @@ import { BookCard } from "../components/BookCard";
 import { BookGrid } from "../components/BookGrid";
 import { LibraryCanvas } from "../components/LibraryCanvas";
 import { ActionSheet } from "../components/Sheet";
-import { GearIcon, PlusIcon, TOOLBAR_ICON_BUTTON_CLASS } from "../components/Toolbar";
+import { GearIcon, PlusIcon, TOOLBAR_CONTROL_CLASS, TOOLBAR_ICON_BUTTON_CLASS, ToolbarRow } from "../components/Toolbar";
 import { CoverPickerModal } from "../components/CoverPickerModal";
 import { OptionsMenu } from "../components/OptionsMenu";
 import { PageContainer } from "../components/PageContainer";
@@ -53,6 +53,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
   const { scrubBooks } = useMurals();
   const copy = COPY[type];
   const [actionsOpen, setActionsOpen] = useState(false);
+  const [search, setSearch] = useState("");
   const toast = useToast();
 
   const [creating, setCreating] = useState(false);
@@ -66,10 +67,24 @@ export function GroupsPage({ type }: { type: GroupType }) {
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
 
   const books = library?.data.books ?? [];
-  const groups = useMemo(
+  const allGroups = useMemo(
     () => (library?.data.groups ?? []).filter((g) => g.type === type).sort((a, b) => a.name.localeCompare(b.name)),
     [library, type]
   );
+  // Matches a group's own name OR any book title inside it — "which
+  // collection did I put Dune in?" is at least as common a question here
+  // as "where's my sci-fi collection", and the second is unanswerable if
+  // only names are searched. Kept out of `allGroups` so the "+" tile and
+  // the empty-state copy can still reason about how many groups exist at
+  // all, rather than how many currently match.
+  const groups = useMemo(() => {
+    const needle = search.trim().toLowerCase();
+    if (!needle) return allGroups;
+    return allGroups.filter((group) => {
+      if (group.name.toLowerCase().includes(needle)) return true;
+      return orderedGroupBooks(group, books).some((book) => String(book.Title ?? "").toLowerCase().includes(needle));
+    });
+  }, [allGroups, books, search]);
   // Which series (if any) each book actually belongs to, regardless of
   // which page this is (Series or Collections) — `groups` above is
   // filtered to just this page's type, so on Collections it never
@@ -275,11 +290,14 @@ export function GroupsPage({ type }: { type: GroupType }) {
 
   return (
     <PageContainer maxWidth={style.contentMaxWidth}>
-      {/* One line: title on the left, actions on the right. Unlike the
-          other list pages this page has no search or filter row to fold
-          a gear into — creating moved to the "+" tile in the list below
-          — so the header IS the toolbar here and stays on phones. */}
-      <header className="mb-6 flex items-center justify-between gap-4">
+      {/* Desktop-only, except in selection mode: the search row below
+          carries the phone gear, and the bottom tab bar already says
+          which page this is. Selection mode is the exception — it holds
+          "Delete selected" with a live count, which is destructive and
+          count-dependent, so it stays visible with explicit buttons. */}
+      <header
+        className={`mb-6 items-center justify-between gap-4 sm:flex ${selectionMode ? "flex" : "hidden"}`}
+      >
         <h2 className="text-lg font-bold">{copy.title}</h2>
         {books.length > 0 &&
           (selectionMode ? (
@@ -300,7 +318,26 @@ export function GroupsPage({ type }: { type: GroupType }) {
               </button>
             </div>
           ) : (
-            <>
+            <button
+              onClick={handleToggleSelectionMode}
+              className="hidden rounded-lg border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover) sm:block"
+            >
+              Select…
+            </button>
+          ))}
+      </header>
+
+      {books.length > 0 && (
+        <ToolbarRow>
+          <div className="flex items-center gap-2">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search"
+              aria-label={`Search ${copy.title.toLowerCase()} by name`}
+              className={`${TOOLBAR_CONTROL_CLASS} min-w-0 flex-1 sm:max-w-xs`}
+            />
+            {!selectionMode && (
               <button
                 onClick={() => setActionsOpen(true)}
                 aria-label={`${copy.title} actions`}
@@ -308,15 +345,10 @@ export function GroupsPage({ type }: { type: GroupType }) {
               >
                 <GearIcon />
               </button>
-              <button
-                onClick={handleToggleSelectionMode}
-                className="hidden rounded-lg border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover) sm:block"
-              >
-                Select…
-              </button>
-            </>
-          ))}
-      </header>
+            )}
+          </div>
+        </ToolbarRow>
+      )}
 
       {actionsOpen && (
         <ActionSheet
@@ -328,7 +360,10 @@ export function GroupsPage({ type }: { type: GroupType }) {
 
       {isLoading && <p className="text-sm text-(--color-text-dim)">Loading…</p>}
 
-      {!isLoading && groups.length === 0 && <p className="text-sm text-(--color-text-dim)">{copy.empty}</p>}
+      {!isLoading && allGroups.length === 0 && <p className="text-sm text-(--color-text-dim)">{copy.empty}</p>}
+      {!isLoading && allGroups.length > 0 && groups.length === 0 && (
+        <p className="text-sm text-(--color-text-dim)">Nothing matches “{search.trim()}”.</p>
+      )}
 
       <div className="flex flex-col gap-6">
         {/* Always first, and always present — deliberately outside the

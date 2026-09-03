@@ -61,10 +61,17 @@ function DuelSideCard({
         isWinner ? "border-(--color-accent)" : "border-(--color-border)"
       } ${canVote ? "cursor-pointer hover:border-(--color-accent)" : "cursor-default"}`}
     >
-      <div className="relative aspect-2/3 w-full bg-(--color-border)">
+      {/* max-h caps how tall a full-width 2:3 cover can get. Two of
+          these sit side by side, so on a phone each is ~160px wide and
+          the untamed aspect ratio made it ~240px tall — a single duel
+          then filled most of the viewport, and a round of eight was an
+          enormous scroll. The cap crops rather than letterboxes
+          (CoverImage uses object-cover), which loses a little art but
+          keeps a whole match on screen. */}
+      <div className="relative aspect-2/3 max-h-36 w-full bg-(--color-border) sm:max-h-56">
         <CoverImage book={coverImageBook} />
       </div>
-      <div className="p-3">
+      <div className="p-2.5 sm:p-3">
         <h4 className="truncate text-sm font-semibold">{side.title}</h4>
         <p className="truncate text-xs text-(--color-text-dim)">{side.author}</p>
         <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-(--color-border)">
