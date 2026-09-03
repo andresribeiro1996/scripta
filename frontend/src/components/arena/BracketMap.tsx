@@ -187,6 +187,7 @@ function RoundRow({
   mirrored,
   feedsInward,
   receivesFromOutside,
+  widthRatio,
   onOpen
 }: {
   duels: Duel[];
@@ -194,6 +195,10 @@ function RoundRow({
   mirrored: boolean;
   feedsInward: boolean;
   receivesFromOutside: boolean;
+  /** This row's tile width as a fraction of its CELL, so every tile in
+   *  the bracket comes out the same absolute width. See BracketMap's
+   *  `tileRatio` for the arithmetic. */
+  widthRatio: number;
   onOpen: (side: DuelSide, duel: Duel) => void;
 }) {
   const outward = mirrored ? "top-0" : "bottom-0";
@@ -214,14 +219,12 @@ function RoundRow({
               <span className={`absolute left-1/2 ${inward} h-1.5 border-l border-(--color-border) sm:h-2`} aria-hidden />
             )}
 
-            {/* Capped and centred. Round 1 has four tiles to a row so
-                the cap never binds there, but the semis have one per
-                half — left to stretch, that put a 30px cover at the far
-                left of a 375px box with the percentage stranded at the
-                other end. The connectors are positioned against the
-                CELL, not the tile, so centring the tile inside it keeps
-                every stub meeting the tile's own centre. */}
-            <div className="mx-auto w-full max-w-56 px-0.5 py-2 sm:px-1 sm:py-2.5">
+            {/* Every match is the same width whatever round it's in —
+                see BracketMap's `tileRatio`. The connectors are
+                positioned against the CELL rather than the tile, so
+                centring a narrower tile inside its cell keeps every stub
+                meeting the tile's own centre. */}
+            <div className="mx-auto px-0.5 py-2 sm:px-1 sm:py-2.5" style={{ width: `${widthRatio * 100}%` }}>
               <MatchTile duel={duel} onOpen={(side) => onOpen(side, duel)} />
             </div>
 
@@ -281,6 +284,16 @@ export function BracketMap({ tournament }: { tournament: TournamentView }) {
   const top = sideRounds.map((duels) => duels.slice(0, Math.ceil(duels.length / 2)));
   const bottom = sideRounds.map((duels) => duels.slice(Math.ceil(duels.length / 2)));
 
+  // Every row spans the same total width, so a row of `c` cells has
+  // cells of W/c. To give every tile the same absolute width — that of
+  // the busiest row's cell, W/N — a tile takes c/N of its own cell.
+  // Round 1 (c === N) fills its cell; the semis (c === 1, N === 4) take
+  // a quarter of theirs. Without this, tiles grew as the bracket
+  // narrowed: 93px in round 1 against 224px in the semis, for identical
+  // content.
+  const maxPerRow = Math.max(1, ...sideRounds.map((duels) => Math.ceil(duels.length / 2)));
+  const tileRatio = (cells: number) => cells / maxPerRow;
+
   function labelFor(roundIdx: number): string {
     const perSide = top[roundIdx]!.length;
     if (perSide === 1) return "Semis";
@@ -307,6 +320,7 @@ export function BracketMap({ tournament }: { tournament: TournamentView }) {
           mirrored={false}
           feedsInward={roundIdx < top.length - 1 || hasCentre}
           receivesFromOutside={roundIdx > 0}
+          widthRatio={tileRatio(duels.length)}
           onOpen={(side, duel) => setOpen({ side, duel })}
         />
       ))}
@@ -314,12 +328,12 @@ export function BracketMap({ tournament }: { tournament: TournamentView }) {
       {finalDuel && (
         <div className="flex flex-col">
           <p className="text-center text-[8.5px] font-semibold tracking-wide text-(--color-accent) uppercase sm:text-[10px]">Final</p>
-          <div className="relative mx-auto flex w-full max-w-56 flex-col justify-center">
+          <div className="relative flex w-full flex-col justify-center">
             {/* Receives from BOTH halves, so it takes a stub on each edge
                 — the only cell in the bracket that does. */}
             <span className="absolute top-0 left-1/2 h-1.5 border-l border-(--color-border) sm:h-2" aria-hidden />
             <span className="absolute bottom-0 left-1/2 h-1.5 border-l border-(--color-border) sm:h-2" aria-hidden />
-            <div className="w-full px-0.5 py-2 sm:px-1 sm:py-2.5">
+            <div className="mx-auto px-0.5 py-2 sm:px-1 sm:py-2.5" style={{ width: `${tileRatio(1) * 100}%` }}>
               <MatchTile duel={finalDuel} onOpen={(side) => setOpen({ side, duel: finalDuel })} />
               {champion && (
                 <p className="mt-1 truncate text-center text-[10px] font-semibold text-(--color-accent) sm:text-[11px]">
@@ -342,6 +356,7 @@ export function BracketMap({ tournament }: { tournament: TournamentView }) {
             mirrored
             feedsInward={roundIdx < bottom.length - 1 || hasCentre}
             receivesFromOutside={roundIdx > 0}
+            widthRatio={tileRatio(duels.length)}
             onOpen={(side, duel) => setOpen({ side, duel })}
           />
         );
