@@ -31,35 +31,36 @@ Then either import a `library.json` (see `exporter/`) through the app, or point 
 
 ## Testing on a phone
 
-For a device on the same Wi-Fi, swap both `dev` commands above for `dev:mobile`:
+For a device on the same Wi-Fi, one command from the repo root:
+
+```bash
+node scripts/test-on-phone.mjs
+```
+
+Installs either side's dependencies if they're missing, creates `backend/.env` from `.env.example` with generated secrets if it doesn't exist yet, then runs both dev servers with their output prefixed `[backend]`/`[frontend]` in one terminal. Open the `[frontend]` process's "Network:" url on the phone. Ctrl-C stops both — cleanly, including the `tsx watch`/Vite child processes underneath, not just the top-level `npm` ones. Pass `LAN_IP=192.168.1.20` before the command if it guesses the wrong network interface (a VPN or Docker bridge is the usual cause).
+
+That script is just a wrapper — it installs, then runs exactly the two commands below itself. Worth knowing about directly for troubleshooting, or if you'd rather run each side in its own terminal:
 
 ```bash
 cd backend  && npm run dev:mobile   # prints the LAN address it's serving on
 cd frontend && npm run dev:mobile   # Vite prints a "Network:" url — open that on the phone
 ```
 
-That's the whole setup. No `.env` editing: the backend script detects this machine's LAN address and sets `PUBLIC_API_URL` (so cover/gallery images, which are absolute urls, resolve from the device) and `ALLOW_LAN_ORIGINS` (so CORS accepts the phone's origin) for that run only. The frontend derives its API base from whatever host it was loaded from, so the device calls the right backend on its own. Pass `LAN_IP=192.168.1.20 npm run dev:mobile` if the detected address is wrong — a VPN or Docker bridge is the usual cause.
+No `.env` editing beyond the one-time creation above: the backend script detects this machine's LAN address and sets `PUBLIC_API_URL` (so cover/gallery images, which are absolute urls, resolve from the device) and `ALLOW_LAN_ORIGINS` (so CORS accepts the phone's origin) for that run only. The frontend derives its API base from whatever host it was loaded from, so the device calls the right backend on its own.
 
 One thing this doesn't cover — **Google login and the social connections.** Their callback urls (`GOOGLE_CALLBACK_URL`, `OAUTH_SUCCESS_REDIRECT_URL`, each platform's `*_CALLBACK_URL`) point at `localhost`, so the redirect dead-ends on the device. Sign in with email/password for LAN testing, or point those at the LAN address and register it with each provider first.
 
 ### PWA install / offline
 
-Service workers need a secure context, and a LAN address over plain HTTP isn't one — `dev:mobile` above is enough for browsing the app on a phone, but "Add to Home Screen", the `autoUpdate` flow, and the `workbox` runtime caching in `frontend/vite.config.ts` all need HTTPS. Also, the service worker is only ever emitted in a **production build** — `npm run dev` deliberately skips it (see `frontend/README.md`'s PWA section), so this needs a real build, not the dev server.
+Service workers need a secure context, and a LAN address over plain HTTP isn't one — the setup above is enough for browsing the app on a phone, but "Add to Home Screen", the `autoUpdate` flow, and the `workbox` runtime caching in `frontend/vite.config.ts` all need HTTPS. Also, the service worker is only ever emitted in a **production build** — `npm run dev` deliberately skips it (see `frontend/README.md`'s PWA section), so this needs a real build, not the dev server.
 
-One-time setup, from the repo root:
-
-```bash
-node scripts/gen-mobile-certs.mjs
-```
-
-Prefers [`mkcert`](https://github.com/FiloSottile/mkcert) if it's installed (`brew install mkcert` / `choco install mkcert` / see its README for Linux) — trusted with zero browser warnings once its root CA is also on the phone, and the script prints exactly how to get it there (AirDrop, cable, whatever's easiest) and where to install it in Settings on iOS/Android. Falls back to a plain self-signed cert via `openssl` if `mkcert` isn't around — works the same, just with an "unsafe site" warning to tap through on first load.
-
-Then:
+Same script, one extra flag — it generates a cert first if one doesn't exist yet, then runs the frontend's `preview:mobile` (build + serve) instead of `dev:mobile`:
 
 ```bash
-cd backend  && npm run dev:mobile          # same as above — now serves https once it finds the cert
-cd frontend && npm run preview:mobile      # builds, then serves the build on the LAN, over https
+node scripts/test-on-phone.mjs --https
 ```
+
+Or by hand: `node scripts/gen-mobile-certs.mjs` once, from the repo root, then `dev:mobile`/`preview:mobile` as above (they pick the cert up automatically). Cert generation prefers [`mkcert`](https://github.com/FiloSottile/mkcert) if it's installed (`brew install mkcert` / `choco install mkcert` / see its README for Linux) — trusted with zero browser warnings once its root CA is also on the phone, and the script prints exactly how to get it there (AirDrop, cable, whatever's easiest) and where to install it in Settings on iOS/Android. Falls back to a plain self-signed cert via `openssl` if `mkcert` isn't around — works the same, just with an "unsafe site" warning to tap through on first load.
 
 `preview:mobile` is a real production build, not a shortcut — it also makes sure the build's baked-in `VITE_API_URL` matches whatever address/protocol the backend is actually serving on that run, which the workbox caching rules need to match traffic against. Open the "Network:" url it prints on the phone; once the cert is trusted there, install works exactly like a normal PWA — home screen icon, offline app shell, cached library/covers.
 
