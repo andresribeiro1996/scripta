@@ -1,7 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
 import { Fragment, useEffect, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
-import { fetchLibrary } from "../api/library";
 import { useAuth } from "../auth/AuthContext";
 import { OfflineBanner } from "../components/OfflineBanner";
 
@@ -43,11 +41,6 @@ const TAB_ITEMS = NAV_GROUPS[0].items;
  *  this existed (see git history on DashboardPage.tsx). */
 export function DashboardLayout() {
   const { session, logout } = useAuth();
-  // Same ["library"] cache LibraryPage/GroupsPage read — this just needs
-  // the background color override (lib/libraryStyle.ts), so no extra
-  // network round trip in practice, it resolves straight from cache.
-  const { data: library } = useQuery({ queryKey: ["library"], queryFn: fetchLibrary });
-  const backgroundColor = library?.data.style?.backgroundColor ?? undefined;
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => {
@@ -96,7 +89,15 @@ export function DashboardLayout() {
         </div>
       </aside>
 
-      <main className="min-w-0 flex-1 pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))] lg:pb-0" style={{ backgroundColor }}>
+      {/* No user background color here on purpose. This element wraps the
+          ENTIRE signed-in app — every route, the page headers, the
+          toolbars — so painting the Library style's `backgroundColor` on
+          it meant one library setting recolored Settings, Library style,
+          Gallery and Murals too, and stranded the header's
+          `--color-text` title on an arbitrary color. That background now
+          belongs to LibraryCanvas, which wraps only the book grid; see
+          its comment for the whole boundary. */}
+      <main className="min-w-0 flex-1 pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))] lg:pb-0">
         <OfflineBanner />
         <Outlet />
       </main>

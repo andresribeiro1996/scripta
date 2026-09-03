@@ -30,7 +30,10 @@ import {
   cardFontFamilyCss,
   effectiveCardStyle,
   extractPerCardStyle,
-  gridColumnsCss,
+  CARD_OVERLAY_COMPACT_WIDTH,
+  CARD_OVERLAY_TEXT_MIN_WIDTH,
+  PHONE_COLUMNS_AT_DEFAULT_SIZE,
+  PHONE_GRID_BREAKPOINT,
   resolveBlockStyle,
   resolveBorderColor,
   resolveLibraryStyle,
@@ -307,10 +310,89 @@ console.log("\n13. Text formatting — cardBold/cardItalic (cards) and bold/ital
   );
 }
 
-console.log("\n14. gridColumnsCss — clamps the grid column floor to the available width");
+console.log("\n14. The phone grid: default size gives PHONE_COLUMNS_AT_DEFAULT_SIZE, and the slider still works");
 {
-  check("default floor (200) is clamped with min()", gridColumnsCss(200) === "min(200px, 100%)");
-  check("smallest slider value (120) is clamped the same way", gridColumnsCss(120) === "min(120px, 100%)");
+  // Models index.css's `.book-grid` rule under the phone media query:
+  //   minmax(max(40px, calc((100% - 4*gap) / 5 * floor / 200)), 1fr)
+  // followed by auto-fill packing. The REAL rule is CSS and is verified
+  // against a live browser engine separately — this guards the numbers
+  // it depends on, which is what actually drifts.
+  function phoneGrid(canvasWidth: number, cardMinWidth: number, gap: number) {
+    const oneOfFive = (canvasWidth - gap * (PHONE_COLUMNS_AT_DEFAULT_SIZE - 1)) / PHONE_COLUMNS_AT_DEFAULT_SIZE;
+    const scaled = (oneOfFive * cardMinWidth) / DEFAULT_LIBRARY_STYLE.cardMinWidth;
+    const floor = Math.max(CARD_MIN_WIDTH_RANGE.min, scaled);
+    const columns = Math.floor((canvasWidth + gap) / (floor + gap));
+    return { columns, cardWidth: (canvasWidth - gap * (columns - 1)) / columns };
+  }
+
+  // A 360px phone, less PageContainer's 16px of padding a side.
+  const canvas = 328;
+  const gap = DEFAULT_LIBRARY_STYLE.cardGap;
+
+  const atDefault = phoneGrid(canvas, DEFAULT_LIBRARY_STYLE.cardMinWidth, gap);
+  check(
+    `the default card size lands on exactly ${PHONE_COLUMNS_AT_DEFAULT_SIZE} columns`,
+    atDefault.columns === PHONE_COLUMNS_AT_DEFAULT_SIZE,
+    `${atDefault.columns} columns of ${atDefault.cardWidth.toFixed(1)}px`
+  );
+
+  // The regression this whole section exists for: the floor must NOT be
+  // a hard cap. With one, every setting collapsed to the same ~53px card
+  // and the slider did nothing on a phone.
+  const atMax = phoneGrid(canvas, CARD_MIN_WIDTH_RANGE.max, gap);
+  const atMin = phoneGrid(canvas, CARD_MIN_WIDTH_RANGE.min, gap);
+  check(
+    "a larger card size really does give a phone bigger cards (the floor scales, it isn't capped)",
+    atMax.cardWidth > atDefault.cardWidth,
+    `${atMax.cardWidth.toFixed(1)}px at max vs ${atDefault.cardWidth.toFixed(1)}px at default`
+  );
+  check(
+    "a smaller card size really does give a phone more columns",
+    atMin.columns > atDefault.columns,
+    `${atMin.columns} columns at min vs ${atDefault.columns} at default`
+  );
+
+  // The point of this round of changes: at the largest card size a phone
+  // card has to be wide enough for the overlay to actually render, or
+  // titles are unreachable on a phone no matter what the user sets.
+  check(
+    `at the largest card size a phone card (${atMax.cardWidth.toFixed(1)}px) clears CARD_OVERLAY_TEXT_MIN_WIDTH (${CARD_OVERLAY_TEXT_MIN_WIDTH})`,
+    atMax.cardWidth >= CARD_OVERLAY_TEXT_MIN_WIDTH,
+    `${atMax.cardWidth.toFixed(1)} vs ${CARD_OVERLAY_TEXT_MIN_WIDTH}`
+  );
+
+  // ...and the floor still can't scale down into single-digit pixels.
+  check(
+    `the smallest card size is held at CARD_MIN_WIDTH_RANGE.min (${CARD_MIN_WIDTH_RANGE.min}px), not scaled below it`,
+    atMin.cardWidth >= CARD_MIN_WIDTH_RANGE.min - 1,
+    `${atMin.cardWidth.toFixed(1)}px`
+  );
+}
+
+console.log("\n15. Overlay tiers are ordered, and reachable");
+{
+  check(
+    "the hide threshold is below the compact threshold",
+    CARD_OVERLAY_TEXT_MIN_WIDTH < CARD_OVERLAY_COMPACT_WIDTH,
+    `${CARD_OVERLAY_TEXT_MIN_WIDTH} vs ${CARD_OVERLAY_COMPACT_WIDTH}`
+  );
+  // A desktop card at the default settings must sit in the FULL tier —
+  // the compact/hide tiers are for genuinely small cards, and it would
+  // be a bug for an ordinary desktop grid to render title-only.
+  const desktopCard = (DEFAULT_LIBRARY_STYLE.contentMaxWidth - DEFAULT_LIBRARY_STYLE.cardGap * 4) / 5;
+  check(
+    `a default desktop card (${desktopCard.toFixed(1)}px) is in the full tier, well clear of compact`,
+    desktopCard > CARD_OVERLAY_COMPACT_WIDTH,
+    `${desktopCard.toFixed(1)} vs ${CARD_OVERLAY_COMPACT_WIDTH}`
+  );
+}
+
+console.log("\n16. The phone rule can't reach a desktop-width grid");
+{
+  check(
+    `PHONE_GRID_BREAKPOINT (${PHONE_GRID_BREAKPOINT}) is below the default content width`,
+    PHONE_GRID_BREAKPOINT < DEFAULT_LIBRARY_STYLE.contentMaxWidth
+  );
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

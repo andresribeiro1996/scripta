@@ -23,6 +23,7 @@ import { useParams } from "react-router-dom";
 import { fetchSharedLibrary } from "../api/sharedLibrary";
 import { BookCard } from "../components/BookCard";
 import { BookGrid } from "../components/BookGrid";
+import { LibraryCanvas } from "../components/LibraryCanvas";
 import { PageContainer } from "../components/PageContainer";
 import { orderLibraryBooks } from "../lib/libraryOrder";
 import { bookKey } from "../lib/merge";
@@ -64,18 +65,20 @@ export function SharedLibraryPage() {
   }
 
   return (
-    <PageContainer style={style}>
+    <PageContainer maxWidth={style.contentMaxWidth}>
       <header className="mb-6">
         <h1 className="text-lg font-bold">{data.data.name || "Library"}</h1>
       </header>
       {books.length === 0 ? (
         <p className="text-sm text-(--color-text-dim)">This library is empty.</p>
       ) : (
-        <BookGrid style={style}>
-          {displayBooks.map((book, i) => (
-            <BookCard key={String(book.ContentID ?? bookKey(book) ?? i)} book={book} onClick={() => {}} style={style} />
-          ))}
-        </BookGrid>
+        <LibraryCanvas style={style}>
+          <BookGrid style={style}>
+            {displayBooks.map((book, i) => (
+              <BookCard key={String(book.ContentID ?? bookKey(book) ?? i)} book={book} onClick={() => {}} style={style} />
+            ))}
+          </BookGrid>
+        </LibraryCanvas>
       )}
     </PageContainer>
   );

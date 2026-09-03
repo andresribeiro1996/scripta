@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { GalleryImage } from "../api/gallery";
 import { BookCard } from "../components/BookCard";
 import { BookGrid } from "../components/BookGrid";
+import { LibraryCanvas } from "../components/LibraryCanvas";
 import { CoverPickerModal } from "../components/CoverPickerModal";
 import { OptionsMenu } from "../components/OptionsMenu";
 import { PageContainer } from "../components/PageContainer";
@@ -263,7 +264,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
   const coverBook = coverBookKey ? books.find((b) => bookKey(b) === coverBookKey) : null;
 
   return (
-    <PageContainer style={style}>
+    <PageContainer maxWidth={style.contentMaxWidth}>
       <header className="mb-6 flex items-center justify-between gap-4">
         <h2 className="text-lg font-bold">{copy.title}</h2>
         {books.length > 0 &&
@@ -375,21 +376,23 @@ export function GroupsPage({ type }: { type: GroupType }) {
                 // library style — series/book overrides never touch
                 // layout fields (see PerCardStyle's type), so there's
                 // nothing to resolve here regardless of which group this is.
-                <BookGrid style={style}>
-                  {members.map((book, i) => (
-                    <BookCard
-                      key={String(book.ContentID ?? i)}
-                      book={book}
-                      onClick={() => {}}
-                      style={effectiveCardStyle(style, bookSeriesGroup.get(bookKey(book))?.style, book._style as PerCardStyle | undefined)}
-                      onOpenStyle={selectionMode ? undefined : () => setStyleBookKey(bookKey(book))}
-                      onOpenCoverPicker={selectionMode ? undefined : () => setCoverBookKey(bookKey(book))}
-                      selectable={selectionMode}
-                      selected={selectedKeys.has(bookKey(book))}
-                      onToggleSelect={handleToggleSelect}
-                    />
-                  ))}
-                </BookGrid>
+                <LibraryCanvas style={style}>
+                  <BookGrid style={style}>
+                    {members.map((book, i) => (
+                      <BookCard
+                        key={String(book.ContentID ?? i)}
+                        book={book}
+                        onClick={() => {}}
+                        style={effectiveCardStyle(style, bookSeriesGroup.get(bookKey(book))?.style, book._style as PerCardStyle | undefined)}
+                        onOpenStyle={selectionMode ? undefined : () => setStyleBookKey(bookKey(book))}
+                        onOpenCoverPicker={selectionMode ? undefined : () => setCoverBookKey(bookKey(book))}
+                        selectable={selectionMode}
+                        selected={selectedKeys.has(bookKey(book))}
+                        onToggleSelect={handleToggleSelect}
+                      />
+                    ))}
+                  </BookGrid>
+                </LibraryCanvas>
               )}
             </section>
           );

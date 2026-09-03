@@ -292,9 +292,18 @@ export function BookCard({
         // own, so those chrome elements' fixed `text-[10.5px]` stay fixed
         // regardless.
         fontFamily: cardFontFamilyCss(style.cardFontFamily),
-        fontSize: `${style.cardFontSize}px`
+        fontSize: `${style.cardFontSize}px`,
+        // Makes this card a query container so index.css can drop the
+        // overlay text once the card actually renders narrow. It has to
+        // be a container query rather than a media query or a check
+        // against `cardMinWidth`: that setting is only the grid's
+        // minmax() FLOOR, and `1fr` tracks stretch cards well past it by
+        // however much the row had left over — so the same setting
+        // produces very different real card widths, and only the card
+        // itself knows which it got.
+        containerType: "inline-size"
       }}
-      className={`group relative cursor-pointer overflow-hidden bg-(--color-border) transition-transform ${style.cardShadow ? "shadow-sm" : ""} ${style.cardHoverEffect && !selectable ? "hover:-translate-y-0.5 hover:scale-[1.01] hover:shadow-lg" : ""} ${dragEnabled ? "select-none" : ""} ${isDragging ? "touch-none opacity-60" : ""}`}
+      className={`book-card ${hasCover ? "book-card--covered" : ""} group relative cursor-pointer overflow-hidden bg-(--color-border) transition-transform ${style.cardShadow ? "shadow-sm" : ""} ${style.cardHoverEffect && !selectable ? "hover:-translate-y-0.5 hover:scale-[1.01] hover:shadow-lg" : ""} ${dragEnabled ? "select-none" : ""} ${isDragging ? "touch-none opacity-60" : ""}`}
     >
       <CoverImage book={book} onHasCoverChange={setHasCover} alt={showOverlayText ? "" : String(book.Title ?? "Book cover")} />
 
@@ -362,7 +371,7 @@ export function BookCard({
           the default (on) showTitleAuthor setting. */}
       {showOverlayText && (
         <div
-          className="absolute inset-0"
+          className="book-card-overlay absolute inset-0"
           style={{
             background: `linear-gradient(to top, rgba(10,8,6,${scrimPeak}) 0%, rgba(10,8,6,${scrimMid}) 32%, rgba(10,8,6,0) 62%)`,
             pointerEvents: "none"
@@ -376,8 +385,22 @@ export function BookCard({
         </div>
       )}
 
+      {/* Both this and the scrim above carry `book-card-overlay`, and
+          index.css sizes them together in three tiers as the card gets
+          narrower: full text, then a compact tier (tighter padding,
+          smaller type, title only — `book-card-author`/`-status` are
+          hidden, since on a narrow card the title is the only line worth
+          the room), then hidden outright. The scrim goes with the text
+          rather than staying behind on its own, which would leave an
+          unexplained dark smear across the bottom of the cover.
+
+          The hide tier is scoped to `book-card--covered`, so it can
+          never fire on a book with no cover: without artwork, hiding the
+          text would leave a bare icon identifying nothing, which is the
+          same invariant `showOverlayText` enforces just above. See
+          CARD_OVERLAY_TEXT_MIN_WIDTH in lib/libraryStyle.ts. */}
       {showOverlayText && (
-        <div className="absolute right-0 bottom-0 left-0 p-3.5">
+        <div className="book-card-overlay absolute right-0 bottom-0 left-0 p-3.5">
           {/* Sizes are `em`, relative to the root's cardFontSize (see its
               style comment above) — text-shadow stays unconditional for
               legibility over the cover art regardless of chosen color.
@@ -393,19 +416,19 @@ export function BookCard({
               class's own 500 weight show through unchanged when the
               toggle is off, matching the pre-existing look exactly. */}
           <h3
-            className="mb-0.5 text-[1.15em] leading-tight [text-shadow:0_1px_3px_rgba(0,0,0,0.4)]"
+            className="book-card-title mb-0.5 text-[1.15em] leading-tight [text-shadow:0_1px_3px_rgba(0,0,0,0.4)]"
             style={{ color: overlayTextColor, fontWeight: style.cardBold ? 700 : undefined, fontStyle: style.cardItalic ? "italic" : undefined }}
           >
             {String(book.Title ?? "Untitled")}
           </h3>
           <div
-            className="mb-1 text-[0.9em]"
+            className="book-card-author mb-1 text-[0.9em]"
             style={{ color: overlayTextColor, opacity: 0.82, fontWeight: style.cardBold ? 700 : undefined, fontStyle: style.cardItalic ? "italic" : undefined }}
           >
             {String(book.Attribution ?? "Unknown author")}
           </div>
           <div
-            className="text-[0.8em] font-medium"
+            className="book-card-status text-[0.8em] font-medium"
             style={{ color: overlayTextColor, opacity: 0.6, fontWeight: style.cardBold ? 700 : undefined, fontStyle: style.cardItalic ? "italic" : undefined }}
           >
             {label}

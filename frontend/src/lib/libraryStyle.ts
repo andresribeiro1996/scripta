@@ -1,7 +1,9 @@
 // User-adjustable display settings — how the book grid looks (card size,
 // spacing, corner rounding, border, shadow, hover animation, aspect
-// ratio, overlay darkness, whether title/author show) and the page area
-// around it (background color, content width, padding). Lives on the
+// ratio, overlay darkness, whether title/author show) and the canvas
+// behind it (background color, content width, padding). Those last three
+// are scoped to the books' own canvas, never the app shell — see
+// components/LibraryCanvas.tsx. Lives on the
 // library document (`data.style`, see api/library.ts) rather than
 // localStorage: it's a per-account preference the user set deliberately,
 // same reasoning as the library `name` (lib/groups.ts's Group and that
@@ -140,15 +142,27 @@ export interface LibraryStyleSettings {
   /** Italicize the overlay text. */
   cardItalic: boolean;
 
-  // --- Page (the area around the cards) ---
-  /** CSS color for the main content area's background. `null` means "use
-   *  the theme default" (--color-bg) — no override applied. */
+  // --- Library canvas (the area behind the cards) ---
+  //
+  // These three are scoped to the book grid's own canvas, NOT to the
+  // application shell — see components/LibraryCanvas.tsx for where that
+  // line is drawn and why it moved there.
+  /** CSS color for the canvas behind the book grid. `null` means "no
+   *  override" — the canvas stays transparent and the app's own theme
+   *  background (--color-bg) shows through. Deliberately does NOT reach
+   *  the page header, the search/filter toolbar, the nav, or any route
+   *  without a book grid. */
   backgroundColor: string | null;
-  /** Max width of the page content (the grid + header), in px. */
+  /** Max width of the page content (the grid AND the header above it),
+   *  in px — applied by PageContainer, the one style field that stays
+   *  there, since a grid and its header have to share a width or they
+   *  visibly stop lining up. */
   contentMaxWidth: number;
-  /** Horizontal page padding, in px. */
+  /** Horizontal padding INSIDE the canvas, in px — the gap between a
+   *  custom background's edge and the cards. Not page padding: it can't
+   *  move the app's own headers or menus. */
   contentPaddingX: number;
-  /** Vertical page padding, in px. */
+  /** Vertical padding inside the canvas, in px. */
   contentPaddingY: number;
 }
 
@@ -174,12 +188,27 @@ export const DEFAULT_LIBRARY_STYLE: LibraryStyleSettings = {
   cardBold: false,
   cardItalic: false,
   backgroundColor: null,
-  contentMaxWidth: 1152, // matches the old hardcoded `max-w-6xl` (72rem) LibraryPage/GroupsPage used before this setting existed
-  contentPaddingX: 20, // matches the old hardcoded `px-5`
-  contentPaddingY: 32 // matches the old hardcoded `py-8`
+  contentMaxWidth: 1152, // matches PageContainer's own default width (72rem)
+  // 0, not the 20/32 these were when they applied to the whole PAGE.
+  // They now pad the book canvas INSIDE PageContainer's own padding
+  // (see LibraryCanvas), so any non-zero default would indent the grid
+  // from the page header sitting right above it — for every user who
+  // never opens these settings. At 0 with no custom background the
+  // canvas is completely invisible, which is the correct default; the
+  // padding becomes worth reaching for once a background color makes
+  // the panel's edges visible.
+  contentPaddingX: 0,
+  contentPaddingY: 0
 };
 
-export const CARD_MIN_WIDTH_RANGE = { min: 120, max: 320, step: 10 };
+// min: 40, not the original 120 — the old floor topped out at 2 columns
+// on a phone (a ~328px canvas fits 2×120 and not 3), which is exactly
+// the ceiling this range exists to lift. 40 clears PHONE_MIN_COLUMNS
+// with headroom: at the default 16px gap a 360px phone fits 6 columns,
+// so 5 is comfortably reachable rather than only just. 200 (the default)
+// still lands on the step grid from `min`, which
+// scripts/test-library-style.mts asserts for every numeric default.
+export const CARD_MIN_WIDTH_RANGE = { min: 40, max: 320, step: 10 };
 export const CARD_GAP_RANGE = { min: 0, max: 32, step: 2 };
 export const CARD_RADIUS_RANGE = { min: 0, max: 32, step: 2 };
 export const CARD_BORDER_WIDTH_RANGE = { min: 0, max: 6, step: 1 };
@@ -464,6 +493,60 @@ export function resolveBorderColor(color: string | null, opacityPercent: number)
   return `rgba(${r}, ${g}, ${b}, ${opacityPercent / 100})`;
 }
 
-export function gridColumnsCss(cardMinWidth: number): string {
-  return `min(${cardMinWidth}px, 100%)`;
-}
+/** Overlay text tiers, by the card's REAL rendered width.
+ *
+ *  A card's width comes from the grid's `1fr` tracks, not from
+ *  `cardMinWidth` — the same setting yields very different widths
+ *  depending on how much room the row had left over — so only the card
+ *  itself knows which tier it's in. That's why these are enforced by CSS
+ *  container queries (see index.css's `.book-card` rules and
+ *  BookCard.tsx's `containerType`) rather than by a media query or a
+ *  check against the setting.
+ *
+ *  Below COMPACT the overlay tightens its padding, drops a step in size
+ *  and shows the title alone — deliberately NOT a hard cut to nothing,
+ *  because a phone at a large card size lands right around here and a
+ *  title is exactly what's wanted there.
+ *
+ *  Below MIN the overlay goes entirely: at that width even one line of
+ *  the title is a few illegible pixels smeared over the artwork, and a
+ *  plain cover tile is the honest rendering. */
+export const CARD_OVERLAY_TEXT_MIN_WIDTH = 88;
+export const CARD_OVERLAY_COMPACT_WIDTH = 132;
+
+/** The number of columns a phone shows AT THE DEFAULT card size.
+ *
+ *  One `cardMinWidth` serves every screen, and a desktop-tuned value —
+ *  the 200px default included — is wider than half a phone, so
+ *  `auto-fill` resolved it to a SINGLE full-bleed card per row: one
+ *  cover filled the viewport and the library became unbrowsable.
+ *
+ *  The phone rule (index.css, behind a max-width query) scales the
+ *  column floor so that the DEFAULT card size lands on exactly this many
+ *  columns, and every other setting scales in proportion. It is
+ *  deliberately NOT a hard `min()` cap, which is what an earlier version
+ *  did: that pinned phone cards at ~53px whatever the slider said, so
+ *  the setting was inert on phones AND the card could never reach a
+ *  width where its title was legible. Scaling keeps the slider
+ *  meaningful — larger settings really do give a phone bigger cards and
+ *  fewer columns, right up to a title-sized card.
+ *
+ *  The floor never drops below CARD_MIN_WIDTH_RANGE.min, so the smallest
+ *  settings converge rather than scaling down to a few unusable pixels.
+ *
+ *  Confined to phone widths on purpose. Applied unconditionally it would
+ *  also fire on a tablet and on a desktop whose `contentMaxWidth` the
+ *  user deliberately narrowed — and people narrow that precisely BECAUSE
+ *  they want large cards in a narrow column, so overriding it would swap
+ *  one wrong-card-size bug for another. */
+export const PHONE_COLUMNS_AT_DEFAULT_SIZE = 5;
+
+/** The width below which PHONE_COLUMNS_AT_DEFAULT_SIZE applies —
+ *  Tailwind's `sm` breakpoint, the same line the page header and toolbar
+ *  switch on, so the grid never changes shape at a width where nothing
+ *  else does. Kept in sync by hand with the `@media` query in index.css;
+ *  CSS can't read a TS constant, and the alternative (a <style> tag
+ *  rendered per grid) would spend a style element on a number that never
+ *  varies at runtime. */
+export const PHONE_GRID_BREAKPOINT = 640;
+

@@ -8,12 +8,10 @@ import { PageContainer } from "../components/PageContainer";
 import { ShareModal } from "../components/ShareModal";
 import { MoveToFolderModal } from "../components/murals/MoveToFolderModal";
 import { MuralFolderTree } from "../components/murals/MuralFolderTree";
-import { useLibrary } from "../hooks/useLibrary";
 import { useMurals } from "../hooks/useMurals";
 import { useMuralFolders } from "../hooks/useMuralFolders";
 import type { Mural, MuralFolder } from "../lib/murals";
 import { buildTree, collectSubtreeIds, folderPath } from "../lib/muralFolders";
-import { resolveLibraryStyle } from "../lib/libraryStyle";
 
 // Field + direction combined into one option each, rather than two
 // separate selects (field, then direction) — four clearly-labeled
@@ -37,12 +35,10 @@ const SORT_OPTIONS: Array<{ value: SortBy; label: string }> = [
  *  its own full page rather than an inline expandable section — a
  *  freeform canvas needs real room. */
 export function MuralsListPage() {
-  const { data: library } = useLibrary();
   const { data: muralsData, isLoading, create, rename, remove, move: moveMural, setCover, clearCover, share, unshare } = useMurals();
   const { data: foldersData, create: createFolder, rename: renameFolder, move: moveFolderApi, remove: removeFolder } = useMuralFolders();
   const navigate = useNavigate();
   const confirm = useConfirm();
-  const style = resolveLibraryStyle(library?.data.style);
   const murals = muralsData ?? [];
   const folders = foldersData ?? [];
 
@@ -127,7 +123,7 @@ export function MuralsListPage() {
   const movingFolder = movingFolderId ? folders.find((f) => f.id === movingFolderId) : null;
 
   return (
-    <PageContainer style={style}>
+    <PageContainer>
       <header className="mb-6 flex items-center justify-between gap-4">
         <h2 className="text-lg font-bold">Murals</h2>
       </header>

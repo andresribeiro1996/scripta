@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { BookCard } from "../components/BookCard";
 import { BookGrid } from "../components/BookGrid";
+import { LibraryCanvas } from "../components/LibraryCanvas";
+import { PageContainer } from "../components/PageContainer";
 import { CardAppearanceSection, CardBorderSection, CardContentSection, CardTextSection, Section, SliderRow } from "../components/StyleControls";
 import { useLibrary } from "../hooks/useLibrary";
 import {
@@ -85,13 +87,14 @@ export function LibraryStylePage() {
   const usingCustomBackground = draft.backgroundColor !== null;
 
   return (
-    <div className="mx-auto max-w-6xl px-5 py-8">
+    <PageContainer>
       <header className="mb-6">
         <h2 className="text-lg font-bold">Library style</h2>
         <p className="text-sm text-(--color-text-dim)">
-          Everything about how your cards and the page around them look — applied across Library, Series, and Collections.
-          A series can override its own card appearance from its own style panel (Series page) — those settings take
-          priority over these for that series' cards.
+          Everything about how your cards and the canvas behind them look — applied across Library, Series, and
+          Collections. These settings stay inside your books: they never restyle the app's own menus, page headers, or
+          search and filter bar. A series can override its own card appearance from its own style panel (Series page) —
+          those settings take priority over these for that series' cards.
         </p>
       </header>
 
@@ -107,7 +110,7 @@ export function LibraryStylePage() {
         <CardContentSection idPrefix="lib" draft={draft} onApply={applyCardPatch} onSaveNow={saveCardPatchNow} />
         <CardTextSection idPrefix="lib" draft={draft} onApply={applyCardPatch} onSaveNow={saveCardPatchNow} />
 
-        <Section title="Page" wide>
+        <Section title="Library canvas" wide>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <div className="mb-1 flex items-center justify-between">
@@ -151,14 +154,14 @@ export function LibraryStylePage() {
             <div />
             <SliderRow
               id="content-padding-x"
-              label="Page padding (sides)"
+              label="Padding around books (sides)"
               value={draft.contentPaddingX}
               range={CONTENT_PADDING_RANGE}
               onChange={(v) => applyDraft({ ...draft, contentPaddingX: v })}
             />
             <SliderRow
               id="content-padding-y"
-              label="Page padding (top/bottom)"
+              label="Padding around books (top/bottom)"
               value={draft.contentPaddingY}
               range={CONTENT_PADDING_RANGE}
               onChange={(v) => applyDraft({ ...draft, contentPaddingY: v })}
@@ -177,37 +180,35 @@ export function LibraryStylePage() {
       <h3 className="mb-3 text-sm font-semibold text-(--color-text-dim)">
         Preview{!library?.data.books.length && " (sample books — your library is empty)"}
       </h3>
-      {/* This frame is what actually makes background color, content
-          width, and padding visible here — before this, those three
-          settings changed nothing on this page (BookGrid alone only
-          knows about card layout, not the page around it), so there was
-          no way to see their effect without leaving the page to check
-          Library/Series/Collections. Border, drawn against the frame's
-          own edge, is what makes width/padding legible; background fills
-          the whole frame so its extent is obvious too. */}
-      <div className="overflow-hidden rounded-xl border border-(--color-border)" style={{ backgroundColor: draft.backgroundColor ?? "var(--color-bg)" }}>
-        <div
-          className="mx-auto"
-          style={{
-            maxWidth: `${draft.contentMaxWidth}px`,
-            paddingLeft: `${draft.contentPaddingX}px`,
-            paddingRight: `${draft.contentPaddingX}px`,
-            paddingTop: `${draft.contentPaddingY}px`,
-            paddingBottom: `${draft.contentPaddingY}px`
-          }}
-        >
+      {/* The real LibraryCanvas, not a hand-rolled imitation of it —
+          this used to duplicate its background/width/padding math inline
+          and would silently drift from the component the moment either
+          changed. The dashed outline is the only thing added on top: it
+          marks where the canvas ENDS, which is the whole point of this
+          preview now that these settings stop at the books instead of
+          washing over the entire page. With no custom background set the
+          canvas is transparent, so without an outline there'd be nothing
+          to see at all.
+
+          `contentMaxWidth` is deliberately NOT applied here: it belongs
+          to PageContainer (the page's own width, header included), not
+          to the canvas, and this preview panel is far narrower than any
+          value the slider offers — showing it here could only ever
+          mislead. */}
+      <div className="overflow-hidden rounded-xl border border-dashed border-(--color-border)">
+        <LibraryCanvas style={draft}>
           <BookGrid style={draft}>
             {previewBooks.map((book, i) => (
               <BookCard key={String(book.ContentID ?? i)} book={book} onClick={() => {}} style={draft} />
             ))}
           </BookGrid>
-        </div>
+        </LibraryCanvas>
       </div>
       <p className="mt-2 text-xs text-(--color-text-dim)">
-        Mirrors the real page's background, width, and padding — though width is capped by how much room this panel
-        has, so a very large content width may look the same here even as it keeps growing on the actual Library page.
-        Hover a card above to see the shadow and hover animation settings.
+        The dashed edge is where your canvas ends — the app's own menus, page header, and search bar sit outside it and
+        keep the app's theme no matter what you set here. Content width isn't previewed: this panel is narrower than
+        every value that slider offers. Hover a card above to see the shadow and hover animation settings.
       </p>
-    </div>
+    </PageContainer>
   );
 }

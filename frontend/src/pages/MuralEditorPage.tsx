@@ -9,7 +9,7 @@ import { ShareModal } from "../components/ShareModal";
 import { useGalleryImages } from "../hooks/useGalleryImages";
 import { useLibrary } from "../hooks/useLibrary";
 import { useMurals } from "../hooks/useMurals";
-import { resolveLibraryStyle, type BlockStyle } from "../lib/libraryStyle";
+import { type BlockStyle } from "../lib/libraryStyle";
 import { addBlock, duplicateBlock, removeBlock, updateBlock, type BlockLayout, type BlockType, type MuralBlock } from "../lib/murals";
 
 /** /dashboard/murals/:muralId — one mural's canvas (see
@@ -23,7 +23,6 @@ export function MuralEditorPage() {
   const { data: library } = useLibrary();
   const { data: muralsData, isLoading, rename, saveBlocks, share, unshare } = useMurals();
   const { images } = useGalleryImages();
-  const style = resolveLibraryStyle(library?.data.style);
   const books = library?.data.books ?? [];
   const murals = muralsData ?? [];
   const mural = murals.find((m) => m.id === muralId);
@@ -108,7 +107,7 @@ export function MuralEditorPage() {
 
   if (isLoading) {
     return (
-      <PageContainer style={style}>
+      <PageContainer>
         <p className="text-sm text-(--color-text-dim)">Loading…</p>
       </PageContainer>
     );
@@ -116,7 +115,7 @@ export function MuralEditorPage() {
 
   if (!mural) {
     return (
-      <PageContainer style={style}>
+      <PageContainer>
         <p className="text-sm text-(--color-text-dim)">
           No mural with that id. <Link to="/dashboard/murals" className="text-(--color-accent) transition-opacity hover:opacity-80">Back to Murals</Link>.
         </p>
@@ -125,7 +124,7 @@ export function MuralEditorPage() {
   }
 
   return (
-    <PageContainer style={style}>
+    <PageContainer>
       <header className="mb-6 flex items-center justify-between gap-4">
         <div>
           <Link to="/dashboard/murals" className="text-xs text-(--color-text-dim) hover:text-(--color-text)">

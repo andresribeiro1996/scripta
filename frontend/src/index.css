@@ -235,3 +235,103 @@ input[type="range"]:focus-visible::-moz-range-thumb {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
+
+/* The book-card grid. `auto-fill` + a `minmax` floor turns the single
+   "card size" setting into responsive columns without breakpoint tiers;
+   BookGrid.tsx feeds the two numbers in as custom properties (it can't
+   hold the media query below, which is the whole reason this lives in
+   CSS at all). `min(..., 100%)` keeps a card wider than the container
+   from overflowing it. */
+.book-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(var(--card-floor), 100%), 1fr));
+}
+
+/* Phone widths only (Tailwind's `sm`; kept in sync by hand with
+   PHONE_GRID_BREAKPOINT / PHONE_COLUMNS_AT_DEFAULT_SIZE in
+   lib/libraryStyle.ts).
+
+   One `cardMinWidth` serves every screen, and a desktop-tuned value —
+   the 200px default included — is wider than half a phone, so `auto-fill`
+   resolved it to a SINGLE full-bleed card per row: one cover filled the
+   viewport and the library became unbrowsable.
+
+   So the floor is SCALED, not capped. `(100% - 4 * gap) / 5` is the width
+   of one card in a five-column row; multiplying by `--card-scale` (the
+   user's setting over the default, computed unitless in BookGrid.tsx)
+   makes the default land on exactly five columns while every other
+   setting stays proportional. `--card-floor-min` is
+   CARD_MIN_WIDTH_RANGE.min, so the smallest settings converge instead of
+   scaling down to a few unusable pixels.
+
+   `--card-scale` has to be unitless: `calc(<length> * <length>)` is
+   invalid, and an invalid declaration is DROPPED, which sends a phone
+   straight back to the one-full-bleed-column bug this rule exists to
+   fix — silently, since nothing errors.
+
+   An earlier version used a hard `min(var(--card-floor), ...)` cap here.
+   It produced the right default and nothing else: phone cards were
+   pinned near 53px whatever the slider said, so the card-size setting
+   was inert on phones and a card could never reach a width where its
+   own title was legible. Scaling keeps the slider meaningful — on a
+   360px phone the range runs from six ~41px columns up to three ~99px
+   columns, and that last one is wide enough for the compact title tier
+   below to render.
+
+   Scoped to phones on purpose. Applied unconditionally it would also
+   fire on a tablet and on a desktop whose `contentMaxWidth` the user
+   deliberately narrowed — and people narrow that precisely BECAUSE they
+   want large cards in a narrow column, so overriding it would swap one
+   wrong-card-size bug for another. */
+@media (max-width: 639px) {
+  .book-grid {
+    grid-template-columns: repeat(
+      auto-fill,
+      minmax(max(var(--card-floor-min), calc((100% - 4 * var(--card-gap)) / 5 * var(--card-scale))), 1fr)
+    );
+  }
+}
+
+/* Overlay text tiers, keyed on the card's REAL rendered width — see
+   CARD_OVERLAY_TEXT_MIN_WIDTH / CARD_OVERLAY_COMPACT_WIDTH in
+   lib/libraryStyle.ts, kept in sync with these by hand.
+
+   CONTAINER queries, not media queries: a card's width comes from the
+   grid's `1fr` tracks, so it depends on how much space the row had left
+   over, not on the viewport or on the cardMinWidth setting alone — two
+   cards at the same setting on the same screen can land either side of
+   these lines. BookCard.tsx sets `container-type: inline-size` for this.
+
+   Compact tier: tighter padding, a step down in type, and the title
+   alone. `font-size` is set on the overlay wrapper rather than on each
+   line, so the `em`-based sizes inside (1.15em / 0.9em / 0.8em) scale
+   with it and keep their relative proportions. This tier exists so a
+   phone at a large card size still shows a title — a hard cut straight
+   to nothing meant titles could never render on a phone at all. */
+@container (max-width: 132px) {
+  .book-card-overlay {
+    padding: 6px;
+    font-size: 0.82em;
+  }
+  .book-card-author,
+  .book-card-status {
+    display: none;
+  }
+}
+
+/* Hide tier: below this even one line of the title is a few illegible
+   pixels over the artwork, so a plain cover tile is the honest
+   rendering.
+
+   Scoped to `--covered`: a book with NO cover renders an icon-only
+   fallback panel, so hiding its title would leave a card identifying
+   nothing at all — the same invariant BookCard's `showOverlayText`
+   already enforces by forcing the text on for coverless books
+   regardless of the showTitleAuthor setting. Illegibly small text still
+   beats a blank tile there. */
+@container (max-width: 88px) {
+  .book-card--covered .book-card-overlay {
+    display: none;
+  }
+}
+

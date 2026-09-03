@@ -4,7 +4,6 @@ import { useGalleryImages } from "../hooks/useGalleryImages";
 import { useLibrary } from "../hooks/useLibrary";
 import { useConfirm } from "../components/ConfirmDialog";
 import { PageContainer } from "../components/PageContainer";
-import { resolveLibraryStyle } from "../lib/libraryStyle";
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -23,7 +22,6 @@ export function GalleryPage() {
   const { images, isLoading, upload } = useGalleryImages();
   const deleteImage = useDeleteGalleryImage();
   const { data: library } = useLibrary();
-  const style = resolveLibraryStyle(library?.data.style);
   const confirm = useConfirm();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -72,7 +70,7 @@ export function GalleryPage() {
   }
 
   return (
-    <PageContainer style={style}>
+    <PageContainer>
       <header className="mb-6 flex items-center justify-between gap-4">
         <h2 className="text-lg font-bold">Gallery</h2>
         <button

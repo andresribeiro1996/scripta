@@ -7,8 +7,10 @@ import { fetchLibrary, saveLibrary, type LibraryDocument } from "../api/library"
 import { BookCard } from "../components/BookCard";
 import { BookDetailSheet } from "../components/BookDetailSheet";
 import { BookGrid } from "../components/BookGrid";
+import { LibraryCanvas } from "../components/LibraryCanvas";
 import { CoverPickerModal } from "../components/CoverPickerModal";
 import { LibraryToolbar } from "../components/LibraryToolbar";
+import { OptionsMenu } from "../components/OptionsMenu";
 import { PageContainer } from "../components/PageContainer";
 import { PerCardStylePanel } from "../components/PerCardStylePanel";
 import { ShareModal } from "../components/ShareModal";
@@ -321,8 +323,8 @@ export function LibraryPage() {
   const detailBook = detailBookKey ? books.find((b) => bookKey(b) === detailBookKey) : null;
 
   return (
-    <PageContainer style={style}>
-      <header className="mb-6 flex items-center justify-between gap-4">
+    <PageContainer maxWidth={style.contentMaxWidth}>
+      <header className="mb-4 flex items-center justify-between gap-3 sm:mb-6 sm:gap-4">
         {editingName ? (
           <input
             autoFocus
@@ -343,52 +345,84 @@ export function LibraryPage() {
               setEditingName(true);
             }}
             title="Rename your library"
-            className="text-left text-lg font-bold transition-colors hover:text-(--color-accent)"
+            className="min-w-0 truncate text-left text-lg font-bold transition-colors hover:text-(--color-accent)"
           >
             {library?.data.name || "Library"}
           </button>
         )}
+        {/* Selection mode is deliberately NOT collapsed into the menu on
+            mobile — "Delete selected" is destructive and count-dependent,
+            so it stays visible with its live count next to it. Everything
+            else folds behind one gear below `sm`; see the menu below. */}
         <div className="flex items-center gap-2">
-          {books.length > 0 &&
-            (selectionMode ? (
-              <>
-                <span className="text-sm text-(--color-text-dim)">{selectedKeys.size} selected</span>
-                <button
-                  onClick={() => void handleDeleteSelected()}
-                  disabled={selectedKeys.size === 0}
-                  className="rounded-lg bg-(--color-danger) px-3.5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
-                >
-                  Delete selected
-                </button>
-                <button
-                  onClick={handleToggleSelectionMode}
-                  className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover)"
-                >
-                  Cancel
-                </button>
-              </>
-            ) : (
+          {books.length > 0 && selectionMode && (
+            <>
+              <span className="text-sm text-(--color-text-dim)">{selectedKeys.size} selected</span>
+              <button
+                onClick={() => void handleDeleteSelected()}
+                disabled={selectedKeys.size === 0}
+                className="min-h-11 rounded-lg bg-(--color-danger) px-3.5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+              >
+                Delete selected
+              </button>
               <button
                 onClick={handleToggleSelectionMode}
-                className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover)"
+                className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover)"
+              >
+                Cancel
+              </button>
+            </>
+          )}
+
+          {/* Below `sm` these three actions cost two wrapped rows of a
+              phone's viewport — the single scarcest resource on this
+              screen — so they collapse into the same OptionsMenu gear
+              every series/mural card already uses. `sm:hidden` /
+              `hidden sm:flex` rather than a JS breakpoint so there's no
+              resize listener and no hydration-time layout flash. */}
+          {!selectionMode && (
+            <div className="sm:hidden">
+              <OptionsMenu
+                title="Library actions"
+                triggerClassName="flex h-11 w-11 items-center justify-center rounded-lg border border-(--color-border) bg-(--color-surface) text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"
+                items={[
+                  ...(books.length > 0 ? [{ label: "Select…", onClick: handleToggleSelectionMode }] : []),
+                  { label: "Share", onClick: () => setSharing(true) },
+                  {
+                    label: importing ? "Importing…" : books.length > 0 ? "Import more…" : "Import library…",
+                    onClick: () => {
+                      if (!importing) fileInputRef.current?.click();
+                    }
+                  }
+                ]}
+              />
+            </div>
+          )}
+
+          <div className={`hidden items-center gap-2 sm:flex ${selectionMode ? "sm:hidden" : ""}`}>
+            {books.length > 0 && (
+              <button
+                onClick={handleToggleSelectionMode}
+                className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover)"
               >
                 Select…
               </button>
-            ))}
-          <button
-            onClick={() => setSharing(true)}
-            className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover)"
-          >
-            Share
-          </button>
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={importing}
-            title={books.length > 0 ? "Matching books are merged with what's already here, not duplicated." : undefined}
-            className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover) disabled:opacity-60"
-          >
-            {importing ? "Importing…" : books.length > 0 ? "Import more…" : "Import library…"}
-          </button>
+            )}
+            <button
+              onClick={() => setSharing(true)}
+              className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover)"
+            >
+              Share
+            </button>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={importing}
+              title={books.length > 0 ? "Matching books are merged with what's already here, not duplicated." : undefined}
+              className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover) disabled:opacity-60"
+            >
+              {importing ? "Importing…" : books.length > 0 ? "Import more…" : "Import library…"}
+            </button>
+          </div>
           <input
             ref={fileInputRef}
             type="file"
@@ -469,32 +503,34 @@ export function LibraryPage() {
             suppressClickAfterDragRef.current = true;
           }}
         >
-          <BookGrid style={style}>
-            {displayBooks.map((book, i) => {
-              const seriesGroup = bookSeriesGroup.get(bookKey(book));
-              const cardStyle = effectiveCardStyle(style, seriesGroup?.style, book._style as PerCardStyle | undefined);
-              return (
-                <BookCard
-                  key={String(book.ContentID ?? i)}
-                  book={book}
-                  onClick={() => {
-                    if (suppressClickAfterDragRef.current) {
-                      suppressClickAfterDragRef.current = false;
-                      return;
-                    }
-                    setDetailBookKey(bookKey(book));
-                  }}
-                  style={cardStyle}
-                  reorderable={!selectionMode}
-                  onOpenStyle={selectionMode ? undefined : () => setStyleBookKey(bookKey(book))}
-                  onOpenCoverPicker={selectionMode ? undefined : () => setCoverBookKey(bookKey(book))}
-                  selectable={selectionMode}
-                  selected={selectedKeys.has(bookKey(book))}
-                  onToggleSelect={handleToggleSelect}
-                />
-              );
-            })}
-          </BookGrid>
+          <LibraryCanvas style={style}>
+            <BookGrid style={style}>
+              {displayBooks.map((book, i) => {
+                const seriesGroup = bookSeriesGroup.get(bookKey(book));
+                const cardStyle = effectiveCardStyle(style, seriesGroup?.style, book._style as PerCardStyle | undefined);
+                return (
+                  <BookCard
+                    key={String(book.ContentID ?? i)}
+                    book={book}
+                    onClick={() => {
+                      if (suppressClickAfterDragRef.current) {
+                        suppressClickAfterDragRef.current = false;
+                        return;
+                      }
+                      setDetailBookKey(bookKey(book));
+                    }}
+                    style={cardStyle}
+                    reorderable={!selectionMode}
+                    onOpenStyle={selectionMode ? undefined : () => setStyleBookKey(bookKey(book))}
+                    onOpenCoverPicker={selectionMode ? undefined : () => setCoverBookKey(bookKey(book))}
+                    selectable={selectionMode}
+                    selected={selectedKeys.has(bookKey(book))}
+                    onToggleSelect={handleToggleSelect}
+                  />
+                );
+              })}
+            </BookGrid>
+          </LibraryCanvas>
         </DndContext>
       )}
 
