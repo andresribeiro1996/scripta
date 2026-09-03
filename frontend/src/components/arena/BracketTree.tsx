@@ -23,7 +23,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import type { TournamentView } from "../../api/arena";
 import { OptionSheet } from "../Sheet";
-import { TOOLBAR_CONTROL_CLASS, toolbarIconClass } from "../Toolbar";
 
 function ChevronLeftIcon() {
   return (
@@ -87,12 +86,30 @@ export function BracketTree({ tournament, renderDuel }: { tournament: Tournament
           are the edges of a real structure, and silently looping from
           one to the other would misrepresent it. */}
       <div className="sm:hidden">
-        <div className="mb-4 flex items-center gap-2">
+        {/* One segmented control, not three buttons in a row. The
+            three used to sit in a `gap-2` flex with their own borders
+            and rounding, which read as three separate things that
+            happened to be adjacent — you had to work out that the
+            arrows drove the dropdown between them. Sharing a single
+            border and splitting it with dividers says "these operate on
+            the same value" without a label needing to.
+
+            The container owns the border, rounding, background and
+            `overflow-hidden`; the children carry none of their own, so
+            their hover fills clip to the rounded corners instead of
+            squaring them off. `items-stretch` makes all three the full
+            height, so the dividers run edge to edge — with the default
+            `items-center` they'd stop short and the seams would look
+            broken. This deliberately doesn't reuse toolbarIconClass() or
+            TOOLBAR_CONTROL_CLASS: both bring their own border, rounding
+            and background, which is exactly what a segment must not
+            have. */}
+        <div className="mb-4 flex items-stretch overflow-hidden rounded-lg border border-(--color-border) bg-(--color-surface)">
           <button
             onClick={() => setSelectedRound(roundNumbers[currentIndex - 1]!)}
             disabled={currentIndex <= 0}
             aria-label="Previous round"
-            className={`${toolbarIconClass()} disabled:opacity-40`}
+            className="flex w-11 shrink-0 items-center justify-center text-(--color-text-dim) enabled:hover:bg-(--color-surface-hover) enabled:hover:text-(--color-text) disabled:opacity-40"
           >
             <ChevronLeftIcon />
           </button>
@@ -100,7 +117,7 @@ export function BracketTree({ tournament, renderDuel }: { tournament: Tournament
           <button
             onClick={() => setPicking(true)}
             aria-label={`Showing ${roundLabel(activeRound!)} — choose a round`}
-            className={`${TOOLBAR_CONTROL_CLASS} flex min-w-0 flex-1 items-center justify-between gap-2 font-semibold`}
+            className="flex min-h-11 min-w-0 flex-1 items-center justify-between gap-2 border-x border-(--color-border) px-3 text-sm font-semibold hover:bg-(--color-surface-hover)"
           >
             <span className="truncate">{roundLabel(activeRound!)}</span>
             <span className="flex shrink-0 items-center gap-2 text-xs font-normal text-(--color-text-dim)">
@@ -115,7 +132,7 @@ export function BracketTree({ tournament, renderDuel }: { tournament: Tournament
             onClick={() => setSelectedRound(roundNumbers[currentIndex + 1]!)}
             disabled={currentIndex < 0 || currentIndex >= roundNumbers.length - 1}
             aria-label="Next round"
-            className={`${toolbarIconClass()} disabled:opacity-40`}
+            className="flex w-11 shrink-0 items-center justify-center text-(--color-text-dim) enabled:hover:bg-(--color-surface-hover) enabled:hover:text-(--color-text) disabled:opacity-40"
           >
             <ChevronRightIcon />
           </button>
