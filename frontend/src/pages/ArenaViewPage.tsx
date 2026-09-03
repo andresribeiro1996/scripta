@@ -8,6 +8,7 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { resolveTiebreak, settleDuelEarly } from "../api/arena";
 import { useAuth } from "../auth/AuthContext";
+import { BracketMap } from "../components/arena/BracketMap";
 import { BracketTree } from "../components/arena/BracketTree";
 import { DuelCard } from "../components/arena/DuelCard";
 import { useArena } from "../hooks/useArena";
@@ -19,6 +20,7 @@ export function ArenaViewPage() {
   const [voteError, setVoteError] = useState<string | null>(null);
   const [ownerActionError, setOwnerActionError] = useState<string | null>(null);
   const [busyDuelId, setBusyDuelId] = useState<string | null>(null);
+  const [view, setView] = useState<"matches" | "bracket">("matches");
 
   if (isLoading) {
     return (
@@ -84,6 +86,31 @@ export function ArenaViewPage() {
       {voteError && <p className="mb-4 text-sm text-(--color-danger)">{voteError}</p>}
       {ownerActionError && <p className="mb-4 text-sm text-(--color-danger)">{ownerActionError}</p>}
 
+      {/* Two views of the same duels rather than one compromised view.
+          "Matches" is where you vote — full cards with covers, tallies
+          and countdowns, which are far too tall to see a bracket's shape
+          through. "Bracket" is the shape: compact two-row tiles wired up
+          with elbow connectors, read-only. Neither can be the other
+          without losing what it's for. Defaults to Matches, since voting
+          is what most visits are for. */}
+      <div className="mb-4 flex items-stretch overflow-hidden rounded-lg border border-(--color-border) bg-(--color-surface) sm:w-64">
+        {(["matches", "bracket"] as const).map((mode, i) => (
+          <button
+            key={mode}
+            onClick={() => setView(mode)}
+            aria-pressed={view === mode}
+            className={`min-h-11 flex-1 px-3 text-sm font-semibold capitalize ${i > 0 ? "border-l border-(--color-border)" : ""} ${
+              view === mode ? "bg-(--color-accent-soft) text-(--color-accent)" : "text-(--color-text-dim) hover:bg-(--color-surface-hover)"
+            }`}
+          >
+            {mode}
+          </button>
+        ))}
+      </div>
+
+      {view === "bracket" && <BracketMap tournament={tournament} />}
+
+      {view === "matches" && (
       <BracketTree
         tournament={tournament}
         renderDuel={(duelId) => {
@@ -123,6 +150,7 @@ export function ArenaViewPage() {
           );
         }}
       />
+      )}
     </div>
   );
 }
