@@ -3,6 +3,8 @@ import type { GalleryImage } from "../api/gallery";
 import { BookCard } from "../components/BookCard";
 import { BookGrid } from "../components/BookGrid";
 import { LibraryCanvas } from "../components/LibraryCanvas";
+import { ActionSheet } from "../components/Sheet";
+import { GearIcon, PlusIcon, TOOLBAR_CONTROL_CLASS, TOOLBAR_ICON_BUTTON_CLASS, ToolbarRow } from "../components/Toolbar";
 import { CoverPickerModal } from "../components/CoverPickerModal";
 import { OptionsMenu } from "../components/OptionsMenu";
 import { PageContainer } from "../components/PageContainer";
@@ -33,13 +35,13 @@ const COPY: Record<GroupType, { title: string; noun: string; empty: string; crea
     noun: "series",
     empty:
       "No series yet. Series are picked up automatically from your books' Series field on import — or add one by hand below.",
-    createPlaceholder: "New series name…"
+    createPlaceholder: "New series"
   },
   collection: {
     title: "Collections",
     noun: "collection",
     empty: "No collections yet. Create one to start organizing your books your own way.",
-    createPlaceholder: "New collection name…"
+    createPlaceholder: "New collection"
   }
 };
 
@@ -50,6 +52,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
   const { data: library, isLoading, updateLibrary } = useLibrary();
   const { scrubBooks } = useMurals();
   const copy = COPY[type];
+  const [actionsOpen, setActionsOpen] = useState(false);
   const toast = useToast();
 
   const [newName, setNewName] = useState("");
@@ -265,7 +268,16 @@ export function GroupsPage({ type }: { type: GroupType }) {
 
   return (
     <PageContainer maxWidth={style.contentMaxWidth}>
-      <header className="mb-6 flex items-center justify-between gap-4">
+      {/* Desktop-only, except in selection mode. On a phone the title row
+          is pure overhead — the bottom tab bar already says which page
+          this is — so it collapses and its one action moves into the
+          toolbar row's gear below. Selection mode is the exception: it
+          carries "Delete selected" with a live count, which is
+          destructive and count-dependent, so it stays visible with
+          explicit buttons rather than hiding behind a gear. */}
+      <header
+        className={`mb-6 items-center justify-between gap-4 sm:flex ${selectionMode ? "flex" : "hidden"}`}
+      >
         <h2 className="text-lg font-bold">{copy.title}</h2>
         {books.length > 0 &&
           (selectionMode ? (
@@ -288,28 +300,61 @@ export function GroupsPage({ type }: { type: GroupType }) {
           ) : (
             <button
               onClick={handleToggleSelectionMode}
-              className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover)"
+              className="hidden rounded-lg border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover) sm:block"
             >
               Select…
             </button>
           ))}
       </header>
 
-      <form onSubmit={handleCreate} className="mb-6 flex gap-2">
-        <input
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-          placeholder={copy.createPlaceholder}
-          className="w-64 max-w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
+      <ToolbarRow>
+        <form onSubmit={handleCreate} className="flex items-center gap-2">
+          <input
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder={copy.createPlaceholder}
+            aria-label={`Name a new ${copy.noun}`}
+            className={`${TOOLBAR_CONTROL_CLASS} min-w-0 flex-1 sm:max-w-xs sm:flex-none`}
+          />
+          {/* Icon-only below `sm`: "Add collection" is nearly a third of a
+              375px row, and the field it submits is right beside it. The
+              words come back at `sm`, where there's room for them. */}
+          <button
+            type="submit"
+            disabled={creating || !newName.trim()}
+            aria-label={`Add ${copy.noun}`}
+            className={`${TOOLBAR_ICON_BUTTON_CLASS} border-(--color-accent) bg-(--color-accent) text-white hover:bg-(--color-accent) hover:text-white disabled:opacity-60 sm:hidden`}
+          >
+            <PlusIcon />
+          </button>
+          <button
+            type="submit"
+            disabled={creating || !newName.trim()}
+            className="hidden rounded-lg bg-(--color-accent) px-3.5 py-2.5 text-sm font-semibold text-white disabled:opacity-60 sm:block"
+          >
+            Add {copy.noun}
+          </button>
+          {/* Phone-only; the header that used to hold this is collapsed. */}
+          {books.length > 0 && !selectionMode && (
+            <button
+              type="button"
+              onClick={() => setActionsOpen(true)}
+              aria-label={`${copy.title} actions`}
+              className={`${TOOLBAR_ICON_BUTTON_CLASS} sm:hidden`}
+            >
+              <GearIcon />
+            </button>
+          )}
+        </form>
+      </ToolbarRow>
+
+      {actionsOpen && (
+        <ActionSheet
+          title={copy.title}
+          items={[{ label: "Select…", onClick: handleToggleSelectionMode }]}
+          onClose={() => setActionsOpen(false)}
         />
-        <button
-          type="submit"
-          disabled={creating || !newName.trim()}
-          className="rounded-lg bg-(--color-accent) px-3.5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
-        >
-          Add {copy.noun}
-        </button>
-      </form>
+      )}
 
       {isLoading && <p className="text-sm text-(--color-text-dim)">Loading…</p>}
 

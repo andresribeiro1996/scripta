@@ -4,6 +4,7 @@ import { useGalleryImages } from "../hooks/useGalleryImages";
 import { useLibrary } from "../hooks/useLibrary";
 import { useConfirm } from "../components/ConfirmDialog";
 import { PageContainer } from "../components/PageContainer";
+import { ToolbarRow } from "../components/Toolbar";
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -71,15 +72,20 @@ export function GalleryPage() {
 
   return (
     <PageContainer>
-      <header className="mb-6 flex items-center justify-between gap-4">
-        <h2 className="text-lg font-bold">Gallery</h2>
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          disabled={uploading}
-          className="rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
-        >
-          {uploading ? "Uploading…" : "Upload image…"}
-        </button>
+      {/* One row on a phone: the title goes (the bottom tab bar already
+          says which page this is) and Upload becomes the row, full width
+          — it's the page's only action, so a gear hiding a single item
+          would be a tap for nothing. The title comes back at `sm`. */}
+      <ToolbarRow>
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="hidden text-lg font-bold sm:block">Gallery</h2>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className="min-h-11 w-full rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-white disabled:opacity-60 sm:w-auto"
+          >
+            {uploading ? "Uploading…" : "Upload image…"}
+          </button>
         <input
           ref={fileInputRef}
           type="file"
@@ -91,14 +97,19 @@ export function GalleryPage() {
             e.target.value = "";
           }}
         />
-      </header>
+        </div>
+      </ToolbarRow>
 
       {uploadError && (
         <div className="mb-5 rounded-lg bg-(--color-danger-soft) px-3 py-2 text-sm text-(--color-danger)">{uploadError}</div>
       )}
 
+      {/* Desktop-only: there is no drag-and-drop on a touch screen, so on
+          a phone this was ~100px of viewport explaining a gesture that
+          cannot be performed. Uploading there goes through the button
+          above, which opens the OS file/photo picker. */}
       <div
-        className={`mb-6 flex items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-8 text-sm transition-colors ${
+        className={`mb-6 hidden items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-8 text-sm transition-colors sm:flex ${
           dragOver ? "border-(--color-accent) bg-(--color-accent-soft)" : "border-(--color-border)"
         }`}
         onDragOver={(e) => {

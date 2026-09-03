@@ -5,6 +5,8 @@ import { useConfirm } from "../components/ConfirmDialog";
 import { CoverPickerModal } from "../components/CoverPickerModal";
 import { OptionsMenu } from "../components/OptionsMenu";
 import { PageContainer } from "../components/PageContainer";
+import { OptionSheet } from "../components/Sheet";
+import { FolderIcon, SortIcon, TOOLBAR_CONTROL_CLASS, TOOLBAR_ICON_BUTTON_CLASS, ToolbarRow } from "../components/Toolbar";
 import { ShareModal } from "../components/ShareModal";
 import { MoveToFolderModal } from "../components/murals/MoveToFolderModal";
 import { MuralFolderTree } from "../components/murals/MuralFolderTree";
@@ -43,6 +45,7 @@ export function MuralsListPage() {
   const folders = foldersData ?? [];
 
   const [creating, setCreating] = useState(false);
+  const [sheet, setSheet] = useState<"sort" | "folder" | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
   const [coverMuralId, setCoverMuralId] = useState<string | null>(null);
@@ -124,7 +127,9 @@ export function MuralsListPage() {
 
   return (
     <PageContainer>
-      <header className="mb-6 flex items-center justify-between gap-4">
+      {/* Desktop-only. On a phone this row held nothing but the word
+          "Murals", which the bottom tab bar already says. */}
+      <header className="mb-6 hidden items-center justify-between gap-4 sm:flex">
         <h2 className="text-lg font-bold">Murals</h2>
       </header>
 
@@ -160,19 +165,6 @@ export function MuralsListPage() {
             ))}
           </nav>
 
-          <select
-            value={selectedFolderId ?? ""}
-            onChange={(e) => setSelectedFolderId(e.target.value || null)}
-            className="mb-3 w-full max-w-xs rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm md:hidden"
-          >
-            <option value="">All murals</option>
-            {buildTree(folders).map(({ folder }) => (
-              <option key={folder.id} value={folder.id}>
-                {folderPath(folders, folder.id).map((p) => p.name).join(" / ")}
-              </option>
-            ))}
-          </select>
-
           {isLoading && <p className="text-sm text-(--color-text-dim)">Loading…</p>}
 
           {!isLoading && murals.length === 0 && (
@@ -183,60 +175,122 @@ export function MuralsListPage() {
           )}
 
           {!isLoading && murals.length > 0 && (
-            // Each control gets its own small uppercase label above it — an
-            // unlabeled select (what this looked like before) reads as
-            // noise; a glance at "Sort" tells you what it does without
-            // having to open it first to find out. `items-end` keeps every
-            // control's own input/select bottom-aligned regardless of the
-            // label's height, so the row stays a clean line rather than the
-            // label pushing one control down more than the other.
-            <div className="mb-4 flex flex-wrap items-end gap-3">
-              <label className="flex flex-col gap-1">
-                <span className="text-[10.5px] font-semibold tracking-wide text-(--color-text-dim) uppercase">Search</span>
+            <ToolbarRow>
+              {/* Phone: one row — search, sort, folder. The three used to
+                  be a full-width folder select on its own line plus two
+                  labelled controls below it, which on a 375px phone cost
+                  more vertical space than the first row of murals. Each
+                  becomes a 44px icon opening a bottom sheet, matching the
+                  Library toolbar's filter and sort exactly, so the same
+                  gesture works on both pages. An icon can't show its
+                  current value, so it goes accent-coloured whenever its
+                  control is off its default — the only cue left once the
+                  labels are gone. */}
+              <div className="flex items-center gap-2 sm:hidden">
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Filter by name…"
-                  className="w-56 max-w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
+                  placeholder="Search"
+                  aria-label="Search murals by name"
+                  className={`${TOOLBAR_CONTROL_CLASS} min-w-0 flex-1`}
                 />
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-[10.5px] font-semibold tracking-wide text-(--color-text-dim) uppercase">Sort</span>
-                {/* appearance-none + a hand-drawn chevron, not the browser's
-                    own <select> arrow — the native one rendered flush
-                    against the box's right edge with no real breathing room
-                    from the border at this size, cramped rather than
-                    deliberate. pr-8 clears space for it; pointer-events-none
-                    on the chevron keeps clicks reaching the (invisibly
-                    stretched, same-size) real <select> underneath. */}
-                <div className="relative">
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value as SortBy)}
-                    className="w-full appearance-none rounded-lg border border-(--color-border) bg-(--color-surface) py-2 pr-8 pl-3 text-sm"
-                  >
-                    {SORT_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-(--color-text-dim)"
-                  >
-                    <polyline points="6 9 12 15 18 9" />
-                  </svg>
-                </div>
-              </label>
-            </div>
+                <button
+                  onClick={() => setSheet("sort")}
+                  aria-label={`Sort murals (${SORT_OPTIONS.find((o) => o.value === sortBy)?.label})`}
+                  className={`${TOOLBAR_ICON_BUTTON_CLASS} ${sortBy !== SORT_OPTIONS[0].value ? "text-(--color-accent)" : ""}`}
+                >
+                  <SortIcon />
+                </button>
+                <button
+                  onClick={() => setSheet("folder")}
+                  aria-label={`Folder (${selectedFolderId ? folderPath(folders, selectedFolderId).map((f) => f.name).join(" / ") : "All murals"})`}
+                  className={`${TOOLBAR_ICON_BUTTON_CLASS} ${selectedFolderId !== null ? "text-(--color-accent)" : ""}`}
+                >
+                  <FolderIcon />
+                </button>
+              </div>
+
+              {/* Desktop keeps the labelled controls: there's room, and a
+                  word beats an icon whose value you'd have to open a
+                  sheet to read. `items-end` bottom-aligns each control
+                  regardless of its label's height. */}
+              <div className="hidden flex-wrap items-end gap-3 sm:flex">
+                <label className="flex flex-col gap-1">
+                  <span className="text-[10.5px] font-semibold tracking-wide text-(--color-text-dim) uppercase">Search</span>
+                  <input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search"
+                    className="w-56 max-w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-[10.5px] font-semibold tracking-wide text-(--color-text-dim) uppercase">Sort</span>
+                  {/* appearance-none + a hand-drawn chevron, not the browser's
+                      own <select> arrow — the native one rendered flush
+                      against the box's right edge with no real breathing room
+                      from the border at this size, cramped rather than
+                      deliberate. pr-8 clears space for it; pointer-events-none
+                      on the chevron keeps clicks reaching the (invisibly
+                      stretched, same-size) real <select> underneath. */}
+                  <div className="relative">
+                    <select
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value as SortBy)}
+                      className="w-full appearance-none rounded-lg border border-(--color-border) bg-(--color-surface) py-2 pr-8 pl-3 text-sm"
+                    >
+                      {SORT_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-(--color-text-dim)"
+                    >
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </div>
+                </label>
+              </div>
+            </ToolbarRow>
+          )}
+
+          {sheet === "sort" && (
+            <OptionSheet
+              title="Sort murals"
+              options={SORT_OPTIONS}
+              value={sortBy}
+              onSelect={(v) => setSortBy(v as SortBy)}
+              onClose={() => setSheet(null)}
+            />
+          )}
+          {sheet === "folder" && (
+            <OptionSheet
+              title="Folder"
+              // "" stands in for "no folder selected" — OptionSheet keys
+              // on a string, and `null` isn't one. Mapped back on the way
+              // out, the same substitution the <select> this replaced
+              // already made with its empty-string <option>.
+              options={[
+                { value: "", label: "All murals" },
+                ...buildTree(folders).map(({ folder }) => ({
+                  value: folder.id,
+                  label: folderPath(folders, folder.id).map((p) => p.name).join(" / ")
+                }))
+              ]}
+              value={selectedFolderId ?? ""}
+              onSelect={(v) => setSelectedFolderId(v || null)}
+              onClose={() => setSheet(null)}
+            />
           )}
 
           {!isLoading && murals.length > 0 && filteredMurals.length === 0 && (
