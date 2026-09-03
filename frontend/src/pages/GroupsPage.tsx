@@ -4,7 +4,7 @@ import { BookCard } from "../components/BookCard";
 import { BookGrid } from "../components/BookGrid";
 import { LibraryCanvas } from "../components/LibraryCanvas";
 import { ActionSheet } from "../components/Sheet";
-import { GearIcon, PlusIcon, TOOLBAR_CONTROL_CLASS, TOOLBAR_ICON_BUTTON_CLASS, ToolbarRow } from "../components/Toolbar";
+import { GearIcon, PlusIcon, TOOLBAR_CONTROL_CLASS, ToolbarRow, toolbarIconClass } from "../components/Toolbar";
 import { CoverPickerModal } from "../components/CoverPickerModal";
 import { OptionsMenu } from "../components/OptionsMenu";
 import { PageContainer } from "../components/PageContainer";
@@ -341,7 +341,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
               <button
                 onClick={() => setActionsOpen(true)}
                 aria-label={`${copy.title} actions`}
-                className={`${TOOLBAR_ICON_BUTTON_CLASS} sm:hidden`}
+                className={`${toolbarIconClass()} sm:hidden`}
               >
                 <GearIcon />
               </button>

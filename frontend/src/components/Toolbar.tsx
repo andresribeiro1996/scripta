@@ -35,11 +35,33 @@ export function ToolbarRow({ children }: { children: ReactNode }) {
 export const TOOLBAR_CONTROL_CLASS =
   "min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-2.5 py-2.5 text-sm";
 
-/** Icon buttons in a ToolbarRow. Unlike a labelled control, an icon
- *  button has no text to widen it, so the 44px target has to be set
- *  explicitly or it collapses to the glyph. */
+/** Icon buttons in a ToolbarRow — geometry and chrome only, NO text
+ *  color. Unlike a labelled control, an icon button has no text to
+ *  widen it, so the 44px target has to be set explicitly or it collapses
+ *  to the glyph.
+ *
+ *  The color deliberately lives in toolbarIconClass() below rather than
+ *  here. It used to be baked in as `text-(--color-text-dim)`, and
+ *  callers that wanted an active icon appended `text-(--color-accent)`
+ *  — which silently did nothing. Both are single-class selectors of
+ *  equal specificity, so the winner is whichever Tailwind emits LATER in
+ *  the stylesheet, not whichever comes later in the class attribute, and
+ *  `text-dim` happens to be emitted after `accent`. Every "active"
+ *  filter and sort icon in the app stayed grey because of it. Keeping
+ *  the two colors mutually exclusive at the source makes the conflict
+ *  unrepresentable rather than merely fixed. */
 export const TOOLBAR_ICON_BUTTON_CLASS =
-  "flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-(--color-border) bg-(--color-surface) text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)";
+  "flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-(--color-border) bg-(--color-surface) hover:bg-(--color-surface-hover)";
+
+/** Full class for a toolbar icon button, including exactly one text
+ *  color. `active` means the control is off its default — the icon goes
+ *  accent-colored, which is the only cue left that a filter or sort is
+ *  doing something once the labels are gone. */
+export function toolbarIconClass(active = false): string {
+  return `${TOOLBAR_ICON_BUTTON_CLASS} ${
+    active ? "text-(--color-accent)" : "text-(--color-text-dim) hover:text-(--color-text)"
+  }`;
+}
 
 // Icons are drawn SVGs on a 24×24 viewBox centred on (12,12), never
 // Unicode glyphs — a character like "⚙" sits off-centre in its own cell

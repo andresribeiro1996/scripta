@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ActionSheet, OptionSheet } from "./Sheet";
-import { FilterIcon, GearIcon, SortIcon, TOOLBAR_CONTROL_CLASS, TOOLBAR_ICON_BUTTON_CLASS, ToolbarRow } from "./Toolbar";
+import { FilterIcon, GearIcon, SortIcon, TOOLBAR_CONTROL_CLASS, ToolbarRow, toolbarIconClass } from "./Toolbar";
 import type { OptionsMenuItem } from "./OptionsMenu";
 import { STATUS_FILTER_OPTIONS, SORT_OPTIONS, type SortKey, type StatusFilter } from "../lib/libraryView";
 
@@ -78,14 +78,14 @@ export function LibraryToolbar({
           <button
             onClick={() => setSheet("status")}
             aria-label={`Filter by status (${STATUS_FILTER_OPTIONS.find((o) => o.value === status)?.label})`}
-            className={`${TOOLBAR_ICON_BUTTON_CLASS} ${statusActive ? "text-(--color-accent)" : "text-(--color-text-dim)"}`}
+            className={toolbarIconClass(statusActive)}
           >
             <FilterIcon />
           </button>
           <button
             onClick={() => setSheet("sort")}
             aria-label={`Sort books (${SORT_OPTIONS.find((o) => o.value === sort)?.label})`}
-            className={`${TOOLBAR_ICON_BUTTON_CLASS} ${sortActive ? "text-(--color-accent)" : "text-(--color-text-dim)"}`}
+            className={toolbarIconClass(sortActive)}
           >
             <SortIcon />
           </button>
@@ -93,7 +93,7 @@ export function LibraryToolbar({
             <button
               onClick={() => setSheet("actions")}
               aria-label="Library actions"
-              className={`${TOOLBAR_ICON_BUTTON_CLASS} text-(--color-text-dim)`}
+              className={toolbarIconClass()}
             >
               <GearIcon />
             </button>

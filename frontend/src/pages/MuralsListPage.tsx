@@ -6,7 +6,7 @@ import { CoverPickerModal } from "../components/CoverPickerModal";
 import { OptionsMenu } from "../components/OptionsMenu";
 import { PageContainer } from "../components/PageContainer";
 import { OptionSheet } from "../components/Sheet";
-import { FolderIcon, PlusIcon, SortIcon, TOOLBAR_CONTROL_CLASS, TOOLBAR_ICON_BUTTON_CLASS, ToolbarRow } from "../components/Toolbar";
+import { FolderIcon, PlusIcon, SortIcon, TOOLBAR_CONTROL_CLASS, ToolbarRow, toolbarIconClass } from "../components/Toolbar";
 import { ShareModal } from "../components/ShareModal";
 import { MoveToFolderModal } from "../components/murals/MoveToFolderModal";
 import { MuralFolderTree } from "../components/murals/MuralFolderTree";
@@ -197,14 +197,14 @@ export function MuralsListPage() {
                 <button
                   onClick={() => setSheet("sort")}
                   aria-label={`Sort murals (${SORT_OPTIONS.find((o) => o.value === sortBy)?.label})`}
-                  className={`${TOOLBAR_ICON_BUTTON_CLASS} ${sortBy !== SORT_OPTIONS[0].value ? "text-(--color-accent)" : ""}`}
+                  className={toolbarIconClass(sortBy !== SORT_OPTIONS[0].value)}
                 >
                   <SortIcon />
                 </button>
                 <button
                   onClick={() => setSheet("folder")}
                   aria-label={`Folder (${selectedFolderId ? folderPath(folders, selectedFolderId).map((f) => f.name).join(" / ") : "All murals"})`}
-                  className={`${TOOLBAR_ICON_BUTTON_CLASS} ${selectedFolderId !== null ? "text-(--color-accent)" : ""}`}
+                  className={toolbarIconClass(selectedFolderId !== null)}
                 >
                   <FolderIcon />
                 </button>

@@ -23,7 +23,23 @@
 import { useEffect, useState, type ReactNode } from "react";
 import type { TournamentView } from "../../api/arena";
 import { OptionSheet } from "../Sheet";
-import { TOOLBAR_CONTROL_CLASS } from "../Toolbar";
+import { TOOLBAR_CONTROL_CLASS, toolbarIconClass } from "../Toolbar";
+
+function ChevronLeftIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="15 6 9 12 15 18" />
+    </svg>
+  );
+}
+
+function ChevronRightIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="9 6 15 12 9 18" />
+    </svg>
+  );
+}
 
 export function BracketTree({ tournament, renderDuel }: { tournament: TournamentView; renderDuel: (duelId: string) => ReactNode }) {
   const rounds = new Map<number, TournamentView["duels"]>();
@@ -52,6 +68,7 @@ export function BracketTree({ tournament, renderDuel }: { tournament: Tournament
   }, [selectedRound, roundNumbers, tournament.currentRound, tournament.status, lastRoundNumber]);
 
   const activeRound = selectedRound !== null && rounds.has(selectedRound) ? selectedRound : roundNumbers[0];
+  const currentIndex = roundNumbers.indexOf(activeRound!);
 
   function duelsIn(roundNumber: number) {
     return [...rounds.get(roundNumber)!].sort((a, b) => a.duelIndex - b.duelIndex);
@@ -61,21 +78,48 @@ export function BracketTree({ tournament, renderDuel }: { tournament: Tournament
 
   return (
     <>
-      {/* Phone: one round, chosen from a dropdown. */}
+      {/* Phone: one round, with arrows either side of the dropdown.
+          The dropdown alone meant two taps and a decision to move one
+          round along, which is the most common thing you do here —
+          walking the bracket forward. The arrows make that one tap, and
+          the dropdown stays for jumping straight to the final. Arrows
+          disable at the ends rather than wrapping: round 1 and the final
+          are the edges of a real structure, and silently looping from
+          one to the other would misrepresent it. */}
       <div className="sm:hidden">
-        <button
-          onClick={() => setPicking(true)}
-          aria-label={`Showing ${roundLabel(activeRound!)} — choose a round`}
-          className={`${TOOLBAR_CONTROL_CLASS} mb-4 flex w-full items-center justify-between font-semibold`}
-        >
-          <span>{roundLabel(activeRound!)}</span>
-          <span className="flex items-center gap-2 text-xs font-normal text-(--color-text-dim)">
-            {duelsIn(activeRound!).length} match{duelsIn(activeRound!).length === 1 ? "" : "es"}
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="6 9 12 15 18 9" />
-            </svg>
-          </span>
-        </button>
+        <div className="mb-4 flex items-center gap-2">
+          <button
+            onClick={() => setSelectedRound(roundNumbers[currentIndex - 1]!)}
+            disabled={currentIndex <= 0}
+            aria-label="Previous round"
+            className={`${toolbarIconClass()} disabled:opacity-40`}
+          >
+            <ChevronLeftIcon />
+          </button>
+
+          <button
+            onClick={() => setPicking(true)}
+            aria-label={`Showing ${roundLabel(activeRound!)} — choose a round`}
+            className={`${TOOLBAR_CONTROL_CLASS} flex min-w-0 flex-1 items-center justify-between gap-2 font-semibold`}
+          >
+            <span className="truncate">{roundLabel(activeRound!)}</span>
+            <span className="flex shrink-0 items-center gap-2 text-xs font-normal text-(--color-text-dim)">
+              {duelsIn(activeRound!).length} match{duelsIn(activeRound!).length === 1 ? "" : "es"}
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </span>
+          </button>
+
+          <button
+            onClick={() => setSelectedRound(roundNumbers[currentIndex + 1]!)}
+            disabled={currentIndex < 0 || currentIndex >= roundNumbers.length - 1}
+            aria-label="Next round"
+            className={`${toolbarIconClass()} disabled:opacity-40`}
+          >
+            <ChevronRightIcon />
+          </button>
+        </div>
 
         <div className="flex flex-col gap-6">
           {duelsIn(activeRound!).map((duel) => (
