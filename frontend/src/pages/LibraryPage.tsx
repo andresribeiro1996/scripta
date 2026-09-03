@@ -10,7 +10,7 @@ import { BookGrid } from "../components/BookGrid";
 import { LibraryCanvas } from "../components/LibraryCanvas";
 import { CoverPickerModal } from "../components/CoverPickerModal";
 import { LibraryToolbar } from "../components/LibraryToolbar";
-import { OptionsMenu } from "../components/OptionsMenu";
+import type { OptionsMenuItem } from "../components/OptionsMenu";
 import { PageContainer } from "../components/PageContainer";
 import { PerCardStylePanel } from "../components/PerCardStylePanel";
 import { ShareModal } from "../components/ShareModal";
@@ -323,39 +323,41 @@ export function LibraryPage() {
   const detailBook = detailBookKey ? books.find((b) => bookKey(b) === detailBookKey) : null;
 
   // The phone's only route to these actions — there is no header on a
-  // phone to hold them. Normally rendered inside the toolbar's row (see
-  // LibraryToolbar's `actions`), but the toolbar only exists once there
-  // are books, so the empty state renders it in the header instead;
-  // without that, a phone with an empty library would have no way to
-  // reach Share or Rename at all. Suppressed during selection mode,
-  // where the header reappears carrying "Delete selected" and its live
-  // count: that action is destructive and count-dependent, so it stays
-  // visible with explicit buttons rather than hiding behind a gear.
-  const actionsMenu = selectionMode ? undefined : (
-    <OptionsMenu
-      title="Library actions"
-      triggerClassName="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-(--color-border) bg-(--color-surface) text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"
-      items={[
-        // First, because it's the one thing that lost its own visible
-        // affordance when the library-name row went away on phones.
-        {
-          label: "Rename library…",
-          onClick: () => {
-            setNameDraft(library?.data.name ?? "");
-            setEditingName(true);
-          }
-        },
-        ...(books.length > 0 ? [{ label: "Select…", onClick: handleToggleSelectionMode }] : []),
-        { label: "Share", onClick: () => setSharing(true) },
-        {
-          label: importing ? "Importing…" : books.length > 0 ? "Import more…" : "Import library…",
-          onClick: () => {
-            if (!importing) fileInputRef.current?.click();
-          }
-        }
-      ]}
-    />
-  );
+  // phone to hold them. Passed to LibraryToolbar as ITEMS rather than a
+  // rendered menu: the toolbar shows them behind a gear in its own row
+  // and opens them in a bottom sheet, matching the filter and sort
+  // controls sitting right beside it.
+  //
+  // Suppressed during selection mode, where the header reappears
+  // carrying "Delete selected" and its live count: that action is
+  // destructive and count-dependent, so it stays visible with explicit
+  // buttons rather than hiding behind a gear.
+  //
+  // Nothing renders these when the library is empty, since the toolbar
+  // itself doesn't render then. That's deliberate rather than a gap: the
+  // empty state shows the header (so the library name is there and
+  // tappable to rename) plus its own prominent "Choose a file" button,
+  // which covers importing. Sharing an empty library is the only thing
+  // out of reach, and it has nothing to share.
+  const actionItems: OptionsMenuItem[] = [
+    // First, because it's the one thing that lost its own visible
+    // affordance when the library-name row went away on phones.
+    {
+      label: "Rename library…",
+      onClick: () => {
+        setNameDraft(library?.data.name ?? "");
+        setEditingName(true);
+      }
+    },
+    ...(books.length > 0 ? [{ label: "Select…", onClick: handleToggleSelectionMode }] : []),
+    { label: "Share", onClick: () => setSharing(true) },
+    {
+      label: importing ? "Importing…" : books.length > 0 ? "Import more…" : "Import library…",
+      onClick: () => {
+        if (!importing) fileInputRef.current?.click();
+      }
+    }
+  ];
 
   return (
     <PageContainer maxWidth={style.contentMaxWidth}>
@@ -419,10 +421,6 @@ export function LibraryPage() {
             </>
           )}
 
-          {/* Phones only, and only while there's no toolbar to host it —
-              see `actionsMenu` above. */}
-          {books.length === 0 && <div className="sm:hidden">{actionsMenu}</div>}
-
           <div className={`hidden items-center gap-2 sm:flex ${selectionMode ? "sm:hidden" : ""}`}>
             {books.length > 0 && (
               <button
@@ -476,8 +474,8 @@ export function LibraryPage() {
           onStatusChange={setStatusFilter}
           sort={sortKey}
           onSortChange={setSortKey}
-          // Phone-only; see the `actionsMenu` definition above.
-          actions={actionsMenu}
+          // Phone-only; see the `actionItems` definition above.
+          actions={selectionMode ? undefined : actionItems}
         />
       )}
 

@@ -1,6 +1,21 @@
-import { type ReactNode, useState } from "react";
-import { OptionSheet } from "./OptionSheet";
+import { useState } from "react";
+import { ActionSheet, OptionSheet } from "./Sheet";
+import type { OptionsMenuItem } from "./OptionsMenu";
 import { STATUS_FILTER_OPTIONS, SORT_OPTIONS, type SortKey, type StatusFilter } from "../lib/libraryView";
+
+/** Hub and spokes — the page's actions. Same drawn SVG OptionsMenu
+ *  uses, and for the same reason: the "⚙" character sits off-centre in
+ *  its own cell in most fonts, so a correctly centred button still looks
+ *  wrong. A 24×24 viewBox centred on (12,12) is centred by
+ *  construction. */
+function GearIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="3.2" />
+      <path d="M12 2.5v3M12 18.5v3M21.5 12h-3M5.5 12h-3M18.5 5.5l-2.1 2.1M7.6 16.4l-2.1 2.1M18.5 18.5l-2.1-2.1M7.6 7.6 5.5 5.5" />
+    </svg>
+  );
+}
 
 /** Funnel — status filter. */
 function FilterIcon() {
@@ -24,13 +39,20 @@ function SortIcon() {
  *
  *  ONE row below `sm`. This was three stacked rows (library name, search,
  *  then two full-width selects), which on a 375px phone spent roughly a
- *  sixth of the viewport before a single cover appeared. The selects
- *  become icon buttons opening an OptionSheet, and the page's action
- *  menu is passed in via `actions` so it shares this row instead of
- *  needing a header of its own — the library name moves into that menu
- *  (as "Rename library…"), since a truncated name plus a search field
- *  plus three icons cannot share 375px without the search field becoming
+ *  sixth of the viewport before a single cover appeared. The selects and
+ *  the page's actions all become icon buttons in this row, each opening
+ *  a bottom sheet — the library name moves into the actions sheet (as
+ *  "Rename library…"), since a truncated name plus a search field plus
+ *  three icons cannot share 375px without the search field becoming
  *  useless.
+ *
+ *  Sheets, not dropdowns, for all three. These icons sit at the top of
+ *  the screen and get used one-handed; a dropdown hanging off the
+ *  top-right corner opens at the furthest point from a thumb. Anchoring
+ *  the choices at the bottom puts them in reach, and using one
+ *  presentation for all three icons means adjacent controls don't behave
+ *  differently from each other. OptionsMenu's dropdown is still right
+ *  where it's used on pointer-sized targets (mural blocks, series rows).
  *
  *  At `sm` and up the labelled native selects come back and `actions` is
  *  not rendered here at all — the page shows its own header with the
@@ -64,10 +86,13 @@ export function LibraryToolbar({
   onStatusChange: (s: StatusFilter) => void;
   sort: SortKey;
   onSortChange: (k: SortKey) => void;
-  /** The page's own action menu, shown inside this row on phones only. */
-  actions?: ReactNode;
+  /** The page's own actions, shown as a gear in this row on phones only.
+   *  Items, not rendered markup: the toolbar opens them in a sheet
+   *  matching the filter and sort controls beside them, so it needs the
+   *  list rather than someone else's dropdown. */
+  actions?: OptionsMenuItem[];
 }) {
-  const [sheet, setSheet] = useState<"status" | "sort" | null>(null);
+  const [sheet, setSheet] = useState<"status" | "sort" | "actions" | null>(null);
 
   const controlClass = "min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-2.5 py-2.5 text-sm";
   // h-11/w-11 ≈ 44px, the smallest comfortably tappable target. An icon
@@ -90,7 +115,7 @@ export function LibraryToolbar({
             type="search"
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
-            placeholder="Search title or author…"
+            placeholder="Search"
             aria-label="Search your library"
             className={`${controlClass} min-w-0 flex-1`}
           />
@@ -108,7 +133,15 @@ export function LibraryToolbar({
           >
             <SortIcon />
           </button>
-          {actions}
+          {actions && actions.length > 0 && (
+            <button
+              onClick={() => setSheet("actions")}
+              aria-label="Library actions"
+              className={`${iconButtonClass} text-(--color-text-dim)`}
+            >
+              <GearIcon />
+            </button>
+          )}
         </div>
 
         {/* Desktop: labelled selects, page keeps its own header. */}
@@ -117,7 +150,7 @@ export function LibraryToolbar({
             type="search"
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
-            placeholder="Search title or author…"
+            placeholder="Search"
             aria-label="Search your library"
             className={`${controlClass} w-full sm:max-w-xs`}
           />
@@ -162,6 +195,7 @@ export function LibraryToolbar({
       {sheet === "sort" && (
         <OptionSheet title="Sort books" options={SORT_OPTIONS} value={sort} onSelect={onSortChange} onClose={() => setSheet(null)} />
       )}
+      {sheet === "actions" && actions && <ActionSheet title="Library" items={actions} onClose={() => setSheet(null)} />}
     </>
   );
 }
