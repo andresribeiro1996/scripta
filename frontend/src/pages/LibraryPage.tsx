@@ -322,9 +322,54 @@ export function LibraryPage() {
   const coverBook = coverBookKey ? books.find((b) => bookKey(b) === coverBookKey) : null;
   const detailBook = detailBookKey ? books.find((b) => bookKey(b) === detailBookKey) : null;
 
+  // The phone's only route to these actions — there is no header on a
+  // phone to hold them. Normally rendered inside the toolbar's row (see
+  // LibraryToolbar's `actions`), but the toolbar only exists once there
+  // are books, so the empty state renders it in the header instead;
+  // without that, a phone with an empty library would have no way to
+  // reach Share or Rename at all. Suppressed during selection mode,
+  // where the header reappears carrying "Delete selected" and its live
+  // count: that action is destructive and count-dependent, so it stays
+  // visible with explicit buttons rather than hiding behind a gear.
+  const actionsMenu = selectionMode ? undefined : (
+    <OptionsMenu
+      title="Library actions"
+      triggerClassName="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-(--color-border) bg-(--color-surface) text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"
+      items={[
+        // First, because it's the one thing that lost its own visible
+        // affordance when the library-name row went away on phones.
+        {
+          label: "Rename library…",
+          onClick: () => {
+            setNameDraft(library?.data.name ?? "");
+            setEditingName(true);
+          }
+        },
+        ...(books.length > 0 ? [{ label: "Select…", onClick: handleToggleSelectionMode }] : []),
+        { label: "Share", onClick: () => setSharing(true) },
+        {
+          label: importing ? "Importing…" : books.length > 0 ? "Import more…" : "Import library…",
+          onClick: () => {
+            if (!importing) fileInputRef.current?.click();
+          }
+        }
+      ]}
+    />
+  );
+
   return (
     <PageContainer maxWidth={style.contentMaxWidth}>
-      <header className="mb-4 flex items-center justify-between gap-3 sm:mb-6 sm:gap-4">
+      {/* Desktop-only, with one exception: renaming. On a phone the whole
+          header is gone — its actions moved into the toolbar row and the
+          library name into that row's menu — but "Rename library…" in
+          that menu still needs somewhere to put its text input, so the
+          header comes back for exactly as long as `editingName` is on.
+          Without that the menu item would appear to do nothing. */}
+      <header
+        className={`mb-4 items-center justify-between gap-3 sm:mb-6 sm:flex sm:gap-4 ${
+          editingName || books.length === 0 ? "flex" : "hidden"
+        }`}
+      >
         {editingName ? (
           <input
             autoFocus
@@ -374,30 +419,9 @@ export function LibraryPage() {
             </>
           )}
 
-          {/* Below `sm` these three actions cost two wrapped rows of a
-              phone's viewport — the single scarcest resource on this
-              screen — so they collapse into the same OptionsMenu gear
-              every series/mural card already uses. `sm:hidden` /
-              `hidden sm:flex` rather than a JS breakpoint so there's no
-              resize listener and no hydration-time layout flash. */}
-          {!selectionMode && (
-            <div className="sm:hidden">
-              <OptionsMenu
-                title="Library actions"
-                triggerClassName="flex h-11 w-11 items-center justify-center rounded-lg border border-(--color-border) bg-(--color-surface) text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"
-                items={[
-                  ...(books.length > 0 ? [{ label: "Select…", onClick: handleToggleSelectionMode }] : []),
-                  { label: "Share", onClick: () => setSharing(true) },
-                  {
-                    label: importing ? "Importing…" : books.length > 0 ? "Import more…" : "Import library…",
-                    onClick: () => {
-                      if (!importing) fileInputRef.current?.click();
-                    }
-                  }
-                ]}
-              />
-            </div>
-          )}
+          {/* Phones only, and only while there's no toolbar to host it —
+              see `actionsMenu` above. */}
+          {books.length === 0 && <div className="sm:hidden">{actionsMenu}</div>}
 
           <div className={`hidden items-center gap-2 sm:flex ${selectionMode ? "sm:hidden" : ""}`}>
             {books.length > 0 && (
@@ -452,6 +476,8 @@ export function LibraryPage() {
           onStatusChange={setStatusFilter}
           sort={sortKey}
           onSortChange={setSortKey}
+          // Phone-only; see the `actionsMenu` definition above.
+          actions={actionsMenu}
         />
       )}
 
