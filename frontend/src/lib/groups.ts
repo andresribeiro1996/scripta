@@ -46,10 +46,20 @@ function normalizeName(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
-export function createGroup(groups: Group[], type: GroupType, name: string): Group[] {
+/** Builds a group WITHOUT appending it, so a caller that needs the new
+ *  group's id can have it — createGroup() below only hands back the new
+ *  array, and fishing the id back out of that (by diffing, or trusting
+ *  the last element) would be guesswork. GroupsPage needs the id to drop
+ *  the freshly-created group straight into inline rename, since it is
+ *  created with a placeholder name that the user is expected to replace
+ *  immediately. */
+export function makeGroup(type: GroupType, name: string): Group {
   const now = new Date().toISOString();
-  const group: Group = { id: newGroupId(), type, name: name.trim(), bookKeys: [], createdAt: now, updatedAt: now };
-  return [...groups, group];
+  return { id: newGroupId(), type, name: name.trim(), bookKeys: [], createdAt: now, updatedAt: now };
+}
+
+export function createGroup(groups: Group[], type: GroupType, name: string): Group[] {
+  return [...groups, makeGroup(type, name)];
 }
 
 export function renameGroup(groups: Group[], id: string, name: string): Group[] {
