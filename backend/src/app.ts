@@ -50,7 +50,17 @@ export function buildApp() {
   // ALLOW_LAN_ORIGINS is set (phone testing).
   app.register(fastifyCors, {
     origin: (origin, cb) => cb(null, isAllowedOrigin(origin)),
-    methods: ["GET", "POST", "PUT", "DELETE"]
+    // Must list every verb the API actually exposes. A method missing
+    // here fails in the BROWSER only: the preflight response omits it
+    // from Access-Control-Allow-Methods, the browser blocks the real
+    // request, and fetch rejects before anything reaches the server — so
+    // there's no log line, no status code, and nothing to find
+    // server-side. PATCH was added for renaming a tournament
+    // (modules/arena) and was missing here, which looked exactly like a
+    // save that silently failed. curl can't catch this: it does no
+    // preflight. Verify with an OPTIONS carrying Origin and
+    // Access-Control-Request-Method instead.
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"]
   });
 
   app.get("/health", async () => ({ status: "ok" }));
