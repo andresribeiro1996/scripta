@@ -1,37 +1,53 @@
-// The whole tournament at a glance — the shape a football/cup bracket
-// has, with rounds as columns and elbow connectors showing which two
-// matches feed the next one.
+// The whole tournament at a glance, in the shape a football/cup bracket
+// has: two halves converging inward on a final in the middle. A 16-book
+// bracket reads as 4 first-round matches down the left, 4 down the
+// right, each half narrowing through its own rounds until the two
+// semi-final winners meet in the centre.
 //
 // Separate from BracketTree, which lays out full DuelCards for VOTING
 // (covers, tallies, countdowns, vote buttons). Those cards are ~230px
 // tall, so eight of them in round 1 make a bracket metres long — you can
 // vote in it, but you can never see it. This is the opposite trade: each
-// match is a ~56px tile of two rows, small enough that all four rounds
-// of a 16-book bracket fit on one screen, and read-only. Two views of the
-// same duels, not one compromised view (ArenaViewPage's own toggle).
+// match is a compact two-row tile, read-only, and the whole bracket fits
+// the screen. Two views of the same duels, not one compromised view
+// (ArenaViewPage's own toggle).
 //
-// Connectors are pure CSS, no SVG and no measuring. Every round is a flex
-// column of equal `flex-1` cells, so round r+1's cell j spans exactly
-// cells 2j and 2j+1 of round r, and its vertical centre lands exactly on
-// the boundary between them. That means the elbow can be drawn with
-// borders alone — a stub right from each match, a vertical joining a
-// pair, a stub left into the next match — and it stays aligned at any
-// height, any bracket size, with no resize listener and nothing to keep
-// in sync with the DOM.
+// NO horizontal scroll, at any bracket size or screen width. Columns are
+// `flex-1 min-w-0`, so they divide whatever width there is rather than
+// claiming a fixed width and overflowing. A 16-book bracket is seven
+// columns, which on a phone is genuinely tiny — that's the accepted
+// trade for seeing the shape at all. Titles truncate; the Matches view
+// is where you go to read them. Type steps up at `sm`, where seven
+// columns have real room.
+//
+// Connectors are pure CSS — no SVG, no measuring, no resize listener.
+// Every round is a flex column of equal `flex-1` cells, so the next
+// round's cell spans exactly two of them and its centre lands on their
+// shared edge. The elbow is then just borders. They are drawn INSIDE
+// each cell's own padding (a stub from the tile's edge to the cell's
+// edge, plus a vertical on that edge) rather than positioned outside it:
+// with flexible columns, anything hanging past a cell's boundary would
+// overlap its neighbour instead of meeting it.
 
-import type { Duel, TournamentView } from "../../api/arena";
-
-const STUB = "1rem"; // horizontal run either side of the vertical joiner
+import type { Duel, DuelSide, TournamentView } from "../../api/arena";
 
 function MatchSide({ label, votes, isWinner, decided }: { label: string; votes: number; isWinner: boolean; decided: boolean }) {
   return (
     <div
-      className={`flex items-center justify-between gap-2 px-2 py-1 text-xs ${
+      className={`flex items-center justify-between gap-1 px-1 py-0.5 text-[9.5px] sm:px-2 sm:py-1 sm:text-[11px] ${
         isWinner ? "font-semibold text-(--color-text)" : decided ? "text-(--color-text-dim)" : "text-(--color-text)"
       }`}
     >
       <span className="truncate">{label}</span>
-      <span className={`shrink-0 tabular-nums ${isWinner ? "text-(--color-accent)" : "text-(--color-text-dim)"}`}>{votes}</span>
+      {/* Hidden below `sm`. Seven columns on a 375px phone leave a tile
+          about 41px wide; spending 8 of those on a vote count cut the
+          title to roughly three characters. Dropping it gives the title
+          the whole width, and nothing is actually lost from the view's
+          job — who won a decided match still reads from the bold/dimmed
+          pair, and exact tallies are what the Matches view is for. */}
+      <span className={`hidden shrink-0 tabular-nums sm:inline ${isWinner ? "text-(--color-accent)" : "text-(--color-text-dim)"}`}>
+        {votes}
+      </span>
     </div>
   );
 }
@@ -40,13 +56,74 @@ function MatchTile({ duel }: { duel: Duel }) {
   const decided = duel.winnerKey !== null;
   return (
     <div
-      className={`w-full overflow-hidden rounded-lg border bg-(--color-surface) ${
+      className={`w-full overflow-hidden rounded border bg-(--color-surface) sm:rounded-lg ${
         duel.status === "active" ? "border-(--color-accent)" : "border-(--color-border)"
       }`}
     >
       <MatchSide label={duel.bookA.title} votes={duel.bookA.votes} isWinner={duel.winnerKey === duel.bookA.key} decided={decided} />
       <div className="border-t border-(--color-border)" />
       <MatchSide label={duel.bookB.title} votes={duel.bookB.votes} isWinner={duel.winnerKey === duel.bookB.key} decided={decided} />
+    </div>
+  );
+}
+
+/** One round of one half of the bracket.
+ *
+ *  `mirrored` flips every connector. The right half flows inward
+ *  (right-to-left), so its matches feed out of their LEFT edge and
+ *  receive on their RIGHT — the exact opposite of the left half. */
+function RoundColumn({
+  duels,
+  label,
+  mirrored,
+  feedsInward,
+  receivesFromOutside
+}: {
+  duels: Duel[];
+  label: string;
+  mirrored: boolean;
+  feedsInward: boolean;
+  receivesFromOutside: boolean;
+}) {
+  const outward = mirrored ? "left-0" : "right-0";
+  const inward = mirrored ? "right-0" : "left-0";
+  return (
+    <div className="flex min-w-0 flex-1 flex-col">
+      <h3 className="mb-1 truncate text-center text-[8.5px] font-semibold tracking-wide text-(--color-text-dim) uppercase sm:mb-2 sm:text-[10.5px]">
+        {label}
+      </h3>
+      <div className="flex flex-1 flex-col">
+        {duels.map((duel, i) => (
+          <div key={duel.id} className="relative flex flex-1 items-center">
+            {receivesFromOutside && (
+              <span className={`absolute top-1/2 ${inward} w-1 border-t border-(--color-border) sm:w-2`} aria-hidden />
+            )}
+
+            <div className="w-full px-1 sm:px-2">
+              <MatchTile duel={duel} />
+            </div>
+
+            {feedsInward && (
+              <>
+                <span className={`absolute top-1/2 ${outward} w-1 border-t border-(--color-border) sm:w-2`} aria-hidden />
+                {/* Half of the vertical joining this match to its pair:
+                    the even cell draws down from its centre, the odd cell
+                    up from its centre, and they meet on the shared edge —
+                    which is exactly the next round's cell centre. Skipped
+                    for a single-match round (a semi feeding the final),
+                    where there is no pair and a half-vertical would
+                    dangle into nothing. */}
+                {duels.length > 1 && (
+                  <span
+                    className={`absolute ${outward} border-l border-(--color-border) ${i % 2 === 0 ? "top-1/2 bottom-0" : "top-0 bottom-1/2"}`}
+                    aria-hidden
+                  />
+                )}
+              </>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -61,99 +138,88 @@ export function BracketMap({ tournament }: { tournament: TournamentView }) {
   const roundNumbers = [...rounds.keys()].sort((a, b) => a - b);
   if (roundNumbers.length === 0) return null;
 
-  const lastRoundNumber = roundNumbers.at(-1)!;
-  const champion = (() => {
-    const final = rounds.get(lastRoundNumber)!;
-    if (final.length !== 1 || !final[0]!.winnerKey) return null;
-    const duel = final[0]!;
-    return duel.winnerKey === duel.bookA.key ? duel.bookA : duel.bookB;
-  })();
+  const byRound = roundNumbers.map((n) => [...rounds.get(n)!].sort((a, b) => a.duelIndex - b.duelIndex));
+  const finalRound = byRound.at(-1)!;
+  // The final is the centre column only when it really is a single
+  // match. A 2-book "bracket" is nothing but a final, and a partially
+  // generated tournament could be shaped oddly; either way, splitting a
+  // round that can't halve would silently drop matches.
+  const hasCentre = finalRound.length === 1;
+  const sideRounds = hasCentre ? byRound.slice(0, -1) : byRound;
+
+  // duelIndex is already the bracket's own top-to-bottom order, so the
+  // first half of every round belongs to the left and the second to the
+  // right. That keeps feeders and their successor on the same side —
+  // round 2's match 0 is fed by round 1's matches 0 and 1, all on the
+  // left — which is what makes the two halves mirror correctly.
+  const left = sideRounds.map((duels) => duels.slice(0, Math.ceil(duels.length / 2)));
+  const right = sideRounds.map((duels) => duels.slice(Math.ceil(duels.length / 2)));
+
+  function labelFor(roundIdx: number): string {
+    const perSide = left[roundIdx]!.length;
+    if (perSide === 1) return "Semis";
+    if (perSide === 2) return "Quarters";
+    return `Round ${roundNumbers[roundIdx]}`;
+  }
+
+  const finalDuel = hasCentre ? finalRound[0]! : null;
+  const champion: DuelSide | null =
+    finalDuel && finalDuel.winnerKey
+      ? finalDuel.winnerKey === finalDuel.bookA.key
+        ? finalDuel.bookA
+        : finalDuel.bookB
+      : null;
 
   return (
-    // Horizontal scroll is correct HERE, unlike the voting view: a
-    // bracket is a wide object and this is the view whose whole purpose
-    // is its shape. It's also opt-in — the round-stepper view remains
-    // the default on phones, so nobody meets a sideways scroll without
-    // having asked to see the bracket.
-    <div className="overflow-x-auto pb-2">
-      <div className="flex min-w-max">
-        {roundNumbers.map((roundNumber, roundIdx) => {
-          const duels = [...rounds.get(roundNumber)!].sort((a, b) => a.duelIndex - b.duelIndex);
-          const isFinal = roundNumber === lastRoundNumber && duels.length === 1;
-          // The final round is only the last COLUMN when no winner
-          // column follows it; otherwise it still needs a stub out.
-          const isLastColumn = roundIdx === roundNumbers.length - 1 && !champion;
-          return (
-            <div key={roundNumber} className="flex w-44 shrink-0 flex-col">
-              <h3 className="mb-2 text-center text-[10.5px] font-semibold tracking-wide text-(--color-text-dim) uppercase">
-                {isFinal ? "Final" : `Round ${roundNumber}`}
-              </h3>
-              <div className="flex flex-1 flex-col">
-                {duels.map((duel, i) => (
-                  // flex-1 on every cell is what makes the connectors
-                  // line up: equal cells mean a pair's shared edge is
-                  // exactly the centre of the next round's cell.
-                  <div key={duel.id} className="relative flex flex-1 items-center">
-                    {/* Stub INTO this match from the previous round. */}
-                    {roundIdx > 0 && (
-                      <span
-                        className="absolute top-1/2 right-full border-t border-(--color-border)"
-                        style={{ width: STUB }}
-                        aria-hidden
-                      />
-                    )}
+    <div className="flex w-full items-stretch">
+      {/* Left half: outermost round first, narrowing inward. */}
+      {left.map((duels, roundIdx) => (
+        <RoundColumn
+          key={`l-${roundIdx}`}
+          duels={duels}
+          label={labelFor(roundIdx)}
+          mirrored={false}
+          feedsInward={roundIdx < left.length - 1 || hasCentre}
+          receivesFromOutside={roundIdx > 0}
+        />
+      ))}
 
-                    <div className="w-full px-4">
-                      <MatchTile duel={duel} />
-                    </div>
-
-                    {!isLastColumn && (
-                      <>
-                        {/* Stub OUT of this match. */}
-                        <span
-                          className="absolute top-1/2 left-full border-t border-(--color-border)"
-                          style={{ width: STUB }}
-                          aria-hidden
-                        />
-                        {/* Half of the vertical joining this match to its
-                            pair: the even cell draws downward from its
-                            centre, the odd cell upward from its centre.
-                            Together they meet exactly on the shared edge
-                            — which is the next round's cell centre.
-                            Skipped when the round has a single match (the
-                            final feeding the winner column): there's no
-                            pair to join, and a half-vertical would dangle
-                            off into nothing. */}
-                        {duels.length > 1 && (
-                          <span
-                            className={`absolute border-l border-(--color-border) ${i % 2 === 0 ? "top-1/2 bottom-0" : "top-0 bottom-1/2"}`}
-                            style={{ left: `calc(100% + ${STUB})` }}
-                            aria-hidden
-                          />
-                        )}
-                      </>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })}
-
-        {champion && (
-          <div className="flex w-44 shrink-0 flex-col">
-            <h3 className="mb-2 text-center text-[10.5px] font-semibold tracking-wide text-(--color-accent) uppercase">Winner</h3>
-            <div className="relative flex flex-1 items-center">
-              <span className="absolute top-1/2 right-full border-t border-(--color-border)" style={{ width: STUB }} aria-hidden />
-              <div className="w-full px-4">
-                <div className="rounded-lg border border-(--color-accent) bg-(--color-accent-soft) px-2 py-2 text-xs font-semibold text-(--color-accent)">
-                  <span className="line-clamp-2">{champion.title}</span>
-                </div>
-              </div>
+      {finalDuel && (
+        <div className="flex min-w-0 flex-1 flex-col">
+          <h3 className="mb-1 truncate text-center text-[8.5px] font-semibold tracking-wide text-(--color-accent) uppercase sm:mb-2 sm:text-[10.5px]">
+            Final
+          </h3>
+          <div className="relative flex flex-1 flex-col items-center justify-center">
+            {/* Receives from BOTH halves, so it takes a stub on each edge
+                — the only cell in the bracket that does. */}
+            <span className="absolute top-1/2 left-0 w-1 border-t border-(--color-border) sm:w-2" aria-hidden />
+            <span className="absolute top-1/2 right-0 w-1 border-t border-(--color-border) sm:w-2" aria-hidden />
+            <div className="w-full px-1 sm:px-2">
+              <MatchTile duel={finalDuel} />
+              {champion && (
+                <p className="mt-1 truncate text-center text-[8.5px] font-semibold text-(--color-accent) sm:text-[10.5px]">
+                  🏆 {champion.title}
+                </p>
+              )}
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* Right half: rendered inner-to-outer, so it mirrors the left. */}
+      {[...right].reverse().map((duels, i) => {
+        const roundIdx = right.length - 1 - i;
+        return (
+          <RoundColumn
+            key={`r-${roundIdx}`}
+            duels={duels}
+            label={labelFor(roundIdx)}
+            mirrored
+            feedsInward={roundIdx < right.length - 1 || hasCentre}
+            receivesFromOutside={roundIdx > 0}
+          />
+        );
+      })}
     </div>
   );
 }
