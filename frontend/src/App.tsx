@@ -1,4 +1,4 @@
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import { RequireAuth } from "./auth/RequireAuth";
 import { RequireUsername } from "./auth/RequireUsername";
 import { DashboardLayout } from "./layouts/DashboardLayout";
@@ -24,6 +24,7 @@ import { SharedMuralPage } from "./pages/SharedMuralPage";
 export function App() {
   return (
     <Routes>
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/oauth-success" element={<OAuthSuccessPage />} />
       <Route path="/arena" element={<ArenaPublicListPage />} />
