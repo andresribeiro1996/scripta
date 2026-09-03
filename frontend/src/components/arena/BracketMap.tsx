@@ -14,9 +14,9 @@
 // Separate from BracketTree, which lays out full DuelCards for VOTING
 // (covers, tallies, countdowns, vote buttons). Those cards are ~230px
 // tall, so eight of them make a bracket you can vote in but never see.
-// This is the opposite trade: compact read-only tiles — a small cover,
-// title and tally per side — with the whole bracket on screen. Two views
-// of the same duels (ArenaViewPage's own toggle).
+// This is the opposite trade: compact read-only tiles — a cover per
+// side, side by side, its vote share below it — with the whole bracket
+// on screen. Two views of the same duels (ArenaViewPage's own toggle).
 //
 // NO horizontal scroll at any bracket size or width: cells are `flex-1
 // min-w-0`, so a row divides whatever width there is rather than
@@ -78,7 +78,7 @@ function MatchSide({
       // percentage, and the covers are decorative images with no text
       // anywhere in the bracket at all.
       aria-label={`${side.title} — ${pct === null ? "no votes yet" : `${pct}% of votes`}`}
-      className="flex w-full items-center gap-1.5 px-1.5 py-1.5 text-left hover:bg-(--color-surface-hover) sm:gap-2 sm:px-2"
+      className="flex min-w-0 flex-1 flex-col items-center gap-0.5 px-0.5 py-1 hover:bg-(--color-surface-hover) sm:gap-1 sm:py-1.5"
     >
       {/* Cover only: no title. At a bracket's scale the jacket is the
           faster identifier, and dropping the text buys the art enough
@@ -87,14 +87,14 @@ function MatchSide({
           and the loser fades, so a settled match still reads instantly
           without any words. */}
       <div
-        className={`relative aspect-2/3 w-[30px] shrink-0 overflow-hidden rounded-xs bg-(--color-border) sm:w-[42px] ${
+        className={`relative aspect-2/3 w-full max-w-[42px] overflow-hidden rounded-xs bg-(--color-border) sm:max-w-[56px] ${
           isWinner ? "ring-2 ring-(--color-accent)" : ""
         } ${decided && !isWinner ? "opacity-40" : ""}`}
       >
         <CoverImage book={coverBook} />
       </div>
       <span
-        className={`ml-auto shrink-0 text-[11px] tabular-nums sm:text-xs ${
+        className={`shrink-0 text-[11px] tabular-nums sm:text-xs ${
           isWinner ? "font-semibold text-(--color-accent)" : "text-(--color-text-dim)"
         }`}
       >
@@ -108,7 +108,7 @@ function MatchTile({ duel, onOpen }: { duel: Duel; onOpen: (side: DuelSide) => v
   const decided = duel.winnerKey !== null;
   return (
     <div
-      className={`w-full overflow-hidden rounded border bg-(--color-surface) sm:rounded-lg ${
+      className={`flex w-full items-stretch overflow-hidden rounded border bg-(--color-surface) sm:rounded-lg ${
         duel.status === "active" ? "border-(--color-accent)" : "border-(--color-border)"
       }`}
     >
@@ -119,7 +119,7 @@ function MatchTile({ duel, onOpen }: { duel: Duel; onOpen: (side: DuelSide) => v
         decided={decided}
         onOpen={() => onOpen(duel.bookA)}
       />
-      <div className="border-t border-(--color-border)" />
+      <div className="w-px shrink-0 bg-(--color-border)" />
       <MatchSide
         side={duel.bookB}
         duel={duel}
