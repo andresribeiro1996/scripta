@@ -1,12 +1,15 @@
 // Format detection + dispatch for an imported library file — mirrors
-// viewer/index.html's readFile()/handleTextBytes(): sniff the file's
-// magic bytes (never trust the filename/extension), then within text
-// content try JSON first (unambiguous — valid JSON with a "books" array
-// can't also be a CSV), then a Goodreads-shaped CSV as the fallback.
+// viewer/index.html's readFile()/handleTextBytes() for the Kobo/Goodreads
+// paths (StoryGraph is a frontend-only addition, see fileImport's README
+// note): sniff the file's magic bytes (never trust the filename/
+// extension), then within text content try JSON first (unambiguous —
+// valid JSON with a "books" array can't also be a CSV), then each known
+// CSV shape by its own distinct header columns.
 
 import type { LibraryData } from "../api/library";
 import { goodreadsCsvToLibraryJson, looksLikeGoodreadsCsv } from "./goodreads";
 import { isSqliteBytes, parseSqliteFile } from "./sqlite";
+import { looksLikeStorygraphCsv, storygraphCsvToLibraryJson } from "./storygraph";
 
 export async function parseImportedFile(file: File): Promise<LibraryData> {
   const bytes = new Uint8Array(await file.arrayBuffer());
@@ -34,8 +37,12 @@ export async function parseImportedFile(file: File): Promise<LibraryData> {
     return goodreadsCsvToLibraryJson(text);
   }
 
+  if (looksLikeStorygraphCsv(text)) {
+    return storygraphCsvToLibraryJson(text);
+  }
+
   throw new Error(
-    "Didn't recognize that file — it's not a KoboReader.sqlite database, a kobo-export library JSON, or a Goodreads library CSV export."
+    "Didn't recognize that file — it's not a KoboReader.sqlite database, a kobo-export library JSON, a Goodreads library CSV export, or a StoryGraph library CSV export."
   );
 }
 
