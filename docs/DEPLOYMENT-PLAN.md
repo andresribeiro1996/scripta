@@ -30,19 +30,37 @@ persisted cover URLs in phase 4).
 
 **What still needs a human, not a commit:**
 
-- Point DNS at the hosts once they exist: `atmyshelf.com` → the frontend host,
-  `api.atmyshelf.com` → the API, `www` redirecting to the apex.
-- Create the four accounts — Fly, Cloudflare (Pages + R2), Neon — and run the
-  first deploy by hand, following the runbook at the top of `backend/fly.toml`.
-  The first deploy cannot come from CI: the Fly app and its secrets have to
-  exist before `flyctl deploy` has anything to deploy to.
-- Then set `DEPLOY_ENABLED`, `API_URL` and the deploy secrets so every later
-  push to `main` deploys itself. The workflow is inert until you do.
-- Generate the three production secrets and store them in a password manager.
-- Register the OAuth apps, one platform at a time. Google sign-in and the
+Paused here — pick back up at the top of this list.
+
+- [x] Cloudflare account
+- [x] `atmyshelf.com` bought, on Cloudflare
+- [x] Fly account
+- [ ] **Neon account** — create the project in `eu-central-1` (Frankfurt), to
+  match the Fly machine. That connection string is `DATABASE_URL`.
+- [ ] **R2 bucket** — Cloudflare dashboard → R2 → Create bucket, name
+  `atmyshelf`, **jurisdiction: EU** (only settable at creation). Then an API
+  token scoped to it for the access key ID/secret.
+- [ ] Generate the three production secrets (`JWT_ACCESS_SECRET`,
+  `JWT_REFRESH_SECRET`, `SOCIALS_ENCRYPTION_KEY`) and store them in a password
+  manager, not only in Fly's own secret store.
+- [ ] `fly apps create atmyshelf-api`, then `fly secrets set` with all ten
+  variables in one call (both above plus the two hostnames) — the full
+  command is at the top of `backend/fly.toml`.
+- [ ] Delete the `[[mounts]]` block from `fly.toml` before deploying — this is
+  the managed-state path (Neon + R2), and Fly refuses to start a machine
+  whose declared mount has no volume behind it.
+- [ ] `fly deploy`, then `fly certs create api.atmyshelf.com`.
+- [ ] Point DNS in Cloudflare: `atmyshelf.com` → the frontend host,
+  `api.atmyshelf.com` → the API (the cert step above gives the record), `www`
+  redirecting to the apex.
+- [ ] Deploy the frontend to Cloudflare Pages, then set `DEPLOY_ENABLED`,
+  `API_URL` and the deploy secrets so every later push to `main` deploys
+  itself.
+- [ ] Register the OAuth apps, one platform at a time. Google sign-in and the
   Hardcover lookup have still never run against real credentials.
-- Schedule the backup (below) and store the three secrets somewhere that is not
-  the backup.
+- [ ] Schedule the backup, and do one real upload/read/delete against the
+  actual R2 bucket before launch — it's only ever been tested against a
+  stand-in S3 server.
 
 **Deliberately not done, with reasons:**
 
