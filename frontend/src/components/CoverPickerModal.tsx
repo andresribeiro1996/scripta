@@ -3,6 +3,7 @@ import type { GalleryImage } from "../api/gallery";
 import { useDeleteGalleryImage } from "../hooks/useDeleteGalleryImage";
 import { useGalleryImages } from "../hooks/useGalleryImages";
 import { useConfirm } from "./ConfirmDialog";
+import { useScrollLock } from "../hooks/useScrollLock";
 
 /** "Cover" button's modal (BookCard.tsx, everywhere a card renders;
  *  MuralsListPage.tsx's mural cards too) — assign one of the account's
@@ -36,6 +37,7 @@ export function CoverPickerModal({
   onRemoveCover: () => void;
   onClose: () => void;
 }) {
+  useScrollLock();
   const { images, isLoading, upload } = useGalleryImages();
   const deleteImage = useDeleteGalleryImage();
   const confirm = useConfirm();
@@ -147,7 +149,7 @@ export function CoverPickerModal({
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 overflow-y-auto overscroll-contain p-4">
           {isLoading && <p className="text-sm text-(--color-text-dim)">Loading your gallery…</p>}
           {!isLoading && images.length === 0 && (
             <p className="text-sm text-(--color-text-dim)">No images in your gallery yet — upload one above.</p>

@@ -16,6 +16,7 @@ import type { GalleryImage } from "../../api/gallery";
 import { ALL_STAT_METRICS, BLOCK_TYPE_LABELS, createTier, STAT_METRIC_LABELS, type MuralBlock } from "../../lib/murals";
 import { bookKey } from "../../lib/merge";
 import { BookSearchList, GalleryImageGrid } from "./pickers";
+import { useScrollLock } from "../../hooks/useScrollLock";
 
 function bookHighlights(book: Record<string, unknown> | undefined): Array<Record<string, unknown>> {
   if (!book || !Array.isArray(book.highlights)) return [];
@@ -35,6 +36,7 @@ export function BlockConfigPanel({
   onSave: (block: MuralBlock) => void;
   onClose: () => void;
 }) {
+  useScrollLock();
   const [draft, setDraft] = useState<MuralBlock>(block);
   // Only meaningful for quote/quoteCollection's two-step "pick a book,
   // then pick one of its highlights" flow — null means "show the book
@@ -68,7 +70,7 @@ export function BlockConfigPanel({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 overflow-y-auto overscroll-contain p-4">
           {draft.type === "text" && (
             <div className="flex flex-col gap-3">
               <div>

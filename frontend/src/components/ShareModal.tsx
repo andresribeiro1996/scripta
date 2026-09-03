@@ -3,6 +3,7 @@ import { ApiError, postToSocial, type SocialProvider } from "../api/socials";
 import { useSocials } from "../hooks/useSocials";
 import { useConfirm } from "./ConfirmDialog";
 import { SocialIcon } from "./icons/SocialIcons";
+import { useScrollLock } from "../hooks/useScrollLock";
 
 type Platform = Extract<SocialProvider, "x" | "threads">;
 
@@ -45,6 +46,7 @@ export function ShareModal({
   onUnshare: () => Promise<void>;
   onClose: () => void;
 }) {
+  useScrollLock();
   const { data: socials } = useSocials();
   const confirm = useConfirm();
 

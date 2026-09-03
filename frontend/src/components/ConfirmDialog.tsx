@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { useScrollLock } from "../hooks/useScrollLock";
 
 interface ConfirmOptions {
   /** Short question, e.g. `Delete "My Series"?` — rendered like
@@ -34,6 +35,8 @@ const ConfirmContext = createContext<ConfirmContextValue | null>(null);
 
 export function ConfirmProvider({ children }: { children: ReactNode }) {
   const [pending, setPending] = useState<PendingConfirm | null>(null);
+  // Always-mounted provider — lock only while a dialog is actually up.
+  useScrollLock(pending !== null);
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
 
   const confirm = useCallback((options: ConfirmOptions) => {

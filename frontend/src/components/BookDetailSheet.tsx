@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { CoverImage } from "./BookCard";
 import { statusLabel } from "../lib/covers";
 import { nextReadStatus } from "../lib/libraryView";
+import { useScrollLock } from "../hooks/useScrollLock";
 
 export function BookDetailSheet({
   book,
@@ -16,6 +17,7 @@ export function BookDetailSheet({
   onSetStatus: (book: Record<string, unknown>) => void;
   onClose: () => void;
 }) {
+  useScrollLock();
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
@@ -34,7 +36,7 @@ export function BookDetailSheet({
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-4" onClick={onClose}>
       <div
-        className="max-h-[88vh] w-full overflow-y-auto rounded-t-2xl border border-(--color-border) bg-(--color-surface) shadow-lg sm:max-w-3xl sm:rounded-2xl"
+        className="max-h-[88vh] w-full overflow-y-auto overscroll-contain rounded-t-2xl border border-(--color-border) bg-(--color-surface) shadow-lg sm:max-w-3xl sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"

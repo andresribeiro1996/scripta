@@ -19,6 +19,7 @@ import { toSeedBook } from "../../lib/arenaSeed";
 import { bookKey } from "../../lib/merge";
 import { CoverImage } from "../BookCard";
 import { BookSearchList } from "../murals/pickers";
+import { useScrollLock } from "../../hooks/useScrollLock";
 
 export function SeedSlotGrid({
   bracketSize,
@@ -37,6 +38,8 @@ export function SeedSlotGrid({
   const { data: library } = useLibrary();
   const books = ((library?.data as { books?: Array<Record<string, unknown>> } | undefined)?.books ?? []) as Array<Record<string, unknown>>;
   const [pickingSlot, setPickingSlot] = useState<number | null>(null);
+  // Always-mounted grid — lock only while the picker modal is up.
+  useScrollLock(pickingSlot !== null);
   const usedKeys = new Set(slots.filter((s): s is SeedBook => s !== null).map((s) => s.key));
   const filledCount = slots.filter(Boolean).length;
 

@@ -2,6 +2,7 @@ import { Fragment, useEffect, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { OfflineBanner } from "../components/OfflineBanner";
+import { useScrollLock } from "../hooks/useScrollLock";
 
 interface NavItem {
   to: string;
@@ -42,6 +43,9 @@ const TAB_ITEMS = NAV_GROUPS[0].items;
 export function DashboardLayout() {
   const { session, logout } = useAuth();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // Always-mounted layout — lock only while the nav drawer is open, or
+  // the app would never scroll at all.
+  useScrollLock(drawerOpen);
 
   useEffect(() => {
     if (!drawerOpen) return;
@@ -129,7 +133,7 @@ export function DashboardLayout() {
       {drawerOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 lg:hidden" onClick={() => setDrawerOpen(false)}>
           <aside
-            className="flex h-full w-72 max-w-[85%] flex-col overflow-y-auto border-r border-(--color-border) bg-(--color-surface) px-3 py-5 pb-[env(safe-area-inset-bottom,0px)]"
+            className="flex h-full w-72 max-w-[85%] flex-col overflow-y-auto overscroll-contain border-r border-(--color-border) bg-(--color-surface) px-3 py-5 pb-[env(safe-area-inset-bottom,0px)]"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-6 flex items-center gap-2 px-2">

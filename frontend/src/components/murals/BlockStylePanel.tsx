@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { resolveBlockStyle, type BlockStyle } from "../../lib/libraryStyle";
 import type { MuralBlock } from "../../lib/murals";
 import { BlockAppearanceSection, BlockTextSection, CardBorderSection } from "../StyleControls";
+import { useScrollLock } from "../../hooks/useScrollLock";
 
 /** "Style" button's modal (MuralCanvas.tsx, edit mode) — a mural block's
  *  own appearance: background color, corner radius, opacity, shadow,
@@ -25,6 +26,7 @@ export function BlockStylePanel({
   onSave: (style: BlockStyle) => void;
   onClose: () => void;
 }) {
+  useScrollLock();
   const [draft, setDraft] = useState<BlockStyle>(resolveBlockStyle(block.style));
   const saveTimerRef = useRef<number | undefined>(undefined);
 
@@ -45,7 +47,7 @@ export function BlockStylePanel({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
-        className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-(--color-border) bg-(--color-surface) shadow-lg"
+        className="max-h-[85vh] w-full max-w-2xl overflow-y-auto overscroll-contain rounded-xl border border-(--color-border) bg-(--color-surface) shadow-lg"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-(--color-border) p-4">

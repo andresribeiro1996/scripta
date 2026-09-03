@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect } from "react";
 import type { OptionsMenuItem } from "./OptionsMenu";
+import { useScrollLock } from "../hooks/useScrollLock";
 
 /** The shared shell behind every bottom sheet: backdrop, Escape and
  *  click-outside dismissal, and the bottom-anchored-on-mobile /
@@ -21,6 +22,7 @@ import type { OptionsMenuItem } from "./OptionsMenu";
  *  backdrop that needs no positioning relative to its trigger at all, so
  *  neither problem applies. */
 function Sheet({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
+  useScrollLock();
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();

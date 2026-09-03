@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { extractPerCardStyle, resolvePerCardStyle, type LibraryStyleSettings, type PerCardStyle } from "../lib/libraryStyle";
 import { CardAppearanceSection, CardBorderSection, CardContentSection, CardTextSection } from "./StyleControls";
+import { useScrollLock } from "../hooks/useScrollLock";
 
 /** Generic "override the per-card style for one thing" modal — used both
  *  for a series (GroupsPage.tsx's "Style" button, series only) and a
@@ -42,6 +43,7 @@ export function PerCardStylePanel({
   onSave: (style: PerCardStyle | undefined) => void;
   onClose: () => void;
 }) {
+  useScrollLock();
   const [customized, setCustomized] = useState(currentOverride !== undefined);
   // Seeded from the current saved override if there is one (resolved
   // against defaults — see resolvePerCardStyle's own comment for why a
@@ -84,7 +86,7 @@ export function PerCardStylePanel({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
-        className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-(--color-border) bg-(--color-surface) shadow-lg"
+        className="max-h-[85vh] w-full max-w-2xl overflow-y-auto overscroll-contain rounded-xl border border-(--color-border) bg-(--color-surface) shadow-lg"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-(--color-border) p-4">

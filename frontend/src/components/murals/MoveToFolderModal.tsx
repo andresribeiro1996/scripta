@@ -1,5 +1,6 @@
 import { buildTree } from "../../lib/muralFolders";
 import type { MuralFolder } from "../../lib/murals";
+import { useScrollLock } from "../../hooks/useScrollLock";
 
 export function MoveToFolderModal({
   title,
@@ -14,6 +15,7 @@ export function MoveToFolderModal({
   onSelect: (folderId: string | null) => void;
   onClose: () => void;
 }) {
+  useScrollLock();
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
@@ -26,7 +28,7 @@ export function MoveToFolderModal({
             Close
           </button>
         </div>
-        <div className="flex max-h-80 flex-col gap-0.5 overflow-y-auto p-3">
+        <div className="flex max-h-80 flex-col gap-0.5 overflow-y-auto overscroll-contain p-3">
           <button
             onClick={() => onSelect(null)}
             className="rounded-lg px-2 py-1.5 text-left text-sm text-(--color-text) hover:bg-(--color-surface-hover)"
