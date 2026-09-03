@@ -18,6 +18,7 @@
 // (e.g. "Book Title (Series, #2)") but isn't parsed out here.
 
 import type { LibraryData } from "../api/library";
+import { csvRowsToObjects, parseCsv } from "./csv";
 
 export function looksLikeGoodreadsCsv(text: string): boolean {
   const firstLine = text.split(/\r?\n/, 1)[0] ?? "";
@@ -27,87 +28,6 @@ export function looksLikeGoodreadsCsv(text: string): boolean {
     firstLine.includes("Author") &&
     firstLine.includes("Exclusive Shelf")
   );
-}
-
-// Minimal RFC4180-ish CSV parser: handles quoted fields, commas and
-// newlines inside quotes, and "" as an escaped quote. Goodreads' export
-// needs all of this — review text routinely contains commas and line
-// breaks.
-function parseCsv(text: string): string[][] {
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let field = "";
-  let inQuotes = false;
-  let i = 0;
-  const len = text.length;
-
-  function pushField() {
-    row.push(field);
-    field = "";
-  }
-  function pushRow() {
-    pushField();
-    rows.push(row);
-    row = [];
-  }
-
-  while (i < len) {
-    const c = text.charAt(i);
-    if (inQuotes) {
-      if (c === '"') {
-        if (text.charAt(i + 1) === '"') {
-          field += '"';
-          i += 2;
-          continue;
-        }
-        inQuotes = false;
-        i++;
-        continue;
-      }
-      field += c;
-      i++;
-      continue;
-    }
-    if (c === '"') {
-      inQuotes = true;
-      i++;
-      continue;
-    }
-    if (c === ",") {
-      pushField();
-      i++;
-      continue;
-    }
-    if (c === "\r") {
-      i++;
-      continue;
-    }
-    if (c === "\n") {
-      pushRow();
-      i++;
-      continue;
-    }
-    field += c;
-    i++;
-  }
-  if (field.length > 0 || row.length > 0) pushRow();
-
-  return rows;
-}
-
-function csvRowsToObjects(rows: string[][]): Array<Record<string, string>> {
-  if (!rows.length) return [];
-  const header = rows[0];
-  return rows
-    .slice(1)
-    .filter((r) => !(r.length === 1 && r[0] === ""))
-    .map((r) => {
-      const obj: Record<string, string> = {};
-      header.forEach((h, i) => {
-        obj[h] = r[i] ?? "";
-      });
-      return obj;
-    });
 }
 
 // Goodreads wraps ISBN/ISBN13 fields as ="1234567890" to stop spreadsheet

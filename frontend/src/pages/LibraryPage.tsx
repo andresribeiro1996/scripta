@@ -428,8 +428,9 @@ export function LibraryPage() {
           <p className="mb-1 text-(--color-text)">No library saved yet.</p>
           <p className="mb-4 text-sm text-(--color-text-dim)">
             Import one of: a <code>library.json</code> from the exporter CLI, a <code>KoboReader.sqlite</code> straight
-            off your device's USB drive, or a Goodreads library CSV export (My Books → Tools → Import/Export → Export
-            Library).
+            off your device's USB drive, a Goodreads library CSV export (My Books → Tools → Import/Export → Export
+            Library), or a StoryGraph library CSV export (profile icon → Manage Your Account → Manage Your Data →
+            Export StoryGraph Library).
           </p>
           <button
             onClick={() => fileInputRef.current?.click()}
