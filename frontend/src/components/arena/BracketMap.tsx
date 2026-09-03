@@ -14,8 +14,9 @@
 // Separate from BracketTree, which lays out full DuelCards for VOTING
 // (covers, tallies, countdowns, vote buttons). Those cards are ~230px
 // tall, so eight of them make a bracket you can vote in but never see.
-// This is the opposite trade: compact read-only tiles, whole bracket on
-// screen. Two views of the same duels (ArenaViewPage's own toggle).
+// This is the opposite trade: compact read-only tiles — a small cover,
+// title and tally per side — with the whole bracket on screen. Two views
+// of the same duels (ArenaViewPage's own toggle).
 //
 // NO horizontal scroll at any bracket size or width: cells are `flex-1
 // min-w-0`, so a row divides whatever width there is rather than
@@ -28,17 +29,44 @@
 // padding: with flexible cells, anything hanging past a cell's boundary
 // would overlap its neighbour instead of meeting it.
 
+import { useMemo } from "react";
 import type { Duel, DuelSide, TournamentView } from "../../api/arena";
+import { CoverImage } from "../BookCard";
 
-function MatchSide({ label, votes, isWinner, decided }: { label: string; votes: number; isWinner: boolean; decided: boolean }) {
+function MatchSide({ side, isWinner, decided }: { side: DuelSide; isWinner: boolean; decided: boolean }) {
+  // Memoized for the same reason DuelCard memoizes its own: CoverImage
+  // resets its resolved-cover state whenever it is handed a NEW object
+  // reference, so without this every poll tick (useArena refetches every
+  // 5s) would restart the lookup for all 30 covers in a 16-book bracket
+  // and flicker the lot.
+  const coverBook = useMemo(
+    () => ({ Title: side.title, Attribution: side.author, _coverUrl: side.cover ?? undefined }),
+    [side.title, side.author, side.cover]
+  );
   return (
     <div
-      className={`flex items-center justify-between gap-1 px-1.5 py-0.5 text-[10px] sm:px-2 sm:py-1 sm:text-[11px] ${
+      className={`flex items-center gap-1.5 px-1 py-1 text-[10px] sm:gap-2 sm:px-1.5 sm:text-[11px] ${
         isWinner ? "font-semibold text-(--color-text)" : decided ? "text-(--color-text-dim)" : "text-(--color-text)"
       }`}
     >
-      <span className="truncate">{label}</span>
-      <span className={`shrink-0 tabular-nums ${isWinner ? "text-(--color-accent)" : "text-(--color-text-dim)"}`}>{votes}</span>
+      {/* Small, but a real cover: at 2:3 this is 21×32 on a phone and
+          28×42 from `sm`. Big enough that a familiar jacket is
+          recognisable at a glance, which is the point — you scan a
+          bracket for "who's still in", and art does that faster than a
+          truncated title. `decided` fades the loser's cover along with
+          its text, so a settled match still reads at a glance. */}
+      <div
+        className={`relative aspect-2/3 w-5 shrink-0 overflow-hidden rounded-xs bg-(--color-border) sm:w-7 ${
+          decided && !isWinner ? "opacity-45" : ""
+        }`}
+      >
+        <CoverImage book={coverBook} />
+      </div>
+      {/* min-w-0 is load-bearing: a flex child defaults to min-width
+          auto, which refuses to shrink below its text and would push the
+          vote count out of the tile instead of truncating. */}
+      <span className="min-w-0 flex-1 truncate">{side.title}</span>
+      <span className={`shrink-0 tabular-nums ${isWinner ? "text-(--color-accent)" : "text-(--color-text-dim)"}`}>{side.votes}</span>
     </div>
   );
 }
@@ -51,9 +79,9 @@ function MatchTile({ duel }: { duel: Duel }) {
         duel.status === "active" ? "border-(--color-accent)" : "border-(--color-border)"
       }`}
     >
-      <MatchSide label={duel.bookA.title} votes={duel.bookA.votes} isWinner={duel.winnerKey === duel.bookA.key} decided={decided} />
+      <MatchSide side={duel.bookA} isWinner={duel.winnerKey === duel.bookA.key} decided={decided} />
       <div className="border-t border-(--color-border)" />
-      <MatchSide label={duel.bookB.title} votes={duel.bookB.votes} isWinner={duel.winnerKey === duel.bookB.key} decided={decided} />
+      <MatchSide side={duel.bookB} isWinner={duel.winnerKey === duel.bookB.key} decided={decided} />
     </div>
   );
 }
@@ -94,7 +122,7 @@ function RoundRow({
               <span className={`absolute left-1/2 ${inward} h-1.5 border-l border-(--color-border) sm:h-2`} aria-hidden />
             )}
 
-            <div className="w-full px-0.5 py-1.5 sm:px-1 sm:py-2">
+            <div className="w-full px-0.5 py-2 sm:px-1 sm:py-2.5">
               <MatchTile duel={duel} />
             </div>
 
@@ -188,7 +216,7 @@ export function BracketMap({ tournament }: { tournament: TournamentView }) {
                 — the only cell in the bracket that does. */}
             <span className="absolute top-0 left-1/2 h-1.5 border-l border-(--color-border) sm:h-2" aria-hidden />
             <span className="absolute bottom-0 left-1/2 h-1.5 border-l border-(--color-border) sm:h-2" aria-hidden />
-            <div className="w-full px-0.5 py-1.5 sm:px-1 sm:py-2">
+            <div className="w-full px-0.5 py-2 sm:px-1 sm:py-2.5">
               <MatchTile duel={finalDuel} />
               {champion && (
                 <p className="mt-1 truncate text-center text-[10px] font-semibold text-(--color-accent) sm:text-[11px]">
