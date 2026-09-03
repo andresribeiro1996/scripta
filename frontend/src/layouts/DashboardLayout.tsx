@@ -27,10 +27,13 @@ const NAV_GROUPS: Array<{ items: NavItem[] }> = [
     ]
   },
   {
-    items: [
-      { to: "/dashboard/style", label: "Library style", end: false },
-      { to: "/dashboard/settings", label: "Settings", end: false }
-    ]
+    // "Library style" deliberately isn't here. It styles ONE page's
+    // cards and canvas, so it belongs to the Library rather than to the
+    // app — it now lives behind that page's own gear, next to the other
+    // things you do to your library. The route still exists and is
+    // reachable directly; it's only the nav entry that moved, so an old
+    // bookmark keeps working.
+    items: [{ to: "/dashboard/settings", label: "Settings", end: false }]
   }
 ];
 

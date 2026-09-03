@@ -1,6 +1,7 @@
 import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { flushSync } from "react-dom";
 import type { GalleryImage } from "../api/gallery";
 import { fetchLibrary, saveLibrary, type LibraryDocument } from "../api/library";
@@ -60,6 +61,7 @@ function updateWithViewTransition(applyUpdate: () => void) {
 
 export function LibraryPage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { scrubBooks } = useMurals();
   const { share: shareLibraryDoc, unshare: unshareLibraryDoc } = useLibrary();
   const toast = useToast();
@@ -350,6 +352,10 @@ export function LibraryPage() {
       }
     },
     ...(books.length > 0 ? [{ label: "Select…", onClick: handleToggleSelectionMode }] : []),
+    // Moved out of the app nav: it styles this page's cards and canvas,
+    // not the app, so it belongs with the other things you do to your
+    // library rather than sitting beside Settings.
+    { label: "Library style…", onClick: () => navigate("/dashboard/style") },
     { label: "Share", onClick: () => setSharing(true) },
     {
       label: importing ? "Importing…" : books.length > 0 ? "Import more…" : "Import library…",
@@ -430,6 +436,16 @@ export function LibraryPage() {
                 Select…
               </button>
             )}
+            {/* The phone reaches this through the toolbar gear; the
+                desktop header has no gear, so without an explicit button
+                here Library style would be unreachable from the UI
+                entirely once it left the nav. */}
+            <button
+              onClick={() => navigate("/dashboard/style")}
+              className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover)"
+            >
+              Style…
+            </button>
             <button
               onClick={() => setSharing(true)}
               className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover)"
