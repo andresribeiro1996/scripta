@@ -29,6 +29,17 @@ const envSchema = z.object({
   // at localhost.
   FRONTEND_URL: z.string().url().default("http://localhost:5173"),
 
+  // Widens CORS to accept any private-network origin (192.168.x.x,
+  // 10.x.x.x, 172.16–31.x.x, loopback) on top of FRONTEND_URL above —
+  // see config/corsOrigin.ts for why that's needed to open the app on a
+  // phone over the LAN, and why it's opt-in rather than inferred. Set by
+  // `npm run dev:mobile`; leave it out everywhere else, and never turn
+  // it on in production.
+  ALLOW_LAN_ORIGINS: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((value) => value === "true"),
+
   AUTH_DB_PATH: z.string().min(1),
   LIBRARY_DB_PATH: z.string().min(1),
   GALLERY_DB_PATH: z.string().min(1),

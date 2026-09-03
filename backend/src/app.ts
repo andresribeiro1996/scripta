@@ -10,7 +10,7 @@
 
 import fastifyCors from "@fastify/cors";
 import Fastify from "fastify";
-import { env } from "./config/env.js";
+import { isAllowedOrigin } from "./config/corsOrigin.js";
 import { runStartupMigrations } from "./migrations/runStartupMigrations.js";
 import { registerAuthModule } from "./modules/auth/index.js";
 import { registerArenaModule } from "./modules/arena/index.js";
@@ -34,9 +34,11 @@ export function buildApp() {
   // Genuinely app-wide (unlike each module's own rate limiter) — the
   // frontend is a separate origin from this API in dev (Vite on 5173,
   // this on 3000) and will be in production too, so every module's
-  // routes need it, not just one.
+  // routes need it, not just one. Which origins pass is config/
+  // corsOrigin.ts's call: FRONTEND_URL always, plus LAN addresses while
+  // ALLOW_LAN_ORIGINS is set (phone testing).
   app.register(fastifyCors, {
-    origin: env.FRONTEND_URL,
+    origin: (origin, cb) => cb(null, isAllowedOrigin(origin)),
     methods: ["GET", "POST", "PUT", "DELETE"]
   });
 
