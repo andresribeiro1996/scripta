@@ -21,7 +21,7 @@ import { useScrollLock } from "../hooks/useScrollLock";
  *  positioning to that ancestor. A sheet is a full-viewport `fixed`
  *  backdrop that needs no positioning relative to its trigger at all, so
  *  neither problem applies. */
-function Sheet({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
+export function Sheet({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
   useScrollLock();
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {

@@ -29,49 +29,82 @@
 // padding: with flexible cells, anything hanging past a cell's boundary
 // would overlap its neighbour instead of meeting it.
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { Duel, DuelSide, TournamentView } from "../../api/arena";
 import { CoverImage } from "../BookCard";
+import { Sheet } from "../Sheet";
 
-function MatchSide({ side, isWinner, decided }: { side: DuelSide; isWinner: boolean; decided: boolean }) {
+/** A duel side's share of the vote, or `null` before anyone has voted.
+ *
+ *  Deliberately null rather than 0 at zero total: 0/0 has no percentage,
+ *  and printing "0%" on both sides of an untouched match states
+ *  something false — that nobody chose either — where the truth is that
+ *  nobody has voted yet. The tile renders an en dash for that. */
+function sharePercent(side: DuelSide, duel: Duel): number | null {
+  const total = duel.bookA.votes + duel.bookB.votes;
+  return total > 0 ? Math.round((side.votes / total) * 100) : null;
+}
+
+function coverBookFor(side: DuelSide) {
+  return { Title: side.title, Attribution: side.author, _coverUrl: side.cover ?? undefined };
+}
+
+function MatchSide({
+  side,
+  duel,
+  isWinner,
+  decided,
+  onOpen
+}: {
+  side: DuelSide;
+  duel: Duel;
+  isWinner: boolean;
+  decided: boolean;
+  onOpen: () => void;
+}) {
   // Memoized for the same reason DuelCard memoizes its own: CoverImage
   // resets its resolved-cover state whenever it is handed a NEW object
   // reference, so without this every poll tick (useArena refetches every
   // 5s) would restart the lookup for all 30 covers in a 16-book bracket
   // and flicker the lot.
-  const coverBook = useMemo(
-    () => ({ Title: side.title, Attribution: side.author, _coverUrl: side.cover ?? undefined }),
-    [side.title, side.author, side.cover]
-  );
+  const coverBook = useMemo(() => coverBookFor(side), [side.title, side.author, side.cover]);
+  const pct = sharePercent(side, duel);
+
   return (
-    <div
-      className={`flex items-center gap-1.5 px-1 py-1 text-[10px] sm:gap-2 sm:px-1.5 sm:text-[11px] ${
-        isWinner ? "font-semibold text-(--color-text)" : decided ? "text-(--color-text-dim)" : "text-(--color-text)"
-      }`}
+    <button
+      onClick={onOpen}
+      // The title is gone from the tile, so the accessible name has to
+      // carry it — otherwise this is a button labelled only by a
+      // percentage, and the covers are decorative images with no text
+      // anywhere in the bracket at all.
+      aria-label={`${side.title} — ${pct === null ? "no votes yet" : `${pct}% of votes`}`}
+      className="flex w-full items-center gap-1.5 px-1.5 py-1.5 text-left hover:bg-(--color-surface-hover) sm:gap-2 sm:px-2"
     >
-      {/* Small, but a real cover: at 2:3 this is 21×32 on a phone and
-          28×42 from `sm`. Big enough that a familiar jacket is
-          recognisable at a glance, which is the point — you scan a
-          bracket for "who's still in", and art does that faster than a
-          truncated title. `decided` fades the loser's cover along with
-          its text, so a settled match still reads at a glance. */}
+      {/* Cover only: no title. At a bracket's scale the jacket is the
+          faster identifier, and dropping the text buys the art enough
+          room to actually be recognisable. Tapping opens the details,
+          which is where the title now lives. The winner keeps a ring
+          and the loser fades, so a settled match still reads instantly
+          without any words. */}
       <div
-        className={`relative aspect-2/3 w-5 shrink-0 overflow-hidden rounded-xs bg-(--color-border) sm:w-7 ${
-          decided && !isWinner ? "opacity-45" : ""
-        }`}
+        className={`relative aspect-2/3 w-[30px] shrink-0 overflow-hidden rounded-xs bg-(--color-border) sm:w-[42px] ${
+          isWinner ? "ring-2 ring-(--color-accent)" : ""
+        } ${decided && !isWinner ? "opacity-40" : ""}`}
       >
         <CoverImage book={coverBook} />
       </div>
-      {/* min-w-0 is load-bearing: a flex child defaults to min-width
-          auto, which refuses to shrink below its text and would push the
-          vote count out of the tile instead of truncating. */}
-      <span className="min-w-0 flex-1 truncate">{side.title}</span>
-      <span className={`shrink-0 tabular-nums ${isWinner ? "text-(--color-accent)" : "text-(--color-text-dim)"}`}>{side.votes}</span>
-    </div>
+      <span
+        className={`ml-auto shrink-0 text-[11px] tabular-nums sm:text-xs ${
+          isWinner ? "font-semibold text-(--color-accent)" : "text-(--color-text-dim)"
+        }`}
+      >
+        {pct === null ? "–" : `${pct}%`}
+      </span>
+    </button>
   );
 }
 
-function MatchTile({ duel }: { duel: Duel }) {
+function MatchTile({ duel, onOpen }: { duel: Duel; onOpen: (side: DuelSide) => void }) {
   const decided = duel.winnerKey !== null;
   return (
     <div
@@ -79,10 +112,67 @@ function MatchTile({ duel }: { duel: Duel }) {
         duel.status === "active" ? "border-(--color-accent)" : "border-(--color-border)"
       }`}
     >
-      <MatchSide side={duel.bookA} isWinner={duel.winnerKey === duel.bookA.key} decided={decided} />
+      <MatchSide
+        side={duel.bookA}
+        duel={duel}
+        isWinner={duel.winnerKey === duel.bookA.key}
+        decided={decided}
+        onOpen={() => onOpen(duel.bookA)}
+      />
       <div className="border-t border-(--color-border)" />
-      <MatchSide side={duel.bookB} isWinner={duel.winnerKey === duel.bookB.key} decided={decided} />
+      <MatchSide
+        side={duel.bookB}
+        duel={duel}
+        isWinner={duel.winnerKey === duel.bookB.key}
+        decided={decided}
+        onOpen={() => onOpen(duel.bookB)}
+      />
     </div>
+  );
+}
+
+/** What a tapped cover opens. The bracket shows no words at all, so this
+ *  carries everything the tile dropped: which book it is, who wrote it,
+ *  and how the match it belongs to actually stands — both sides, not
+ *  just the tapped one, since "60%" only means something next to the
+ *  40% it beat. */
+function BookSheet({ side, duel, onClose }: { side: DuelSide; duel: Duel; onClose: () => void }) {
+  const coverBook = useMemo(() => coverBookFor(side), [side.title, side.author, side.cover]);
+  const decided = duel.winnerKey !== null;
+  return (
+    <Sheet title="Match" onClose={onClose}>
+      <div className="flex gap-3 px-2 pb-1">
+        <div className="relative aspect-2/3 w-20 shrink-0 overflow-hidden rounded-lg bg-(--color-border)">
+          <CoverImage book={coverBook} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-sm font-semibold">{side.title}</h3>
+          <p className="mt-0.5 text-xs text-(--color-text-dim)">{side.author}</p>
+          {decided && (
+            <p className="mt-1.5 text-xs font-semibold text-(--color-accent)">
+              {duel.winnerKey === side.key ? "Advanced" : "Knocked out"}
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-3 space-y-1 px-2">
+        {[duel.bookA, duel.bookB].map((s) => {
+          const pct = sharePercent(s, duel);
+          return (
+            <div key={s.key} className="flex items-center gap-2 text-xs">
+              <span className={`min-w-0 flex-1 truncate ${s.key === side.key ? "font-semibold" : "text-(--color-text-dim)"}`}>
+                {s.title}
+              </span>
+              <span className="shrink-0 tabular-nums text-(--color-text-dim)">
+                {s.votes} vote{s.votes === 1 ? "" : "s"}
+              </span>
+              <span className="w-9 shrink-0 text-right tabular-nums font-semibold">{pct === null ? "–" : `${pct}%`}</span>
+            </div>
+          );
+        })}
+      </div>
+    </Sheet>
   );
 }
 
@@ -96,13 +186,15 @@ function RoundRow({
   label,
   mirrored,
   feedsInward,
-  receivesFromOutside
+  receivesFromOutside,
+  onOpen
 }: {
   duels: Duel[];
   label: string;
   mirrored: boolean;
   feedsInward: boolean;
   receivesFromOutside: boolean;
+  onOpen: (side: DuelSide, duel: Duel) => void;
 }) {
   const outward = mirrored ? "top-0" : "bottom-0";
   const inward = mirrored ? "bottom-0" : "top-0";
@@ -122,8 +214,15 @@ function RoundRow({
               <span className={`absolute left-1/2 ${inward} h-1.5 border-l border-(--color-border) sm:h-2`} aria-hidden />
             )}
 
-            <div className="w-full px-0.5 py-2 sm:px-1 sm:py-2.5">
-              <MatchTile duel={duel} />
+            {/* Capped and centred. Round 1 has four tiles to a row so
+                the cap never binds there, but the semis have one per
+                half — left to stretch, that put a 30px cover at the far
+                left of a 375px box with the percentage stranded at the
+                other end. The connectors are positioned against the
+                CELL, not the tile, so centring the tile inside it keeps
+                every stub meeting the tile's own centre. */}
+            <div className="mx-auto w-full max-w-56 px-0.5 py-2 sm:px-1 sm:py-2.5">
+              <MatchTile duel={duel} onOpen={(side) => onOpen(side, duel)} />
             </div>
 
             {feedsInward && (
@@ -153,6 +252,9 @@ function RoundRow({
 }
 
 export function BracketMap({ tournament }: { tournament: TournamentView }) {
+  // Which cover was tapped. Holds the duel alongside the side because a
+  // book's share only means anything next to its opponent's.
+  const [open, setOpen] = useState<{ side: DuelSide; duel: Duel } | null>(null);
   const rounds = new Map<number, Duel[]>();
   for (const duel of tournament.duels) {
     const list = rounds.get(duel.roundNumber) ?? [];
@@ -205,6 +307,7 @@ export function BracketMap({ tournament }: { tournament: TournamentView }) {
           mirrored={false}
           feedsInward={roundIdx < top.length - 1 || hasCentre}
           receivesFromOutside={roundIdx > 0}
+          onOpen={(side, duel) => setOpen({ side, duel })}
         />
       ))}
 
@@ -217,7 +320,7 @@ export function BracketMap({ tournament }: { tournament: TournamentView }) {
             <span className="absolute top-0 left-1/2 h-1.5 border-l border-(--color-border) sm:h-2" aria-hidden />
             <span className="absolute bottom-0 left-1/2 h-1.5 border-l border-(--color-border) sm:h-2" aria-hidden />
             <div className="w-full px-0.5 py-2 sm:px-1 sm:py-2.5">
-              <MatchTile duel={finalDuel} />
+              <MatchTile duel={finalDuel} onOpen={(side) => setOpen({ side, duel: finalDuel })} />
               {champion && (
                 <p className="mt-1 truncate text-center text-[10px] font-semibold text-(--color-accent) sm:text-[11px]">
                   🏆 {champion.title}
@@ -239,9 +342,12 @@ export function BracketMap({ tournament }: { tournament: TournamentView }) {
             mirrored
             feedsInward={roundIdx < bottom.length - 1 || hasCentre}
             receivesFromOutside={roundIdx > 0}
+            onOpen={(side, duel) => setOpen({ side, duel })}
           />
         );
       })}
+
+      {open && <BookSheet side={open.side} duel={open.duel} onClose={() => setOpen(null)} />}
     </div>
   );
 }
