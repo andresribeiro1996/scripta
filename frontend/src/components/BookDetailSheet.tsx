@@ -1,7 +1,7 @@
-import { useEffect } from "react";
 import { CoverImage } from "./BookCard";
 import { statusLabel } from "../lib/covers";
 import { nextReadStatus } from "../lib/libraryView";
+import { useDismissible } from "../hooks/useDismissible";
 import { useScrollLock } from "../hooks/useScrollLock";
 
 export function BookDetailSheet({
@@ -18,13 +18,7 @@ export function BookDetailSheet({
   onClose: () => void;
 }) {
   useScrollLock();
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  useDismissible(onClose);
 
   const highlights = Array.isArray(book.highlights)
     ? (book.highlights as Array<Record<string, unknown>>).filter((h) => String(h.Text ?? "").trim() !== "")
