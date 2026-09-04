@@ -126,28 +126,38 @@ export function CurrentlyReadingBlockView({ books }: { books: Array<Record<strin
   );
 }
 
-/** A tier from the tier list, with its books displayed in tiles. Uses TierRowShell for
- *  the chrome (colored label, wrapping layout, empty state), and fills the tile area
- *  with MiniBookTile components. Each cover tile gets a fixed height (`h-[6em]`,
- *  not `h-full`) specifically so the tiles can wrap onto additional lines while
- *  letting the row's own height be DERIVED from how many lines they wrap onto,
- *  rather than forcing a fixed height that would require scrolling.
+/** Displays a tier's books, using TierRowShell for the row's chrome
+ *  (colored label, layout, empty state) and filling the tile area with
+ *  MiniBookTile components. Each cover tile gets a fixed height (`h-[6em]`,
+ *  not `h-full`) specifically so this works: an intrinsic height lets the
+ *  row's own height be DERIVED from how many lines its tiles wrap onto,
+ *  whereas `h-full` would need a height from its parent that doesn't exist
+ *  yet — a circular dependency the old fixed-height/scroll design never had
+ *  to resolve.
  *
- *  Every cover tile is a fixed pixel box, not `aspect-[2/3]` computed from height
- *  alone — plus its OWN `overflow-hidden`: this is `flex-wrap`, so a tile's own
- *  intrinsic box directly determines the grid every book lines up against.
- *  `MiniBookTile`'s title/author use `truncate` (`white-space: nowrap`), and a flex
- *  item's "automatic minimum size" is its CONTENT's min-content width unless that
- *  item's own `overflow` is non-`visible` — so without `overflow-hidden` right here,
- *  a book with a long title/author (whose nowrap text can't shrink) silently forced
- *  its OWN tile wider than every other book's.
+ *  Every cover tile is a fixed pixel box, not `aspect-[2/3]` computed
+ *  from height alone — plus its OWN `overflow-hidden`, for the same reason
+ *  the label needs one: this is `flex-wrap`, so a tile's own intrinsic box
+ *  directly determines the grid every book lines up against. `MiniBookTile`'s
+ *  title/author use `truncate` (`white-space: nowrap`), and a flex item's
+ *  "automatic minimum size" is its CONTENT's min-content width unless that
+ *  item's own `overflow` is non-`visible` — so without `overflow-hidden`
+ *  right here, a book with a long title/author (whose nowrap text can't
+ *  shrink) silently forced its OWN tile wider than every other book's.
+ *  Reported live as "some books have a bigger width in a tier list" — same
+ *  bug existed in Shelf/Currently-reading's tiles too (`aspect-[2/3] h-full`),
+ *  just harder to notice there since a horizontally-scrolling row has no
+ *  neighboring line for a too-wide tile to visibly misalign against; both got
+ *  the identical `overflow-hidden` fix for consistency, even though only the
+ *  tier list version was ever actually reported as visibly wrong.
  *
- *  Title AND author both omitted (`showTitle={false} showAuthor={false}`) — at a
- *  tier tile's small footprint, a text footer (of either one line or two) was mostly
- *  just a truncated fragment eating into the cover art's own room, not adding legible
- *  information; dropping both lets `MiniBookTile` skip the footer strip entirely, so
- *  the cover fills the whole tile. View-only by design: this is the mural block's
- *  pure renderer — all ranking/editing lives in TierListEditorPage, whose own
+ *  Title AND author both omitted (`showTitle={false} showAuthor={false}`)
+ *  — at a tier tile's small footprint, a text footer (of either one line
+ *  or two) was mostly just a truncated fragment eating into the cover
+ *  art's own room, not adding legible information; dropping both lets
+ *  `MiniBookTile` skip the footer strip entirely, so the cover fills the
+ *  whole tile. View-only by design: this is the mural block's pure
+ *  renderer — all ranking/editing lives in TierListEditorPage, whose own
  *  draggable tiles (DraggableTierTile below) are shared from this file. */
 export function TierRow({ tier, books }: { tier: TierDefinition; books: Array<Record<string, unknown>> }) {
   const byKey = new Map(books.map((b) => [bookKey(b), b] as const));
