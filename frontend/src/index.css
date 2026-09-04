@@ -81,6 +81,13 @@ body {
   background: var(--color-bg);
   color: var(--color-text);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  /* Chrome on Android has its own edge-swipe-to-navigate-back gesture,
+     which otherwise fires alongside EdgeSwipeBack.tsx's — the two race,
+     and Chrome's own history navigation wins visually (the whole page
+     goes back a step) even when our own listener already closed the
+     topmost dialog. overscroll-behavior-x suppresses that native
+     gesture without touching normal vertical scrolling/pull-to-refresh. */
+  overscroll-behavior-x: none;
 }
 
 /* Themed scrollbars — every scrollable area in the app (the page itself,
