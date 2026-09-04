@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useDismissible } from "../hooks/useDismissible";
 
 export interface OptionsMenuItem {
   label: string;
@@ -72,16 +73,11 @@ export function OptionsMenu({
     function handlePointerDown(e: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) setOpen(false);
     }
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
-    }
     window.addEventListener("mousedown", handlePointerDown);
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("mousedown", handlePointerDown);
-      window.removeEventListener("keydown", handleKeyDown);
-    };
+    return () => window.removeEventListener("mousedown", handlePointerDown);
   }, [open]);
+
+  useDismissible(() => setOpen(false), open);
 
   function toggle(e: React.MouseEvent<HTMLButtonElement>) {
     e.stopPropagation();
