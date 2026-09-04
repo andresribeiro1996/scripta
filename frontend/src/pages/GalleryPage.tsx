@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { useConfirm } from "../components/ConfirmDialog";
 import { PageContainer } from "../components/PageContainer";
 import { SkeletonCardGrid } from "../components/Skeleton";
-import { ToolbarRow } from "../components/Toolbar";
+import { CloseIcon, ToolbarRow } from "../components/Toolbar";
 import { useDelayedShow } from "../hooks/useDelayedShow";
 import { useDeleteGalleryImage } from "../hooks/useDeleteGalleryImage";
 import { useGalleryImages } from "../hooks/useGalleryImages";
@@ -168,7 +168,7 @@ export function GalleryPage() {
                   title="Delete from gallery"
                   className="absolute top-2 right-2 flex h-7 w-7 items-center justify-center rounded-full bg-[rgba(10,8,6,0.72)] text-sm font-bold text-white opacity-0 backdrop-blur-xs transition-opacity group-hover:opacity-100 disabled:opacity-100"
                 >
-                  {deletingId === image.id ? "…" : "×"}
+                  {deletingId === image.id ? "…" : <CloseIcon size={13} />}
                 </button>
               </div>
             );

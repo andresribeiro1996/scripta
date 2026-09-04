@@ -127,6 +127,55 @@ export function PencilIcon() {
   );
 }
 
+/** A cross — dismiss or delete. Replaces the literal "×" character
+ *  these buttons used to print: a multiplication sign is not a close
+ *  glyph, it sits at a different weight and baseline from the SVGs
+ *  beside it, and its size varies with whatever font happens to load.
+ *  Takes a size because it appears in a 24px overlay chip and in a 44px
+ *  toast row. */
+export function CloseIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+      <path d="M6.5 6.5l11 11M17.5 6.5l-11 11" />
+    </svg>
+  );
+}
+
+/** Chevron — the back links that used to print a literal "←". */
+export function ChevronLeftIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M15 4.5 7.5 12l7.5 7.5" />
+    </svg>
+  );
+}
+
+/** Chevron — forward, for a link that leaves the current context. */
+export function ChevronRightIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 4.5 16.5 12 9 19.5" />
+    </svg>
+  );
+}
+
+/** Six dots — a drag handle. Was "⠿", a BRAILLE PATTERN character: it
+ *  renders from whatever fallback font has it, so its size and weight
+ *  were outside the app's control entirely, and it carries a meaning to
+ *  a screen reader that has nothing to do with dragging. */
+export function GripIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="none">
+      <circle cx="9" cy="6.5" r="1.6" />
+      <circle cx="15" cy="6.5" r="1.6" />
+      <circle cx="9" cy="12" r="1.6" />
+      <circle cx="15" cy="12" r="1.6" />
+      <circle cx="9" cy="17.5" r="1.6" />
+      <circle cx="15" cy="17.5" r="1.6" />
+    </svg>
+  );
+}
+
 /** Arrow up out of a tray — share. */
 export function ShareIcon() {
   return (

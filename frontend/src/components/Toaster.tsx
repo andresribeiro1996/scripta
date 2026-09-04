@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from "react";
+import { CloseIcon } from "./Toolbar";
 
 export interface ToastOptions {
   message: string;
@@ -68,7 +69,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 </button>
               )}
               <button onClick={() => dismiss(t.id)} aria-label="Dismiss" className="-my-2 inline-flex min-h-11 items-center px-1 text-(--color-text-dim) hover:text-(--color-text)">
-                ×
+                <CloseIcon size={16} />
               </button>
             </div>
           );

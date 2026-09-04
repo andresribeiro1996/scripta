@@ -7,7 +7,7 @@ import { MuralCanvas } from "../components/murals/MuralCanvas";
 import { PageContainer } from "../components/PageContainer";
 import { ShareModal } from "../components/ShareModal";
 import { useToast } from "../components/Toaster";
-import { PencilIcon, ShareIcon, toolbarIconClass } from "../components/Toolbar";
+import { ChevronLeftIcon, PencilIcon, ShareIcon, toolbarIconClass } from "../components/Toolbar";
 import { useGalleryImages } from "../hooks/useGalleryImages";
 import { useLibrary } from "../hooks/useLibrary";
 import { useMurals } from "../hooks/useMurals";
@@ -258,8 +258,9 @@ export function MuralEditorPage() {
     <PageContainer>
       <header className="mb-6 flex items-center justify-between gap-4">
         <div>
-          <Link to="/dashboard/murals" className="text-xs text-(--color-text-dim) hover:text-(--color-text)">
-            ← Murals
+          <Link to="/dashboard/murals" className="inline-flex items-center gap-1 text-xs text-(--color-text-dim) hover:text-(--color-text)">
+            <ChevronLeftIcon size={13} />
+            Murals
           </Link>
           {editingName ? (
             <input

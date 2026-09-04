@@ -8,6 +8,7 @@ import { useLibrary } from "../hooks/useLibrary";
 import { useTierlists } from "../hooks/useTierlists";
 import { bookKey } from "../lib/merge";
 import { createTier } from "../lib/murals";
+import { ChevronLeftIcon } from "../components/Toolbar";
 
 type MoveDestination = { type: "pool"; beforeKey?: string } | { type: "tier"; tierId: string; beforeKey?: string };
 
@@ -309,8 +310,9 @@ export function TierListEditorPage() {
   return (
     <PageContainer>
       <header className="mb-6">
-        <Link to="/dashboard/arena?tab=tierlists" className="text-xs text-(--color-text-dim) hover:text-(--color-text)">
-          ← Arena
+        <Link to="/dashboard/arena?tab=tierlists" className="inline-flex items-center gap-1 text-xs text-(--color-text-dim) hover:text-(--color-text)">
+          <ChevronLeftIcon size={13} />
+          Arena
         </Link>
         {editingName ? (
           <input

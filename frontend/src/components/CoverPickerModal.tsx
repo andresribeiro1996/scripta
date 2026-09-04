@@ -4,6 +4,7 @@ import { useDeleteGalleryImage } from "../hooks/useDeleteGalleryImage";
 import { useGalleryImages } from "../hooks/useGalleryImages";
 import { useConfirm } from "./ConfirmDialog";
 import { useScrollLock } from "../hooks/useScrollLock";
+import { CloseIcon } from "./Toolbar";
 
 /** "Cover" button's modal (BookCard.tsx, everywhere a card renders;
  *  MuralsListPage.tsx's mural cards too) — assign one of the account's
@@ -188,7 +189,7 @@ export function CoverPickerModal({
                     title="Delete from gallery"
                     className="absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-[rgba(10,8,6,0.72)] text-xs font-bold text-white opacity-0 backdrop-blur-xs transition-opacity group-hover:opacity-100"
                   >
-                    {deletingId === image.id ? "…" : "×"}
+                    {deletingId === image.id ? "…" : <CloseIcon size={13} />}
                   </button>
                 </div>
               ))}

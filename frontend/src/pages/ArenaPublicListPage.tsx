@@ -8,6 +8,7 @@ import { TournamentStatusBadge } from "../components/arena/TournamentStatusBadge
 import { SkeletonCardGrid } from "../components/Skeleton";
 import { useDelayedShow } from "../hooks/useDelayedShow";
 import { usePublicTournaments } from "../hooks/usePublicTournaments";
+import { ChevronLeftIcon } from "../components/Toolbar";
 
 export function ArenaPublicListPage() {
   const { tournaments, isLoading } = usePublicTournaments();
@@ -15,8 +16,9 @@ export function ArenaPublicListPage() {
 
   return (
     <div className="mx-auto max-w-3xl p-6">
-      <Link to="/dashboard" className="mb-2 inline-block text-xs text-(--color-text-dim) hover:text-(--color-text)">
-        ← Back to app
+      <Link to="/dashboard" className="mb-2 inline-flex items-center gap-1 text-xs text-(--color-text-dim) hover:text-(--color-text)">
+        <ChevronLeftIcon size={13} />
+        Back to app
       </Link>
       <h1 className="mb-1 text-xl font-bold">BookArena</h1>
       <p className="mb-6 text-sm text-(--color-text-dim)">Vote in book bracket tournaments — no account needed.</p>

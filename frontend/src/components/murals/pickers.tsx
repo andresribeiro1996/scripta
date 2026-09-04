@@ -9,6 +9,7 @@ import { useMemo, useState } from "react";
 import type { GalleryImage } from "../../api/gallery";
 import { useDeleteGalleryImage } from "../../hooks/useDeleteGalleryImage";
 import { useConfirm } from "../ConfirmDialog";
+import { CloseIcon } from "../Toolbar";
 
 /** Search-filtered, click-to-select list of books — used for Spotlight
  *  (single pick), Shelf ("add another book"), and as the first step of
@@ -142,7 +143,7 @@ export function GalleryImageGrid({
             title="Delete from gallery"
             className="absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-[rgba(10,8,6,0.72)] text-xs font-bold text-white opacity-0 backdrop-blur-xs transition-opacity group-hover:opacity-100"
           >
-            {deletingId === image.id ? "…" : "×"}
+            {deletingId === image.id ? "…" : <CloseIcon size={13} />}
           </button>
         </div>
       ))}

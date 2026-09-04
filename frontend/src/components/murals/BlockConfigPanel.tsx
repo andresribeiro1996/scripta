@@ -19,6 +19,7 @@ import { bookKey } from "../../lib/merge";
 import { BookSearchList, GalleryImageGrid } from "./pickers";
 import { useScrollLock } from "../../hooks/useScrollLock";
 import { useTierlists } from "../../hooks/useTierlists";
+import { ChevronLeftIcon, ChevronRightIcon } from "../Toolbar";
 
 function bookHighlights(book: Record<string, unknown> | undefined): Array<Record<string, unknown>> {
   if (!book || !Array.isArray(book.highlights)) return [];
@@ -238,8 +239,9 @@ export function BlockConfigPanel({
           {draft.type === "quote" &&
             (browsingBookKey ? (
               <div className="flex flex-col gap-2">
-                <button onClick={() => setBrowsingBookKey(null)} className="self-start text-xs text-(--color-text-dim) hover:text-(--color-text)">
-                  ← Back to books
+                <button onClick={() => setBrowsingBookKey(null)} className="inline-flex items-center gap-1 self-start text-xs text-(--color-text-dim) hover:text-(--color-text)">
+                  <ChevronLeftIcon size={13} />
+                  Back to books
                 </button>
                 {bookHighlights(books.find((b) => bookKey(b) === browsingBookKey)).length === 0 ? (
                   <p className="text-sm text-(--color-text-dim)">This book has no saved highlights.</p>
@@ -304,8 +306,9 @@ export function BlockConfigPanel({
 
               {browsingBookKey ? (
                 <div className="flex flex-col gap-2">
-                  <button onClick={() => setBrowsingBookKey(null)} className="self-start text-xs text-(--color-text-dim) hover:text-(--color-text)">
-                    ← Back to books
+                  <button onClick={() => setBrowsingBookKey(null)} className="inline-flex items-center gap-1 self-start text-xs text-(--color-text-dim) hover:text-(--color-text)">
+                    <ChevronLeftIcon size={13} />
+                    Back to books
                   </button>
                   {bookHighlights(books.find((b) => bookKey(b) === browsingBookKey)).map((h, i) => (
                     <button
@@ -374,9 +377,10 @@ export function BlockConfigPanel({
                   <Link
                     to="/dashboard/arena?tab=tierlists"
                     onClick={onClose}
-                    className="self-start text-xs font-medium text-(--color-accent) transition-opacity hover:opacity-80"
+                    className="inline-flex items-center gap-1 self-start text-xs font-medium text-(--color-accent) transition-opacity hover:opacity-80"
                   >
-                    Create in Arena →
+                    Create in Arena
+                    <ChevronRightIcon size={13} />
                   </Link>
                 </div>
               );

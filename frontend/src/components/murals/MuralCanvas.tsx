@@ -24,6 +24,7 @@ import { OptionsMenu } from "../OptionsMenu";
 import { blockFontFamilyCss, resolveBlockStyle, resolveBorderColor } from "../../lib/libraryStyle";
 import { GRID_COLUMNS, type BlockLayout, type Mural, type MuralBlock } from "../../lib/murals";
 import { BlockRenderer } from "./BlockRenderer";
+import { GripIcon } from "../Toolbar";
 
 const ResponsiveGridLayout = GridLayout.WidthProvider(GridLayout);
 const ROW_HEIGHT = 28;
@@ -215,7 +216,9 @@ export function MuralCanvas({
       >
         {touchMode && editMode && (
           <div className="mural-grip absolute inset-x-0 top-0 z-10 flex items-center justify-between px-1.5 py-1">
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[rgba(10,8,6,0.72)] text-sm text-white select-none">⠿</span>
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[rgba(10,8,6,0.72)] text-white select-none">
+              <GripIcon size={14} />
+            </span>
             <span className="mural-block-controls">
               <OptionsMenu
                 title="Block settings"
