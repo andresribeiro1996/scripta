@@ -129,3 +129,22 @@ share a one-finger gesture. Resolution:
     controls intact, tier-list drag still works.
   - Tier-list ranking on touch via ⋮ menus persists correctly
     (same-block save path as desktop).
+
+## Amendment (2026-09-04, later session): proportional zoom
+
+The shipped width-only zoom scales the grid's width while `rowHeight`
+(28px) and block fonts (authored px) stay fixed — blocks stretch wide
+while their content stays small. Superseded sizing semantics, on touch
+only:
+
+- `scale = canvasWidth / 1200` (1200 = reference desktop canvas).
+- `rowHeight = max(1, round(28 × scale))` in the touch branch; block
+  inline `fontSize = style.fontSize × scale`. Rows, text, and em-based
+  content scale together — a coherent miniature.
+- Block view components are swept for rem-based sizing (`h-24 w-16`
+  tier tiles etc.) and converted to em so they track the scaled font.
+- Phone default zoom rises to 200% (≈⅔ desktop scale); range stays
+  50–300%. Desktop is untouched (scale 1, rowHeight 28, authored px).
+
+The viewport/gesture model (width-scaled container, grip bars,
+stepper) is unchanged — only what zoom does to geometry.
