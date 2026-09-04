@@ -74,7 +74,7 @@ export function MuralCanvas({
   const [touchMode] = useState(
     () => typeof window !== "undefined" && Boolean(window.matchMedia?.("(pointer: coarse)").matches)
   );
-  const [zoom, setZoom] = useState(() => (typeof window !== "undefined" && window.innerWidth < 700 ? 2 : 1));
+  const [zoom, setZoom] = useState(() => (typeof window !== "undefined" && window.innerWidth < 700 ? 3 : 1));
   const viewportRef = useRef<HTMLDivElement>(null);
   const [viewportWidth, setViewportWidth] = useState(0);
   const lastTapRef = useRef(0);
@@ -95,7 +95,7 @@ export function MuralCanvas({
   const scale = canvasWidth / 1200;
 
   function setZoomBy(delta: number) {
-    setZoom((z) => Math.min(3, Math.max(0.5, Math.round((z + delta) * 100) / 100)));
+    setZoom((z) => Math.min(4, Math.max(0.5, Math.round((z + delta) * 100) / 100)));
   }
 
   function handlePercentTap() {
