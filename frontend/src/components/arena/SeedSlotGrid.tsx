@@ -19,6 +19,7 @@ import { toSeedBook } from "../../lib/arenaSeed";
 import { bookKey } from "../../lib/merge";
 import { CoverImage } from "../BookCard";
 import { BookSearchList } from "../murals/pickers";
+import { useDismissible } from "../../hooks/useDismissible";
 import { useScrollLock } from "../../hooks/useScrollLock";
 
 export function SeedSlotGrid({
@@ -48,6 +49,7 @@ export function SeedSlotGrid({
   const [pickingSlot, setPickingSlot] = useState<number | null>(null);
   // Always-mounted grid — lock only while the picker modal is up.
   useScrollLock(pickingSlot !== null);
+  useDismissible(() => setPickingSlot(null), pickingSlot !== null);
   const usedKeys = new Set(slots.filter((s): s is SeedBook => s !== null).map((s) => s.key));
   const filledCount = slots.filter(Boolean).length;
 

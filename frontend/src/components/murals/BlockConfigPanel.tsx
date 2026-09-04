@@ -17,6 +17,7 @@ import type { GalleryImage } from "../../api/gallery";
 import { ALL_STAT_METRICS, BLOCK_TYPE_LABELS, STAT_METRIC_LABELS, type MuralBlock } from "../../lib/murals";
 import { bookKey } from "../../lib/merge";
 import { BookSearchList, GalleryImageGrid } from "./pickers";
+import { useDismissible } from "../../hooks/useDismissible";
 import { useScrollLock } from "../../hooks/useScrollLock";
 import { useTierlists } from "../../hooks/useTierlists";
 
@@ -39,6 +40,7 @@ export function BlockConfigPanel({
   onClose: () => void;
 }) {
   useScrollLock();
+  useDismissible(onClose);
   const [draft, setDraft] = useState<MuralBlock>(block);
   // tierlist only: the saved tier lists to pick from. Everything else
   // about a tier list — structure, pool, ranking — is edited over in

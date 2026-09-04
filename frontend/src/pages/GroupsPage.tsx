@@ -10,6 +10,7 @@ import { OptionsMenu } from "../components/OptionsMenu";
 import { PageContainer } from "../components/PageContainer";
 import { PerCardStylePanel } from "../components/PerCardStylePanel";
 import { useToast } from "../components/Toaster";
+import { useDismissible } from "../hooks/useDismissible";
 import { useLibrary } from "../hooks/useLibrary";
 import { useMurals } from "../hooks/useMurals";
 import { clearBookCover, setBookCover } from "../lib/bookCovers";
@@ -565,6 +566,7 @@ function BookPickerModal({
   onToggle: (book: Record<string, unknown>, inGroup: boolean) => void;
   onClose: () => void;
 }) {
+  useDismissible(onClose);
   const [search, setSearch] = useState("");
   const memberKeys = useMemo(() => new Set(group.bookKeys), [group]);
 

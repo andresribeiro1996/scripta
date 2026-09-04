@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import type { GalleryImage } from "../api/gallery";
 import { useDeleteGalleryImage } from "../hooks/useDeleteGalleryImage";
+import { useDismissible } from "../hooks/useDismissible";
 import { useGalleryImages } from "../hooks/useGalleryImages";
 import { useConfirm } from "./ConfirmDialog";
 import { useScrollLock } from "../hooks/useScrollLock";
@@ -38,6 +39,7 @@ export function CoverPickerModal({
   onClose: () => void;
 }) {
   useScrollLock();
+  useDismissible(onClose);
   const { images, isLoading, upload } = useGalleryImages();
   const deleteImage = useDeleteGalleryImage();
   const confirm = useConfirm();

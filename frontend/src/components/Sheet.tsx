@@ -1,5 +1,6 @@
-import { type ReactNode, useEffect } from "react";
+import type { ReactNode } from "react";
 import type { OptionsMenuItem } from "./OptionsMenu";
+import { useDismissible } from "../hooks/useDismissible";
 import { useScrollLock } from "../hooks/useScrollLock";
 
 /** The shared shell behind every bottom sheet: backdrop, Escape and
@@ -23,13 +24,7 @@ import { useScrollLock } from "../hooks/useScrollLock";
  *  neither problem applies. */
 export function Sheet({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
   useScrollLock();
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  useDismissible(onClose);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-4" onClick={onClose}>

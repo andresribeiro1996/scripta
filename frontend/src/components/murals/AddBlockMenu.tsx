@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useDismissible } from "../../hooks/useDismissible";
 import { Sheet } from "../Sheet";
 import { PlusIcon, toolbarIconClass } from "../Toolbar";
 import { BLOCK_TYPE_LABELS, type BlockType } from "../../lib/murals";
@@ -37,6 +38,12 @@ const BLOCK_CHOICES: Array<{ type: BlockType; description: string }> = [
  *  across the split. */
 export function AddBlockMenu({ onAdd }: { onAdd: (type: BlockType) => void }) {
   const [open, setOpen] = useState(false);
+  // Only covers the desktop dropdown branch below — the mobile Sheet
+  // branch already registers its own dismissible via Sheet itself. Both
+  // branches render whenever `open` is true (split only by CSS
+  // breakpoint), so this harmlessly double-registers on mobile widths
+  // too; that's a duplicate stack entry, not a bug.
+  useDismissible(() => setOpen(false), open);
 
   function pick(type: BlockType) {
     onAdd(type);

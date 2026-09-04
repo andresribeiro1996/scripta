@@ -1,7 +1,8 @@
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { OfflineBanner } from "../components/OfflineBanner";
+import { useDismissible } from "../hooks/useDismissible";
 import { useScrollLock } from "../hooks/useScrollLock";
 
 interface NavItem {
@@ -55,14 +56,7 @@ export function DashboardLayout() {
   // the app would never scroll at all.
   useScrollLock(drawerOpen);
 
-  useEffect(() => {
-    if (!drawerOpen) return;
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setDrawerOpen(false);
-    }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [drawerOpen]);
+  useDismissible(() => setDrawerOpen(false), drawerOpen);
 
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
     `rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${

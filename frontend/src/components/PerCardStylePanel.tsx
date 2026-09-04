@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { extractPerCardStyle, resolvePerCardStyle, type LibraryStyleSettings, type PerCardStyle } from "../lib/libraryStyle";
 import { CardAppearanceSection, CardBorderSection, CardContentSection, CardTextSection } from "./StyleControls";
+import { useDismissible } from "../hooks/useDismissible";
 import { useScrollLock } from "../hooks/useScrollLock";
 
 /** Generic "override the per-card style for one thing" modal — used both
@@ -44,6 +45,7 @@ export function PerCardStylePanel({
   onClose: () => void;
 }) {
   useScrollLock();
+  useDismissible(onClose);
   const [customized, setCustomized] = useState(currentOverride !== undefined);
   // Seeded from the current saved override if there is one (resolved
   // against defaults — see resolvePerCardStyle's own comment for why a
