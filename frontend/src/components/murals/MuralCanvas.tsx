@@ -17,6 +17,7 @@
 import GridLayout from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
+import { useEffect, useRef, useState } from "react";
 import type { GalleryImage } from "../../api/gallery";
 import { OptionsMenu } from "../OptionsMenu";
 import { blockFontFamilyCss, resolveBlockStyle, resolveBorderColor } from "../../lib/libraryStyle";
@@ -72,6 +73,42 @@ export function MuralCanvas({
   // live-computed behavior exactly.
   statsOverride?: Record<string, number>;
 }) {
+  const [touchMode] = useState(
+    () => typeof window !== "undefined" && Boolean(window.matchMedia?.("(pointer: coarse)").matches)
+  );
+  const [zoom, setZoom] = useState(() => (typeof window !== "undefined" && window.innerWidth < 700 ? 1.5 : 1));
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const [viewportWidth, setViewportWidth] = useState(0);
+  const lastTapRef = useRef(0);
+
+  useEffect(() => {
+    if (!touchMode) return;
+    const el = viewportRef.current;
+    if (!el) return;
+    const measure = () => {
+      setViewportWidth(el.clientWidth);
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [touchMode]);
+
+  const canvasWidth = Math.round(viewportWidth * zoom);
+
+  function setZoomBy(delta: number) {
+    setZoom((z) => Math.min(3, Math.max(0.5, Math.round((z + delta) * 100) / 100)));
+  }
+
+  function handlePercentTap() {
+    const now = Date.now();
+    if (now - lastTapRef.current < 300) {
+      setZoom(1);
+      lastTapRef.current = 0;
+    } else {
+      lastTapRef.current = now;
+    }
+  }
+
   const layout = mural.blocks.map((b) => ({ i: b.id, x: b.layout.x, y: b.layout.y, w: b.layout.w, h: b.layout.h }));
 
   // Persist on DROP/RESIZE-END only, not onLayoutChange — RGL fires
@@ -87,98 +124,140 @@ export function MuralCanvas({
     onLayoutChange?.(newItem.i, { x: newItem.x, y: newItem.y, w: newItem.w, h: newItem.h });
   }
 
-  return (
-    <ResponsiveGridLayout
-      layout={layout}
-      cols={GRID_COLUMNS}
-      rowHeight={ROW_HEIGHT}
-      isDraggable={editMode}
-      isResizable={editMode}
-      compactType={null}
-      preventCollision
-      // The settings button rendered inside each block (below) sits above
-      // the block's own drag surface — without excluding it, a click
-      // meant for it starts a drag instead. RGL matches this against a
-      // CSS selector, not a ref. `.mural-tierlist-editor` is the same
-      // exclusion for the tier list's own live pool/tier drag-and-drop
-      // (BookBlocks.tsx's TierListBlockView) — without it, RGL would
-      // claim every mousedown inside that editor as the start of a whole-
-      // BLOCK reposition (its default is "the entire grid item is a drag
-      // handle"), and native HTML5 drag-and-drop on a book tile would
-      // never get a chance to start. Excluding just that inner region —
-      // not the block's title bar above it — keeps the block itself
-      // repositionable by dragging from anywhere else in it.
-      draggableCancel=".mural-block-controls, .mural-tierlist-editor"
-      onDragStop={handleGestureEnd}
-      onResizeStop={handleGestureEnd}
-    >
-      {mural.blocks.map((block) => {
-        // Same inline-style shape as BookCard.tsx's own border/opacity/
-        // radius handling (down to reusing resolveBorderColor) — a mural
-        // block's style has no priority chain, so this is just "resolve
-        // the block's own override over the defaults," one level, not
-        // three.
-        const style = resolveBlockStyle(block.style);
-        return (
-          <div
-            key={block.id}
-            className={`group relative overflow-hidden ${style.cardShadow ? "shadow-sm" : ""} ${style.cardHoverEffect ? "transition-transform hover:-translate-y-0.5 hover:scale-[1.01] hover:shadow-lg" : ""}`}
-            style={{
-              borderRadius: `${style.cardRadius}px`,
-              opacity: style.cardOpacity / 100,
-              backgroundColor: style.backgroundColor ?? "var(--color-surface)",
-              borderTopWidth: `${style.cardBorderSides.top ? style.cardBorderWidth : 0}px`,
-              borderRightWidth: `${style.cardBorderSides.right ? style.cardBorderWidth : 0}px`,
-              borderBottomWidth: `${style.cardBorderSides.bottom ? style.cardBorderWidth : 0}px`,
-              borderLeftWidth: `${style.cardBorderSides.left ? style.cardBorderWidth : 0}px`,
-              borderStyle: style.cardBorderWidth > 0 ? style.cardBorderStyle : "none",
-              borderColor: resolveBorderColor(style.cardBorderColor, style.cardBorderOpacity),
-              // Sets the base for every text element inside the block —
-              // see components/murals/blocks/*.tsx, which size themselves
-              // in `em` specifically so they respond to this. font-family,
-              // font-weight, font-style, and color all cascade to
-              // children on their own via plain CSS inheritance; fontSize
-              // needs the em-sizing on the receiving end too, since
-              // Tailwind's text-* utilities are rem-based (root-relative,
-              // not parent-relative) and wouldn't move at all otherwise.
-              // Inheritance means an element with its OWN explicit
-              // font-weight class (most block headings use font-semibold/
-              // font-bold already, by design, for visual hierarchy) won't
-              // additionally react to the `bold` toggle — it's already
-              // bold-ish; the toggle's visible effect is mainly on body/
-              // caption text that has no weight class of its own.
-              // codeStyle FORCES monospace regardless of `fontFamily` —
-              // same "always monospace no matter the surrounding font"
-              // rule markdown's inline `code` mark follows.
-              fontFamily: style.codeStyle ? blockFontFamilyCss("jetbrainsMono") : blockFontFamilyCss(style.fontFamily),
-              fontSize: `${style.fontSize}px`,
-              fontWeight: style.bold ? 700 : undefined,
-              fontStyle: style.italic ? "italic" : undefined,
-              color: style.textColor ?? undefined
-            }}
-          >
-            <BlockRenderer block={block} books={books} images={images} editMode={editMode} onUpdateBlock={onUpdateBlock} statsOverride={statsOverride} />
-            {editMode && (
-              <div className="mural-block-controls absolute top-1.5 right-1.5 opacity-0 transition-opacity group-hover:opacity-100">
-                <OptionsMenu
-                  title="Block settings"
-                  items={[
-                    { label: "Style", onClick: () => onStyleBlock?.(block) },
-                    { label: "Configure", onClick: () => onConfigureBlock?.(block) },
-                    { label: "Duplicate", onClick: () => onDuplicateBlock?.(block.id) },
-                    // No confirmation on this one, unlike every other
-                    // delete in the app — composing a mural means
-                    // adding/removing blocks constantly, and re-adding
-                    // one is cheap, unlike deleting a book/image/mural
-                    // itself.
-                    { label: "Delete", onClick: () => onDeleteBlock?.(block.id), danger: true }
-                  ]}
-                />
-              </div>
-            )}
+  const gridProps = {
+    layout,
+    cols: GRID_COLUMNS,
+    rowHeight: ROW_HEIGHT,
+    isDraggable: editMode,
+    isResizable: editMode,
+    compactType: null,
+    preventCollision: true,
+    // The settings button rendered inside each block (below) sits above
+    // the block's own drag surface — without excluding it, a click
+    // meant for it starts a drag instead. RGL matches this against a
+    // CSS selector, not a ref. `.mural-tierlist-editor` is the same
+    // exclusion for the tier list's own live pool/tier drag-and-drop
+    // (BookBlocks.tsx's TierListBlockView) — without it, RGL would
+    // claim every mousedown inside that editor as the start of a whole-
+    // BLOCK reposition (its default is "the entire grid item is a drag
+    // handle"), and native HTML5 drag-and-drop on a book tile would
+    // never get a chance to start. Excluding just that inner region —
+    // not the block's title bar above it — keeps the block itself
+    // repositionable by dragging from anywhere else in it.
+    draggableCancel: touchMode
+      ? ".mural-block-controls, .mural-tierlist-editor, .mural-block-body"
+      : ".mural-block-controls, .mural-tierlist-editor",
+    onDragStop: handleGestureEnd,
+    onResizeStop: handleGestureEnd
+  };
+
+  const blockNodes = mural.blocks.map((block) => {
+    // Same inline-style shape as BookCard.tsx's own border/opacity/
+    // radius handling (down to reusing resolveBorderColor) — a mural
+    // block's style has no priority chain, so this is just "resolve
+    // the block's own override over the defaults," one level, not
+    // three.
+    const style = resolveBlockStyle(block.style);
+    return (
+      <div
+        key={block.id}
+        className={`group relative overflow-hidden ${style.cardShadow ? "shadow-sm" : ""} ${style.cardHoverEffect ? "transition-transform hover:-translate-y-0.5 hover:scale-[1.01] hover:shadow-lg" : ""}`}
+        style={{
+          borderRadius: `${style.cardRadius}px`,
+          opacity: style.cardOpacity / 100,
+          backgroundColor: style.backgroundColor ?? "var(--color-surface)",
+          borderTopWidth: `${style.cardBorderSides.top ? style.cardBorderWidth : 0}px`,
+          borderRightWidth: `${style.cardBorderSides.right ? style.cardBorderWidth : 0}px`,
+          borderBottomWidth: `${style.cardBorderSides.bottom ? style.cardBorderWidth : 0}px`,
+          borderLeftWidth: `${style.cardBorderSides.left ? style.cardBorderWidth : 0}px`,
+          borderStyle: style.cardBorderWidth > 0 ? style.cardBorderStyle : "none",
+          borderColor: resolveBorderColor(style.cardBorderColor, style.cardBorderOpacity),
+          // Sets the base for every text element inside the block —
+          // see components/murals/blocks/*.tsx, which size themselves
+          // in `em` specifically so they respond to this. font-family,
+          // font-weight, font-style, and color all cascade to
+          // children on their own via plain CSS inheritance; fontSize
+          // needs the em-sizing on the receiving end too, since
+          // Tailwind's text-* utilities are rem-based (root-relative,
+          // not parent-relative) and wouldn't move at all otherwise.
+          // Inheritance means an element with its OWN explicit
+          // font-weight class (most block headings use font-semibold/
+          // font-bold already, by design, for visual hierarchy) won't
+          // additionally react to the `bold` toggle — it's already
+          // bold-ish; the toggle's visible effect is mainly on body/
+          // caption text that has no weight class of its own.
+          // codeStyle FORCES monospace regardless of `fontFamily` —
+          // same "always monospace no matter the surrounding font"
+          // rule markdown's inline `code` mark follows.
+          fontFamily: style.codeStyle ? blockFontFamilyCss("jetbrainsMono") : blockFontFamilyCss(style.fontFamily),
+          fontSize: `${style.fontSize}px`,
+          fontWeight: style.bold ? 700 : undefined,
+          fontStyle: style.italic ? "italic" : undefined,
+          color: style.textColor ?? undefined
+        }}
+      >
+        <BlockRenderer block={block} books={books} images={images} editMode={editMode} onUpdateBlock={onUpdateBlock} statsOverride={statsOverride} />
+        {editMode && (
+          <div className="mural-block-controls absolute top-1.5 right-1.5 opacity-0 transition-opacity group-hover:opacity-100">
+            <OptionsMenu
+              title="Block settings"
+              items={[
+                { label: "Style", onClick: () => onStyleBlock?.(block) },
+                { label: "Configure", onClick: () => onConfigureBlock?.(block) },
+                { label: "Duplicate", onClick: () => onDuplicateBlock?.(block.id) },
+                // No confirmation on this one, unlike every other
+                // delete in the app — composing a mural means
+                // adding/removing blocks constantly, and re-adding
+                // one is cheap, unlike deleting a book/image/mural
+                // itself.
+                { label: "Delete", onClick: () => onDeleteBlock?.(block.id), danger: true }
+              ]}
+            />
           </div>
-        );
-      })}
+        )}
+      </div>
+    );
+  });
+
+  if (touchMode) {
+    return (
+      <div className="relative">
+        <div ref={viewportRef} className="mural-touch overflow-x-auto">
+          {viewportWidth > 0 && (
+            <div style={{ width: canvasWidth }}>
+              <GridLayout {...gridProps} width={canvasWidth}>
+                {blockNodes}
+              </GridLayout>
+            </div>
+          )}
+        </div>
+        <div className="mt-2 flex items-center justify-end gap-1">
+          <button
+            onClick={() => setZoomBy(-0.25)}
+            className="h-10 w-10 rounded-lg border border-(--color-border) bg-(--color-surface) text-lg font-semibold"
+          >
+            −
+          </button>
+          <button
+            onClick={handlePercentTap}
+            className="h-10 min-w-14 rounded-lg border border-(--color-border) bg-(--color-surface) px-2 text-sm font-semibold"
+          >
+            {Math.round(zoom * 100)}%
+          </button>
+          <button
+            onClick={() => setZoomBy(0.25)}
+            className="h-10 w-10 rounded-lg border border-(--color-border) bg-(--color-surface) text-lg font-semibold"
+          >
+            +
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <ResponsiveGridLayout {...gridProps}>
+      {blockNodes}
     </ResponsiveGridLayout>
   );
 }
