@@ -1,5 +1,6 @@
 import { buildTree } from "../../lib/muralFolders";
 import type { MuralFolder } from "../../lib/murals";
+import { useDismissible } from "../../hooks/useDismissible";
 import { useScrollLock } from "../../hooks/useScrollLock";
 
 export function MoveToFolderModal({
@@ -16,6 +17,7 @@ export function MoveToFolderModal({
   onClose: () => void;
 }) {
   useScrollLock();
+  useDismissible(onClose);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
