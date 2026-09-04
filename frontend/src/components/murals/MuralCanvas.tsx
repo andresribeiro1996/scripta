@@ -17,7 +17,7 @@
 import GridLayout from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
 import { OptionsMenu } from "../OptionsMenu";
@@ -29,15 +29,6 @@ import { GripIcon } from "../Toolbar";
 const ResponsiveGridLayout = GridLayout.WidthProvider(GridLayout);
 const ROW_HEIGHT = 28;
 
-/** The zoom a canvas opens at. A phone viewport is far narrower than
- *  the 1200px design grid, so 100% there is a legible-only-in-theory
- *  miniature; 300% is roughly where a block's text becomes readable.
- *  One function rather than a literal in each place, because the
- *  initial zoom and the double-tap reset are the same idea and have
- *  already fallen out of step twice. */
-function defaultZoom(): number {
-  return typeof window !== "undefined" && window.innerWidth < 700 ? 3 : 1;
-}
 
 export function MuralCanvas({
   mural,
@@ -94,45 +85,6 @@ export function MuralCanvas({
   const [touchMode] = useState(
     () => typeof window !== "undefined" && Boolean(window.matchMedia?.("(pointer: coarse)").matches)
   );
-  const [zoom, setZoom] = useState(defaultZoom);
-  const viewportRef = useRef<HTMLDivElement>(null);
-  const [viewportWidth, setViewportWidth] = useState(0);
-  const lastTapRef = useRef(0);
-
-  useEffect(() => {
-    if (!touchMode) return;
-    const el = viewportRef.current;
-    if (!el) return;
-    const measure = () => {
-      setViewportWidth(el.clientWidth);
-    };
-    measure();
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
-  }, [touchMode]);
-
-  const canvasWidth = Math.round(viewportWidth * zoom);
-  const scale = canvasWidth / 1200;
-
-  function setZoomBy(delta: number) {
-    setZoom((z) => Math.min(4, Math.max(0.5, Math.round((z + delta) * 100) / 100)));
-  }
-
-  // Double-tapping the percentage resets the zoom — to the DEFAULT,
-  // via the same function that picks it initially. It used to reset to
-  // a hardcoded 1, which drifted from the phone default twice (2, then
-  // 3), each time turning the reset into a control that made the canvas
-  // unreadable rather than restoring it.
-  function handlePercentTap() {
-    const now = Date.now();
-    if (now - lastTapRef.current < 300) {
-      setZoom(defaultZoom());
-      lastTapRef.current = 0;
-    } else {
-      lastTapRef.current = now;
-    }
-  }
-
   const layout = mural.blocks.map((b) => ({ i: b.id, x: b.layout.x, y: b.layout.y, w: b.layout.w, h: b.layout.h }));
 
   // Persist on DROP/RESIZE-END only, not onLayoutChange — RGL fires
@@ -151,7 +103,7 @@ export function MuralCanvas({
   const gridProps = {
     layout,
     cols: GRID_COLUMNS,
-    rowHeight: touchMode ? Math.max(1, Math.round(ROW_HEIGHT * scale)) : ROW_HEIGHT,
+    rowHeight: ROW_HEIGHT,
     isDraggable: editMode,
     isResizable: editMode,
     compactType: null,
@@ -208,7 +160,7 @@ export function MuralCanvas({
           // same "always monospace no matter the surrounding font"
           // rule markdown's inline `code` mark follows.
           fontFamily: style.codeStyle ? blockFontFamilyCss("jetbrainsMono") : blockFontFamilyCss(style.fontFamily),
-          fontSize: `${touchMode ? Math.round(style.fontSize * scale) : style.fontSize}px`,
+          fontSize: `${style.fontSize}px`,
           fontWeight: style.bold ? 700 : undefined,
           fontStyle: style.italic ? "italic" : undefined,
           color: style.textColor ?? undefined
@@ -233,7 +185,14 @@ export function MuralCanvas({
           </div>
         )}
         {touchMode && editMode ? (
-          <div className="mural-block-body h-full">
+          // pt-8 clears the grip bar above. It is absolutely positioned
+          // across the top of the block, so without this it sits ON the
+          // content — hiding the first line of a text or heading block,
+          // which is exactly the part you need to see to know which
+          // block you are dragging. Padding shrinks the content box
+          // rather than growing the block (border-box), so the layout is
+          // unchanged.
+          <div className="mural-block-body h-full pt-8">
             <BlockRenderer block={block} books={books} images={images} statsOverride={statsOverride} tierlistData={tierlistData} />
           </div>
         ) : (
@@ -260,42 +219,6 @@ export function MuralCanvas({
       </div>
     );
   });
-
-  if (touchMode) {
-    return (
-      <div className="relative">
-        <div ref={viewportRef} className="mural-touch max-h-[calc(100dvh-8.5rem)] overflow-auto">
-          {viewportWidth > 0 && (
-            <div style={{ width: canvasWidth }}>
-              <GridLayout key={revertNonce} {...gridProps} width={canvasWidth}>
-                {blockNodes}
-              </GridLayout>
-            </div>
-          )}
-        </div>
-        <div className="mt-2 flex items-center justify-end gap-1">
-          <button
-            onClick={() => setZoomBy(-0.25)}
-            className="h-10 w-10 rounded-lg border border-(--color-border) bg-(--color-surface) text-lg font-semibold"
-          >
-            −
-          </button>
-          <button
-            onClick={handlePercentTap}
-            className="h-10 min-w-14 rounded-lg border border-(--color-border) bg-(--color-surface) px-2 text-sm font-semibold"
-          >
-            {Math.round(zoom * 100)}%
-          </button>
-          <button
-            onClick={() => setZoomBy(0.25)}
-            className="h-10 w-10 rounded-lg border border-(--color-border) bg-(--color-surface) text-lg font-semibold"
-          >
-            +
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <ResponsiveGridLayout key={revertNonce} {...gridProps}>

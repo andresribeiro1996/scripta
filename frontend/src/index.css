@@ -345,16 +345,21 @@ input[type="range"]:focus-visible::-moz-range-thumb {
 }
 
 /* Mobile mural editor (spec: docs/superpowers/specs/2026-09-04-mobile-mural-editor-design.md).
-   .mural-touch is the zoom/pan viewport that wraps the canvas on pointer:coarse
-   devices; every touch-only override is scoped under it so desktop rendering
-   is untouched. */
-.mural-touch {
-  overscroll-behavior: contain;
-}
-.mural-touch .react-resizable-handle {
-  width: 24px;
-  height: 24px;
-  touch-action: none;
+
+   These used to hang off .mural-touch, the zoom/pan viewport that wrapped
+   the canvas on touch devices. The canvas renders at one scale for
+   everyone now — no zoom, no pan viewport, so no such element — but the
+   two rules under it were never about zoom: a react-resizable corner is
+   an 8px hit area by default, which is nothing to a fingertip, and a
+   drag surface has to opt out of the browser's own touch scrolling. Both
+   move to a plain pointer-coarse query, which is the condition they
+   actually depended on. */
+@media (pointer: coarse) {
+  .react-resizable-handle {
+    width: 24px;
+    height: 24px;
+    touch-action: none;
+  }
 }
 .mural-grip {
   touch-action: none;
