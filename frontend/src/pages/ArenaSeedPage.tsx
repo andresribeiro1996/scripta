@@ -203,14 +203,12 @@ export function ArenaSeedPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-8">
-      {/* Exactly two rows. The name, the bracket size and the "fixed
-          once created" caveat each had a line of their own, and the
-          caveat wrapped on a phone — three or four rows of chrome above
-          a grid that is the actual work. Row 1 pairs the name with the
-          size (both identity: what this is, how big), row 2 carries the
-          progress the grid never stated in words plus the caveat, cut to
-          a clause. */}
-      <div className="mb-1 flex items-center gap-2">
+      {/* One row: the name, and nothing else. The bracket size moved
+          down into the grid's own toolbar — it belongs beside the slot
+          count and Random fill, which describe the same thing — and the
+          seeded count that briefly lived here was a second way of saying
+          what that toolbar already said ("0 / 16 slots filled"). */}
+      <div className="mb-4">
         {editingName ? (
           <input
             autoFocus
@@ -223,7 +221,7 @@ export function ArenaSeedPage() {
             }}
             placeholder="Name this tournament…"
             aria-label="Tournament name"
-            className="min-w-0 flex-1 rounded-lg border border-(--color-border) bg-(--color-surface) px-2 py-1 text-lg font-bold"
+            className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-2 py-1 text-lg font-bold"
           />
         ) : (
           <button
@@ -232,35 +230,12 @@ export function ArenaSeedPage() {
               setEditingName(true);
             }}
             title="Rename this tournament"
-            className="min-w-0 flex-1 truncate text-left text-lg font-bold transition-colors hover:text-(--color-accent)"
+            className="block w-full truncate text-left text-lg font-bold transition-colors hover:text-(--color-accent)"
           >
             Seed &quot;{name}&quot;
           </button>
         )}
-
-        {/* Draft only. Bracket size lays out the slots and duels and
-            there is no endpoint to change it afterwards, so the one
-            moment it can be chosen is before the tournament exists. */}
-        {isDraft && (
-          <select
-            value={draftBracketSize}
-            onChange={(e) => setDraftBracketSize(Number(e.target.value))}
-            aria-label="Bracket size"
-            className="min-h-11 shrink-0 rounded-lg border border-(--color-border) bg-(--color-surface) px-2 text-sm"
-          >
-            {BRACKET_SIZES.map((size) => (
-              <option key={size} value={size}>
-                {size} books
-              </option>
-            ))}
-          </select>
-        )}
       </div>
-
-      <p className="mb-4 text-xs text-(--color-text-dim)">
-        {filledCount} of {bracketSize} seeded
-        {isDraft && " · size is fixed once you start"}
-      </p>
 
       {actionError && <p className="mb-4 text-sm text-(--color-danger)">{actionError}</p>}
 
@@ -269,6 +244,29 @@ export function ArenaSeedPage() {
         slots={slots}
         onChange={setSlots}
         onRandomFill={() => void handleRandomFill()}
+        // Draft only. Bracket size lays out the slots and duels and
+        // there is no endpoint to change it afterwards, so the one
+        // moment it can be chosen is before the tournament exists —
+        // which is exactly when this control is rendered. The caveat
+        // lives in the accessible name rather than as visible text,
+        // since the row already carries three things.
+        sizeControl={
+          isDraft ? (
+            <select
+              value={draftBracketSize}
+              onChange={(e) => setDraftBracketSize(Number(e.target.value))}
+              aria-label="Bracket size — fixed once the tournament starts"
+              title="Fixed once the tournament starts"
+              className="min-h-9 shrink-0 rounded-lg border border-(--color-border) bg-(--color-surface) px-2 text-sm"
+            >
+              {BRACKET_SIZES.map((size) => (
+                <option key={size} value={size}>
+                  {size} books
+                </option>
+              ))}
+            </select>
+          ) : undefined
+        }
       />
       {randomFilling && <p className="mt-2 text-sm text-(--color-text-dim)">Filling…</p>}
 

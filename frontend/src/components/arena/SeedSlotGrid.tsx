@@ -12,7 +12,7 @@
 // books AND assigns slots server-side — this component never runs the
 // shuffle itself).
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { SeedBook } from "../../api/arena";
 import { useLibrary } from "../../hooks/useLibrary";
 import { toSeedBook } from "../../lib/arenaSeed";
@@ -25,7 +25,8 @@ export function SeedSlotGrid({
   bracketSize,
   slots,
   onChange,
-  onRandomFill
+  onRandomFill,
+  sizeControl
 }: {
   bracketSize: number;
   slots: Array<SeedBook | null>;
@@ -34,6 +35,13 @@ export function SeedSlotGrid({
    *  actual call + persisting the result) — see this file's own header
    *  comment for why the shuffle doesn't happen here. */
   onRandomFill: () => void;
+  /** Optional bracket-size picker, rendered in this toolbar beside the
+   *  count and Random fill. It belongs on this row rather than up in the
+   *  page header because all three describe the same thing — how many
+   *  slots there are, how many are filled, and how to fill them — and
+   *  the size is only ever settable while the tournament is still an
+   *  unsaved draft, so the page owns whether it exists at all. */
+  sizeControl?: ReactNode;
 }) {
   const { data: library } = useLibrary();
   const books = ((library?.data as { books?: Array<Record<string, unknown>> } | undefined)?.books ?? []) as Array<Record<string, unknown>>;
@@ -53,10 +61,15 @@ export function SeedSlotGrid({
 
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between">
+      {/* Wraps rather than overflowing: on a narrow phone the count, the
+          size picker and the button don't all fit on one line, and a
+          second line is better than a squeezed button. */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-(--color-text-dim)">
           {filledCount} / {bracketSize} slots filled
         </p>
+        <div className="flex items-center gap-2">
+        {sizeControl}
         <button
           onClick={onRandomFill}
           disabled={books.length < bracketSize}
@@ -65,6 +78,7 @@ export function SeedSlotGrid({
         >
           Random fill
         </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-4 gap-3">
