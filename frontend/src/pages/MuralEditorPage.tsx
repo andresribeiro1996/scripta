@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useRef, useState } from "react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AddBlockMenu } from "../components/murals/AddBlockMenu";
 import { BlockConfigPanel } from "../components/murals/BlockConfigPanel";
 import { BlockStylePanel } from "../components/murals/BlockStylePanel";
@@ -10,7 +10,7 @@ import { useGalleryImages } from "../hooks/useGalleryImages";
 import { useLibrary } from "../hooks/useLibrary";
 import { useMurals } from "../hooks/useMurals";
 import { type BlockStyle } from "../lib/libraryStyle";
-import { addBlock, duplicateBlock, removeBlock, updateBlock, type BlockLayout, type BlockType, type MuralBlock } from "../lib/murals";
+import { addBlock, duplicateBlock, removeBlock, updateBlock, type BlockLayout, type BlockType, type Mural, type MuralBlock } from "../lib/murals";
 
 /** /dashboard/murals/:muralId — one mural's canvas (see
  *  components/murals/MuralCanvas.tsx for the actual freeform grid).
@@ -20,12 +20,53 @@ import { addBlock, duplicateBlock, removeBlock, updateBlock, type BlockLayout, t
  *  corners, and each block's configure/delete controls. */
 export function MuralEditorPage() {
   const { muralId } = useParams<{ muralId: string }>();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { data: library } = useLibrary();
-  const { data: muralsData, isLoading, rename, saveBlocks, share, unshare } = useMurals();
+  const { data: muralsData, isLoading, create, rename, saveBlocks, share, unshare } = useMurals();
   const { images } = useGalleryImages();
   const books = library?.data.books ?? [];
   const murals = muralsData ?? [];
-  const mural = murals.find((m) => m.id === muralId);
+  // `/dashboard/murals/new` opens an UNSAVED mural. Clicking "New mural"
+  // used to POST one immediately, so every idle tap left an "Untitled
+  // mural" behind. Nothing is persisted now until the first real change
+  // — a block added, or a name typed — at which point materialize()
+  // creates it and swaps the URL for the real id.
+  // "new" is a safe sentinel rather than a separate route: real ids are
+  // UUIDs (the murals service uses randomUUID), so no mural can ever be
+  // called "new" and shadow this. The existing `:muralId` route matches
+  // it unchanged.
+  const isDraft = muralId === "new";
+  const mural = isDraft ? undefined : murals.find((m) => m.id === muralId);
+  // Which folder the draft belongs to, carried from the list page so a
+  // mural created from inside a folder lands in it.
+  const draftFolderId = searchParams.get("folder");
+  const [draftName, setDraftName] = useState("Untitled mural");
+  // Guards against a double-create: two quick actions on a draft (add a
+  // block, then another before the first resolves) would otherwise each
+  // see `mural` still undefined and POST their own mural. A ref, not
+  // state, because it must be true for the SECOND call synchronously,
+  // before any re-render.
+  const creatingRef = useRef(false);
+
+  /** The mural to act on, creating it first if this is still a draft.
+   *  Every mutation below goes through this rather than touching
+   *  `mural` directly, so there is exactly one place that turns a draft
+   *  into a real mural and no handler can forget to. */
+  async function materialize(): Promise<Mural | null> {
+    if (mural) return mural;
+    if (!isDraft || creatingRef.current) return null;
+    creatingRef.current = true;
+    try {
+      const created = await create(draftName.trim() || "Untitled mural", draftFolderId);
+      // `replace` so Back skips the draft URL — returning to it would
+      // open a second empty draft, not the mural just created.
+      navigate(`/dashboard/murals/${created.id}`, { replace: true });
+      return created;
+    } finally {
+      creatingRef.current = false;
+    }
+  }
 
   const [editMode, setEditMode] = useState(false);
   const [configuringBlockId, setConfiguringBlockId] = useState<string | null>(null);
@@ -35,10 +76,19 @@ export function MuralEditorPage() {
   const [sharing, setSharing] = useState(false);
 
   async function handleRename() {
-    if (!mural) return;
     const name = nameDraft.trim();
     setEditingName(false);
     if (!name) return;
+    if (isDraft) {
+      // Naming a draft is itself the first real change, so it creates
+      // the mural WITH that name rather than creating an "Untitled" one
+      // and immediately renaming it.
+      setDraftName(name);
+      const created = await create(name, draftFolderId);
+      navigate(`/dashboard/murals/${created.id}`, { replace: true });
+      return;
+    }
+    if (!mural) return;
     await rename(mural.id, name);
   }
 
@@ -50,6 +100,7 @@ export function MuralEditorPage() {
   // page. The resulting single mural's `blocks` is what actually gets
   // persisted, via useMurals()'s saveBlocks for just this one mural.
   async function handleAddBlock(type: BlockType) {
+    const mural = await materialize();
     if (!mural) return;
     const { murals: updated, blockId } = addBlock([mural], mural.id, type);
     await saveBlocks(mural.id, updated[0].blocks);
@@ -61,12 +112,14 @@ export function MuralEditorPage() {
   }
 
   async function handleSaveBlockConfig(block: MuralBlock) {
+    const mural = await materialize();
     if (!mural) return;
     const [updated] = updateBlock([mural], mural.id, block);
     await saveBlocks(mural.id, updated.blocks);
   }
 
   async function handleSaveBlockStyle(blockId: string, blockStyle: BlockStyle) {
+    const mural = await materialize();
     if (!mural) return;
     const current = mural.blocks.find((b) => b.id === blockId);
     if (!current) return;
@@ -75,6 +128,7 @@ export function MuralEditorPage() {
   }
 
   async function handleDuplicateBlock(blockId: string) {
+    const mural = await materialize();
     if (!mural) return;
     const [updated] = duplicateBlock([mural], mural.id, blockId);
     await saveBlocks(mural.id, updated.blocks);
@@ -86,12 +140,14 @@ export function MuralEditorPage() {
   // arranging one), and re-adding + reconfiguring one is cheap. A
   // confirmation on every removal would just be editing friction.
   async function handleDeleteBlock(blockId: string) {
+    const mural = await materialize();
     if (!mural) return;
     const [updated] = removeBlock([mural], mural.id, blockId);
     await saveBlocks(mural.id, updated.blocks);
   }
 
   async function handleLayoutChange(blockId: string, layout: BlockLayout) {
+    const mural = await materialize();
     if (!mural) return;
     const current = mural.blocks.find((b) => b.id === blockId);
     if (!current) return;
@@ -110,7 +166,7 @@ export function MuralEditorPage() {
     );
   }
 
-  if (!mural) {
+  if (!mural && !isDraft) {
     return (
       <PageContainer>
         <p className="text-sm text-(--color-text-dim)">
@@ -119,6 +175,9 @@ export function MuralEditorPage() {
       </PageContainer>
     );
   }
+
+  // A draft renders as an empty mural: same editor, nothing saved yet.
+  const view = mural ?? { id: "", name: draftName, blocks: [] as MuralBlock[] };
 
   return (
     <PageContainer>
@@ -142,24 +201,30 @@ export function MuralEditorPage() {
           ) : (
             <button
               onClick={() => {
-                setNameDraft(mural.name);
+                setNameDraft(view.name);
                 setEditingName(true);
               }}
               title="Rename this mural"
               className="block text-left text-lg font-bold transition-colors hover:text-(--color-accent)"
             >
-              {mural.name}
+              {view.name}
             </button>
           )}
         </div>
         <div className="flex items-center gap-2">
           {editMode && <AddBlockMenu onAdd={(type) => void handleAddBlock(type)} />}
-          <button
-            onClick={() => setSharing(true)}
-            className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm font-semibold hover:bg-(--color-surface-hover)"
-          >
-            Share
-          </button>
+          {/* Nothing to share until the mural exists. Hidden rather
+              than disabled on a draft: a greyed button invites a tap
+              that can't do anything, and the button reappears the
+              instant the first change saves. */}
+          {mural && (
+            <button
+              onClick={() => setSharing(true)}
+              className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm font-semibold hover:bg-(--color-surface-hover)"
+            >
+              Share
+            </button>
+          )}
           <button
             onClick={() => setEditMode((e) => !e)}
             className={`rounded-lg px-3 py-2 text-sm font-semibold ${
@@ -171,7 +236,7 @@ export function MuralEditorPage() {
         </div>
       </header>
 
-      {mural.blocks.length === 0 && (
+      {view.blocks.length === 0 && (
         <div className="rounded-xl border-2 border-dashed border-(--color-border) py-16 text-center">
           <p className="mb-1 text-(--color-text)">This mural is empty.</p>
           <p className="mb-4 text-sm text-(--color-text-dim)">Turn on editing and add your first block.</p>
@@ -183,7 +248,7 @@ export function MuralEditorPage() {
         </div>
       )}
 
-      {mural.blocks.length > 0 && (
+      {mural && mural.blocks.length > 0 && (
         <MuralCanvas
           mural={mural}
           editMode={editMode}
@@ -223,7 +288,7 @@ export function MuralEditorPage() {
         />
       )}
 
-      {sharing && (
+      {sharing && mural && (
         <ShareModal
           title={mural.name}
           shareToken={mural.shareToken}

@@ -4,22 +4,13 @@
 
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { createTournament, renameTournament } from "../api/arena";
+import { renameTournament } from "../api/arena";
 import { GearIcon, PlusIcon, TOOLBAR_CONTROL_CLASS, ToolbarRow } from "../components/Toolbar";
 import { useMyTournaments } from "../hooks/useMyTournaments";
-
-// Defaults for a tournament created from the "+" tile. Both were the
-// create form's own defaults before that form went away — 16 books is a
-// bracket most libraries can actually fill, and a day per round suits a
-// tournament people vote in over time rather than in one sitting.
-const DEFAULT_NAME = "Untitled tournament";
-const DEFAULT_BRACKET_SIZE = 16;
-const DEFAULT_ROUND_HOURS = 24;
 
 export function ArenaListPage() {
   const { tournaments, isLoading, refetch } = useMyTournaments();
   const navigate = useNavigate();
-  const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -49,32 +40,13 @@ export function ArenaListPage() {
     return tournaments.filter((t) => t.name.toLowerCase().includes(needle));
   }, [tournaments, search]);
 
-  async function handleCreate() {
-    if (creating) return;
-    setCreating(true);
-    setCreateError(null);
-    try {
-      // No settings dialog: the "+" tile creates on click, like a new
-      // mural. The two things that genuinely can't change later
-      // (bracketSize lays out the slots and duels; roundDurationMinutes
-      // is stamped onto live duel deadlines) take their previous form
-      // defaults, and getting them wrong costs a delete and one more
-      // click — nothing has been seeded yet at this point, which is
-      // exactly why this is a safe moment to default them.
-      const created = await createTournament({
-        name: DEFAULT_NAME,
-        bracketSize: DEFAULT_BRACKET_SIZE,
-        roundDurationMinutes: DEFAULT_ROUND_HOURS * 60
-      });
-      // Straight to seeding, same as a new mural opens itself: an empty
-      // bracket sitting in a list isn't useful, and the seed page is
-      // where the name can be edited too.
-      navigate(`/dashboard/arena/${created.id}/seed`);
-    } catch (err) {
-      setCreateError(err instanceof Error ? err.message : "Couldn't create that tournament.");
-    } finally {
-      setCreating(false);
-    }
+  // Opens an UNSAVED tournament rather than POSTing one. Creating on
+  // click left an "Untitled tournament" behind on every idle tap, and
+  // silently fixed its bracket size at 16 — which cannot be changed
+  // afterwards. The seed page now creates it on the first real change,
+  // and offers the size picker until then.
+  function handleCreate() {
+    navigate("/dashboard/arena/new/seed");
   }
 
   return (
@@ -114,12 +86,11 @@ export function ArenaListPage() {
             defaults and goes straight to seeding; the name is editable
             there. */}
         <button
-          onClick={() => void handleCreate()}
-          disabled={creating}
+          onClick={handleCreate}
           className="flex min-h-14 items-center justify-center gap-2 rounded-xl border-2 border-dashed border-(--color-border) p-4 text-(--color-text-dim) transition-colors hover:border-(--color-accent) hover:text-(--color-accent) disabled:opacity-60"
         >
           <PlusIcon />
-          <span className="text-sm font-semibold">{creating ? "Creating…" : "New tournament"}</span>
+          <span className="text-sm font-semibold">New tournament</span>
         </button>
 
         {visibleTournaments.map((t) =>

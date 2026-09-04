@@ -54,6 +54,8 @@ export function GroupsPage({ type }: { type: GroupType }) {
   const copy = COPY[type];
   const [actionsOpen, setActionsOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [drafting, setDrafting] = useState(false);
+  const [draftName, setDraftName] = useState("");
   const toast = useToast();
 
   const [creating, setCreating] = useState(false);
@@ -94,22 +96,27 @@ export function GroupsPage({ type }: { type: GroupType }) {
   // FULL group list, same as LibraryPage.tsx's identical lookup.
   const bookSeriesGroup = useMemo(() => seriesGroupByBookKey(library?.data.books ?? [], library?.data.groups ?? []), [library]);
 
-  async function handleCreate() {
-    if (creating) return;
+  // Clicking "+" does NOT create anything: it opens an unsaved draft row
+  // with its name field focused. The group is only persisted once a
+  // non-empty name is committed — so backing out, or tapping "+" out of
+  // curiosity, leaves nothing behind. Creating on click had been
+  // littering the list with "Untitled series" every time someone
+  // changed their mind.
+  function handleStartDraft() {
+    setDraftName("");
+    setDrafting(true);
+  }
+
+  async function handleCommitDraft() {
+    const name = draftName.trim();
+    setDrafting(false);
+    setDraftName("");
+    // An empty name is an abandoned draft, not an error to report: it's
+    // the ordinary way of backing out, by tapping away.
+    if (!name || creating) return;
     setCreating(true);
-    // No name prompt: the "+" tile creates on click, the same way a new
-    // mural does (MuralsListPage's handleCreate) — and the same way a
-    // fresh Google Doc or Figma file is named, which is to say later or
-    // not at all. Unlike a mural, though, there's nowhere to navigate to
-    // afterwards: a series lives on this page. So instead of leaving,
-    // the new group drops straight into its own inline rename with the
-    // placeholder pre-selected, which puts the cursor exactly where
-    // someone who DID want to name it now would go next.
-    const group = makeGroup(type, copy.untitled);
     try {
-      await updateLibrary((data) => ({ ...data, groups: [...(data.groups ?? []), group] }));
-      setEditingId(group.id);
-      setEditingName(group.name);
+      await updateLibrary((data) => ({ ...data, groups: [...(data.groups ?? []), makeGroup(type, name)] }));
     } catch {
       toast({ message: "Couldn't save — check your connection.", kind: "error" });
     } finally {
@@ -374,18 +381,43 @@ export function GroupsPage({ type }: { type: GroupType }) {
             instead of laying them out in a grid; the dashed border and
             the "+" are what carry the "this makes a new one" meaning
             across both. */}
-        <button
-          onClick={() => void handleCreate()}
-          disabled={creating}
-          className="flex min-h-14 items-center justify-center gap-2 rounded-xl border-2 border-dashed border-(--color-border) p-4 text-(--color-text-dim) transition-colors hover:border-(--color-accent) hover:text-(--color-accent) disabled:opacity-60"
-        >
-          {creating ? <span className="text-sm font-semibold">Adding…</span> : (
-            <>
-              <PlusIcon />
-              <span className="text-sm font-semibold">New {copy.noun}</span>
-            </>
-          )}
-        </button>
+        {drafting ? (
+          <div className="flex min-h-14 items-center gap-2 rounded-xl border-2 border-dashed border-(--color-accent) p-3">
+            <input
+              autoFocus
+              value={draftName}
+              onChange={(e) => setDraftName(e.target.value)}
+              onBlur={() => void handleCommitDraft()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void handleCommitDraft();
+                if (e.key === "Escape") {
+                  // Discard outright — don't let the blur that follows
+                  // commit what Escape just cancelled.
+                  setDraftName("");
+                  setDrafting(false);
+                }
+              }}
+              placeholder={`Name this ${copy.noun}…`}
+              aria-label={`Name the new ${copy.noun}`}
+              className="min-h-11 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm"
+            />
+          </div>
+        ) : (
+          <button
+            onClick={handleStartDraft}
+            disabled={creating}
+            className="flex min-h-14 items-center justify-center gap-2 rounded-xl border-2 border-dashed border-(--color-border) p-4 text-(--color-text-dim) transition-colors hover:border-(--color-accent) hover:text-(--color-accent) disabled:opacity-60"
+          >
+            {creating ? (
+              <span className="text-sm font-semibold">Adding…</span>
+            ) : (
+              <>
+                <PlusIcon />
+                <span className="text-sm font-semibold">New {copy.noun}</span>
+              </>
+            )}
+          </button>
+        )}
 
         {groups.map((group) => {
           const members = orderedGroupBooks(group, books);

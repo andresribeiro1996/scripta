@@ -37,14 +37,13 @@ const SORT_OPTIONS: Array<{ value: SortBy; label: string }> = [
  *  its own full page rather than an inline expandable section — a
  *  freeform canvas needs real room. */
 export function MuralsListPage() {
-  const { data: muralsData, isLoading, create, rename, remove, move: moveMural, setCover, clearCover, share, unshare } = useMurals();
+  const { data: muralsData, isLoading, rename, remove, move: moveMural, setCover, clearCover, share, unshare } = useMurals();
   const { data: foldersData, create: createFolder, rename: renameFolder, move: moveFolderApi, remove: removeFolder } = useMuralFolders();
   const navigate = useNavigate();
   const confirm = useConfirm();
   const murals = muralsData ?? [];
   const folders = foldersData ?? [];
 
-  const [creating, setCreating] = useState(false);
   const [sheet, setSheet] = useState<"sort" | "folder" | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
@@ -76,22 +75,13 @@ export function MuralsListPage() {
     (a, b) => (new Date(a[sortField]).getTime() - new Date(b[sortField]).getTime()) * sortDirection
   );
 
-  async function handleCreate() {
-    if (creating) return;
-    setCreating(true);
-    try {
-      // No name prompt anymore — the "+" tile creates on click, not on
-      // submitting a form, so there's nothing to type a name into first.
-      // "Untitled mural" is the same "name it now, or don't — rename any
-      // time from the ⚙ menu" convention a fresh Google Doc/Figma file
-      // uses. Straight into the new mural afterward, same as before:
-      // creating one with nothing to build on isn't useful on its own, so
-      // skip the extra click back here.
-      const created = await create("Untitled mural", selectedFolderId);
-      navigate(`/dashboard/murals/${created.id}`);
-    } finally {
-      setCreating(false);
-    }
+  // Opens an UNSAVED mural rather than POSTing one. Creating on click
+  // meant every idle tap left an "Untitled mural" in the list; the
+  // editor now persists it on the first real change (see
+  // MuralEditorPage's materialize). The current folder rides along so a
+  // mural started inside one lands there.
+  function handleCreate() {
+    navigate(selectedFolderId ? `/dashboard/murals/new?folder=${encodeURIComponent(selectedFolderId)}` : "/dashboard/murals/new");
   }
 
   async function handleRename(id: string) {
@@ -323,19 +313,12 @@ export function MuralsListPage() {
                 real content. A single compact row still reads as "add
                 one" from the dashed border and the "+". */}
             <button
-              onClick={() => void handleCreate()}
-              disabled={creating}
+              onClick={handleCreate}
               title="Create a new mural"
               className="flex min-h-14 items-center justify-center gap-2 rounded-xl border-2 border-dashed border-(--color-border) p-4 text-(--color-text-dim) transition-colors hover:border-(--color-accent) hover:text-(--color-accent) disabled:opacity-60"
             >
-              {creating ? (
-                <span className="text-sm font-semibold">Creating…</span>
-              ) : (
-                <>
-                  <PlusIcon />
-                  <span className="text-sm font-semibold">New mural</span>
-                </>
-              )}
+              <PlusIcon />
+              <span className="text-sm font-semibold">New mural</span>
             </button>
 
             {filteredMurals.map((mural) => {

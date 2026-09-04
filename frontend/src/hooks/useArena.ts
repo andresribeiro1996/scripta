@@ -21,6 +21,11 @@ export function useArena(id: string) {
   const query = useQuery({
     queryKey,
     queryFn: () => fetchTournament(id, voterToken),
+    // An empty id means the caller has nothing to fetch yet — the seed
+    // page passes one for an unsaved draft tournament. Without this the
+    // query would request `/arenas/` and sit in an error state behind a
+    // page that is working perfectly well on local state.
+    enabled: id !== "",
     refetchInterval: (q) => (q.state.data?.status === "completed" ? false : POLL_INTERVAL_MS)
   });
 
