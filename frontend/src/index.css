@@ -50,6 +50,13 @@
   --color-accent-soft: #f1e2d8;
   --color-danger: #b3432f;
   --color-danger-soft: #f6dfda;
+  /* "Finished, and it went fine" — the only genuinely positive state in
+     the app, added for tournament status where seeding/active/completed
+     otherwise had to share one colour. Desaturated and warm-leaning so
+     it sits with the ink-and-paper palette rather than reading as a
+     system-green alert. */
+  --color-success: #47713c;
+  --color-success-soft: #e4efdf;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -64,6 +71,8 @@
     --color-accent-soft: #3a2c22;
     --color-danger: #e08072;
     --color-danger-soft: #3a2420;
+    --color-success: #8fbf7f;
+    --color-success-soft: #262f21;
   }
 }
 

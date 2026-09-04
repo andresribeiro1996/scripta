@@ -5,6 +5,7 @@
 
 import { Link } from "react-router-dom";
 import { usePublicTournaments } from "../hooks/usePublicTournaments";
+import { TournamentStatusBadge } from "../components/arena/TournamentStatusBadge";
 
 export function ArenaPublicListPage() {
   const { tournaments, isLoading } = usePublicTournaments();
@@ -25,7 +26,7 @@ export function ArenaPublicListPage() {
           <a key={t.id} href={`/arena/${t.id}`} className="rounded-xl border border-(--color-border) bg-(--color-surface) p-4 hover:border-(--color-accent)">
             <h3 className="font-semibold">{t.name}</h3>
             <p className="text-sm text-(--color-text-dim)">
-              {t.bracketSize}-book bracket · {t.status === "completed" ? "Completed" : `Round ${t.currentRound}`}
+              {t.bracketSize}-book bracket <TournamentStatusBadge status={t.status} round={t.currentRound} />
             </p>
           </a>
         ))}

@@ -5,6 +5,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { renameTournament } from "../api/arena";
+import { TournamentStatusBadge } from "../components/arena/TournamentStatusBadge";
 import { GearIcon, PlusIcon, TOOLBAR_CONTROL_CLASS, ToolbarRow } from "../components/Toolbar";
 import { useMyTournaments } from "../hooks/useMyTournaments";
 
@@ -111,8 +112,9 @@ export function ArenaListPage() {
                 aria-label="Tournament name"
                 className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-2 py-1 font-semibold"
               />
-              <p className="mt-1 text-sm text-(--color-text-dim)">
-                {t.bracketSize}-book bracket · {t.status}
+              <p className="mt-1 flex flex-wrap items-center gap-1.5 text-sm text-(--color-text-dim)">
+                {t.bracketSize}-book bracket
+                <TournamentStatusBadge status={t.status} round={t.currentRound} />
               </p>
             </div>
           ) : (
@@ -129,8 +131,9 @@ export function ArenaListPage() {
                 className="block p-4 pr-12"
               >
                 <h3 className="font-semibold">{t.name}</h3>
-                <p className="text-sm text-(--color-text-dim)">
-                  {t.bracketSize}-book bracket · {t.status}
+                <p className="flex flex-wrap items-center gap-1.5 text-sm text-(--color-text-dim)">
+                  {t.bracketSize}-book bracket
+                  <TournamentStatusBadge status={t.status} round={t.currentRound} />
                 </p>
               </a>
               <button

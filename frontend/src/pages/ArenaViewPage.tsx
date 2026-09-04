@@ -9,6 +9,7 @@ import { Link, useParams } from "react-router-dom";
 import { resolveTiebreak, settleDuelEarly } from "../api/arena";
 import { useAuth } from "../auth/AuthContext";
 import { BracketMap } from "../components/arena/BracketMap";
+import { TournamentStatusBadge } from "../components/arena/TournamentStatusBadge";
 import { BracketTree } from "../components/arena/BracketTree";
 import { DuelCard } from "../components/arena/DuelCard";
 import { useArena } from "../hooks/useArena";
@@ -85,8 +86,9 @@ export function ArenaViewPage() {
         ← All tournaments
       </Link>
       <h2 className="mb-1 text-lg font-bold">{tournament.name}</h2>
-      <p className="mb-4 text-sm text-(--color-text-dim)">
-        {tournament.bracketSize}-book bracket · {tournament.status === "completed" ? "Completed" : `Round ${tournament.currentRound}`}
+      <p className="mb-4 flex flex-wrap items-center gap-1.5 text-sm text-(--color-text-dim)">
+        {tournament.bracketSize}-book bracket
+        <TournamentStatusBadge status={tournament.status} round={tournament.currentRound} />
       </p>
       {voteError && <p className="mb-4 text-sm text-(--color-danger)">{voteError}</p>}
       {ownerActionError && <p className="mb-4 text-sm text-(--color-danger)">{ownerActionError}</p>}
