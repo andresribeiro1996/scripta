@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { resolveBlockStyle, type BlockStyle } from "../../lib/libraryStyle";
 import type { MuralBlock } from "../../lib/murals";
 import { BlockAppearanceSection, BlockTextSection, CardBorderSection } from "../StyleControls";
+import { useDismissible } from "../../hooks/useDismissible";
 import { useScrollLock } from "../../hooks/useScrollLock";
 
 /** "Style" button's modal (MuralCanvas.tsx, edit mode) — a mural block's
@@ -27,6 +28,7 @@ export function BlockStylePanel({
   onClose: () => void;
 }) {
   useScrollLock();
+  useDismissible(onClose);
   const [draft, setDraft] = useState<BlockStyle>(resolveBlockStyle(block.style));
   const saveTimerRef = useRef<number | undefined>(undefined);
 

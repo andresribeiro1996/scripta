@@ -3,6 +3,7 @@ import { ApiError, startSocialConnect, type SocialProvider, type SocialStatus } 
 import { useSocials } from "../hooks/useSocials";
 import { useConfirm } from "./ConfirmDialog";
 import { SocialIcon } from "./icons/SocialIcons";
+import { useDismissible } from "../hooks/useDismissible";
 import { useScrollLock } from "../hooks/useScrollLock";
 
 const PROVIDER_META: Record<SocialProvider, { label: string; hint: string }> = {
@@ -191,6 +192,7 @@ function BlueskyConnectModal({
   onClose: () => void;
 }) {
   useScrollLock();
+  useDismissible(onClose);
   const [handle, setHandle] = useState("");
   const [appPassword, setAppPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
