@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../auth/AuthContext";
 import { dismissTopmost } from "../hooks/useDismissible";
 
 const EDGE_ZONE_PX = 24;
@@ -22,6 +23,7 @@ const MIN_SWIPE_PX = 60;
  *  useNavigate is available here. Renders nothing itself. */
 export function EdgeSwipeBack() {
   const navigate = useNavigate();
+  const { session } = useAuth();
 
   useEffect(() => {
     let armed = false;
@@ -57,7 +59,13 @@ export function EdgeSwipeBack() {
       // would leave the app or no-op instead of going anywhere useful.
       const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0;
       if (idx > 0) navigate(-1);
-      else navigate("/dashboard");
+      // No history to go back to: only fall back to /dashboard when
+      // there's an active session. The public share/arena routes
+      // (/shared/murals/:token, /shared/library/:token, /arena, /arena/:id)
+      // are mounted with EdgeSwipeBack too, and /dashboard sits behind
+      // RequireAuth — sending a session-less visitor there would bounce
+      // them straight to a login wall these routes exist to avoid.
+      else if (session) navigate("/dashboard");
     }
 
     window.addEventListener("touchstart", handleTouchStart);
@@ -66,7 +74,7 @@ export function EdgeSwipeBack() {
       window.removeEventListener("touchstart", handleTouchStart);
       window.removeEventListener("touchend", handleTouchEnd);
     };
-  }, [navigate]);
+  }, [navigate, session]);
 
   return null;
 }
