@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useOutletContext, useParams, useSearchParams } from "react-router-dom";
+import { EmptyState } from "../components/EmptyState";
 import { AddBlockMenu } from "../components/murals/AddBlockMenu";
 import { BlockConfigPanel } from "../components/murals/BlockConfigPanel";
 import { BlockStylePanel } from "../components/murals/BlockStylePanel";
 import { MuralCanvas } from "../components/murals/MuralCanvas";
+import { MuralsIcon } from "../components/NavIcons";
 import { PageContainer } from "../components/PageContainer";
 import { ShareModal } from "../components/ShareModal";
 import { useToast } from "../components/Toaster";
@@ -334,21 +336,21 @@ export function MuralEditorPage() {
       </header>
 
       {view.blocks.length === 0 && (
-        <div className="rounded-xl border-2 border-dashed border-(--color-border) py-16 text-center">
-          <p className="mb-1 text-(--color-text)">This mural is empty.</p>
-          {/* Editing is already on in the second case, so telling you to
-              turn it on — and offering a button that turns it on — is
-              advice you've taken. Point at the control you actually
-              need instead. */}
-          <p className="mb-4 text-sm text-(--color-text-dim)">
-            {editMode ? "Add your first block with the + button above." : "Turn on editing and add your first block."}
-          </p>
-          {!editMode && (
-            <button onClick={() => setEditMode(true)} className="rounded-lg bg-(--color-accent) px-4 py-2 font-semibold text-white">
-              Start building
-            </button>
-          )}
-        </div>
+        // Editing is already on in the second case, so telling you to turn
+        // it on — and offering a button that turns it on — is advice you
+        // have taken. Point at the control you actually need instead.
+        <EmptyState
+          icon={MuralsIcon}
+          title="This mural is empty."
+          body={editMode ? "Add your first block with the + button above." : "Turn on editing and add your first block."}
+          action={
+            !editMode && (
+              <button onClick={() => setEditMode(true)} className="rounded-lg bg-(--color-accent) px-4 py-2 font-semibold text-white">
+                Start building
+              </button>
+            )
+          }
+        />
       )}
 
       {mural && mural.blocks.length > 0 && (

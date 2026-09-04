@@ -5,6 +5,8 @@
 
 import { Link } from "react-router-dom";
 import { TournamentStatusBadge } from "../components/arena/TournamentStatusBadge";
+import { EmptyState } from "../components/EmptyState";
+import { ArenaIcon } from "../components/NavIcons";
 import { SkeletonCardGrid } from "../components/Skeleton";
 import { useDelayedShow } from "../hooks/useDelayedShow";
 import { usePublicTournaments } from "../hooks/usePublicTournaments";
@@ -24,7 +26,13 @@ export function ArenaPublicListPage() {
       <p className="mb-6 text-sm text-(--color-text-dim)">Vote in book bracket tournaments — no account needed.</p>
 
       {showSkeleton && <SkeletonCardGrid count={3} label="Loading tournaments" tileClassName="min-h-[86px]" />}
-      {!isLoading && tournaments.length === 0 && <p className="text-sm text-(--color-text-dim)">No tournaments yet. A tournament is a bracket where friends vote books head-to-head — check back soon.</p>}
+      {!isLoading && tournaments.length === 0 && (
+        <EmptyState
+          icon={ArenaIcon}
+          title="No tournaments yet."
+          body="A tournament is a bracket where friends vote books head-to-head — check back soon."
+        />
+      )}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {tournaments.map((t) => (

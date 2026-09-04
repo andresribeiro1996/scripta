@@ -3,8 +3,10 @@ import { useNavigate } from "react-router-dom";
 import type { GalleryImage } from "../api/gallery";
 import { useConfirm } from "../components/ConfirmDialog";
 import { CoverPickerModal } from "../components/CoverPickerModal";
+import { EmptyState } from "../components/EmptyState";
 import { MoveToFolderModal } from "../components/murals/MoveToFolderModal";
 import { MuralFolderTree } from "../components/murals/MuralFolderTree";
+import { MuralsIcon } from "../components/NavIcons";
 import { OptionsMenu } from "../components/OptionsMenu";
 import { PageContainer } from "../components/PageContainer";
 import { ShareModal } from "../components/ShareModal";
@@ -161,10 +163,11 @@ export function MuralsListPage() {
           {showSkeleton && <SkeletonCardGrid label="Loading murals" />}
 
           {!isLoading && murals.length === 0 && (
-            <p className="mb-4 text-sm text-(--color-text-dim)">
-              No murals yet. A mural is a freeform dashboard you build yourself — a "Top 5 Books This Year" shelf, a favorite
-              quote, a photo, whatever you want on the wall. Click the + below to start.
-            </p>
+            <EmptyState
+              icon={MuralsIcon}
+              title="No murals yet."
+              body={'A mural is a freeform dashboard you build yourself \u2014 a "Top 5 Books This Year" shelf, a favorite quote, a photo, whatever you want on the wall. Use the + below to start.'}
+            />
           )}
 
           {!isLoading && murals.length > 0 && (

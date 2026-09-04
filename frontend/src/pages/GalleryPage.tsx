@@ -1,5 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useConfirm } from "../components/ConfirmDialog";
+import { EmptyState } from "../components/EmptyState";
+import { GalleryIcon } from "../components/NavIcons";
 import { PageContainer } from "../components/PageContainer";
 import { SkeletonCardGrid } from "../components/Skeleton";
 import { CloseIcon, ToolbarRow } from "../components/Toolbar";
@@ -140,7 +142,11 @@ export function GalleryPage() {
       )}
 
       {!isLoading && images.length === 0 && (
-        <p className="text-sm text-(--color-text-dim)">No images yet — upload one above, or straight from a book's "Cover" button.</p>
+        <EmptyState
+          icon={GalleryIcon}
+          title="No images yet."
+          body={'Upload one above, or straight from a book\u2019s "Cover" button.'}
+        />
       )}
 
       {images.length > 0 && (

@@ -1,9 +1,11 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ComponentType } from "react";
 import type { GalleryImage } from "../api/gallery";
 import { BookCard } from "../components/BookCard";
 import { BookGrid } from "../components/BookGrid";
 import { CoverPickerModal } from "../components/CoverPickerModal";
+import { EmptyState } from "../components/EmptyState";
 import { LibraryCanvas } from "../components/LibraryCanvas";
+import { CollectionsIcon, SeriesIcon } from "../components/NavIcons";
 import { OptionsMenu } from "../components/OptionsMenu";
 import { PageContainer } from "../components/PageContainer";
 import { PerCardStylePanel } from "../components/PerCardStylePanel";
@@ -31,19 +33,23 @@ import { seriesGroupByBookKey } from "../lib/libraryOrder";
 import { effectiveCardStyle, resolveLibraryStyle, type PerCardStyle } from "../lib/libraryStyle";
 import { bookKey } from "../lib/merge";
 
-const COPY: Record<GroupType, { title: string; noun: string; empty: string; untitled: string }> = {
+const COPY: Record<GroupType, { title: string; noun: string; emptyTitle: string; emptyBody: string; untitled: string; icon: ComponentType<{ size?: number }> }> = {
   series: {
     title: "Series",
     noun: "series",
-    empty:
-      "No series yet. Series are picked up automatically from your books' Series field on import — or add one by hand below.",
-    untitled: "Untitled series"
+    emptyTitle: "No series yet.",
+    emptyBody:
+      "Series are picked up automatically from your books' Series field on import — or add one by hand below.",
+    untitled: "Untitled series",
+    icon: SeriesIcon
   },
   collection: {
     title: "Collections",
     noun: "collection",
-    empty: "No collections yet. Create one to start organizing your books your own way.",
-    untitled: "Untitled collection"
+    emptyTitle: "No collections yet.",
+    emptyBody: "Create one to start organizing your books your own way.",
+    untitled: "Untitled collection",
+    icon: CollectionsIcon
   }
 };
 
@@ -369,7 +375,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
       )}
 
 
-      {!isLoading && allGroups.length === 0 && <p className="text-sm text-(--color-text-dim)">{copy.empty}</p>}
+      {!isLoading && allGroups.length === 0 && <EmptyState icon={copy.icon} title={copy.emptyTitle} body={copy.emptyBody} />}
       {!isLoading && allGroups.length > 0 && groups.length === 0 && (
         <p className="text-sm text-(--color-text-dim)">Nothing matches “{search.trim()}”.</p>
       )}

@@ -9,14 +9,17 @@ import { BookCard } from "../components/BookCard";
 import { BookDetailSheet } from "../components/BookDetailSheet";
 import { BookGrid } from "../components/BookGrid";
 import { CoverPickerModal } from "../components/CoverPickerModal";
+import { EmptyState } from "../components/EmptyState";
 import { LibraryCanvas } from "../components/LibraryCanvas";
 import { LibraryToolbar } from "../components/LibraryToolbar";
+import { LibraryIcon } from "../components/NavIcons";
 import type { OptionsMenuItem } from "../components/OptionsMenu";
 import { PageContainer } from "../components/PageContainer";
 import { PerCardStylePanel } from "../components/PerCardStylePanel";
 import { ShareModal } from "../components/ShareModal";
 import { SkeletonBookGrid } from "../components/Skeleton";
 import { useToast } from "../components/Toaster";
+import { FilterIcon } from "../components/Toolbar";
 import { useDelayedShow } from "../hooks/useDelayedShow";
 import { useLibrary } from "../hooks/useLibrary";
 import { useMurals } from "../hooks/useMurals";
@@ -509,40 +512,49 @@ export function LibraryPage() {
       )}
 
       {!isLoading && books.length === 0 && (
-        <div className="rounded-xl border-2 border-dashed border-(--color-border) py-16 text-center">
-          <p className="mb-1 text-(--color-text)">No library saved yet.</p>
-          <p className="mb-4 text-sm text-(--color-text-dim)">
-            Import one of: a <code>library.json</code> from the exporter CLI, a <code>KoboReader.sqlite</code> straight
-            off your device's USB drive, a Goodreads library CSV export (My Books → Tools → Import/Export → Export
-            Library), or a StoryGraph library CSV export (profile icon → Manage Your Account → Manage Your Data →
-            Export StoryGraph Library).
-          </p>
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={importing}
-            className="rounded-lg bg-(--color-accent) px-4 py-2.5 font-semibold text-white disabled:opacity-60"
-          >
-            {importing ? "Importing…" : "Choose a file"}
-          </button>
-        </div>
+        <EmptyState
+          icon={LibraryIcon}
+          title="No library saved yet."
+          body={
+            <>
+              Import one of: a <code>library.json</code> from the exporter CLI, a <code>KoboReader.sqlite</code> straight
+              off your device's USB drive, a Goodreads library CSV export (My Books → Tools → Import/Export → Export
+              Library), or a StoryGraph library CSV export (profile icon → Manage Your Account → Manage Your Data →
+              Export StoryGraph Library).
+            </>
+          }
+          action={
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={importing}
+              className="rounded-lg bg-(--color-accent) px-4 py-2.5 font-semibold text-white disabled:opacity-60"
+            >
+              {importing ? "Importing…" : "Choose a file"}
+            </button>
+          }
+        />
       )}
 
       {books.length > 0 && displayBooks.length === 0 && (
-        <div className="rounded-xl border-2 border-dashed border-(--color-border) py-12 text-center">
-          <p className="mb-3 text-(--color-text)">No books match.</p>
-          {toolbarActive && (
-            <button
-              onClick={() => {
-                setQuery("");
-                setStatusFilter("all");
-                setSortKey("manual");
-              }}
-              className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover)"
-            >
-              Clear search and filters
-            </button>
-          )}
-        </div>
+        <EmptyState
+          icon={FilterIcon}
+          title="No books match."
+          body="Every book is still here — the search or filters above just don't match any of them."
+          action={
+            toolbarActive && (
+              <button
+                onClick={() => {
+                  setQuery("");
+                  setStatusFilter("all");
+                  setSortKey("manual");
+                }}
+                className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover)"
+              >
+                Clear search and filters
+              </button>
+            )
+          }
+        />
       )}
 
       {books.length > 0 && displayBooks.length > 0 && (

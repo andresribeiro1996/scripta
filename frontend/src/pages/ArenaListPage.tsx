@@ -10,6 +10,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import type { Tierlist } from "../api/tierlists";
 import { TournamentStatusBadge } from "../components/arena/TournamentStatusBadge";
 import { useConfirm } from "../components/ConfirmDialog";
+import { EmptyState } from "../components/EmptyState";
+import { ArenaIcon } from "../components/NavIcons";
 import { OptionsMenu } from "../components/OptionsMenu";
 import { SkeletonCardGrid } from "../components/Skeleton";
 import { PlusIcon, TOOLBAR_CONTROL_CLASS, ToolbarRow } from "../components/Toolbar";
@@ -171,9 +173,11 @@ export function ArenaListPage() {
           {showTierlistSkeleton && <SkeletonCardGrid count={3} label="Loading tier lists" tileClassName="min-h-[86px]" />}
 
           {!tierlistsLoading && tierlists.length === 0 && (
-            <p className="mb-4 text-sm text-(--color-text-dim)">
-              No tier lists yet. A tier list ranks your books into S/A/B… rows — build one and drop it into a mural.
-            </p>
+            <EmptyState
+              icon={ArenaIcon}
+              title="No tier lists yet."
+              body="A tier list ranks your books into S/A/B… rows — build one and drop it into a mural."
+            />
           )}
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
