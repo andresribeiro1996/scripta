@@ -56,6 +56,13 @@ export function MuralEditorPage() {
   // Which folder the draft belongs to, carried from the list page so a
   // mural created from inside a folder lands in it.
   const draftFolderId = searchParams.get("folder");
+  // Back goes to the folder this mural lives in, not to "All murals".
+  // The list page keeps its folder in the URL now, so handing it the
+  // mural's own folderId lands you exactly where the mural was — the
+  // folder you must have been in to open it. A draft has no folderId of
+  // its own yet, so it falls back to the one it was created from.
+  const backFolderId = mural?.folderId ?? draftFolderId;
+  const backToMurals = backFolderId ? `/dashboard/murals?folder=${encodeURIComponent(backFolderId)}` : "/dashboard/murals";
   const [draftName, setDraftName] = useState("Untitled mural");
   // Guards against a double-create: two quick actions on a draft (add a
   // block, then another before the first resolves) would otherwise each
@@ -260,7 +267,7 @@ export function MuralEditorPage() {
     <PageContainer>
       <header className="mb-6 flex items-center justify-between gap-4">
         <div>
-          <Link to="/dashboard/murals" className="inline-flex items-center gap-1 text-xs text-(--color-text-dim) hover:text-(--color-text)">
+          <Link to={backToMurals} className="inline-flex items-center gap-1 text-xs text-(--color-text-dim) hover:text-(--color-text)">
             <ChevronLeftIcon size={13} />
             Murals
           </Link>

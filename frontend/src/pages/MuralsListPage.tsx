@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import type { GalleryImage } from "../api/gallery";
 import { useConfirm } from "../components/ConfirmDialog";
 import { CoverPickerModal } from "../components/CoverPickerModal";
@@ -54,7 +54,27 @@ export function MuralsListPage() {
   const [editingName, setEditingName] = useState("");
   const [coverMuralId, setCoverMuralId] = useState<string | null>(null);
   const [sharingMuralId, setSharingMuralId] = useState<string | null>(null);
-  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  // Which folder you're looking at lives in the URL rather than in
+  // component state. It used to be state, so it was lost the moment you
+  // opened a mural: the editor's back link goes to /dashboard/murals,
+  // which remounted this page at "All murals" no matter which folder you
+  // had come from. In the URL it survives the round trip (the editor's
+  // back link carries the mural's own folder), a refresh, and a shared
+  // link. `replace` so picking through a folder tree doesn't fill the
+  // back button with every step.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedFolderId = searchParams.get("folder");
+  function setSelectedFolderId(folderId: string | null) {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (folderId) next.set("folder", folderId);
+        else next.delete("folder");
+        return next;
+      },
+      { replace: true }
+    );
+  }
   const [movingMuralId, setMovingMuralId] = useState<string | null>(null);
   const [movingFolderId, setMovingFolderId] = useState<string | null>(null);
 
