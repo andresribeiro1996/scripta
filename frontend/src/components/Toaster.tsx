@@ -49,19 +49,25 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                   : "border-(--color-border) bg-(--color-surface) text-(--color-text)"
               }`}
             >
-              <span className="flex-1">{t.message}</span>
+              {/* Both controls carry negative margins against padding so
+                  they reach 44px of touch target without making the toast
+                  any taller than the text needs. An "Undo" you have to aim
+                  at is not an undo — the plain text button measured 48x19,
+                  and Undo is the affordance a mis-tapped Delete depends
+                  on. */}
+              <span className="flex-1 self-center">{t.message}</span>
               {action && (
                 <button
                   onClick={() => {
                     action.onClick();
                     dismiss(t.id);
                   }}
-                  className="font-semibold text-(--color-accent) hover:opacity-80"
+                  className="-my-2 inline-flex min-h-11 items-center px-1 font-semibold text-(--color-accent) hover:opacity-80"
                 >
                   {action.label}
                 </button>
               )}
-              <button onClick={() => dismiss(t.id)} aria-label="Dismiss" className="text-(--color-text-dim) hover:text-(--color-text)">
+              <button onClick={() => dismiss(t.id)} aria-label="Dismiss" className="-my-2 inline-flex min-h-11 items-center px-1 text-(--color-text-dim) hover:text-(--color-text)">
                 ×
               </button>
             </div>
