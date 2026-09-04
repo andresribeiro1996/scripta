@@ -20,6 +20,7 @@ import { registerGalleryModule } from "./modules/gallery/index.js";
 import { registerLibraryModule } from "./modules/library/index.js";
 import { registerMuralsModule } from "./modules/murals/index.js";
 import { registerSocialsModule } from "./modules/socials/index.js";
+import { registerTierlistsModule } from "./modules/tierlists/index.js";
 
 export function buildApp() {
   // Moves any still-embedded library.murals[] into the new murals table
@@ -72,6 +73,7 @@ export function buildApp() {
   app.register(registerCoversModule);
   app.register(registerSocialsModule);
   app.register(registerMuralsModule);
+  app.register(registerTierlistsModule);
 
   return app;
 }
