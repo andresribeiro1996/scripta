@@ -188,16 +188,37 @@ export function MuralEditorPage() {
     await saveBlocks(mural.id, updated.blocks);
   }
 
-  // Deliberately no confirm() here, unlike deleting a book/image/mural —
-  // removing one block while actively composing a mural is low-stakes
-  // and high-frequency (you'll add and remove blocks constantly while
-  // arranging one), and re-adding + reconfiguring one is cheap. A
-  // confirmation on every removal would just be editing friction.
+  // Still deliberately no confirm(), unlike deleting a book/image/mural:
+  // adding and removing blocks is what composing a mural IS, and a
+  // dialog on every removal would be friction on the most frequent
+  // action here.
+  //
+  // What made that reasoning safe was a mouse. On touch the block's ⋮
+  // lives at the end of the same thin grip bar your thumb rides while
+  // dragging, so a miss opens the menu, and Delete is then one tap away
+  // with nothing between it and a gone block. Undo costs nothing on the
+  // desktop path and gives the touch path a way back.
+  //
+  // It restores the whole previous blocks array rather than re-inserting
+  // the one block, because removeBlock also compacts the survivors
+  // upwards — putting the block back alone would drop it into a layout
+  // that has closed around the hole. The cost is that an edit made
+  // inside the undo window is discarded along with the delete; over a
+  // few seconds that is the behaviour "undo" is expected to have.
   async function handleDeleteBlock(blockId: string) {
     const mural = await materialize();
     if (!mural) return;
+    const before = mural.blocks;
     const [updated] = removeBlock([mural], mural.id, blockId);
     await saveBlocks(mural.id, updated.blocks);
+    toast({
+      message: "Block deleted.",
+      duration: 8000,
+      action: {
+        label: "Undo",
+        onClick: () => void guard(saveBlocks(mural.id, before), "Couldn't undo that.")
+      }
+    });
   }
 
   async function handleLayoutChange(blockId: string, layout: BlockLayout) {
