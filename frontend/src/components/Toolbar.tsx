@@ -68,12 +68,16 @@ export function toolbarIconClass(active = false): string {
 // in most fonts, so even a correctly centred button looks wrong. Same
 // reasoning OptionsMenu.tsx's own gear already follows.
 
-/** Hub and spokes — a page's actions. */
+/** A cog — a page's actions. Was hub-and-spokes: a small circle with
+ *  eight long radial ticks, which is the geometry of a SUN, and read as
+ *  a brightness control rather than settings. Teeth on the silhouette
+ *  are what make the eye call it a gear. Shares its shape with
+ *  NavIcons.tsx's SettingsIcon — one settings mark in the app. */
 export function GearIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="3.2" />
-      <path d="M12 2.5v3M12 18.5v3M21.5 12h-3M5.5 12h-3M18.5 5.5l-2.1 2.1M7.6 16.4l-2.1 2.1M18.5 18.5l-2.1-2.1M7.6 7.6 5.5 5.5" />
+      <path d="" />
+      <circle cx="12" cy="12" r="3.1" />
     </svg>
   );
 }
