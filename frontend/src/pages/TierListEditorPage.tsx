@@ -1,9 +1,10 @@
-import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useOutletContext, useParams } from "react-router-dom";
 import type { TierDefinition, TierlistData } from "../api/tierlists";
-import { DraggableTierTile } from "../components/murals/blocks/BookBlocks";
+import { DraggableTierTile, TierRow } from "../components/murals/blocks/BookBlocks";
 import { BookSearchList } from "../components/murals/pickers";
 import { PageContainer } from "../components/PageContainer";
+import { useDismissible } from "../hooks/useDismissible";
 import { useLibrary } from "../hooks/useLibrary";
 import { useTierlists } from "../hooks/useTierlists";
 import { bookKey } from "../lib/merge";
@@ -147,6 +148,22 @@ export function TierListEditorPage() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [dragOverTarget, setDragOverTarget] = useState<string | null>(null);
   const [dragOverTileKey, setDragOverTileKey] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+
+  // Escape and the app-wide edge-swipe-back (components/EdgeSwipeBack.tsx)
+  // exit editing first and only leave the page on a second gesture —
+  // registering here rather than making the mode a route keeps the
+  // browser's own history meaning "which tier list", not "which mode".
+  useDismissible(() => setEditing(false), editing);
+
+  // The bottom tab bar covers the pool dock and costs 3.5rem of a phone's
+  // height while ranking, which is the whole activity in edit mode. Same
+  // trade MuralEditorPage.tsx:89-93 already makes for its canvas.
+  const { setNavHidden } = useOutletContext<{ setNavHidden: (hidden: boolean) => void }>();
+  useEffect(() => {
+    setNavHidden(editing);
+    return () => setNavHidden(false);
+  }, [editing, setNavHidden]);
 
   if (isLoading) {
     return (
@@ -312,106 +329,133 @@ export function TierListEditorPage() {
         <Link to="/dashboard/arena?tab=tierlists" className="text-xs text-(--color-text-dim) hover:text-(--color-text)">
           ← Arena
         </Link>
-        {editingName ? (
-          <input
-            autoFocus
-            value={nameDraft}
-            onChange={(e) => setNameDraft(e.target.value)}
-            onBlur={() => void handleRename()}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") void handleRename();
-              if (e.key === "Escape") setEditingName(false);
-            }}
-            aria-label="Tier list name"
-            className="block rounded-lg border border-(--color-border) bg-(--color-surface) px-2 py-1 text-lg font-bold"
-          />
-        ) : (
+        <div className="flex items-center justify-between gap-3">
+          {editingName ? (
+            <input
+              autoFocus
+              value={nameDraft}
+              onChange={(e) => setNameDraft(e.target.value)}
+              onBlur={() => void handleRename()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void handleRename();
+                if (e.key === "Escape") setEditingName(false);
+              }}
+              aria-label="Tier list name"
+              className="block min-w-0 flex-1 rounded-lg border border-(--color-border) bg-(--color-surface) px-2 py-1 text-lg font-bold"
+            />
+          ) : (
+            <button
+              onClick={() => {
+                setNameDraft(tierlist.name);
+                setEditingName(true);
+              }}
+              title="Rename this tier list"
+              className="block min-w-0 flex-1 truncate text-left text-lg font-bold transition-colors hover:text-(--color-accent)"
+            >
+              {tierlist.name}
+            </button>
+          )}
           <button
-            onClick={() => {
-              setNameDraft(tierlist.name);
-              setEditingName(true);
-            }}
-            title="Rename this tier list"
-            className="block text-left text-lg font-bold transition-colors hover:text-(--color-accent)"
-          >
-            {tierlist.name}
-          </button>
-        )}
-      </header>
-
-      <div className="flex flex-col gap-2">
-        {data.tiers.length === 0 && <p className="text-sm text-(--color-text-dim)">No tiers yet — add one.</p>}
-        {data.tiers.map((tier, i) => (
-          <TierEditorRow
-            key={tier.id}
-            tier={tier}
-            books={books}
-            isDragOver={dragOverTarget === tier.id}
-            dropZoneProps={dropZoneProps(tier.id)}
-            dragOverTileKey={dragOverTileKey}
-            tileDropProps={(k) => tileDropProps({ type: "tier", tierId: tier.id }, k)}
-            otherTiers={data.tiers.filter((t) => t.id !== tier.id)}
-            onMoveBook={moveBook}
-            isFirst={i === 0}
-            isLast={i === data.tiers.length - 1}
-            onRename={(label) => updateTier(tier.id, { label })}
-            onRecolor={(color) => updateTier(tier.id, { color })}
-            onMoveUp={() => moveTier(i, -1)}
-            onMoveDown={() => moveTier(i, 1)}
-            onDelete={() => deleteTier(tier)}
-          />
-        ))}
-
-        <button
-          onClick={addTier}
-          className="self-start rounded-lg border border-dashed border-(--color-border) px-3 py-1.5 text-sm text-(--color-text-dim) hover:border-(--color-accent) hover:text-(--color-accent)"
-        >
-          + Add tier
-        </button>
-
-        {(resolvedPool.length > 0 || searchOpen) && (
-          <div
-            {...dropZoneProps("pool")}
-            className={`flex shrink-0 flex-col gap-1.5 rounded-lg border border-dashed p-2 transition-colors ${
-              dragOverTarget === "pool" ? "border-(--color-accent) bg-(--color-accent-soft)" : "border-(--color-border)"
+            onClick={() => setEditing((e) => !e)}
+            className={`min-h-9 shrink-0 rounded-lg px-3 text-sm font-semibold ${
+              editing
+                ? "bg-(--color-accent) text-white"
+                : "border border-(--color-border) bg-(--color-surface) hover:bg-(--color-surface-hover)"
             }`}
           >
-            <div className="text-xs font-semibold text-(--color-text-dim)">Pool — drag up into a tier</div>
-            <div className="flex min-h-[4em] flex-wrap items-start gap-1.5">
-              {resolvedPool.map((key) => (
-                <DraggableTierTile
-                  key={key}
-                  book={byKey.get(key)!}
-                  bookKeyStr={key}
-                  isDragOver={dragOverTileKey === key}
-                  dropProps={tileDropProps({ type: "pool" }, key)}
-                  menuItems={data.tiers.map((t) => ({ label: `Move to ${t.label || "Untitled tier"}`, onClick: () => moveBook(key, { type: "tier", tierId: t.id }) }))}
-                />
-              ))}
-            </div>
-            {searchOpen && (
-              <div>
-                <BookSearchList
-                  books={books.filter((b) => {
-                    const key = bookKey(b);
-                    return !data.pool.includes(key) && !data.tiers.some((t) => t.bookKeys.includes(key));
-                  })}
-                  onSelect={(b) => addBookToPool(b)}
-                />
-                <button onClick={() => setSearchOpen(false)} className="mt-1 text-xs text-(--color-text-dim) hover:text-(--color-text)">
-                  Cancel
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {!searchOpen && (
-          <button onClick={() => setSearchOpen(true)} className="self-start text-xs font-medium text-(--color-accent) hover:opacity-80">
-            + Add books to pool
+            {editing ? "Done" : "Edit"}
           </button>
-        )}
-      </div>
+        </div>
+      </header>
+
+      {!editing ? (
+        <div className="flex flex-col gap-2">
+          {data.tiers.length === 0 ? (
+            <p className="text-sm text-(--color-text-dim)">No tiers yet — tap Edit to add one.</p>
+          ) : (
+            data.tiers.map((tier) => <TierRow key={tier.id} tier={tier} books={books} />)
+          )}
+          {resolvedPool.length > 0 && (
+            <p className="mt-1 text-xs text-(--color-text-dim)">
+              {resolvedPool.length} {resolvedPool.length === 1 ? "book" : "books"} still unranked — tap Edit to place them.
+            </p>
+          )}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {data.tiers.length === 0 && <p className="text-sm text-(--color-text-dim)">No tiers yet — add one.</p>}
+          {data.tiers.map((tier, i) => (
+            <TierEditorRow
+              key={tier.id}
+              tier={tier}
+              books={books}
+              isDragOver={dragOverTarget === tier.id}
+              dropZoneProps={dropZoneProps(tier.id)}
+              dragOverTileKey={dragOverTileKey}
+              tileDropProps={(k) => tileDropProps({ type: "tier", tierId: tier.id }, k)}
+              otherTiers={data.tiers.filter((t) => t.id !== tier.id)}
+              onMoveBook={moveBook}
+              isFirst={i === 0}
+              isLast={i === data.tiers.length - 1}
+              onRename={(label) => updateTier(tier.id, { label })}
+              onRecolor={(color) => updateTier(tier.id, { color })}
+              onMoveUp={() => moveTier(i, -1)}
+              onMoveDown={() => moveTier(i, 1)}
+              onDelete={() => deleteTier(tier)}
+            />
+          ))}
+
+          <button
+            onClick={addTier}
+            className="self-start rounded-lg border border-dashed border-(--color-border) px-3 py-1.5 text-sm text-(--color-text-dim) hover:border-(--color-accent) hover:text-(--color-accent)"
+          >
+            + Add tier
+          </button>
+
+          {(resolvedPool.length > 0 || searchOpen) && (
+            <div
+              {...dropZoneProps("pool")}
+              className={`flex shrink-0 flex-col gap-1.5 rounded-lg border border-dashed p-2 transition-colors ${
+                dragOverTarget === "pool" ? "border-(--color-accent) bg-(--color-accent-soft)" : "border-(--color-border)"
+              }`}
+            >
+              <div className="text-xs font-semibold text-(--color-text-dim)">Pool — drag up into a tier</div>
+              <div className="flex min-h-[4em] flex-wrap items-start gap-1.5">
+                {resolvedPool.map((key) => (
+                  <DraggableTierTile
+                    key={key}
+                    book={byKey.get(key)!}
+                    bookKeyStr={key}
+                    isDragOver={dragOverTileKey === key}
+                    dropProps={tileDropProps({ type: "pool" }, key)}
+                    menuItems={data.tiers.map((t) => ({ label: `Move to ${t.label || "Untitled tier"}`, onClick: () => moveBook(key, { type: "tier", tierId: t.id }) }))}
+                  />
+                ))}
+              </div>
+              {searchOpen && (
+                <div>
+                  <BookSearchList
+                    books={books.filter((b) => {
+                      const key = bookKey(b);
+                      return !data.pool.includes(key) && !data.tiers.some((t) => t.bookKeys.includes(key));
+                    })}
+                    onSelect={(b) => addBookToPool(b)}
+                  />
+                  <button onClick={() => setSearchOpen(false)} className="mt-1 text-xs text-(--color-text-dim) hover:text-(--color-text)">
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!searchOpen && (
+            <button onClick={() => setSearchOpen(true)} className="self-start text-xs font-medium text-(--color-accent) hover:opacity-80">
+              + Add books to pool
+            </button>
+          )}
+        </div>
+      )}
     </PageContainer>
   );
 }
