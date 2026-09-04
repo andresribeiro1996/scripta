@@ -15,6 +15,7 @@ import {
 } from "../api/arena";
 import { useAuth } from "../auth/AuthContext";
 import { SeedSlotGrid } from "../components/arena/SeedSlotGrid";
+import { OptionSheet } from "../components/Sheet";
 import { useArena } from "../hooks/useArena";
 import { useLibrary } from "../hooks/useLibrary";
 import { toSeedBook } from "../lib/arenaSeed";
@@ -51,6 +52,7 @@ export function ArenaSeedPage() {
   const [nameDraft, setNameDraft] = useState("");
   const [draftName, setDraftName] = useState("Untitled tournament");
   const [draftBracketSize, setDraftBracketSize] = useState(DEFAULT_BRACKET_SIZE);
+  const [pickingSize, setPickingSize] = useState(false);
   // A ref, not state: two quick actions on a draft must not each see
   // "no tournament yet" and POST their own.
   const creatingRef = useRef(false);
@@ -252,23 +254,40 @@ export function ArenaSeedPage() {
         // since the row already carries three things.
         sizeControl={
           isDraft ? (
-            <select
-              value={draftBracketSize}
-              onChange={(e) => setDraftBracketSize(Number(e.target.value))}
-              aria-label="Bracket size — fixed once the tournament starts"
-              title="Fixed once the tournament starts"
-              className="min-h-9 shrink-0 rounded-lg border border-(--color-border) bg-(--color-surface) px-2 text-sm"
+            // A button opening our own OptionSheet, not a <select>. The
+            // native control took its font from the OS — mobile browsers
+            // force ~16px on form controls to stop tap-zoom, so it sat
+            // noticeably larger than the row around it — and drew its own
+            // arrow wherever it liked, which never lined up with the
+            // box's padding. It also opened the OS picker, the only
+            // place left in the app that did: every other choice
+            // (filter, sort, folder, actions, rounds) is a bottom sheet.
+            <button
+              onClick={() => setPickingSize(true)}
+              aria-label={`Bracket size, ${draftBracketSize} books — fixed once the tournament starts`}
+              className="flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg border border-(--color-border) bg-(--color-surface) px-2.5 text-xs hover:bg-(--color-surface-hover)"
             >
-              {BRACKET_SIZES.map((size) => (
-                <option key={size} value={size}>
-                  {size} books
-                </option>
-              ))}
-            </select>
+              {draftBracketSize} books
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-(--color-text-dim)">
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
           ) : undefined
         }
       />
       {randomFilling && <p className="mt-2 text-sm text-(--color-text-dim)">Filling…</p>}
+
+      {pickingSize && (
+        <OptionSheet
+          title="Bracket size"
+          // OptionSheet keys on strings; sizes are numbers, so they're
+          // converted on the way in and back on the way out.
+          options={BRACKET_SIZES.map((size) => ({ value: String(size), label: `${size} books` }))}
+          value={String(draftBracketSize)}
+          onSelect={(v) => setDraftBracketSize(Number(v))}
+          onClose={() => setPickingSize(false)}
+        />
+      )}
 
       <div className="mt-6 flex items-center justify-between">
         <button onClick={() => void handleSaveProgress()} className="rounded-lg border border-(--color-border) px-3 py-1.5 text-sm">
