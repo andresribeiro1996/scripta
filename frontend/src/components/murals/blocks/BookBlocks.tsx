@@ -1,3 +1,4 @@
+import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { CoverImage } from "../../BookCard";
 import type { ResolvedTierlist } from "../../../api/tierlists";
 import { bookKey } from "../../../lib/merge";
@@ -185,57 +186,66 @@ export function TierRow({ tier, books }: { tier: TierDefinition; books: Array<Re
 }
 
 /** One draggable, rankable book — the same compact cover tile TierRow
- *  above renders (`MiniBookTile`), just wrapped in plain HTML5
- *  drag-and-drop (`draggable` + `dataTransfer`, the exact convention
- *  BookCard.tsx's own shelf-reorder drag already uses) plus a small
- *  hover-revealed ⋮ menu (`OptionsMenu`, reused rather than rebuilt).
- *  Native HTML5 drag has no real touch equivalent, so the menu is never
- *  optional polish — it's the only way to rank a book at all on a device
- *  that can't drag. Used identically by TierListEditorPage's tier tiles
- *  and pool tiles, so a book looks and behaves the same regardless of
- *  which side of "ranked" it's currently on.
+ *  above renders (`MiniBookTile`), just wrapped in `@dnd-kit`'s
+ *  `useDraggable`/`useDroppable` (the same sensors LibraryPage.tsx already
+ *  runs for its own drag-to-reorder) plus a small ⋮ menu (`OptionsMenu`,
+ *  reused rather than rebuilt). This used to be plain HTML5 drag
+ *  (`draggable` + `dataTransfer`), which has NO touch equivalent at all —
+ *  on a phone there was no way to drag a tile, and the menu was the only
+ *  way to rank a book, yet it only appeared on hover, which touch also
+ *  doesn't have. `@dnd-kit`'s `PointerSensor` (configured by the caller
+ *  with a long-press delay) fixes the drag itself, so the menu goes back
+ *  to being a genuine alternative rather than the only option — though it
+ *  now stays permanently visible on a coarse (touch) pointer rather than
+ *  hover-revealed, since hover still doesn't exist there. Used identically
+ *  by TierListEditorPage's tier tiles and pool tiles, so a book looks and
+ *  behaves the same regardless of which side of "ranked" it's currently on.
  *
- *  Every tile is ALSO a drop target (`dropProps`, wired up by the caller
- *  — see `tileDropProps`/`moveBook` in TierListEditorPage) — not just the
- *  row/pool container around it. Dropping directly on a tile SWAPS the
- *  dragged book with it (each takes the other's exact slot), which is
- *  what actually makes moving a book backward/earlier possible — an
- *  earlier version instead removed the dragged book and re-inserted it
- *  before the target, which shifts every book BETWEEN the two spots over
- *  by one rather than trading places; reported live as the dragged book
- *  visibly sliding rightward instead of the two actually swapping.
- *  Dropping on the row/pool's own background (no specific tile under the
- *  cursor) still just appends at the end, same as always. `stopPropagation()`
- *  on this tile's own dragover/drop keeps the row-level handler from ALSO firing for the
- *  same event and re-appending the book a second time. */
+ *  Every tile is ALSO a drop target (its own `useDroppable`, same `id` as
+ *  its `useDraggable`) — not just the row/pool container around it.
+ *  Dropping directly on a tile SWAPS the dragged book with it (each takes
+ *  the other's exact slot), which is what actually makes moving a book
+ *  backward/earlier possible — see `handleDragEnd` in TierListEditorPage,
+ *  which maps a tile-drop onto `moveBook`'s `beforeKey`. An earlier version
+ *  instead removed the dragged book and re-inserted it before the target,
+ *  which shifts every book BETWEEN the two spots over by one rather than
+ *  trading places; reported live as the dragged book visibly sliding
+ *  rightward instead of the two actually swapping. Dropping on the row/
+ *  pool's own background (no specific tile under the pointer) still just
+ *  appends at the end, same as always — `@dnd-kit` resolves that itself via
+ *  `closestCenter` picking the row/pool `DropZone` instead of any tile. */
 export function DraggableTierTile({
   book,
   bookKeyStr,
-  menuItems,
-  isDragOver,
-  dropProps
+  menuItems
 }: {
   book: Record<string, unknown>;
   bookKeyStr: string;
   menuItems: OptionsMenuItem[];
-  isDragOver: boolean;
-  dropProps: React.HTMLAttributes<HTMLDivElement>;
 }) {
+  const { attributes, listeners, setNodeRef: setDragRef, transform, isDragging } = useDraggable({ id: bookKeyStr });
+  const { setNodeRef: setDropRef, isOver } = useDroppable({ id: bookKeyStr });
+  const setRefs = (el: HTMLDivElement | null) => {
+    setDragRef(el);
+    setDropRef(el);
+  };
+  // Coarse pointers get the ⋮ menu permanently. It used to be
+  // hover-only, and hover does not exist on touch — so on a phone the
+  // one control that could rank a book without dragging was invisible.
+  const coarse = typeof window !== "undefined" && Boolean(window.matchMedia?.("(pointer: coarse)").matches);
   return (
     <div
-      draggable
-      onDragStart={(e) => {
-        e.dataTransfer.setData("text/plain", bookKeyStr);
-        e.dataTransfer.effectAllowed = "move";
-      }}
-      {...dropProps}
+      ref={setRefs}
+      {...listeners}
+      {...attributes}
+      style={transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: 50 } : undefined}
       title="Drag to a tier, or use the ⋮ menu"
-      className={`group/tile relative h-[6em] w-[4em] shrink-0 cursor-grab overflow-hidden rounded-lg active:cursor-grabbing ${
-        isDragOver ? "ring-2 ring-(--color-accent)" : ""
-      }`}
+      className={`group/tile relative h-[6em] w-[4em] shrink-0 cursor-grab touch-none overflow-hidden rounded-lg active:cursor-grabbing ${
+        isOver && !isDragging ? "ring-2 ring-(--color-accent)" : ""
+      } ${isDragging ? "opacity-50" : ""}`}
     >
       <MiniBookTile book={book} showTitle={false} showAuthor={false} />
-      <div className="absolute top-0.5 right-0.5 opacity-0 transition-opacity group-hover/tile:opacity-100">
+      <div className={`absolute top-0.5 right-0.5 transition-opacity ${coarse ? "opacity-100" : "opacity-0 group-hover/tile:opacity-100"}`}>
         <OptionsMenu
           items={menuItems}
           title="Move this book"

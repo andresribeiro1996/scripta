@@ -1,3 +1,4 @@
+import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useDroppable, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { useEffect, useState } from "react";
 import { Link, useOutletContext, useParams } from "react-router-dom";
 import type { TierDefinition, TierlistData } from "../api/tierlists";
@@ -16,17 +17,28 @@ import { createTier } from "../lib/murals";
 
 type MoveDestination = { type: "pool"; beforeKey?: string } | { type: "tier"; tierId: string; beforeKey?: string };
 
+/** A tier row or the pool as a drop target. `id` is what `handleDragEnd`
+ *  reads back from `over.id`: the literal string "pool", or a tier's own
+ *  id. This is also what restores the drag-over highlight a tier row lost
+ *  when the previous task pulled the old HTML5 `dragOverTarget` styling out
+ *  ahead of this one — the pool's dashed box already had this feedback,
+ *  and a tier row now matches it via the same mechanism instead of a
+ *  bespoke one. `shrink-0` lives here (not just on `TierRowShell`/the pool
+ *  box nested inside) because THIS div — not its child — is now the actual
+ *  flex item inside the surrounding `flex flex-col` stack of rows; putting
+ *  it only on the child would leave the real flex item free to shrink. */
+function DropZone({ id, children }: { id: string; children: React.ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id });
+  return (
+    <div ref={setNodeRef} className={`shrink-0 rounded-lg transition-colors ${isOver ? "bg-(--color-accent-soft)" : ""}`}>
+      {children}
+    </div>
+  );
+}
+
 function TierEditorRow({
   tier,
   books,
-  // Not read yet — TierRowShell doesn't take drag-over styling until
-  // Task 5 moves dropZoneProps onto its own wrapper. Kept in the prop
-  // list (rather than dropped and re-added) so this function's signature
-  // doesn't churn twice for the same drag mechanism.
-  isDragOver: _isDragOver,
-  dropZoneProps,
-  dragOverTileKey,
-  tileDropProps,
   otherTiers,
   onMoveBook,
   isFirst,
@@ -39,10 +51,6 @@ function TierEditorRow({
 }: {
   tier: TierDefinition;
   books: Array<Record<string, unknown>>;
-  isDragOver: boolean;
-  dropZoneProps: React.HTMLAttributes<HTMLDivElement>;
-  dragOverTileKey: string | null;
-  tileDropProps: (beforeKey: string) => React.HTMLAttributes<HTMLDivElement>;
   otherTiers: TierDefinition[];
   onMoveBook: (key: string, destination: MoveDestination) => void;
   isFirst: boolean;
@@ -104,12 +112,7 @@ function TierEditorRow({
           items={[{ label: "Delete tier", onClick: onDelete, danger: true }]}
         />
       </div>
-      {/* dropZoneProps is spread on this plain wrapper rather than on
-          TierRowShell itself — it moves onto the shell's own wrapper in
-          Task 5, once @dnd-kit replaces this drag mechanism wholesale.
-          Until then this keeps drag-and-drop working without teaching
-          the shared shell about a mechanism it's about to lose. */}
-      <div {...dropZoneProps}>
+      <DropZone id={tier.id}>
         <TierRowShell tier={tier} colorControl={<TierColorPicker color={tier.color} onChange={onRecolor} />}>
           {resolvedKeys.length === 0 ? (
             <TierRowEmpty message="Drag a book here from the pool." />
@@ -122,8 +125,6 @@ function TierEditorRow({
                     key={key}
                     book={book}
                     bookKeyStr={key}
-                    isDragOver={dragOverTileKey === key}
-                    dropProps={tileDropProps(key)}
                     menuItems={[
                       ...otherTiers.map((t) => ({ label: `Move to ${t.label || "Untitled tier"}`, onClick: () => onMoveBook(key, { type: "tier", tierId: t.id }) })),
                       { label: "Return to pool", onClick: () => onMoveBook(key, { type: "pool" }) }
@@ -134,7 +135,7 @@ function TierEditorRow({
             </TierRowTiles>
           )}
         </TierRowShell>
-      </div>
+      </DropZone>
     </div>
   );
 }
@@ -148,9 +149,24 @@ export function TierListEditorPage() {
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
-  const [dragOverTarget, setDragOverTarget] = useState<string | null>(null);
-  const [dragOverTileKey, setDragOverTileKey] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
+  // Same sensor pair, same constants, as LibraryPage.tsx's own drag-to-
+  // reorder: PointerSensor's 150ms/5px activation constraint means a touch
+  // press has to hold for a beat before a drag starts (so a tap still just
+  // taps — opens the ⋮ menu, follows a link, etc. — rather than every touch
+  // immediately kicking off a drag), while a mouse press starts dragging
+  // right away since `delay`/`tolerance` are pointer-type-agnostic in
+  // effect but a mouse rarely triggers them by accident the way a finger
+  // does. KeyboardSensor is what makes ranking reachable without a pointer
+  // at all. useSensors is a hook, so it has to sit above BOTH early
+  // returns below it, alongside the component's other hooks — calling it
+  // conditionally (e.g. only once `tierlist` is known to exist) would
+  // break React's rule that the same hooks run in the same order on every
+  // render.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { delay: 150, tolerance: 5 } }),
+    useSensor(KeyboardSensor)
+  );
 
   // Escape and the app-wide edge-swipe-back (components/EdgeSwipeBack.tsx)
   // exit editing first and only leave the page on a second gesture —
@@ -261,41 +277,27 @@ export function TierListEditorPage() {
     }
   }
 
-  function dropZoneProps(target: string): React.HTMLAttributes<HTMLDivElement> {
-    return {
-      onDragOver: (e) => {
-        e.preventDefault();
-        setDragOverTarget(target);
-      },
-      onDragLeave: () => setDragOverTarget((t) => (t === target ? null : t)),
-      onDrop: (e) => {
-        e.preventDefault();
-        setDragOverTarget(null);
-        const key = e.dataTransfer.getData("text/plain");
-        if (key) moveBook(key, target === "pool" ? { type: "pool" } : { type: "tier", tierId: target });
-      }
-    };
-  }
-
-  function tileDropProps(container: { type: "pool" } | { type: "tier"; tierId: string }, beforeKey: string): React.HTMLAttributes<HTMLDivElement> {
-    return {
-      onDragOver: (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setDragOverTileKey(beforeKey);
-      },
-      onDragLeave: () => setDragOverTileKey((k) => (k === beforeKey ? null : k)),
-      onDrop: (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setDragOverTileKey(null);
-        setDragOverTarget(null);
-        const key = e.dataTransfer.getData("text/plain");
-        if (key && key !== beforeKey) {
-          moveBook(key, container.type === "pool" ? { type: "pool", beforeKey } : { type: "tier", tierId: container.tierId, beforeKey });
-        }
-      }
-    };
+  // A plain function, not a hook — it closes over `data`/`locate`/
+  // `moveBook`, which only exist below this component's two early
+  // returns, so it has to live down here rather than next to `sensors`
+  // above them.
+  function handleDragEnd(e: DragEndEvent) {
+    if (!e.over) return;
+    const key = String(e.active.id);
+    const overId = String(e.over.id);
+    if (overId === key) return;
+    // Dropping onto another TILE swaps the two (beforeKey); dropping onto
+    // a row or the pool background appends. The swap is deliberate — see
+    // DraggableTierTile's comment; an earlier version re-inserted instead,
+    // which slid every book between the two spots over by one.
+    const overIsTile = data.pool.includes(overId) || data.tiers.some((t) => t.bookKeys.includes(overId));
+    if (overIsTile) {
+      const dest = locate(overId);
+      if (!dest) return;
+      moveBook(key, dest.type === "pool" ? { type: "pool", beforeKey: overId } : { type: "tier", tierId: dest.tierId, beforeKey: overId });
+      return;
+    }
+    moveBook(key, overId === "pool" ? { type: "pool" } : { type: "tier", tierId: overId });
   }
 
   function updateTier(tierId: string, patch: Partial<TierDefinition>) {
@@ -384,79 +386,72 @@ export function TierListEditorPage() {
           )}
         </div>
       ) : (
-        <div className="flex flex-col gap-2">
-          {data.tiers.length === 0 && <p className="text-sm text-(--color-text-dim)">No tiers yet — add one.</p>}
-          {data.tiers.map((tier, i) => (
-            <TierEditorRow
-              key={tier.id}
-              tier={tier}
-              books={books}
-              isDragOver={dragOverTarget === tier.id}
-              dropZoneProps={dropZoneProps(tier.id)}
-              dragOverTileKey={dragOverTileKey}
-              tileDropProps={(k) => tileDropProps({ type: "tier", tierId: tier.id }, k)}
-              otherTiers={data.tiers.filter((t) => t.id !== tier.id)}
-              onMoveBook={moveBook}
-              isFirst={i === 0}
-              isLast={i === data.tiers.length - 1}
-              onRename={(label) => updateTier(tier.id, { label })}
-              onRecolor={(color) => updateTier(tier.id, { color })}
-              onMoveUp={() => moveTier(i, -1)}
-              onMoveDown={() => moveTier(i, 1)}
-              onDelete={() => deleteTier(tier)}
-            />
-          ))}
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <div className="flex flex-col gap-2">
+            {data.tiers.length === 0 && <p className="text-sm text-(--color-text-dim)">No tiers yet — add one.</p>}
+            {data.tiers.map((tier, i) => (
+              <TierEditorRow
+                key={tier.id}
+                tier={tier}
+                books={books}
+                otherTiers={data.tiers.filter((t) => t.id !== tier.id)}
+                onMoveBook={moveBook}
+                isFirst={i === 0}
+                isLast={i === data.tiers.length - 1}
+                onRename={(label) => updateTier(tier.id, { label })}
+                onRecolor={(color) => updateTier(tier.id, { color })}
+                onMoveUp={() => moveTier(i, -1)}
+                onMoveDown={() => moveTier(i, 1)}
+                onDelete={() => deleteTier(tier)}
+              />
+            ))}
 
-          <button
-            onClick={addTier}
-            className="self-start rounded-lg border border-dashed border-(--color-border) px-3 py-1.5 text-sm text-(--color-text-dim) hover:border-(--color-accent) hover:text-(--color-accent)"
-          >
-            + Add tier
-          </button>
-
-          {(resolvedPool.length > 0 || searchOpen) && (
-            <div
-              {...dropZoneProps("pool")}
-              className={`flex shrink-0 flex-col gap-1.5 rounded-lg border border-dashed p-2 transition-colors ${
-                dragOverTarget === "pool" ? "border-(--color-accent) bg-(--color-accent-soft)" : "border-(--color-border)"
-              }`}
+            <button
+              onClick={addTier}
+              className="self-start rounded-lg border border-dashed border-(--color-border) px-3 py-1.5 text-sm text-(--color-text-dim) hover:border-(--color-accent) hover:text-(--color-accent)"
             >
-              <div className="text-xs font-semibold text-(--color-text-dim)">Pool — drag up into a tier</div>
-              <div className="flex min-h-[4em] flex-wrap items-start gap-1.5">
-                {resolvedPool.map((key) => (
-                  <DraggableTierTile
-                    key={key}
-                    book={byKey.get(key)!}
-                    bookKeyStr={key}
-                    isDragOver={dragOverTileKey === key}
-                    dropProps={tileDropProps({ type: "pool" }, key)}
-                    menuItems={data.tiers.map((t) => ({ label: `Move to ${t.label || "Untitled tier"}`, onClick: () => moveBook(key, { type: "tier", tierId: t.id }) }))}
-                  />
-                ))}
-              </div>
-              {searchOpen && (
-                <div>
-                  <BookSearchList
-                    books={books.filter((b) => {
-                      const key = bookKey(b);
-                      return !data.pool.includes(key) && !data.tiers.some((t) => t.bookKeys.includes(key));
-                    })}
-                    onSelect={(b) => addBookToPool(b)}
-                  />
-                  <button onClick={() => setSearchOpen(false)} className="mt-1 text-xs text-(--color-text-dim) hover:text-(--color-text)">
-                    Cancel
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {!searchOpen && (
-            <button onClick={() => setSearchOpen(true)} className="self-start text-xs font-medium text-(--color-accent) hover:opacity-80">
-              + Add books to pool
+              + Add tier
             </button>
-          )}
-        </div>
+
+            {(resolvedPool.length > 0 || searchOpen) && (
+              <DropZone id="pool">
+                <div className="flex flex-col gap-1.5 rounded-lg border border-dashed border-(--color-border) p-2">
+                  <div className="text-xs font-semibold text-(--color-text-dim)">Pool — drag up into a tier</div>
+                  <div className="flex min-h-[4em] flex-wrap items-start gap-1.5">
+                    {resolvedPool.map((key) => (
+                      <DraggableTierTile
+                        key={key}
+                        book={byKey.get(key)!}
+                        bookKeyStr={key}
+                        menuItems={data.tiers.map((t) => ({ label: `Move to ${t.label || "Untitled tier"}`, onClick: () => moveBook(key, { type: "tier", tierId: t.id }) }))}
+                      />
+                    ))}
+                  </div>
+                  {searchOpen && (
+                    <div>
+                      <BookSearchList
+                        books={books.filter((b) => {
+                          const key = bookKey(b);
+                          return !data.pool.includes(key) && !data.tiers.some((t) => t.bookKeys.includes(key));
+                        })}
+                        onSelect={(b) => addBookToPool(b)}
+                      />
+                      <button onClick={() => setSearchOpen(false)} className="mt-1 text-xs text-(--color-text-dim) hover:text-(--color-text)">
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </DropZone>
+            )}
+
+            {!searchOpen && (
+              <button onClick={() => setSearchOpen(true)} className="self-start text-xs font-medium text-(--color-accent) hover:opacity-80">
+                + Add books to pool
+              </button>
+            )}
+          </div>
+        </DndContext>
       )}
     </PageContainer>
   );
