@@ -280,7 +280,13 @@ export function MuralEditorPage() {
       {view.blocks.length === 0 && (
         <div className="rounded-xl border-2 border-dashed border-(--color-border) py-16 text-center">
           <p className="mb-1 text-(--color-text)">This mural is empty.</p>
-          <p className="mb-4 text-sm text-(--color-text-dim)">Turn on editing and add your first block.</p>
+          {/* Editing is already on in the second case, so telling you to
+              turn it on — and offering a button that turns it on — is
+              advice you've taken. Point at the control you actually
+              need instead. */}
+          <p className="mb-4 text-sm text-(--color-text-dim)">
+            {editMode ? "Add your first block with the + button above." : "Turn on editing and add your first block."}
+          </p>
           {!editMode && (
             <button onClick={() => setEditMode(true)} className="rounded-lg bg-(--color-accent) px-4 py-2 font-semibold text-white">
               Start building
