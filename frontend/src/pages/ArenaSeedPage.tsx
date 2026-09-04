@@ -203,50 +203,50 @@ export function ArenaSeedPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-8">
-      {editingName ? (
-        <input
-          autoFocus
-          value={nameDraft}
-          onChange={(e) => setNameDraft(e.target.value)}
-          onBlur={() => void handleRename()}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") void handleRename();
-            if (e.key === "Escape") setEditingName(false);
-          }}
-          placeholder="Name this tournament…"
-          aria-label="Tournament name"
-          className="mb-6 w-full max-w-md rounded-lg border border-(--color-border) bg-(--color-surface) px-2 py-1 text-lg font-bold"
-        />
-      ) : (
-        <button
-          onClick={() => {
-            setNameDraft(name);
-            setEditingName(true);
-          }}
-          title="Rename this tournament"
-          className="mb-6 block max-w-full truncate text-left text-lg font-bold transition-colors hover:text-(--color-accent)"
-        >
-          Seed &quot;{name}&quot;
-        </button>
-      )}
-      {actionError && <p className="mb-4 text-sm text-(--color-danger)">{actionError}</p>}
+      {/* Exactly two rows. The name, the bracket size and the "fixed
+          once created" caveat each had a line of their own, and the
+          caveat wrapped on a phone — three or four rows of chrome above
+          a grid that is the actual work. Row 1 pairs the name with the
+          size (both identity: what this is, how big), row 2 carries the
+          progress the grid never stated in words plus the caveat, cut to
+          a clause. */}
+      <div className="mb-1 flex items-center gap-2">
+        {editingName ? (
+          <input
+            autoFocus
+            value={nameDraft}
+            onChange={(e) => setNameDraft(e.target.value)}
+            onBlur={() => void handleRename()}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void handleRename();
+              if (e.key === "Escape") setEditingName(false);
+            }}
+            placeholder="Name this tournament…"
+            aria-label="Tournament name"
+            className="min-w-0 flex-1 rounded-lg border border-(--color-border) bg-(--color-surface) px-2 py-1 text-lg font-bold"
+          />
+        ) : (
+          <button
+            onClick={() => {
+              setNameDraft(name);
+              setEditingName(true);
+            }}
+            title="Rename this tournament"
+            className="min-w-0 flex-1 truncate text-left text-lg font-bold transition-colors hover:text-(--color-accent)"
+          >
+            Seed &quot;{name}&quot;
+          </button>
+        )}
 
-      {/* Only while this is still a draft. Bracket size is fixed at
-          creation — it lays out the slots and duels, and there is no
-          endpoint to change it afterwards — so the one moment it can be
-          chosen is before anything exists. Previously "New tournament"
-          created a 16-book bracket outright and anyone who wanted 32 had
-          to delete it and start again. */}
-      {isDraft && (
-        <div className="mb-4 flex items-center gap-2">
-          <label htmlFor="bracket-size" className="text-sm text-(--color-text-dim)">
-            Bracket size
-          </label>
+        {/* Draft only. Bracket size lays out the slots and duels and
+            there is no endpoint to change it afterwards, so the one
+            moment it can be chosen is before the tournament exists. */}
+        {isDraft && (
           <select
-            id="bracket-size"
             value={draftBracketSize}
             onChange={(e) => setDraftBracketSize(Number(e.target.value))}
-            className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-2.5 text-sm"
+            aria-label="Bracket size"
+            className="min-h-11 shrink-0 rounded-lg border border-(--color-border) bg-(--color-surface) px-2 text-sm"
           >
             {BRACKET_SIZES.map((size) => (
               <option key={size} value={size}>
@@ -254,9 +254,15 @@ export function ArenaSeedPage() {
               </option>
             ))}
           </select>
-          <span className="text-xs text-(--color-text-dim)">Fixed once the tournament is created.</span>
-        </div>
-      )}
+        )}
+      </div>
+
+      <p className="mb-4 text-xs text-(--color-text-dim)">
+        {filledCount} of {bracketSize} seeded
+        {isDraft && " · size is fixed once you start"}
+      </p>
+
+      {actionError && <p className="mb-4 text-sm text-(--color-danger)">{actionError}</p>}
 
       <SeedSlotGrid
         bracketSize={bracketSize}
