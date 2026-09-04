@@ -48,7 +48,7 @@ test("createTierlist stores a tier list and getTierlist round-trips it", () => {
   const service = makeService();
   const created = service.createTierlist("u1", "Favorites");
   assert.equal(created.name, "Favorites");
-  assert.deepEqual(created.data, {});
+  assert.deepEqual(created.data, { tiers: [], pool: [] });
   const fetched = service.getTierlist("u1", created.id);
   assert.deepEqual(fetched, created);
 });
@@ -69,7 +69,7 @@ test("updateTierlist renames without touching data", () => {
   const t = service.createTierlist("u1", "Old");
   const updated = service.updateTierlist("u1", t.id, { name: "New" });
   assert.equal(updated?.name, "New");
-  assert.deepEqual(updated?.data, {});
+  assert.deepEqual(updated?.data, { tiers: [], pool: [] });
 });
 
 test("updateTierlist replaces data without touching name", () => {
@@ -99,6 +99,21 @@ test("a deleted tier list is no longer returned by getTierlist", () => {
   const t = service.createTierlist("u1", "Doomed");
   assert.equal(service.deleteTierlist("u1", t.id), true);
   assert.equal(service.getTierlist("u1", t.id), undefined);
+});
+
+test("a tier list stored before the tiers/pool shape existed normalizes to empty arrays", () => {
+  const repo = createInMemoryRepo();
+  const legacy: TierlistRow = {
+    id: "00000000-0000-4000-8000-000000000001",
+    owner_user_id: "u1",
+    name: "Legacy",
+    data: "{}",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  } as TierlistRow;
+  repo.insert(legacy);
+  const service = createTierlistsService(repo);
+  assert.deepEqual(service.getTierlist("u1", legacy.id)?.data, { tiers: [], pool: [] });
 });
 
 test("createTierlistsPublicApi resolves the raw document and defaults missing arrays", () => {
