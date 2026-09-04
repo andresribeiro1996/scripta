@@ -68,11 +68,17 @@ export function EdgeSwipeBack() {
       else if (session) navigate("/dashboard");
     }
 
+    function handleTouchCancel() {
+      armed = false;
+    }
+
     window.addEventListener("touchstart", handleTouchStart);
     window.addEventListener("touchend", handleTouchEnd);
+    window.addEventListener("touchcancel", handleTouchCancel);
     return () => {
       window.removeEventListener("touchstart", handleTouchStart);
       window.removeEventListener("touchend", handleTouchEnd);
+      window.removeEventListener("touchcancel", handleTouchCancel);
     };
   }, [navigate, session]);
 
