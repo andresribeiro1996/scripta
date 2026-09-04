@@ -174,15 +174,20 @@ edge-swipe close it).
 - Receives the library's books already filtered to exclude anything
   currently in the pool or on a tier — the same exclusion the page
   computes today.
-- Renders `BookSearchList` with its existing optional `isSelected`
-  predicate driving a checkmark; selection is a `Set<string>` of book
-  keys held by the sheet.
+- Renders its own cover grid — a `MiniBookTile` per book with a
+  selected-state ring and checkmark — not `BookSearchList`.
+  `BookSearchList` is a text list of `Title — Author` rows, and a tier
+  list is an entirely cover-driven UI where recognising a book by its
+  cover is the whole point. `pickers.tsx`'s own comment sets the
+  precedent: when the surrounding chrome differs, a small separate copy
+  beats threading extra props through a shared picker. The search filter
+  is the same three-line title/author match `BookSearchList` uses.
+- Selection is a `Set<string>` of book keys held by the sheet.
 - Footer button reads `Add N books`, disabled at zero, and commits every
   selected key to the pool in one `saveData` call.
 - Cancelling discards the selection and adds nothing.
 
-`BookSearchList` itself needs no change beyond being passed
-`isSelected`; it already accepts that prop.
+`BookSearchList` is left untouched by this work.
 
 ### 6. Tier control polish
 
