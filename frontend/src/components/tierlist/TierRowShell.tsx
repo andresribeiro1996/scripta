@@ -15,6 +15,19 @@ import type { TierDefinition } from "../../api/tierlists";
  *  mean a pile of optional render props. `children` is the tile area;
  *  `colorControl` is an optional node the editor drops into the chip.
  *
+ *  The label chip itself needs its OWN `overflow-hidden` (not just the row's) —
+ *  a label is free-typed text, so a long single "word" with no spaces to
+ *  wrap on (no whitespace for the browser's normal line-breaking) would
+ *  otherwise render past the edge of its fixed `w-[3em]` box and visibly
+ *  bleed into the tiles next to it, since a flex child's own overflow is
+ *  visible by default regardless of its parent's. `break-words` (so it
+ *  wraps mid-word once nothing else will fit) plus `line-clamp-3` (so a
+ *  genuinely long label clips with an ellipsis rather than pushing the
+ *  row's height around on its own) keep it fully contained either way.
+ *  `items-stretch` on the row then stretches this label to match the tiles'
+ *  height, so it stays full-height regardless of how many lines the tiles
+ *  wrap onto.
+ *
  *  Lives here rather than in BookBlocks.tsx to keep the dependency graph
  *  one-directional: BookBlocks.tsx owns MiniBookTile, so a shared file
  *  that imported from it while it imported the row back would be a
