@@ -539,7 +539,7 @@ export const CARD_OVERLAY_COMPACT_WIDTH = 132;
  *  user deliberately narrowed — and people narrow that precisely BECAUSE
  *  they want large cards in a narrow column, so overriding it would swap
  *  one wrong-card-size bug for another. */
-export const PHONE_COLUMNS_AT_DEFAULT_SIZE = 5;
+export const PHONE_COLUMNS_AT_DEFAULT_SIZE = 3;
 
 /** The width below which PHONE_COLUMNS_AT_DEFAULT_SIZE applies —
  *  Tailwind's `sm` breakpoint, the same line the page header and toolbar

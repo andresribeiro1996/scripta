@@ -265,10 +265,10 @@ input[type="range"]:focus-visible::-moz-range-thumb {
    resolved it to a SINGLE full-bleed card per row: one cover filled the
    viewport and the library became unbrowsable.
 
-   So the floor is SCALED, not capped. `(100% - 4 * gap) / 5` is the width
-   of one card in a five-column row; multiplying by `--card-scale` (the
+   So the floor is SCALED, not capped. `(100% - 2 * gap) / 3` is the width
+   of one card in a three-column row; multiplying by `--card-scale` (the
    user's setting over the default, computed unitless in BookGrid.tsx)
-   makes the default land on exactly five columns while every other
+   makes the default land on exactly three columns while every other
    setting stays proportional. `--card-floor-min` is
    CARD_MIN_WIDTH_RANGE.min, so the smallest settings converge instead of
    scaling down to a few unusable pixels.
@@ -283,9 +283,9 @@ input[type="range"]:focus-visible::-moz-range-thumb {
    pinned near 53px whatever the slider said, so the card-size setting
    was inert on phones and a card could never reach a width where its
    own title was legible. Scaling keeps the slider meaningful — on a
-   360px phone the range runs from six ~41px columns up to three ~99px
-   columns, and that last one is wide enough for the compact title tier
-   below to render.
+   360px phone the default lands on three ~110px columns, wide enough
+   for the compact title tier below to render, and the slider still
+   moves the whole row's size proportionally.
 
    Scoped to phones on purpose. Applied unconditionally it would also
    fire on a tablet and on a desktop whose `contentMaxWidth` the user
@@ -296,7 +296,7 @@ input[type="range"]:focus-visible::-moz-range-thumb {
   .book-grid {
     grid-template-columns: repeat(
       auto-fill,
-      minmax(max(var(--card-floor-min), calc((100% - 4 * var(--card-gap)) / 5 * var(--card-scale))), 1fr)
+      minmax(max(var(--card-floor-min), calc((100% - 2 * var(--card-gap)) / 3 * var(--card-scale))), 1fr)
     );
   }
 }
