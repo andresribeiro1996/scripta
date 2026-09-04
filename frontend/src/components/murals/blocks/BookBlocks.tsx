@@ -3,6 +3,7 @@ import type { ResolvedTierlist } from "../../../api/tierlists";
 import { bookKey } from "../../../lib/merge";
 import { resolveShelfBooks, type MuralBlock, type TierDefinition } from "../../../lib/murals";
 import { OptionsMenu, type OptionsMenuItem } from "../../OptionsMenu";
+import { TierRowEmpty, TierRowShell, TierRowTiles } from "../../tierlist/TierRowShell";
 
 /** A small, read-only cover tile — reuses BookCard's own CoverImage (same
  *  Kobo/Open Library/gallery-assigned resolution chain) but with none of
@@ -183,7 +184,65 @@ export function CurrentlyReadingBlockView({ books }: { books: Array<Record<strin
  *  whole tile. View-only by design: this is the mural block's pure
  *  renderer — all ranking/editing lives in TierListEditorPage, whose own
  *  draggable tiles (DraggableTierTile below) are shared from this file. */
-function TierRow({ tier, books }: { tier: TierDefinition; books: Array<Record<string, unknown>> }) {
+/** One rung of the tier list — a fixed-width colored label on the left
+ *  (the tier's own color, white bold text; no auto-contrast calculation,
+ *  same deliberate choice TierListEditorPage's own tier rows make) and
+ *  its books on the right, WRAPPING onto additional lines rather than
+ *  scrolling — deliberately the opposite of ShelfBlockView's horizontal
+ *  scroll. A shelf is a hand-curated, ordered sequence where order and
+ *  "which ones are visible first" matter, so scrolling (never reflowing
+ *  the row's own height) is right for it; a tier is closer to a bucket
+ *  you keep piling books into, where the whole point is seeing every
+ *  book on that rung at a glance, not scrubbing through it — so a rung
+ *  with more books than fit on one line simply grows taller
+ *  (`flex-wrap`) instead of hiding the overflow behind a scrollbar.
+ *  Each cover tile gets a fixed height (`h-[6em]`, not `h-full`)
+ *  specifically so this works: an intrinsic height lets the row's own
+ *  height be DERIVED from how many lines its tiles wrap onto, whereas
+ *  `h-full` would need a height from its parent that doesn't exist yet —
+ *  a circular dependency the old fixed-height/scroll design never had to
+ *  resolve. `items-stretch` on the row then stretches the color label to
+ *  match, so it stays full-height regardless of how many lines a rung's
+ *  covers wrap onto. Rendered even when empty — a tier list's whole point
+ *  is showing every configured rung, blank ones included, not hiding the
+ *  ones nobody's filled in yet.
+ *
+ *  The label itself needs its OWN `overflow-hidden` (not just the row's) —
+ *  a label is free-typed text, so a long single "word" with no spaces to
+ *  wrap on (no whitespace for the browser's normal line-breaking) would
+ *  otherwise render past the edge of its fixed `w-12` box and visibly
+ *  bleed into the books next to it, since a flex child's own overflow is
+ *  visible by default regardless of its parent's. `break-words` (so it
+ *  wraps mid-word once nothing else will fit) plus `line-clamp-3` (so a
+ *  genuinely long label clips with an ellipsis rather than pushing the
+ *  row's height around on its own) keep it fully contained either way.
+ *
+ *  Every cover tile is a fixed pixel box, not `aspect-[2/3]` computed
+ *  from height alone — plus its OWN `overflow-hidden`, for the same
+ *  reason the label needs one: this is `flex-wrap`, so a tile's own
+ *  intrinsic box directly determines the grid every book lines up against.
+ *  `MiniBookTile`'s title/author use `truncate` (`white-space: nowrap`),
+ *  and a flex item's "automatic minimum size" is its CONTENT's min-content
+ *  width unless that item's own `overflow` is non-`visible` — so without
+ *  `overflow-hidden` right here, a book with a long title/author (whose
+ *  nowrap text can't shrink) silently forced its OWN tile wider than every
+ *  other book's. Reported live as "some books have a bigger width in a
+ *  tier list" — same bug existed in Shelf/Currently-reading's tiles too
+ *  (`aspect-[2/3] h-full`), just harder to notice there since a
+ *  horizontally-scrolling row has no neighboring line for a too-wide tile
+ *  to visibly misalign against; both got the identical `overflow-hidden`
+ *  fix for consistency, even though only the tier list version was ever
+ *  actually reported as visibly wrong.
+ *
+ *  Title AND author both omitted (`showTitle={false} showAuthor={false}`)
+ *  — at a tier tile's small footprint, a text footer (of either one line
+ *  or two) was mostly just a truncated fragment eating into the cover
+ *  art's own room, not adding legible information; dropping both lets
+ *  `MiniBookTile` skip the footer strip entirely, so the cover fills the
+ *  whole tile. View-only by design: this is the mural block's pure
+ *  renderer — all ranking/editing lives in TierListEditorPage, whose own
+ *  draggable tiles (DraggableTierTile below) are shared from this file. */
+export function TierRow({ tier, books }: { tier: TierDefinition; books: Array<Record<string, unknown>> }) {
   const byKey = new Map(books.map((b) => [bookKey(b), b] as const));
   // Walking `tier.bookKeys` directly (not filtering to resolved books
   // first) so each tile still knows its own real bookKey string — a
@@ -192,25 +251,19 @@ function TierRow({ tier, books }: { tier: TierDefinition; books: Array<Record<st
   // a shelf.
   const resolvedKeys = tier.bookKeys.filter((k) => byKey.has(k));
   return (
-    <div className="flex shrink-0 items-stretch gap-2 overflow-hidden rounded-lg border border-(--color-border)">
-      <div
-        className="flex w-[3em] shrink-0 items-center justify-center overflow-hidden p-1 text-center text-[0.9em] leading-tight font-bold break-words text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.35)]"
-        style={{ backgroundColor: tier.color }}
-      >
-        <span className="line-clamp-3">{tier.label || "—"}</span>
-      </div>
+    <TierRowShell tier={tier}>
       {resolvedKeys.length === 0 ? (
-        <div className="flex min-h-[4em] flex-1 items-center px-2 text-[0.75em] text-(--color-text-dim)">No books on this tier.</div>
+        <TierRowEmpty message="No books on this tier." />
       ) : (
-        <div className="flex flex-1 flex-wrap content-start gap-1.5 p-1.5">
+        <TierRowTiles>
           {resolvedKeys.map((key) => (
             <div key={key} className="h-[6em] w-[4em] shrink-0 overflow-hidden">
               <MiniBookTile book={byKey.get(key)!} showTitle={false} showAuthor={false} />
             </div>
           ))}
-        </div>
+        </TierRowTiles>
       )}
-    </div>
+    </TierRowShell>
   );
 }
 
