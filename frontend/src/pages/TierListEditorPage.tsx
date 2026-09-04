@@ -3,7 +3,9 @@ import { Link, useOutletContext, useParams } from "react-router-dom";
 import type { TierDefinition, TierlistData } from "../api/tierlists";
 import { DraggableTierTile, TierRow } from "../components/murals/blocks/BookBlocks";
 import { BookSearchList } from "../components/murals/pickers";
+import { OptionsMenu } from "../components/OptionsMenu";
 import { PageContainer } from "../components/PageContainer";
+import { ChevronDownIcon, ChevronUpIcon, toolbarIconClass } from "../components/Toolbar";
 import { useDismissible } from "../hooks/useDismissible";
 import { useLibrary } from "../hooks/useLibrary";
 import { useTierlists } from "../hooks/useTierlists";
@@ -49,7 +51,7 @@ function TierEditorRow({
   const resolvedKeys = tier.bookKeys.filter((k) => byKey.has(k));
   return (
     <div className="flex flex-col gap-1">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5">
         <input
           defaultValue={tier.label}
           onBlur={(e) => {
@@ -65,27 +67,36 @@ function TierEditorRow({
           }}
           placeholder="Label"
           aria-label="Tier label"
-          className="min-w-0 flex-1 rounded-lg border border-(--color-border) bg-transparent px-2 py-1 text-sm font-semibold"
+          className="min-h-9 min-w-0 flex-1 rounded-lg border border-(--color-border) bg-(--color-surface) px-2.5 text-sm font-semibold"
         />
+        {/* Up/down stay as direct buttons — reordering tiers is the
+            frequent action. Delete goes behind the ⋮ menu: rare, and
+            destructive enough that a mis-tap on a 44px target next to
+            two other 44px targets is a real risk. Same consolidation
+            OptionsMenu already does for mural blocks and list cards. */}
         <button
           disabled={isFirst}
           onClick={onMoveUp}
-          className="shrink-0 text-(--color-text-dim) hover:text-(--color-text) disabled:opacity-30"
+          aria-label="Move tier up"
           title="Move tier up"
+          className={`${toolbarIconClass()} disabled:opacity-30`}
         >
-          ▲
+          <ChevronUpIcon />
         </button>
         <button
           disabled={isLast}
           onClick={onMoveDown}
-          className="shrink-0 text-(--color-text-dim) hover:text-(--color-text) disabled:opacity-30"
+          aria-label="Move tier down"
           title="Move tier down"
+          className={`${toolbarIconClass()} disabled:opacity-30`}
         >
-          ▼
+          <ChevronDownIcon />
         </button>
-        <button onClick={onDelete} className="shrink-0 text-(--color-danger) transition-opacity hover:opacity-80" title="Delete tier">
-          Delete
-        </button>
+        <OptionsMenu
+          title="Tier settings"
+          triggerClassName={toolbarIconClass()}
+          items={[{ label: "Delete tier", onClick: onDelete, danger: true }]}
+        />
       </div>
       <div
         {...dropZoneProps}
