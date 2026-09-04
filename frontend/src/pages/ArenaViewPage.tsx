@@ -6,7 +6,7 @@
 
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { resolveTiebreak, settleDuelEarly } from "../api/arena";
+import { renameTournament, resolveTiebreak, settleDuelEarly } from "../api/arena";
 import { useAuth } from "../auth/AuthContext";
 import { BracketMap } from "../components/arena/BracketMap";
 import { TournamentStatusBadge } from "../components/arena/TournamentStatusBadge";
@@ -22,6 +22,8 @@ export function ArenaViewPage() {
   const [ownerActionError, setOwnerActionError] = useState<string | null>(null);
   const [busyDuelId, setBusyDuelId] = useState<string | null>(null);
   const [view, setView] = useState<"matches" | "bracket">("matches");
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
 
   if (isLoading) {
     return (
@@ -46,6 +48,26 @@ export function ArenaViewPage() {
       await vote(duelId, bookKey);
     } catch (err) {
       setVoteError(err instanceof Error ? err.message : "Couldn't record that vote.");
+    }
+  }
+
+  // The seed page can name a tournament, but it stops being reachable
+  // the moment one starts — so without this an active or finished
+  // tournament would be stuck with whatever it was called forever.
+  // Same gesture as the seed page's: tap the name, type, blur or Enter.
+  // No icon: an owner-only control that only appears on hover or focus
+  // would be invisible on a phone, and one that is always visible costs
+  // every viewer a button only the owner can use.
+  async function handleRename() {
+    const name = nameDraft.trim();
+    setEditingName(false);
+    if (!name || name === tournament!.name) return;
+    setOwnerActionError(null);
+    try {
+      await renameTournament(tournament!.id, name);
+      await refetch();
+    } catch (err) {
+      setOwnerActionError(err instanceof Error ? err.message : "Couldn't save that name.");
     }
   }
 
@@ -85,7 +107,39 @@ export function ArenaViewPage() {
       <Link to="/arena" className="mb-2 inline-block text-xs text-(--color-text-dim) hover:text-(--color-text)">
         ← All tournaments
       </Link>
-      <h2 className="mb-1 text-lg font-bold">{tournament.name}</h2>
+      {/* The heading stays a heading for everyone; for the owner it is
+          also the rename control. */}
+      {isOwner && editingName ? (
+        <input
+          autoFocus
+          value={nameDraft}
+          onChange={(e) => setNameDraft(e.target.value)}
+          onBlur={() => void handleRename()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void handleRename();
+            if (e.key === "Escape") setEditingName(false);
+          }}
+          aria-label="Tournament name"
+          className="mb-1 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-2 py-1 text-lg font-bold"
+        />
+      ) : (
+        <h2 className="mb-1 text-lg font-bold">
+          {isOwner ? (
+            <button
+              onClick={() => {
+                setNameDraft(tournament.name);
+                setEditingName(true);
+              }}
+              title="Rename this tournament"
+              className="block w-full truncate text-left font-bold transition-colors hover:text-(--color-accent)"
+            >
+              {tournament.name}
+            </button>
+          ) : (
+            tournament.name
+          )}
+        </h2>
+      )}
       <p className="mb-4 flex flex-wrap items-center gap-1.5 text-sm text-(--color-text-dim)">
         {tournament.bracketSize}-book bracket
         <TournamentStatusBadge status={tournament.status} round={tournament.currentRound} />
