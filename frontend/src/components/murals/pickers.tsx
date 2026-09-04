@@ -141,7 +141,7 @@ export function GalleryImageGrid({
               void handleDelete(image.id);
             }}
             title="Delete from gallery"
-            className="absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-[rgba(10,8,6,0.72)] text-xs font-bold text-white opacity-0 backdrop-blur-xs transition-opacity group-hover:opacity-100"
+            className="absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-[rgba(10,8,6,0.72)] text-xs font-bold text-white opacity-0 backdrop-blur-xs transition-opacity group-hover:opacity-100 pointer-coarse:h-9 pointer-coarse:w-9 pointer-coarse:opacity-100"
           >
             {deletingId === image.id ? "…" : <CloseIcon size={13} />}
           </button>

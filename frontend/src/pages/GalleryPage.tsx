@@ -172,7 +172,7 @@ export function GalleryPage() {
                   onClick={() => void handleDelete(image.id)}
                   disabled={deletingId === image.id}
                   title="Delete from gallery"
-                  className="absolute top-2 right-2 flex h-7 w-7 items-center justify-center rounded-full bg-[rgba(10,8,6,0.72)] text-sm font-bold text-white opacity-0 backdrop-blur-xs transition-opacity group-hover:opacity-100 disabled:opacity-100"
+                  className="absolute top-2 right-2 flex h-7 w-7 items-center justify-center rounded-full bg-[rgba(10,8,6,0.72)] text-sm font-bold text-white opacity-0 backdrop-blur-xs transition-opacity group-hover:opacity-100 disabled:opacity-100 pointer-coarse:h-9 pointer-coarse:w-9 pointer-coarse:opacity-100"
                 >
                   {deletingId === image.id ? "…" : <CloseIcon size={13} />}
                 </button>
