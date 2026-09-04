@@ -167,7 +167,7 @@ export function DashboardLayout() {
       )}
 
       {drawerOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40 lg:hidden" onClick={() => setDrawerOpen(false)}>
+        <div className="drawer-in fixed inset-0 z-50 bg-black/40 lg:hidden" onClick={() => setDrawerOpen(false)}>
           <aside
             className="flex h-full w-72 max-w-[85%] flex-col overflow-y-auto overscroll-contain border-r border-(--color-border) bg-(--color-surface) px-3 py-5 pb-[env(safe-area-inset-bottom,0px)]"
             onClick={(e) => e.stopPropagation()}

@@ -17,7 +17,7 @@ export function MoveToFolderModal({
 }) {
   useScrollLock();
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    <div className="overlay-in fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
         className="w-full max-w-sm rounded-xl border border-(--color-border) bg-(--color-surface) shadow-lg"
         onClick={(e) => e.stopPropagation()}

@@ -75,7 +75,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
         // Same fixed-overlay modal shell as CoverPickerModal.tsx / the
         // mural pickers — bg-black/40 backdrop, click-outside-to-close
         // (here: cancel) via the inner panel's stopPropagation.
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => settle(false)}>
+        <div className="overlay-in fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => settle(false)}>
           <div
             className="w-full max-w-sm rounded-xl border border-(--color-border) bg-(--color-surface) p-5 shadow-lg"
             onClick={(e) => e.stopPropagation()}

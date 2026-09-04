@@ -34,7 +34,7 @@ export function BookDetailSheet({
     "rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2.5 text-sm font-medium hover:bg-(--color-surface-hover)";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-4" onClick={onClose}>
+    <div className="overlay-in fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-4" onClick={onClose}>
       <div
         className="max-h-[88vh] w-full overflow-y-auto overscroll-contain rounded-t-2xl border border-(--color-border) bg-(--color-surface) shadow-lg sm:max-w-3xl sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}

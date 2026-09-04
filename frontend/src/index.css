@@ -359,3 +359,102 @@ input[type="range"]:focus-visible::-moz-range-thumb {
 .mural-grip {
   touch-action: none;
 }
+
+/* Motion. Sheets, dialogs, menus and toasts all appeared instantly —
+   correct, and the single clearest way an interface reads as a document
+   rather than an app: things that arrive without arriving. These are
+   short enough to feel like response rather than animation (140-200ms,
+   an ease-out that decelerates into place).
+
+   Scoped under `no-preference` rather than switched off under `reduce`,
+   so the declaration simply never exists for anyone who asked for less
+   motion — no rule left applied with its animation disabled.
+
+   Every keyframe block below spells out an explicit `to`. Omitting it
+   and relying on the implicit one is what the shorthand seems to invite,
+   and it does not work with `fill-mode: both`: the animation runs,
+   reports `finished`, and the element stays pinned at the FROM values
+   forever. Measured, not guessed — it left every dialog in the app at
+   opacity 0. */
+@media (prefers-reduced-motion: no-preference) {
+  /* One class on the backdrop covers both halves: the scrim fades and
+     its panel child rises. Saves adding a second class to ten separate
+     dialogs, all of which are a full-screen backdrop wrapping exactly
+     one panel. */
+  .overlay-in {
+    animation: scripta-fade 140ms ease-out both;
+  }
+  .overlay-in > * {
+    animation: scripta-rise 200ms cubic-bezier(0.32, 0.72, 0, 1) both;
+  }
+  /* The nav drawer comes in from the left edge it is anchored to, so it
+     slides sideways rather than rising. */
+  .drawer-in {
+    animation: scripta-fade 140ms ease-out both;
+  }
+  .drawer-in > * {
+    animation: scripta-slide-left 200ms cubic-bezier(0.32, 0.72, 0, 1) both;
+  }
+  .toast-in {
+    animation: scripta-toast 180ms cubic-bezier(0.32, 0.72, 0, 1) both;
+  }
+  .menu-in {
+    animation: scripta-menu 130ms ease-out both;
+  }
+}
+
+@keyframes scripta-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Rises from below on a phone, where a sheet is anchored to the bottom
+   edge and the motion says where it came from. 10px, not 100%: a full
+   slide-up is a lot of travel to sit through on every filter tap. */
+@keyframes scripta-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes scripta-toast {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes scripta-menu {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes scripta-slide-left {
+  from {
+    opacity: 0;
+    transform: translateX(-14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

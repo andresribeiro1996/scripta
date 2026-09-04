@@ -32,7 +32,7 @@ export function Sheet({ title, children, onClose }: { title: string; children: R
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-4" onClick={onClose}>
+    <div className="overlay-in fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-4" onClick={onClose}>
       <div
         // The bottom padding carries the safe-area inset: a sheet's rows
         // run to the very bottom edge (unlike BookDetailSheet's
