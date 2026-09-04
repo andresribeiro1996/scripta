@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ApiError, postToSocial, type SocialProvider } from "../api/socials";
+import { useDismissible } from "../hooks/useDismissible";
 import { useSocials } from "../hooks/useSocials";
 import { useConfirm } from "./ConfirmDialog";
 import { SocialIcon } from "./icons/SocialIcons";
@@ -73,13 +74,7 @@ export function ShareModal({
     };
   }, []);
 
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  useDismissible(onClose);
 
   async function handleShare() {
     setShareError(null);
