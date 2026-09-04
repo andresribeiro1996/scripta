@@ -228,13 +228,13 @@ function TierRow({
       }`}
     >
       <div
-        className="flex w-12 shrink-0 items-center justify-center overflow-hidden p-1 text-center text-[0.9em] leading-tight font-bold break-words text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.35)]"
+        className="flex w-[3em] shrink-0 items-center justify-center overflow-hidden p-1 text-center text-[0.9em] leading-tight font-bold break-words text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.35)]"
         style={{ backgroundColor: tier.color }}
       >
         <span className="line-clamp-3">{tier.label || "—"}</span>
       </div>
       {resolvedKeys.length === 0 ? (
-        <div className="flex min-h-16 flex-1 items-center px-2 text-[0.75em] text-(--color-text-dim)">
+        <div className="flex min-h-[4em] flex-1 items-center px-2 text-[0.75em] text-(--color-text-dim)">
           {editMode ? "Drag a book here from the pool." : "No books on this tier."}
         </div>
       ) : (
@@ -243,7 +243,7 @@ function TierRow({
             const book = byKey.get(key)!;
             if (!editMode) {
               return (
-                <div key={key} className="h-24 w-16 shrink-0 overflow-hidden">
+                <div key={key} className="h-[6em] w-[4em] shrink-0 overflow-hidden">
                   <MiniBookTile book={book} showTitle={false} showAuthor={false} />
                 </div>
               );
@@ -314,7 +314,7 @@ function DraggableTierTile({
       }}
       {...dropProps}
       title="Drag to a tier, or use the ⋮ menu"
-      className={`group/tile relative h-24 w-16 shrink-0 cursor-grab overflow-hidden rounded-lg active:cursor-grabbing ${
+      className={`group/tile relative h-[6em] w-[4em] shrink-0 cursor-grab overflow-hidden rounded-lg active:cursor-grabbing ${
         isDragOver ? "ring-2 ring-(--color-accent)" : ""
       }`}
     >
@@ -573,7 +573,7 @@ export function TierListBlockView({
               }`}
             >
               <div className="text-[0.7em] font-semibold text-(--color-text-dim)">Pool — drag up into a tier</div>
-              <div className="flex min-h-16 flex-wrap items-start gap-1.5">
+              <div className="flex min-h-[4em] flex-wrap items-start gap-1.5">
                 {resolvedPool.map((key) => (
                   <DraggableTierTile
                     key={key}

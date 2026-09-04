@@ -76,7 +76,7 @@ export function MuralCanvas({
   const [touchMode] = useState(
     () => typeof window !== "undefined" && Boolean(window.matchMedia?.("(pointer: coarse)").matches)
   );
-  const [zoom, setZoom] = useState(() => (typeof window !== "undefined" && window.innerWidth < 700 ? 1.5 : 1));
+  const [zoom, setZoom] = useState(() => (typeof window !== "undefined" && window.innerWidth < 700 ? 2 : 1));
   const viewportRef = useRef<HTMLDivElement>(null);
   const [viewportWidth, setViewportWidth] = useState(0);
   const lastTapRef = useRef(0);
@@ -94,6 +94,7 @@ export function MuralCanvas({
   }, [touchMode]);
 
   const canvasWidth = Math.round(viewportWidth * zoom);
+  const scale = canvasWidth / 1200;
 
   function setZoomBy(delta: number) {
     setZoom((z) => Math.min(3, Math.max(0.5, Math.round((z + delta) * 100) / 100)));
@@ -127,7 +128,7 @@ export function MuralCanvas({
   const gridProps = {
     layout,
     cols: GRID_COLUMNS,
-    rowHeight: ROW_HEIGHT,
+    rowHeight: touchMode ? Math.max(1, Math.round(ROW_HEIGHT * scale)) : ROW_HEIGHT,
     isDraggable: editMode,
     isResizable: editMode,
     compactType: null,
@@ -190,7 +191,7 @@ export function MuralCanvas({
           // same "always monospace no matter the surrounding font"
           // rule markdown's inline `code` mark follows.
           fontFamily: style.codeStyle ? blockFontFamilyCss("jetbrainsMono") : blockFontFamilyCss(style.fontFamily),
-          fontSize: `${style.fontSize}px`,
+          fontSize: `${touchMode ? Math.round(style.fontSize * scale) : style.fontSize}px`,
           fontWeight: style.bold ? 700 : undefined,
           fontStyle: style.italic ? "italic" : undefined,
           color: style.textColor ?? undefined
