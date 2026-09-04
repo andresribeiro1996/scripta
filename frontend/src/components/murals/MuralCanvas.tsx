@@ -244,7 +244,7 @@ export function MuralCanvas({
   if (touchMode) {
     return (
       <div className="relative">
-        <div ref={viewportRef} className="mural-touch overflow-x-auto">
+        <div ref={viewportRef} className="mural-touch max-h-[calc(100dvh-8.5rem)] overflow-auto">
           {viewportWidth > 0 && (
             <div style={{ width: canvasWidth }}>
               <GridLayout {...gridProps} width={canvasWidth}>

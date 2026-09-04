@@ -1,5 +1,5 @@
-import { useRef, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, useNavigate, useOutletContext, useParams, useSearchParams } from "react-router-dom";
 import { AddBlockMenu } from "../components/murals/AddBlockMenu";
 import { BlockConfigPanel } from "../components/murals/BlockConfigPanel";
 import { BlockStylePanel } from "../components/murals/BlockStylePanel";
@@ -70,6 +70,15 @@ export function MuralEditorPage() {
   }
 
   const [editMode, setEditMode] = useState(false);
+  // While editing, the canvas IS the page — tell the layout to drop the
+  // phone bottom nav (DashboardLayout's navHidden). Restored on leaving
+  // edit mode and on unmount, so a mid-edit navigation can't strand the
+  // app without a nav.
+  const { setNavHidden } = useOutletContext<{ setNavHidden: (hidden: boolean) => void }>();
+  useEffect(() => {
+    setNavHidden(editMode);
+    return () => setNavHidden(false);
+  }, [editMode, setNavHidden]);
   const [configuringBlockId, setConfiguringBlockId] = useState<string | null>(null);
   const [stylingBlockId, setStylingBlockId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState(false);

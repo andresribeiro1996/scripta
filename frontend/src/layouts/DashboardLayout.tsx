@@ -46,6 +46,11 @@ const TAB_ITEMS = NAV_GROUPS[0].items;
 export function DashboardLayout() {
   const { session, logout } = useAuth();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // Set by the mural editor while it's in edit mode: the canvas is the
+  // whole activity then, and the fixed bottom nav both covers it and
+  // spends 3.5rem of a phone's height. View mode keeps the nav — a
+  // mural being looked at is still just another page.
+  const [navHidden, setNavHidden] = useState(false);
   // Always-mounted layout — lock only while the nav drawer is open, or
   // the app would never scroll at all.
   useScrollLock(drawerOpen);
@@ -104,34 +109,36 @@ export function DashboardLayout() {
           `--color-text` title on an arbitrary color. That background now
           belongs to LibraryCanvas, which wraps only the book grid; see
           its comment for the whole boundary. */}
-      <main className="min-w-0 flex-1 pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))] lg:pb-0">
+      <main className={`min-w-0 flex-1 ${navHidden ? "lg:pb-0" : "pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))] lg:pb-0"}`}>
         <OfflineBanner />
-        <Outlet />
+        <Outlet context={{ setNavHidden }} />
       </main>
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 flex border-t border-(--color-border) bg-(--color-surface) pb-[env(safe-area-inset-bottom,0px)] lg:hidden">
-        {TAB_ITEMS.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.end}
-            className={({ isActive }) =>
-              `flex h-14 flex-1 items-center justify-center text-[13px] font-medium ${
-                isActive ? "text-(--color-accent)" : "text-(--color-text-dim)"
-              }`
-            }
+      {!navHidden && (
+        <nav className="fixed inset-x-0 bottom-0 z-40 flex border-t border-(--color-border) bg-(--color-surface) pb-[env(safe-area-inset-bottom,0px)] lg:hidden">
+          {TAB_ITEMS.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.end}
+              className={({ isActive }) =>
+                `flex h-14 flex-1 items-center justify-center text-[13px] font-medium ${
+                  isActive ? "text-(--color-accent)" : "text-(--color-text-dim)"
+                }`
+              }
+            >
+              {item.label}
+            </NavLink>
+          ))}
+          <button
+            onClick={() => setDrawerOpen(true)}
+            aria-expanded={drawerOpen}
+            className={`h-14 flex-1 text-[13px] font-medium ${drawerOpen ? "text-(--color-accent)" : "text-(--color-text-dim)"}`}
           >
-            {item.label}
-          </NavLink>
-        ))}
-        <button
-          onClick={() => setDrawerOpen(true)}
-          aria-expanded={drawerOpen}
-          className={`h-14 flex-1 text-[13px] font-medium ${drawerOpen ? "text-(--color-accent)" : "text-(--color-text-dim)"}`}
-        >
-          More
-        </button>
-      </nav>
+            More
+          </button>
+        </nav>
+      )}
 
       {drawerOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 lg:hidden" onClick={() => setDrawerOpen(false)}>
