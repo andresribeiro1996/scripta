@@ -196,8 +196,30 @@ export function MuralCanvas({
           color: style.textColor ?? undefined
         }}
       >
-        <BlockRenderer block={block} books={books} images={images} editMode={editMode} onUpdateBlock={onUpdateBlock} statsOverride={statsOverride} />
-        {editMode && (
+        {touchMode && editMode && (
+          <div className="mural-grip absolute inset-x-0 top-0 z-10 flex items-center justify-between px-1.5 py-1">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[rgba(10,8,6,0.72)] text-sm text-white select-none">⠿</span>
+            <span className="mural-block-controls">
+              <OptionsMenu
+                title="Block settings"
+                items={[
+                  { label: "Style", onClick: () => onStyleBlock?.(block) },
+                  { label: "Configure", onClick: () => onConfigureBlock?.(block) },
+                  { label: "Duplicate", onClick: () => onDuplicateBlock?.(block.id) },
+                  { label: "Delete", onClick: () => onDeleteBlock?.(block.id), danger: true }
+                ]}
+              />
+            </span>
+          </div>
+        )}
+        {touchMode && editMode ? (
+          <div className="mural-block-body h-full">
+            <BlockRenderer block={block} books={books} images={images} editMode={editMode} onUpdateBlock={onUpdateBlock} statsOverride={statsOverride} />
+          </div>
+        ) : (
+          <BlockRenderer block={block} books={books} images={images} editMode={editMode} onUpdateBlock={onUpdateBlock} statsOverride={statsOverride} />
+        )}
+        {editMode && !touchMode && (
           <div className="mural-block-controls absolute top-1.5 right-1.5 opacity-0 transition-opacity group-hover:opacity-100">
             <OptionsMenu
               title="Block settings"
