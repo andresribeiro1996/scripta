@@ -74,6 +74,11 @@ export function ArenaViewPage() {
     }
   }
 
+  // Live matches this viewer hasn't voted in — the only thing the
+  // tournament actually asks of them.
+  const pendingVotes =
+    tournament.status === "active" ? tournament.duels.filter((d) => d.status === "active" && !d.hasVoted).length : 0;
+
   return (
     <div className="mx-auto max-w-5xl px-5 py-8">
       <Link to="/arena" className="mb-2 inline-block text-xs text-(--color-text-dim) hover:text-(--color-text)">
@@ -93,22 +98,44 @@ export function ArenaViewPage() {
           with elbow connectors, read-only. Neither can be the other
           without losing what it's for. Defaults to Matches, since voting
           is what most visits are for. */}
-      <div className="mb-4 flex items-stretch overflow-hidden rounded-lg border border-(--color-border) bg-(--color-surface) sm:w-64">
+      <div className="mb-4 flex items-stretch overflow-hidden rounded-lg border border-(--color-border) bg-(--color-surface) sm:w-72">
         {(["matches", "bracket"] as const).map((mode, i) => (
           <button
             key={mode}
             onClick={() => setView(mode)}
             aria-pressed={view === mode}
-            className={`min-h-11 flex-1 px-3 text-sm font-semibold capitalize ${i > 0 ? "border-l border-(--color-border)" : ""} ${
-              view === mode ? "bg-(--color-accent-soft) text-(--color-accent)" : "text-(--color-text-dim) hover:bg-(--color-surface-hover)"
-            }`}
+            className={`flex min-h-11 flex-1 items-center justify-center gap-1.5 px-3 text-sm font-semibold capitalize ${
+              i > 0 ? "border-l border-(--color-border)" : ""
+            } ${view === mode ? "bg-(--color-accent-soft) text-(--color-accent)" : "text-(--color-text-dim) hover:bg-(--color-surface-hover)"}`}
           >
             {mode}
+            {/* How many live matches this viewer still hasn't voted in.
+                Without it the tournament never asks for anything — you
+                have to open a view and hunt for a match still running.
+                Shown on both tabs because the count is a property of the
+                tournament, not of how you're looking at it. */}
+            {pendingVotes > 0 && (
+              <span className="rounded-full bg-(--color-accent) px-1.5 text-[10px] font-bold text-white tabular-nums">{pendingVotes}</span>
+            )}
           </button>
         ))}
       </div>
 
-      {view === "bracket" && <BracketMap tournament={tournament} />}
+      {view === "bracket" &&
+        (tournament.status === "seeding" ? (
+          // BracketMap draws the full skeleton from bracketSize, so it
+          // WOULD render an all-empty bracket here. That reads as broken
+          // rather than as "not started", so say so instead.
+          <p className="rounded-xl border-2 border-dashed border-(--color-border) py-10 text-center text-sm text-(--color-text-dim)">
+            This tournament hasn't started yet — its bracket appears once it's seeded and running.
+          </p>
+        ) : (
+          <BracketMap
+            tournament={tournament}
+            onVote={(duelId, bookKey) => void handleVote(duelId, bookKey)}
+            votingDuelId={busyDuelId}
+          />
+        ))}
 
       {view === "matches" && (
       <BracketTree
