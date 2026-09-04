@@ -2,14 +2,16 @@ import { useMemo, useState } from "react";
 import type { GalleryImage } from "../api/gallery";
 import { BookCard } from "../components/BookCard";
 import { BookGrid } from "../components/BookGrid";
-import { LibraryCanvas } from "../components/LibraryCanvas";
-import { ActionSheet } from "../components/Sheet";
-import { GearIcon, PlusIcon, TOOLBAR_CONTROL_CLASS, ToolbarRow, toolbarIconClass } from "../components/Toolbar";
 import { CoverPickerModal } from "../components/CoverPickerModal";
+import { LibraryCanvas } from "../components/LibraryCanvas";
 import { OptionsMenu } from "../components/OptionsMenu";
 import { PageContainer } from "../components/PageContainer";
 import { PerCardStylePanel } from "../components/PerCardStylePanel";
+import { ActionSheet } from "../components/Sheet";
+import { SkeletonGroups } from "../components/Skeleton";
 import { useToast } from "../components/Toaster";
+import { GearIcon, PlusIcon, TOOLBAR_CONTROL_CLASS, ToolbarRow, toolbarIconClass } from "../components/Toolbar";
+import { useDelayedShow } from "../hooks/useDelayedShow";
 import { useLibrary } from "../hooks/useLibrary";
 import { useMurals } from "../hooks/useMurals";
 import { clearBookCover, setBookCover } from "../lib/bookCovers";
@@ -292,6 +294,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
   const pickerGroup = groups.find((g) => g.id === pickerGroupId) ?? null;
   const styleGroup = groups.find((g) => g.id === styleGroupId) ?? null;
   const style = resolveLibraryStyle(library?.data.style);
+  const showSkeleton = useDelayedShow(isLoading);
   const styleBook = styleBookKey ? books.find((b) => bookKey(b) === styleBookKey) : null;
   const coverBook = coverBookKey ? books.find((b) => bookKey(b) === coverBookKey) : null;
 
@@ -365,7 +368,6 @@ export function GroupsPage({ type }: { type: GroupType }) {
         />
       )}
 
-      {isLoading && <p className="text-sm text-(--color-text-dim)">Loading…</p>}
 
       {!isLoading && allGroups.length === 0 && <p className="text-sm text-(--color-text-dim)">{copy.empty}</p>}
       {!isLoading && allGroups.length > 0 && groups.length === 0 && (
@@ -418,6 +420,11 @@ export function GroupsPage({ type }: { type: GroupType }) {
             )}
           </button>
         )}
+
+        {/* After the "New …" tile, which is where the real panels
+            start — a skeleton above it would put the placeholder
+            somewhere the content never appears. */}
+        {showSkeleton && <SkeletonGroups style={style} />}
 
         {groups.map((group) => {
           const members = orderedGroupBooks(group, books);

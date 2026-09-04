@@ -1,10 +1,12 @@
 import { useMemo, useRef, useState } from "react";
+import { useConfirm } from "../components/ConfirmDialog";
+import { PageContainer } from "../components/PageContainer";
+import { SkeletonCardGrid } from "../components/Skeleton";
+import { ToolbarRow } from "../components/Toolbar";
+import { useDelayedShow } from "../hooks/useDelayedShow";
 import { useDeleteGalleryImage } from "../hooks/useDeleteGalleryImage";
 import { useGalleryImages } from "../hooks/useGalleryImages";
 import { useLibrary } from "../hooks/useLibrary";
-import { useConfirm } from "../components/ConfirmDialog";
-import { PageContainer } from "../components/PageContainer";
-import { ToolbarRow } from "../components/Toolbar";
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -21,6 +23,7 @@ function formatBytes(bytes: number): string {
  *  to its normal auto-detected cover the same way either place. */
 export function GalleryPage() {
   const { images, isLoading, upload } = useGalleryImages();
+  const showSkeleton = useDelayedShow(isLoading);
   const deleteImage = useDeleteGalleryImage();
   const { data: library } = useLibrary();
   const confirm = useConfirm();
@@ -127,7 +130,14 @@ export function GalleryPage() {
         <span className="text-(--color-text-dim)">Drag an image here to upload it — JPEG, PNG, or WebP, up to 20 MB.</span>
       </div>
 
-      {isLoading && <p className="text-sm text-(--color-text-dim)">Loading your gallery…</p>}
+      {showSkeleton && (
+        <SkeletonCardGrid
+          count={10}
+          label="Loading images"
+          tileClassName="aspect-square"
+          gridClassName="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
+        />
+      )}
 
       {!isLoading && images.length === 0 && (
         <p className="text-sm text-(--color-text-dim)">No images yet — upload one above, or straight from a book's "Cover" button.</p>

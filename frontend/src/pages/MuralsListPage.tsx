@@ -3,17 +3,19 @@ import { useNavigate } from "react-router-dom";
 import type { GalleryImage } from "../api/gallery";
 import { useConfirm } from "../components/ConfirmDialog";
 import { CoverPickerModal } from "../components/CoverPickerModal";
-import { OptionsMenu } from "../components/OptionsMenu";
-import { PageContainer } from "../components/PageContainer";
-import { OptionSheet } from "../components/Sheet";
-import { FolderIcon, PlusIcon, SortIcon, TOOLBAR_CONTROL_CLASS, ToolbarRow, toolbarIconClass } from "../components/Toolbar";
-import { ShareModal } from "../components/ShareModal";
 import { MoveToFolderModal } from "../components/murals/MoveToFolderModal";
 import { MuralFolderTree } from "../components/murals/MuralFolderTree";
-import { useMurals } from "../hooks/useMurals";
+import { OptionsMenu } from "../components/OptionsMenu";
+import { PageContainer } from "../components/PageContainer";
+import { ShareModal } from "../components/ShareModal";
+import { OptionSheet } from "../components/Sheet";
+import { SkeletonCardGrid } from "../components/Skeleton";
+import { FolderIcon, PlusIcon, SortIcon, TOOLBAR_CONTROL_CLASS, ToolbarRow, toolbarIconClass } from "../components/Toolbar";
+import { useDelayedShow } from "../hooks/useDelayedShow";
 import { useMuralFolders } from "../hooks/useMuralFolders";
-import type { Mural, MuralFolder } from "../lib/murals";
+import { useMurals } from "../hooks/useMurals";
 import { buildTree, collectSubtreeIds, folderPath } from "../lib/muralFolders";
+import type { Mural, MuralFolder } from "../lib/murals";
 
 // Field + direction combined into one option each, rather than two
 // separate selects (field, then direction) — four clearly-labeled
@@ -38,6 +40,7 @@ const SORT_OPTIONS: Array<{ value: SortBy; label: string }> = [
  *  freeform canvas needs real room. */
 export function MuralsListPage() {
   const { data: muralsData, isLoading, rename, remove, move: moveMural, setCover, clearCover, share, unshare } = useMurals();
+  const showSkeleton = useDelayedShow(isLoading);
   const { data: foldersData, create: createFolder, rename: renameFolder, move: moveFolderApi, remove: removeFolder } = useMuralFolders();
   const navigate = useNavigate();
   const confirm = useConfirm();
@@ -155,7 +158,7 @@ export function MuralsListPage() {
             ))}
           </nav>
 
-          {isLoading && <p className="text-sm text-(--color-text-dim)">Loading…</p>}
+          {showSkeleton && <SkeletonCardGrid label="Loading murals" />}
 
           {!isLoading && murals.length === 0 && (
             <p className="mb-4 text-sm text-(--color-text-dim)">

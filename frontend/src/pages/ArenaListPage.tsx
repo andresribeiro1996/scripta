@@ -7,17 +7,21 @@
 
 import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { TournamentStatusBadge } from "../components/arena/TournamentStatusBadge";
 import type { Tierlist } from "../api/tierlists";
+import { TournamentStatusBadge } from "../components/arena/TournamentStatusBadge";
 import { useConfirm } from "../components/ConfirmDialog";
 import { OptionsMenu } from "../components/OptionsMenu";
+import { SkeletonCardGrid } from "../components/Skeleton";
 import { PlusIcon, TOOLBAR_CONTROL_CLASS, ToolbarRow } from "../components/Toolbar";
+import { useDelayedShow } from "../hooks/useDelayedShow";
 import { useMyTournaments } from "../hooks/useMyTournaments";
 import { useTierlists } from "../hooks/useTierlists";
 
 export function ArenaListPage() {
   const { tournaments, isLoading } = useMyTournaments();
+  const showSkeleton = useDelayedShow(isLoading);
   const { data: tierlistsData, isLoading: tierlistsLoading, create, rename, remove } = useTierlists();
+  const showTierlistSkeleton = useDelayedShow(tierlistsLoading);
   const tierlists = tierlistsData ?? [];
   const navigate = useNavigate();
   const confirm = useConfirm();
@@ -123,7 +127,7 @@ export function ArenaListPage() {
             </ToolbarRow>
           )}
 
-          {isLoading && <p className="text-sm text-(--color-text-dim)">Loading…</p>}
+          {showSkeleton && <SkeletonCardGrid count={3} label="Loading tournaments" tileClassName="min-h-[86px]" />}
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {/* Always first, always present — deliberately outside the map
@@ -164,7 +168,7 @@ export function ArenaListPage() {
         <>
           {createError && <p className="mb-4 text-sm text-(--color-danger)">{createError}</p>}
 
-          {tierlistsLoading && <p className="text-sm text-(--color-text-dim)">Loading…</p>}
+          {showTierlistSkeleton && <SkeletonCardGrid count={3} label="Loading tier lists" tileClassName="min-h-[86px]" />}
 
           {!tierlistsLoading && tierlists.length === 0 && (
             <p className="mb-4 text-sm text-(--color-text-dim)">

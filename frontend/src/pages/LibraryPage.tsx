@@ -1,26 +1,28 @@
 import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { flushSync } from "react-dom";
+import { useNavigate } from "react-router-dom";
 import type { GalleryImage } from "../api/gallery";
 import { fetchLibrary, saveLibrary, type LibraryDocument } from "../api/library";
 import { BookCard } from "../components/BookCard";
 import { BookDetailSheet } from "../components/BookDetailSheet";
 import { BookGrid } from "../components/BookGrid";
-import { LibraryCanvas } from "../components/LibraryCanvas";
 import { CoverPickerModal } from "../components/CoverPickerModal";
+import { LibraryCanvas } from "../components/LibraryCanvas";
 import { LibraryToolbar } from "../components/LibraryToolbar";
 import type { OptionsMenuItem } from "../components/OptionsMenu";
 import { PageContainer } from "../components/PageContainer";
 import { PerCardStylePanel } from "../components/PerCardStylePanel";
 import { ShareModal } from "../components/ShareModal";
+import { SkeletonBookGrid } from "../components/Skeleton";
 import { useToast } from "../components/Toaster";
+import { useDelayedShow } from "../hooks/useDelayedShow";
 import { useLibrary } from "../hooks/useLibrary";
 import { useMurals } from "../hooks/useMurals";
 import { clearBookCover, setBookCover } from "../lib/bookCovers";
-import { deriveSeriesGroups, removeBooksFromAllGroups } from "../lib/groups";
 import { parseImportedFile } from "../lib/fileImport";
+import { deriveSeriesGroups, removeBooksFromAllGroups } from "../lib/groups";
 import { assignBookOrder, orderLibraryBooks, reorderOnDrop, seriesGroupByBookKey } from "../lib/libraryOrder";
 import { effectiveCardStyle, resolveLibraryStyle, type PerCardStyle } from "../lib/libraryStyle";
 import { filterBooks, nextReadStatus, sortBooks, type SortKey, type StatusFilter } from "../lib/libraryView";
@@ -300,6 +302,7 @@ export function LibraryPage() {
   const books = library?.data.books ?? [];
   const importing = importStatus !== null;
   const style = resolveLibraryStyle(library?.data.style);
+  const showSkeleton = useDelayedShow(isLoading);
   // Display order only — the stored `books` array itself stays in plain
   // merge order (see lib/libraryOrder.ts's own comment for why). Series
   // cluster together ahead of standalone books (collections don't affect
@@ -495,7 +498,15 @@ export function LibraryPage() {
         />
       )}
 
-      {isLoading && <p className="text-sm text-(--color-text-dim)">Loading your library…</p>}
+      {/* Inside LibraryCanvas, like the real grid below: the canvas
+          carries the user's own background and padding, so a skeleton
+          outside it would shift the whole grid the moment books
+          arrive — the exact jump this replaces. */}
+      {showSkeleton && (
+        <LibraryCanvas style={style}>
+          <SkeletonBookGrid style={style} />
+        </LibraryCanvas>
+      )}
 
       {!isLoading && books.length === 0 && (
         <div className="rounded-xl border-2 border-dashed border-(--color-border) py-16 text-center">
