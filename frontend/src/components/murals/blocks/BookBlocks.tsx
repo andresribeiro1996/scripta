@@ -35,7 +35,7 @@ import { OptionsMenu, type OptionsMenuItem } from "../../OptionsMenu";
  *  `bg-(--color-border)` (right below) does double duty as the letterbox
  *  color behind whatever gap `contain` leaves, not just the no-cover
  *  placeholder background it already was. */
-function MiniBookTile({
+export function MiniBookTile({
   book,
   showTitle = true,
   showAuthor = true
@@ -292,7 +292,7 @@ function TierRow({
  *  cursor) still just appends at the end, same as always. `stopPropagation()`
  *  on this tile's own dragover/drop keeps the row-level handler from ALSO firing for the
  *  same event and re-appending the book a second time. */
-function DraggableTierTile({
+export function DraggableTierTile({
   book,
   bookKeyStr,
   menuItems,

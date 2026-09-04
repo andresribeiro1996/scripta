@@ -20,6 +20,7 @@ import { SeriesPage } from "./pages/SeriesPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { SharedLibraryPage } from "./pages/SharedLibraryPage";
 import { SharedMuralPage } from "./pages/SharedMuralPage";
+import { TierListEditorPage } from "./pages/TierListEditorPage";
 
 export function App() {
   return (
@@ -54,6 +55,7 @@ export function App() {
             <Route path="/dashboard/murals" element={<MuralsListPage />} />
             <Route path="/dashboard/murals/:muralId" element={<MuralEditorPage />} />
             <Route path="/dashboard/arena" element={<ArenaListPage />} />
+            <Route path="/dashboard/arena/tierlist/:id" element={<TierListEditorPage />} />
             <Route path="/dashboard/arena/:id/seed" element={<ArenaSeedPage />} />
             <Route path="/dashboard/style" element={<LibraryStylePage />} />
             <Route path="/dashboard/settings" element={<SettingsPage />} />
