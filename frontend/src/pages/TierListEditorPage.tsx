@@ -6,6 +6,8 @@ import { BookSearchList } from "../components/murals/pickers";
 import { OptionsMenu } from "../components/OptionsMenu";
 import { PageContainer } from "../components/PageContainer";
 import { ChevronDownIcon, ChevronUpIcon, toolbarIconClass } from "../components/Toolbar";
+import { TierColorPicker } from "../components/tierlist/TierColorPicker";
+import { TierRowEmpty, TierRowShell, TierRowTiles } from "../components/tierlist/TierRowShell";
 import { useDismissible } from "../hooks/useDismissible";
 import { useLibrary } from "../hooks/useLibrary";
 import { useTierlists } from "../hooks/useTierlists";
@@ -17,7 +19,11 @@ type MoveDestination = { type: "pool"; beforeKey?: string } | { type: "tier"; ti
 function TierEditorRow({
   tier,
   books,
-  isDragOver,
+  // Not read yet — TierRowShell doesn't take drag-over styling until
+  // Task 5 moves dropZoneProps onto its own wrapper. Kept in the prop
+  // list (rather than dropped and re-added) so this function's signature
+  // doesn't churn twice for the same drag mechanism.
+  isDragOver: _isDragOver,
   dropZoneProps,
   dragOverTileKey,
   tileDropProps,
@@ -98,51 +104,36 @@ function TierEditorRow({
           items={[{ label: "Delete tier", onClick: onDelete, danger: true }]}
         />
       </div>
-      <div
-        {...dropZoneProps}
-        className={`flex shrink-0 items-stretch gap-2 overflow-hidden rounded-lg border transition-colors ${
-          isDragOver ? "border-(--color-accent) bg-(--color-accent-soft)" : "border-(--color-border)"
-        }`}
-      >
-        <div
-          className="flex w-[3em] shrink-0 flex-col items-center justify-center gap-1 overflow-hidden p-1 text-center text-[0.9em] leading-tight font-bold break-words text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.35)]"
-          style={{ backgroundColor: tier.color }}
-        >
-          <span className="line-clamp-3">{tier.label || "—"}</span>
-          <input
-            type="color"
-            defaultValue={tier.color}
-            onBlur={(e) => {
-              const color = e.target.value;
-              if (color !== tier.color) onRecolor(color);
-            }}
-            title="Tier color"
-            aria-label="Tier color"
-            className="h-3 w-6 shrink-0 cursor-pointer rounded-sm border-0 bg-transparent p-0 ring-1 ring-white/70"
-          />
-        </div>
-        {resolvedKeys.length === 0 ? (
-          <div className="flex min-h-[4em] flex-1 items-center px-2 text-[0.75em] text-(--color-text-dim)">Drag a book here from the pool.</div>
-        ) : (
-          <div className="flex flex-1 flex-wrap content-start gap-1.5 p-1.5">
-            {resolvedKeys.map((key) => {
-              const book = byKey.get(key)!;
-              return (
-                <DraggableTierTile
-                  key={key}
-                  book={book}
-                  bookKeyStr={key}
-                  isDragOver={dragOverTileKey === key}
-                  dropProps={tileDropProps(key)}
-                  menuItems={[
-                    ...otherTiers.map((t) => ({ label: `Move to ${t.label || "Untitled tier"}`, onClick: () => onMoveBook(key, { type: "tier", tierId: t.id }) })),
-                    { label: "Return to pool", onClick: () => onMoveBook(key, { type: "pool" }) }
-                  ]}
-                />
-              );
-            })}
-          </div>
-        )}
+      {/* dropZoneProps is spread on this plain wrapper rather than on
+          TierRowShell itself — it moves onto the shell's own wrapper in
+          Task 5, once @dnd-kit replaces this drag mechanism wholesale.
+          Until then this keeps drag-and-drop working without teaching
+          the shared shell about a mechanism it's about to lose. */}
+      <div {...dropZoneProps}>
+        <TierRowShell tier={tier} colorControl={<TierColorPicker color={tier.color} onChange={onRecolor} />}>
+          {resolvedKeys.length === 0 ? (
+            <TierRowEmpty message="Drag a book here from the pool." />
+          ) : (
+            <TierRowTiles>
+              {resolvedKeys.map((key) => {
+                const book = byKey.get(key)!;
+                return (
+                  <DraggableTierTile
+                    key={key}
+                    book={book}
+                    bookKeyStr={key}
+                    isDragOver={dragOverTileKey === key}
+                    dropProps={tileDropProps(key)}
+                    menuItems={[
+                      ...otherTiers.map((t) => ({ label: `Move to ${t.label || "Untitled tier"}`, onClick: () => onMoveBook(key, { type: "tier", tierId: t.id }) })),
+                      { label: "Return to pool", onClick: () => onMoveBook(key, { type: "pool" }) }
+                    ]}
+                  />
+                );
+              })}
+            </TierRowTiles>
+          )}
+        </TierRowShell>
       </div>
     </div>
   );
