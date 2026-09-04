@@ -4,36 +4,14 @@
 
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { renameTournament } from "../api/arena";
 import { TournamentStatusBadge } from "../components/arena/TournamentStatusBadge";
-import { GearIcon, PlusIcon, TOOLBAR_CONTROL_CLASS, ToolbarRow } from "../components/Toolbar";
+import { PlusIcon, TOOLBAR_CONTROL_CLASS, ToolbarRow } from "../components/Toolbar";
 import { useMyTournaments } from "../hooks/useMyTournaments";
 
 export function ArenaListPage() {
-  const { tournaments, isLoading, refetch } = useMyTournaments();
+  const { tournaments, isLoading } = useMyTournaments();
   const navigate = useNavigate();
-  const [createError, setCreateError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [renamingId, setRenamingId] = useState<string | null>(null);
-  const [nameDraft, setNameDraft] = useState("");
-
-  // A tournament is created as "Untitled tournament" (see the "+" tile),
-  // and the seed page — the only other place a name could be edited —
-  // stops being reachable the moment the tournament starts. Without this
-  // an active or finished tournament would be stuck with its placeholder
-  // forever, which is exactly the gap the rename endpoint exists to
-  // close. Allowed at any status for that reason.
-  async function handleRename(t: { id: string; name: string }) {
-    const name = nameDraft.trim();
-    setRenamingId(null);
-    if (!name || name === t.name) return;
-    try {
-      await renameTournament(t.id, name);
-      await refetch();
-    } catch (err) {
-      setCreateError(err instanceof Error ? err.message : "Couldn't save that name.");
-    }
-  }
 
   const visibleTournaments = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -76,16 +54,14 @@ export function ArenaListPage() {
         </ToolbarRow>
       )}
 
-      {createError && <p className="mb-4 text-sm text-(--color-danger)">{createError}</p>}
-
       {isLoading && <p className="text-sm text-(--color-text-dim)">Loading…</p>}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {/* Always first, always present — deliberately outside the map
             so creating never disappears when the list is empty, the same
-            way the mural grid's "+" tile works. Creates on click with
-            defaults and goes straight to seeding; the name is editable
-            there. */}
+            way the mural grid's "+" tile works. Opens an unsaved
+            tournament on the seed page, where the name and bracket size
+            are editable until the first real change saves it. */}
         <button
           onClick={handleCreate}
           className="flex min-h-14 items-center justify-center gap-2 rounded-xl border-2 border-dashed border-(--color-border) p-4 text-(--color-text-dim) transition-colors hover:border-(--color-accent) hover:text-(--color-accent) disabled:opacity-60"
@@ -94,62 +70,19 @@ export function ArenaListPage() {
           <span className="text-sm font-semibold">New tournament</span>
         </button>
 
-        {visibleTournaments.map((t) =>
-          renamingId === t.id ? (
-            // Renaming replaces the card's own contents rather than
-            // opening a dialog — the field lands exactly where the name
-            // it's replacing was, so there's no jump to a modal and back.
-            <div key={t.id} className="rounded-xl border border-(--color-accent) bg-(--color-surface) p-4">
-              <input
-                autoFocus
-                value={nameDraft}
-                onChange={(e) => setNameDraft(e.target.value)}
-                onBlur={() => void handleRename(t)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") void handleRename(t);
-                  if (e.key === "Escape") setRenamingId(null);
-                }}
-                aria-label="Tournament name"
-                className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-2 py-1 font-semibold"
-              />
-              <p className="mt-1 flex flex-wrap items-center gap-1.5 text-sm text-(--color-text-dim)">
-                {t.bracketSize}-book bracket
-                <TournamentStatusBadge status={t.status} round={t.currentRound} />
-              </p>
-            </div>
-          ) : (
-            <div
-              key={t.id}
-              className="relative rounded-xl border border-(--color-border) bg-(--color-surface) hover:border-(--color-accent)"
-            >
-              {/* The card is still one big link; the gear sits on top of
-                  it rather than inside it, because a <button> nested in
-                  an <a> is invalid HTML and taps on it would follow the
-                  link. pr-12 keeps a long name from running under it. */}
-              <a
-                href={t.status === "seeding" ? `/dashboard/arena/${t.id}/seed` : `/arena/${t.id}`}
-                className="block p-4 pr-12"
-              >
-                <h3 className="font-semibold">{t.name}</h3>
-                <p className="flex flex-wrap items-center gap-1.5 text-sm text-(--color-text-dim)">
-                  {t.bracketSize}-book bracket
-                  <TournamentStatusBadge status={t.status} round={t.currentRound} />
-                </p>
-              </a>
-              <button
-                onClick={() => {
-                  setNameDraft(t.name);
-                  setRenamingId(t.id);
-                }}
-                aria-label={`Rename ${t.name}`}
-                title="Rename"
-                className="absolute top-3 right-3 flex h-9 w-9 items-center justify-center rounded-lg text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"
-              >
-                <GearIcon />
-              </button>
-            </div>
-          )
-        )}
+        {visibleTournaments.map((t) => (
+          <a
+            key={t.id}
+            href={t.status === "seeding" ? `/dashboard/arena/${t.id}/seed` : `/arena/${t.id}`}
+            className="block rounded-xl border border-(--color-border) bg-(--color-surface) p-4 hover:border-(--color-accent)"
+          >
+            <h3 className="font-semibold">{t.name}</h3>
+            <p className="flex flex-wrap items-center gap-1.5 text-sm text-(--color-text-dim)">
+              {t.bracketSize}-book bracket
+              <TournamentStatusBadge status={t.status} round={t.currentRound} />
+            </p>
+          </a>
+        ))}
       </div>
 
       {tournaments.length > 0 && visibleTournaments.length === 0 && (
