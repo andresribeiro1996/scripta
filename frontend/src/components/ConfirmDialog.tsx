@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { useDismissible } from "../hooks/useDismissible";
 import { useScrollLock } from "../hooks/useScrollLock";
 
 interface ConfirmOptions {
@@ -58,15 +59,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
     if (pending) cancelButtonRef.current?.focus();
   }, [pending]);
 
-  useEffect(() => {
-    if (!pending) return;
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") settle(false);
-    }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pending]);
+  useDismissible(() => settle(false), pending !== null);
 
   return (
     <ConfirmContext.Provider value={{ confirm }}>
