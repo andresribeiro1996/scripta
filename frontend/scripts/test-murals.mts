@@ -7,12 +7,9 @@ import {
   addBlock,
   clearMuralCover,
   compactBlocksVertically,
-  createMural,
   createTier,
-  deleteMural,
   duplicateBlock,
   removeBlock,
-  renameMural,
   resolveQuote,
   resolveQuoteCollection,
   resolveShelfBooks,
@@ -23,6 +20,33 @@ import {
   type Mural,
   type MuralBlock
 } from "../src/lib/murals";
+
+let muralSeq = 0;
+
+/** Stands in for the createMural lib/murals.ts used to export.
+ *
+ *  It, renameMural and deleteMural were removed when a mural stopped
+ *  being a field on the library blob and became its own backend row:
+ *  creating, renaming and deleting one is now a request, and lives in
+ *  hooks/useMurals.ts against modules/murals. Their tests went with
+ *  them — this file covers the pure block/scrub/resolve logic that
+ *  stayed — but the rest of the suite still needs a mural to operate
+ *  on, which is all this builds. */
+function makeMural(name = "M"): Mural[] {
+  const now = new Date("2026-01-01T00:00:00.000Z").toISOString();
+  return [
+    {
+      id: `m${++muralSeq}`,
+      name,
+      blocks: [],
+      createdAt: now,
+      updatedAt: now,
+      shareToken: null,
+      shareUrl: null,
+      folderId: null
+    }
+  ];
+}
 
 let passed = 0;
 let failed = 0;
@@ -36,23 +60,9 @@ function check(label: string, condition: boolean, detail?: string) {
   }
 }
 
-console.log("1. createMural / renameMural / deleteMural");
-{
-  let murals = createMural([], "  2026 Year in Books  ");
-  check("trims the name", murals[0].name === "2026 Year in Books");
-  check("starts with no blocks", murals[0].blocks.length === 0);
-  const id = murals[0].id;
-  murals = renameMural(murals, id, "Renamed");
-  check("renamed", murals[0].name === "Renamed");
-  murals = renameMural(murals, id, "   ");
-  check("blank rename is a no-op", murals[0].name === "Renamed");
-  murals = deleteMural(murals, id);
-  check("deleted", murals.length === 0);
-}
-
 console.log("\n2. addBlock — lands below existing blocks, never overlapping");
 {
-  let murals = createMural([], "M");
+  let murals = makeMural();
   const muralId = murals[0].id;
   const first = addBlock(murals, muralId, "text");
   murals = first.murals;
@@ -66,7 +76,7 @@ console.log("\n2. addBlock — lands below existing blocks, never overlapping");
 
 console.log("\n3. updateBlock / removeBlock");
 {
-  let murals = createMural([], "M");
+  let murals = makeMural();
   const muralId = murals[0].id;
   const { murals: m2, blockId } = addBlock(murals, muralId, "spotlight");
   murals = m2;
@@ -189,7 +199,7 @@ console.log("\n8. resolveShelfBooks / resolveQuote / resolveQuoteCollection — 
 
 console.log("\n9. setMuralCover / clearMuralCover — direct counterparts to lib/bookCovers.ts's setBookCover/clearBookCover");
 {
-  let murals = createMural([], "M");
+  let murals = makeMural();
   const muralId = murals[0].id;
   check("starts with no cover", murals[0].coverImageId === undefined && murals[0].coverImageUrl === undefined);
 
@@ -321,7 +331,7 @@ console.log("\n14. scrubImageFromMurals — closes the gap an image block leaves
 
 console.log("\n15. addBlock — the 'empty' block type: a plain styled rectangle, no content fields at all");
 {
-  let murals = createMural([], "M");
+  let murals = makeMural();
   const muralId = murals[0].id;
   const { murals: m2, blockId } = addBlock(murals, muralId, "empty");
   murals = m2;
@@ -362,62 +372,58 @@ console.log("\n16. duplicateBlock — same type/content/style, a fresh id, lands
   check("duplicating into a mural id that doesn't exist is also a true no-op", duplicateBlock(result, "does-not-exist", "spot1") === result);
 }
 
-console.log("\n17. addBlock — the 'tierlist' block type: 5 default tiers, each empty with a unique id");
+console.log("\n17. addBlock — the 'tierlist' block type: a reference, not an inline ladder");
 {
-  let murals = createMural([], "M");
+  // A mural's tier-list block USED to carry its own tiers and pool
+  // inline, and this section tested those five default rows. A tier
+  // list is its own resource now (api/tierlists.ts, backed by
+  // modules/tierlists) and the block holds only the id of one — the
+  // same list can appear in several murals, and editing it in Arena
+  // updates all of them. What's worth pinning down is that a new block
+  // starts UNLINKED rather than inventing a tier list of its own.
+  let murals = makeMural();
   const muralId = murals[0].id;
   const { murals: m2, blockId } = addBlock(murals, muralId, "tierlist");
   murals = m2;
   const block = murals[0].blocks.find((b) => b.id === blockId) as Extract<MuralBlock, { type: "tierlist" }>;
   check("block type is 'tierlist'", block.type === "tierlist");
-  check("starts with no title", block.title === "");
-  check("starts with 5 default tiers", block.tiers.length === 5);
-  check("default tiers are labeled S/A/B/C/D in order", block.tiers.map((t) => t.label).join("") === "SABCD");
-  check("every default tier starts empty", block.tiers.every((t) => t.bookKeys.length === 0));
-  check("the evaluation pool starts empty too", block.pool.length === 0);
-  check("every default tier has its own unique id", new Set(block.tiers.map((t) => t.id)).size === 5);
+  check("starts unlinked, so the config panel asks which list to show", block.tierlistId === "");
+  check("carries no tiers of its own", !("tiers" in block));
+  check("lands at the tierlist default footprint", block.layout.w === 10 && block.layout.h === 8);
+
+  // createTier stayed in lib/murals.ts even though the tiers moved:
+  // TierListEditorPage.tsx's "New tier" button is its one caller.
   const tier = createTier("Custom", "#123456");
   check("createTier builds a fresh, empty, id-bearing tier", tier.label === "Custom" && tier.color === "#123456" && tier.bookKeys.length === 0 && tier.id.length > 0);
-  check("createTier ids don't collide with the block's own default tiers", !block.tiers.some((t) => t.id === tier.id));
+  check("createTier ids are unique per call", createTier("A", "#000").id !== createTier("A", "#000").id);
 }
 
-console.log("\n18. scrubBooksFromMurals — tierlist: deleted books drop off their own tier or the pool, block survives while anything remains anywhere");
+console.log("\n18. scrubBooksFromMurals — a tierlist block is never touched by a book deletion");
 {
+  // The counterpart to the change above, and the reason it matters:
+  // when tiers lived in the block, deleting a book had to reach into
+  // them, and emptying every tier removed the block. A block that only
+  // holds an id has no book references to scrub, so it must survive a
+  // deletion untouched — down to the same object reference, which is
+  // what scrubBooksFromMurals promises for anything it doesn't change.
   const murals = muralWithBlocks([
-    {
-      id: "tl1",
-      type: "tierlist",
-      layout: { x: 0, y: 0, w: 10, h: 8 },
-      title: "Ranked",
-      tiers: [
-        { id: "s", label: "S", color: "#c9482f", bookKeys: ["ta:deleted|a", "ta:kept|b"] },
-        { id: "a", label: "A", color: "#d98a3d", bookKeys: ["ta:untouched|c"] }
-      ],
-      pool: ["ta:pooled-deleted|d", "ta:pooled-kept|e"]
-    }
+    { id: "tl1", type: "tierlist", layout: { x: 0, y: 0, w: 10, h: 8 }, tierlistId: "list-1" },
+    { id: "sp1", type: "spotlight", layout: { x: 0, y: 8, w: 4, h: 5 }, bookKey: "ta:deleted|a" }
   ]);
-  const originalBlock = murals[0].blocks.find((b) => b.id === "tl1") as Extract<MuralBlock, { type: "tierlist" }>;
-  const result = scrubBooksFromMurals(murals, ["ta:deleted|a", "ta:pooled-deleted|d"]);
-  const block = result[0].blocks.find((b) => b.id === "tl1") as Extract<MuralBlock, { type: "tierlist" }>;
-  check("the deleted book's key is gone from its tier", !block.tiers[0].bookKeys.includes("ta:deleted|a"));
-  check("a surviving book on the same tier is untouched", block.tiers[0].bookKeys.includes("ta:kept|b"));
-  check("a tier with no affected books is completely untouched (same array reference)", block.tiers[1] === originalBlock.tiers[1]);
-  check("the deleted book's key is gone from the pool too", !block.pool.includes("ta:pooled-deleted|d"));
-  check("a surviving book in the pool is untouched", block.pool.includes("ta:pooled-kept|e"));
-
-  // Emptying every tier AND the pool removes the block entirely — same
-  // "nothing left to show" convention as a shelf/quoteCollection left
-  // with zero members, extended to cover the pool as just as real a
-  // reference as a tier's own bookKeys.
-  const stillHasPool = scrubBooksFromMurals(murals, ["ta:deleted|a", "ta:kept|b", "ta:untouched|c"]);
-  check(
-    "emptying every tier but leaving books in the pool keeps the block",
-    stillHasPool[0].blocks.some((b) => b.id === "tl1")
-  );
-  const emptied = scrubBooksFromMurals(murals, ["ta:deleted|a", "ta:kept|b", "ta:untouched|c", "ta:pooled-deleted|d", "ta:pooled-kept|e"]);
-  check("once every tier AND the pool are empty, the whole block is removed", !emptied[0].blocks.some((b) => b.id === "tl1"));
-
-  check("scrubbing a book nothing references (tier or pool) is a true no-op (same array reference)", scrubBooksFromMurals(murals, ["ta:nobody-has-this|z"]) === murals);
+  const originalTierlist = murals[0].blocks.find((b) => b.id === "tl1");
+  const result = scrubBooksFromMurals(murals, ["ta:deleted|a"]);
+  const block = result[0].blocks.find((b) => b.id === "tl1");
+  check("the tierlist block survives a book deletion", block !== undefined);
+  // Deep-equal rather than `===`: removing the spotlight runs
+  // compactBlocksVertically over what's left, which rebuilds the blocks
+  // it walks even where nothing moves. Identity through compaction was
+  // never promised (the reference guarantee in this module is at the
+  // mural level, see useMurals.ts), so asserting it would be testing an
+  // implementation detail. What must hold is that nothing about the
+  // block changed — including that the compaction didn't shove it.
+  check("nothing about it changed", JSON.stringify(block) === JSON.stringify(originalTierlist));
+  check("its link is intact", (block as Extract<MuralBlock, { type: "tierlist" }>).tierlistId === "list-1");
+  check("the block that DID reference the deleted book is gone", !result[0].blocks.some((b) => b.id === "sp1"));
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);
