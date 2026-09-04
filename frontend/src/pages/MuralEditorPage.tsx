@@ -6,6 +6,7 @@ import { BlockStylePanel } from "../components/murals/BlockStylePanel";
 import { MuralCanvas } from "../components/murals/MuralCanvas";
 import { PageContainer } from "../components/PageContainer";
 import { ShareModal } from "../components/ShareModal";
+import { useToast } from "../components/Toaster";
 import { PencilIcon, ShareIcon, toolbarIconClass } from "../components/Toolbar";
 import { useGalleryImages } from "../hooks/useGalleryImages";
 import { useLibrary } from "../hooks/useLibrary";
@@ -25,7 +26,8 @@ export function MuralEditorPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { data: library } = useLibrary();
-  const { data: muralsData, isLoading, create, rename, saveBlocks, share, unshare } = useMurals();
+  const { data: muralsData, isLoading, refetch, create, rename, saveBlocks, share, unshare } = useMurals();
+  const toast = useToast();
   const { images } = useGalleryImages();
   // Tier-list blocks reference Arena tier lists by id; the canvas resolves
   // them through this lookup (a plain find over the cached list — one
@@ -94,6 +96,9 @@ export function MuralEditorPage() {
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const [sharing, setSharing] = useState(false);
+  // Bumped only when a save fails; see guard() below for why a
+  // remount is what puts a block back where it was.
+  const [revertNonce, setRevertNonce] = useState(0);
 
   async function handleRename() {
     const name = nameDraft.trim();
@@ -110,6 +115,35 @@ export function MuralEditorPage() {
     }
     if (!mural) return;
     await rename(mural.id, name);
+  }
+
+  // Every mutation on this page PUTs the whole block list, and every
+  // call site fired one with `void handleX()` — so a failed save (LAN
+  // drop, offline, a 500) rejected into nothing: no message, and a
+  // canvas still showing the change that didn't happen.
+  //
+  // It really does keep showing it. MuralCanvas gives react-grid-layout
+  // a controlled `layout` prop, but RGL's getDerivedStateFromProps only
+  // rebases its internal layout when that prop DIFFERS from the last one
+  // it saw. After a failed save the prop is rebuilt from an unchanged
+  // mural, so it's deep-equal and RGL keeps the position you dropped the
+  // block at. Refetching can't dislodge it either, for the same reason —
+  // remounting the grid is what actually reverts it, hence revertNonce.
+  //
+  // Unconditional on failure rather than only for layout saves: after
+  // ANY failed mutation the canvas should be showing the cache, and a
+  // remount is cheap on a path that already went wrong.
+  async function guard<T>(work: Promise<T>, message: string): Promise<T | undefined> {
+    try {
+      return await work;
+    } catch {
+      toast({ kind: "error", message });
+      // The PUT may have landed with only its response lost, so take the
+      // server's word before forcing the canvas to match the cache.
+      await refetch();
+      setRevertNonce((n) => n + 1);
+      return undefined;
+    }
   }
 
   // Every pure function below (addBlock/updateBlock/duplicateBlock/
@@ -211,9 +245,9 @@ export function MuralEditorPage() {
               autoFocus
               value={nameDraft}
               onChange={(e) => setNameDraft(e.target.value)}
-              onBlur={() => void handleRename()}
+              onBlur={() => void guard(handleRename(), "Couldn't save that name.")}
               onKeyDown={(e) => {
-                if (e.key === "Enter") void handleRename();
+                if (e.key === "Enter") void guard(handleRename(), "Couldn't save that name.");
                 if (e.key === "Escape") setEditingName(false);
               }}
               className="block rounded-lg border border-(--color-border) bg-(--color-surface) px-2 py-1 text-lg font-bold"
@@ -239,7 +273,7 @@ export function MuralEditorPage() {
             word beats an icon whose meaning you'd have to long-press to
             discover. */}
         <div className="flex items-center gap-2 sm:hidden">
-          {editMode && <AddBlockMenu onAdd={(type) => void handleAddBlock(type)} />}
+          {editMode && <AddBlockMenu onAdd={(type) => void guard(handleAddBlock(type), "Couldn't add that block.")} />}
           <button onClick={() => setSharing(true)} aria-label="Share this mural" title="Share this mural" className={toolbarIconClass()}>
             <ShareIcon />
           </button>
@@ -253,7 +287,7 @@ export function MuralEditorPage() {
           </button>
         </div>
         <div className="hidden items-center gap-2 sm:flex">
-          {editMode && <AddBlockMenu onAdd={(type) => void handleAddBlock(type)} />}
+          {editMode && <AddBlockMenu onAdd={(type) => void guard(handleAddBlock(type), "Couldn't add that block.")} />}
           {/* Nothing to share until the mural exists. Hidden rather
               than disabled on a draft: a greyed button invites a tap
               that can't do anything, and the button reappears the
@@ -301,11 +335,12 @@ export function MuralEditorPage() {
           editMode={editMode}
           books={books}
           images={images}
-          onLayoutChange={(blockId, layout) => void handleLayoutChange(blockId, layout)}
+          revertNonce={revertNonce}
+          onLayoutChange={(blockId, layout) => void guard(handleLayoutChange(blockId, layout), "Couldn't save that move.")}
           onConfigureBlock={(block) => setConfiguringBlockId(block.id)}
           onStyleBlock={(block) => setStylingBlockId(block.id)}
-          onDuplicateBlock={(blockId) => void handleDuplicateBlock(blockId)}
-          onDeleteBlock={(blockId) => void handleDeleteBlock(blockId)}
+          onDuplicateBlock={(blockId) => void guard(handleDuplicateBlock(blockId), "Couldn't duplicate that block.")}
+          onDeleteBlock={(blockId) => void guard(handleDeleteBlock(blockId), "Couldn't delete that block.")}
           tierlistData={tierlistData}
         />
       )}
@@ -315,7 +350,7 @@ export function MuralEditorPage() {
           block={configuringBlock}
           books={books}
           images={images}
-          onSave={(block) => void handleSaveBlockConfig(block)}
+          onSave={(block) => void guard(handleSaveBlockConfig(block), "Couldn't save those settings.")}
           onClose={() => setConfiguringBlockId(null)}
         />
       )}
@@ -323,7 +358,7 @@ export function MuralEditorPage() {
       {stylingBlock && (
         <BlockStylePanel
           block={stylingBlock}
-          onSave={(blockStyle) => void handleSaveBlockStyle(stylingBlock.id, blockStyle)}
+          onSave={(blockStyle) => void guard(handleSaveBlockStyle(stylingBlock.id, blockStyle), "Couldn't save that style.")}
           onClose={() => setStylingBlockId(null)}
         />
       )}

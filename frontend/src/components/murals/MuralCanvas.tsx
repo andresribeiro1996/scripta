@@ -49,7 +49,8 @@ export function MuralCanvas({
   onDuplicateBlock,
   onDeleteBlock,
   statsOverride,
-  tierlistData
+  tierlistData,
+  revertNonce = 0
 }: {
   mural: Mural;
   editMode: boolean;
@@ -80,6 +81,14 @@ export function MuralCanvas({
   // server-side map on the public page. Threaded straight through to
   // BlockRenderer → TierListBlockView; see those files' own comments.
   tierlistData?: (tierlistId: string) => ResolvedTierlist | undefined;
+  // Incremented by the editor when a save fails, purely to remount the
+  // grid. react-grid-layout treats `layout` as controlled but only
+  // rebases its internal copy when the prop DIFFERS from the last one it
+  // saw (getDerivedStateFromProps) — after a failed save the prop is
+  // rebuilt from an unchanged mural, so it's deep-equal and RGL happily
+  // keeps showing the position you dropped the block at. A new key is
+  // the one thing that makes it read the saved layout again.
+  revertNonce?: number;
 }) {
   const [touchMode] = useState(
     () => typeof window !== "undefined" && Boolean(window.matchMedia?.("(pointer: coarse)").matches)
@@ -255,7 +264,7 @@ export function MuralCanvas({
         <div ref={viewportRef} className="mural-touch max-h-[calc(100dvh-8.5rem)] overflow-auto">
           {viewportWidth > 0 && (
             <div style={{ width: canvasWidth }}>
-              <GridLayout {...gridProps} width={canvasWidth}>
+              <GridLayout key={revertNonce} {...gridProps} width={canvasWidth}>
                 {blockNodes}
               </GridLayout>
             </div>
@@ -286,7 +295,7 @@ export function MuralCanvas({
   }
 
   return (
-    <ResponsiveGridLayout {...gridProps}>
+    <ResponsiveGridLayout key={revertNonce} {...gridProps}>
       {blockNodes}
     </ResponsiveGridLayout>
   );
