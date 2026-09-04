@@ -113,3 +113,22 @@ export function PlusIcon() {
     </svg>
   );
 }
+
+/** Pencil — edit. */
+export function PencilIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 20l4.5-1L20 7.5 16.5 4 5 15.5 4 20Z" />
+    </svg>
+  );
+}
+
+/** Arrow up out of a tray — share. */
+export function ShareIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 15V4m0 0L8 8m4-4 4 4" />
+      <path d="M5 13v6a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 19v-6" />
+    </svg>
+  );
+}

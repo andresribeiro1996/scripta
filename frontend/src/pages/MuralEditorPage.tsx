@@ -6,6 +6,7 @@ import { BlockStylePanel } from "../components/murals/BlockStylePanel";
 import { MuralCanvas } from "../components/murals/MuralCanvas";
 import { PageContainer } from "../components/PageContainer";
 import { ShareModal } from "../components/ShareModal";
+import { PencilIcon, ShareIcon, toolbarIconClass } from "../components/Toolbar";
 import { useGalleryImages } from "../hooks/useGalleryImages";
 import { useLibrary } from "../hooks/useLibrary";
 import { useMurals } from "../hooks/useMurals";
@@ -211,7 +212,28 @@ export function MuralEditorPage() {
             </button>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        {/* Phone: the header's actions as the same 44px icon row every
+            list page's toolbar uses — Share opens the same ShareModal,
+            Edit/Done is a pencil that goes accent while editing, and
+            AddBlockMenu renders its own icon-plus-bottom-sheet form.
+            Desktop below keeps the labelled buttons: there's room, and a
+            word beats an icon whose meaning you'd have to long-press to
+            discover. */}
+        <div className="flex items-center gap-2 sm:hidden">
+          {editMode && <AddBlockMenu onAdd={(type) => void handleAddBlock(type)} />}
+          <button onClick={() => setSharing(true)} aria-label="Share this mural" title="Share this mural" className={toolbarIconClass()}>
+            <ShareIcon />
+          </button>
+          <button
+            onClick={() => setEditMode((e) => !e)}
+            aria-label={editMode ? "Done editing" : "Edit this mural"}
+            title={editMode ? "Done editing" : "Edit this mural"}
+            className={toolbarIconClass(editMode)}
+          >
+            <PencilIcon />
+          </button>
+        </div>
+        <div className="hidden items-center gap-2 sm:flex">
           {editMode && <AddBlockMenu onAdd={(type) => void handleAddBlock(type)} />}
           {/* Nothing to share until the mural exists. Hidden rather
               than disabled on a draft: a greyed button invites a tap
