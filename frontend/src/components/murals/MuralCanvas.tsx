@@ -28,6 +28,16 @@ import { BlockRenderer } from "./BlockRenderer";
 const ResponsiveGridLayout = GridLayout.WidthProvider(GridLayout);
 const ROW_HEIGHT = 28;
 
+/** The zoom a canvas opens at. A phone viewport is far narrower than
+ *  the 1200px design grid, so 100% there is a legible-only-in-theory
+ *  miniature; 300% is roughly where a block's text becomes readable.
+ *  One function rather than a literal in each place, because the
+ *  initial zoom and the double-tap reset are the same idea and have
+ *  already fallen out of step twice. */
+function defaultZoom(): number {
+  return typeof window !== "undefined" && window.innerWidth < 700 ? 3 : 1;
+}
+
 export function MuralCanvas({
   mural,
   editMode,
@@ -74,7 +84,7 @@ export function MuralCanvas({
   const [touchMode] = useState(
     () => typeof window !== "undefined" && Boolean(window.matchMedia?.("(pointer: coarse)").matches)
   );
-  const [zoom, setZoom] = useState(() => (typeof window !== "undefined" && window.innerWidth < 700 ? 3 : 1));
+  const [zoom, setZoom] = useState(defaultZoom);
   const viewportRef = useRef<HTMLDivElement>(null);
   const [viewportWidth, setViewportWidth] = useState(0);
   const lastTapRef = useRef(0);
@@ -98,10 +108,15 @@ export function MuralCanvas({
     setZoom((z) => Math.min(4, Math.max(0.5, Math.round((z + delta) * 100) / 100)));
   }
 
+  // Double-tapping the percentage resets the zoom — to the DEFAULT,
+  // via the same function that picks it initially. It used to reset to
+  // a hardcoded 1, which drifted from the phone default twice (2, then
+  // 3), each time turning the reset into a control that made the canvas
+  // unreadable rather than restoring it.
   function handlePercentTap() {
     const now = Date.now();
     if (now - lastTapRef.current < 300) {
-      setZoom(1);
+      setZoom(defaultZoom());
       lastTapRef.current = 0;
     } else {
       lastTapRef.current = now;
