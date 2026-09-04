@@ -27,3 +27,4 @@ exporter/library.json
 # offline flow on a phone (see root README's "Testing on a phone").
 # Machine-specific and regenerable; never meant to be shared or committed.
 .certs/
+.superpowers/
