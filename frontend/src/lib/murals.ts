@@ -38,15 +38,16 @@ interface QuoteRef {
 }
 
 /** One rung of a tier list — a label ("S", "Favorites", whatever the user
- *  wants), a color used as that row's own accent (view mode) and swatch
- *  (config panel), and the books placed on it, in order. A book only ever
- *  sits in ONE place at a time across the whole block — either one tier's
- *  `bookKeys`, or the block's own `pool` (see MuralBlock's `tierlist`
- *  variant) if it's been picked for evaluation but not ranked yet — never
- *  both, and BlockConfigPanel.tsx's `moveBook` helper is the one place
- *  that invariant is enforced (it always strips a book out of wherever it
- *  currently sits before adding it to its destination), same "pick once"
- *  convention resolveShelfBooks's caller already relies on for a shelf. */
+ *  wants), a color used as that row's own accent (view mode), and the
+ *  books placed on it, in order. A book only ever sits in ONE place at a
+ *  time across the whole list — either one tier's `bookKeys`, or the
+ *  list's own `pool` (api/tierlists.ts's TierlistData) if it's been
+ *  picked for evaluation but not ranked yet — never both, and
+ *  TierListEditorPage.tsx's `moveBook` helper is the one place that
+ *  invariant is enforced (it always strips a book out of wherever it
+ *  currently sits before adding it to its destination). Lives here, with
+ *  api/tierlists.ts re-exporting it, same lib-owns-the-type split
+ *  api/murals.ts already follows for Mural/MuralBlock. */
 export interface TierDefinition {
   id: string;
   label: string;
@@ -54,34 +55,11 @@ export interface TierDefinition {
   bookKeys: string[];
 }
 
-/** The starting five rungs a fresh tier list block gets — the familiar
- *  S/A/B/C/D scale, each with its own mid-saturation color (deliberately
- *  not pale/pastel: BlockConfigPanel/TierListBlockView render each tier's
- *  label in white text over this color with no auto-contrast calculation,
- *  same "the user's own color choice, no contrast solver" approach the
- *  rest of this app's style panels already take for arbitrary
- *  background/text color pairs — these five are picked to read fine as-is,
- *  and the user is free to recolor/relabel/reorder/add/remove every one
- *  of them from there). All configurable after the fact — this is just
- *  where a new tier list starts out, not a fixed scale.  */
-const DEFAULT_TIER_PRESET: Array<{ label: string; color: string }> = [
-  { label: "S", color: "#c9482f" },
-  { label: "A", color: "#d98a3d" },
-  { label: "B", color: "#c9a53d" },
-  { label: "C", color: "#5c9e5c" },
-  { label: "D", color: "#4a7fc9" }
-];
-
-/** Builds one fresh, empty tier — used both for a new block's starting
- *  five (defaultTiers below) and BlockConfigPanel.tsx's own "+ Add tier"
- *  button, so id generation for a tier only ever happens in this one
+/** Builds one fresh, empty tier — TierListEditorPage.tsx's "+ Add tier"
+ *  button's only source, so id generation for a tier happens in this one
  *  place. */
 export function createTier(label: string, color: string): TierDefinition {
   return { id: newId(), label, color, bookKeys: [] };
-}
-
-function defaultTiers(): TierDefinition[] {
-  return DEFAULT_TIER_PRESET.map((t) => createTier(t.label, t.color));
 }
 
 /** Fields every block type carries, intersected into each variant below
@@ -119,7 +97,7 @@ export type MuralBlock =
   | (MuralBlockBase & { type: "currentlyReading" })
   | (MuralBlockBase & { type: "stats"; metrics: StatMetric[] })
   | (MuralBlockBase & { type: "empty" })
-  | (MuralBlockBase & { type: "tierlist"; title: string; tiers: TierDefinition[]; pool: string[] });
+  | (MuralBlockBase & { type: "tierlist"; tierlistId: string });
 
 export type BlockType = MuralBlock["type"];
 
@@ -322,7 +300,7 @@ function defaultBlockForType(id: string, type: BlockType, layout: BlockLayout): 
     case "empty":
       return { id, type, layout };
     case "tierlist":
-      return { id, type, layout, title: "", tiers: defaultTiers(), pool: [] };
+      return { id, type, layout, tierlistId: "" };
   }
 }
 
@@ -390,28 +368,6 @@ export function scrubBooksFromMurals(murals: Mural[], keys: Iterable<string>): M
           if (quotes.length === b.quotes.length) return b;
           return quotes.length === 0 ? null : { ...b, quotes };
         }
-        if (b.type === "tierlist") {
-          let changedHere = false;
-          const tiers = b.tiers.map((t) => {
-            const bookKeys = t.bookKeys.filter((k) => !keySet.has(k));
-            if (bookKeys.length === t.bookKeys.length) return t;
-            changedHere = true;
-            return { ...t, bookKeys };
-          });
-          // The evaluation pool (books picked but not yet ranked into a
-          // tier) is just as real a reference as a tier's own bookKeys —
-          // a deleted book sitting unranked in the pool needs scrubbing
-          // exactly the same way.
-          const pool = b.pool.filter((k) => !keySet.has(k));
-          if (pool.length !== b.pool.length) changedHere = true;
-          if (!changedHere) return b;
-          // Removed entirely only once every rung AND the pool are empty —
-          // a tier list with even one book left anywhere (ranked or still
-          // in the pool) is still a real tier list, unlike a shelf/
-          // quoteCollection which has exactly one pool of members to lose.
-          const anyBooksLeft = tiers.some((t) => t.bookKeys.length > 0) || pool.length > 0;
-          return anyBooksLeft ? { ...b, tiers, pool } : null;
-        }
         return b;
       })
       .filter((b): b is MuralBlock => b !== null);
@@ -419,9 +375,10 @@ export function scrubBooksFromMurals(murals: Mural[], keys: Iterable<string>): M
     if (blocks.length === m.blocks.length && blocks.every((b, i) => b === m.blocks[i])) return m;
     changed = true;
     // Only actually removing a block (spotlight/quote/an emptied-out
-    // shelf, quoteCollection, or tierlist) leaves a gap worth closing — a
-    // shelf/quoteCollection/tierlist merely losing one member stays
-    // exactly where it was, nothing to compact.
+    // shelf or quoteCollection) leaves a gap worth closing — a
+    // shelf/quoteCollection merely losing one member stays exactly where
+    // it was, nothing to compact. (`tierlist` blocks reference a tier
+    // list by id, not books, so nothing here ever touches them.)
     const blockRemoved = blocks.length < m.blocks.length;
     return { ...m, blocks: blockRemoved ? compactBlocksVertically(blocks) : blocks, updatedAt: new Date().toISOString() };
   });

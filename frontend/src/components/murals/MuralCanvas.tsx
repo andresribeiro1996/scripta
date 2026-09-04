@@ -19,6 +19,7 @@ import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 import { useEffect, useRef, useState } from "react";
 import type { GalleryImage } from "../../api/gallery";
+import type { ResolvedTierlist } from "../../api/tierlists";
 import { OptionsMenu } from "../OptionsMenu";
 import { blockFontFamilyCss, resolveBlockStyle, resolveBorderColor } from "../../lib/libraryStyle";
 import { GRID_COLUMNS, type BlockLayout, type Mural, type MuralBlock } from "../../lib/murals";
@@ -37,8 +38,8 @@ export function MuralCanvas({
   onStyleBlock,
   onDuplicateBlock,
   onDeleteBlock,
-  onUpdateBlock,
-  statsOverride
+  statsOverride,
+  tierlistData
 }: {
   mural: Mural;
   editMode: boolean;
@@ -55,14 +56,6 @@ export function MuralCanvas({
   onStyleBlock?: (block: MuralBlock) => void;
   onDuplicateBlock?: (blockId: string) => void;
   onDeleteBlock?: (blockId: string) => void;
-  // Optional: only the tier list block type has live, in-place edits (its
-  // own drag-and-drop ranking board — see BlockRenderer.tsx/
-  // BookBlocks.tsx's TierListBlockView) that need to persist immediately
-  // from right here on the canvas, bypassing the Configure modal
-  // entirely. Every other block type's content only ever changes through
-  // that modal's own Save, so this is threaded straight through to
-  // BlockRenderer and ignored by every other case.
-  onUpdateBlock?: (block: MuralBlock) => void;
   // Optional: the public share page (pages/SharedMuralPage.tsx) has no
   // live library to compute stats from — the mural owner's public GET
   // /murals/shared/:token response already carries precomputed numbers
@@ -72,6 +65,11 @@ export function MuralCanvas({
   // (the authenticated editor never passes this) preserves the existing
   // live-computed behavior exactly.
   statsOverride?: Record<string, number>;
+  // Optional: resolves a tierlist block's reference into its document —
+  // useTierlists' cache on the authenticated editor, the shared response's
+  // server-side map on the public page. Threaded straight through to
+  // BlockRenderer → TierListBlockView; see those files' own comments.
+  tierlistData?: (tierlistId: string) => ResolvedTierlist | undefined;
 }) {
   const [touchMode] = useState(
     () => typeof window !== "undefined" && Boolean(window.matchMedia?.("(pointer: coarse)").matches)
@@ -136,18 +134,12 @@ export function MuralCanvas({
     // The settings button rendered inside each block (below) sits above
     // the block's own drag surface — without excluding it, a click
     // meant for it starts a drag instead. RGL matches this against a
-    // CSS selector, not a ref. `.mural-tierlist-editor` is the same
-    // exclusion for the tier list's own live pool/tier drag-and-drop
-    // (BookBlocks.tsx's TierListBlockView) — without it, RGL would
-    // claim every mousedown inside that editor as the start of a whole-
-    // BLOCK reposition (its default is "the entire grid item is a drag
-    // handle"), and native HTML5 drag-and-drop on a book tile would
-    // never get a chance to start. Excluding just that inner region —
-    // not the block's title bar above it — keeps the block itself
-    // repositionable by dragging from anywhere else in it.
+    // CSS selector, not a ref. `.mural-block-body` (touch only) makes
+    // block CONTENT a pan surface instead of a drag surface, so only
+    // the grip bar repositions the block — see the touch branch below.
     draggableCancel: touchMode
-      ? ".mural-block-controls, .mural-tierlist-editor, .mural-block-body"
-      : ".mural-block-controls, .mural-tierlist-editor",
+      ? ".mural-block-controls, .mural-block-body"
+      : ".mural-block-controls",
     onDragStop: handleGestureEnd,
     onResizeStop: handleGestureEnd
   };
@@ -215,10 +207,10 @@ export function MuralCanvas({
         )}
         {touchMode && editMode ? (
           <div className="mural-block-body h-full">
-            <BlockRenderer block={block} books={books} images={images} editMode={editMode} onUpdateBlock={onUpdateBlock} statsOverride={statsOverride} />
+            <BlockRenderer block={block} books={books} images={images} statsOverride={statsOverride} tierlistData={tierlistData} />
           </div>
         ) : (
-          <BlockRenderer block={block} books={books} images={images} editMode={editMode} onUpdateBlock={onUpdateBlock} statsOverride={statsOverride} />
+          <BlockRenderer block={block} books={books} images={images} statsOverride={statsOverride} tierlistData={tierlistData} />
         )}
         {editMode && !touchMode && (
           <div className="mural-block-controls absolute top-1.5 right-1.5 opacity-0 transition-opacity group-hover:opacity-100">

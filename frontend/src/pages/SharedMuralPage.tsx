@@ -130,7 +130,18 @@ export function SharedMuralPage() {
       {mural.blocks.length === 0 ? (
         <p className="text-sm text-(--color-text-dim)">This mural is empty.</p>
       ) : (
-        <MuralCanvas mural={mural} editMode={false} books={books} images={images} statsOverride={data.stats} />
+        <MuralCanvas
+          mural={mural}
+          editMode={false}
+          books={books}
+          images={images}
+          statsOverride={data.stats}
+          // Tier-list references were resolved server-side into this map
+          // (backend murals routes → tierlists' public API); an id the
+          // server couldn't resolve just isn't in it, which
+          // TierListBlockView renders as its "unavailable" state.
+          tierlistData={(tierlistId) => data.tierlists[tierlistId]}
+        />
       )}
     </div>
   );

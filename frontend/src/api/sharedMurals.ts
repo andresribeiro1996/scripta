@@ -12,6 +12,7 @@
 
 import type { MuralBlock } from "../lib/murals";
 import { publicFetch } from "./client";
+import type { ResolvedTierlist } from "./tierlists";
 
 export interface PublicBookData {
   title: string;
@@ -36,6 +37,7 @@ export interface SharedMuralPayload {
   currentlyReading: PublicBookData[];
   stats: Record<string, number>;
   imageUrls: Record<string, string | null>;
+  tierlists: Record<string, ResolvedTierlist>;
 }
 
 export async function fetchSharedMural(token: string): Promise<SharedMuralPayload> {

@@ -10,6 +10,7 @@ import { PencilIcon, ShareIcon, toolbarIconClass } from "../components/Toolbar";
 import { useGalleryImages } from "../hooks/useGalleryImages";
 import { useLibrary } from "../hooks/useLibrary";
 import { useMurals } from "../hooks/useMurals";
+import { useTierlists } from "../hooks/useTierlists";
 import { type BlockStyle } from "../lib/libraryStyle";
 import { addBlock, duplicateBlock, removeBlock, updateBlock, type BlockLayout, type BlockType, type Mural, type MuralBlock } from "../lib/murals";
 
@@ -26,6 +27,15 @@ export function MuralEditorPage() {
   const { data: library } = useLibrary();
   const { data: muralsData, isLoading, create, rename, saveBlocks, share, unshare } = useMurals();
   const { images } = useGalleryImages();
+  // Tier-list blocks reference Arena tier lists by id; the canvas resolves
+  // them through this lookup (a plain find over the cached list — one
+  // mural holds at most a handful of tier-list blocks, so a Map would be
+  // ceremony).
+  const { data: tierlists } = useTierlists();
+  const tierlistData = (tierlistId: string) => {
+    const tierlist = tierlists?.find((t) => t.id === tierlistId);
+    return tierlist ? { name: tierlist.name, tiers: tierlist.data.tiers, pool: tierlist.data.pool } : undefined;
+  };
   const books = library?.data.books ?? [];
   const murals = muralsData ?? [];
   // `/dashboard/murals/new` opens an UNSAVED mural. Clicking "New mural"
@@ -290,14 +300,7 @@ export function MuralEditorPage() {
           onStyleBlock={(block) => setStylingBlockId(block.id)}
           onDuplicateBlock={(blockId) => void handleDuplicateBlock(blockId)}
           onDeleteBlock={(blockId) => void handleDeleteBlock(blockId)}
-          // The tier list's own live drag-and-drop ranking board (see
-          // MuralCanvas.tsx's own comment) persists straight through this
-          // — literally the same save path handleSaveBlockConfig already
-          // uses for the Configure modal's Save button, since "a block's
-          // content changed, write the whole updated block back" is
-          // exactly the same operation regardless of which UI triggered
-          // it.
-          onUpdateBlock={(block) => void handleSaveBlockConfig(block)}
+          tierlistData={tierlistData}
         />
       )}
 

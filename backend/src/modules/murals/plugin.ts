@@ -6,12 +6,20 @@
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
 import { env } from "../../config/env.js";
+import type { TierlistData } from "../tierlists/index.js";
 import { createSqliteMuralsRepository } from "./adapters/sqlite/sqliteMuralsRepository.js";
 import { openMuralsDb } from "./adapters/sqlite/connection.js";
 import { buildMuralRoutes, buildPublicMuralRoutes } from "./routes.js";
 import { createMuralsService } from "./service.js";
 
-export async function muralsPlugin(app: FastifyInstance) {
+/** Optional wiring handed in by app.ts when the tierlists module is
+ *  present: lets GET /murals/shared/:token resolve tierlist block
+ *  references. See routes.ts's buildPublicMuralRoutes comment. */
+export interface MuralsPluginOptions {
+  getTierlistData?: (ownerUserId: string, tierlistId: string) => TierlistData | undefined;
+}
+
+export async function muralsPlugin(app: FastifyInstance, opts: MuralsPluginOptions = {}) {
   // --- composition: swap this one block to change storage technology ---
   const db = openMuralsDb();
   const muralsRepository = createSqliteMuralsRepository(db);
@@ -37,6 +45,6 @@ export async function muralsPlugin(app: FastifyInstance) {
 
   await app.register(async (scoped) => {
     await scoped.register(fastifyRateLimit, { max: 30, timeWindow: "1 minute" });
-    await scoped.register(buildPublicMuralRoutes(muralsService));
+    await scoped.register(buildPublicMuralRoutes(muralsService, opts.getTierlistData));
   });
 }

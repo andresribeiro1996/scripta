@@ -12,11 +12,13 @@
 // discard, not leave a half-built block saved.
 
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import type { GalleryImage } from "../../api/gallery";
-import { ALL_STAT_METRICS, BLOCK_TYPE_LABELS, createTier, STAT_METRIC_LABELS, type MuralBlock } from "../../lib/murals";
+import { ALL_STAT_METRICS, BLOCK_TYPE_LABELS, STAT_METRIC_LABELS, type MuralBlock } from "../../lib/murals";
 import { bookKey } from "../../lib/merge";
 import { BookSearchList, GalleryImageGrid } from "./pickers";
 import { useScrollLock } from "../../hooks/useScrollLock";
+import { useTierlists } from "../../hooks/useTierlists";
 
 function bookHighlights(book: Record<string, unknown> | undefined): Array<Record<string, unknown>> {
   if (!book || !Array.isArray(book.highlights)) return [];
@@ -38,19 +40,15 @@ export function BlockConfigPanel({
 }) {
   useScrollLock();
   const [draft, setDraft] = useState<MuralBlock>(block);
+  // tierlist only: the saved tier lists to pick from. Everything else
+  // about a tier list — structure, pool, ranking — is edited over in
+  // Arena (TierListEditorPage); this modal's whole tierlist job is
+  // choosing WHICH one the block displays.
+  const { data: tierlists } = useTierlists();
   // Only meaningful for quote/quoteCollection's two-step "pick a book,
   // then pick one of its highlights" flow — null means "show the book
-  // search," set means "show that book's highlights."
+  // search," set means "show that highlights."
   const [browsingBookKey, setBrowsingBookKey] = useState<string | null>(null);
-  // tierlist only: whether the pool's own "+ Add books to pool" search is
-  // open. Actually RANKING (moving a book between the pool and a tier)
-  // isn't done here at all anymore — it's a live drag-and-drop board
-  // right on the canvas itself (see BookBlocks.tsx's TierListBlockView,
-  // turn on Edit mode and look at the block directly); this modal only
-  // handles the two things that genuinely belong in a settings dialog —
-  // tier structure (add/rename/recolor/reorder/delete) and searching new
-  // books INTO the pool.
-  const [poolPickerOpen, setPoolPickerOpen] = useState(false);
 
   function handleSave() {
     onSave(draft);
@@ -345,144 +343,41 @@ export function BlockConfigPanel({
               if (block.type !== "tierlist") return null;
 
               return (
-                <div className="flex flex-col gap-3">
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-(--color-text-dim)">Title (optional)</label>
-                    <input
-                      value={block.title}
-                      onChange={(e) => setDraft({ ...block, title: e.target.value })}
-                      placeholder="e.g. My all-time favorites, ranked"
-                      className="w-full rounded-lg border border-(--color-border) bg-transparent px-3 py-2 text-sm"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-(--color-text-dim)">Book pool</label>
-                    <p className="mb-1.5 text-xs text-(--color-text-dim)">
-                      The books you're evaluating. Add them here — then turn on Edit mode and open this block on the mural itself to drag each one into
-                      a tier (or use a book's own ⋮ menu there, for touch).
-                    </p>
-
-                    {block.pool.length > 0 && (
-                      <div className="mb-2 flex flex-col gap-1">
-                        {block.pool.map((key) => {
-                          const book = books.find((b) => bookKey(b) === key);
-                          return (
-                            <div key={key} className="flex items-center gap-2 rounded-lg border border-(--color-border) px-2 py-1.5 text-sm">
-                              <span className="min-w-0 flex-1 truncate">{String(book?.Title ?? key)}</span>
-                              <button
-                                onClick={() => setDraft({ ...block, pool: block.pool.filter((k) => k !== key) })}
-                                className="shrink-0 text-(--color-danger) transition-opacity hover:opacity-80"
-                              >
-                                Remove
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {poolPickerOpen ? (
-                      <div>
-                        <BookSearchList
-                          books={books.filter((b) => {
-                            const key = bookKey(b);
-                            return !block.pool.includes(key) && !block.tiers.some((t) => t.bookKeys.includes(key));
-                          })}
-                          onSelect={(b) => {
-                            setDraft({ ...block, pool: [...block.pool, bookKey(b)] });
-                            setPoolPickerOpen(false);
-                          }}
-                        />
-                        <button onClick={() => setPoolPickerOpen(false)} className="mt-1 text-xs text-(--color-text-dim) hover:text-(--color-text)">
-                          Cancel
-                        </button>
-                      </div>
-                    ) : (
-                      <button onClick={() => setPoolPickerOpen(true)} className="text-xs font-medium text-(--color-accent) hover:opacity-80">
-                        + Add books to pool
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-medium text-(--color-text-dim)">Which tier list</label>
+                  {tierlists === undefined ? (
+                    <p className="text-xs text-(--color-text-dim)">Loading tier lists…</p>
+                  ) : tierlists.length === 0 ? (
+                    <p className="text-xs text-(--color-text-dim)">No tier lists yet — create one in Arena and it will show up here.</p>
+                  ) : (
+                    tierlists.map((t) => (
+                      <button
+                        key={t.id}
+                        onClick={() => setDraft({ ...block, tierlistId: t.id })}
+                        aria-pressed={block.tierlistId === t.id}
+                        className={`flex min-h-11 w-full items-center justify-between rounded-lg px-3 text-left text-sm ${
+                          block.tierlistId === t.id
+                            ? "bg-(--color-accent-soft) font-semibold text-(--color-accent)"
+                            : "hover:bg-(--color-surface-hover)"
+                        }`}
+                      >
+                        {t.name}
+                        {block.tierlistId === t.id && (
+                          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M20 6 9 17l-5-5" />
+                          </svg>
+                        )}
                       </button>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col gap-2">
-                    {block.tiers.map((tier, i) => {
-                      const tiers = block.tiers;
-                      const updateTier = (patch: Partial<typeof tier>) => setDraft({ ...block, tiers: tiers.map((t) => (t.id === tier.id ? { ...t, ...patch } : t)) });
-                      return (
-                        <div key={tier.id} className="rounded-lg border border-(--color-border) p-2">
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="color"
-                              value={tier.color}
-                              onChange={(e) => updateTier({ color: e.target.value })}
-                              title="Tier color"
-                              className="h-8 w-8 shrink-0 rounded border border-(--color-border) bg-transparent p-0"
-                            />
-                            <input
-                              value={tier.label}
-                              onChange={(e) => updateTier({ label: e.target.value })}
-                              placeholder="Label"
-                              className="min-w-0 flex-1 rounded-lg border border-(--color-border) bg-transparent px-2 py-1 text-sm font-semibold"
-                            />
-                            <button
-                              disabled={i === 0}
-                              onClick={() => {
-                                const reordered = [...tiers];
-                                [reordered[i - 1], reordered[i]] = [reordered[i], reordered[i - 1]];
-                                setDraft({ ...block, tiers: reordered });
-                              }}
-                              className="shrink-0 text-(--color-text-dim) hover:text-(--color-text) disabled:opacity-30"
-                              title="Move up"
-                            >
-                              ▲
-                            </button>
-                            <button
-                              disabled={i === tiers.length - 1}
-                              onClick={() => {
-                                const reordered = [...tiers];
-                                [reordered[i], reordered[i + 1]] = [reordered[i + 1], reordered[i]];
-                                setDraft({ ...block, tiers: reordered });
-                              }}
-                              className="shrink-0 text-(--color-text-dim) hover:text-(--color-text) disabled:opacity-30"
-                              title="Move down"
-                            >
-                              ▼
-                            </button>
-                            <button
-                              onClick={() =>
-                                setDraft({
-                                  ...block,
-                                  tiers: tiers.filter((t) => t.id !== tier.id),
-                                  // Deleting the tier returns its books to
-                                  // the pool rather than dropping them —
-                                  // they're still part of what's being
-                                  // evaluated, just unranked again, same as
-                                  // if you'd dragged each one out on the
-                                  // canvas yourself.
-                                  pool: [...block.pool, ...tier.bookKeys]
-                                })
-                              }
-                              className="shrink-0 text-(--color-danger) transition-opacity hover:opacity-80"
-                              title="Delete tier"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                          <p className="mt-1 text-xs text-(--color-text-dim)">
-                            {tier.bookKeys.length === 0 ? "No books ranked here yet." : `${tier.bookKeys.length} book${tier.bookKeys.length === 1 ? "" : "s"} ranked.`}
-                          </p>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  <button
-                    onClick={() => setDraft({ ...block, tiers: [...block.tiers, createTier("New tier", "#8a8580")] })}
-                    className="self-start rounded-lg border border-dashed border-(--color-border) px-3 py-1.5 text-sm text-(--color-text-dim) hover:border-(--color-accent) hover:text-(--color-accent)"
+                    ))
+                  )}
+                  <p className="mt-1 text-xs text-(--color-text-dim)">Ranking and tiers are edited over in Arena.</p>
+                  <Link
+                    to="/dashboard/arena?tab=tierlists"
+                    onClick={onClose}
+                    className="self-start text-xs font-medium text-(--color-accent) transition-opacity hover:opacity-80"
                   >
-                    + Add tier
-                  </button>
+                    Create in Arena →
+                  </Link>
                 </div>
               );
             })()}

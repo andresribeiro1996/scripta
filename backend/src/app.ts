@@ -20,7 +20,7 @@ import { registerGalleryModule } from "./modules/gallery/index.js";
 import { registerLibraryModule } from "./modules/library/index.js";
 import { registerMuralsModule } from "./modules/murals/index.js";
 import { registerSocialsModule } from "./modules/socials/index.js";
-import { registerTierlistsModule } from "./modules/tierlists/index.js";
+import { registerTierlistsModule, getTierlistsPublicApi } from "./modules/tierlists/index.js";
 
 export function buildApp() {
   // Moves any still-embedded library.murals[] into the new murals table
@@ -72,7 +72,13 @@ export function buildApp() {
   app.register(registerGalleryModule);
   app.register(registerCoversModule);
   app.register(registerSocialsModule);
-  app.register(registerMuralsModule);
+  app.register(registerMuralsModule, {
+    // Cross-module wiring, same shape as covers' peekCachedCoverUrl
+    // consumers: the murals module never imports tierlists' internals —
+    // app.ts hands it this one function, and only for the public shared
+    // mural route's tierlist block resolution (see murals/plugin.ts).
+    getTierlistData: getTierlistsPublicApi().getTierlistData
+  });
   app.register(registerTierlistsModule);
 
   return app;

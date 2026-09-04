@@ -30,6 +30,7 @@ import { authGuard } from "../auth/index.js";
 // boundary it enforces. Never reach into modules/library's internals
 // (service.ts, adapters/, domain/) from here.
 import { resolvePublicLibraryData } from "../library/index.js";
+import type { TierlistData } from "../tierlists/index.js";
 import { extractReferences } from "./domain/blockRefs.js";
 import { FolderCycleError, InvalidFolderReferenceError } from "./domain/errors.js";
 import type { MuralsService } from "./service.js";
@@ -258,8 +259,15 @@ export function buildMuralRoutes(service: MuralsService) {
 
 /** The public, unauthenticated surface — just GET /murals/shared/:token.
  *  Registered in plugin.ts in its OWN scope, carrying its own tight rate
- *  limit — see this module's own top comment and plugin.ts. */
-export function buildPublicMuralRoutes(service: MuralsService) {
+ *  limit — see this module's own top comment and plugin.ts.
+ *
+ *  `getTierlistData` (optional, threaded from app.ts via plugin.ts)
+ *  resolves tierlist blocks' references through the tierlists module's
+ *  public API — the one cross-module read this route needs beyond
+ *  library's publicResolver. Absent (tests, future compositions without
+ *  tierlists), referenced blocks simply resolve to nothing and render
+ *  their "unavailable" state client-side. */
+export function buildPublicMuralRoutes(service: MuralsService, getTierlistData?: (ownerUserId: string, tierlistId: string) => TierlistData | undefined) {
   return async function publicMuralRoutes(app: FastifyInstance) {
     // Deliberately NOT behind authGuard — same trust model as
     // modules/library/routes.ts's own GET /library/shared/:token: the
@@ -291,8 +299,39 @@ export function buildPublicMuralRoutes(service: MuralsService) {
       // modules/library/publicResolver.ts) for exactly what is and isn't
       // safe to include in the response built from them.
       const refs = extractReferences(blocks);
+
+      // Tier-list blocks: same resolve-server-side idea as the library
+      // refs — the block carries only a tierlistId, and the raw
+      // {name, tiers, pool} document goes out under `tierlists` keyed by
+      // that id. Resolved BEFORE the library call because tiers/pool
+      // hold book KEYS the library resolver must also see, or the
+      // shared page would have the tier list but none of its books. A
+      // dangling id (tier list deleted since the mural last saved) is
+      // simply omitted, which the frontend renders as the block's
+      // unavailable state — a shared mural going quietly stale beats
+      // a 500.
+      const tierlistIds: string[] = [];
+      if (Array.isArray(blocks)) {
+        for (const block of blocks) {
+          if (!block || typeof block !== "object") continue;
+          const candidate = block as { type?: unknown; tierlistId?: unknown };
+          if (candidate.type !== "tierlist" || typeof candidate.tierlistId !== "string" || !candidate.tierlistId) continue;
+          if (!tierlistIds.includes(candidate.tierlistId)) tierlistIds.push(candidate.tierlistId);
+        }
+      }
+      const tierlists = Object.fromEntries(
+        tierlistIds
+          .map((id) => [id, getTierlistData?.(row.user_id, id)] as const)
+          .filter((entry): entry is readonly [string, TierlistData] => entry[1] !== undefined)
+      );
+      const tierlistBookKeys = new Set<string>();
+      for (const tierlist of Object.values(tierlists)) {
+        for (const key of tierlist.pool) tierlistBookKeys.add(key);
+        for (const tier of tierlist.tiers) for (const key of tier.bookKeys) tierlistBookKeys.add(key);
+      }
+
       const libraryData = resolvePublicLibraryData(row.user_id, {
-        bookKeys: [...refs.bookKeys],
+        bookKeys: [...refs.bookKeys, ...tierlistBookKeys],
         highlightRefs: refs.highlightRefs,
         needsCurrentlyReading: refs.needsCurrentlyReading,
         statsMetrics: [...refs.statsMetrics]
@@ -319,7 +358,8 @@ export function buildPublicMuralRoutes(service: MuralsService) {
         highlights: libraryData.highlights,
         currentlyReading: libraryData.currentlyReading,
         stats: libraryData.stats,
-        imageUrls
+        imageUrls,
+        tierlists
       });
     });
   };
