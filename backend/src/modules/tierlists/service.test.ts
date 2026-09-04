@@ -48,7 +48,13 @@ test("createTierlist stores a tier list and getTierlist round-trips it", () => {
   const service = makeService();
   const created = service.createTierlist("u1", "Favorites");
   assert.equal(created.name, "Favorites");
-  assert.deepEqual(created.data, { tiers: [], pool: [] });
+  const preset = (created.data as { tiers: Array<{ label: string; color: string }>; pool: string[] }).tiers;
+  assert.deepEqual(
+    preset.map((t) => t.label),
+    ["S", "A", "B", "C", "D"]
+  );
+  assert.equal(preset[0]?.color, "#c9482f");
+  assert.deepEqual((created.data as { pool: string[] }).pool, []);
   const fetched = service.getTierlist("u1", created.id);
   assert.deepEqual(fetched, created);
 });
@@ -69,7 +75,7 @@ test("updateTierlist renames without touching data", () => {
   const t = service.createTierlist("u1", "Old");
   const updated = service.updateTierlist("u1", t.id, { name: "New" });
   assert.equal(updated?.name, "New");
-  assert.deepEqual(updated?.data, { tiers: [], pool: [] });
+  assert.equal(((updated?.data as { tiers: unknown[] })?.tiers ?? []).length, 5);
 });
 
 test("updateTierlist replaces data without touching name", () => {
@@ -120,8 +126,11 @@ test("createTierlistsPublicApi resolves the raw document and defaults missing ar
   const service = makeService();
   const api = createTierlistsPublicApi(service);
 
-  const empty = service.createTierlist("u1", "Empty");
-  assert.deepEqual(api.getTierlistData("u1", empty.id), { name: "Empty", tiers: [], pool: [] });
+  const fresh = service.createTierlist("u1", "Fresh");
+  const freshData = api.getTierlistData("u1", fresh.id);
+  assert.equal(freshData?.name, "Fresh");
+  assert.equal(freshData?.tiers.length, 5);
+  assert.deepEqual(freshData?.pool, []);
 
   const doc = { tiers: [{ id: "s", label: "S", color: "#ff7f7f", bookKeys: ["b1"] }], pool: ["b2"] };
   const ranked = service.createTierlist("u1", "Ranked");

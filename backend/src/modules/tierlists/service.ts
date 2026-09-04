@@ -37,6 +37,20 @@ export interface TierlistsService {
   deleteTierlist(userId: string, id: string): boolean;
 }
 
+/** Where a new tier list starts — the familiar S–D ladder, matching the
+ *  preset the old mural-embedded tier list used to seed (down to the
+ *  colors). Not a fixed scale: the editor can rename/recolor/reorder/
+ *  delete every one of these and add more — this is just the starting
+ *  point, so "New tier list" opens on a recognizable board instead of
+ *  an empty one. */
+const DEFAULT_TIER_PRESET: Array<{ label: string; color: string }> = [
+  { label: "S", color: "#c9482f" },
+  { label: "A", color: "#d98a3d" },
+  { label: "B", color: "#c9a53d" },
+  { label: "C", color: "#5c9e5c" },
+  { label: "D", color: "#4a7fc9" }
+];
+
 export function createTierlistsService(repo: TierlistsRepository): TierlistsService {
   return {
     listTierlists(userId) {
@@ -49,7 +63,10 @@ export function createTierlistsService(repo: TierlistsRepository): TierlistsServ
         id: randomUUID(),
         owner_user_id: userId,
         name,
-        data: JSON.stringify({ tiers: [], pool: [] }),
+        data: JSON.stringify({
+          tiers: DEFAULT_TIER_PRESET.map((t) => ({ id: randomUUID(), label: t.label, color: t.color, bookKeys: [] })),
+          pool: []
+        }),
         created_at: now,
         updated_at: now
       };
