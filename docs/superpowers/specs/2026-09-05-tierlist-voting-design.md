@@ -25,6 +25,9 @@ crowd's version of the owner's list.
   it while voting is open; ballots already cast are kept when tightening.
 - **The public identity is a short code**, e.g. `/vote/k7m2x9qp` — short
   enough to say out loud, and **stable for the life of the resource**.
+- **Every community tier list is listed publicly** in the existing
+  `/arena` directory, exactly as every tournament already is. A poll is
+  discoverable, not just link-shared.
 - **Players start from a blank board**, full pool, same tiers. Votes stay
   independent, so the consensus means something.
 - **Unranked = "no opinion"**, excluded from that book's aggregate rather
@@ -70,10 +73,11 @@ Three separate concerns that must not be conflated:
 | **Authorization** — who may cast a ballot | `vote_access` = `anonymous` \| `members` |
 | **Dedupe** — what stops one person voting twice | `voter_user_id` when signed in; browser-stored ballot id otherwise |
 
-`vote_code` is an identity, not a secret. It is unguessable enough
-(8 chars over a 32-symbol alphabet ≈ 10¹² combinations, behind a rate
-limit) that a poll isn't casually discoverable, but authorization is
-`vote_access`'s job, not the code's.
+`vote_code` is an identity, not a secret — and since every community tier
+list is publicly listed (see "Discovery" below), it is emphatically not
+doing access control. It is short because links should be short, not
+because it is hiding anything. Authorization is `vote_access`'s job.
+This mirrors tournaments, whose public id is simply the row id.
 
 **Signed-in voters are deduped for real.** A partial unique index makes
 one-ballot-per-account a database invariant, and their ballot follows
@@ -85,6 +89,29 @@ applies whenever a voter *happens* to be signed in — including in
 that will be beaten.** Clearing storage lets someone vote again. The rate
 limit is the real defence. A poll that must actually hold up should be
 set to `members`.
+
+## Discovery
+
+Community tier lists are listed in the **existing public `/arena`
+directory**, as a second section beside the tournament grid. That page
+(`ArenaPublicListPage`) is already a standalone, unauthenticated,
+chrome-free page whose own header comment describes the model this
+feature is adopting — *"tournaments are public: a shareable link, and
+also listed"*. It mirrors the segmented **Tournaments | Tier lists** tabs
+the authenticated `/dashboard/arena` already has, so the public and
+private halves of Arena finally have the same shape.
+
+Every community copy is listed. Unlike tournaments there is no
+`status != 'seeding'` filter to apply — a community tier list is votable
+the moment it is created, so there is no not-yet-ready state to hide.
+Closed polls stay listed with a closed badge; their results are the point.
+
+Each card mirrors the tournament card's layout and reuses its badge
+component: **name, pool size, ballot count, open/closed badge**, linking
+to `/vote/:code`. Deliberately *not* on the card: any preview of the
+current standings, which would leak results past the
+results-after-you-submit gate, and the owner's username, which would
+publish an account-to-book-taste link that doesn't exist today.
 
 ## Backend design
 
@@ -104,6 +131,14 @@ set to `members`.
 - `source_tierlist_id TEXT` — NULL for an ordinary tier list, else the id
   of the original this was duplicated from. Lets the UI badge community
   copies, and lets the owner navigate original ↔ community version.
+
+Plus a partial index for the public directory, so listing community
+copies never scans every private tier list in the table:
+
+```sql
+CREATE INDEX IF NOT EXISTS idx_tierlists_public
+  ON tierlists(created_at DESC) WHERE vote_code IS NOT NULL;
+```
 
 Two new tables:
 
@@ -196,6 +231,10 @@ vote later is legitimate.
   `voting_open`. Ballots and `vote_code` survive both.
 - `getResults(tierlistId)` — the histogram plus `ballotCount`.
 - `getVotingBoard(code)` — the community copy resolved for public display.
+- `listPublic(limit, offset)` — every community copy, newest first, each
+  with its pool size and ballot count. Paginated exactly like arena's
+  `listPublic`. Ballot counts come from one grouped count over
+  `tierlist_ballots`, not a per-row query.
 - `submitBallot(code, placements, voter)` / `updateBallot(...)` /
   `getBallot(...)`, where `voter` is either a user id or an anonymous
   ballot id.
@@ -225,6 +264,9 @@ Public, registered in a **new encapsulated scope with a tight
 precisely the split `modules/tierlists/plugin.ts`'s own comment says the
 module doesn't have yet:
 
+- `GET /tierlists/public?limit&offset` → `{tierlists}` for the directory
+  — name, `voteCode`, pool size, ballot count, `votingOpen`. Same
+  query-schema and pagination shape as `GET /arenas/public`.
 - `GET /tierlists/voting/:code` → the board: name, tiers, pool,
   `access`, and whether voting is open. Books resolved through
   `resolvePublicLibraryData` (library's public surface), the same
@@ -285,6 +327,11 @@ It lives in `guard.ts` next to `authGuard` and is re-exported from
   voters the ballot id goes to `localStorage` keyed by code, so a return
   visit rehydrates and allows editing. In `members` mode an unauthenticated
   visitor sees the board with a sign-in prompt in place of submit.
+- **`ArenaPublicListPage` gains a tier lists section** — a second grid
+  under the tournaments one, fed by a `usePublicTierlists` hook mirroring
+  `usePublicTournaments`, with cards reusing the tournament card's layout
+  and badge component. The page's intro copy widens from bracket
+  tournaments to "vote in book brackets and tier lists".
 - **Results view** — segmented control (Average · Most-voted · Median),
   the control Arena already uses. Per-book vote count and spread are
   visible in every mode, since a book with one vote is not as settled as
@@ -304,6 +351,13 @@ It lives in `guard.ts` next to `authGuard` and is re-exported from
 - Voting anonymously and then signing in and voting again produces two
   ballots — the anonymous one is not claimed or merged. Impossible in
   `members` mode.
+- **There is no unlisted poll.** Opening voting publishes the tier list
+  to the public directory; a poll shared only with friends isn't
+  possible. That's the deliberate cost of matching tournaments rather
+  than adding a third toggle beside `vote_access` and `voting_open`.
+- No moderation tooling for the directory — no reporting, hiding or
+  ranking. The owner deleting the community copy is the only remedy.
+- The directory is newest-first only; no sorting by activity or search.
 - No voter names or per-ballot identity in the UI — ballots are anonymous
   to everyone, including the owner, even when tied to an account.
 - Results don't live-update; they refresh on load and after submitting.
@@ -323,7 +377,9 @@ It lives in `guard.ts` next to `authGuard` and is re-exported from
   unauthenticated write but still serves the board; switching access
   keeps existing ballots; a closed poll serves results and refuses
   ballots; unknown book key or tier id is rejected; histogram counts
-  including the owner's ballot; unranked books produce no rows.
+  including the owner's ballot; unranked books produce no rows;
+  `listPublic` returns community copies only (never a private tier list),
+  newest first, with correct pool and ballot counts, and paginates.
 - Frontend: `cd frontend && npm run typecheck && npm run lint && npm run
   build`, plus `lib/tierlistResults.test.ts` covering mean, plurality,
   median, ties, single-vote and zero-vote books, and unranked exclusion.
@@ -331,4 +387,6 @@ It lives in `guard.ts` next to `authGuard` and is re-exported from
   results gate, switch all three modes, edit the ballot on a return
   visit, switch the poll to members-only and confirm the anonymous window
   can read but not submit, sign in and confirm one ballot per account,
-  close voting and confirm the link still shows final results.
+  close voting and confirm the link still shows final results, and check
+  the poll appears in the public `/arena` directory throughout — signed
+  out, with a correct ballot count and an open-then-closed badge.
