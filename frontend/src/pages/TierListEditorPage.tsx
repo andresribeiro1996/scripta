@@ -3,10 +3,10 @@ import { useEffect, useState } from "react";
 import { Link, useOutletContext, useParams } from "react-router-dom";
 import type { TierDefinition, TierlistData } from "../api/tierlists";
 import { DraggableTierTile, TierRow } from "../components/murals/blocks/BookBlocks";
-import { BookSearchList } from "../components/murals/pickers";
 import { OptionsMenu } from "../components/OptionsMenu";
 import { PageContainer } from "../components/PageContainer";
 import { ChevronDownIcon, ChevronUpIcon, toolbarIconClass } from "../components/Toolbar";
+import { AddBooksSheet } from "../components/tierlist/AddBooksSheet";
 import { TierColorPicker } from "../components/tierlist/TierColorPicker";
 import { TierRowEmpty, TierRowShell, TierRowTiles } from "../components/tierlist/TierRowShell";
 import { useDismissible } from "../hooks/useDismissible";
@@ -148,7 +148,7 @@ export function TierListEditorPage() {
   const tierlist = (tierlistsData ?? []).find((t) => t.id === id);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
-  const [searchOpen, setSearchOpen] = useState(false);
+  const [addingBooks, setAddingBooks] = useState(false);
   const [editing, setEditing] = useState(false);
   // Same sensor pair, same constants, as LibraryPage.tsx's own drag-to-
   // reorder: PointerSensor's 150ms/5px activation constraint means a touch
@@ -168,11 +168,25 @@ export function TierListEditorPage() {
     useSensor(KeyboardSensor)
   );
 
+  // Leaving edit mode should leave no editing UI armed for the next Edit tap
+  // — without this, Edit → open the add-books sheet → Done → Edit reopens
+  // the sheet (and, previously, reopened the rename input) because neither
+  // piece of state was ever cleared, only hidden behind `editing`'s own
+  // check. Called from both places editing actually turns off (Done below,
+  // and the dismissible handler right after) rather than from an effect
+  // watching `editing`, so this stays a plain event-driven state update
+  // instead of a setState-in-effect.
+  function exitEditing() {
+    setEditing(false);
+    setAddingBooks(false);
+    setEditingName(false);
+  }
+
   // Escape and the app-wide edge-swipe-back (components/EdgeSwipeBack.tsx)
   // exit editing first and only leave the page on a second gesture —
   // registering here rather than making the mode a route keeps the
   // browser's own history meaning "which tier list", not "which mode".
-  useDismissible(() => setEditing(false), editing);
+  useDismissible(exitEditing, editing);
 
   // The bottom tab bar covers the pool dock and costs 3.5rem of a phone's
   // height while ranking, which is the whole activity in edit mode. Same
@@ -318,10 +332,11 @@ export function TierListEditorPage() {
     commit({ ...data, tiers: [...data.tiers, createTier("New tier", "#8a8580")] });
   }
 
-  function addBookToPool(book: Record<string, unknown>) {
-    const key = bookKey(book);
-    if (data.pool.includes(key) || data.tiers.some((t) => t.bookKeys.includes(key))) return;
-    commit({ ...data, pool: [...data.pool, key] });
+  function addBooksToPool(keys: string[]) {
+    const taken = new Set([...data.pool, ...data.tiers.flatMap((t) => t.bookKeys)]);
+    const fresh = keys.filter((k) => !taken.has(k));
+    if (fresh.length === 0) return;
+    commit({ ...data, pool: [...data.pool, ...fresh] });
   }
 
   const byKey = new Map(books.map((b) => [bookKey(b), b] as const));
@@ -360,7 +375,7 @@ export function TierListEditorPage() {
             </button>
           )}
           <button
-            onClick={() => setEditing((e) => !e)}
+            onClick={() => (editing ? exitEditing() : setEditing(true))}
             className={`min-h-9 shrink-0 rounded-lg px-3 text-sm font-semibold ${
               editing
                 ? "bg-(--color-accent) text-white"
@@ -413,7 +428,7 @@ export function TierListEditorPage() {
               + Add tier
             </button>
 
-            {(resolvedPool.length > 0 || searchOpen) && (
+            {resolvedPool.length > 0 && (
               <DropZone id="pool">
                 <div className="flex flex-col gap-1.5 rounded-lg border border-dashed border-(--color-border) p-2">
                   <div className="text-xs font-semibold text-(--color-text-dim)">Pool — drag up into a tier</div>
@@ -427,31 +442,26 @@ export function TierListEditorPage() {
                       />
                     ))}
                   </div>
-                  {searchOpen && (
-                    <div>
-                      <BookSearchList
-                        books={books.filter((b) => {
-                          const key = bookKey(b);
-                          return !data.pool.includes(key) && !data.tiers.some((t) => t.bookKeys.includes(key));
-                        })}
-                        onSelect={(b) => addBookToPool(b)}
-                      />
-                      <button onClick={() => setSearchOpen(false)} className="mt-1 text-xs text-(--color-text-dim) hover:text-(--color-text)">
-                        Cancel
-                      </button>
-                    </div>
-                  )}
                 </div>
               </DropZone>
             )}
 
-            {!searchOpen && (
-              <button onClick={() => setSearchOpen(true)} className="self-start text-xs font-medium text-(--color-accent) hover:opacity-80">
-                + Add books to pool
-              </button>
-            )}
+            <button onClick={() => setAddingBooks(true)} className="self-start text-xs font-medium text-(--color-accent) hover:opacity-80">
+              + Add books to pool
+            </button>
           </div>
         </DndContext>
+      )}
+
+      {addingBooks && (
+        <AddBooksSheet
+          books={books.filter((b) => {
+            const key = bookKey(b);
+            return !data.pool.includes(key) && !data.tiers.some((t) => t.bookKeys.includes(key));
+          })}
+          onAdd={addBooksToPool}
+          onClose={() => setAddingBooks(false)}
+        />
       )}
     </PageContainer>
   );
