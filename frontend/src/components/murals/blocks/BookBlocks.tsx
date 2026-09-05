@@ -278,7 +278,23 @@ export function DraggableTierTile({
       }`}
     >
       <MiniBookTile book={book} showTitle={false} showAuthor={false} />
-      <div className={`absolute top-0.5 right-0.5 transition-opacity ${coarse ? "opacity-100" : "opacity-0 group-hover/tile:opacity-100"}`}>
+      {/* `onPointerDown` stops here, before it reaches `{...listeners}`
+          above (attached to this whole wrapper, not just the cover) —
+          `listeners.onPointerDown` is what ARMS the drag sensor, and
+          without this the sensor arms on every press including one aimed
+          at the ⋮ trigger below. `OptionsMenu.toggle` only calls
+          `stopPropagation()` on `click`, which fires well after
+          `pointerdown` already started the sensor's 150ms timer; a
+          deliberate tap on a small target easily holds past that. The ⋮
+          menu is this branch's stated fallback for anyone who can't (or
+          doesn't want to) drag, so it has to open reliably rather than
+          racing a drag every time. Left on the wrapper div, not
+          `OptionsMenu` itself, since that component is shared with mural
+          blocks and list cards that have no drag listeners to fight. */}
+      <div
+        onPointerDown={(e) => e.stopPropagation()}
+        className={`absolute top-0.5 right-0.5 transition-opacity ${coarse ? "opacity-100" : "opacity-0 group-hover/tile:opacity-100"}`}
+      >
         <OptionsMenu
           items={menuItems}
           title="Move this book"
