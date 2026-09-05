@@ -81,6 +81,13 @@ export function AddBooksSheet({
                     key={String(book.ContentID ?? i)}
                     onClick={() => toggle(key)}
                     aria-pressed={isSelected}
+                    // MiniBookTile's only content here is a cover image
+                    // (`showTitle={false} showAuthor={false}`), whose
+                    // `CoverImage` renders `alt=""` — without this, every
+                    // button in the grid reads identically to a screen
+                    // reader ("button, not pressed" x N). The book's own
+                    // title gives each one a distinct accessible name.
+                    aria-label={String(book.Title ?? "Untitled")}
                     className={`relative h-[6.5em] overflow-hidden rounded-lg ring-2 transition-shadow ${
                       isSelected ? "ring-(--color-accent)" : "ring-transparent"
                     }`}

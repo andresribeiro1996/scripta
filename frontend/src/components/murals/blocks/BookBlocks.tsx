@@ -250,11 +250,21 @@ export function DraggableTierTile({
   // hover-only, and hover does not exist on touch — so on a phone the
   // one control that could rank a book without dragging was invisible.
   const coarse = typeof window !== "undefined" && Boolean(window.matchMedia?.("(pointer: coarse)").matches);
+  const title = String(book.Title ?? "Untitled");
   return (
     <div
       ref={setRefs}
       {...listeners}
       {...attributes}
+      // dnd-kit's `attributes` add `role="button"` + `tabIndex=0`, which
+      // makes THIS element's accessible name come from `aria-label` (or,
+      // failing that, `title`) rather than any text content — and there
+      // is none, since the cover is an image. Without an explicit label
+      // every tile in a tier/pool reads identically to a screen reader
+      // ("button, Drag to a tier, or use the ⋮ menu" x N); folding the
+      // book's own title in gives each one a distinct accessible name.
+      // `title` is kept too, purely for the mouse-hover tooltip.
+      aria-label={`${title} — drag to a tier, or use the ⋮ menu`}
       title="Drag to a tier, or use the ⋮ menu"
       className={`group/tile relative h-[6em] w-[4em] shrink-0 cursor-grab overflow-hidden rounded-lg active:cursor-grabbing ${
         isOver && !isDragging ? "ring-2 ring-(--color-accent)" : ""
