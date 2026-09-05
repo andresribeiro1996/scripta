@@ -308,8 +308,10 @@ It lives in `guard.ts` next to `authGuard` and is re-exported from
 
 - **`lib/tierlistResults.ts`** — the pure core. `aggregate(histogram,
   mode)` → per book `{tierId, score, votes, spread}`. All three rules
-  live here and are unit-tested against fixture histograms with no DB and
-  no network.
+  live here and are tested against fixture histograms with no DB and no
+  network, via `scripts/test-tierlist-results.mts`. `spread` is the share
+  of voters *outside* the winning tier — 0 is unanimous — so it reflects
+  whichever mode is on screen.
   - *Average*: tiers score by index (first tier = 0); a book's score is
     the mean over ballots that ranked it, placed in the nearest tier.
     Also gives ordering within a tier.
@@ -381,8 +383,12 @@ It lives in `guard.ts` next to `authGuard` and is re-exported from
   `listPublic` returns community copies only (never a private tier list),
   newest first, with correct pool and ballot counts, and paginates.
 - Frontend: `cd frontend && npm run typecheck && npm run lint && npm run
-  build`, plus `lib/tierlistResults.test.ts` covering mean, plurality,
-  median, ties, single-vote and zero-vote books, and unranked exclusion.
+  build`, plus `npx tsx scripts/test-tierlist-results.mts` covering mean,
+  plurality, median, ties, single-vote and zero-vote books, and unranked
+  exclusion. That follows this frontend's established convention for
+  pure-logic tests — standalone `scripts/test-*.mts` scripts with a
+  hand-rolled `check()` helper (see `scripts/test-murals.mts`). The
+  package has no test runner and this feature does not add one.
 - Manual: open voting on a list, vote from a private window, confirm the
   results gate, switch all three modes, edit the ballot on a return
   visit, switch the poll to members-only and confirm the anonymous window
