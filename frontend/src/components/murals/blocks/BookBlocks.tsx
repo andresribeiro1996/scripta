@@ -240,9 +240,26 @@ export function DraggableTierTile({
       {...attributes}
       style={transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: 50 } : undefined}
       title="Drag to a tier, or use the ⋮ menu"
-      className={`group/tile relative h-[6em] w-[4em] shrink-0 cursor-grab touch-none overflow-hidden rounded-lg active:cursor-grabbing ${
+      className={`group/tile relative h-[6em] w-[4em] shrink-0 cursor-grab overflow-hidden rounded-lg active:cursor-grabbing ${
         isOver && !isDragging ? "ring-2 ring-(--color-accent)" : ""
-      } ${isDragging ? "opacity-50" : ""}`}
+      } ${
+        // `touch-none` ONLY while actually dragging, not always: this tile
+        // sits inside the pool dock's `overflow-x-auto` strip, and a
+        // permanent `touch-none` disables the strip's own native touch
+        // scrolling on every pixel a tile covers — with more than a
+        // handful of pooled books, most of the strip becomes unscrollable
+        // by touch (and a finger landing on any tier tile can't scroll the
+        // page vertically either). `PointerSensor`'s 150ms/5px activation
+        // constraint (TierListEditorPage.tsx) is what makes this safe: it
+        // does not preventDefault while a press is still pending, and it
+        // cancels outright once the pointer moves >5px before the delay
+        // elapses — so a swipe scrolls normally and only a held press
+        // reaches `isDragging`, at which point `touch-none` stops the
+        // browser's own scroll gesture from fighting dnd-kit's drag.
+        // Matches BookCard.tsx's identical `isDragging`-gated `touch-none`
+        // for the Library page's own drag-to-reorder.
+        isDragging ? "touch-none opacity-50" : ""
+      }`}
     >
       <MiniBookTile book={book} showTitle={false} showAuthor={false} />
       <div className={`absolute top-0.5 right-0.5 transition-opacity ${coarse ? "opacity-100" : "opacity-0 group-hover/tile:opacity-100"}`}>
