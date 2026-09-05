@@ -150,6 +150,7 @@ export function TierListEditorPage() {
   const [nameDraft, setNameDraft] = useState("");
   const [addingBooks, setAddingBooks] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [poolCollapsed, setPoolCollapsed] = useState(false);
   // Same sensor pair, same constants, as LibraryPage.tsx's own drag-to-
   // reorder: PointerSensor's 150ms/5px activation constraint means a touch
   // press has to hold for a beat before a drag starts (so a tap still just
@@ -402,7 +403,7 @@ export function TierListEditorPage() {
         </div>
       ) : (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 pb-[13rem]">
             {data.tiers.length === 0 && <p className="text-sm text-(--color-text-dim)">No tiers yet — add one.</p>}
             {data.tiers.map((tier, i) => (
               <TierEditorRow
@@ -427,28 +428,55 @@ export function TierListEditorPage() {
             >
               + Add tier
             </button>
+          </div>
 
-            {resolvedPool.length > 0 && (
+          {/* Pinned to the bottom rather than sitting after the last tier.
+              Ranking means dragging pool → tier, which needs both on screen
+              at once; as a page-flow block at the end of a long list of
+              tiers, the pool was almost never visible at the same time as
+              the tier being aimed at. The bottom nav is hidden in edit mode
+              (see setNavHidden above), so this occupies space that is
+              otherwise unused. */}
+          <div className="fixed inset-x-0 bottom-0 z-40 border-t border-(--color-border) bg-(--color-surface) pb-[env(safe-area-inset-bottom,0px)]">
+            <div className="flex items-center justify-between gap-2 px-3 py-2">
+              <button
+                onClick={() => setPoolCollapsed((c) => !c)}
+                aria-expanded={!poolCollapsed}
+                className="flex min-h-9 items-center gap-1.5 text-xs font-semibold text-(--color-text-dim) hover:text-(--color-text)"
+              >
+                {poolCollapsed ? <ChevronUpIcon /> : <ChevronDownIcon />}
+                Pool — {resolvedPool.length} {resolvedPool.length === 1 ? "book" : "books"}
+              </button>
+              <button
+                onClick={() => setAddingBooks(true)}
+                className="min-h-9 shrink-0 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm font-semibold hover:bg-(--color-surface-hover)"
+              >
+                Add books
+              </button>
+            </div>
+            {!poolCollapsed && (
               <DropZone id="pool">
-                <div className="flex flex-col gap-1.5 rounded-lg border border-dashed border-(--color-border) p-2">
-                  <div className="text-xs font-semibold text-(--color-text-dim)">Pool — drag up into a tier</div>
-                  <div className="flex min-h-[4em] flex-wrap items-start gap-1.5">
-                    {resolvedPool.map((key) => (
+                <div className="flex min-h-[7em] items-start gap-1.5 overflow-x-auto overscroll-contain px-3 pb-3">
+                  {resolvedPool.length === 0 ? (
+                    <p className="py-4 text-xs text-(--color-text-dim)">
+                      Pool is empty — every book is ranked. Drag one back here to unrank it.
+                    </p>
+                  ) : (
+                    resolvedPool.map((key) => (
                       <DraggableTierTile
                         key={key}
                         book={byKey.get(key)!}
                         bookKeyStr={key}
-                        menuItems={data.tiers.map((t) => ({ label: `Move to ${t.label || "Untitled tier"}`, onClick: () => moveBook(key, { type: "tier", tierId: t.id }) }))}
+                        menuItems={data.tiers.map((t) => ({
+                          label: `Move to ${t.label || "Untitled tier"}`,
+                          onClick: () => moveBook(key, { type: "tier", tierId: t.id })
+                        }))}
                       />
-                    ))}
-                  </div>
+                    ))
+                  )}
                 </div>
               </DropZone>
             )}
-
-            <button onClick={() => setAddingBooks(true)} className="self-start text-xs font-medium text-(--color-accent) hover:opacity-80">
-              + Add books to pool
-            </button>
           </div>
         </DndContext>
       )}
