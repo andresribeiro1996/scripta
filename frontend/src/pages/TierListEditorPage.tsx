@@ -1,4 +1,15 @@
-import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useDroppable, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import {
+  closestCenter,
+  DndContext,
+  KeyboardSensor,
+  pointerWithin,
+  PointerSensor,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type CollisionDetection,
+  type DragEndEvent
+} from "@dnd-kit/core";
 import { useEffect, useState } from "react";
 import { Link, useOutletContext, useParams } from "react-router-dom";
 import type { TierDefinition, TierlistData } from "../api/tierlists";
@@ -315,6 +326,27 @@ export function TierListEditorPage() {
     moveBook(key, overId === "pool" ? { type: "pool" } : { type: "tier", tierId: overId });
   }
 
+  // Plain `closestCenter` compares rect CENTRES with no containment test
+  // at all, and a tier's `DropZone` rect fully CONTAINS every tile inside
+  // it — so on any non-empty row, whichever tile's centre happens to be
+  // nearest the pointer always wins over the row itself, even when the
+  // pointer is over bare row background nowhere near a tile. That made
+  // "drop on the row background to append" (the comment on `handleDragEnd`
+  // above, and `DraggableTierTile`'s own comment, both promise this)
+  // actually unreachable on any tier that already has a book in it — every
+  // drop resolved to a swap instead, silently demoting whichever existing
+  // book happened to be geometrically closest. `pointerWithin` fixes this
+  // by only considering droppables the pointer is literally INSIDE, sorted
+  // nearest-centre-first: over bare row background that's just the row
+  // (append); over a tile it's the tile first, since a tile's rect nests
+  // inside the row's (swap). It can return zero results (pointer not
+  // over any registered droppable, e.g. mid-drag over the header), so
+  // `closestCenter` stays as the fallback for that case only.
+  const collisionDetection: CollisionDetection = (args) => {
+    const within = pointerWithin(args);
+    return within.length > 0 ? within : closestCenter(args);
+  };
+
   function updateTier(tierId: string, patch: Partial<TierDefinition>) {
     commit({ ...data, tiers: data.tiers.map((t) => (t.id === tierId ? { ...t, ...patch } : t)) });
   }
@@ -402,7 +434,7 @@ export function TierListEditorPage() {
           )}
         </div>
       ) : (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragEnd={handleDragEnd}>
           <div className="flex flex-col gap-2 pb-[13rem]">
             {data.tiers.length === 0 && <p className="text-sm text-(--color-text-dim)">No tiers yet — add one.</p>}
             {data.tiers.map((tier, i) => (

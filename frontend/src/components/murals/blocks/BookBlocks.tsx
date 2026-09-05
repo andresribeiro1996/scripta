@@ -212,8 +212,12 @@ export function TierRow({ tier, books }: { tier: TierDefinition; books: Array<Re
  *  trading places; reported live as the dragged book visibly sliding
  *  rightward instead of the two actually swapping. Dropping on the row/
  *  pool's own background (no specific tile under the pointer) still just
- *  appends at the end, same as always — `@dnd-kit` resolves that itself via
- *  `closestCenter` picking the row/pool `DropZone` instead of any tile. */
+ *  appends at the end, same as always — TierListEditorPage's `DndContext`
+ *  uses `pointerWithin` (falling back to `closestCenter`) specifically so
+ *  a pointer over bare row/pool background resolves to that `DropZone`
+ *  rather than whichever tile's rect happens to contain it; see the
+ *  collision-detection comment there for why plain `closestCenter` can't
+ *  tell those two cases apart. */
 export function DraggableTierTile({
   book,
   bookKeyStr,
