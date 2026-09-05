@@ -7,20 +7,24 @@ Tier lists today are a private, owner-scoped resource (`modules/tierlists`,
 nobody else ever touches the document. The only way one reaches another
 person is read-only, embedded in a shared mural.
 
-This feature makes a tier list *playable*. The owner opens it for
-voting; anyone with the link ranks the same pool of books themselves,
-and every submission is a ballot. Aggregating the ballots decides each
-book's tier — the crowd's version of the owner's list.
+This feature makes a tier list *votable*. The owner opens it for voting;
+other people rank the same pool of books themselves, and every submission
+is a ballot. Aggregating the ballots decides each book's tier — the
+crowd's version of the owner's list.
 
 ## Decisions locked in with the user
 
-- **Anyone with the link can vote — no account.** Same trust model as
-  `GET /murals/shared/:token`: an unguessable token, not a session check.
 - **Opening voting DUPLICATES the tier list.** The votable thing is a
-  separate "community" resource; the owner's original stays private and
-  fully editable. This is the decision the rest of the design hangs on.
+  separate "community" resource with its own public identity; the owner's
+  original stays private and fully editable. This is the decision the
+  rest of the design hangs on.
 - **The community copy's structure is frozen** — its tiers and its pool
   never change. That is what makes ballots comparable.
+- **Voting access is per-poll and switchable**: `anonymous` (anyone with
+  the link) or `members` (signed-in accounts only). The owner can change
+  it while voting is open; ballots already cast are kept when tightening.
+- **The public identity is a short code**, e.g. `/vote/k7m2x9qp` — short
+  enough to say out loud, and **stable for the life of the resource**.
 - **Players start from a blank board**, full pool, same tiers. Votes stay
   independent, so the consensus means something.
 - **Unranked = "no opinion"**, excluded from that book's aggregate rather
@@ -56,15 +60,47 @@ exactly **two** points, both explicit and both documented in-module:
 splitting structure from placements at duplication, and validating a
 ballot's book keys and tier ids on submit. Nowhere else.
 
+## Identity, access, and dedupe
+
+Three separate concerns that must not be conflated:
+
+| Concern | Mechanism |
+|---|---|
+| **Addressing** — how the poll is named publicly | `vote_code`, a short random code, permanent |
+| **Authorization** — who may cast a ballot | `vote_access` = `anonymous` \| `members` |
+| **Dedupe** — what stops one person voting twice | `voter_user_id` when signed in; browser-stored ballot id otherwise |
+
+`vote_code` is an identity, not a secret. It is unguessable enough
+(8 chars over a 32-symbol alphabet ≈ 10¹² combinations, behind a rate
+limit) that a poll isn't casually discoverable, but authorization is
+`vote_access`'s job, not the code's.
+
+**Signed-in voters are deduped for real.** A partial unique index makes
+one-ballot-per-account a database invariant, and their ballot follows
+them across devices instead of dying with their browser storage. This
+applies whenever a voter *happens* to be signed in — including in
+`anonymous` mode, where it costs nothing and yields strictly better data.
+
+**Anonymous voters are deduped only by a browser-stored ballot id, and
+that will be beaten.** Clearing storage lets someone vote again. The rate
+limit is the real defence. A poll that must actually hold up should be
+set to `members`.
+
 ## Backend design
 
 ### Schema (`adapters/sqlite/schema.sql`)
 
-`tierlists` gains two columns:
+`tierlists` gains four columns:
 
-- `vote_token TEXT UNIQUE` — NULL means "not open for voting". SQLite
-  treats multiple NULLs as distinct, so unopened rows never collide;
-  same reasoning as `murals.share_token`.
+- `vote_code TEXT UNIQUE` — NULL for an ordinary tier list; set once when
+  the community copy is created and never changed thereafter. SQLite
+  treats multiple NULLs as distinct, so ordinary rows never collide.
+- `vote_access TEXT NOT NULL DEFAULT 'anonymous'` — `'anonymous'` or
+  `'members'`.
+- `voting_open INTEGER NOT NULL DEFAULT 0` — whether ballots are being
+  accepted. Separate from `vote_code` on purpose: closing a poll must not
+  destroy its public identity, so a closed poll's link keeps working and
+  shows the final result.
 - `source_tierlist_id TEXT` — NULL for an ordinary tier list, else the id
   of the original this was duplicated from. Lets the UI badge community
   copies, and lets the owner navigate original ↔ community version.
@@ -73,13 +109,21 @@ Two new tables:
 
 ```sql
 CREATE TABLE IF NOT EXISTS tierlist_ballots (
-  id          TEXT PRIMARY KEY,   -- the secret handle the voter's browser stores
-  tierlist_id TEXT NOT NULL,
-  created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-  updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  id            TEXT PRIMARY KEY,  -- the handle an anonymous voter's browser stores
+  tierlist_id   TEXT NOT NULL,
+  voter_user_id TEXT,              -- NULL for anonymous ballots
+  created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 CREATE INDEX IF NOT EXISTS idx_tierlist_ballots_tierlist
   ON tierlist_ballots(tierlist_id);
+
+-- One ballot per account per tier list, enforced by the database rather
+-- than by handler logic. Partial so that anonymous ballots (many NULLs)
+-- never collide with each other.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tierlist_ballots_one_per_voter
+  ON tierlist_ballots(tierlist_id, voter_user_id)
+  WHERE voter_user_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS tierlist_ballot_placements (
   ballot_id   TEXT NOT NULL REFERENCES tierlist_ballots(id) ON DELETE CASCADE,
@@ -113,23 +157,28 @@ most-voted, median and spread are all derivable from this one structure,
 which is why all three view modes cost one fetch and switch instantly.
 
 If the `GROUP BY` ever becomes hot, the fix is a maintained counts table.
-Not now — no evidence, and it adds transactional write-path complexity.
+Not now — no evidence, and it adds write-path complexity.
 
 ### Opening voting
 
-`POST /tierlists/:id/open-voting` (authed, owner-scoped), in one
-transaction:
+`POST /tierlists/:id/open-voting` `{access}` (authed, owner-scoped), in
+one transaction:
 
 1. Read the original's `data` — `{tiers, pool}`.
 2. Insert a new `tierlists` row: same `owner_user_id`, name `"<original
-   name> (community)"`, `source_tierlist_id` = original id, fresh
-   `vote_token`,
-   and `data` = **structure only** — every tier keeps its `id`, `label`
-   and `color` but gets `bookKeys: []`, and `pool` becomes the full union
-   of the original's pool and all its tiers' book keys.
-3. Insert one ballot whose placements are the original's tier
-   placements — the owner's vote.
-4. Return the new tier list and its `voteToken`.
+   name> (community)"`, `source_tierlist_id` = original id, a freshly
+   generated `vote_code`, `vote_access` = the requested mode,
+   `voting_open` = 1, and `data` = **structure only** — every tier keeps
+   its `id`, `label` and `color` but gets `bookKeys: []`, and `pool`
+   becomes the full union of the original's pool and all its tiers' book
+   keys.
+3. Insert one ballot, `voter_user_id` = the owner, whose placements are
+   the original's tier placements — the owner's vote.
+4. Return the new tier list and its `voteCode`.
+
+Code generation retries on a `UNIQUE` violation rather than pre-checking
+for collisions — the check-then-insert race is the bug the constraint
+exists to prevent.
 
 The original is not modified. Opening voting twice creates two
 independent community copies; that is allowed on purpose — re-running a
@@ -137,46 +186,81 @@ vote later is legitimate.
 
 ### Service surface
 
-- `openVoting(ownerUserId, id)` — as above; `undefined` if not found or
-  not owned, matching the module's existing convention.
-- `closeVoting(ownerUserId, id)` — clears `vote_token`. **Ballots are
-  kept**, so results survive and voting can be reopened.
+- `openVoting(ownerUserId, id, access)` — as above; `undefined` if not
+  found or not owned, matching the module's existing convention.
+- `setVotingAccess(ownerUserId, id, access)` — switches
+  `anonymous`/`members` while open. **Ballots already cast are kept**,
+  including anonymous ones when tightening: they were cast in good faith
+  under the rule in force at the time.
+- `closeVoting(ownerUserId, id)` / `reopenVoting(...)` — flips
+  `voting_open`. Ballots and `vote_code` survive both.
 - `getResults(tierlistId)` — the histogram plus `ballotCount`.
-- `getVotingBoard(token)` — the community copy resolved for public
-  display.
-- `submitBallot(token, placements)` / `updateBallot(token, ballotId,
-  placements)` / `getBallot(token, ballotId)`.
+- `getVotingBoard(code)` — the community copy resolved for public display.
+- `submitBallot(code, placements, voter)` / `updateBallot(...)` /
+  `getBallot(...)`, where `voter` is either a user id or an anonymous
+  ballot id.
 
 Placement validation rejects (400) any `book_key` not in the copy's pool
 or any `tier_id` not among its tiers, and any ballot longer than the pool.
+
+### Ballot identity
+
+- **Signed in** → the ballot is found or created by `(tierlist_id,
+  voter_user_id)`. Any ballot id the client sends is ignored; the unique
+  index is the authority.
+- **Anonymous** → found or created by the ballot id the browser stored,
+  returned by the first submission.
 
 ### Routes
 
 Authenticated, in the existing unthrottled scope:
 
-- `POST /tierlists/:id/open-voting` → `201 {tierlist, voteToken}`
-- `POST /tierlists/:id/close-voting` → `{tierlist}`
+- `POST /tierlists/:id/open-voting` `{access}` → `201 {tierlist, voteCode}`
+- `PUT /tierlists/:id/voting` `{access?, open?}` → `{tierlist}`
 - `GET /tierlists/:id/results` → `{histogram, ballotCount}`
 
-Public and unauthenticated, registered in a **new encapsulated scope with
-a tight `@fastify/rate-limit`** — the same builder split
+Public, registered in a **new encapsulated scope with a tight
+`@fastify/rate-limit`** — the same builder split
 `modules/murals/plugin.ts` uses for `GET /murals/shared/:token`, and
 precisely the split `modules/tierlists/plugin.ts`'s own comment says the
 module doesn't have yet:
 
-- `GET /tierlists/voting/:token` → the board: name, tiers, pool. Books
-  resolved through `resolvePublicLibraryData` (library's public surface),
-  the same redaction path the shared-mural route already uses for
-  tier-list blocks.
-- `POST /tierlists/voting/:token/ballot` `{placements}` → `201
-  {ballotId, results}`
-- `PUT /tierlists/voting/:token/ballot/:ballotId` `{placements}` →
+- `GET /tierlists/voting/:code` → the board: name, tiers, pool,
+  `access`, and whether voting is open. Books resolved through
+  `resolvePublicLibraryData` (library's public surface), the same
+  redaction path the shared-mural route already uses for tier-list blocks.
+- `POST /tierlists/voting/:code/ballot` `{placements}` → `201 {ballotId,
+  results}`
+- `PUT /tierlists/voting/:code/ballot/:ballotId` `{placements}` →
   `{results}`
-- `GET /tierlists/voting/:token/ballot/:ballotId` → `{placements,
-  results}` — rehydrates a returning voter.
+- `GET /tierlists/voting/:code/ballot/:ballotId` → `{placements, results}`
+  — rehydrates a returning anonymous voter. A signed-in voter's ballot
+  comes back with the board instead, since it's keyed by their account.
 
-An unknown or closed token is a 404, treated identically to "no such
-token" — a closed poll must not be distinguishable from a fake link.
+Responses:
+
+- Unknown code → 404.
+- `voting_open = 0` → the board still resolves and results are returned;
+  ballot writes are `409`. A closed poll stays readable, because the code
+  is the resource's permanent identity.
+- `vote_access = 'members'` with no valid access token → `401` on ballot
+  writes. The board itself remains readable, so someone following the
+  link sees what they'd be signing in for.
+
+### Cross-module addition to `auth`
+
+The ballot routes need "who is this, if anyone" — `authGuard` can't serve,
+since it rejects outright. `modules/auth` gains one export alongside it:
+
+```ts
+getOptionalAuthenticatedUser(request): AuthenticatedUser | null
+```
+
+A plain function, not a preHandler — so there's no Fastify decoration, no
+preHandler ordering to reason about, and no need to widen the
+`request.user` type declaration into a lie on genuinely public routes.
+It lives in `guard.ts` next to `authGuard` and is re-exported from
+`modules/auth/index.js`; nothing else about auth's public surface changes.
 
 ## Frontend design
 
@@ -196,28 +280,32 @@ token" — a closed poll must not be distinguishable from a fake link.
   no unrelated restructuring.
 - **`api/tierlistVoting.ts` + `hooks/useTierlistVoting.ts`** — thin
   `apiFetch` wrappers per route, matching `api/tierlists.ts`'s shape.
-- **Public `/vote/:token` page** — unauthenticated route alongside
-  `SharedMuralPage`. Blank board → rank → submit → results. The ballot id
-  goes to `localStorage` keyed by token, so a return visit rehydrates the
-  ballot and allows editing it.
+- **Public `/vote/:code` page** — unauthenticated route alongside
+  `SharedMuralPage`. Blank board → rank → submit → results. For anonymous
+  voters the ballot id goes to `localStorage` keyed by code, so a return
+  visit rehydrates and allows editing. In `members` mode an unauthenticated
+  visitor sees the board with a sign-in prompt in place of submit.
 - **Results view** — segmented control (Average · Most-voted · Median),
   the control Arena already uses. Per-book vote count and spread are
   visible in every mode, since a book with one vote is not as settled as
-  one with two hundred.
-- **Owner UI** — "Open for voting" in the tier list editor, which
-  navigates to the new community copy and surfaces its link and ballot
-  count. Community copies are badged in the Arena tier lists tab and
-  their structural controls are absent, with a line explaining that a
-  community list is frozen and that the original remains editable.
+  one with two hundred. A closed poll renders the same view, marked final.
+- **Owner UI** — "Open for voting" in the tier list editor with the
+  access choice, which navigates to the new community copy and surfaces
+  its link, ballot count, an access toggle and a close/reopen control.
+  Community copies are badged in the Arena tier lists tab and their
+  structural controls are absent, with a line explaining that a community
+  list is frozen and that the original remains editable.
 
 ## Known simplifications (stated, not hidden)
 
-- **Ballot dedupe is a browser-stored id, and will be beaten.** Clearing
-  storage lets someone vote again. The rate limit is the real defence.
-  This is a vibe poll, not an election; one-person-one-vote requires
-  accounts, which was explicitly declined.
-- No voter names or per-ballot identity — ballots are anonymous and
-  indistinguishable.
+- **Anonymous dedupe is a browser-stored id, and will be beaten.** See
+  "Identity, access, and dedupe". `members` mode is the answer when it
+  matters.
+- Voting anonymously and then signing in and voting again produces two
+  ballots — the anonymous one is not claimed or merged. Impossible in
+  `members` mode.
+- No voter names or per-ballot identity in the UI — ballots are anonymous
+  to everyone, including the owner, even when tied to an account.
 - Results don't live-update; they refresh on load and after submitting.
 - No way to adopt the community result back into the original list.
 - Mural `tierlist` blocks continue to render a tier list, not results.
@@ -230,12 +318,17 @@ token" — a closed poll must not be distinguishable from a fake link.
 - Backend: `cd backend && npm run typecheck && npm test`. New
   `service.test.ts` cases — open-voting duplicates without touching the
   original and seeds the owner's ballot; the copy rejects `data` writes;
-  ballot submit and edit; unknown book key or tier id is rejected;
-  histogram counts including the owner's ballot; unranked books produce
-  no rows; closed and unknown tokens are indistinguishable 404s.
+  ballot submit and edit, anonymous and signed-in; the unique index
+  rejects an account's second ballot; `members` mode refuses an
+  unauthenticated write but still serves the board; switching access
+  keeps existing ballots; a closed poll serves results and refuses
+  ballots; unknown book key or tier id is rejected; histogram counts
+  including the owner's ballot; unranked books produce no rows.
 - Frontend: `cd frontend && npm run typecheck && npm run lint && npm run
   build`, plus `lib/tierlistResults.test.ts` covering mean, plurality,
   median, ties, single-vote and zero-vote books, and unranked exclusion.
 - Manual: open voting on a list, vote from a private window, confirm the
   results gate, switch all three modes, edit the ballot on a return
-  visit, close voting and confirm the link 404s while results survive.
+  visit, switch the poll to members-only and confirm the anonymous window
+  can read but not submit, sign in and confirm one ballot per account,
+  close voting and confirm the link still shows final results.
