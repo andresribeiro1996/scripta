@@ -1,6 +1,7 @@
 import {
   closestCenter,
   DndContext,
+  DragOverlay,
   KeyboardSensor,
   pointerWithin,
   PointerSensor,
@@ -8,12 +9,13 @@ import {
   useSensor,
   useSensors,
   type CollisionDetection,
-  type DragEndEvent
+  type DragEndEvent,
+  type DragStartEvent
 } from "@dnd-kit/core";
 import { useEffect, useState } from "react";
 import { Link, useOutletContext, useParams } from "react-router-dom";
 import type { TierDefinition, TierlistData } from "../api/tierlists";
-import { DraggableTierTile, TierRow } from "../components/murals/blocks/BookBlocks";
+import { DraggableTierTile, MiniBookTile, TierRow } from "../components/murals/blocks/BookBlocks";
 import { OptionsMenu } from "../components/OptionsMenu";
 import { PageContainer } from "../components/PageContainer";
 import { ChevronDownIcon, ChevronUpIcon, toolbarIconClass } from "../components/Toolbar";
@@ -162,6 +164,17 @@ export function TierListEditorPage() {
   const [addingBooks, setAddingBooks] = useState(false);
   const [editing, setEditing] = useState(false);
   const [poolCollapsed, setPoolCollapsed] = useState(false);
+  // The book currently being dragged, tracked purely to feed `DragOverlay`
+  // below — dnd-kit doesn't render an overlay on its own, and without one
+  // the dragged tile is only ever moved IN PLACE via its own transform
+  // (BookBlocks.tsx used to do exactly that). The pool dock's strip is
+  // `overflow-x-auto`, which computes `overflow-y` to `auto` too, so an
+  // in-place-translated tile lifted toward a tier row got clipped at the
+  // strip's own top edge the moment it crossed it — you were dragging
+  // something you couldn't see. `DragOverlay` renders in a portal outside
+  // that clipping ancestor, so it stays visible for the whole drag; the
+  // source tile just dims in place (see its own `isDragging` styling).
+  const [activeKey, setActiveKey] = useState<string | null>(null);
   // Same sensor pair, same constants, as LibraryPage.tsx's own drag-to-
   // reorder: PointerSensor's 150ms/5px activation constraint means a touch
   // press has to hold for a beat before a drag starts (so a tap still just
@@ -303,11 +316,16 @@ export function TierListEditorPage() {
     }
   }
 
-  // A plain function, not a hook — it closes over `data`/`locate`/
+  // Plain functions, not hooks — they close over `data`/`locate`/
   // `moveBook`, which only exist below this component's two early
-  // returns, so it has to live down here rather than next to `sensors`
+  // returns, so they have to live down here rather than next to `sensors`
   // above them.
+  function handleDragStart(e: DragStartEvent) {
+    setActiveKey(String(e.active.id));
+  }
+
   function handleDragEnd(e: DragEndEvent) {
+    setActiveKey(null);
     if (!e.over) return;
     const key = String(e.active.id);
     const overId = String(e.over.id);
@@ -434,7 +452,17 @@ export function TierListEditorPage() {
           )}
         </div>
       ) : (
-        <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragEnd={handleDragEnd}>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={collisionDetection}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          // Cancelled drags (Escape, or the draggable node unmounting) skip
+          // `onDragEnd` entirely — without also clearing `activeKey` here,
+          // `DragOverlay` would keep rendering the last-dragged book frozen
+          // in place until some later drag started and ended normally.
+          onDragCancel={() => setActiveKey(null)}
+        >
           <div className="flex flex-col gap-2 pb-[13rem]">
             {data.tiers.length === 0 && <p className="text-sm text-(--color-text-dim)">No tiers yet — add one.</p>}
             {data.tiers.map((tier, i) => (
@@ -510,6 +538,27 @@ export function TierListEditorPage() {
               </DropZone>
             )}
           </div>
+
+          {/* Renders the ONLY visible copy of the dragged book — the source
+              tile stays mounted (dimmed via its own `isDragging` opacity)
+              rather than hiding, which is what lets it keep receiving a
+              drop (it's also a `useDroppable` target for the swap case)
+              and keeps its layout slot from collapsing mid-drag. This
+              floats in a portal at the document root, outside the pool
+              strip's `overflow-x-auto` (which computes `overflow-y` to
+              `auto` too and would otherwise clip a tile the instant it's
+              lifted past the strip's own top edge — see DraggableTierTile's
+              comment). Plain `MiniBookTile` at the same `h-[6em] w-[4em]`
+              tile size, not `DraggableTierTile` itself — the overlay copy
+              needs no drag listeners or drop target of its own, only to
+              look like the tile being moved. */}
+          <DragOverlay>
+            {activeKey && byKey.has(activeKey) ? (
+              <div className="h-[6em] w-[4em] cursor-grabbing overflow-hidden rounded-lg shadow-lg">
+                <MiniBookTile book={byKey.get(activeKey)!} showTitle={false} showAuthor={false} />
+              </div>
+            ) : null}
+          </DragOverlay>
         </DndContext>
       )}
 

@@ -217,7 +217,20 @@ export function TierRow({ tier, books }: { tier: TierDefinition; books: Array<Re
  *  a pointer over bare row/pool background resolves to that `DropZone`
  *  rather than whichever tile's rect happens to contain it; see the
  *  collision-detection comment there for why plain `closestCenter` can't
- *  tell those two cases apart. */
+ *  tell those two cases apart.
+ *
+ *  No in-place `style={{ transform }}` translation here — TierListEditorPage
+ *  renders a `DragOverlay` that follows the pointer instead, so the source
+ *  tile just dims (`opacity-50`) and stays put while dragging. Two reasons:
+ *  (1) the pool strip is `overflow-x-auto`, which computes `overflow-y` to
+ *  `auto` too, so an in-place-translated tile lifted toward a tier got
+ *  clipped at the strip's own top edge — invisible while you're dragging
+ *  it; `DragOverlay` renders in a portal outside that clipping ancestor.
+ *  (2) `touch-none` below is now conditional on `isDragging` rather than
+ *  permanent — see that comment — and an in-place transform combined with
+ *  a non-permanent `touch-none` would fight a still-scrolling ancestor
+ *  during the icon's own reflow; letting `DragOverlay` own the visual
+ *  sidesteps that entirely. */
 export function DraggableTierTile({
   book,
   bookKeyStr,
@@ -227,7 +240,7 @@ export function DraggableTierTile({
   bookKeyStr: string;
   menuItems: OptionsMenuItem[];
 }) {
-  const { attributes, listeners, setNodeRef: setDragRef, transform, isDragging } = useDraggable({ id: bookKeyStr });
+  const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({ id: bookKeyStr });
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id: bookKeyStr });
   const setRefs = (el: HTMLDivElement | null) => {
     setDragRef(el);
@@ -242,7 +255,6 @@ export function DraggableTierTile({
       ref={setRefs}
       {...listeners}
       {...attributes}
-      style={transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: 50 } : undefined}
       title="Drag to a tier, or use the ⋮ menu"
       className={`group/tile relative h-[6em] w-[4em] shrink-0 cursor-grab overflow-hidden rounded-lg active:cursor-grabbing ${
         isOver && !isDragging ? "ring-2 ring-(--color-accent)" : ""
