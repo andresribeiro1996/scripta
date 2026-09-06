@@ -35,3 +35,6 @@ exporter/library.json
 
 # Dev-only scratch config for parallel sessions — see its own header.
 frontend/vite.http.config.ts
+
+# Personal remote-workflow notes — machine-specific, not project source.
+todo/
