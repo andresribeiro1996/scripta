@@ -97,7 +97,7 @@ export function OptionsMenu({
           <div
             ref={menuRef}
             style={{ top: position.top, left: position.left, width: MENU_WIDTH }}
-            className="fixed z-50 overflow-hidden rounded-lg border border-(--color-border) bg-(--color-surface) py-1 text-sm shadow-lg"
+            className="menu-in fixed z-50 overflow-hidden rounded-lg border border-(--color-border) bg-(--color-surface) py-1 text-sm shadow-lg"
           >
             {items.map((item) => (
               <button

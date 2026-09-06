@@ -1,26 +1,31 @@
 import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { flushSync } from "react-dom";
+import { useNavigate } from "react-router-dom";
 import type { GalleryImage } from "../api/gallery";
 import { fetchLibrary, saveLibrary, type LibraryDocument } from "../api/library";
 import { BookCard } from "../components/BookCard";
 import { BookDetailSheet } from "../components/BookDetailSheet";
 import { BookGrid } from "../components/BookGrid";
-import { LibraryCanvas } from "../components/LibraryCanvas";
 import { CoverPickerModal } from "../components/CoverPickerModal";
+import { EmptyState } from "../components/EmptyState";
+import { LibraryCanvas } from "../components/LibraryCanvas";
 import { LibraryToolbar } from "../components/LibraryToolbar";
+import { LibraryIcon } from "../components/NavIcons";
 import type { OptionsMenuItem } from "../components/OptionsMenu";
 import { PageContainer } from "../components/PageContainer";
 import { PerCardStylePanel } from "../components/PerCardStylePanel";
 import { ShareModal } from "../components/ShareModal";
+import { SkeletonBookGrid } from "../components/Skeleton";
 import { useToast } from "../components/Toaster";
+import { FilterIcon } from "../components/Toolbar";
+import { useDelayedShow } from "../hooks/useDelayedShow";
 import { useLibrary } from "../hooks/useLibrary";
 import { useMurals } from "../hooks/useMurals";
 import { clearBookCover, setBookCover } from "../lib/bookCovers";
-import { deriveSeriesGroups, removeBooksFromAllGroups } from "../lib/groups";
 import { parseImportedFile } from "../lib/fileImport";
+import { deriveSeriesGroups, removeBooksFromAllGroups } from "../lib/groups";
 import { assignBookOrder, orderLibraryBooks, reorderOnDrop, seriesGroupByBookKey } from "../lib/libraryOrder";
 import { effectiveCardStyle, resolveLibraryStyle, type PerCardStyle } from "../lib/libraryStyle";
 import { filterBooks, nextReadStatus, sortBooks, type SortKey, type StatusFilter } from "../lib/libraryView";
@@ -300,6 +305,7 @@ export function LibraryPage() {
   const books = library?.data.books ?? [];
   const importing = importStatus !== null;
   const style = resolveLibraryStyle(library?.data.style);
+  const showSkeleton = useDelayedShow(isLoading);
   // Display order only — the stored `books` array itself stays in plain
   // merge order (see lib/libraryOrder.ts's own comment for why). Series
   // cluster together ahead of standalone books (collections don't affect
@@ -495,43 +501,60 @@ export function LibraryPage() {
         />
       )}
 
-      {isLoading && <p className="text-sm text-(--color-text-dim)">Loading your library…</p>}
+      {/* Inside LibraryCanvas, like the real grid below: the canvas
+          carries the user's own background and padding, so a skeleton
+          outside it would shift the whole grid the moment books
+          arrive — the exact jump this replaces. */}
+      {showSkeleton && (
+        <LibraryCanvas style={style}>
+          <SkeletonBookGrid style={style} />
+        </LibraryCanvas>
+      )}
 
       {!isLoading && books.length === 0 && (
-        <div className="rounded-xl border-2 border-dashed border-(--color-border) py-16 text-center">
-          <p className="mb-1 text-(--color-text)">No library saved yet.</p>
-          <p className="mb-4 text-sm text-(--color-text-dim)">
-            Import one of: a <code>library.json</code> from the exporter CLI, a <code>KoboReader.sqlite</code> straight
-            off your device's USB drive, a Goodreads library CSV export (My Books → Tools → Import/Export → Export
-            Library), or a StoryGraph library CSV export (profile icon → Manage Your Account → Manage Your Data →
-            Export StoryGraph Library).
-          </p>
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={importing}
-            className="rounded-lg bg-(--color-accent) px-4 py-2.5 font-semibold text-white disabled:opacity-60"
-          >
-            {importing ? "Importing…" : "Choose a file"}
-          </button>
-        </div>
+        <EmptyState
+          icon={LibraryIcon}
+          title="No library saved yet."
+          body={
+            <>
+              Import one of: a <code>library.json</code> from the exporter CLI, a <code>KoboReader.sqlite</code> straight
+              off your device's USB drive, a Goodreads library CSV export (My Books → Tools → Import/Export → Export
+              Library), or a StoryGraph library CSV export (profile icon → Manage Your Account → Manage Your Data →
+              Export StoryGraph Library).
+            </>
+          }
+          action={
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={importing}
+              className="rounded-lg bg-(--color-accent) px-4 py-2.5 font-semibold text-white disabled:opacity-60"
+            >
+              {importing ? "Importing…" : "Choose a file"}
+            </button>
+          }
+        />
       )}
 
       {books.length > 0 && displayBooks.length === 0 && (
-        <div className="rounded-xl border-2 border-dashed border-(--color-border) py-12 text-center">
-          <p className="mb-3 text-(--color-text)">No books match.</p>
-          {toolbarActive && (
-            <button
-              onClick={() => {
-                setQuery("");
-                setStatusFilter("all");
-                setSortKey("manual");
-              }}
-              className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover)"
-            >
-              Clear search and filters
-            </button>
-          )}
-        </div>
+        <EmptyState
+          icon={FilterIcon}
+          title="No books match."
+          body="Every book is still here — the search or filters above just don't match any of them."
+          action={
+            toolbarActive && (
+              <button
+                onClick={() => {
+                  setQuery("");
+                  setStatusFilter("all");
+                  setSortKey("manual");
+                }}
+                className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover)"
+              >
+                Clear search and filters
+              </button>
+            )
+          }
+        />
       )}
 
       {books.length > 0 && displayBooks.length > 0 && (

@@ -1,10 +1,14 @@
 import { useMemo, useRef, useState } from "react";
+import { useConfirm } from "../components/ConfirmDialog";
+import { EmptyState } from "../components/EmptyState";
+import { GalleryIcon } from "../components/NavIcons";
+import { PageContainer } from "../components/PageContainer";
+import { SkeletonCardGrid } from "../components/Skeleton";
+import { CloseIcon, ToolbarRow } from "../components/Toolbar";
+import { useDelayedShow } from "../hooks/useDelayedShow";
 import { useDeleteGalleryImage } from "../hooks/useDeleteGalleryImage";
 import { useGalleryImages } from "../hooks/useGalleryImages";
 import { useLibrary } from "../hooks/useLibrary";
-import { useConfirm } from "../components/ConfirmDialog";
-import { PageContainer } from "../components/PageContainer";
-import { ToolbarRow } from "../components/Toolbar";
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -21,6 +25,7 @@ function formatBytes(bytes: number): string {
  *  to its normal auto-detected cover the same way either place. */
 export function GalleryPage() {
   const { images, isLoading, upload } = useGalleryImages();
+  const showSkeleton = useDelayedShow(isLoading);
   const deleteImage = useDeleteGalleryImage();
   const { data: library } = useLibrary();
   const confirm = useConfirm();
@@ -127,10 +132,21 @@ export function GalleryPage() {
         <span className="text-(--color-text-dim)">Drag an image here to upload it — JPEG, PNG, or WebP, up to 20 MB.</span>
       </div>
 
-      {isLoading && <p className="text-sm text-(--color-text-dim)">Loading your gallery…</p>}
+      {showSkeleton && (
+        <SkeletonCardGrid
+          count={10}
+          label="Loading images"
+          tileClassName="aspect-square"
+          gridClassName="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
+        />
+      )}
 
       {!isLoading && images.length === 0 && (
-        <p className="text-sm text-(--color-text-dim)">No images yet — upload one above, or straight from a book's "Cover" button.</p>
+        <EmptyState
+          icon={GalleryIcon}
+          title="No images yet."
+          body={'Upload one above, or straight from a book\u2019s "Cover" button.'}
+        />
       )}
 
       {images.length > 0 && (
@@ -156,9 +172,9 @@ export function GalleryPage() {
                   onClick={() => void handleDelete(image.id)}
                   disabled={deletingId === image.id}
                   title="Delete from gallery"
-                  className="absolute top-2 right-2 flex h-7 w-7 items-center justify-center rounded-full bg-[rgba(10,8,6,0.72)] text-sm font-bold text-white opacity-0 backdrop-blur-xs transition-opacity group-hover:opacity-100 disabled:opacity-100"
+                  className="absolute top-2 right-2 flex h-7 w-7 items-center justify-center rounded-full bg-[rgba(10,8,6,0.72)] text-sm font-bold text-white opacity-0 backdrop-blur-xs transition-opacity group-hover:opacity-100 disabled:opacity-100 pointer-coarse:h-9 pointer-coarse:w-9 pointer-coarse:opacity-100"
                 >
-                  {deletingId === image.id ? "…" : "×"}
+                  {deletingId === image.id ? "…" : <CloseIcon size={13} />}
                 </button>
               </div>
             );

@@ -1,19 +1,23 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import type { GalleryImage } from "../api/gallery";
 import { useConfirm } from "../components/ConfirmDialog";
 import { CoverPickerModal } from "../components/CoverPickerModal";
-import { OptionsMenu } from "../components/OptionsMenu";
-import { PageContainer } from "../components/PageContainer";
-import { OptionSheet } from "../components/Sheet";
-import { FolderIcon, PlusIcon, SortIcon, TOOLBAR_CONTROL_CLASS, ToolbarRow, toolbarIconClass } from "../components/Toolbar";
-import { ShareModal } from "../components/ShareModal";
+import { EmptyState } from "../components/EmptyState";
 import { MoveToFolderModal } from "../components/murals/MoveToFolderModal";
 import { MuralFolderTree } from "../components/murals/MuralFolderTree";
-import { useMurals } from "../hooks/useMurals";
+import { MuralsIcon } from "../components/NavIcons";
+import { OptionsMenu } from "../components/OptionsMenu";
+import { PageContainer } from "../components/PageContainer";
+import { ShareModal } from "../components/ShareModal";
+import { OptionSheet } from "../components/Sheet";
+import { SkeletonCardGrid } from "../components/Skeleton";
+import { FolderIcon, PlusIcon, SortIcon, TOOLBAR_CONTROL_CLASS, ToolbarRow, toolbarIconClass } from "../components/Toolbar";
+import { useDelayedShow } from "../hooks/useDelayedShow";
 import { useMuralFolders } from "../hooks/useMuralFolders";
-import type { Mural, MuralFolder } from "../lib/murals";
+import { useMurals } from "../hooks/useMurals";
 import { buildTree, collectSubtreeIds, folderPath } from "../lib/muralFolders";
+import type { Mural, MuralFolder } from "../lib/murals";
 
 // Field + direction combined into one option each, rather than two
 // separate selects (field, then direction) — four clearly-labeled
@@ -38,6 +42,7 @@ const SORT_OPTIONS: Array<{ value: SortBy; label: string }> = [
  *  freeform canvas needs real room. */
 export function MuralsListPage() {
   const { data: muralsData, isLoading, rename, remove, move: moveMural, setCover, clearCover, share, unshare } = useMurals();
+  const showSkeleton = useDelayedShow(isLoading);
   const { data: foldersData, create: createFolder, rename: renameFolder, move: moveFolderApi, remove: removeFolder } = useMuralFolders();
   const navigate = useNavigate();
   const confirm = useConfirm();
@@ -49,7 +54,27 @@ export function MuralsListPage() {
   const [editingName, setEditingName] = useState("");
   const [coverMuralId, setCoverMuralId] = useState<string | null>(null);
   const [sharingMuralId, setSharingMuralId] = useState<string | null>(null);
-  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  // Which folder you're looking at lives in the URL rather than in
+  // component state. It used to be state, so it was lost the moment you
+  // opened a mural: the editor's back link goes to /dashboard/murals,
+  // which remounted this page at "All murals" no matter which folder you
+  // had come from. In the URL it survives the round trip (the editor's
+  // back link carries the mural's own folder), a refresh, and a shared
+  // link. `replace` so picking through a folder tree doesn't fill the
+  // back button with every step.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedFolderId = searchParams.get("folder");
+  function setSelectedFolderId(folderId: string | null) {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (folderId) next.set("folder", folderId);
+        else next.delete("folder");
+        return next;
+      },
+      { replace: true }
+    );
+  }
   const [movingMuralId, setMovingMuralId] = useState<string | null>(null);
   const [movingFolderId, setMovingFolderId] = useState<string | null>(null);
 
@@ -155,13 +180,14 @@ export function MuralsListPage() {
             ))}
           </nav>
 
-          {isLoading && <p className="text-sm text-(--color-text-dim)">Loading…</p>}
+          {showSkeleton && <SkeletonCardGrid label="Loading murals" />}
 
           {!isLoading && murals.length === 0 && (
-            <p className="mb-4 text-sm text-(--color-text-dim)">
-              No murals yet. A mural is a freeform dashboard you build yourself — a "Top 5 Books This Year" shelf, a favorite
-              quote, a photo, whatever you want on the wall. Click the + below to start.
-            </p>
+            <EmptyState
+              icon={MuralsIcon}
+              title="No murals yet."
+              body={'A mural is a freeform dashboard you build yourself \u2014 a "Top 5 Books This Year" shelf, a favorite quote, a photo, whatever you want on the wall. Use the + below to start.'}
+            />
           )}
 
           {!isLoading && murals.length > 0 && (

@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from "react";
+import { CloseIcon } from "./Toolbar";
 
 export interface ToastOptions {
   message: string;
@@ -43,7 +44,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             <div
               key={t.id}
               role={t.kind === "error" ? "alert" : "status"}
-              className={`pointer-events-auto flex items-start gap-3 rounded-xl border px-4 py-3 text-sm shadow-lg ${
+              className={`toast-in pointer-events-auto flex items-start gap-3 rounded-xl border px-4 py-3 text-sm shadow-lg ${
                 t.kind === "error"
                   ? "border-(--color-danger-soft) bg-(--color-danger-soft) text-(--color-danger)"
                   : "border-(--color-border) bg-(--color-surface) text-(--color-text)"
@@ -68,7 +69,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 </button>
               )}
               <button onClick={() => dismiss(t.id)} aria-label="Dismiss" className="-my-2 inline-flex min-h-11 items-center px-1 text-(--color-text-dim) hover:text-(--color-text)">
-                ×
+                <CloseIcon size={16} />
               </button>
             </div>
           );

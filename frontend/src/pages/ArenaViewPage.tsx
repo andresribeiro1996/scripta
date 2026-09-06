@@ -13,6 +13,7 @@ import { TournamentStatusBadge } from "../components/arena/TournamentStatusBadge
 import { BracketTree } from "../components/arena/BracketTree";
 import { DuelCard } from "../components/arena/DuelCard";
 import { useArena } from "../hooks/useArena";
+import { ChevronLeftIcon } from "../components/Toolbar";
 
 export function ArenaViewPage() {
   const { id } = useParams<{ id: string }>();
@@ -104,8 +105,9 @@ export function ArenaViewPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-8">
-      <Link to="/arena" className="mb-2 inline-block text-xs text-(--color-text-dim) hover:text-(--color-text)">
-        ← All tournaments
+      <Link to="/arena" className="mb-2 inline-flex items-center gap-1 text-xs text-(--color-text-dim) hover:text-(--color-text)">
+        <ChevronLeftIcon size={13} />
+        All tournaments
       </Link>
       {/* The heading stays a heading for everyone; for the owner it is
           also the rename control. */}

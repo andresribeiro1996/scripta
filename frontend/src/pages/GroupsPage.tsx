@@ -1,15 +1,19 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ComponentType } from "react";
 import type { GalleryImage } from "../api/gallery";
 import { BookCard } from "../components/BookCard";
 import { BookGrid } from "../components/BookGrid";
-import { LibraryCanvas } from "../components/LibraryCanvas";
-import { ActionSheet } from "../components/Sheet";
-import { GearIcon, PlusIcon, TOOLBAR_CONTROL_CLASS, ToolbarRow, toolbarIconClass } from "../components/Toolbar";
 import { CoverPickerModal } from "../components/CoverPickerModal";
+import { EmptyState } from "../components/EmptyState";
+import { LibraryCanvas } from "../components/LibraryCanvas";
+import { CollectionsIcon, SeriesIcon } from "../components/NavIcons";
 import { OptionsMenu } from "../components/OptionsMenu";
 import { PageContainer } from "../components/PageContainer";
 import { PerCardStylePanel } from "../components/PerCardStylePanel";
+import { ActionSheet } from "../components/Sheet";
+import { SkeletonGroups } from "../components/Skeleton";
 import { useToast } from "../components/Toaster";
+import { GearIcon, PlusIcon, TOOLBAR_CONTROL_CLASS, ToolbarRow, toolbarIconClass } from "../components/Toolbar";
+import { useDelayedShow } from "../hooks/useDelayedShow";
 import { useDismissible } from "../hooks/useDismissible";
 import { useLibrary } from "../hooks/useLibrary";
 import { useMurals } from "../hooks/useMurals";
@@ -30,19 +34,23 @@ import { seriesGroupByBookKey } from "../lib/libraryOrder";
 import { effectiveCardStyle, resolveLibraryStyle, type PerCardStyle } from "../lib/libraryStyle";
 import { bookKey } from "../lib/merge";
 
-const COPY: Record<GroupType, { title: string; noun: string; empty: string; untitled: string }> = {
+const COPY: Record<GroupType, { title: string; noun: string; emptyTitle: string; emptyBody: string; untitled: string; icon: ComponentType<{ size?: number }> }> = {
   series: {
     title: "Series",
     noun: "series",
-    empty:
-      "No series yet. Series are picked up automatically from your books' Series field on import — or add one by hand below.",
-    untitled: "Untitled series"
+    emptyTitle: "No series yet.",
+    emptyBody:
+      "Series are picked up automatically from your books' Series field on import — or add one by hand below.",
+    untitled: "Untitled series",
+    icon: SeriesIcon
   },
   collection: {
     title: "Collections",
     noun: "collection",
-    empty: "No collections yet. Create one to start organizing your books your own way.",
-    untitled: "Untitled collection"
+    emptyTitle: "No collections yet.",
+    emptyBody: "Create one to start organizing your books your own way.",
+    untitled: "Untitled collection",
+    icon: CollectionsIcon
   }
 };
 
@@ -293,6 +301,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
   const pickerGroup = groups.find((g) => g.id === pickerGroupId) ?? null;
   const styleGroup = groups.find((g) => g.id === styleGroupId) ?? null;
   const style = resolveLibraryStyle(library?.data.style);
+  const showSkeleton = useDelayedShow(isLoading);
   const styleBook = styleBookKey ? books.find((b) => bookKey(b) === styleBookKey) : null;
   const coverBook = coverBookKey ? books.find((b) => bookKey(b) === coverBookKey) : null;
 
@@ -366,9 +375,8 @@ export function GroupsPage({ type }: { type: GroupType }) {
         />
       )}
 
-      {isLoading && <p className="text-sm text-(--color-text-dim)">Loading…</p>}
 
-      {!isLoading && allGroups.length === 0 && <p className="text-sm text-(--color-text-dim)">{copy.empty}</p>}
+      {!isLoading && allGroups.length === 0 && <EmptyState icon={copy.icon} title={copy.emptyTitle} body={copy.emptyBody} />}
       {!isLoading && allGroups.length > 0 && groups.length === 0 && (
         <p className="text-sm text-(--color-text-dim)">Nothing matches “{search.trim()}”.</p>
       )}
@@ -419,6 +427,11 @@ export function GroupsPage({ type }: { type: GroupType }) {
             )}
           </button>
         )}
+
+        {/* After the "New …" tile, which is where the real panels
+            start — a skeleton above it would put the placeholder
+            somewhere the content never appears. */}
+        {showSkeleton && <SkeletonGroups style={style} />}
 
         {groups.map((group) => {
           const members = orderedGroupBooks(group, books);
@@ -577,7 +590,7 @@ function BookPickerModal({
   }, [allBooks, search]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    <div className="overlay-in fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
         className="flex max-h-[80vh] w-full max-w-md flex-col rounded-xl border border-(--color-border) bg-(--color-surface) shadow-lg"
         onClick={(e) => e.stopPropagation()}

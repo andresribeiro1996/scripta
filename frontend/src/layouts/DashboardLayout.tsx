@@ -1,7 +1,17 @@
-import { Fragment, useState } from "react";
+import { Fragment, useState, type ComponentType } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { Avatar } from "../components/Avatar";
+import {
+  ArenaIcon,
+  CollectionsIcon,
+  GalleryIcon,
+  LibraryIcon,
+  MoreIcon,
+  MuralsIcon,
+  SeriesIcon,
+  SettingsIcon
+} from "../components/NavIcons";
 import { OfflineBanner } from "../components/OfflineBanner";
 import { useDismissible } from "../hooks/useDismissible";
 import { useScrollLock } from "../hooks/useScrollLock";
@@ -11,21 +21,26 @@ interface NavItem {
   label: string;
   end: boolean;
   description?: string;
+  // Every destination carries one. The bottom tab bar is the app's most
+  // looked-at surface and it was five words in a row, which is what a
+  // site's nav looks like — an app's tab bar is icon over label, and the
+  // shape is what you actually navigate by once you know the app.
+  icon: ComponentType<{ size?: number }>;
 }
 
 const NAV_GROUPS: Array<{ items: NavItem[] }> = [
   {
     items: [
-      { to: "/dashboard", label: "Library", end: true },
-      { to: "/dashboard/series", label: "Series", end: false },
-      { to: "/dashboard/collections", label: "Collections", end: false }
+      { to: "/dashboard", label: "Library", end: true, icon: LibraryIcon },
+      { to: "/dashboard/series", label: "Series", end: false, icon: SeriesIcon },
+      { to: "/dashboard/collections", label: "Collections", end: false, icon: CollectionsIcon }
     ]
   },
   {
     items: [
-      { to: "/dashboard/gallery", label: "Gallery", end: false },
-      { to: "/dashboard/murals", label: "Murals", end: false, description: "Freeform dashboard pages" },
-      { to: "/dashboard/arena", label: "Arena", end: false, description: "Book-bracket tournaments" }
+      { to: "/dashboard/gallery", label: "Gallery", end: false, icon: GalleryIcon },
+      { to: "/dashboard/murals", label: "Murals", end: false, description: "Freeform dashboard pages", icon: MuralsIcon },
+      { to: "/dashboard/arena", label: "Arena", end: false, description: "Book-bracket tournaments", icon: ArenaIcon }
     ]
   },
   {
@@ -35,7 +50,7 @@ const NAV_GROUPS: Array<{ items: NavItem[] }> = [
     // things you do to your library. The route still exists and is
     // reachable directly; it's only the nav entry that moved, so an old
     // bookmark keeps working.
-    items: [{ to: "/dashboard/settings", label: "Settings", end: false }]
+    items: [{ to: "/dashboard/settings", label: "Settings", end: false, icon: SettingsIcon }]
   }
 ];
 
@@ -60,7 +75,7 @@ export function DashboardLayout() {
   useDismissible(() => setDrawerOpen(false), drawerOpen);
 
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+    `flex items-start gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
       isActive
         ? "bg-(--color-accent-soft) text-(--color-accent)"
         : "text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"
@@ -79,7 +94,14 @@ export function DashboardLayout() {
               {groupIndex > 0 && <div className="my-3 border-t border-(--color-border)" />}
               {group.items.map((item) => (
                 <NavLink key={item.to} to={item.to} end={item.end} title={item.description} className={navLinkClass}>
-                  {item.label}
+                  {/* mt-px optically centres an 18px glyph on a 20px
+                      first line; the row is items-start so the drawer's
+                      two-line entries keep the icon beside the label
+                      rather than floating between the two lines. */}
+                  <span className="mt-px shrink-0">
+                    <item.icon size={18} />
+                  </span>
+                  <span>{item.label}</span>
                 </NavLink>
               ))}
             </Fragment>
@@ -120,26 +142,30 @@ export function DashboardLayout() {
               to={item.to}
               end={item.end}
               className={({ isActive }) =>
-                `flex h-14 flex-1 items-center justify-center text-[13px] font-medium ${
+                `flex h-14 flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-medium ${
                   isActive ? "text-(--color-accent)" : "text-(--color-text-dim)"
                 }`
               }
             >
+              <item.icon size={22} />
               {item.label}
             </NavLink>
           ))}
           <button
             onClick={() => setDrawerOpen(true)}
             aria-expanded={drawerOpen}
-            className={`h-14 flex-1 text-[13px] font-medium ${drawerOpen ? "text-(--color-accent)" : "text-(--color-text-dim)"}`}
+            className={`flex h-14 flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-medium ${
+              drawerOpen ? "text-(--color-accent)" : "text-(--color-text-dim)"
+            }`}
           >
+            <MoreIcon size={22} />
             More
           </button>
         </nav>
       )}
 
       {drawerOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40 lg:hidden" onClick={() => setDrawerOpen(false)}>
+        <div className="drawer-in fixed inset-0 z-50 bg-black/40 lg:hidden" onClick={() => setDrawerOpen(false)}>
           <aside
             className="flex h-full w-72 max-w-[85%] flex-col overflow-y-auto overscroll-contain border-r border-(--color-border) bg-(--color-surface) px-3 py-5 pb-[env(safe-area-inset-bottom,0px)]"
             onClick={(e) => e.stopPropagation()}
@@ -160,10 +186,15 @@ export function DashboardLayout() {
                       className={navLinkClass}
                       onClick={() => setDrawerOpen(false)}
                     >
-                      {item.label}
-                      {item.description && (
-                        <span className="block text-xs font-normal text-(--color-text-dim)">{item.description}</span>
-                      )}
+                      <span className="mt-px shrink-0">
+                        <item.icon size={18} />
+                      </span>
+                      <span>
+                        {item.label}
+                        {item.description && (
+                          <span className="block text-xs font-normal text-(--color-text-dim)">{item.description}</span>
+                        )}
+                      </span>
                     </NavLink>
                   ))}
                 </Fragment>

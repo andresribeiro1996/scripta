@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useOutletContext, useParams, useSearchParams } from "react-router-dom";
+import { EmptyState } from "../components/EmptyState";
 import { AddBlockMenu } from "../components/murals/AddBlockMenu";
 import { BlockConfigPanel } from "../components/murals/BlockConfigPanel";
 import { BlockStylePanel } from "../components/murals/BlockStylePanel";
 import { MuralCanvas } from "../components/murals/MuralCanvas";
 import type { MobileMuralDraft } from "../components/murals/MobileMuralCanvas";
+import { MuralsIcon } from "../components/NavIcons";
 import { PageContainer } from "../components/PageContainer";
 import { ShareModal } from "../components/ShareModal";
 import { useToast } from "../components/Toaster";
-import { FullscreenIcon, PencilIcon, ShareIcon, toolbarIconClass } from "../components/Toolbar";
+import { ChevronLeftIcon, FullscreenIcon, PencilIcon, ShareIcon, toolbarIconClass } from "../components/Toolbar";
 import { useGalleryImages } from "../hooks/useGalleryImages";
 import { useLibrary } from "../hooks/useLibrary";
 import { useMuralFullscreen } from "../hooks/useMuralFullscreen";
@@ -68,6 +70,13 @@ export function MuralEditorPage() {
   // Which folder the draft belongs to, carried from the list page so a
   // mural created from inside a folder lands in it.
   const draftFolderId = searchParams.get("folder");
+  // Back goes to the folder this mural lives in, not to "All murals".
+  // The list page keeps its folder in the URL now, so handing it the
+  // mural's own folderId lands you exactly where the mural was — the
+  // folder you must have been in to open it. A draft has no folderId of
+  // its own yet, so it falls back to the one it was created from.
+  const backFolderId = mural?.folderId ?? draftFolderId;
+  const backToMurals = backFolderId ? `/dashboard/murals?folder=${encodeURIComponent(backFolderId)}` : "/dashboard/murals";
   const [draftName, setDraftName] = useState("Untitled mural");
   // Guards against a double-create: two quick actions on a draft (add a
   // block, then another before the first resolves) would otherwise each
@@ -422,8 +431,9 @@ export function MuralEditorPage() {
     <PageContainer>
       <header className="mb-6 flex items-center justify-between gap-4">
         <div>
-          <Link to="/dashboard/murals" className="text-xs text-(--color-text-dim) hover:text-(--color-text)">
-            ← Murals
+          <Link to={backToMurals} className="inline-flex items-center gap-1 text-xs text-(--color-text-dim) hover:text-(--color-text)">
+            <ChevronLeftIcon size={13} />
+            Murals
           </Link>
           {editingName ? (
             <input
@@ -510,21 +520,21 @@ export function MuralEditorPage() {
       </header>
 
       {view.blocks.length === 0 && !mobileDraft && (
-        <div className="rounded-xl border-2 border-dashed border-(--color-border) py-16 text-center">
-          <p className="mb-1 text-(--color-text)">This mural is empty.</p>
-          {/* Editing is already on in the second case, so telling you to
-              turn it on — and offering a button that turns it on — is
-              advice you've taken. Point at the control you actually
-              need instead. */}
-          <p className="mb-4 text-sm text-(--color-text-dim)">
-            {editMode ? "Add your first block with the + button above." : "Turn on editing and add your first block."}
-          </p>
-          {!editMode && (
-            <button onClick={() => setEditMode(true)} className="rounded-lg bg-(--color-accent) px-4 py-2 font-semibold text-white">
-              Start building
-            </button>
-          )}
-        </div>
+        // Editing is already on in the second case, so telling you to turn
+        // it on — and offering a button that turns it on — is advice you
+        // have taken. Point at the control you actually need instead.
+        <EmptyState
+          icon={MuralsIcon}
+          title="This mural is empty."
+          body={editMode ? "Add your first block with the + button above." : "Turn on editing and add your first block."}
+          action={
+            !editMode && (
+              <button onClick={() => setEditMode(true)} className="rounded-lg bg-(--color-accent) px-4 py-2 font-semibold text-white">
+                Start building
+              </button>
+            )
+          }
+        />
       )}
 
       {(view.blocks.length > 0 || mobileDraft) && (
