@@ -15,6 +15,6 @@
 // below.
 
 export { authPlugin as registerAuthModule } from "./plugin.js";
-export { authGuard } from "./guard.js";
+export { authGuard, getOptionalAuthenticatedUser } from "./guard.js";
 export type { AuthenticatedUser } from "./domain/types.js";
 export { EmailInUseError, InvalidCredentialsError } from "./domain/errors.js";

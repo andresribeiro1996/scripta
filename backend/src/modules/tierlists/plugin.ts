@@ -1,12 +1,12 @@
 // The tierlists module's Fastify plugin and composition root — mirrors
-// modules/arena/plugin.ts's shape: one authenticated route builder, no
-// public/unauthenticated surface to split into its own rate-limited
-// scope.
+// modules/murals/plugin.ts's shape: two route builders, each registered in
+// its OWN Fastify encapsulation scope so each carries its own rate limit.
 
+import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
 import { openTierlistsDb } from "./adapters/sqlite/connection.js";
 import { createSqliteTierlistsRepository } from "./adapters/sqlite/sqliteTierlistsRepository.js";
-import { buildTierlistRoutes } from "./routes.js";
+import { buildPublicTierlistRoutes, buildTierlistRoutes } from "./routes.js";
 import type { TierlistsPublicApi } from "./service.js";
 import { createTierlistsPublicApi, createTierlistsService } from "./service.js";
 
@@ -22,6 +22,15 @@ export async function tierlistsPlugin(app: FastifyInstance) {
   // same posture as modules/murals' own authenticated routes (see that
   // module's plugin.ts).
   await app.register(buildTierlistRoutes(tierlistsService));
+
+  // The public surface is the one that needs a tight limit: it is
+  // unauthenticated, it WRITES (a ballot), and a community tier list is
+  // publicly listed, so its link is meant to be found. Same 30/minute as
+  // the public shared-mural route.
+  await app.register(async (scoped) => {
+    await scoped.register(fastifyRateLimit, { max: 30, timeWindow: "1 minute" });
+    await scoped.register(buildPublicTierlistRoutes(tierlistsService));
+  });
 }
 
 let cachedApi: TierlistsPublicApi | null = null;

@@ -23,6 +23,7 @@ import { SharedLibraryPage } from "./pages/SharedLibraryPage";
 import { SharedMuralPage } from "./pages/SharedMuralPage";
 import { TierListEditorPage } from "./pages/TierListEditorPage";
 import { WelcomeAvatarPage } from "./pages/WelcomeAvatarPage";
+import { VoteTierlistPage } from "./pages/VoteTierlistPage";
 
 export function App() {
   return (
@@ -41,6 +42,7 @@ export function App() {
             needs — and never gets asked for — an account. */}
         <Route path="/shared/murals/:token" element={<SharedMuralPage />} />
         <Route path="/shared/library/:token" element={<SharedLibraryPage />} />
+        <Route path="/vote/:code" element={<VoteTierlistPage />} />
 
         {/* RequireAuth: must be signed in at all. RequireUsername, nested
             inside it: must also have finished setup (a username) — a
