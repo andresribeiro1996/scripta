@@ -21,6 +21,12 @@ function toTierlist(row: TierlistRow): Tierlist {
   };
 }
 
+export type Voter = { kind: "user"; userId: string } | { kind: "anonymous"; ballotId: string | null };
+
+export type BallotOutcome =
+  | { ok: true; ballotId: string; placements: Placement[] }
+  | { ok: false; reason: "not-found" | "closed" | "members-only" | "invalid" };
+
 export interface TierlistsService {
   listTierlists(userId: string): Tierlist[];
   createTierlist(userId: string, name: string): Tierlist;
@@ -39,6 +45,8 @@ export interface TierlistsService {
    *  undefined if not owned. */
   openVoting(userId: string, id: string, access: VoteAccess): Tierlist | undefined;
   setVotingState(userId: string, id: string, patch: { access?: VoteAccess; open?: boolean }): Tierlist | undefined;
+  submitBallot(code: string, placements: Placement[], voter: Voter): BallotOutcome;
+  getBallot(code: string, voter: Voter): BallotOutcome;
 }
 
 /** Where a new tier list starts — the familiar S–D ladder, matching the
@@ -179,6 +187,60 @@ export function createTierlistsService(repo: TierlistsRepository): TierlistsServ
         ...(patch.open !== undefined ? { voting_open: patch.open ? 1 : 0 } : {})
       });
       return row ? toTierlist(row) : undefined;
+    },
+
+    submitBallot(code, placements, voter) {
+      const row = repo.getByVoteCode(code);
+      if (!row) return { ok: false, reason: "not-found" };
+      if (row.voting_open !== 1) return { ok: false, reason: "closed" };
+      if (row.vote_access === "members" && voter.kind !== "user") return { ok: false, reason: "members-only" };
+
+      const { tiers, pool } = readDocument(toTierlist(row));
+      const validPool = new Set(pool);
+      const validTiers = new Set(tiers.map((t) => t.id));
+      const seen = new Set<string>();
+      for (const placement of placements) {
+        if (!validPool.has(placement.bookKey)) return { ok: false, reason: "invalid" };
+        if (!validTiers.has(placement.tierId)) return { ok: false, reason: "invalid" };
+        if (seen.has(placement.bookKey)) return { ok: false, reason: "invalid" };
+        seen.add(placement.bookKey);
+      }
+
+      const existing =
+        voter.kind === "user"
+          ? repo.getBallotByVoter(row.id, voter.userId)
+          : voter.ballotId
+            ? repo.getBallotById(row.id, voter.ballotId)
+            : undefined;
+
+      const now = new Date().toISOString();
+      const ballot: BallotRow = existing
+        ? { ...existing, updated_at: now }
+        : {
+            id: randomUUID(),
+            tierlist_id: row.id,
+            voter_user_id: voter.kind === "user" ? voter.userId : null,
+            created_at: now,
+            updated_at: now
+          };
+
+      repo.saveBallot(ballot, placements);
+      return { ok: true, ballotId: ballot.id, placements };
+    },
+
+    getBallot(code, voter) {
+      const row = repo.getByVoteCode(code);
+      if (!row) return { ok: false, reason: "not-found" };
+
+      const existing =
+        voter.kind === "user"
+          ? repo.getBallotByVoter(row.id, voter.userId)
+          : voter.ballotId
+            ? repo.getBallotById(row.id, voter.ballotId)
+            : undefined;
+      if (!existing) return { ok: false, reason: "not-found" };
+
+      return { ok: true, ballotId: existing.id, placements: repo.getPlacements(existing.id) };
     }
   };
 }

@@ -321,3 +321,110 @@ test("setVotingState switches access and closes without losing ballots", () => {
 
   assert.equal(service.setVotingState("u2", copy.id, { open: true }), undefined);
 });
+
+function openPoll(service: ReturnType<typeof makeService>, access: "anonymous" | "members" = "anonymous") {
+  const original = service.createTierlist("u1", "Fantasy");
+  const tiers = (original.data as { tiers: Array<{ id: string }> }).tiers;
+  service.updateTierlist("u1", original.id, {
+    data: { tiers: tiers.map((t) => ({ ...t, bookKeys: [] })), pool: ["b1", "b2"] }
+  });
+  const copy = service.openVoting("u1", original.id, access)!;
+  return { copy, code: copy.voteCode!, tierIds: tiers.map((t) => t.id) };
+}
+
+test("an anonymous ballot is created, then edited by its returned id", () => {
+  const service = makeService();
+  const { code, tierIds } = openPoll(service);
+
+  const first = service.submitBallot(code, [{ bookKey: "b1", tierId: tierIds[0]! }], { kind: "anonymous", ballotId: null });
+  assert.equal(first.ok, true);
+  const ballotId = first.ok ? first.ballotId : "";
+
+  const edit = service.submitBallot(code, [{ bookKey: "b1", tierId: tierIds[1]! }], { kind: "anonymous", ballotId });
+  assert.equal(edit.ok, true);
+  assert.equal(edit.ok && edit.ballotId, ballotId);
+
+  const results = service.getResults(openPollIdFor(service, code));
+  assert.equal(results.ballotCount, 2);
+  assert.equal(results.histogram.find((c) => c.bookKey === "b1" && c.tierId === tierIds[1]!)?.votes, 1);
+});
+
+function openPollIdFor(service: ReturnType<typeof makeService>, code: string): string {
+  return service.getVotingBoard(code)!.id;
+}
+
+test("a signed-in voter gets one ballot, edited in place across submissions", () => {
+  const service = makeService();
+  const { code, tierIds } = openPoll(service);
+
+  const first = service.submitBallot(code, [{ bookKey: "b1", tierId: tierIds[0]! }], { kind: "user", userId: "u7" });
+  const second = service.submitBallot(code, [{ bookKey: "b1", tierId: tierIds[2]! }], { kind: "user", userId: "u7" });
+
+  assert.equal(first.ok && second.ok && first.ballotId === second.ballotId, true);
+  const results = service.getResults(openPollIdFor(service, code));
+  assert.equal(results.ballotCount, 2);
+});
+
+test("members-only refuses an anonymous ballot", () => {
+  const service = makeService();
+  const { code, tierIds } = openPoll(service, "members");
+  const outcome = service.submitBallot(code, [{ bookKey: "b1", tierId: tierIds[0]! }], { kind: "anonymous", ballotId: null });
+  assert.deepEqual(outcome, { ok: false, reason: "members-only" });
+});
+
+test("a closed poll refuses new ballots", () => {
+  const service = makeService();
+  const { copy, code, tierIds } = openPoll(service);
+  service.setVotingState("u1", copy.id, { open: false });
+  const outcome = service.submitBallot(code, [{ bookKey: "b1", tierId: tierIds[0]! }], { kind: "anonymous", ballotId: null });
+  assert.deepEqual(outcome, { ok: false, reason: "closed" });
+});
+
+test("an unknown code is not found", () => {
+  const service = makeService();
+  assert.deepEqual(service.submitBallot("nosuch", [], { kind: "anonymous", ballotId: null }), { ok: false, reason: "not-found" });
+});
+
+test("placements outside the frozen structure are rejected", () => {
+  const service = makeService();
+  const { code, tierIds } = openPoll(service);
+
+  assert.deepEqual(service.submitBallot(code, [{ bookKey: "nope", tierId: tierIds[0]! }], { kind: "anonymous", ballotId: null }), {
+    ok: false,
+    reason: "invalid"
+  });
+  assert.deepEqual(service.submitBallot(code, [{ bookKey: "b1", tierId: "nosuchtier" }], { kind: "anonymous", ballotId: null }), {
+    ok: false,
+    reason: "invalid"
+  });
+  assert.deepEqual(
+    service.submitBallot(
+      code,
+      [
+        { bookKey: "b1", tierId: tierIds[0]! },
+        { bookKey: "b1", tierId: tierIds[1]! }
+      ],
+      { kind: "anonymous", ballotId: null }
+    ),
+    { ok: false, reason: "invalid" }
+  );
+});
+
+test("an unranked book simply has no placement", () => {
+  const service = makeService();
+  const { code, tierIds } = openPoll(service);
+  service.submitBallot(code, [{ bookKey: "b1", tierId: tierIds[0]! }], { kind: "anonymous", ballotId: null });
+  const results = service.getResults(openPollIdFor(service, code));
+  assert.equal(results.histogram.some((c) => c.bookKey === "b2"), false);
+});
+
+test("getBallot rehydrates an anonymous voter's placements", () => {
+  const service = makeService();
+  const { code, tierIds } = openPoll(service);
+  const submitted = service.submitBallot(code, [{ bookKey: "b1", tierId: tierIds[0]! }], { kind: "anonymous", ballotId: null });
+  const ballotId = submitted.ok ? submitted.ballotId : "";
+
+  const fetched = service.getBallot(code, { kind: "anonymous", ballotId });
+  assert.equal(fetched.ok, true);
+  assert.deepEqual(fetched.ok && fetched.placements, [{ bookKey: "b1", tierId: tierIds[0]! }]);
+});
