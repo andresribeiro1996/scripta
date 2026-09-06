@@ -1,6 +1,6 @@
 # Kobo Library Backend
 
-A Node.js/Fastify/TypeScript backend, structured as a **modular monolith**: one deployable service, internally split into self-contained modules that only talk to each other through explicit public interfaces. Seven modules so far — `auth`, `library`, `gallery`, `covers`, `socials`, `arena`, and `murals` — with more expected as the project grows. Consumed by the [frontend](../frontend/README.md), which replaces the old static, drag-your-own-file [viewer](../viewer/README.md).
+A Node.js/Fastify/TypeScript backend, structured as a **modular monolith**: one deployable service, internally split into self-contained modules that only talk to each other through explicit public interfaces. Eight modules so far — `auth`, `library`, `gallery`, `covers`, `socials`, `arena`, `murals`, and `tierlists` — with more expected as the project grows. Consumed by the [frontend](../frontend/README.md), which replaces the old static, drag-your-own-file [viewer](../viewer/README.md).
 
 Every module with a persistence dependency follows **hexagonal architecture** (ports & adapters): the module's business logic depends only on a repository *interface* it defines, never on a concrete database. See "Hexagonal architecture" below — this is a standing convention for this backend, not just how `auth` happened to be built.
 
@@ -17,6 +17,7 @@ Skim layer over the detailed sections below — each module's own section has th
 | `socials` | Platform connections (X/Instagram/Threads/TikTok OAuth, Bluesky app password), tokens encrypted at rest | `GET /socials`, link-session, bluesky, `DELETE` ✓; `connect`/`callback` open |
 | `arena` | Anonymous-vote book bracket tournaments; duels settled by a 30s background sweep | create/seed/start/settle/tiebreak/delete/mine ✓; view/public-list/vote open |
 | `murals` | Per-account freeform dashboard documents (block semantics live in the frontend) plus public share links | all `/murals*` ✓ except `GET /murals/shared/:token` |
+| `tierlists` | Tier list ranking polls: owner-created private tier lists can open to community voting (anonymous or members-only), with live vote aggregation in three modes | create/list/get/update/delete/results ✓; open-voting/set-voting-state ✓; public-list/voting-board/ballot (submit/edit/get) open |
 
 ## Running it
 
@@ -166,6 +167,37 @@ Rate-limited (30 requests/minute, scoped to this module's routes only) and given
 | POST | `/murals/folders` | ✓ | `{name, parentId?}` → `{muralFolder}`, `201` (400 if parentId isn't yours) |
 | PUT | `/murals/folders/:id` | ✓ | `{name? \| parentId?}` at least one (`parentId: null` = root) → `{muralFolder}` (400 on cycle) |
 | DELETE | `/murals/folders/:id` | ✓ | children/murals splice up one level → `204`, or `404` |
+
+### `tierlists`
+
+- **Private tier lists and public voting copies** — an account owns private tier lists (edit freely, never exposed publicly). When voting opens, a tier list is duplicated into a frozen community copy with its own vote code, while the original remains private and fully editable. The community copy's structure (tiers and pool) never changes after creation — all ballots vote on the same shape. Toggling the voting state (open/closed, anonymous/members-only) happens on the copy only.
+- **Two vote access modes and their guarantees about deduplication**:
+  - **Anonymous**: anyone with the link can vote; no account required. Behind the scenes, a `ballotId` is stored in the voter's browser `localStorage` and restored on return visits, allowing ballot edits. **The honest limitation**: an anonymous ballot is deduped only by the browser-held id, so the vote counts are a vibe poll, not an election. A person with two browsers or cleared `localStorage` each counts as a separate voter.
+  - **Members-only**: requires an account (`user.id`) to vote. One vote per account, deduped by user id across all devices and browsers. A genuine community consensus measure, not browser-dependent.
+- **Three aggregation modes, computed from a vote histogram** (per-book × per-tier vote counts; the size depends on pool/tier count but not voter count):
+  - **Average** (`average`): mean tier index per book (0 = top tier). Ties break toward the higher tier. Books unranked by everyone score `null` and drop to the bottom.
+  - **Most-voted** (`plurality`): whichever tier got the most votes for that book. Ties break toward the higher tier. Most aligned with "which tier do voters most agree on."
+  - **Median** (`median`): the middle-ranked tier when walking voters' ballots in tier order. Ties break toward the higher tier (for an even vote split, stops at the higher half's tier, not the lower).
+- **The voting board** (`getVotingBoard`) returns the histogram live: per-book vote counts in each tier, plus total ballot count. Live means revisiting always shows the current tally.
+- **The public directory** (`GET /tierlists/public`) lists all public tier lists (community copies only, never private originals) with vote code, name, pool size, ballot count, and voting state. Links route to `/vote/:code` where voters rank and submit.
+- **A ballot is exactly what the voter placed** — anything still in the pool (unranked books) is recorded as "no opinion" for that book. Results carry per-book vote counts, never per-book response rates, so the same three aggregation modes work regardless of which books each voter ranked.
+- **Its own SQLite file** (`TIERLISTS_DB_PATH`), same one-module-one-database isolation as every other module.
+
+| Method | Path | Auth required | Notes |
+|---|---|---|---|
+| GET | `/tierlists` | ✓ | `{tierlists: Tierlist[]}` for the caller's account |
+| POST | `/tierlists` | ✓ | `{name}` → `{tierlist}` with DEFAULT_TIER_PRESET tiers, `201` |
+| GET | `/tierlists/:id` | ✓ | `{tierlist}`, or `404` |
+| PUT | `/tierlists/:id` | ✓ | `{name?, data?}` (at least one) → `{tierlist}`. Structure edits blocked if voting is open (copy is frozen) |
+| DELETE | `/tierlists/:id` | ✓ | `204`, or `404` |
+| POST | `/tierlists/:id/open-voting` | ✓ | `{access: "anonymous" \| "members"}` → duplicates the tier list into a public community copy, seeds it with the owner's current ranking as the first ballot, `{tierlist}` the copy. Owner's original stays untouched. `undefined` if not owned |
+| PUT | `/tierlists/:id/voting` | ✓ | `{access?, open?}` (at least one) → `{tierlist}`. Toggles access mode and/or open/closed state on a community copy only. `undefined` if not owned or not a copy |
+| GET | `/tierlists/:id/results` | ✓ | `{histogram: HistogramCell[], ballotCount: number}` from a community copy (the owner's private tier list never gets voting results) |
+| GET | `/tierlists/public?limit=50&offset=0` | — | `{summaries: PublicTierlistSummary[]}` listing community tier lists across all accounts, newest first; `limit` 1–100 (default 50), `offset` for pagination |
+| GET | `/tierlists/voting/:code` | — | The public voting board: `{id, name, tiers, pool, access, votingOpen, histogram, ballotCount}` for a given community copy. Unauthenticated, same as a public share link |
+| POST | `/tierlists/voting/:code/ballot` | — | `{placements: [{bookKey, tierId}, ...]}` → creates or replaces a ballot (anon by browser id, or by user id if signed in). `{ok, ballotId, placements}` on success; `{ok: false, reason: "not-found" \| "closed" \| "members-only" \| "invalid"}` on rejection |
+| PUT | `/tierlists/voting/:code/ballot/:ballotId` | — | Same validation/replacement as POST; for UI simplicity, `PUT` is also allowed (though the backend resolves both to an edit of the existing ballot, never creating duplicates) |
+| GET | `/tierlists/voting/:code/ballot/:ballotId` | — | `{ok, ballotId, placements}` for the voter to see their current ballot; same voter-identification as POST/PUT (anon or user) |
 
 ## Hexagonal architecture — the standing convention for dependencies like a database
 
