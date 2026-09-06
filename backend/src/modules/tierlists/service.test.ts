@@ -7,11 +7,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { TierlistsRepository } from "./domain/ports.js";
-import type { TierlistRow } from "./domain/types.js";
+import type { TierlistRow, BallotRow, HistogramCell, Placement } from "./domain/types.js";
 import { createTierlistsPublicApi, createTierlistsService } from "./service.js";
 
 function createInMemoryRepo(): TierlistsRepository {
   const tierlists = new Map<string, TierlistRow>();
+  const ballots = new Map<string, BallotRow>();
+  const placements = new Map<string, Placement[]>();
 
   return {
     listByUser(userId) {
@@ -36,6 +38,77 @@ function createInMemoryRepo(): TierlistsRepository {
       if (!existing || existing.owner_user_id !== userId) return false;
       tierlists.delete(id);
       return true;
+    },
+
+    getByVoteCode(code) {
+      return [...tierlists.values()].find((t) => t.vote_code === code);
+    },
+
+    insertCommunityCopy(row, ballot, ps) {
+      tierlists.set(row.id, { ...row });
+      ballots.set(ballot.id, { ...ballot });
+      placements.set(ballot.id, [...ps]);
+    },
+
+    setVoting(id, userId, patch) {
+      const existing = tierlists.get(id);
+      if (!existing || existing.owner_user_id !== userId) return undefined;
+      const merged: TierlistRow = { ...existing, ...patch, updated_at: new Date().toISOString() };
+      tierlists.set(id, merged);
+      return merged;
+    },
+
+    listPublic(limit, offset) {
+      return [...tierlists.values()]
+        .filter((t) => t.vote_code !== null)
+        .sort((a, b) => b.created_at.localeCompare(a.created_at))
+        .slice(offset, offset + limit);
+    },
+
+    getBallotById(tierlistId, ballotId) {
+      const b = ballots.get(ballotId);
+      return b && b.tierlist_id === tierlistId ? b : undefined;
+    },
+
+    getBallotByVoter(tierlistId, voterUserId) {
+      return [...ballots.values()].find((b) => b.tierlist_id === tierlistId && b.voter_user_id === voterUserId);
+    },
+
+    saveBallot(ballot, ps) {
+      const clash = [...ballots.values()].find(
+        (b) => b.tierlist_id === ballot.tierlist_id && b.voter_user_id !== null && b.voter_user_id === ballot.voter_user_id && b.id !== ballot.id
+      );
+      if (clash) throw new Error("UNIQUE constraint failed: tierlist_ballots.voter_user_id");
+      ballots.set(ballot.id, { ...ballot });
+      placements.set(ballot.id, [...ps]);
+    },
+
+    getPlacements(ballotId) {
+      return [...(placements.get(ballotId) ?? [])];
+    },
+
+    histogram(tierlistId) {
+      const counts = new Map<string, HistogramCell>();
+      for (const ballot of ballots.values()) {
+        if (ballot.tierlist_id !== tierlistId) continue;
+        for (const p of placements.get(ballot.id) ?? []) {
+          const key = JSON.stringify([p.bookKey, p.tierId]);
+          const cell = counts.get(key) ?? { bookKey: p.bookKey, tierId: p.tierId, votes: 0 };
+          cell.votes += 1;
+          counts.set(key, cell);
+        }
+      }
+      return [...counts.values()];
+    },
+
+    ballotCount(tierlistId) {
+      return [...ballots.values()].filter((b) => b.tierlist_id === tierlistId).length;
+    },
+
+    ballotCountsByTierlist() {
+      const counts = new Map<string, number>();
+      for (const b of ballots.values()) counts.set(b.tierlist_id, (counts.get(b.tierlist_id) ?? 0) + 1);
+      return counts;
     }
   };
 }
@@ -109,7 +182,7 @@ test("a deleted tier list is no longer returned by getTierlist", () => {
 
 test("a tier list stored before the tiers/pool shape existed normalizes to empty arrays", () => {
   const repo = createInMemoryRepo();
-  const legacy: TierlistRow = {
+  const legacy = {
     id: "00000000-0000-4000-8000-000000000001",
     owner_user_id: "u1",
     name: "Legacy",
