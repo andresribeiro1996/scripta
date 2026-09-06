@@ -32,6 +32,16 @@ const updateTierlistSchema = z
     message: "At least one of name or data must be provided."
   });
 
+const voteAccessSchema = z.enum(["anonymous", "members"]);
+
+const openVotingSchema = z.object({ access: voteAccessSchema });
+
+const votingStateSchema = z
+  .object({ access: voteAccessSchema.optional(), open: z.boolean().optional() })
+  .refine((body) => body.access !== undefined || body.open !== undefined, {
+    message: "At least one of access or open must be provided."
+  });
+
 export function buildTierlistRoutes(service: TierlistsService) {
   return async function tierlistRoutes(app: FastifyInstance) {
     app.get("/tierlists", { preHandler: authGuard }, async (request, reply) => {
@@ -85,6 +95,52 @@ export function buildTierlistRoutes(service: TierlistsService) {
         return reply.code(404).send({ error: "No tier list with that id." });
       }
       return reply.code(204).send();
+    });
+
+    app.post("/tierlists/:id/open-voting", { preHandler: authGuard }, async (request, reply) => {
+      const params = idParamSchema.safeParse(request.params);
+      if (!params.success) {
+        return reply.code(400).send({ error: "Invalid tier list id." });
+      }
+      const body = openVotingSchema.safeParse(request.body);
+      if (!body.success) {
+        return reply.code(400).send({ error: body.error.issues[0]?.message ?? "Invalid request." });
+      }
+      const tierlist = service.openVoting(request.user.id, params.data.id, body.data.access);
+      if (!tierlist) {
+        return reply.code(404).send({ error: "No tier list with that id." });
+      }
+      return reply.code(201).send({ tierlist, voteCode: tierlist.voteCode });
+    });
+
+    app.put("/tierlists/:id/voting", { preHandler: authGuard }, async (request, reply) => {
+      const params = idParamSchema.safeParse(request.params);
+      if (!params.success) {
+        return reply.code(400).send({ error: "Invalid tier list id." });
+      }
+      const body = votingStateSchema.safeParse(request.body);
+      if (!body.success) {
+        return reply.code(400).send({ error: body.error.issues[0]?.message ?? "Invalid request." });
+      }
+      const tierlist = service.setVotingState(request.user.id, params.data.id, body.data);
+      if (!tierlist) {
+        return reply.code(404).send({ error: "No tier list with that id." });
+      }
+      return reply.send({ tierlist });
+    });
+
+    app.get("/tierlists/:id/results", { preHandler: authGuard }, async (request, reply) => {
+      const params = idParamSchema.safeParse(request.params);
+      if (!params.success) {
+        return reply.code(400).send({ error: "Invalid tier list id." });
+      }
+      // Ownership-checked BEFORE reading results: getResults takes a plain
+      // tier list id, so without this an authenticated user could read any
+      // poll's raw histogram by id.
+      if (!service.getTierlist(request.user.id, params.data.id)) {
+        return reply.code(404).send({ error: "No tier list with that id." });
+      }
+      return reply.send(service.getResults(params.data.id));
     });
   };
 }
