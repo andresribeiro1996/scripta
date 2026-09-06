@@ -5,10 +5,12 @@
 
 import { Link } from "react-router-dom";
 import { usePublicTournaments } from "../hooks/usePublicTournaments";
+import { usePublicTierlists } from "../hooks/usePublicTierlists";
 import { TournamentStatusBadge } from "../components/arena/TournamentStatusBadge";
 
 export function ArenaPublicListPage() {
   const { tournaments, isLoading } = usePublicTournaments();
+  const { tierlists } = usePublicTierlists();
 
   return (
     <div className="mx-auto max-w-3xl p-6">
@@ -16,7 +18,7 @@ export function ArenaPublicListPage() {
         ← Back to app
       </Link>
       <h1 className="mb-1 text-xl font-bold">BookArena</h1>
-      <p className="mb-6 text-sm text-(--color-text-dim)">Vote in book bracket tournaments — no account needed.</p>
+      <p className="mb-6 text-sm text-(--color-text-dim)">Vote in book bracket tournaments and tier lists — no account needed.</p>
 
       {isLoading && <p className="text-sm text-(--color-text-dim)">Loading…</p>}
       {!isLoading && tournaments.length === 0 && <p className="text-sm text-(--color-text-dim)">No tournaments yet. A tournament is a bracket where friends vote books head-to-head — check back soon.</p>}
@@ -31,6 +33,27 @@ export function ArenaPublicListPage() {
           </a>
         ))}
       </div>
+
+      {tierlists.length > 0 && (
+        <>
+          <h2 className="mt-8 mb-3 text-lg font-bold">Tier lists</h2>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {tierlists.map((t) => (
+              <a
+                key={t.voteCode}
+                href={`/vote/${t.voteCode}`}
+                className="rounded-xl border border-(--color-border) bg-(--color-surface) p-4 hover:border-(--color-accent)"
+              >
+                <h3 className="font-semibold">{t.name}</h3>
+                <p className="text-sm text-(--color-text-dim)">
+                  {t.poolSize} books · {t.ballotCount} {t.ballotCount === 1 ? "vote" : "votes"}
+                  {!t.votingOpen && " · closed"}
+                </p>
+              </a>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
