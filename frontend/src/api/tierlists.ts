@@ -35,6 +35,10 @@ export interface Tierlist {
   data: TierlistData;
   createdAt: string;
   updatedAt: string;
+  voteCode: string | null;
+  voteAccess: "anonymous" | "members";
+  votingOpen: boolean;
+  sourceTierlistId: string | null;
 }
 
 export async function fetchTierlists(): Promise<Tierlist[]> {
