@@ -88,7 +88,10 @@ export function VoteTierlistPage() {
   const showResults = alreadySubmitted || !board.votingOpen;
 
   if (showResults) {
-    const histogram = ballot?.results.histogram ?? board.histogram;
+    // board.histogram is only ever present on a CLOSED poll — while voting
+    // is open the backend withholds it, and the only histogram this page
+    // has is the one that came back with the ballot it just submitted.
+    const histogram = ballot?.results.histogram ?? board.histogram ?? [];
     const ballotCount = ballot?.results.ballotCount ?? board.ballotCount;
     return (
       <div className="mx-auto max-w-5xl px-5 py-8">

@@ -10,7 +10,7 @@ import { TierlistResultsView } from "../components/tierlist/TierlistResultsView"
 import { useDismissible } from "../hooks/useDismissible";
 import { useLibrary } from "../hooks/useLibrary";
 import { useTierlists } from "../hooks/useTierlists";
-import { useTierlistVoting } from "../hooks/useTierlistVoting";
+import { useTierlistResults, useTierlistVoting } from "../hooks/useTierlistVoting";
 import { bookKey } from "../lib/merge";
 
 export function TierListEditorPage() {
@@ -25,13 +25,17 @@ export function TierListEditorPage() {
   const [addingBooks, setAddingBooks] = useState(false);
   const [editing, setEditing] = useState(false);
 
-  // The voting board (histogram, ballot count, frozen tiers/pool) behind
-  // this tier list's OWN vote code, read through the same public route
-  // voters hit (GET /tierlists/voting/:code) — reused rather than adding a
-  // separate owner-only results fetch, since it already carries everything
-  // TierlistResultsView needs. Called unconditionally (hook rules), with ""
-  // when there's no code yet; that resolves to a harmless 404 nobody reads.
+  // The voting board (ballot count, frozen tiers/pool) behind this tier
+  // list's OWN vote code, read through the same public route voters hit
+  // (GET /tierlists/voting/:code). Called unconditionally (hook rules),
+  // with "" when there's no code yet — the hook itself declines to fire on
+  // an empty code rather than spending the public rate limit on a 404.
   const { board: votingBoard } = useTierlistVoting(tierlist?.voteCode ?? "");
+  // The histogram does NOT come from that board: it's withheld while voting
+  // is open, so nobody reads the standings before voting. The owner is the
+  // exception the spec grants ("owner sees them any time"), and this is the
+  // ownership-checked route that serves them.
+  const ownerResults = useTierlistResults(tierlist?.voteCode ? tierlist.id : undefined);
 
   // "Open for voting" and the community copy's own access/open toggles —
   // three independent async actions sharing one error slot, since only one
@@ -341,14 +345,14 @@ export function TierListEditorPage() {
         // sit on top of whatever scrolls to the end of this results section.
         <div className="mt-6 pb-[13rem]">
           <h2 className="mb-2 text-sm font-bold">Results</h2>
-          {votingBoard ? (
+          {votingBoard && ownerResults ? (
             <TierlistResultsView
-              histogram={votingBoard.histogram}
+              histogram={ownerResults.histogram}
               tierIds={votingBoard.tiers.map((t) => t.id)}
               tiers={votingBoard.tiers}
               pool={votingBoard.pool}
               books={books}
-              ballotCount={votingBoard.ballotCount}
+              ballotCount={ownerResults.ballotCount}
             />
           ) : (
             <p className="text-sm text-(--color-text-dim)">Loading results…</p>

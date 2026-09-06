@@ -8,11 +8,22 @@
 // aggregation that consumes it lives, same api-reuses-lib-types split
 // api/tierlists.ts already follows for TierDefinition.
 
+import { getSession } from "../auth/tokenStore";
 import type { HistogramCell } from "../lib/tierlistResults";
 import { apiFetch, publicFetch } from "./client";
 import type { Tierlist } from "./tierlists";
 
 export type { HistogramCell };
+
+/** Ballot routes are public — anyone with the link may vote — but a caller
+ *  who HAS a session must still send its token: `members` access is refused
+ *  outright without one, and account-level dedupe (the backend's partial
+ *  unique index on (tierlist_id, voter_user_id)) only engages when the
+ *  request identifies a user. publicFetch hard-codes the token to
+ *  undefined, so it can only ever produce an anonymous ballot. */
+async function ballotFetch(path: string, init?: RequestInit): Promise<unknown> {
+  return (getSession() ? apiFetch : publicFetch)(path, init);
+}
 
 export interface PublicTierlistSummary {
   voteCode: string;
@@ -29,7 +40,10 @@ export interface VotingBoard {
   access: "anonymous" | "members";
   votingOpen: boolean;
   ballotCount: number;
-  histogram: HistogramCell[];
+  /** Absent while voting is open — the backend withholds the standings
+   *  until you've voted (see routes.ts's board route). A closed poll's
+   *  board carries the final histogram. */
+  histogram?: HistogramCell[];
 }
 
 export interface BallotResponse {
@@ -61,12 +75,19 @@ export async function submitBallotApi(
 ): Promise<BallotResponse> {
   const encodedCode = encodeURIComponent(code);
   const path = ballotId === null ? `/tierlists/voting/${encodedCode}/ballot` : `/tierlists/voting/${encodedCode}/ballot/${encodeURIComponent(ballotId)}`;
-  return (await publicFetch(path, { method: ballotId === null ? "POST" : "PUT", body: JSON.stringify({ placements }) })) as BallotResponse;
+  return (await ballotFetch(path, { method: ballotId === null ? "POST" : "PUT", body: JSON.stringify({ placements }) })) as BallotResponse;
 }
 
 /** Public — re-fetches an existing ballot by id. */
 export async function fetchBallotApi(code: string, ballotId: string): Promise<BallotResponse> {
-  return (await publicFetch(`/tierlists/voting/${encodeURIComponent(code)}/ballot/${encodeURIComponent(ballotId)}`)) as BallotResponse;
+  return (await ballotFetch(`/tierlists/voting/${encodeURIComponent(code)}/ballot/${encodeURIComponent(ballotId)}`)) as BallotResponse;
+}
+
+/** Owner-only — the poll's full results, ownership-checked server-side.
+ *  The public board withholds the histogram while voting is open, so this
+ *  is how the owner sees the standings of an open poll at any time. */
+export async function fetchTierlistResultsApi(id: string): Promise<{ histogram: HistogramCell[]; ballotCount: number }> {
+  return (await apiFetch(`/tierlists/${id}/results`)) as { histogram: HistogramCell[]; ballotCount: number };
 }
 
 /** Owner-only — turns voting on for the first time, minting the vote code. */

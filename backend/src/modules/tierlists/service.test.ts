@@ -365,6 +365,24 @@ test("a signed-in voter gets one ballot, edited in place across submissions", ()
   assert.equal(results.ballotCount, 2);
 });
 
+test("a signed-in voter's ballot is stored against their account id", () => {
+  // The dedupe half of "signed in" — the partial unique index on
+  // (tierlist_id, voter_user_id) can only do its job if the ballot row
+  // actually carries the voter's id, which is what a caller sending no
+  // Authorization header silently loses (every such voter resolves to
+  // {kind: "anonymous"} in routes.ts's voterFor).
+  const repo = createInMemoryRepo();
+  const service = createTierlistsService(repo);
+  const { code, tierIds } = openPoll(service);
+  const tierlistId = service.getVotingBoard(code)!.id;
+
+  const outcome = service.submitBallot(code, [{ bookKey: "b1", tierId: tierIds[0]! }], { kind: "user", userId: "u7" });
+
+  const stored = repo.getBallotByVoter(tierlistId, "u7");
+  assert.equal(stored?.voter_user_id, "u7");
+  assert.equal(outcome.ok && outcome.ballotId, stored?.id);
+});
+
 test("members-only refuses an anonymous ballot", () => {
   const service = makeService();
   const { code, tierIds } = openPoll(service, "members");

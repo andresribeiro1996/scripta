@@ -197,6 +197,15 @@ export function buildPublicTierlistRoutes(service: TierlistsService) {
       });
 
       // board.ownerUserId is deliberately NOT spread into the response.
+      //
+      // Results-after-you-submit is enforced HERE, not just in the UI: while
+      // voting is open the per-book/per-tier histogram is omitted entirely,
+      // so a plain curl of this route can't hand someone the standings
+      // before they vote. A voter gets the histogram back in the ballot
+      // submit/edit response instead, and the owner reads it through the
+      // ownership-checked GET /tierlists/:id/results. Once voting is closed
+      // the final result IS the point, so it's included. ballotCount stays
+      // in both cases — the public directory already publishes it.
       return reply.send({
         board: {
           name: board.name,
@@ -205,7 +214,7 @@ export function buildPublicTierlistRoutes(service: TierlistsService) {
           access: board.access,
           votingOpen: board.votingOpen,
           ballotCount: board.ballotCount,
-          histogram: board.histogram
+          ...(board.votingOpen ? {} : { histogram: board.histogram })
         },
         books: libraryData.books
       });
