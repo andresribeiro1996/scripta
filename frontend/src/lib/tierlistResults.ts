@@ -74,6 +74,13 @@ export function aggregate(
   });
 }
 
+/** A ballot is exactly the books the voter PLACED. Anything still sitting
+ *  in the pool is left out entirely — that absence is how "no opinion" is
+ *  recorded, and it's why results carry a per-book vote count. */
+export function toPlacements(data: { tiers: Array<{ id: string; bookKeys: string[] }> }): Array<{ bookKey: string; tierId: string }> {
+  return data.tiers.flatMap((tier) => tier.bookKeys.map((bookKey) => ({ bookKey, tierId: tier.id })));
+}
+
 function winningIndex(counts: number[], total: number, score: number, mode: AggregationMode): number {
   if (mode === "average") {
     // Math.round would send an exact .5 DOWN the ladder (1.5 → 2); every

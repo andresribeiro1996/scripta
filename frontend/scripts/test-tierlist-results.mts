@@ -1,4 +1,4 @@
-import { aggregate, type HistogramCell } from "../src/lib/tierlistResults";
+import { aggregate, toPlacements, type HistogramCell } from "../src/lib/tierlistResults";
 
 let passed = 0;
 let failed = 0;
@@ -83,6 +83,14 @@ console.log("\n8. Unknown tiers are ignored rather than crashing");
   const results = aggregate(cells(["b1", "ghost", 5], ["b1", "s", 1]), TIERS, POOL, "average");
   const b1 = results.find((r) => r.bookKey === "b1")!;
   check("a cell naming a deleted tier is dropped", b1.votes === 1 && b1.tierId === "s");
+}
+
+console.log("\n9. Ballot conversion");
+{
+  const placements = toPlacements({ tiers: [{ id: "s", bookKeys: ["b1", "b2"] }, { id: "a", bookKeys: [] }] });
+  check("each placed book becomes one placement", placements.length === 2);
+  check("placements carry their tier", placements[0]!.tierId === "s");
+  check("an empty tier contributes nothing", placements.every((p) => p.tierId === "s"));
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);
