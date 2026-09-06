@@ -6,6 +6,7 @@ import { CoverPickerModal } from "../components/CoverPickerModal";
 import { EmptyState } from "../components/EmptyState";
 import { MoveToFolderModal } from "../components/murals/MoveToFolderModal";
 import { MuralFolderTree } from "../components/murals/MuralFolderTree";
+import { MuralPresetPicker } from "../components/murals/MuralPresetPicker";
 import { MuralsIcon } from "../components/NavIcons";
 import { OptionsMenu } from "../components/OptionsMenu";
 import { PageContainer } from "../components/PageContainer";
@@ -50,6 +51,7 @@ export function MuralsListPage() {
   const folders = foldersData ?? [];
 
   const [sheet, setSheet] = useState<"sort" | "folder" | null>(null);
+  const [presetsOpen, setPresetsOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
   const [coverMuralId, setCoverMuralId] = useState<string | null>(null);
@@ -142,6 +144,10 @@ export function MuralsListPage() {
 
   return (
     <PageContainer>
+      <button onClick={() => setPresetsOpen(true)} className="mb-4 flex min-h-11 w-full items-center justify-between rounded-xl border border-(--color-border) bg-(--color-surface) px-4 text-left text-sm font-semibold hover:bg-(--color-surface-hover)">
+        <span>Começar com um preset</span><span aria-hidden="true">→</span>
+      </button>
+      {presetsOpen && <MuralPresetPicker folderId={selectedFolderId} onClose={() => setPresetsOpen(false)} />}
       {/* Desktop-only. On a phone this row held nothing but the word
           "Murals", which the bottom tab bar already says. */}
       <header className="mb-6 hidden items-center justify-between gap-4 sm:flex">

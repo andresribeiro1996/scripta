@@ -87,7 +87,7 @@ export function MobileBlockPreview({
           <div className="flex min-w-0 flex-1 justify-start gap-2 overflow-hidden">
             {visible.map((book, index) => (
               <div key={index} className="relative aspect-[3/4] h-full shrink-0 overflow-hidden rounded bg-(--color-bg)">
-                <CoverImage book={book} fit="cover" />
+                <CoverImage book={book} fit="contain" />
               </div>
             ))}
           </div>
@@ -105,7 +105,7 @@ export function MobileBlockPreview({
           <div className="flex min-h-0 flex-1 justify-start gap-2">
             {visible.map((book, index) => (
               <div key={index} className="relative aspect-[3/4] h-full shrink-0 overflow-hidden rounded bg-(--color-bg)">
-                <CoverImage book={book} fit="cover" />
+                <CoverImage book={book} fit="contain" />
               </div>
             ))}
           </div>

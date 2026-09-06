@@ -19,6 +19,33 @@ export interface MobileMuralDraft {
   valid: boolean;
 }
 
+function SizeStepper({
+  label,
+  value,
+  decreaseDisabled,
+  increaseDisabled,
+  onDecrease,
+  onIncrease
+}: {
+  label: string;
+  value: number;
+  decreaseDisabled?: boolean;
+  increaseDisabled?: boolean;
+  onDecrease: () => void;
+  onIncrease: () => void;
+}) {
+  return (
+    <div className="rounded-xl bg-(--color-bg) p-2">
+      <p className="mb-1.5 text-xs font-medium text-(--color-text-dim)">{label}</p>
+      <div className="grid grid-cols-[2.5rem_1fr_2.5rem] items-center overflow-hidden rounded-lg border border-(--color-border)">
+        <button onClick={onDecrease} disabled={decreaseDisabled} aria-label={`Decrease ${label.toLowerCase()}`} className="h-10 text-xl text-(--color-text-dim) hover:bg-(--color-surface-hover) disabled:opacity-30">−</button>
+        <span className="flex h-10 items-center justify-center border-x border-(--color-border) text-sm font-semibold tabular-nums">{value}</span>
+        <button onClick={onIncrease} disabled={increaseDisabled} aria-label={`Increase ${label.toLowerCase()}`} className="h-10 text-xl text-(--color-text-dim) hover:bg-(--color-surface-hover) disabled:opacity-30">+</button>
+      </div>
+    </div>
+  );
+}
+
 function BlockFrame({
   block,
   selected,
@@ -183,9 +210,15 @@ export function MobileMuralCanvas({
   const originalMoveBlock = draft?.kind === "move" ? mural.blocks.find((block) => block.id === draft.block.id) : undefined;
   if (originalMoveBlock) layout.push({ ...originalMoveBlock.layout, i: "__origin", static: true });
 
+  const controlsPadding = draft?.kind === "resize" ? "pb-60" : draft ? "pb-36" : editMode && selected ? "pb-24" : "";
+
   return (
-    <div className="relative">
-      <div ref={setViewport} className="mural-overview-stage relative w-full overflow-hidden" style={{ height: logicalHeight * scale }}>
+    <div className={`relative bg-(--color-bg) ${controlsPadding}`}>
+      <div
+        ref={setViewport}
+        className="mural-overview-stage relative w-full overflow-hidden bg-(--color-bg)"
+        style={{ height: logicalHeight * scale, minHeight: editMode ? "52dvh" : undefined }}
+      >
         {viewportWidth > 0 && (
           <div
             className="absolute top-0 left-0 origin-top-left"
@@ -260,31 +293,53 @@ export function MobileMuralCanvas({
       </div>
 
       {editMode && selected && !draft && (
-        <div className="sticky bottom-[calc(env(safe-area-inset-bottom,0px)+0.5rem)] z-30 mt-3 flex flex-wrap gap-2 rounded-xl border border-(--color-border) bg-(--color-surface) p-2 shadow-lg">
-          <button onClick={() => setFocusedBlockId(selected.id)} className="min-h-11 flex-1 rounded-lg border border-(--color-border) px-3 font-semibold">Read</button>
-          <button onClick={() => onStartResize?.(selected)} className="min-h-11 flex-1 rounded-lg border border-(--color-border) px-3 font-semibold">Resize</button>
-          <button onClick={() => setMoreOpen(true)} className="min-h-11 flex-1 rounded-lg border border-(--color-border) px-3 font-semibold">More</button>
+        <div className="fixed inset-x-4 bottom-[calc(env(safe-area-inset-bottom,0px)+0.75rem)] z-40 mx-auto grid max-w-xl grid-cols-3 gap-1 rounded-2xl border border-(--color-border) bg-(--color-surface)/95 p-1.5 shadow-xl backdrop-blur">
+          <button onClick={() => setFocusedBlockId(selected.id)} className="min-h-11 rounded-xl px-3 text-sm font-semibold hover:bg-(--color-surface-hover)">Open</button>
+          <button onClick={() => onStartResize?.(selected)} className="min-h-11 rounded-xl px-3 text-sm font-semibold hover:bg-(--color-surface-hover)">Resize</button>
+          <button onClick={() => setMoreOpen(true)} className="min-h-11 rounded-xl px-3 text-sm font-semibold hover:bg-(--color-surface-hover)">More</button>
         </div>
       )}
 
       {draft && (
-        <div className="sticky bottom-[calc(env(safe-area-inset-bottom,0px)+0.5rem)] z-30 mt-3 rounded-xl border border-(--color-border) bg-(--color-surface) p-3 shadow-lg">
-          <p className="mb-2 text-sm font-semibold">{draft.kind === "resize" ? "Resize block" : "Drag the block to place it"}</p>
-          <div className="mb-2 flex flex-wrap gap-2">
-            {draft.kind === "resize" ? (
-              <>
-                <button onClick={() => changeDraft({ w: draft.block.layout.w - 1 })} disabled={draft.block.layout.w <= 1} className="min-h-11 rounded-lg border border-(--color-border) px-3 disabled:opacity-40">Width −</button>
-                <span className="self-center text-sm">{draft.block.layout.w} × {draft.block.layout.h}</span>
-                <button onClick={() => changeDraft({ w: draft.block.layout.w + 1 })} disabled={draft.block.layout.x + draft.block.layout.w >= GRID_COLUMNS} className="min-h-11 rounded-lg border border-(--color-border) px-3 disabled:opacity-40">Width +</button>
-                <button onClick={() => changeDraft({ h: draft.block.layout.h - 1 })} disabled={draft.block.layout.h <= 1} className="min-h-11 rounded-lg border border-(--color-border) px-3 disabled:opacity-40">Height −</button>
-                <button onClick={() => changeDraft({ h: draft.block.layout.h + 1 })} className="min-h-11 rounded-lg border border-(--color-border) px-3">Height +</button>
-              </>
-            ) : null}
-          </div>
-          {!draft.valid && <p role="alert" className="mb-2 text-sm text-(--color-danger)">That position overlaps another block or crosses the mural edge.</p>}
-          <div className="flex gap-2">
-            <button onClick={onCancelDraft} disabled={busy} className="min-h-11 flex-1 rounded-lg border border-(--color-border) font-semibold disabled:opacity-40">Cancel</button>
-            <button onClick={onApplyDraft} disabled={busy || !draft.valid} className="min-h-11 flex-1 rounded-lg bg-(--color-accent) font-semibold text-white disabled:opacity-40">{busy ? "Saving…" : draft.kind === "add" || draft.kind === "duplicate" ? "Place" : "Apply"}</button>
+        <div className="fixed inset-x-4 bottom-[calc(env(safe-area-inset-bottom,0px)+0.75rem)] z-40 mx-auto max-w-xl rounded-2xl border border-(--color-border) bg-(--color-surface)/95 p-3 shadow-xl backdrop-blur">
+          {draft.kind === "resize" ? (
+            <>
+              <div className="mb-2 flex items-center justify-between px-1">
+                <p className="text-sm font-semibold">Resize block</p>
+                <span className="text-xs text-(--color-text-dim) tabular-nums">{draft.block.layout.w} × {draft.block.layout.h}</span>
+              </div>
+              <div className="mb-3 grid grid-cols-2 gap-2">
+                <SizeStepper
+                  label="Width"
+                  value={draft.block.layout.w}
+                  decreaseDisabled={draft.block.layout.w <= 1}
+                  increaseDisabled={draft.block.layout.x + draft.block.layout.w >= GRID_COLUMNS}
+                  onDecrease={() => changeDraft({ w: draft.block.layout.w - 1 })}
+                  onIncrease={() => changeDraft({ w: draft.block.layout.w + 1 })}
+                />
+                <SizeStepper
+                  label="Height"
+                  value={draft.block.layout.h}
+                  decreaseDisabled={draft.block.layout.h <= 1}
+                  onDecrease={() => changeDraft({ h: draft.block.layout.h - 1 })}
+                  onIncrease={() => changeDraft({ h: draft.block.layout.h + 1 })}
+                />
+              </div>
+            </>
+          ) : (
+            <div className="mb-3 px-1">
+              <p className="text-sm font-semibold">Place block</p>
+              <p className="mt-0.5 text-xs text-(--color-text-dim)">Drag it anywhere in the mural.</p>
+            </div>
+          )}
+          {!draft.valid && <p role="alert" className="mb-3 px-1 text-sm text-(--color-danger)">Choose a free position inside the mural.</p>}
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={onCancelDraft} disabled={busy} className="min-h-11 rounded-xl px-3 text-sm font-semibold text-(--color-text-dim) hover:bg-(--color-surface-hover) disabled:opacity-40">
+              {draft.kind === "add" || draft.kind === "duplicate" ? "Discard" : "Cancel"}
+            </button>
+            <button onClick={onApplyDraft} disabled={busy || !draft.valid} className="min-h-11 rounded-xl bg-(--color-accent) px-3 text-sm font-semibold text-white disabled:opacity-40">
+              {busy ? "Saving…" : draft.kind === "add" || draft.kind === "duplicate" ? "Place" : "Save size"}
+            </button>
           </div>
         </div>
       )}

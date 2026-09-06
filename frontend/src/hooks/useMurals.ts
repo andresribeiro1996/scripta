@@ -26,11 +26,14 @@ import {
   unshareMuralApi,
   updateMuralApi
 } from "../api/murals";
-import { scrubBooksFromMurals, scrubImageFromMurals, type Mural, type MuralBlock } from "../lib/murals";
+import { ensureBookBlockHeights, scrubBooksFromMurals, scrubImageFromMurals, type Mural, type MuralBlock } from "../lib/murals";
 
 export function useMurals() {
   const queryClient = useQueryClient();
-  const query = useQuery({ queryKey: ["murals"], queryFn: fetchMurals });
+  const query = useQuery({
+    queryKey: ["murals"],
+    queryFn: async () => (await fetchMurals()).map((mural) => ({ ...mural, blocks: ensureBookBlockHeights(mural.blocks) }))
+  });
 
   function current(): Mural[] {
     return queryClient.getQueryData<Mural[]>(["murals"]) ?? [];
@@ -45,7 +48,7 @@ export function useMurals() {
   }
 
   function replaceOne(updated: Mural) {
-    setMurals(current().map((m) => (m.id === updated.id ? updated : m)));
+    setMurals(current().map((m) => (m.id === updated.id ? { ...updated, blocks: ensureBookBlockHeights(updated.blocks) } : m)));
   }
 
   async function create(name: string, folderId: string | null = null): Promise<Mural> {

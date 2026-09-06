@@ -4,7 +4,8 @@ import { useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import type { GalleryImage } from "../api/gallery";
-import { fetchLibrary, saveLibrary, type LibraryDocument } from "../api/library";
+import { fetchLibrary, saveLibrary, type LibraryData, type LibraryDocument } from "../api/library";
+import { AddBookModal } from "../components/AddBookModal";
 import { BookCard } from "../components/BookCard";
 import { BookDetailSheet } from "../components/BookDetailSheet";
 import { BookGrid } from "../components/BookGrid";
@@ -17,6 +18,7 @@ import type { OptionsMenuItem } from "../components/OptionsMenu";
 import { PageContainer } from "../components/PageContainer";
 import { PerCardStylePanel } from "../components/PerCardStylePanel";
 import { ShareModal } from "../components/ShareModal";
+import { SyncGoodreadsModal } from "../components/SyncGoodreadsModal";
 import { SkeletonBookGrid } from "../components/Skeleton";
 import { useToast } from "../components/Toaster";
 import { FilterIcon } from "../components/Toolbar";
@@ -78,6 +80,8 @@ export function LibraryPage() {
   );
   const [importError, setImportError] = useState<string | null>(null);
   const [importStatus, setImportStatus] = useState<string | null>(null);
+  const [syncingGoodreads, setSyncingGoodreads] = useState(false);
+  const [addingBook, setAddingBook] = useState(false);
 
   const { data: library, isLoading } = useQuery({
     queryKey: ["library"],
@@ -113,33 +117,44 @@ export function LibraryPage() {
     }
   }
 
+  // Shared tail of every path that brings books in — a generic file
+  // import, a Goodreads re-sync (SyncGoodreadsModal), a single manual
+  // add (AddBookModal). Merge against the freshest saved document (see
+  // lib/merge.ts for the rules — book identity across sources,
+  // newest-wins, the keep-whichever-has-a-cover rule, highlight union),
+  // then `_order` for genuinely-new books (lib/libraryOrder.ts) and the
+  // additive series auto-seed (lib/groups.ts), and one PUT. Because the
+  // manual-add path funnels through here too, adding a book you already
+  // have updates it in place instead of duplicating it.
+  async function mergeAndSave(parsed: LibraryData) {
+    // Read the freshest cached copy, not a stale closure — same
+    // reasoning as handleRenameLibrary above.
+    const current = queryClient.getQueryData<LibraryDocument>(["library"]);
+    const existing = current?.data ?? library?.data;
+    const merged = existing ? mergeLibraryData(existing, parsed) : parsed;
+    const ordered = { ...merged, books: assignBookOrder(merged.books) };
+    const withSeries = { ...ordered, groups: deriveSeriesGroups(ordered.books, ordered.groups ?? []) };
+    const saved = await saveLibrary(withSeries);
+    queryClient.setQueryData(["library"], saved);
+  }
+
   async function handleFileChosen(file: File) {
     setImportError(null);
     // Parsing a multi-MB SQLite file through sql.js's WASM engine can take
     // a beat — worth a status message rather than a silent pause.
     setImportStatus(file.name.toLowerCase().endsWith(".sqlite") || file.name.toLowerCase().endsWith(".db") ? "Reading SQLite database…" : "Reading file…");
     try {
-      const parsed = await parseImportedFile(file);
-      // First import: nothing to merge against, save as-is. Every import
-      // after that merges into whatever's already saved — see lib/merge.ts
-      // for the actual rules (book identity across sources, the
-      // keep-whichever-has-a-cover rule, highlight union, ...).
-      const merged = library ? mergeLibraryData(library.data, parsed) : parsed;
-      // Every book gets a stable `_order` the first time it's seen — the
-      // backbone of the Library grid's display order (lib/libraryOrder.ts).
-      // A book that already has one (survived a prior merge) keeps it.
-      const ordered = { ...merged, books: assignBookOrder(merged.books) };
-      // Additive series auto-seed (see lib/groups.ts) — never touches a
-      // series the user has already renamed/deleted/hand-edited, only
-      // fills in newly-appeared Series values from this import.
-      const withSeries = { ...ordered, groups: deriveSeriesGroups(ordered.books, ordered.groups ?? []) };
-      const saved = await saveLibrary(withSeries);
-      queryClient.setQueryData(["library"], saved);
+      await mergeAndSave(await parseImportedFile(file));
     } catch (err) {
       setImportError(err instanceof Error ? err.message : "Couldn't import that file.");
     } finally {
       setImportStatus(null);
     }
+  }
+
+  async function handleAddBook(book: Record<string, unknown>) {
+    await mergeAndSave({ books: [book] });
+    toast({ message: `Added "${String(book.Title ?? "book")}".` });
   }
 
   // Drag a card onto another to reorder — see lib/libraryOrder.ts's
@@ -357,6 +372,8 @@ export function LibraryPage() {
         setEditingName(true);
       }
     },
+    { label: "Add book…", onClick: () => setAddingBook(true) },
+    { label: "Sync Goodreads…", onClick: () => setSyncingGoodreads(true) },
     ...(books.length > 0 ? [{ label: "Select…", onClick: handleToggleSelectionMode }] : []),
     // Moved out of the app nav: it styles this page's cards and canvas,
     // not the app, so it belongs with the other things you do to your
@@ -434,6 +451,18 @@ export function LibraryPage() {
           )}
 
           <div className={`hidden items-center gap-2 sm:flex ${selectionMode ? "sm:hidden" : ""}`}>
+            <button
+              onClick={() => setAddingBook(true)}
+              className="min-h-11 rounded-lg bg-(--color-accent) px-3.5 py-2.5 text-sm font-semibold text-white hover:opacity-90"
+            >
+              Add book
+            </button>
+            <button
+              onClick={() => setSyncingGoodreads(true)}
+              className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover)"
+            >
+              Sync Goodreads…
+            </button>
             {books.length > 0 && (
               <button
                 onClick={handleToggleSelectionMode}
@@ -524,13 +553,21 @@ export function LibraryPage() {
             </>
           }
           action={
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={importing}
-              className="rounded-lg bg-(--color-accent) px-4 py-2.5 font-semibold text-white disabled:opacity-60"
-            >
-              {importing ? "Importing…" : "Choose a file"}
-            </button>
+            <div className="flex flex-wrap justify-center gap-2">
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={importing}
+                className="rounded-lg bg-(--color-accent) px-4 py-2.5 font-semibold text-white disabled:opacity-60"
+              >
+                {importing ? "Importing…" : "Choose a file"}
+              </button>
+              <button
+                onClick={() => setAddingBook(true)}
+                className="rounded-lg border border-(--color-border) bg-(--color-surface) px-4 py-2.5 text-sm hover:bg-(--color-surface-hover)"
+              >
+                Add a book
+              </button>
+            </div>
           }
         />
       )}
@@ -630,6 +667,15 @@ export function LibraryPage() {
           onSelect={(image) => void handleSaveBookCover(coverBook, image)}
           onRemoveCover={() => void handleRemoveBookCover(coverBook)}
           onClose={() => setCoverBookKey(null)}
+        />
+      )}
+
+      {addingBook && <AddBookModal onAdd={(book) => handleAddBook(book)} onClose={() => setAddingBook(false)} />}
+
+      {syncingGoodreads && (
+        <SyncGoodreadsModal
+          onFile={async (file) => mergeAndSave(await parseImportedFile(file))}
+          onClose={() => setSyncingGoodreads(false)}
         />
       )}
 

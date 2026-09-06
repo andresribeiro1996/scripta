@@ -28,7 +28,7 @@ import { MuralCanvas } from "../components/murals/MuralCanvas";
 import { FullscreenIcon, toolbarIconClass } from "../components/Toolbar";
 import { useMuralFullscreen } from "../hooks/useMuralFullscreen";
 import { bookKey } from "../lib/merge";
-import type { Mural } from "../lib/murals";
+import { ensureBookBlockHeights, type Mural } from "../lib/murals";
 
 /** The exact inverse of publicResolver.ts's toPublicBookData — see this
  *  file's own top comment. `highlights` starts empty; the caller
@@ -116,7 +116,7 @@ export function SharedMuralPage() {
   const mural: Mural = {
     id: data.mural.id,
     name: data.mural.name,
-    blocks: data.mural.blocks,
+    blocks: ensureBookBlockHeights(data.mural.blocks),
     createdAt: "",
     updatedAt: "",
     coverImageUrl: data.mural.coverImageUrl ?? undefined,

@@ -10,6 +10,7 @@ import {
   createDuplicateCandidate,
   createTier,
   duplicateBlock,
+  ensureBookBlockHeights,
   findAvailableLayout,
   isValidBlockLayout,
   removeBlock,
@@ -88,6 +89,19 @@ console.log("\n2. Screen coordinates map to the rendered grid");
   check("one full column step maps to column 1", screenPointToGrid(109.17, 10).x === 1);
   check("one row step maps to row 1", screenPointToGrid(10, 48).y === 1);
   check("coordinates clamp at the left edge", screenPointToGrid(-100, 10).x === 0);
+}
+
+console.log("\n2b. Multi-book blocks have enough height for full covers");
+{
+  const blocks: MuralBlock[] = [
+    { id: "shelf", type: "shelf", layout: { x: 0, y: 0, w: 6, h: 3 }, title: "Shelf", bookKeys: [] },
+    { id: "reading", type: "currentlyReading", layout: { x: 6, y: 0, w: 4, h: 3 } },
+    { id: "below", type: "text", layout: { x: 0, y: 3, w: 4, h: 2 }, heading: "Below" }
+  ];
+  const upgraded = ensureBookBlockHeights(blocks);
+  check("short multi-book blocks gain one row", upgraded[0].layout.h === 4 && upgraded[1].layout.h === 4);
+  check("blocks below move once without overlap", upgraded[2].layout.y === 4);
+  check("height upgrade is idempotent", ensureBookBlockHeights(upgraded) === upgraded);
 }
 
 console.log("\n3. addBlock — lands below existing blocks, never overlapping");

@@ -179,18 +179,36 @@ function newId(): string {
 export const GRID_COLUMNS = 12;
 const DEFAULT_SIZE_BY_TYPE: Record<BlockType, { w: number; h: number }> = {
   spotlight: { w: 3, h: 4 },
-  shelf: { w: 8, h: 3 },
+  shelf: { w: 8, h: 4 },
   quote: { w: 4, h: 3 },
   quoteCollection: { w: 6, h: 4 },
   image: { w: 4, h: 3 },
   text: { w: 4, h: 2 },
-  currentlyReading: { w: 4, h: 3 },
+  currentlyReading: { w: 4, h: 4 },
   stats: { w: 6, h: 2 },
   empty: { w: 3, h: 2 },
   // Five stacked tier rows each need enough height to read as a row, not
   // a sliver — noticeably taller than every other type's default.
   tierlist: { w: 10, h: 8 }
 };
+
+export function ensureBookBlockHeights(blocks: MuralBlock[]): MuralBlock[] {
+  const boundaries = new Map<number, number>();
+  for (const block of blocks) {
+    const minimum = block.type === "shelf" || block.type === "currentlyReading" ? 4 : block.type === "tierlist" ? 8 : 0;
+    const increase = Math.max(0, minimum - block.layout.h);
+    if (increase > 0) {
+      const boundary = block.layout.y + block.layout.h;
+      boundaries.set(boundary, Math.max(boundaries.get(boundary) ?? 0, increase));
+    }
+  }
+  if (boundaries.size === 0) return blocks;
+  return blocks.map((block) => {
+    const minimum = block.type === "shelf" || block.type === "currentlyReading" ? 4 : block.type === "tierlist" ? 8 : 0;
+    const shift = [...boundaries].reduce((total, [boundary, amount]) => total + (block.layout.y >= boundary ? amount : 0), 0);
+    return { ...block, layout: { ...block.layout, y: block.layout.y + shift, h: Math.max(block.layout.h, minimum) } };
+  });
+}
 
 /** Where the next new footprint of size `w`×`h` lands: below everything
  *  already on the canvas, left-aligned — never overlapping existing
