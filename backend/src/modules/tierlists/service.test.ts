@@ -428,3 +428,44 @@ test("getBallot rehydrates an anonymous voter's placements", () => {
   assert.equal(fetched.ok, true);
   assert.deepEqual(fetched.ok && fetched.placements, [{ bookKey: "b1", tierId: tierIds[0]! }]);
 });
+
+test("getVotingBoard exposes structure and never the owner's placements", () => {
+  const service = makeService();
+  const { code, tierIds } = openPoll(service);
+  const board = service.getVotingBoard(code)!;
+
+  assert.equal(board.name, "Fantasy (community)");
+  assert.equal(board.votingOpen, true);
+  assert.equal(board.access, "anonymous");
+  assert.deepEqual([...board.pool].sort(), ["b1", "b2"]);
+  assert.deepEqual(board.tiers.map((t) => t.id), tierIds);
+  assert.equal(Object.keys(board.tiers[0]!).includes("bookKeys"), false);
+  assert.equal(board.ballotCount, 1);
+});
+
+test("getVotingBoard still resolves once voting is closed", () => {
+  const service = makeService();
+  const { copy, code } = openPoll(service);
+  service.setVotingState("u1", copy.id, { open: false });
+  const board = service.getVotingBoard(code);
+  assert.equal(board?.votingOpen, false);
+  assert.equal(board?.ballotCount, 1);
+});
+
+test("getVotingBoard is undefined for an unknown code", () => {
+  const service = makeService();
+  assert.equal(service.getVotingBoard("nosuch"), undefined);
+});
+
+test("listPublicTierlists returns community copies only, newest first", () => {
+  const service = makeService();
+  service.createTierlist("u1", "Private");
+  const { code } = openPoll(service);
+
+  const listed = service.listPublicTierlists(10, 0);
+  assert.equal(listed.length, 1);
+  assert.equal(listed[0]?.voteCode, code);
+  assert.equal(listed[0]?.poolSize, 2);
+  assert.equal(listed[0]?.ballotCount, 1);
+  assert.equal(listed[0]?.votingOpen, true);
+});

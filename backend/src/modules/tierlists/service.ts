@@ -4,7 +4,7 @@
 
 import { randomBytes, randomUUID } from "node:crypto";
 import type { TierlistsRepository } from "./domain/ports.js";
-import type { BallotRow, Placement, Tierlist, TierlistRow, VoteAccess } from "./domain/types.js";
+import type { BallotRow, HistogramCell, Placement, Tierlist, TierlistRow, VoteAccess } from "./domain/types.js";
 
 function toTierlist(row: TierlistRow): Tierlist {
   const parsed = JSON.parse(row.data) as { tiers?: unknown; pool?: unknown };
@@ -27,6 +27,28 @@ export type BallotOutcome =
   | { ok: true; ballotId: string; placements: Placement[] }
   | { ok: false; reason: "not-found" | "closed" | "members-only" | "invalid" };
 
+export interface VotingBoard {
+  id: string;
+  /** For routes.ts's resolvePublicLibraryData call only — never serialized
+   *  to a public response. */
+  ownerUserId: string;
+  name: string;
+  tiers: Array<{ id: string; label: string; color: string }>;
+  pool: string[];
+  access: VoteAccess;
+  votingOpen: boolean;
+  histogram: HistogramCell[];
+  ballotCount: number;
+}
+
+export interface PublicTierlistSummary {
+  voteCode: string;
+  name: string;
+  poolSize: number;
+  ballotCount: number;
+  votingOpen: boolean;
+}
+
 export interface TierlistsService {
   listTierlists(userId: string): Tierlist[];
   createTierlist(userId: string, name: string): Tierlist;
@@ -47,6 +69,9 @@ export interface TierlistsService {
   setVotingState(userId: string, id: string, patch: { access?: VoteAccess; open?: boolean }): Tierlist | undefined;
   submitBallot(code: string, placements: Placement[], voter: Voter): BallotOutcome;
   getBallot(code: string, voter: Voter): BallotOutcome;
+  getResults(tierlistId: string): { histogram: HistogramCell[]; ballotCount: number };
+  getVotingBoard(code: string): VotingBoard | undefined;
+  listPublicTierlists(limit: number, offset: number): PublicTierlistSummary[];
 }
 
 /** Where a new tier list starts — the familiar S–D ladder, matching the
@@ -241,6 +266,43 @@ export function createTierlistsService(repo: TierlistsRepository): TierlistsServ
       if (!existing) return { ok: false, reason: "not-found" };
 
       return { ok: true, ballotId: existing.id, placements: repo.getPlacements(existing.id) };
+    },
+
+    getResults(tierlistId) {
+      return { histogram: repo.histogram(tierlistId), ballotCount: repo.ballotCount(tierlistId) };
+    },
+
+    getVotingBoard(code) {
+      const row = repo.getByVoteCode(code);
+      if (!row) return undefined;
+      const { tiers, pool } = readDocument(toTierlist(row));
+      return {
+        id: row.id,
+        ownerUserId: row.owner_user_id,
+        name: row.name,
+        tiers: tiers.map((t) => ({ id: t.id, label: t.label, color: t.color })),
+        pool,
+        access: row.vote_access,
+        votingOpen: row.voting_open === 1,
+        histogram: repo.histogram(row.id),
+        ballotCount: repo.ballotCount(row.id)
+      };
+    },
+
+    listPublicTierlists(limit, offset) {
+      const counts = repo.ballotCountsByTierlist();
+      return repo.listPublic(limit, offset).map((row) => {
+        const { tiers, pool } = readDocument(toTierlist(row));
+        const keys = new Set(pool);
+        for (const tier of tiers) for (const key of tier.bookKeys) keys.add(key);
+        return {
+          voteCode: row.vote_code!,
+          name: row.name,
+          poolSize: keys.size,
+          ballotCount: counts.get(row.id) ?? 0,
+          votingOpen: row.voting_open === 1
+        };
+      });
     }
   };
 }
