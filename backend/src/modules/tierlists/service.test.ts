@@ -213,3 +213,111 @@ test("createTierlistsPublicApi resolves the raw document and defaults missing ar
   assert.equal(api.getTierlistData("u2", ranked.id), undefined);
   assert.equal(api.getTierlistData("u1", "00000000-0000-4000-8000-000000000000"), undefined);
 });
+
+test("openVoting duplicates the tier list without touching the original", () => {
+  const service = makeService();
+  const original = service.createTierlist("u1", "Fantasy");
+  const tiers = (original.data as { tiers: Array<{ id: string }> }).tiers;
+  service.updateTierlist("u1", original.id, {
+    data: { tiers: tiers.map((t, i) => ({ ...t, bookKeys: i === 0 ? ["b1"] : [] })), pool: ["b2"] }
+  });
+
+  const copy = service.openVoting("u1", original.id, "anonymous");
+
+  assert.ok(copy);
+  assert.notEqual(copy.id, original.id);
+  assert.equal(copy.name, "Fantasy (community)");
+  assert.equal(copy.sourceTierlistId, original.id);
+  assert.equal(copy.votingOpen, true);
+  assert.equal(copy.voteAccess, "anonymous");
+  assert.ok(copy.voteCode && copy.voteCode.length >= 6);
+
+  const untouched = service.getTierlist("u1", original.id);
+  assert.deepEqual((untouched?.data as { tiers: Array<{ bookKeys: string[] }> }).tiers[0]?.bookKeys, ["b1"]);
+  assert.equal(untouched?.voteCode, null);
+});
+
+test("the community copy carries structure only, with the whole pool", () => {
+  const service = makeService();
+  const original = service.createTierlist("u1", "Fantasy");
+  const tiers = (original.data as { tiers: Array<{ id: string }> }).tiers;
+  service.updateTierlist("u1", original.id, {
+    data: { tiers: tiers.map((t, i) => ({ ...t, bookKeys: i === 0 ? ["b1"] : [] })), pool: ["b2"] }
+  });
+
+  const copy = service.openVoting("u1", original.id, "anonymous");
+  const data = copy?.data as { tiers: Array<{ id: string; bookKeys: string[] }>; pool: string[] };
+
+  assert.deepEqual(data.tiers.map((t) => t.bookKeys), [[], [], [], [], []]);
+  assert.deepEqual(data.tiers.map((t) => t.id), tiers.map((t) => t.id));
+  assert.deepEqual([...data.pool].sort(), ["b1", "b2"]);
+});
+
+test("openVoting seeds the owner's ranking as the first ballot", () => {
+  const service = makeService();
+  const original = service.createTierlist("u1", "Fantasy");
+  const tiers = (original.data as { tiers: Array<{ id: string }> }).tiers;
+  const topTierId = tiers[0]!.id;
+  service.updateTierlist("u1", original.id, {
+    data: { tiers: tiers.map((t, i) => ({ ...t, bookKeys: i === 0 ? ["b1"] : [] })), pool: ["b2"] }
+  });
+
+  const copy = service.openVoting("u1", original.id, "anonymous")!;
+  const results = service.getResults(copy.id);
+
+  assert.equal(results.ballotCount, 1);
+  assert.equal(results.histogram.find((c) => c.bookKey === "b1")?.tierId, topTierId);
+  assert.equal(results.histogram.find((c) => c.bookKey === "b2"), undefined);
+});
+
+test("openVoting returns undefined for an unowned tier list", () => {
+  const service = makeService();
+  const theirs = service.createTierlist("u2", "Theirs");
+  assert.equal(service.openVoting("u1", theirs.id, "anonymous"), undefined);
+});
+
+test("opening voting twice yields two independent community copies", () => {
+  const service = makeService();
+  const original = service.createTierlist("u1", "Fantasy");
+  const first = service.openVoting("u1", original.id, "anonymous")!;
+  const second = service.openVoting("u1", original.id, "members")!;
+  assert.notEqual(first.id, second.id);
+  assert.notEqual(first.voteCode, second.voteCode);
+  assert.equal(second.voteAccess, "members");
+});
+
+test("a community copy refuses data writes but still accepts a rename", () => {
+  const service = makeService();
+  const original = service.createTierlist("u1", "Fantasy");
+  const copy = service.openVoting("u1", original.id, "anonymous")!;
+  const frozen = copy.data;
+
+  assert.equal(service.updateTierlist("u1", copy.id, { data: { tiers: [], pool: ["sneaky"] } }), undefined);
+  assert.deepEqual(service.getTierlist("u1", copy.id)?.data, frozen);
+
+  assert.equal(service.updateTierlist("u1", copy.id, { name: "Renamed" })?.name, "Renamed");
+});
+
+test("the original stays fully editable after its copy is voting", () => {
+  const service = makeService();
+  const original = service.createTierlist("u1", "Fantasy");
+  service.openVoting("u1", original.id, "anonymous");
+  const edited = service.updateTierlist("u1", original.id, { data: { tiers: [], pool: ["b9"] } });
+  assert.deepEqual(edited?.data, { tiers: [], pool: ["b9"] });
+});
+
+test("setVotingState switches access and closes without losing ballots", () => {
+  const service = makeService();
+  const original = service.createTierlist("u1", "Fantasy");
+  const copy = service.openVoting("u1", original.id, "anonymous")!;
+
+  const tightened = service.setVotingState("u1", copy.id, { access: "members" });
+  assert.equal(tightened?.voteAccess, "members");
+
+  const closed = service.setVotingState("u1", copy.id, { open: false });
+  assert.equal(closed?.votingOpen, false);
+  assert.equal(closed?.voteCode, copy.voteCode);
+  assert.equal(service.getResults(copy.id).ballotCount, 1);
+
+  assert.equal(service.setVotingState("u2", copy.id, { open: true }), undefined);
+});

@@ -2,9 +2,9 @@
 // TierlistsRepository port, not on SQLite — same reasoning as every other
 // module's service.ts.
 
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import type { TierlistsRepository } from "./domain/ports.js";
-import type { Tierlist, TierlistRow } from "./domain/types.js";
+import type { BallotRow, Placement, Tierlist, TierlistRow, VoteAccess } from "./domain/types.js";
 
 function toTierlist(row: TierlistRow): Tierlist {
   const parsed = JSON.parse(row.data) as { tiers?: unknown; pool?: unknown };
@@ -34,6 +34,11 @@ export interface TierlistsService {
   /** Returns false if no tier list with that id was owned by userId —
    *  same convention as modules/murals/service.ts's deleteMural. */
   deleteTierlist(userId: string, id: string): boolean;
+  /** Duplicates the tier list into a public community copy whose structure
+   *  is frozen, seeding the owner's current ranking as its first ballot.
+   *  undefined if not owned. */
+  openVoting(userId: string, id: string, access: VoteAccess): Tierlist | undefined;
+  setVotingState(userId: string, id: string, patch: { access?: VoteAccess; open?: boolean }): Tierlist | undefined;
 }
 
 /** Where a new tier list starts — the familiar S–D ladder, matching the
@@ -49,6 +54,30 @@ const DEFAULT_TIER_PRESET: Array<{ label: string; color: string }> = [
   { label: "C", color: "#5c9e5c" },
   { label: "D", color: "#4a7fc9" }
 ];
+
+// Unambiguous alphabet: no 0/O/1/I/L, because these codes get read aloud
+// and typed by hand. 8 chars over 32 symbols is ~10^12 combinations —
+// enough that a poll isn't stumbled upon, though it is an identifier and
+// not a secret (community tier lists are publicly listed; vote_access is
+// what actually authorizes a ballot).
+const CODE_ALPHABET = "23456789abcdefghjkmnpqrstuvwxyz";
+
+export function generateVoteCode(): string {
+  const bytes = randomBytes(8);
+  return [...bytes].map((b) => CODE_ALPHABET[b % CODE_ALPHABET.length]).join("");
+}
+
+/** The two places this module looks inside the opaque `data` document —
+ *  see the spec's "Why duplication simplifies everything downstream". */
+interface TierlistDocument {
+  tiers: Array<{ id: string; label: string; color: string; bookKeys: string[] }>;
+  pool: string[];
+}
+
+function readDocument(tierlist: Tierlist): TierlistDocument {
+  const data = (tierlist.data ?? {}) as Partial<TierlistDocument>;
+  return { tiers: data.tiers ?? [], pool: data.pool ?? [] };
+}
 
 export function createTierlistsService(repo: TierlistsRepository): TierlistsService {
   return {
@@ -83,6 +112,16 @@ export function createTierlistsService(repo: TierlistsRepository): TierlistsServ
     },
 
     updateTierlist(userId, id, patch) {
+      // A community copy's tiers and pool are frozen for the life of the
+      // vote — that's what makes ballots comparable, and it's why the
+      // owner's ORIGINAL is left untouched and editable when voting opens.
+      // Renaming stays allowed: the name is not part of the structure any
+      // ballot was cast against.
+      if (patch.data !== undefined) {
+        const existing = repo.getOwned(id, userId);
+        if (!existing) return undefined;
+        if (existing.vote_code !== null) return undefined;
+      }
       const row = repo.update(id, userId, {
         ...(patch.name !== undefined ? { name: patch.name } : {}),
         ...(patch.data !== undefined ? { data: JSON.stringify(patch.data) } : {})
@@ -92,6 +131,54 @@ export function createTierlistsService(repo: TierlistsRepository): TierlistsServ
 
     deleteTierlist(userId, id) {
       return repo.delete(id, userId);
+    },
+
+    openVoting(userId, id, access) {
+      const row = repo.getOwned(id, userId);
+      if (!row) return undefined;
+      const original = toTierlist(row);
+
+      const { tiers, pool } = readDocument(original);
+      const placements: Placement[] = [];
+      const poolKeys = new Set(pool);
+      for (const tier of tiers) {
+        for (const bookKey of tier.bookKeys) {
+          placements.push({ bookKey, tierId: tier.id });
+          poolKeys.add(bookKey);
+        }
+      }
+
+      const now = new Date().toISOString();
+      const copy: TierlistRow = {
+        id: randomUUID(),
+        owner_user_id: userId,
+        name: `${original.name} (community)`,
+        data: JSON.stringify({ tiers: tiers.map((t) => ({ ...t, bookKeys: [] })), pool: [...poolKeys] }),
+        vote_code: generateVoteCode(),
+        vote_access: access,
+        voting_open: 1,
+        source_tierlist_id: original.id,
+        created_at: now,
+        updated_at: now
+      };
+      const ballot: BallotRow = {
+        id: randomUUID(),
+        tierlist_id: copy.id,
+        voter_user_id: userId,
+        created_at: now,
+        updated_at: now
+      };
+
+      repo.insertCommunityCopy(copy, ballot, placements);
+      return toTierlist(copy);
+    },
+
+    setVotingState(userId, id, patch) {
+      const row = repo.setVoting(id, userId, {
+        ...(patch.access !== undefined ? { vote_access: patch.access } : {}),
+        ...(patch.open !== undefined ? { voting_open: patch.open ? 1 : 0 } : {})
+      });
+      return row ? toTierlist(row) : undefined;
     }
   };
 }
