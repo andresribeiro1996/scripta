@@ -7,16 +7,15 @@ import type { TierlistsRepository } from "./domain/ports.js";
 import type { Tierlist, TierlistRow } from "./domain/types.js";
 
 function toTierlist(row: TierlistRow): Tierlist {
-  // `data` is opaque, so nothing stops a row whose document predates a
-  // field (or was hand-written) from missing tiers/pool — normalizing
-  // HERE means every consumer (routes, the cross-module getter's
-  // callers, the frontend editor) can trust the shape instead of each
-  // one defending against `undefined.tiers` at its own read site.
   const parsed = JSON.parse(row.data) as { tiers?: unknown; pool?: unknown };
   return {
     id: row.id,
     name: row.name,
     data: { tiers: parsed.tiers ?? [], pool: parsed.pool ?? [] },
+    voteCode: row.vote_code,
+    voteAccess: row.vote_access,
+    votingOpen: row.voting_open === 1,
+    sourceTierlistId: row.source_tierlist_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -67,6 +66,10 @@ export function createTierlistsService(repo: TierlistsRepository): TierlistsServ
           tiers: DEFAULT_TIER_PRESET.map((t) => ({ id: randomUUID(), label: t.label, color: t.color, bookKeys: [] })),
           pool: []
         }),
+        vote_code: null,
+        vote_access: "anonymous",
+        voting_open: 0,
+        source_tierlist_id: null,
         created_at: now,
         updated_at: now
       };
