@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import type { OptionsMenuItem } from "./OptionsMenu";
 import { useDismissible } from "../hooks/useDismissible";
 import { useScrollLock } from "../hooks/useScrollLock";
@@ -22,25 +22,92 @@ import { useScrollLock } from "../hooks/useScrollLock";
  *  positioning to that ancestor. A sheet is a full-viewport `fixed`
  *  backdrop that needs no positioning relative to its trigger at all, so
  *  neither problem applies. */
-export function Sheet({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
+export function Sheet({
+  title,
+  children,
+  onClose,
+  onBack
+}: {
+  title: string;
+  children: ReactNode;
+  onClose: () => void;
+  onBack?: () => void;
+}) {
   useScrollLock();
   useDismissible(onClose);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const previous = document.activeElement;
+    closeRef.current?.focus({ preventScroll: true });
+    return () => {
+      if (previous instanceof HTMLElement && previous.isConnected) previous.focus({ preventScroll: true });
+    };
+  }, []);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-4" onClick={onClose}>
       <div
         // The bottom padding carries the safe-area inset: a sheet's rows
         // run to the very bottom edge (unlike BookDetailSheet's
         // scrolling body), so without it the last row sits under a
         // gesture bar.
-        className="w-full rounded-t-2xl border border-(--color-border) bg-(--color-surface) pb-[env(safe-area-inset-bottom,0px)] shadow-lg sm:max-w-sm sm:rounded-2xl sm:pb-0"
+        className="flex max-h-[90dvh] w-full flex-col overflow-hidden rounded-t-3xl bg-(--color-surface) pb-[env(safe-area-inset-bottom,0px)] shadow-xl sm:max-w-md sm:rounded-2xl sm:pb-0"
         onClick={(e) => e.stopPropagation()}
+        onKeyDown={(event) => {
+          if (event.key !== "Tab") return;
+          const controls = Array.from(
+            event.currentTarget.querySelectorAll<HTMLElement>(
+              'button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]'
+            )
+          ).filter((element) => element.getClientRects().length > 0);
+          const first = controls[0];
+          const last = controls[controls.length - 1];
+          if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last?.focus();
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first?.focus();
+          }
+        }}
         role="dialog"
         aria-modal="true"
         aria-label={title}
       >
-        <p className="px-5 pt-4 pb-1 text-sm font-semibold text-(--color-text-dim)">{title}</p>
-        <div className="p-2">{children}</div>
+        <div className="flex shrink-0 items-center gap-2 px-4 pt-3 pb-2">
+          {onBack && (
+            <button
+              onClick={onBack}
+              aria-label="Back to books"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-(--color-text-dim) hover:bg-(--color-surface-hover)"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="m14 6-6 6 6 6" />
+              </svg>
+            </button>
+          )}
+          <h2 className="min-w-0 flex-1 truncate pl-1 text-base font-semibold">{title}</h2>
+          <button
+            ref={closeRef}
+            onClick={onClose}
+            aria-label="Close"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-(--color-text-dim) hover:bg-(--color-surface-hover)"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="m6 6 12 12M18 6 6 18" />
+            </svg>
+          </button>
+        </div>
+        <div className="min-h-0 overflow-y-auto overscroll-contain p-2 pt-0">{children}</div>
       </div>
     </div>
   );
@@ -90,7 +157,16 @@ export function OptionSheet<T extends string>({
           >
             {option.label}
             {selected && (
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="17"
+                height="17"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="M20 6 9 17l-5-5" />
               </svg>
             )}

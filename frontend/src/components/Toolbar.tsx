@@ -133,6 +133,18 @@ export function ShareIcon() {
   );
 }
 
+export function FullscreenIcon({ exit = false }: { exit?: boolean }) {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      {exit ? (
+        <path d="M9 3v6H3M15 3v6h6M9 21v-6H3M15 21v-6h6" />
+      ) : (
+        <path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5" />
+      )}
+    </svg>
+  );
+}
+
 /** Chevrons — move a row up or down in an ordered stack. */
 export function ChevronUpIcon() {
   return (

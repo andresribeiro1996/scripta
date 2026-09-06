@@ -4,16 +4,30 @@ import { AddBlockMenu } from "../components/murals/AddBlockMenu";
 import { BlockConfigPanel } from "../components/murals/BlockConfigPanel";
 import { BlockStylePanel } from "../components/murals/BlockStylePanel";
 import { MuralCanvas } from "../components/murals/MuralCanvas";
+import type { MobileMuralDraft } from "../components/murals/MobileMuralCanvas";
 import { PageContainer } from "../components/PageContainer";
 import { ShareModal } from "../components/ShareModal";
 import { useToast } from "../components/Toaster";
-import { PencilIcon, ShareIcon, toolbarIconClass } from "../components/Toolbar";
+import { FullscreenIcon, PencilIcon, ShareIcon, toolbarIconClass } from "../components/Toolbar";
 import { useGalleryImages } from "../hooks/useGalleryImages";
 import { useLibrary } from "../hooks/useLibrary";
+import { useMuralFullscreen } from "../hooks/useMuralFullscreen";
 import { useMurals } from "../hooks/useMurals";
 import { useTierlists } from "../hooks/useTierlists";
 import { type BlockStyle } from "../lib/libraryStyle";
-import { addBlock, duplicateBlock, removeBlock, updateBlock, type BlockLayout, type BlockType, type Mural, type MuralBlock } from "../lib/murals";
+import {
+  addBlock,
+  createBlockCandidate,
+  createDuplicateCandidate,
+  duplicateBlock,
+  isValidBlockLayout,
+  removeBlock,
+  updateBlock,
+  type BlockLayout,
+  type BlockType,
+  type Mural,
+  type MuralBlock
+} from "../lib/murals";
 
 /** /dashboard/murals/:muralId — one mural's canvas (see
  *  components/murals/MuralCanvas.tsx for the actual freeform grid).
@@ -26,7 +40,7 @@ export function MuralEditorPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { data: library } = useLibrary();
-  const { data: muralsData, isLoading, refetch, create, rename, saveBlocks, share, unshare } = useMurals();
+  const { data: muralsData, isLoading, refetch, create, rename, saveBlocks, currentMural, share, unshare } = useMurals();
   const toast = useToast();
   const { images } = useGalleryImages();
   // Tier-list blocks reference Arena tier lists by id; the canvas resolves
@@ -96,9 +110,37 @@ export function MuralEditorPage() {
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const [sharing, setSharing] = useState(false);
+  const { ref: fullscreenRef, fullscreen, enterFullscreen, exitFullscreen } = useMuralFullscreen();
   // Bumped only when a save fails; see guard() below for why a
   // remount is what puts a block back where it was.
   const [revertNonce, setRevertNonce] = useState(0);
+  const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
+  const [mobileDraft, setMobileDraft] = useState<MobileMuralDraft | null>(null);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const savingDraftRef = useRef(false);
+  const editVersionRef = useRef(0);
+  const [compactMode, setCompactMode] = useState(
+    () => typeof window !== "undefined" && (window.innerWidth < 768 || Boolean(window.matchMedia?.("(pointer: coarse)").matches))
+  );
+
+  useEffect(() => {
+    const coarse = window.matchMedia("(pointer: coarse)");
+    const measure = () => setCompactMode(window.innerWidth < 768 || coarse.matches);
+    window.addEventListener("resize", measure);
+    coarse.addEventListener("change", measure);
+    return () => {
+      window.removeEventListener("resize", measure);
+      coarse.removeEventListener("change", measure);
+    };
+  }, []);
+
+  function toggleEditMode() {
+    if (editMode) {
+      setSelectedBlockId(null);
+      setMobileDraft(null);
+    }
+    setEditMode(!editMode);
+  }
 
   async function handleRename() {
     const name = nameDraft.trim();
@@ -154,10 +196,17 @@ export function MuralEditorPage() {
   // page. The resulting single mural's `blocks` is what actually gets
   // persisted, via useMurals()'s saveBlocks for just this one mural.
   async function handleAddBlock(type: BlockType) {
-    const mural = await materialize();
-    if (!mural) return;
-    const { murals: updated, blockId } = addBlock([mural], mural.id, type);
-    await saveBlocks(mural.id, updated[0].blocks);
+    if (compactMode) {
+      const block = createBlockCandidate(type, mural?.blocks ?? []);
+      setSelectedBlockId(block.id);
+      setMobileDraft({ kind: "add", block, valid: isValidBlockLayout(block.layout, mural?.blocks ?? []) });
+      return;
+    }
+    const target = await materialize();
+    if (!target) return;
+    const { murals: updated, blockId } = addBlock([target], target.id, type);
+    await saveBlocks(target.id, updated[0].blocks);
+    editVersionRef.current++;
     // "currentlyReading" and "empty" have nothing to configure at all —
     // skip straight to them just sitting on the canvas. Every other type
     // opens its config panel right away, same "add then configure" flow
@@ -170,6 +219,7 @@ export function MuralEditorPage() {
     if (!mural) return;
     const [updated] = updateBlock([mural], mural.id, block);
     await saveBlocks(mural.id, updated.blocks);
+    editVersionRef.current++;
   }
 
   async function handleSaveBlockStyle(blockId: string, blockStyle: BlockStyle) {
@@ -179,44 +229,56 @@ export function MuralEditorPage() {
     if (!current) return;
     const [updated] = updateBlock([mural], mural.id, { ...current, style: blockStyle });
     await saveBlocks(mural.id, updated.blocks);
+    editVersionRef.current++;
   }
 
   async function handleDuplicateBlock(blockId: string) {
-    const mural = await materialize();
-    if (!mural) return;
-    const [updated] = duplicateBlock([mural], mural.id, blockId);
-    await saveBlocks(mural.id, updated.blocks);
+    if (compactMode) {
+      const original = mural?.blocks.find((block) => block.id === blockId);
+      if (!original) return;
+      const block = createDuplicateCandidate(original, mural?.blocks ?? []);
+      setSelectedBlockId(block.id);
+      setMobileDraft({ kind: "duplicate", block, valid: isValidBlockLayout(block.layout, mural?.blocks ?? []) });
+      return;
+    }
+    const target = await materialize();
+    if (!target) return;
+    const [updated] = duplicateBlock([target], target.id, blockId);
+    await saveBlocks(target.id, updated.blocks);
+    editVersionRef.current++;
   }
 
   // Still deliberately no confirm(), unlike deleting a book/image/mural:
   // adding and removing blocks is what composing a mural IS, and a
   // dialog on every removal would be friction on the most frequent
   // action here.
-  //
-  // What made that reasoning safe was a mouse. On touch the block's ⋮
-  // lives at the end of the same thin grip bar your thumb rides while
-  // dragging, so a miss opens the menu, and Delete is then one tap away
-  // with nothing between it and a gone block. Undo costs nothing on the
-  // desktop path and gives the touch path a way back.
-  //
-  // It restores the whole previous blocks array rather than re-inserting
-  // the one block, because removeBlock also compacts the survivors
-  // upwards — putting the block back alone would drop it into a layout
-  // that has closed around the hole. The cost is that an edit made
-  // inside the undo window is discarded along with the delete; over a
-  // few seconds that is the behaviour "undo" is expected to have.
   async function handleDeleteBlock(blockId: string) {
     const mural = await materialize();
     if (!mural) return;
     const before = mural.blocks;
+    const removedIndex = before.findIndex((block) => block.id === blockId);
+    const removed = before[removedIndex];
+    if (!removed) return;
     const [updated] = removeBlock([mural], mural.id, blockId);
     await saveBlocks(mural.id, updated.blocks);
+    setSelectedBlockId(null);
+    setMobileDraft(null);
+    const version = ++editVersionRef.current;
     toast({
       message: "Block deleted.",
       duration: 8000,
       action: {
         label: "Undo",
-        onClick: () => void guard(saveBlocks(mural.id, before), "Couldn't undo that.")
+        onClick: () => {
+          if (version !== editVersionRef.current) return;
+          const latest = currentMural(mural.id);
+          if (!latest || latest.blocks.some((block) => block.id === removed.id) || !isValidBlockLayout(removed.layout, latest.blocks)) return;
+          const restoredBlocks = [...latest.blocks];
+          restoredBlocks.splice(Math.min(removedIndex, restoredBlocks.length), 0, removed);
+          void guard(saveBlocks(mural.id, restoredBlocks), "Couldn't undo that.").then((restored) => {
+            if (restored) editVersionRef.current++;
+          });
+        }
       }
     });
   }
@@ -228,6 +290,100 @@ export function MuralEditorPage() {
     if (!current) return;
     const [updated] = updateBlock([mural], mural.id, { ...current, layout });
     await saveBlocks(mural.id, updated.blocks);
+    editVersionRef.current++;
+  }
+
+  function startMobileDraft(kind: "move" | "resize", block: MuralBlock) {
+    setMobileDraft({ kind, block: { ...block, layout: { ...block.layout } }, valid: true });
+  }
+
+  function changeMobileDraft(layout: BlockLayout) {
+    setMobileDraft((draft) => {
+      if (!draft) return null;
+      const blocks = mural?.blocks ?? [];
+      const ignoreBlockId = draft.kind === "move" || draft.kind === "resize" ? draft.block.id : undefined;
+      return {
+        ...draft,
+        block: { ...draft.block, layout },
+        valid: isValidBlockLayout(layout, blocks, ignoreBlockId)
+      };
+    });
+  }
+
+  async function applyMobileDraft() {
+    if (!mobileDraft || savingDraftRef.current) return;
+    savingDraftRef.current = true;
+    setSavingDraft(true);
+    try {
+      const target = await materialize();
+      if (!target) return;
+      const persistedBlock = target.blocks.find((block) => block.id === mobileDraft.block.id);
+      const alreadyInserted = (mobileDraft.kind === "add" || mobileDraft.kind === "duplicate") && persistedBlock;
+      const alreadyPositioned =
+        (mobileDraft.kind === "move" || mobileDraft.kind === "resize") &&
+        persistedBlock &&
+        JSON.stringify(persistedBlock.layout) === JSON.stringify(mobileDraft.block.layout);
+      if (alreadyInserted || alreadyPositioned) {
+        const finishedDraft = mobileDraft;
+        editVersionRef.current++;
+        setMobileDraft(null);
+        setSelectedBlockId(finishedDraft.block.id);
+        if (alreadyInserted && finishedDraft.kind === "add" && finishedDraft.block.type !== "currentlyReading" && finishedDraft.block.type !== "empty") {
+          setConfiguringBlockId(finishedDraft.block.id);
+        }
+        return;
+      }
+      const ignoreBlockId = mobileDraft.kind === "move" || mobileDraft.kind === "resize" ? mobileDraft.block.id : undefined;
+      if (!isValidBlockLayout(mobileDraft.block.layout, target.blocks, ignoreBlockId)) {
+        setMobileDraft((draft) => draft ? { ...draft, valid: false } : null);
+        return;
+      }
+      const before = target.blocks;
+      let blocks: MuralBlock[];
+      if (mobileDraft.kind === "add" || mobileDraft.kind === "duplicate") {
+        blocks = [...target.blocks, mobileDraft.block];
+      } else {
+        blocks = target.blocks.map((block) => block.id === mobileDraft.block.id ? { ...block, layout: mobileDraft.block.layout } : block);
+      }
+      const saved = await saveBlocks(target.id, blocks);
+      const finishedDraft = mobileDraft;
+      setMobileDraft(null);
+      setSelectedBlockId(finishedDraft.block.id);
+      const version = ++editVersionRef.current;
+      if (finishedDraft.kind === "move" || finishedDraft.kind === "resize") {
+        toast({
+          message: finishedDraft.kind === "move" ? "Block moved." : "Block resized.",
+          duration: 8000,
+          action: {
+            label: "Undo",
+            onClick: () => {
+              if (version !== editVersionRef.current) return;
+              const latest = currentMural(target.id);
+              const original = before.find((block) => block.id === finishedDraft.block.id);
+              const current = latest?.blocks.find((block) => block.id === finishedDraft.block.id);
+              if (
+                !latest ||
+                !original ||
+                !current ||
+                JSON.stringify(current.layout) !== JSON.stringify(finishedDraft.block.layout) ||
+                !isValidBlockLayout(original.layout, latest.blocks, current.id)
+              ) return;
+              const restoredBlocks = latest.blocks.map((block) => block.id === current.id ? { ...block, layout: original.layout } : block);
+              void guard(saveBlocks(target.id, restoredBlocks), "Couldn't undo that.").then((restored) => {
+                if (restored) editVersionRef.current++;
+              });
+            }
+          }
+        });
+      }
+      if (finishedDraft.kind === "add" && finishedDraft.block.type !== "currentlyReading" && finishedDraft.block.type !== "empty") {
+        const inserted = saved.blocks.find((block) => block.id === finishedDraft.block.id);
+        if (inserted) setConfiguringBlockId(inserted.id);
+      }
+    } finally {
+      savingDraftRef.current = false;
+      setSavingDraft(false);
+    }
   }
 
   const configuringBlock = configuringBlockId ? mural?.blocks.find((b) => b.id === configuringBlockId) : null;
@@ -251,8 +407,16 @@ export function MuralEditorPage() {
     );
   }
 
-  // A draft renders as an empty mural: same editor, nothing saved yet.
-  const view = mural ?? { id: "", name: draftName, blocks: [] as MuralBlock[] };
+  const view: Mural = mural ?? {
+    id: "",
+    name: draftName,
+    blocks: [],
+    createdAt: "",
+    updatedAt: "",
+    shareToken: null,
+    shareUrl: null,
+    folderId: draftFolderId
+  };
 
   return (
     <PageContainer>
@@ -294,12 +458,17 @@ export function MuralEditorPage() {
             word beats an icon whose meaning you'd have to long-press to
             discover. */}
         <div className="flex items-center gap-2 sm:hidden">
-          {editMode && <AddBlockMenu onAdd={(type) => void guard(handleAddBlock(type), "Couldn't add that block.")} />}
+          {editMode && !mobileDraft && <AddBlockMenu onAdd={(type) => void guard(handleAddBlock(type), "Couldn't add that block.")} />}
+          {view.blocks.length > 0 && (
+            <button onClick={() => void enterFullscreen()} aria-label="View mural fullscreen" title="View mural fullscreen" className={toolbarIconClass()}>
+              <FullscreenIcon />
+            </button>
+          )}
           <button onClick={() => setSharing(true)} aria-label="Share this mural" title="Share this mural" className={toolbarIconClass()}>
             <ShareIcon />
           </button>
           <button
-            onClick={() => setEditMode((e) => !e)}
+            onClick={toggleEditMode}
             aria-label={editMode ? "Done editing" : "Edit this mural"}
             title={editMode ? "Done editing" : "Edit this mural"}
             className={toolbarIconClass(editMode)}
@@ -308,7 +477,15 @@ export function MuralEditorPage() {
           </button>
         </div>
         <div className="hidden items-center gap-2 sm:flex">
-          {editMode && <AddBlockMenu onAdd={(type) => void guard(handleAddBlock(type), "Couldn't add that block.")} />}
+          {editMode && !mobileDraft && <AddBlockMenu onAdd={(type) => void guard(handleAddBlock(type), "Couldn't add that block.")} />}
+          {view.blocks.length > 0 && (
+            <button
+              onClick={() => void enterFullscreen()}
+              className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm font-semibold hover:bg-(--color-surface-hover)"
+            >
+              Fullscreen
+            </button>
+          )}
           {/* Nothing to share until the mural exists. Hidden rather
               than disabled on a draft: a greyed button invites a tap
               that can't do anything, and the button reappears the
@@ -322,7 +499,7 @@ export function MuralEditorPage() {
             </button>
           )}
           <button
-            onClick={() => setEditMode((e) => !e)}
+            onClick={toggleEditMode}
             className={`rounded-lg px-3 py-2 text-sm font-semibold ${
               editMode ? "bg-(--color-accent) text-white" : "border border-(--color-border) bg-(--color-surface) hover:bg-(--color-surface-hover)"
             }`}
@@ -332,7 +509,7 @@ export function MuralEditorPage() {
         </div>
       </header>
 
-      {view.blocks.length === 0 && (
+      {view.blocks.length === 0 && !mobileDraft && (
         <div className="rounded-xl border-2 border-dashed border-(--color-border) py-16 text-center">
           <p className="mb-1 text-(--color-text)">This mural is empty.</p>
           {/* Editing is already on in the second case, so telling you to
@@ -350,20 +527,46 @@ export function MuralEditorPage() {
         </div>
       )}
 
-      {mural && mural.blocks.length > 0 && (
-        <MuralCanvas
-          mural={mural}
-          editMode={editMode}
-          books={books}
-          images={images}
-          revertNonce={revertNonce}
-          onLayoutChange={(blockId, layout) => void guard(handleLayoutChange(blockId, layout), "Couldn't save that move.")}
-          onConfigureBlock={(block) => setConfiguringBlockId(block.id)}
-          onStyleBlock={(block) => setStylingBlockId(block.id)}
-          onDuplicateBlock={(blockId) => void guard(handleDuplicateBlock(blockId), "Couldn't duplicate that block.")}
-          onDeleteBlock={(blockId) => void guard(handleDeleteBlock(blockId), "Couldn't delete that block.")}
-          tierlistData={tierlistData}
-        />
+      {(view.blocks.length > 0 || mobileDraft) && (
+        <div
+          ref={fullscreenRef}
+          className={fullscreen ? "fixed inset-0 z-50 overflow-y-auto bg-(--color-bg) px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]" : ""}
+        >
+          {fullscreen && (
+            <div className="sticky top-0 z-40 -mx-4 -mt-4 mb-3 flex items-center justify-between bg-(--color-bg)/95 px-4 py-3 backdrop-blur">
+              <p className="truncate font-semibold">{view.name}</p>
+              <button onClick={() => void exitFullscreen()} aria-label="Exit fullscreen" className={toolbarIconClass()}>
+                <FullscreenIcon exit />
+              </button>
+            </div>
+          )}
+          <MuralCanvas
+            mural={view}
+            editMode={editMode}
+            books={books}
+            images={images}
+            revertNonce={revertNonce}
+            onLayoutChange={(blockId, layout) => void guard(handleLayoutChange(blockId, layout), "Couldn't save that move.")}
+            onConfigureBlock={(block) => setConfiguringBlockId(block.id)}
+            onStyleBlock={(block) => setStylingBlockId(block.id)}
+            onDuplicateBlock={(blockId) => void guard(handleDuplicateBlock(blockId), "Couldn't duplicate that block.")}
+            onDeleteBlock={(blockId) => void guard(handleDeleteBlock(blockId), "Couldn't delete that block.")}
+            selectedBlockId={selectedBlockId}
+            mobileDraft={mobileDraft}
+            busy={savingDraft}
+            onSelectBlock={setSelectedBlockId}
+            onStartResize={(block) => startMobileDraft("resize", block)}
+            onMobileDraftChange={changeMobileDraft}
+            onApplyMobileDraft={() => void guard(applyMobileDraft(), "Couldn't save that change.")}
+            onCancelMobileDraft={() => {
+              const keepSelected = mobileDraft?.kind === "move" || mobileDraft?.kind === "resize";
+              const blockId = mobileDraft?.block.id ?? null;
+              setMobileDraft(null);
+              setSelectedBlockId(keepSelected ? blockId : null);
+            }}
+            tierlistData={tierlistData}
+          />
+        </div>
       )}
 
       {configuringBlock && (

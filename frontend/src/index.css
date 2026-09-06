@@ -351,18 +351,6 @@ input[type="range"]:focus-visible::-moz-range-thumb {
   }
 }
 
-/* Mobile mural editor (spec: docs/superpowers/specs/2026-09-04-mobile-mural-editor-design.md).
-   .mural-touch is the zoom/pan viewport that wraps the canvas on pointer:coarse
-   devices; every touch-only override is scoped under it so desktop rendering
-   is untouched. */
-.mural-touch {
-  overscroll-behavior: contain;
-}
-.mural-touch .react-resizable-handle {
-  width: 24px;
-  height: 24px;
-  touch-action: none;
-}
-.mural-grip {
-  touch-action: none;
+.mural-overview-stage {
+  touch-action: pan-y;
 }

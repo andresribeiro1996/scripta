@@ -25,6 +25,8 @@ import { useParams } from "react-router-dom";
 import { fetchSharedMural, type PublicBookData, type PublicHighlight } from "../api/sharedMurals";
 import type { GalleryImage } from "../api/gallery";
 import { MuralCanvas } from "../components/murals/MuralCanvas";
+import { FullscreenIcon, toolbarIconClass } from "../components/Toolbar";
+import { useMuralFullscreen } from "../hooks/useMuralFullscreen";
 import { bookKey } from "../lib/merge";
 import type { Mural } from "../lib/murals";
 
@@ -79,6 +81,7 @@ function InfoScreen({ message }: { message: string }) {
 
 export function SharedMuralPage() {
   const { token } = useParams<{ token: string }>();
+  const { ref: fullscreenRef, fullscreen, enterFullscreen, exitFullscreen } = useMuralFullscreen();
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["sharedMural", token],
@@ -124,24 +127,38 @@ export function SharedMuralPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-8">
-      <header className="mb-6">
+      <header className="mb-6 flex items-center justify-between gap-4">
         <h1 className="text-lg font-bold">{mural.name}</h1>
+        {mural.blocks.length > 0 && (
+          <button onClick={() => void enterFullscreen()} aria-label="View mural fullscreen" title="View mural fullscreen" className={toolbarIconClass()}>
+            <FullscreenIcon />
+          </button>
+        )}
       </header>
       {mural.blocks.length === 0 ? (
         <p className="text-sm text-(--color-text-dim)">This mural is empty.</p>
       ) : (
-        <MuralCanvas
-          mural={mural}
-          editMode={false}
-          books={books}
-          images={images}
-          statsOverride={data.stats}
-          // Tier-list references were resolved server-side into this map
-          // (backend murals routes → tierlists' public API); an id the
-          // server couldn't resolve just isn't in it, which
-          // TierListBlockView renders as its "unavailable" state.
-          tierlistData={(tierlistId) => data.tierlists[tierlistId]}
-        />
+        <div
+          ref={fullscreenRef}
+          className={fullscreen ? "fixed inset-0 z-50 overflow-y-auto bg-(--color-bg) px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]" : ""}
+        >
+          {fullscreen && (
+            <div className="sticky top-0 z-40 -mx-4 -mt-4 mb-3 flex items-center justify-between bg-(--color-bg)/95 px-4 py-3 backdrop-blur">
+              <p className="truncate font-semibold">{mural.name}</p>
+              <button onClick={() => void exitFullscreen()} aria-label="Exit fullscreen" className={toolbarIconClass()}>
+                <FullscreenIcon exit />
+              </button>
+            </div>
+          )}
+          <MuralCanvas
+            mural={mural}
+            editMode={false}
+            books={books}
+            images={images}
+            statsOverride={data.stats}
+            tierlistData={(tierlistId) => data.tierlists[tierlistId]}
+          />
+        </div>
       )}
     </div>
   );

@@ -117,6 +117,15 @@ export const BLOCK_TYPE_LABELS: Record<BlockType, string> = {
   tierlist: "Tier list"
 };
 
+export function muralBlockTitle(block: MuralBlock, books: Array<Record<string, unknown>>, tierlistName?: string) {
+  if (block.type === "text") return block.heading || "Note";
+  if (block.type === "shelf" || block.type === "quoteCollection") return block.title || BLOCK_TYPE_LABELS[block.type];
+  if (block.type === "spotlight") return String(books.find((book) => bookKey(book) === block.bookKey)?.Title ?? "Book spotlight");
+  if (block.type === "image") return block.caption || "Image";
+  if (block.type === "tierlist") return tierlistName || "Tier list";
+  return BLOCK_TYPE_LABELS[block.type];
+}
+
 export interface Mural {
   id: string;
   name: string;
@@ -200,39 +209,32 @@ function nextBlockLayout(existing: MuralBlock[], type: BlockType): BlockLayout {
   return nextLayoutBelow(existing, w, h);
 }
 
-function layoutsOverlap(a: BlockLayout, b: BlockLayout): boolean {
+export function layoutsOverlap(a: BlockLayout, b: BlockLayout): boolean {
   return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 }
 
-/** Collapses vertical gaps in a mural's layout — the same "gravity pack"
- *  algorithm react-grid-layout's own `compactType: "vertical"` uses,
- *  reimplemented here as plain data-in/data-out logic since
- *  MuralCanvas.tsx deliberately runs WITHOUT continuous auto-compaction
- *  (see its own comment: a block stays exactly where you put it, so a
- *  careful freeform arrangement never gets rearranged out from under you
- *  while you're actively dragging/composing). This function is only ever
- *  called right after a block actually DISAPPEARS — a direct delete
- *  (removeBlock) or a scrub (scrubBooksFromMurals/scrubImageFromMurals
- *  below) — to close the hole that departure leaves behind, never as a
- *  standing behavior that would fight the user's own placement. Only `y`
- *  is ever touched; `x`/`w`/`h` (and which column a block sits in) are
- *  untouched, so a block only ever slides straight up, never sideways.
- *  Exported for direct testing — every real caller reaches it only
- *  through removeBlock/scrubBooksFromMurals/scrubImageFromMurals above. */
-export function compactBlocksVertically(blocks: MuralBlock[]): MuralBlock[] {
-  const ordered = [...blocks].sort((a, b) => a.layout.y - b.layout.y || a.layout.x - b.layout.x);
-  const placed: MuralBlock[] = [];
-  for (const block of ordered) {
-    let y = 0;
-    // Walk down from the top until this block's own x/w range no longer
-    // collides with anything already placed — the lowest such `y` is
-    // exactly as close to the top as this block can legally sit.
-    while (placed.some((p) => layoutsOverlap(p.layout, { ...block.layout, y }))) {
-      y++;
+export function isValidBlockLayout(layout: BlockLayout, blocks: MuralBlock[], ignoreBlockId?: string): boolean {
+  if (layout.x < 0 || layout.y < 0 || layout.w < 1 || layout.h < 1 || layout.x + layout.w > GRID_COLUMNS) return false;
+  return !blocks.some((block) => block.id !== ignoreBlockId && layoutsOverlap(layout, block.layout));
+}
+
+export function findAvailableLayout(blocks: MuralBlock[], w: number, h: number, startY = 0): BlockLayout {
+  const lastRow = blocks.reduce((max, block) => Math.max(max, block.layout.y + block.layout.h), startY);
+  for (let y = Math.max(0, startY); y <= lastRow; y++) {
+    for (let x = 0; x <= GRID_COLUMNS - w; x++) {
+      const layout = { x, y, w, h };
+      if (isValidBlockLayout(layout, blocks)) return layout;
     }
-    placed.push({ ...block, layout: { ...block.layout, y } });
   }
-  return placed;
+  return { x: 0, y: lastRow, w, h };
+}
+
+export function screenPointToGrid(x: number, y: number, canvasWidth = 1200, margin = 10, padding = 10): { x: number; y: number } {
+  const columnWidth = (canvasWidth - padding * 2 - margin * (GRID_COLUMNS - 1)) / GRID_COLUMNS;
+  return {
+    x: Math.max(0, Math.min(GRID_COLUMNS - 1, Math.round((x - padding) / (columnWidth + margin)))),
+    y: Math.max(0, Math.round((y - padding) / (28 + margin)))
+  };
 }
 
 /** Adds a new block of `type` (with default config for that type — the
@@ -304,6 +306,15 @@ function defaultBlockForType(id: string, type: BlockType, layout: BlockLayout): 
   }
 }
 
+export function createBlockCandidate(type: BlockType, blocks: MuralBlock[]): MuralBlock {
+  const { w, h } = DEFAULT_SIZE_BY_TYPE[type];
+  return defaultBlockForType(newId(), type, findAvailableLayout(blocks, w, h));
+}
+
+export function createDuplicateCandidate(block: MuralBlock, blocks: MuralBlock[]): MuralBlock {
+  return { ...block, id: newId(), layout: findAvailableLayout(blocks, block.layout.w, block.layout.h) };
+}
+
 /** Whole-object patch (like lib/groups.ts's setGroupStyle) — the caller
  *  (each block's config editor) is responsible for handing back a
  *  complete, correctly-typed block. Used for both "save this block's
@@ -314,14 +325,6 @@ export function updateBlock(murals: Mural[], muralId: string, block: MuralBlock)
   return murals.map((m) => (m.id === muralId ? { ...m, blocks: m.blocks.map((b) => (b.id === block.id ? block : b)), updatedAt: now } : m));
 }
 
-/** Removing a block closes the gap it leaves behind — the remaining
- *  blocks slide up (compactBlocksVertically above) rather than leaving a
- *  dead zone where it used to sit, the same "why is there a hole here"
- *  problem a scrubbed-away block (see the two scrub functions below) has.
- *  Guarded on the block actually having existed: compaction is a real
- *  rearrangement, not something to trigger on a no-op — and, matching
- *  the two scrub functions' own no-op convention, returns the SAME
- *  `murals` array reference when the block id didn't match anything. */
 export function removeBlock(murals: Mural[], muralId: string, blockId: string): Mural[] {
   const now = new Date().toISOString();
   let changed = false;
@@ -330,7 +333,7 @@ export function removeBlock(murals: Mural[], muralId: string, blockId: string): 
     const blocks = m.blocks.filter((b) => b.id !== blockId);
     if (blocks.length === m.blocks.length) return m;
     changed = true;
-    return { ...m, blocks: compactBlocksVertically(blocks), updatedAt: now };
+    return { ...m, blocks, updatedAt: now };
   });
   return changed ? result : murals;
 }
@@ -374,13 +377,7 @@ export function scrubBooksFromMurals(murals: Mural[], keys: Iterable<string>): M
 
     if (blocks.length === m.blocks.length && blocks.every((b, i) => b === m.blocks[i])) return m;
     changed = true;
-    // Only actually removing a block (spotlight/quote/an emptied-out
-    // shelf or quoteCollection) leaves a gap worth closing — a
-    // shelf/quoteCollection merely losing one member stays exactly where
-    // it was, nothing to compact. (`tierlist` blocks reference a tier
-    // list by id, not books, so nothing here ever touches them.)
-    const blockRemoved = blocks.length < m.blocks.length;
-    return { ...m, blocks: blockRemoved ? compactBlocksVertically(blocks) : blocks, updatedAt: new Date().toISOString() };
+    return { ...m, blocks, updatedAt: new Date().toISOString() };
   });
 
   return changed ? result : murals;
@@ -403,9 +400,7 @@ export function scrubImageFromMurals(murals: Mural[], imageId: string): Mural[] 
     const coverChanged = m.coverImageId === imageId;
     if (!blocksChanged && !coverChanged) return m;
     changed = true;
-    // A cover-only change touches nothing on the canvas — only an
-    // actually-removed image block leaves a gap worth closing.
-    const next: Mural = { ...m, blocks: blocksChanged ? compactBlocksVertically(blocks) : blocks, updatedAt: new Date().toISOString() };
+    const next: Mural = { ...m, blocks, updatedAt: new Date().toISOString() };
     if (coverChanged) {
       delete next.coverImageId;
       delete next.coverImageUrl;

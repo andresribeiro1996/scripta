@@ -36,6 +36,10 @@ export function useMurals() {
     return queryClient.getQueryData<Mural[]>(["murals"]) ?? [];
   }
 
+  function currentMural(id: string): Mural | undefined {
+    return current().find((mural) => mural.id === id);
+  }
+
   function setMurals(murals: Mural[]) {
     queryClient.setQueryData(["murals"], murals);
   }
@@ -141,5 +145,5 @@ export function useMurals() {
     setMurals(results);
   }
 
-  return { ...query, create, rename, saveBlocks, remove, setCover, clearCover, share, unshare, move, scrubBooks, scrubImage };
+  return { ...query, create, rename, saveBlocks, currentMural, remove, setCover, clearCover, share, unshare, move, scrubBooks, scrubImage };
 }

@@ -1,42 +1,18 @@
-// The actual wall — wraps react-grid-layout, which does the real work
-// (drag, resize, keeping blocks from overlapping) so this doesn't have to
-// hand-roll pointer-event math. Two deliberate config choices away from
-// RGL's defaults:
-//   - compactType={null}: RGL's default auto-compacts every block upward,
-//     closing gaps — the opposite of what a freeform "arrange it your own
-//     way" mural wants. null means a block stays exactly where it's put.
-//   - preventCollision={true}: dragging one block never silently shoves
-//     another out of the way; an illegal drop (overlapping something)
-//     just doesn't happen, so the layout never changes underneath you.
-//
-// Import type GridLayout from "react-grid-layout" only (not a named
-// `{ WidthProvider }` import) — its .d.ts is `export = ReactGridLayout`
-// (a class merged with a namespace), same shape sharp's types take in the
-// backend's gallery module; accessing WidthProvider off the default
-// import is what actually works here.
 import GridLayout from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
-import { OptionsMenu } from "../OptionsMenu";
 import { blockFontFamilyCss, resolveBlockStyle, resolveBorderColor } from "../../lib/libraryStyle";
 import { GRID_COLUMNS, type BlockLayout, type Mural, type MuralBlock } from "../../lib/murals";
+import { useMuralBookMetadata } from "../../hooks/useMuralBookMetadata";
+import { OptionsMenu } from "../OptionsMenu";
 import { BlockRenderer } from "./BlockRenderer";
+import { MobileMuralCanvas, type MobileMuralDraft } from "./MobileMuralCanvas";
 
 const ResponsiveGridLayout = GridLayout.WidthProvider(GridLayout);
 const ROW_HEIGHT = 28;
-
-/** The zoom a canvas opens at. A phone viewport is far narrower than
- *  the 1200px design grid, so 100% there is a legible-only-in-theory
- *  miniature; 300% is roughly where a block's text becomes readable.
- *  One function rather than a literal in each place, because the
- *  initial zoom and the double-tap reset are the same idea and have
- *  already fallen out of step twice. */
-function defaultZoom(): number {
-  return typeof window !== "undefined" && window.innerWidth < 700 ? 3 : 1;
-}
 
 export function MuralCanvas({
   mural,
@@ -50,253 +26,139 @@ export function MuralCanvas({
   onDeleteBlock,
   statsOverride,
   tierlistData,
-  revertNonce = 0
+  revertNonce = 0,
+  selectedBlockId,
+  mobileDraft,
+  busy,
+  onSelectBlock,
+  onStartResize,
+  onMobileDraftChange,
+  onApplyMobileDraft,
+  onCancelMobileDraft
 }: {
   mural: Mural;
   editMode: boolean;
   books: Array<Record<string, unknown>>;
   images: GalleryImage[];
-  // All five of these are only ever invoked from inside the `editMode &&`
-  // controls block below, or (onLayoutChange) from a drag/resize gesture
-  // that `isDraggable`/`isResizable` (both gated on `editMode`) make
-  // possible in the first place — so they're all optional here purely for
-  // the read-only public share pages (pages/SharedMuralPage.tsx), which
-  // always render with `editMode={false}` and have nothing to persist to.
   onLayoutChange?: (blockId: string, layout: BlockLayout) => void;
   onConfigureBlock?: (block: MuralBlock) => void;
   onStyleBlock?: (block: MuralBlock) => void;
   onDuplicateBlock?: (blockId: string) => void;
   onDeleteBlock?: (blockId: string) => void;
-  // Optional: the public share page (pages/SharedMuralPage.tsx) has no
-  // live library to compute stats from — the mural owner's public GET
-  // /murals/shared/:token response already carries precomputed numbers
-  // (see backend/src/modules/library/publicResolver.ts), threaded straight
-  // through to StatsBlockView, which prefers this over its own
-  // computeStat(metric, books) when present. `undefined` everywhere else
-  // (the authenticated editor never passes this) preserves the existing
-  // live-computed behavior exactly.
   statsOverride?: Record<string, number>;
-  // Optional: resolves a tierlist block's reference into its document —
-  // useTierlists' cache on the authenticated editor, the shared response's
-  // server-side map on the public page. Threaded straight through to
-  // BlockRenderer → TierListBlockView; see those files' own comments.
   tierlistData?: (tierlistId: string) => ResolvedTierlist | undefined;
-  // Incremented by the editor when a save fails, purely to remount the
-  // grid. react-grid-layout treats `layout` as controlled but only
-  // rebases its internal copy when the prop DIFFERS from the last one it
-  // saw (getDerivedStateFromProps) — after a failed save the prop is
-  // rebuilt from an unchanged mural, so it's deep-equal and RGL happily
-  // keeps showing the position you dropped the block at. A new key is
-  // the one thing that makes it read the saved layout again.
   revertNonce?: number;
+  selectedBlockId?: string | null;
+  mobileDraft?: MobileMuralDraft | null;
+  busy?: boolean;
+  onSelectBlock?: (blockId: string | null) => void;
+  onStartResize?: (block: MuralBlock) => void;
+  onMobileDraftChange?: (layout: BlockLayout) => void;
+  onApplyMobileDraft?: () => void;
+  onCancelMobileDraft?: () => void;
 }) {
-  const [touchMode] = useState(
-    () => typeof window !== "undefined" && Boolean(window.matchMedia?.("(pointer: coarse)").matches)
+  useMuralBookMetadata(mural.blocks, books, tierlistData);
+  const [compactMode, setCompactMode] = useState(
+    () => typeof window !== "undefined" && (window.innerWidth < 768 || Boolean(window.matchMedia?.("(pointer: coarse)").matches))
   );
-  const [zoom, setZoom] = useState(defaultZoom);
-  const viewportRef = useRef<HTMLDivElement>(null);
-  const [viewportWidth, setViewportWidth] = useState(0);
-  const lastTapRef = useRef(0);
 
   useEffect(() => {
-    if (!touchMode) return;
-    const el = viewportRef.current;
-    if (!el) return;
-    const measure = () => {
-      setViewportWidth(el.clientWidth);
-    };
-    measure();
+    const coarse = window.matchMedia("(pointer: coarse)");
+    const measure = () => setCompactMode(window.innerWidth < 768 || coarse.matches);
     window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
-  }, [touchMode]);
+    coarse.addEventListener("change", measure);
+    return () => {
+      window.removeEventListener("resize", measure);
+      coarse.removeEventListener("change", measure);
+    };
+  }, []);
 
-  const canvasWidth = Math.round(viewportWidth * zoom);
-  const scale = canvasWidth / 1200;
-
-  function setZoomBy(delta: number) {
-    setZoom((z) => Math.min(4, Math.max(0.5, Math.round((z + delta) * 100) / 100)));
-  }
-
-  // Double-tapping the percentage resets the zoom — to the DEFAULT,
-  // via the same function that picks it initially. It used to reset to
-  // a hardcoded 1, which drifted from the phone default twice (2, then
-  // 3), each time turning the reset into a control that made the canvas
-  // unreadable rather than restoring it.
-  function handlePercentTap() {
-    const now = Date.now();
-    if (now - lastTapRef.current < 300) {
-      setZoom(defaultZoom());
-      lastTapRef.current = 0;
-    } else {
-      lastTapRef.current = now;
-    }
-  }
-
-  const layout = mural.blocks.map((b) => ({ i: b.id, x: b.layout.x, y: b.layout.y, w: b.layout.w, h: b.layout.h }));
-
-  // Persist on DROP/RESIZE-END only, not onLayoutChange — RGL fires
-  // onLayoutChange continuously while a drag is in progress (every
-  // intermediate position), and `layout` above is a CONTROLLED prop
-  // sourced straight from the saved mural; echoing every intermediate
-  // frame back through a save round trip would mean dozens of PUTs per
-  // drag and a real risk of two in-flight saves clobbering each other.
-  // RGL's own drag/resize placeholder rendering doesn't need the
-  // controlled prop to keep up in real time — only the FINAL position,
-  // once the gesture ends, needs to make it back to the saved document.
-  function handleGestureEnd(_layout: unknown, _oldItem: unknown, newItem: { i: string; x: number; y: number; w: number; h: number }) {
-    onLayoutChange?.(newItem.i, { x: newItem.x, y: newItem.y, w: newItem.w, h: newItem.h });
-  }
-
-  const gridProps = {
-    layout,
-    cols: GRID_COLUMNS,
-    rowHeight: touchMode ? Math.max(1, Math.round(ROW_HEIGHT * scale)) : ROW_HEIGHT,
-    isDraggable: editMode,
-    isResizable: editMode,
-    compactType: null,
-    preventCollision: true,
-    // The settings button rendered inside each block (below) sits above
-    // the block's own drag surface — without excluding it, a click
-    // meant for it starts a drag instead. RGL matches this against a
-    // CSS selector, not a ref. `.mural-block-body` (touch only) makes
-    // block CONTENT a pan surface instead of a drag surface, so only
-    // the grip bar repositions the block — see the touch branch below.
-    draggableCancel: touchMode
-      ? ".mural-block-controls, .mural-block-body"
-      : ".mural-block-controls",
-    onDragStop: handleGestureEnd,
-    onResizeStop: handleGestureEnd
-  };
-
-  const blockNodes = mural.blocks.map((block) => {
-    // Same inline-style shape as BookCard.tsx's own border/opacity/
-    // radius handling (down to reusing resolveBorderColor) — a mural
-    // block's style has no priority chain, so this is just "resolve
-    // the block's own override over the defaults," one level, not
-    // three.
-    const style = resolveBlockStyle(block.style);
+  if (compactMode) {
     return (
-      <div
-        key={block.id}
-        className={`group relative overflow-hidden ${style.cardShadow ? "shadow-sm" : ""} ${style.cardHoverEffect ? "transition-transform hover:-translate-y-0.5 hover:scale-[1.01] hover:shadow-lg" : ""}`}
-        style={{
-          borderRadius: `${style.cardRadius}px`,
-          opacity: style.cardOpacity / 100,
-          backgroundColor: style.backgroundColor ?? "var(--color-surface)",
-          borderTopWidth: `${style.cardBorderSides.top ? style.cardBorderWidth : 0}px`,
-          borderRightWidth: `${style.cardBorderSides.right ? style.cardBorderWidth : 0}px`,
-          borderBottomWidth: `${style.cardBorderSides.bottom ? style.cardBorderWidth : 0}px`,
-          borderLeftWidth: `${style.cardBorderSides.left ? style.cardBorderWidth : 0}px`,
-          borderStyle: style.cardBorderWidth > 0 ? style.cardBorderStyle : "none",
-          borderColor: resolveBorderColor(style.cardBorderColor, style.cardBorderOpacity),
-          // Sets the base for every text element inside the block —
-          // see components/murals/blocks/*.tsx, which size themselves
-          // in `em` specifically so they respond to this. font-family,
-          // font-weight, font-style, and color all cascade to
-          // children on their own via plain CSS inheritance; fontSize
-          // needs the em-sizing on the receiving end too, since
-          // Tailwind's text-* utilities are rem-based (root-relative,
-          // not parent-relative) and wouldn't move at all otherwise.
-          // Inheritance means an element with its OWN explicit
-          // font-weight class (most block headings use font-semibold/
-          // font-bold already, by design, for visual hierarchy) won't
-          // additionally react to the `bold` toggle — it's already
-          // bold-ish; the toggle's visible effect is mainly on body/
-          // caption text that has no weight class of its own.
-          // codeStyle FORCES monospace regardless of `fontFamily` —
-          // same "always monospace no matter the surrounding font"
-          // rule markdown's inline `code` mark follows.
-          fontFamily: style.codeStyle ? blockFontFamilyCss("jetbrainsMono") : blockFontFamilyCss(style.fontFamily),
-          fontSize: `${touchMode ? Math.round(style.fontSize * scale) : style.fontSize}px`,
-          fontWeight: style.bold ? 700 : undefined,
-          fontStyle: style.italic ? "italic" : undefined,
-          color: style.textColor ?? undefined
-        }}
-      >
-        {touchMode && editMode && (
-          <div className="mural-grip absolute inset-x-0 top-0 z-10 flex items-center justify-between px-1.5 py-1">
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[rgba(10,8,6,0.72)] text-sm text-white select-none">⠿</span>
-            <span className="mural-block-controls">
-              <OptionsMenu
-                title="Block settings"
-                items={[
-                  { label: "Style", onClick: () => onStyleBlock?.(block) },
-                  { label: "Configure", onClick: () => onConfigureBlock?.(block) },
-                  { label: "Duplicate", onClick: () => onDuplicateBlock?.(block.id) },
-                  { label: "Delete", onClick: () => onDeleteBlock?.(block.id), danger: true }
-                ]}
-              />
-            </span>
-          </div>
-        )}
-        {touchMode && editMode ? (
-          <div className="mural-block-body h-full">
-            <BlockRenderer block={block} books={books} images={images} statsOverride={statsOverride} tierlistData={tierlistData} />
-          </div>
-        ) : (
-          <BlockRenderer block={block} books={books} images={images} statsOverride={statsOverride} tierlistData={tierlistData} />
-        )}
-        {editMode && !touchMode && (
-          <div className="mural-block-controls absolute top-1.5 right-1.5 opacity-0 transition-opacity group-hover:opacity-100">
-            <OptionsMenu
-              title="Block settings"
-              items={[
-                { label: "Style", onClick: () => onStyleBlock?.(block) },
-                { label: "Configure", onClick: () => onConfigureBlock?.(block) },
-                { label: "Duplicate", onClick: () => onDuplicateBlock?.(block.id) },
-                // No confirmation on this one, unlike every other
-                // delete in the app — composing a mural means
-                // adding/removing blocks constantly, and re-adding
-                // one is cheap, unlike deleting a book/image/mural
-                // itself.
-                { label: "Delete", onClick: () => onDeleteBlock?.(block.id), danger: true }
-              ]}
-            />
-          </div>
-        )}
-      </div>
+      <MobileMuralCanvas
+        mural={mural}
+        editMode={editMode}
+        books={books}
+        images={images}
+        selectedBlockId={selectedBlockId}
+        draft={mobileDraft}
+        busy={busy}
+        onSelectBlock={onSelectBlock}
+        onConfigureBlock={onConfigureBlock}
+        onStyleBlock={onStyleBlock}
+        onDuplicateBlock={onDuplicateBlock}
+        onDeleteBlock={onDeleteBlock}
+        onStartResize={onStartResize}
+        onLayoutChange={onLayoutChange}
+        onDraftChange={onMobileDraftChange}
+        onApplyDraft={onApplyMobileDraft}
+        onCancelDraft={onCancelMobileDraft}
+        statsOverride={statsOverride}
+        tierlistData={tierlistData}
+        revertNonce={revertNonce}
+      />
     );
-  });
+  }
 
-  if (touchMode) {
-    return (
-      <div className="relative">
-        <div ref={viewportRef} className="mural-touch max-h-[calc(100dvh-8.5rem)] overflow-auto">
-          {viewportWidth > 0 && (
-            <div style={{ width: canvasWidth }}>
-              <GridLayout key={revertNonce} {...gridProps} width={canvasWidth}>
-                {blockNodes}
-              </GridLayout>
-            </div>
-          )}
-        </div>
-        <div className="mt-2 flex items-center justify-end gap-1">
-          <button
-            onClick={() => setZoomBy(-0.25)}
-            className="h-10 w-10 rounded-lg border border-(--color-border) bg-(--color-surface) text-lg font-semibold"
-          >
-            −
-          </button>
-          <button
-            onClick={handlePercentTap}
-            className="h-10 min-w-14 rounded-lg border border-(--color-border) bg-(--color-surface) px-2 text-sm font-semibold"
-          >
-            {Math.round(zoom * 100)}%
-          </button>
-          <button
-            onClick={() => setZoomBy(0.25)}
-            className="h-10 w-10 rounded-lg border border-(--color-border) bg-(--color-surface) text-lg font-semibold"
-          >
-            +
-          </button>
-        </div>
-      </div>
-    );
+  const layout = mural.blocks.map((block) => ({ i: block.id, ...block.layout }));
+  function handleGestureEnd(_layout: unknown, _oldItem: unknown, item: { i: string; x: number; y: number; w: number; h: number }) {
+    onLayoutChange?.(item.i, { x: item.x, y: item.y, w: item.w, h: item.h });
   }
 
   return (
-    <ResponsiveGridLayout key={revertNonce} {...gridProps}>
-      {blockNodes}
+    <ResponsiveGridLayout
+      key={revertNonce}
+      layout={layout}
+      cols={GRID_COLUMNS}
+      rowHeight={ROW_HEIGHT}
+      isDraggable={editMode}
+      isResizable={editMode}
+      compactType={null}
+      preventCollision
+      draggableCancel=".mural-block-controls"
+      onDragStop={handleGestureEnd}
+      onResizeStop={handleGestureEnd}
+    >
+      {mural.blocks.map((block) => {
+        const style = resolveBlockStyle(block.style);
+        return (
+          <div
+            key={block.id}
+            className={`group relative overflow-hidden ${style.cardShadow ? "shadow-sm" : ""} ${style.cardHoverEffect ? "transition-transform hover:-translate-y-0.5 hover:scale-[1.01] hover:shadow-lg" : ""}`}
+            style={{
+              borderRadius: `${style.cardRadius}px`,
+              opacity: style.cardOpacity / 100,
+              backgroundColor: style.backgroundColor ?? "var(--color-surface)",
+              borderTopWidth: `${style.cardBorderSides.top ? style.cardBorderWidth : 0}px`,
+              borderRightWidth: `${style.cardBorderSides.right ? style.cardBorderWidth : 0}px`,
+              borderBottomWidth: `${style.cardBorderSides.bottom ? style.cardBorderWidth : 0}px`,
+              borderLeftWidth: `${style.cardBorderSides.left ? style.cardBorderWidth : 0}px`,
+              borderStyle: style.cardBorderWidth > 0 ? style.cardBorderStyle : "none",
+              borderColor: resolveBorderColor(style.cardBorderColor, style.cardBorderOpacity),
+              fontFamily: style.codeStyle ? blockFontFamilyCss("jetbrainsMono") : blockFontFamilyCss(style.fontFamily),
+              fontSize: `${style.fontSize}px`,
+              fontWeight: style.bold ? 700 : undefined,
+              fontStyle: style.italic ? "italic" : undefined,
+              color: style.textColor ?? undefined
+            }}
+          >
+            <BlockRenderer block={block} books={books} images={images} statsOverride={statsOverride} tierlistData={tierlistData} />
+            {editMode && (
+              <div className="mural-block-controls absolute top-1.5 right-1.5 opacity-0 transition-opacity group-hover:opacity-100">
+                <OptionsMenu
+                  title="Block settings"
+                  items={[
+                    { label: "Style", onClick: () => onStyleBlock?.(block) },
+                    { label: "Configure", onClick: () => onConfigureBlock?.(block) },
+                    { label: "Duplicate", onClick: () => onDuplicateBlock?.(block.id) },
+                    { label: "Delete", onClick: () => onDeleteBlock?.(block.id), danger: true }
+                  ]}
+                />
+              </div>
+            )}
+          </div>
+        );
+      })}
     </ResponsiveGridLayout>
   );
 }

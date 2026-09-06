@@ -1,4 +1,5 @@
 import { CoverImage } from "./BookCard";
+import { BookSummary } from "./BookSummary";
 import { statusLabel } from "../lib/covers";
 import { nextReadStatus } from "../lib/libraryView";
 import { useDismissible } from "../hooks/useDismissible";
@@ -72,6 +73,7 @@ export function BookDetailSheet({
           </div>
         </div>
 
+        <div className="px-5 pb-5"><BookSummary book={book} /></div>
         <div className="border-t border-(--color-border) p-5">
           <h3 className="mb-3 text-sm font-semibold">
             Highlights{highlights.length > 0 ? ` (${highlights.length})` : ""}

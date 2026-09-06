@@ -32,12 +32,12 @@ export function EdgeSwipeBack() {
 
     function handleTouchStart(e: TouchEvent) {
       const touch = e.touches[0];
-      // The mural canvas's own touch-mode viewport (`.mural-touch`,
+      // The mural canvas's own touch-mode viewport (`.mural-overview-stage`,
       // MuralCanvas.tsx) can extend into the edge zone at mobile widths
       // and owns its own pan/drag interactions there — don't arm this
       // gesture over it, or panning near the edge would misfire as a
       // back-navigation.
-      const insideMuralCanvas = (e.target as Element).closest?.(".mural-touch") !== null;
+      const insideMuralCanvas = (e.target as Element).closest?.(".mural-overview-stage") !== null;
       armed = e.touches.length === 1 && touch.clientX <= EDGE_ZONE_PX && !insideMuralCanvas;
       startX = touch.clientX;
       startY = touch.clientY;

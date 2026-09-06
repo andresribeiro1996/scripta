@@ -28,3 +28,10 @@ exporter/library.json
 # Machine-specific and regenerable; never meant to be shared or committed.
 .certs/
 .superpowers/
+
+# Local opencode tooling (skills, plugins, its own node_modules) — machine
+# config, not project source.
+.opencode/
+
+# Dev-only scratch config for parallel sessions — see its own header.
+frontend/vite.http.config.ts
