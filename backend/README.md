@@ -59,6 +59,9 @@ curl -X PUT http://localhost:3000/library \
 | POST | `/auth/logout-everywhere` | ✓ | revokes every session for the caller |
 | GET | `/auth/me` | ✓ | `{user}` |
 | POST | `/auth/username` | ✓ | `{username}` → claims a username for the caller's account; `409` if taken. What a Google sign-in without one yet calls before it's treated as set up |
+| POST | `/auth/avatar` | ✓ | multipart `image` field → `{user}` with the new `avatarId`. Same validation pipeline as gallery uploads (magic-byte sniff, EXIF strip), then square-cropped to 256×256 WebP; replaces any previous avatar |
+| DELETE | `/auth/avatar` | ✓ | `{user}` — clears the avatar (back to the frontend's initial-letter fallback) |
+| GET | `/auth/avatar/:id/file` | — | the avatar bytes as a plain `<img src>`; unauthenticated by unguessable UUID, `Cache-Control: immutable` (the id regenerates on every replacement, so caching can't go stale) |
 | GET | `/auth/google` | — | starts the Google OAuth redirect flow (only if configured) |
 | GET | `/auth/google/callback` | — | Google redirects here; ends by redirecting the browser to `OAUTH_SUCCESS_REDIRECT_URL#access_token=...&refresh_token=...` |
 | GET | `/auth/providers` | — | `{google: boolean}` — lets a frontend show/hide the Google button without hardcoding it |

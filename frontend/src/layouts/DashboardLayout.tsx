@@ -1,6 +1,7 @@
 import { Fragment, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import { Avatar } from "../components/Avatar";
 import { OfflineBanner } from "../components/OfflineBanner";
 import { useDismissible } from "../hooks/useDismissible";
 import { useScrollLock } from "../hooks/useScrollLock";
@@ -85,7 +86,10 @@ export function DashboardLayout() {
           ))}
         </nav>
         <div className="mt-auto border-t border-(--color-border) pt-3">
-          <p className="mb-2 truncate px-2 text-xs text-(--color-text-dim)">@{session?.user.username ?? session?.user.email}</p>
+          <div className="mb-2 flex items-center gap-2 px-2">
+            {session && <Avatar user={session.user} size={24} />}
+            <p className="truncate text-xs text-(--color-text-dim)">@{session?.user.username ?? session?.user.email}</p>
+          </div>
           <button
             onClick={() => void logout()}
             className="w-full rounded-lg border border-(--color-danger-soft) px-3 py-2.5 text-left text-sm text-(--color-danger) hover:bg-(--color-danger-soft)"
@@ -166,7 +170,10 @@ export function DashboardLayout() {
               ))}
             </nav>
             <div className="mt-6 border-t border-(--color-border) pt-3">
-              <p className="mb-2 truncate px-2 text-xs text-(--color-text-dim)">@{session?.user.username ?? session?.user.email}</p>
+              <div className="mb-2 flex items-center gap-2 px-2">
+                {session && <Avatar user={session.user} size={24} />}
+                <p className="truncate text-xs text-(--color-text-dim)">@{session?.user.username ?? session?.user.email}</p>
+              </div>
               <button
                 onClick={() => void logout()}
                 className="w-full rounded-lg border border-(--color-danger-soft) px-3 py-2.5 text-left text-sm text-(--color-danger) hover:bg-(--color-danger-soft)"

@@ -22,6 +22,7 @@ import { SettingsPage } from "./pages/SettingsPage";
 import { SharedLibraryPage } from "./pages/SharedLibraryPage";
 import { SharedMuralPage } from "./pages/SharedMuralPage";
 import { TierListEditorPage } from "./pages/TierListEditorPage";
+import { WelcomeAvatarPage } from "./pages/WelcomeAvatarPage";
 
 export function App() {
   return (
@@ -45,9 +46,14 @@ export function App() {
             inside it: must also have finished setup (a username) — a
             Google sign-in without one yet is routed to /choose-username,
             which itself only needs RequireAuth (not RequireUsername, or
-            it'd redirect to itself). */}
+            it'd redirect to itself). /welcome-avatar is the skippable
+            avatar step of the signup journey — same placement: it needs a
+            session, but NOT a username yet (a password signup goes
+            straight here after registering; a Google signup passes
+            through choose-username first). */}
         <Route element={<RequireAuth />}>
           <Route path="/choose-username" element={<ChooseUsernamePage />} />
+          <Route path="/welcome-avatar" element={<WelcomeAvatarPage />} />
 
           <Route element={<RequireUsername />}>
             <Route element={<DashboardLayout />}>

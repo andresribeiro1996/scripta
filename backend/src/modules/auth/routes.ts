@@ -8,13 +8,18 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import {
+  AvatarDimensionsTooLargeError,
+  AvatarError,
+  AvatarTooLargeError,
   EmailInUseError,
+  InvalidAvatarError,
   InvalidCredentialsError,
   InvalidRefreshTokenError,
   OAuthAccountConflictError,
   UsernameInUseError
 } from "./domain/errors.js";
 import type { AuthService } from "./service.js";
+import { MAX_AVATAR_UPLOAD_BYTES } from "./service.js";
 import { authGuard } from "./guard.js";
 
 const usernameSchema = z
@@ -42,6 +47,14 @@ const refreshSchema = z.object({
 const setUsernameSchema = z.object({
   username: usernameSchema
 });
+
+const avatarIdParamSchema = z.object({ id: z.string().uuid() });
+
+function statusForAvatarError(err: AvatarError): number {
+  if (err instanceof AvatarTooLargeError) return 413;
+  if (err instanceof InvalidAvatarError || err instanceof AvatarDimensionsTooLargeError) return 422;
+  return 400;
+}
 
 export function buildAuthRoutes(service: AuthService) {
   return async function authRoutes(app: FastifyInstance) {
@@ -106,7 +119,12 @@ export function buildAuthRoutes(service: AuthService) {
     });
 
     app.get("/auth/me", { preHandler: authGuard }, async (request, reply) => {
-      return reply.send({ user: request.user });
+      // From the repository, not request.user: the guard's copy comes from
+      // JWT claims and can lag a just-completed avatar change (see
+      // domain/types.ts's AuthenticatedUser). request.user is the fallback
+      // for a user deleted between token issue and this call.
+      const user = service.getUserById(request.user.id) ?? request.user;
+      return reply.send({ user });
     });
 
     // Claims a username for the signed-in account — the step a Google
@@ -123,6 +141,55 @@ export function buildAuthRoutes(service: AuthService) {
         if (err instanceof UsernameInUseError) return reply.code(409).send({ error: err.message });
         throw err;
       }
+    });
+
+    app.post(
+      "/auth/avatar",
+      {
+        preHandler: authGuard,
+        // Aborts the upload stream over this size rather than buffering it
+        // first — belt-and-suspenders alongside service.ts's own cap, same
+        // as gallery's upload route.
+        bodyLimit: MAX_AVATAR_UPLOAD_BYTES + 1024
+      },
+      async (request, reply) => {
+        const upload = await request.file();
+        if (!upload) {
+          return reply.code(400).send({ error: "No file uploaded — send a multipart/form-data request with an \"image\" field." });
+        }
+        const buffer = await upload.toBuffer();
+        try {
+          const user = await service.setAvatar(request.user.id, buffer);
+          return reply.send({ user });
+        } catch (err) {
+          if (err instanceof AvatarError) {
+            return reply.code(statusForAvatarError(err)).send({ error: err.message });
+          }
+          throw err;
+        }
+      }
+    );
+
+    app.delete("/auth/avatar", { preHandler: authGuard }, async (request, reply) => {
+      const user = await service.removeAvatar(request.user.id);
+      return reply.send({ user });
+    });
+
+    // Deliberately NOT behind authGuard — a plain <img src> target, same
+    // as gallery's file route. Access control is "the id is an
+    // unguessable UUID"; the id regenerates on every replacement, so the
+    // immutable caching below can't serve a stale avatar after a change.
+    app.get("/auth/avatar/:id/file", async (request, reply) => {
+      const parsed = avatarIdParamSchema.safeParse(request.params);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: "Invalid avatar id." });
+      }
+      const file = service.getAvatarFile(parsed.data.id);
+      if (!file) {
+        return reply.code(404).send({ error: "No such avatar." });
+      }
+      reply.header("Cache-Control", "public, max-age=31536000, immutable");
+      return reply.type(file.mimeType).send(file.buffer);
     });
 
     app.setErrorHandler((error, _request, reply) => {

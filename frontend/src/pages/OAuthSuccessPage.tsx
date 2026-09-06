@@ -39,8 +39,17 @@ export function OAuthSuccessPage() {
 
     try {
       const payloadBase64 = accessToken.split(".")[1]?.replace(/-/g, "+").replace(/_/g, "/");
-      const claims = JSON.parse(atob(payloadBase64)) as { sub: string; email: string; username: string | null };
-      setSession({ user: { id: claims.sub, email: claims.email, username: claims.username }, accessToken, refreshToken });
+      const claims = JSON.parse(atob(payloadBase64)) as {
+        sub: string;
+        email: string;
+        username: string | null;
+        avatarId?: string | null;
+      };
+      setSession({
+        user: { id: claims.sub, email: claims.email, username: claims.username, avatarId: claims.avatarId ?? null },
+        accessToken,
+        refreshToken
+      });
       // Scrub the tokens out of the URL so they don't linger in history/bookmarks.
       window.history.replaceState(null, "", window.location.pathname);
       setStatus("done");

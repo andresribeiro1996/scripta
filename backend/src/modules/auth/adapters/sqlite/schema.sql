@@ -14,8 +14,18 @@ CREATE TABLE IF NOT EXISTS users (
                                      -- which is exactly what's needed here).
   password_hash TEXT,              -- NULL for accounts created via Google only
   google_id     TEXT UNIQUE,       -- NULL until/unless linked to a Google account
+  avatar_id     TEXT UNIQUE,       -- NULL until a profile picture is uploaded; the
+                                   -- id changes on every replacement, which doubles
+                                   -- as the cache-buster for the immutable file route
   created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
+
+-- UNIQUE as a separate index (not an inline column constraint) because
+-- SQLite's ALTER TABLE ADD COLUMN can't add a UNIQUE column — the
+-- boot-time migration in connection.ts adds avatar_id via ALTER, and this
+-- statement then backfills the constraint identically for both fresh and
+-- migrated databases.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_avatar_id ON users(avatar_id);
 
 -- Refresh tokens are stored hashed (sha256), never in plaintext — the same
 -- reasoning as password storage: a DB leak shouldn't hand out usable

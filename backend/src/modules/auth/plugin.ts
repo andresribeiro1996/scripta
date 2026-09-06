@@ -9,6 +9,7 @@
 // and wires it into the service. Nothing above this file (routes.ts,
 // service.ts, domain/) knows or cares that it's SQLite.
 
+import fastifyMultipart from "@fastify/multipart";
 import fastifyOauth2 from "@fastify/oauth2";
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
@@ -16,10 +17,11 @@ import { readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { env, googleOAuthConfigured } from "../../config/env.js";
+import { createFsAvatarBlobStore } from "./adapters/fs/avatarBlobStore.js";
 import { createSqliteAuthRepository } from "./adapters/sqlite/sqliteAuthRepository.js";
 import { openAuthDb } from "./adapters/sqlite/connection.js";
 import { buildAuthRoutes } from "./routes.js";
-import { createAuthService } from "./service.js";
+import { createAuthService, MAX_AVATAR_UPLOAD_BYTES } from "./service.js";
 
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 const consoleHtml = readFileSync(`${moduleDir}/public/console.html`, "utf8");
@@ -40,7 +42,8 @@ export async function authPlugin(app: FastifyInstance) {
   // --- composition: swap this one block to change storage technology ---
   const db = openAuthDb();
   const authRepository = createSqliteAuthRepository(db);
-  const authService = createAuthService(authRepository);
+  const avatarStore = createFsAvatarBlobStore(env.AVATAR_STORAGE_PATH);
+  const authService = createAuthService(authRepository, avatarStore);
   // -----------------------------------------------------------------------
 
   // Scoped to this plugin only — login/signup/refresh are the endpoints
@@ -49,6 +52,15 @@ export async function authPlugin(app: FastifyInstance) {
   await app.register(fastifyRateLimit, {
     max: 20,
     timeWindow: "1 minute"
+  });
+
+  // Also plugin-scoped: only the avatar upload route needs multipart
+  // parsing (same pattern as gallery's own registration there).
+  await app.register(fastifyMultipart, {
+    limits: {
+      fileSize: MAX_AVATAR_UPLOAD_BYTES,
+      files: 1
+    }
   });
 
   await app.register(buildAuthRoutes(authService));

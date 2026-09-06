@@ -1,14 +1,46 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
+import { Avatar } from "../components/Avatar";
 import { SocialsSection } from "../components/SocialsSection";
 
 export function SettingsPage() {
-  const { session, setUsername } = useAuth();
+  const { session, setUsername, uploadAvatar, removeAvatar } = useAuth();
   const [draft, setDraft] = useState(session?.user.username ?? "");
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setError(null);
+    setSuccess(false);
+    setAvatarBusy(true);
+    try {
+      await uploadAvatar(file);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setAvatarBusy(false);
+    }
+  }
+
+  async function handleAvatarRemove() {
+    setError(null);
+    setSuccess(false);
+    setAvatarBusy(true);
+    try {
+      await removeAvatar();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setAvatarBusy(false);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -32,6 +64,40 @@ export function SettingsPage() {
 
       <section className="rounded-xl border border-(--color-border) bg-(--color-surface) p-5">
         <h3 className="mb-4 text-sm font-semibold">Account</h3>
+
+        {session && (
+          <div className="mb-4 flex items-center gap-3">
+            <Avatar user={session.user} size={48} className={avatarBusy ? "animate-pulse" : ""} />
+            <div>
+              <div className="mb-0.5 text-xs text-(--color-text-dim)">Profile picture</div>
+              <div className="flex items-center gap-3">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/heic"
+                  onChange={handleAvatarChange}
+                  className="hidden"
+                />
+                <button
+                  disabled={avatarBusy}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="text-xs text-(--color-accent) transition-opacity hover:opacity-80 disabled:opacity-50"
+                >
+                  {avatarBusy ? "Working…" : "Change"}
+                </button>
+                {session.user.avatarId && (
+                  <button
+                    disabled={avatarBusy}
+                    onClick={() => void handleAvatarRemove()}
+                    className="text-xs text-(--color-text-dim) transition-opacity hover:opacity-80 disabled:opacity-50"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="mb-4">
           <div className="mb-1 text-xs text-(--color-text-dim)">Email</div>

@@ -7,8 +7,8 @@ import jwt from "jsonwebtoken";
 import { env } from "../../config/env.js";
 import type { AccessTokenClaims, AuthenticatedUser, UserRow } from "./domain/types.js";
 
-export function signAccessToken(user: Pick<UserRow, "id" | "email" | "username">): string {
-  const claims: AccessTokenClaims = { sub: user.id, email: user.email, username: user.username };
+export function signAccessToken(user: Pick<UserRow, "id" | "email" | "username" | "avatar_id">): string {
+  const claims: AccessTokenClaims = { sub: user.id, email: user.email, username: user.username, avatarId: user.avatar_id };
   // jsonwebtoken's own types narrow `expiresIn` to a template-literal
   // subset of strings it doesn't export a name for; env.ACCESS_TOKEN_TTL
   // is validated at startup (config/env.ts) to already be in that shape
@@ -32,7 +32,8 @@ export function verifyAccessToken(token: string): AccessTokenClaims | null {
 export function getAuthenticatedUserFromAccessToken(accessToken: string): AuthenticatedUser | null {
   const claims = verifyAccessToken(accessToken);
   if (!claims) return null;
-  return { id: claims.sub, email: claims.email, username: claims.username };
+  // `?? null` — tokens issued before avatars existed carry no avatarId claim.
+  return { id: claims.sub, email: claims.email, username: claims.username, avatarId: claims.avatarId ?? null };
 }
 
 /** A refresh token is just high-entropy random data — it carries no

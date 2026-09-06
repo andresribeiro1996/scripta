@@ -1,27 +1,52 @@
 import { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import {
+  GOLD,
+  INK,
+  PAPER_DIM,
+  AuthBrandHeading,
+  AuthCard,
+  AuthFieldError,
+  AuthServerError,
+  AuthStage,
+  authFieldClass,
+  authFieldErrorClass,
+  authLabelClass,
+  authSubmitClass
+} from "../auth/AuthStage";
 
 /** Where a Google sign-in without a username yet gets routed (see
  *  RequireUsername). Not shown to password-signup accounts — they pick a
- *  username at signup time and never have a null one to begin with. */
+ *  username at signup time and never have a null one to begin with. Same
+ *  cover-stage-plus-card treatment as LoginPage, so the whole first-run
+ *  journey reads as one designed sequence. */
 export function ChooseUsernamePage() {
   const { session, setUsername } = useAuth();
   const navigate = useNavigate();
   const [username, setUsernameInput] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [fieldError, setFieldError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   if (!session) return <Navigate to="/login" replace />;
   if (session.user.username) return <Navigate to="/dashboard" replace />;
 
+  function handleInvalid(e: React.InvalidEvent<HTMLInputElement>) {
+    e.preventDefault();
+    setFieldError(e.currentTarget.validationMessage);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setFieldError(null);
     setSubmitting(true);
     try {
       await setUsername(username);
-      navigate("/dashboard", { replace: true });
+      // Onward into the (skippable) avatar step — same signup journey a
+      // password account takes after registering.
+      navigate("/welcome-avatar", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
@@ -30,42 +55,51 @@ export function ChooseUsernamePage() {
   }
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-5">
-      <h1 className="mb-1 text-xl font-bold">One more thing</h1>
-      <p className="mb-6 text-sm text-(--color-text-dim)">
-        Choose a username for your account ({session.user.email}). You'll be able to log in with either it or your
-        email from now on.
-      </p>
+    <AuthStage>
+      <AuthCard>
+        <AuthBrandHeading subtitle="One more thing before your library" />
 
-      {error && (
-        <div className="mb-4 rounded-lg bg-(--color-danger-soft) px-3 py-2 text-sm text-(--color-danger)">{error}</div>
-      )}
+        <p className="mb-6 text-center text-[12px]" style={{ color: PAPER_DIM }}>
+          Choose a username for your account ({session.user.email}). You'll be able to log in with either it or your
+          email from now on.
+        </p>
 
-      <form onSubmit={handleSubmit} className="rounded-xl border border-(--color-border) bg-(--color-surface) p-6 shadow-sm">
-        <label className="mb-1 block text-sm text-(--color-text-dim)" htmlFor="username">
-          Username
-        </label>
-        <input
-          id="username"
-          type="text"
-          required
-          minLength={3}
-          maxLength={30}
-          pattern="[a-zA-Z0-9_.]+"
-          title="Letters, numbers, underscores, and periods only."
-          autoComplete="username"
-          value={username}
-          onChange={(e) => setUsernameInput(e.target.value)}
-          className="mb-4 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
-        />
-        <button
-          type="submit"
-          disabled={submitting}
-          className="w-full rounded-lg bg-(--color-accent) py-2.5 font-semibold text-white disabled:opacity-60"
-        >
-          {submitting ? "…" : "Continue"}
-        </button>
-      </form>
-    </div>
+        <AuthServerError message={error} />
+
+        <form onSubmit={handleSubmit}>
+          <label className={authLabelClass} style={{ color: PAPER_DIM }} htmlFor="username">
+            Username
+          </label>
+          <input
+            id="username"
+            type="text"
+            required
+            minLength={3}
+            maxLength={30}
+            pattern="[a-zA-Z0-9_.]+"
+            title="Letters, numbers, underscores, and periods only."
+            autoComplete="username"
+            value={username}
+            onChange={(e) => {
+              setUsernameInput(e.target.value);
+              setFieldError(null);
+            }}
+            onInvalid={handleInvalid}
+            aria-describedby={fieldError ? "username-error" : undefined}
+            className={fieldError ? authFieldErrorClass : authFieldClass}
+          />
+          <AuthFieldError id="username-error" message={fieldError} />
+
+          <button
+            type="submit"
+            disabled={submitting}
+            className={`${authSubmitClass} mt-6`}
+            style={{ backgroundColor: GOLD, color: INK }}
+          >
+            {submitting ? "…" : "Continue"}
+          </button>
+        </form>
+      </AuthCard>
+    </AuthStage>
   );
 }

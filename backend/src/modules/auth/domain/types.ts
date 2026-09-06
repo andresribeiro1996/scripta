@@ -8,6 +8,7 @@ export interface UserRow {
   username: string | null;
   password_hash: string | null;
   google_id: string | null;
+  avatar_id: string | null;
   created_at: string;
 }
 
@@ -28,6 +29,15 @@ export interface AuthenticatedUser {
   id: string;
   email: string;
   username: string | null;
+  /** Server-generated id of the account's avatar image, served (unauthenticated,
+   *  same UUID-trust model as gallery) at GET /auth/avatar/:id/file. NULL until
+   *  one is uploaded — the frontend renders an initial in that case. Regenerated
+   *  on every replacement, so the file URL changes and immutable caching stays
+   *  correct. Note: in `request.user` (built from JWT claims by guard.ts) this
+   *  can be briefly stale after an avatar change until the access token is
+   *  reissued — it's identity data for display, not an ownership check, so
+   *  staleness is harmless; the avatar endpoints themselves return a fresh user. */
+  avatarId: string | null;
 }
 
 export interface TokenPair {
@@ -39,4 +49,5 @@ export interface AccessTokenClaims {
   sub: string; // user id
   email: string;
   username: string | null;
+  avatarId: string | null; // can be stale until the token is reissued — see AuthenticatedUser
 }

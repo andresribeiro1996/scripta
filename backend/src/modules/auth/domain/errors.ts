@@ -35,3 +35,26 @@ export class OAuthAccountConflictError extends AuthError {
     super(`An account with email "${email}" already exists with a different sign-in method.`);
   }
 }
+
+// Avatar uploads — same shape as gallery's upload errors (modules/gallery/
+// domain/errors.ts), duplicated rather than shared so the two modules stay
+// independently swappable, per the module-isolation rule in backend/README.
+export class AvatarError extends AuthError {}
+
+export class AvatarTooLargeError extends AvatarError {
+  constructor(maxBytes: number) {
+    super(`Avatar must be at most ${Math.floor(maxBytes / (1024 * 1024))} MB.`);
+  }
+}
+
+export class InvalidAvatarError extends AvatarError {
+  constructor() {
+    super("That file doesn't look like a supported image.");
+  }
+}
+
+export class AvatarDimensionsTooLargeError extends AvatarError {
+  constructor(maxDimension: number) {
+    super(`Avatar image is too large — at most ${maxDimension}px per side.`);
+  }
+}

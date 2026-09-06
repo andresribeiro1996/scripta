@@ -17,6 +17,11 @@ interface AuthContextValue {
   /** Claims a username for the current session — the step a Google
    *  sign-in without one yet goes through on its first login. */
   setUsername: (username: string) => Promise<void>;
+  /** Uploads (validates/crops server-side) a profile picture, replacing
+   *  any previous one. Multipart, not JSON — same FormData carve-out in
+   *  api/client.ts as gallery uploads. */
+  uploadAvatar: (file: File) => Promise<void>;
+  removeAvatar: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -68,7 +73,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession({ ...current, user: body.user });
   }
 
-  return <AuthContext.Provider value={{ session, signup, login, logout, setUsername }}>{children}</AuthContext.Provider>;
+  async function uploadAvatar(file: File) {
+    const current = getSession();
+    if (!current) throw new Error("Not signed in.");
+    const form = new FormData();
+    form.append("image", file, file.name);
+    const body = (await apiFetch("/auth/avatar", { method: "POST", body: form })) as { user: Session["user"] };
+    setSession({ ...current, user: body.user });
+  }
+
+  async function removeAvatar() {
+    const current = getSession();
+    if (!current) throw new Error("Not signed in.");
+    const body = (await apiFetch("/auth/avatar", { method: "DELETE" })) as { user: Session["user"] };
+    setSession({ ...current, user: body.user });
+  }
+
+  return (
+    <AuthContext.Provider value={{ session, signup, login, logout, setUsername, uploadAvatar, removeAvatar }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth(): AuthContextValue {

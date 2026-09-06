@@ -59,6 +59,9 @@ const envSchema = z.object({
   // Where uploaded images are actually stored on disk, one subdirectory
   // per account — see modules/gallery/adapters/fs/fsImageBlobStore.ts.
   GALLERY_STORAGE_PATH: z.string().min(1),
+  // Profile pictures (modules/auth avatars) — one subdirectory per
+  // account, same shape as GALLERY_STORAGE_PATH.
+  AVATAR_STORAGE_PATH: z.string().min(1).default("./data/avatar-files"),
 
   // modules/murals' own SQLite file — same one-file-per-module isolation as
   // every other module's *_DB_PATH above.

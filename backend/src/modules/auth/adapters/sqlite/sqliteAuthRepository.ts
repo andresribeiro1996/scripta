@@ -10,7 +10,7 @@ import type { RefreshTokenRow, UserRow } from "../../domain/types.js";
 
 export function createSqliteAuthRepository(db: DatabaseSync): AuthRepository {
   const insertUserStmt = db.prepare(
-    `INSERT INTO users (id, email, username, password_hash, google_id) VALUES ($id, $email, $username, $password_hash, $google_id)`
+    `INSERT INTO users (id, email, username, password_hash, google_id, avatar_id) VALUES ($id, $email, $username, $password_hash, $google_id, $avatar_id)`
   );
   const findByEmailStmt = db.prepare(`SELECT * FROM users WHERE email = ?`);
   const findByUsernameStmt = db.prepare(`SELECT * FROM users WHERE username = ?`);
@@ -18,6 +18,8 @@ export function createSqliteAuthRepository(db: DatabaseSync): AuthRepository {
   const findByGoogleIdStmt = db.prepare(`SELECT * FROM users WHERE google_id = ?`);
   const linkGoogleIdStmt = db.prepare(`UPDATE users SET google_id = ? WHERE id = ?`);
   const setUsernameStmt = db.prepare(`UPDATE users SET username = ? WHERE id = ?`);
+  const setAvatarIdStmt = db.prepare(`UPDATE users SET avatar_id = ? WHERE id = ?`);
+  const findUserIdByAvatarIdStmt = db.prepare(`SELECT id FROM users WHERE avatar_id = ?`);
 
   const insertRefreshTokenStmt = db.prepare(
     `INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at) VALUES ($id, $user_id, $token_hash, $expires_at)`
@@ -36,6 +38,7 @@ export function createSqliteAuthRepository(db: DatabaseSync): AuthRepository {
         username: input.username,
         password_hash: input.passwordHash,
         google_id: input.googleId,
+        avatar_id: null,
         created_at: new Date().toISOString()
       };
       insertUserStmt.run({
@@ -43,7 +46,8 @@ export function createSqliteAuthRepository(db: DatabaseSync): AuthRepository {
         $email: row.email,
         $username: row.username,
         $password_hash: row.password_hash,
-        $google_id: row.google_id
+        $google_id: row.google_id,
+        $avatar_id: row.avatar_id
       });
       return row;
     },
@@ -70,6 +74,15 @@ export function createSqliteAuthRepository(db: DatabaseSync): AuthRepository {
 
     setUsername(userId, username) {
       setUsernameStmt.run(username, userId);
+    },
+
+    setAvatarId(userId, avatarId) {
+      setAvatarIdStmt.run(avatarId, userId);
+    },
+
+    findUserIdByAvatarId(avatarId) {
+      const row = findUserIdByAvatarIdStmt.get(avatarId) as { id: string } | undefined;
+      return row?.id;
     },
 
     insertRefreshToken(input) {

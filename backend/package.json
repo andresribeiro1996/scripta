@@ -10,7 +10,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsx --test src/modules/arena/service.test.ts src/modules/murals/service.test.ts src/modules/tierlists/service.test.ts"
+    "test": "tsx --test src/modules/arena/service.test.ts src/modules/auth/service.test.ts src/modules/murals/service.test.ts src/modules/tierlists/service.test.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.3.0",

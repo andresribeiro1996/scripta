@@ -11,6 +11,7 @@ Skim layer over the detailed sections below. Everything under `/dashboard/*` sit
 | `/login` | `LoginPage.tsx` | signup / login (email or username), Google sign-in if configured |
 | `/oauth-success` | `OAuthSuccessPage.tsx` | where Google's login flow lands back |
 | `/choose-username` | `ChooseUsernamePage.tsx` | first-login username claim for Google sign-ins |
+| `/welcome-avatar` | `WelcomeAvatarPage.tsx` | skippable profile-picture step of the signup journey (password signups land here right after registering; Google signups after choosing a username) |
 | `/dashboard` | `LibraryPage.tsx` | the book grid — import (4 formats, merged), reorder, select-delete |
 | `/dashboard/series`, `/dashboard/collections` | `GroupsPage.tsx` | grouped views over the same books |
 | `/dashboard/gallery` | `GalleryPage.tsx` | the account's uploaded-image pool |
@@ -44,7 +45,7 @@ If you change the frontend's port or domain, update the backend's `FRONTEND_URL`
   - **`/dashboard`** (`LibraryPage.tsx`) — loads the account's saved library via `GET /library`. Import accepts four formats — a `library.json` from the [exporter](../exporter/export.py), a `KoboReader.sqlite` straight off the device's USB drive, a Goodreads library CSV export, or a StoryGraph library CSV export — auto-detected by content (magic bytes / header shape), never by filename. `src/lib/fileImport.ts`, `sqlite.ts` and `goodreads.ts` are direct ports of the viewer's identical logic, kept in sync by hand since the viewer is being retired rather than shared as a common module; `storygraph.ts` is a frontend-only addition (no viewer equivalent — new formats land here, not there). `goodreads.ts` and `storygraph.ts` share their CSV-parsing internals via `csv.ts`. The first import for an account is saved as-is; every import after that is **merged** into what's already saved rather than replacing it (see below).
   - **`/dashboard/series`** and **`/dashboard/collections`** (`SeriesPage.tsx` / `CollectionsPage.tsx`, both thin wrappers around the shared `GroupsPage.tsx`) — see "Series and collections" below.
   - **`/dashboard/style`** (`LibraryStylePage.tsx`) — see "Library style" below.
-  - **`/dashboard/settings`** (`SettingsPage.tsx`) — account email (read-only) and username, with a "Change" action that reuses the same `setUsername` call `/choose-username` uses. Also renders `SocialsSection.tsx` — see "Socials" below.
+  - **`/dashboard/settings`** (`SettingsPage.tsx`) — account email (read-only) and username, with a "Change" action that reuses the same `setUsername` call `/choose-username` uses; profile picture with Change/Remove (initials fallback otherwise — see `components/Avatar.tsx`). Also renders `SocialsSection.tsx` — see "Socials" below.
   - **`/dashboard/gallery`** (`GalleryPage.tsx`) — the account's image pool — see "Gallery and custom book covers" below.
   - **`/dashboard/murals`** and **`/dashboard/murals/:muralId`** (`MuralsListPage.tsx` / `MuralEditorPage.tsx`) — see "Murals" below.
   - **`/dashboard/arena`** and **`/dashboard/arena/:id/seed`** (`ArenaListPage.tsx` / `ArenaSeedPage.tsx`, plus the accountless public `/arena` pages) — book-bracket tournaments; the backend README's `arena` section covers the model and its routes.

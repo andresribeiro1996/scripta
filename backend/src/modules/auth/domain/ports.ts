@@ -17,9 +17,24 @@ export interface AuthRepository {
   findUserByGoogleId(googleId: string): UserRow | undefined;
   linkGoogleId(userId: string, googleId: string): void;
   setUsername(userId: string, username: string): void;
+  setAvatarId(userId: string, avatarId: string | null): void;
+  /** No ownership filter — needed by the public, unauthenticated
+   *  GET /auth/avatar/:id/file route to find which account's blob to
+   *  read, keyed only by the unguessable avatar id (same trust model as
+   *  gallery's getImageById). */
+  findUserIdByAvatarId(avatarId: string): string | undefined;
 
   insertRefreshToken(input: { userId: string; tokenHash: string; expiresAt: Date }): string;
   findRefreshTokenByHash(tokenHash: string): RefreshTokenRow | undefined;
   revokeRefreshToken(id: string): void;
   revokeAllRefreshTokensForUser(userId: string): void;
+}
+
+/** Raw avatar image bytes on disk. Always exactly one per user (or none),
+ *  addressed by a server-generated id — see types.ts's AuthenticatedUser.
+ *  Output format is fixed (webp) by the service, so no extension parameter. */
+export interface AvatarBlobStore {
+  save(userId: string, avatarId: string, bytes: Buffer): void;
+  read(userId: string, avatarId: string): Buffer | null;
+  delete(userId: string, avatarId: string): void;
 }

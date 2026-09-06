@@ -8,8 +8,9 @@
 export interface Session {
   // `username` is null for a Google-signed-in account that hasn't chosen
   // one yet — App.tsx routes a session in that state to /choose-username
-  // before letting it any further in.
-  user: { id: string; email: string; username: string | null };
+  // before letting it any further in. `avatarId` is null until a profile
+  // picture is uploaded (the avatar step is skippable).
+  user: { id: string; email: string; username: string | null; avatarId: string | null };
   accessToken: string;
   refreshToken: string;
 }
