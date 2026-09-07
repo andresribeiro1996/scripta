@@ -25,7 +25,11 @@ export function createSqliteAuthRepository(db: DatabaseSync): AuthRepository {
     `INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at) VALUES ($id, $user_id, $token_hash, $expires_at)`
   );
   const findRefreshTokenByHashStmt = db.prepare(`SELECT * FROM refresh_tokens WHERE token_hash = ?`);
+  const findRefreshTokenByIdStmt = db.prepare(`SELECT * FROM refresh_tokens WHERE id = ?`);
   const revokeRefreshTokenStmt = db.prepare(`UPDATE refresh_tokens SET revoked_at = $revoked_at WHERE id = $id`);
+  const rotateRefreshTokenStmt = db.prepare(
+    `UPDATE refresh_tokens SET revoked_at = $revoked_at, rotated_at = $rotated_at, replaced_by = $replaced_by WHERE id = $id`
+  );
   const revokeAllForUserStmt = db.prepare(
     `UPDATE refresh_tokens SET revoked_at = $revoked_at WHERE user_id = $user_id AND revoked_at IS NULL`
   );
@@ -100,8 +104,17 @@ export function createSqliteAuthRepository(db: DatabaseSync): AuthRepository {
       return findRefreshTokenByHashStmt.get(tokenHash) as RefreshTokenRow | undefined;
     },
 
+    findRefreshTokenById(id) {
+      return findRefreshTokenByIdStmt.get(id) as RefreshTokenRow | undefined;
+    },
+
     revokeRefreshToken(id) {
       revokeRefreshTokenStmt.run({ $id: id, $revoked_at: new Date().toISOString() });
+    },
+
+    rotateRefreshToken(id, replacedByTokenId) {
+      const now = new Date().toISOString();
+      rotateRefreshTokenStmt.run({ $id: id, $revoked_at: now, $rotated_at: now, $replaced_by: replacedByTokenId });
     },
 
     revokeAllRefreshTokensForUser(userId) {

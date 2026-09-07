@@ -12,7 +12,7 @@
 import fastifyMultipart from "@fastify/multipart";
 import fastifyOauth2 from "@fastify/oauth2";
 import fastifyRateLimit from "@fastify/rate-limit";
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyRequest } from "fastify";
 import { readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -20,6 +20,9 @@ import { env, googleOAuthConfigured } from "../../config/env.js";
 import { createFsAvatarBlobStore } from "./adapters/fs/avatarBlobStore.js";
 import { createSqliteAuthRepository } from "./adapters/sqlite/sqliteAuthRepository.js";
 import { openAuthDb } from "./adapters/sqlite/connection.js";
+import { createAuthorizationCode } from "./authorizationCode.js";
+import { consumeGoogleOAuthFlow, createGoogleOAuthFlow } from "./googleOAuthFlow.js";
+import { isAllowedRedirectTarget, parseMobileRedirectAllowlist } from "./mobileRedirectAllowlist.js";
 import { buildAuthRoutes } from "./routes.js";
 import { createAuthService, MAX_AVATAR_UPLOAD_BYTES } from "./service.js";
 
@@ -37,6 +40,16 @@ const GOOGLE_OAUTH_ENDPOINTS = {
   tokenHost: "https://www.googleapis.com",
   tokenPath: "/oauth2/v4/token"
 };
+
+/** noUncheckedIndexedAccess makes a plain `request.query.foo` cast come
+ *  back as `string | undefined` even after an `as Record<string, string>`
+ *  cast — same helper as modules/socials/plugin.ts's own queryParam,
+ *  duplicated rather than shared since these are two independently
+ *  swappable modules (see backend/README's module-isolation convention). */
+function queryParam(request: FastifyRequest, key: string): string {
+  const value = (request.query as Record<string, unknown> | undefined)?.[key];
+  return typeof value === "string" ? value : "";
+}
 
 export async function authPlugin(app: FastifyInstance) {
   // --- composition: swap this one block to change storage technology ---
@@ -77,6 +90,8 @@ export async function authPlugin(app: FastifyInstance) {
   });
 
   if (googleOAuthConfigured) {
+    const mobileRedirectAllowlist = parseMobileRedirectAllowlist(env.MOBILE_OAUTH_REDIRECT_ALLOWLIST);
+
     await app.register(fastifyOauth2, {
       name: "googleOAuth2",
       scope: ["email", "profile"],
@@ -85,7 +100,41 @@ export async function authPlugin(app: FastifyInstance) {
         auth: GOOGLE_OAUTH_ENDPOINTS
       },
       startRedirectPath: "/auth/google",
-      callbackUri: env.GOOGLE_CALLBACK_URL
+      callbackUri: env.GOOGLE_CALLBACK_URL,
+      // Threads this flow's PKCE code_challenge and (for a mobile caller)
+      // chosen redirect target through Google's own round trip — see
+      // googleOAuthFlow.ts's top comment. @fastify/oauth2 independently
+      // round-trips whatever this returns through its own signed cookie
+      // and checks it back on callback (defaultCheckStateFunction, left
+      // untouched below), same CSRF protection the plain login flow
+      // already had — this only adds "and here's what THIS app instance
+      // asked for", not a replacement for that check. Throwing here (same
+      // as modules/socials/plugin.ts's own generateStateFunction) makes
+      // @fastify/oauth2 reply 500 with the message instead of starting a
+      // flow bound to a request parameter this backend never validated.
+      generateStateFunction(request: FastifyRequest) {
+        const codeChallenge = queryParam(request, "code_challenge") || null;
+        const codeChallengeMethod = queryParam(request, "code_challenge_method") || null;
+        const redirectTargetParam = queryParam(request, "redirect_target") || null;
+
+        if (codeChallenge && codeChallengeMethod !== "S256") {
+          throw new Error("code_challenge_method must be S256 when code_challenge is provided.");
+        }
+
+        let redirectTarget: string | null = null;
+        if (redirectTargetParam) {
+          // The redirect target ALWAYS comes from this fixed, server-side
+          // list — redirectTargetParam only selects which allowlisted
+          // entry to use, by exact match. Anything else is rejected
+          // outright, never partially trusted.
+          if (!isAllowedRedirectTarget(redirectTargetParam, mobileRedirectAllowlist)) {
+            throw new Error("redirect_target is not on the configured allowlist.");
+          }
+          redirectTarget = redirectTargetParam;
+        }
+
+        return createGoogleOAuthFlow({ codeChallenge, redirectTarget });
+      }
     });
 
     app.get("/auth/google/callback", async (request, reply) => {
@@ -102,15 +151,26 @@ export async function authPlugin(app: FastifyInstance) {
         return reply.code(400).send({ error: "Google account has no email to sign in with." });
       }
 
-      const { tokens } = await authService.loginWithGoogle({ googleId: profile.id, email: profile.email });
+      const { user, tokens } = await authService.loginWithGoogle({ googleId: profile.id, email: profile.email });
 
-      // Browser redirect flow, not a JSON API call — there's no request
-      // body to put tokens in, so they ride the redirect URL's fragment
-      // instead of the query string (fragments never reach the server in
-      // later requests/logs, unlike query params). Whatever frontend ends
-      // up consuming this module reads them client-side from location.hash.
-      const redirectUrl = new URL(env.OAUTH_SUCCESS_REDIRECT_URL);
-      redirectUrl.hash = `access_token=${encodeURIComponent(tokens.accessToken)}&refresh_token=${encodeURIComponent(tokens.refreshToken)}`;
+      // The state param this callback receives is exactly what our own
+      // generateStateFunction returned above — a flow id, not a CSRF
+      // token to check ourselves (that already happened inside
+      // getAccessTokenFromAuthorizationCodeFlow, via the library's own
+      // checkStateFunction and signed cookie). A missing/expired flow
+      // degrades to "no PKCE, no explicit redirect target" — the plain
+      // desktop-web shape — rather than failing the sign-in outright.
+      const flow = consumeGoogleOAuthFlow(queryParam(request, "state"));
+
+      // Never place access or refresh tokens in URLs (global constraint):
+      // the tokens are already minted above, but they stay server-side —
+      // only this short-lived, single-use, PKCE-bound code rides the
+      // redirect. See authorizationCode.ts.
+      const code = createAuthorizationCode({ user, tokens, codeChallenge: flow?.codeChallenge ?? null });
+
+      const redirectBase = flow?.redirectTarget ?? env.OAUTH_SUCCESS_REDIRECT_URL;
+      const redirectUrl = new URL(redirectBase);
+      redirectUrl.searchParams.set("code", code);
       return reply.redirect(redirectUrl.toString());
     });
   } else {

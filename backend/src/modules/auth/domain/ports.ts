@@ -26,7 +26,20 @@ export interface AuthRepository {
 
   insertRefreshToken(input: { userId: string; tokenHash: string; expiresAt: Date }): string;
   findRefreshTokenByHash(tokenHash: string): RefreshTokenRow | undefined;
+  /** Needed by the refresh-rotation grace window (service.ts) to follow a
+   *  rotated-away token's replaced_by pointer to the row it became. */
+  findRefreshTokenById(id: string): RefreshTokenRow | undefined;
+  /** Plain logout revocation — leaves rotated_at/replaced_by both null, so
+   *  a token revoked this way never qualifies for the grace-window
+   *  reissue below. Used for /auth/logout and the theft/replay
+   *  revoke-all path in service.ts's refresh(). */
   revokeRefreshToken(id: string): void;
+  /** Same effect as revokeRefreshToken, but records WHEN (rotated_at) and
+   *  INTO WHAT (replaced_by) — the bookkeeping that lets refresh()
+   *  distinguish "the client just hasn't seen its new pair yet" from
+   *  "this token was revoked for a real reason" within a short grace
+   *  window after normal rotation. */
+  rotateRefreshToken(id: string, replacedByTokenId: string): void;
   revokeAllRefreshTokensForUser(userId: string): void;
 }
 

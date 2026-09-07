@@ -11,19 +11,28 @@ import {
 } from "react-native";
 import { Redirect } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "../../core/auth";
+import { GoogleSignInCancelledError, useAuth } from "../../core/auth";
 import { apiClient } from "../../core/api";
 
 export default function LoginPage() {
-  const { ready, user, signIn } = useAuth();
+  const { ready, user, signIn, signInWithGoogle } = useAuth();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [googleBusy, setGoogleBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const health = useQuery({
     queryKey: ["health"],
     queryFn: () => apiClient.request<{ status: string }>("/health"),
+    retry: false,
+  });
+
+  // Same "let the backend say whether Google sign-in is configured"
+  // pattern as the PWA's LoginPage — no hardcoded assumption here either.
+  const providers = useQuery({
+    queryKey: ["auth-providers"],
+    queryFn: () => apiClient.request<{ google: boolean }>("/auth/providers"),
     retry: false,
   });
 
@@ -45,6 +54,20 @@ export default function LoginPage() {
       setError(e instanceof Error ? e.message : "Sign-in failed");
     } finally {
       setBusy(false);
+    }
+  };
+
+  const onGoogleSignIn = async () => {
+    setGoogleBusy(true);
+    setError(null);
+    try {
+      await signInWithGoogle();
+    } catch (e) {
+      if (!(e instanceof GoogleSignInCancelledError)) {
+        setError(e instanceof Error ? e.message : "Google sign-in failed");
+      }
+    } finally {
+      setGoogleBusy(false);
     }
   };
 
@@ -76,6 +99,15 @@ export default function LoginPage() {
         <Pressable style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]} onPress={onSubmit} disabled={busy}>
           {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Sign in</Text>}
         </Pressable>
+        {providers.data?.google && (
+          <Pressable
+            style={({ pressed }) => [styles.googleButton, pressed && styles.buttonPressed]}
+            onPress={onGoogleSignIn}
+            disabled={googleBusy}
+          >
+            {googleBusy ? <ActivityIndicator color="#1c1917" /> : <Text style={styles.googleButtonText}>Sign in with Google</Text>}
+          </Pressable>
+        )}
         {error && <Text style={styles.error}>{error}</Text>}
       </View>
     </KeyboardAvoidingView>
@@ -101,5 +133,16 @@ const styles = StyleSheet.create({
   button: { width: "100%", backgroundColor: "#1c1917", borderRadius: 12, padding: 16, alignItems: "center" },
   buttonPressed: { opacity: 0.85 },
   buttonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
+  googleButton: {
+    width: "100%",
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#d6d3d1",
+    borderRadius: 12,
+    padding: 16,
+    alignItems: "center",
+    marginTop: 12,
+  },
+  googleButtonText: { color: "#1c1917", fontSize: 16, fontWeight: "600" },
   error: { color: "#dc2626", marginTop: 12, textAlign: "center" },
 });
