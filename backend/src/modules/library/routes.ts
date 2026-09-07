@@ -15,10 +15,19 @@
 // this module had NO rate limit anywhere, leaving that public,
 // unauthenticated, DB-querying route wide open.
 
+import fastifyMultipart from "@fastify/multipart";
+import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
+import { createWriteStream } from "node:fs";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { pipeline } from "node:stream/promises";
 import { z } from "zod";
+import { env } from "../../config/env.js";
 import { authGuard } from "../auth/index.js";
 import { NoLibraryDocumentError } from "./domain/errors.js";
+import { InvalidImportError, parseImport } from "./import/parseImport.js";
 import type { LibraryService } from "./service.js";
 
 // Deliberately light-touch: this only checks the document is a plausible
@@ -46,7 +55,20 @@ export function buildLibraryRoutes(service: LibraryService) {
       return reply.send(library);
     });
 
-    app.put("/library", { preHandler: authGuard }, async (request, reply) => {
+    app.put("/library", {
+      preHandler: authGuard,
+      bodyLimit: env.LIBRARY_BODY_LIMIT_BYTES,
+      errorHandler(error, _request, reply) {
+        if (error.statusCode === 413) {
+          return reply.code(413).send({
+            error: "Library document is too large.",
+            code: "LIBRARY_BODY_TOO_LARGE",
+            maxBytes: env.LIBRARY_BODY_LIMIT_BYTES
+          });
+        }
+        throw error;
+      }
+    }, async (request, reply) => {
       const parsed = saveLibrarySchema.safeParse(request.body);
       if (!parsed.success) {
         return reply.code(400).send({
@@ -55,6 +77,40 @@ export function buildLibraryRoutes(service: LibraryService) {
       }
       const library = service.saveLibrary(request.user.id, parsed.data.data);
       return reply.send(library);
+    });
+
+    await app.register(async (imports) => {
+      await imports.register(fastifyRateLimit, { max: 10, timeWindow: "1 minute" });
+      await imports.register(fastifyMultipart, {
+        limits: { files: 1, fileSize: env.IMPORT_MAX_UPLOAD_BYTES }
+      });
+      imports.post("/library/import/preview", {
+        preHandler: authGuard,
+        bodyLimit: env.IMPORT_MAX_UPLOAD_BYTES + 64 * 1024
+      }, async (request, reply) => {
+        const scratch = await mkdtemp(join(tmpdir(), "scripta-import-"));
+        const outcome = await (async () => {
+          try {
+            const upload = await request.file();
+            if (!upload) return { status: 400, body: { error: "Upload one import file in multipart field \"file\"." } };
+            const path = join(scratch, "upload");
+            await pipeline(upload.file, createWriteStream(path, { flags: "wx" }));
+            if (upload.file.truncated) {
+              return { status: 413, body: { error: "Import file is too large.", code: "IMPORT_TOO_LARGE", maxBytes: env.IMPORT_MAX_UPLOAD_BYTES } };
+            }
+            return { status: 200, body: await parseImport(path, env.IMPORT_PARSE_TIMEOUT_MS, env.LIBRARY_BODY_LIMIT_BYTES) };
+          } catch (error) {
+            if (error instanceof InvalidImportError) return { status: 422, body: { error: error.message, code: "INVALID_IMPORT" } };
+            if ((error as { statusCode?: number }).statusCode === 413) {
+              return { status: 413, body: { error: "Import file is too large.", code: "IMPORT_TOO_LARGE", maxBytes: env.IMPORT_MAX_UPLOAD_BYTES } };
+            }
+            throw error;
+          } finally {
+            await rm(scratch, { recursive: true, force: true });
+          }
+        })();
+        return reply.code(outcome.status).send(outcome.body);
+      });
     });
 
     app.post("/library/share", { preHandler: authGuard }, async (request, reply) => {
