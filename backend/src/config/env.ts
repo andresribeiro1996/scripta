@@ -97,6 +97,20 @@ const envSchema = z.object({
   ACCESS_TOKEN_TTL: durationString.default("15m"),
   REFRESH_TOKEN_TTL: durationString.default("30d"),
 
+  // Task 4A — one-time-code Google OAuth redirect targets for the mobile
+  // client. Comma-separated exact origins (https App Link origins, or a
+  // dev-only custom scheme). The mobile exchange endpoint rejects any
+  // redirect target not on this list; blank disables the mobile flow.
+  MOBILE_OAUTH_REDIRECT_ALLOWLIST: z.string().optional().default(""),
+  // Task 4B — server-side import pipeline: hard wall-clock kill for the
+  // worker-thread SQLite parse, and the multipart upload size cap for
+  // POST /library/import/preview.
+  IMPORT_PARSE_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
+  IMPORT_MAX_UPLOAD_BYTES: z.coerce.number().int().positive().default(104857600),
+  // Task 5A/4B — explicit bodyLimit for PUT /library (Fastify's default
+  // 1 MiB is far below a real Kobo export carrying per-book highlights).
+  LIBRARY_BODY_LIMIT_BYTES: z.coerce.number().int().positive().default(26214400),
+
   GOOGLE_CLIENT_ID: z.string().optional().default(""),
   GOOGLE_CLIENT_SECRET: z.string().optional().default(""),
   GOOGLE_CALLBACK_URL: z.string().optional().default(""),
