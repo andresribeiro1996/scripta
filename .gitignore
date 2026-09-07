@@ -38,3 +38,8 @@ frontend/vite.http.config.ts
 
 # Personal remote-workflow notes — machine-specific, not project source.
 todo/
+
+# A real KoboReader.sqlite dropped at the root for local testing — same
+# privacy stance as exporter/library.json above: a person's actual reading
+# history and highlights, never source code.
+/KoboReader.sqlite

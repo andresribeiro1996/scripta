@@ -9,7 +9,7 @@
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b --noEmit",
     "lint": "oxlint",
-    "test": "tsx scripts/test-murals.mts && tsx scripts/test-arena-bracket.mts && tsx scripts/test-book-search.mts && tsx --test scripts/test-mural-presets.mts scripts/test-book-metadata.mts",
+    "test": "tsx --test scripts/test-*.mts",
     "preview": "vite preview",
     "preview:mobile": "node scripts/build-mobile.mjs"
   },
