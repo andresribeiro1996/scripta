@@ -50,6 +50,7 @@ export function createApiClient(
 
   let refreshPromise: Promise<boolean> | null = null;
   let logoutPromise: Promise<void> | null = null;
+  let onSessionExpired: () => void = () => {};
 
   function refreshAccessToken(): Promise<boolean> {
     if (logoutPromise) return Promise.resolve(false);
@@ -65,6 +66,7 @@ export function createApiClient(
           if (status !== 200) {
             if (status === 401 || status === 403) await tokenStore.clearRefreshToken();
             setAccessToken(null);
+            if (status === 401 || status === 403) onSessionExpired();
             return false;
           }
           setAccessToken(body.accessToken);
@@ -97,6 +99,13 @@ export function createApiClient(
     return logoutPromise;
   }
 
+  function setSessionExpiredHandler(handler: () => void): () => void {
+    onSessionExpired = handler;
+    return () => {
+      if (onSessionExpired === handler) onSessionExpired = () => {};
+    };
+  }
+
   const apiClient: ApiClient = {
     async request<T>(path: string, init: { method?: string; body?: unknown; auth?: boolean } = {}) {
       if (init.auth && !getAccessToken()) throw new ApiError(401, "Not signed in");
@@ -116,5 +125,5 @@ export function createApiClient(
     },
   };
 
-  return { apiClient, refreshAccessToken, logout };
+  return { apiClient, refreshAccessToken, logout, setSessionExpiredHandler };
 }

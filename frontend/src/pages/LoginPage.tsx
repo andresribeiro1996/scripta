@@ -3,6 +3,7 @@ import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { API_URL } from "../api/baseUrl";
 import { publicFetch } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
+import { createGoogleOAuthState } from "../auth/googleOAuthState";
 import {
   GOLD,
   INK,
@@ -71,6 +72,13 @@ export function LoginPage() {
   function handleInvalid(e: React.InvalidEvent<HTMLInputElement>) {
     e.preventDefault();
     setFieldErrors((prev) => ({ ...prev, [e.currentTarget.id]: e.currentTarget.validationMessage }));
+  }
+
+  function startGoogleSignIn(e: React.MouseEvent<HTMLAnchorElement>) {
+    e.preventDefault();
+    const url = new URL(`${API_URL}/auth/google`);
+    url.searchParams.set("client_state", createGoogleOAuthState());
+    window.location.assign(url.toString());
   }
 
   function clearFieldError(e: React.FormEvent<HTMLInputElement>) {
@@ -241,6 +249,7 @@ export function LoginPage() {
                   "sign up with Google" flow to word this differently for. */}
               <a
                 href={`${API_URL}/auth/google`}
+                onClick={startGoogleSignIn}
                 className="flex w-full items-center justify-center gap-2.5 rounded-lg border py-2.5 text-sm font-medium transition-opacity hover:opacity-90"
                 style={{ borderColor: PAPER, backgroundColor: PAPER, color: INK }}
               >

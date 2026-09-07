@@ -110,3 +110,36 @@ test("late old-token 401 responses reuse the completed refresh", async () => {
   assert.deepEqual(await Promise.all(requests), [{ ok: true }, { ok: true }, { ok: true }]);
   assert.equal(refreshRequests, 1);
 });
+
+test("a rejected refresh expires the app session", async () => {
+  let accessToken: string | null = "access-old";
+  let refreshToken: string | null = "refresh-old";
+  let expired = false;
+  const session = createApiClient(
+    "http://api.test",
+    {
+      async getRefreshToken() {
+        return refreshToken;
+      },
+      async setRefreshToken(token) {
+        refreshToken = token;
+      },
+      async clearRefreshToken() {
+        refreshToken = null;
+      },
+    },
+    () => accessToken,
+    (token) => {
+      accessToken = token;
+    },
+    async () => jsonResponse(401, { error: "expired" }),
+  );
+  session.setSessionExpiredHandler(() => {
+    expired = true;
+  });
+
+  assert.equal(await session.refreshAccessToken(), false);
+  assert.equal(accessToken, null);
+  assert.equal(refreshToken, null);
+  assert.equal(expired, true);
+});
