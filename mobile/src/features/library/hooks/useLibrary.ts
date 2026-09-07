@@ -11,8 +11,7 @@
 // LibraryPage.tsx handlers give for doing this), sends its `updatedAt`
 // on every save (api/client.ts), and on a 409 (LibraryConflictError)
 // re-fetches and replays the same `updater` against the fresh document
-// exactly once rather than clobbering it — see api/client.ts's own top
-// comment for what today's backend actually does with that field.
+// exactly once rather than clobbering it.
 
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { fetchLibrary, LibraryConflictError, saveLibrary, shareLibrary, unshareLibrary } from "../api/client";
