@@ -3,7 +3,7 @@
 // module's service.ts.
 
 import { randomUUID } from "node:crypto";
-import { FolderCycleError, InvalidFolderReferenceError } from "./domain/errors.js";
+import { FolderCycleError, InvalidFolderReferenceError, MuralConflictError } from "./domain/errors.js";
 import type { MuralsRepository } from "./domain/ports.js";
 import type { Mural, MuralFolder, MuralFolderRow, MuralRow } from "./domain/types.js";
 
@@ -41,7 +41,7 @@ export interface MuralsService {
   getMural(userId: string, id: string): Mural | undefined;
   /** Partial merge onto the existing row — only the keys present in
    *  `patch` change. undefined if not owned. */
-  updateMural(userId: string, id: string, patch: { name?: string; blocks?: unknown[]; folderId?: string | null }): Mural | undefined;
+  updateMural(userId: string, id: string, patch: { name?: string; blocks?: unknown[]; folderId?: string | null; updatedAt?: string }): Mural | undefined;
   /** Returns false if no mural with that id was owned by userId — same
    *  convention as modules/gallery/service.ts's deleteImage. */
   deleteMural(userId: string, id: string): boolean;
@@ -108,7 +108,8 @@ export function createMuralsService(repo: MuralsRepository, publicUrlFor: (token
         ...(patch.name !== undefined ? { name: patch.name } : {}),
         ...(patch.blocks !== undefined ? { blocks: JSON.stringify(patch.blocks) } : {}),
         ...(patch.folderId !== undefined ? { folder_id: patch.folderId } : {})
-      });
+      }, patch.updatedAt);
+      if (!row && patch.updatedAt !== undefined && repo.getOwned(id, userId)) throw new MuralConflictError();
       return row ? toMural(row, publicUrlFor) : undefined;
     },
 

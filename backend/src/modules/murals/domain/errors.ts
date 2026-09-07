@@ -11,3 +11,10 @@ export class FolderCycleError extends Error {
     this.name = "FolderCycleError";
   }
 }
+
+export class MuralConflictError extends Error {
+  constructor() {
+    super("This mural changed elsewhere since it was loaded.");
+    this.name = "MuralConflictError";
+  }
+}

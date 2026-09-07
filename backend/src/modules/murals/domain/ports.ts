@@ -20,7 +20,8 @@ export interface MuralsRepository {
   update(
     id: string,
     userId: string,
-    patch: Partial<Pick<MuralRow, "name" | "blocks" | "cover_image_id" | "cover_image_url" | "folder_id">>
+    patch: Partial<Pick<MuralRow, "name" | "blocks" | "cover_image_id" | "cover_image_url" | "folder_id">>,
+    expectedUpdatedAt?: string
   ): MuralRow | undefined;
   /** Returns true if a row was actually deleted (i.e. it existed AND was
    *  owned by userId). */

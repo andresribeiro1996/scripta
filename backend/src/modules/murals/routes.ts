@@ -32,7 +32,7 @@ import { authGuard } from "../auth/index.js";
 import { resolvePublicLibraryData } from "../library/index.js";
 import type { TierlistData } from "../tierlists/index.js";
 import { extractReferences } from "./domain/blockRefs.js";
-import { FolderCycleError, InvalidFolderReferenceError } from "./domain/errors.js";
+import { FolderCycleError, InvalidFolderReferenceError, MuralConflictError } from "./domain/errors.js";
 import type { MuralsService } from "./service.js";
 
 const idParamSchema = z.object({ id: z.string().uuid() });
@@ -49,7 +49,8 @@ const updateMuralSchema = z
   .object({
     name: z.string().min(1).optional(),
     blocks: z.array(z.unknown()).optional(),
-    folderId: z.string().uuid().nullable().optional()
+    folderId: z.string().uuid().nullable().optional(),
+    updatedAt: z.string().datetime().optional()
   })
   .refine((body) => body.name !== undefined || body.blocks !== undefined || body.folderId !== undefined, {
     message: "At least one of name, blocks, or folderId must be provided."
@@ -127,6 +128,9 @@ export function buildMuralRoutes(service: MuralsService) {
         }
         return reply.send(mural);
       } catch (err) {
+        if (err instanceof MuralConflictError) {
+          return reply.code(409).send({ error: err.message, current: service.getMural(request.user.id, params.data.id) });
+        }
         if (err instanceof InvalidFolderReferenceError) return reply.code(400).send({ error: err.message });
         throw err;
       }

@@ -40,6 +40,7 @@ import {
 import { Button, EmptyState, ErrorState, Input, Menu, Sheet, type MenuItem } from "../../ui/components";
 import { spacing, typography, useTheme } from "../../ui/theme";
 import type { GalleryImage } from "../gallery/api";
+import { useMurals } from "../murals/useMurals";
 import { useLibrary } from "./hooks/useLibrary";
 import { buildMergedLibrary } from "./lib/mergeAndSave";
 import { AddBookSheet } from "./components/AddBookSheet";
@@ -60,6 +61,7 @@ type ScreenView = "browse" | "series" | "collections" | "style";
 export function LibraryScreen() {
   const { colors } = useTheme();
   const { data: library, isPending, isError, error, refetch, isRefetching, updateLibrary, share, unshare } = useLibrary();
+  const murals = useMurals();
 
   const [view, setView] = useState<ScreenView>("browse");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -170,6 +172,7 @@ export function LibraryScreen() {
             }),
             "Couldn't delete — nothing was changed.",
           ).then(() => {
+            void murals.scrubBooks(keys).catch(() => Alert.alert("The books were deleted, but some mural references couldn't be updated."));
             setSelectedKeys(new Set());
             setSelectionMode(false);
           });

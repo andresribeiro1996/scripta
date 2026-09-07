@@ -20,6 +20,7 @@ export function createSqliteMuralsRepository(db: DatabaseSync): MuralsRepository
     UPDATE murals
     SET name = $name, blocks = $blocks, cover_image_id = $cover_image_id, cover_image_url = $cover_image_url, folder_id = $folder_id, updated_at = $updated_at
     WHERE id = $id AND user_id = $user_id
+      AND ($expected_updated_at IS NULL OR updated_at = $expected_updated_at)
   `);
   const deleteStmt = db.prepare(`DELETE FROM murals WHERE id = ? AND user_id = ?`);
   const setShareTokenStmt = db.prepare(`UPDATE murals SET share_token = $share_token, updated_at = $updated_at WHERE id = $id AND user_id = $user_id`);
@@ -69,13 +70,13 @@ export function createSqliteMuralsRepository(db: DatabaseSync): MuralsRepository
       });
     },
 
-    update(id, userId, patch) {
+    update(id, userId, patch, expectedUpdatedAt) {
       const existing = getOwnedStmt.get(id, userId) as MuralRow | undefined;
       if (!existing) return undefined;
 
-      const updatedAt = new Date().toISOString();
+      const updatedAt = new Date(Math.max(Date.now(), Date.parse(existing.updated_at) + 1)).toISOString();
       const merged: MuralRow = { ...existing, ...patch, updated_at: updatedAt };
-      updateStmt.run({
+      const result = updateStmt.run({
         $id: id,
         $user_id: userId,
         $name: merged.name,
@@ -83,8 +84,10 @@ export function createSqliteMuralsRepository(db: DatabaseSync): MuralsRepository
         $cover_image_id: merged.cover_image_id,
         $cover_image_url: merged.cover_image_url,
         $folder_id: merged.folder_id,
-        $updated_at: updatedAt
+        $updated_at: updatedAt,
+        $expected_updated_at: expectedUpdatedAt ?? null
       });
+      if (result.changes === 0) return undefined;
       return merged;
     },
 

@@ -7,6 +7,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, EmptyState, ErrorState } from "../../ui";
 import { minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui/theme";
 import { useLibrary } from "../library/hooks/useLibrary";
+import { useMurals } from "../murals/useMurals";
 import { deleteGalleryImage, fetchGalleryImages, uploadGalleryImage, type GalleryImage } from "./api";
 
 const GALLERY_QUERY_KEY = ["gallery"] as const;
@@ -22,6 +23,7 @@ export function GalleryScreen() {
   const queryClient = useQueryClient();
   const gallery = useQuery({ queryKey: GALLERY_QUERY_KEY, queryFn: fetchGalleryImages });
   const { data: library, updateLibrary } = useLibrary();
+  const murals = useMurals();
   const [error, setError] = useState<string | null>(null);
   const usage = useMemo(() => {
     const counts = new Map<string, number>();
@@ -31,6 +33,14 @@ export function GalleryScreen() {
     }
     return counts;
   }, [library]);
+  const muralUsage = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const mural of murals.data ?? []) {
+      if (mural.coverImageId) counts.set(mural.coverImageId, (counts.get(mural.coverImageId) ?? 0) + 1);
+      for (const block of mural.blocks) if (block.type === "image" && block.imageId) counts.set(block.imageId, (counts.get(block.imageId) ?? 0) + 1);
+    }
+    return counts;
+  }, [murals.data]);
 
   const upload = useMutation({
     mutationFn: uploadGalleryImage,
@@ -39,6 +49,7 @@ export function GalleryScreen() {
   const remove = useMutation({
     mutationFn: async (image: GalleryImage) => {
       await deleteGalleryImage(image.id);
+      await murals.scrubImage(image.id);
       if ((usage.get(image.id) ?? 0) > 0) {
         await updateLibrary((data) => ({ ...data, books: scrubImageFromBooks(data.books, image.id) }));
       }
@@ -67,8 +78,9 @@ export function GalleryScreen() {
 
   function confirmDelete(image: GalleryImage) {
     const usedBy = usage.get(image.id) ?? 0;
-    const warning = usedBy
-      ? `This image is the cover for ${usedBy} book${usedBy === 1 ? "" : "s"}. Deleting it will remove those custom covers.`
+    const usedByMurals = muralUsage.get(image.id) ?? 0;
+    const warning = usedBy || usedByMurals
+      ? `Deleting it will remove it from ${usedBy} book${usedBy === 1 ? "" : "s"} and ${usedByMurals} mural reference${usedByMurals === 1 ? "" : "s"}.`
       : "This can't be undone.";
     Alert.alert("Delete this image?", warning, [
       { text: "Cancel", style: "cancel" },
@@ -97,6 +109,7 @@ export function GalleryScreen() {
             <Image source={{ uri: item.url }} style={styles.image} contentFit="cover" />
             <Text numberOfLines={1} style={[typography.caption, { color: colors.textDim }]}>{item.width}×{item.height} · {formatBytes(item.byteSize)}</Text>
             {(usage.get(item.id) ?? 0) > 0 ? <Text style={[typography.caption, { color: colors.accent }]}>Cover for {usage.get(item.id)} book{usage.get(item.id) === 1 ? "" : "s"}</Text> : null}
+            {(muralUsage.get(item.id) ?? 0) > 0 ? <Text style={[typography.caption, { color: colors.accent }]}>Used by {muralUsage.get(item.id)} mural reference{muralUsage.get(item.id) === 1 ? "" : "s"}</Text> : null}
             <Pressable accessibilityRole="button" accessibilityLabel={`Delete ${item.filename}`} disabled={remove.isPending} onPress={() => confirmDelete(item)} style={styles.deleteButton}>
               <Text style={[typography.body, { color: colors.danger }]}>Delete</Text>
             </Pressable>

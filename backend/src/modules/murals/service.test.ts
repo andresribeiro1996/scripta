@@ -3,9 +3,10 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { FolderCycleError, InvalidFolderReferenceError } from "./domain/errors.js";
+import { FolderCycleError, InvalidFolderReferenceError, MuralConflictError } from "./domain/errors.js";
 import type { MuralsRepository } from "./domain/ports.js";
 import type { MuralFolderRow, MuralRow } from "./domain/types.js";
+import { createSqliteMuralsRepository } from "./adapters/sqlite/sqliteMuralsRepository.js";
 import { createMuralsService } from "./service.js";
 
 process.env.AUTH_DB_PATH ??= join(tmpdir(), "murals-test-auth.sqlite");
@@ -28,10 +29,11 @@ function createInMemoryRepo(): MuralsRepository {
     insert(row) {
       murals.set(row.id, { ...row });
     },
-    update(id, userId, patch) {
+    update(id, userId, patch, expectedUpdatedAt) {
       const existing = murals.get(id);
       if (!existing || existing.user_id !== userId) return undefined;
-      const merged: MuralRow = { ...existing, ...patch, updated_at: new Date().toISOString() };
+      if (expectedUpdatedAt !== undefined && expectedUpdatedAt !== existing.updated_at) return undefined;
+      const merged: MuralRow = { ...existing, ...patch, updated_at: new Date(Date.parse(existing.updated_at) + 1).toISOString() };
       murals.set(id, merged);
       return merged;
     },
@@ -201,6 +203,15 @@ test("updateMural moves a mural into a folder and back to root", () => {
   assert.equal(atRoot?.folderId, null);
 });
 
+test("updateMural rejects a stale save without overwriting the current mural", () => {
+  const service = makeService();
+  const mural = service.createMural("u1", "Original");
+  const current = service.updateMural("u1", mural.id, { name: "Current", updatedAt: mural.updatedAt });
+  assert.throws(() => service.updateMural("u1", mural.id, { name: "Stale", updatedAt: mural.updatedAt }), MuralConflictError);
+  assert.equal(service.getMural("u1", mural.id)?.name, "Current");
+  assert.notEqual(current?.updatedAt, mural.updatedAt);
+});
+
 test("createMural carries folderId and defaults to root", () => {
   const service = makeService();
   const f = service.createFolder("u1", "F");
@@ -225,6 +236,12 @@ test("openMuralsDb migration is idempotent and preserves data", async () => {
   assert.ok(columns.some((c) => c.name === "folder_id"));
   const row = second.prepare(`SELECT name FROM murals WHERE id = 'm1'`).get() as { name: string };
   assert.equal(row.name, "Keep me");
+  const repository = createSqliteMuralsRepository(second);
+  const before = repository.getOwned("m1", "u1")!;
+  const current = repository.update("m1", "u1", { name: "Current" }, before.updated_at);
+  assert.equal(repository.update("m1", "u1", { name: "Stale" }, before.updated_at), undefined);
+  assert.equal(repository.getOwned("m1", "u1")?.name, "Current");
+  assert.notEqual(current?.updated_at, before.updated_at);
   const foldersTable = second
     .prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'mural_folders'`)
     .get();
