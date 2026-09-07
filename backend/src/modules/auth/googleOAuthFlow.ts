@@ -1,7 +1,7 @@
 // Carries a starting /auth/google request's own PKCE code_challenge and
 // chosen redirect target through Google's round trip, keyed by the OAuth
 // `state` value — the same "generateStateFunction stashes something,
-// checkStateFunction round-trips it via @fastify/oauth2's own signed
+// checkStateFunction round-trips it via @fastify/oauth2's own state
 // cookie, the callback looks it back up" shape as
 // modules/socials/linkSessions.ts's link-session flow (see that file's own
 // top comment for the full reasoning). The difference here: this flow
@@ -64,15 +64,9 @@ export function createGoogleOAuthFlow(flow: PendingGoogleOAuthFlow): string {
   return flowId;
 }
 
-/** Called from the callback route once Google's own redirect has arrived.
- *  Single-use: a replayed callback request (or a second app racing to hit
- *  the same callback URL — @fastify/oauth2's own state-cookie check
- *  already guards against most of that, this is defense in depth) finds
- *  nothing here the second time. Returns null for an unknown/expired
- *  state, which the callback route treats as "no PKCE, no explicit
- *  redirect target" rather than failing the whole sign-in — the flow
- *  degrades to the plain desktop-web behavior rather than 500ing on a
- *  quirk of a state value this map never saw. */
+/** Called from the callback route immediately after the provider-code
+ *  exchange. Single-use: an unknown, expired, or replayed state returns
+ *  null and the callback rejects it before profile lookup or session issue. */
 export function consumeGoogleOAuthFlow(flowId: string): PendingGoogleOAuthFlow | null {
   sweepExpired();
   const flow = pendingFlows.get(flowId);

@@ -43,12 +43,13 @@ const GOOGLE_OAUTH_ENDPOINTS = {
   tokenPath: "/oauth2/v4/token"
 };
 
-// @fastify/oauth2's own default (DEFAULT_REDIRECT_STATE_COOKIE_NAME) — the
-// googleOAuth2 registration below passes no `cookie`/`redirectStateCookieName`
-// override, so this is genuinely the name it writes/reads. checkStateFunction
-// below reads this cookie itself (see that option's own comment for why a
-// real implementation is required here at all).
-const OAUTH_REDIRECT_STATE_COOKIE_NAME = "oauth2-redirect-state";
+// __Host- cookies require HTTPS. GOOGLE_CALLBACK_URL is the browser-facing
+// deployment URL, so TLS-terminated production uses the hardened name while
+// plain-http LAN development keeps working with the library default.
+const OAUTH_HOST_PREFIXED_COOKIES = env.GOOGLE_CALLBACK_URL.startsWith("https://");
+const OAUTH_REDIRECT_STATE_COOKIE_NAME = OAUTH_HOST_PREFIXED_COOKIES
+  ? "__Host-oauth2-redirect-state"
+  : "oauth2-redirect-state";
 const OAUTH_COOKIE_OPTIONS: { signed?: boolean } = { signed: false };
 
 /** noUncheckedIndexedAccess makes a plain `request.query.foo` cast come
@@ -112,6 +113,7 @@ export async function authPlugin(app: FastifyInstance) {
       startRedirectPath: "/auth/google",
       callbackUri: env.GOOGLE_CALLBACK_URL,
       cookie: OAUTH_COOKIE_OPTIONS,
+      hostPrefixedCookies: OAUTH_HOST_PREFIXED_COOKIES,
       // Threads this flow's PKCE code_challenge, (for a mobile caller)
       // chosen redirect target, and mobile client-side state nonce through
       // Google's own round trip — see googleOAuthFlow.ts's top comment.
@@ -164,7 +166,11 @@ export async function authPlugin(app: FastifyInstance) {
     });
 
     app.get("/auth/google/callback", async (request, reply) => {
-      const { token } = await app.googleOAuth2.getAccessTokenFromAuthorizationCodeFlow(request);
+      const { token } = await app.googleOAuth2.getAccessTokenFromAuthorizationCodeFlow(request, reply);
+      const flow = consumeGoogleOAuthFlow(queryParam(request, "state"));
+      if (!flow) {
+        return reply.code(400).send({ error: "Google OAuth flow is missing, expired, or already used." });
+      }
 
       const profileResponse = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
         headers: { Authorization: `Bearer ${token.access_token}` }
@@ -179,22 +185,13 @@ export async function authPlugin(app: FastifyInstance) {
 
       const { user, tokens } = await authService.loginWithGoogle({ googleId: profile.id, email: profile.email });
 
-      // The state param this callback receives is exactly what our own
-      // generateStateFunction returned above — a flow id, not a CSRF
-      // token to check ourselves (that already happened inside
-      // getAccessTokenFromAuthorizationCodeFlow, via checkStateFunction
-      // above and its signed cookie). A missing/expired flow degrades to
-      // "no PKCE, no explicit redirect target" — the plain desktop-web
-      // shape — rather than failing the sign-in outright.
-      const flow = consumeGoogleOAuthFlow(queryParam(request, "state"));
-
       // Never place access or refresh tokens in URLs (global constraint):
       // the tokens are already minted above, but they stay server-side —
       // only this short-lived, single-use, PKCE-bound code rides the
       // redirect. See authorizationCode.ts.
-      const code = createAuthorizationCode({ user, tokens, codeChallenge: flow?.codeChallenge ?? null });
+      const code = createAuthorizationCode({ user, tokens, codeChallenge: flow.codeChallenge });
 
-      const redirectBase = flow?.redirectTarget ?? env.OAUTH_SUCCESS_REDIRECT_URL;
+      const redirectBase = flow.redirectTarget ?? env.OAUTH_SUCCESS_REDIRECT_URL;
       const redirectUrl = new URL(redirectBase);
       redirectUrl.searchParams.set("code", code);
       // BLOCKER 2(b) — echo the mobile app's own client_state nonce back
@@ -202,7 +199,7 @@ export async function authPlugin(app: FastifyInstance) {
       // googleSignIn.ts refuses to accept `code` unless this matches the
       // nonce it generated before opening this flow. Absent for a flow
       // that sent none (the plain desktop-web flow).
-      if (flow?.clientState) {
+      if (flow.clientState) {
         redirectUrl.searchParams.set("state", flow.clientState);
       }
       return reply.redirect(redirectUrl.toString());

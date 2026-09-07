@@ -68,6 +68,8 @@ test("GET /auth/google (no params) redirects to Google — the plain desktop-web
 
   assert.equal(res.statusCode, 302);
   assert.ok(res.headers.location?.toString().startsWith("https://accounts.google.com"));
+  assert.match(res.headers["set-cookie"]?.toString() ?? "", /oauth2-redirect-state=/);
+  assert.doesNotMatch(res.headers["set-cookie"]?.toString() ?? "", /__Host-|Secure/);
   await app.close();
 });
 
@@ -123,4 +125,51 @@ test("GET /auth/google/callback with no state cookie is rejected before any toke
 
   assert.equal(res.statusCode, 500);
   await app.close();
+});
+
+test("concurrent callbacks reject the one whose flow state was already consumed", async () => {
+  const app = Fastify();
+  await authPlugin(app);
+  await app.ready();
+
+  const start = await app.inject({ method: "GET", url: "/auth/google" });
+  const location = new URL(start.headers.location?.toString() ?? "");
+  const state = location.searchParams.get("state");
+  assert.ok(state);
+
+  const oauth = app.googleOAuth2 as unknown as {
+    oauth2: { getToken: () => Promise<{ token: { access_token: string } }> };
+  };
+  oauth.oauth2.getToken = async () => ({ token: { access_token: "google-access-token" } });
+
+  const originalFetch = globalThis.fetch;
+  let profileRequests = 0;
+  globalThis.fetch = async () => {
+    profileRequests += 1;
+    return new Response(JSON.stringify({ id: "google-user-1", email: "google@example.com" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" }
+    });
+  };
+
+  try {
+    const callback = {
+      method: "GET" as const,
+      url: `/auth/google/callback?code=provider-code&state=${encodeURIComponent(state)}`,
+      headers: { cookie: `oauth2-redirect-state=${state}` }
+    };
+    const responses = await Promise.all([app.inject(callback), app.inject(callback)]);
+
+    assert.deepEqual(
+      responses.map((response) => response.statusCode).sort(),
+      [302, 400]
+    );
+    assert.equal(profileRequests, 1);
+    for (const response of responses) {
+      assert.match(response.headers["set-cookie"]?.toString() ?? "", /oauth2-redirect-state=;/);
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+    await app.close();
+  }
 });

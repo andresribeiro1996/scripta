@@ -32,6 +32,6 @@ test("a flow is single-use", () => {
   assert.equal(consumeGoogleOAuthFlow(flowId), null);
 });
 
-test("an unknown flow id degrades to null rather than throwing", () => {
+test("an unknown flow id returns null for the callback to reject", () => {
   assert.equal(consumeGoogleOAuthFlow("does-not-exist"), null);
 });

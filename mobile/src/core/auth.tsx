@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { GoogleSignInCancelledError, startGoogleSignIn } from "../features/auth/googleSignIn";
-import { apiClient, refreshAccessToken } from "./api";
+import { apiClient, logout, refreshAccessToken } from "./api";
 import { getAccessToken, secureTokenStore, setAccessToken } from "./tokenStore";
 
 interface AuthUser {
@@ -89,12 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
-    const refreshToken = await secureTokenStore.getRefreshToken();
-    if (refreshToken) {
-      await apiClient.request("/auth/logout", { method: "POST", body: { refreshToken } }).catch(() => {});
-    }
-    await secureTokenStore.clearRefreshToken();
-    setAccessToken(null);
+    await logout();
     setUser(null);
   }, []);
 
