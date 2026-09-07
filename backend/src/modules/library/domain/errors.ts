@@ -9,3 +9,9 @@ export class NoLibraryDocumentError extends LibraryError {
     super("No library saved yet — there's nothing to share.");
   }
 }
+
+export class LibraryConflictError extends LibraryError {
+  constructor() {
+    super("The library changed elsewhere since it was loaded.");
+  }
+}

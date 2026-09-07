@@ -29,8 +29,8 @@ export async function fetchLibrary(): Promise<LibraryDocument | null> {
   }
 }
 
-export async function saveLibrary(data: LibraryData): Promise<LibraryDocument> {
-  return (await apiFetch("/library", { method: "PUT", body: JSON.stringify({ data }) })) as LibraryDocument;
+export async function saveLibrary(data: LibraryData, updatedAt?: string): Promise<LibraryDocument> {
+  return (await apiFetch("/library", { method: "PUT", body: JSON.stringify({ data, updatedAt }) })) as LibraryDocument;
 }
 
 export async function shareLibrary(): Promise<LibraryDocument> {

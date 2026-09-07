@@ -157,7 +157,8 @@ export function createAuthService(repo: AuthRepository, avatarStore: AvatarBlobS
      *  process kill) leaves exactly this shape on the next launch. That
      *  case reissues from the replacement row instead of revoking
      *  everything, so the desktop PWA's own session survives a phone's
-     *  dropped response. */
+     *  dropped response. The grace marker persists for the login's lifetime,
+     *  so this exception can be used only once per login, not once per window. */
     async refresh(refreshToken) {
       const tokenHash = hashRefreshToken(refreshToken);
       const row = repo.findRefreshTokenByHash(tokenHash);

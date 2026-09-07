@@ -80,13 +80,8 @@ function timingSafeStringEqual(a: string, b: string): boolean {
  *  attempt fails too (loudly, forcing a fresh sign-in) rather than
  *  silently racing to see who exchanges first. */
 export function consumeAuthorizationCode(code: string, codeVerifier: string | null): ConsumeAuthorizationCodeResult {
-  // Deliberately no sweepExpired() call here: this code's own entry (if
-  // any) needs to be inspected for expiry itself, below, and an eager
-  // sweep would delete an expired-but-still-present entry first, turning
-  // an "expired" result into an indistinguishable "not_found" one. Lazy
-  // cleanup of OTHER abandoned entries still happens on every
-  // createAuthorizationCode call.
   const entry = pendingCodes.get(code);
+  sweepExpired();
   if (!entry) return { ok: false, reason: "not_found" };
   pendingCodes.delete(code);
 
@@ -111,9 +106,6 @@ export function consumeAuthorizationCode(code: string, codeVerifier: string | nu
   return { ok: true, user: entry.user, tokens: entry.tokens };
 }
 
-export function authorizationCodeErrorMessage(reason: "not_found" | "expired" | "verifier_mismatch" | "verifier_not_expected"): string {
-  if (reason === "verifier_mismatch" || reason === "verifier_not_expected") {
-    return "This sign-in could not be verified — please try again.";
-  }
+export function authorizationCodeErrorMessage(_reason: "not_found" | "expired" | "verifier_mismatch" | "verifier_not_expected"): string {
   return "This sign-in code has expired or was already used — please try again.";
 }

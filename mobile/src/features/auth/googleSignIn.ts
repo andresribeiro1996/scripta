@@ -51,6 +51,7 @@ export async function startGoogleSignIn(): Promise<GoogleAuthorizationCode> {
   // state nonce below rides as a SEPARATE query param on the /auth/google
   // request instead, never appended to this redirect URI itself.
   const redirectUri = Linking.createURL("oauth-redirect");
+  console.info("Google OAuth redirect URI:", redirectUri);
   const codeVerifier = generateCodeVerifier();
   const codeChallenge = await deriveCodeChallenge(codeVerifier);
   // A nonce THIS app instance generated and never told anyone but the

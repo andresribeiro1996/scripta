@@ -6,7 +6,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { test } from "node:test";
-import { createAuthorizationCode, consumeAuthorizationCode } from "./authorizationCode.js";
+import { authorizationCodeErrorMessage, createAuthorizationCode, consumeAuthorizationCode } from "./authorizationCode.js";
 import type { AuthenticatedUser, TokenPair } from "./domain/types.js";
 
 const user: AuthenticatedUser = { id: "u1", email: "a@b.c", username: "andre", avatarId: null };
@@ -25,6 +25,11 @@ test("a code with no PKCE challenge (plain web flow) exchanges with no verifier"
 test("an unknown code is rejected", () => {
   const result = consumeAuthorizationCode("does-not-exist", null);
   assert.deepEqual(result, { ok: false, reason: "not_found" });
+});
+
+test("exchange failures use one indistinguishable error message", () => {
+  const reasons = ["not_found", "expired", "verifier_mismatch", "verifier_not_expected"] as const;
+  assert.equal(new Set(reasons.map(authorizationCodeErrorMessage)).size, 1);
 });
 
 test("a code is single-use: a second exchange attempt fails even with the right verifier", () => {
@@ -46,6 +51,16 @@ test("an expired code is rejected even before the verifier is checked", async ()
 
   const result = consumeAuthorizationCode(code, verifier);
   assert.deepEqual(result, { ok: false, reason: "expired" });
+});
+
+test("a consume attempt sweeps other expired codes from the store", async () => {
+  const expiredCode = createAuthorizationCode({ user, tokens, codeChallenge: null }, 10);
+  const liveCode = createAuthorizationCode({ user, tokens, codeChallenge: null });
+
+  await new Promise((resolve) => setTimeout(resolve, 25));
+
+  assert.equal(consumeAuthorizationCode(liveCode, null).ok, true);
+  assert.deepEqual(consumeAuthorizationCode(expiredCode, null), { ok: false, reason: "not_found" });
 });
 
 // "A second app receives the redirect and exchanges the code without the

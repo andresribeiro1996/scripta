@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { GoogleSignInCancelledError, startGoogleSignIn } from "../features/auth/googleSignIn";
-import { apiClient, logout, refreshAccessToken } from "./api";
+import { apiClient, logout, refreshAccessToken, setSessionExpiredHandler } from "./api";
 import { getAccessToken, secureTokenStore, setAccessToken } from "./tokenStore";
 
 interface AuthUser {
@@ -41,6 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
+    const clearSessionExpiredHandler = setSessionExpiredHandler(() => setUser(null));
     (async () => {
       try {
         // Shared with api.ts's own 401 retry — see refreshAccessToken's
@@ -64,6 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })();
     return () => {
       cancelled = true;
+      clearSessionExpiredHandler();
     };
   }, []);
 

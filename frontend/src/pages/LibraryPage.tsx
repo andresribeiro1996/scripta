@@ -110,7 +110,7 @@ export function LibraryPage() {
     const base = current?.data ?? library?.data ?? { books: [] };
     if ((base.name ?? "") === name) return; // unchanged — nothing to save
     try {
-      const saved = await saveLibrary({ ...base, name });
+      const saved = await saveLibrary({ ...base, name }, current?.updatedAt ?? library?.updatedAt);
       queryClient.setQueryData(["library"], saved);
     } catch {
       toast({ message: "Couldn't save the new name.", kind: "error" });
@@ -134,7 +134,7 @@ export function LibraryPage() {
     const merged = existing ? mergeLibraryData(existing, parsed) : parsed;
     const ordered = { ...merged, books: assignBookOrder(merged.books) };
     const withSeries = { ...ordered, groups: deriveSeriesGroups(ordered.books, ordered.groups ?? []) };
-    const saved = await saveLibrary(withSeries);
+    const saved = await saveLibrary(withSeries, current?.updatedAt ?? library?.updatedAt);
     queryClient.setQueryData(["library"], saved);
   }
 
@@ -176,7 +176,7 @@ export function LibraryPage() {
     const optimistic: LibraryDocument = { ...current, data: { ...current.data, books: reordered } };
     updateWithViewTransition(() => queryClient.setQueryData(["library"], optimistic));
 
-    saveLibrary({ ...current.data, books: reordered })
+    saveLibrary({ ...current.data, books: reordered }, current.updatedAt)
       .then((saved) => queryClient.setQueryData(["library"], saved))
       .catch((err) => {
         console.error("Failed to persist new book order:", err);
@@ -202,7 +202,7 @@ export function LibraryPage() {
     const key = bookKey(book);
     const updatedBooks = current.data.books.map((b) => (bookKey(b) === key ? { ...b, _style: bookStyle } : b));
     try {
-      const saved = await saveLibrary({ ...current.data, books: updatedBooks });
+      const saved = await saveLibrary({ ...current.data, books: updatedBooks }, current.updatedAt);
       queryClient.setQueryData(["library"], saved);
     } catch {
       toast({ message: "Couldn't save the style change.", kind: "error" });
@@ -215,7 +215,7 @@ export function LibraryPage() {
     const key = bookKey(book);
     const updatedBooks = current.data.books.map((b) => (bookKey(b) === key ? { ...b, ReadStatus: nextReadStatus(b.ReadStatus) } : b));
     try {
-      const saved = await saveLibrary({ ...current.data, books: updatedBooks });
+      const saved = await saveLibrary({ ...current.data, books: updatedBooks }, current.updatedAt);
       queryClient.setQueryData(["library"], saved);
     } catch {
       toast({ message: "Couldn't save the status change.", kind: "error" });
@@ -234,7 +234,7 @@ export function LibraryPage() {
     const key = bookKey(book);
     const updatedBooks = current.data.books.map((b) => (bookKey(b) === key ? setBookCover(b, image.id, image.url) : b));
     try {
-      const saved = await saveLibrary({ ...current.data, books: updatedBooks });
+      const saved = await saveLibrary({ ...current.data, books: updatedBooks }, current.updatedAt);
       queryClient.setQueryData(["library"], saved);
     } catch {
       toast({ message: "Couldn't save the cover change.", kind: "error" });
@@ -247,7 +247,7 @@ export function LibraryPage() {
     const key = bookKey(book);
     const updatedBooks = current.data.books.map((b) => (bookKey(b) === key ? clearBookCover(b) : b));
     try {
-      const saved = await saveLibrary({ ...current.data, books: updatedBooks });
+      const saved = await saveLibrary({ ...current.data, books: updatedBooks }, current.updatedAt);
       queryClient.setQueryData(["library"], saved);
     } catch {
       toast({ message: "Couldn't save the cover change.", kind: "error" });
@@ -287,7 +287,7 @@ export function LibraryPage() {
         ...current.data,
         books: current.data.books.filter((b) => !keys.has(bookKey(b))),
         groups: removeBooksFromAllGroups(current.data.groups ?? [], keys)
-      });
+      }, current.updatedAt);
       queryClient.setQueryData(["library"], saved);
     } catch {
       toast({ message: "Couldn't delete — nothing was changed.", kind: "error" });
@@ -304,7 +304,8 @@ export function LibraryPage() {
           clearTimeout(scrubTimer);
           void (async () => {
             try {
-              const restored = await saveLibrary(current.data);
+              const latest = queryClient.getQueryData<LibraryDocument>(["library"]);
+              const restored = await saveLibrary(current.data, latest?.updatedAt);
               queryClient.setQueryData(["library"], restored);
               toast({ message: "Restored." });
             } catch {

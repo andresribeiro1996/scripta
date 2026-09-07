@@ -1,5 +1,6 @@
 import type { LibraryData } from "@scripta/shared";
-import { fork } from "node:child_process";
+import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
 const MAX_IMPORT_ROWS = 100_000;
 const CHILD_MEMORY_MB = 64;
@@ -39,21 +40,39 @@ export function sanitizeImportError(raw: string | undefined): string {
 
 let inFlight = 0;
 
-export function parseImport(path: string, timeoutMs: number, maxResultBytes: number): Promise<ImportPreview> {
+type ImportLogger = { warn(...args: unknown[]): void };
+
+export function parseImport(path: string, timeoutMs: number, maxResultBytes: number, logger: ImportLogger = console): Promise<ImportPreview> {
   if (inFlight >= MAX_PARALLEL_IMPORTS) {
     return Promise.reject(new ImportBusyError("Import parser is busy — try again in a moment."));
   }
   inFlight++;
   return new Promise((resolve, reject) => {
     const sourceUrl = new URL(import.meta.url.endsWith(".ts") ? "./importChild.ts" : "./importChild.js", import.meta.url);
-    let child: ReturnType<typeof fork>;
+    const childArgs = [
+      ...process.execArgv,
+      `--max-old-space-size=${CHILD_MEMORY_MB}`,
+      fileURLToPath(sourceUrl),
+      path,
+      String(MAX_IMPORT_ROWS),
+      String(maxResultBytes),
+      String(CHILD_MEMORY_MB * 1024 * 1024)
+    ];
+    if (process.env.NODE_ENV === "test" && process.env.IMPORT_PARSE_TEST_DELAY_MS) {
+      childArgs.push("--test-delay", process.env.IMPORT_PARSE_TEST_DELAY_MS);
+    }
+    let child: ReturnType<typeof spawn>;
     try {
-      child = fork(sourceUrl, [path, String(MAX_IMPORT_ROWS), String(maxResultBytes), String(CHILD_MEMORY_MB * 1024 * 1024)], {
-        execArgv: [...process.execArgv, `--max-old-space-size=${CHILD_MEMORY_MB}`],
+      child = spawn("/bin/sh", ["-c", 'ulimit -t "$1"; shift; exec "$@"', "scripta-import", String(Math.max(1, Math.ceil(timeoutMs / 1000) * 2)), process.execPath, ...childArgs], {
+        env: {
+          ...(process.env.PATH ? { PATH: process.env.PATH } : {}),
+          ...(process.env.NODE_ENV ? { NODE_ENV: process.env.NODE_ENV } : {})
+        },
         stdio: ["ignore", "ignore", "ignore", "ipc"]
       });
     } catch (error) {
       inFlight--;
+      logger.warn({ err: error }, "import parser child failed to spawn");
       throw error;
     }
     let settled = false;
@@ -75,10 +94,12 @@ export function parseImport(path: string, timeoutMs: number, maxResultBytes: num
         ? resolve({ data: message.data, warnings: [] })
         : reject(new InvalidImportError(sanitizeImportError(message.error))));
     });
-    child.once("error", () => {
+    child.once("error", (error) => {
+      if (!settled) logger.warn({ err: error }, "import parser child failed to spawn");
       if (!timedOut) finish(() => reject(new InvalidImportError("Couldn't parse that import file.")));
     });
-    child.once("exit", (_code, signal) => {
+    child.once("exit", (code, signal) => {
+      if (!settled) logger.warn({ code, signal }, "import parser child exited before sending a result");
       if (timedOut && signal === "SIGKILL") {
         finish(() => reject(new ImportTimeoutError("The import file took too long to parse.")));
       } else {
