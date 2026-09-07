@@ -513,7 +513,7 @@ Start Tasks 5A–5C in parallel against stable contracts and fixtures. Tasks 5D�
 
 - Resolve central navigation, manifests, lockfiles, backend registration, and environment-schema changes.
 - Return feature-local defects to the owning agent.
-- Verify token expiry during uploads/saves, offline recovery (drop this if Task 4D declared offline read out of scope), import then edit, referenced-image/book deletion, and signed-out incoming links.
+- Verify token expiry during uploads/saves, import then edit, referenced-image/book deletion, and signed-out incoming links. ~~offline recovery~~ (dropped: Task 4D declared native offline read out of scope — access tokens and the query cache are memory-only).
 - Verify **editing the same library from web and mobile with stale caches on both** — the `PUT /library` 409 path from Task 5A. This is the failure mode a second client introduces, and nothing else in the plan exercises it.
 
 ### Task 7: Performance stabilization
