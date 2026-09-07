@@ -251,6 +251,6 @@ test("a successful parse releases its concurrency slot", async () => {
 test("a timed-out parse releases its concurrency slot", async () => {
   const path = koboDb("slot-timeout.sqlite");
   await assert.rejects(parseImport(path, 1, 32 * 1024 * 1024), (error: Error) => error instanceof InvalidImportError);
-  const after = parseImport(path, 2000, 32 * 1024 * 1024);
-  await assert.rejects(after, (error: Error) => !(error instanceof ImportBusyError));
+  const after = await parseImport(path, 5000, 32 * 1024 * 1024);
+  assert.ok(after.data.books.length > 0);
 });
