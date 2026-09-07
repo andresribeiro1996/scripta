@@ -437,6 +437,8 @@ These were listed as Wave 5 product-owner prerequisites. They are needed here, t
 
 **Wave 2 gate:** OAuth, imports, and UI primitives work in preview builds; universal links too if Task 4C ran. PWA behavior remains unchanged, including web Google sign-in end to end — this is not implied by per-branch checks, because a backend-only branch never runs the frontend suite.
 
+**Wave 2 status (2026-09-07):** PASSED at `15b9c2f4` (4C deferred per its prerequisites). Gate reviews under the product-owner-approved substitution (Codex standing in for the quota-blocked Claude opus, with an opus retro-review backstop): 4A needed two review rounds (fixed: cookie-state check + boot test, mandatory PKCE for custom-scheme targets, one-hop grace, immediate flow-state consumption with no silent desktop downgrade, logout/refresh race, `__Host-` cookie, refresh stampede guard); 4B's worker-thread kill was proven nonfunctional by direct reproduction (terminate() never resolves against synchronous SQLite) and became fork()+SIGKILL with bounded concurrency (2) and allowlisted error sanitization. Backend 161/161; frontend/lint/mobile at baseline. Web Google sign-in end-to-end remains unexercised (no GOOGLE credentials configured anywhere — flows degrade to configured-off), flagged for the first real deployment.
+
 ## Wave 3: Feature parity streams
 
 Start Tasks 5A–5C in parallel against stable contracts and fixtures. Tasks 5D–5E follow their listed dependencies.
