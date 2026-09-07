@@ -18,7 +18,7 @@ process.env.IMPORT_MAX_UPLOAD_BYTES = "32768";
 process.env.IMPORT_PARSE_TIMEOUT_MS = "1000";
 process.env.LIBRARY_BODY_LIMIT_BYTES = "32768";
 
-const { parseImport, InvalidImportError } = await import("./parseImport.js");
+const { parseImport, InvalidImportError, ImportBusyError } = await import("./parseImport.js");
 const { buildLibraryRoutes } = await import("../routes.js");
 const { signAccessToken } = await import("../../auth/tokens.js");
 
@@ -236,6 +236,21 @@ test("concurrent imports beyond the cap are rejected busy, and the slot frees af
   const third = parseImport(path, 10_000, 32 * 1024 * 1024);
   await assert.rejects(third, (error: Error) => error instanceof ImportBusyError);
   await Promise.all([first, second]);
+  const after = parseImport(path, 2000, 32 * 1024 * 1024);
+  await assert.rejects(after, (error: Error) => !(error instanceof ImportBusyError));
+});
+
+test("a successful parse releases its concurrency slot", async () => {
+  const path = koboDb("slot-success.sqlite");
+  const preview = await parseImport(path, 5000, 32 * 1024 * 1024);
+  assert.ok(preview.data.books.length > 0);
+  const again = parseImport(path, 5000, 32 * 1024 * 1024);
+  await assert.doesNotReject(again, (error: Error) => error instanceof ImportBusyError);
+});
+
+test("a timed-out parse releases its concurrency slot", async () => {
+  const path = koboDb("slot-timeout.sqlite");
+  await assert.rejects(parseImport(path, 1, 32 * 1024 * 1024), (error: Error) => error instanceof InvalidImportError);
   const after = parseImport(path, 2000, 32 * 1024 * 1024);
   await assert.rejects(after, (error: Error) => !(error instanceof ImportBusyError));
 });

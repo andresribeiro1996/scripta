@@ -46,10 +46,16 @@ export function parseImport(path: string, timeoutMs: number, maxResultBytes: num
   inFlight++;
   return new Promise((resolve, reject) => {
     const sourceUrl = new URL(import.meta.url.endsWith(".ts") ? "./importChild.ts" : "./importChild.js", import.meta.url);
-    const child = fork(sourceUrl, [path, String(MAX_IMPORT_ROWS), String(maxResultBytes), String(CHILD_MEMORY_MB * 1024 * 1024)], {
-      execArgv: [...process.execArgv, `--max-old-space-size=${CHILD_MEMORY_MB}`],
-      stdio: ["ignore", "ignore", "ignore", "ipc"]
-    });
+    let child: ReturnType<typeof fork>;
+    try {
+      child = fork(sourceUrl, [path, String(MAX_IMPORT_ROWS), String(maxResultBytes), String(CHILD_MEMORY_MB * 1024 * 1024)], {
+        execArgv: [...process.execArgv, `--max-old-space-size=${CHILD_MEMORY_MB}`],
+        stdio: ["ignore", "ignore", "ignore", "ipc"]
+      });
+    } catch (error) {
+      inFlight--;
+      throw error;
+    }
     let settled = false;
     let timedOut = false;
     const finish = (action: () => void) => {
