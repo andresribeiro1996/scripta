@@ -162,6 +162,12 @@ These assignments organize file ownership; they do not assume one tool is inhere
 
 ### Subscription limits and recovery
 
+- **Standing takeover rule (adopted 2026-09-07):** when an agent hits its usage limit, another agent with available quota takes the work over instead of idling the round — subject to all of:
+  1. Preserve the process log and the dirty worktree; the successor surveys `git status`/`git diff` first and builds on partial work, never reverts it.
+  2. File ownership transfers with the task — the successor gets exactly the original owner's allowed/forbidden lists.
+  3. The takeover packet must carry explicit boundaries: the task's plan text, plus any review findings the work is implementing, verbatim. A successor without explicit boundaries is a silent downgrade — not allowed for authentication, import security, destructive data handling, or integration review.
+  4. Merge gates do NOT transfer: if a task was merge-blocked on a review tier (e.g. opus for auth work), the block survives the takeover until that review runs or the product owner explicitly waives it.
+  5. The original owner resumes for review/follow-up after its quota resets where its tier is still the pinned gate.
 - Persist for every task: state, owner, model, base commit, branch, worktree, CLI session ID, process ID, last commit, last successful check, and log path.
 - Allowed states: `pending`, `running`, `needs_approval`, `quota_paused`, `review`, `rework`, `merged`, `blocked`.
 - On quota exhaustion:
