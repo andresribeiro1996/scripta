@@ -1,5 +1,6 @@
-// Wave 1 (Tasks 3A–3C) extracts the real shared domains — library,
-// arena, murals/tierlists — into this package from frontend/src/lib.
-// Until then this placeholder export exists so the workspace installs,
-// typechecks, and is consumable by backend, frontend, and mobile alike.
-export const SHARED_PACKAGE_READY = true;
+// @scripta/shared — proven cross-client logic, compiled and consumed via
+// `dist` by frontend, mobile, and backend alike (see this package's own
+// README/package.json `exports`). Each domain lives in its own
+// subdirectory; Task 3A landed `library` first, Tasks 3B (`arena`) and 3C
+// (`murals`/`tierlists`) add their own alongside it.
+export * from "./library/index.js";

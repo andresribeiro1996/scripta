@@ -1,16 +1,16 @@
+// The `BookMetadata` shape and `validBookRating` moved to
+// packages/shared/src/library/bookMetadata.ts (Task 3A) — re-exported
+// here so every existing `from "./lib/bookMetadata"` import keeps
+// working unchanged. `fetchBookMetadata` (an Open Library network call)
+// and `bookMetadataOptions` (a TanStack Query `queryOptions` wrapper)
+// stay here — see the shared module's own top comment for why.
+
 import { queryOptions } from "@tanstack/react-query";
 import { normalizeIsbn } from "./covers";
+import { validBookRating, type BookMetadata } from "@scripta/shared";
 
-export interface BookMetadata {
-  summary: string | null;
-  rating: number | null;
-  ratingCount: number;
-  sourceUrl: string;
-}
-
-export function validBookRating(value: unknown): number | null {
-  return typeof value === "number" && Number.isFinite(value) && value > 0 && value <= 5 ? value : null;
-}
+export type { BookMetadata };
+export { validBookRating };
 
 function normalized(value: string) {
   return value

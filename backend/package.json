@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@fastify/cors": "^11.3.0",
+    "@scripta/shared": "*",
     "@fastify/multipart": "^10.1.1",
     "@fastify/oauth2": "^8.3.0",
     "@fastify/rate-limit": "^11.2.0",

@@ -1,26 +1,12 @@
-import type { Group } from "../lib/groups";
-import type { LibraryStyleSettings } from "../lib/libraryStyle";
+import type { LibraryData } from "@scripta/shared";
 import { ApiError, apiFetch } from "./client";
 
-export interface LibraryData {
-  source?: string;
-  schema_version?: number;
-  book_count?: number;
-  books: Array<Record<string, unknown>>;
-  /** User-given name for this library (e.g. "Andre's Library") — never
-   *  set by an importer, only by the user via LibraryPage. Absent until
-   *  they name it for the first time; falls back to "Library" in the UI. */
-  name?: string;
-  /** Series and collections — see lib/groups.ts. Optional: absent until
-   *  the first group (auto-seeded series or user-created collection) is
-   *  saved. */
-  groups?: Group[];
-  /** Card size/spacing/background preferences — see lib/libraryStyle.ts.
-   *  Absent until the user visits /dashboard/style and changes something;
-   *  resolveLibraryStyle() fills in defaults wherever this is read. */
-  style?: LibraryStyleSettings;
-  [key: string]: unknown;
-}
+// LibraryData moved to packages/shared/src/library/types.ts (Task 3A) —
+// merge.ts, csv/goodreads/storygraph and groups/libraryStyle all
+// reference it, and backend needs the same shape for Task 4B's import
+// pipeline. Re-exported under the same name so every existing
+// `from "../api/library"` import keeps working unchanged.
+export type { LibraryData } from "@scripta/shared";
 
 export interface LibraryDocument {
   data: LibraryData;
