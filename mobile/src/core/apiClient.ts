@@ -36,15 +36,21 @@ export function createApiClient(
   ): Promise<RawResponse<T>> {
     const headers: Record<string, string> = {};
     const accessTokenUsed = init.auth ? getAccessToken() : null;
-    if (init.body !== undefined) headers["Content-Type"] = "application/json";
+    const multipart = typeof FormData !== "undefined" && init.body instanceof FormData;
+    if (init.body !== undefined && !multipart) headers["Content-Type"] = "application/json";
     if (accessTokenUsed) headers.Authorization = `Bearer ${accessTokenUsed}`;
     const res = await fetcher(`${baseUrl}${path}`, {
       method: init.method ?? "GET",
       headers,
-      body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
+      body: init.body === undefined ? undefined : multipart ? init.body as FormData : JSON.stringify(init.body),
     });
     const text = await res.text();
-    const body = text ? JSON.parse(text) : {};
+    let body: unknown = {};
+    try {
+      if (text) body = JSON.parse(text);
+    } catch {
+      throw new ApiError(res.status, res.ok ? "Server returned an invalid response" : `Request failed (${res.status})`);
+    }
     return { status: res.status, body: body as T, accessTokenUsed };
   }
 
