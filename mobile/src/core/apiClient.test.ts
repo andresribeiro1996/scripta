@@ -143,3 +143,35 @@ test("a rejected refresh expires the app session", async () => {
   assert.equal(refreshToken, null);
   assert.equal(expired, true);
 });
+
+test("multipart bodies are sent unchanged without a JSON content type", async () => {
+  const form = new FormData();
+  form.append("image", new Blob(["image"]), "cover.jpg");
+  let received: RequestInit | undefined;
+  const session = createApiClient(
+    "http://api.test",
+    { async getRefreshToken() { return null; }, async setRefreshToken() {}, async clearRefreshToken() {} },
+    () => "access",
+    () => {},
+    async (_input, init) => {
+      received = init;
+      return jsonResponse(200, { ok: true });
+    },
+  );
+
+  await session.apiClient.request("/gallery", { method: "POST", body: form, auth: true });
+  assert.equal(received?.body, form);
+  assert.equal(new Headers(received?.headers).has("Content-Type"), false);
+});
+
+test("non-JSON responses become ApiError messages", async () => {
+  const session = createApiClient(
+    "http://api.test",
+    { async getRefreshToken() { return null; }, async setRefreshToken() {}, async clearRefreshToken() {} },
+    () => "access",
+    () => {},
+    async () => new Response("Bad gateway", { status: 502 }),
+  );
+
+  await assert.rejects(session.apiClient.request("/gallery", { auth: true }), /Request failed \(502\)/);
+});

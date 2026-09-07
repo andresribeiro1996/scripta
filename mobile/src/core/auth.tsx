@@ -11,6 +11,7 @@ interface AuthUser {
   // state to /choose-username before letting it any further in (the same
   // gate backend/README documents for the PWA's own RequireUsername).
   username: string | null;
+  avatarId: string | null;
 }
 
 interface AuthState {
@@ -23,6 +24,8 @@ interface AuthState {
    *  sign-in without one yet goes through before the app treats it as
    *  fully set up. */
   setUsername(username: string): Promise<void>;
+  uploadAvatar(file: { uri: string; name: string; mimeType: string }): Promise<void>;
+  removeAvatar(): Promise<void>;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -104,9 +107,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(res.user);
   }, []);
 
+  const uploadAvatar = useCallback(async (file: { uri: string; name: string; mimeType: string }) => {
+    const form = new FormData();
+    form.append("image", { uri: file.uri, name: file.name, type: file.mimeType } as unknown as Blob);
+    const res = await apiClient.request<{ user: AuthUser }>("/auth/avatar", { method: "POST", body: form, auth: true });
+    setUser(res.user);
+  }, []);
+
+  const removeAvatar = useCallback(async () => {
+    const res = await apiClient.request<{ user: AuthUser }>("/auth/avatar", { method: "DELETE", auth: true });
+    setUser(res.user);
+  }, []);
+
   const value = useMemo(
-    () => ({ ready, user, signIn, signInWithGoogle, signOut, setUsername }),
-    [ready, user, signIn, signInWithGoogle, signOut, setUsername],
+    () => ({ ready, user, signIn, signInWithGoogle, signOut, setUsername, uploadAvatar, removeAvatar }),
+    [ready, user, signIn, signInWithGoogle, signOut, setUsername, uploadAvatar, removeAvatar],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

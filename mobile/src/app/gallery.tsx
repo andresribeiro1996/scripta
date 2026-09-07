@@ -17,6 +17,8 @@ import {
   typography,
   useTheme,
 } from "../ui";
+import { useLocalSearchParams } from "expo-router";
+import { GalleryScreen as GalleryFeatureScreen } from "../features/gallery";
 
 const buttonFixtures = [
   { label: "Primary", variant: "primary" as const },
@@ -26,12 +28,16 @@ const buttonFixtures = [
   { label: "Disabled", variant: "secondary" as const, disabled: true },
 ];
 
-export default function GalleryScreen() {
+export default function GalleryRoute() {
+  const { ui } = useLocalSearchParams<{ ui?: string }>();
+  if (__DEV__ && ui === "1") return <UiGalleryScreen />;
+  return <GalleryFeatureScreen />;
+}
+
+function UiGalleryScreen() {
   const { colors } = useTheme();
   const [overlay, setOverlay] = useState<"sheet" | "dialog" | "menu" | null>(null);
   const [toast, setToast] = useState(false);
-
-  if (!__DEV__) return null;
 
   return (
     <ScrollView style={{ backgroundColor: colors.background }} contentContainerStyle={styles.page}>
