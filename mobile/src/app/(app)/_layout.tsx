@@ -19,9 +19,11 @@ export default function AppLayout() {
   return (
     <Tabs screenOptions={{ headerShown: false, tabBarActiveTintColor: "#1c1917", tabBarInactiveTintColor: "#a8a29e" }}>
       <Tabs.Screen name="index" options={{ title: "Library" }} />
-      <Tabs.Screen name="arena" options={{ title: "Arena" }} />
+      <Tabs.Screen name="my-arena" options={{ title: "Arena" }} />
       <Tabs.Screen name="murals" options={{ title: "Murals" }} />
       <Tabs.Screen name="settings" options={{ title: "Settings" }} />
+      <Tabs.Screen name="tierlist" options={{ href: null }} />
+      <Tabs.Screen name="seed" options={{ href: null }} />
     </Tabs>
   );
 }

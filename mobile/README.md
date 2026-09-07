@@ -15,7 +15,23 @@ Backend must be up (`npm run backend`). Open in Expo Go by entering `exp://<lan-
 
 - `src/core/` — config (validated API URL), token store (refresh token in `expo-secure-store`, access token in memory only), API client, `AuthProvider` (cold-start refresh).
 - `src/app/` — Expo Router file routes. `(public)/` unauthenticated (login), `(app)/` auth-guarded tab shell (Library, Arena, Murals, Settings). The guard redirects to login when no session.
-- Route groups follow the PWA's split in `frontend/src/App.tsx`: everything under `dashboard` is authenticated; public routes arrive in Task 5E.
+- Public share, arena, and ballot routes are outside the authenticated `(app)` group. Dashboard URLs redirect into guarded native screens.
+
+## Route adaptations
+
+The web route tree has a native equivalent. The native tab shell uses shorter internal paths while incoming web links keep working through redirects.
+
+| Web route | Native destination |
+|---|---|
+| `/dashboard` | Library tab `/` |
+| `/dashboard/series`, `/dashboard/collections`, `/dashboard/style` | Library tab views |
+| `/dashboard/gallery`, `/dashboard/murals`, `/dashboard/settings` | `/gallery`, `/murals`, `/settings` |
+| `/dashboard/arena` | Arena tab `/my-arena` |
+| `/dashboard/arena/tierlist/:id`, `/dashboard/arena/:id/seed` | Guarded native editor routes |
+| `/welcome-avatar` | Settings profile editor |
+| `/oauth-success` | Native OAuth uses the `scripta://oauth-redirect` auth-session callback; the web callback path returns to login |
+
+`/arena`, `/arena/:id`, `/vote/:code`, `/shared/library/:token`, and `/shared/murals/:token` remain public and never pass through the app auth guard.
 
 ## Conventions
 

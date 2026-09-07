@@ -26,7 +26,7 @@ import { muralCanvasHeight } from "./layout";
 const ROW_HEIGHT = 36;
 const GAP = 8;
 
-function BlockContent({ block, books, images, tierlists }: { block: MuralBlock; books: Array<Record<string, unknown>>; images: GalleryImage[]; tierlists: Tierlist[] }) {
+function BlockContent({ block, books, images, tierlists, statsOverride }: { block: MuralBlock; books: Array<Record<string, unknown>>; images: GalleryImage[]; tierlists: Tierlist[]; statsOverride?: Record<string, number> }) {
   const { colors } = useTheme();
   const title = (book: Record<string, unknown> | undefined) => String(book?.Title ?? "Book unavailable");
   if (block.type === "text") return <><Text style={styles.blockTitle}>{block.heading || "Note"}</Text><Text>{block.body}</Text></>;
@@ -36,12 +36,12 @@ function BlockContent({ block, books, images, tierlists }: { block: MuralBlock; 
   if (block.type === "quoteCollection") return <><Text style={styles.blockTitle}>{block.title || "Quotes"}</Text>{resolveQuoteCollection(block, books).map(({ highlight }, index) => <Text key={index}>“{String(highlight.Text ?? highlight.Annotation ?? "")}”</Text>)}</>;
   if (block.type === "image") { const image = images.find((item) => item.id === block.imageId); return image ? <><Image source={{ uri: image.url }} style={styles.fill} contentFit="cover" />{block.caption ? <Text>{block.caption}</Text> : null}</> : <Text>Image unavailable</Text>; }
   if (block.type === "currentlyReading") { const reading = books.filter((book) => book.ReadStatus === 1); return <><Text style={styles.blockTitle}>Currently reading</Text>{reading.map((book) => <Text key={bookKey(book)}>{title(book)}</Text>)}</>; }
-  if (block.type === "stats") return <View style={styles.stats}>{block.metrics.map((metric) => <View key={metric}><Text style={styles.stat}>{computeStat(metric, books)}</Text><Text>{STAT_METRIC_LABELS[metric]}</Text></View>)}</View>;
+  if (block.type === "stats") return <View style={styles.stats}>{block.metrics.map((metric) => <View key={metric}><Text style={styles.stat}>{statsOverride?.[metric] ?? computeStat(metric, books)}</Text><Text>{STAT_METRIC_LABELS[metric]}</Text></View>)}</View>;
   if (block.type === "tierlist") { const tierlist = tierlists.find((item) => item.id === block.tierlistId); return <><Text style={styles.blockTitle}>{tierlist?.name ?? "Tier list unavailable"}</Text>{tierlist?.data.tiers.map((tier) => <Text key={tier.id}>{tier.label}: {tier.bookKeys.length}</Text>)}</>; }
   return <Text>{BLOCK_TYPE_LABELS[block.type]}</Text>;
 }
 
-function CanvasBlock({ block, columnWidth, editable, selected, books, images, tierlists, onSelect, onMove }: {
+function CanvasBlock({ block, columnWidth, editable, selected, books, images, tierlists, statsOverride, onSelect, onMove }: {
   block: MuralBlock;
   columnWidth: number;
   editable: boolean;
@@ -49,6 +49,7 @@ function CanvasBlock({ block, columnWidth, editable, selected, books, images, ti
   books: Array<Record<string, unknown>>;
   images: GalleryImage[];
   tierlists: Tierlist[];
+  statsOverride?: Record<string, number>;
   onSelect: () => void;
   onMove: (dx: number, dy: number) => void;
 }) {
@@ -77,18 +78,19 @@ function CanvasBlock({ block, columnWidth, editable, selected, books, images, ti
         animated,
       ]}>
         <Pressable accessibilityRole="button" accessibilityLabel={`${BLOCK_TYPE_LABELS[block.type]} block${editable ? ". Long press and drag to move" : ""}`} onPress={onSelect} style={styles.blockPress}>
-          <View style={{ flex: 1 }}><BlockContent block={block} books={books} images={images} tierlists={tierlists} /></View>
+          <View style={{ flex: 1 }}><BlockContent block={block} books={books} images={images} tierlists={tierlists} statsOverride={statsOverride} /></View>
         </Pressable>
       </Animated.View>
     </GestureDetector>
   );
 }
 
-export function MuralCanvas({ mural, books, images, tierlists, editable = false, selectedBlockId, onSelectBlock, onLayoutChange }: {
+export function MuralCanvas({ mural, books, images, tierlists, statsOverride, editable = false, selectedBlockId, onSelectBlock, onLayoutChange }: {
   mural: Mural;
   books: Array<Record<string, unknown>>;
   images: GalleryImage[];
   tierlists: Tierlist[];
+  statsOverride?: Record<string, number>;
   editable?: boolean;
   selectedBlockId?: string | null;
   onSelectBlock?: (id: string) => void;
@@ -109,6 +111,7 @@ export function MuralCanvas({ mural, books, images, tierlists, editable = false,
         books={books}
         images={images}
         tierlists={tierlists}
+        statsOverride={statsOverride}
         onSelect={() => onSelectBlock?.(block.id)}
         onMove={(dx, dy) => onLayoutChange?.(block.id, { ...block.layout, x: block.layout.x + dx, y: block.layout.y + dy })}
       />) : null}

@@ -58,12 +58,12 @@ import { ShareSheetBody } from "./components/ShareSheet";
 
 type ScreenView = "browse" | "series" | "collections" | "style";
 
-export function LibraryScreen() {
+export function LibraryScreen({ initialView = "browse" }: { initialView?: ScreenView }) {
   const { colors } = useTheme();
   const { data: library, isPending, isError, error, refetch, isRefetching, updateLibrary, share, unshare } = useLibrary();
   const murals = useMurals();
 
-  const [view, setView] = useState<ScreenView>("browse");
+  const [view, setView] = useState<ScreenView>(initialView);
   const [menuOpen, setMenuOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");

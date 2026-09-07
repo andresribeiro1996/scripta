@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
 import {
   Button,
   Dialog,
@@ -17,8 +17,9 @@ import {
   typography,
   useTheme,
 } from "../ui";
-import { useLocalSearchParams } from "expo-router";
+import { Redirect, useLocalSearchParams } from "expo-router";
 import { GalleryScreen as GalleryFeatureScreen } from "../features/gallery";
+import { useAuth } from "../core/auth";
 
 const buttonFixtures = [
   { label: "Primary", variant: "primary" as const },
@@ -30,7 +31,11 @@ const buttonFixtures = [
 
 export default function GalleryRoute() {
   const { ui } = useLocalSearchParams<{ ui?: string }>();
+  const { ready, user } = useAuth();
   if (__DEV__ && ui === "1") return <UiGalleryScreen />;
+  if (!ready) return <View style={styles.center}><ActivityIndicator size="large" /></View>;
+  if (!user) return <Redirect href="/(public)/login" />;
+  if (!user.username) return <Redirect href="/choose-username" />;
   return <GalleryFeatureScreen />;
 }
 
@@ -102,6 +107,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 const styles = StyleSheet.create({
+  center: { flex: 1, alignItems: "center", justifyContent: "center" },
   page: { padding: spacing.lg, paddingBottom: spacing.huge, gap: spacing.xxxl },
   heading: { ...typography.heading, fontWeight: "700" },
   section: { gap: spacing.md },

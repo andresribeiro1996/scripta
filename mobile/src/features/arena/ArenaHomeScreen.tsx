@@ -69,7 +69,7 @@ export function ArenaHomeScreen() {
   const needle = search.trim().toLowerCase();
   const items = needle ? allItems.filter((item) => item.name.toLowerCase().includes(needle)) : allItems;
   return <View style={[styles.screen, { backgroundColor: colors.background }]}>
-    <View style={styles.header}><Text accessibilityRole="header" {...dynamicType} style={[typography.heading, styles.strong, styles.grow, { color: colors.text }]}>Arena</Text><Button label="Browse public" variant="secondary" onPress={() => router.push("/book-arena" as never)} /></View>
+    <View style={styles.header}><Text accessibilityRole="header" {...dynamicType} style={[typography.heading, styles.strong, styles.grow, { color: colors.text }]}>Arena</Text><Button label="Browse public" variant="secondary" onPress={() => router.push("/arena" as never)} /></View>
     <View style={styles.row}><Button label="Tournaments" variant={tab === "tournaments" ? "primary" : "secondary"} onPress={() => setTab("tournaments")} /><Button label="Tier lists" variant={tab === "tierlists" ? "primary" : "secondary"} onPress={() => setTab("tierlists")} /></View>
     {error ? <Toast visible message={error} tone="error" /> : null}
     {allItems.length ? <Input label="Search" value={search} onChangeText={setSearch} placeholder={`Search ${tab}`} /> : null}
