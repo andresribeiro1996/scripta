@@ -33,13 +33,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const refreshToken = await secureTokenStore.getRefreshToken();
         if (refreshToken) {
-          const refreshed = await apiClient.request<LoginResponse>("/auth/refresh", {
+          const refreshed = await apiClient.request<{ accessToken: string; refreshToken: string }>("/auth/refresh", {
             method: "POST",
             body: { refreshToken },
           });
+          setAccessToken(refreshed.accessToken);
+          const me = await apiClient.request<{ user: AuthUser }>("/auth/me", { auth: true });
           if (!cancelled) {
-            setAccessToken(refreshed.accessToken);
-            setUser(refreshed.user);
+            setUser(me.user);
             await secureTokenStore.setRefreshToken(refreshed.refreshToken);
           }
         }
