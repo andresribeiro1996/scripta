@@ -333,6 +333,8 @@ Why not all three at once: `merge.ts`, `covers.ts` and `libraryStyle.ts` belong 
 
 **Wave 1 gate:** All three branches merge; the full `frontend` and `backend` test runs match the Task 1 baseline; PWA behavior remains unchanged.
 
+**Wave 1 status (2026-09-07):** PASSED at `b1e11b47`. 3A (Claude) merged clean; 3B (Codex) authored + verified but was committed by the integration owner after its resumed session lost sandbox write (its verification: arena 45/45, 21/22 suites baseline-only); 3C (OpenCode) merged clean. Full gate re-run at integration: backend 81/81, frontend typecheck/lint green with exactly the baseline failure, mobile typecheck green, shared builds. Codex integration review: APPROVED. Deviation recorded: `packages/shared/package.json` gained extensionless subpath exports (`./library/*`, `./murals/*`, `./tierlists/*`) — the barrel remains single-writer (integration owner) and `./arena/*` was left out until a consumer needs it.
+
 ## Wave 2: Native platform gaps
 
 Run Tasks 4A, 4C and 4D in parallel after shared contracts exist; 4B follows 4A on the same owner. 4C is gated on the deployment prerequisites above.
