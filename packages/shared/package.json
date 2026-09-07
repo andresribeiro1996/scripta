@@ -9,6 +9,18 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./library/*": {
+      "types": "./dist/library/*.d.ts",
+      "default": "./dist/library/*.js"
+    },
+    "./murals/*": {
+      "types": "./dist/murals/*.d.ts",
+      "default": "./dist/murals/*.js"
+    },
+    "./tierlists/*": {
+      "types": "./dist/tierlists/*.d.ts",
+      "default": "./dist/tierlists/*.js"
     }
   },
   "files": [
