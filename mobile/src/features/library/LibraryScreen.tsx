@@ -39,7 +39,7 @@ import {
 } from "@scripta/shared";
 import { Button, EmptyState, ErrorState, Input, Menu, Sheet, type MenuItem } from "../../ui/components";
 import { spacing, typography, useTheme } from "../../ui/theme";
-import type { GalleryImage } from "./api/gallery";
+import type { GalleryImage } from "../gallery/api";
 import { useLibrary } from "./hooks/useLibrary";
 import { buildMergedLibrary } from "./lib/mergeAndSave";
 import { AddBookSheet } from "./components/AddBookSheet";

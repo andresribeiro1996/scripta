@@ -51,6 +51,8 @@ async function registerOAuthProvider(app: FastifyInstance, config: OAuthProvider
   }
 
   const oauthInstanceName = `${config.provider}OAuth2`;
+  const hostPrefixedCookies = config.callbackUrl.startsWith("https://");
+  const redirectStateCookieName = hostPrefixedCookies ? "__Host-oauth2-redirect-state" : "oauth2-redirect-state";
 
   await app.register(fastifyOauth2, {
     name: oauthInstanceName,
@@ -66,6 +68,8 @@ async function registerOAuthProvider(app: FastifyInstance, config: OAuthProvider
     pkce: config.pkce,
     startRedirectPath: `/socials/${config.provider}/connect`,
     callbackUri: config.callbackUrl,
+    cookie: { signed: false },
+    hostPrefixedCookies,
     // The whole reason this module needs its own state handling instead
     // of the library's default random one — see linkSessions.ts. The
     // library still independently round-trips whatever this returns
@@ -80,10 +84,15 @@ async function registerOAuthProvider(app: FastifyInstance, config: OAuthProvider
         throw new Error("This connection link has expired or is invalid — go back to Settings and try connecting again.");
       }
       return linkId;
+    },
+    checkStateFunction(request: FastifyRequest): boolean {
+      const state = queryParam(request, "state");
+      const stateCookie = request.cookies[redirectStateCookieName];
+      return Boolean(state && stateCookie && state === stateCookie);
     }
   });
 
-  const oauthNamespace = (app as unknown as Record<string, { getAccessTokenFromAuthorizationCodeFlow: (request: FastifyRequest) => Promise<{ token: { access_token: string; refresh_token?: string; expires_at?: Date } }> } | undefined>)[
+  const oauthNamespace = (app as unknown as Record<string, { getAccessTokenFromAuthorizationCodeFlow: (request: FastifyRequest, reply: import("fastify").FastifyReply) => Promise<{ token: { access_token: string; refresh_token?: string; expires_at?: Date } }> } | undefined>)[
     oauthInstanceName
   ];
   if (!oauthNamespace) {
@@ -98,7 +107,7 @@ async function registerOAuthProvider(app: FastifyInstance, config: OAuthProvider
     }
 
     try {
-      const { token } = await oauthNamespace.getAccessTokenFromAuthorizationCodeFlow(request);
+      const { token } = await oauthNamespace.getAccessTokenFromAuthorizationCodeFlow(request, reply);
       const profile = await config.fetchProfile(token.access_token);
 
       service.saveConnection({

@@ -30,7 +30,7 @@ import {
 } from "@scripta/shared";
 import { Button, EmptyState, Input, Sheet } from "../../../ui/components";
 import { spacing, typography, useTheme } from "../../../ui/theme";
-import type { GalleryImage } from "../api/gallery";
+import type { GalleryImage } from "../../gallery/api";
 import { useLibrary } from "../hooks/useLibrary";
 import { BookCard } from "./BookCard";
 import { BookWrapGrid } from "./BookWrapGrid";

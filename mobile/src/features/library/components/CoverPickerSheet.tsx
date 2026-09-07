@@ -1,17 +1,10 @@
-// Mirrors frontend's components/CoverPickerModal.tsx — assign one of the
-// account's gallery images as a book's custom cover, upload a new one on
-// the spot (expo-image-picker, already installed), or clear back to
-// auto-resolution. See ../api/gallery.ts's own top comment for why this
-// feature carries its own minimal gallery client rather than importing
-// Task 5B's.
-
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { Button, ErrorState, Sheet } from "../../../ui/components";
 import { minimumTouchTarget, radii, spacing, typography, useTheme } from "../../../ui/theme";
-import { deleteGalleryImage, fetchGalleryImages, uploadGalleryImage, type GalleryImage } from "../api/gallery";
+import { deleteGalleryImage, fetchGalleryImages, uploadGalleryImage, type GalleryImage } from "../../gallery/api";
 
 export function CoverPickerSheet({
   visible,
