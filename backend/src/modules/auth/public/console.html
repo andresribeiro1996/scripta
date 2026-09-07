@@ -213,10 +213,11 @@
 </div>
 
 <script>
-(function () {
+(async function () {
   "use strict";
 
   var STORAGE_KEY = "kobo_auth_console_session";
+  var OAUTH_STATE_KEY = "kobo_auth_console_oauth_state";
 
   var msgEl = document.getElementById("msg");
   var loginCard = document.getElementById("login-card");
@@ -414,28 +415,39 @@
     })
     .catch(function () { /* backend too old / route missing — just hide it */ });
 
-  // After a Google OAuth redirect back here, tokens ride the URL fragment
-  // (see backend/src/modules/auth/plugin.ts). Pick them up once, then
-  // scrub the fragment so a reload/copy-paste of the URL doesn't leak them.
-  function consumeOAuthFragment() {
-    if (!location.hash || location.hash.indexOf("access_token=") === -1) return false;
-    var params = new URLSearchParams(location.hash.slice(1));
-    var accessToken = params.get("access_token");
-    var refreshToken = params.get("refresh_token");
-    if (!accessToken || !refreshToken) return false;
-    history.replaceState(null, "", location.pathname + location.search);
-    // The token carries the user id/email as JWT claims; decode the
-    // payload locally rather than making an extra /auth/me round trip
-    // just to render the console.
-    var claims = JSON.parse(atob(accessToken.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
-    session = { user: { id: claims.sub, email: claims.email, username: claims.username || null }, accessToken: accessToken, refreshToken: refreshToken };
-    saveSession();
+  googleBtn.addEventListener("click", function (e) {
+    e.preventDefault();
+    var state = crypto.randomUUID();
+    sessionStorage.setItem(OAUTH_STATE_KEY, state);
+    location.assign("/auth/google?client_state=" + encodeURIComponent(state));
+  });
+
+  async function consumeOAuthCode() {
+    var params = new URLSearchParams(location.search);
+    var code = params.get("code");
+    if (!code) return false;
+    var expectedState = sessionStorage.getItem(OAUTH_STATE_KEY);
+    sessionStorage.removeItem(OAUTH_STATE_KEY);
+    history.replaceState(null, "", location.pathname);
+    if (!expectedState || params.get("state") !== expectedState) {
+      showMessage("Google sign-in did not match the request this console started.", true);
+      return true;
+    }
+    try {
+      session = await api("/auth/google/exchange", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: code })
+      });
+      saveSession();
+      showMessage("Signed in with Google.", false);
+    } catch (err) {
+      showMessage(err.message, true);
+    }
     return true;
   }
 
-  if (consumeOAuthFragment()) {
-    showMessage("Signed in with Google.", false);
-  } else {
+  if (!(await consumeOAuthCode())) {
     var stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       try { session = JSON.parse(stored); } catch (e) { session = null; }

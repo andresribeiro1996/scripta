@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { publicFetch } from "../api/client";
+import { consumeGoogleOAuthState } from "../auth/googleOAuthState";
 import { setSession } from "../auth/tokenStore";
 
 interface ExchangeResponse {
@@ -14,12 +15,10 @@ interface ExchangeResponse {
  *  themselves (see the global "never place access or refresh tokens in
  *  URLs" constraint, and modules/auth/authorizationCode.ts for the code's
  *  own lifecycle). This page's whole job is exchanging that code for a
- *  session through POST /auth/google/exchange. This desktop flow never
- *  sends a PKCE code_challenge when starting /auth/google (see
- *  LoginPage.tsx's plain `<a href>` — there's no JS involved in that
- *  navigation to attach one), so the exchange sends no codeVerifier
- *  either; the backend only requires one for a code minted with a
- *  challenge (the mobile flow). A first-time Google sign-in has no
+ *  session through POST /auth/google/exchange. The flow is bound to the
+ *  browser tab by a nonce that LoginPage stores in sessionStorage and the
+ *  backend echoes as `state`; this page rejects a callback unless they
+ *  match. A first-time Google sign-in has no
  *  username yet (`null`) — navigating to /dashboard still works in that
  *  case: RequireUsername (nested under it, see App.tsx) catches the
  *  missing username and redirects to /choose-username itself. */
@@ -41,8 +40,11 @@ export function OAuthSuccessPage() {
     if (processedRef.current) return;
     processedRef.current = true;
 
-    const code = new URLSearchParams(window.location.search).get("code");
-    if (!code) {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    const stateMatches = consumeGoogleOAuthState(params.get("state"));
+    if (!code || !stateMatches) {
+      window.history.replaceState(null, "", window.location.pathname);
       setStatus("error");
       return;
     }
