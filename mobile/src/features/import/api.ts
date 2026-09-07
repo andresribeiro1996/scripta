@@ -14,7 +14,12 @@ export async function uploadImportPreview(file: ImportFile): Promise<ImportPrevi
     body: form
   });
   const text = await response.text();
-  const body: unknown = text ? JSON.parse(text) : {};
+  let body: unknown = {};
+  try {
+    if (text) body = JSON.parse(text);
+  } catch {
+    throw new ApiError(response.status, response.ok ? "Server returned an invalid response" : `Request failed (${response.status})`);
+  }
   if (!response.ok) {
     throw new ApiError(response.status, typeof body === "object" && body !== null && "error" in body ? String(body.error) : `Request failed (${response.status})`);
   }

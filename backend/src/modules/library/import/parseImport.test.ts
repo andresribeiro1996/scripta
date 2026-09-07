@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { mkdtempSync, readdirSync } from "node:fs";
-import { readFile, rm, writeFile } from "node:fs/promises";
+import { readFile, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -17,9 +17,10 @@ process.env.JWT_REFRESH_SECRET = "test-refresh-secret-at-least-32-characters";
 process.env.IMPORT_MAX_UPLOAD_BYTES = "32768";
 process.env.IMPORT_PARSE_TIMEOUT_MS = "1000";
 process.env.LIBRARY_BODY_LIMIT_BYTES = "32768";
+process.env.NODE_ENV = "test";
 
 const { parseImport, InvalidImportError, ImportBusyError } = await import("./parseImport.js");
-const { buildLibraryRoutes } = await import("../routes.js");
+const { buildLibraryRoutes, rejectOversizedImport, sweepStaleImportDirs } = await import("../routes.js");
 const { signAccessToken } = await import("../../auth/tokens.js");
 
 after(async () => rm(scratch, { recursive: true, force: true }));
@@ -131,6 +132,25 @@ test("oversized multipart uploads return a client-usable 413", async () => {
   await app.close();
 });
 
+test("multipart truncation replies 413 before destroying the request", () => {
+  const events: string[] = [];
+  rejectOversizedImport(
+    { raw: { destroy: () => { events.push("destroy"); } } },
+    { code: (statusCode) => ({ send: (body) => { events.push(`send:${statusCode}:${String((body as { code: string }).code)}`); } }) }
+  );
+  assert.deepEqual(events, ["send:413:IMPORT_TOO_LARGE", "destroy"]);
+});
+
+test("startup sweep removes only stale import directories", async () => {
+  const stale = mkdtempSync(join(tmpdir(), "scripta-import-stale-"));
+  const fresh = mkdtempSync(join(tmpdir(), "scripta-import-fresh-"));
+  await utimes(stale, new Date(0), new Date(0));
+  await sweepStaleImportDirs();
+  assert.equal(readdirSync(tmpdir()).includes(stale.split("/").at(-1)!), false);
+  assert.equal(readdirSync(tmpdir()).includes(fresh.split("/").at(-1)!), true);
+  await rm(fresh, { recursive: true, force: true });
+});
+
 test("temporary uploads are removed after parser failure", async () => {
   const before = new Set(readdirSync(tmpdir()).filter((name) => name.startsWith("scripta-import-")));
   const { app, authorization } = await testApp();
@@ -157,6 +177,20 @@ test("timed-out parser is SIGKILLed before its temporary upload is removed", asy
     assert.deepEqual(after, []);
     await app.close();
   } finally {
+    delete process.env.IMPORT_PARSE_TEST_DELAY_MS;
+  }
+});
+
+test("the parser delay hook is ignored outside test mode", async () => {
+  const path = join(scratch, "production-delay.json");
+  await writeFile(path, JSON.stringify({ books: [] }));
+  const previousNodeEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = "production";
+  process.env.IMPORT_PARSE_TEST_DELAY_MS = "10000";
+  try {
+    await assert.doesNotReject(parseImport(path, 1000, 32768));
+  } finally {
+    process.env.NODE_ENV = previousNodeEnv;
     delete process.env.IMPORT_PARSE_TEST_DELAY_MS;
   }
 });
