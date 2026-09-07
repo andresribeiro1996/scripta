@@ -27,7 +27,7 @@ import { z } from "zod";
 import { env } from "../../config/env.js";
 import { authGuard } from "../auth/index.js";
 import { NoLibraryDocumentError } from "./domain/errors.js";
-import { InvalidImportError, parseImport } from "./import/parseImport.js";
+import { ImportBusyError, InvalidImportError, parseImport } from "./import/parseImport.js";
 import type { LibraryService } from "./service.js";
 
 // Deliberately light-touch: this only checks the document is a plausible
@@ -101,6 +101,7 @@ export function buildLibraryRoutes(service: LibraryService) {
             return { status: 200, body: await parseImport(path, env.IMPORT_PARSE_TIMEOUT_MS, env.LIBRARY_BODY_LIMIT_BYTES) };
           } catch (error) {
             if (error instanceof InvalidImportError) return { status: 422, body: { error: error.message, code: "INVALID_IMPORT" } };
+            if (error instanceof ImportBusyError) return { status: 503, body: { error: error.message, code: "IMPORT_BUSY" } };
             if ((error as { statusCode?: number }).statusCode === 413) {
               return { status: 413, body: { error: "Import file is too large.", code: "IMPORT_TOO_LARGE", maxBytes: env.IMPORT_MAX_UPLOAD_BYTES } };
             }

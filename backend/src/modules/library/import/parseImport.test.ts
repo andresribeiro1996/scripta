@@ -215,3 +215,27 @@ test("PUT library returns a distinct oversized-body error", async () => {
   assert.equal(response.json().code, "LIBRARY_BODY_TOO_LARGE");
   await app.close();
 });
+
+test("import error sanitization: only allowlisted messages pass through", async () => {
+  const { sanitizeImportError } = await import("./parseImport.js");
+  assert.equal(sanitizeImportError("/var/private/secret-path is not a table"), "Couldn't parse that import file.");
+  assert.equal(sanitizeImportError("Unexpected token < at position 0 of /tmp/upload"), "Couldn't parse that import file.");
+  assert.equal(sanitizeImportError(undefined), "Couldn't parse that import file.");
+  assert.equal(sanitizeImportError("The import contains too many rows."), "The import contains too many rows.");
+  assert.equal(sanitizeImportError("`Bookmark` must be a real SQLite table."), "`Bookmark` must be a real SQLite table.");
+  assert.equal(sanitizeImportError("`content` must be a real SQLite table."), "`content` must be a real SQLite table.");
+});
+
+test("concurrent imports beyond the cap are rejected busy, and the slot frees after", async () => {
+  const { ImportBusyError } = await import("./parseImport.js");
+  const slow = mkdtempSync(join(tmpdir(), "scripta-import-slow-"));
+  const path = join(slow, "upload");
+  await writeFile(path, Buffer.from("not a database at all"));
+  const first = parseImport(path, 10_000, 32 * 1024 * 1024).catch(() => "settled");
+  const second = parseImport(path, 10_000, 32 * 1024 * 1024).catch(() => "settled");
+  const third = parseImport(path, 10_000, 32 * 1024 * 1024);
+  await assert.rejects(third, (error: Error) => error instanceof ImportBusyError);
+  await Promise.all([first, second]);
+  const after = parseImport(path, 2000, 32 * 1024 * 1024);
+  await assert.rejects(after, (error: Error) => !(error instanceof ImportBusyError));
+});
