@@ -6,28 +6,11 @@
 // createTier lives, same api-reuses-lib-types split api/murals.ts already
 // follows for Mural/MuralBlock.
 
-import type { TierDefinition } from "../lib/murals";
 import { apiFetch } from "./client";
+import type { ResolvedTierlist, TierDefinition, TierlistData } from "@scripta/shared";
 
 export type { TierDefinition };
-
-export interface TierlistData {
-  tiers: TierDefinition[];
-  pool: string[];
-}
-
-/** A tier list resolved for RENDERING — its name and its document in one
- *  flat shape. What the mural `tierlist` block displays (threaded
- *  MuralCanvas → BlockRenderer → TierListBlockView) and what GET
- *  /murals/shared/:token resolves each referenced tierlistId into
- *  server-side (api/sharedMurals.ts's response `tierlists` map) — mirrors
- *  the backend's own cross-module TierlistData
- *  (modules/tierlists/service.ts) exactly. */
-export interface ResolvedTierlist {
-  name: string;
-  tiers: TierDefinition[];
-  pool: string[];
-}
+export type { ResolvedTierlist, TierlistData };
 
 export interface Tierlist {
   id: string;
