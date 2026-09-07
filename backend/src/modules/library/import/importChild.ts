@@ -1,6 +1,14 @@
-import { parentPort, workerData } from "node:worker_threads";
+import { open, readFile } from "node:fs/promises";
 import { DatabaseSync } from "node:sqlite";
+import {
+  goodreadsCsvToLibraryJson,
+  looksLikeGoodreadsCsv,
+  looksLikeStorygraphCsv,
+  storygraphCsvToLibraryJson,
+  type LibraryData
+} from "@scripta/shared";
 
+const SQLITE_MAGIC = Buffer.from("SQLite format 3\0");
 const BOOK_COLUMNS = [
   "ContentID", "Title", "Attribution", "Series", "SeriesNumber", "ISBN", "Publisher", "Language",
   "___PercentRead", "ReadStatus", "DateLastRead", "DateCreated", "Rating", "TimeSpentReading",
@@ -14,6 +22,21 @@ type Input = { path: string; maxRows: number; maxResultBytes: number; sqliteHeap
 
 function fail(message: string): never {
   throw new Error(message);
+}
+
+function isLibraryData(value: unknown): value is LibraryData {
+  return typeof value === "object" && value !== null && Array.isArray((value as { books?: unknown }).books);
+}
+
+async function isSqlite(path: string): Promise<boolean> {
+  const file = await open(path, "r");
+  try {
+    const header = Buffer.alloc(SQLITE_MAGIC.length);
+    const { bytesRead } = await file.read(header, 0, header.length, 0);
+    return bytesRead === header.length && header.equals(SQLITE_MAGIC);
+  } finally {
+    await file.close();
+  }
 }
 
 function tableColumns(db: DatabaseSync, table: string): Set<string> {
@@ -30,18 +53,17 @@ function quoted(columns: string[]): string {
   return columns.map((column) => `"${column}"`).join(", ");
 }
 
-function checkedRows(statement: ReturnType<DatabaseSync["prepare"]>, limit: number, byteState: { value: number }): Array<Record<string, unknown>> {
+function checkedRows(statement: ReturnType<DatabaseSync["prepare"]>, limit: number, byteState: { value: number }, maxResultBytes: number): Array<Record<string, unknown>> {
   const rows = statement.all(limit + 1) as Array<Record<string, unknown>>;
-  if (rows.length > limit) fail("The SQLite import contains too many rows.");
+  if (rows.length > limit) fail("The import contains too many rows.");
   for (const row of rows) {
     byteState.value += Buffer.byteLength(JSON.stringify(row));
-    if (byteState.value > (workerData as Input).maxResultBytes) fail("The SQLite import result is too large.");
+    if (byteState.value > maxResultBytes) fail("The import result is too large.");
   }
   return rows.map((row) => ({ ...row }));
 }
 
-function parse(): Record<string, unknown> {
-  const input = workerData as Input;
+function parseKobo(input: Input): LibraryData {
   const db = new DatabaseSync(input.path, { readOnly: true });
   try {
     db.exec(`PRAGMA hard_heap_limit = ${input.sqliteHeapBytes}`);
@@ -64,12 +86,13 @@ function parse(): Record<string, unknown> {
     const books = checkedRows(
       db.prepare(`SELECT ${quoted(bookColumns)} FROM "content" WHERE ${where.join(" AND ")} LIMIT ?`),
       input.maxRows,
-      bytes
+      bytes,
+      input.maxResultBytes
     );
     const remaining = input.maxRows - books.length;
     let highlights: Array<Record<string, unknown>> = [];
     if (highlightColumns.includes("VolumeID")) {
-      highlights = checkedRows(db.prepare(`SELECT ${quoted(highlightColumns)} FROM "Bookmark" LIMIT ?`), remaining, bytes);
+      highlights = checkedRows(db.prepare(`SELECT ${quoted(highlightColumns)} FROM "Bookmark" LIMIT ?`), remaining, bytes, input.maxResultBytes);
     }
 
     const byVolume = new Map<string, Array<Record<string, unknown>>>();
@@ -84,16 +107,51 @@ function parse(): Record<string, unknown> {
       book.highlights = typeof book.ContentID === "string" ? (byVolume.get(book.ContentID) ?? []) : [];
     }
 
-    const result = { source: "kobo-export", schema_version: 1, book_count: books.length, books };
-    if (Buffer.byteLength(JSON.stringify(result)) > input.maxResultBytes) fail("The SQLite import result is too large.");
-    return result;
+    return { source: "kobo-export", schema_version: 1, book_count: books.length, books };
   } finally {
     db.close();
   }
 }
 
+async function parseText(input: Input): Promise<LibraryData> {
+  let text: string;
+  try {
+    text = new TextDecoder("utf-8", { fatal: true }).decode(await readFile(input.path));
+  } catch {
+    fail("Couldn't decode that file as text, and it isn't a SQLite database.");
+  }
+
+  try {
+    const json: unknown = JSON.parse(text);
+    if (!isLibraryData(json)) fail('That JSON is missing a "books" array.');
+    return json;
+  } catch (error) {
+    if (error instanceof Error && error.message === 'That JSON is missing a "books" array.') throw error;
+  }
+
+  try {
+    if (looksLikeGoodreadsCsv(text)) return goodreadsCsvToLibraryJson(text);
+    if (looksLikeStorygraphCsv(text)) return storygraphCsvToLibraryJson(text);
+  } catch (error) {
+    fail(error instanceof Error ? error.message : "Couldn't parse that CSV export.");
+  }
+  fail("Didn't recognize that file as Kobo SQLite, library JSON, Goodreads CSV, or StoryGraph CSV.");
+}
+
+async function parse(input: Input): Promise<LibraryData> {
+  const delayMs = Number(process.env.IMPORT_PARSE_TEST_DELAY_MS ?? 0);
+  if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
+  const data = await isSqlite(input.path) ? parseKobo(input) : await parseText(input);
+  if (data.books.length > input.maxRows) fail("The import contains too many rows.");
+  if (Buffer.byteLength(JSON.stringify(data)) > input.maxResultBytes) fail("The import result is too large.");
+  return data;
+}
+
+const [path, maxRows, maxResultBytes, sqliteHeapBytes] = process.argv.slice(2);
+if (!path || !maxRows || !maxResultBytes || !sqliteHeapBytes) process.exit(1);
+
 try {
-  parentPort!.postMessage({ data: parse() });
+  process.send!({ data: await parse({ path, maxRows: Number(maxRows), maxResultBytes: Number(maxResultBytes), sqliteHeapBytes: Number(sqliteHeapBytes) }) });
 } catch (error) {
-  parentPort!.postMessage({ error: error instanceof Error ? error.message : "Couldn't parse the Kobo database." });
+  process.send!({ error: error instanceof Error ? error.message : "Couldn't parse that import file." });
 }

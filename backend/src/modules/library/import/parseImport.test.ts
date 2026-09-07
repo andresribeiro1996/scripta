@@ -106,6 +106,16 @@ test("library JSON only requires a books array", async () => {
   assert.equal(preview.data.custom, true);
 });
 
+test("non-SQLite rows and results are capped", async () => {
+  const tooManyRows = join(scratch, "too-many-rows.json");
+  await writeFile(tooManyRows, JSON.stringify({ books: Array.from({ length: 100_001 }, () => null) }));
+  await assert.rejects(parseImport(tooManyRows, 1000, 32 * 1024 * 1024), /too many rows/);
+
+  const tooLarge = join(scratch, "too-large.csv");
+  await writeFile(tooLarge, `Book Id,Title,Author,Exclusive Shelf\n1,${"x".repeat(1000)},Author,read\n`);
+  await assert.rejects(parseImport(tooLarge, 1000, 256), /result is too large/);
+});
+
 test("malformed files are rejected", async () => {
   const path = join(scratch, "bad.dat");
   await writeFile(path, "not an export");
@@ -130,6 +140,25 @@ test("temporary uploads are removed after parser failure", async () => {
   const after = readdirSync(tmpdir()).filter((name) => name.startsWith("scripta-import-") && !before.has(name));
   assert.deepEqual(after, []);
   await app.close();
+});
+
+test("timed-out parser is SIGKILLed before its temporary upload is removed", async () => {
+  const before = new Set(readdirSync(tmpdir()).filter((name) => name.startsWith("scripta-import-")));
+  process.env.IMPORT_PARSE_TEST_DELAY_MS = "10000";
+  const started = Date.now();
+  try {
+    const { app, authorization } = await testApp();
+    const upload = multipart(Buffer.from("not an export"));
+    const response = await app.inject({ method: "POST", url: "/library/import/preview", headers: { ...upload.headers, authorization }, payload: upload.payload });
+    assert.equal(response.statusCode, 422);
+    assert.equal(response.json().error, "The import file took too long to parse.");
+    assert.ok(Date.now() - started < 3000);
+    const after = readdirSync(tmpdir()).filter((name) => name.startsWith("scripta-import-") && !before.has(name));
+    assert.deepEqual(after, []);
+    await app.close();
+  } finally {
+    delete process.env.IMPORT_PARSE_TEST_DELAY_MS;
+  }
 });
 
 test("content as a recursive view is rejected and the server remains responsive", async () => {
