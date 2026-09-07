@@ -18,6 +18,18 @@ export interface RefreshTokenRow {
   token_hash: string;
   expires_at: string;
   revoked_at: string | null;
+  // Task 4A — set ONLY when revoked_at was set by rotation (never by
+  // logout). This is what lets service.ts's refresh-rotation grace window
+  // tell "this token was superseded by a normal rotation" apart from
+  // "this account signed out" — only the former is ever safe to reissue
+  // from instead of revoking every session. See sqlite/schema.sql.
+  rotated_at: string | null;
+  // Id of the refresh_tokens row this one rotated into, set alongside
+  // rotated_at. Lets a reissue-within-grace-window pick up the pair the
+  // client never actually received, instead of minting a third one.
+  replaced_by: string | null;
+  // 1 once this token chain has used its single refresh grace hop.
+  granted_via_grace: 0 | 1;
   created_at: string;
 }
 

@@ -37,6 +37,18 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
   token_hash  TEXT NOT NULL,
   expires_at  TEXT NOT NULL,
   revoked_at  TEXT,
+  -- Task 4A: set ONLY when revoked_at was set by rotation, never by
+  -- logout — see domain/types.ts's RefreshTokenRow for why this
+  -- distinction matters (the refresh-rotation grace window in service.ts
+  -- reissues from a rotated-away token presented within ~60s of
+  -- rotated_at, but must still revoke-all for a logout-revoked or
+  -- genuinely stale/stolen token). replaced_by is the id of the row this
+  -- one rotated into. Added via ALTER in connection.ts for a database
+  -- that predates this column — same pattern as avatar_id below.
+  rotated_at  TEXT,
+  replaced_by TEXT,
+  -- 1 once this token chain has used its single refresh grace hop.
+  granted_via_grace INTEGER NOT NULL DEFAULT 0,
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 

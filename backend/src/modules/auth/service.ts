@@ -20,7 +20,7 @@ import {
   UsernameInUseError
 } from "./domain/errors.js";
 import type { AuthRepository, AvatarBlobStore } from "./domain/ports.js";
-import type { AuthenticatedUser, TokenPair, UserRow } from "./domain/types.js";
+import type { AuthenticatedUser, RefreshTokenRow, TokenPair, UserRow } from "./domain/types.js";
 import { generateRefreshToken, hashRefreshToken, refreshTokenExpiry, signAccessToken } from "./tokens.js";
 
 export interface AuthService {
@@ -49,6 +49,18 @@ export interface AuthService {
   getAvatarFile(avatarId: string): { buffer: Buffer; mimeType: string } | null;
 }
 
+// Task 4A — how long a rotation-revoked refresh token is still allowed to
+// reissue instead of nuking every session for the user. Mobile keeps its
+// access token in memory only and refreshes on nearly every cold start;
+// rotation revokes the presented token before the new pair reaches the
+// client, so a response lost in flight (backgrounded, network switch,
+// process kill) leaves SecureStore holding a token this backend already
+// revoked. Presenting that token once more, shortly after, is what a
+// legitimate retry looks like — anything older than this window (or a
+// token revoked for a real reason: logout, actual theft) still gets the
+// full revoke-all treatment below.
+export const REFRESH_ROTATION_GRACE_MS = 60 * 1000;
+
 // Personal/family-scale limits, same reasoning as gallery's constants.
 export const MAX_AVATAR_UPLOAD_BYTES = 5 * 1024 * 1024;
 export const MAX_AVATAR_INPUT_DIMENSION = 8000;
@@ -73,6 +85,25 @@ export function createAuthService(repo: AuthRepository, avatarStore: AvatarBlobS
       tokenHash: hashRefreshToken(refreshToken),
       expiresAt: refreshTokenExpiry()
     });
+    return { accessToken, refreshToken };
+  }
+
+  /** Rotation: mints a fresh pair and marks `oldRow` as rotated into it —
+   *  as opposed to issueTokenPair above, which is for a token's FIRST
+   *  issuance (signup/login/Google), where there is no prior row to
+   *  chain from. `grantedViaGrace` marks the chain as having used its
+   *  single grace hop. */
+  async function rotateTokenPair(oldRow: RefreshTokenRow, user: UserRow, options?: { grantedViaGrace?: boolean }): Promise<TokenPair> {
+    const accessToken = signAccessToken(user);
+    const refreshToken = generateRefreshToken();
+    const grantedViaGrace = oldRow.granted_via_grace === 1 || options?.grantedViaGrace === true;
+    const newTokenId = repo.insertRefreshToken({
+      userId: user.id,
+      tokenHash: hashRefreshToken(refreshToken),
+      expiresAt: refreshTokenExpiry(),
+      grantedViaGrace
+    });
+    repo.rotateRefreshToken(oldRow.id, newTokenId, { grantedViaGrace });
     return { accessToken, refreshToken };
   }
 
@@ -110,26 +141,57 @@ export function createAuthService(repo: AuthRepository, avatarStore: AvatarBlobS
 
     /** Refresh token rotation: the presented token is revoked and a fresh
      *  pair issued, every time. If a token is presented that's already
-     *  revoked, that's a signal it was stolen and replayed (the
+     *  revoked, that's normally a signal it was stolen and replayed (the
      *  legitimate client would only ever have the latest one) — so every
      *  other session for that user is revoked too, forcing a re-login
-     *  everywhere. */
+     *  everywhere.
+     *
+     *  The one exception is the refresh-rotation grace window: a token
+     *  revoked_at set BY ROTATION (rotated_at is non-null — never true for
+     *  a logout-revoked token, see revokeRefreshToken vs
+     *  rotateRefreshToken) and presented again within
+     *  REFRESH_ROTATION_GRACE_MS is treated as "the client never received
+     *  the pair this token rotated into," not theft — mobile keeps its
+     *  access token in memory only and refreshes on nearly every cold
+     *  start, so a response lost in flight (backgrounded, network switch,
+     *  process kill) leaves exactly this shape on the next launch. That
+     *  case reissues from the replacement row instead of revoking
+     *  everything, so the desktop PWA's own session survives a phone's
+     *  dropped response. */
     async refresh(refreshToken) {
       const tokenHash = hashRefreshToken(refreshToken);
       const row = repo.findRefreshTokenByHash(tokenHash);
 
       if (!row) throw new InvalidRefreshTokenError();
 
-      if (row.revoked_at || new Date(row.expires_at) < new Date()) {
-        if (row.revoked_at) repo.revokeAllRefreshTokensForUser(row.user_id);
+      if (row.revoked_at) {
+        const rotatedAt = row.rotated_at ? new Date(row.rotated_at).getTime() : null;
+        const withinGraceWindow = rotatedAt !== null && Date.now() - rotatedAt <= REFRESH_ROTATION_GRACE_MS;
+
+        if (withinGraceWindow && row.replaced_by && !row.granted_via_grace) {
+          const replacement = repo.findRefreshTokenById(row.replaced_by);
+          const replacementStillLive = replacement && !replacement.revoked_at && new Date(replacement.expires_at) >= new Date();
+          if (replacementStillLive) {
+            const user = repo.findUserById(replacement.user_id);
+            if (user) return rotateTokenPair(replacement, user, { grantedViaGrace: true });
+          }
+          // The replacement is itself gone, expired, or already used —
+          // this is no longer "one lost response," so fall through to the
+          // theft/replay handling below.
+        }
+
+        repo.revokeAllRefreshTokensForUser(row.user_id);
+        throw new InvalidRefreshTokenError();
+      }
+
+      if (new Date(row.expires_at) < new Date()) {
         throw new InvalidRefreshTokenError();
       }
 
       const user = repo.findUserById(row.user_id);
       if (!user) throw new InvalidRefreshTokenError();
 
-      repo.revokeRefreshToken(row.id);
-      return issueTokenPair(user);
+      return rotateTokenPair(row, user);
     },
 
     logout(refreshToken) {

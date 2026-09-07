@@ -12,6 +12,9 @@ export default function AppLayout() {
     );
   }
   if (!user) return <Redirect href="/(public)/login" />;
+  // Google sign-in without a username yet — see choose-username.tsx's own
+  // top comment, mirrors the PWA's RequireUsername guard.
+  if (!user.username) return <Redirect href="/choose-username" />;
 
   return (
     <Tabs screenOptions={{ headerShown: false, tabBarActiveTintColor: "#1c1917", tabBarInactiveTintColor: "#a8a29e" }}>

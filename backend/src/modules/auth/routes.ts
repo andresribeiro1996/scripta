@@ -7,6 +7,7 @@
 
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { authorizationCodeErrorMessage, consumeAuthorizationCode } from "./authorizationCode.js";
 import {
   AvatarDimensionsTooLargeError,
   AvatarError,
@@ -42,6 +43,13 @@ const loginSchema = z.object({
 
 const refreshSchema = z.object({
   refreshToken: z.string().min(1)
+});
+
+const googleExchangeSchema = z.object({
+  code: z.string().min(1),
+  // Only required when the code was minted for a flow that sent a PKCE
+  // code_challenge when starting /auth/google — see authorizationCode.ts.
+  codeVerifier: z.string().min(1).optional()
 });
 
 const setUsernameSchema = z.object({
@@ -99,6 +107,26 @@ export function buildAuthRoutes(service: AuthService) {
         if (err instanceof InvalidRefreshTokenError) return reply.code(401).send({ error: err.message });
         throw err;
       }
+    });
+
+    // Task 4A — exchanges the one-time code /auth/google/callback (plugin.ts)
+    // redirects with for the actual session. Registered unconditionally
+    // (not gated behind googleOAuthConfigured, unlike the Google routes
+    // themselves in plugin.ts): if Google sign-in isn't configured, no
+    // code was ever minted, so this just always answers "invalid or
+    // expired code" — no need for routes.ts to know about that config
+    // flag. Same wire shape as /auth/login and /auth/signup, so a client
+    // handles all three identically.
+    app.post("/auth/google/exchange", async (request, reply) => {
+      const parsed = googleExchangeSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: "code is required." });
+      }
+      const result = consumeAuthorizationCode(parsed.data.code, parsed.data.codeVerifier ?? null);
+      if (!result.ok) {
+        return reply.code(400).send({ error: authorizationCodeErrorMessage(result.reason) });
+      }
+      return reply.send({ user: result.user, ...result.tokens });
     });
 
     app.post("/auth/logout", async (request, reply) => {
