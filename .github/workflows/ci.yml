@@ -14,12 +14,12 @@ jobs:
           node-version: 26
           cache: npm
       - run: npm ci
+      - run: npm run build --workspace @scripta/shared
       - run: npm run typecheck --workspace backend
       - run: npm test --workspace backend
       - run: npm run typecheck --workspace frontend
       - run: npm run lint --workspace frontend
       - run: npm test --workspace frontend
-      - run: npm run build --workspace @scripta/shared
       - run: npm run typecheck --workspace mobile
         env:
           EXPO_PUBLIC_API_URL: http://localhost:3000
