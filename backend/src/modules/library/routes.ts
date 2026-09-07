@@ -19,7 +19,7 @@ import fastifyMultipart from "@fastify/multipart";
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
 import { createWriteStream } from "node:fs";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readdir, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pipeline } from "node:stream/promises";
@@ -29,6 +29,28 @@ import { authGuard } from "../auth/index.js";
 import { NoLibraryDocumentError } from "./domain/errors.js";
 import { ImportBusyError, InvalidImportError, parseImport } from "./import/parseImport.js";
 import type { LibraryService } from "./service.js";
+
+const IMPORT_TMP_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+export async function sweepStaleImportDirs(now = Date.now()) {
+  const directory = tmpdir();
+  const entries = await readdir(directory, { withFileTypes: true });
+  for (const entry of entries) {
+    if (!entry.isDirectory() || !entry.name.startsWith("scripta-import-")) continue;
+    const path = join(directory, entry.name);
+    if (now - (await stat(path)).mtimeMs > IMPORT_TMP_MAX_AGE_MS) {
+      await rm(path, { recursive: true, force: true });
+    }
+  }
+}
+
+export function rejectOversizedImport(
+  request: { raw: { destroy(): void } },
+  reply: { code(statusCode: number): { send(payload: unknown): unknown } }
+) {
+  reply.code(413).send({ error: "Import file is too large.", code: "IMPORT_TOO_LARGE", maxBytes: env.IMPORT_MAX_UPLOAD_BYTES });
+  request.raw.destroy();
+}
 
 // Deliberately light-touch: this only checks the document is a plausible
 // library export (an object with a `books` array), the same minimum the
@@ -47,6 +69,8 @@ const saveLibrarySchema = z.object({
  *  authGuard. Registered in plugin.ts with no rate limit, same as before. */
 export function buildLibraryRoutes(service: LibraryService) {
   return async function libraryRoutes(app: FastifyInstance) {
+    await sweepStaleImportDirs().catch((error) => app.log.warn({ err: error }, "stale import cleanup failed"));
+
     app.get("/library", { preHandler: authGuard }, async (request, reply) => {
       const library = service.getLibrary(request.user.id);
       if (!library) {
@@ -85,8 +109,7 @@ export function buildLibraryRoutes(service: LibraryService) {
         limits: { files: 1, fileSize: env.IMPORT_MAX_UPLOAD_BYTES }
       });
       imports.post("/library/import/preview", {
-        preHandler: authGuard,
-        bodyLimit: env.IMPORT_MAX_UPLOAD_BYTES + 64 * 1024
+        preHandler: authGuard
       }, async (request, reply) => {
         const scratch = await mkdtemp(join(tmpdir(), "scripta-import-"));
         const outcome = await (async () => {
@@ -94,12 +117,14 @@ export function buildLibraryRoutes(service: LibraryService) {
             const upload = await request.file();
             if (!upload) return { status: 400, body: { error: "Upload one import file in multipart field \"file\"." } };
             const path = join(scratch, "upload");
+            upload.file.once("limit", () => rejectOversizedImport(request, reply));
             await pipeline(upload.file, createWriteStream(path, { flags: "wx" }));
             if (upload.file.truncated) {
               return { status: 413, body: { error: "Import file is too large.", code: "IMPORT_TOO_LARGE", maxBytes: env.IMPORT_MAX_UPLOAD_BYTES } };
             }
-            return { status: 200, body: await parseImport(path, env.IMPORT_PARSE_TIMEOUT_MS, env.LIBRARY_BODY_LIMIT_BYTES) };
+            return { status: 200, body: await parseImport(path, env.IMPORT_PARSE_TIMEOUT_MS, env.LIBRARY_BODY_LIMIT_BYTES, request.log) };
           } catch (error) {
+            if (reply.sent) return { status: 413, body: null };
             if (error instanceof InvalidImportError) return { status: 422, body: { error: error.message, code: "INVALID_IMPORT" } };
             if (error instanceof ImportBusyError) return { status: 503, body: { error: error.message, code: "IMPORT_BUSY" } };
             if ((error as { statusCode?: number }).statusCode === 413) {
@@ -110,6 +135,7 @@ export function buildLibraryRoutes(service: LibraryService) {
             await rm(scratch, { recursive: true, force: true });
           }
         })();
+        if (reply.sent) return;
         return reply.code(outcome.status).send(outcome.body);
       });
     });

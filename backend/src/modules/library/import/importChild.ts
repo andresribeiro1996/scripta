@@ -139,7 +139,8 @@ async function parseText(input: Input): Promise<LibraryData> {
 }
 
 async function parse(input: Input): Promise<LibraryData> {
-  const delayMs = Number(process.env.IMPORT_PARSE_TEST_DELAY_MS ?? 0);
+  const [, , , , testFlag, testDelay] = process.argv.slice(2);
+  const delayMs = testFlag === "--test-delay" ? Number(testDelay) : 0;
   if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
   const data = await isSqlite(input.path) ? parseKobo(input) : await parseText(input);
   if (data.books.length > input.maxRows) fail("The import contains too many rows.");
