@@ -5,6 +5,7 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { Button, Dialog, Input, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { moveBook, reorderBook } from "./tierBoardData";
 
 export type TierBook = Record<string, unknown>;
 
@@ -50,29 +51,8 @@ export function TierBoard({ data, books, onChange, structureEditable, onAddBooks
   const byKey = new Map(books.map((book) => [keyOf(book), book]));
 
   function keysFor(section: string) { return section === "pool" ? data.pool : data.tiers.find((tier) => tier.id === section)?.bookKeys ?? []; }
-  function replace(section: string, keys: string[], source = data) {
-    return section === "pool" ? { ...source, pool: keys } : { ...source, tiers: source.tiers.map((tier) => tier.id === section ? { ...tier, bookKeys: keys } : tier) };
-  }
-  function locate(key: string) { return sections.find((section) => keysFor(section).includes(key)); }
-  function moveSection(key: string, direction: -1 | 1) {
-    const from = locate(key);
-    if (!from) return;
-    const target = sections[sections.indexOf(from) + direction];
-    if (!target) return;
-    const without = replace(from, keysFor(from).filter((candidate) => candidate !== key));
-    const targetKeys = target === "pool" ? without.pool : without.tiers.find((tier) => tier.id === target)?.bookKeys ?? [];
-    onChange(replace(target, [...targetKeys, key], without));
-  }
-  function reorder(key: string, direction: -1 | 1) {
-    const section = locate(key);
-    if (!section) return;
-    const keys = [...keysFor(section)];
-    const index = keys.indexOf(key);
-    const target = index + direction;
-    if (target < 0 || target >= keys.length) return;
-    [keys[index], keys[target]] = [keys[target], keys[index]];
-    onChange(replace(section, keys));
-  }
+  function moveSection(key: string, direction: -1 | 1) { onChange(moveBook(data, key, direction)); }
+  function reorder(key: string, direction: -1 | 1) { onChange(reorderBook(data, key, direction)); }
   function renderBooks(section: string) {
     const keys = keysFor(section).filter((key) => byKey.has(key));
     const index = sections.indexOf(section);

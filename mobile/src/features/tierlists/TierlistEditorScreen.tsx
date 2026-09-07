@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { bookKey, type TierlistData } from "@scripta/shared";
+import { bookKey, filterBooks, type TierlistData } from "@scripta/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Linking from "expo-linking";
 import { FlatList, Pressable, Share, StyleSheet, Text, View } from "react-native";
@@ -18,6 +18,7 @@ export function TierlistEditorScreen({ tierlist, onClose, onUpdated }: { tierlis
   const [name, setName] = useState(tierlist.name);
   const [data, setData] = useState<TierlistData>(tierlist.data);
   const [adding, setAdding] = useState(false);
+  const [bookSearch, setBookSearch] = useState("");
   const [view, setView] = useState<"board" | "results">("board");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +47,7 @@ export function TierlistEditorScreen({ tierlist, onClose, onUpdated }: { tierlis
 
   const books = library.data?.data?.books ?? [];
   const used = new Set([...data.pool, ...data.tiers.flatMap((tier) => tier.bookKeys)]);
+  const availableBooks = filterBooks(books, bookSearch, "all").filter((book) => !used.has(bookKey(book)));
   const frozen = current.voteCode !== null;
   return <View style={[styles.screen, { backgroundColor: colors.background }]}>
     <View style={styles.header}><Button label="Back" variant="secondary" onPress={onClose} /><Text accessibilityRole="header" numberOfLines={1} {...dynamicType} style={[typography.title, styles.grow, styles.strong, { color: colors.text }]}>{current.name}</Text></View>
@@ -55,7 +57,8 @@ export function TierlistEditorScreen({ tierlist, onClose, onUpdated }: { tierlis
     {frozen ? <View style={styles.row}><Button label="Board" variant={view === "board" ? "primary" : "secondary"} onPress={() => setView("board")} /><Button label="Results" variant={view === "results" ? "primary" : "secondary"} onPress={() => setView("results")} /></View> : null}
     {library.isPending ? <Skeleton height={180} /> : library.isError ? <ErrorState body="Your library couldn't be loaded." actionLabel="Retry" onAction={() => void library.refetch()} /> : !frozen || view === "board" ? <TierBoard data={data} books={books} onChange={frozen ? () => {} : setData} structureEditable={!frozen} onAddBooks={frozen ? undefined : () => setAdding(true)} /> : <View style={styles.results}>{results.isPending ? <Skeleton height={140} /> : results.isError ? <ErrorState title="Results unavailable" actionLabel="Retry" onAction={() => void results.refetch()} /> : <TierlistResults histogram={results.data.histogram} tiers={data.tiers} pool={data.pool} books={books} ballotCount={results.data.ballotCount} />}</View>}
     <Sheet visible={adding} title="Add books" onClose={() => setAdding(false)}>
-      <FlatList data={books.filter((book) => !used.has(bookKey(book)))} keyExtractor={bookKey} style={styles.picker} ListEmptyComponent={<EmptyState title="No books to add" />} renderItem={({ item }) => <Pressable accessibilityRole="button" accessibilityLabel={`Add ${String(item.Title ?? "Untitled")}`} onPress={() => setData((value) => ({ ...value, pool: [...value.pool, bookKey(item)] }))} style={styles.bookRow}><Text numberOfLines={1} {...dynamicType} style={[typography.body, { color: colors.text }]}>{String(item.Title ?? "Untitled")}</Text></Pressable>} />
+      <Input label="Search books" value={bookSearch} onChangeText={setBookSearch} placeholder="Title or author" />
+      <FlatList data={availableBooks} keyExtractor={bookKey} style={styles.picker} ListEmptyComponent={<EmptyState title={bookSearch ? "Nothing matches" : "No books to add"} />} renderItem={({ item }) => <Pressable accessibilityRole="button" accessibilityLabel={`Add ${String(item.Title ?? "Untitled")}`} onPress={() => setData((value) => ({ ...value, pool: [...value.pool, bookKey(item)] }))} style={styles.bookRow}><Text numberOfLines={1} {...dynamicType} style={[typography.body, { color: colors.text }]}>{String(item.Title ?? "Untitled")}</Text></Pressable>} />
     </Sheet>
   </View>;
 }

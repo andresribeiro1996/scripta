@@ -9,12 +9,13 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { Redirect } from "expo-router";
+import { Redirect, useLocalSearchParams } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { GoogleSignInCancelledError, useAuth } from "../../core/auth";
 import { apiClient } from "../../core/api";
 
 export default function LoginPage() {
+  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const { ready, user, signIn, signInWithGoogle } = useAuth();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
@@ -43,7 +44,7 @@ export default function LoginPage() {
       </View>
     );
   }
-  if (user) return <Redirect href="/(app)" />;
+  if (user) return <Redirect href={(returnTo?.startsWith("/vote/") ? returnTo : "/(app)") as never} />;
 
   const onSubmit = async () => {
     setBusy(true);
