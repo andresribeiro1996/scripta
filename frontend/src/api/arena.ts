@@ -3,13 +3,9 @@
 // not a field on the account's library document).
 
 import { apiFetch, publicFetch } from "./client";
+import type { Duel, SeedBook } from "@scripta/shared";
 
-export interface SeedBook {
-  key: string;
-  title: string;
-  author: string;
-  cover: string | null;
-}
+export type { Duel, DuelSide, SeedBook } from "@scripta/shared";
 
 export interface TournamentSummary {
   id: string;
@@ -20,23 +16,6 @@ export interface TournamentSummary {
   currentRound: number;
   createdAt: string;
   ownerUserId: string;
-}
-
-export interface DuelSide extends SeedBook {
-  votes: number;
-}
-
-export interface Duel {
-  id: string;
-  roundNumber: number;
-  duelIndex: number;
-  bookA: DuelSide;
-  bookB: DuelSide;
-  winnerKey: string | null;
-  status: "active" | "tied_pending_tiebreak" | "settled";
-  opensAt: string;
-  closesAt: string;
-  hasVoted: boolean;
 }
 
 export interface TournamentView extends TournamentSummary {

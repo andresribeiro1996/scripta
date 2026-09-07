@@ -8,8 +8,8 @@
 // to draw a bracket rather than a list. Run with:
 //   npx tsx scripts/test-arena-bracket.mts
 
-import type { Duel } from "../src/api/arena.ts";
-import { bracketShape, needsVote, sharePercent } from "../src/lib/arenaBracket.ts";
+import type { Duel } from "../../packages/shared/dist/arena/index.js";
+import { bracketShape, countdownLabel, createVoterToken, needsVote, sharePercent } from "../../packages/shared/dist/arena/index.js";
 
 let passed = 0;
 let failed = 0;
@@ -152,6 +152,20 @@ console.log("\n7. sharePercent is null before any vote, never 0%");
   });
   check("a side that genuinely got none -> 0, not null", sharePercent(shutout.bookB.votes, shutout) === 0);
   check("shares of a decided match still total 100", sharePercent(shutout.bookA.votes, shutout) === 100);
+}
+
+console.log("\n8. Countdown labels keep the existing hour, minute, and closing boundaries");
+{
+  const now = Date.parse("2026-01-01T00:00:00.000Z");
+  check("expired", countdownLabel("2026-01-01T00:00:00.000Z", now) === "Closing…");
+  check("seconds", countdownLabel("2026-01-01T00:00:59.999Z", now) === "59s left");
+  check("minutes", countdownLabel("2026-01-01T00:01:01.000Z", now) === "1m 1s left");
+  check("hours", countdownLabel("2026-01-01T01:01:01.000Z", now) === "1h 1m left");
+}
+
+console.log("\n9. Voter tokens use the client's UUID source when available");
+{
+  check("UUID is returned unchanged", createVoterToken(() => "fixed-uuid") === "fixed-uuid");
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

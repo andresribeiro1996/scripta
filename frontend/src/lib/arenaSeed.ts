@@ -11,32 +11,19 @@
 
 import { resolveCover } from "../api/covers";
 import type { SeedBook } from "../api/arena";
-import { normalizeImageId, normalizeIsbn } from "./covers";
-import { bookKey } from "./merge";
+import { seedCoverLookup, toSeedBook as createSeedBook } from "@scripta/shared";
 
 export async function toSeedBook(book: Record<string, unknown>): Promise<SeedBook> {
   const existing = typeof book._coverUrl === "string" ? book._coverUrl : null;
   const cover = existing ?? (await resolveBookCover(book));
-  return {
-    key: bookKey(book),
-    title: String(book.Title ?? "Untitled"),
-    author: String(book.Attribution ?? "Unknown author"),
-    cover
-  };
+  return createSeedBook(book, cover);
 }
 
 async function resolveBookCover(book: Record<string, unknown>): Promise<string | null> {
-  const isbn = normalizeIsbn(book.ISBN);
-  const imageId = normalizeImageId(book.ImageId);
-  const title = String(book.Title ?? "").trim();
-  if (!isbn && !imageId && !title) return null;
+  const params = seedCoverLookup(book);
+  if (!params) return null;
   try {
-    return await resolveCover({
-      isbn: isbn || undefined,
-      imageId: imageId || undefined,
-      title: title || undefined,
-      author: book.Attribution ? String(book.Attribution) : undefined
-    });
+    return await resolveCover(params);
   } catch {
     // Same "a lookup failure is just a miss" contract CoverImage itself
     // follows — never block seeding on a flaky/rate-limited cover lookup.

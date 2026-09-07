@@ -5,6 +5,8 @@
 // clearing storage gets a fresh token — see the design spec's own
 // "Known simplifications" note (docs/superpowers/specs/2026-08-29-bookarena-design.md).
 
+import { createVoterToken } from "@scripta/shared";
+
 const STORAGE_KEY = "bookarena.voterToken";
 
 /** In-memory fallback when localStorage isn't available — cached at
@@ -15,13 +17,7 @@ const STORAGE_KEY = "bookarena.voterToken";
 let memoryToken: string | null = null;
 
 function randomToken(): string {
-  // crypto.randomUUID() requires a secure context (https, or localhost) —
-  // fall back to a plain random string on a plain-http origin, which is
-  // exactly the kind of origin most likely to also hit the localStorage
-  // catch below.
-  return typeof crypto !== "undefined" && crypto.randomUUID
-    ? crypto.randomUUID()
-    : `anon-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return createVoterToken(typeof crypto !== "undefined" && crypto.randomUUID ? () => crypto.randomUUID() : undefined);
 }
 
 export function getVoterToken(): string {
