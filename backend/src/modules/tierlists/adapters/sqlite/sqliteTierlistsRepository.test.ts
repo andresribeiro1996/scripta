@@ -5,7 +5,19 @@
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import { test } from "node:test";
-import { applyTierlistsMigrations } from "./connection.js";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+const scratchDir = mkdtempSync(join(tmpdir(), "tierlists-repo-test-"));
+process.env.JWT_ACCESS_SECRET ??= "a".repeat(40);
+process.env.JWT_REFRESH_SECRET ??= "b".repeat(40);
+process.env.AUTH_DB_PATH ??= join(scratchDir, "auth.sqlite");
+process.env.LIBRARY_DB_PATH ??= join(scratchDir, "library.sqlite");
+process.env.GALLERY_DB_PATH ??= join(scratchDir, "gallery.sqlite");
+process.env.GALLERY_STORAGE_PATH ??= join(scratchDir, "gallery-files");
+
+const { applyTierlistsMigrations } = await import("./connection.js");
 
 function freshDb(): DatabaseSync {
   const db = new DatabaseSync(":memory:");
@@ -72,7 +84,7 @@ test("vote_code is unique but many rows may leave it NULL", () => {
   assert.throws(() => insert.run("d", "code1"));
 });
 
-import { createSqliteTierlistsRepository } from "./sqliteTierlistsRepository.js";
+const { createSqliteTierlistsRepository } = await import("./sqliteTierlistsRepository.js");
 import type { BallotRow, TierlistRow } from "../../domain/types.js";
 
 function row(overrides: Partial<TierlistRow> & { id: string }): TierlistRow {

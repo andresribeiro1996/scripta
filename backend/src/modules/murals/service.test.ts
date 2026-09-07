@@ -8,6 +8,11 @@ import type { MuralsRepository } from "./domain/ports.js";
 import type { MuralFolderRow, MuralRow } from "./domain/types.js";
 import { createMuralsService } from "./service.js";
 
+process.env.AUTH_DB_PATH ??= join(tmpdir(), "murals-test-auth.sqlite");
+process.env.LIBRARY_DB_PATH ??= join(tmpdir(), "murals-test-library.sqlite");
+process.env.GALLERY_DB_PATH ??= join(tmpdir(), "murals-test-gallery.sqlite");
+process.env.GALLERY_STORAGE_PATH ??= join(tmpdir(), "murals-test-gallery-files");
+
 function createInMemoryRepo(): MuralsRepository {
   const murals = new Map<string, MuralRow>();
   const folders = new Map<string, MuralFolderRow>();

@@ -43,3 +43,9 @@ todo/
 # privacy stance as exporter/library.json above: a person's actual reading
 # history and highlights, never source code.
 /KoboReader.sqlite
+/KoboReader.sqlite-shm
+/KoboReader.sqlite-wal
+
+# Workspace-wide (npm workspaces at the root since Task 2).
+node_modules/
+packages/*/dist/

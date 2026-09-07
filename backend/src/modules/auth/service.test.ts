@@ -12,7 +12,20 @@ import sharp from "sharp";
 import { AvatarDimensionsTooLargeError, AvatarTooLargeError, InvalidAvatarError } from "./domain/errors.js";
 import type { AuthRepository, AvatarBlobStore } from "./domain/ports.js";
 import type { RefreshTokenRow, UserRow } from "./domain/types.js";
-import { createAuthService } from "./service.js";
+
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+const scratchDir = mkdtempSync(join(tmpdir(), "auth-service-test-"));
+process.env.JWT_ACCESS_SECRET ??= "a".repeat(40);
+process.env.JWT_REFRESH_SECRET ??= "b".repeat(40);
+process.env.AUTH_DB_PATH ??= join(scratchDir, "auth.sqlite");
+process.env.LIBRARY_DB_PATH ??= join(scratchDir, "library.sqlite");
+process.env.GALLERY_DB_PATH ??= join(scratchDir, "gallery.sqlite");
+process.env.GALLERY_STORAGE_PATH ??= join(scratchDir, "gallery-files");
+
+const { createAuthService } = await import("./service.js");
 
 function createInMemoryRepo(): AuthRepository & { rows: Map<string, UserRow> } {
   const rows = new Map<string, UserRow>();
