@@ -35,6 +35,7 @@ test("a fresh database has the rotation-bookkeeping columns", () => {
   const cols = columnNames(db, "refresh_tokens");
   assert.ok(cols.includes("rotated_at"));
   assert.ok(cols.includes("replaced_by"));
+  assert.ok(cols.includes("granted_via_grace"));
 });
 
 test("migrating a pre-4A database adds the columns without losing rows", () => {
@@ -59,14 +60,17 @@ test("migrating a pre-4A database adds the columns without losing rows", () => {
   const cols = columnNames(db, "refresh_tokens");
   assert.ok(cols.includes("rotated_at"));
   assert.ok(cols.includes("replaced_by"));
-  const row = db.prepare(`SELECT user_id, rotated_at, replaced_by FROM refresh_tokens WHERE id = 'r1'`).get() as {
+  assert.ok(cols.includes("granted_via_grace"));
+  const row = db.prepare(`SELECT user_id, rotated_at, replaced_by, granted_via_grace FROM refresh_tokens WHERE id = 'r1'`).get() as {
     user_id: string;
     rotated_at: string | null;
     replaced_by: string | null;
+    granted_via_grace: number;
   };
   assert.equal(row.user_id, "u1");
   assert.equal(row.rotated_at, null);
   assert.equal(row.replaced_by, null);
+  assert.equal(row.granted_via_grace, 0);
 });
 
 test("applyAuthMigrations is idempotent", () => {
@@ -89,9 +93,33 @@ test("rotateRefreshToken revokes the old row and records rotated_at/replaced_by"
   assert.ok(oldRow?.revoked_at);
   assert.ok(oldRow?.rotated_at);
   assert.equal(oldRow?.replaced_by, newId);
+  assert.equal(oldRow?.granted_via_grace, 0, "a plain rotation is not itself a grace reissue");
 
   const newRow = repo.findRefreshTokenById(newId);
   assert.equal(newRow?.revoked_at, null);
+});
+
+// SHOULD-FIX (one-hop grace) — service.ts's refresh() threads this flag
+// through so a row rotated ON SOMEONE ELSE'S BEHALF by the grace path can
+// never itself grant a further grace pass.
+test("refresh token persistence records granted_via_grace", () => {
+  const db = freshDb();
+  const repo = createSqliteAuthRepository(db);
+  const user = repo.createUser({ email: "a@b.c", username: "andre", passwordHash: "x", googleId: null });
+
+  const oldId = repo.insertRefreshToken({ userId: user.id, tokenHash: "hash-old", expiresAt: new Date(Date.now() + 60_000) });
+  const newId = repo.insertRefreshToken({
+    userId: user.id,
+    tokenHash: "hash-new",
+    expiresAt: new Date(Date.now() + 60_000),
+    grantedViaGrace: true
+  });
+
+  repo.rotateRefreshToken(oldId, newId, { grantedViaGrace: true });
+
+  const oldRow = repo.findRefreshTokenById(oldId);
+  assert.equal(oldRow?.granted_via_grace, 1);
+  assert.equal(repo.findRefreshTokenById(newId)?.granted_via_grace, 1);
 });
 
 test("revokeRefreshToken (logout) leaves rotated_at/replaced_by null", () => {

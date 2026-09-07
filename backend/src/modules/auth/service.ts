@@ -91,16 +91,19 @@ export function createAuthService(repo: AuthRepository, avatarStore: AvatarBlobS
   /** Rotation: mints a fresh pair and marks `oldRow` as rotated into it —
    *  as opposed to issueTokenPair above, which is for a token's FIRST
    *  issuance (signup/login/Google), where there is no prior row to
-   *  chain from. */
-  async function rotateTokenPair(oldRow: RefreshTokenRow, user: UserRow): Promise<TokenPair> {
+   *  chain from. `grantedViaGrace` marks the chain as having used its
+   *  single grace hop. */
+  async function rotateTokenPair(oldRow: RefreshTokenRow, user: UserRow, options?: { grantedViaGrace?: boolean }): Promise<TokenPair> {
     const accessToken = signAccessToken(user);
     const refreshToken = generateRefreshToken();
+    const grantedViaGrace = oldRow.granted_via_grace === 1 || options?.grantedViaGrace === true;
     const newTokenId = repo.insertRefreshToken({
       userId: user.id,
       tokenHash: hashRefreshToken(refreshToken),
-      expiresAt: refreshTokenExpiry()
+      expiresAt: refreshTokenExpiry(),
+      grantedViaGrace
     });
-    repo.rotateRefreshToken(oldRow.id, newTokenId);
+    repo.rotateRefreshToken(oldRow.id, newTokenId, { grantedViaGrace });
     return { accessToken, refreshToken };
   }
 
@@ -165,12 +168,12 @@ export function createAuthService(repo: AuthRepository, avatarStore: AvatarBlobS
         const rotatedAt = row.rotated_at ? new Date(row.rotated_at).getTime() : null;
         const withinGraceWindow = rotatedAt !== null && Date.now() - rotatedAt <= REFRESH_ROTATION_GRACE_MS;
 
-        if (withinGraceWindow && row.replaced_by) {
+        if (withinGraceWindow && row.replaced_by && !row.granted_via_grace) {
           const replacement = repo.findRefreshTokenById(row.replaced_by);
           const replacementStillLive = replacement && !replacement.revoked_at && new Date(replacement.expires_at) >= new Date();
           if (replacementStillLive) {
             const user = repo.findUserById(replacement.user_id);
-            if (user) return rotateTokenPair(replacement, user);
+            if (user) return rotateTokenPair(replacement, user, { grantedViaGrace: true });
           }
           // The replacement is itself gone, expired, or already used —
           // this is no longer "one lost response," so fall through to the

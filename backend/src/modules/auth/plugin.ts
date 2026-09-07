@@ -22,7 +22,9 @@ import { createSqliteAuthRepository } from "./adapters/sqlite/sqliteAuthReposito
 import { openAuthDb } from "./adapters/sqlite/connection.js";
 import { createAuthorizationCode } from "./authorizationCode.js";
 import { consumeGoogleOAuthFlow, createGoogleOAuthFlow } from "./googleOAuthFlow.js";
-import { isAllowedRedirectTarget, parseMobileRedirectAllowlist } from "./mobileRedirectAllowlist.js";
+import { isValidGoogleOAuthState } from "./googleOAuthState.js";
+import { validateGoogleStartRequest } from "./googleStartRequest.js";
+import { parseMobileRedirectAllowlist } from "./mobileRedirectAllowlist.js";
 import { buildAuthRoutes } from "./routes.js";
 import { createAuthService, MAX_AVATAR_UPLOAD_BYTES } from "./service.js";
 
@@ -40,6 +42,14 @@ const GOOGLE_OAUTH_ENDPOINTS = {
   tokenHost: "https://www.googleapis.com",
   tokenPath: "/oauth2/v4/token"
 };
+
+// @fastify/oauth2's own default (DEFAULT_REDIRECT_STATE_COOKIE_NAME) — the
+// googleOAuth2 registration below passes no `cookie`/`redirectStateCookieName`
+// override, so this is genuinely the name it writes/reads. checkStateFunction
+// below reads this cookie itself (see that option's own comment for why a
+// real implementation is required here at all).
+const OAUTH_REDIRECT_STATE_COOKIE_NAME = "oauth2-redirect-state";
+const OAUTH_COOKIE_OPTIONS: { signed?: boolean } = { signed: false };
 
 /** noUncheckedIndexedAccess makes a plain `request.query.foo` cast come
  *  back as `string | undefined` even after an `as Record<string, string>`
@@ -101,39 +111,55 @@ export async function authPlugin(app: FastifyInstance) {
       },
       startRedirectPath: "/auth/google",
       callbackUri: env.GOOGLE_CALLBACK_URL,
-      // Threads this flow's PKCE code_challenge and (for a mobile caller)
-      // chosen redirect target through Google's own round trip — see
-      // googleOAuthFlow.ts's top comment. @fastify/oauth2 independently
-      // round-trips whatever this returns through its own signed cookie
-      // and checks it back on callback (defaultCheckStateFunction, left
-      // untouched below), same CSRF protection the plain login flow
-      // already had — this only adds "and here's what THIS app instance
-      // asked for", not a replacement for that check. Throwing here (same
-      // as modules/socials/plugin.ts's own generateStateFunction) makes
+      cookie: OAUTH_COOKIE_OPTIONS,
+      // Threads this flow's PKCE code_challenge, (for a mobile caller)
+      // chosen redirect target, and mobile client-side state nonce through
+      // Google's own round trip — see googleOAuthFlow.ts's top comment.
+      // Validation (PKCE-required-for-redirect_target included — BLOCKER
+      // 2(a)) is pulled out into googleStartRequest.ts so it's
+      // unit-testable without Fastify. Throwing here (same as
+      // modules/socials/plugin.ts's own generateStateFunction) makes
       // @fastify/oauth2 reply 500 with the message instead of starting a
       // flow bound to a request parameter this backend never validated.
       generateStateFunction(request: FastifyRequest) {
-        const codeChallenge = queryParam(request, "code_challenge") || null;
-        const codeChallengeMethod = queryParam(request, "code_challenge_method") || null;
+        const codeChallengeParam = queryParam(request, "code_challenge") || null;
+        const codeChallengeMethodParam = queryParam(request, "code_challenge_method") || null;
         const redirectTargetParam = queryParam(request, "redirect_target") || null;
+        const clientState = queryParam(request, "client_state") || null;
 
-        if (codeChallenge && codeChallengeMethod !== "S256") {
-          throw new Error("code_challenge_method must be S256 when code_challenge is provided.");
-        }
+        const { codeChallenge, redirectTarget } = validateGoogleStartRequest(
+          { codeChallenge: codeChallengeParam, codeChallengeMethod: codeChallengeMethodParam, redirectTargetParam },
+          mobileRedirectAllowlist
+        );
 
-        let redirectTarget: string | null = null;
-        if (redirectTargetParam) {
-          // The redirect target ALWAYS comes from this fixed, server-side
-          // list — redirectTargetParam only selects which allowlisted
-          // entry to use, by exact match. Anything else is rejected
-          // outright, never partially trusted.
-          if (!isAllowedRedirectTarget(redirectTargetParam, mobileRedirectAllowlist)) {
-            throw new Error("redirect_target is not on the configured allowlist.");
-          }
-          redirectTarget = redirectTargetParam;
-        }
+        return createGoogleOAuthFlow({ codeChallenge, redirectTarget, clientState });
+      },
+      // BLOCKER 1 — @fastify/oauth2 v8 rejects registration outright if
+      // generateStateFunction is given without a checkStateFunction (its
+      // `!a ^ !b` guard in index.js); supplying generateStateFunction above
+      // without this meant the backend never booted with Google configured.
+      // This is the actual CSRF check (equivalent to the library's own
+      // unexported defaultCheckStateFunction): the callback's `state` query
+      // param must equal the redirect-state cookie the SAME start request
+      // set. A single-arg, boolean-returning function (rather than the
+      // (request, callback) form) — @fastify/oauth2 promisifies this itself
+      // (checkStateFunctionCallbacked's `.length <= 1` branch). NEVER
+      // replace this with `checkStateFunction: () => true` — that satisfies
+      // the registration guard but throws away the whole protection this
+      // option exists to provide. See googleOAuthState.ts for the pure
+      // comparison this wraps.
+      checkStateFunction(request: FastifyRequest): boolean {
+        const state = queryParam(request, "state") || undefined;
+        const rawCookie = request.cookies[OAUTH_REDIRECT_STATE_COOKIE_NAME];
+        const stateCookie = !OAUTH_COOKIE_OPTIONS.signed
+          ? rawCookie
+          : (() => {
+              if (rawCookie === undefined || typeof request.unsignCookie !== "function") return undefined;
+              const unsigned = request.unsignCookie(rawCookie);
+              return unsigned.valid ? unsigned.value : undefined;
+            })();
 
-        return createGoogleOAuthFlow({ codeChallenge, redirectTarget });
+        return isValidGoogleOAuthState(state, stateCookie);
       }
     });
 
@@ -156,10 +182,10 @@ export async function authPlugin(app: FastifyInstance) {
       // The state param this callback receives is exactly what our own
       // generateStateFunction returned above — a flow id, not a CSRF
       // token to check ourselves (that already happened inside
-      // getAccessTokenFromAuthorizationCodeFlow, via the library's own
-      // checkStateFunction and signed cookie). A missing/expired flow
-      // degrades to "no PKCE, no explicit redirect target" — the plain
-      // desktop-web shape — rather than failing the sign-in outright.
+      // getAccessTokenFromAuthorizationCodeFlow, via checkStateFunction
+      // above and its signed cookie). A missing/expired flow degrades to
+      // "no PKCE, no explicit redirect target" — the plain desktop-web
+      // shape — rather than failing the sign-in outright.
       const flow = consumeGoogleOAuthFlow(queryParam(request, "state"));
 
       // Never place access or refresh tokens in URLs (global constraint):
@@ -171,6 +197,14 @@ export async function authPlugin(app: FastifyInstance) {
       const redirectBase = flow?.redirectTarget ?? env.OAUTH_SUCCESS_REDIRECT_URL;
       const redirectUrl = new URL(redirectBase);
       redirectUrl.searchParams.set("code", code);
+      // BLOCKER 2(b) — echo the mobile app's own client_state nonce back
+      // verbatim (see googleOAuthFlow.ts's own comment on clientState);
+      // googleSignIn.ts refuses to accept `code` unless this matches the
+      // nonce it generated before opening this flow. Absent for a flow
+      // that sent none (the plain desktop-web flow).
+      if (flow?.clientState) {
+        redirectUrl.searchParams.set("state", flow.clientState);
+      }
       return reply.redirect(redirectUrl.toString());
     });
   } else {

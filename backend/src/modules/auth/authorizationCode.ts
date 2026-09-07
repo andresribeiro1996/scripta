@@ -54,7 +54,7 @@ export function createAuthorizationCode(input: PendingAuthorizationCode, ttlMs: 
 
 export type ConsumeAuthorizationCodeResult =
   | { ok: true; user: AuthenticatedUser; tokens: TokenPair }
-  | { ok: false; reason: "not_found" | "expired" | "verifier_mismatch" };
+  | { ok: false; reason: "not_found" | "expired" | "verifier_mismatch" | "verifier_not_expected" };
 
 /** RFC 7636: code_challenge = BASE64URL(SHA256(ASCII(code_verifier))). */
 function s256Challenge(verifier: string): string {
@@ -96,12 +96,24 @@ export function consumeAuthorizationCode(code: string, codeVerifier: string | nu
     if (!codeVerifier || !timingSafeStringEqual(s256Challenge(codeVerifier), entry.codeChallenge)) {
       return { ok: false, reason: "verifier_mismatch" };
     }
+  } else if (codeVerifier) {
+    // BLOCKER 2(c) — a code minted with no PKCE challenge (the plain
+    // desktop-web flow) must not silently accept a verifier either: that
+    // would downgrade "this exchange claimed to be PKCE-bound" into
+    // "no binding was ever checked" instead of failing loudly. A code
+    // legitimately has no challenge only when its /auth/google start
+    // request also had none (see googleStartRequest.ts) — a caller now
+    // supplying a verifier means the two sides disagree about whether
+    // this exchange was meant to be bound at all.
+    return { ok: false, reason: "verifier_not_expected" };
   }
 
   return { ok: true, user: entry.user, tokens: entry.tokens };
 }
 
-export function authorizationCodeErrorMessage(reason: "not_found" | "expired" | "verifier_mismatch"): string {
-  if (reason === "verifier_mismatch") return "This sign-in could not be verified — please try again.";
+export function authorizationCodeErrorMessage(reason: "not_found" | "expired" | "verifier_mismatch" | "verifier_not_expected"): string {
+  if (reason === "verifier_mismatch" || reason === "verifier_not_expected") {
+    return "This sign-in could not be verified — please try again.";
+  }
   return "This sign-in code has expired or was already used — please try again.";
 }

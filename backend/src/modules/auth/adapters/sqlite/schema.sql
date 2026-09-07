@@ -47,6 +47,8 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
   -- that predates this column — same pattern as avatar_id below.
   rotated_at  TEXT,
   replaced_by TEXT,
+  -- 1 once this token chain has used its single refresh grace hop.
+  granted_via_grace INTEGER NOT NULL DEFAULT 0,
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 

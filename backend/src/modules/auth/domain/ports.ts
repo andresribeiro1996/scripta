@@ -24,7 +24,7 @@ export interface AuthRepository {
    *  gallery's getImageById). */
   findUserIdByAvatarId(avatarId: string): string | undefined;
 
-  insertRefreshToken(input: { userId: string; tokenHash: string; expiresAt: Date }): string;
+  insertRefreshToken(input: { userId: string; tokenHash: string; expiresAt: Date; grantedViaGrace?: boolean }): string;
   findRefreshTokenByHash(tokenHash: string): RefreshTokenRow | undefined;
   /** Needed by the refresh-rotation grace window (service.ts) to follow a
    *  rotated-away token's replaced_by pointer to the row it became. */
@@ -38,8 +38,9 @@ export interface AuthRepository {
    *  INTO WHAT (replaced_by) — the bookkeeping that lets refresh()
    *  distinguish "the client just hasn't seen its new pair yet" from
    *  "this token was revoked for a real reason" within a short grace
-   *  window after normal rotation. */
-  rotateRefreshToken(id: string, replacedByTokenId: string): void;
+   *  window after normal rotation. `grantedViaGrace` marks the chain as
+   *  having used its single grace hop. */
+  rotateRefreshToken(id: string, replacedByTokenId: string, options?: { grantedViaGrace?: boolean }): void;
   revokeAllRefreshTokensForUser(userId: string): void;
 }
 

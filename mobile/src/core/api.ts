@@ -60,7 +60,16 @@ export function refreshAccessToken(): Promise<boolean> {
           body: { refreshToken },
         });
         if (status !== 200) {
-          await secureTokenStore.clearRefreshToken();
+          // Only 401/403 mean the backend actually rejected this refresh
+          // token (expired, revoked, theft/replay) — that's the only case
+          // where holding onto it is pointless or actively wrong. A 429
+          // (rate limited) or 5xx (backend/network trouble) says nothing
+          // about the token itself; clearing SecureStore here would sign
+          // the user out over a transient failure that a later retry (or
+          // the next cold start) could have recovered from.
+          if (status === 401 || status === 403) {
+            await secureTokenStore.clearRefreshToken();
+          }
           setAccessToken(null);
           return false;
         }

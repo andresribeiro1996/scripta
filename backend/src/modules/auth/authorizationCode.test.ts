@@ -89,3 +89,15 @@ test("the correct verifier exchanges successfully", () => {
   const result = consumeAuthorizationCode(code, verifier);
   assert.deepEqual(result, { ok: true, user, tokens });
 });
+
+// BLOCKER 2(c) — a code minted with no PKCE challenge must not silently
+// accept a codeVerifier either. Without this, a client that intended to
+// bind an exchange to a verifier (and whose start request should have
+// been rejected — see googleStartRequest.ts) could be silently downgraded
+// to "no verifier needed" instead of failing loudly.
+test("a codeVerifier supplied for a code with no bound challenge is rejected, not silently ignored", () => {
+  const code = createAuthorizationCode({ user, tokens, codeChallenge: null });
+
+  const result = consumeAuthorizationCode(code, "unexpected-verifier-0000000000000000000000");
+  assert.deepEqual(result, { ok: false, reason: "verifier_not_expected" });
+});

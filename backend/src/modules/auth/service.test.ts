@@ -85,6 +85,7 @@ function createInMemoryRepo(): AuthRepository & { rows: Map<string, UserRow>; re
         revoked_at: null,
         rotated_at: null,
         replaced_by: null,
+        granted_via_grace: input.grantedViaGrace ? 1 : 0,
         created_at: new Date().toISOString()
       });
       return id;
@@ -99,11 +100,17 @@ function createInMemoryRepo(): AuthRepository & { rows: Map<string, UserRow>; re
       const row = refreshTokens.get(id);
       if (row) refreshTokens.set(id, { ...row, revoked_at: new Date().toISOString() });
     },
-    rotateRefreshToken(id, replacedByTokenId) {
+    rotateRefreshToken(id, replacedByTokenId, options) {
       const row = refreshTokens.get(id);
       if (row) {
         const now = new Date().toISOString();
-        refreshTokens.set(id, { ...row, revoked_at: now, rotated_at: now, replaced_by: replacedByTokenId });
+        refreshTokens.set(id, {
+          ...row,
+          revoked_at: now,
+          rotated_at: now,
+          replaced_by: replacedByTokenId,
+          granted_via_grace: options?.grantedViaGrace ? 1 : 0
+        });
       }
     },
     revokeAllRefreshTokensForUser(userId) {
@@ -340,6 +347,50 @@ test("a logout-revoked token always revokes every session, even presented immedi
 
   const secondRow = findRowByToken(repo, second.tokens.refreshToken);
   assert.ok(secondRow?.revoked_at, "logout-revoked tokens never qualify for the grace-window reissue");
+});
+
+// SHOULD-FIX — the grace window must be strictly ONE hop: a token issued
+// BY the grace path must never itself be able to grant another grace pass.
+// Without this, an attacker holding a stale-but-recently-superseded token
+// and a legitimate client each replaying "the token right before whatever
+// is currently live" can ping-pong indefinite reissues forever — each hop
+// looks exactly like a legitimate "lost response" retry to the grace path,
+// so the real theft/replay revoke-all never fires.
+test("presenting a grace-issued token's predecessor-in-chain again within the window does NOT re-grace", async () => {
+  const { service, repo } = makeService();
+  const { tokens } = await service.signup("a@b.c", "andre", "password123");
+  // An unrelated session that must only survive if the eventual response
+  // here really is "revoke everything" (the real theft/replay path).
+  const second = await service.login("a@b.c", "password123");
+
+  // T0 -> T1 (a normal, client-initiated rotation).
+  const first = await service.refresh(tokens.refreshToken);
+  // The client never received T1 and retries with T0 — the grace path
+  // fires, rotating T1 (the replacement) into T2 on the client's behalf.
+  await service.refresh(tokens.refreshToken);
+
+  // T1 ("first") is the grace-issued token's predecessor-in-chain: its own
+  // revocation just now was performed BY the grace path, not by its
+  // holder calling /auth/refresh directly. Replaying it again, still well
+  // within the grace window, must NOT grant a further grace reissue.
+  await assert.rejects(service.refresh(first.refreshToken), InvalidRefreshTokenError);
+
+  // The real theft/replay response: every other session revoked too.
+  const secondRow = findRowByToken(repo, second.tokens.refreshToken);
+  assert.ok(secondRow?.revoked_at, "a re-graced chain must fall through to the full revoke-all response");
+});
+
+test("a grace-issued token cannot be graced after a later normal rotation", async () => {
+  const { service, repo } = makeService();
+  const { tokens } = await service.signup("a@b.c", "andre", "password123");
+  const second = await service.login("a@b.c", "password123");
+
+  await service.refresh(tokens.refreshToken);
+  const graceIssued = await service.refresh(tokens.refreshToken);
+  await service.refresh(graceIssued.refreshToken);
+
+  await assert.rejects(service.refresh(graceIssued.refreshToken), InvalidRefreshTokenError);
+  assert.ok(findRowByToken(repo, second.tokens.refreshToken)?.revoked_at);
 });
 
 test("concurrent refreshes of the same token both succeed without revoking unrelated sessions", async () => {

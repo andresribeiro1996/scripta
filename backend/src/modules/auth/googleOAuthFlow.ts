@@ -30,6 +30,18 @@ export interface PendingGoogleOAuthFlow {
    *  validated by plugin.ts before this flow was created — or null to
    *  fall back to the default OAUTH_SUCCESS_REDIRECT_URL (desktop web). */
   redirectTarget: string | null;
+  /** BLOCKER 2(b) — an opaque nonce the mobile app generated itself before
+   *  starting this flow (see googleSignIn.ts), echoed back verbatim as
+   *  `state` on the final redirect to redirectTarget. This is a SEPARATE
+   *  check from @fastify/oauth2's own state-cookie CSRF protection
+   *  (googleOAuthState.ts) — that one proves the callback belongs to a
+   *  request THIS SERVER started; this one lets the app itself refuse to
+   *  accept a redirect it didn't just ask for, closing the gap where
+   *  something other than the flow it just launched (a stale browser tab,
+   *  a maliciously triggered deep link) resolves openAuthSessionAsync
+   *  instead. Null for a flow that sent none (the plain desktop-web
+   *  flow — no app-level deep link to spoof there). */
+  clientState: string | null;
 }
 
 interface StoredFlow extends PendingGoogleOAuthFlow {
@@ -66,5 +78,5 @@ export function consumeGoogleOAuthFlow(flowId: string): PendingGoogleOAuthFlow |
   const flow = pendingFlows.get(flowId);
   if (!flow) return null;
   pendingFlows.delete(flowId);
-  return { codeChallenge: flow.codeChallenge, redirectTarget: flow.redirectTarget };
+  return { codeChallenge: flow.codeChallenge, redirectTarget: flow.redirectTarget, clientState: flow.clientState };
 }

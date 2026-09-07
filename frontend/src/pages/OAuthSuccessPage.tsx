@@ -47,6 +47,13 @@ export function OAuthSuccessPage() {
       return;
     }
 
+    // Scrub the code out of the URL before attempting the exchange, not
+    // after — it's single-use already, but a FAILED exchange (network
+    // error, backend down, code already expired/used) must not leave
+    // `?code=` sitting in history either. Reading `code` above already
+    // happened, so this doesn't affect the exchange itself.
+    window.history.replaceState(null, "", window.location.pathname);
+
     (async () => {
       try {
         const body = (await publicFetch("/auth/google/exchange", {
@@ -54,10 +61,6 @@ export function OAuthSuccessPage() {
           body: JSON.stringify({ code })
         })) as ExchangeResponse;
         setSession({ user: body.user, accessToken: body.accessToken, refreshToken: body.refreshToken });
-        // Scrub the code out of the URL so it doesn't linger in
-        // history/bookmarks — it's single-use already, but a stale value
-        // there is still worth not leaving around.
-        window.history.replaceState(null, "", window.location.pathname);
         setStatus("done");
       } catch {
         setStatus("error");

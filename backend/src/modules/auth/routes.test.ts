@@ -114,6 +114,20 @@ test("a PKCE-bound code without a verifier is a 400 — the second-app scenario"
   assert.equal(status, 400);
 });
 
+// BLOCKER 2(c) — no silent downgrade: a code minted with no PKCE challenge
+// must reject a supplied codeVerifier rather than ignore it.
+test("a codeVerifier supplied for a code with no bound challenge is a 400", async () => {
+  const code = createAuthorizationCode({ user, tokens, codeChallenge: null });
+
+  const { status } = await call({
+    method: "POST",
+    url: "/auth/google/exchange",
+    payload: { code, codeVerifier: "unexpected-verifier-0000000000000000000000" }
+  });
+
+  assert.equal(status, 400);
+});
+
 test("a PKCE-bound code with the wrong verifier is a 400", async () => {
   const verifier = "mobile-app-verifier-12345678901234567890123";
   const code = createAuthorizationCode({ user, tokens, codeChallenge: s256(verifier) });

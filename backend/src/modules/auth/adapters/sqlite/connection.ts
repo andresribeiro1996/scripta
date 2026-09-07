@@ -39,6 +39,9 @@ export function applyAuthMigrations(db: DatabaseSync): void {
     if (!refreshTokenColumns.some((column) => column.name === "replaced_by")) {
       db.exec("ALTER TABLE refresh_tokens ADD COLUMN replaced_by TEXT");
     }
+    if (!refreshTokenColumns.some((column) => column.name === "granted_via_grace")) {
+      db.exec("ALTER TABLE refresh_tokens ADD COLUMN granted_via_grace INTEGER NOT NULL DEFAULT 0");
+    }
   }
 
   const schema = readFileSync(`${adapterDir}/schema.sql`, "utf8");

@@ -28,6 +28,8 @@ export interface RefreshTokenRow {
   // rotated_at. Lets a reissue-within-grace-window pick up the pair the
   // client never actually received, instead of minting a third one.
   replaced_by: string | null;
+  // 1 once this token chain has used its single refresh grace hop.
+  granted_via_grace: 0 | 1;
   created_at: string;
 }
 
