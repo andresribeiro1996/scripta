@@ -263,6 +263,8 @@ flowchart LR
 
 **Gate:** Development builds launch on iOS and Android, call `/health`, `npx expo-doctor` passes, and the Task 1 command lines stay at their recorded baseline.
 
+**Task 2 status (2026-09-07):** Landed on `mobile-migration` (`6adffd2` + auth fix). Verified: Android/Expo Go launch, `/health`, login, library list, kill-and-reopen cold-start refresh (bug found and fixed: `/auth/refresh` returns tokens only — the provider must chain `GET /auth/me` for the user; relevant to 4A). `expo-doctor` 21/21; Task 1 baselines unchanged; backend tests now `.env`-hermetic (81/81 either way) so CI runs without secrets. iOS launch UNVERIFIED — no active simulator runtime on the dev machine; ride until Task 4C-era device testing unless requested earlier. Confirmed both ways: no `metro.config.js` is needed (the plan's claim holds; an earlier failure was a wrong bundle URL, not workspace resolution). Deviations: root `allowScripts` approvals for argon2/esbuild (npm 11 install-script gating).
+
 ## Wave 1: Reusable logic
 
 Task 3A runs **serial and first**. Tasks 3B and 3C run in parallel against 3A's published integration commit.
