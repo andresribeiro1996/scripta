@@ -21,6 +21,7 @@ process.env.NODE_ENV = "test";
 
 const { parseImport, InvalidImportError, ImportBusyError } = await import("./parseImport.js");
 const { buildLibraryRoutes, rejectOversizedImport, sweepStaleImportDirs } = await import("../routes.js");
+const { LibraryConflictError } = await import("../domain/errors.js");
 const { signAccessToken } = await import("../../auth/tokens.js");
 
 after(async () => rm(scratch, { recursive: true, force: true }));
@@ -59,11 +60,14 @@ function multipart(bytes: Buffer, filename = "library.dat") {
 
 async function testApp() {
   let stored: unknown = null;
+  let storedAt = "2026-01-01T00:00:00.000Z";
   const service = {
-    getLibrary: () => stored ? { data: stored, updatedAt: "now", shareToken: null, shareUrl: null } : null,
-    saveLibrary: (_userId: string, data: unknown) => {
+    getLibrary: () => stored ? { data: stored, updatedAt: storedAt, shareToken: null, shareUrl: null } : null,
+    saveLibrary: (_userId: string, data: unknown, expectedUpdatedAt?: string) => {
+      if (stored && expectedUpdatedAt !== storedAt) throw new LibraryConflictError();
       stored = data;
-      return { data, updatedAt: "now", shareToken: null, shareUrl: null };
+      storedAt = new Date(Date.parse(storedAt) + 1).toISOString();
+      return { data, updatedAt: storedAt, shareToken: null, shareUrl: null };
     },
     share: () => { throw new Error("not used"); },
     unshare: () => undefined,
@@ -76,6 +80,22 @@ async function testApp() {
   const token = signAccessToken({ id: "user-1", email: "test@example.com", username: "tester", avatar_id: null });
   return { app, authorization: `Bearer ${token}` };
 }
+
+test("PUT library rejects a stale version with the current document", async () => {
+  const { app, authorization } = await testApp();
+  const first = await app.inject({ method: "PUT", url: "/library", headers: { authorization }, payload: { data: { books: [{ Title: "First" }] } } });
+  const stale = await app.inject({
+    method: "PUT",
+    url: "/library",
+    headers: { authorization },
+    payload: { data: { books: [] }, updatedAt: "2026-01-01T00:00:00.000Z" }
+  });
+
+  assert.equal(first.statusCode, 200);
+  assert.equal(stale.statusCode, 409);
+  assert.deepEqual(stale.json().current.data, { books: [{ Title: "First" }] });
+  await app.close();
+});
 
 test("Kobo SQLite returns books and highlights", async () => {
   const preview = await parseImport(koboDb("happy.sqlite"), 1000, 32768);

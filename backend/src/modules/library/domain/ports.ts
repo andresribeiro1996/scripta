@@ -10,7 +10,7 @@ export interface LibraryRepository {
   /** Insert-or-replace: one document per user. Returns the stored row
    *  (with its server-assigned updatedAt) so the service doesn't need to
    *  compute or guess it. */
-  upsertDocument(userId: string, dataJson: string): LibraryDocumentRow;
+  upsertDocument(userId: string, dataJson: string, expectedUpdatedAt?: string): LibraryDocumentRow | undefined;
   /** Sets (or, with `token: null`, clears) the share token on this user's
    *  existing library document. Returns undefined if this user has no
    *  library document yet — service.ts turns that into a clear "nothing

@@ -26,7 +26,7 @@ import { pipeline } from "node:stream/promises";
 import { z } from "zod";
 import { env } from "../../config/env.js";
 import { authGuard } from "../auth/index.js";
-import { NoLibraryDocumentError } from "./domain/errors.js";
+import { LibraryConflictError, NoLibraryDocumentError } from "./domain/errors.js";
 import { ImportBusyError, InvalidImportError, parseImport } from "./import/parseImport.js";
 import type { LibraryService } from "./service.js";
 
@@ -58,6 +58,7 @@ export function rejectOversizedImport(
 // inside `books`. The library module treats the document as an opaque
 // blob; it doesn't try to understand a book's shape.
 const saveLibrarySchema = z.object({
+  updatedAt: z.string().datetime().optional(),
   data: z
     .object({
       books: z.array(z.unknown())
@@ -99,8 +100,15 @@ export function buildLibraryRoutes(service: LibraryService) {
           error: 'Expected {"data": {"books": [...], ...}} — see the exporter\'s library.json shape.'
         });
       }
-      const library = service.saveLibrary(request.user.id, parsed.data.data);
-      return reply.send(library);
+      try {
+        const library = service.saveLibrary(request.user.id, parsed.data.data, parsed.data.updatedAt);
+        return reply.send(library);
+      } catch (error) {
+        if (error instanceof LibraryConflictError) {
+          return reply.code(409).send({ error: error.message, current: service.getLibrary(request.user.id) });
+        }
+        throw error;
+      }
     });
 
     await app.register(async (imports) => {

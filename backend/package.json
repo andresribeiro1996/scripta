@@ -10,7 +10,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsx --test src/modules/arena/service.test.ts src/modules/auth/service.test.ts src/modules/auth/authorizationCode.test.ts src/modules/auth/googleOAuthFlow.test.ts src/modules/auth/googleOAuthState.test.ts src/modules/auth/googleStartRequest.test.ts src/modules/auth/mobileRedirectAllowlist.test.ts src/modules/auth/plugin.test.ts src/modules/auth/routes.test.ts src/modules/auth/adapters/sqlite/sqliteAuthRepository.test.ts src/modules/murals/service.test.ts src/modules/tierlists/service.test.ts src/modules/tierlists/routes.test.ts src/modules/tierlists/adapters/sqlite/sqliteTierlistsRepository.test.ts src/modules/library/import/parseImport.test.ts"
+    "test": "tsx --test src/modules/arena/service.test.ts src/modules/auth/service.test.ts src/modules/auth/authorizationCode.test.ts src/modules/auth/googleOAuthFlow.test.ts src/modules/auth/googleOAuthState.test.ts src/modules/auth/googleStartRequest.test.ts src/modules/auth/mobileRedirectAllowlist.test.ts src/modules/auth/plugin.test.ts src/modules/auth/routes.test.ts src/modules/auth/adapters/sqlite/sqliteAuthRepository.test.ts src/modules/murals/service.test.ts src/modules/tierlists/service.test.ts src/modules/tierlists/routes.test.ts src/modules/tierlists/adapters/sqlite/sqliteTierlistsRepository.test.ts src/modules/library/import/parseImport.test.ts src/modules/library/service.test.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.3.0",

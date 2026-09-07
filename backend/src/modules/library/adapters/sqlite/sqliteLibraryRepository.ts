@@ -14,6 +14,7 @@ export function createSqliteLibraryRepository(db: DatabaseSync): LibraryReposito
     INSERT INTO library_documents (user_id, data, updated_at)
     VALUES ($user_id, $data, $updated_at)
     ON CONFLICT(user_id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at
+    WHERE library_documents.updated_at = $expected_updated_at
   `);
   // Deliberately leaves share_token untouched on conflict — re-saving a
   // library document (a normal, frequent PUT /library) must never disturb
@@ -26,10 +27,17 @@ export function createSqliteLibraryRepository(db: DatabaseSync): LibraryReposito
       return getStmt.get(userId) as LibraryDocumentRow | undefined;
     },
 
-    upsertDocument(userId, dataJson) {
-      const updatedAt = new Date().toISOString();
-      upsertStmt.run({ $user_id: userId, $data: dataJson, $updated_at: updatedAt });
-      return (getStmt.get(userId) as LibraryDocumentRow | undefined)!;
+    upsertDocument(userId, dataJson, expectedUpdatedAt) {
+      const current = getStmt.get(userId) as LibraryDocumentRow | undefined;
+      const updatedAt = new Date(Math.max(Date.now(), current ? Date.parse(current.updated_at) + 1 : 0)).toISOString();
+      const result = upsertStmt.run({
+        $user_id: userId,
+        $data: dataJson,
+        $updated_at: updatedAt,
+        $expected_updated_at: expectedUpdatedAt ?? null
+      });
+      if (result.changes === 0) return undefined;
+      return getStmt.get(userId) as unknown as LibraryDocumentRow;
     },
 
     setShareToken(userId, token) {

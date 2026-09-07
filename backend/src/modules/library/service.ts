@@ -11,7 +11,7 @@ import { randomUUID } from "node:crypto";
 // mural sharing) for why a public, unauthenticated resolver may use this
 // but not the authGuard'd, network-calling GET /covers/resolve path.
 import { peekCachedCoverUrl } from "../covers/index.js";
-import { NoLibraryDocumentError } from "./domain/errors.js";
+import { LibraryConflictError, NoLibraryDocumentError } from "./domain/errors.js";
 import type { LibraryRepository } from "./domain/ports.js";
 import type { LibraryDocument, LibraryDocumentRow } from "./domain/types.js";
 import { normalizeImageId, normalizeIsbn } from "./publicResolver.js";
@@ -98,7 +98,7 @@ function toLibraryDocument(row: LibraryDocumentRow, publicUrlFor: (token: string
 
 export interface LibraryService {
   getLibrary(userId: string): LibraryDocument | null;
-  saveLibrary(userId: string, data: unknown): LibraryDocument;
+  saveLibrary(userId: string, data: unknown, expectedUpdatedAt?: string): LibraryDocument;
   /** Idempotent: a document that's already shared keeps its existing
    *  token rather than minting a new one, so a re-opened share modal (or
    *  a retried request) never invalidates a link someone already has.
@@ -124,8 +124,9 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
       return toLibraryDocument(row, publicUrlFor);
     },
 
-    saveLibrary(userId, data) {
-      const row = repo.upsertDocument(userId, JSON.stringify(data));
+    saveLibrary(userId, data, expectedUpdatedAt) {
+      const row = repo.upsertDocument(userId, JSON.stringify(data), expectedUpdatedAt);
+      if (!row) throw new LibraryConflictError();
       return toLibraryDocument(row, publicUrlFor);
     },
 

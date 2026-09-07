@@ -36,7 +36,7 @@ export function useDeleteGalleryImage() {
     const scrubbedBooks = scrubImageFromBooks(current.data.books, id);
     if (scrubbedBooks === current.data.books) return; // nothing referenced it — nothing to save
 
-    const saved = await saveLibrary({ ...current.data, books: scrubbedBooks });
+    const saved = await saveLibrary({ ...current.data, books: scrubbedBooks }, current.updatedAt);
     queryClient.setQueryData(["library"], saved);
   };
 }
