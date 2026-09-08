@@ -28,7 +28,7 @@ export function buildMuralPreset(id: MuralPresetId, books: Array<Record<string, 
   const style: BlockStyle = { ...DEFAULT_BLOCK_STYLE, backgroundColor: preset.color, textColor: "#f5f1e9", cardBorderWidth: 0, cardShadow: false, cardRadius: 16, fontFamily: "sans" };
   const blocks: MuralBlock[] = [];
   const base = (x: number, y: number, w: number, h: number, accent = false) => ({
-    id: typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `preset_${Date.now()}_${Math.random().toString(36).slice(2)}`, layout: { x, y, w, h },
+    id: typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `preset_${Date.now()}_${Math.random().toString(36).slice(2)}`, layout: { x, y, w, h },
     style: accent ? { ...style, backgroundColor: preset.accent, textColor: preset.color, fontFamily: "playfairDisplay" as const } : style
   });
   const note = selected.length === 0

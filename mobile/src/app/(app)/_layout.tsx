@@ -22,8 +22,8 @@ export default function AppLayout() {
       <Tabs.Screen name="my-arena" options={{ title: "Arena" }} />
       <Tabs.Screen name="murals" options={{ title: "Murals" }} />
       <Tabs.Screen name="settings" options={{ title: "Settings" }} />
-      <Tabs.Screen name="tierlist" options={{ href: null }} />
-      <Tabs.Screen name="seed" options={{ href: null }} />
+      <Tabs.Screen name="tierlist/[id]" options={{ href: null }} />
+      <Tabs.Screen name="seed/[id]" options={{ href: null }} />
     </Tabs>
   );
 }

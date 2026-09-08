@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   ALL_STAT_METRICS,
   BLOCK_TYPE_LABELS,
@@ -9,7 +9,7 @@ import {
   type MuralBlock,
 } from "@scripta/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Button, EmptyState, ErrorState, Input, Sheet, Toast } from "../../ui";
 import { spacing, typography, useTheme } from "../../ui/theme";
@@ -46,6 +46,14 @@ export function MuralEditorScreen({ id }: { id: string }) {
   const books = library?.data.books ?? [];
   const needle = search.trim().toLowerCase();
   const filteredBooks = needle ? books.filter((book) => `${book.Title ?? ""} ${book.Attribution ?? ""}`.toLowerCase().includes(needle)) : books;
+
+  useFocusEffect(useCallback(() => {
+    void muralQuery.refetch().then(({ data }) => {
+      if (!data) return;
+      setName(data.name);
+      setBlocks(data.blocks);
+    });
+  }, [muralQuery.refetch]));
 
   const draftMural = useMemo(() => mural ? { ...mural, name: currentName, blocks: currentBlocks } : null, [mural, currentName, currentBlocks]);
 
