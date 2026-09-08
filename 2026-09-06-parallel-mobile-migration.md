@@ -509,6 +509,8 @@ Start Tasks 5A–5C in parallel against stable contracts and fixtures. Tasks 5D�
 
 **Wave 3 gate:** Every pathed route in [`frontend/src/App.tsx`](../../../frontend/src/App.tsx), plus the wildcard, has a native equivalent or an approved, written platform-specific adaptation. Enumerate them from the tree at gate time, not from this document.
 
+**Wave 3 status (2026-09-08):** PASSED at `265c11ca`. The live `App.tsx` tree was re-enumerated: all 21 paths plus the wildcard have native routes or the adaptations recorded in `mobile/README.md`. Public arena, ballot, library-share, and mural-share routes remain outside auth guards. Gate results: shared build green; backend typecheck + 169/169 tests green; frontend typecheck/lint green with only the recorded `test-library-style.mts` section 14 baseline failure; mobile typecheck + 18/18 tests green; Expo Doctor 21/21; Android production bundle export green. Native signup/avatar onboarding was restored during integration. Real-device iOS/Android acceptance, universal links, Google OAuth, and preview builds remain blocked on Task 4C's HTTPS origin and platform credentials.
+
 ## Wave 4: Integration and quality
 
 ### Task 6: Integrate feature streams — serialized
