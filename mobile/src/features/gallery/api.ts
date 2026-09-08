@@ -1,3 +1,4 @@
+import { File } from "expo-file-system";
 import { apiClient } from "../../core/api";
 
 export interface GalleryImage {
@@ -17,7 +18,7 @@ export async function fetchGalleryImages(): Promise<GalleryImage[]> {
 
 export async function uploadGalleryImage(file: { uri: string; name: string; mimeType: string }): Promise<GalleryImage> {
   const form = new FormData();
-  form.append("image", { uri: file.uri, name: file.name, type: file.mimeType } as unknown as Blob);
+  form.append("image", new File(file.uri));
   return (await apiClient.request<{ image: GalleryImage }>("/gallery", { method: "POST", body: form, auth: true })).image;
 }
 

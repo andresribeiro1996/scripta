@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { File } from "expo-file-system";
 import { GoogleSignInCancelledError, startGoogleSignIn } from "../features/auth/googleSignIn";
 import { apiClient, logout, refreshAccessToken, setSessionExpiredHandler } from "./api";
 import { getAccessToken, secureTokenStore, setAccessToken } from "./tokenStore";
@@ -120,7 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const uploadAvatar = useCallback(async (file: { uri: string; name: string; mimeType: string }) => {
     const form = new FormData();
-    form.append("image", { uri: file.uri, name: file.name, type: file.mimeType } as unknown as Blob);
+    form.append("image", new File(file.uri));
     const res = await apiClient.request<{ user: AuthUser }>("/auth/avatar", { method: "POST", body: form, auth: true });
     setUser(res.user);
   }, []);

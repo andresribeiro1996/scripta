@@ -1,3 +1,4 @@
+import { File } from "expo-file-system";
 import { ApiError } from "../../core/api";
 import { API_URL } from "../../core/config";
 import { getAccessToken } from "../../core/tokenStore";
@@ -7,7 +8,7 @@ export async function uploadImportPreview(file: ImportFile): Promise<ImportPrevi
   const token = getAccessToken();
   if (!token) throw new ApiError(401, "Not signed in");
   const form = new FormData();
-  form.append("file", { uri: file.uri, name: file.name, type: file.mimeType ?? "application/octet-stream" } as unknown as Blob);
+  form.append("file", new File(file.uri));
   const response = await fetch(`${API_URL}/library/import/preview`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
