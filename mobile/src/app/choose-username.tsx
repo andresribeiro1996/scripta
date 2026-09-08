@@ -12,6 +12,7 @@ import { useAuth } from "../core/auth";
  *  never shows up as a tab. */
 export default function ChooseUsernamePage() {
   const { ready, user, setUsername } = useAuth();
+  const [continueToAvatar, setContinueToAvatar] = useState(false);
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,12 +25,13 @@ export default function ChooseUsernamePage() {
     );
   }
   if (!user) return <Redirect href="/(public)/login" />;
-  if (user.username) return <Redirect href="/(app)" />;
+  if (user.username) return <Redirect href={continueToAvatar ? "/welcome-avatar" : "/(app)"} />;
 
   const trimmed = value.trim();
   const onSubmit = async () => {
     setBusy(true);
     setError(null);
+    setContinueToAvatar(true);
     try {
       await setUsername(trimmed);
     } catch (e) {

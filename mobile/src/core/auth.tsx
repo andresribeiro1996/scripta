@@ -17,6 +17,7 @@ interface AuthUser {
 interface AuthState {
   ready: boolean;
   user: AuthUser | null;
+  signUp(email: string, username: string, password: string): Promise<void>;
   signIn(identifier: string, password: string): Promise<void>;
   signInWithGoogle(): Promise<void>;
   signOut(): Promise<void>;
@@ -82,6 +83,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await secureTokenStore.setRefreshToken(res.refreshToken);
   }, []);
 
+  const signUp = useCallback(async (email: string, username: string, password: string) => {
+    const res = await apiClient.request<AuthTokenResponse>("/auth/signup", {
+      method: "POST",
+      body: { email, username, password },
+    });
+    setAccessToken(res.accessToken);
+    setUser(res.user);
+    await secureTokenStore.setRefreshToken(res.refreshToken);
+  }, []);
+
   const signInWithGoogle = useCallback(async () => {
     const { code, codeVerifier } = await startGoogleSignIn();
     const res = await apiClient.request<AuthTokenResponse>("/auth/google/exchange", {
@@ -120,8 +131,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ ready, user, signIn, signInWithGoogle, signOut, setUsername, uploadAvatar, removeAvatar }),
-    [ready, user, signIn, signInWithGoogle, signOut, setUsername, uploadAvatar, removeAvatar],
+    () => ({ ready, user, signUp, signIn, signInWithGoogle, signOut, setUsername, uploadAvatar, removeAvatar }),
+    [ready, user, signUp, signIn, signInWithGoogle, signOut, setUsername, uploadAvatar, removeAvatar],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

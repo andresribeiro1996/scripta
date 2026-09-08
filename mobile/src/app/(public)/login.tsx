@@ -16,8 +16,10 @@ import { apiClient } from "../../core/api";
 
 export default function LoginPage() {
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
-  const { ready, user, signIn, signInWithGoogle } = useAuth();
+  const { ready, user, signUp, signIn, signInWithGoogle } = useAuth();
+  const [mode, setMode] = useState<"login" | "signup">("login");
   const [identifier, setIdentifier] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [googleBusy, setGoogleBusy] = useState(false);
@@ -44,13 +46,14 @@ export default function LoginPage() {
       </View>
     );
   }
-  if (user) return <Redirect href={(returnTo?.startsWith("/vote/") ? returnTo : "/(app)") as never} />;
+  if (user) return <Redirect href={(!user.username ? "/choose-username" : mode === "signup" ? "/welcome-avatar" : returnTo?.startsWith("/vote/") ? returnTo : "/(app)") as never} />;
 
   const onSubmit = async () => {
     setBusy(true);
     setError(null);
     try {
-      await signIn(identifier.trim(), password);
+      if (mode === "signup") await signUp(identifier.trim(), username.trim(), password);
+      else await signIn(identifier.trim(), password);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Sign-in failed");
     } finally {
@@ -79,16 +82,29 @@ export default function LoginPage() {
         <Text style={styles.server}>
           {health.isPending ? "checking server…" : health.isError ? "server unreachable" : "server ok"}
         </Text>
+        <View style={styles.modeRow}>
+          <Pressable accessibilityRole="tab" accessibilityState={{ selected: mode === "login" }} style={[styles.modeButton, mode === "login" && styles.modeActive]} onPress={() => setMode("login")}><Text style={styles.modeText}>Log in</Text></Pressable>
+          <Pressable accessibilityRole="tab" accessibilityState={{ selected: mode === "signup" }} style={[styles.modeButton, mode === "signup" && styles.modeActive]} onPress={() => setMode("signup")}><Text style={styles.modeText}>Sign up</Text></Pressable>
+        </View>
         <TextInput
           style={styles.input}
           value={identifier}
           onChangeText={setIdentifier}
           autoCapitalize="none"
           autoCorrect={false}
-          keyboardType="email-address"
-          placeholder="Email or username"
+          keyboardType={mode === "signup" ? "email-address" : "default"}
+          placeholder={mode === "signup" ? "Email" : "Email or username"}
           placeholderTextColor="#9ca3af"
         />
+        {mode === "signup" ? <TextInput
+          style={styles.input}
+          value={username}
+          onChangeText={setUsername}
+          autoCapitalize="none"
+          autoCorrect={false}
+          placeholder="Username"
+          placeholderTextColor="#9ca3af"
+        /> : null}
         <TextInput
           style={styles.input}
           value={password}
@@ -97,8 +113,8 @@ export default function LoginPage() {
           placeholder="Password"
           placeholderTextColor="#9ca3af"
         />
-        <Pressable style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]} onPress={onSubmit} disabled={busy}>
-          {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Sign in</Text>}
+        <Pressable accessibilityState={{ disabled: busy || (mode === "signup" && (username.trim().length < 3 || password.length < 8)) }} style={({ pressed }) => [styles.button, pressed && styles.buttonPressed, mode === "signup" && (username.trim().length < 3 || password.length < 8) && styles.buttonDisabled]} onPress={onSubmit} disabled={busy || (mode === "signup" && (username.trim().length < 3 || password.length < 8))}>
+          {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{mode === "signup" ? "Create account" : "Sign in"}</Text>}
         </Pressable>
         {providers.data?.google && (
           <Pressable
@@ -120,6 +136,10 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: "center", alignItems: "center", padding: 24 },
   logo: { fontSize: 40, fontWeight: "700", color: "#1c1917" },
   server: { fontSize: 13, color: "#78716c", marginTop: 4, marginBottom: 32 },
+  modeRow: { width: "100%", flexDirection: "row", marginBottom: 16, borderWidth: 1, borderColor: "#d6d3d1", borderRadius: 12, overflow: "hidden" },
+  modeButton: { flex: 1, padding: 12, alignItems: "center" },
+  modeActive: { backgroundColor: "#e7e5e4" },
+  modeText: { color: "#1c1917", fontWeight: "600" },
   input: {
     width: "100%",
     borderWidth: 1,
@@ -133,6 +153,7 @@ const styles = StyleSheet.create({
   },
   button: { width: "100%", backgroundColor: "#1c1917", borderRadius: 12, padding: 16, alignItems: "center" },
   buttonPressed: { opacity: 0.85 },
+  buttonDisabled: { opacity: 0.4 },
   buttonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
   googleButton: {
     width: "100%",

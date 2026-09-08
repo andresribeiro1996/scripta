@@ -28,7 +28,7 @@ The web route tree has a native equivalent. The native tab shell uses shorter in
 | `/dashboard/gallery`, `/dashboard/murals`, `/dashboard/settings` | `/gallery`, `/murals`, `/settings` |
 | `/dashboard/arena` | Arena tab `/my-arena` |
 | `/dashboard/arena/tierlist/:id`, `/dashboard/arena/:id/seed` | Guarded native editor routes |
-| `/welcome-avatar` | Settings profile editor |
+| `/welcome-avatar` | Native skippable avatar onboarding |
 | `/oauth-success` | Native OAuth uses the `scripta://oauth-redirect` auth-session callback; the web callback path returns to login |
 
 `/arena`, `/arena/:id`, `/vote/:code`, `/shared/library/:token`, and `/shared/murals/:token` remain public and never pass through the app auth guard.
