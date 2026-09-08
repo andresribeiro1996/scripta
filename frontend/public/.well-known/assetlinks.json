@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.atmyshelf.app",
+      "sha256_cert_fingerprints": [
+        "82:54:8B:5E:D7:D5:61:59:4E:9F:82:B4:5D:B0:C9:D6:DA:70:07:E1:29:45:AA:A6:C5:4F:A4:2A:19:1D:C6:85"
+      ]
+    }
+  }
+]

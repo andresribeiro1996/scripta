@@ -17,6 +17,35 @@
     },
     "android": {
       "package": "com.atmyshelf.app",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "category": ["BROWSABLE", "DEFAULT"],
+          "data": [
+            {
+              "scheme": "https",
+              "host": "atmyshelf.com",
+              "pathPrefix": "/shared/library/"
+            },
+            {
+              "scheme": "https",
+              "host": "atmyshelf.com",
+              "pathPrefix": "/shared/murals/"
+            },
+            {
+              "scheme": "https",
+              "host": "atmyshelf.com",
+              "pathPrefix": "/arena"
+            },
+            {
+              "scheme": "https",
+              "host": "atmyshelf.com",
+              "pathPrefix": "/vote/"
+            }
+          ]
+        }
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
