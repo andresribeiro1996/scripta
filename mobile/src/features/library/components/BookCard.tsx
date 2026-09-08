@@ -84,7 +84,6 @@ export function BookCard({
           aspectRatio: aspectRatioNumber(style.cardAspectRatio),
           borderRadius: style.cardRadius,
           opacity: (style.cardOpacity / 100) * (pressed && style.cardHoverEffect ? 0.85 : 1),
-          transform: pressed && style.cardHoverEffect ? [{ scale: 0.98 }] : undefined,
           borderTopWidth: borderWidthFor("top"),
           borderRightWidth: borderWidthFor("right"),
           borderBottomWidth: borderWidthFor("bottom"),
@@ -93,6 +92,7 @@ export function BookCard({
           borderColor: resolveBorderColor(style.cardBorderColor, style.cardBorderOpacity, colors.border),
           backgroundColor: colors.border,
           ...(style.cardShadow ? cardShadow : null),
+          ...(pressed && style.cardHoverEffect ? { transform: [{ scale: 0.98 }] } : null),
           ...(selected ? { outlineWidth: 3, outlineColor: colors.accent, outlineStyle: "solid", outlineOffset: 2 } : null),
         },
       ]}

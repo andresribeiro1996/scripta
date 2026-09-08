@@ -15,7 +15,7 @@
 // copy from LibraryScreen's action menu.
 
 import { useState } from "react";
-import * as DocumentPicker from "expo-document-picker";
+import { File } from "expo-file-system";
 import { ScrollView, Text, View } from "react-native";
 import type { LibraryData } from "@scripta/shared";
 import { Button, ErrorState, Sheet, Skeleton } from "../../../ui/components";
@@ -47,17 +47,15 @@ export function ImportSheet({
     setError(null);
     setWarnings([]);
     setPreview(null);
-    const result = await DocumentPicker.getDocumentAsync({ type: "*/*", copyToCacheDirectory: true });
-    if (result.canceled || !result.assets[0]) return;
-    const asset = result.assets[0];
+    const result = await File.pickFileAsync({ mimeTypes: "*/*" });
+    if (result.canceled) return;
+    const file = result.result;
     setBusy(true);
     try {
-      if (asset.name.toLowerCase().endsWith(".json")) {
-        const response = await fetch(asset.uri);
-        const text = await response.text();
-        setPreview(parseLibraryJson(text));
+      if (file.name.toLowerCase().endsWith(".json")) {
+        setPreview(parseLibraryJson(await file.text()));
       } else {
-        const uploaded = await uploadImportPreview({ uri: asset.uri, name: asset.name, mimeType: asset.mimeType });
+        const uploaded = await uploadImportPreview(file);
         setPreview(uploaded.data);
         setWarnings(uploaded.warnings);
       }

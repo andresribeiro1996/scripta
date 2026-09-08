@@ -1,12 +1,7 @@
 import type { LibraryData } from "@scripta/shared";
+import type { File } from "expo-file-system";
 
-export interface ImportFile {
-  uri: string;
-  name: string;
-  mimeType?: string;
-}
-
-export type ImportFilePicker = () => Promise<ImportFile | null>;
+export type ImportFilePicker = () => Promise<File | null>;
 
 export interface ImportPreview {
   data: LibraryData;
