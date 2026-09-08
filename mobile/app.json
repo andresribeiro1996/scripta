@@ -6,11 +6,17 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "scripta",
+    "extra": {
+      "eas": {
+        "projectId": "08320592-07d4-4e5b-b124-f46315c420df"
+      }
+    },
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon"
     },
     "android": {
+      "package": "com.atmyshelf.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
