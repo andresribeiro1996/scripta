@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "book_count": 24,
+  "name": "Dev Library",
+  "books": [
+    { "ContentID": "fixture-1", "Title": "The Fellowship of the Ring", "Attribution": "J.R.R. Tolkien", "ISBN": "9780544003415", "Series": "The Lord of the Rings", "SeriesNumber": 1, "ReadStatus": 2 },
+    { "ContentID": "fixture-2", "Title": "The Two Towers", "Attribution": "J.R.R. Tolkien", "ISBN": "9780544003423", "Series": "The Lord of the Rings", "SeriesNumber": 2, "ReadStatus": 2 },
+    { "ContentID": "fixture-3", "Title": "The Return of the King", "Attribution": "J.R.R. Tolkien", "ISBN": "9780544003430", "Series": "The Lord of the Rings", "SeriesNumber": 3, "ReadStatus": 1 },
+    { "ContentID": "fixture-4", "Title": "A Game of Thrones", "Attribution": "George R.R. Martin", "ISBN": "9780553593716", "Series": "A Song of Ice and Fire", "SeriesNumber": 1, "ReadStatus": 2 },
+    { "ContentID": "fixture-5", "Title": "A Clash of Kings", "Attribution": "George R.R. Martin", "ISBN": "9780553579901", "Series": "A Song of Ice and Fire", "SeriesNumber": 2, "ReadStatus": 1 },
+    { "ContentID": "fixture-6", "Title": "A Storm of Swords", "Attribution": "George R.R. Martin", "ISBN": "9780553573428", "Series": "A Song of Ice and Fire", "SeriesNumber": 3, "ReadStatus": 0 },
+    { "ContentID": "fixture-7", "Title": "The Hobbit", "Attribution": "J.R.R. Tolkien", "ISBN": "9780547928227", "ReadStatus": 2 },
+    {
+      "ContentID": "fixture-8",
+      "Title": "1984",
+      "Attribution": "George Orwell",
+      "ISBN": "9780451524935",
+      "ReadStatus": 2,
+      "_style": {
+        "cardRadius": 0,
+        "cardAspectRatio": "1/1",
+        "cardBorderWidth": 2,
+        "cardBorderStyle": "dashed",
+        "cardBorderColor": "#c0392b",
+        "cardBorderOpacity": 100,
+        "cardBorderSides": { "top": true, "right": true, "bottom": true, "left": true },
+        "cardOpacity": 100,
+        "cardShadow": false,
+        "cardHoverEffect": true,
+        "overlayIntensity": 88,
+        "showTitleAuthor": true,
+        "cardFontFamily": "mono",
+        "cardFontSize": 13,
+        "cardTextColor": null,
+        "cardBold": true,
+        "cardItalic": false
+      }
+    },
+    { "ContentID": "fixture-9", "Title": "Brave New World", "Attribution": "Aldous Huxley", "ISBN": "9780060850524", "ReadStatus": 1 },
+    { "ContentID": "fixture-10", "Title": "Fahrenheit 451", "Attribution": "Ray Bradbury", "ISBN": "9781451673319", "ReadStatus": 0 },
+    { "ContentID": "fixture-11", "Title": "Pride and Prejudice", "Attribution": "Jane Austen", "ISBN": "9780141439518", "ReadStatus": 2 },
+    { "ContentID": "fixture-12", "Title": "To Kill a Mockingbird", "Attribution": "Harper Lee", "ISBN": "9780061120084", "ReadStatus": 2 },
+    { "ContentID": "fixture-13", "Title": "The Great Gatsby", "Attribution": "F. Scott Fitzgerald", "ISBN": "9780743273565", "ReadStatus": 1 },
+    { "ContentID": "fixture-14", "Title": "Moby-Dick", "Attribution": "Herman Melville", "ISBN": "9781503280786", "ReadStatus": 0 },
+    { "ContentID": "fixture-15", "Title": "War and Peace", "Attribution": "Leo Tolstoy", "ISBN": "9781400079988", "ReadStatus": 0 },
+    { "ContentID": "fixture-16", "Title": "Crime and Punishment", "Attribution": "Fyodor Dostoevsky", "ISBN": "9780486415871", "ReadStatus": 1 },
+    { "ContentID": "fixture-17", "Title": "Dracula", "Attribution": "Bram Stoker", "ISBN": "9780486411095", "ReadStatus": 2 },
+    { "ContentID": "fixture-18", "Title": "Frankenstein", "Attribution": "Mary Shelley", "ISBN": "9780486282114", "ReadStatus": 2 },
+    { "ContentID": "fixture-19", "Title": "The Picture of Dorian Gray", "Attribution": "Oscar Wilde", "ISBN": "9780486278070", "ReadStatus": 1 },
+    { "ContentID": "fixture-20", "Title": "Jane Eyre", "Attribution": "Charlotte Brontë", "ISBN": "9780141441146", "ReadStatus": 0 },
+    { "ContentID": "fixture-21", "Title": "Wuthering Heights", "Attribution": "Emily Brontë", "ISBN": "9780141439556", "ReadStatus": 0 },
+    { "ContentID": "fixture-22", "Title": "The Odyssey", "Attribution": "Homer", "ISBN": "9780140268867", "ReadStatus": 1 },
+    { "ContentID": "fixture-23", "Title": "Don Quixote", "Attribution": "Miguel de Cervantes", "ISBN": "9780060934347", "ReadStatus": 2 },
+    { "ContentID": "fixture-24", "Title": "The Catcher in the Rye", "Attribution": "J.D. Salinger", "ISBN": "9780316769488", "ReadStatus": 2 }
+  ],
+  "groups": [
+    {
+      "id": "fixture-group-lotr",
+      "type": "series",
+      "name": "The Lord of the Rings",
+      "bookKeys": ["isbn:9780544003415", "isbn:9780544003423", "isbn:9780544003430"],
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "updatedAt": "2026-01-01T00:00:00.000Z",
+      "style": {
+        "cardRadius": 24,
+        "cardAspectRatio": "3/4",
+        "cardBorderWidth": 3,
+        "cardBorderStyle": "double",
+        "cardBorderColor": "#8e6b2c",
+        "cardBorderOpacity": 100,
+        "cardBorderSides": { "top": true, "right": true, "bottom": true, "left": true },
+        "cardOpacity": 100,
+        "cardShadow": true,
+        "cardHoverEffect": true,
+        "overlayIntensity": 92,
+        "showTitleAuthor": true,
+        "cardFontFamily": "playfairDisplay",
+        "cardFontSize": 14,
+        "cardTextColor": null,
+        "cardBold": false,
+        "cardItalic": true
+      }
+    },
+    {
+      "id": "fixture-group-asoiaf",
+      "type": "series",
+      "name": "A Song of Ice and Fire",
+      "bookKeys": ["isbn:9780553593716", "isbn:9780553579901", "isbn:9780553573428"],
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "updatedAt": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "fixture-group-favorites",
+      "type": "collection",
+      "name": "Favorites",
+      "bookKeys": [
+        "isbn:9780544003415",
+        "isbn:9780547928227",
+        "isbn:9780451524935",
+        "isbn:9780061120084",
+        "isbn:9780486411095"
+      ],
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "updatedAt": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "fixture-group-nightstand",
+      "type": "collection",
+      "name": "On the nightstand",
+      "bookKeys": [
+        "isbn:9780553579901",
+        "isbn:9780743273565",
+        "isbn:9781400079988",
+        "isbn:9780141439556"
+      ],
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "updatedAt": "2026-01-01T00:00:00.000Z"
+    }
+  ]
+}

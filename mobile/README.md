@@ -11,6 +11,53 @@ EXPO_PUBLIC_API_URL=http://<your-mac-lan-ip>:3000 npm run mobile
 
 Backend must be up (`npm run backend`). Open in Expo Go by entering `exp://<lan-ip>:8081`. `EXPO_PUBLIC_API_URL` is validated at startup — the app refuses to boot with it unset or non-http(s).
 
+## Testing on an emulator
+
+A physical phone works (see above), but it locks its screen, can't be driven
+headlessly, and is a single shared device across concurrent worktrees. For
+anything scripted — an agent verifying a change, a quick "does this still
+work" — an Android emulator has none of those problems: no lock screen, no
+screen timeout, and `adb`/`uiautomator` drive it the same as a real device.
+
+One-time setup (no `sudo`, ~3GB):
+
+```bash
+brew install openjdk
+brew install --cask android-commandlinetools
+export JAVA_HOME=/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home ANDROID_HOME=/opt/homebrew/share/android-commandlinetools PATH="$JAVA_HOME/bin:$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools:$PATH"
+yes | sdkmanager --licenses
+sdkmanager platform-tools emulator platforms\;android-35 "system-images;android-35;google_apis;arm64-v8a"
+```
+
+Then, from the repo root, any time:
+
+```bash
+node scripts/dev-emulator.mjs
+```
+
+Idempotent — boots the `scripta-dev` AVD if it isn't running (creating it
+first, on a machine that's never run this before), sideloads Expo Go if
+needed, builds `@scripta/shared` if this worktree hasn't yet, starts the
+backend and Metro if either isn't already up, and opens Expo Go pointed at
+this worktree's servers. Safe to re-run any time — re-running while
+everything is already up just re-launches Expo Go against the current
+bundle.
+
+It signs straight into a dedicated local-only dev account
+(`scripta-dev@local.test`, seeded by `scripts/dev-account.mjs`) carrying a
+~24-book fixture library (`scripts/fixtures/library.json`) — two series,
+two collections, mixed read statuses, and both a book-level and a
+series-level style override, so Series/Collections/Style screens all have
+real content to look at immediately. Re-running `dev-account.mjs` (or
+`dev-emulator.mjs`, which calls it) resets that account back to the
+fixture's known state without touching any other account.
+
+The auto-sign-in is dev-only by construction — see
+`src/core/devSession.ts`'s own comment — and only ever seeds a session
+when SecureStore has none yet; it never overwrites a real signed-in
+session. Every file it touches (`backend/.env`, `backend/data/*.sqlite`,
+`mobile/.env.local`) is gitignored and worktree-local.
+
 ## Layout
 
 - `src/core/` — config (validated API URL), token store (refresh token in `expo-secure-store`, access token in memory only), API client, `AuthProvider` (cold-start refresh).

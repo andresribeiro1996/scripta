@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { File } from "expo-file-system";
 import { GoogleSignInCancelledError, startGoogleSignIn } from "../features/auth/googleSignIn";
 import { apiClient, logout, refreshAccessToken, setSessionExpiredHandler } from "./api";
+import { seedDevSession } from "./devSession";
 import { getAccessToken, secureTokenStore, setAccessToken } from "./tokenStore";
 
 interface AuthUser {
@@ -49,6 +50,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const clearSessionExpiredHandler = setSessionExpiredHandler(() => setUser(null));
     (async () => {
       try {
+        // Dev-only, and a no-op unless both conditions below hold: see
+        // devSession.ts's own comment for why this can't reach a release
+        // build. Lets scripts/dev-emulator.mjs boot straight into a
+        // signed-in session on a fresh emulator install, no password.
+        await seedDevSession(secureTokenStore, {
+          isDev: __DEV__,
+          devToken: process.env.EXPO_PUBLIC_DEV_REFRESH_TOKEN,
+        });
         // Shared with api.ts's own 401 retry — see refreshAccessToken's
         // own comment for why this must be the SAME coalesced call rather
         // than a second, independent refresh done inline here.
