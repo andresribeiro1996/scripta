@@ -18,18 +18,16 @@ import { useState } from "react";
 import { File } from "expo-file-system";
 import { ScrollView, Text, View } from "react-native";
 import type { LibraryData } from "@scripta/shared";
-import { Button, ErrorState, Sheet, Skeleton } from "../../../ui/components";
+import { Button, ErrorState, Skeleton } from "../../../ui/components";
 import { spacing, typography, useTheme } from "../../../ui/theme";
 import { uploadImportPreview } from "../../import/api";
 import { parseLibraryJson } from "../lib/localImport";
 
-export function ImportSheet({
-  visible,
+export function ImportForm({
   title = "Import library",
   onMerge,
   onClose,
 }: {
-  visible: boolean;
   title?: string;
   /** Runs the merge/save pipeline; rejects on failure so this sheet can
    *  show it and stay open. */
@@ -82,7 +80,7 @@ export function ImportSheet({
   }
 
   return (
-    <Sheet visible={visible} title={title} onClose={onClose}>
+    <>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: spacing.md, paddingBottom: spacing.xl }}>
         <Text style={[typography.body, { color: colors.textDim }]}>
           A <Text style={{ fontWeight: "700" }}>library.json</Text> from the exporter CLI, a{" "}
@@ -116,6 +114,6 @@ export function ImportSheet({
           </View>
         )}
       </ScrollView>
-    </Sheet>
+    </>
   );
 }

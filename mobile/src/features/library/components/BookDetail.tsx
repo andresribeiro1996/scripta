@@ -4,11 +4,11 @@
 
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { nextReadStatus, statusLabel } from "@scripta/shared";
-import { Button, Sheet } from "../../../ui/components";
+import { Button } from "../../../ui/components";
 import { spacing, typography, useTheme } from "../../../ui/theme";
 import { CoverImage } from "./CoverImage";
 
-export function BookDetailSheet({
+export function BookDetail({
   book,
   onOpenStyle,
   onOpenCoverPicker,
@@ -30,7 +30,7 @@ export function BookDetailSheet({
   const percent = typeof book.___PercentRead === "number" ? Math.round(book.___PercentRead) : null;
 
   return (
-    <Sheet visible title="Book details" onClose={onClose}>
+    <>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: spacing.lg, paddingBottom: spacing.xl }}>
         <View style={styles.header}>
           <View style={[styles.cover, { backgroundColor: colors.border }]}>
@@ -71,7 +71,7 @@ export function BookDetailSheet({
           </View>
         </View>
       </ScrollView>
-    </Sheet>
+    </>
   );
 }
 

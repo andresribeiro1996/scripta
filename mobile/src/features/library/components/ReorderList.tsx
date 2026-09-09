@@ -18,16 +18,13 @@
 
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { bookKey } from "@scripta/shared";
-import { Sheet } from "../../../ui/components";
 import { minimumTouchTarget, radii, spacing, typography, useTheme } from "../../../ui/theme";
 
-export function ReorderSheet({
-  visible,
+export function ReorderList({
   orderedBooks,
   onMove,
   onClose,
 }: {
-  visible: boolean;
   /** Same display order LibraryScreen's grid renders (before search/
    *  filter/sort narrows it further — reordering only makes sense
    *  against the library's OWN order, not a filtered view of it). */
@@ -38,7 +35,7 @@ export function ReorderSheet({
   const { colors } = useTheme();
 
   return (
-    <Sheet visible={visible} title="Reorder books" onClose={onClose}>
+    <>
       <FlatList
         data={orderedBooks}
         keyExtractor={(book, i) => String(book.ContentID ?? i)}
@@ -74,7 +71,7 @@ export function ReorderSheet({
           );
         }}
       />
-    </Sheet>
+    </>
   );
 }
 

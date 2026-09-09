@@ -2,7 +2,7 @@
 // CardBorderSection/CardContentSection/CardTextSection (components/
 // StyleControls.tsx) collapsed into one component — used by both
 // LibraryStyleView.tsx (the full library-wide panel) and
-// PerCardStyleSheet.tsx (a series/book override), same as the web
+// PerCardStyleForm.tsx (a series/book override), same as the web
 // version reuses the same four sections in both places.
 
 import { View } from "react-native";

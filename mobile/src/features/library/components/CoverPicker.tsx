@@ -6,15 +6,30 @@ import { Button, ErrorState, Sheet } from "../../../ui/components";
 import { minimumTouchTarget, radii, spacing, typography, useTheme } from "../../../ui/theme";
 import { deleteGalleryImage, fetchGalleryImages, uploadGalleryImage, type GalleryImage } from "../../gallery/api";
 
-export function CoverPickerSheet({
-  visible,
+type CoverPickerProps = {
+  title: string;
+  currentImageId: string | null;
+  onSelect: (image: GalleryImage) => void;
+  onRemoveCover: () => void;
+  onClose: () => void;
+};
+
+/** Presented as a modal from a screen that has its own chrome (GroupsView). */
+export function CoverPickerSheet({ visible, ...props }: CoverPickerProps & { visible: boolean }) {
+  return (
+    <Sheet visible={visible} title={`Cover for "${props.title}"`} onClose={props.onClose}>
+      <CoverPicker {...props} />
+    </Sheet>
+  );
+}
+
+export function CoverPicker({
   title,
   currentImageId,
   onSelect,
   onRemoveCover,
   onClose,
 }: {
-  visible: boolean;
   title: string;
   currentImageId: string | null;
   onSelect: (image: GalleryImage) => void;
@@ -29,7 +44,6 @@ export function CoverPickerSheet({
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!visible) return;
     let cancelled = false;
     setLoadError(null);
     fetchGalleryImages()
@@ -42,7 +56,7 @@ export function CoverPickerSheet({
     return () => {
       cancelled = true;
     };
-  }, [visible]);
+  }, []);
 
   async function handlePickAndUpload() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -88,7 +102,7 @@ export function CoverPickerSheet({
   }
 
   return (
-    <Sheet visible={visible} title={`Cover for "${title}"`} onClose={onClose}>
+    <>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: spacing.md, paddingBottom: spacing.xl }}>
         <Button label={uploading ? "Uploading…" : "Upload from your photos…"} loading={uploading} onPress={() => void handlePickAndUpload()} />
         {uploadError && <Text style={[typography.caption, { color: colors.danger }]}>{uploadError}</Text>}
@@ -143,7 +157,7 @@ export function CoverPickerSheet({
           <Text style={[typography.caption, { color: colors.textDim }]}>Tap to use as cover. Long-press to delete from your gallery.</Text>
         )}
       </ScrollView>
-    </Sheet>
+    </>
   );
 }
 

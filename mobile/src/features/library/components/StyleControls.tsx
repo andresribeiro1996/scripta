@@ -1,5 +1,5 @@
 // Native building blocks for the style panels (LibraryStyleView.tsx,
-// PerCardStyleSheet.tsx) — mirrors frontend's components/StyleControls.tsx
+// PerCardStyleForm.tsx) — mirrors frontend's components/StyleControls.tsx
 // section-by-section (Section/SliderRow/ToggleRow → Section/StepperRow/
 // ToggleRow/SelectRow/ColorSwatchRow here), adapted for touch:
 //

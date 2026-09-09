@@ -1,6 +1,6 @@
 // Mirrors frontend's components/PerCardStylePanel.tsx — the "override
 // this book/series' own card style" sheet, reused for both a book
-// (BookDetailSheet's "Style" action) and a series (GroupsView's series
+// (BookDetail's "Style" action) and a series (GroupsView's series
 // settings menu). See @scripta/shared's Group.style / book._style for
 // where each side persists.
 //
@@ -21,8 +21,25 @@ import { useDebouncedCallback } from "../lib/debounce";
 import { PerCardStyleFields } from "./PerCardStyleFields";
 import { ToggleRow } from "./StyleControls";
 
-export function PerCardStyleSheet({
-  visible,
+type PerCardStyleProps = {
+  name: string;
+  priorityText: string;
+  currentOverride: PerCardStyle | undefined;
+  seedStyle: LibraryStyleSettings;
+  onSave: (style: PerCardStyle | undefined) => void;
+  onClose: () => void;
+};
+
+/** Presented as a modal from a screen that has its own chrome (GroupsView). */
+export function PerCardStyleSheet({ visible, ...props }: PerCardStyleProps & { visible: boolean }) {
+  return (
+    <Sheet visible={visible} title={`Style for "${props.name}"`} onClose={props.onClose}>
+      <PerCardStyleForm {...props} />
+    </Sheet>
+  );
+}
+
+export function PerCardStyleForm({
   name,
   priorityText,
   currentOverride,
@@ -30,7 +47,6 @@ export function PerCardStyleSheet({
   onSave,
   onClose,
 }: {
-  visible: boolean;
   name: string;
   priorityText: string;
   currentOverride: PerCardStyle | undefined;
@@ -63,7 +79,7 @@ export function PerCardStyleSheet({
   }
 
   return (
-    <Sheet visible={visible} title={`Style for "${name}"`} onClose={onClose}>
+    <>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: spacing.md, paddingBottom: spacing.xl }}>
         <ToggleRow label="Custom style" checked={customized} onChange={toggleCustomized} />
         {!customized ? (
@@ -72,6 +88,6 @@ export function PerCardStyleSheet({
           <PerCardStyleFields draft={draft} onApply={applyPatch} onSaveNow={saveNowPatch} themeBorderColor={colors.border} />
         )}
       </ScrollView>
-    </Sheet>
+    </>
   );
 }

@@ -10,7 +10,7 @@ import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
 import { buildManualBook, normalizeIsbn } from "@scripta/shared";
-import { Button, Input, Sheet } from "../../../ui/components";
+import { Button, Input } from "../../../ui/components";
 import { spacing, typography, useTheme } from "../../../ui/theme";
 import { searchBooks, type BookSearchResult } from "../api/search";
 import { SelectRow } from "./StyleControls";
@@ -21,12 +21,10 @@ const STATUS_OPTIONS = [
   { value: "0", label: "Not read" },
 ];
 
-export function AddBookSheet({
-  visible,
+export function AddBookForm({
   onAdd,
   onClose,
 }: {
-  visible: boolean;
   onAdd: (book: Record<string, unknown>) => Promise<void>;
   onClose: () => void;
 }) {
@@ -102,7 +100,7 @@ export function AddBookSheet({
   }
 
   return (
-    <Sheet visible={visible} title="Add a book" onClose={onClose}>
+    <>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: spacing.md, paddingBottom: spacing.xl }}>
         <View style={styles.searchRow}>
           <View style={{ flex: 1 }}>
@@ -152,7 +150,7 @@ export function AddBookSheet({
           {saveError && <Text style={[typography.caption, { color: colors.danger }]}>{saveError}</Text>}
         </View>
       </ScrollView>
-    </Sheet>
+    </>
   );
 }
 

@@ -7,7 +7,7 @@
 // same explanation.
 //
 // Deliberately pure/RN-free (no expo-document-picker import here) — the
-// actual picker call lives in components/ImportSheet.tsx, which reads the
+// actual picker call lives in components/ImportForm.tsx, which reads the
 // chosen file via plain `fetch(uri).then(r => r.text())` (works for a
 // local file:// / cache-copied URI in React Native's own networking
 // layer, same trick features/import/api.ts's multipart upload already

@@ -36,8 +36,8 @@ import { useLibrary } from "../hooks/useLibrary";
 import { attemptUpdate } from "../lib/attemptUpdate";
 import { BookCard } from "./BookCard";
 import { BookWrapGrid } from "./BookWrapGrid";
-import { CoverPickerSheet } from "./CoverPickerSheet";
-import { PerCardStyleSheet } from "./PerCardStyleSheet";
+import { CoverPickerSheet } from "./CoverPicker";
+import { PerCardStyleSheet } from "./PerCardStyleForm";
 
 const COPY: Record<GroupType, { title: string; noun: string; emptyTitle: string; emptyBody: string }> = {
   series: {
