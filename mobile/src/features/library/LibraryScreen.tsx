@@ -43,6 +43,7 @@ import type { GalleryImage } from "../gallery/api";
 import { useMurals } from "../murals/useMurals";
 import { useLibrary } from "./hooks/useLibrary";
 import { buildMergedLibrary } from "./lib/mergeAndSave";
+import { attemptUpdate } from "./lib/attemptUpdate";
 import { AddBookSheet } from "./components/AddBookSheet";
 import { BookCard } from "./components/BookCard";
 import { BookDetailSheet } from "./components/BookDetailSheet";
@@ -92,12 +93,8 @@ export function LibraryScreen({ initialView = "browse" }: { initialView?: Screen
   const styleBook = styleBookKey ? books.find((b) => bookKey(b) === styleBookKey) ?? null : null;
   const coverBook = coverBookKey ? books.find((b) => bookKey(b) === coverBookKey) ?? null : null;
 
-  async function runUpdate(mutate: (data: LibraryData) => LibraryData, failureMessage: string) {
-    try {
-      await updateLibrary(mutate);
-    } catch {
-      Alert.alert(failureMessage);
-    }
+  async function runUpdate(mutate: (data: LibraryData) => LibraryData, failureMessage: string, onSuccess?: () => void) {
+    return attemptUpdate(() => updateLibrary(mutate), () => Alert.alert(failureMessage), onSuccess);
   }
 
   async function handleRenameLibrary() {
@@ -171,11 +168,12 @@ export function LibraryScreen({ initialView = "browse" }: { initialView?: Screen
               groups: removeBooksFromAllGroups(data.groups ?? [], keys),
             }),
             "Couldn't delete — nothing was changed.",
-          ).then(() => {
-            void murals.scrubBooks(keys).catch(() => Alert.alert("The books were deleted, but some mural references couldn't be updated."));
-            setSelectedKeys(new Set());
-            setSelectionMode(false);
-          });
+            () => {
+              void murals.scrubBooks(keys).catch(() => Alert.alert("The books were deleted, but some mural references couldn't be updated."));
+              setSelectedKeys(new Set());
+              setSelectionMode(false);
+            },
+          );
         },
       },
     ]);

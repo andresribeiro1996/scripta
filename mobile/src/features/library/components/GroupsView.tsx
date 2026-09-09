@@ -31,7 +31,9 @@ import {
 import { Button, EmptyState, Input, Sheet } from "../../../ui/components";
 import { spacing, typography, useTheme } from "../../../ui/theme";
 import type { GalleryImage } from "../../gallery/api";
+import { useMurals } from "../../murals/useMurals";
 import { useLibrary } from "../hooks/useLibrary";
+import { attemptUpdate } from "../lib/attemptUpdate";
 import { BookCard } from "./BookCard";
 import { BookWrapGrid } from "./BookWrapGrid";
 import { CoverPickerSheet } from "./CoverPickerSheet";
@@ -54,6 +56,7 @@ const COPY: Record<GroupType, { title: string; noun: string; emptyTitle: string;
 
 export function GroupsView({ type }: { type: GroupType }) {
   const { data: library, updateLibrary } = useLibrary();
+  const murals = useMurals();
   const copy = COPY[type];
   const { colors } = useTheme();
 
@@ -85,12 +88,8 @@ export function GroupsView({ type }: { type: GroupType }) {
   const bookSeriesGroup = useMemo(() => seriesGroupByBookKey(library?.data.books ?? [], library?.data.groups ?? []), [library]);
   const style = resolveLibraryStyle(library?.data.style);
 
-  async function runUpdate(mutate: (data: LibraryData) => LibraryData) {
-    try {
-      await updateLibrary(mutate);
-    } catch {
-      Alert.alert("Couldn't save — check your connection.");
-    }
+  async function runUpdate(mutate: (data: LibraryData) => LibraryData, onSuccess?: () => void) {
+    return attemptUpdate(() => updateLibrary(mutate), () => Alert.alert("Couldn't save — check your connection."), onSuccess);
   }
 
   async function handleCommitDraft() {
@@ -167,14 +166,18 @@ export function GroupsView({ type }: { type: GroupType }) {
         text: "Delete",
         style: "destructive",
         onPress: () => {
-          void runUpdate((data) => ({
-            ...data,
-            books: data.books.filter((b) => !keys.has(bookKey(b))),
-            groups: removeBooksFromAllGroups(data.groups ?? [], keys),
-          })).then(() => {
-            setSelectedKeys(new Set());
-            setSelectionMode(false);
-          });
+          void runUpdate(
+            (data) => ({
+              ...data,
+              books: data.books.filter((b) => !keys.has(bookKey(b))),
+              groups: removeBooksFromAllGroups(data.groups ?? [], keys),
+            }),
+            () => {
+              void murals.scrubBooks(keys).catch(() => Alert.alert("The books were deleted, but some mural references couldn't be updated."));
+              setSelectedKeys(new Set());
+              setSelectionMode(false);
+            },
+          );
         },
       },
     ]);
