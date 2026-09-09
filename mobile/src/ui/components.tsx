@@ -12,6 +12,7 @@ import {
   View,
   type ViewStyle,
 } from "react-native";
+import MenuView from "@expo/ui/community/menu";
 import SegmentedControl from "@expo/ui/community/segmented-control";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { errorHaptic, successHaptic } from "./haptics";
@@ -61,7 +62,8 @@ export function Button({
   variant?: ButtonVariant;
   loading?: boolean;
   disabled?: boolean;
-  onPress: () => void;
+  /** Omitted when the button is only a trigger — see Menu. */
+  onPress?: () => void;
 }) {
   const { colors } = useTheme();
   const unavailable = disabled || loading;
@@ -228,26 +230,33 @@ export type MenuItem = {
   onPress: () => void;
 };
 
-export function Menu({ visible, title = "Menu", items, onClose }: { visible: boolean; title?: string; items: MenuItem[]; onClose: () => void }) {
-  const { colors } = useTheme();
+/**
+ * The platform's own menu — SwiftUI `Menu` on iOS, Compose `DropdownMenu` on
+ * Android — anchored to whatever trigger you wrap.
+ *
+ * This is trigger-based, not visibility-controlled: the native menu owns its
+ * own open state and neither platform exposes a programmatic open, so there is
+ * no `visible` prop to drive. Pass the control that opens it as `children`; its
+ * own `onPress` is not called, because the native menu intercepts the tap.
+ */
+export function Menu({ title, items, children }: { title?: string; items: MenuItem[]; children: ReactNode }) {
   return (
-    <Dialog visible={visible} title={title} onClose={onClose}>
-      <View accessibilityRole="menu" style={styles.menu}>
-        {items.map((item) => (
-          <Pressable
-            accessibilityLabel={item.accessibilityLabel ?? item.label}
-            accessibilityRole="menuitem"
-            accessibilityState={{ disabled: item.disabled }}
-            disabled={item.disabled}
-            key={item.label}
-            onPress={() => { item.onPress(); onClose(); }}
-            style={({ pressed }) => [styles.menuItem, { backgroundColor: pressed ? colors.surfacePressed : colors.surface, opacity: item.disabled ? 0.55 : 1 }]}
-          >
-            <Text {...dynamicType} style={[typography.body, { color: item.destructive ? colors.danger : colors.text }]}>{item.label}</Text>
-          </Pressable>
-        ))}
-      </View>
-    </Dialog>
+    <MenuView
+      actions={items.map((item, index) => ({
+        // Index rather than label: two items may share a label, and the id is
+        // what comes back on press.
+        id: String(index),
+        title: item.label,
+        attributes: { destructive: item.destructive, disabled: item.disabled },
+      }))}
+      onPressAction={({ nativeEvent }) => {
+        const item = items[Number(nativeEvent.event)];
+        if (item && !item.disabled) item.onPress();
+      }}
+      title={title}
+    >
+      {children}
+    </MenuView>
   );
 }
 
@@ -354,8 +363,6 @@ const styles = StyleSheet.create({
   overlayTitle: { ...typography.title, fontWeight: "700", flex: 1 },
   closeButton: { minHeight: minimumTouchTarget, minWidth: minimumTouchTarget, alignItems: "center", justifyContent: "center" },
   closeText: { ...typography.body, fontWeight: "600" },
-  menu: { gap: spacing.xs },
-  menuItem: { minHeight: minimumTouchTarget, justifyContent: "center", paddingHorizontal: spacing.md, borderRadius: radii.md },
   toast: { borderRadius: radii.md, borderWidth: 1, paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
   state: { borderWidth: 2, borderStyle: "dashed", borderRadius: radii.lg, padding: spacing.huge, alignItems: "center", gap: spacing.md },
   stateTitle: { ...typography.title, fontWeight: "700", textAlign: "center" },

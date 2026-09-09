@@ -41,7 +41,7 @@ export default function GalleryRoute() {
 
 function UiGalleryScreen() {
   const { colors } = useTheme();
-  const [overlay, setOverlay] = useState<"sheet" | "dialog" | "menu" | null>(null);
+  const [overlay, setOverlay] = useState<"sheet" | "dialog" | null>(null);
   const [toast, setToast] = useState(false);
 
   return (
@@ -61,22 +61,22 @@ function UiGalleryScreen() {
       <Section title="Overlays">
         <Button label="Open sheet" variant="secondary" onPress={() => setOverlay("sheet")} />
         <Button label="Open dialog" variant="secondary" onPress={() => setOverlay("dialog")} />
-        <Button label="Open menu" variant="secondary" onPress={() => setOverlay("menu")} />
+        <Menu
+          title="Book"
+          items={[
+            { label: "Mark as read", onPress: () => undefined },
+            { label: "Disabled item", disabled: true, onPress: () => undefined },
+            { label: "Delete", destructive: true, onPress: () => undefined },
+          ]}
+        >
+          <Button label="Open menu" variant="secondary" />
+        </Menu>
         <Sheet visible={overlay === "sheet"} title="Book details" onClose={() => setOverlay(null)}>
           <ModalBody><Input label="Book title" defaultValue="The Left Hand of Darkness" /><Button label="Save" onPress={() => setOverlay(null)} /></ModalBody>
         </Sheet>
         <Dialog visible={overlay === "dialog"} title="Remove book?" onClose={() => setOverlay(null)}>
           <ModalBody><Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>This action cannot be undone.</Text><Button label="Remove" variant="destructive" onPress={() => setOverlay(null)} /></ModalBody>
         </Dialog>
-        <Menu
-          visible={overlay === "menu"}
-          onClose={() => setOverlay(null)}
-          items={[
-            { label: "Mark as read", onPress: () => undefined },
-            { label: "Disabled item", disabled: true, onPress: () => undefined },
-            { label: "Delete", destructive: true, onPress: () => undefined },
-          ]}
-        />
       </Section>
 
       <Section title="Feedback">

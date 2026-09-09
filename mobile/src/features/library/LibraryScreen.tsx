@@ -66,7 +66,6 @@ export function LibraryScreen({ initialView = "browse" }: { initialView?: Screen
   const murals = useMurals();
 
   const [view, setView] = useState<ScreenView>(initialView);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sortKey, setSortKey] = useState<SortKey>("manual");
@@ -249,7 +248,9 @@ export function LibraryScreen({ initialView = "browse" }: { initialView?: Screen
             <Text style={[typography.heading, { color: colors.text }]} numberOfLines={1}>
               {library?.data.name || "Library"}
             </Text>
-            <Button label="Menu" variant="secondary" onPress={() => setMenuOpen(true)} />
+            <Menu title={library?.data.name || "Library"} items={actionItems}>
+              <Button label="Menu" variant="secondary" />
+            </Menu>
           </>
         )}
       </View>
@@ -325,8 +326,6 @@ export function LibraryScreen({ initialView = "browse" }: { initialView?: Screen
           )}
         </>
       )}
-
-      <Menu visible={menuOpen} title={library?.data.name || "Library"} items={actionItems} onClose={() => setMenuOpen(false)} />
 
       <Sheet visible={editingName} title="Rename library" onClose={() => setEditingName(false)}>
         <Input label="Library name" autoFocus value={nameDraft} onChangeText={setNameDraft} onSubmitEditing={() => void handleRenameLibrary()} onBlur={() => void handleRenameLibrary()} />
