@@ -112,16 +112,19 @@ export function createApiClient(
     };
   }
 
+  async function recoverAccessToken(rejectedToken: string | null): Promise<string | null> {
+    const currentToken = getAccessToken();
+    const recovered = Boolean(currentToken && currentToken !== rejectedToken) || (await refreshAccessToken());
+    return recovered ? getAccessToken() : null;
+  }
+
   const apiClient: ApiClient = {
     async request<T>(path: string, init: { method?: string; body?: unknown; auth?: boolean } = {}) {
       if (init.auth && !getAccessToken()) throw new ApiError(401, "Not signed in");
 
       let response = await rawRequest<T & { error?: string }>(path, init);
       if (response.status === 401 && init.auth) {
-        const currentToken = getAccessToken();
-        const refreshed =
-          Boolean(currentToken && currentToken !== response.accessTokenUsed) || (await refreshAccessToken());
-        if (refreshed) response = await rawRequest<T & { error?: string }>(path, init);
+        if (await recoverAccessToken(response.accessTokenUsed)) response = await rawRequest<T & { error?: string }>(path, init);
       }
 
       if (response.status < 200 || response.status >= 300) {
@@ -131,5 +134,5 @@ export function createApiClient(
     },
   };
 
-  return { apiClient, refreshAccessToken, logout, setSessionExpiredHandler };
+  return { apiClient, refreshAccessToken, recoverAccessToken, logout, setSessionExpiredHandler };
 }

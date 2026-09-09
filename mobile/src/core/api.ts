@@ -6,6 +6,7 @@ const session = createApiClient(API_URL, secureTokenStore, getAccessToken, setAc
 
 export const apiClient: ApiClient = session.apiClient;
 export const refreshAccessToken = session.refreshAccessToken;
+export const recoverAccessToken = session.recoverAccessToken;
 export const logout = session.logout;
 export const setSessionExpiredHandler = session.setSessionExpiredHandler;
 export { ApiError };
