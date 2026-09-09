@@ -12,6 +12,7 @@ import {
   View,
   type ViewStyle,
 } from "react-native";
+import SegmentedControl from "@expo/ui/community/segmented-control";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { errorHaptic, successHaptic } from "./haptics";
 import { dynamicType, minimumTouchTarget, radii, spacing, typography, useReducedMotion, useTheme } from "./theme";
@@ -184,6 +185,39 @@ export function Sheet(props: OverlayProps) {
 
 export function Dialog(props: OverlayProps) {
   return <Overlay {...props} sheet={false} />;
+}
+
+// The native segmented control — SwiftUI's segmented Picker on iOS, Compose's
+// SingleChoiceSegmentedButtonRow on Android. Replaces the pairs of Buttons that
+// were standing in for one.
+export function Segmented<T extends string>({
+  options,
+  value,
+  onChange,
+  accessibilityLabel,
+}: {
+  options: readonly { readonly value: T; readonly label: string }[];
+  value: T;
+  onChange: (value: T) => void;
+  accessibilityLabel?: string;
+}) {
+  const { colors, mode } = useTheme();
+  const index = Math.max(0, options.findIndex((option) => option.value === value));
+
+  return (
+    <View accessibilityLabel={accessibilityLabel} accessibilityRole="tablist">
+      <SegmentedControl
+        appearance={mode}
+        onValueChange={(label) => {
+          const picked = options.find((option) => option.label === label);
+          if (picked) onChange(picked.value);
+        }}
+        selectedIndex={index}
+        tintColor={colors.accent}
+        values={options.map((option) => option.label)}
+      />
+    </View>
+  );
 }
 
 export type MenuItem = {

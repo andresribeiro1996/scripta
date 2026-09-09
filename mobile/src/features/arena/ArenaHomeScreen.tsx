@@ -2,11 +2,16 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
-import { Button, Dialog, EmptyState, ErrorState, Input, Screen, Skeleton, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { Button, Dialog, EmptyState, ErrorState, Input, Screen, Segmented, Skeleton, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { createTierlist, deleteTierlist, fetchTierlists, type Tierlist } from "../tierlists/api";
 import { TierlistEditorScreen } from "../tierlists/TierlistEditorScreen";
 import { deleteTournament, fetchMyTournaments, type TournamentSummary } from "./api";
 import { ArenaSeedScreen } from "./ArenaSeedScreen";
+
+const ARENA_TABS = [
+  { value: "tournaments", label: "Tournaments" },
+  { value: "tierlists", label: "Tier lists" },
+] as const;
 
 type OwnedItem =
   | { id: string; name: string; detail: string; kind: "tournament"; source: TournamentSummary }
@@ -70,7 +75,7 @@ export function ArenaHomeScreen() {
   const items = needle ? allItems.filter((item) => item.name.toLowerCase().includes(needle)) : allItems;
   return <Screen style={styles.screen}>
     <View style={styles.header}><Text accessibilityRole="header" {...dynamicType} style={[typography.heading, styles.strong, styles.grow, { color: colors.text }]}>Arena</Text><Button label="Browse public" variant="secondary" onPress={() => router.push("/arena" as never)} /></View>
-    <View style={styles.row}><Button label="Tournaments" variant={tab === "tournaments" ? "primary" : "secondary"} onPress={() => setTab("tournaments")} /><Button label="Tier lists" variant={tab === "tierlists" ? "primary" : "secondary"} onPress={() => setTab("tierlists")} /></View>
+    <Segmented accessibilityLabel="Arena section" options={ARENA_TABS} value={tab} onChange={setTab} />
     {error ? <Toast visible message={error} tone="error" /> : null}
     {allItems.length ? <Input label="Search" value={search} onChangeText={setSearch} placeholder={`Search ${tab}`} autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" returnKeyType="search" /> : null}
     <Button label={tab === "tournaments" ? "New tournament" : "New tier list"} loading={busy} onPress={() => tab === "tournaments" ? setSeeding("new") : void createList()} />
@@ -95,7 +100,6 @@ const styles = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   grow: { flex: 1 },
   strong: { fontWeight: "700" },
-  row: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   list: { gap: spacing.sm, paddingBottom: spacing.huge },
   card: { minHeight: 92, borderWidth: 1, borderRadius: radii.lg, padding: spacing.md, flexDirection: "row", alignItems: "center", gap: spacing.md },
   dialog: { gap: spacing.md },

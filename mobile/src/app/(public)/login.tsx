@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   StyleSheet,
   Text,
   type TextInput,
@@ -13,8 +12,13 @@ import { Redirect, useLocalSearchParams } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { GoogleSignInCancelledError, useAuth } from "../../core/auth";
 import { apiClient } from "../../core/api";
-import { Button, Input, Screen } from "../../ui";
-import { minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui/theme";
+import { Button, Input, Screen, Segmented } from "../../ui";
+import { spacing, typography, useTheme } from "../../ui/theme";
+
+const AUTH_MODES = [
+  { value: "login", label: "Log in" },
+  { value: "signup", label: "Sign up" },
+] as const;
 
 export default function LoginPage() {
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
@@ -100,20 +104,13 @@ export default function LoginPage() {
             <Text style={[styles.server, { color: colors.textDim }]}>Your bookshelf, everywhere.</Text>
           )}
 
-          <View style={[styles.modeRow, { borderColor: colors.border }]}>
-            {(["login", "signup"] as const).map((option) => (
-              <Pressable
-                accessibilityRole="tab"
-                accessibilityState={{ selected: mode === option }}
-                key={option}
-                onPress={() => { setMode(option); setError(null); }}
-                style={[styles.modeButton, mode === option && { backgroundColor: colors.accentSoft }]}
-              >
-                <Text style={[styles.modeText, { color: mode === option ? colors.accent : colors.textDim }]}>
-                  {option === "login" ? "Log in" : "Sign up"}
-                </Text>
-              </Pressable>
-            ))}
+          <View style={styles.modeRow}>
+            <Segmented
+              accessibilityLabel="Sign in or create an account"
+              options={AUTH_MODES}
+              value={mode}
+              onChange={(next) => { setMode(next); setError(null); }}
+            />
           </View>
 
           <View style={styles.form}>
@@ -185,9 +182,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: "center", alignItems: "center", padding: spacing.xxl },
   logo: { fontSize: 40, lineHeight: 48, fontWeight: "700" },
   server: { ...typography.body, marginTop: spacing.xs, marginBottom: spacing.xxxl, textAlign: "center" },
-  modeRow: { width: "100%", flexDirection: "row", marginBottom: spacing.lg, borderWidth: 1, borderRadius: radii.md, overflow: "hidden" },
-  modeButton: { flex: 1, minHeight: minimumTouchTarget, alignItems: "center", justifyContent: "center" },
-  modeText: { ...typography.body, fontWeight: "600" },
+  modeRow: { width: "100%", marginBottom: spacing.lg },
   form: { width: "100%", gap: spacing.md },
   error: { ...typography.body, textAlign: "center" },
 });
