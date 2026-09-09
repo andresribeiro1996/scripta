@@ -1,5 +1,6 @@
 import { ActivityIndicator, View } from "react-native";
 import { Redirect, Tabs } from "expo-router";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useAuth } from "../../core/auth";
 
 export default function AppLayout() {
@@ -18,10 +19,10 @@ export default function AppLayout() {
 
   return (
     <Tabs screenOptions={{ headerShown: false, tabBarActiveTintColor: "#1c1917", tabBarInactiveTintColor: "#a8a29e" }}>
-      <Tabs.Screen name="index" options={{ title: "Library" }} />
-      <Tabs.Screen name="my-arena" options={{ title: "Arena" }} />
-      <Tabs.Screen name="murals" options={{ title: "Murals" }} />
-      <Tabs.Screen name="settings" options={{ title: "Settings" }} />
+      <Tabs.Screen name="index" options={{ title: "Library", tabBarIcon: ({ color, focused, size }) => <Ionicons name={focused ? "library" : "library-outline"} color={color} size={size} /> }} />
+      <Tabs.Screen name="my-arena" options={{ title: "Arena", tabBarIcon: ({ color, focused, size }) => <Ionicons name={focused ? "trophy" : "trophy-outline"} color={color} size={size} /> }} />
+      <Tabs.Screen name="murals" options={{ title: "Murals", tabBarIcon: ({ color, focused, size }) => <Ionicons name={focused ? "color-palette" : "color-palette-outline"} color={color} size={size} /> }} />
+      <Tabs.Screen name="settings" options={{ title: "Settings", tabBarIcon: ({ color, focused, size }) => <Ionicons name={focused ? "settings" : "settings-outline"} color={color} size={size} /> }} />
       <Tabs.Screen name="murals/[id]" options={{ href: null }} />
       <Tabs.Screen name="tierlist/[id]" options={{ href: null }} />
       <Tabs.Screen name="seed/[id]" options={{ href: null }} />
