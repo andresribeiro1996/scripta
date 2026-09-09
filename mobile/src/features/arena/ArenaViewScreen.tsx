@@ -6,7 +6,7 @@ import * as Linking from "expo-linking";
 import { FlatList, Pressable, Share, StyleSheet, Text, View } from "react-native";
 import { bracketShape, countdownLabel, createVoterToken, sharePercent, type Duel, type DuelSide } from "@scripta/shared";
 import { useAuth } from "../../core/auth";
-import { Button, Dialog, EmptyState, ErrorState, Input, Skeleton, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { Button, Dialog, EmptyState, ErrorState, Input, Screen, Skeleton, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { fetchTournament, renameTournament, resolveTiebreak, settleDuelEarly, voteOnDuel } from "./api";
 
 const TOKEN_KEY = "arena-voter-token";
@@ -67,14 +67,14 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
     }
   }
 
-  if (!token || tournament.isPending) return <View style={[styles.screen, { backgroundColor: colors.background }]}><Skeleton height={160} /></View>;
-  if (tournament.isError || !data) return <View style={[styles.screen, { backgroundColor: colors.background }]}><ErrorState title="Tournament unavailable" body={tournament.error instanceof Error ? tournament.error.message : "No such tournament."} actionLabel="Retry" onAction={() => void tournament.refetch()} /></View>;
+  if (!token || tournament.isPending) return <Screen bottomInset style={styles.screen}><Skeleton height={160} /></Screen>;
+  if (tournament.isError || !data) return <Screen bottomInset style={styles.screen}><ErrorState title="Tournament unavailable" body={tournament.error instanceof Error ? tournament.error.message : "No such tournament."} actionLabel="Retry" onAction={() => void tournament.refetch()} /></Screen>;
 
   const duels: Array<{ key: string; duel: Duel | null }> = mode === "matches"
     ? data.duels.map((duel) => ({ key: duel.id, duel }))
     : bracketShape(data.bracketSize, data.duels).flatMap((round, roundIndex) => round.map((duel, duelIndex) => ({ duel, key: `${roundIndex}:${duelIndex}` })));
   return (
-    <View style={[styles.screen, { backgroundColor: colors.background }]}>
+    <Screen bottomInset style={styles.screen}>
       <View style={styles.header}>
         {onClose ? <Button label="Back" variant="secondary" onPress={onClose} /> : null}
         <View style={styles.grow}><Text accessibilityRole="header" numberOfLines={1} {...dynamicType} style={[typography.title, styles.strong, { color: colors.text }]}>{data.name}</Text><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{data.bracketSize} books · {data.status === "active" ? `Round ${data.currentRound}` : data.status}</Text></View>
@@ -104,12 +104,12 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
         }}
       />
       <Dialog visible={renaming} title="Rename tournament" onClose={() => setRenaming(false)}><View style={styles.dialog}><Input label="Tournament name" value={name} onChangeText={setName} maxLength={200} /><Button label="Save name" disabled={!name.trim()} loading={busy === "rename"} onPress={() => void action("rename", async () => { await renameTournament(id, name.trim()); setRenaming(false); })} /></View></Dialog>
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, padding: spacing.lg, gap: spacing.md },
+  screen: { padding: spacing.lg, gap: spacing.md },
   header: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   grow: { flex: 1 },
   strong: { fontWeight: "700" },

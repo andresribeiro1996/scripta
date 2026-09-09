@@ -3,7 +3,7 @@ import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
-import { Button, Input } from "../../ui";
+import { Button, Input, Screen } from "../../ui";
 import { radii, spacing, typography, useTheme } from "../../ui/theme";
 import { useAuth } from "../../core/auth";
 import { API_URL } from "../../core/config";
@@ -46,7 +46,8 @@ export function SettingsScreen() {
   }
 
   return (
-    <ScrollView style={{ backgroundColor: colors.background }} contentContainerStyle={styles.page}>
+    <Screen>
+      <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
       <Text accessibilityRole="header" style={[styles.title, { color: colors.text }]}>Settings</Text>
       <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <Text style={[styles.heading, { color: colors.text }]}>Account</Text>
@@ -69,6 +70,7 @@ export function SettingsScreen() {
       <SocialsSection />
       <Button label="Sign out" variant="destructive" onPress={confirmSignOut} />
     </ScrollView>
+    </Screen>
   );
 }
 

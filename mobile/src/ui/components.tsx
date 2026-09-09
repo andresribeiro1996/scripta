@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, type Ref, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -12,7 +12,37 @@ import {
   View,
   type ViewStyle,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { dynamicType, minimumTouchTarget, radii, spacing, typography, useReducedMotion, useTheme } from "./theme";
+
+// Every screen root. Paints the themed background and pays the top safe-area
+// inset so headers clear the status bar / Dynamic Island — nothing in this app
+// sits under a native stack header, so no other layer applies the inset.
+// `bottomInset` is for screens outside the tab shell, where no tab bar is
+// already reserving the home-indicator strip.
+export function Screen({
+  children,
+  bottomInset = false,
+  style,
+}: {
+  children: ReactNode;
+  bottomInset?: boolean;
+  style?: ViewStyle;
+}) {
+  const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+  return (
+    <View
+      style={[
+        { flex: 1, backgroundColor: colors.background, paddingTop: insets.top },
+        bottomInset ? { paddingBottom: insets.bottom } : null,
+        style,
+      ]}
+    >
+      {children}
+    </View>
+  );
+}
 
 export type ButtonVariant = "primary" | "secondary" | "destructive";
 
@@ -58,7 +88,17 @@ export function Button({
   );
 }
 
-export function Input({ label, error, accessibilityLabel = label, editable = true, style, ...props }: TextInputProps & { label: string; error?: string }) {
+export function Input({
+  label,
+  error,
+  accessibilityLabel = label,
+  editable = true,
+  style,
+  // Forwarded so a form can move focus to the next field on "next" — without
+  // it there is no way to reach the underlying TextInput.
+  ref,
+  ...props
+}: TextInputProps & { label: string; error?: string; ref?: Ref<TextInput> }) {
   const { colors } = useTheme();
   const [focused, setFocused] = useState(false);
 
@@ -67,6 +107,7 @@ export function Input({ label, error, accessibilityLabel = label, editable = tru
       <Text {...dynamicType} style={[styles.label, { color: colors.text }]}>{label}</Text>
       <TextInput
         {...props}
+        ref={ref}
         accessibilityLabel={accessibilityLabel}
         accessibilityState={{ disabled: !editable }}
         allowFontScaling
@@ -96,6 +137,7 @@ type OverlayProps = {
 
 function Overlay({ visible, title, children, onClose, closeAccessibilityLabel, sheet }: OverlayProps & { sheet: boolean }) {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const reducedMotion = useReducedMotion();
 
   return (
@@ -112,7 +154,16 @@ function Overlay({ visible, title, children, onClose, closeAccessibilityLabel, s
           onPress={onClose}
           style={[StyleSheet.absoluteFill, { backgroundColor: colors.scrim }]}
         />
-        <View accessibilityViewIsModal style={[sheet ? styles.sheet : styles.dialog, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <View
+          accessibilityViewIsModal
+          style={[
+            sheet ? styles.sheet : styles.dialog,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+            // A sheet is flush to the bottom edge, so its own content has to
+            // clear the home indicator — spacing.xxxl was a fixed guess at it.
+            sheet ? { paddingBottom: insets.bottom + spacing.xl } : null,
+          ]}
+        >
           <View style={styles.overlayHeader}>
             <Text accessibilityRole="header" {...dynamicType} style={[styles.overlayTitle, { color: colors.text }]}>{title}</Text>
             <Pressable accessibilityLabel={`Close ${title}`} accessibilityRole="button" hitSlop={8} onPress={onClose} style={styles.closeButton}>
@@ -251,7 +302,7 @@ const styles = StyleSheet.create({
   overlay: { flex: 1 },
   sheetOverlay: { justifyContent: "flex-end" },
   dialogOverlay: { justifyContent: "center", padding: spacing.lg },
-  sheet: { maxHeight: "90%", padding: spacing.xl, paddingBottom: spacing.xxxl, borderWidth: 1, borderBottomWidth: 0, borderTopLeftRadius: radii.xl, borderTopRightRadius: radii.xl },
+  sheet: { maxHeight: "90%", padding: spacing.xl, borderWidth: 1, borderBottomWidth: 0, borderTopLeftRadius: radii.xl, borderTopRightRadius: radii.xl },
   dialog: { maxHeight: "90%", padding: spacing.xl, borderWidth: 1, borderRadius: radii.lg },
   overlayHeader: { minHeight: minimumTouchTarget, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md },
   overlayTitle: { ...typography.title, fontWeight: "700", flex: 1 },

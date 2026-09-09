@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { StyleSheet, Text, View } from "react-native";
 import { useAuth } from "../../core/auth";
-import { Button, ErrorState, Skeleton, Toast, dynamicType, spacing, typography, useTheme } from "../../ui";
+import { Button, ErrorState, Screen, Skeleton, Toast, dynamicType, spacing, typography, useTheme } from "../../ui";
 import { fetchBallot, fetchVotingBoard, submitBallot, type BallotResponse } from "./api";
 import { keyOf, TierBoard, type TierBook } from "./TierBoard";
 import { TierlistResults } from "./TierlistResults";
@@ -34,8 +34,8 @@ export function VoteTierlistScreen({ code }: { code: string }) {
     void fetchBallot(code, storedId, Boolean(user)).then(setBallot).catch(() => { void AsyncStorage.removeItem(storageKey(code)); setStoredId(null); });
   }, [code, ready, storedId, user]);
 
-  if (!ready || storedId === undefined || boardQuery.isPending) return <View style={[styles.screen, { backgroundColor: colors.background }]}><Skeleton height={180} /></View>;
-  if (boardQuery.isError || !boardQuery.data) return <View style={[styles.screen, { backgroundColor: colors.background }]}><ErrorState title="No tier list at that link" body="Check the voting code and try again." actionLabel="Retry" onAction={() => void boardQuery.refetch()} /></View>;
+  if (!ready || storedId === undefined || boardQuery.isPending) return <Screen bottomInset style={styles.screen}><Skeleton height={180} /></Screen>;
+  if (boardQuery.isError || !boardQuery.data) return <Screen bottomInset style={styles.screen}><ErrorState title="No tier list at that link" body="Check the voting code and try again." actionLabel="Retry" onAction={() => void boardQuery.refetch()} /></Screen>;
   const { board } = boardQuery.data;
   const books: TierBook[] = boardQuery.data.books.map((book) => ({ Title: book.title, Attribution: book.author, ISBN: book.isbn, ImageId: book.imageId, _coverUrl: book.coverUrl }));
   const allKeys = new Set(books.map(keyOf));
@@ -60,7 +60,7 @@ export function VoteTierlistScreen({ code }: { code: string }) {
     }
   }
 
-  return <View style={[styles.screen, { backgroundColor: colors.background }]}>
+  return <Screen bottomInset style={styles.screen}>
     <Text accessibilityRole="header" {...dynamicType} style={[typography.heading, styles.strong, { color: colors.text }]}>{board.name}</Text>
     <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{board.votingOpen ? "Voting is open." : "Voting is closed."}</Text>
     {error ? <Toast visible message={error} tone="error" /> : null}
@@ -69,11 +69,11 @@ export function VoteTierlistScreen({ code }: { code: string }) {
       <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{blocked ? "Rank the books, then sign in to cast your ballot." : "Long press and drag books vertically, or use the arrow controls."}</Text>
       <TierBoard data={data} books={books} onChange={setWorking} structureEditable={false} poolLabel="Unranked" />
     </>}
-  </View>;
+  </Screen>;
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, padding: spacing.lg, paddingTop: spacing.huge, gap: spacing.md },
+  screen: { padding: spacing.lg, gap: spacing.md },
   strong: { fontWeight: "700" },
   row: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
 });

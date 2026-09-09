@@ -11,7 +11,7 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useFocusEffect, useRouter } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { Button, EmptyState, ErrorState, Input, Sheet, Toast } from "../../ui";
+import { Button, EmptyState, ErrorState, Input, Screen, Sheet, Toast } from "../../ui";
 import { spacing, typography, useTheme } from "../../ui/theme";
 import { fetchGalleryImages } from "../gallery/api";
 import { useLibrary } from "../library/hooks/useLibrary";
@@ -90,7 +90,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
   if (muralQuery.isError || !mural || !draftMural) return <ErrorState title="Mural unavailable" body="It may have been deleted." actionLabel="Back" onAction={() => router.back()} />;
 
   return (
-    <View style={[styles.screen, { backgroundColor: colors.background }]}>
+    <Screen style={styles.screen}>
       <View style={styles.header}><Button label="Back" variant="secondary" onPress={() => router.back()} /><Input label="Mural name" value={currentName} onChangeText={setName} style={styles.name} /><Button label="Save" loading={busy} onPress={() => void save()} /></View>
       {error ? <Toast visible message={error} tone="error" /> : null}
       <ScrollView contentContainerStyle={styles.canvasScroll}>
@@ -132,12 +132,12 @@ export function MuralEditorScreen({ id }: { id: string }) {
           {picking && ((picking === "book" && filteredBooks.length === 0) || (picking === "image" && !gallery.data?.length) || (picking === "tierlist" && !tierlists.data?.length)) ? <EmptyState title="Nothing available" /> : null}
         </ScrollView>
       </Sheet>
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1 },
+  screen: {},
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   header: { flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.sm },
   name: { minWidth: 140 },

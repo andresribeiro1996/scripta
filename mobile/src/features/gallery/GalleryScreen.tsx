@@ -4,7 +4,7 @@ import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { scrubImageFromBooks } from "@scripta/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, EmptyState, ErrorState } from "../../ui";
+import { Button, EmptyState, ErrorState, Screen } from "../../ui";
 import { minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui/theme";
 import { useLibrary } from "../library/hooks/useLibrary";
 import { useMurals } from "../murals/useMurals";
@@ -91,7 +91,7 @@ export function GalleryScreen() {
   if (gallery.isError) return <ErrorState body={gallery.error.message} actionLabel="Retry" onAction={() => void gallery.refetch()} />;
 
   return (
-    <View style={[styles.screen, { backgroundColor: colors.background }]}>
+    <Screen bottomInset style={styles.screen}>
       <View style={styles.header}>
         <Text accessibilityRole="header" style={[styles.title, { color: colors.text }]}>Gallery</Text>
         <Button label={upload.isPending ? "Uploading…" : "Upload image"} loading={upload.isPending} onPress={() => void pickImage()} />
@@ -116,12 +116,12 @@ export function GalleryScreen() {
           </View>
         )}
       />
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, paddingTop: spacing.xl },
+  screen: {},
   header: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md, gap: spacing.md },
   title: { ...typography.heading, fontWeight: "700" },
   list: { padding: spacing.sm, flexGrow: 1 },

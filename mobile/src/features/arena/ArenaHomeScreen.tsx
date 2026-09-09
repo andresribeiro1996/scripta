@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
-import { Button, Dialog, EmptyState, ErrorState, Input, Skeleton, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { Button, Dialog, EmptyState, ErrorState, Input, Screen, Skeleton, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { createTierlist, deleteTierlist, fetchTierlists, type Tierlist } from "../tierlists/api";
 import { TierlistEditorScreen } from "../tierlists/TierlistEditorScreen";
 import { deleteTournament, fetchMyTournaments, type TournamentSummary } from "./api";
@@ -68,7 +68,7 @@ export function ArenaHomeScreen() {
     : (tierlists.data ?? []).map((item) => ({ id: item.id, name: item.name, detail: `${item.data.tiers.length} tiers${item.voteCode ? ` · voting ${item.votingOpen ? "open" : "closed"}` : ""}`, kind: "tierlist" as const, source: item }));
   const needle = search.trim().toLowerCase();
   const items = needle ? allItems.filter((item) => item.name.toLowerCase().includes(needle)) : allItems;
-  return <View style={[styles.screen, { backgroundColor: colors.background }]}>
+  return <Screen style={styles.screen}>
     <View style={styles.header}><Text accessibilityRole="header" {...dynamicType} style={[typography.heading, styles.strong, styles.grow, { color: colors.text }]}>Arena</Text><Button label="Browse public" variant="secondary" onPress={() => router.push("/arena" as never)} /></View>
     <View style={styles.row}><Button label="Tournaments" variant={tab === "tournaments" ? "primary" : "secondary"} onPress={() => setTab("tournaments")} /><Button label="Tier lists" variant={tab === "tierlists" ? "primary" : "secondary"} onPress={() => setTab("tierlists")} /></View>
     {error ? <Toast visible message={error} tone="error" /> : null}
@@ -87,11 +87,11 @@ export function ArenaHomeScreen() {
       </View>}
     />}
     <Dialog visible={deleting !== null} title={`Delete “${deleting?.name ?? ""}”?`} onClose={() => setDeleting(null)}><View style={styles.dialog}><Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>This cannot be undone.</Text><Button label="Delete" variant="destructive" loading={busy} onPress={() => void remove()} /></View></Dialog>
-  </View>;
+  </Screen>;
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, padding: spacing.lg, paddingTop: spacing.xxl, gap: spacing.md },
+  screen: { padding: spacing.lg, gap: spacing.md },
   header: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   grow: { flex: 1 },
   strong: { fontWeight: "700" },

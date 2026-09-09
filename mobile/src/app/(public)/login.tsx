@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -6,17 +6,20 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
+  type TextInput,
   View,
 } from "react-native";
 import { Redirect, useLocalSearchParams } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { GoogleSignInCancelledError, useAuth } from "../../core/auth";
 import { apiClient } from "../../core/api";
+import { Button, Input, Screen } from "../../ui";
+import { minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui/theme";
 
 export default function LoginPage() {
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const { ready, user, signUp, signIn, signInWithGoogle } = useAuth();
+  const { colors } = useTheme();
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [identifier, setIdentifier] = useState("");
   const [username, setUsername] = useState("");
@@ -24,6 +27,8 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [googleBusy, setGoogleBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const usernameRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
 
   const health = useQuery({
     queryKey: ["health"],
@@ -41,14 +46,19 @@ export default function LoginPage() {
 
   if (!ready) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" />
-      </View>
+      <Screen bottomInset style={styles.center}>
+        <ActivityIndicator size="large" color={colors.accent} />
+      </Screen>
     );
   }
   if (user) return <Redirect href={(!user.username ? "/choose-username" : mode === "signup" ? "/welcome-avatar" : returnTo?.startsWith("/vote/") ? returnTo : "/(app)") as never} />;
 
+  const incomplete = mode === "signup"
+    ? username.trim().length < 3 || password.length < 8 || identifier.trim() === ""
+    : identifier.trim() === "" || password === "";
+
   const onSubmit = async () => {
+    if (incomplete) return;
     setBusy(true);
     setError(null);
     try {
@@ -76,101 +86,108 @@ export default function LoginPage() {
   };
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.flex}>
-      <View style={styles.center}>
-        <Text accessibilityRole="header" style={styles.logo}>Scripta</Text>
-        <Text style={styles.server}>
-          {health.isPending ? "checking server…" : health.isError ? "server unreachable" : "server ok"}
-        </Text>
-        <View style={styles.modeRow}>
-          <Pressable accessibilityRole="tab" accessibilityState={{ selected: mode === "login" }} style={[styles.modeButton, mode === "login" && styles.modeActive]} onPress={() => setMode("login")}><Text style={styles.modeText}>Log in</Text></Pressable>
-          <Pressable accessibilityRole="tab" accessibilityState={{ selected: mode === "signup" }} style={[styles.modeButton, mode === "signup" && styles.modeActive]} onPress={() => setMode("signup")}><Text style={styles.modeText}>Sign up</Text></Pressable>
+    <Screen bottomInset>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.flex}>
+        <View style={styles.center}>
+          <Text accessibilityRole="header" style={[styles.logo, { color: colors.text }]}>Scripta</Text>
+          {/* Only worth the user's attention when the server is actually
+              unreachable — "server ok" is a developer's line, not a reader's. */}
+          {health.isError ? (
+            <Text accessibilityRole="alert" style={[styles.server, { color: colors.danger }]}>
+              Can&apos;t reach the server. Check your connection.
+            </Text>
+          ) : (
+            <Text style={[styles.server, { color: colors.textDim }]}>Your bookshelf, everywhere.</Text>
+          )}
+
+          <View style={[styles.modeRow, { borderColor: colors.border }]}>
+            {(["login", "signup"] as const).map((option) => (
+              <Pressable
+                accessibilityRole="tab"
+                accessibilityState={{ selected: mode === option }}
+                key={option}
+                onPress={() => { setMode(option); setError(null); }}
+                style={[styles.modeButton, mode === option && { backgroundColor: colors.accentSoft }]}
+              >
+                <Text style={[styles.modeText, { color: mode === option ? colors.accent : colors.textDim }]}>
+                  {option === "login" ? "Log in" : "Sign up"}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <View style={styles.form}>
+            <Input
+              label={mode === "signup" ? "Email" : "Email or username"}
+              value={identifier}
+              onChangeText={setIdentifier}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete={mode === "signup" ? "email" : "username"}
+              textContentType={mode === "signup" ? "emailAddress" : "username"}
+              keyboardType={mode === "signup" ? "email-address" : "default"}
+              returnKeyType="next"
+              onSubmitEditing={() => (mode === "signup" ? usernameRef : passwordRef).current?.focus()}
+              submitBehavior="submit"
+              placeholder={mode === "signup" ? "you@example.com" : "Email or username"}
+            />
+            {mode === "signup" ? (
+              <Input
+                ref={usernameRef}
+                label="Username"
+                value={username}
+                onChangeText={setUsername}
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="username-new"
+                textContentType="username"
+                returnKeyType="next"
+                onSubmitEditing={() => passwordRef.current?.focus()}
+                submitBehavior="submit"
+                placeholder="username"
+              />
+            ) : null}
+            <Input
+              ref={passwordRef}
+              label="Password"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              // Without these, iOS offers neither Keychain autofill nor
+              // "save this password" after a successful sign-in.
+              autoComplete={mode === "signup" ? "new-password" : "current-password"}
+              textContentType={mode === "signup" ? "newPassword" : "password"}
+              returnKeyType="go"
+              onSubmitEditing={() => void onSubmit()}
+              placeholder={mode === "signup" ? "At least 8 characters" : "Password"}
+            />
+            <Button
+              label={mode === "signup" ? "Create account" : "Sign in"}
+              loading={busy}
+              disabled={incomplete}
+              onPress={() => void onSubmit()}
+            />
+            {providers.data?.google ? (
+              <Button label="Sign in with Google" variant="secondary" loading={googleBusy} onPress={() => void onGoogleSignIn()} />
+            ) : null}
+            {error ? (
+              <Text accessibilityLiveRegion="polite" accessibilityRole="alert" style={[styles.error, { color: colors.danger }]}>{error}</Text>
+            ) : null}
+          </View>
         </View>
-        <TextInput
-          accessibilityLabel={mode === "signup" ? "Email" : "Email or username"}
-          style={styles.input}
-          value={identifier}
-          onChangeText={setIdentifier}
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType={mode === "signup" ? "email-address" : "default"}
-          placeholder={mode === "signup" ? "Email" : "Email or username"}
-          placeholderTextColor="#9ca3af"
-        />
-        {mode === "signup" ? <TextInput
-          accessibilityLabel="Username"
-          style={styles.input}
-          value={username}
-          onChangeText={setUsername}
-          autoCapitalize="none"
-          autoCorrect={false}
-          placeholder="Username"
-          placeholderTextColor="#9ca3af"
-        /> : null}
-        <TextInput
-          accessibilityLabel="Password"
-          style={styles.input}
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          placeholder="Password"
-          placeholderTextColor="#9ca3af"
-        />
-        <Pressable accessibilityLabel={mode === "signup" ? "Create account" : "Sign in"} accessibilityRole="button" accessibilityState={{ busy, disabled: busy || (mode === "signup" && (username.trim().length < 3 || password.length < 8)) }} style={({ pressed }) => [styles.button, pressed && styles.buttonPressed, mode === "signup" && (username.trim().length < 3 || password.length < 8) && styles.buttonDisabled]} onPress={onSubmit} disabled={busy || (mode === "signup" && (username.trim().length < 3 || password.length < 8))}>
-          {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{mode === "signup" ? "Create account" : "Sign in"}</Text>}
-        </Pressable>
-        {providers.data?.google && (
-          <Pressable
-            accessibilityLabel="Sign in with Google"
-            accessibilityRole="button"
-            accessibilityState={{ busy: googleBusy, disabled: googleBusy }}
-            style={({ pressed }) => [styles.googleButton, pressed && styles.buttonPressed]}
-            onPress={onGoogleSignIn}
-            disabled={googleBusy}
-          >
-            {googleBusy ? <ActivityIndicator color="#1c1917" /> : <Text style={styles.googleButtonText}>Sign in with Google</Text>}
-          </Pressable>
-        )}
-        {error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
-      </View>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: "#fafaf9" },
-  center: { flex: 1, justifyContent: "center", alignItems: "center", padding: 24 },
-  logo: { fontSize: 40, fontWeight: "700", color: "#1c1917" },
-  server: { fontSize: 13, color: "#78716c", marginTop: 4, marginBottom: 32 },
-  modeRow: { width: "100%", flexDirection: "row", marginBottom: 16, borderWidth: 1, borderColor: "#d6d3d1", borderRadius: 12, overflow: "hidden" },
-  modeButton: { flex: 1, padding: 12, alignItems: "center" },
-  modeActive: { backgroundColor: "#e7e5e4" },
-  modeText: { color: "#1c1917", fontWeight: "600" },
-  input: {
-    width: "100%",
-    borderWidth: 1,
-    borderColor: "#d6d3d1",
-    borderRadius: 12,
-    padding: 14,
-    fontSize: 16,
-    marginBottom: 12,
-    backgroundColor: "#fff",
-    color: "#1c1917",
-  },
-  button: { width: "100%", backgroundColor: "#1c1917", borderRadius: 12, padding: 16, alignItems: "center" },
-  buttonPressed: { opacity: 0.85 },
-  buttonDisabled: { opacity: 0.4 },
-  buttonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
-  googleButton: {
-    width: "100%",
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: "#d6d3d1",
-    borderRadius: 12,
-    padding: 16,
-    alignItems: "center",
-    marginTop: 12,
-  },
-  googleButtonText: { color: "#1c1917", fontSize: 16, fontWeight: "600" },
-  error: { color: "#dc2626", marginTop: 12, textAlign: "center" },
+  flex: { flex: 1 },
+  center: { flex: 1, justifyContent: "center", alignItems: "center", padding: spacing.xxl },
+  logo: { fontSize: 40, lineHeight: 48, fontWeight: "700" },
+  server: { ...typography.body, marginTop: spacing.xs, marginBottom: spacing.xxxl, textAlign: "center" },
+  modeRow: { width: "100%", flexDirection: "row", marginBottom: spacing.lg, borderWidth: 1, borderRadius: radii.md, overflow: "hidden" },
+  modeButton: { flex: 1, minHeight: minimumTouchTarget, alignItems: "center", justifyContent: "center" },
+  modeText: { ...typography.body, fontWeight: "600" },
+  form: { width: "100%", gap: spacing.md },
+  error: { ...typography.body, textAlign: "center" },
 });

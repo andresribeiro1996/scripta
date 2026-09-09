@@ -1,7 +1,9 @@
 import { useState } from "react";
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "react-native";
 import { Redirect } from "expo-router";
 import { useAuth } from "../core/auth";
+import { Button, Input, Screen } from "../ui";
+import { spacing, typography, useTheme } from "../ui/theme";
 
 /** A Google sign-in with no username yet (`user.username === null`) is
  *  routed here by (app)/_layout.tsx's own guard before it's treated as
@@ -12,6 +14,7 @@ import { useAuth } from "../core/auth";
  *  never shows up as a tab. */
 export default function ChooseUsernamePage() {
   const { ready, user, setUsername } = useAuth();
+  const { colors } = useTheme();
   const [continueToAvatar, setContinueToAvatar] = useState(false);
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
@@ -19,15 +22,16 @@ export default function ChooseUsernamePage() {
 
   if (!ready) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" />
-      </View>
+      <Screen bottomInset style={styles.center}>
+        <ActivityIndicator size="large" color={colors.accent} />
+      </Screen>
     );
   }
   if (!user) return <Redirect href="/(public)/login" />;
   if (user.username) return <Redirect href={continueToAvatar ? "/welcome-avatar" : "/(app)"} />;
 
   const trimmed = value.trim();
+  const tooShort = trimmed.length < 3;
   const onSubmit = async () => {
     setBusy(true);
     setError(null);
@@ -42,55 +46,37 @@ export default function ChooseUsernamePage() {
   };
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.flex}>
-      <View style={styles.center}>
-        <Text accessibilityRole="header" style={styles.title}>Choose a username</Text>
-        <Text style={styles.sub}>One more step before your library loads.</Text>
-        <TextInput
-          style={styles.input}
-          accessibilityLabel="Username"
-          value={value}
-          onChangeText={setValue}
-          autoCapitalize="none"
-          autoCorrect={false}
-          placeholder="username"
-          placeholderTextColor="#9ca3af"
-        />
-        <Pressable
-          accessibilityLabel="Continue"
-          accessibilityRole="button"
-          accessibilityState={{ busy, disabled: busy || trimmed.length < 3 }}
-          style={({ pressed }) => [styles.button, pressed && styles.buttonPressed, trimmed.length < 3 && styles.buttonDisabled]}
-          onPress={onSubmit}
-          disabled={busy || trimmed.length < 3}
-        >
-          {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Continue</Text>}
-        </Pressable>
-        {error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
-      </View>
-    </KeyboardAvoidingView>
+    <Screen bottomInset>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.flex}>
+        <View style={styles.center}>
+          <Text accessibilityRole="header" style={[styles.title, { color: colors.text }]}>Choose a username</Text>
+          <Text style={[styles.sub, { color: colors.textDim }]}>One more step before your library loads.</Text>
+          <View style={styles.form}>
+            <Input
+              label="Username"
+              value={value}
+              onChangeText={setValue}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="username-new"
+              textContentType="username"
+              returnKeyType="done"
+              onSubmitEditing={() => { if (!tooShort && !busy) void onSubmit(); }}
+              placeholder="username"
+              error={error ?? undefined}
+            />
+            <Button label="Continue" loading={busy} disabled={tooShort} onPress={() => void onSubmit()} />
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: "#fafaf9" },
-  center: { flex: 1, justifyContent: "center", alignItems: "center", padding: 24 },
-  title: { fontSize: 24, fontWeight: "700", color: "#1c1917" },
-  sub: { fontSize: 13, color: "#78716c", marginTop: 4, marginBottom: 24, textAlign: "center" },
-  input: {
-    width: "100%",
-    borderWidth: 1,
-    borderColor: "#d6d3d1",
-    borderRadius: 12,
-    padding: 14,
-    fontSize: 16,
-    marginBottom: 12,
-    backgroundColor: "#fff",
-    color: "#1c1917",
-  },
-  button: { width: "100%", backgroundColor: "#1c1917", borderRadius: 12, padding: 16, alignItems: "center" },
-  buttonPressed: { opacity: 0.85 },
-  buttonDisabled: { opacity: 0.4 },
-  buttonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
-  error: { color: "#dc2626", marginTop: 12, textAlign: "center" },
+  flex: { flex: 1 },
+  center: { flex: 1, justifyContent: "center", alignItems: "center", padding: spacing.xxl, gap: spacing.xs },
+  title: { ...typography.heading, fontWeight: "700" },
+  sub: { ...typography.body, marginBottom: spacing.xxl, textAlign: "center" },
+  form: { width: "100%", gap: spacing.md },
 });

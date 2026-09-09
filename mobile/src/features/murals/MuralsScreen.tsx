@@ -4,7 +4,7 @@ import { Image } from "expo-image";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { buildMuralPreset, buildTree, MURAL_PRESETS, type Mural } from "@scripta/shared";
-import { Button, EmptyState, ErrorState, Input, Sheet } from "../../ui";
+import { Button, EmptyState, ErrorState, Input, Screen, Sheet } from "../../ui";
 import { radii, spacing, typography, useTheme } from "../../ui/theme";
 import { fetchGalleryImages } from "../gallery/api";
 import { useLibrary } from "../library/hooks/useLibrary";
@@ -66,7 +66,7 @@ export function MuralsScreen() {
 
   if (murals.isError) return <ErrorState body={murals.error.message} actionLabel="Retry" onAction={() => void murals.refetch()} />;
   return (
-    <View style={[styles.screen, { backgroundColor: colors.background }]}>
+    <Screen style={styles.screen}>
       <View style={styles.header}><Text accessibilityRole="header" style={[styles.title, { color: colors.text }]}>Murals</Text><Button label="Presets" variant="secondary" onPress={() => setPresets(true)} /><Button label="New mural" onPress={() => void murals.create("Untitled mural", folderId ?? null).then((mural) => router.push(`/murals/${mural.id}` as never))} /></View>
       <Input label="Search murals" value={search} onChangeText={setSearch} />
       <ScrollView horizontal contentContainerStyle={styles.folders}><Button label="All" variant={folderId === undefined ? "primary" : "secondary"} onPress={() => setFolderId(undefined)} /><Button label="Unfiled" variant={folderId === null ? "primary" : "secondary"} onPress={() => setFolderId(null)} />{tree.map(({ folder, depth }) => <Button key={folder.id} label={`${"  ".repeat(depth)}${folder.name}`} variant={folderId === folder.id ? "primary" : "secondary"} onPress={() => setFolderId(folder.id)} />)}<Button label="New folder" variant="secondary" onPress={() => void folders.create("New folder", folderId ?? null).then((folder) => { setEditingFolderId(folder.id); setFolderName(folder.name); setFolderParentId(folder.parentId); })} />{typeof folderId === "string" ? <><Button label="Edit folder" variant="secondary" onPress={() => editFolder(folderId)} /><Button label="Delete folder" variant="destructive" onPress={() => Alert.alert("Delete folder?", "Murals and subfolders move up one level.", [{ text: "Cancel", style: "cancel" }, { text: "Delete", style: "destructive", onPress: () => void folders.remove(folderId).then(() => setFolderId(undefined)) }])} /></> : null}</ScrollView>
@@ -87,12 +87,12 @@ export function MuralsScreen() {
       <Sheet visible={shareFor !== null} title="Share mural" onClose={() => setShareFor(null)}><View style={styles.sheet}>{shareFor?.shareUrl ? <><ShareActions message={shareFor.shareUrl} title={shareFor.name} /><Button label="Stop sharing" variant="destructive" onPress={() => void murals.unshare(shareFor.id).then(() => setShareFor(null))} /></> : <Button label="Create share link" onPress={() => void murals.share(shareFor!.id).then(setShareFor)} />}</View></Sheet>
       <Sheet visible={moveFor !== null} title="Move mural" onClose={() => setMoveFor(null)}><View style={styles.sheet}><Button label="Unfiled" variant="secondary" onPress={() => void murals.update(moveFor!.id, { folderId: null }).then(() => setMoveFor(null))} />{tree.map(({ folder, depth }) => <Button key={folder.id} label={`${"  ".repeat(depth)}${folder.name}`} variant="secondary" onPress={() => void murals.update(moveFor!.id, { folderId: folder.id }).then(() => setMoveFor(null))} />)}</View></Sheet>
       <Sheet visible={editingFolderId !== null} title="Edit folder" onClose={() => setEditingFolderId(null)}><View style={styles.sheet}><Input label="Folder name" value={folderName} onChangeText={setFolderName} /><Text style={[typography.caption, { color: colors.textDim }]}>Parent folder</Text><Button label="Top level" variant={folderParentId === null ? "primary" : "secondary"} onPress={() => setFolderParentId(null)} />{tree.filter(({ folder }) => folder.id !== editingFolderId).map(({ folder, depth }) => <Button key={folder.id} label={`${"  ".repeat(depth)}${folder.name}`} variant={folderParentId === folder.id ? "primary" : "secondary"} onPress={() => setFolderParentId(folder.id)} />)}<Button label="Save folder" onPress={() => void saveFolder()} /></View></Sheet>
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, padding: spacing.lg, gap: spacing.md },
+  screen: { padding: spacing.lg, gap: spacing.md },
   header: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   title: { ...typography.heading, fontWeight: "700", flex: 1 },
   folders: { gap: spacing.sm },

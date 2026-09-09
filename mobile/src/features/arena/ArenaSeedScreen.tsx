@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { filterBooks, seedCoverLookup, toSeedBook, type SeedBook } from "@scripta/shared";
-import { Button, EmptyState, ErrorState, Input, Sheet, Skeleton, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { Button, EmptyState, ErrorState, Input, Screen, Sheet, Skeleton, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { apiClient } from "../../core/api";
 import { createTournament, fetchTournament, randomFillTournament, resolveCover, setTournamentSlots, startTournament, type TournamentSummary } from "./api";
 
@@ -106,7 +106,7 @@ export function ArenaSeedScreen({ tournament, onClose, onStarted }: { tournament
   const assigned = new Set(slots.flatMap((book) => book ? [book.key] : []));
   const availableBooks = filterBooks(books, bookSearch, "all").filter((book) => !assigned.has(toSeedBook(book, null).key));
   return (
-    <View style={[styles.screen, { backgroundColor: colors.background }]}>
+    <Screen style={styles.screen}>
       <View style={styles.header}>
         <Button label="Back" variant="secondary" onPress={onClose} />
         <Text accessibilityRole="header" {...dynamicType} style={[typography.title, styles.grow, { color: colors.text }]}>Seed tournament</Text>
@@ -149,12 +149,12 @@ export function ArenaSeedScreen({ tournament, onClose, onStarted }: { tournament
           renderItem={({ item }) => <Pressable accessibilityLabel={`Assign ${String(item.Title ?? "Untitled")}`} accessibilityRole="button" accessibilityState={{ disabled: busy }} disabled={busy} onPress={() => void seedBook(item, slotToAssign!)} style={styles.pickRow}><Text numberOfLines={1} {...dynamicType} style={[typography.body, { color: colors.text }]}>{String(item.Title ?? "Untitled")}</Text></Pressable>}
         />
       </Sheet>
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, padding: spacing.lg, gap: spacing.md },
+  screen: { padding: spacing.lg, gap: spacing.md },
   header: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   grow: { flex: 1 },
   form: { gap: spacing.sm },

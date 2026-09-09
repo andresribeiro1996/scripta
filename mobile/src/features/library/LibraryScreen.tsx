@@ -37,7 +37,7 @@ import {
   type SortKey,
   type StatusFilter,
 } from "@scripta/shared";
-import { Button, EmptyState, ErrorState, Input, Menu, Sheet, type MenuItem } from "../../ui/components";
+import { Button, EmptyState, ErrorState, Input, Menu, Screen, Sheet, type MenuItem } from "../../ui/components";
 import { spacing, typography, useTheme } from "../../ui/theme";
 import type { GalleryImage } from "../gallery/api";
 import { useMurals } from "../murals/useMurals";
@@ -212,7 +212,7 @@ export function LibraryScreen({ initialView = "browse" }: { initialView?: Screen
   ];
 
   return (
-    <View style={[styles.flex, { backgroundColor: colors.background }]}>
+    <Screen>
       <View style={[styles.header, { borderColor: colors.border }]}>
         {selectionMode ? (
           <>
@@ -351,25 +351,24 @@ export function LibraryScreen({ initialView = "browse" }: { initialView?: Screen
           }}
         />
       </Sheet>
-    </View>
+    </Screen>
   );
 }
 
 function SubView({ title, onBack, children }: { title: string; onBack: () => void; children: ReactNode }) {
   const { colors } = useTheme();
   return (
-    <View style={[styles.flex, { backgroundColor: colors.background }]}>
+    <Screen>
       <View style={[styles.header, { borderColor: colors.border }]}>
         <Button label="← Library" variant="secondary" onPress={onBack} />
         <Text style={[typography.title, { color: colors.text }]}>{title}</Text>
       </View>
       {children}
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   header: {
     minHeight: 56,
