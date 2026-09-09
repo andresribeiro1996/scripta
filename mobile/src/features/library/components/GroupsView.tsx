@@ -309,7 +309,7 @@ export function GroupsView({ type }: { type: GroupType }) {
           which series/book is being styled without a remount would leave
           the sheet showing the PREVIOUS target's draft. */}
       <PerCardStyleSheet
-        key={styleGroupId ?? "none"}
+        key={`group-${styleGroupId ?? "none"}`}
         visible={styleGroup !== null}
         name={styleGroup?.name ?? ""}
         priorityText="the library-wide"
@@ -320,7 +320,7 @@ export function GroupsView({ type }: { type: GroupType }) {
       />
 
       <PerCardStyleSheet
-        key={styleBookKey ?? "none"}
+        key={`book-${styleBookKey ?? "none"}`}
         visible={styleBook !== null}
         name={String(styleBook?.Title ?? "")}
         priorityText="the series and library-wide"
