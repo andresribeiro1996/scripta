@@ -38,7 +38,7 @@ import {
   type SortKey,
   type StatusFilter,
 } from "@scripta/shared";
-import { Button, EmptyState, ErrorState, Input, Menu, Screen, Sheet, type MenuItem } from "../../ui/components";
+import { Button, EmptyState, ErrorState, Input, Menu, Screen, Sheet, Skeleton, type MenuItem } from "../../ui/components";
 import { spacing, typography, useTheme } from "../../ui/theme";
 import type { GalleryImage } from "../gallery/api";
 import { useMurals } from "../murals/useMurals";
@@ -254,7 +254,21 @@ export function LibraryScreen({ initialView = "browse" }: { initialView?: Screen
         )}
       </View>
 
-      {isPending && <View style={styles.center} />}
+      {/* Was an empty <View>, so the app's home screen was blank on every cold
+          start until the library resolved. */}
+      {isPending && (
+        <View style={styles.loading}>
+          <Skeleton height={44} radius={8} />
+          <View style={styles.loadingRow}>
+            <Skeleton height={190} radius={12} width="48%" />
+            <Skeleton height={190} radius={12} width="48%" />
+          </View>
+          <View style={styles.loadingRow}>
+            <Skeleton height={190} radius={12} width="48%" />
+            <Skeleton height={190} radius={12} width="48%" />
+          </View>
+        </View>
+      )}
       {isError && <ErrorState body={error instanceof Error ? error.message : "Couldn't load your library."} actionLabel="Retry" onAction={() => refetch()} />}
 
       {!isPending && !isError && books.length === 0 && (
@@ -384,7 +398,8 @@ function SubView({ title, onBack, children }: { title: string; onBack: () => voi
 }
 
 const styles = StyleSheet.create({
-  center: { flex: 1, alignItems: "center", justifyContent: "center" },
+  loading: { padding: spacing.lg, gap: spacing.md },
+  loadingRow: { flexDirection: "row", gap: spacing.md },
   header: {
     minHeight: 56,
     flexDirection: "row",
