@@ -64,7 +64,7 @@ export function PerCardStyleSheet({
 
   return (
     <Sheet visible={visible} title={`Style for "${name}"`} onClose={onClose}>
-      <ScrollView contentContainerStyle={{ gap: spacing.md, paddingBottom: spacing.xl }}>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: spacing.md, paddingBottom: spacing.xl }}>
         <ToggleRow label="Custom style" checked={customized} onChange={toggleCustomized} />
         {!customized ? (
           <Text style={[typography.body, { color: colors.textDim }]}>Currently uses {priorityText} style. Turn this on to override it.</Text>

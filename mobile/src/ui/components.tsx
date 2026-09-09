@@ -289,7 +289,7 @@ export function OfflineBanner({ message = "You're offline. Connect to refresh." 
 }
 
 export function ModalBody({ children }: { children: ReactNode }) {
-  return <ScrollView contentContainerStyle={styles.modalBody}>{children}</ScrollView>;
+  return <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalBody}>{children}</ScrollView>;
 }
 
 const styles = StyleSheet.create({

@@ -31,7 +31,7 @@ export function BookDetailSheet({
 
   return (
     <Sheet visible title="Book details" onClose={onClose}>
-      <ScrollView contentContainerStyle={{ gap: spacing.lg, paddingBottom: spacing.xl }}>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: spacing.lg, paddingBottom: spacing.xl }}>
         <View style={styles.header}>
           <View style={[styles.cover, { backgroundColor: colors.border }]}>
             <CoverImage book={book} />

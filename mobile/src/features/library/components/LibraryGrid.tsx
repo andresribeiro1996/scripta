@@ -61,6 +61,10 @@ export function LibraryGrid<T>({
       ListEmptyComponent={ListEmptyComponent}
       ListHeaderComponent={ListHeaderComponent}
       columnWrapperStyle={{ gap: style.cardGap }}
+      // The toolbar's search field sits directly above this grid: without
+      // this the first tap on a card only dismisses the keyboard.
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
       contentContainerStyle={[
         styles.content,
         {

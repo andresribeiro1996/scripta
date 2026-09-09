@@ -83,7 +83,7 @@ export function ImportSheet({
 
   return (
     <Sheet visible={visible} title={title} onClose={onClose}>
-      <ScrollView contentContainerStyle={{ gap: spacing.md, paddingBottom: spacing.xl }}>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: spacing.md, paddingBottom: spacing.xl }}>
         <Text style={[typography.body, { color: colors.textDim }]}>
           A <Text style={{ fontWeight: "700" }}>library.json</Text> from the exporter CLI, a{" "}
           <Text style={{ fontWeight: "700" }}>KoboReader.sqlite</Text> straight off your device, a Goodreads library CSV

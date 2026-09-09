@@ -89,7 +89,7 @@ export function CoverPickerSheet({
 
   return (
     <Sheet visible={visible} title={`Cover for "${title}"`} onClose={onClose}>
-      <ScrollView contentContainerStyle={{ gap: spacing.md, paddingBottom: spacing.xl }}>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: spacing.md, paddingBottom: spacing.xl }}>
         <Button label={uploading ? "Uploading…" : "Upload from your photos…"} loading={uploading} onPress={() => void handlePickAndUpload()} />
         {uploadError && <Text style={[typography.caption, { color: colors.danger }]}>{uploadError}</Text>}
 

@@ -103,10 +103,10 @@ export function AddBookSheet({
 
   return (
     <Sheet visible={visible} title="Add a book" onClose={onClose}>
-      <ScrollView contentContainerStyle={{ gap: spacing.md, paddingBottom: spacing.xl }}>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: spacing.md, paddingBottom: spacing.xl }}>
         <View style={styles.searchRow}>
           <View style={{ flex: 1 }}>
-            <Input label="Search" placeholder="ISBN, title, or author" value={query} onChangeText={setQuery} onSubmitEditing={() => void runSearch()} />
+            <Input label="Search" placeholder="ISBN, title, or author" value={query} onChangeText={setQuery} onSubmitEditing={() => void runSearch()} autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" returnKeyType="search" />
           </View>
           <View style={styles.searchButton}>
             <Button label={searching ? "…" : "Search"} loading={searching} disabled={query.trim() === ""} onPress={() => void runSearch()} />

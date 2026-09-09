@@ -140,7 +140,7 @@ export function ArenaSeedScreen({ tournament, onClose, onStarted }: { tournament
         />
       )}
       <Sheet visible={slotToAssign !== null} title={`Choose book for slot ${(slotToAssign ?? 0) + 1}`} onClose={() => setSlotToAssign(null)}>
-        <Input label="Search books" value={bookSearch} onChangeText={setBookSearch} placeholder="Title or author" />
+        <Input label="Search books" value={bookSearch} onChangeText={setBookSearch} placeholder="Title or author" autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" returnKeyType="search" />
         <FlatList
           data={availableBooks}
           keyExtractor={(book) => toSeedBook(book, null).key}

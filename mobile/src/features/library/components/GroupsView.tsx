@@ -189,7 +189,7 @@ export function GroupsView({ type }: { type: GroupType }) {
   const coverBook = coverBookKey ? books.find((b) => bookKey(b) === coverBookKey) ?? null : null;
 
   return (
-    <ScrollView contentContainerStyle={styles.content}>
+    <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <Text style={[typography.heading, { color: colors.text }]}>{copy.title}</Text>
         {books.length > 0 &&
@@ -211,7 +211,7 @@ export function GroupsView({ type }: { type: GroupType }) {
           ))}
       </View>
 
-      {books.length > 0 && <Input label="Search" placeholder={`Search ${copy.title.toLowerCase()}`} value={search} onChangeText={setSearch} />}
+      {books.length > 0 && <Input label="Search" placeholder={`Search ${copy.title.toLowerCase()}`} value={search} onChangeText={setSearch} autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" returnKeyType="search" />}
 
       {!allGroups.length && <EmptyState title={copy.emptyTitle} body={copy.emptyBody} />}
       {allGroups.length > 0 && groups.length === 0 && <Text style={[typography.body, { color: colors.textDim }]}>Nothing matches "{search.trim()}".</Text>}
@@ -364,8 +364,8 @@ function BookPickerSheet({
 
   return (
     <Sheet visible title={`Books in "${group.name}"`} onClose={onClose}>
-      <ScrollView contentContainerStyle={{ gap: spacing.xs, paddingBottom: spacing.xl }}>
-        <Input label="Search your library" value={search} onChangeText={setSearch} />
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: spacing.xs, paddingBottom: spacing.xl }}>
+        <Input label="Search your library" value={search} onChangeText={setSearch} autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" returnKeyType="search" />
         {filtered.length === 0 && <Text style={[typography.body, { color: colors.textDim }]}>No books match.</Text>}
         {filtered.map((book, i) => {
           const key = bookKey(book);

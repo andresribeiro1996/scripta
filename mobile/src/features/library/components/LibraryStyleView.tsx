@@ -71,7 +71,7 @@ export function LibraryStyleView({
   const shownPreview = previewBooks.length > 0 ? previewBooks.slice(0, 4) : PREVIEW_BOOKS;
 
   return (
-    <ScrollView contentContainerStyle={styles.content}>
+    <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
       <Text style={[typography.heading, { color: colors.text }]}>Library style</Text>
       <Text style={[typography.body, { color: colors.textDim, marginTop: spacing.xs, marginBottom: spacing.lg }]}>
         Applies across Library, Series, and Collections. A series can override its own card appearance from its own

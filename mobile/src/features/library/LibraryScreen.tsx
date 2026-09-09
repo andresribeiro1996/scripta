@@ -17,8 +17,9 @@
 // component in this feature — every one of them already takes its data
 // as props/hooks, not route params.
 
-import { useMemo, useState, type ReactNode } from "react";
-import { Alert, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { Alert, BackHandler, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { useFocusEffect } from "expo-router";
 import {
   bookKey,
   clearBookCover,
@@ -178,6 +179,20 @@ export function LibraryScreen({ initialView = "browse" }: { initialView?: Screen
       },
     ]);
   }
+
+  // Series/Collections/Style are internal views of this one route (see the
+  // PLATFORM ADAPTATION note above), so Android's hardware back had nothing to
+  // pop and left the Library tab entirely instead of returning to the grid.
+  useFocusEffect(
+    useCallback(() => {
+      if (view === "browse") return;
+      const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+        setView("browse");
+        return true;
+      });
+      return () => subscription.remove();
+    }, [view]),
+  );
 
   if (view === "series") return <SubView title="Series" onBack={() => setView("browse")}><GroupsView type="series" /></SubView>;
   if (view === "collections") return <SubView title="Collections" onBack={() => setView("browse")}><GroupsView type="collection" /></SubView>;

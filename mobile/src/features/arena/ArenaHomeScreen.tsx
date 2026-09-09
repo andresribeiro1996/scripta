@@ -72,7 +72,7 @@ export function ArenaHomeScreen() {
     <View style={styles.header}><Text accessibilityRole="header" {...dynamicType} style={[typography.heading, styles.strong, styles.grow, { color: colors.text }]}>Arena</Text><Button label="Browse public" variant="secondary" onPress={() => router.push("/arena" as never)} /></View>
     <View style={styles.row}><Button label="Tournaments" variant={tab === "tournaments" ? "primary" : "secondary"} onPress={() => setTab("tournaments")} /><Button label="Tier lists" variant={tab === "tierlists" ? "primary" : "secondary"} onPress={() => setTab("tierlists")} /></View>
     {error ? <Toast visible message={error} tone="error" /> : null}
-    {allItems.length ? <Input label="Search" value={search} onChangeText={setSearch} placeholder={`Search ${tab}`} /> : null}
+    {allItems.length ? <Input label="Search" value={search} onChangeText={setSearch} placeholder={`Search ${tab}`} autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" returnKeyType="search" /> : null}
     <Button label={tab === "tournaments" ? "New tournament" : "New tier list"} loading={busy} onPress={() => tab === "tournaments" ? setSeeding("new") : void createList()} />
     {query.isPending ? <Skeleton height={160} /> : query.isError ? <ErrorState body={query.error instanceof Error ? query.error.message : "Couldn't load this list."} actionLabel="Retry" onAction={() => void query.refetch()} /> : <FlatList
       data={items}

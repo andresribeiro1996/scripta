@@ -28,9 +28,16 @@ export function LibraryToolbar({
       <TextInput
         accessibilityLabel="Search your library"
         allowFontScaling
+        autoCapitalize="none"
+        autoCorrect={false}
+        // iOS's inline clear affordance; Android has no equivalent prop, so
+        // the field is cleared there by selecting and deleting.
+        clearButtonMode="while-editing"
         onChangeText={onQueryChange}
         placeholder="Search title or author"
         placeholderTextColor={colors.textDim}
+        returnKeyType="search"
+        selectionColor={colors.accent}
         style={[styles.search, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
         value={query}
       />

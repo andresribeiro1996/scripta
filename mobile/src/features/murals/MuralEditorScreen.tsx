@@ -93,16 +93,16 @@ export function MuralEditorScreen({ id }: { id: string }) {
     <Screen style={styles.screen}>
       <View style={styles.header}><Button label="Back" variant="secondary" onPress={() => router.back()} /><Input label="Mural name" value={currentName} onChangeText={setName} style={styles.name} /><Button label="Save" loading={busy} onPress={() => void save()} /></View>
       {error ? <Toast visible message={error} tone="error" /> : null}
-      <ScrollView contentContainerStyle={styles.canvasScroll}>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.canvasScroll}>
         <MuralCanvas mural={draftMural} books={books} images={gallery.data ?? []} tierlists={tierlists.data ?? []} editable selectedBlockId={selectedId} onSelectBlock={setSelectedId} onLayoutChange={(blockId, layout) => setBlocks(changeBlockLayout(currentBlocks, blockId, layout))} />
       </ScrollView>
       <View style={[styles.dock, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <Button label="Add block" onPress={() => setAdding(true)} />
         {selected ? <><Button label="Configure" variant="secondary" onPress={() => setPicking(selected.type === "image" ? "image" : selected.type === "tierlist" ? "tierlist" : selected.type === "spotlight" || selected.type === "shelf" || selected.type === "quote" || selected.type === "quoteCollection" ? "book" : null)} /><Button label="Duplicate" variant="secondary" onPress={() => setBlocks([...currentBlocks, createDuplicateCandidate(selected, currentBlocks)])} /><Button label="Delete" variant="destructive" onPress={() => { setBlocks(currentBlocks.filter((block) => block.id !== selected.id)); setSelectedId(null); }} /></> : null}
       </View>
-      <Sheet visible={adding} title="Add block" onClose={() => setAdding(false)}><ScrollView contentContainerStyle={styles.sheet}>{BLOCK_TYPES.map((type) => <Button key={type} label={BLOCK_TYPE_LABELS[type]} variant="secondary" onPress={() => add(type)} />)}</ScrollView></Sheet>
+      <Sheet visible={adding} title="Add block" onClose={() => setAdding(false)}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheet}>{BLOCK_TYPES.map((type) => <Button key={type} label={BLOCK_TYPE_LABELS[type]} variant="secondary" onPress={() => add(type)} />)}</ScrollView></Sheet>
       <Sheet visible={selected !== null && picking === null} title="Block settings" onClose={() => setSelectedId(null)}>
-        {selected ? <ScrollView contentContainerStyle={styles.sheet}>
+        {selected ? <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheet}>
           {selected.type === "text" ? <><Input label="Heading" value={selected.heading} onChangeText={(heading) => updateSelected((block) => ({ ...block, heading } as MuralBlock))} /><Input label="Body" value={selected.body} multiline onChangeText={(body) => updateSelected((block) => ({ ...block, body } as MuralBlock))} /></> : null}
           {selected.type === "shelf" || selected.type === "quoteCollection" ? <Input label="Title" value={selected.title} onChangeText={(title) => updateSelected((block) => ({ ...block, title } as MuralBlock))} /> : null}
           {selected.type === "spotlight" || selected.type === "image" ? <Input label="Caption" value={selected.caption ?? ""} onChangeText={(caption) => updateSelected((block) => ({ ...block, caption } as MuralBlock))} /> : null}
@@ -116,8 +116,8 @@ export function MuralEditorScreen({ id }: { id: string }) {
         </ScrollView> : null}
       </Sheet>
       <Sheet visible={picking !== null} title={`Choose ${picking ?? "content"}`} onClose={() => setPicking(null)}>
-        <ScrollView contentContainerStyle={styles.sheet}>
-          {picking === "book" ? <><Input label="Search books" value={search} onChangeText={setSearch} />{filteredBooks.map((book) => <Button key={bookKey(book)} label={String(book.Title ?? "Untitled")} variant="secondary" onPress={() => { updateSelected((block) => {
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheet}>
+          {picking === "book" ? <><Input label="Search books" value={search} onChangeText={setSearch} autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" returnKeyType="search" />{filteredBooks.map((book) => <Button key={bookKey(book)} label={String(book.Title ?? "Untitled")} variant="secondary" onPress={() => { updateSelected((block) => {
             const key = bookKey(book);
             if (block.type === "spotlight") return { ...block, bookKey: key };
             if (block.type === "shelf") return { ...block, bookKeys: block.bookKeys.includes(key) ? block.bookKeys.filter((item) => item !== key) : [...block.bookKeys, key] };
