@@ -4,7 +4,7 @@
     "slug": "scripta",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/scripta-icon.png",
+    "icon": "./assets/images/icon.png",
     "scheme": "scripta",
     "extra": {
       "eas": {
@@ -15,7 +15,9 @@
     "ios": {
       "bundleIdentifier": "com.atmyshelf.app",
       "supportsTablet": true,
-      "associatedDomains": ["applinks:atmyshelf.com"]
+      "associatedDomains": [
+        "applinks:atmyshelf.com"
+      ]
     },
     "android": {
       "package": "com.atmyshelf.app",
@@ -23,7 +25,10 @@
         {
           "action": "VIEW",
           "autoVerify": true,
-          "category": ["BROWSABLE", "DEFAULT"],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ],
           "data": [
             {
               "scheme": "https",
@@ -50,7 +55,8 @@
       ],
       "adaptiveIcon": {
         "backgroundColor": "#1a1815",
-        "foregroundImage": "./assets/images/scripta-icon.png"
+        "foregroundImage": "./assets/images/adaptive-foreground.png",
+        "monochromeImage": "./assets/images/adaptive-monochrome.png"
       },
       "predictiveBackGestureEnabled": false
     },
@@ -65,11 +71,12 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#f5f4f2",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 180,
           "dark": {
-            "backgroundColor": "#1a1815"
-          },
-          "image": "./assets/images/scripta-icon.png",
-          "imageWidth": 160
+            "backgroundColor": "#1a1815",
+            "image": "./assets/images/splash-icon-dark.png"
+          }
         }
       ]
     ],
