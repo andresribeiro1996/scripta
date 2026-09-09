@@ -146,7 +146,7 @@ export function ArenaSeedScreen({ tournament, onClose, onStarted }: { tournament
           keyExtractor={(book) => toSeedBook(book, null).key}
           style={styles.picker}
           ListEmptyComponent={<EmptyState title="No available books" body={bookSearch ? "Try a different search." : "Every available book is already assigned."} />}
-          renderItem={({ item }) => <Pressable disabled={busy} onPress={() => void seedBook(item, slotToAssign!)} style={styles.pickRow}><Text numberOfLines={1} {...dynamicType} style={[typography.body, { color: colors.text }]}>{String(item.Title ?? "Untitled")}</Text></Pressable>}
+          renderItem={({ item }) => <Pressable accessibilityLabel={`Assign ${String(item.Title ?? "Untitled")}`} accessibilityRole="button" accessibilityState={{ disabled: busy }} disabled={busy} onPress={() => void seedBook(item, slotToAssign!)} style={styles.pickRow}><Text numberOfLines={1} {...dynamicType} style={[typography.body, { color: colors.text }]}>{String(item.Title ?? "Untitled")}</Text></Pressable>}
         />
       </Sheet>
     </View>

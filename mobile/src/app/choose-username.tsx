@@ -44,10 +44,11 @@ export default function ChooseUsernamePage() {
   return (
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.flex}>
       <View style={styles.center}>
-        <Text style={styles.title}>Choose a username</Text>
+        <Text accessibilityRole="header" style={styles.title}>Choose a username</Text>
         <Text style={styles.sub}>One more step before your library loads.</Text>
         <TextInput
           style={styles.input}
+          accessibilityLabel="Username"
           value={value}
           onChangeText={setValue}
           autoCapitalize="none"
@@ -56,13 +57,16 @@ export default function ChooseUsernamePage() {
           placeholderTextColor="#9ca3af"
         />
         <Pressable
+          accessibilityLabel="Continue"
+          accessibilityRole="button"
+          accessibilityState={{ busy, disabled: busy || trimmed.length < 3 }}
           style={({ pressed }) => [styles.button, pressed && styles.buttonPressed, trimmed.length < 3 && styles.buttonDisabled]}
           onPress={onSubmit}
           disabled={busy || trimmed.length < 3}
         >
           {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Continue</Text>}
         </Pressable>
-        {error && <Text style={styles.error}>{error}</Text>}
+        {error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
       </View>
     </KeyboardAvoidingView>
   );

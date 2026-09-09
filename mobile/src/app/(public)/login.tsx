@@ -78,7 +78,7 @@ export default function LoginPage() {
   return (
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.flex}>
       <View style={styles.center}>
-        <Text style={styles.logo}>Scripta</Text>
+        <Text accessibilityRole="header" style={styles.logo}>Scripta</Text>
         <Text style={styles.server}>
           {health.isPending ? "checking server…" : health.isError ? "server unreachable" : "server ok"}
         </Text>
@@ -87,6 +87,7 @@ export default function LoginPage() {
           <Pressable accessibilityRole="tab" accessibilityState={{ selected: mode === "signup" }} style={[styles.modeButton, mode === "signup" && styles.modeActive]} onPress={() => setMode("signup")}><Text style={styles.modeText}>Sign up</Text></Pressable>
         </View>
         <TextInput
+          accessibilityLabel={mode === "signup" ? "Email" : "Email or username"}
           style={styles.input}
           value={identifier}
           onChangeText={setIdentifier}
@@ -97,6 +98,7 @@ export default function LoginPage() {
           placeholderTextColor="#9ca3af"
         />
         {mode === "signup" ? <TextInput
+          accessibilityLabel="Username"
           style={styles.input}
           value={username}
           onChangeText={setUsername}
@@ -106,6 +108,7 @@ export default function LoginPage() {
           placeholderTextColor="#9ca3af"
         /> : null}
         <TextInput
+          accessibilityLabel="Password"
           style={styles.input}
           value={password}
           onChangeText={setPassword}
@@ -113,11 +116,14 @@ export default function LoginPage() {
           placeholder="Password"
           placeholderTextColor="#9ca3af"
         />
-        <Pressable accessibilityState={{ disabled: busy || (mode === "signup" && (username.trim().length < 3 || password.length < 8)) }} style={({ pressed }) => [styles.button, pressed && styles.buttonPressed, mode === "signup" && (username.trim().length < 3 || password.length < 8) && styles.buttonDisabled]} onPress={onSubmit} disabled={busy || (mode === "signup" && (username.trim().length < 3 || password.length < 8))}>
+        <Pressable accessibilityLabel={mode === "signup" ? "Create account" : "Sign in"} accessibilityRole="button" accessibilityState={{ busy, disabled: busy || (mode === "signup" && (username.trim().length < 3 || password.length < 8)) }} style={({ pressed }) => [styles.button, pressed && styles.buttonPressed, mode === "signup" && (username.trim().length < 3 || password.length < 8) && styles.buttonDisabled]} onPress={onSubmit} disabled={busy || (mode === "signup" && (username.trim().length < 3 || password.length < 8))}>
           {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{mode === "signup" ? "Create account" : "Sign in"}</Text>}
         </Pressable>
         {providers.data?.google && (
           <Pressable
+            accessibilityLabel="Sign in with Google"
+            accessibilityRole="button"
+            accessibilityState={{ busy: googleBusy, disabled: googleBusy }}
             style={({ pressed }) => [styles.googleButton, pressed && styles.buttonPressed]}
             onPress={onGoogleSignIn}
             disabled={googleBusy}
@@ -125,7 +131,7 @@ export default function LoginPage() {
             {googleBusy ? <ActivityIndicator color="#1c1917" /> : <Text style={styles.googleButtonText}>Sign in with Google</Text>}
           </Pressable>
         )}
-        {error && <Text style={styles.error}>{error}</Text>}
+        {error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
       </View>
     </KeyboardAvoidingView>
   );

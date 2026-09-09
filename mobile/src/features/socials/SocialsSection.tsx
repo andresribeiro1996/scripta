@@ -70,6 +70,7 @@ export function SocialsSection() {
             <Text style={[typography.caption, { color: colors.textDim }]}>{!status.enabled ? "Not configured on this server" : status.connected ? `Connected${status.handle ? ` as ${status.handle}` : ""}` : "Not connected"}</Text>
           </View>
           <Pressable
+            accessibilityLabel={LABELS[status.provider]}
             accessibilityRole="switch"
             accessibilityState={{ checked: status.connected, disabled: !status.enabled || busy === status.provider }}
             disabled={!status.enabled || busy === status.provider}

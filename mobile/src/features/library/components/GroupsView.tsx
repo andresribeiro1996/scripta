@@ -244,6 +244,8 @@ export function GroupsView({ type }: { type: GroupType }) {
                 />
               ) : (
                 <Pressable
+                  accessibilityLabel={`Rename ${group.name}`}
+                  accessibilityRole="button"
                   onPress={() => {
                     setEditingId(group.id);
                     setEditingName(group.name);
