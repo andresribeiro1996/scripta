@@ -190,8 +190,9 @@ export function GroupsView({ type }: { type: GroupType }) {
 
   return (
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
+      {/* No title here: the route above this owns it, and the native header
+          already shows it. Rendering it again printed "Series" twice. */}
       <View style={styles.header}>
-        <Text style={[typography.heading, { color: colors.text }]}>{copy.title}</Text>
         {books.length > 0 &&
           (selectionMode ? (
             <View style={styles.headerActions}>
@@ -393,7 +394,7 @@ function BookPickerSheet({
 
 const styles = StyleSheet.create({
   content: { padding: spacing.lg, gap: spacing.lg, paddingBottom: spacing.huge },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: spacing.md },
   headerActions: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   draftRow: { borderWidth: 2, borderStyle: "dashed", borderRadius: 12, padding: spacing.md },
   section: { borderWidth: 1, borderRadius: 12, padding: spacing.lg, gap: spacing.md },

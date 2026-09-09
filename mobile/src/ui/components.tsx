@@ -292,7 +292,13 @@ export function Menu({ title, items, children }: { title?: string; items: MenuIt
       }}
       title={title}
     >
-      {children}
+      {/* The trigger must not be a touch responder of its own. On Android
+          MenuView anchors the menu to a Pressable it wraps around these
+          children, and a nested Pressable (IconButton is one) captures the
+          touch first, so the anchor never fires and the menu never opens.
+          iOS doesn't hit this — SwiftUI's Menu intercepts above the RN host
+          view — which is exactly why it needed a device to catch. */}
+      <View pointerEvents="none">{children}</View>
     </MenuView>
   );
 }

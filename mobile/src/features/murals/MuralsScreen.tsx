@@ -85,7 +85,7 @@ export function MuralsScreen() {
         }}
       />
       <Input label="Search murals" value={search} onChangeText={setSearch} autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" returnKeyType="search" />
-      <ScrollView horizontal contentContainerStyle={styles.folders}><Button label="All" variant={folderId === undefined ? "primary" : "secondary"} onPress={() => setFolderId(undefined)} /><Button label="Unfiled" variant={folderId === null ? "primary" : "secondary"} onPress={() => setFolderId(null)} />{tree.map(({ folder, depth }) => <Button key={folder.id} label={`${"  ".repeat(depth)}${folder.name}`} variant={folderId === folder.id ? "primary" : "secondary"} onPress={() => setFolderId(folder.id)} />)}<Button label="New folder" variant="secondary" onPress={() => void folders.create("New folder", folderId ?? null).then((folder) => { setEditingFolderId(folder.id); setFolderName(folder.name); setFolderParentId(folder.parentId); })} />{typeof folderId === "string" ? <><Button label="Edit folder" variant="secondary" onPress={() => editFolder(folderId)} /><Button label="Delete folder" variant="destructive" onPress={() => Alert.alert("Delete folder?", "Murals and subfolders move up one level.", [{ text: "Cancel", style: "cancel" }, { text: "Delete", style: "destructive", onPress: () => void folders.remove(folderId).then(() => setFolderId(undefined)) }])} /></> : null}</ScrollView>
+      <ScrollView horizontal contentContainerStyle={styles.folders} showsHorizontalScrollIndicator={false} style={styles.folderStrip}><Button label="All" variant={folderId === undefined ? "primary" : "secondary"} onPress={() => setFolderId(undefined)} /><Button label="Unfiled" variant={folderId === null ? "primary" : "secondary"} onPress={() => setFolderId(null)} />{tree.map(({ folder, depth }) => <Button key={folder.id} label={`${"  ".repeat(depth)}${folder.name}`} variant={folderId === folder.id ? "primary" : "secondary"} onPress={() => setFolderId(folder.id)} />)}<Button label="New folder" variant="secondary" onPress={() => void folders.create("New folder", folderId ?? null).then((folder) => { setEditingFolderId(folder.id); setFolderName(folder.name); setFolderParentId(folder.parentId); })} />{typeof folderId === "string" ? <><Button label="Edit folder" variant="secondary" onPress={() => editFolder(folderId)} /><Button label="Delete folder" variant="destructive" onPress={() => Alert.alert("Delete folder?", "Murals and subfolders move up one level.", [{ text: "Cancel", style: "cancel" }, { text: "Delete", style: "destructive", onPress: () => void folders.remove(folderId).then(() => setFolderId(undefined)) }])} /></> : null}</ScrollView>
       <FlatList
         data={visible}
         keyExtractor={(item) => item.id}
@@ -120,7 +120,8 @@ export function MuralsScreen() {
 const styles = StyleSheet.create({
   screen: { padding: spacing.lg, gap: spacing.md },
   title: { ...typography.heading, fontWeight: "700", flex: 1 },
-  folders: { gap: spacing.sm },
+  folderStrip: { flexGrow: 0, flexShrink: 0 },
+  folders: { gap: spacing.sm, alignItems: "center" },
   list: { gap: spacing.md, paddingBottom: spacing.huge },
   card: { borderWidth: 1, borderRadius: radii.lg, padding: spacing.md, gap: spacing.sm, flexDirection: "row", alignItems: "center" },
   open: { flex: 1, flexDirection: "row", alignItems: "center", gap: spacing.md },

@@ -2,7 +2,7 @@
 // the four tab stacks can't drift from each other. Every screen used to draw
 // its own header View instead, which is why none of them had a back gesture.
 import type { NativeStackNavigationOptions } from "expo-router";
-import { useTheme } from "./theme";
+import { radii, spacing, useTheme } from "./theme";
 
 export function useScreenOptions(): NativeStackNavigationOptions {
   const { colors } = useTheme();
@@ -24,13 +24,27 @@ export function useScreenOptions(): NativeStackNavigationOptions {
   };
 }
 
-/** Detent-backed sheet presentation for the screens that used to be modals. */
-export function sheetOptions(title: string): NativeStackNavigationOptions {
+/**
+ * Detent-backed sheet presentation for the screens that used to be modals.
+ *
+ * The padding matters and is easy to lose: these bodies used to sit inside the
+ * Sheet component, which supplied `padding: spacing.xl`. As routes they have no
+ * such wrapper, so without this every sheet renders its text hard against both
+ * screen edges. A hook rather than a plain function so the sheet surface can be
+ * painted from the live palette.
+ */
+export function useSheetOptions(): NativeStackNavigationOptions {
+  const { colors } = useTheme();
   return {
-    title,
     presentation: "formSheet",
     sheetGrabberVisible: true,
     sheetAllowedDetents: [0.6, 1],
+    sheetCornerRadius: radii.xl,
     headerLargeTitleEnabled: false,
+    contentStyle: {
+      backgroundColor: colors.background,
+      paddingHorizontal: spacing.xl,
+      paddingTop: spacing.md,
+    },
   };
 }

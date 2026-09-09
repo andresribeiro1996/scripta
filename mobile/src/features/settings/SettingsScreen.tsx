@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
-import { useRouter } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import { Button, Input, Screen } from "../../ui";
 import { radii, spacing, typography, useTheme } from "../../ui/theme";
 import { useAuth } from "../../core/auth";
@@ -46,9 +46,9 @@ export function SettingsScreen() {
   }
 
   return (
-    <Screen>
+    <Screen top={false}>
+      <Stack.Screen options={{ headerShown: true, title: "Settings" }} />
       <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
-      <Text accessibilityRole="header" style={[styles.title, { color: colors.text }]}>Settings</Text>
       <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <Text style={[styles.heading, { color: colors.text }]}>Account</Text>
         <View style={styles.profile}>
@@ -76,7 +76,6 @@ export function SettingsScreen() {
 
 const styles = StyleSheet.create({
   page: { padding: spacing.lg, paddingBottom: spacing.huge, gap: spacing.lg },
-  title: { ...typography.heading, fontWeight: "700" },
   heading: { ...typography.title, fontWeight: "700" },
   section: { borderWidth: 1, borderRadius: radii.lg, padding: spacing.lg, gap: spacing.md },
   profile: { flexDirection: "row", alignItems: "center", gap: spacing.md },

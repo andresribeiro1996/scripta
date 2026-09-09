@@ -55,7 +55,7 @@ export default function LoginPage() {
       </Screen>
     );
   }
-  if (user) return <Redirect href={(!user.username ? "/choose-username" : mode === "signup" ? "/welcome-avatar" : returnTo?.startsWith("/vote/") ? returnTo : "/(app)") as never} />;
+  if (user) return <Redirect href={(!user.username ? "/choose-username" : mode === "signup" ? "/welcome-avatar" : returnTo?.startsWith("/vote/") ? returnTo : "/") as never} />;
 
   const incomplete = mode === "signup"
     ? username.trim().length < 3 || password.length < 8 || identifier.trim() === ""

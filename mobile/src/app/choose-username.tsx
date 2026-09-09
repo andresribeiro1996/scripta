@@ -28,7 +28,7 @@ export default function ChooseUsernamePage() {
     );
   }
   if (!user) return <Redirect href="/(public)/login" />;
-  if (user.username) return <Redirect href={continueToAvatar ? "/welcome-avatar" : "/(app)"} />;
+  if (user.username) return <Redirect href={continueToAvatar ? "/welcome-avatar" : "/"} />;
 
   const trimmed = value.trim();
   const tooShort = trimmed.length < 3;
