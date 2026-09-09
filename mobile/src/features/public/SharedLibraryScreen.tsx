@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { Stack } from "expo-router";
 import { bookKey, orderLibraryBooks, resolveLibraryStyle } from "@scripta/shared";
 import { useQuery } from "@tanstack/react-query";
 import { StyleSheet, Text, View } from "react-native";
@@ -17,8 +18,8 @@ export function SharedLibraryScreen({ token }: { token: string }) {
 
   if (query.isPending) return <View style={[styles.center, { backgroundColor: colors.background }]}><Skeleton height={180} /></View>;
   if (query.isError || !query.data) return <View style={[styles.center, { backgroundColor: colors.background }]}><ErrorState title="Library unavailable" body="This link is invalid or no longer active." /></View>;
-  return <Screen bottom style={styles.screen}>
-    <Text accessibilityRole="header" style={[styles.title, { color: colors.text }]}>{query.data.data.name || "Library"}</Text>
+  return <Screen bottom top={false} style={styles.screen}>
+    <Stack.Screen options={{ headerShown: true, title: query.data.data.name || "Library" }} />
     <LibraryGrid data={ordered} style={style} keyExtractor={(book, index) => bookKey(book) || String(index)} ListEmptyComponent={<EmptyState title="This library is empty" />} renderItem={(book) => <BookCard book={book} onPress={() => undefined} style={style} />} />
   </Screen>;
 }
@@ -26,5 +27,4 @@ export function SharedLibraryScreen({ token }: { token: string }) {
 const styles = StyleSheet.create({
   screen: {},
   center: { flex: 1, justifyContent: "center", padding: spacing.lg },
-  title: { ...typography.heading, fontWeight: "700", paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
 });

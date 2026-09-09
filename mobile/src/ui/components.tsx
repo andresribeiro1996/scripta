@@ -1,4 +1,4 @@
-import { type ComponentProps, type ReactNode, type Ref, useEffect, useRef, useState } from "react";
+import { type ReactNode, type Ref, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -12,8 +12,8 @@ import {
   View,
   type ViewStyle,
 } from "react-native";
-import Ionicons from "@expo/vector-icons/Ionicons";
 import MenuView from "@expo/ui/community/menu";
+import { Icon, type IconName } from "./icon";
 import SegmentedControl from "@expo/ui/community/segmented-control";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { errorHaptic, successHaptic } from "./haptics";
@@ -107,7 +107,7 @@ export function IconButton({
   onPress,
   tone = "default",
 }: {
-  name: ComponentProps<typeof Ionicons>["name"];
+  name: IconName;
   accessibilityLabel: string;
   onPress?: () => void;
   tone?: "default" | "danger";
@@ -124,7 +124,7 @@ export function IconButton({
         { backgroundColor: pressed ? colors.surfacePressed : "transparent" },
       ]}
     >
-      <Ionicons color={tone === "danger" ? colors.danger : colors.textDim} name={name} size={22} />
+      <Icon color={tone === "danger" ? colors.danger : colors.textDim} name={name} size={22} />
     </Pressable>
   );
 }

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { toPlacements, type TierlistData } from "@scripta/shared";
 import { useQuery } from "@tanstack/react-query";
-import { router } from "expo-router";
+import { router, Stack } from "expo-router";
 import { StyleSheet, Text, View } from "react-native";
 import { useAuth } from "../../core/auth";
 import { Button, ErrorState, Screen, Skeleton, Toast, dynamicType, spacing, typography, useTheme } from "../../ui";
@@ -60,8 +60,8 @@ export function VoteTierlistScreen({ code }: { code: string }) {
     }
   }
 
-  return <Screen bottom style={styles.screen}>
-    <Text accessibilityRole="header" {...dynamicType} style={[typography.heading, styles.strong, { color: colors.text }]}>{board.name}</Text>
+  return <Screen bottom top={false} style={styles.screen}>
+    <Stack.Screen options={{ headerShown: true, title: board.name }} />
     <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{board.votingOpen ? "Voting is open." : "Voting is closed."}</Text>
     {error ? <Toast visible message={error} tone="error" /> : null}
     {showResults ? <><View style={styles.row}>{ballot && board.votingOpen ? <Button label="Edit ballot" variant="secondary" onPress={() => { setWorking(ballotBoard(cleanBoard, ballot)); setEditing(true); }} /> : null}</View><TierlistResults histogram={ballot?.results.histogram ?? board.histogram ?? []} tiers={board.tiers} pool={cleanBoard.pool} books={books} ballotCount={ballot?.results.ballotCount ?? board.ballotCount} /></> : <>
@@ -74,6 +74,5 @@ export function VoteTierlistScreen({ code }: { code: string }) {
 
 const styles = StyleSheet.create({
   screen: { padding: spacing.lg, gap: spacing.md },
-  strong: { fontWeight: "700" },
   row: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
 });

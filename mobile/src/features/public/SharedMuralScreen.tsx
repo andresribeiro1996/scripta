@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { Stack } from "expo-router";
 import type { Mural } from "@scripta/shared";
 import { useQuery } from "@tanstack/react-query";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
@@ -20,14 +21,15 @@ export function SharedMuralScreen({ token }: { token: string }) {
   if (query.isPending) return <View style={[styles.center, { backgroundColor: colors.background }]}><Skeleton height={180} /></View>;
   if (query.isError || !query.data) return <View style={[styles.center, { backgroundColor: colors.background }]}><ErrorState title="Mural unavailable" body="This link is invalid or no longer active." /></View>;
   const mural: Mural = { ...query.data.mural, coverImageId: undefined, coverImageUrl: query.data.mural.coverImageUrl ?? undefined, shareToken: null, shareUrl: null, folderId: null, createdAt: "", updatedAt: "" };
-  return <Screen bottom><ScrollView contentContainerStyle={styles.screen}>
-    <Text accessibilityRole="header" style={[styles.title, { color: colors.text }]}>{mural.name}</Text>
+  return <Screen bottom top={false}>
+    <Stack.Screen options={{ headerShown: true, title: mural.name }} />
+    <ScrollView contentContainerStyle={styles.screen}>
     {mural.blocks.length ? <MuralCanvas mural={mural} books={books} images={images} tierlists={tierlists} statsOverride={query.data.stats} /> : <EmptyState title="This mural is empty" />}
-  </ScrollView></Screen>;
+    </ScrollView>
+  </Screen>;
 }
 
 const styles = StyleSheet.create({
   screen: { padding: spacing.lg },
   center: { flex: 1, justifyContent: "center", padding: spacing.lg },
-  title: { ...typography.heading, fontWeight: "700", marginBottom: spacing.lg },
 });

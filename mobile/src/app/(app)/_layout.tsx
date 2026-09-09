@@ -1,7 +1,7 @@
 import { ActivityIndicator, View } from "react-native";
 import { Redirect, Tabs } from "expo-router";
-import Ionicons from "@expo/vector-icons/Ionicons";
 import { useAuth } from "../../core/auth";
+import { Icon } from "../../ui/icon";
 import { useTheme } from "../../ui/theme";
 
 export default function AppLayout() {
@@ -32,10 +32,10 @@ export default function AppLayout() {
         tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
       }}
     >
-      <Tabs.Screen name="(library)" options={{ title: "Library", tabBarIcon: ({ color, focused, size }) => <Ionicons name={focused ? "library" : "library-outline"} color={color} size={size} /> }} />
-      <Tabs.Screen name="(arena)" options={{ title: "Arena", tabBarIcon: ({ color, focused, size }) => <Ionicons name={focused ? "trophy" : "trophy-outline"} color={color} size={size} /> }} />
-      <Tabs.Screen name="(murals)" options={{ title: "Murals", tabBarIcon: ({ color, focused, size }) => <Ionicons name={focused ? "color-palette" : "color-palette-outline"} color={color} size={size} /> }} />
-      <Tabs.Screen name="(settings)" options={{ title: "Settings", tabBarIcon: ({ color, focused, size }) => <Ionicons name={focused ? "settings" : "settings-outline"} color={color} size={size} /> }} />
+      <Tabs.Screen name="(library)" options={{ title: "Library", tabBarIcon: ({ color, focused, size }) => <Icon name="library" filled={focused} color={color} size={size} /> }} />
+      <Tabs.Screen name="(arena)" options={{ title: "Arena", tabBarIcon: ({ color, focused, size }) => <Icon name="arena" filled={focused} color={color} size={size} /> }} />
+      <Tabs.Screen name="(murals)" options={{ title: "Murals", tabBarIcon: ({ color, focused, size }) => <Icon name="murals" filled={focused} color={color} size={size} /> }} />
+      <Tabs.Screen name="(settings)" options={{ title: "Settings", tabBarIcon: ({ color, focused, size }) => <Icon name="settings" filled={focused} color={color} size={size} /> }} />
     </Tabs>
   );
 }

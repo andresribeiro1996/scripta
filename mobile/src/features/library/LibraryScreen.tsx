@@ -125,7 +125,7 @@ export function LibraryScreen() {
               headerRight: () => (
                 <IconButton
                   accessibilityLabel={`Delete ${selectedKeys.size} selected`}
-                  name="trash-outline"
+                  name="delete"
                   onPress={selectedKeys.size === 0 ? undefined : handleDeleteSelected}
                   tone="danger"
                 />
@@ -136,7 +136,7 @@ export function LibraryScreen() {
               title: library?.data.name || "Library",
               headerRight: () => (
                 <Menu title={library?.data.name || "Library"} items={actionItems}>
-                  <IconButton accessibilityLabel="Library actions" name="ellipsis-horizontal" />
+                  <IconButton accessibilityLabel="Library actions" name="more" />
                 </Menu>
               ),
             }}

@@ -78,7 +78,7 @@ export function ArenaHomeScreen() {
       options={{
         headerShown: true,
         title: "Arena",
-        headerRight: () => <IconButton accessibilityLabel="Browse public arena" name="globe-outline" onPress={() => router.push("/arena" as never)} />,
+        headerRight: () => <IconButton accessibilityLabel="Browse public arena" name="public" onPress={() => router.push("/arena" as never)} />,
       }}
     />
     <Segmented accessibilityLabel="Arena section" options={ARENA_TABS} value={tab} onChange={setTab} />
@@ -98,7 +98,7 @@ export function ArenaHomeScreen() {
           title={item.name}
           items={[{ label: "Delete", destructive: true, onPress: () => setDeleting({ kind: item.kind, id: item.id, name: item.name }) }]}
         >
-          <IconButton accessibilityLabel={`Actions for ${item.name}`} name="ellipsis-horizontal" />
+          <IconButton accessibilityLabel={`Actions for ${item.name}`} name="more" />
         </Menu>
       </View>}
     />}

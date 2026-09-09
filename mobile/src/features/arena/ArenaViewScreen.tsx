@@ -88,7 +88,7 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
                 { label: "Share…", onPress: () => void Share.share({ message: Linking.createURL(`/arena/${id}`) }) },
               ]}
             >
-              <IconButton accessibilityLabel={`Actions for ${data.name}`} name="ellipsis-horizontal" />
+              <IconButton accessibilityLabel={`Actions for ${data.name}`} name="more" />
             </Menu>
           ),
         }}

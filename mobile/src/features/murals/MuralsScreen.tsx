@@ -104,7 +104,7 @@ export function MuralsScreen() {
               { label: "Delete", destructive: true, onPress: () => confirmDelete(item) },
             ]}
           >
-            <IconButton accessibilityLabel={`Actions for ${item.name}`} name="ellipsis-horizontal" />
+            <IconButton accessibilityLabel={`Actions for ${item.name}`} name="more" />
           </Menu>
         </View>}
       />
