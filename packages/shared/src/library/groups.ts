@@ -43,7 +43,7 @@ function newGroupId(): string {
   return typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `g_${Math.random().toString(36).slice(2)}`;
 }
 
-function normalizeName(name: string): string {
+export function normalizeGroupName(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
@@ -158,7 +158,7 @@ export function deriveSeriesGroups(books: Array<Record<string, unknown>>, groups
     const seriesName = typeof book.Series === "string" ? book.Series.trim() : "";
     if (!seriesName) continue;
     const key = bookKey(book);
-    const idx = result.findIndex((g) => g.type === "series" && normalizeName(g.name) === normalizeName(seriesName));
+    const idx = result.findIndex((g) => g.type === "series" && normalizeGroupName(g.name) === normalizeGroupName(seriesName));
     if (idx === -1) {
       const now = new Date().toISOString();
       result.push({ id: newGroupId(), type: "series", name: seriesName, bookKeys: [key], createdAt: now, updatedAt: now });

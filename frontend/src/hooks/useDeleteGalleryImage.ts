@@ -10,18 +10,19 @@
 // (GalleryPage.tsx / CoverPickerModal.tsx) never has to remember which
 // one applies.
 
-import { useQueryClient } from "@tanstack/react-query";
-import { saveLibrary, type LibraryDocument } from "../api/library";
+import { fetchLibrary } from "../api/library";
 import { scrubImageFromBooks } from "../lib/bookCovers";
 import { useGalleryImages } from "./useGalleryImages";
+import { useLibrary } from "./useLibrary";
 import { useMurals } from "./useMurals";
 
 export function useDeleteGalleryImage() {
-  const queryClient = useQueryClient();
   const { remove } = useGalleryImages();
+  const { updateLibrary } = useLibrary();
   const { scrubImage } = useMurals();
 
   return async function deleteGalleryImageAndScrub(id: string): Promise<void> {
+    const current = await fetchLibrary();
     await remove(id);
 
     // Independent of the library save below — see scrubImage's own
@@ -29,14 +30,10 @@ export function useDeleteGalleryImage() {
     // rather than riding along in the library save's payload.
     await scrubImage(id);
 
-    // Read the freshest cached library rather than a prop/closure — same
-    // reasoning as every other page's delete handler.
-    const current = queryClient.getQueryData<LibraryDocument>(["library"]);
     if (!current) return;
     const scrubbedBooks = scrubImageFromBooks(current.data.books, id);
     if (scrubbedBooks === current.data.books) return; // nothing referenced it — nothing to save
 
-    const saved = await saveLibrary({ ...current.data, books: scrubbedBooks }, current.updatedAt);
-    queryClient.setQueryData(["library"], saved);
+    await updateLibrary((data) => ({ ...data, books: scrubImageFromBooks(data.books, id) }), current);
   };
 }

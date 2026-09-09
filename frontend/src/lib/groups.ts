@@ -12,5 +12,6 @@ export {
   removeBooksFromAllGroups,
   booksInGroup,
   orderedGroupBooks,
-  deriveSeriesGroups
+  deriveSeriesGroups,
+  normalizeGroupName
 } from "@scripta/shared";

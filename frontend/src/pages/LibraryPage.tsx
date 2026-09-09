@@ -1,10 +1,10 @@
 import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import type { GalleryImage } from "../api/gallery";
-import { fetchLibrary, saveLibrary, type LibraryData, type LibraryDocument } from "../api/library";
+import type { LibraryData, LibraryDocument } from "../api/library";
 import { AddBookModal } from "../components/AddBookModal";
 import { BookCard } from "../components/BookCard";
 import { BookDetailSheet } from "../components/BookDetailSheet";
@@ -32,6 +32,7 @@ import { assignBookOrder, orderLibraryBooks, reorderOnDrop, seriesGroupByBookKey
 import { effectiveCardStyle, resolveLibraryStyle, type PerCardStyle } from "../lib/libraryStyle";
 import { filterBooks, nextReadStatus, sortBooks, type SortKey, type StatusFilter } from "../lib/libraryView";
 import { bookKey, mergeLibraryData } from "../lib/merge";
+import { restoreDeletedBooks } from "../lib/restoreDeletedBooks";
 
 /** Applies a React state update wrapped in the View Transitions API when
  *  the browser supports it, so a drag-to-reorder visibly animates cards
@@ -70,7 +71,7 @@ export function LibraryPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { scrubBooks } = useMurals();
-  const { share: shareLibraryDoc, unshare: unshareLibraryDoc } = useLibrary();
+  const { data: library, isLoading, updateLibrary, share: shareLibraryDoc, unshare: unshareLibraryDoc } = useLibrary();
   const toast = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const suppressClickAfterDragRef = useRef(false);
@@ -82,11 +83,6 @@ export function LibraryPage() {
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const [syncingGoodreads, setSyncingGoodreads] = useState(false);
   const [addingBook, setAddingBook] = useState(false);
-
-  const { data: library, isLoading } = useQuery({
-    queryKey: ["library"],
-    queryFn: fetchLibrary
-  });
 
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
@@ -110,8 +106,7 @@ export function LibraryPage() {
     const base = current?.data ?? library?.data ?? { books: [] };
     if ((base.name ?? "") === name) return; // unchanged — nothing to save
     try {
-      const saved = await saveLibrary({ ...base, name }, current?.updatedAt ?? library?.updatedAt);
-      queryClient.setQueryData(["library"], saved);
+      await updateLibrary((data) => ({ ...data, name }));
     } catch {
       toast({ message: "Couldn't save the new name.", kind: "error" });
     }
@@ -129,13 +124,11 @@ export function LibraryPage() {
   async function mergeAndSave(parsed: LibraryData) {
     // Read the freshest cached copy, not a stale closure — same
     // reasoning as handleRenameLibrary above.
-    const current = queryClient.getQueryData<LibraryDocument>(["library"]);
-    const existing = current?.data ?? library?.data;
-    const merged = existing ? mergeLibraryData(existing, parsed) : parsed;
-    const ordered = { ...merged, books: assignBookOrder(merged.books) };
-    const withSeries = { ...ordered, groups: deriveSeriesGroups(ordered.books, ordered.groups ?? []) };
-    const saved = await saveLibrary(withSeries, current?.updatedAt ?? library?.updatedAt);
-    queryClient.setQueryData(["library"], saved);
+    await updateLibrary((existing) => {
+      const merged = mergeLibraryData(existing, parsed);
+      const ordered = { ...merged, books: assignBookOrder(merged.books) };
+      return { ...ordered, groups: deriveSeriesGroups(ordered.books, ordered.groups ?? []) };
+    });
   }
 
   async function handleFileChosen(file: File) {
@@ -174,15 +167,20 @@ export function LibraryPage() {
     if (reordered === current.data.books) return; // no-op (e.g. dropped within the same series)
 
     const optimistic: LibraryDocument = { ...current, data: { ...current.data, books: reordered } };
-    updateWithViewTransition(() => queryClient.setQueryData(["library"], optimistic));
+    updateWithViewTransition(() =>
+      queryClient.setQueryData<LibraryDocument | null>(["library"], (latest) => latest === current ? optimistic : latest)
+    );
+    const saving = updateLibrary((data) => ({
+      ...data,
+      books: reorderOnDrop(data.books, data.groups ?? [], draggedKey, targetKey)
+    }), current);
 
-    saveLibrary({ ...current.data, books: reordered }, current.updatedAt)
-      .then((saved) => queryClient.setQueryData(["library"], saved))
-      .catch((err) => {
-        console.error("Failed to persist new book order:", err);
-        toast({ message: "Couldn't save the new order — moved back.", kind: "error" });
-        queryClient.setQueryData(["library"], current); // roll back the optimistic update
-      });
+    saving.catch((err) => {
+      console.error("Failed to persist new book order:", err);
+      toast({ message: "Couldn't save the new order — moved back.", kind: "error" });
+      queryClient.setQueryData<LibraryDocument | null>(["library"], (latest) => latest === optimistic ? current : latest);
+      void queryClient.invalidateQueries({ queryKey: ["library"] });
+    });
   }
 
   function handleDragEnd(e: DragEndEvent) {
@@ -200,10 +198,11 @@ export function LibraryPage() {
     const current = queryClient.getQueryData<LibraryDocument>(["library"]);
     if (!current) return;
     const key = bookKey(book);
-    const updatedBooks = current.data.books.map((b) => (bookKey(b) === key ? { ...b, _style: bookStyle } : b));
     try {
-      const saved = await saveLibrary({ ...current.data, books: updatedBooks }, current.updatedAt);
-      queryClient.setQueryData(["library"], saved);
+      await updateLibrary((data) => ({
+        ...data,
+        books: data.books.map((b) => (bookKey(b) === key ? { ...b, _style: bookStyle } : b))
+      }));
     } catch {
       toast({ message: "Couldn't save the style change.", kind: "error" });
     }
@@ -213,10 +212,11 @@ export function LibraryPage() {
     const current = queryClient.getQueryData<LibraryDocument>(["library"]);
     if (!current) return;
     const key = bookKey(book);
-    const updatedBooks = current.data.books.map((b) => (bookKey(b) === key ? { ...b, ReadStatus: nextReadStatus(b.ReadStatus) } : b));
     try {
-      const saved = await saveLibrary({ ...current.data, books: updatedBooks }, current.updatedAt);
-      queryClient.setQueryData(["library"], saved);
+      await updateLibrary((data) => ({
+        ...data,
+        books: data.books.map((b) => (bookKey(b) === key ? { ...b, ReadStatus: nextReadStatus(b.ReadStatus) } : b))
+      }));
     } catch {
       toast({ message: "Couldn't save the status change.", kind: "error" });
     }
@@ -232,10 +232,11 @@ export function LibraryPage() {
     const current = queryClient.getQueryData<LibraryDocument>(["library"]);
     if (!current) return;
     const key = bookKey(book);
-    const updatedBooks = current.data.books.map((b) => (bookKey(b) === key ? setBookCover(b, image.id, image.url) : b));
     try {
-      const saved = await saveLibrary({ ...current.data, books: updatedBooks }, current.updatedAt);
-      queryClient.setQueryData(["library"], saved);
+      await updateLibrary((data) => ({
+        ...data,
+        books: data.books.map((b) => (bookKey(b) === key ? setBookCover(b, image.id, image.url) : b))
+      }));
     } catch {
       toast({ message: "Couldn't save the cover change.", kind: "error" });
     }
@@ -245,10 +246,11 @@ export function LibraryPage() {
     const current = queryClient.getQueryData<LibraryDocument>(["library"]);
     if (!current) return;
     const key = bookKey(book);
-    const updatedBooks = current.data.books.map((b) => (bookKey(b) === key ? clearBookCover(b) : b));
     try {
-      const saved = await saveLibrary({ ...current.data, books: updatedBooks }, current.updatedAt);
-      queryClient.setQueryData(["library"], saved);
+      await updateLibrary((data) => ({
+        ...data,
+        books: data.books.map((b) => (bookKey(b) === key ? clearBookCover(b) : b))
+      }));
     } catch {
       toast({ message: "Couldn't save the cover change.", kind: "error" });
     }
@@ -282,13 +284,16 @@ export function LibraryPage() {
     const current = queryClient.getQueryData<LibraryDocument>(["library"]);
     if (!current) return;
     const keys = selectedKeys;
+    let snapshot = current.data;
     try {
-      const saved = await saveLibrary({
-        ...current.data,
-        books: current.data.books.filter((b) => !keys.has(bookKey(b))),
-        groups: removeBooksFromAllGroups(current.data.groups ?? [], keys)
-      }, current.updatedAt);
-      queryClient.setQueryData(["library"], saved);
+      await updateLibrary((data) => {
+        snapshot = data;
+        return {
+          ...data,
+          books: data.books.filter((b) => !keys.has(bookKey(b))),
+          groups: removeBooksFromAllGroups(data.groups ?? [], keys)
+        };
+      });
     } catch {
       toast({ message: "Couldn't delete — nothing was changed.", kind: "error" });
       return;
@@ -304,9 +309,7 @@ export function LibraryPage() {
           clearTimeout(scrubTimer);
           void (async () => {
             try {
-              const latest = queryClient.getQueryData<LibraryDocument>(["library"]);
-              const restored = await saveLibrary(current.data, latest?.updatedAt);
-              queryClient.setQueryData(["library"], restored);
+              await updateLibrary((data) => restoreDeletedBooks(data, snapshot, keys));
               toast({ message: "Restored." });
             } catch {
               toast({ message: "Couldn't restore — check your connection.", kind: "error" });

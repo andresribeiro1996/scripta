@@ -22,6 +22,7 @@ import {
   addBookToGroup,
   deleteGroup,
   makeGroup,
+  normalizeGroupName,
   orderedGroupBooks,
   removeBooksFromAllGroups,
   removeBookFromGroup,
@@ -33,6 +34,7 @@ import {
 import { seriesGroupByBookKey } from "../lib/libraryOrder";
 import { effectiveCardStyle, resolveLibraryStyle, type PerCardStyle } from "../lib/libraryStyle";
 import { bookKey } from "../lib/merge";
+import { restoreDeletedBooks } from "../lib/restoreDeletedBooks";
 
 const COPY: Record<GroupType, { title: string; noun: string; emptyTitle: string; emptyBody: string; untitled: string; icon: ComponentType<{ size?: number }> }> = {
   series: {
@@ -145,8 +147,6 @@ export function GroupsPage({ type }: { type: GroupType }) {
   }
 
   async function handleDelete(group: Group) {
-    const snapshot = library?.data;
-    if (!snapshot) return;
     try {
       await updateLibrary((data) => ({ ...data, groups: deleteGroup(data.groups ?? [], group.id) }));
     } catch {
@@ -160,7 +160,14 @@ export function GroupsPage({ type }: { type: GroupType }) {
         onClick: () => {
           void (async () => {
             try {
-              await updateLibrary(() => snapshot);
+              await updateLibrary((data) => {
+                const exists = (data.groups ?? []).some((candidate) =>
+                  candidate.id === group.id ||
+                  (group.type === "series" && candidate.type === "series" && normalizeGroupName(candidate.name) === normalizeGroupName(group.name))
+                );
+                if (exists) return data;
+                return { ...data, groups: [...(data.groups ?? []), group] };
+              });
               toast({ message: "Restored." });
             } catch {
               toast({ message: "Couldn't restore — check your connection.", kind: "error" });
@@ -259,15 +266,19 @@ export function GroupsPage({ type }: { type: GroupType }) {
   // collection it was in.
   async function handleDeleteSelected() {
     if (selectedKeys.size === 0) return;
-    const snapshot = library?.data;
-    if (!snapshot) return;
+    const initialSnapshot = library?.data;
+    if (!initialSnapshot) return;
+    let snapshot = initialSnapshot;
     const keys = selectedKeys;
     try {
-      await updateLibrary((data) => ({
-        ...data,
-        books: data.books.filter((b) => !keys.has(bookKey(b))),
-        groups: removeBooksFromAllGroups(data.groups ?? [], keys)
-      }));
+      await updateLibrary((data) => {
+        snapshot = data;
+        return {
+          ...data,
+          books: data.books.filter((b) => !keys.has(bookKey(b))),
+          groups: removeBooksFromAllGroups(data.groups ?? [], keys)
+        };
+      });
     } catch {
       toast({ message: "Couldn't delete — nothing was changed.", kind: "error" });
       return;
@@ -286,7 +297,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
           clearTimeout(scrubTimer);
           void (async () => {
             try {
-              await updateLibrary(() => snapshot);
+              await updateLibrary((data) => restoreDeletedBooks(data, snapshot, keys));
               toast({ message: "Restored." });
             } catch {
               toast({ message: "Couldn't restore — check your connection.", kind: "error" });
