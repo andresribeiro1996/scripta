@@ -13,6 +13,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { errorHaptic, successHaptic } from "./haptics";
 import { dynamicType, minimumTouchTarget, radii, spacing, typography, useReducedMotion, useTheme } from "./theme";
 
 // Every screen root. Paints the themed background and pays the top safe-area
@@ -220,6 +221,17 @@ export function Toast({ visible, message, tone = "default" }: { visible: boolean
   const { colors } = useTheme();
   const reducedMotion = useReducedMotion();
   const opacity = useRef(new Animated.Value(visible ? 1 : 0)).current;
+  const wasVisible = useRef(visible);
+
+  // Once per appearance, and only for an outcome the user was waiting on — a
+  // neutral toast is information, not a result.
+  useEffect(() => {
+    if (visible && !wasVisible.current) {
+      if (tone === "success") successHaptic();
+      else if (tone === "error") errorHaptic();
+    }
+    wasVisible.current = visible;
+  }, [tone, visible]);
 
   useEffect(() => {
     if (reducedMotion) {

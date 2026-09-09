@@ -15,7 +15,9 @@ import {
 } from "@scripta/shared";
 import { Image } from "expo-image";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
+import { commitHaptic, liftHaptic } from "../../ui/haptics";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { resolveBorderColor, resolveBorderStyle } from "../../ui/libraryStyle";
 import { minimumTouchTarget, spacing, typography, useTheme } from "../../ui/theme";
@@ -23,6 +25,7 @@ import type { GalleryImage } from "../gallery/api";
 import type { Tierlist } from "../tierlists/api";
 import { muralCanvasHeight } from "./layout";
 
+const LIFT_SPRING = { duration: 300, dampingRatio: 0.8 } as const;
 const ROW_HEIGHT = 36;
 const GAP = 8;
 
@@ -56,8 +59,25 @@ function CanvasBlock({ block, columnWidth, editable, selected, books, images, ti
   const { colors } = useTheme();
   const x = useSharedValue(0);
   const y = useSharedValue(0);
-  const gesture = Gesture.Pan().enabled(editable).activateAfterLongPress(220).onUpdate((event) => { x.value = event.translationX; y.value = event.translationY; }).onEnd((event) => { runOnJS(onMove)(Math.round(event.translationX / columnWidth), Math.round(event.translationY / ROW_HEIGHT)); }).onFinalize(() => { x.value = withSpring(0); y.value = withSpring(0); });
-  const animated = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }, { translateY: y.value }] }));
+  const lifted = useSharedValue(0);
+  // A block gave no sign at all that the long press had armed it — the haptic
+  // arrives with a visible lift, never on its own.
+  const gesture = Gesture.Pan()
+    .enabled(editable)
+    .activateAfterLongPress(220)
+    .onStart(() => { lifted.value = withSpring(1, LIFT_SPRING); scheduleOnRN(liftHaptic); })
+    .onUpdate((event) => { x.value = event.translationX; y.value = event.translationY; })
+    .onEnd((event) => {
+      const dx = Math.round(event.translationX / columnWidth);
+      const dy = Math.round(event.translationY / ROW_HEIGHT);
+      scheduleOnRN(onMove, dx, dy);
+      if (dx !== 0 || dy !== 0) scheduleOnRN(commitHaptic);
+    })
+    .onFinalize(() => { x.value = withSpring(0); y.value = withSpring(0); lifted.value = withSpring(0, LIFT_SPRING); });
+  const animated = useAnimatedStyle(() => ({
+    opacity: 1 - lifted.value * 0.15,
+    transform: [{ translateX: x.value }, { translateY: y.value }, { scale: 1 + lifted.value * 0.03 }],
+  }));
   const style = resolveBlockStyle(block.style);
   return (
     <GestureDetector gesture={gesture}>

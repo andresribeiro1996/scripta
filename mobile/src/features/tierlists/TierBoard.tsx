@@ -2,7 +2,9 @@ import { useState } from "react";
 import { bookKey, createTier, type TierDefinition, type TierlistData } from "@scripta/shared";
 import { Image } from "expo-image";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
+import { commitHaptic, liftHaptic } from "../../ui/haptics";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { Button, Dialog, Input, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { moveBook, reorderBook } from "./tierBoardData";
@@ -21,7 +23,20 @@ function BookChip({ book, onDrag, onMoveUp, onMoveDown, onEarlier, onLater }: { 
   const { colors } = useTheme();
   const y = useSharedValue(0);
   const dragging = useSharedValue(1);
-  const gesture = Gesture.Pan().activateAfterLongPress(220).onBegin(() => { dragging.value = 0.75; }).onUpdate((event) => { y.value = event.translationY; }).onEnd((event) => { if (Math.abs(event.translationY) > 36) runOnJS(onDrag)(event.translationY < 0 ? -1 : 1); }).onFinalize(() => { y.value = withSpring(0); dragging.value = withSpring(1); });
+  // onStart, not onBegin: onBegin fires on finger-down, so the chip used to dim
+  // 220ms before the long press had actually armed the drag. Both the dim and
+  // the lift haptic now land on the frame the gesture really activates.
+  const gesture = Gesture.Pan()
+    .activateAfterLongPress(220)
+    .onStart(() => { dragging.value = 0.75; scheduleOnRN(liftHaptic); })
+    .onUpdate((event) => { y.value = event.translationY; })
+    .onEnd((event) => {
+      if (Math.abs(event.translationY) > 36) {
+        scheduleOnRN(onDrag, event.translationY < 0 ? -1 : 1);
+        scheduleOnRN(commitHaptic);
+      }
+    })
+    .onFinalize(() => { y.value = withSpring(0); dragging.value = withSpring(1); });
   const animated = useAnimatedStyle(() => ({ opacity: dragging.value, transform: [{ translateY: y.value }] }));
   const cover = coverOf(book);
   return (
