@@ -4,7 +4,7 @@ import { Image } from "expo-image";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { buildMuralPreset, buildTree, MURAL_PRESETS, type Mural } from "@scripta/shared";
-import { Button, EmptyState, ErrorState, Input, Screen, Sheet } from "../../ui";
+import { Button, EmptyState, ErrorState, IconButton, Input, Menu, Screen, Sheet } from "../../ui";
 import { radii, spacing, typography, useTheme } from "../../ui/theme";
 import { fetchGalleryImages } from "../gallery/api";
 import { useLibrary } from "../library/hooks/useLibrary";
@@ -79,7 +79,17 @@ export function MuralsScreen() {
         ListEmptyComponent={!murals.isPending ? <EmptyState title={search ? "Nothing matches" : "No murals here"} body="Create a freeform mural or start from a preset." /> : null}
         renderItem={({ item }) => <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Pressable accessibilityLabel={`Open ${item.name}`} accessibilityRole="button" style={styles.open} onPress={() => router.push(`/murals/${item.id}` as never)}>{item.coverImageUrl ? <Image source={{ uri: item.coverImageUrl }} style={styles.cover} contentFit="cover" /> : null}<View style={styles.grow}><Text style={[typography.title, { color: colors.text, fontWeight: "700" }]}>{item.name}</Text><Text style={[typography.caption, { color: colors.textDim }]}>{item.blocks.length} blocks</Text></View></Pressable>
-          <View style={styles.actions}><Button label="Move" variant="secondary" onPress={() => setMoveFor(item)} /><Button label="Cover" variant="secondary" onPress={() => setCoverFor(item)} /><Button label="Share" variant="secondary" onPress={() => setShareFor(item)} /><Button label="Delete" variant="destructive" onPress={() => confirmDelete(item)} /></View>
+          <Menu
+            title={item.name}
+            items={[
+              { label: "Move to folder…", onPress: () => setMoveFor(item) },
+              { label: "Change cover…", onPress: () => setCoverFor(item) },
+              { label: "Share…", onPress: () => setShareFor(item) },
+              { label: "Delete", destructive: true, onPress: () => confirmDelete(item) },
+            ]}
+          >
+            <IconButton accessibilityLabel={`Actions for ${item.name}`} name="ellipsis-horizontal" />
+          </Menu>
         </View>}
       />
       <Sheet visible={presets} title="Start with a preset" onClose={() => setPresets(false)}><View style={styles.sheet}>{MURAL_PRESETS.map((preset) => <Button key={preset.id} label={preset.name} variant="secondary" onPress={() => void createFromPreset(preset.id)} />)}</View></Sheet>
@@ -97,11 +107,10 @@ const styles = StyleSheet.create({
   title: { ...typography.heading, fontWeight: "700", flex: 1 },
   folders: { gap: spacing.sm },
   list: { gap: spacing.md, paddingBottom: spacing.huge },
-  card: { borderWidth: 1, borderRadius: radii.lg, padding: spacing.md, gap: spacing.sm },
-  open: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  card: { borderWidth: 1, borderRadius: radii.lg, padding: spacing.md, gap: spacing.sm, flexDirection: "row", alignItems: "center" },
+  open: { flex: 1, flexDirection: "row", alignItems: "center", gap: spacing.md },
   cover: { width: 64, height: 64, borderRadius: radii.md },
   grow: { flex: 1 },
-  actions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   sheet: { gap: spacing.sm, paddingBottom: spacing.xl },
   imageChoice: { width: "100%", height: 120, borderRadius: radii.md },
 });

@@ -1,4 +1,4 @@
-import { type ReactNode, type Ref, useEffect, useRef, useState } from "react";
+import { type ComponentProps, type ReactNode, type Ref, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -12,6 +12,7 @@ import {
   View,
   type ViewStyle,
 } from "react-native";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import MenuView from "@expo/ui/community/menu";
 import SegmentedControl from "@expo/ui/community/segmented-control";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -88,6 +89,37 @@ export function Button({
       ]}
     >
       {loading ? <ActivityIndicator color={color} /> : <Text {...dynamicType} style={[styles.buttonText, { color }]}>{label}</Text>}
+    </Pressable>
+  );
+}
+
+// An icon-only control. Exists mainly as a menu trigger and for header
+// actions, where a text button would crowd the row — the accessibility label
+// carries the meaning the glyph can't.
+export function IconButton({
+  name,
+  accessibilityLabel,
+  onPress,
+  tone = "default",
+}: {
+  name: ComponentProps<typeof Ionicons>["name"];
+  accessibilityLabel: string;
+  onPress?: () => void;
+  tone?: "default" | "danger";
+}) {
+  const { colors } = useTheme();
+  return (
+    <Pressable
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="button"
+      hitSlop={8}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.iconButton,
+        { backgroundColor: pressed ? colors.surfacePressed : "transparent" },
+      ]}
+    >
+      <Ionicons color={tone === "danger" ? colors.danger : colors.textDim} name={name} size={22} />
     </Pressable>
   );
 }
@@ -350,6 +382,7 @@ export function ModalBody({ children }: { children: ReactNode }) {
 const styles = StyleSheet.create({
   button: { minHeight: minimumTouchTarget, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: radii.md, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   buttonText: { ...typography.body, fontWeight: "600" },
+  iconButton: { minHeight: minimumTouchTarget, minWidth: minimumTouchTarget, alignItems: "center", justifyContent: "center", borderRadius: radii.full },
   field: { gap: spacing.xs },
   label: { ...typography.body, fontWeight: "600" },
   input: { minHeight: minimumTouchTarget, borderWidth: 1, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, ...typography.input },

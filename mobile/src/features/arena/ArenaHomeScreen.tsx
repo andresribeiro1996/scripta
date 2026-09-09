@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
-import { Button, Dialog, EmptyState, ErrorState, Input, Screen, Segmented, Skeleton, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { Button, Dialog, EmptyState, ErrorState, IconButton, Input, Menu, Screen, Segmented, Skeleton, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { createTierlist, deleteTierlist, fetchTierlists, type Tierlist } from "../tierlists/api";
 import { TierlistEditorScreen } from "../tierlists/TierlistEditorScreen";
 import { deleteTournament, fetchMyTournaments, type TournamentSummary } from "./api";
@@ -88,7 +88,12 @@ export function ArenaHomeScreen() {
       ListEmptyComponent={<EmptyState title={allItems.length ? "Nothing matches" : tab === "tournaments" ? "No tournaments yet" : "No tier lists yet"} body={allItems.length ? "Try a different search." : tab === "tournaments" ? "Create one and seed it from your library." : "Create one to rank books into tiers."} />}
       renderItem={({ item }) => <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <Pressable accessibilityRole="button" accessibilityLabel={`Open ${item.name}`} onPress={() => item.kind === "tournament" ? (item.source.status === "seeding" ? setSeeding(item.source) : router.push(`/arena/${item.id}` as never)) : setEditing(item.source)} style={styles.grow}><Text numberOfLines={1} {...dynamicType} style={[typography.title, styles.strong, { color: colors.text }]}>{item.name}</Text><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{item.detail}</Text></Pressable>
-        <Button label="Delete" variant="destructive" onPress={() => setDeleting({ kind: item.kind, id: item.id, name: item.name })} />
+        <Menu
+          title={item.name}
+          items={[{ label: "Delete", destructive: true, onPress: () => setDeleting({ kind: item.kind, id: item.id, name: item.name }) }]}
+        >
+          <IconButton accessibilityLabel={`Actions for ${item.name}`} name="ellipsis-horizontal" />
+        </Menu>
       </View>}
     />}
     <Dialog visible={deleting !== null} title={`Delete “${deleting?.name ?? ""}”?`} onClose={() => setDeleting(null)}><View style={styles.dialog}><Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>This cannot be undone.</Text><Button label="Delete" variant="destructive" loading={busy} onPress={() => void remove()} /></View></Dialog>
