@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Stack } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Image } from "expo-image";
@@ -6,7 +7,7 @@ import * as Linking from "expo-linking";
 import { FlatList, Pressable, Share, StyleSheet, Text, View } from "react-native";
 import { bracketShape, countdownLabel, createVoterToken, sharePercent, type Duel, type DuelSide } from "@scripta/shared";
 import { useAuth } from "../../core/auth";
-import { Button, Dialog, EmptyState, ErrorState, Input, Screen, Skeleton, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { Button, Dialog, EmptyState, ErrorState, IconButton, Input, Menu, Screen, Skeleton, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { fetchTournament, renameTournament, resolveTiebreak, settleDuelEarly, voteOnDuel } from "./api";
 
 const TOKEN_KEY = "arena-voter-token";
@@ -67,20 +68,32 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
     }
   }
 
-  if (!token || tournament.isPending) return <Screen bottomInset style={styles.screen}><Skeleton height={160} /></Screen>;
-  if (tournament.isError || !data) return <Screen bottomInset style={styles.screen}><ErrorState title="Tournament unavailable" body={tournament.error instanceof Error ? tournament.error.message : "No such tournament."} actionLabel="Retry" onAction={() => void tournament.refetch()} /></Screen>;
+  if (!token || tournament.isPending) return <Screen bottom top={false} style={styles.screen}><Skeleton height={160} /></Screen>;
+  if (tournament.isError || !data) return <Screen bottom top={false} style={styles.screen}><ErrorState title="Tournament unavailable" body={tournament.error instanceof Error ? tournament.error.message : "No such tournament."} actionLabel="Retry" onAction={() => void tournament.refetch()} /></Screen>;
 
   const duels: Array<{ key: string; duel: Duel | null }> = mode === "matches"
     ? data.duels.map((duel) => ({ key: duel.id, duel }))
     : bracketShape(data.bracketSize, data.duels).flatMap((round, roundIndex) => round.map((duel, duelIndex) => ({ duel, key: `${roundIndex}:${duelIndex}` })));
   return (
-    <Screen bottomInset style={styles.screen}>
-      <View style={styles.header}>
-        {onClose ? <Button label="Back" variant="secondary" onPress={onClose} /> : null}
-        <View style={styles.grow}><Text accessibilityRole="header" numberOfLines={1} {...dynamicType} style={[typography.title, styles.strong, { color: colors.text }]}>{data.name}</Text><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{data.bracketSize} books · {data.status === "active" ? `Round ${data.currentRound}` : data.status}</Text></View>
-        {isOwner ? <Button label="Rename" variant="secondary" onPress={() => { setName(data.name); setRenaming(true); }} /> : null}
-        <Button label="Share" variant="secondary" onPress={() => void Share.share({ message: Linking.createURL(`/arena/${id}`) })} />
-      </View>
+    <Screen bottom top={false} style={styles.screen}>
+      <Stack.Screen
+        options={{
+          headerShown: true,
+          title: data.name,
+          headerRight: () => (
+            <Menu
+              title={data.name}
+              items={[
+                ...(isOwner ? [{ label: "Rename…", onPress: () => { setName(data.name); setRenaming(true); } }] : []),
+                { label: "Share…", onPress: () => void Share.share({ message: Linking.createURL(`/arena/${id}`) }) },
+              ]}
+            >
+              <IconButton accessibilityLabel={`Actions for ${data.name}`} name="ellipsis-horizontal" />
+            </Menu>
+          ),
+        }}
+      />
+      <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{data.bracketSize} books · {data.status === "active" ? `Round ${data.currentRound}` : data.status}</Text>
       {error ? <Toast visible message={error} tone="error" /> : null}
       <View style={styles.row}><Button label="Matches" variant={mode === "matches" ? "primary" : "secondary"} onPress={() => setMode("matches")} /><Button label="Bracket" variant={mode === "bracket" ? "primary" : "secondary"} onPress={() => setMode("bracket")} /></View>
       <FlatList
@@ -110,7 +123,6 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
 
 const styles = StyleSheet.create({
   screen: { padding: spacing.lg, gap: spacing.md },
-  header: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   grow: { flex: 1 },
   strong: { fontWeight: "700" },
   row: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },

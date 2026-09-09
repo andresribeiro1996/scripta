@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
+import { Stack } from "expo-router";
 import { Alert, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { scrubImageFromBooks } from "@scripta/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, EmptyState, ErrorState, Screen } from "../../ui";
+import { Button, EmptyState, ErrorState, IconButton, Screen } from "../../ui";
 import { minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui/theme";
 import { useLibrary } from "../library/hooks/useLibrary";
 import { useMurals } from "../murals/useMurals";
@@ -91,11 +92,15 @@ export function GalleryScreen() {
   if (gallery.isError) return <ErrorState body={gallery.error.message} actionLabel="Retry" onAction={() => void gallery.refetch()} />;
 
   return (
-    <Screen bottomInset style={styles.screen}>
-      <View style={styles.header}>
-        <Text accessibilityRole="header" style={[styles.title, { color: colors.text }]}>Gallery</Text>
-        <Button label={upload.isPending ? "Uploading…" : "Upload image"} loading={upload.isPending} onPress={() => void pickImage()} />
-      </View>
+    <Screen bottom top={false} style={styles.screen}>
+      <Stack.Screen
+        options={{
+          headerShown: true,
+          title: "Gallery",
+          headerRight: () => <IconButton accessibilityLabel="Upload image" name="add" onPress={() => void pickImage()} />,
+        }}
+      />
+      {upload.isPending ? <Text style={[typography.caption, styles.uploading, { color: colors.textDim }]}>Uploading…</Text> : null}
       {error ? <Text accessibilityRole="alert" style={[typography.body, { color: colors.danger }]}>{error}</Text> : null}
       <FlatList
         contentContainerStyle={styles.list}
@@ -122,7 +127,7 @@ export function GalleryScreen() {
 
 const styles = StyleSheet.create({
   screen: {},
-  header: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md, gap: spacing.md },
+  uploading: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
   title: { ...typography.heading, fontWeight: "700" },
   list: { padding: spacing.sm, flexGrow: 1 },
   card: { flex: 1, margin: spacing.sm, padding: spacing.sm, borderWidth: 1, borderRadius: radii.lg, gap: spacing.xs },

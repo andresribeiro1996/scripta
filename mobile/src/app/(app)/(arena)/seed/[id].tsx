@@ -1,9 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { View } from "react-native";
-import { ErrorState, Skeleton } from "../../../ui";
-import { fetchMyTournaments } from "../../../features/arena/api";
-import { ArenaSeedScreen } from "../../../features/arena/ArenaSeedScreen";
+import { ErrorState, Skeleton } from "@/ui";
+import { fetchMyTournaments } from "@/features/arena/api";
+import { ArenaSeedScreen } from "@/features/arena/ArenaSeedScreen";
 
 export default function ArenaSeedRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();

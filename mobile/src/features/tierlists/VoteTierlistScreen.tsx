@@ -34,8 +34,8 @@ export function VoteTierlistScreen({ code }: { code: string }) {
     void fetchBallot(code, storedId, Boolean(user)).then(setBallot).catch(() => { void AsyncStorage.removeItem(storageKey(code)); setStoredId(null); });
   }, [code, ready, storedId, user]);
 
-  if (!ready || storedId === undefined || boardQuery.isPending) return <Screen bottomInset style={styles.screen}><Skeleton height={180} /></Screen>;
-  if (boardQuery.isError || !boardQuery.data) return <Screen bottomInset style={styles.screen}><ErrorState title="No tier list at that link" body="Check the voting code and try again." actionLabel="Retry" onAction={() => void boardQuery.refetch()} /></Screen>;
+  if (!ready || storedId === undefined || boardQuery.isPending) return <Screen bottom style={styles.screen}><Skeleton height={180} /></Screen>;
+  if (boardQuery.isError || !boardQuery.data) return <Screen bottom style={styles.screen}><ErrorState title="No tier list at that link" body="Check the voting code and try again." actionLabel="Retry" onAction={() => void boardQuery.refetch()} /></Screen>;
   const { board } = boardQuery.data;
   const books: TierBook[] = boardQuery.data.books.map((book) => ({ Title: book.title, Attribution: book.author, ISBN: book.isbn, ImageId: book.imageId, _coverUrl: book.coverUrl }));
   const allKeys = new Set(books.map(keyOf));
@@ -60,7 +60,7 @@ export function VoteTierlistScreen({ code }: { code: string }) {
     }
   }
 
-  return <Screen bottomInset style={styles.screen}>
+  return <Screen bottom style={styles.screen}>
     <Text accessibilityRole="header" {...dynamicType} style={[typography.heading, styles.strong, { color: colors.text }]}>{board.name}</Text>
     <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{board.votingOpen ? "Voting is open." : "Voting is closed."}</Text>
     {error ? <Toast visible message={error} tone="error" /> : null}

@@ -17,7 +17,7 @@ export function SharedLibraryScreen({ token }: { token: string }) {
 
   if (query.isPending) return <View style={[styles.center, { backgroundColor: colors.background }]}><Skeleton height={180} /></View>;
   if (query.isError || !query.data) return <View style={[styles.center, { backgroundColor: colors.background }]}><ErrorState title="Library unavailable" body="This link is invalid or no longer active." /></View>;
-  return <Screen bottomInset style={styles.screen}>
+  return <Screen bottom style={styles.screen}>
     <Text accessibilityRole="header" style={[styles.title, { color: colors.text }]}>{query.data.data.name || "Library"}</Text>
     <LibraryGrid data={ordered} style={style} keyExtractor={(book, index) => bookKey(book) || String(index)} ListEmptyComponent={<EmptyState title="This library is empty" />} renderItem={(book) => <BookCard book={book} onPress={() => undefined} style={style} />} />
   </Screen>;

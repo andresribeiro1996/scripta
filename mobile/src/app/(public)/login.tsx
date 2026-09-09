@@ -50,7 +50,7 @@ export default function LoginPage() {
 
   if (!ready) {
     return (
-      <Screen bottomInset style={styles.center}>
+      <Screen bottom style={styles.center}>
         <ActivityIndicator size="large" color={colors.accent} />
       </Screen>
     );
@@ -90,7 +90,7 @@ export default function LoginPage() {
   };
 
   return (
-    <Screen bottomInset>
+    <Screen bottom>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.flex}>
         <View style={styles.center}>
           <Text accessibilityRole="header" style={[styles.logo, { color: colors.text }]}>Scripta</Text>

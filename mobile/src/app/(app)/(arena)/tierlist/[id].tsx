@@ -1,9 +1,9 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { View } from "react-native";
-import { ErrorState, Skeleton } from "../../../ui";
-import { fetchTierlists, type Tierlist } from "../../../features/tierlists/api";
-import { TierlistEditorScreen } from "../../../features/tierlists/TierlistEditorScreen";
+import { ErrorState, Skeleton } from "@/ui";
+import { fetchTierlists, type Tierlist } from "@/features/tierlists/api";
+import { TierlistEditorScreen } from "@/features/tierlists/TierlistEditorScreen";
 
 export default function TierlistEditorRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();

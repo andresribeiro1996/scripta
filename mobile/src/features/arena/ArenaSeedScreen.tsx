@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Stack } from "expo-router";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { filterBooks, seedCoverLookup, toSeedBook, type SeedBook } from "@scripta/shared";
@@ -106,11 +107,8 @@ export function ArenaSeedScreen({ tournament, onClose, onStarted }: { tournament
   const assigned = new Set(slots.flatMap((book) => book ? [book.key] : []));
   const availableBooks = filterBooks(books, bookSearch, "all").filter((book) => !assigned.has(toSeedBook(book, null).key));
   return (
-    <Screen style={styles.screen}>
-      <View style={styles.header}>
-        <Button label="Back" variant="secondary" onPress={onClose} />
-        <Text accessibilityRole="header" {...dynamicType} style={[typography.title, styles.grow, { color: colors.text }]}>Seed tournament</Text>
-      </View>
+    <Screen top={false} style={styles.screen}>
+      <Stack.Screen options={{ headerShown: true, title: "Seed tournament" }} />
       {!current ? (
         <View style={styles.form}>
           <Input label="Tournament name" value={name} onChangeText={setName} maxLength={200} />
@@ -155,7 +153,6 @@ export function ArenaSeedScreen({ tournament, onClose, onStarted }: { tournament
 
 const styles = StyleSheet.create({
   screen: { padding: spacing.lg, gap: spacing.md },
-  header: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   grow: { flex: 1 },
   form: { gap: spacing.sm },
   row: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },

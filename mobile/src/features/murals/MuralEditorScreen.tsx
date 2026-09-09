@@ -9,9 +9,9 @@ import {
   type MuralBlock,
 } from "@scripta/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useFocusEffect, useRouter } from "expo-router";
+import { Stack, useFocusEffect, useRouter } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { Button, EmptyState, ErrorState, Input, Screen, Sheet, Toast } from "../../ui";
+import { Button, EmptyState, ErrorState, IconButton, Input, Screen, Sheet, Toast } from "../../ui";
 import { spacing, typography, useTheme } from "../../ui/theme";
 import { fetchGalleryImages } from "../gallery/api";
 import { useLibrary } from "../library/hooks/useLibrary";
@@ -90,8 +90,15 @@ export function MuralEditorScreen({ id }: { id: string }) {
   if (muralQuery.isError || !mural || !draftMural) return <ErrorState title="Mural unavailable" body="It may have been deleted." actionLabel="Back" onAction={() => router.back()} />;
 
   return (
-    <Screen style={styles.screen}>
-      <View style={styles.header}><Button label="Back" variant="secondary" onPress={() => router.back()} /><Input label="Mural name" value={currentName} onChangeText={setName} style={styles.name} /><Button label="Save" loading={busy} onPress={() => void save()} /></View>
+    <Screen top={false} style={styles.screen}>
+      <Stack.Screen
+        options={{
+          headerShown: true,
+          title: currentName || "Mural",
+          headerRight: () => <IconButton accessibilityLabel="Save mural" name="checkmark" onPress={() => void save()} />,
+        }}
+      />
+      <View style={styles.nameRow}><Input label="Mural name" value={currentName} onChangeText={setName} /></View>
       {error ? <Toast visible message={error} tone="error" /> : null}
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.canvasScroll}>
         <MuralCanvas mural={draftMural} books={books} images={gallery.data ?? []} tierlists={tierlists.data ?? []} editable selectedBlockId={selectedId} onSelectBlock={setSelectedId} onLayoutChange={(blockId, layout) => setBlocks(changeBlockLayout(currentBlocks, blockId, layout))} />
@@ -139,8 +146,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
 const styles = StyleSheet.create({
   screen: {},
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  header: { flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.sm },
-  name: { minWidth: 140 },
+  nameRow: { paddingHorizontal: spacing.md, paddingTop: spacing.sm },
   canvasScroll: { paddingHorizontal: spacing.sm, paddingBottom: 120 },
   dock: { position: "absolute", left: 0, right: 0, bottom: 0, borderTopWidth: 1, padding: spacing.sm, flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   sheet: { gap: spacing.sm, paddingBottom: spacing.xl },

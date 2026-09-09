@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { router } from "expo-router";
+import { Stack, router } from "expo-router";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { Button, Dialog, EmptyState, ErrorState, IconButton, Input, Menu, Screen, Segmented, Skeleton, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { createTierlist, deleteTierlist, fetchTierlists, type Tierlist } from "../tierlists/api";
@@ -73,8 +73,14 @@ export function ArenaHomeScreen() {
     : (tierlists.data ?? []).map((item) => ({ id: item.id, name: item.name, detail: `${item.data.tiers.length} tiers${item.voteCode ? ` · voting ${item.votingOpen ? "open" : "closed"}` : ""}`, kind: "tierlist" as const, source: item }));
   const needle = search.trim().toLowerCase();
   const items = needle ? allItems.filter((item) => item.name.toLowerCase().includes(needle)) : allItems;
-  return <Screen style={styles.screen}>
-    <View style={styles.header}><Text accessibilityRole="header" {...dynamicType} style={[typography.heading, styles.strong, styles.grow, { color: colors.text }]}>Arena</Text><Button label="Browse public" variant="secondary" onPress={() => router.push("/arena" as never)} /></View>
+  return <Screen top={false} style={styles.screen}>
+    <Stack.Screen
+      options={{
+        headerShown: true,
+        title: "Arena",
+        headerRight: () => <IconButton accessibilityLabel="Browse public arena" name="globe-outline" onPress={() => router.push("/arena" as never)} />,
+      }}
+    />
     <Segmented accessibilityLabel="Arena section" options={ARENA_TABS} value={tab} onChange={setTab} />
     {error ? <Toast visible message={error} tone="error" /> : null}
     {allItems.length ? <Input label="Search" value={search} onChangeText={setSearch} placeholder={`Search ${tab}`} autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" returnKeyType="search" /> : null}
@@ -102,7 +108,6 @@ export function ArenaHomeScreen() {
 
 const styles = StyleSheet.create({
   screen: { padding: spacing.lg, gap: spacing.md },
-  header: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   grow: { flex: 1 },
   strong: { fontWeight: "700" },
   list: { gap: spacing.sm, paddingBottom: spacing.huge },

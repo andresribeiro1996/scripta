@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Alert, FlatList, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
 import { useQuery } from "@tanstack/react-query";
-import { useRouter } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import { buildMuralPreset, buildTree, MURAL_PRESETS, type Mural } from "@scripta/shared";
 import { Button, EmptyState, ErrorState, IconButton, Input, Menu, Screen, Sheet } from "../../ui";
 import { radii, spacing, typography, useTheme } from "../../ui/theme";
@@ -66,8 +66,24 @@ export function MuralsScreen() {
 
   if (murals.isError) return <ErrorState body={murals.error.message} actionLabel="Retry" onAction={() => void murals.refetch()} />;
   return (
-    <Screen style={styles.screen}>
-      <View style={styles.header}><Text accessibilityRole="header" style={[styles.title, { color: colors.text }]}>Murals</Text><Button label="Presets" variant="secondary" onPress={() => setPresets(true)} /><Button label="New mural" onPress={() => void murals.create("Untitled mural", folderId ?? null).then((mural) => router.push(`/murals/${mural.id}` as never))} /></View>
+    <Screen top={false} style={styles.screen}>
+      <Stack.Screen
+        options={{
+          headerShown: true,
+          title: "Murals",
+          headerRight: () => (
+            <Menu
+              title="New mural"
+              items={[
+                { label: "Blank mural", onPress: () => void murals.create("Untitled mural", folderId ?? null).then((mural) => router.push(`/murals/${mural.id}` as never)) },
+                { label: "Start from a preset…", onPress: () => setPresets(true) },
+              ]}
+            >
+              <IconButton accessibilityLabel="New mural" name="add" />
+            </Menu>
+          ),
+        }}
+      />
       <Input label="Search murals" value={search} onChangeText={setSearch} autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" returnKeyType="search" />
       <ScrollView horizontal contentContainerStyle={styles.folders}><Button label="All" variant={folderId === undefined ? "primary" : "secondary"} onPress={() => setFolderId(undefined)} /><Button label="Unfiled" variant={folderId === null ? "primary" : "secondary"} onPress={() => setFolderId(null)} />{tree.map(({ folder, depth }) => <Button key={folder.id} label={`${"  ".repeat(depth)}${folder.name}`} variant={folderId === folder.id ? "primary" : "secondary"} onPress={() => setFolderId(folder.id)} />)}<Button label="New folder" variant="secondary" onPress={() => void folders.create("New folder", folderId ?? null).then((folder) => { setEditingFolderId(folder.id); setFolderName(folder.name); setFolderParentId(folder.parentId); })} />{typeof folderId === "string" ? <><Button label="Edit folder" variant="secondary" onPress={() => editFolder(folderId)} /><Button label="Delete folder" variant="destructive" onPress={() => Alert.alert("Delete folder?", "Murals and subfolders move up one level.", [{ text: "Cancel", style: "cancel" }, { text: "Delete", style: "destructive", onPress: () => void folders.remove(folderId).then(() => setFolderId(undefined)) }])} /></> : null}</ScrollView>
       <FlatList
@@ -103,7 +119,6 @@ export function MuralsScreen() {
 
 const styles = StyleSheet.create({
   screen: { padding: spacing.lg, gap: spacing.md },
-  header: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   title: { ...typography.heading, fontWeight: "700", flex: 1 },
   folders: { gap: spacing.sm },
   list: { gap: spacing.md, paddingBottom: spacing.huge },

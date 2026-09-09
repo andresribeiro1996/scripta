@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Stack } from "expo-router";
 import { bookKey, filterBooks, type TierlistData } from "@scripta/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Linking from "expo-linking";
@@ -49,8 +50,8 @@ export function TierlistEditorScreen({ tierlist, onClose, onUpdated }: { tierlis
   const used = new Set([...data.pool, ...data.tiers.flatMap((tier) => tier.bookKeys)]);
   const availableBooks = filterBooks(books, bookSearch, "all").filter((book) => !used.has(bookKey(book)));
   const frozen = current.voteCode !== null;
-  return <Screen style={styles.screen}>
-    <View style={styles.header}><Button label="Back" variant="secondary" onPress={onClose} /><Text accessibilityRole="header" numberOfLines={1} {...dynamicType} style={[typography.title, styles.grow, styles.strong, { color: colors.text }]}>{current.name}</Text></View>
+  return <Screen top={false} style={styles.screen}>
+    <Stack.Screen options={{ headerShown: true, title: current.name }} />
     {error ? <Toast visible message={error} tone="error" /> : null}
     <View style={styles.form}><Input label="Tier list name" value={name} onChangeText={setName} editable={!busy} /><Button label="Save changes" loading={busy} onPress={() => void run(() => updateTierlist(current.id, { name: name.trim() || current.name, data }))} /></View>
     {!frozen ? <View style={styles.row}><Text {...dynamicType} style={[typography.caption, styles.grow, { color: colors.textDim }]}>Open a frozen community copy for voting.</Text><Button label="Open: anyone" variant="secondary" loading={busy} onPress={() => void run(async () => (await openVoting(current.id, "anonymous")).tierlist)} /><Button label="Members" variant="secondary" loading={busy} onPress={() => void run(async () => (await openVoting(current.id, "members")).tierlist)} /></View> : <View style={styles.voting}><Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>Vote code: {current.voteCode}</Text><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{board.data?.board.ballotCount ?? 0} ballots · {current.votingOpen ? "open" : "closed"} · {current.voteAccess === "anonymous" ? "anyone" : "members only"}</Text><View style={styles.row}><Button label="Share ballot" variant="secondary" onPress={() => void Share.share({ message: Linking.createURL(`/vote/${current.voteCode}`) })} /><Button label={current.votingOpen ? "Close voting" : "Reopen voting"} variant="secondary" loading={busy} onPress={() => void run(() => setVotingState(current.id, { open: !current.votingOpen }))} /><Button label={current.voteAccess === "anonymous" ? "Require members" : "Allow anyone"} variant="secondary" loading={busy} onPress={() => void run(() => setVotingState(current.id, { access: current.voteAccess === "anonymous" ? "members" : "anonymous" }))} /></View></View>}
@@ -65,7 +66,6 @@ export function TierlistEditorScreen({ tierlist, onClose, onUpdated }: { tierlis
 
 const styles = StyleSheet.create({
   screen: { padding: spacing.lg, gap: spacing.md },
-  header: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   grow: { flex: 1 },
   strong: { fontWeight: "700" },
   form: { gap: spacing.sm },

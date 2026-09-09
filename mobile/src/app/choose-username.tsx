@@ -22,7 +22,7 @@ export default function ChooseUsernamePage() {
 
   if (!ready) {
     return (
-      <Screen bottomInset style={styles.center}>
+      <Screen bottom style={styles.center}>
         <ActivityIndicator size="large" color={colors.accent} />
       </Screen>
     );
@@ -46,7 +46,7 @@ export default function ChooseUsernamePage() {
   };
 
   return (
-    <Screen bottomInset>
+    <Screen bottom>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.flex}>
         <View style={styles.center}>
           <Text accessibilityRole="header" style={[styles.title, { color: colors.text }]}>Choose a username</Text>

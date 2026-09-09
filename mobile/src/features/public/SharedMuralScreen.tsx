@@ -20,7 +20,7 @@ export function SharedMuralScreen({ token }: { token: string }) {
   if (query.isPending) return <View style={[styles.center, { backgroundColor: colors.background }]}><Skeleton height={180} /></View>;
   if (query.isError || !query.data) return <View style={[styles.center, { backgroundColor: colors.background }]}><ErrorState title="Mural unavailable" body="This link is invalid or no longer active." /></View>;
   const mural: Mural = { ...query.data.mural, coverImageId: undefined, coverImageUrl: query.data.mural.coverImageUrl ?? undefined, shareToken: null, shareUrl: null, folderId: null, createdAt: "", updatedAt: "" };
-  return <Screen bottomInset><ScrollView contentContainerStyle={styles.screen}>
+  return <Screen bottom><ScrollView contentContainerStyle={styles.screen}>
     <Text accessibilityRole="header" style={[styles.title, { color: colors.text }]}>{mural.name}</Text>
     {mural.blocks.length ? <MuralCanvas mural={mural} books={books} images={images} tierlists={tierlists} statsOverride={query.data.stats} /> : <EmptyState title="This mural is empty" />}
   </ScrollView></Screen>;

@@ -1,25 +1,11 @@
-// The native Library tab — mirrors frontend's pages/LibraryPage.tsx, plus
-// (as in-tab views rather than separate routes — see this task's handoff
-// notes) SeriesPage/CollectionsPage/LibraryStylePage. Composes every
-// other component in this feature; mobile/src/app/(app)/index.tsx is a
-// one-line wrapper around this.
-//
-// PLATFORM ADAPTATION (see this task's handoff notes for the full
-// reasoning): the PWA has Library/Series/Collections/Style as four
-// separate routes. This screen owns exactly one Expo Router route — the
-// Library tab — and switches between four internal `view`s instead of
-// pushing new routes, specifically to avoid touching
-// mobile/src/app/(app)/_layout.tsx's <Tabs> (central navigation, which
-// this task's file-ownership rules don't grant — see the plan's "Feature
-// agents must not edit central navigation" rule). A future task with
-// central-navigation ownership could promote these to real routes
-// (stack screens pushed from the Library tab) with no changes to any
-// component in this feature — every one of them already takes its data
-// as props/hooks, not route params.
+// The native Library tab — mirrors frontend's pages/LibraryPage.tsx. Series,
+// Collections and Library style are sibling routes in the same stack, so each
+// gets the platform's own header, back chevron and swipe-back; this screen is
+// just the grid.
 
-import { useCallback, useMemo, useState, type ReactNode } from "react";
-import { Alert, BackHandler, RefreshControl, StyleSheet, Text, View } from "react-native";
-import { useFocusEffect } from "expo-router";
+import { useMemo, useState } from "react";
+import { Alert, RefreshControl, StyleSheet, View } from "react-native";
+import { router, Stack } from "expo-router";
 import {
   bookKey,
   clearBookCover,
@@ -38,8 +24,8 @@ import {
   type SortKey,
   type StatusFilter,
 } from "@scripta/shared";
-import { Button, EmptyState, ErrorState, Input, Menu, Screen, Sheet, Skeleton, type MenuItem } from "../../ui/components";
-import { spacing, typography, useTheme } from "../../ui/theme";
+import { Button, EmptyState, ErrorState, IconButton, Input, Menu, Screen, Sheet, Skeleton, type MenuItem } from "../../ui/components";
+import { spacing } from "../../ui/theme";
 import type { GalleryImage } from "../gallery/api";
 import { useMurals } from "../murals/useMurals";
 import { useLibrary } from "./hooks/useLibrary";
@@ -58,14 +44,10 @@ import { PerCardStyleSheet } from "./components/PerCardStyleSheet";
 import { ReorderSheet } from "./components/ReorderSheet";
 import { ShareSheetBody } from "./components/ShareSheet";
 
-type ScreenView = "browse" | "series" | "collections" | "style";
-
-export function LibraryScreen({ initialView = "browse" }: { initialView?: ScreenView }) {
-  const { colors } = useTheme();
+export function LibraryScreen() {
   const { data: library, isPending, isError, error, refetch, isRefetching, updateLibrary, share, unshare } = useLibrary();
   const murals = useMurals();
 
-  const [view, setView] = useState<ScreenView>(initialView);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sortKey, setSortKey] = useState<SortKey>("manual");
@@ -179,34 +161,6 @@ export function LibraryScreen({ initialView = "browse" }: { initialView?: Screen
     ]);
   }
 
-  // Series/Collections/Style are internal views of this one route (see the
-  // PLATFORM ADAPTATION note above), so Android's hardware back had nothing to
-  // pop and left the Library tab entirely instead of returning to the grid.
-  useFocusEffect(
-    useCallback(() => {
-      if (view === "browse") return;
-      const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
-        setView("browse");
-        return true;
-      });
-      return () => subscription.remove();
-    }, [view]),
-  );
-
-  if (view === "series") return <SubView title="Series" onBack={() => setView("browse")}><GroupsView type="series" /></SubView>;
-  if (view === "collections") return <SubView title="Collections" onBack={() => setView("browse")}><GroupsView type="collection" /></SubView>;
-  if (view === "style") {
-    return (
-      <SubView title="Library style" onBack={() => setView("browse")}>
-        <LibraryStyleView
-          savedStyle={library?.data.style}
-          previewBooks={books}
-          onSave={(next) => void runUpdate((data) => ({ ...data, style: next }), "Couldn't save the style change.")}
-        />
-      </SubView>
-    );
-  }
-
   const actionItems: MenuItem[] = [
     {
       label: "Rename library…",
@@ -219,41 +173,48 @@ export function LibraryScreen({ initialView = "browse" }: { initialView?: Screen
     { label: "Import / sync…", onPress: () => setImportVisible(true) },
     ...(books.length > 1 ? [{ label: "Reorder…", onPress: () => setReordering(true) }] : []),
     ...(books.length > 0 ? [{ label: "Select…", onPress: () => setSelectionMode(true) }] : []),
-    { label: "Series…", onPress: () => setView("series") },
-    { label: "Collections…", onPress: () => setView("collections") },
-    { label: "Library style…", onPress: () => setView("style") },
+    { label: "Series…", onPress: () => router.push("/series" as never) },
+    { label: "Collections…", onPress: () => router.push("/collections" as never) },
+    { label: "Library style…", onPress: () => router.push("/style" as never) },
     { label: "Share…", onPress: () => setSharing(true) },
   ];
 
   return (
-    <Screen>
-      <View style={[styles.header, { borderColor: colors.border }]}>
-        {selectionMode ? (
-          <>
-            <Text style={[typography.title, { color: colors.text }]}>{selectedKeys.size} selected</Text>
-            <View style={styles.headerActions}>
-              <Button label="Delete" variant="destructive" disabled={selectedKeys.size === 0} onPress={handleDeleteSelected} />
-              <Button
-                label="Cancel"
-                variant="secondary"
-                onPress={() => {
-                  setSelectionMode(false);
-                  setSelectedKeys(new Set());
-                }}
-              />
-            </View>
-          </>
-        ) : (
-          <>
-            <Text style={[typography.heading, { color: colors.text }]} numberOfLines={1}>
-              {library?.data.name || "Library"}
-            </Text>
-            <Menu title={library?.data.name || "Library"} items={actionItems}>
-              <Button label="Menu" variant="secondary" />
-            </Menu>
-          </>
-        )}
-      </View>
+    <Screen top={false}>
+      <Stack.Screen
+        options={selectionMode
+          ? {
+              headerShown: true,
+              title: `${selectedKeys.size} selected`,
+              // Selection is a mode, not a place — its own back is Cancel, so
+              // the stack's back chevron would be the wrong affordance here.
+              headerBackVisible: false,
+              headerLeft: () => (
+                <Button
+                  label="Cancel"
+                  variant="secondary"
+                  onPress={() => { setSelectionMode(false); setSelectedKeys(new Set()); }}
+                />
+              ),
+              headerRight: () => (
+                <IconButton
+                  accessibilityLabel={`Delete ${selectedKeys.size} selected`}
+                  name="trash-outline"
+                  onPress={selectedKeys.size === 0 ? undefined : handleDeleteSelected}
+                  tone="danger"
+                />
+              ),
+            }
+          : {
+              headerShown: true,
+              title: library?.data.name || "Library",
+              headerRight: () => (
+                <Menu title={library?.data.name || "Library"} items={actionItems}>
+                  <IconButton accessibilityLabel="Library actions" name="ellipsis-horizontal" />
+                </Menu>
+              ),
+            }}
+      />
 
       {/* Was an empty <View>, so the app's home screen was blank on every cold
           start until the library resolved. */}
@@ -383,31 +344,7 @@ export function LibraryScreen({ initialView = "browse" }: { initialView?: Screen
   );
 }
 
-function SubView({ title, onBack, children }: { title: string; onBack: () => void; children: ReactNode }) {
-  const { colors } = useTheme();
-  return (
-    <Screen>
-      <View style={[styles.header, { borderColor: colors.border }]}>
-        <Button label="← Library" variant="secondary" onPress={onBack} />
-        <Text style={[typography.title, { color: colors.text }]}>{title}</Text>
-      </View>
-      {children}
-    </Screen>
-  );
-}
-
 const styles = StyleSheet.create({
   loading: { padding: spacing.lg, gap: spacing.md },
   loadingRow: { flexDirection: "row", gap: spacing.md },
-  header: {
-    minHeight: 56,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    gap: spacing.md,
-  },
-  headerActions: { flexDirection: "row", gap: spacing.sm },
 });

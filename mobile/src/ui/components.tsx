@@ -19,18 +19,22 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { errorHaptic, successHaptic } from "./haptics";
 import { dynamicType, minimumTouchTarget, radii, spacing, typography, useReducedMotion, useTheme } from "./theme";
 
-// Every screen root. Paints the themed background and pays the top safe-area
-// inset so headers clear the status bar / Dynamic Island — nothing in this app
-// sits under a native stack header, so no other layer applies the inset.
-// `bottomInset` is for screens outside the tab shell, where no tab bar is
-// already reserving the home-indicator strip.
+// Every screen root: paints the themed background and pays whichever safe-area
+// insets nothing else is covering.
+//
+// `top` is false wherever a native stack header sits above the screen — the
+// header already clears the status bar, and paying the inset again pushes the
+// content down by it twice. `bottom` is for routes outside the tab shell, where
+// no tab bar is reserving the home-indicator strip.
 export function Screen({
   children,
-  bottomInset = false,
+  top = true,
+  bottom = false,
   style,
 }: {
   children: ReactNode;
-  bottomInset?: boolean;
+  top?: boolean;
+  bottom?: boolean;
   style?: ViewStyle;
 }) {
   const { colors } = useTheme();
@@ -38,8 +42,9 @@ export function Screen({
   return (
     <View
       style={[
-        { flex: 1, backgroundColor: colors.background, paddingTop: insets.top },
-        bottomInset ? { paddingBottom: insets.bottom } : null,
+        { flex: 1, backgroundColor: colors.background },
+        top ? { paddingTop: insets.top } : null,
+        bottom ? { paddingBottom: insets.bottom } : null,
         style,
       ]}
     >
