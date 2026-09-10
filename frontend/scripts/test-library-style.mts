@@ -313,13 +313,32 @@ console.log("\n13. Text formatting — cardBold/cardItalic (cards) and bold/ital
 console.log("\n14. The phone grid: default size gives PHONE_COLUMNS_AT_DEFAULT_SIZE, and the slider still works");
 {
   // Models index.css's `.book-grid` rule under the phone media query:
-  //   minmax(max(40px, calc((100% - 4*gap) / 5 * floor / 200)), 1fr)
+  //   minmax(max(--card-floor-min, calc((100% - 2*gap) / 3 * --card-scale)), 1fr)
   // followed by auto-fill packing. The REAL rule is CSS and is verified
   // against a live browser engine separately — this guards the numbers
   // it depends on, which is what actually drifts.
+  //
+  // Two details below are not stylistic; get either wrong and this model
+  // disagrees with every real browser at the DEFAULT setting, which is
+  // the one case that matters most.
+  //
+  // 1. `scale` is its own unitless number, because that is literally what
+  //    ships: BookGrid.tsx computes `--card-scale` as setting / default
+  //    and CSS multiplies the track expression by it. Folding it in the
+  //    other order — `(oneColumn * cardMinWidth) / default` — is a
+  //    different floating-point expression, and at the default it lands a
+  //    hair ABOVE the exact 296/3, dropping the auto-fill division to
+  //    2.9999999999999996 and reporting 2 columns.
+  // 2. Layout engines carry lengths as 1/64px fixed point, so a real
+  //    floor is quantized DOWN off an exact boundary (Chromium resolves
+  //    these tracks at 98.6641px, not 98.66666…) and auto-fill gets slack
+  //    that raw f64 never has. Quantizing here puts the model on the same
+  //    footing instead of on a knife edge no browser sits on.
+  const LAYOUT_UNIT = 1 / 64;
   function phoneGrid(canvasWidth: number, cardMinWidth: number, gap: number) {
-    const oneOfFive = (canvasWidth - gap * (PHONE_COLUMNS_AT_DEFAULT_SIZE - 1)) / PHONE_COLUMNS_AT_DEFAULT_SIZE;
-    const scaled = (oneOfFive * cardMinWidth) / DEFAULT_LIBRARY_STYLE.cardMinWidth;
+    const oneColumn = (canvasWidth - gap * (PHONE_COLUMNS_AT_DEFAULT_SIZE - 1)) / PHONE_COLUMNS_AT_DEFAULT_SIZE;
+    const scale = cardMinWidth / DEFAULT_LIBRARY_STYLE.cardMinWidth;
+    const scaled = Math.floor((oneColumn * scale) / LAYOUT_UNIT) * LAYOUT_UNIT;
     const floor = Math.max(CARD_MIN_WIDTH_RANGE.min, scaled);
     const columns = Math.floor((canvasWidth + gap) / (floor + gap));
     return { columns, cardWidth: (canvasWidth - gap * (columns - 1)) / columns };
