@@ -175,3 +175,65 @@ test("non-JSON responses become ApiError messages", async () => {
 
   await assert.rejects(session.apiClient.request("/gallery", { auth: true }), /Request failed \(502\)/);
 });
+
+function store(initial: string | null) {
+  let refreshToken = initial;
+  return {
+    read: () => refreshToken,
+    async getRefreshToken() {
+      return refreshToken;
+    },
+    async setRefreshToken(token: string) {
+      refreshToken = token;
+    },
+    async clearRefreshToken() {
+      refreshToken = null;
+    },
+  };
+}
+
+test("an authed request with no access token refreshes instead of failing", async () => {
+  // The shape after a cold start whose refresh failed on a flaky network: the
+  // refresh token is still good, only the in-memory access token is missing.
+  let accessToken: string | null = null;
+  const tokenStore = store("refresh-1");
+  const urls: string[] = [];
+  const fetcher: typeof fetch = async (input, init) => {
+    const url = String(input);
+    urls.push(url);
+    if (url.endsWith("/auth/refresh")) return jsonResponse(200, { accessToken: "access-new", refreshToken: "refresh-2" });
+    const auth = (init?.headers as Record<string, string> | undefined)?.Authorization;
+    return auth === "Bearer access-new" ? jsonResponse(200, { ok: true }) : jsonResponse(401, { error: "unauthorized" });
+  };
+  const session = createApiClient("http://api.test", tokenStore, () => accessToken, (t) => { accessToken = t; }, fetcher);
+
+  assert.deepEqual(await session.apiClient.request("/library", { auth: true }), { ok: true });
+  assert.ok(urls.some((u) => u.endsWith("/auth/refresh")), "should have attempted a refresh");
+  assert.equal(tokenStore.read(), "refresh-2");
+});
+
+test("an authed request with neither token fails fast without touching the network", async () => {
+  const tokenStore = store(null);
+  const urls: string[] = [];
+  const fetcher: typeof fetch = async (input) => {
+    urls.push(String(input));
+    return jsonResponse(200, {});
+  };
+  const session = createApiClient("http://api.test", tokenStore, () => null, () => {}, fetcher);
+
+  await assert.rejects(() => session.apiClient.request("/library", { auth: true }), /Not signed in/);
+  assert.equal(urls.length, 0, "no refresh token means there is nothing to recover with");
+});
+
+test("a refresh that fails on the network leaves the refresh token in place", async () => {
+  // The transient-outage case: nothing should be cleared, so a later attempt
+  // can still succeed.
+  const tokenStore = store("refresh-1");
+  const fetcher: typeof fetch = async () => {
+    throw new TypeError("Network request failed");
+  };
+  const session = createApiClient("http://api.test", tokenStore, () => null, () => {}, fetcher);
+
+  assert.equal(await session.refreshAccessToken(), false);
+  assert.equal(tokenStore.read(), "refresh-1", "a network failure is not proof the session is gone");
+});

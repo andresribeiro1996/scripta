@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { AppState } from "react-native";
 import { File } from "expo-file-system";
 import { GoogleSignInCancelledError, startGoogleSignIn } from "../features/auth/googleSignIn";
 import { apiClient, logout, refreshAccessToken, setSessionExpiredHandler } from "./api";
@@ -18,6 +19,13 @@ interface AuthUser {
 interface AuthState {
   ready: boolean;
   user: AuthUser | null;
+  /** True when there IS a stored session but the server couldn't be reached
+   *  to load it. Distinct from `user === null`, which means signed out —
+   *  conflating the two showed a login form to someone who was simply
+   *  offline, and left them there for the rest of the app's life. */
+  unreachable: boolean;
+  /** Re-attempts the startup session load. Safe to call repeatedly. */
+  retry(): Promise<void>;
   signUp(email: string, username: string, password: string): Promise<void>;
   signIn(identifier: string, password: string): Promise<void>;
   signInWithGoogle(): Promise<void>;
@@ -43,36 +51,58 @@ export { GoogleSignInCancelledError };
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [unreachable, setUnreachable] = useState(false);
+
+  /** Whether a failed load means "signed out" or merely "couldn't reach the
+   *  server" is decided by what survives in the store: refreshAccessToken
+   *  clears the refresh token on 401/403 and deliberately leaves it alone on
+   *  a network error. So a token still present after a failure is a session
+   *  we simply could not load yet. */
+  const loadSession = useCallback(async () => {
+    try {
+      // Shared with api.ts's own 401 retry — see refreshAccessToken's
+      // own comment for why this must be the SAME coalesced call rather
+      // than a second, independent refresh done inline here.
+      const refreshed = await refreshAccessToken();
+      if (refreshed) {
+        // /auth/refresh returns tokens only — the user has to come from
+        // a separate /auth/me call (found during Task 2's own on-device
+        // testing: a killed-and-reopened app has no in-memory user to
+        // fall back on).
+        const me = await apiClient.request<{ user: AuthUser }>("/auth/me", { auth: true });
+        setUser(me.user);
+        setUnreachable(false);
+        return;
+      }
+      setUnreachable(Boolean(await secureTokenStore.getRefreshToken()));
+    } catch {
+      setUnreachable(Boolean(await secureTokenStore.getRefreshToken()));
+    } finally {
+      setReady(true);
+    }
+  }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    const clearSessionExpiredHandler = setSessionExpiredHandler(() => setUser(null));
-    (async () => {
-      try {
-        // Shared with api.ts's own 401 retry — see refreshAccessToken's
-        // own comment for why this must be the SAME coalesced call rather
-        // than a second, independent refresh done inline here.
-        const refreshed = await refreshAccessToken();
-        if (refreshed) {
-          // /auth/refresh returns tokens only — the user has to come from
-          // a separate /auth/me call (found during Task 2's own on-device
-          // testing: a killed-and-reopened app has no in-memory user to
-          // fall back on).
-          const me = await apiClient.request<{ user: AuthUser }>("/auth/me", { auth: true });
-          if (!cancelled) setUser(me.user);
-        }
-      } catch {
-        // refreshAccessToken already clears SecureStore/the access token
-        // on a real failure — nothing else to clean up here.
-      } finally {
-        if (!cancelled) setReady(true);
-      }
-    })();
-    return () => {
-      cancelled = true;
-      clearSessionExpiredHandler();
-    };
-  }, []);
+    const clearSessionExpiredHandler = setSessionExpiredHandler(() => {
+      setUser(null);
+      // A 401 IS a real sign-out, so stop calling it unreachable.
+      setUnreachable(false);
+    });
+    void loadSession();
+    return clearSessionExpiredHandler;
+  }, [loadSession]);
+
+  // Coming back to the foreground is the moment connectivity most often
+  // returns — someone reopening the app after moving between networks. Only
+  // retries when there is a session waiting to be loaded, so a signed-out app
+  // does not poll the server every time it is opened.
+  useEffect(() => {
+    if (!unreachable) return;
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") void loadSession();
+    });
+    return () => subscription.remove();
+  }, [loadSession, unreachable]);
 
   const signIn = useCallback(async (identifier: string, password: string) => {
     const res = await apiClient.request<AuthTokenResponse>("/auth/login", {
@@ -108,6 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     await logout();
     setUser(null);
+    setUnreachable(false);
   }, []);
 
   const setUsername = useCallback(async (username: string) => {
@@ -132,8 +163,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ ready, user, signUp, signIn, signInWithGoogle, signOut, setUsername, uploadAvatar, removeAvatar }),
-    [ready, user, signUp, signIn, signInWithGoogle, signOut, setUsername, uploadAvatar, removeAvatar],
+    () => ({ ready, user, unreachable, retry: loadSession, signUp, signIn, signInWithGoogle, signOut, setUsername, uploadAvatar, removeAvatar }),
+    [ready, user, unreachable, loadSession, signUp, signIn, signInWithGoogle, signOut, setUsername, uploadAvatar, removeAvatar],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

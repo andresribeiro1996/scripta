@@ -1,16 +1,33 @@
 import { ActivityIndicator, View } from "react-native";
 import { Redirect, Tabs } from "expo-router";
 import { useAuth } from "../../core/auth";
+import { ErrorState } from "../../ui/components";
 import { Icon } from "../../ui/icon";
 import { useTheme } from "../../ui/theme";
 
 export default function AppLayout() {
-  const { ready, user } = useAuth();
+  const { ready, user, unreachable, retry } = useAuth();
   const { colors } = useTheme();
   if (!ready) {
     return (
       <View style={{ flex: 1, alignItems: "center", backgroundColor: colors.background, justifyContent: "center" }}>
         <ActivityIndicator size="large" color={colors.accent} />
+      </View>
+    );
+  }
+  // Being unable to reach the server is not being signed out. Sending an
+  // offline user to a login form asks them to re-enter a password they do not
+  // need, and — before the retry below existed — stranded them there until the
+  // app was killed and reopened.
+  if (!user && unreachable) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: "center" }}>
+        <ErrorState
+          title="Can't reach the server"
+          body="You're still signed in — we just couldn't load your account. Check your connection and try again."
+          actionLabel="Try again"
+          onAction={() => void retry()}
+        />
       </View>
     );
   }
