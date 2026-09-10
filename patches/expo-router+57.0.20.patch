@@ -1,0 +1,22 @@
+diff --git a/node_modules/expo-router/build/link/linking.js b/node_modules/expo-router/build/link/linking.js
+index b9535b5..395fe04 100644
+--- a/node_modules/expo-router/build/link/linking.js
++++ b/node_modules/expo-router/build/link/linking.js
+@@ -78,7 +78,16 @@ function getRootURL() {
+     if (_rootURL === undefined) {
+         _rootURL = Linking.createURL('/');
+         if (isExpoGo) {
+-            _rootURL = (0, extractPathFromURL_1.parsePathFromExpoGoLink)(_rootURL);
++            // parsePathFromExpoGoLink strips everything up to and including the
++            // "/--/" Expo Go marker, leaving whatever comes after it. For the
++            // root URL there is nothing after the marker, so this legitimately
++            // comes back empty -- but every caller of getRootURL() treats its
++            // return value as a PATH: parseExpoGoUrlFromListener concatenates it
++            // with a query string, and getInitialURL falls back to it via
++            // `parseExpoGoUrlFromListener(url) ?? getRootURL()`, a check that
++            // never fires for an empty string since '' is not nullish. An empty
++            // path is not a valid stand-in for root, so fall back to '/'.
++            _rootURL = (0, extractPathFromURL_1.parsePathFromExpoGoLink)(_rootURL) || '/';
+         }
+     }
+     return _rootURL;

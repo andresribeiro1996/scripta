@@ -16,10 +16,14 @@
     "frontend": "npm run dev --workspace frontend",
     "mobile": "npm run start --workspace mobile",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "npm test --workspaces --if-present"
+    "test": "npm test --workspaces --if-present",
+    "postinstall": "patch-package"
   },
   "allowScripts": {
     "argon2@0.40.3": true,
     "esbuild@0.28.2": true
+  },
+  "devDependencies": {
+    "patch-package": "^8.0.1"
   }
 }
