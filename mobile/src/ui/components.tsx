@@ -12,7 +12,7 @@ import {
   View,
   type ViewStyle,
 } from "react-native";
-import MenuView from "@expo/ui/community/menu";
+import MenuView, { type MenuAction } from "@expo/ui/community/menu";
 import { Icon, type IconName } from "./icon";
 import SegmentedControl from "@expo/ui/community/segmented-control";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -264,8 +264,40 @@ export type MenuItem = {
   accessibilityLabel?: string;
   destructive?: boolean;
   disabled?: boolean;
-  onPress: () => void;
+  /** Draws a checkmark. Use for the current choice in a one-of-N group. */
+  selected?: boolean;
+  /** Nested choices — renders a real submenu on both platforms. */
+  items?: MenuItem[];
+  /** Omitted on a row whose only job is to open a submenu. */
+  onPress?: () => void;
 };
+
+/** Ids are the item's path through the tree ("2", "0.1") rather than its
+ *  label: the id is what comes back on press, and a label can repeat across
+ *  groups ("Title A–Z" could plausibly appear under two of them). */
+function toAction(item: MenuItem, id: string): MenuAction {
+  return {
+    id,
+    title: item.label,
+    attributes: { destructive: item.destructive, disabled: item.disabled },
+    // Only send `state` for rows that belong to a choice group. Sending "off"
+    // everywhere indents every other row to leave space for a tick that never
+    // comes.
+    ...(item.selected === undefined ? null : { state: item.selected ? "on" : "off" }),
+    ...(item.items ? { subactions: item.items.map((child, i) => toAction(child, `${id}.${i}`)) } : null),
+  };
+}
+
+function itemAt(items: MenuItem[], path: string): MenuItem | undefined {
+  let level = items;
+  let found: MenuItem | undefined;
+  for (const step of path.split(".")) {
+    found = level[Number(step)];
+    if (!found) return undefined;
+    level = found.items ?? [];
+  }
+  return found;
+}
 
 /**
  * The platform's own menu — SwiftUI `Menu` on iOS, Compose `DropdownMenu` on
@@ -279,16 +311,10 @@ export type MenuItem = {
 export function Menu({ title, items, children }: { title?: string; items: MenuItem[]; children: ReactNode }) {
   return (
     <MenuView
-      actions={items.map((item, index) => ({
-        // Index rather than label: two items may share a label, and the id is
-        // what comes back on press.
-        id: String(index),
-        title: item.label,
-        attributes: { destructive: item.destructive, disabled: item.disabled },
-      }))}
+      actions={items.map((item, index) => toAction(item, String(index)))}
       onPressAction={({ nativeEvent }) => {
-        const item = items[Number(nativeEvent.event)];
-        if (item && !item.disabled) item.onPress();
+        const item = itemAt(items, nativeEvent.event);
+        if (item && !item.disabled) item.onPress?.();
       }}
       title={title}
     >
@@ -297,8 +323,15 @@ export function Menu({ title, items, children }: { title?: string; items: MenuIt
           children, and a nested Pressable (IconButton is one) captures the
           touch first, so the anchor never fires and the menu never opens.
           iOS doesn't hit this — SwiftUI's Menu intercepts above the RN host
-          view — which is exactly why it needed a device to catch. */}
-      <View pointerEvents="none">{children}</View>
+          view — which is exactly why it needed a device to catch.
+
+          That same pointerEvents is why this View, not the child, has to carry
+          the touch target: a non-responder can't grow one, so IconButton's own
+          hitSlop is dead here, and MenuView sizes its Pressable to whatever
+          this box measures. Left at the glyph's size that came to 44pt of icon
+          with no slop at all, in the very corner of the screen — reliably
+          missable, and reported as such. */}
+      <View pointerEvents="none" style={styles.menuTrigger}>{children}</View>
     </MenuView>
   );
 }
@@ -393,6 +426,11 @@ export function ModalBody({ children }: { children: ReactNode }) {
 const styles = StyleSheet.create({
   button: { minHeight: minimumTouchTarget, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: radii.md, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   buttonText: { ...typography.body, fontWeight: "600" },
+  // 48 is Material's minimum and clears HIG's 44. It is also the ceiling here:
+  // padding past it measured as having no effect, because the native header
+  // clamps its subview's width — verified by probing taps either side of the
+  // edge on a device, not assumed.
+  menuTrigger: { minWidth: 48, minHeight: 48, alignItems: "center", justifyContent: "center" },
   iconButton: { minHeight: minimumTouchTarget, minWidth: minimumTouchTarget, alignItems: "center", justifyContent: "center", borderRadius: radii.full },
   field: { gap: spacing.xs },
   label: { ...typography.body, fontWeight: "600" },

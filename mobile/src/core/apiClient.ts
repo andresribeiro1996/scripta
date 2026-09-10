@@ -120,7 +120,14 @@ export function createApiClient(
 
   const apiClient: ApiClient = {
     async request<T>(path: string, init: { method?: string; body?: unknown; auth?: boolean } = {}) {
-      if (init.auth && !getAccessToken()) throw new ApiError(401, "Not signed in");
+      // No access token is not the same as no session. It is also the shape
+      // left by a cold start whose refresh lost the network — the refresh
+      // token is still good, so try it before declaring the user signed out.
+      // Without this, one failed refresh made every authed request fail with
+      // "Not signed in" for the rest of the app's life.
+      if (init.auth && !getAccessToken() && !(await refreshAccessToken())) {
+        throw new ApiError(401, "Not signed in");
+      }
 
       let response = await rawRequest<T & { error?: string }>(path, init);
       if (response.status === 401 && init.auth) {

@@ -2,9 +2,10 @@
 // panel it used to present as a modal (book detail, add, import, reorder,
 // share, per-book style and cover) is now a sibling route presented as a form
 // sheet, so each one is a real UISheetPresentationController the user can drag
-// away. What is left here is the grid, its toolbar, and selection mode.
+// away. Search now lives in the native header bar and the status/sort choices
+// in the overflow menu, so what is left here is the grid and selection mode.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, RefreshControl, StyleSheet, View } from "react-native";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import {
@@ -15,27 +16,39 @@ import {
   resolveLibraryStyle,
   seriesGroupByBookKey,
   sortBooks,
+  SORT_OPTIONS,
+  STATUS_FILTER_OPTIONS,
   type PerCardStyle,
   type SortKey,
   type StatusFilter,
 } from "@scripta/shared";
 import { Button, EmptyState, ErrorState, IconButton, Input, Menu, Screen, Sheet, Skeleton, type MenuItem } from "../../ui/components";
+import type { SearchBarCommands } from "react-native-screens";
 import { spacing } from "../../ui/theme";
 import { useMurals } from "../murals/useMurals";
 import { useLibrary } from "./hooks/useLibrary";
 import { useLibraryActions } from "./hooks/useLibraryActions";
 import { BookCard } from "./components/BookCard";
 import { LibraryGrid } from "./components/LibraryGrid";
-import { LibraryToolbar } from "./components/LibraryToolbar";
 
 export function LibraryScreen() {
   const { data: library, isPending, isError, error, refetch, isRefetching } = useLibrary();
   const actions = useLibraryActions();
   const murals = useMurals();
 
+  // Home hands its search over as ?q=. The native search bar owns its own
+  // text, so both have to be driven: `setText`/`clearText` are the only way to
+  // move the visible field, and without them the grid would filter against a
+  // query the header never shows. Both platforms implement them (Android via
+  // SearchBarManager).
   const { q } = useLocalSearchParams<{ q?: string }>();
+  const searchBar = useRef<SearchBarCommands>(null);
   const [query, setQuery] = useState(q ?? "");
-  useEffect(() => { setQuery(q ?? ""); }, [q]);
+  useEffect(() => {
+    setQuery(q ?? "");
+    if (q) searchBar.current?.setText(q);
+    else searchBar.current?.clearText();
+  }, [q]);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sortKey, setSortKey] = useState<SortKey>("manual");
 
@@ -52,6 +65,13 @@ export function LibraryScreen() {
   const displayBooks = useMemo(() => sortBooks(filterBooks(ordered, query, statusFilter), sortKey), [ordered, query, statusFilter, sortKey]);
   const bookSeriesGroup = useMemo(() => seriesGroupByBookKey(library?.data.books ?? [], library?.data.groups ?? []), [library]);
   const toolbarActive = query.trim() !== "" || statusFilter !== "all" || sortKey !== "manual";
+
+  function clearSearchAndFilters() {
+    searchBar.current?.clearText();
+    setQuery("");
+    setStatusFilter("all");
+    setSortKey("manual");
+  }
 
   async function handleRenameLibrary() {
     const name = nameDraft.trim();
@@ -90,6 +110,26 @@ export function LibraryScreen() {
   }
 
   const actionItems: MenuItem[] = [
+    // Status and sort used to be two rows of pills above the grid, which cost
+    // roughly a third of the screen before a single cover. As submenus they
+    // read the way the platform's own library apps present the same choice,
+    // and `selected` puts the tick on the live one.
+    {
+      label: "Status",
+      items: STATUS_FILTER_OPTIONS.map((option) => ({
+        label: option.label,
+        selected: option.value === statusFilter,
+        onPress: () => setStatusFilter(option.value),
+      })),
+    },
+    {
+      label: "Sort",
+      items: SORT_OPTIONS.map((option) => ({
+        label: option.label,
+        selected: option.value === sortKey,
+        onPress: () => setSortKey(option.value),
+      })),
+    },
     {
       label: "Rename library…",
       onPress: () => {
@@ -136,6 +176,20 @@ export function LibraryScreen() {
           : {
               headerShown: true,
               title: library?.data.name || "Library",
+              // Only worth a search field once there is something to search;
+              // an empty library gets the plain header instead.
+              headerSearchBarOptions: books.length > 0
+                ? {
+                    ref: searchBar,
+                    autoCapitalize: "none",
+                    placeholder: "Search title or author",
+                    // iOS only: the bar tucks under the large title until the
+                    // grid is pulled back down.
+                    hideWhenScrolling: true,
+                    onChangeText: (event) => setQuery(event.nativeEvent.text),
+                    onCancelButtonPress: () => setQuery(""),
+                  }
+                : undefined,
               headerRight: () => (
                 <Menu title={library?.data.name || "Library"} items={actionItems}>
                   <IconButton accessibilityLabel="Library actions" name="more" />
@@ -172,21 +226,12 @@ export function LibraryScreen() {
 
       {!isPending && !isError && books.length > 0 && (
         <>
-          <LibraryToolbar query={query} onQueryChange={setQuery} status={statusFilter} onStatusChange={setStatusFilter} sort={sortKey} onSortChange={setSortKey} />
           {displayBooks.length === 0 ? (
             <EmptyState
               title="No books match."
               body="Every book is still here — the search or filters above just don't match any of them."
               actionLabel={toolbarActive ? "Clear search and filters" : undefined}
-              onAction={
-                toolbarActive
-                  ? () => {
-                      setQuery("");
-                      setStatusFilter("all");
-                      setSortKey("manual");
-                    }
-                  : undefined
-              }
+              onAction={toolbarActive ? clearSearchAndFilters : undefined}
             />
           ) : (
             <LibraryGrid
