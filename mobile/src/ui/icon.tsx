@@ -14,6 +14,7 @@ type Glyph = { ios: SFSymbol; android: string };
 /** Each entry is the outline form; `filled` picks the solid variant where the
  *  pair exists, which is how both platforms mark a selected tab. */
 const GLYPHS = {
+  home: { ios: "house", android: "home" },
   library: { ios: "books.vertical", android: "library_books" },
   arena: { ios: "trophy", android: "trophy" },
   murals: { ios: "paintpalette", android: "palette" },
@@ -28,6 +29,7 @@ const GLYPHS = {
 /** Only these four have a solid counterpart worth using; the rest read the
  *  same either way, and `plus.fill` etc. aren't the iOS convention anyway. */
 const FILLED = {
+  home: { ios: "house.fill", android: "home" },
   library: { ios: "books.vertical.fill", android: "library_books" },
   arena: { ios: "trophy.fill", android: "trophy" },
   murals: { ios: "paintpalette.fill", android: "palette" },

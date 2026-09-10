@@ -128,6 +128,7 @@ export function MobileMuralCanvas({
   draft,
   busy,
   onSelectBlock,
+  onOpenBlock,
   onConfigureBlock,
   onStyleBlock,
   onDuplicateBlock,
@@ -148,6 +149,7 @@ export function MobileMuralCanvas({
   selectedBlockId?: string | null;
   draft?: MobileMuralDraft | null;
   busy?: boolean;
+  onOpenBlock?: (block: MuralBlock) => void;
   onSelectBlock?: (blockId: string | null) => void;
   onConfigureBlock?: (block: MuralBlock) => void;
   onStyleBlock?: (block: MuralBlock) => void;
@@ -198,6 +200,7 @@ export function MobileMuralCanvas({
   function activate(block: MuralBlock) {
     if (draft) return;
     if (editMode) onSelectBlock?.(block.id);
+    else if (onOpenBlock) onOpenBlock(block);
     else setFocusedBlockId(block.id);
   }
 

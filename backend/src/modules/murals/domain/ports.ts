@@ -7,6 +7,9 @@
 import type { MuralFolderRow, MuralRow } from "./types.js";
 
 export interface MuralsRepository {
+  getHome(userId: string): MuralRow | undefined;
+  setHome(userId: string, muralId: string): MuralRow | undefined;
+  initializeHome(row: MuralRow): MuralRow;
   listByUser(userId: string): MuralRow[];
   /** Ownership-checked lookup — undefined if no row with that id exists,
    *  or it exists but isn't owned by userId. service.ts treats both cases

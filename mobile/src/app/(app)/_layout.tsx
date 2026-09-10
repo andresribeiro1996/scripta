@@ -32,6 +32,7 @@ export default function AppLayout() {
         tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
       }}
     >
+      <Tabs.Screen name="(home)" options={{ title: "Home", tabBarIcon: ({ color, focused, size }) => <Icon name="home" filled={focused} color={color} size={size} /> }} />
       <Tabs.Screen name="(library)" options={{ title: "Library", tabBarIcon: ({ color, focused, size }) => <Icon name="library" filled={focused} color={color} size={size} /> }} />
       <Tabs.Screen name="(arena)" options={{ title: "Arena", tabBarIcon: ({ color, focused, size }) => <Icon name="arena" filled={focused} color={color} size={size} /> }} />
       <Tabs.Screen name="(murals)" options={{ title: "Murals", tabBarIcon: ({ color, focused, size }) => <Icon name="murals" filled={focused} color={color} size={size} /> }} />

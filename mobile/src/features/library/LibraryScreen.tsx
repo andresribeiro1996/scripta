@@ -4,9 +4,9 @@
 // sheet, so each one is a real UISheetPresentationController the user can drag
 // away. What is left here is the grid, its toolbar, and selection mode.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Alert, RefreshControl, StyleSheet, View } from "react-native";
-import { router, Stack } from "expo-router";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 import {
   bookKey,
   effectiveCardStyle,
@@ -33,7 +33,9 @@ export function LibraryScreen() {
   const actions = useLibraryActions();
   const murals = useMurals();
 
-  const [query, setQuery] = useState("");
+  const { q } = useLocalSearchParams<{ q?: string }>();
+  const [query, setQuery] = useState(q ?? "");
+  useEffect(() => { setQuery(q ?? ""); }, [q]);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sortKey, setSortKey] = useState<SortKey>("manual");
 

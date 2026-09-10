@@ -32,6 +32,8 @@ npm run dev
 
 ## Trying it out
 
+**Three-user development fixture:** `npm run dev` (also `dev:mobile` and root `npm run backend`) automatically seeds Alice, Bob, and Charlie and starts the isolated development backend. All three use password `scripta123`; startup also updates older fixture passwords. Production `npm start` is unchanged. Reruns preserve progress; `npm run fixture -- --reset` restores the starting data. See [accounts, phone setup, and test checklist](scripts/three-users.md). Verify with `npm run test:fixture`.
+
 **`http://localhost:3000/auth/console`** — a minimal test console (signup/login form, session panel with the issued tokens, buttons for `/auth/me`, refresh, logout, logout-everywhere, and a "Sign in with Google" link if that's configured). Not a real app screen — just the fastest way to poke the auth module from a browser instead of curl. Session is kept in `localStorage` so it survives a reload.
 
 **`node scripts/test-auth-flow.mjs`** — runs the full auth flow (signup → duplicate rejection → login → wrong-password rejection → `/auth/me` → refresh rotation → replay detection → logout) against a running server and prints pass/fail for each step. Safe to re-run; it uses a fresh timestamped email every time.

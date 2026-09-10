@@ -9,12 +9,14 @@ import { radii, spacing, typography, useTheme } from "../../ui/theme";
 import { fetchGalleryImages } from "../gallery/api";
 import { useLibrary } from "../library/hooks/useLibrary";
 import { ShareActions } from "../socials";
+import { useHome } from "./useHome";
 import { useMuralFolders, useMurals } from "./useMurals";
 
 export function MuralsScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const murals = useMurals();
+  const home = useHome();
   const folders = useMuralFolders();
   const { data: library } = useLibrary();
   const gallery = useQuery({ queryKey: ["gallery"], queryFn: fetchGalleryImages });
@@ -98,6 +100,7 @@ export function MuralsScreen() {
           <Menu
             title={item.name}
             items={[
+              { label: "Set as home", onPress: () => { void home.choose(item.id).then(() => router.push("/")).catch((error) => Alert.alert("Could not set home", error.message)); } },
               { label: "Move to folder…", onPress: () => setMoveFor(item) },
               { label: "Change cover…", onPress: () => setCoverFor(item) },
               { label: "Share…", onPress: () => setShareFor(item) },

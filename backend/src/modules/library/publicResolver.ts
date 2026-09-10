@@ -55,6 +55,7 @@ export interface PublicHighlight {
 }
 
 export interface ResolvedPublicData {
+  collectionBooks?: Record<string, string[]>;
   books: PublicBookData[];
   highlights: PublicHighlight[];
   currentlyReading: PublicBookData[];
@@ -62,6 +63,7 @@ export interface ResolvedPublicData {
 }
 
 export interface PublicDataRequest {
+  collectionIds?: string[];
   bookKeys: string[];
   highlightRefs: Array<{ bookKey: string; highlightId: string }>;
   needsCurrentlyReading: boolean;
@@ -237,8 +239,14 @@ export function resolvePublicLibraryData(userId: string, req: PublicDataRequest)
   // doesn't resolve (a stale bookKey from a deleted/merged-away book) is
   // silently skipped, same tolerant convention frontend/src/lib/murals.ts's
   // own resolveShelfBooks/resolveQuote already use.
+  const collectionBooks: Record<string, string[]> = Object.create(null);
+  const collections = Array.isArray(parsed.groups) ? parsed.groups.filter(isRecord) : [];
+  for (const id of req.collectionIds ?? []) {
+    const collection = collections.find((group) => group.id === id && group.type === "collection");
+    collectionBooks[id] = Array.isArray(collection?.bookKeys) ? collection.bookKeys.filter((key): key is string => typeof key === "string" && byKey.has(key)) : [];
+  }
   const books: PublicBookData[] = [];
-  for (const key of req.bookKeys) {
+  for (const key of new Set([...req.bookKeys, ...Object.values(collectionBooks).flat()])) {
     const book = byKey.get(key);
     if (book) books.push(toPublicBookData(book));
   }
@@ -281,5 +289,5 @@ export function resolvePublicLibraryData(userId: string, req: PublicDataRequest)
     }
   }
 
-  return { books, highlights, currentlyReading, stats };
+  return { books, highlights, currentlyReading, stats, ...(req.collectionIds ? { collectionBooks } : {}) };
 }

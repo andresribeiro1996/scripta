@@ -42,7 +42,7 @@ export function MobileBlockPreview({
   if (block.type === "empty") return null;
   if ((height < 32 || width < 48) && block.type !== "image" && block.type !== "spotlight") {
     const symbol =
-      block.type === "text" ? "Aa" : block.type === "quote" || block.type === "quoteCollection" ? "“”" : block.type === "stats" ? "#" : "▤";
+      block.type === "text" ? (height >= 24 && width >= 100 ? title : "Aa") : block.type === "quote" || block.type === "quoteCollection" ? "“”" : block.type === "stats" ? "#" : "▤";
     return (
       <div className="flex h-full items-center justify-center overflow-hidden text-[16px] font-semibold" aria-hidden="true">
         {symbol}

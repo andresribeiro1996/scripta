@@ -18,7 +18,11 @@ function createInMemoryRepo(): MuralsRepository {
   const murals = new Map<string, MuralRow>();
   const folders = new Map<string, MuralFolderRow>();
 
+  const homes = new Map<string, string>();
   return {
+    getHome(userId) { const id = homes.get(userId); return id ? this.getOwned(id, userId) : undefined; },
+    setHome(userId, id) { const row = this.getOwned(id, userId); if (row) homes.set(userId, id); return row; },
+    initializeHome(row) { const existing = this.getHome(row.user_id); if (existing) return existing; this.insert(row); homes.set(row.user_id, row.id); return row; },
     listByUser(userId) {
       return [...murals.values()].filter((m) => m.user_id === userId);
     },
@@ -246,5 +250,31 @@ test("openMuralsDb migration is idempotent and preserves data", async () => {
     .prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'mural_folders'`)
     .get();
   assert.ok(foldersTable);
+  const service = createMuralsService(repository, urlFor);
+  const home = service.initializeHome("home-owner", true);
+  assert.equal(service.initializeHome("home-owner", false).id, home.id);
+  assert.equal(service.setHome("stranger", home.id), undefined);
+  assert.equal(service.getHome("home-owner")?.id, home.id);
+  service.deleteMural("home-owner", home.id);
+  assert.equal(service.getHome("home-owner"), null);
+  assert.equal(second.prepare("SELECT * FROM mural_homes WHERE user_id = ?").get("home-owner"), undefined);
   second.close();
+});
+
+test("home creation is retry-safe, private, ownership checked, and preserves edits", () => {
+  const service = makeService();
+  const first = service.initializeHome("u1", true);
+  assert.equal(first.shareToken, null);
+  service.updateMural("u1", first.id, { name: "Mine", blocks: [], updatedAt: first.updatedAt });
+  const again = service.initializeHome("u1", false);
+  assert.equal(again.id, first.id);
+  assert.equal(again.name, "Mine");
+  assert.deepEqual(again.blocks, []);
+  assert.equal(service.listMurals("u1").length, 1);
+  assert.equal(service.getHome("u2"), null);
+  assert.equal(service.setHome("u2", first.id), undefined);
+  const other = service.createMural("u1", "Other");
+  assert.equal(service.setHome("u1", other.id)?.id, other.id);
+  service.deleteMural("u1", other.id);
+  assert.equal(service.getHome("u1"), null);
 });

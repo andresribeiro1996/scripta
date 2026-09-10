@@ -1,3 +1,5 @@
+import { MuralBlockDetail } from "./MuralBlockDetail";
+import { resolveHomeBlock, type Group } from "@scripta/shared";
 import GridLayout from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
@@ -15,7 +17,9 @@ const ResponsiveGridLayout = GridLayout.WidthProvider(GridLayout);
 const ROW_HEIGHT = 28;
 
 export function MuralCanvas({
-  mural,
+  mural: originalMural,
+  groups = [],
+  onOpenBlock,
   editMode,
   books,
   images,
@@ -37,6 +41,8 @@ export function MuralCanvas({
   onCancelMobileDraft
 }: {
   mural: Mural;
+  groups?: Group[];
+  onOpenBlock?: (block: MuralBlock) => void;
   editMode: boolean;
   books: Array<Record<string, unknown>>;
   images: GalleryImage[];
@@ -57,6 +63,10 @@ export function MuralCanvas({
   onApplyMobileDraft?: () => void;
   onCancelMobileDraft?: () => void;
 }) {
+  const [focusedId, setFocusedId] = useState<string | null>(null);
+  const [day] = useState(() => new Date().toISOString().slice(0, 10));
+  const mural = { ...originalMural, blocks: originalMural.blocks.map((block) => resolveHomeBlock(block, books, groups, day)) };
+  const originalBlock = (block: MuralBlock) => originalMural.blocks.find((item) => item.id === block.id) ?? block;
   useMuralBookMetadata(mural.blocks, books, tierlistData);
   const [compactMode, setCompactMode] = useState(
     () => typeof window !== "undefined" && (window.innerWidth < 768 || Boolean(window.matchMedia?.("(pointer: coarse)").matches))
@@ -84,8 +94,9 @@ export function MuralCanvas({
         draft={mobileDraft}
         busy={busy}
         onSelectBlock={onSelectBlock}
-        onConfigureBlock={onConfigureBlock}
-        onStyleBlock={onStyleBlock}
+        onOpenBlock={onOpenBlock}
+        onConfigureBlock={(block) => onConfigureBlock?.(originalBlock(block))}
+        onStyleBlock={(block) => onStyleBlock?.(originalBlock(block))}
         onDuplicateBlock={onDuplicateBlock}
         onDeleteBlock={onDeleteBlock}
         onStartResize={onStartResize}
@@ -106,6 +117,7 @@ export function MuralCanvas({
   }
 
   return (
+    <>
     <ResponsiveGridLayout
       key={revertNonce}
       layout={layout}
@@ -142,14 +154,15 @@ export function MuralCanvas({
               color: style.textColor ?? undefined
             }}
           >
+            {!editMode ? <button className="absolute inset-0 z-10 rounded-[inherit] focus-visible:outline-2 focus-visible:outline-(--color-accent)" aria-label={`Open ${block.type} block`} onClick={() => onOpenBlock ? onOpenBlock(block) : setFocusedId(block.id)} /> : null}
             <BlockRenderer block={block} books={books} images={images} statsOverride={statsOverride} tierlistData={tierlistData} />
             {editMode && (
               <div className="mural-block-controls absolute top-1.5 right-1.5 opacity-0 transition-opacity group-hover:opacity-100">
                 <OptionsMenu
                   title="Block settings"
                   items={[
-                    { label: "Style", onClick: () => onStyleBlock?.(block) },
-                    { label: "Configure", onClick: () => onConfigureBlock?.(block) },
+                    { label: "Style", onClick: () => onStyleBlock?.(originalBlock(block)) },
+                    { label: "Configure", onClick: () => onConfigureBlock?.(originalBlock(block)) },
                     { label: "Duplicate", onClick: () => onDuplicateBlock?.(block.id) },
                     { label: "Delete", onClick: () => onDeleteBlock?.(block.id), danger: true }
                   ]}
@@ -160,5 +173,7 @@ export function MuralCanvas({
         );
       })}
     </ResponsiveGridLayout>
+    {focusedId && mural.blocks.some((block) => block.id === focusedId) ? <MuralBlockDetail block={mural.blocks.find((block) => block.id === focusedId)!} books={books} images={images} statsOverride={statsOverride} tierlistData={tierlistData} onClose={() => setFocusedId(null)} /> : null}
+    </>
   );
 }

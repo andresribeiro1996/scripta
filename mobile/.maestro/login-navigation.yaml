@@ -1,0 +1,27 @@
+appId: ${APP_ID}
+name: Login and primary navigation
+tags:
+  - android
+  - acceptance
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "server ok"
+    timeout: 15000
+- tapOn: "Email or username"
+- inputText: ${USERNAME}
+- tapOn: "Password"
+- inputText: ${PASSWORD}
+- tapOn: "Sign in"
+- extendedWaitUntil:
+    visible: "Library"
+    timeout: 15000
+- tapOn: "Arena"
+- assertVisible: "Arena"
+- tapOn: "Murals"
+- assertVisible: "Murals"
+- tapOn: "Settings"
+- assertVisible: "Settings"
+- tapOn: "Open gallery"
+- assertVisible: "Gallery"

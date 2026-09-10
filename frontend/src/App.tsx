@@ -1,3 +1,4 @@
+import { HomePage } from "./pages/HomePage";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { RequireAuth } from "./auth/RequireAuth";
 import { RequireUsername } from "./auth/RequireUsername";
@@ -59,7 +60,8 @@ export function App() {
 
           <Route element={<RequireUsername />}>
             <Route element={<DashboardLayout />}>
-              <Route path="/dashboard" element={<LibraryPage />} />
+              <Route path="/dashboard" element={<HomePage />} />
+              <Route path="/dashboard/library" element={<LibraryPage />} />
               <Route path="/dashboard/series" element={<SeriesPage />} />
               <Route path="/dashboard/collections" element={<CollectionsPage />} />
               <Route path="/dashboard/gallery" element={<GalleryPage />} />

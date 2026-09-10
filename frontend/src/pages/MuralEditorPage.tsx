@@ -104,7 +104,7 @@ export function MuralEditorPage() {
     }
   }
 
-  const [editMode, setEditMode] = useState(false);
+  const [editMode, setEditMode] = useState(searchParams.get("edit") === "1");
   // While editing, the canvas IS the page — tell the layout to drop the
   // phone bottom nav (DashboardLayout's navHidden). Restored on leaving
   // edit mode and on unmount, so a mid-edit navigation can't strand the
@@ -553,6 +553,7 @@ export function MuralEditorPage() {
           <MuralCanvas
             mural={view}
             editMode={editMode}
+            groups={library?.data.groups ?? []}
             books={books}
             images={images}
             revertNonce={revertNonce}
@@ -582,6 +583,7 @@ export function MuralEditorPage() {
       {configuringBlock && (
         <BlockConfigPanel
           block={configuringBlock}
+          groups={library?.data.groups ?? []}
           books={books}
           images={images}
           onSave={(block) => void guard(handleSaveBlockConfig(block), "Couldn't save those settings.")}

@@ -1,8 +1,8 @@
 import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { useQueryClient } from "@tanstack/react-query";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import type { GalleryImage } from "../api/gallery";
 import type { LibraryData, LibraryDocument } from "../api/library";
 import { AddBookModal } from "../components/AddBookModal";
@@ -70,6 +70,7 @@ function updateWithViewTransition(applyUpdate: () => void) {
 export function LibraryPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { scrubBooks } = useMurals();
   const { data: library, isLoading, updateLibrary, share: shareLibraryDoc, unshare: unshareLibraryDoc } = useLibrary();
   const toast = useToast();
@@ -82,7 +83,7 @@ export function LibraryPage() {
   const [importError, setImportError] = useState<string | null>(null);
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const [syncingGoodreads, setSyncingGoodreads] = useState(false);
-  const [addingBook, setAddingBook] = useState(false);
+  const [addingBook, setAddingBook] = useState(searchParams.get("action") === "add");
 
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
@@ -92,7 +93,8 @@ export function LibraryPage() {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [sharing, setSharing] = useState(false);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(searchParams.get("q") ?? "");
+  useEffect(() => { setQuery(searchParams.get("q") ?? ""); setAddingBook(searchParams.get("action") === "add"); }, [searchParams]);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sortKey, setSortKey] = useState<SortKey>("manual");
 
@@ -394,6 +396,7 @@ export function LibraryPage() {
 
   return (
     <PageContainer maxWidth={style.contentMaxWidth}>
+      {searchParams.get("action") === "import" ? <div className="mb-4 rounded-lg border border-(--color-border) p-4"><h2 className="font-semibold">Import your library</h2><button className="mt-2 min-h-11 rounded-lg bg-(--color-accent) px-4 py-2 text-white" onClick={() => fileInputRef.current?.click()}>Choose import file</button></div> : null}
       {/* Desktop-only, with one exception: renaming. On a phone the whole
           header is gone — its actions moved into the toolbar row and the
           library name into that row's menu — but "Rename library…" in

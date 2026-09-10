@@ -2,6 +2,8 @@
 
 A personal Kobo/Goodreads e-book library app — import your reading history, browse it as a styled card grid, organize it into series/collections, build freeform "mural" dashboards out of it, and (optionally) connect social accounts. Started as a small script to get data off a Kobo e-reader; grew into a full accounts-based web app.
 
+New to the codebase? Read the [beginner's architecture guide](docs/architecture.md).
+
 ## Layout
 
 | Directory | What it is |

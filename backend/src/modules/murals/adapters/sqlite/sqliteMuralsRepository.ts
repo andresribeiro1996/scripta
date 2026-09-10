@@ -46,7 +46,36 @@ export function createSqliteMuralsRepository(db: DatabaseSync): MuralsRepository
   `);
   const deleteFolderStmt = db.prepare(`DELETE FROM mural_folders WHERE id = ? AND user_id = ?`);
 
+  const homeStmt = db.prepare("SELECT murals.* FROM murals JOIN mural_homes ON murals.id = mural_homes.mural_id AND murals.user_id = mural_homes.user_id WHERE mural_homes.user_id = ?");
+  const selectHomeStmt = db.prepare("INSERT INTO mural_homes (user_id, mural_id) SELECT user_id, id FROM murals WHERE user_id = ? AND id = ? ON CONFLICT(user_id) DO UPDATE SET mural_id = excluded.mural_id");
+
   return {
+    getHome(userId) {
+      return homeStmt.get(userId) as MuralRow | undefined;
+    },
+    setHome(userId, muralId) {
+      const row = getOwnedStmt.get(muralId, userId) as MuralRow | undefined;
+      if (!row) return undefined;
+      selectHomeStmt.run(userId, muralId);
+      return row;
+    },
+    initializeHome(row) {
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        const existing = homeStmt.get(row.user_id) as MuralRow | undefined;
+        if (existing) {
+          db.exec("COMMIT");
+          return existing;
+        }
+        this.insert(row);
+        selectHomeStmt.run(row.user_id, row.id);
+        db.exec("COMMIT");
+        return row;
+      } catch (error) {
+        db.exec("ROLLBACK");
+        throw error;
+      }
+    },
     listByUser(userId) {
       return listStmt.all(userId) as unknown as MuralRow[];
     },

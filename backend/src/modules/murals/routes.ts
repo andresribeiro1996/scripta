@@ -82,6 +82,18 @@ const updateFolderSchema = z
  *  see plugin.ts's own comment for which. */
 export function buildMuralRoutes(service: MuralsService) {
   return async function muralRoutes(app: FastifyInstance) {
+    app.get("/murals/home", { preHandler: authGuard }, async (request) => ({ mural: service.getHome(request.user.id) }));
+    app.put("/murals/home", { preHandler: authGuard }, async (request, reply) => {
+      const body = z.object({ muralId: z.string().uuid() }).safeParse(request.body);
+      if (!body.success) return reply.code(400).send({ error: "Choose a valid mural." });
+      const mural = service.setHome(request.user.id, body.data.muralId);
+      return mural ? reply.send(mural) : reply.code(404).send({ error: "Mural unavailable." });
+    });
+    app.post("/murals/home", { preHandler: authGuard }, async (request, reply) => {
+      const body = z.object({ withPassage: z.boolean() }).safeParse(request.body);
+      if (!body.success) return reply.code(400).send({ error: "Invalid home request." });
+      return reply.send(service.initializeHome(request.user.id, body.data.withPassage));
+    });
     app.get("/murals", { preHandler: authGuard }, async (request, reply) => {
       return reply.send({ murals: service.listMurals(request.user.id) });
     });
@@ -336,6 +348,7 @@ export function buildPublicMuralRoutes(service: MuralsService, getTierlistData?:
 
       const libraryData = resolvePublicLibraryData(row.user_id, {
         bookKeys: [...refs.bookKeys, ...tierlistBookKeys],
+        collectionIds: [...refs.collectionIds],
         highlightRefs: refs.highlightRefs,
         needsCurrentlyReading: refs.needsCurrentlyReading,
         statsMetrics: [...refs.statsMetrics]
@@ -355,7 +368,15 @@ export function buildPublicMuralRoutes(service: MuralsService, getTierlistData?:
         mural: {
           id: row.id,
           name: row.name,
-          blocks,
+          blocks: Array.isArray(blocks) ? blocks.map((block) => {
+            if (!block || typeof block !== "object") return block;
+            if (block.type === "quote" && block.mode === "rediscover") return { id: block.id, type: "text", layout: block.layout, style: block.style, heading: "Private passage", body: "Rediscovered passages are only visible to the owner." };
+            if (block.type === "shelf" && typeof block.collectionId === "string") {
+              const { collectionId, ...rest } = block;
+              return { ...rest, bookKeys: libraryData.collectionBooks?.[collectionId] ?? [] };
+            }
+            return block;
+          }) : [],
           coverImageUrl: row.cover_image_id ? imageUrls[row.cover_image_id] : row.cover_image_url
         },
         books: libraryData.books,

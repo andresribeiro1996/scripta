@@ -31,7 +31,8 @@ interface NavItem {
 const NAV_GROUPS: Array<{ items: NavItem[] }> = [
   {
     items: [
-      { to: "/dashboard", label: "Library", end: true, icon: LibraryIcon },
+      { to: "/dashboard", label: "Home", end: true, icon: MuralsIcon },
+      { to: "/dashboard/library", label: "Library", end: true, icon: LibraryIcon },
       { to: "/dashboard/series", label: "Series", end: false, icon: SeriesIcon },
       { to: "/dashboard/collections", label: "Collections", end: false, icon: CollectionsIcon }
     ]

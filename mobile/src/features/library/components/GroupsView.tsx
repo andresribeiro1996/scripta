@@ -1,3 +1,4 @@
+import { useLocalSearchParams } from "expo-router";
 // Mirrors frontend's pages/GroupsPage.tsx — backs both the Series and
 // Collections in-tab views (LibraryScreen.tsx's `view` state; see this
 // task's handoff notes for why these are in-tab views rather than
@@ -57,6 +58,7 @@ const COPY: Record<GroupType, { title: string; noun: string; emptyTitle: string;
 export function GroupsView({ type }: { type: GroupType }) {
   const { data: library, updateLibrary } = useLibrary();
   const murals = useMurals();
+  const { group: selectedGroupId } = useLocalSearchParams<{ group?: string }>();
   const copy = COPY[type];
   const { colors } = useTheme();
 
@@ -75,8 +77,8 @@ export function GroupsView({ type }: { type: GroupType }) {
 
   const books = library?.data.books ?? [];
   const allGroups = useMemo(
-    () => (library?.data.groups ?? []).filter((g) => g.type === type).sort((a, b) => a.name.localeCompare(b.name)),
-    [library, type],
+    () => (library?.data.groups ?? []).filter((g) => g.type === type && (!selectedGroupId || g.id === selectedGroupId)).sort((a, b) => a.name.localeCompare(b.name)),
+    [library, type, selectedGroupId],
   );
   const groups = useMemo(() => {
     const needle = search.trim().toLowerCase();

@@ -45,6 +45,7 @@ export function useMurals() {
 
   function setMurals(murals: Mural[]) {
     queryClient.setQueryData(["murals"], murals);
+    void queryClient.invalidateQueries({ queryKey: ["home"] });
   }
 
   function replaceOne(updated: Mural) {

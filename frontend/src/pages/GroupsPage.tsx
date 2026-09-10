@@ -1,3 +1,4 @@
+import { useSearchParams } from "react-router-dom";
 import { useMemo, useState, type ComponentType } from "react";
 import type { GalleryImage } from "../api/gallery";
 import { BookCard } from "../components/BookCard";
@@ -64,6 +65,8 @@ export function GroupsPage({ type }: { type: GroupType }) {
   const { scrubBooks } = useMurals();
   const copy = COPY[type];
   const [actionsOpen, setActionsOpen] = useState(false);
+  const [params] = useSearchParams();
+  const selectedGroupId = params.get("group");
   const [search, setSearch] = useState("");
   const [drafting, setDrafting] = useState(false);
   const [draftName, setDraftName] = useState("");
@@ -81,8 +84,8 @@ export function GroupsPage({ type }: { type: GroupType }) {
 
   const books = library?.data.books ?? [];
   const allGroups = useMemo(
-    () => (library?.data.groups ?? []).filter((g) => g.type === type).sort((a, b) => a.name.localeCompare(b.name)),
-    [library, type]
+    () => (library?.data.groups ?? []).filter((g) => g.type === type && (!selectedGroupId || g.id === selectedGroupId)).sort((a, b) => a.name.localeCompare(b.name)),
+    [library, type, selectedGroupId]
   );
   // Matches a group's own name OR any book title inside it — "which
   // collection did I put Dune in?" is at least as common a question here

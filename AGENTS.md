@@ -14,6 +14,7 @@ Scripta — personal Kobo/Goodreads e-book library app. Each subdirectory's READ
 |---|---|---|
 | `backend/` | Fastify/TS API, modular monolith | `npm run dev` / `typecheck` / `test` |
 | `frontend/` | React/Vite/TS + Tailwind, PWA | `npm run dev` / `lint` (oxlint) / `typecheck` |
+| `mobile/` | Expo/React Native + Expo Router | `npm run mobile` / `typecheck` / `test` / `expo-doctor` |
 | `exporter/` | Python stdlib script → `library.json` | `python3 export.py` |
 | `viewer/` | Static single-file HTML | none |
 

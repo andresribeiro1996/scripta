@@ -64,8 +64,8 @@ interface MuralBlockBase {
  *  content of its own to configure. */
 export type MuralBlock =
   | (MuralBlockBase & { type: "spotlight"; bookKey: string; caption?: string })
-  | (MuralBlockBase & { type: "shelf"; title: string; bookKeys: string[] })
-  | (MuralBlockBase & { type: "quote"; bookKey: string; highlightId: string })
+  | (MuralBlockBase & { type: "shelf"; title: string; bookKeys: string[]; collectionId?: string })
+  | (MuralBlockBase & { type: "quote"; bookKey: string; highlightId: string; mode?: "rediscover" })
   | (MuralBlockBase & { type: "quoteCollection"; title: string; quotes: QuoteRef[] })
   | (MuralBlockBase & { type: "image"; imageId: string; caption?: string })
   | (MuralBlockBase & { type: "text"; heading?: string; body?: string })
@@ -351,6 +351,7 @@ export function scrubBooksFromMurals(murals: Mural[], keys: Iterable<string>): M
   const result = murals.map((m) => {
     const blocks = m.blocks
       .map((b): MuralBlock | null => {
+        if ((b.type === "shelf" && b.collectionId) || (b.type === "quote" && b.mode === "rediscover")) return b;
         if (b.type === "spotlight" || b.type === "quote") {
           return keySet.has(b.bookKey) ? null : b;
         }
@@ -427,7 +428,7 @@ export function resolveQuote(
   const book = books.find((b) => bookKey(b) === block.bookKey);
   if (!book) return null;
   const highlights = Array.isArray(book.highlights) ? (book.highlights as Array<Record<string, unknown>>) : [];
-  const highlight = highlights.find((h) => String(h.BookmarkID) === block.highlightId);
+  const highlight = highlights.find((h) => h && typeof h === "object" && String(h.BookmarkID) === block.highlightId);
   if (!highlight) return null;
   return { book, highlight };
 }

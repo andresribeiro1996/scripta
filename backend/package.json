@@ -5,12 +5,14 @@
   "description": "Backend for the Kobo Library Viewer — currently just the isolated auth module.",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
+    "dev": "tsx watch scripts/three-users.mjs",
     "dev:mobile": "node scripts/dev-mobile.mjs",
+    "fixture": "tsx scripts/three-users.mjs",
+    "test:fixture": "tsx scripts/three-users.mjs --check",
     "build": "tsc -p tsconfig.json && node -e \"const fs=require('node:fs');fs.cpSync('src','dist',{recursive:true,filter:p=>fs.statSync(p).isDirectory()||/\\.(html|sql)$/.test(p)})\"",
     "start": "node dist/server.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsx --test src/modules/arena/service.test.ts src/modules/auth/service.test.ts src/modules/auth/authorizationCode.test.ts src/modules/auth/googleOAuthFlow.test.ts src/modules/auth/googleOAuthState.test.ts src/modules/auth/googleStartRequest.test.ts src/modules/auth/mobileRedirectAllowlist.test.ts src/modules/auth/plugin.test.ts src/modules/auth/routes.test.ts src/modules/auth/adapters/sqlite/sqliteAuthRepository.test.ts src/modules/murals/service.test.ts src/modules/tierlists/service.test.ts src/modules/tierlists/routes.test.ts src/modules/tierlists/adapters/sqlite/sqliteTierlistsRepository.test.ts src/modules/library/import/parseImport.test.ts src/modules/library/service.test.ts"
+    "test": "tsx --test src/modules/arena/service.test.ts src/modules/auth/service.test.ts src/modules/auth/authorizationCode.test.ts src/modules/auth/googleOAuthFlow.test.ts src/modules/auth/googleOAuthState.test.ts src/modules/auth/googleStartRequest.test.ts src/modules/auth/mobileRedirectAllowlist.test.ts src/modules/auth/plugin.test.ts src/modules/auth/routes.test.ts src/modules/auth/adapters/sqlite/sqliteAuthRepository.test.ts src/modules/murals/service.test.ts src/modules/murals/home.test.ts src/modules/tierlists/service.test.ts src/modules/tierlists/routes.test.ts src/modules/tierlists/adapters/sqlite/sqliteTierlistsRepository.test.ts src/modules/library/import/parseImport.test.ts src/modules/library/service.test.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.3.0",

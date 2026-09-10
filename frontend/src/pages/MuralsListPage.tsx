@@ -1,3 +1,5 @@
+import { useToast } from "../components/Toaster";
+import { useHome } from "../hooks/useHome";
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import type { GalleryImage } from "../api/gallery";
@@ -42,6 +44,8 @@ const SORT_OPTIONS: Array<{ value: SortBy; label: string }> = [
  *  its own full page rather than an inline expandable section — a
  *  freeform canvas needs real room. */
 export function MuralsListPage() {
+  const home = useHome();
+  const toast = useToast();
   const { data: muralsData, isLoading, rename, remove, move: moveMural, setCover, clearCover, share, unshare } = useMurals();
   const showSkeleton = useDelayedShow(isLoading);
   const { data: foldersData, create: createFolder, rename: renameFolder, move: moveFolderApi, remove: removeFolder } = useMuralFolders();
@@ -442,6 +446,7 @@ export function MuralsListPage() {
                             : "flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"
                         }
                         items={[
+                          { label: "Set as home", onClick: () => { void home.choose(mural.id).then(() => navigate("/dashboard")).catch((error) => toast({ message: error.message, kind: "error" })); } },
                           {
                             label: "Rename",
                             onClick: () => {

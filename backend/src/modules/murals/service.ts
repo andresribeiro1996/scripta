@@ -2,6 +2,7 @@
 // MuralsRepository port, not on SQLite — same reasoning as every other
 // module's service.ts.
 
+import { buildHomeBlocks } from "@scripta/shared";
 import { randomUUID } from "node:crypto";
 import { FolderCycleError, InvalidFolderReferenceError, MuralConflictError } from "./domain/errors.js";
 import type { MuralsRepository } from "./domain/ports.js";
@@ -33,6 +34,9 @@ function toFolder(row: MuralFolderRow): MuralFolder {
 }
 
 export interface MuralsService {
+  getHome(userId: string): Mural | null;
+  setHome(userId: string, muralId: string): Mural | undefined;
+  initializeHome(userId: string, withPassage: boolean): Mural;
   listMurals(userId: string): Mural[];
   createMural(userId: string, name: string, folderId?: string | null): Mural;
   /** undefined if no mural with that id is owned by userId — a
@@ -72,6 +76,20 @@ export interface MuralsService {
 
 export function createMuralsService(repo: MuralsRepository, publicUrlFor: (token: string) => string): MuralsService {
   return {
+    getHome(userId) {
+      const row = repo.getHome(userId);
+      return row ? toMural(row, publicUrlFor) : null;
+    },
+    setHome(userId, muralId) {
+      const row = repo.setHome(userId, muralId);
+      return row ? toMural(row, publicUrlFor) : undefined;
+    },
+    initializeHome(userId, withPassage) {
+      const now = new Date().toISOString();
+      return toMural(repo.initializeHome({ id: randomUUID(), user_id: userId, name: "My reading space",
+        blocks: JSON.stringify(buildHomeBlocks(withPassage)), cover_image_id: null, cover_image_url: null,
+        share_token: null, folder_id: null, created_at: now, updated_at: now }), publicUrlFor);
+    },
     listMurals(userId) {
       return repo.listByUser(userId).map((row) => toMural(row, publicUrlFor));
     },

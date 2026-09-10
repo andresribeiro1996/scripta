@@ -14,7 +14,7 @@ export function useMurals() {
     ...query,
     async create(name: string, folderId: string | null = null) { const mural = await api.createMural(name, folderId); client.setQueryData(MURALS_QUERY_KEY, [...current(), mural]); return mural; },
     async update(id: string, patch: { name?: string; blocks?: MuralBlock[]; folderId?: string | null }) { const mural = await api.updateMural(id, { ...patch, updatedAt: current().find((item) => item.id === id)?.updatedAt }); replace(mural); return mural; },
-    async remove(id: string) { await api.deleteMural(id); client.setQueryData(MURALS_QUERY_KEY, current().filter((item) => item.id !== id)); },
+    async remove(id: string) { await api.deleteMural(id); await client.invalidateQueries({ queryKey: ["home"] }); client.setQueryData(MURALS_QUERY_KEY, current().filter((item) => item.id !== id)); },
     async setCover(id: string, imageId: string, url: string) { const mural = await api.setMuralCover(id, imageId, url); replace(mural); return mural; },
     async clearCover(id: string) { const mural = await api.clearMuralCover(id); replace(mural); return mural; },
     async share(id: string) { const mural = await api.shareMural(id); replace(mural); return mural; },

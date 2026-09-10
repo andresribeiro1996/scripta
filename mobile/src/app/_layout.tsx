@@ -1,15 +1,19 @@
+import { useMemo } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { AuthProvider } from "../core/auth";
+import { AuthProvider, useAuth } from "../core/auth";
 import { ThemeProvider, useTheme } from "../ui/theme";
 import { useScreenOptions } from "../ui/navigation";
 
-const queryClient = new QueryClient({
-  defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
-});
+function AccountRoutes() {
+  const { user } = useAuth();
+  const userId = user?.id;
+  const queryClient = useMemo(() => new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 30_000 } } }), [userId]);
+  return <QueryClientProvider key={userId ?? "public"} client={queryClient}><ThemedStatusBar /><RootStack /></QueryClientProvider>;
+}
 
 // Inside ThemeProvider so the bar contrasts with whichever palette is live —
 // a fixed `style="dark"` renders dark glyphs on the dark background.
@@ -29,14 +33,11 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <QueryClientProvider client={queryClient}>
           <ThemeProvider>
             <AuthProvider>
-              <ThemedStatusBar />
-              <RootStack />
+              <AccountRoutes />
             </AuthProvider>
           </ThemeProvider>
-        </QueryClientProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

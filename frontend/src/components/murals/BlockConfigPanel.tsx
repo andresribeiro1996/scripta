@@ -1,3 +1,4 @@
+import { resolveHomeBlock, type Group } from "@scripta/shared";
 // "Configure this block" modal, opened from a block's gear icon
 // (MuralCanvas.tsx) in edit mode. One modal handles every block type —
 // its body switches on `draft.type` — rather than eight separate modals,
@@ -29,12 +30,14 @@ function bookHighlights(book: Record<string, unknown> | undefined): Array<Record
 
 export function BlockConfigPanel({
   block,
+  groups = [],
   books,
   images,
   onSave,
   onClose
 }: {
   block: MuralBlock;
+  groups?: Group[];
   books: Array<Record<string, unknown>>;
   images: GalleryImage[];
   onSave: (block: MuralBlock) => void;
@@ -175,7 +178,22 @@ export function BlockConfigPanel({
             </div>
           )}
 
-          {draft.type === "shelf" && (
+          {draft.type === "shelf" && <div className="space-y-2">
+            <label className="block text-sm">Shelf source
+              <select className="ml-2 rounded border p-2" value={draft.collectionId ?? ""} onChange={(event) => {
+                const collectionId = event.target.value || undefined;
+                const resolved = resolveHomeBlock(draft, books, groups, "");
+                setDraft({ ...draft, collectionId, bookKeys: collectionId ? [] : resolved.type === "shelf" ? resolved.bookKeys : [] });
+              }}>
+                <option value="">Pick books (keep current selection)</option>
+                {draft.collectionId && !groups.some((group) => group.id === draft.collectionId) ? <option value={draft.collectionId}>Collection unavailable</option> : null}
+                {groups.filter((group) => group.type === "collection").map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
+              </select>
+            </label>
+            {draft.collectionId ? <label className="block text-sm">Title (blank follows collection name)<input className="mt-1 w-full rounded border p-2" value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label> : null}
+          </div>}
+          {draft.type === "quote" && <label className="block text-sm">Passage source <select className="rounded border p-2" value={draft.mode ?? "pinned"} onChange={(event) => setDraft({ ...draft, mode: event.target.value === "rediscover" ? "rediscover" : undefined, bookKey: "", highlightId: "" })}><option value="pinned">Choose a passage</option><option value="rediscover">Rediscover a passage</option></select></label>}
+          {draft.type === "shelf" && !draft.collectionId && (
             <div className="flex flex-col gap-3">
               <div>
                 <label className="mb-1 block text-xs font-medium text-(--color-text-dim)">Title</label>
@@ -238,7 +256,7 @@ export function BlockConfigPanel({
             </div>
           )}
 
-          {draft.type === "quote" &&
+          {draft.type === "quote" && draft.mode !== "rediscover" &&
             (browsingBookKey ? (
               <div className="flex flex-col gap-2">
                 <button onClick={() => setBrowsingBookKey(null)} className="inline-flex items-center gap-1 self-start text-xs text-(--color-text-dim) hover:text-(--color-text)">

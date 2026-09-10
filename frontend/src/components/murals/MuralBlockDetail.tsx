@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
 import {
@@ -21,7 +21,8 @@ export function MuralBlockDetail({
   images,
   statsOverride,
   tierlistData,
-  onClose
+  onClose,
+  actions
 }: {
   block: MuralBlock;
   books: Array<Record<string, unknown>>;
@@ -29,6 +30,7 @@ export function MuralBlockDetail({
   statsOverride?: Record<string, number>;
   tierlistData?: (tierlistId: string) => ResolvedTierlist | undefined;
   onClose: () => void;
+  actions?: ReactNode;
 }) {
   const [selectedBook, setSelectedBook] = useState<Record<string, unknown> | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -71,6 +73,7 @@ export function MuralBlockDetail({
       }
       onClose={onClose}
     >
+      {actions}
       <div ref={contentRef} className="max-h-[min(70dvh,40rem)] overflow-y-auto overscroll-contain px-3 pt-1 pb-5 text-base">
         {book ? (
           <div>

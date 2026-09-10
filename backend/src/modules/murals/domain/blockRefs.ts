@@ -27,6 +27,7 @@
 
 export interface ExtractedReferences {
   bookKeys: Set<string>;
+  collectionIds: Set<string>;
   highlightRefs: Array<{ bookKey: string; highlightId: string }>;
   imageIds: Set<string>;
   needsCurrentlyReading: boolean;
@@ -55,6 +56,7 @@ function addStringArrayEntries(target: Set<string>, value: unknown): void {
 export function extractReferences(blocks: unknown): ExtractedReferences {
   const refs: ExtractedReferences = {
     bookKeys: new Set(),
+    collectionIds: new Set(),
     highlightRefs: [],
     imageIds: new Set(),
     needsCurrentlyReading: false,
@@ -75,11 +77,13 @@ export function extractReferences(blocks: unknown): ExtractedReferences {
       }
 
       case "shelf": {
-        addStringArrayEntries(refs.bookKeys, block.bookKeys);
+        if (isNonEmptyString(block.collectionId)) refs.collectionIds.add(block.collectionId);
+        else addStringArrayEntries(refs.bookKeys, block.bookKeys);
         break;
       }
 
       case "quote": {
+        if (block.mode === "rediscover") break;
         if (isNonEmptyString(block.bookKey)) {
           refs.bookKeys.add(block.bookKey);
           if (isNonEmptyString(block.highlightId)) {

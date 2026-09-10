@@ -52,3 +52,13 @@ export function updateFolder(id: string, patch: { name?: string; parentId?: stri
 export function deleteFolder(id: string): Promise<void> {
   return apiClient.request(`/murals/folders/${id}`, { method: "DELETE", auth: true });
 }
+
+export async function fetchHome(): Promise<Mural | null> {
+  return (await apiClient.request<{ mural: Mural | null }>("/murals/home", { auth: true })).mural;
+}
+export async function selectHome(muralId: string): Promise<Mural> {
+  return apiClient.request("/murals/home", { method: "PUT", body: { muralId }, auth: true });
+}
+export async function initializeHome(withPassage: boolean): Promise<Mural> {
+  return apiClient.request("/murals/home", { method: "POST", body: { withPassage }, auth: true });
+}

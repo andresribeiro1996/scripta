@@ -32,3 +32,12 @@ CREATE TABLE IF NOT EXISTS mural_folders (
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 CREATE INDEX IF NOT EXISTS idx_mural_folders_user_id ON mural_folders(user_id);
+
+CREATE TABLE IF NOT EXISTS mural_homes (
+  user_id TEXT PRIMARY KEY,
+  mural_id TEXT NOT NULL
+);
+CREATE TRIGGER IF NOT EXISTS clear_mural_home AFTER DELETE ON murals
+BEGIN
+  DELETE FROM mural_homes WHERE mural_id = OLD.id AND user_id = OLD.user_id;
+END;
