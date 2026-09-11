@@ -159,3 +159,59 @@ export function releaseSlot({ path, worktree }) {
     writeRegistry(path, registry);
   });
 }
+
+// Exactly two AVDs exist on the shared machine, so the device lease is a
+// two-slot semaphore rather than a per-worktree mutex like claimSlot above:
+// two worktrees may each hold one emulator, but a third must wait or steal
+// a dead one.
+export const AVDS = ["scripta-dev-0", "scripta-dev-1"];
+
+export function deviceHolders(registry) {
+  return AVDS.flatMap((avd) => {
+    const lease = registry.devices[avd];
+    return lease ? [{ avd, ...lease }] : [];
+  });
+}
+
+// Hands out the lowest free AVD, reusing whatever this worktree already
+// holds so re-running the dev script doesn't grab a second emulator. When
+// both are live-held, the error names both holders and when each was taken
+// — contention must be loud and attributable, never a silent steal of
+// someone else's adb tunnel.
+export function takeDevice({ path, worktree, pid, avd }) {
+  return withLock(path, () => {
+    const registry = readRegistry(path);
+    const free = (name) => {
+      const lease = registry.devices[name];
+      return lease === null || lease === undefined || !isPidAlive(lease.pid);
+    };
+    const mine = AVDS.find((name) => registry.devices[name]?.worktree === worktree);
+    if (mine !== undefined) return { avd: mine };
+
+    const wanted = avd ? [avd] : AVDS;
+    const chosen = wanted.find(free);
+    if (chosen === undefined) {
+      const held = deviceHolders(registry)
+        .map((holder) => `  ${holder.avd} — ${holder.worktree} since ${holder.takenAt}`)
+        .join("\n");
+      throw new Error(`every emulator is leased:\n${held}\nWait for one, or release it from that worktree.`);
+    }
+    registry.devices[chosen] = { worktree, pid, takenAt: new Date().toISOString() };
+    writeRegistry(path, registry);
+    return { avd: chosen };
+  });
+}
+
+// Releases only the lease(s) this worktree holds — pass `avd` to release a
+// specific one, or omit it to release everything this worktree has.
+export function releaseDevice({ path, worktree, avd }) {
+  withLock(path, () => {
+    const registry = readRegistry(path);
+    for (const name of AVDS) {
+      const lease = registry.devices[name];
+      if (!lease) continue;
+      if (lease.worktree === worktree && (avd === undefined || avd === name)) registry.devices[name] = null;
+    }
+    writeRegistry(path, registry);
+  });
+}

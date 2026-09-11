@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { MAX_SLOT, portsForSlot, readRegistry, withLock, writeRegistry } from "./devRegistry.mjs";
 import { claimSlot, releaseSlot, slotForWorktree } from "./devRegistry.mjs";
+import { AVDS, deviceHolders, releaseDevice, takeDevice } from "./devRegistry.mjs";
 
 test("slot 0 keeps the familiar default ports", () => {
   assert.deepEqual(portsForSlot(0), { backend: 3000, vite: 5173, metro: 8081 });
@@ -178,5 +179,60 @@ test("running out of slots throws", () => {
     const path = join(dir, "scripta-dev.json");
     for (let i = 1; i <= MAX_SLOT; i += 1) claim(path, `/wt/${i}`);
     assert.throws(() => claim(path, "/wt/overflow"), /no free slot/);
+  });
+});
+
+test("taking a device returns the first free AVD", () => {
+  withTempDir((dir) => {
+    const path = join(dir, "scripta-dev.json");
+    assert.equal(takeDevice({ path, worktree: "/wt/a", pid: process.pid }).avd, AVDS[0]);
+    assert.equal(takeDevice({ path, worktree: "/wt/b", pid: process.pid }).avd, AVDS[1]);
+  });
+});
+
+test("taking a device twice from the same worktree is idempotent", () => {
+  withTempDir((dir) => {
+    const path = join(dir, "scripta-dev.json");
+    const first = takeDevice({ path, worktree: "/wt/a", pid: process.pid });
+    assert.equal(takeDevice({ path, worktree: "/wt/a", pid: process.pid }).avd, first.avd);
+  });
+});
+
+test("taking a device when both are held names the holders", () => {
+  withTempDir((dir) => {
+    const path = join(dir, "scripta-dev.json");
+    takeDevice({ path, worktree: "/wt/a", pid: process.pid });
+    takeDevice({ path, worktree: "/wt/b", pid: process.pid });
+    assert.throws(
+      () => takeDevice({ path, worktree: "/wt/c", pid: process.pid }),
+      /\/wt\/a[\s\S]*\/wt\/b/,
+    );
+  });
+});
+
+test("a lease whose pid is dead is reclaimable", () => {
+  withTempDir((dir) => {
+    const path = join(dir, "scripta-dev.json");
+    takeDevice({ path, worktree: "/wt/a", pid: 2147483646 });
+    takeDevice({ path, worktree: "/wt/b", pid: 2147483646 });
+    assert.equal(takeDevice({ path, worktree: "/wt/c", pid: process.pid }).avd, AVDS[0]);
+  });
+});
+
+test("a specific AVD can be requested", () => {
+  withTempDir((dir) => {
+    const path = join(dir, "scripta-dev.json");
+    assert.equal(takeDevice({ path, worktree: "/wt/a", pid: process.pid, avd: AVDS[1] }).avd, AVDS[1]);
+  });
+});
+
+test("releaseDevice frees only that worktree's lease", () => {
+  withTempDir((dir) => {
+    const path = join(dir, "scripta-dev.json");
+    takeDevice({ path, worktree: "/wt/a", pid: process.pid });
+    takeDevice({ path, worktree: "/wt/b", pid: process.pid });
+    releaseDevice({ path, worktree: "/wt/a" });
+    const holders = deviceHolders(readRegistry(path));
+    assert.deepEqual(holders.map((holder) => holder.worktree), ["/wt/b"]);
   });
 });
