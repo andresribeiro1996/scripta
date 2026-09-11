@@ -21,7 +21,7 @@ export default defineConfig(({ mode }) => {
   // here covers `npm run dev:mobile` AND `npm run preview:mobile` both.
   const https = mobileCertsExist() ? { key: readFileSync(KEY_PATH), cert: readFileSync(CERT_PATH) } : undefined
   return {
-    server: { https },
+    server: { https, strictPort: true },
     plugins: [
       react(),
       tailwindcss(),

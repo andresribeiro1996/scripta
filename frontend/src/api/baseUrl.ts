@@ -15,9 +15,15 @@
 // calls go to http://192.168.1.20:3000 on their own, with no per-machine
 // .env editing (and nothing to remember to revert afterwards). See
 // "Testing on a phone" in the root README.
+//
+// The port is also derived rather than hardcoded: each git worktree gets
+// its own dev port slot (see VITE_API_PORT in .env.example), so this
+// worktree's frontend follows its own worktree's backend instead of
+// falling back to whichever backend happens to be on :3000.
 
-/** The backend's own default port — see backend/.env.example's PORT. */
-const DEFAULT_API_PORT = 3000;
+import { resolveApiUrl } from "./resolveApiUrl";
 
-export const API_URL =
-  import.meta.env.VITE_API_URL ?? `${window.location.protocol}//${window.location.hostname}:${DEFAULT_API_PORT}`;
+export const API_URL = resolveApiUrl(
+  { apiUrl: import.meta.env.VITE_API_URL, apiPort: import.meta.env.VITE_API_PORT },
+  window.location,
+);
