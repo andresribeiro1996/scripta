@@ -15,15 +15,36 @@ export const DEFAULT_LIMITS = {
 // Async, unlike devRegistry.mjs's claimSlot predicate: this opens a real
 // socket, so callers must await it and pass the resolved (sync) result
 // through — see probePorts below and Task 8, which bridges the two.
-export function isPortFree(port) {
+//
+// Dialing 127.0.0.1 alone is not enough: Vite has been observed binding
+// only [::1] (IPv6 loopback, not dual-stack), and backend/src/server.ts
+// binds "::" outright. Either can leave a real listener that an
+// IPv4-only probe walks right past, reporting the port free when it is
+// not. So a port only counts as free when BOTH loopback families refuse
+// the connection; either one accepting means something is there.
+function probeLoopback(port, host) {
   return new Promise((resolve) => {
-    const socket = connect({ port, host: "127.0.0.1" });
-    socket.once("connect", () => {
+    const socket = connect({ port, host });
+    const finish = (occupied) => {
       socket.destroy();
-      resolve(false);
-    });
-    socket.once("error", () => resolve(true));
+      resolve(occupied);
+    };
+    socket.once("connect", () => finish(true));
+    // Any connect error means "nothing reachable there" for this family,
+    // never something to propagate: a refused connection is the normal
+    // free-port case, and a host with no IPv6 loopback at all fails the
+    // same way (EAFNOSUPPORT/ENETUNREACH/EADDRNOTAVAIL) — both read as
+    // "not occupied", not as an error to surface.
+    socket.once("error", () => finish(false));
   });
+}
+
+export async function isPortFree(port) {
+  const [v4Occupied, v6Occupied] = await Promise.all([
+    probeLoopback(port, "127.0.0.1"),
+    probeLoopback(port, "::1"),
+  ]);
+  return !v4Occupied && !v6Occupied;
 }
 
 export async function probePorts(ports) {
