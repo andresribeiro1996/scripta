@@ -13,6 +13,7 @@
   },
   "scripts": {
     "backend": "npm run dev --workspace backend",
+    "backend:fixture": "npm run dev:fixture --workspace backend",
     "frontend": "npm run dev --workspace frontend",
     "mobile": "npm run start --workspace mobile",
     "typecheck": "npm run typecheck --workspaces --if-present",

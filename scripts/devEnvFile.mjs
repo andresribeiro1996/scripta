@@ -19,3 +19,18 @@ export function upsertEnvLine(path, key, value) {
   else lines[idx] = newLine;
   writeFileSync(path, lines.join("\n") + "\n");
 }
+
+/** Like upsertEnvLine, but never overwrites an existing value for `key` —
+ *  only fills the line in when it's absent. Used for
+ *  EXPO_PUBLIC_API_URL: dev-account.mjs wants a sane localhost default in
+ *  place so the app isn't dead on a bare `node scripts/dev-account.mjs`,
+ *  but must never clobber a phone tester's own LAN IP already sitting in
+ *  mobile/.env.local. */
+export function defaultEnvLine(path, key, value) {
+  const existing = existsSync(path) ? readFileSync(path, "utf8") : "";
+  const lines = existing.split("\n").filter((line) => line.trim() !== "");
+  const prefix = `${key}=`;
+  if (lines.some((line) => line.startsWith(prefix))) return;
+  lines.push(`${prefix}${value}`);
+  writeFileSync(path, lines.join("\n") + "\n");
+}

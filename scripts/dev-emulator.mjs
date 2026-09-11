@@ -7,18 +7,33 @@
 // thing is already up before starting anything — re-running while
 // everything is already running just re-launches Expo Go against the
 // current bundle, which is the point (see it now, not "nothing to do").
+// Pass --reset to wipe backend/data/dev/ first (a whole-directory wipe —
+// there is no per-user teardown across these modules, see devDataDir.mjs)
+// and reseed everything from scratch; without it, existing dev-account
+// and fixture-user progress survives a re-run.
 //
 //   1. Boot the `scripta-dev` AVD if it isn't already running (creating
 //      it first, on a machine that's never run this before). No lock
 //      screen, no screen timeout — the whole reason this script exists.
 //   2. Sideload Expo Go if this AVD doesn't have it (the `google_apis`
 //      image has no Play Store to install it from normally).
-//   3. Seed the dev account + fixture library (scripts/dev-account.mjs).
-//   4. Start the backend (plain http — an emulator reaches the host's
-//      localhost through `adb reverse`, so unlike a physical phone this
-//      never needs the LAN-IP/HTTPS dance `dev-mobile.mjs` does) and
-//      Metro, if either isn't already running.
-//   5. `adb reverse` both ports, then open Expo Go at the project and
+//   3. --reset only: wipe backend/data/dev/ so every module starts clean.
+//   4. Seed the dev account + fixture library (scripts/dev-account.mjs,
+//      writing into backend/data/dev/), then seed the three fixture
+//      users (fixture_alice/bob/charlie, backend/scripts/three-users.mjs
+//      --seed-only --shared) into that SAME directory — one database,
+//      four logins.
+//   5. Start the real backend (plain http — an emulator reaches the
+//      host's localhost through `adb reverse`, so unlike a physical
+//      phone this never needs the LAN-IP/HTTPS dance `dev-mobile.mjs`
+//      does) against backend/data/dev/, and Metro, if either isn't
+//      already running. If something is already listening on the
+//      backend port, this logs into it as the dev account first
+//      (POST /auth/login, never /auth/refresh — that call ROTATES the
+//      presented token) to confirm it's actually pointed at the same
+//      seeded data before adopting it; a stale/wrong server there fails
+//      loudly instead of silently reproducing a 401 on the mobile app.
+//   6. `adb reverse` both ports, then open Expo Go at the project and
 //      wait for the first bundle to land.
 //
 // Assumes ports 3000 (backend) and 8081 (Metro, Expo's default) are free
@@ -27,12 +42,14 @@
 // to disambiguate further.
 
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, openSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { connect } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { androidEnv } from "./androidSdk.mjs";
+import { devDataDir, devDataDirEnv } from "./devDataDir.mjs";
+import { DEV_EMAIL, DEV_PASSWORD, DEV_USERNAME } from "./dev-account.mjs";
 import { upsertEnvLine } from "./devEnvFile.mjs";
 
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -42,6 +59,7 @@ const runtimeDir = join(tmpdir(), "scripta-dev-emulator");
 const AVD_NAME = "scripta-dev";
 const BACKEND_PORT = 3000;
 const METRO_PORT = 8081;
+const resetRequested = process.argv.includes("--reset");
 
 function log(message) {
   console.log(`[dev-emulator] ${message}`);
@@ -163,19 +181,68 @@ function ensureSharedBuilt() {
   if (result.status !== 0) throw new Error("Building @scripta/shared failed — see output above.");
 }
 
+function resetDevDataIfRequested() {
+  if (!resetRequested) return;
+  log(`--reset: wiping ${devDataDir}...`);
+  rmSync(devDataDir, { recursive: true, force: true });
+}
+
 function seedDevAccount() {
   log("Seeding the dev account + fixture library...");
-  const result = spawnSync("node", ["--import", "tsx", "scripts/dev-account.mjs"], { cwd: repoRoot, stdio: "inherit" });
+  const args = ["--import", "tsx", "scripts/dev-account.mjs", ...(resetRequested ? ["--reset"] : [])];
+  const result = spawnSync("node", args, { cwd: repoRoot, stdio: "inherit" });
   if (result.status !== 0) throw new Error("scripts/dev-account.mjs failed — see output above.");
+}
+
+/** Seeds fixture_alice/bob/charlie into the SAME backend/data/dev/
+ *  database dev-account.mjs just wrote to (devDataDirEnv() below is what
+ *  makes --shared mode point there instead of the isolated
+ *  backend/data/three-users/ default — see three-users.mjs's own
+ *  comment). --seed-only: this never starts its own server: the real
+ *  backend, started next, serves both the dev account and these three. */
+function seedFixtureUsers() {
+  log("Seeding fixture_alice/bob/charlie into the same dev database...");
+  const env = { ...process.env, ...devDataDirEnv() };
+  const result = spawnSync("node", ["--import", "tsx", "scripts/three-users.mjs", "--seed-only", "--shared"], { cwd: backendDir, env, stdio: "inherit" });
+  if (result.status !== 0) throw new Error("backend/scripts/three-users.mjs --shared failed — see output above.");
+}
+
+/** POST /auth/login (never /auth/refresh — that call ROTATES AND REVOKES
+ *  the presented token, see backend/src/modules/auth/service.ts, so a
+ *  health probe using it would burn the app's own seeded session) with
+ *  the dev account's own credentials. Used only to tell a real backend
+ *  serving backend/data/dev/ apart from some other stale server that
+ *  happens to be listening on the same port. */
+async function probeDevLogin() {
+  try {
+    const response = await fetch(`http://127.0.0.1:${BACKEND_PORT}/auth/login`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ identifier: DEV_EMAIL, password: DEV_PASSWORD }),
+    });
+    return response.status;
+  } catch {
+    return null;
+  }
 }
 
 async function ensureBackendRunning() {
   if (await isPortOpen(BACKEND_PORT)) {
-    log(`Backend already listening on ${BACKEND_PORT}.`);
+    log(`Something is already listening on ${BACKEND_PORT} — checking it's this workflow's server (POST /auth/login as the dev account)...`);
+    const status = await probeDevLogin();
+    if (status !== 200) {
+      throw new Error(
+        `Port ${BACKEND_PORT} is already in use, but POST /auth/login for the dev account returned ${status ?? "no response"}, not 200. ` +
+          `This is likely a wrong/stale server on :${BACKEND_PORT} (e.g. a leftover \`npm run backend:fixture\` / three-users.mjs instance ` +
+          `reading a different database) rather than this workflow's own backend. Stop whatever is listening on ${BACKEND_PORT} and re-run.`,
+      );
+    }
+    log(`Backend on ${BACKEND_PORT} confirmed as this workflow's server.`);
     return;
   }
   log("Starting the backend...");
-  spawnDetached("npm", ["run", "backend"], { cwd: repoRoot, env: process.env, logName: "backend.log" });
+  const env = { ...process.env, ...devDataDirEnv() };
+  spawnDetached("npm", ["run", "backend"], { cwd: repoRoot, env, logName: "backend.log" });
   await waitFor(() => isPortOpen(BACKEND_PORT), { timeoutMs: 30_000, label: `backend on port ${BACKEND_PORT}` });
 }
 
@@ -201,7 +268,9 @@ async function main() {
   const serial = await ensureAvdBooted(env);
   await ensureExpoGo(serial, env);
 
+  resetDevDataIfRequested();
   seedDevAccount();
+  seedFixtureUsers();
   await ensureBackendRunning();
   const metroLogPath = await ensureMetroRunning();
 
@@ -223,7 +292,7 @@ async function main() {
     { timeoutMs: 180_000, label: "first bundle to finish" },
   );
 
-  log(`Ready. Serial: ${serial}. Signed in as the dev account with the fixture library.`);
+  log(`Ready. Serial: ${serial}. Signed in as ${DEV_USERNAME} (24-book fixture library). fixture_alice/fixture_bob/fixture_charlie (password scripta123) are also seeded on the same server for multi-user testing.`);
   log(`Drive it with: adb -s ${serial} shell uiautomator dump /sdcard/ui.xml && adb -s ${serial} pull /sdcard/ui.xml .`);
   log(`Screenshot with: adb -s ${serial} exec-out screencap -p > screen.png`);
 }

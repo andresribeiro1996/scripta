@@ -2,16 +2,43 @@ import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 import argon2 from "argon2";
 
 const flags = new Set(process.argv.slice(2));
-assert([...flags].every((flag) => ["--reset", "--seed-only", "--check"].includes(flag)), "Use --reset, --seed-only, or --check.");
+assert([...flags].every((flag) => ["--reset", "--seed-only", "--check", "--shared"].includes(flag)), "Use --reset, --seed-only, --check, or --shared.");
 assert.notEqual(process.env.NODE_ENV, "production", "Fixtures are development-only.");
 const checking = flags.has("--check");
-const directory = checking ? mkdtempSync(join(tmpdir(), "scripta-three-users-")) : fileURLToPath(new URL("../data/three-users", import.meta.url));
+const shared = flags.has("--shared");
+assert(!(flags.has("--reset") && shared), "--reset --shared is not supported: reset the shared dev data directory itself, e.g. `node scripts/dev-emulator.mjs --reset`.");
+
+// --shared seeds into whatever the ambient environment already points
+// at (scripts/devDataDir.mjs's backend/data/dev/, set up by the caller)
+// instead of this file's own isolated backend/data/three-users/ — so it
+// never generates secrets, never blanks OAuth/socials env vars, and
+// never overrides *_DB_PATH/*_STORAGE_PATH. The manifest and lock live
+// next to those ambient databases, derived from AUTH_DB_PATH, so they
+// don't collide with (or depend on) the isolated fixture's own directory.
+//
+// That derivation MUST resolve AUTH_DB_PATH against process.cwd(), the
+// same way the backend itself does (modules/auth/adapters/sqlite/
+// connection.ts hands env.AUTH_DB_PATH straight to dirname/DatabaseSync).
+// Resolving it against import.meta.url instead would put the manifest and
+// lock under backend/scripts/data/ for any RELATIVE AUTH_DB_PATH — which
+// is exactly what backend/.env.example ships (./data/auth.sqlite) — while
+// the databases themselves landed in backend/data/, silently seeding the
+// three fixture users into a developer's own library.
+assert(
+  !shared || process.env.AUTH_DB_PATH,
+  "--shared needs AUTH_DB_PATH (and the other *_DB_PATH/*_STORAGE_PATH vars) already pointing at the shared dev data directory — see scripts/devDataDir.mjs; scripts/dev-emulator.mjs sets them for you.",
+);
+const directory = checking
+  ? mkdtempSync(join(tmpdir(), "scripta-three-users-"))
+  : shared
+    ? dirname(resolve(process.env.AUTH_DB_PATH))
+    : fileURLToPath(new URL("../data/three-users", import.meta.url));
 const lock = `${directory}.lock`;
 mkdirSync(dirname(directory), { recursive: true });
 try {
@@ -27,19 +54,26 @@ process.on("exit", () => {
 if (flags.has("--reset")) rmSync(directory, { recursive: true, force: true });
 mkdirSync(directory, { recursive: true });
 const manifestPath = join(directory, "fixture.json");
-assert(existsSync(manifestPath) || !existsSync(join(directory, "auth.sqlite")), "Incomplete fixture: rerun with --reset.");
-const secretsPath = join(directory, "secrets.json");
-if (!existsSync(secretsPath)) writeFileSync(secretsPath, JSON.stringify({ JWT_ACCESS_SECRET: randomBytes(32).toString("hex"), JWT_REFRESH_SECRET: randomBytes(32).toString("hex") }), { mode: 0o600 });
-Object.assign(process.env, JSON.parse(readFileSync(secretsPath, "utf8")), {
-  DOTENV_CONFIG_PATH: join(directory, "unused.env"),
-  GOOGLE_CLIENT_ID: "", GOOGLE_CLIENT_SECRET: "", GOOGLE_CALLBACK_URL: "", HARDCOVER_API_KEY: "",
-  SOCIALS_ENCRYPTION_KEY: "", X_CLIENT_ID: "", INSTAGRAM_CLIENT_ID: "", THREADS_CLIENT_ID: "", TIKTOK_CLIENT_KEY: "",
-  ALLOW_LAN_ORIGINS: "true"
-});
-for (const module of ["auth", "library", "gallery", "covers", "socials", "arena", "murals", "tierlists"]) {
-  process.env[`${module.toUpperCase()}_DB_PATH`] = join(directory, `${module}.sqlite`);
+// In --shared mode, auth.sqlite legitimately predates this fixture (it's
+// the dev account's own database, seeded by dev-account.mjs before this
+// ever runs) — its existence without a manifest says nothing about
+// whether a PREVIOUS run of this script was interrupted, so only the
+// isolated modes apply this guard.
+assert(shared || existsSync(manifestPath) || !existsSync(join(directory, "auth.sqlite")), "Incomplete fixture: rerun with --reset.");
+if (!shared) {
+  const secretsPath = join(directory, "secrets.json");
+  if (!existsSync(secretsPath)) writeFileSync(secretsPath, JSON.stringify({ JWT_ACCESS_SECRET: randomBytes(32).toString("hex"), JWT_REFRESH_SECRET: randomBytes(32).toString("hex") }), { mode: 0o600 });
+  Object.assign(process.env, JSON.parse(readFileSync(secretsPath, "utf8")), {
+    DOTENV_CONFIG_PATH: join(directory, "unused.env"),
+    GOOGLE_CLIENT_ID: "", GOOGLE_CLIENT_SECRET: "", GOOGLE_CALLBACK_URL: "", HARDCOVER_API_KEY: "",
+    SOCIALS_ENCRYPTION_KEY: "", X_CLIENT_ID: "", INSTAGRAM_CLIENT_ID: "", THREADS_CLIENT_ID: "", TIKTOK_CLIENT_KEY: "",
+    ALLOW_LAN_ORIGINS: "true"
+  });
+  for (const module of ["auth", "library", "gallery", "covers", "socials", "arena", "murals", "tierlists"]) {
+    process.env[`${module.toUpperCase()}_DB_PATH`] = join(directory, `${module}.sqlite`);
+  }
+  for (const storage of ["gallery", "avatar", "covers"]) process.env[`${storage.toUpperCase()}_STORAGE_PATH`] = join(directory, `${storage}-files`);
 }
-for (const storage of ["gallery", "avatar", "covers"]) process.env[`${storage.toUpperCase()}_STORAGE_PATH`] = join(directory, `${storage}-files`);
 const { buildApp } = await import("../src/app.ts");
 const { bookKey } = await import("../../packages/shared/src/library/merge.ts");
 const app = buildApp();
@@ -177,7 +211,7 @@ try {
     const frontend = (process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/$/, "");
     console.log(`\nFixture: ${manifestPath}\nAccounts: fixture_alice, fixture_bob, fixture_charlie\nPassword: ${password}\nLibrary: ${frontend}/shared/library/${fixture.library.shareToken}\nMural: ${frontend}/shared/murals/${fixture.murals.shared.shareToken}\nMembers poll: ${frontend}/vote/${fixture.polls.members.code}\nAnonymous poll: ${frontend}/vote/${fixture.polls.anonymous.code}\nArena: ${frontend}/arena/${fixture.arena.id}\nBob's Arena token: ${fixture.arena.bobVoterToken}\nLinks reflect initial seeding; revoked/deleted content stays that way until --reset.\n`);
   }
-  if (checking || flags.has("--seed-only")) await app.close();
+  if (checking || shared || flags.has("--seed-only")) await app.close();
   else {
     await app.listen({ port: Number(process.env.PORT || 3000), host: "0.0.0.0" });
     for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, async () => { await app.close(); process.exit(0); });

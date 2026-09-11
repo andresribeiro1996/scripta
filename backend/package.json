@@ -5,7 +5,8 @@
   "description": "Backend for the Kobo Library Viewer — currently just the isolated auth module.",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch scripts/three-users.mjs",
+    "dev": "tsx watch src/server.ts",
+    "dev:fixture": "tsx watch scripts/three-users.mjs",
     "dev:mobile": "node scripts/dev-mobile.mjs",
     "fixture": "tsx scripts/three-users.mjs",
     "test:fixture": "tsx scripts/three-users.mjs --check",
