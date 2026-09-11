@@ -136,9 +136,11 @@ bare form returns a relative `.git` in the primary checkout. Needs git
   "version": 1,
   "slots": {
     "0": { "worktree": "/Users/andreribeiro/Documents/scripta",
-           "branch": "main", "pid": 40122, "claimedAt": "2026-09-11T14:02:11Z" },
+           "branch": "main", "pid": 40122, "session": null,
+           "claimedAt": "2026-09-11T14:02:11Z" },
     "2": { "worktree": "/Users/andreribeiro/Documents/scripta-wt/4d",
            "branch": "mobile/4d-design-system", "pid": 51880,
+           "session": "claude/4d-design-system-40a896",
            "claimedAt": "2026-09-11T14:20:03Z" }
   },
   "devices": {
@@ -148,6 +150,13 @@ bare form returns a relative `.git` in the primary checkout. Needs git
   }
 }
 ```
+
+`session` names the agent session that claimed the slot, so a human can
+tell which of several concurrent agents owns a stack. Nothing on the
+system knows this, so it must be supplied at claim time — from
+`$CLAUDE_SESSION` if the harness exports one, else a `--session` argument,
+else `null` for a human-booted stack. It is a label only; nothing keys off
+it.
 
 Writes take an exclusive lock (`O_EXCL` lockfile beside it, stale after
 10s) so two worktrees booting at once cannot claim the same slot.
