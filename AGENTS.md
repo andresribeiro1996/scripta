@@ -10,6 +10,8 @@
 
 Scripta — personal Kobo/Goodreads e-book library app. Each subdirectory has its own `AGENTS.md` (rules + verify commands) and `README.md` (architecture detail); read both before working there.
 
+A new subdirectory `AGENTS.md` needs two things to reach every tool: a `CLAUDE.md` symlink beside it (`ln -s AGENTS.md <dir>/CLAUDE.md`), and an entry in `opencode.json`'s `instructions`. Codex finds it on its own.
+
 | Dir | What | Commands |
 |---|---|---|
 | `backend/` | Fastify/TS API, modular monolith | `npm run dev` / `typecheck` / `test` |

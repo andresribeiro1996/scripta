@@ -34,9 +34,11 @@ exporter/library.json
 .certs/
 .superpowers/
 
-# Local opencode tooling (skills, plugins, its own node_modules) — machine
-# config, not project source.
-.opencode/
+# OpenCode: its node_modules and lockfiles are machine state, but the skills
+# are shared agent config and travel with the repo (same stance as .claude/
+# above). .opencode/.gitignore already excludes the machine-local parts.
+.opencode/*
+!.opencode/skills/
 
 # Dev-only scratch config for parallel sessions — see its own header.
 frontend/vite.http.config.ts
