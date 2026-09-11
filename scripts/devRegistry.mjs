@@ -2,6 +2,10 @@
 // so two worktrees can never land on the same number — see
 // docs/superpowers/specs/2026-09-11-worktree-port-lanes-design.md.
 
+import { execFileSync } from "node:child_process";
+import { closeSync, existsSync, openSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+
 export const MAX_SLOT = 15;
 export const BACKEND_BASE = 3000;
 export const VITE_BASE = 5173;
@@ -17,10 +21,6 @@ export function portsForSlot(slot) {
     metro: METRO_BASE + 100 * slot,
   };
 }
-
-import { execFileSync } from "node:child_process";
-import { closeSync, existsSync, openSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
 
 const LOCK_STALE_MS = 10_000;
 
