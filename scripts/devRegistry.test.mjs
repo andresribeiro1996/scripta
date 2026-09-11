@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { MAX_SLOT, portsForSlot, readRegistry, withLock, writeRegistry } from "./devRegistry.mjs";
+import { claimSlot, releaseSlot, slotForWorktree } from "./devRegistry.mjs";
 
 test("slot 0 keeps the familiar default ports", () => {
   assert.deepEqual(portsForSlot(0), { backend: 3000, vite: 5173, metro: 8081 });
@@ -82,5 +83,100 @@ test("withLock breaks a lock older than the stale timeout", () => {
     const old = Date.now() / 1000 - 30;
     utimesSync(`${path}.lock`, old, old);
     assert.equal(withLock(path, () => "broke through"), "broke through");
+  });
+});
+
+const allFree = () => true;
+
+function claim(path, worktree, extra = {}) {
+  return claimSlot({
+    path,
+    worktree,
+    branch: "b",
+    pid: process.pid,
+    session: null,
+    isPrimary: false,
+    isPortFree: allFree,
+    ...extra,
+  });
+}
+
+test("the primary checkout always takes slot 0", () => {
+  withTempDir((dir) => {
+    const path = join(dir, "scripta-dev.json");
+    claim(path, "/wt/a");
+    const primary = claim(path, "/repo", { isPrimary: true });
+    assert.equal(primary.slot, 0);
+    assert.deepEqual(primary.ports, { backend: 3000, vite: 5173, metro: 8081 });
+  });
+});
+
+test("a non-primary worktree never takes slot 0", () => {
+  withTempDir((dir) => {
+    const path = join(dir, "scripta-dev.json");
+    assert.equal(claim(path, "/wt/a").slot, 1);
+  });
+});
+
+test("claiming twice from the same worktree reuses its slot", () => {
+  withTempDir((dir) => {
+    const path = join(dir, "scripta-dev.json");
+    assert.equal(claim(path, "/wt/a").slot, claim(path, "/wt/a").slot);
+  });
+});
+
+test("slots are handed out lowest-free-first, reusing released gaps", () => {
+  withTempDir((dir) => {
+    const path = join(dir, "scripta-dev.json");
+    claim(path, "/wt/a");
+    claim(path, "/wt/b");
+    claim(path, "/wt/c");
+    releaseSlot({ path, worktree: "/wt/b" });
+    assert.equal(claim(path, "/wt/d").slot, 2);
+  });
+});
+
+test("a slot whose pid is dead is reclaimable", () => {
+  withTempDir((dir) => {
+    const path = join(dir, "scripta-dev.json");
+    claim(path, "/wt/a", { pid: 2147483646 });
+    assert.equal(claim(path, "/wt/b").slot, 1);
+  });
+});
+
+test("a slot whose pid is alive is not reclaimable", () => {
+  withTempDir((dir) => {
+    const path = join(dir, "scripta-dev.json");
+    claim(path, "/wt/a");
+    assert.equal(claim(path, "/wt/b").slot, 2);
+  });
+});
+
+test("a slot whose ports are externally occupied is skipped with a warning", () => {
+  withTempDir((dir) => {
+    const path = join(dir, "scripta-dev.json");
+    const busyOnSlotOne = (port) => port !== 3100;
+    const result = claim(path, "/wt/a", { isPortFree: busyOnSlotOne });
+    assert.equal(result.slot, 2);
+  });
+});
+
+test("releaseSlot removes only that worktree's entry", () => {
+  withTempDir((dir) => {
+    const path = join(dir, "scripta-dev.json");
+    claim(path, "/wt/a");
+    claim(path, "/wt/b");
+    releaseSlot({ path, worktree: "/wt/a" });
+    const registry = readRegistry(path);
+    assert.equal(slotForWorktree(registry, "/wt/a"), undefined);
+    assert.equal(slotForWorktree(registry, "/wt/b"), "2");
+  });
+});
+
+test("running out of slots throws", () => {
+  withTempDir((dir) => {
+    const path = join(dir, "scripta-dev.json");
+    for (let i = 1; i <= MAX_SLOT; i += 1) claim(path, `/wt/${i}`);
+    assert.throws(() => claim(path, "/wt/overflow"), /no free slot/);
   });
 });

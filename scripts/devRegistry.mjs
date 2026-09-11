@@ -94,3 +94,68 @@ export function withLock(path, fn) {
     rmSync(lockPath, { force: true });
   }
 }
+
+// signal 0 sends nothing but still validates the pid: ESRCH means it's
+// gone, EPERM means it exists but is owned by someone else (still alive).
+export function isPidAlive(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error.code === "EPERM";
+  }
+}
+
+export function slotForWorktree(registry, worktree) {
+  return Object.keys(registry.slots).find((slot) => registry.slots[slot].worktree === worktree);
+}
+
+// Claims the lowest free slot for a worktree, or reuses the one it already
+// holds. A slot counts as free only when its previous holder's pid is dead
+// AND its ports are actually unbound — isPortFree is injected (sync) so
+// tests need no real sockets; the production default lives in Task 4.
+export function claimSlot({ path, worktree, branch, pid, session, isPrimary, isPortFree }) {
+  return withLock(path, () => {
+    const registry = readRegistry(path);
+
+    const existing = slotForWorktree(registry, worktree);
+    if (existing !== undefined) {
+      registry.slots[existing] = { worktree, branch, pid, session, claimedAt: new Date().toISOString() };
+      writeRegistry(path, registry);
+      return { slot: Number(existing), ports: portsForSlot(Number(existing)) };
+    }
+
+    const held = (slot) => {
+      const entry = registry.slots[String(slot)];
+      return entry !== undefined && isPidAlive(entry.pid);
+    };
+
+    const candidates = isPrimary ? [0] : Array.from({ length: MAX_SLOT }, (_, i) => i + 1);
+    for (const slot of candidates) {
+      if (held(slot)) continue;
+      const ports = portsForSlot(slot);
+      if (!Object.values(ports).every((port) => isPortFree(port))) continue;
+      registry.slots[String(slot)] = { worktree, branch, pid, session, claimedAt: new Date().toISOString() };
+      writeRegistry(path, registry);
+      return { slot, ports };
+    }
+    throw new Error(`no free slot in 0..${MAX_SLOT} — run \`npm run dev:status\` to see what holds them`);
+  });
+}
+
+// Also clears any device lease this worktree held (Task 5 adds takeDevice /
+// releaseDevice on top of registry.devices, which Task 2's EMPTY_REGISTRY
+// already defines) so a released worktree never leaves a stale device lock.
+export function releaseSlot({ path, worktree }) {
+  withLock(path, () => {
+    const registry = readRegistry(path);
+    const slot = slotForWorktree(registry, worktree);
+    if (slot === undefined) return;
+    delete registry.slots[slot];
+    for (const [avd, lease] of Object.entries(registry.devices)) {
+      if (lease?.worktree === worktree) registry.devices[avd] = null;
+    }
+    writeRegistry(path, registry);
+  });
+}
