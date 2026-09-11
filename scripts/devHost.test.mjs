@@ -2,9 +2,18 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { createServer } from "node:net";
+import { freemem } from "node:os";
 import { isAbsolute } from "node:path";
 import { test } from "node:test";
-import { DEFAULT_LIMITS, assertResourcesAvailable, isPortFree, probePorts, worktreeIdentity } from "./devHost.mjs";
+import {
+  DEFAULT_LIMITS,
+  assertResourcesAvailable,
+  isPortFree,
+  parseVmStatAvailableBytes,
+  probePorts,
+  readHost,
+  worktreeIdentity,
+} from "./devHost.mjs";
 
 const roomy = { freeBytes: 16 * 1024 ** 3, loadAvg1: 1 };
 
@@ -133,4 +142,58 @@ test("probePorts returns the correct boolean per port across a mixed set", async
     await closeServer(v4Server);
     await closeServer(v6Server);
   }
+});
+
+// Fixture: a real `vm_stat` capture from this machine (arm64, 16 KB pages).
+// Pinned as text rather than shelled out to at test time, per the fix's
+// requirement that the parser be unit-testable without touching the host.
+const VM_STAT_SAMPLE = `Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                     4456.
+Pages active:                                 514015.
+Pages inactive:                               512377.
+Pages speculative:                               593.
+Pages throttled:                                   0.
+Pages wired down:                             196948.
+Pages purgeable:                                  36.
+"Translation faults":                     2634220208.
+Pages copy-on-write:                        88561654.
+Pages zero filled:                        1414842328.
+Pages reactivated:                         247093936.
+Pages purged:                               43044411.
+File-backed pages:                            247722.
+Anonymous pages:                              779263.
+Pages stored in compressor:                  2217672.
+Pages occupied by compressor:                 827340.
+Decompressions:                            169029133.
+Compressions:                              197869480.
+Pageins:                                    30430870.
+Pageouts:                                     640639.
+Swapins:                                      273296.
+Swapouts:                                     706869.
+`;
+
+test("parseVmStatAvailableBytes reads the page size from the header and sums free+inactive+speculative+purgeable", () => {
+  // page size 16384; free 4456 + inactive 512377 + speculative 593 + purgeable 36 = 517462 pages
+  const expectedBytes = 517462 * 16384;
+  assert.equal(parseVmStatAvailableBytes(VM_STAT_SAMPLE), expectedBytes);
+});
+
+test("parseVmStatAvailableBytes returns a falsy failure signal on malformed input", () => {
+  assert.ok(!parseVmStatAvailableBytes("not vm_stat output at all"));
+  assert.ok(!parseVmStatAvailableBytes(""));
+  // Header present but the page lines it needs are missing.
+  assert.ok(!parseVmStatAvailableBytes("Mach Virtual Memory Statistics: (page size of 16384 bytes)\n"));
+});
+
+test("readHost reports substantially more available memory than os.freemem() on a healthy macOS box", { skip: process.platform !== "darwin" }, () => {
+  const { freeBytes } = readHost();
+  // freemem() on macOS reports only genuinely-unused pages, which is
+  // typically well under 1 GB even on a healthy machine because macOS
+  // keeps RAM populated as cache. `readHost()` must report the larger
+  // "available" figure (free + inactive + speculative + purgeable), so
+  // it should exceed freemem() by a wide margin — not just be >=.
+  assert.ok(
+    freeBytes > freemem() * 2,
+    `expected readHost().freeBytes (${freeBytes}) to be substantially larger than os.freemem() (${freemem()})`,
+  );
 });
