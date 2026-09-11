@@ -12,8 +12,12 @@
 // and reseed everything from scratch; without it, existing dev-account
 // and fixture-user progress survives a re-run.
 //
-//   1. Boot the `scripta-dev` AVD if it isn't already running (creating
-//      it first, on a machine that's never run this before). No lock
+//   0. Claim this worktree's port slot from the shared registry
+//      (scripts/devRegistry.mjs) and lease one of the two AVDs
+//      (scripta-dev-0/1) from the same registry — see AGENTS.md's Rules
+//      for when to take one. `npm run dev:release` hands both back.
+//   1. Boot the leased AVD if it isn't already running (creating it
+//      first, on a machine that's never run this before). No lock
 //      screen, no screen timeout — the whole reason this script exists.
 //   2. Sideload Expo Go if this AVD doesn't have it (the `google_apis`
 //      image has no Play Store to install it from normally).
@@ -27,19 +31,17 @@
 //      host's localhost through `adb reverse`, so unlike a physical
 //      phone this never needs the LAN-IP/HTTPS dance `dev-mobile.mjs`
 //      does) against backend/data/dev/, and Metro, if either isn't
-//      already running. If something is already listening on the
-//      backend port, this logs into it as the dev account first
-//      (POST /auth/login, never /auth/refresh — that call ROTATES the
-//      presented token) to confirm it's actually pointed at the same
-//      seeded data before adopting it; a stale/wrong server there fails
-//      loudly instead of silently reproducing a 401 on the mobile app.
+//      already running. Anything already listening on this slot's
+//      backend port is this worktree's own server by construction —
+//      claimSlot refuses the slot if the port was externally occupied —
+//      so this just adopts it rather than re-verifying who it is.
 //   6. `adb reverse` both ports, then open Expo Go at the project and
 //      wait for the first bundle to land.
 //
-// Assumes ports 3000 (backend) and 8081 (Metro, Expo's default) are free
-// or already running THIS script's own servers — fine for a single-
-// developer machine with one emulator, not something this script tries
-// to disambiguate further.
+// Ports are never hardcoded: BACKEND_PORT and METRO_PORT come from the
+// slot this worktree claims at startup (scripts/devRegistry.mjs), so two
+// worktrees running this script at once land on different, non-
+// overlapping ports and never contend for the same one.
 
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -49,17 +51,22 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { androidEnv } from "./androidSdk.mjs";
 import { devDataDir, devDataDirEnv } from "./devDataDir.mjs";
-import { DEV_EMAIL, DEV_PASSWORD, DEV_USERNAME } from "./dev-account.mjs";
+import { DEV_USERNAME } from "./dev-account.mjs";
 import { upsertEnvLine } from "./devEnvFile.mjs";
+import { claimSlot, portsForSlot, readRegistry, registryPath, takeDevice } from "./devRegistry.mjs";
+import { DEFAULT_LIMITS, assertResourcesAvailable, probePorts, readHost, worktreeIdentity } from "./devHost.mjs";
+import { applySlotEnv } from "./devSlotEnv.mjs";
+import { pickLanAddress } from "./lanAddress.mjs";
 
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const backendDir = join(repoRoot, "backend");
 const mobileDir = join(repoRoot, "mobile");
 const runtimeDir = join(tmpdir(), "scripta-dev-emulator");
-const AVD_NAME = "scripta-dev";
-const BACKEND_PORT = 3000;
-const METRO_PORT = 8081;
 const resetRequested = process.argv.includes("--reset");
+const lanRequested = process.argv.includes("--lan");
+let BACKEND_PORT;
+let METRO_PORT;
+let claimedSlot;
 
 function log(message) {
   console.log(`[dev-emulator] ${message}`);
@@ -120,23 +127,23 @@ function getEmulatorSerial(env) {
   return match ? match.split(/\s+/)[0] : null;
 }
 
-async function ensureAvdBooted(env) {
+async function ensureAvdBooted(avd, env) {
   let serial = getEmulatorSerial(env);
   if (serial) {
-    log(`${AVD_NAME} already running as ${serial}.`);
+    log(`${avd} already running as ${serial}.`);
   } else {
     const { stdout: avds } = run("avdmanager", ["list", "avd"], { env });
-    if (!avds.includes(AVD_NAME)) {
-      log(`Creating the ${AVD_NAME} AVD (first run on this machine)...`);
+    if (!avds.includes(avd)) {
+      log(`Creating the ${avd} AVD (first run on this machine)...`);
       const create = spawnSync(
         "avdmanager",
-        ["create", "avd", "-n", AVD_NAME, "-k", "system-images;android-35;google_apis;arm64-v8a", "--force"],
+        ["create", "avd", "-n", avd, "-k", "system-images;android-35;google_apis;arm64-v8a", "--force"],
         { env, input: "no\n", encoding: "utf8" },
       );
       if (create.status !== 0) throw new Error(`Failed to create AVD:\n${create.stdout}\n${create.stderr}`);
     }
-    log(`Booting ${AVD_NAME}...`);
-    spawnDetached("emulator", ["-avd", AVD_NAME, "-no-boot-anim", "-no-audio"], { env, logName: "emulator.log" });
+    log(`Booting ${avd}...`);
+    spawnDetached("emulator", ["-avd", avd, "-no-boot-anim", "-no-audio"], { env, logName: "emulator.log" });
     await waitFor(() => Boolean(getEmulatorSerial(env)), { timeoutMs: 120_000, label: "emulator to register with adb" });
     serial = getEmulatorSerial(env);
   }
@@ -207,37 +214,9 @@ function seedFixtureUsers() {
   if (result.status !== 0) throw new Error("backend/scripts/three-users.mjs --shared failed — see output above.");
 }
 
-/** POST /auth/login (never /auth/refresh — that call ROTATES AND REVOKES
- *  the presented token, see backend/src/modules/auth/service.ts, so a
- *  health probe using it would burn the app's own seeded session) with
- *  the dev account's own credentials. Used only to tell a real backend
- *  serving backend/data/dev/ apart from some other stale server that
- *  happens to be listening on the same port. */
-async function probeDevLogin() {
-  try {
-    const response = await fetch(`http://127.0.0.1:${BACKEND_PORT}/auth/login`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ identifier: DEV_EMAIL, password: DEV_PASSWORD }),
-    });
-    return response.status;
-  } catch {
-    return null;
-  }
-}
-
 async function ensureBackendRunning() {
   if (await isPortOpen(BACKEND_PORT)) {
-    log(`Something is already listening on ${BACKEND_PORT} — checking it's this workflow's server (POST /auth/login as the dev account)...`);
-    const status = await probeDevLogin();
-    if (status !== 200) {
-      throw new Error(
-        `Port ${BACKEND_PORT} is already in use, but POST /auth/login for the dev account returned ${status ?? "no response"}, not 200. ` +
-          `This is likely a wrong/stale server on :${BACKEND_PORT} (e.g. a leftover \`npm run backend:fixture\` / three-users.mjs instance ` +
-          `reading a different database) rather than this workflow's own backend. Stop whatever is listening on ${BACKEND_PORT} and re-run.`,
-      );
-    }
-    log(`Backend on ${BACKEND_PORT} confirmed as this workflow's server.`);
+    log(`Backend already listening on ${BACKEND_PORT} for this slot.`);
     return;
   }
   log("Starting the backend...");
@@ -262,10 +241,49 @@ async function ensureMetroRunning() {
   return logPath;
 }
 
+// Claims this worktree's slot before anything else runs, so every port
+// this script touches — backend, Metro, and the emulator it leases next —
+// is derived from that slot rather than a hardcoded number some other
+// worktree might already be using.
+async function claimThisWorktree() {
+  const path = registryPath(repoRoot);
+  const { worktree, branch, isPrimary } = worktreeIdentity(repoRoot);
+  const stackCount = Object.keys(readRegistry(path).slots).length;
+  assertResourcesAvailable({ stackCount, limits: DEFAULT_LIMITS, host: readHost() });
+
+  const candidatePorts = Array.from({ length: 16 }, (_, slot) => Object.values(portsForSlot(slot))).flat();
+  const freeByPort = await probePorts(candidatePorts);
+
+  const { slot, ports } = claimSlot({
+    path,
+    worktree,
+    branch,
+    pid: process.pid,
+    session: process.env.CLAUDE_SESSION ?? null,
+    isPrimary,
+    isPortFree: (port) => freeByPort[port] === true,
+  });
+
+  claimedSlot = slot;
+  BACKEND_PORT = ports.backend;
+  METRO_PORT = ports.metro;
+  applySlotEnv({
+    repoRoot,
+    ports,
+    transport: lanRequested ? "lan" : "loopback",
+    lanAddress: lanRequested ? pickLanAddress() : undefined,
+  });
+  log(`Slot ${slot} — backend ${ports.backend}, web ${ports.vite}, Metro ${ports.metro} (${branch}).`);
+}
+
 async function main() {
+  await claimThisWorktree();
   ensureSharedBuilt();
   const env = { ...process.env, ...androidEnv() };
-  const serial = await ensureAvdBooted(env);
+  const { worktree } = worktreeIdentity(repoRoot);
+  const { avd } = takeDevice({ path: registryPath(repoRoot), worktree, pid: process.pid });
+  log(`Holding ${avd}. Release it with \`npm run dev:release\` when you're done verifying.`);
+  const serial = await ensureAvdBooted(avd, env);
   await ensureExpoGo(serial, env);
 
   resetDevDataIfRequested();
