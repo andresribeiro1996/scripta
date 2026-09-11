@@ -37,26 +37,57 @@ node scripts/dev-emulator.mjs
 
 Idempotent — boots the `scripta-dev` AVD if it isn't running (creating it
 first, on a machine that's never run this before), sideloads Expo Go if
-needed, builds `@scripta/shared` if this worktree hasn't yet, starts the
-backend and Metro if either isn't already up, and opens Expo Go pointed at
-this worktree's servers. Safe to re-run any time — re-running while
-everything is already up just re-launches Expo Go against the current
-bundle.
+needed, builds `@scripta/shared` if this worktree hasn't yet, seeds the dev
+data (below), starts the backend and Metro if either isn't already up, and
+opens Expo Go pointed at this worktree's servers. Safe to re-run any time —
+re-running while everything is already up just re-launches Expo Go against
+the current bundle. By default, re-running **preserves** whatever you did
+in the app last time; pass `--reset` to wipe the seeded data back to its
+initial state:
 
-It signs straight into a dedicated local-only dev account
-(`scripta-dev@local.test`, seeded by `scripts/dev-account.mjs`) carrying a
-~24-book fixture library (`scripts/fixtures/library.json`) — two series,
-two collections, mixed read statuses, and both a book-level and a
-series-level style override, so Series/Collections/Style screens all have
-real content to look at immediately. Re-running `dev-account.mjs` (or
-`dev-emulator.mjs`, which calls it) resets that account back to the
-fixture's known state without touching any other account.
+```bash
+node scripts/dev-emulator.mjs --reset
+```
 
-The auto-sign-in is dev-only by construction — see
-`src/core/devSession.ts`'s own comment — and only ever seeds a session
-when SecureStore has none yet; it never overwrites a real signed-in
-session. Every file it touches (`backend/.env`, `backend/data/*.sqlite`,
-`mobile/.env.local`) is gitignored and worktree-local.
+`--reset` deletes `backend/data/dev/` (every module's database and upload
+directory for this workflow — there's no reliable per-user teardown, see
+`scripts/devDataDir.mjs`'s own comment) before reseeding, so it also
+affects anything you did as the fixture users below, not just the dev
+account.
+
+### One server, one database, four logins
+
+`dev-emulator.mjs` starts a single real backend
+(`backend/src/server.ts`, same as `npm run backend`) against a dedicated
+`backend/data/dev/` directory, and seeds it with two things before that
+server starts:
+
+- A dedicated local-only dev account (`scripta-dev@local.test` /
+  `scripta_dev`, seeded by `scripts/dev-account.mjs`) carrying a ~24-book
+  fixture library (`scripts/fixtures/library.json`) — two series, two
+  collections, mixed read statuses, and both a book-level and a
+  series-level style override, so Series/Collections/Style screens all
+  have real content to look at immediately. The Expo app auto-signs into
+  this account on boot (dev builds only — see `src/core/devSession.ts`'s
+  own comment; it never overwrites a real signed-in session).
+- The three-user fixture (`backend/scripts/three-users.mjs --shared`,
+  see its own `backend/scripts/three-users.md`) — `fixture_alice`,
+  `fixture_bob`, `fixture_charlie`, password `scripta123` for all three —
+  for exercising multi-user flows (shared libraries, murals, tier-list
+  polls, Arena) against that same server and database. Sign into one of
+  these manually in the app (or a second Expo Go session/device) alongside
+  the auto-signed-in dev account.
+
+Without `--reset`, re-running preserves both the dev account's and the
+fixture users' state, so testing progress across a session survives a
+re-run; `--reset` wipes all of it back to each fixture's initial seed.
+
+Every file this workflow touches (`backend/.env`, `backend/data/dev/`,
+`mobile/.env.local`) is gitignored and worktree-local — it never touches
+your own `backend/data/*.sqlite`, and if something else is already
+listening on the backend port, `dev-emulator.mjs` verifies it's actually
+this workflow's server (logging in as the dev account) before reusing it,
+rather than silently trusting whatever is there.
 
 ## Layout
 

@@ -1,14 +1,26 @@
 # Three-user fixture
 
-The normal development commands load this fixture automatically. From the repository root:
+`npm run backend` (the normal dev command) no longer loads this fixture — it runs the real `backend/src/server.ts` against your own `backend/data/*.sqlite`. To run this fixture's own isolated, self-contained server instead, from the repository root:
 
 ```sh
-npm run backend
+npm run backend:fixture
 ```
 
-`npm run dev` in `backend/`, `npm run dev:mobile`, and the phone launcher use the same fixture. Production `npm start` remains unchanged.
+which is `npm run dev:fixture --workspace backend`. Production `npm start` remains unchanged.
 
 This seeds and starts the real API on port 3000 using only `backend/data/three-users/`. No `.env` is required. All database and upload paths are isolated; OAuth and social integrations are disabled. Existing development data is untouched. Open the web app as usual (`npm run frontend`) or point Expo at this API.
+
+## `--shared` mode
+
+For testing `fixture_alice`/`fixture_bob`/`fixture_charlie` alongside the dev account seeded by `scripts/dev-account.mjs` (see the root `mobile/README.md`'s "Testing on an emulator"), pass `--shared`:
+
+```sh
+node --import tsx scripts/three-users.mjs --seed-only --shared
+```
+
+run from `backend/`, with `AUTH_DB_PATH` etc. already pointed at `backend/data/dev/` (see `scripts/devDataDir.mjs`) — `scripts/dev-emulator.mjs` does this for you as one of its own seeding steps. In `--shared` mode this script seeds into whatever `*_DB_PATH`/`*_STORAGE_PATH` the ambient environment already points at instead of `backend/data/three-users/`: it skips generating `secrets.json`, skips blanking OAuth/socials/Hardcover env vars, and skips `ALLOW_LAN_ORIGINS` — all of that is the caller's job. The "existing development data is untouched" guarantee above still holds in `--shared` mode, but for a different reason: seeding goes to the dedicated `backend/data/dev/` directory, never to your own `backend/data/*.sqlite`. `--shared` always implies seed-only (it never calls `app.listen()` — the real backend, started separately, serves this data) and refuses `--reset` (reset the whole `backend/data/dev/` directory instead, e.g. `node scripts/dev-emulator.mjs --reset`). The manifest and lock live alongside the ambient databases, not in `backend/data/three-users/`.
+
+The isolated default mode and `--check` described below are unaffected by `--shared` and keep behaving exactly as they always have.
 
 | Login | Starting state |
 |---|---|
