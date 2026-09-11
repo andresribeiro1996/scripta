@@ -111,10 +111,26 @@ export function slotForWorktree(registry, worktree) {
   return Object.keys(registry.slots).find((slot) => registry.slots[slot].worktree === worktree);
 }
 
+// A slot is live — in use, not reclaimable by a different worktree — when
+// its recorded pid is alive OR any of its three derived ports is occupied.
+// Pid alone is not a valid "in use" signal: dev-emulator.mjs spawns the
+// backend and Metro detached and then exits, so the claiming pid is dead
+// within seconds while the stack it started keeps the ports bound. Only a
+// slot that is both pid-dead and fully port-free is free — that's the
+// recovery path for a worktree that actually crashed before ever binding
+// anything. `entry` may be undefined (no registry record for this slot at
+// all); its ports can still be occupied by something outside the registry,
+// which must also block a claim. isPortFree is injected (sync) so callers
+// can test against a snapshot with no real sockets.
+export function isSlotLive(slot, entry, isPortFree) {
+  if (entry !== undefined && isPidAlive(entry.pid)) return true;
+  return !Object.values(portsForSlot(Number(slot))).every((port) => isPortFree(port));
+}
+
 // Claims the lowest free slot for a worktree, or reuses the one it already
-// holds. A slot counts as free only when its previous holder's pid is dead
-// AND its ports are actually unbound — isPortFree is injected (sync) so
-// tests need no real sockets; the production default lives in Task 4.
+// holds — a worktree re-claiming its own slot bypasses isSlotLive entirely,
+// since its own live servers occupying its own ports must never look like
+// contention.
 export function claimSlot({ path, worktree, branch, pid, session, isPrimary, isPortFree }) {
   return withLock(path, () => {
     const registry = readRegistry(path);
@@ -126,16 +142,10 @@ export function claimSlot({ path, worktree, branch, pid, session, isPrimary, isP
       return { slot: Number(existing), ports: portsForSlot(Number(existing)) };
     }
 
-    const held = (slot) => {
-      const entry = registry.slots[String(slot)];
-      return entry !== undefined && isPidAlive(entry.pid);
-    };
-
     const candidates = isPrimary ? [0] : Array.from({ length: MAX_SLOT }, (_, i) => i + 1);
     for (const slot of candidates) {
-      if (held(slot)) continue;
+      if (isSlotLive(slot, registry.slots[String(slot)], isPortFree)) continue;
       const ports = portsForSlot(slot);
-      if (!Object.values(ports).every((port) => isPortFree(port))) continue;
       registry.slots[String(slot)] = { worktree, branch, pid, session, claimedAt: new Date().toISOString() };
       writeRegistry(path, registry);
       return { slot, ports };

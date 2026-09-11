@@ -53,7 +53,7 @@ import { androidEnv } from "./androidSdk.mjs";
 import { devDataDir, devDataDirEnv } from "./devDataDir.mjs";
 import { DEV_USERNAME } from "./dev-account.mjs";
 import { upsertEnvLine } from "./devEnvFile.mjs";
-import { claimSlot, portsForSlot, readRegistry, registryPath, takeDevice } from "./devRegistry.mjs";
+import { claimSlot, isSlotLive, portsForSlot, readRegistry, registryPath, takeDevice } from "./devRegistry.mjs";
 import { DEFAULT_LIMITS, assertResourcesAvailable, probePorts, readHost, worktreeIdentity } from "./devHost.mjs";
 import { applySlotEnv } from "./devSlotEnv.mjs";
 import { pickLanAddress } from "./lanAddress.mjs";
@@ -248,11 +248,20 @@ async function ensureMetroRunning() {
 async function claimThisWorktree() {
   const path = registryPath(repoRoot);
   const { worktree, branch, isPrimary } = worktreeIdentity(repoRoot);
-  const stackCount = Object.keys(readRegistry(path).slots).length;
-  assertResourcesAvailable({ stackCount, limits: DEFAULT_LIMITS, host: readHost() });
 
+  // Probed once, up front, so both the resource-gate count below and the
+  // claim itself (isSlotLive / claimSlot) judge port occupancy from the
+  // same snapshot rather than two probes racing against each other.
   const candidatePorts = Array.from({ length: 16 }, (_, slot) => Object.values(portsForSlot(slot))).flat();
   const freeByPort = await probePorts(candidatePorts);
+  const isPortFree = (port) => freeByPort[port] === true;
+
+  // Only slots that are actually live count as booted stacks — a stale
+  // entry (pid dead, ports free) is nobody's running stack and must not
+  // eat into the 4-stack resource gate.
+  const registry = readRegistry(path);
+  const stackCount = Object.entries(registry.slots).filter(([slot, entry]) => isSlotLive(slot, entry, isPortFree)).length;
+  assertResourcesAvailable({ stackCount, limits: DEFAULT_LIMITS, host: readHost() });
 
   const { slot, ports } = claimSlot({
     path,
@@ -261,7 +270,7 @@ async function claimThisWorktree() {
     pid: process.pid,
     session: process.env.CLAUDE_SESSION ?? null,
     isPrimary,
-    isPortFree: (port) => freeByPort[port] === true,
+    isPortFree,
   });
 
   claimedSlot = slot;

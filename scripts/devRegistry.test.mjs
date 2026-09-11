@@ -4,8 +4,30 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { MAX_SLOT, portsForSlot, readRegistry, withLock, writeRegistry } from "./devRegistry.mjs";
-import { claimSlot, releaseSlot, slotForWorktree } from "./devRegistry.mjs";
+import { claimSlot, isSlotLive, releaseSlot, slotForWorktree } from "./devRegistry.mjs";
 import { AVDS, deviceHolders, releaseDevice, takeDevice } from "./devRegistry.mjs";
+
+test("isSlotLive: a dead pid with an occupied port is live", () => {
+  const occupied = (port) => port !== 3100;
+  assert.equal(isSlotLive(1, { pid: 2147483646 }, occupied), true);
+});
+
+test("isSlotLive: a dead pid with all ports free is not live", () => {
+  assert.equal(isSlotLive(1, { pid: 2147483646 }, () => true), false);
+});
+
+test("isSlotLive: a live pid is live even when its ports are free", () => {
+  assert.equal(isSlotLive(1, { pid: process.pid }, () => true), true);
+});
+
+test("isSlotLive: no entry and free ports is not live", () => {
+  assert.equal(isSlotLive(1, undefined, () => true), false);
+});
+
+test("isSlotLive: no entry but an externally occupied port is live", () => {
+  const occupied = (port) => port !== 3100;
+  assert.equal(isSlotLive(1, undefined, occupied), true);
+});
 
 test("slot 0 keeps the familiar default ports", () => {
   assert.deepEqual(portsForSlot(0), { backend: 3000, vite: 5173, metro: 8081 });
@@ -150,6 +172,48 @@ test("a slot whose pid is alive is not reclaimable", () => {
     const path = join(dir, "scripta-dev.json");
     claim(path, "/wt/a");
     assert.equal(claim(path, "/wt/b").slot, 2);
+  });
+});
+
+test("a dead pid whose ports are occupied is NOT handed to a different worktree", () => {
+  // The worktree-port-lanes repro: dev-emulator.mjs spawns the backend and
+  // Metro detached and exits, so the claiming pid is dead within seconds
+  // while the stack it started keeps the ports bound. Pid-liveness alone
+  // must not signal "this slot is free" when the ports say otherwise.
+  withTempDir((dir) => {
+    const path = join(dir, "scripta-dev.json");
+    const occupiedOnSlotOne = (port) => port !== 3100 && port !== 5273 && port !== 8181;
+    claim(path, "/wt/a", { pid: 2147483646, isPortFree: occupiedOnSlotOne });
+    assert.equal(claim(path, "/wt/b", { isPortFree: occupiedOnSlotOne }).slot, 2);
+  });
+});
+
+test("a dead pid with all ports free is reclaimable", () => {
+  // The recovery case this must keep working: a genuinely crashed
+  // worktree's slot is freed once nothing is actually bound to its ports.
+  withTempDir((dir) => {
+    const path = join(dir, "scripta-dev.json");
+    claim(path, "/wt/a", { pid: 2147483646 });
+    assert.equal(claim(path, "/wt/b").slot, 1);
+  });
+});
+
+test("a live pid blocks reclaiming even when its ports are free", () => {
+  withTempDir((dir) => {
+    const path = join(dir, "scripta-dev.json");
+    claim(path, "/wt/a");
+    assert.equal(claim(path, "/wt/b").slot, 2);
+  });
+});
+
+test("a worktree re-claiming its own slot reuses it even when its ports are occupied", () => {
+  withTempDir((dir) => {
+    const path = join(dir, "scripta-dev.json");
+    assert.equal(claim(path, "/wt/a").slot, 1);
+    // Now its own backend/Vite/Metro are bound to those ports — the
+    // own-worktree match must short-circuit before any liveness check.
+    const occupiedOnSlotOne = (port) => port !== 3100 && port !== 5273 && port !== 8181;
+    assert.equal(claim(path, "/wt/a", { isPortFree: occupiedOnSlotOne }).slot, 1);
   });
 });
 

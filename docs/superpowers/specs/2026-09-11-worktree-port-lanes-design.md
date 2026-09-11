@@ -173,9 +173,16 @@ Writes take an exclusive lock (`O_EXCL` lockfile beside it, stale after
 ### Release
 
 On teardown: kill this worktree's processes, remove the slot entry,
-release any held device. A slot whose `pid` is gone is stale and may be
-reclaimed by the next worktree that wants it — this is what keeps the
-registry honest when an agent crashes rather than exits.
+release any held device. A slot is reclaimable by a different worktree
+only when its `pid` is gone **and** all three of its derived ports are
+actually unbound. Pid alone is not a valid "in use" signal:
+`dev-emulator.mjs` spawns the backend and Metro detached and then exits,
+so the claiming pid is dead within seconds while the stack it started
+keeps the ports bound — treating a dead pid as "free" hands that slot to
+the next worktree while the first one's servers are still running,
+unrecorded. Requiring both dead-pid and free-ports is what keeps the
+registry honest when an agent genuinely crashes before binding anything,
+without also handing away a slot whose stack is alive and well.
 
 Ports are cheap; running stacks are not. A booted worktree is roughly
 400–700 MB across backend, Vite and Metro, so the registry exists as much
@@ -249,7 +256,8 @@ Unit, against a temp registry file:
 
 - lowest-free-slot allocation, including gaps left by released slots
 - primary checkout always resolves to slot 0
-- a slot whose `pid` is dead is reclaimable; a live one is not
+- a slot is reclaimable only when its `pid` is dead **and** its ports are
+  free; a live pid, or an occupied port, is not
 - concurrent claims under the lock never produce a duplicate slot
 - port derivation for slots 0 and 15
 - device take/release, including take-while-held
