@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { isAbsolute } from "node:path";
 import { test } from "node:test";
@@ -55,10 +56,19 @@ test("worktreeIdentity reports this repo's branch and primary-ness", () => {
 
   // Strengthen beyond the brief's type-only check without hardcoding
   // anything environment-specific: `worktree` must be a real, absolute
-  // path (git always reports it that way), and this test runs from a
-  // linked worktree (see task-4-brief.md), never the primary checkout,
-  // so isPrimary must be false here.
+  // path (git always reports it that way) ...
   assert.ok(isAbsolute(identity.worktree), "worktree should be an absolute path");
   assert.ok(existsSync(identity.worktree), "worktree path should exist on disk");
-  assert.equal(identity.isPrimary, false);
+
+  // ... and isPrimary must agree with an independent derivation of the
+  // same fact, so this holds whether the suite runs from the primary
+  // checkout or any linked worktree — no assumption about which one this
+  // happens to be.
+  const cwd = process.cwd();
+  const toplevel = execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd, encoding: "utf8" }).trim();
+  const firstWorktree = execFileSync("git", ["worktree", "list", "--porcelain"], { cwd, encoding: "utf8" })
+    .split("\n")
+    .find((line) => line.startsWith("worktree "))
+    ?.slice("worktree ".length);
+  assert.equal(identity.isPrimary, toplevel === firstWorktree);
 });
