@@ -11,9 +11,14 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-# Claude Code launch config — hardcoded to this machine's own absolute
-# paths (see .claude/launch.json), meaningless on anyone else's checkout.
-.claude/
+# Claude Code: machine-local state (launch.json's absolute paths, linked
+# worktrees, lockfiles) stays out; shared agent config is versioned so it
+# travels with the repo the way AGENTS.md does. Matched at any depth, since
+# packages carry their own .claude/ too.
+**/.claude/*
+!**/.claude/settings.json
+!**/.claude/skills/
+!**/.claude/commands/
 
 # The exporter's own output against a real device — an actual person's
 # reading history and highlights/annotations, not source code or a
