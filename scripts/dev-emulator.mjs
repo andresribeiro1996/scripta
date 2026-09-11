@@ -51,7 +51,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { androidEnv } from "./androidSdk.mjs";
 import { devDataDir, devDataDirEnv } from "./devDataDir.mjs";
-import { DEV_USERNAME } from "./dev-account.mjs";
+import { DEV_USERNAME, ensureBackendEnv } from "./dev-account.mjs";
 import { upsertEnvLine } from "./devEnvFile.mjs";
 import { claimSlot, isSlotLive, portsForSlot, readRegistry, registryPath, takeDevice } from "./devRegistry.mjs";
 import { DEFAULT_LIMITS, assertResourcesAvailable, probePorts, readHost, worktreeIdentity } from "./devHost.mjs";
@@ -276,6 +276,16 @@ async function claimThisWorktree() {
   claimedSlot = slot;
   BACKEND_PORT = ports.backend;
   METRO_PORT = ports.metro;
+
+  // Must run BEFORE applySlotEnv: on a fresh worktree there is no
+  // backend/.env yet, and applySlotEnv's upsertEnvLine would otherwise be
+  // what creates it — with only PORT/FRONTEND_URL — which then makes
+  // dev-account.mjs's own ensureBackendEnv() (seedDevAccount(), later)
+  // see an existing file and skip generating JWT secrets. Calling it here
+  // first means the slot values land on top of a complete .env instead
+  // of standing in for one. A no-op when backend/.env already exists.
+  ensureBackendEnv(backendDir);
+
   applySlotEnv({
     repoRoot,
     ports,

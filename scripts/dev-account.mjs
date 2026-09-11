@@ -61,10 +61,19 @@ export const DEV_PASSWORD = "scripta-dev-local-only";
 const flags = new Set(process.argv.slice(2));
 const forceReset = flags.has("--reset");
 
-function ensureBackendEnv() {
-  const envPath = join(backendDir, ".env");
+// Exported so dev-emulator.mjs's claimThisWorktree() can call this BEFORE
+// applySlotEnv() writes the slot's PORT/FRONTEND_URL — otherwise
+// applySlotEnv's upsertEnvLine would itself create backend/.env (with
+// only those two keys) on a fresh worktree, and the existsSync check
+// below would then see a file already there and skip generating the
+// JWT secrets entirely. `dir` defaults to this module's own backendDir
+// (main()'s normal call, and a bare `node scripts/dev-account.mjs`) but
+// takes an explicit dir so tests can point it at a temp directory
+// instead of this repo's real backend/.env.
+export function ensureBackendEnv(dir = backendDir) {
+  const envPath = join(dir, ".env");
   if (existsSync(envPath)) return;
-  const examplePath = join(backendDir, ".env.example");
+  const examplePath = join(dir, ".env.example");
   const secret = () => randomBytes(48).toString("hex");
   const filled = readFileSync(examplePath, "utf8")
     .replace(
