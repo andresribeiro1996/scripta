@@ -174,7 +174,7 @@ Writes take an exclusive lock (`O_EXCL` lockfile beside it, stale after
 3. Verify all three derived ports are actually free before writing the
    claim; if any is held by something outside the registry, skip to the
    next slot and warn.
-4. Write the five derived values, then start the stack.
+4. Write the six derived values, then start the stack.
 
 ### Release
 
