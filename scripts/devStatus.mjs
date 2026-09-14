@@ -85,6 +85,25 @@ function isStackAncestor(row, worktree, cwdForPid) {
   return cwd === worktree || cwd.startsWith(`${worktree}/`);
 }
 
+const SHELL_COMMS = new Set(["sh", "bash", "zsh"]);
+
+// A shell is crossed only when its OWN parent is another supervisor —
+// the `npm run backend` -> sh -> `npm run dev` chain npm itself creates.
+// Without this, an interactive shell is crossed too: it prints comm
+// "/bin/zsh", which passes the toolchain test, and its cwd is the
+// worktree you started the server from, which passes the cwd test. Its
+// parent is a terminal, so climbing through it bills every sibling
+// started in that same shell to this stack — measured at 1028 MB for a
+// ~100 MB stack. (A login shell prints "-zsh" and is already rejected by
+// name; a non-login one is not, so this is the check that holds.) An
+// unknown grandparent is not crossed either: under-reporting is the safe
+// direction.
+function crossesShell(parent, byPid) {
+  if (!SHELL_COMMS.has(commName(parent.comm))) return true;
+  const grandparent = byPid.get(parent.ppid);
+  return grandparent !== undefined && SUPERVISOR_COMMS.has(commName(grandparent.comm));
+}
+
 export function climbToStackRoot(pid, { byPid, worktree, cwdForPid }) {
   let current = byPid.get(pid);
   if (current === undefined) return pid;
@@ -93,6 +112,7 @@ export function climbToStackRoot(pid, { byPid, worktree, cwdForPid }) {
     const parent = byPid.get(current.ppid);
     if (parent === undefined || seen.has(parent.pid)) break;
     if (!isStackAncestor(parent, worktree, cwdForPid)) break;
+    if (!crossesShell(parent, byPid)) break;
     seen.add(parent.pid);
     current = parent;
   }

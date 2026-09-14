@@ -419,3 +419,46 @@ test("a ppid cycle above a listener terminates instead of looping forever", () =
   });
   assert.deepEqual(stack.processes.map((p) => p.pid).sort((a, b) => a - b), [910, 911]);
 });
+
+// The mirror image of the undercount bug. An interactive shell passes
+// both of the climb's original tests — comm "/bin/zsh" is a toolchain
+// name, and its cwd is the worktree the server was started from — so
+// climbing through it reaches every sibling started in that same
+// terminal. pid 914 stands for the unrelated app that made this 1028 MB
+// for a ~100 MB stack when it was measured.
+const SHELL_ROWS = [
+  { pid: 910, ppid: 1, rss: 300_000, cpu: 0.1, comm: "/Applications/Ghostty.app/Contents/MacOS/ghostty" },
+  { pid: 911, ppid: 910, rss: 12_000, cpu: 0.1, comm: "/bin/zsh" },
+  { pid: 912, ppid: 911, rss: 46_000, cpu: 0.2, comm: "npm run backend" },
+  { pid: 913, ppid: 912, rss: 60_000, cpu: 0.3, comm: "/opt/homebrew/bin/node" },
+  { pid: 914, ppid: 911, rss: 900_000, cpu: 0.4, comm: "/Applications/Some Big App.app/Contents/MacOS/Some Big App" },
+];
+
+test("the climb does not cross an interactive shell, so the terminal's other children are excluded", () => {
+  const [stack] = buildStacks({
+    registry: TREE_REGISTRY,
+    rows: SHELL_ROWS,
+    listeners: { [portsForSlot(2).backend]: [913] },
+    lanAddress: "192.168.1.24",
+    // Every cwd is the worktree, so only the comm rules can stop the
+    // climb — this pins the shell rule itself, not the cwd test.
+    cwdForPid: () => "/wt/4d",
+  });
+  const pids = stack.processes.map((p) => p.pid).sort((a, b) => a - b);
+  assert.deepEqual(pids, [912, 913]);
+  assert.equal(stack.rssTotalMB, Math.round((46_000 + 60_000) / 1024));
+});
+
+test("a shell whose own parent is a supervisor is still crossed", () => {
+  const [stack] = buildStacks({
+    registry: TREE_REGISTRY,
+    rows: TREE_ROWS,
+    listeners: { [portsForSlot(2).backend]: [804] },
+    lanAddress: "192.168.1.24",
+    cwdForPid: () => "/wt/4d",
+  });
+  assert.ok(
+    stack.processes.some((p) => p.pid === 801),
+    "npm's own `npm run backend` -> sh -> `npm run dev` chain must stay counted",
+  );
+});
