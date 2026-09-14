@@ -12,6 +12,8 @@ Scripta — personal Kobo/Goodreads e-book library app. Each subdirectory has it
 
 A new subdirectory `AGENTS.md` needs two things to reach every tool: a `CLAUDE.md` symlink beside it (`ln -s AGENTS.md <dir>/CLAUDE.md`), and an entry in `opencode.json`'s `instructions`. Codex finds it on its own.
 
+Claude Code reads no `AGENTS.md` at any level, including this one — the root `CLAUDE.md` bridges it with an `@AGENTS.md` import on its first line. Don't delete that line: without it these rules reach Codex and opencode but never a Claude session, and nothing fails loudly.
+
 The table below is generated from those files — edit each package's own `AGENTS.md`, then run `node scripts/sync-agent-table.mjs`. `npm run check:agents` verifies the table and both requirements above without writing.
 
 | Dir | What | Commands |
