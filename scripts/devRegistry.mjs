@@ -3,7 +3,7 @@
 // docs/superpowers/specs/2026-09-11-worktree-port-lanes-design.md.
 
 import { execFileSync } from "node:child_process";
-import { closeSync, existsSync, openSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, openSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 export const MAX_SLOT = 15;
@@ -55,8 +55,18 @@ export function readRegistry(path) {
   }
 }
 
+// Writes to a temp file beside `path` and renames it into place, rather
+// than writeFileSync'ing `path` directly: rename within one directory is
+// atomic, so a crash mid-write can never leave unparseable JSON there. A
+// truncated write from a plain writeFileSync would make readRegistry's
+// catch-and-reset kick in on the NEXT read, silently discarding every
+// slot and every device lease — ports survive that (occupancy is an
+// independent signal) but a wiped lease lets a second worktree grab an
+// AVD someone is actively using, with nothing to say otherwise.
 export function writeRegistry(path, registry) {
-  writeFileSync(path, `${JSON.stringify(registry, null, 2)}\n`);
+  const tmpPath = `${path}.${process.pid}.${Date.now()}.tmp`;
+  writeFileSync(tmpPath, `${JSON.stringify(registry, null, 2)}\n`);
+  renameSync(tmpPath, path);
 }
 
 // Blocks synchronously for ~100ms without spawning a process (no `sleep`

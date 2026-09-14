@@ -51,11 +51,11 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { androidEnv } from "./androidSdk.mjs";
 import { devDataDir, devDataDirEnv } from "./devDataDir.mjs";
-import { DEV_USERNAME, ensureBackendEnv } from "./dev-account.mjs";
+import { DEV_USERNAME } from "./dev-account.mjs";
 import { upsertEnvLine } from "./devEnvFile.mjs";
-import { claimSlot, isSlotLive, portsForSlot, readRegistry, registryPath, takeDevice } from "./devRegistry.mjs";
-import { DEFAULT_LIMITS, assertResourcesAvailable, probePorts, readHost, worktreeIdentity } from "./devHost.mjs";
-import { applySlotEnv } from "./devSlotEnv.mjs";
+import { claimThisWorktreeSlot } from "./devClaim.mjs";
+import { registryPath, takeDevice } from "./devRegistry.mjs";
+import { worktreeIdentity } from "./devHost.mjs";
 import { pickLanAddress } from "./lanAddress.mjs";
 
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -244,54 +244,20 @@ async function ensureMetroRunning() {
 // Claims this worktree's slot before anything else runs, so every port
 // this script touches — backend, Metro, and the emulator it leases next —
 // is derived from that slot rather than a hardcoded number some other
-// worktree might already be using.
+// worktree might already be using. The claim itself (resource gate, port
+// probe, registry write, env files) is the shared step in
+// scripts/devClaim.mjs — `npm run backend`/`frontend` run the same one.
 async function claimThisWorktree() {
-  const path = registryPath(repoRoot);
-  const { worktree, branch, isPrimary } = worktreeIdentity(repoRoot);
-
-  // Probed once, up front, so both the resource-gate count below and the
-  // claim itself (isSlotLive / claimSlot) judge port occupancy from the
-  // same snapshot rather than two probes racing against each other.
-  const candidatePorts = Array.from({ length: 16 }, (_, slot) => Object.values(portsForSlot(slot))).flat();
-  const freeByPort = await probePorts(candidatePorts);
-  const isPortFree = (port) => freeByPort[port] === true;
-
-  // Only slots that are actually live count as booted stacks — a stale
-  // entry (pid dead, ports free) is nobody's running stack and must not
-  // eat into the 4-stack resource gate.
-  const registry = readRegistry(path);
-  const stackCount = Object.entries(registry.slots).filter(([slot, entry]) => isSlotLive(slot, entry, isPortFree)).length;
-  assertResourcesAvailable({ stackCount, limits: DEFAULT_LIMITS, host: readHost() });
-
-  const { slot, ports } = claimSlot({
-    path,
-    worktree,
-    branch,
-    pid: process.pid,
-    session: process.env.CLAUDE_SESSION ?? null,
-    isPrimary,
-    isPortFree,
+  const { slot, ports, branch } = await claimThisWorktreeSlot({
+    repoRoot,
+    transport: lanRequested ? "lan" : "loopback",
+    lanAddress: lanRequested ? pickLanAddress() : undefined,
   });
 
   claimedSlot = slot;
   BACKEND_PORT = ports.backend;
   METRO_PORT = ports.metro;
 
-  // Must run BEFORE applySlotEnv: on a fresh worktree there is no
-  // backend/.env yet, and applySlotEnv's upsertEnvLine would otherwise be
-  // what creates it — with only PORT/FRONTEND_URL — which then makes
-  // dev-account.mjs's own ensureBackendEnv() (seedDevAccount(), later)
-  // see an existing file and skip generating JWT secrets. Calling it here
-  // first means the slot values land on top of a complete .env instead
-  // of standing in for one. A no-op when backend/.env already exists.
-  ensureBackendEnv(backendDir);
-
-  applySlotEnv({
-    repoRoot,
-    ports,
-    transport: lanRequested ? "lan" : "loopback",
-    lanAddress: lanRequested ? pickLanAddress() : undefined,
-  });
   log(`Slot ${slot} — backend ${ports.backend}, web ${ports.vite}, Metro ${ports.metro} (${branch}).`);
 }
 

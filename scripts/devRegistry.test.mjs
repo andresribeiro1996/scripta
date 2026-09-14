@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -80,6 +80,17 @@ test("writeRegistry round-trips through readRegistry", () => {
     writeRegistry(path, registry);
     assert.equal(readRegistry(path).slots["2"].branch, "x");
     assert.match(readFileSync(path, "utf8"), /\n$/);
+  });
+});
+
+test("writeRegistry is atomic: no stray temp file remains and content round-trips", () => {
+  withTempDir((dir) => {
+    const path = join(dir, "scripta-dev.json");
+    const registry = readRegistry(path);
+    registry.slots["3"] = { worktree: "/tmp/atomic-wt", branch: "z", pid: 1, session: null, claimedAt: "t2" };
+    writeRegistry(path, registry);
+    assert.deepEqual(readdirSync(dir), ["scripta-dev.json"]);
+    assert.equal(readRegistry(path).slots["3"].branch, "z");
   });
 });
 
