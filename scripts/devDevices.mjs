@@ -50,13 +50,23 @@ function avdForPid(pid, commandForPid) {
 }
 
 export function collectDevices({ registry, rows = [], commandForPid = readCommandForPid, now = Date.now() }) {
-  // A booted emulator's launcher and its qemu-system child can both match
-  // EMULATOR_COMM as separate pids (rather than the launcher exec'ing into
-  // the child) — if both were treated as subtree roots, the child's memory
-  // would be summed twice: once on its own and once inside the launcher's
-  // subtree. Only rows whose ppid is NOT itself a matching emulator row are
-  // treated as roots, so a child already covered by its parent's subtree is
-  // skipped.
+  // Observed on this machine: a booted emulator leaves BOTH shapes alive
+  // as separate pids — two `.../emulator/emulator` processes beside a
+  // `.../qemu/darwin-aarch64/qemu-system-aarch64` — so the launcher does
+  // not simply exec into qemu. Both match EMULATOR_COMM. Where one is an
+  // ancestor of the other, treating both as subtree roots would sum the
+  // child's memory twice: once on its own and once inside its parent's
+  // subtree. Hence only rows whose ppid is NOT itself a matching emulator
+  // row are treated as roots.
+  //
+  // This does not cover every shape. In the tree actually sampled here
+  // qemu had been reparented to pid 1, so it and the launchers were
+  // siblings, not parent and child, and the guard did not apply to that
+  // pair — their RSS is summed per AVD as separate roots, which is right
+  // when both genuinely belong to that AVD and overstates it if one is a
+  // leftover from an earlier launch. Only the ancestor case is guarded;
+  // the sibling case is deliberately left summing, since two live
+  // processes serving one AVD are both really costing memory.
   const emulatorPids = new Set(rows.filter((row) => EMULATOR_COMM.test(row.comm)).map((row) => row.pid));
   const rssKBByAvd = {};
   for (const row of rows) {
