@@ -95,6 +95,58 @@ export function buildStacks({ registry, rows, listeners, lanAddress, cwdForPid =
     });
 }
 
+export const DEVICE_LEASE_WARN_MS = 30 * 60 * 1000;
+
+export function statusWarnings({ host, stacks, devices, orphans, limits = DEFAULT_LIMITS, now = Date.now() }) {
+  const warnings = [];
+
+  if (host.freeBytes < limits.minFreeBytes) {
+    warnings.push(
+      `only ${(host.freeBytes / 1024 ** 3).toFixed(1)} GB of memory available — ` +
+        `below the ${(limits.minFreeBytes / 1024 ** 3).toFixed(0)} GB floor, so the next stack will be refused at boot.`,
+    );
+  }
+  if (host.loadAvg1 > limits.maxLoadForSecondEmulator) {
+    warnings.push(
+      `1-minute load average is ${host.loadAvg1.toFixed(1)} — above the ${limits.maxLoadForSecondEmulator} limit for a second emulator.`,
+    );
+  }
+  if (!host.lanAddress) {
+    warnings.push("no LAN address resolved — phone URLs are unavailable until this machine has one.");
+  }
+
+  for (const stack of stacks) {
+    if (stack.state === "stale") {
+      // Only one warning for a stale slot: its ports are silent by
+      // definition, so also listing each silent port would be three
+      // lines saying the same thing.
+      warnings.push(`slot ${stack.slot} (${stack.branch}) is stale — its pid is gone and nothing holds its ports. Run \`npm run dev:release\` in that worktree.`);
+      continue;
+    }
+    for (const { role, port, pids, foreignPids } of stack.portAudit) {
+      if (pids.length === 0) {
+        warnings.push(`slot ${stack.slot} (${stack.branch}) claims ${role} :${port}, but nothing is listening on it.`);
+      }
+      for (const { pid, cwd } of foreignPids) {
+        warnings.push(`slot ${stack.slot} (${stack.branch}) claims ${role} :${port}, but pid ${pid} holds it from ${cwd}.`);
+      }
+    }
+  }
+
+  for (const device of devices) {
+    if (device.heldMs !== null && device.heldMs > DEVICE_LEASE_WARN_MS) {
+      warnings.push(
+        `${device.avd} has been held by ${device.holder} for ${Math.round(device.heldMs / 60000)} minutes — likely a forgotten lease.`,
+      );
+    }
+  }
+  for (const serial of orphans) {
+    warnings.push(`${serial} is running but no worktree holds a lease on it.`);
+  }
+
+  return warnings;
+}
+
 export function collectStatus({
   repoRoot = process.cwd(),
   registry = readRegistry(registryPath(repoRoot)),
@@ -117,5 +169,7 @@ export function collectStatus({
   };
   const stacks = buildStacks({ registry, rows, listeners, lanAddress, cwdForPid });
   const devices = collectDevices({ registry, rows, now });
-  return { host, stacks, devices, orphans: orphanSerials(registry, serials), limits, warnings: [] };
+  const orphans = orphanSerials(registry, serials);
+  const warnings = statusWarnings({ host, stacks, devices, orphans, limits, now });
+  return { host, stacks, devices, orphans, limits, warnings };
 }

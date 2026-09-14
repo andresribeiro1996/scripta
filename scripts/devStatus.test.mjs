@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { auditPorts, buildStacks, collectStatus, connectionUrls, slotState } from "./devStatus.mjs";
+import { auditPorts, buildStacks, collectStatus, connectionUrls, slotState, statusWarnings } from "./devStatus.mjs";
 import { portsForSlot } from "./devRegistry.mjs";
 import { DEFAULT_LIMITS } from "./devHost.mjs";
 
@@ -192,8 +192,109 @@ test("collectStatus joins every injected source with no default evaluated", () =
   assert.equal(status.host.freeBytes, 5_000_000_000);
   assert.equal(status.host.freeMemGB, Number((5_000_000_000 / 1024 ** 3).toFixed(1)));
   assert.equal(status.host.loadAvg1, 1.23);
-  assert.deepEqual(status.warnings, []);
+  assert.equal(status.warnings.length, 1);
+  assert.match(status.warnings[0], /stale/);
   assert.ok(Array.isArray(status.devices));
   const stack = status.stacks.find((s) => s.slot === 3);
   assert.equal(stack.branch, "test/branch");
+});
+
+const HEALTHY = {
+  host: { freeBytes: 8 * 1024 ** 3, loadAvg1: 2, lanAddress: "192.168.1.24" },
+  stacks: [],
+  devices: [],
+  orphans: [],
+  limits: DEFAULT_LIMITS,
+  now: Date.now(),
+};
+
+test("a healthy host warns about nothing", () => {
+  assert.deepEqual(statusWarnings(HEALTHY), []);
+});
+
+test("free memory exactly at the floor does not warn, below it does", () => {
+  assert.deepEqual(statusWarnings({ ...HEALTHY, host: { ...HEALTHY.host, freeBytes: DEFAULT_LIMITS.minFreeBytes } }), []);
+  const below = statusWarnings({ ...HEALTHY, host: { ...HEALTHY.host, freeBytes: DEFAULT_LIMITS.minFreeBytes - 1 } });
+  assert.equal(below.length, 1);
+  assert.match(below[0], /memory/i);
+});
+
+test("load exactly at the emulator limit does not warn, above it does", () => {
+  assert.deepEqual(statusWarnings({ ...HEALTHY, host: { ...HEALTHY.host, loadAvg1: DEFAULT_LIMITS.maxLoadForSecondEmulator } }), []);
+  const above = statusWarnings({ ...HEALTHY, host: { ...HEALTHY.host, loadAvg1: DEFAULT_LIMITS.maxLoadForSecondEmulator + 0.1 } });
+  assert.match(above[0], /load/i);
+});
+
+test("a stale slot warns by branch and names dev:release", () => {
+  const warnings = statusWarnings({
+    ...HEALTHY,
+    stacks: [{ slot: 3, branch: "mobile/x", state: "stale", portAudit: [] }],
+  });
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /slot 3/);
+  assert.match(warnings[0], /dev:release/);
+});
+
+test("a live slot with a port nothing is listening on warns", () => {
+  const warnings = statusWarnings({
+    ...HEALTHY,
+    stacks: [
+      {
+        slot: 2,
+        branch: "mobile/x",
+        state: "live",
+        portAudit: [
+          { role: "backend", port: 3200, pids: [1], foreignPids: [] },
+          { role: "metro", port: 8281, pids: [], foreignPids: [] },
+        ],
+      },
+    ],
+  });
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /8281/);
+});
+
+test("a stale slot does not also warn about each of its silent ports", () => {
+  const warnings = statusWarnings({
+    ...HEALTHY,
+    stacks: [{ slot: 3, branch: "mobile/x", state: "stale", portAudit: [{ role: "backend", port: 3300, pids: [], foreignPids: [] }] }],
+  });
+  assert.equal(warnings.length, 1);
+});
+
+test("a port held by another worktree's process warns with that cwd", () => {
+  const warnings = statusWarnings({
+    ...HEALTHY,
+    stacks: [
+      {
+        slot: 2,
+        branch: "mobile/x",
+        state: "live",
+        portAudit: [
+          { role: "backend", port: 3200, pids: [9], foreignPids: [{ pid: 9, cwd: "/wt/other" }] },
+          { role: "vite", port: 5373, pids: [1], foreignPids: [] },
+          { role: "metro", port: 8281, pids: [1], foreignPids: [] },
+        ],
+      },
+    ],
+  });
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /\/wt\/other/);
+});
+
+test("a device held past 30 minutes warns, at 30 it does not", () => {
+  const device = (heldMs) => ({ avd: "scripta-dev-0", holder: "mobile/x", heldMs });
+  assert.deepEqual(statusWarnings({ ...HEALTHY, devices: [device(30 * 60 * 1000)] }), []);
+  const warnings = statusWarnings({ ...HEALTHY, devices: [device(31 * 60 * 1000)] });
+  assert.match(warnings[0], /scripta-dev-0/);
+});
+
+test("an emulator no lease accounts for warns", () => {
+  const warnings = statusWarnings({ ...HEALTHY, orphans: ["emulator-5556"] });
+  assert.match(warnings[0], /emulator-5556/);
+});
+
+test("no LAN address warns, since every phone URL depends on it", () => {
+  const warnings = statusWarnings({ ...HEALTHY, host: { ...HEALTHY.host, lanAddress: null } });
+  assert.match(warnings[0], /LAN/i);
 });
