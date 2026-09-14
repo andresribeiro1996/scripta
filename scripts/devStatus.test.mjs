@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { auditPorts, buildStacks, connectionUrls, slotState } from "./devStatus.mjs";
+import { auditPorts, buildStacks, collectStatus, connectionUrls, slotState } from "./devStatus.mjs";
 import { portsForSlot } from "./devRegistry.mjs";
+import { DEFAULT_LIMITS } from "./devHost.mjs";
 
 test("URLs for slot 0 use the familiar ports", () => {
   assert.deepEqual(connectionUrls({ ports: portsForSlot(0), lanAddress: "192.168.1.24" }), {
@@ -127,4 +128,72 @@ test("stacks come back in slot order", () => {
   };
   const stacks = buildStacks({ registry, rows: [], listeners: {}, lanAddress: undefined, cwdForPid: () => undefined });
   assert.deepEqual(stacks.map((s) => s.slot), [0, 2, 5]);
+});
+
+test("a stack's process set is the union of disjoint roots, each pid counted once", () => {
+  const registry = { ...REGISTRY, slots: { 2: { ...REGISTRY.slots[2], pid: 500 } } };
+  const rows = [
+    { pid: 500, ppid: 1, rss: 102_400, cpu: 1, comm: "/usr/local/bin/node" },
+    { pid: 700, ppid: 1, rss: 204_800, cpu: 2, comm: "/usr/local/bin/node" },
+    { pid: 701, ppid: 700, rss: 51_200, cpu: 3, comm: "/usr/local/bin/node" },
+    { pid: 702, ppid: 701, rss: 10_240, cpu: 0.5, comm: "/usr/local/bin/node" },
+  ];
+  const ports = portsForSlot(2);
+  const [stack] = buildStacks({
+    registry,
+    rows,
+    listeners: { [ports.backend]: [700], [ports.metro]: [701] },
+    lanAddress: "192.168.1.24",
+    cwdForPid: () => "/wt/4d",
+  });
+  const pids = stack.processes.map((p) => p.pid).sort((a, b) => a - b);
+  assert.deepEqual(pids, [500, 700, 701, 702]);
+  assert.equal(new Set(pids).size, pids.length);
+  assert.equal(stack.rssTotalMB, 360);
+  assert.equal(stack.cpuTotal, 6.5);
+});
+
+test("auditPorts treats a sibling directory with a matching prefix as foreign", () => {
+  const audit = auditPorts({
+    ports: PORTS,
+    listeners: { [PORTS.backend]: [11] },
+    worktree: "/wt/mine",
+    cwdForPid: () => "/wt/mine-other",
+  });
+  assert.deepEqual(audit.find((a) => a.role === "backend").foreignPids, [{ pid: 11, cwd: "/wt/mine-other" }]);
+});
+
+test("collectStatus joins every injected source with no default evaluated", () => {
+  const registry = {
+    version: 1,
+    slots: {
+      3: {
+        worktree: "/wt/x",
+        branch: "test/branch",
+        pid: 12_345,
+        session: "sess",
+        claimedAt: "2026-01-01T00:00:00.000Z",
+      },
+    },
+    devices: { "scripta-dev-0": null, "scripta-dev-1": null },
+  };
+  const status = collectStatus({
+    registry,
+    rows: [],
+    listeners: {},
+    serials: [],
+    hostReading: { freeBytes: 5_000_000_000, loadAvg1: 1.234 },
+    lanAddress: "10.0.0.5",
+    limits: DEFAULT_LIMITS,
+    cwdForPid: () => undefined,
+    now: 1_700_000_000_000,
+  });
+  assert.deepEqual(Object.keys(status).sort(), ["devices", "host", "limits", "orphans", "stacks", "warnings"].sort());
+  assert.equal(status.host.freeBytes, 5_000_000_000);
+  assert.equal(status.host.freeMemGB, Number((5_000_000_000 / 1024 ** 3).toFixed(1)));
+  assert.equal(status.host.loadAvg1, 1.23);
+  assert.deepEqual(status.warnings, []);
+  assert.ok(Array.isArray(status.devices));
+  const stack = status.stacks.find((s) => s.slot === 3);
+  assert.equal(stack.branch, "test/branch");
 });

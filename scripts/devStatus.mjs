@@ -1,4 +1,4 @@
-import { cpus, loadavg, totalmem } from "node:os";
+import { cpus, totalmem } from "node:os";
 import { collectDevices, orphanSerials, readAdbSerials } from "./devDevices.mjs";
 import { DEFAULT_LIMITS, readHost } from "./devHost.mjs";
 import { readListeners } from "./devListeners.mjs";
@@ -112,7 +112,7 @@ export function collectStatus({
     totalMemGB: Number((totalmem() / 1024 ** 3).toFixed(1)),
     freeMemGB: Number((hostReading.freeBytes / 1024 ** 3).toFixed(1)),
     freeBytes: hostReading.freeBytes,
-    loadAvg1: Number(loadavg()[0].toFixed(2)),
+    loadAvg1: Number(hostReading.loadAvg1.toFixed(2)),
     cores: cpus().length,
   };
   const stacks = buildStacks({ registry, rows, listeners, lanAddress, cwdForPid });
