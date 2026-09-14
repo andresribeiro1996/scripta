@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { MAX_SLOT, portsForSlot, readRegistry, withLock, writeRegistry } from "./devRegistry.mjs";
 import { claimSlot, isSlotLive, releaseSlot, slotForWorktree } from "./devRegistry.mjs";
-import { AVDS, deviceHolders, releaseDevice, takeDevice } from "./devRegistry.mjs";
+import { AVDS, deviceHolders, recordDeviceSerial, releaseDevice, takeDevice } from "./devRegistry.mjs";
 
 test("isSlotLive: a dead pid with an occupied port is live", () => {
   const occupied = (port) => port !== 3100;
@@ -309,5 +309,35 @@ test("releaseDevice frees only that worktree's lease", () => {
     releaseDevice({ path, worktree: "/wt/a" });
     const holders = deviceHolders(readRegistry(path));
     assert.deepEqual(holders.map((holder) => holder.worktree), ["/wt/b"]);
+  });
+});
+
+test("recordDeviceSerial round-trips through the registry", () => {
+  withTempDir((dir) => {
+    const path = join(dir, "scripta-dev.json");
+    const { avd } = takeDevice({ path, worktree: "/wt/a", pid: process.pid });
+    recordDeviceSerial({ path, worktree: "/wt/a", avd, serial: "emulator-5554" });
+    const holders = deviceHolders(readRegistry(path));
+    assert.equal(holders.find((holder) => holder.avd === avd).serial, "emulator-5554");
+  });
+});
+
+test("recordDeviceSerial is a no-op when this worktree no longer holds the lease", () => {
+  withTempDir((dir) => {
+    const path = join(dir, "scripta-dev.json");
+    const { avd } = takeDevice({ path, worktree: "/wt/a", pid: process.pid });
+    releaseDevice({ path, worktree: "/wt/a" });
+    // Must not resurrect a released lease, and must not throw.
+    assert.doesNotThrow(() => recordDeviceSerial({ path, worktree: "/wt/a", avd, serial: "emulator-5554" }));
+    assert.deepEqual(deviceHolders(readRegistry(path)), []);
+  });
+});
+
+test("a lease with no recorded serial is handled without throwing", () => {
+  withTempDir((dir) => {
+    const path = join(dir, "scripta-dev.json");
+    const { avd } = takeDevice({ path, worktree: "/wt/a", pid: process.pid });
+    const holders = deviceHolders(readRegistry(path));
+    assert.equal(holders.find((holder) => holder.avd === avd).serial, undefined);
   });
 });

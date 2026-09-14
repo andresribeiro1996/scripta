@@ -222,6 +222,24 @@ export function takeDevice({ path, worktree, pid, avd }) {
   });
 }
 
+// Records the adb serial ensureAvdBooted resolved for this worktree's
+// leased AVD, so the lease is self-describing instead of something later
+// code (dev-release.mjs's tunnel cleanup) has to re-derive from scratch.
+// A no-op — never throws, never resurrects a lease — when this worktree
+// no longer holds `avd`: the lease may have been released or stolen by a
+// dead-pid reclaim between takeDevice and this call, and recording a
+// serial onto someone else's (or nobody's) lease would be exactly the
+// kind of guess this whole module exists to avoid.
+export function recordDeviceSerial({ path, worktree, avd, serial }) {
+  withLock(path, () => {
+    const registry = readRegistry(path);
+    const lease = registry.devices[avd];
+    if (lease?.worktree !== worktree) return;
+    registry.devices[avd] = { ...lease, serial };
+    writeRegistry(path, registry);
+  });
+}
+
 // Releases only the lease(s) this worktree holds — pass `avd` to release a
 // specific one, or omit it to release everything this worktree has.
 export function releaseDevice({ path, worktree, avd }) {

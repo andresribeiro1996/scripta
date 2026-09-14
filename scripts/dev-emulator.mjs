@@ -45,7 +45,6 @@
 
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { connect } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -54,8 +53,8 @@ import { devDataDir, devDataDirEnv } from "./devDataDir.mjs";
 import { DEV_USERNAME } from "./dev-account.mjs";
 import { upsertEnvLine } from "./devEnvFile.mjs";
 import { claimThisWorktreeSlot } from "./devClaim.mjs";
-import { registryPath, takeDevice } from "./devRegistry.mjs";
-import { worktreeIdentity } from "./devHost.mjs";
+import { recordDeviceSerial, registryPath, takeDevice } from "./devRegistry.mjs";
+import { isPortFree, worktreeIdentity } from "./devHost.mjs";
 import { pickLanAddress } from "./lanAddress.mjs";
 
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -72,19 +71,12 @@ function log(message) {
   console.log(`[dev-emulator] ${message}`);
 }
 
-function isPortOpen(port) {
-  return new Promise((resolve) => {
-    const socket = connect({ port, host: "127.0.0.1" });
-    socket.once("connect", () => {
-      socket.destroy();
-      resolve(true);
-    });
-    socket.once("error", () => resolve(false));
-    socket.setTimeout(1000, () => {
-      socket.destroy();
-      resolve(false);
-    });
-  });
+// devHost.mjs's isPortFree already probes both loopback families (Vite
+// binds [::1] only; the backend binds "::") — this just inverts the sense
+// for the "is my own server already up" checks below, rather than the
+// codebase carrying a second, IPv4-only probe alongside it.
+async function isPortOpen(port) {
+  return !(await isPortFree(port));
 }
 
 async function waitFor(check, { timeoutMs, intervalMs = 2000, label }) {
@@ -121,14 +113,46 @@ function run(command, args, { env } = {}) {
   return spawnSync(command, args, { env, encoding: "utf8" });
 }
 
-function getEmulatorSerial(env) {
+// Pure decision function — given `adb devices` output and a name-lookup
+// function (real callers: `adb -s <serial> emu avd name`), returns the
+// serial of the emulator running THIS avd, or null. Two AVDs
+// (scripta-dev-0/1) can be booted concurrently now that the device lease
+// is a two-slot semaphore rather than a mutex, so "the first emulator in
+// `device` state" is no longer a safe stand-in for "my emulator" — that
+// mistake is Finding C1: it makes one worktree's ensureAvdBooted report
+// another worktree's AVD as its own, then `adb reverse` its ports onto
+// the wrong device. Only `device`-state lines are even considered:
+// `offline`/`unauthorized` entries are excluded before the name lookup
+// ever runs, since a serial in either of those states cannot answer `emu
+// avd name` usefully anyway.
+export function pickSerialForAvd(devicesOutput, avd, avdNameForSerial) {
+  const serials = devicesOutput
+    .split("\n")
+    .filter((line) => /^emulator-\d+\s+device\b/.test(line))
+    .map((line) => line.split(/\s+/)[0]);
+  return serials.find((serial) => avdNameForSerial(serial) === avd) ?? null;
+}
+
+// `adb -s <serial> emu avd name` prints the AVD name followed by a
+// trailing "OK" line (verified on this machine) — this returns the first
+// non-blank line, trimmed, which is the name whether or not there are
+// leading blank lines or incidental whitespace around it.
+export function parseAvdNameOutput(stdout) {
+  const line = stdout.split("\n").find((l) => l.trim().length > 0);
+  return line ? line.trim() : null;
+}
+
+function avdNameForSerial(serial, env) {
+  return parseAvdNameOutput(run("adb", ["-s", serial, "emu", "avd", "name"], { env }).stdout);
+}
+
+function getEmulatorSerial(avd, env) {
   const { stdout } = run("adb", ["devices"], { env });
-  const match = stdout.split("\n").find((line) => /^emulator-\d+\s+device\b/.test(line));
-  return match ? match.split(/\s+/)[0] : null;
+  return pickSerialForAvd(stdout, avd, (serial) => avdNameForSerial(serial, env));
 }
 
 async function ensureAvdBooted(avd, env) {
-  let serial = getEmulatorSerial(env);
+  let serial = getEmulatorSerial(avd, env);
   if (serial) {
     log(`${avd} already running as ${serial}.`);
   } else {
@@ -144,8 +168,8 @@ async function ensureAvdBooted(avd, env) {
     }
     log(`Booting ${avd}...`);
     spawnDetached("emulator", ["-avd", avd, "-no-boot-anim", "-no-audio"], { env, logName: "emulator.log" });
-    await waitFor(() => Boolean(getEmulatorSerial(env)), { timeoutMs: 120_000, label: "emulator to register with adb" });
-    serial = getEmulatorSerial(env);
+    await waitFor(() => Boolean(getEmulatorSerial(avd, env)), { timeoutMs: 120_000, label: "emulator to register with adb" });
+    serial = getEmulatorSerial(avd, env);
   }
   await waitFor(
     () => run("adb", ["-s", serial, "shell", "getprop", "sys.boot_completed"], { env }).stdout.trim() === "1",
@@ -266,9 +290,11 @@ async function main() {
   ensureSharedBuilt();
   const env = { ...process.env, ...androidEnv() };
   const { worktree } = worktreeIdentity(repoRoot);
-  const { avd } = takeDevice({ path: registryPath(repoRoot), worktree, pid: process.pid });
+  const path = registryPath(repoRoot);
+  const { avd } = takeDevice({ path, worktree, pid: process.pid });
   log(`Holding ${avd}. Release it with \`npm run dev:release\` when you're done verifying.`);
   const serial = await ensureAvdBooted(avd, env);
+  recordDeviceSerial({ path, worktree, avd, serial });
   await ensureExpoGo(serial, env);
 
   resetDevDataIfRequested();
@@ -300,7 +326,14 @@ async function main() {
   log(`Screenshot with: adb -s ${serial} exec-out screencap -p > screen.png`);
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+// Guarded like dev-account.mjs's own main(): tests import this module for
+// its pure functions (pickSerialForAvd, parseAvdNameOutput) and must not
+// trigger a real boot — claiming a slot, leasing a device, starting the
+// backend and Metro against the live emulator — as a side effect of that
+// import.
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}

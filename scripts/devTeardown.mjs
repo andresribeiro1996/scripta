@@ -21,6 +21,14 @@
 
 import { execFileSync } from "node:child_process";
 
+// Blocks synchronously for `ms` without spawning a process — the same
+// Atomics.wait idiom scripts/devRegistry.mjs's sleepSync uses, for the
+// same reason (no `sleep` child, no portability concern). Used below to
+// poll killPid's grace period instead of busy-waiting the CPU.
+function sleepSync(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
 // dev-emulator.mjs spawns both the backend and Metro with `cwd: repoRoot`
 // (spawnDetached's `cwd` option, see ensureBackendRunning/ensureMetroRunning),
 // so a process's own working directory is an exact, load-bearing signal of
@@ -116,9 +124,7 @@ function killPid(pid, { graceMs = 2000 } = {}) {
   }
   const deadline = Date.now() + graceMs;
   while (Date.now() < deadline && isAlive(pid)) {
-    // Busy-wait briefly and synchronously — this runs once, at teardown,
-    // never in a hot path, and a real sleep would need a child process
-    // (see devRegistry.mjs's sleepSync for the same tradeoff).
+    sleepSync(100);
   }
   if (isAlive(pid)) {
     try {

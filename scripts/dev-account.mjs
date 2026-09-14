@@ -163,9 +163,9 @@ async function main() {
   console.log("mobile/.env.local now has EXPO_PUBLIC_DEV_REFRESH_TOKEN set.");
 }
 
-// Guarded: dev-emulator.mjs imports this module just for the DEV_EMAIL /
-// DEV_PASSWORD constants (for its own login probe), and must not trigger
-// a full seeding run as a side effect of that import.
+// Guarded: dev-emulator.mjs imports this module just for the DEV_USERNAME
+// constant (to log which account got seeded), and must not trigger a full
+// seeding run as a side effect of that import.
 if (import.meta.url === `file://${process.argv[1]}`) {
   main().catch((error) => {
     console.error(error);

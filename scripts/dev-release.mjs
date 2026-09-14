@@ -17,6 +17,7 @@
 // worktrees. This resolves PIDs from THIS worktree's own slot ports only,
 // and verifies each PID's cwd before touching it.
 
+import { spawnSync } from "node:child_process";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { portsForSlot, readRegistry, registryPath, releaseDevice, releaseSlot, slotForWorktree } from "./devRegistry.mjs";
@@ -32,15 +33,17 @@ function log(message) {
 }
 
 // Read the registry BEFORE releasing anything: releaseSlot deletes this
-// worktree's entry, and its ports can only be derived from the slot
-// number (portsForSlot) while that entry still exists.
+// worktree's entry, and its ports (needed for both process teardown below
+// and adb reverse tunnel cleanup further down) can only be derived from
+// the slot number (portsForSlot) while that entry still exists. Same for
+// the device lease's recorded serial — releaseDevice clears it.
 const registry = readRegistry(path);
 const slot = slotForWorktree(registry, worktree);
+const ports = slot === undefined ? undefined : portsForSlot(Number(slot));
 
 if (slot === undefined) {
   log(`${branch} holds no slot — nothing to tear down.`);
 } else {
-  const ports = portsForSlot(Number(slot));
   log(`Slot ${slot} (${branch}) — tearing down backend :${ports.backend} and Metro :${ports.metro}...`);
   for (const [label, port] of [["backend", ports.backend], ["Metro", ports.metro]]) {
     const { killed, skipped } = teardownPort(port, worktree);
@@ -52,28 +55,37 @@ if (slot === undefined) {
   }
 }
 
-// adb reverse tunnel cleanup. The registry records only the AVD name and
-// pid for a device lease (see devRegistry.mjs's EMPTY_REGISTRY.devices
-// shape) — never the adb serial that lease resolved to, and
-// dev-emulator.mjs's own getEmulatorSerial() doesn't disambiguate between
-// two concurrently-booted emulators either (it returns the first
-// "emulator-\d+ device" line adb reports, full stop). Reliably mapping
-// "the AVD this worktree leased" to "the one serial holding its tunnels"
-// would need new, unverified adb-console interaction (e.g. `adb -s
-// <serial> emu avd name` per candidate serial) that nothing here has
-// exercised — and a wrong guess removes another worktree's tunnels,
-// exactly the class of mistake this whole design exists to prevent. So
-// this skips tunnel cleanup rather than risk it: safer to leave a stale
-// `adb reverse` entry (harmless once nothing is listening behind it) than
-// to `--remove` the wrong worktree's.
-const hadDeviceLease = Object.values(registry.devices).some((lease) => lease?.worktree === worktree);
-if (hadDeviceLease) {
-  console.warn(
-    "[dev-release] WARNING: a device lease is held, but its adb serial isn't recorded in the registry — " +
-      "skipping adb reverse tunnel cleanup. Remove them by hand if needed: " +
-      "`adb -s <serial> reverse --remove tcp:<port>` for this worktree's own backend/Metro ports only " +
-      "(never `--remove-all`, which would break another worktree's device session).",
-  );
+// adb reverse tunnel cleanup. dev-emulator.mjs's ensureAvdBooted now
+// resolves the serial by AVD name (scripts/devRegistry.mjs's
+// recordDeviceSerial stores it on the lease), so — when a serial was
+// actually recorded — this removes exactly this worktree's own two
+// tunnels by port, on that one serial, and NEVER `--remove-all` (which
+// would tear down a different worktree's device session sharing the same
+// machine). An older registry, or a lease taken before this recording
+// existed, has no serial on it: this degrades to the previous warning and
+// skips cleanup rather than guess which serial to touch.
+const deviceEntry = Object.entries(registry.devices).find(([, lease]) => lease?.worktree === worktree);
+if (deviceEntry) {
+  const [avd, lease] = deviceEntry;
+  if (lease.serial && ports) {
+    for (const [label, port] of [["backend", ports.backend], ["Metro", ports.metro]]) {
+      const result = spawnSync("adb", ["-s", lease.serial, "reverse", "--remove", `tcp:${port}`], { encoding: "utf8" });
+      if (result.status === 0) log(`  removed adb reverse tcp:${port} (${label}) on ${lease.serial} (${avd}).`);
+      else {
+        console.warn(
+          `[dev-release] WARNING: could not remove adb reverse tcp:${port} on ${lease.serial}: ` +
+            `${(result.stderr || result.stdout || "").trim()}`,
+        );
+      }
+    }
+  } else {
+    console.warn(
+      "[dev-release] WARNING: a device lease is held, but its adb serial isn't recorded in the registry — " +
+        "skipping adb reverse tunnel cleanup. Remove them by hand if needed: " +
+        "`adb -s <serial> reverse --remove tcp:<port>` for this worktree's own backend/Metro ports only " +
+        "(never `--remove-all`, which would break another worktree's device session).",
+    );
+  }
 }
 
 releaseDevice({ path, worktree });
