@@ -1,6 +1,12 @@
 # Orchestrator handoff kit — Scripta mobile migration
 
-For whoever (or whatever) holds the integration-owner role next. Read AGENTS.md, 2026-09-06-parallel-mobile-migration.md (the plan), and /tmp task-state.md first. This file is mechanics only.
+> **Historical.** The mobile migration it coordinates shipped — every Wave 5 feature
+> (library, arena, tierlists, murals, gallery, settings, socials, public routes) is on
+> `main` under `mobile/src/features/`. The roles, queue, and `/var/folders/.../opencode/`
+> state files below no longer exist. Kept for the dispatch and merge lessons only; do not
+> follow it as a live process.
+
+For whoever (or whatever) held the integration-owner role next. Read AGENTS.md and [the plan](2026-09-06-parallel-mobile-migration.md) first. This file is mechanics only.
 
 ## Current role assignment
 - Integration owner / orchestrator: was OpenCode+GLM; succession by product-owner decision (recorded in plan). May be Codex (`codex exec --sandbox danger-full-access`) or Claude (`claude -p ... --permission-mode acceptEdits --allowedTools ...`) — both have executed tasks here successfully.

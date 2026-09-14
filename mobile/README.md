@@ -1,6 +1,6 @@
 # Scripta Mobile
 
-Expo / React Native client for the Scripta backend (Fastify, see `../backend`). Third client beside the Vite PWA in `../frontend`. Built per the plan in `../2026-09-06-parallel-mobile-migration.md` — Task numbers below refer to it.
+Expo / React Native client for the Scripta backend (Fastify, see `../backend`). Third client beside the Vite PWA in `../frontend`. Built per the plan in `../docs/history/2026-09-06-parallel-mobile-migration.md` — Task numbers below refer to it.
 
 ## Running
 
