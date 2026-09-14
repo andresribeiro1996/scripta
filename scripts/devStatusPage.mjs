@@ -16,6 +16,7 @@ function stackCard(stack, hostAddress) {
       <ul>
         <li>${link(stack.urls.webLan, "open the web app")}</li>
         <li>${link(stack.urls.expoLan, "open in Expo Go")}</li>
+        ${stack.urls.expoLan ? '<li class="muted">if Expo Go reopens a different project, relaunch from here.</li>' : ""}
         <li class="api">API <code>http://${escapeHtml(hostAddress)}:${stack.ports.backend}</code></li>
       </ul>
     </section>`;
@@ -50,7 +51,7 @@ export function renderPage(status) {
   .meta { font-size: 13px; opacity: .7; margin: 0 0 8px; }
   ul { list-style: none; padding: 0; margin: 0; }
   li { padding: 6px 0; }
-  a { display: inline-block; padding: 6px 0; }
+  a { display: inline-block; padding: 12px 4px; }
   code { word-break: break-all; }
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
   td { padding: 6px 4px; border-top: 1px solid rgba(128,128,128,.25); }

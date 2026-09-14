@@ -11,7 +11,7 @@ import { pickLanAddress } from "./lanAddress.mjs";
 
 export const STATUS_PAGE_PORT = 7070;
 
-export function startServer({ repoRoot, port = STATUS_PAGE_PORT } = {}) {
+export function startServer({ repoRoot, port = STATUS_PAGE_PORT, onError = console.error } = {}) {
   const server = createServer((request, response) => {
     if (request.url === "/favicon.ico") {
       response.writeHead(204).end();
@@ -25,6 +25,23 @@ export function startServer({ repoRoot, port = STATUS_PAGE_PORT } = {}) {
     } catch (error) {
       response.writeHead(500, { "content-type": "text/plain; charset=utf-8" }).end(String(error?.stack ?? error));
     }
+  });
+  // Verified trap: a failed listen() (EADDRINUSE, most commonly — an
+  // earlier --serve still running) arrives as an async "error" event, not
+  // a synchronous throw, so the CLI's outer try/catch in dev-status.mjs
+  // never sees it. Without this listener, Node's default behaviour prints
+  // a raw stack trace and crashes — exactly what that outer guard exists
+  // to prevent for the rest of the tool. Must be attached before listen().
+  server.on("error", (error) => {
+    if (error.code === "EADDRINUSE") {
+      onError(
+        `[dev-status] port ${port} is already in use — probably an earlier --serve still running. ` +
+          `Run \`lsof -nP -iTCP:${port} -sTCP:LISTEN\` to see what's holding it.`,
+      );
+    } else {
+      onError(`[dev-status] could not start the status server on port ${port}: ${error.message}`);
+    }
+    process.exitCode = 1;
   });
   server.listen(port, "0.0.0.0", () => {
     console.log(`[dev-status] http://${pickLanAddress() ?? "localhost"}:${port} — Ctrl-C to stop.`);
