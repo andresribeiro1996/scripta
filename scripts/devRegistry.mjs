@@ -121,6 +121,11 @@ export function slotForWorktree(registry, worktree) {
   return Object.keys(registry.slots).find((slot) => registry.slots[slot].worktree === worktree);
 }
 
+export function branchForWorktree(registry, worktree) {
+  const slot = slotForWorktree(registry, worktree);
+  return slot === undefined ? undefined : registry.slots[slot].branch;
+}
+
 // A slot is live — in use, not reclaimable by a different worktree — when
 // its recorded pid is alive OR any of its three derived ports is occupied.
 // Pid alone is not a valid "in use" signal: dev-emulator.mjs spawns the

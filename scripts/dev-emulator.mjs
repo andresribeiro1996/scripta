@@ -109,8 +109,13 @@ function mkdirRuntimeDir() {
   spawnSync("mkdir", ["-p", runtimeDir]);
 }
 
-function run(command, args, { env } = {}) {
-  return spawnSync(command, args, { env, encoding: "utf8" });
+// Bounded, because `adb -s <serial> emu avd name` never answers for a
+// hung emulator and this helper is called inside a poll loop. spawnSync
+// returns stdout/stderr as null when it kills a timed-out child, so both
+// are normalised — every caller here does string work on them.
+function run(command, args, { env, timeoutMs = 15_000 } = {}) {
+  const result = spawnSync(command, args, { env, encoding: "utf8", timeout: timeoutMs });
+  return { ...result, stdout: result.stdout ?? "", stderr: result.stderr ?? "" };
 }
 
 // Pure decision function — given `adb devices` output and a name-lookup
