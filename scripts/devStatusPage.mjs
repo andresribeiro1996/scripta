@@ -8,7 +8,7 @@ function link(href, label) {
   return href ? `<a href="${escapeHtml(href)}">${escapeHtml(label)}</a>` : `<span class="muted">${escapeHtml(label)} unavailable</span>`;
 }
 
-function stackCard(stack, hostAddress) {
+function stackCard(stack) {
   return `
     <section class="card${stack.state === "stale" ? " stale" : ""}">
       <h2>${escapeHtml(stack.branch)}</h2>
@@ -17,7 +17,7 @@ function stackCard(stack, hostAddress) {
         <li>${link(stack.urls.webLan, "open the web app")}</li>
         <li>${link(stack.urls.expoLan, "open in Expo Go")}</li>
         ${stack.urls.expoLan ? '<li class="muted">if Expo Go reopens a different project, relaunch from here.</li>' : ""}
-        <li class="api">API <code>http://${escapeHtml(hostAddress)}:${stack.ports.backend}</code></li>
+        <li class="api">API <code>${escapeHtml(stack.urls.apiLan ?? stack.urls.apiLocal)}</code></li>
       </ul>
     </section>`;
 }
@@ -61,7 +61,7 @@ export function renderPage(status) {
 </head>
 <body>
 <p class="host">${escapeHtml(host.lanAddress ?? "no LAN address")} · ${host.freeMemGB} GB free of ${host.totalMemGB} GB · load ${host.loadAvg1.toFixed(1)} / ${host.cores} cores · ${stacks.length} of ${limits.maxStacks} stacks</p>
-${stacks.length === 0 ? '<p class="muted">no stacks running.</p>' : stacks.map((stack) => stackCard(stack, host.lanAddress ?? "localhost")).join("")}
+${stacks.length === 0 ? '<p class="muted">no stacks running.</p>' : stacks.map(stackCard).join("")}
 <table>${devices.map(deviceRow).join("")}</table>
 ${warnings.map((warning) => `<p class="warning">⚠ ${escapeHtml(warning)}</p>`).join("")}
 </body>

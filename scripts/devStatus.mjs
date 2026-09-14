@@ -1,18 +1,51 @@
+import { execFileSync } from "node:child_process";
 import { cpus, totalmem } from "node:os";
 import { collectDevices, orphanSerials, readAdbSerials } from "./devDevices.mjs";
 import { DEFAULT_LIMITS, readHost } from "./devHost.mjs";
 import { readListeners } from "./devListeners.mjs";
 import { indexProcessTable, readProcessTable, sumSubtree } from "./devProcessTable.mjs";
 import { isPidAlive, portsForSlot, readRegistry, registryPath } from "./devRegistry.mjs";
+import { mobileCertsExist } from "./mobileCertPaths.mjs";
 import { processCwd } from "./devTeardown.mjs";
 import { pickLanAddress } from "./lanAddress.mjs";
 
-export function connectionUrls({ ports, lanAddress }) {
+// The web scheme is not a guess: frontend/vite.config.ts serves https
+// exactly when scripts/gen-mobile-certs.mjs has written the pair
+// (`mobileCertsExist() ? {key, cert} : undefined`), in plain `npm run
+// frontend` as much as in dev:mobile, because a service worker only runs
+// in a secure context and a LAN address over plain http is not one. So
+// this reads the same predicate vite.config.ts does rather than assuming
+// http — a link with the wrong scheme is a link that cannot be tapped.
+// Whether whatever holds `port` speaks TLS, decided by attempting a real
+// handshake rather than inferring it. The API's scheme is NOT derivable
+// from the certs on disk the way vite's is: only `npm run dev:mobile`
+// sets DEV_HTTPS_CERT_PATH (backend/src/config/devCerts.ts), and it
+// passes it as spawn env, so nothing on disk records which mode a
+// running backend was started in — in plain `npm run backend` the API is
+// http while vite is still https. Verified against both on this machine,
+// and against a closed port, which answers in ~10ms rather than hanging.
+export function portSpeaksTls(port, exec = execFileSync) {
+  try {
+    exec("curl", ["-sk", "--max-time", "2", "-o", "/dev/null", `https://127.0.0.1:${port}/`], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function connectionUrls({
+  ports,
+  lanAddress,
+  webScheme = mobileCertsExist() ? "https" : "http",
+  apiScheme = "http",
+}) {
   return {
-    webLocal: `http://localhost:${ports.vite}`,
-    webLan: lanAddress ? `http://${lanAddress}:${ports.vite}` : null,
+    webLocal: `${webScheme}://localhost:${ports.vite}`,
+    webLan: lanAddress ? `${webScheme}://${lanAddress}:${ports.vite}` : null,
     expoLan: lanAddress ? `exp://${lanAddress}:${ports.metro}` : null,
     expoEmulator: `exp://127.0.0.1:${ports.metro}`,
+    apiLocal: `${apiScheme}://localhost:${ports.backend}`,
+    apiLan: lanAddress ? `${apiScheme}://${lanAddress}:${ports.backend}` : null,
   };
 }
 
@@ -119,7 +152,7 @@ export function climbToStackRoot(pid, { byPid, worktree, cwdForPid }) {
   return current.pid;
 }
 
-export function buildStacks({ registry, rows, listeners, lanAddress, cwdForPid = processCwd }) {
+export function buildStacks({ registry, rows, listeners, lanAddress, cwdForPid = processCwd, webScheme, speaksTls = portSpeaksTls }) {
   const index = indexProcessTable(rows);
   const { byPid } = index;
   // processCwd shells out to lsof, and the climb asks about the same
@@ -136,6 +169,8 @@ export function buildStacks({ registry, rows, listeners, lanAddress, cwdForPid =
       const entry = registry.slots[String(slot)];
       const ports = portsForSlot(slot);
       const portAudit = auditPorts({ ports, listeners, worktree: entry.worktree, cwdForPid: cwdOnce });
+
+      const backendListening = (listeners[ports.backend] ?? []).length > 0;
 
       const roleByPid = new Map(portAudit.flatMap(({ role, pids }) => pids.map((pid) => [pid, role])));
       // Every pid the slot owns: the recorded claimer's subtree, plus the
@@ -174,7 +209,15 @@ export function buildStacks({ registry, rows, listeners, lanAddress, cwdForPid =
         rssTotalMB: Math.round(processes.reduce((total, p) => total + p.rss, 0) / 1024),
         cpuTotal: Number(processes.reduce((total, p) => total + p.cpu, 0).toFixed(1)),
         portAudit,
-        urls: connectionUrls({ ports, lanAddress }),
+        urls: connectionUrls({
+          ports,
+          lanAddress,
+          ...(webScheme === undefined ? {} : { webScheme }),
+          // Only probed when something is actually listening: a handshake
+          // against a free port tells us nothing, and every slot in the
+          // registry would otherwise cost a curl.
+          apiScheme: backendListening && speaksTls(ports.backend) ? "https" : "http",
+        }),
       };
     });
 }

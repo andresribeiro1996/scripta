@@ -25,6 +25,8 @@ const STATUS = {
         webLan: "http://192.168.1.24:5373",
         expoLan: "exp://192.168.1.24:8281",
         expoEmulator: "exp://127.0.0.1:8281",
+        apiLocal: "http://localhost:3200",
+        apiLan: "http://192.168.1.24:3200",
       },
     },
   ],

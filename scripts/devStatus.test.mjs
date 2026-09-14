@@ -1,29 +1,33 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { auditPorts, buildStacks, collectStatus, connectionUrls, slotState, statusWarnings } from "./devStatus.mjs";
+import { auditPorts, buildStacks, collectStatus, connectionUrls, portSpeaksTls, slotState, statusWarnings } from "./devStatus.mjs";
 import { portsForSlot } from "./devRegistry.mjs";
 import { DEFAULT_LIMITS } from "./devHost.mjs";
 
 test("URLs for slot 0 use the familiar ports", () => {
-  assert.deepEqual(connectionUrls({ ports: portsForSlot(0), lanAddress: "192.168.1.24" }), {
+  assert.deepEqual(connectionUrls({ ports: portsForSlot(0), lanAddress: "192.168.1.24", webScheme: "http" }), {
     webLocal: "http://localhost:5173",
     webLan: "http://192.168.1.24:5173",
     expoLan: "exp://192.168.1.24:8081",
     expoEmulator: "exp://127.0.0.1:8081",
+    apiLocal: "http://localhost:3000",
+    apiLan: "http://192.168.1.24:3000",
   });
 });
 
 test("URLs for slot 15 use its derived ports", () => {
-  assert.deepEqual(connectionUrls({ ports: portsForSlot(15), lanAddress: "192.168.1.24" }), {
+  assert.deepEqual(connectionUrls({ ports: portsForSlot(15), lanAddress: "192.168.1.24", webScheme: "http" }), {
     webLocal: "http://localhost:6673",
     webLan: "http://192.168.1.24:6673",
     expoLan: "exp://192.168.1.24:9581",
     expoEmulator: "exp://127.0.0.1:9581",
+    apiLocal: "http://localhost:4500",
+    apiLan: "http://192.168.1.24:4500",
   });
 });
 
 test("with no LAN address the local URLs still resolve and the LAN ones are null", () => {
-  const urls = connectionUrls({ ports: portsForSlot(2), lanAddress: undefined });
+  const urls = connectionUrls({ ports: portsForSlot(2), lanAddress: undefined, webScheme: "http" });
   assert.equal(urls.webLocal, "http://localhost:5373");
   assert.equal(urls.webLan, null);
   assert.equal(urls.expoLan, null);
@@ -461,4 +465,91 @@ test("a shell whose own parent is a supervisor is still crossed", () => {
     stack.processes.some((p) => p.pid === 801),
     "npm's own `npm run backend` -> sh -> `npm run dev` chain must stay counted",
   );
+});
+
+// vite.config.ts serves https exactly when the mobile certs exist, so a
+// hardcoded http here produced a web link that could not be tapped —
+// found by opening the page on a real phone.
+test("the web URLs follow the https scheme when the mobile certs exist", () => {
+  const urls = connectionUrls({ ports: portsForSlot(2), lanAddress: "192.168.1.24", webScheme: "https" });
+  assert.equal(urls.webLocal, "https://localhost:5373");
+  assert.equal(urls.webLan, "https://192.168.1.24:5373");
+});
+
+test("the scheme applies to the web URLs only, never to the Expo ones", () => {
+  const urls = connectionUrls({ ports: portsForSlot(2), lanAddress: "192.168.1.24", webScheme: "https" });
+  assert.equal(urls.expoLan, "exp://192.168.1.24:8281");
+  assert.equal(urls.expoEmulator, "exp://127.0.0.1:8281");
+});
+
+test("buildStacks passes the web scheme through to each stack's urls", () => {
+  const [stack] = buildStacks({
+    registry: REGISTRY,
+    rows: [],
+    listeners: {},
+    lanAddress: "192.168.1.24",
+    cwdForPid: () => undefined,
+    webScheme: "https",
+  });
+  assert.equal(stack.urls.webLan, "https://192.168.1.24:5373");
+});
+
+// The API scheme cannot be inferred the way vite's can: only dev:mobile
+// sets DEV_HTTPS_CERT_PATH, and it does so as spawn env, so a running
+// backend leaves no on-disk record of its mode. It is probed instead.
+test("portSpeaksTls is true when the handshake succeeds", () => {
+  assert.equal(portSpeaksTls(3000, () => ""), true);
+});
+
+test("portSpeaksTls is false when the handshake is refused, never a throw", () => {
+  assert.equal(
+    portSpeaksTls(3000, () => {
+      throw Object.assign(new Error("curl exited 35"), { status: 35 });
+    }),
+    false,
+  );
+});
+
+test("the API URLs carry the probed scheme", () => {
+  const urls = connectionUrls({ ports: portsForSlot(2), lanAddress: "192.168.1.24", apiScheme: "https" });
+  assert.equal(urls.apiLan, "https://192.168.1.24:3200");
+  assert.equal(urls.apiLocal, "https://localhost:3200");
+});
+
+test("the API URLs default to http and apiLan is null without a LAN address", () => {
+  const urls = connectionUrls({ ports: portsForSlot(2), lanAddress: undefined });
+  assert.equal(urls.apiLocal, "http://localhost:3200");
+  assert.equal(urls.apiLan, null);
+});
+
+test("a stack whose backend speaks TLS reports an https API URL", () => {
+  const ports = portsForSlot(2);
+  const [stack] = buildStacks({
+    registry: REGISTRY,
+    rows: [],
+    listeners: { [ports.backend]: [501] },
+    lanAddress: "192.168.1.24",
+    cwdForPid: () => undefined,
+    speaksTls: () => true,
+  });
+  assert.equal(stack.urls.apiLan, "https://192.168.1.24:3200");
+});
+
+// A handshake against a port nothing holds proves nothing, and probing
+// every registry slot would cost a curl each.
+test("a stack with nothing listening on its backend port is never probed", () => {
+  let probes = 0;
+  const [stack] = buildStacks({
+    registry: REGISTRY,
+    rows: [],
+    listeners: {},
+    lanAddress: "192.168.1.24",
+    cwdForPid: () => undefined,
+    speaksTls: () => {
+      probes += 1;
+      return true;
+    },
+  });
+  assert.equal(probes, 0);
+  assert.equal(stack.urls.apiLan, "http://192.168.1.24:3200");
 });
