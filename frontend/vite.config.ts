@@ -20,8 +20,15 @@ export default defineConfig(({ mode }) => {
   // inherits `server.https` when not set separately, so setting it once
   // here covers `npm run dev:mobile` AND `npm run preview:mobile` both.
   const https = mobileCertsExist() ? { key: readFileSync(KEY_PATH), cert: readFileSync(CERT_PATH) } : undefined
+  // VITE_PORT is this worktree's slot-derived Vite port (scripts/devSlotEnv.mjs,
+  // written to frontend/.env.local) — absent it, Vite always binds the
+  // default 5173 no matter what slot backend/.env's FRONTEND_URL names,
+  // and the browser gets CORS-rejected by its own backend. strictPort
+  // means a worktree whose assigned port is taken refuses to start
+  // rather than sliding to the next free one.
+  const port = env.VITE_PORT ? Number(env.VITE_PORT) : undefined
   return {
-    server: { https },
+    server: { https, strictPort: true, port },
     plugins: [
       react(),
       tailwindcss(),

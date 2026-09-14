@@ -1,8 +1,16 @@
 # Dev status
 
 Date: 2026-09-11
-Status: approved for planning
+Status: implemented — see `docs/superpowers/plans/2026-09-14-dev-status.md`
 Depends on: `2026-09-11-worktree-port-lanes-design.md`
+
+Three details below were superseded during implementation: `stale` means
+a dead recorded pid AND no listener on any of the slot's three ports, not
+a dead pid alone — `dev-emulator.mjs` spawns the backend and Metro
+detached and exits, so the claiming pid is normally gone within seconds
+while a healthy stack keeps running. Device serials are read from the
+lease rather than re-derived via `adb`. The headroom line is defined as
+free memory minus the 4 GB floor, printed as GB above or below it.
 
 ## Problem
 

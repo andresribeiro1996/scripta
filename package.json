@@ -12,14 +12,18 @@
     "react-dom": "19.2.3"
   },
   "scripts": {
-    "backend": "npm run dev --workspace backend",
+    "backend": "npm run dev:claim && npm run dev --workspace backend",
     "backend:fixture": "npm run dev:fixture --workspace backend",
-    "frontend": "npm run dev --workspace frontend",
+    "frontend": "npm run dev:claim && npm run dev --workspace frontend",
     "mobile": "npm run start --workspace mobile",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "node --test \"scripts/**/*.test.mjs\" && npm test --workspaces --if-present",
-    "postinstall": "patch-package",
-    "check:agents": "node scripts/sync-agent-table.mjs --check"
+    "dev:claim": "node scripts/dev-claim.mjs",
+    "dev:release": "node scripts/dev-release.mjs",
+    "dev:status": "node scripts/dev-status.mjs",
+    "test:scripts": "node --test scripts/*.test.mjs",
+    "test": "npm run test:scripts && npm test --workspaces --if-present",
+    "check:agents": "node scripts/sync-agent-table.mjs --check",
+    "postinstall": "patch-package"
   },
   "allowScripts": {
     "argon2@0.40.3": true,

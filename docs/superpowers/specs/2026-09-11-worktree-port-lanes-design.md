@@ -74,14 +74,18 @@ slot 2 is :3200, :5373, :8281.
 
 ### Derived values
 
-One slot number decides five things. Any one of them left at a default
-reproduces the silent-read bug.
+One slot number decides six things. Any one of them left at a default
+reproduces the silent-read bug — `VITE_PORT` is the one that produced it
+in practice: nothing gave Vite its slot port, so it always bound 5173
+while `backend/.env`'s `FRONTEND_URL` named 5373, and the browser was
+CORS-rejected by its own backend.
 
 | Value | Written to | Slot 0 | Slot 2 |
 |---|---|---|---|
 | `PORT` | `backend/.env` | 3000 | 3200 |
 | `FRONTEND_URL` | `backend/.env` (CORS) | `http://localhost:5173` | `http://localhost:5373` |
 | `VITE_API_PORT` | `frontend/.env.local` | 3000 | 3200 |
+| `VITE_PORT` | `frontend/.env.local` | 5173 | 5373 |
 | `EXPO_PUBLIC_API_URL` | `mobile/.env.local` | `http://127.0.0.1:3000` | `http://127.0.0.1:3200` |
 | `--port` | `expo start` argument | 8081 | 8281 |
 
@@ -109,10 +113,12 @@ would hardcode `localhost` and break phone testing.
 
 ### Failing loudly
 
-`frontend/vite.config.ts` gains `server.strictPort = true`. Sliding to
-the next free port is the mechanism that produced consequence 1; a
-worktree whose assigned port is taken must refuse to start and say so.
-The backend already fails on `EADDRINUSE`.
+`frontend/vite.config.ts` reads `VITE_PORT` (via the same `loadEnv` call
+it already makes for `VITE_API_URL`) and sets `server.port` from it,
+defaulting to 5173 when absent, and gains `server.strictPort = true`.
+Sliding to the next free port is the mechanism that produced
+consequence 1; a worktree whose assigned port is taken must refuse to
+start and say so. The backend already fails on `EADDRINUSE`.
 
 ## The registry
 
@@ -168,14 +174,21 @@ Writes take an exclusive lock (`O_EXCL` lockfile beside it, stale after
 3. Verify all three derived ports are actually free before writing the
    claim; if any is held by something outside the registry, skip to the
    next slot and warn.
-4. Write the five derived values, then start the stack.
+4. Write the six derived values, then start the stack.
 
 ### Release
 
 On teardown: kill this worktree's processes, remove the slot entry,
-release any held device. A slot whose `pid` is gone is stale and may be
-reclaimed by the next worktree that wants it — this is what keeps the
-registry honest when an agent crashes rather than exits.
+release any held device. A slot is reclaimable by a different worktree
+only when its `pid` is gone **and** all three of its derived ports are
+actually unbound. Pid alone is not a valid "in use" signal:
+`dev-emulator.mjs` spawns the backend and Metro detached and then exits,
+so the claiming pid is dead within seconds while the stack it started
+keeps the ports bound — treating a dead pid as "free" hands that slot to
+the next worktree while the first one's servers are still running,
+unrecorded. Requiring both dead-pid and free-ports is what keeps the
+registry honest when an agent genuinely crashes before binding anything,
+without also handing away a slot whose stack is alive and well.
 
 Ports are cheap; running stacks are not. A booted worktree is roughly
 400–700 MB across backend, Vite and Metro, so the registry exists as much
@@ -249,7 +262,8 @@ Unit, against a temp registry file:
 
 - lowest-free-slot allocation, including gaps left by released slots
 - primary checkout always resolves to slot 0
-- a slot whose `pid` is dead is reclaimable; a live one is not
+- a slot is reclaimable only when its `pid` is dead **and** its ports are
+  free; a live pid, or an occupied port, is not
 - concurrent claims under the lock never produce a duplicate slot
 - port derivation for slots 0 and 15
 - device take/release, including take-while-held
@@ -268,6 +282,14 @@ The scheme is inert until a worktree claims, so it can land before every
 call site uses it. Order: registry module and tests; `baseUrl.ts` plus
 `strictPort`; `dev-emulator.mjs` reading its ports from the claim;
 threshold gates; deletion of the superseded probe and constants.
+
+The claim itself (`scripts/devClaim.mjs`'s `claimThisWorktreeSlot`) is a
+shared step, not something only the emulator script runs: `dev-emulator.mjs`
+calls it before leasing an AVD, and the plain `npm run backend` /
+`npm run frontend` workflows call it too (via `npm run dev:claim`, also
+runnable by hand) before starting their own server. A worktree doing
+pure web+backend work gets the same port isolation as one running the
+full emulator flow, with no AVD boot required to get it.
 
 ## Follow-on
 

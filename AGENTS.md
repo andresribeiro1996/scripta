@@ -5,6 +5,8 @@
 - Don't simplify away validation, error handling, or security. The backend holds accounts, OAuth tokens and public share links, so a swallowed error is a silent one. Catch the specific failure you expect and let everything else propagate — a bare `catch { return null }` reports "permission denied" as "nothing there", and the caller reads that as success.
 - Keep replies terse. Code and commands stay exact — they get pasted verbatim, and an approximated flag fails without saying whether the tool or the transcription was wrong.
 - No comments in code unless asked. A comment restating the line under it goes stale the moment that line changes and nothing checks it; put the non-obvious *why* in the commit message, where it stays attached to the change that needed it.
+- Dev servers: run `node scripts/dev-emulator.mjs` (claims this worktree's port slot) and `npm run dev:release` when done. Never hardcode 3000/8081/5173, and never kill another worktree's process to free a port. Run `npm run dev:status` to see which worktrees hold slots, which ports they bound, and who holds an emulator — agents should use `node scripts/dev-status.mjs --json` instead.
+- The emulator is leased, two at a time. Take one only to verify a change that must be rendered — layout, navigation, touch behaviour, animation, native modules. Not for backend, shared-package, type or refactor work. Write, typecheck and test with no device, then take the lease for one verification pass at the end.
 
 # Project
 
