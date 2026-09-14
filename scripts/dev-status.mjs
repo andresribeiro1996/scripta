@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 import { worktreeIdentity } from "./devHost.mjs";
 import { collectStatus } from "./devStatus.mjs";
 import { renderStatus, renderWorktree } from "./devStatusRender.mjs";
+import { startServer } from "./dev-status-server.mjs";
 
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const args = process.argv.slice(2);
@@ -27,6 +28,11 @@ function flagValue(name) {
 }
 
 function main() {
+  if (args.includes("--serve")) {
+    startServer({ repoRoot });
+    return;
+  }
+
   const status = collectStatus({ repoRoot });
 
   if (args.includes("--json")) {
