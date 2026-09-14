@@ -86,6 +86,22 @@ export function pidsListeningOn(port) {
 // this module's header comment): a false negative just leaves a process
 // running for the caller to notice and clean up by hand; a false positive
 // kills someone else's stack out from under them.
+// Every port a worktree's stack binds, in the order dev-release tears them
+// down. All THREE belong here, not just the two the emulator workflow
+// starts: `npm run frontend` binds the slot's web port too, and an orphaned
+// Vite is the same failure as an orphaned backend — it keeps the port bound,
+// so isSlotLive reads the slot as in use, while the registry says it is
+// free. That mismatch is exactly what the release step exists to prevent.
+// (adb reverse tunnels are a separate list — only backend and Metro are
+// ever tunnelled to a device; the browser reaches Vite directly.)
+export function teardownTargets(ports) {
+  return [
+    ["backend", ports.backend],
+    ["web", ports.vite],
+    ["Metro", ports.metro],
+  ];
+}
+
 export function pidsToTeardown(candidates, worktreePath) {
   const toKill = [];
   const toSkip = [];

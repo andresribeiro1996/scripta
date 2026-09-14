@@ -21,7 +21,7 @@ import { spawnSync } from "node:child_process";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { portsForSlot, readRegistry, registryPath, releaseDevice, releaseSlot, slotForWorktree } from "./devRegistry.mjs";
-import { teardownPort } from "./devTeardown.mjs";
+import { teardownPort, teardownTargets } from "./devTeardown.mjs";
 import { worktreeIdentity } from "./devHost.mjs";
 
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -44,8 +44,8 @@ const ports = slot === undefined ? undefined : portsForSlot(Number(slot));
 if (slot === undefined) {
   log(`${branch} holds no slot — nothing to tear down.`);
 } else {
-  log(`Slot ${slot} (${branch}) — tearing down backend :${ports.backend} and Metro :${ports.metro}...`);
-  for (const [label, port] of [["backend", ports.backend], ["Metro", ports.metro]]) {
+  log(`Slot ${slot} (${branch}) — tearing down backend :${ports.backend}, web :${ports.vite} and Metro :${ports.metro}...`);
+  for (const [label, port] of teardownTargets(ports)) {
     const { killed, skipped } = teardownPort(port, worktree);
     if (killed.length > 0) log(`  ${label} :${port} — killed pid(s) ${killed.join(", ")}.`);
     else log(`  ${label} :${port} — nothing listening.`);

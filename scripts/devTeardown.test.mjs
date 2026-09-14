@@ -1,6 +1,22 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { pidsToTeardown } from "./devTeardown.mjs";
+import { pidsToTeardown, teardownTargets } from "./devTeardown.mjs";
+
+test("teardownTargets covers all three of the slot's ports, web included", () => {
+  assert.deepEqual(teardownTargets({ backend: 3100, vite: 5273, metro: 8181 }), [
+    ["backend", 3100],
+    ["web", 5273],
+    ["Metro", 8181],
+  ]);
+});
+
+test("teardownTargets does not drop the web port", () => {
+  const ports = { backend: 3100, vite: 5273, metro: 8181 };
+  assert.ok(
+    teardownTargets(ports).some(([, port]) => port === ports.vite),
+    "a Vite left running holds the slot's web port while the registry reads the slot as free",
+  );
+});
 
 const THIS_WORKTREE = "/Users/dev/scripta";
 
