@@ -56,6 +56,24 @@ test("an emulator whose AVD cannot be resolved contributes no memory", () => {
   assert.equal(held.rssMB, null);
 });
 
+test("a launcher and its qemu child both matching the emulator pattern are counted once", () => {
+  const rows = [
+    { pid: 700, ppid: 1, rss: 2_097_152, cpu: 30, comm: "/opt/homebrew/share/android-commandlinetools/emulator/emulator" },
+    { pid: 701, ppid: 700, rss: 1_048_576, cpu: 5, comm: "/opt/android/emulator/qemu/darwin-aarch64/qemu-system-aarch64" },
+  ];
+  const commandForPid = () => "qemu-system-aarch64 -avd scripta-dev-0 -no-audio";
+  const [held] = collectDevices({ registry: registryWithLease(), rows, commandForPid, now: NOW });
+  assert.equal(held.rssMB, 3072);
+});
+
+test("a lease with an unparseable takenAt degrades heldMs to null, not NaN", () => {
+  const registry = registryWithLease({
+    "scripta-dev-0": { worktree: "/wt/5a", pid: 1, takenAt: "not-a-date", serial: "emulator-5554" },
+  });
+  const [held] = collectDevices({ registry, now: NOW });
+  assert.equal(held.heldMs, null);
+});
+
 test("a running serial that matches no lease is an orphan", () => {
   assert.deepEqual(orphanSerials(registryWithLease(), ["emulator-5554", "emulator-5556"]), ["emulator-5556"]);
 });

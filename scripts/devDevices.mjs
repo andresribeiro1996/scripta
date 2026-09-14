@@ -50,9 +50,17 @@ function avdForPid(pid, commandForPid) {
 }
 
 export function collectDevices({ registry, rows = [], commandForPid = readCommandForPid, now = Date.now() }) {
+  // A booted emulator's launcher and its qemu-system child can both match
+  // EMULATOR_COMM as separate pids (rather than the launcher exec'ing into
+  // the child) — if both were treated as subtree roots, the child's memory
+  // would be summed twice: once on its own and once inside the launcher's
+  // subtree. Only rows whose ppid is NOT itself a matching emulator row are
+  // treated as roots, so a child already covered by its parent's subtree is
+  // skipped.
+  const emulatorPids = new Set(rows.filter((row) => EMULATOR_COMM.test(row.comm)).map((row) => row.pid));
   const rssKBByAvd = {};
   for (const row of rows) {
-    if (!EMULATOR_COMM.test(row.comm)) continue;
+    if (!emulatorPids.has(row.pid) || emulatorPids.has(row.ppid)) continue;
     const avd = avdForPid(row.pid, commandForPid);
     if (avd === undefined) continue;
     rssKBByAvd[avd] = (rssKBByAvd[avd] ?? 0) + sumSubtree(row.pid, rows).rssKB;
@@ -61,13 +69,14 @@ export function collectDevices({ registry, rows = [], commandForPid = readComman
   return AVDS.map((avd) => {
     const lease = registry.devices[avd] ?? null;
     const rssKB = rssKBByAvd[avd];
+    const takenAtMs = lease?.takenAt ? Date.parse(lease.takenAt) : NaN;
     return {
       avd,
       serial: lease?.serial ?? null,
       holder: lease ? (branchForWorktree(registry, lease.worktree) ?? lease.worktree) : null,
       worktree: lease?.worktree ?? null,
       takenAt: lease?.takenAt ?? null,
-      heldMs: lease?.takenAt ? now - Date.parse(lease.takenAt) : null,
+      heldMs: Number.isFinite(takenAtMs) ? now - takenAtMs : null,
       rssMB: rssKB === undefined ? null : Math.round(rssKB / 1024),
     };
   });

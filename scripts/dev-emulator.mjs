@@ -199,7 +199,11 @@ async function ensureExpoGo(serial, env) {
   mkdirRuntimeDir();
   const apkPath = join(runtimeDir, "expo-go.apk");
   writeFileSync(apkPath, Buffer.from(apkBytes));
-  const install = run("adb", ["-s", serial, "install", apkPath], { env });
+  // The ~100 MB Expo Go APK, with dex optimisation on first install,
+  // routinely outruns run()'s 15s default — that default exists to bound
+  // the fast adb calls (devices/getprop/emu avd name/reverse), not this
+  // one, so it's overridden here rather than raised globally.
+  const install = run("adb", ["-s", serial, "install", apkPath], { env, timeoutMs: 300_000 });
   if (!install.stdout.includes("Success")) throw new Error(`adb install failed:\n${install.stdout}\n${install.stderr}`);
 }
 
