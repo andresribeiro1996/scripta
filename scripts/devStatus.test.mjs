@@ -205,7 +205,6 @@ const HEALTHY = {
   devices: [],
   orphans: [],
   limits: DEFAULT_LIMITS,
-  now: Date.now(),
 };
 
 test("a healthy host warns about nothing", () => {
@@ -297,4 +296,126 @@ test("an emulator no lease accounts for warns", () => {
 test("no LAN address warns, since every phone URL depends on it", () => {
   const warnings = statusWarnings({ ...HEALTHY, host: { ...HEALTHY.host, lanAddress: null } });
   assert.match(warnings[0], /LAN/i);
+});
+
+// The topology the machine actually produces: the listener is a LEAF and
+// its `npm` / `sh` / supervisor processes are its ANCESTORS. Measured on
+// this machine for the backend of slot 0:
+//   77852(node, listener) <- 77851(node) <- 77830(npm run dev)
+//     <- 77729(sh) <- 77715(npm run backend) <- 1 launchd
+const TREE_REGISTRY = {
+  version: 1,
+  slots: {
+    2: {
+      worktree: "/wt/4d",
+      branch: "mobile/4d-design-system",
+      pid: 999_999,
+      session: "4d-design-system",
+      claimedAt: "2026-09-14T14:00:00.000Z",
+    },
+  },
+  devices: { "scripta-dev-0": null, "scripta-dev-1": null },
+};
+
+const TREE_ROWS = [
+  { pid: 800, ppid: 1, rss: 46_560, cpu: 0.1, comm: "npm run backend" },
+  { pid: 801, ppid: 800, rss: 1_024, cpu: 0.2, comm: "sh" },
+  { pid: 802, ppid: 801, rss: 46_736, cpu: 0.3, comm: "npm run dev" },
+  { pid: 803, ppid: 802, rss: 40_256, cpu: 0.4, comm: "node" },
+  { pid: 804, ppid: 803, rss: 61_328, cpu: 0.5, comm: "/opt/homebrew/Cellar/node/26.7.0/bin/node" },
+];
+
+test("a stack counts the supervisors ABOVE its listener, not just the leaf", () => {
+  const [stack] = buildStacks({
+    registry: TREE_REGISTRY,
+    rows: TREE_ROWS,
+    listeners: { [portsForSlot(2).backend]: [804] },
+    lanAddress: "192.168.1.24",
+    cwdForPid: () => "/wt/4d",
+  });
+  const total = 46_560 + 1_024 + 46_736 + 40_256 + 61_328;
+  assert.equal(stack.rssTotalMB, Math.round(total / 1024));
+  assert.equal(stack.cpuTotal, 1.5);
+});
+
+test("every wrapper process above the listener appears in the stack's process list", () => {
+  const [stack] = buildStacks({
+    registry: TREE_REGISTRY,
+    rows: TREE_ROWS,
+    listeners: { [portsForSlot(2).backend]: [804] },
+    lanAddress: "192.168.1.24",
+    cwdForPid: () => "/wt/4d",
+  });
+  const pids = stack.processes.map((p) => p.pid).sort((a, b) => a - b);
+  assert.deepEqual(pids, [800, 801, 802, 803, 804]);
+  assert.equal(stack.processes.find((p) => p.pid === 804).role, "backend");
+  assert.equal(stack.processes.find((p) => p.pid === 800).role, "other");
+});
+
+// Measured on this machine: the vite chain of slot 0 continues upward
+// into `codex` (97 MB) and then `ChatGPT` (277 MB) — the agent that
+// launched the dev server. processCwd(41061) is "/", and neither comm is
+// a node-toolchain name, so both conditions stop the climb there.
+const AGENT_ROWS = [
+  { pid: 899, ppid: 1, rss: 277_536, cpu: 0.6, comm: "/Applications/ChatGPT.app/Contents/MacOS/ChatGPT" },
+  { pid: 900, ppid: 899, rss: 97_536, cpu: 0.1, comm: "/Applications/ChatGPT.app/Contents/Resources/codex" },
+  { pid: 901, ppid: 900, rss: 46_496, cpu: 0.1, comm: "npm run frontend" },
+  { pid: 902, ppid: 901, rss: 1_024, cpu: 0.2, comm: "sh" },
+  { pid: 903, ppid: 902, rss: 46_800, cpu: 0.3, comm: "npm run dev" },
+  { pid: 904, ppid: 903, rss: 59_216, cpu: 0.4, comm: "node" },
+];
+
+test("the climb stops below a process that is not attributable to the worktree", () => {
+  const [stack] = buildStacks({
+    registry: TREE_REGISTRY,
+    rows: AGENT_ROWS,
+    listeners: { [portsForSlot(2).vite]: [904] },
+    lanAddress: "192.168.1.24",
+    cwdForPid: (pid) => (pid >= 901 ? "/wt/4d" : "/"),
+  });
+  const pids = stack.processes.map((p) => p.pid).sort((a, b) => a - b);
+  assert.deepEqual(pids, [901, 902, 903, 904]);
+  assert.equal(stack.rssTotalMB, Math.round((46_496 + 1_024 + 46_800 + 59_216) / 1024));
+});
+
+test("an ancestor inside the worktree that is not a toolchain process still stops the climb", () => {
+  const rows = [
+    { pid: 899, ppid: 1, rss: 277_536, cpu: 0.6, comm: "/Applications/ChatGPT.app/Contents/Resources/codex" },
+    { pid: 901, ppid: 899, rss: 46_496, cpu: 0.1, comm: "npm run frontend" },
+    { pid: 904, ppid: 901, rss: 59_216, cpu: 0.4, comm: "node" },
+  ];
+  const [stack] = buildStacks({
+    registry: TREE_REGISTRY,
+    rows,
+    listeners: { [portsForSlot(2).vite]: [904] },
+    lanAddress: "192.168.1.24",
+    cwdForPid: () => "/wt/4d",
+  });
+  assert.deepEqual(stack.processes.map((p) => p.pid).sort((a, b) => a - b), [901, 904]);
+});
+
+test("an ancestor whose cwd cannot be resolved stops the climb", () => {
+  const [stack] = buildStacks({
+    registry: TREE_REGISTRY,
+    rows: TREE_ROWS,
+    listeners: { [portsForSlot(2).backend]: [804] },
+    lanAddress: "192.168.1.24",
+    cwdForPid: (pid) => (pid === 804 || pid === 803 ? "/wt/4d" : undefined),
+  });
+  assert.deepEqual(stack.processes.map((p) => p.pid).sort((a, b) => a - b), [803, 804]);
+});
+
+test("a ppid cycle above a listener terminates instead of looping forever", () => {
+  const rows = [
+    { pid: 910, ppid: 911, rss: 1_024, cpu: 0, comm: "node" },
+    { pid: 911, ppid: 910, rss: 1_024, cpu: 0, comm: "node" },
+  ];
+  const [stack] = buildStacks({
+    registry: TREE_REGISTRY,
+    rows,
+    listeners: { [portsForSlot(2).backend]: [910] },
+    lanAddress: undefined,
+    cwdForPid: () => "/wt/4d",
+  });
+  assert.deepEqual(stack.processes.map((p) => p.pid).sort((a, b) => a - b), [910, 911]);
 });

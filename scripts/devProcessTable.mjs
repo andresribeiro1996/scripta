@@ -58,10 +58,18 @@ export function subtreePids(rootPid, childIndex) {
   return [...seen];
 }
 
-export function sumSubtree(rootPid, rows) {
-  const byPid = new Map(rows.map((row) => [row.pid, row]));
+export function indexProcessTable(rows) {
+  return { byPid: new Map(rows.map((row) => [row.pid, row])), childIndex: childrenByPpid(rows) };
+}
+
+// `index` is optional and defaults to building both maps here, so the
+// two-argument call sites (devDevices.mjs) are unchanged. Callers that
+// sum many roots over one `ps` table pass a hoisted index instead, which
+// is the difference between one index build and one per root.
+export function sumSubtree(rootPid, rows, index = indexProcessTable(rows)) {
+  const { byPid, childIndex } = index;
   if (!byPid.has(rootPid)) return { rssKB: 0, cpu: 0, pids: [] };
-  const pids = subtreePids(rootPid, childrenByPpid(rows)).filter((pid) => byPid.has(pid));
+  const pids = subtreePids(rootPid, childIndex).filter((pid) => byPid.has(pid));
   return {
     rssKB: pids.reduce((total, pid) => total + byPid.get(pid).rss, 0),
     cpu: Number(pids.reduce((total, pid) => total + byPid.get(pid).cpu, 0).toFixed(1)),

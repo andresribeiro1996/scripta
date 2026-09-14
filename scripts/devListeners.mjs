@@ -25,11 +25,11 @@ export function parseListeners(output) {
 export function readListeners(exec = execFileSync) {
   try {
     return parseListeners(exec("lsof", ["-nP", "-iTCP", "-sTCP:LISTEN", "-Fpn"], { encoding: "utf8" }));
-  } catch (error) {
+  } catch {
     // lsof exits 1 with empty output when nothing is listening at all —
     // the normal empty case, not a failure. A missing lsof lands here
-    // too, and this tool must degrade rather than abort.
-    if (error.status === 1) return {};
+    // too, and this tool must degrade rather than abort. Both read as an
+    // empty listener map.
     return {};
   }
 }

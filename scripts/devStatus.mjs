@@ -2,7 +2,7 @@ import { cpus, totalmem } from "node:os";
 import { collectDevices, orphanSerials, readAdbSerials } from "./devDevices.mjs";
 import { DEFAULT_LIMITS, readHost } from "./devHost.mjs";
 import { readListeners } from "./devListeners.mjs";
-import { readProcessTable, sumSubtree } from "./devProcessTable.mjs";
+import { indexProcessTable, readProcessTable, sumSubtree } from "./devProcessTable.mjs";
 import { isPidAlive, portsForSlot, readRegistry, registryPath } from "./devRegistry.mjs";
 import { processCwd } from "./devTeardown.mjs";
 import { pickLanAddress } from "./lanAddress.mjs";
@@ -49,25 +49,89 @@ export function auditPorts({ ports, listeners, worktree, cwdForPid }) {
   });
 }
 
+// A stack's true root is ABOVE its listener, never below it. Measured on
+// this machine: the backend listener 77852 is a leaf whose `node`,
+// `npm run dev`, `sh` and `npm run backend` supervisors are all its
+// ancestors, and 76% of the stack's RSS lives in them. Walking only
+// downward from the listener (and from the recorded pid, which
+// dev-emulator.mjs leaves dead) reported three leaf processes and missed
+// the rest.
+//
+// THE STOP CONDITION IS THE DANGEROUS PART. Measured on this machine, the
+// vite chain continues upward into `codex` (97 MB) and then `ChatGPT`
+// (277 MB) — the agent that happened to launch the dev server. An
+// unbounded climb bills a third of a gigabyte of unrelated editor to this
+// stack. So an ancestor is only crossed when BOTH hold:
+//   - its cwd is at or inside the worktree (processCwd(41061) is "/" for
+//     codex here, but an agent started from the repo root would pass this
+//     alone, which is why it is not the only condition), and
+//   - its comm names a node-toolchain supervisor. The whole real chain is
+//     node/npm/sh; `codex` and `ChatGPT` are not.
+// pid 1 (and an unknown or already-visited parent) always terminates it.
+const SUPERVISOR_COMMS = new Set(["node", "npm", "npx", "sh", "bash", "zsh", "tsx"]);
+
+// macOS `ps -o comm` prints npm as its full argv line ("npm run backend")
+// and everything else as a path that may itself contain spaces
+// ("/Applications/Some App.app/Contents/MacOS/Some App"), so the name is
+// the first whitespace-delimited word of the path's last segment.
+function commName(comm) {
+  return comm.slice(comm.lastIndexOf("/") + 1).split(/\s+/)[0];
+}
+
+function isStackAncestor(row, worktree, cwdForPid) {
+  if (!SUPERVISOR_COMMS.has(commName(row.comm))) return false;
+  const cwd = cwdForPid(row.pid);
+  if (typeof cwd !== "string" || cwd.length === 0) return false;
+  return cwd === worktree || cwd.startsWith(`${worktree}/`);
+}
+
+export function climbToStackRoot(pid, { byPid, worktree, cwdForPid }) {
+  let current = byPid.get(pid);
+  if (current === undefined) return pid;
+  const seen = new Set([current.pid]);
+  while (current.ppid > 1) {
+    const parent = byPid.get(current.ppid);
+    if (parent === undefined || seen.has(parent.pid)) break;
+    if (!isStackAncestor(parent, worktree, cwdForPid)) break;
+    seen.add(parent.pid);
+    current = parent;
+  }
+  return current.pid;
+}
+
 export function buildStacks({ registry, rows, listeners, lanAddress, cwdForPid = processCwd }) {
+  const index = indexProcessTable(rows);
+  const { byPid } = index;
+  // processCwd shells out to lsof, and the climb asks about the same
+  // ancestor once per listener, so the answers are memoised per call.
+  const cwdCache = new Map();
+  const cwdOnce = (pid) => {
+    if (!cwdCache.has(pid)) cwdCache.set(pid, cwdForPid(pid));
+    return cwdCache.get(pid);
+  };
   return Object.keys(registry.slots)
     .map(Number)
     .sort((a, b) => a - b)
     .map((slot) => {
       const entry = registry.slots[String(slot)];
       const ports = portsForSlot(slot);
-      const portAudit = auditPorts({ ports, listeners, worktree: entry.worktree, cwdForPid });
+      const portAudit = auditPorts({ ports, listeners, worktree: entry.worktree, cwdForPid: cwdOnce });
 
       const roleByPid = new Map(portAudit.flatMap(({ role, pids }) => pids.map((pid) => [pid, role])));
-      // Every pid the slot owns: the recorded claimer's subtree plus each
-      // listener's subtree. They are usually disjoint — the claimer exits
-      // and the servers it spawned are reparented to launchd — so both
-      // roots must be walked, and the union deduped.
-      const roots = [entry.pid, ...portAudit.flatMap(({ pids }) => pids)];
-      const byPid = new Map(rows.map((row) => [row.pid, row]));
+      // Every pid the slot owns: the recorded claimer's subtree, plus the
+      // subtree of the highest ancestor of each listener still
+      // attributable to this worktree. They are usually disjoint — the
+      // claimer exits and the servers it spawned are reparented to
+      // launchd — so every root is walked and the union deduped.
+      const roots = [
+        entry.pid,
+        ...portAudit.flatMap(({ pids }) =>
+          pids.map((pid) => climbToStackRoot(pid, { byPid, worktree: entry.worktree, cwdForPid: cwdOnce })),
+        ),
+      ];
       const owned = new Map();
       for (const root of roots) {
-        for (const pid of sumSubtree(root, rows).pids) owned.set(pid, byPid.get(pid));
+        for (const pid of sumSubtree(root, rows, index).pids) owned.set(pid, byPid.get(pid));
       }
 
       const processes = [...owned.values()].map((row) => ({
@@ -97,7 +161,7 @@ export function buildStacks({ registry, rows, listeners, lanAddress, cwdForPid =
 
 export const DEVICE_LEASE_WARN_MS = 30 * 60 * 1000;
 
-export function statusWarnings({ host, stacks, devices, orphans, limits = DEFAULT_LIMITS, now = Date.now() }) {
+export function statusWarnings({ host, stacks, devices, orphans, limits = DEFAULT_LIMITS }) {
   const warnings = [];
 
   if (host.freeBytes < limits.minFreeBytes) {
@@ -170,6 +234,6 @@ export function collectStatus({
   const stacks = buildStacks({ registry, rows, listeners, lanAddress, cwdForPid });
   const devices = collectDevices({ registry, rows, now });
   const orphans = orphanSerials(registry, serials);
-  const warnings = statusWarnings({ host, stacks, devices, orphans, limits, now });
+  const warnings = statusWarnings({ host, stacks, devices, orphans, limits });
   return { host, stacks, devices, orphans, limits, warnings };
 }

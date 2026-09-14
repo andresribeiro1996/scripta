@@ -115,7 +115,25 @@ function mkdirRuntimeDir() {
 // are normalised — every caller here does string work on them.
 function run(command, args, { env, timeoutMs = 15_000 } = {}) {
   const result = spawnSync(command, args, { env, encoding: "utf8", timeout: timeoutMs });
+  // A killed child is otherwise indistinguishable from a quiet success —
+  // a timed-out `adb reverse` used to resurface only 180 seconds later as
+  // "Timed out waiting for: first bundle". Warn, never throw: every
+  // caller here already handles its own failure.
+  if (result.error?.code === "ETIMEDOUT") {
+    log(`Warning: \`${command} ${args.join(" ")}\` timed out after ${timeoutMs}ms and was killed.`);
+  }
   return { ...result, stdout: result.stdout ?? "", stderr: result.stderr ?? "" };
+}
+
+// `avdmanager create avd --force` OVERWRITES an existing AVD, so a failed
+// or timed-out `avdmanager list avd` must read as "unknown — do not
+// recreate", never as "absent". spawnSync reports a killed child in
+// `error` and a real failure in a non-zero `status`; only a clean exit
+// makes the empty-list conclusion trustworthy.
+export function shouldCreateAvd(result, avd) {
+  if (result.error !== undefined && result.error !== null) return false;
+  if (result.status !== 0) return false;
+  return !(result.stdout ?? "").includes(avd);
 }
 
 // Pure decision function — given `adb devices` output and a name-lookup
@@ -161,8 +179,8 @@ async function ensureAvdBooted(avd, env) {
   if (serial) {
     log(`${avd} already running as ${serial}.`);
   } else {
-    const { stdout: avds } = run("avdmanager", ["list", "avd"], { env });
-    if (!avds.includes(avd)) {
+    const listed = run("avdmanager", ["list", "avd"], { env });
+    if (shouldCreateAvd(listed, avd)) {
       log(`Creating the ${avd} AVD (first run on this machine)...`);
       const create = spawnSync(
         "avdmanager",

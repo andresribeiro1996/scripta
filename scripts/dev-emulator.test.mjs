@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { parseAvdNameOutput, pickSerialForAvd } from "./dev-emulator.mjs";
+import { parseAvdNameOutput, pickSerialForAvd, shouldCreateAvd } from "./dev-emulator.mjs";
 
 const TWO_EMULATORS = "List of devices attached\nemulator-5554\tdevice\nemulator-5556\tdevice\n";
 
@@ -47,4 +47,19 @@ test("parseAvdNameOutput tolerates leading blank lines", () => {
 
 test("parseAvdNameOutput returns null for blank output", () => {
   assert.equal(parseAvdNameOutput("\n\n"), null);
+});
+
+test("shouldCreateAvd creates only when a clean listing omits the AVD", () => {
+  const listing = "Available Android Virtual Devices:\n    Name: scripta-dev-0\n";
+  assert.equal(shouldCreateAvd({ status: 0, stdout: listing }, "scripta-dev-1"), true);
+  assert.equal(shouldCreateAvd({ status: 0, stdout: listing }, "scripta-dev-0"), false);
+});
+
+test("a timed-out avdmanager listing never recreates an existing AVD", () => {
+  const killed = { status: null, stdout: "", error: Object.assign(new Error("spawnSync ETIMEDOUT"), { code: "ETIMEDOUT" }) };
+  assert.equal(shouldCreateAvd(killed, "scripta-dev-0"), false);
+});
+
+test("a failed avdmanager listing is unknown, not absent", () => {
+  assert.equal(shouldCreateAvd({ status: 1, stdout: "" }, "scripta-dev-0"), false);
 });
