@@ -16,15 +16,23 @@ import { applySlotEnv } from "./devSlotEnv.mjs";
 
 // The 4-stack gate must never block a worktree re-running its OWN
 // already-live stack — dev-emulator.mjs documents itself as "Idempotent:
-// safe to re-run any time" — so this only counts OTHER worktrees' live
-// slots, and only applies the gate at all when this worktree is about to
-// be handed a genuinely NEW slot: claimSlot short-circuits to reusing its
-// own slot before ever consulting isSlotLive, so re-claiming adds no new
-// stack and must never be counted against, or blocked by, other
-// worktrees' stacks.
+// safe to re-run any time" — so the STACK-COUNT check excludes this
+// worktree's own slot, but ONLY when that slot is actually live
+// (isSlotLive, not mere presence in registry.slots): a stale record from
+// a worktree that crashed without `npm run dev:release` — dead pid, free
+// ports — is not a live re-claim, and must still count toward the limit
+// like any other slot, since the claim about to follow spawns genuinely
+// new, memory-consuming processes. Memory and load-average are NEVER
+// excluded, on any path: re-claiming a live slot adds no new stack, but
+// it does nothing to prove the machine has room, and a host genuinely
+// low on memory must still refuse — that's the entire point of the gate.
 export function assertResourceGate({ registry, worktree, isPortFree, limits = DEFAULT_LIMITS, host }) {
-  if (slotForWorktree(registry, worktree) !== undefined) return;
-  const stackCount = Object.entries(registry.slots).filter(([slot, entry]) => isSlotLive(slot, entry, isPortFree)).length;
+  const ownSlot = slotForWorktree(registry, worktree);
+  const ownSlotIsLiveReclaim = ownSlot !== undefined && isSlotLive(ownSlot, registry.slots[ownSlot], isPortFree);
+  const stackCount = Object.entries(registry.slots).filter(([slot, entry]) => {
+    if (ownSlotIsLiveReclaim && slot === ownSlot) return false;
+    return isSlotLive(slot, entry, isPortFree);
+  }).length;
   assertResourcesAvailable({ stackCount, limits, host });
 }
 

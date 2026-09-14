@@ -11,10 +11,47 @@ const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const realExample = readFileSync(join(repoRoot, "backend", ".env.example"), "utf8");
 
 const roomyHost = { freeBytes: 16 * 1024 ** 3, loadAvg1: 1 };
+const starvedHost = { freeBytes: 1 * 1024 ** 3, loadAvg1: 1 };
 
 function liveEntry() {
   return { worktree: "/wt/other", branch: "b", pid: process.pid, session: null, claimedAt: "t" };
 }
+
+// A dead pid — never a real, currently-running process — so isSlotLive
+// only calls this "live" if a port is also occupied. Paired with
+// isPortFree: () => true below, this is the stale case: a worktree that
+// crashed (or had its terminal closed) without `npm run dev:release`.
+function staleEntry() {
+  return { worktree: "/wt/other", branch: "b", pid: 2_147_483_646, session: null, claimedAt: "t" };
+}
+
+test("assertResourceGate: a STALE entry for this worktree does not exempt it — low memory still throws", () => {
+  const registry = {
+    slots: { 1: { ...staleEntry(), worktree: "/wt/self" } },
+    devices: {},
+  };
+  // Only one (stale) slot on record, well under the stack-count limit —
+  // this must fail on the memory check, not slide past it because the
+  // record happens to name this worktree.
+  assert.throws(
+    () => assertResourceGate({ registry, worktree: "/wt/self", isPortFree: () => true, host: starvedHost }),
+    /memory/i,
+  );
+});
+
+test("assertResourceGate: a LIVE slot for this worktree plus low memory still throws", () => {
+  const registry = {
+    slots: { 1: { ...liveEntry(), worktree: "/wt/self" } },
+    devices: {},
+  };
+  // The stack-count exclusion for a live re-claim must never leak into
+  // the memory/load checks — those run on every path, live re-claim or
+  // not.
+  assert.throws(
+    () => assertResourceGate({ registry, worktree: "/wt/self", isPortFree: () => true, host: starvedHost }),
+    /memory/i,
+  );
+});
 
 test("assertResourceGate: this worktree's own live slot does not count toward the limit", () => {
   const registry = {
