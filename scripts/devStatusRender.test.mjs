@@ -37,8 +37,8 @@ const STATUS = {
 test("formatTable pads every column to its widest cell", () => {
   const out = formatTable(["A", "BBBB"], [["aaa", "b"]]);
   const [header, row] = out.split("\n");
-  assert.match(header, /^ A {3}BBBB$/);
-  assert.match(row, /^ aaa b {3}$/);
+  assert.match(header, /^ A {4}BBBB$/);
+  assert.match(row, /^ aaa {2}b {3}$/);
 });
 
 test("renderStatus prints the host line, the slot row and its ports", () => {
@@ -62,6 +62,11 @@ test("renderStatus prints device holders and marks a free AVD free", () => {
 
 test("renderStatus prints the headroom line against the boot floor", () => {
   assert.match(renderStatus(STATUS), /1 of 4 stacks · 4\.2 GB above the 4 GB floor/);
+});
+
+test("renderStatus prints headroom as below the floor when free memory is under it", () => {
+  const belowFloor = { ...STATUS, host: { ...STATUS.host, freeBytes: 2.7 * 1024 ** 3 } };
+  assert.match(renderStatus(belowFloor), /1 of 4 stacks · 1\.3 GB below the 4 GB floor/);
 });
 
 test("renderStatus prints warnings under the table, marked", () => {

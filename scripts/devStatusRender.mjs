@@ -2,7 +2,7 @@ export function formatTable(headers, rows) {
   const widths = headers.map((header, column) =>
     Math.max(header.length, ...rows.map((row) => String(row[column] ?? "").length)),
   );
-  const line = (cells) => ` ${cells.map((cell, column) => String(cell ?? "").padEnd(widths[column])).join(" ")}`;
+  const line = (cells) => ` ${cells.map((cell, column) => String(cell ?? "").padEnd(widths[column])).join("  ")}`;
   return [line(headers), ...rows.map(line)].join("\n");
 }
 
@@ -18,6 +18,7 @@ export function renderStatus(status) {
   const { host, stacks, devices, limits, warnings } = status;
   const headroomGB = (host.freeBytes - limits.minFreeBytes) / 1024 ** 3;
   const floorGB = (limits.minFreeBytes / 1024 ** 3).toFixed(0);
+  const headroomDirection = headroomGB < 0 ? "below" : "above";
 
   const sections = [
     `scripta dev · ${host.lanAddress ?? "no LAN address"} · ${host.totalMemGB} GB total, ${host.freeMemGB} GB free · load ${host.loadAvg1.toFixed(1)} / ${host.cores} cores`,
@@ -55,7 +56,7 @@ export function renderStatus(status) {
       ),
     ),
     "",
-    ` ${stacks.length} of ${limits.maxStacks} stacks · ${headroomGB.toFixed(1)} GB above the ${floorGB} GB floor`,
+    ` ${stacks.length} of ${limits.maxStacks} stacks · ${Math.abs(headroomGB).toFixed(1)} GB ${headroomDirection} the ${floorGB} GB floor`,
   );
 
   if (warnings.length > 0) {
