@@ -4,7 +4,7 @@
 
 import type { DatabaseSync } from "node:sqlite";
 import type { ArenaRepository } from "../../domain/ports.js";
-import type { DuelRow, TournamentRow, TournamentSlotRow, VoteRow } from "../../domain/types.js";
+import type { DuelRow, SeedPreview, TournamentRow, TournamentSlotRow, VoteRow } from "../../domain/types.js";
 
 export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
   const insertTournamentStmt = db.prepare(`
@@ -29,6 +29,15 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
     VALUES ($tournament_id, $slot_index, $book_key, $title, $author, $cover_url)
   `);
   const getSlotsStmt = db.prepare(`SELECT * FROM tournament_slots WHERE tournament_id = ? ORDER BY slot_index ASC`);
+  // One statement for a whole page of cards. The IN list is built per call
+  // because better-sqlite3 has no array binding — the ids come from rows this
+  // module just read, never from a request, and each is still a bound `?`.
+  const seedPreviewStmt = (count: number) =>
+    db.prepare(
+      `SELECT tournament_id, slot_index, cover_url FROM tournament_slots ` +
+        `WHERE tournament_id IN (${new Array(count).fill("?").join(", ")}) ` +
+        `ORDER BY tournament_id ASC, slot_index ASC`
+    );
 
   const insertDuelStmt = db.prepare(`
     INSERT INTO duels (id, tournament_id, round_number, duel_index, book_a_key, book_a_title, book_a_author, book_a_cover,
@@ -107,6 +116,21 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
     },
     getSlots(tournamentId) {
       return getSlotsStmt.all(tournamentId) as unknown as TournamentSlotRow[];
+    },
+
+    getSeedPreviews(tournamentIds, coverLimit) {
+      const previews = new Map<string, SeedPreview>();
+      if (tournamentIds.length === 0) return previews;
+      const rows = seedPreviewStmt(tournamentIds.length).all(...tournamentIds) as unknown as Array<
+        Pick<TournamentSlotRow, "tournament_id" | "cover_url">
+      >;
+      for (const row of rows) {
+        const preview = previews.get(row.tournament_id) ?? { covers: [], filledSlots: 0 };
+        preview.filledSlots += 1;
+        if (row.cover_url && preview.covers.length < coverLimit) preview.covers.push(row.cover_url);
+        previews.set(row.tournament_id, preview);
+      }
+      return previews;
     },
 
     insertDuels(duels) {

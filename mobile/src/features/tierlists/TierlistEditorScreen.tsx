@@ -12,7 +12,7 @@ import { TierlistResults } from "./TierlistResults";
 
 interface LibraryResponse { data: { books?: Array<Record<string, unknown>> } | null }
 
-export function TierlistEditorScreen({ tierlist, onClose, onUpdated }: { tierlist: Tierlist; onClose: () => void; onUpdated: (tierlist: Tierlist) => void }) {
+export function TierlistEditorScreen({ tierlist, onUpdated }: { tierlist: Tierlist; onUpdated: (tierlist: Tierlist) => void }) {
   const { colors } = useTheme();
   const queryClient = useQueryClient();
   const [current, setCurrent] = useState(tierlist);

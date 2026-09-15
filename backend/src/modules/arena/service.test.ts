@@ -18,7 +18,7 @@ import {
   TournamentNotFoundError
 } from "./domain/errors.js";
 import type { ArenaRepository } from "./domain/ports.js";
-import type { DuelRow, TournamentRow, TournamentSlotRow, VoteRow } from "./domain/types.js";
+import type { DuelRow, SeedPreview, TournamentRow, TournamentSlotRow, VoteRow } from "./domain/types.js";
 import { createArenaService } from "./service.js";
 import type { DuelView } from "./service.js";
 
@@ -69,6 +69,18 @@ function createInMemoryArenaRepository(): ArenaRepository {
       return [...(slots.get(tournamentId) ?? [])];
     },
 
+    getSeedPreviews(tournamentIds, coverLimit) {
+      const previews = new Map<string, SeedPreview>();
+      for (const id of tournamentIds) {
+        const rows = [...(slots.get(id) ?? [])].sort((a, b) => a.slot_index - b.slot_index);
+        previews.set(id, {
+          covers: rows.map((row) => row.cover_url).filter((url): url is string => Boolean(url)).slice(0, coverLimit),
+          filledSlots: rows.length
+        });
+      }
+      return previews;
+    },
+
     insertDuels(newDuels) {
       for (const duel of newDuels) duels.set(duel.id, { ...duel });
     },
@@ -113,6 +125,55 @@ function createInMemoryArenaRepository(): ArenaRepository {
 function makeBook(n: number) {
   return { key: `book-${n}`, title: `Book ${n}`, author: `Author ${n}`, cover: null };
 }
+
+function makeBookWithCover(n: number) {
+  return { key: `book-${n}`, title: `Book ${n}`, author: `Author ${n}`, cover: `https://covers.test/${n}.jpg` };
+}
+
+test("a summary carries the seeded cover preview and how many slots are filled", () => {
+  const service = createArenaService(createInMemoryArenaRepository());
+  const tournament = service.createTournament("owner-1", { name: "Best of 2025", bracketSize: 8, roundDurationMinutes: 60 });
+  service.setSlotsManual(tournament.id, "owner-1", [
+    { slotIndex: 0, book: makeBookWithCover(1) },
+    { slotIndex: 1, book: makeBookWithCover(2) },
+    { slotIndex: 2, book: makeBookWithCover(3) },
+    { slotIndex: 3, book: makeBookWithCover(4) },
+    { slotIndex: 4, book: makeBookWithCover(5) }
+  ]);
+
+  const summary = service.listMine("owner-1")[0];
+  assert.equal(summary?.filledSlots, 5);
+  // Capped at four: the card shows four thumbnails and a remainder.
+  assert.deepEqual(summary?.covers, [
+    "https://covers.test/1.jpg",
+    "https://covers.test/2.jpg",
+    "https://covers.test/3.jpg",
+    "https://covers.test/4.jpg"
+  ]);
+});
+
+test("a cover preview skips slots seeded without art but still counts them", () => {
+  const service = createArenaService(createInMemoryArenaRepository());
+  const tournament = service.createTournament("owner-1", { name: "No art", bracketSize: 4, roundDurationMinutes: 60 });
+  service.setSlotsManual(tournament.id, "owner-1", [
+    { slotIndex: 0, book: makeBook(1) },
+    { slotIndex: 1, book: makeBookWithCover(2) },
+    { slotIndex: 2, book: makeBook(3) }
+  ]);
+
+  const summary = service.listMine("owner-1")[0];
+  assert.equal(summary?.filledSlots, 3);
+  assert.deepEqual(summary?.covers, ["https://covers.test/2.jpg"]);
+});
+
+test("an unseeded tournament has an empty preview rather than a missing one", () => {
+  const service = createArenaService(createInMemoryArenaRepository());
+  service.createTournament("owner-1", { name: "Fresh", bracketSize: 4, roundDurationMinutes: 60 });
+
+  const summary = service.listMine("owner-1")[0];
+  assert.equal(summary?.filledSlots, 0);
+  assert.deepEqual(summary?.covers, []);
+});
 
 test("renameTournament changes the name and leaves the bracket alone", () => {
   const service = createArenaService(createInMemoryArenaRepository());

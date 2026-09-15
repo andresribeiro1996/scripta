@@ -27,7 +27,7 @@ import {
   TournamentNotFoundError
 } from "./domain/errors.js";
 import type { ArenaRepository } from "./domain/ports.js";
-import type { DuelRow, SeedBookInput, TournamentRow, TournamentSlotRow } from "./domain/types.js";
+import type { DuelRow, SeedBookInput, SeedPreview, TournamentRow, TournamentSlotRow } from "./domain/types.js";
 
 export interface TournamentSummary {
   id: string;
@@ -38,6 +38,10 @@ export interface TournamentSummary {
   currentRound: number;
   createdAt: string;
   ownerUserId: string;
+  /** Up to four cover URLs from the seeded pool, for the list card.
+   *  Empty when nothing is seeded yet, or when no seeded book had art. */
+  covers: string[];
+  filledSlots: number;
 }
 
 export interface DuelSideView extends SeedBookInput {
@@ -86,7 +90,13 @@ function isPowerOfTwo(n: number): boolean {
   return n >= 2 && (n & (n - 1)) === 0;
 }
 
-function toTournamentSummary(row: TournamentRow): TournamentSummary {
+const COVER_PREVIEW_LIMIT = 4;
+const EMPTY_PREVIEW: SeedPreview = { covers: [], filledSlots: 0 };
+
+// The preview is a required argument rather than an optional one: every
+// caller has to say what a card should show, so a new list endpoint can't
+// quietly ship summaries with no covers and no error to notice.
+function toTournamentSummary(row: TournamentRow, preview: SeedPreview): TournamentSummary {
   return {
     id: row.id,
     name: row.name,
@@ -95,8 +105,25 @@ function toTournamentSummary(row: TournamentRow): TournamentSummary {
     status: row.status,
     currentRound: row.current_round,
     createdAt: row.created_at,
-    ownerUserId: row.owner_user_id
+    ownerUserId: row.owner_user_id,
+    covers: preview.covers,
+    filledSlots: preview.filledSlots
   };
+}
+
+export function previewFromSlots(slots: TournamentSlotRow[]): SeedPreview {
+  const covers: string[] = [];
+  for (const slot of slots) {
+    if (covers.length >= COVER_PREVIEW_LIMIT) break;
+    if (slot.cover_url) covers.push(slot.cover_url);
+  }
+  return { covers, filledSlots: slots.length };
+}
+
+function summariesWithPreviews(repo: ArenaRepository, rows: TournamentRow[]): TournamentSummary[] {
+  if (rows.length === 0) return [];
+  const previews = repo.getSeedPreviews(rows.map((row) => row.id), COVER_PREVIEW_LIMIT);
+  return rows.map((row) => toTournamentSummary(row, previews.get(row.id) ?? EMPTY_PREVIEW));
 }
 
 function winnerBookFromDuel(d: DuelRow): SeedBookInput {
@@ -219,15 +246,15 @@ export function createArenaService(repo: ArenaRepository): ArenaService {
         updated_at: now
       };
       repo.insertTournament(row);
-      return toTournamentSummary(row);
+      return toTournamentSummary(row, EMPTY_PREVIEW);
     },
 
     listMine(ownerUserId) {
-      return repo.listTournamentsByOwner(ownerUserId).map(toTournamentSummary);
+      return summariesWithPreviews(repo, repo.listTournamentsByOwner(ownerUserId));
     },
 
     listPublic(limit, offset) {
-      return repo.listPublicTournaments(limit, offset).map(toTournamentSummary);
+      return summariesWithPreviews(repo, repo.listPublicTournaments(limit, offset));
     },
 
     getTournamentView(id, voterToken) {
@@ -238,7 +265,7 @@ export function createArenaService(repo: ArenaRepository): ArenaService {
         .getDuelsForTournament(id)
         .sort((a, b) => a.round_number - b.round_number || a.duel_index - b.duel_index);
       return {
-        ...toTournamentSummary(tournament),
+        ...toTournamentSummary(tournament, previewFromSlots(slots)),
         slots: slots.map((s) => ({ slotIndex: s.slot_index, key: s.book_key, title: s.title, author: s.author, cover: s.cover_url })),
         duels: duels.map((d) => toDuelView(d, voterToken))
       };

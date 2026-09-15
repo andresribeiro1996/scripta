@@ -13,11 +13,14 @@ import {
   type ViewStyle,
 } from "react-native";
 import MenuView, { type MenuAction } from "@expo/ui/community/menu";
+import PagerView from "react-native-pager-view";
 import { Icon, type IconName } from "./icon";
 import SegmentedControl from "@expo/ui/community/segmented-control";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { errorHaptic, successHaptic } from "./haptics";
 import { dynamicType, minimumTouchTarget, radii, spacing, typography, useReducedMotion, useTheme } from "./theme";
+
+const AnimatedPagerView = Animated.createAnimatedComponent(PagerView);
 
 // Every screen root: paints the themed background and pays whichever safe-area
 // insets nothing else is covering.
@@ -104,15 +107,20 @@ export function Button({
 export function IconButton({
   name,
   accessibilityLabel,
+  label,
   onPress,
   tone = "default",
 }: {
   name: IconName;
   accessibilityLabel: string;
+  /** Draws the word beside the glyph. Use wherever the glyph alone is a guess
+   *  — a globe could be public, or language, or region. */
+  label?: string;
   onPress?: () => void;
   tone?: "default" | "danger";
 }) {
   const { colors } = useTheme();
+  const color = tone === "danger" ? colors.danger : colors.textDim;
   return (
     <Pressable
       accessibilityLabel={accessibilityLabel}
@@ -120,11 +128,12 @@ export function IconButton({
       hitSlop={8}
       onPress={onPress}
       style={({ pressed }) => [
-        styles.iconButton,
+        label ? styles.labelledIconButton : styles.iconButton,
         { backgroundColor: pressed ? colors.surfacePressed : "transparent" },
       ]}
     >
-      <Icon color={tone === "danger" ? colors.danger : colors.textDim} name={name} size={22} />
+      <Icon color={color} name={name} size={22} />
+      {label ? <Text {...dynamicType} numberOfLines={1} style={[typography.body, { color }]}>{label}</Text> : null}
     </Pressable>
   );
 }
@@ -270,6 +279,150 @@ export function Segmented<T extends string>({
         values={options.map((option) => option.label)}
       />
     </View>
+  );
+}
+
+// Panes of content, swiped or tapped. A segmented control is the wrong
+// component for this: on both platforms it selects an option or a filter —
+// hence the checkmark Android draws in it — while moving between panes is what
+// tabs are for, and tabs bring an indicator that tracks the finger mid-drag.
+//
+// The tab row stays visible because the swipe is an accelerator, never the only
+// path: a gesture-only switch is invisible to a first-time user and unreachable
+// with a screen reader or limited motor control.
+//
+// Android consumes swipes that start within a few dp of either screen edge as
+// its back gesture. That is the platform's call, not a bug here.
+export function SwipeableTabs<T extends string>({
+  options,
+  value,
+  onChange,
+  renderPage,
+  accessibilityLabel,
+}: {
+  options: readonly { readonly value: T; readonly label: string }[];
+  value: T;
+  onChange: (value: T) => void;
+  renderPage: (value: T, active: boolean) => ReactNode;
+  accessibilityLabel?: string;
+}) {
+  const { colors } = useTheme();
+  const reducedMotion = useReducedMotion();
+  const pager = useRef<PagerView>(null);
+  const [rowWidth, setRowWidth] = useState(0);
+  const index = Math.max(0, options.findIndex((option) => option.value === value));
+  // position and offset arrive as separate keys on one native event, so they
+  // are two values added together rather than one.
+  const position = useRef(new Animated.Value(0)).current;
+  const offset = useRef(new Animated.Value(0)).current;
+  const tabWidth = options.length ? rowWidth / options.length : 0;
+
+  // The pager is the source of truth for which page is showing; tapping a tab
+  // asks it to move and the selection follows from onPageSelected, so a tap and
+  // a swipe land in exactly the same state.
+  useEffect(() => {
+    if (!pager.current) return;
+    if (reducedMotion) pager.current.setPageWithoutAnimation(index);
+    else pager.current.setPage(index);
+  }, [index, reducedMotion]);
+
+  return (
+    <View style={styles.grow}>
+      <View
+        accessibilityLabel={accessibilityLabel}
+        accessibilityRole="tablist"
+        onLayout={(event) => setRowWidth(event.nativeEvent.layout.width)}
+        style={[styles.tabRow, { borderBottomColor: colors.border }]}
+      >
+        {options.map((option) => {
+          const selected = option.value === value;
+          return (
+            <Pressable
+              accessibilityLabel={option.label}
+              accessibilityRole="tab"
+              accessibilityState={{ selected }}
+              key={option.value}
+              onPress={() => onChange(option.value)}
+              style={({ pressed }) => [
+                styles.tab,
+                { backgroundColor: pressed ? colors.surfacePressed : "transparent" },
+              ]}
+            >
+              <Text
+                {...dynamicType}
+                numberOfLines={1}
+                style={[typography.body, styles.tabLabel, { color: selected ? colors.accent : colors.textDim }]}
+              >
+                {option.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+        {tabWidth ? (
+          <Animated.View
+            style={[
+              styles.tabIndicator,
+              {
+                backgroundColor: colors.accent,
+                width: tabWidth,
+                transform: [{ translateX: Animated.multiply(Animated.add(position, offset), tabWidth) }],
+              },
+            ]}
+          />
+        ) : null}
+      </View>
+      <AnimatedPagerView
+        initialPage={index}
+        onPageScroll={Animated.event([{ nativeEvent: { position, offset } }], { useNativeDriver: true })}
+        onPageSelected={(event) => {
+          const picked = options[event.nativeEvent.position];
+          if (picked && picked.value !== value) onChange(picked.value);
+        }}
+        ref={pager}
+        style={styles.grow}
+      >
+        {options.map((option) => (
+          <View collapsable={false} key={option.value} style={styles.grow}>
+            {renderPage(option.value, option.value === value)}
+          </View>
+        ))}
+      </AnimatedPagerView>
+    </View>
+  );
+}
+
+// The screen's one primary action, in the thumb arc rather than above the
+// content. Extended — the label is the affordance; a bare + on a screen that
+// can create two different things says nothing about which.
+export function Fab({
+  label,
+  icon = "add",
+  onPress,
+  loading = false,
+}: {
+  label: string;
+  icon?: IconName;
+  onPress: () => void;
+  loading?: boolean;
+}) {
+  const { colors } = useTheme();
+  return (
+    <Pressable
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      accessibilityState={{ busy: loading, disabled: loading }}
+      disabled={loading}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.fab,
+        { backgroundColor: pressed ? colors.accentSoft : colors.accent },
+      ]}
+    >
+      {loading
+        ? <ActivityIndicator color={colors.onAccent} />
+        : <Icon color={colors.onAccent} name={icon} size={22} />}
+      <Text {...dynamicType} numberOfLines={1} style={[typography.body, styles.fabLabel, { color: colors.onAccent }]}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -445,6 +598,14 @@ const styles = StyleSheet.create({
   // clamps its subview's width — verified by probing taps either side of the
   // edge on a device, not assumed.
   menuTrigger: { minWidth: 48, minHeight: 48, alignItems: "center", justifyContent: "center" },
+  labelledIconButton: { minHeight: minimumTouchTarget, flexDirection: "row", alignItems: "center", gap: spacing.xs, paddingHorizontal: spacing.sm, borderRadius: radii.full },
+  grow: { flex: 1 },
+  tabRow: { flexDirection: "row", borderBottomWidth: 1 },
+  tab: { flex: 1, minHeight: minimumTouchTarget, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.sm },
+  tabLabel: { fontWeight: "700" },
+  tabIndicator: { position: "absolute", left: 0, bottom: 0, height: 3, borderTopLeftRadius: radii.sm, borderTopRightRadius: radii.sm },
+  fab: { position: "absolute", right: spacing.lg, bottom: spacing.lg, minHeight: 56, flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingHorizontal: spacing.lg, borderRadius: radii.full, elevation: 6, shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
+  fabLabel: { fontWeight: "700" },
   iconButton: { minHeight: minimumTouchTarget, minWidth: minimumTouchTarget, alignItems: "center", justifyContent: "center", borderRadius: radii.full },
   field: { gap: spacing.xs },
   label: { ...typography.body, fontWeight: "600" },
