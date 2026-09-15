@@ -125,7 +125,7 @@ const styles = StyleSheet.create({
   title: { ...typography.heading, fontWeight: "700", flex: 1 },
   folderStrip: { flexGrow: 0, flexShrink: 0 },
   folders: { gap: spacing.sm, alignItems: "center" },
-  list: { gap: spacing.md, paddingBottom: spacing.huge },
+  list: { gap: spacing.md, paddingBottom: spacing.huge, flexGrow: 1 },
   card: { borderWidth: 1, borderRadius: radii.lg, padding: spacing.md, gap: spacing.sm, flexDirection: "row", alignItems: "center" },
   open: { flex: 1, flexDirection: "row", alignItems: "center", gap: spacing.md },
   cover: { width: 64, height: 64, borderRadius: radii.md },

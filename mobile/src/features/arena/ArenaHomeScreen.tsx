@@ -208,8 +208,11 @@ function TierlistBody({ item }: { item: Extract<OwnedItem, { kind: "tierlist" }>
 const styles = StyleSheet.create({
   grow: { flex: 1 },
   strong: { fontWeight: "700" },
-  page: { padding: spacing.lg },
-  // Clears the extended FAB so the last card isn't sitting under it.
+  // flex so a centred EmptyState/ErrorState has a height to centre within —
+  // StatePanel grows and centres itself, which needs a parent that has room.
+  page: { flex: 1, padding: spacing.lg },
+  // flexGrow does the same job for the list's own empty state; paddingBottom
+  // clears the extended FAB so the last card isn't sitting under it.
   list: { padding: spacing.lg, gap: spacing.sm, paddingBottom: 96, flexGrow: 1 },
   card: { minHeight: 92, borderWidth: 1, borderRadius: radii.lg, padding: spacing.md, flexDirection: "row", alignItems: "center", gap: spacing.md },
   row: { flexDirection: "row", alignItems: "center", gap: spacing.md },

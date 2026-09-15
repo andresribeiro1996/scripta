@@ -561,10 +561,12 @@ export function Skeleton({ width = "100%", height = 16, radius = radii.sm, acces
 function StatePanel({ title, body, actionLabel, onAction, error }: { title: string; body?: string; actionLabel?: string; onAction?: () => void; error?: boolean }) {
   const { colors } = useTheme();
   return (
-    <View style={[styles.state, { borderColor: error ? colors.danger : colors.border }]}>
-      <Text accessibilityRole="header" {...dynamicType} style={[styles.stateTitle, { color: error ? colors.danger : colors.text }]}>{title}</Text>
-      {body ? <Text {...dynamicType} style={[typography.body, styles.centerText, { color: colors.textDim }]}>{body}</Text> : null}
-      {actionLabel && onAction ? <Button label={actionLabel} onPress={onAction} variant={error ? "destructive" : "secondary"} /> : null}
+    <View style={styles.state}>
+      <View style={error ? [styles.errorCard, { backgroundColor: colors.dangerSoft }] : styles.emptyCard}>
+        <Text accessibilityRole="header" {...dynamicType} style={[styles.stateTitle, { color: error ? colors.danger : colors.text }]}>{title}</Text>
+        {body ? <Text {...dynamicType} style={[typography.body, styles.centerText, { color: error ? colors.text : colors.textDim }]}>{body}</Text> : null}
+        {actionLabel && onAction ? <Button label={actionLabel} onPress={onAction} variant={error ? "destructive" : "secondary"} /> : null}
+      </View>
     </View>
   );
 }
@@ -621,7 +623,9 @@ const styles = StyleSheet.create({
   closeButton: { minHeight: minimumTouchTarget, minWidth: minimumTouchTarget, alignItems: "center", justifyContent: "center" },
   closeText: { ...typography.body, fontWeight: "600" },
   toast: { borderRadius: radii.md, borderWidth: 1, paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
-  state: { borderWidth: 2, borderStyle: "dashed", borderRadius: radii.lg, padding: spacing.huge, alignItems: "center", gap: spacing.md },
+  state: { flexGrow: 1, justifyContent: "center", paddingVertical: spacing.xxl, paddingHorizontal: spacing.lg },
+  emptyCard: { alignItems: "center", gap: spacing.md },
+  errorCard: { alignItems: "center", gap: spacing.md, borderRadius: radii.lg, padding: spacing.lg },
   stateTitle: { ...typography.title, fontWeight: "700", textAlign: "center" },
   centerText: { textAlign: "center" },
   banner: { minHeight: minimumTouchTarget, justifyContent: "center", paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
