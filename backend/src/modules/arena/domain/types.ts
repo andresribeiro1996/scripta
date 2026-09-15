@@ -32,6 +32,14 @@ export interface TournamentSlotRow {
   cover_url: string | null;
 }
 
+/** What a list card needs about a tournament's seeded pool: the first few
+ *  cover URLs (slots seeded without art are skipped) and the number of
+ *  slots actually filled, which the skipped ones still count toward. */
+export interface SeedPreview {
+  covers: string[];
+  filledSlots: number;
+}
+
 export interface DuelRow {
   id: string;
   tournament_id: string;

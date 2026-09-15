@@ -10,6 +10,9 @@ export interface TournamentSummary {
   currentRound: number;
   createdAt: string;
   ownerUserId: string;
+  /** Up to four cover URLs from the seeded pool, for the list card. */
+  covers: string[];
+  filledSlots: number;
 }
 
 export interface TournamentView extends TournamentSummary {

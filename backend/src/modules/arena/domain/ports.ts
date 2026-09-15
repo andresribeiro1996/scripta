@@ -4,7 +4,7 @@
 // covers, arena has no separate blob store, so there's nothing to split
 // a second port out for.
 
-import type { DuelRow, TournamentRow, TournamentSlotRow, VoteRow } from "./types.js";
+import type { DuelRow, SeedPreview, TournamentRow, TournamentSlotRow, VoteRow } from "./types.js";
 
 export interface ArenaRepository {
   insertTournament(row: TournamentRow): void;
@@ -29,6 +29,10 @@ export interface ArenaRepository {
    *  this tournament first, then inserts the given ones. */
   replaceSlots(tournamentId: string, slots: TournamentSlotRow[]): void;
   getSlots(tournamentId: string): TournamentSlotRow[];
+  /** Cover art for the first few seeded slots of each tournament, plus how
+   *  many slots are filled — what a list card shows without paying a
+   *  getSlots call per row. One query for the whole page, not N. */
+  getSeedPreviews(tournamentIds: string[], coverLimit: number): Map<string, SeedPreview>;
 
   insertDuels(duels: DuelRow[]): void;
   getDuel(id: string): DuelRow | undefined;

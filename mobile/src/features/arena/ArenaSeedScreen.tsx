@@ -9,7 +9,7 @@ import { createTournament, fetchTournament, randomFillTournament, resolveCover, 
 
 interface LibraryResponse { data: { books?: Array<Record<string, unknown>> } | null }
 
-export function ArenaSeedScreen({ tournament, onClose, onStarted }: { tournament?: TournamentSummary; onClose: () => void; onStarted: (id: string) => void }) {
+export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: TournamentSummary; onStarted: (id: string) => void }) {
   const { colors } = useTheme();
   const queryClient = useQueryClient();
   const [name, setName] = useState(tournament?.name ?? "Untitled tournament");
@@ -47,7 +47,10 @@ export function ArenaSeedScreen({ tournament, onClose, onStarted }: { tournament
   async function persist(nextSlots = slots) {
     const target = await materialize();
     await setTournamentSlots(target.id, nextSlots.flatMap((book, slotIndex) => book ? [{ slotIndex, book }] : []));
-    await queryClient.invalidateQueries({ queryKey: ["arena", target.id, "seed"] });
+    // The prefix covers this tournament's seed query AND the owner's list,
+    // whose cards show the seeded covers and how many slots are filled —
+    // both of which just changed.
+    await queryClient.invalidateQueries({ queryKey: ["arena"] });
     return target;
   }
 
@@ -80,7 +83,7 @@ export function ArenaSeedScreen({ tournament, onClose, onStarted }: { tournament
       const refreshed = await fetchTournament(target.id, "owner-seed");
       const byIndex = new Map(refreshed.slots.map((slot) => [slot.slotIndex, slot]));
       setSlots(Array.from({ length: refreshed.bracketSize }, (_, index) => byIndex.get(index) ?? null));
-      await queryClient.invalidateQueries({ queryKey: ["arena", target.id, "seed"] });
+      await queryClient.invalidateQueries({ queryKey: ["arena"] });
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Couldn't fill the bracket.");
     } finally {
