@@ -1,11 +1,14 @@
-"""Generate Scripta's app-icon set from the white-on-transparent source mark.
+"""Generate the app-icon sets from the white-on-transparent source mark.
 
     python3 scripts/make-app-icons.py mobile/assets/images/amsicon-source.png \
-        mobile/assets/images
+        mobile/assets/images mobile
+    python3 scripts/make-app-icons.py mobile/assets/images/amsicon-source.png \
+        frontend/public web
 
-Writes icon.png (opaque, for iOS/base), adaptive-foreground.png and
+mobile writes icon.png (opaque, for iOS/base), adaptive-foreground.png and
 adaptive-monochrome.png (transparent, inset to Android's safe circle), and the
-two splash marks. See mobile/app.json for where each is wired up.
+two splash marks; see mobile/app.json for where each is wired up. web writes
+the three PWA icons; see frontend/index.html and frontend/vite.config.ts.
 
 Pure stdlib on purpose: this machine has neither Pillow nor ImageMagick, and
 installing one for an occasional asset build isn't worth it. Re-run this rather
@@ -149,9 +152,9 @@ def drop_alpha(px):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        sys.exit(f"usage: {sys.argv[0]} <source.png> <output-dir>")
-    src, outdir = sys.argv[1], sys.argv[2]
+    if len(sys.argv) != 4 or sys.argv[3] not in ("mobile", "web"):
+        sys.exit(f"usage: {sys.argv[0]} <source.png> <output-dir> <mobile|web>")
+    src, outdir, target = sys.argv[1], sys.argv[2], sys.argv[3]
     os.makedirs(outdir, exist_ok=True)
     w, h, px = read_rgba(src)
     x0, y0, x1, y1 = bbox(w, h, px)
@@ -169,24 +172,38 @@ if __name__ == "__main__":
     INK  = (0x20, 0x1e, 0x1c)        # theme light text
     WHITE = (0xff, 0xff, 0xff)
 
-    # iOS / base icon: opaque, no alpha — Apple rejects icons with alpha.
-    icon = canvas(1024, mw, mh, recolour(mark, WHITE), 0.68, DARK)
-    write_png(f"{outdir}/icon.png", 1024, 1024, drop_alpha(icon), alpha=False)
-    print("wrote icon.png            1024x1024 opaque, mark at 68%")
+    if target == "mobile":
+        # iOS / base icon: opaque, no alpha — Apple rejects icons with alpha.
+        icon = canvas(1024, mw, mh, recolour(mark, WHITE), 0.68, DARK)
+        write_png(f"{outdir}/icon.png", 1024, 1024, drop_alpha(icon), alpha=False)
+        print("wrote icon.png            1024x1024 opaque, mark at 68%")
 
-    # Android adaptive foreground: transparent, and inside the 66% safe circle
-    # the launcher mask can crop to.
-    fg = canvas(1024, mw, mh, recolour(mark, WHITE), 0.60)
-    write_png(f"{outdir}/adaptive-foreground.png", 1024, 1024, fg)
-    print("wrote adaptive-foreground 1024x1024 transparent, mark at 60% (safe zone)")
+        # Android adaptive foreground: transparent, and inside the 66% safe circle
+        # the launcher mask can crop to.
+        fg = canvas(1024, mw, mh, recolour(mark, WHITE), 0.60)
+        write_png(f"{outdir}/adaptive-foreground.png", 1024, 1024, fg)
+        print("wrote adaptive-foreground 1024x1024 transparent, mark at 60% (safe zone)")
 
-    mono = canvas(1024, mw, mh, recolour(mark, WHITE), 0.60)
-    write_png(f"{outdir}/adaptive-monochrome.png", 1024, 1024, mono)
-    print("wrote adaptive-monochrome 1024x1024 silhouette for themed icons")
+        mono = canvas(1024, mw, mh, recolour(mark, WHITE), 0.60)
+        write_png(f"{outdir}/adaptive-monochrome.png", 1024, 1024, mono)
+        print("wrote adaptive-monochrome 1024x1024 silhouette for themed icons")
 
-    # Splash marks: the source is white, which would vanish on the light
-    # theme's #f5f4f2 ground, so light mode gets an ink version.
-    write_png(f"{outdir}/splash-icon.png", 512, 512, canvas(512, mw, mh, recolour(mark, INK), 0.86))
-    print("wrote splash-icon.png     512x512 ink mark, for the light splash")
-    write_png(f"{outdir}/splash-icon-dark.png", 512, 512, canvas(512, mw, mh, recolour(mark, WHITE), 0.86))
-    print("wrote splash-icon-dark    512x512 white mark, for the dark splash")
+        # Splash marks: the source is white, which would vanish on the light
+        # theme's #f5f4f2 ground, so light mode gets an ink version.
+        write_png(f"{outdir}/splash-icon.png", 512, 512, canvas(512, mw, mh, recolour(mark, INK), 0.86))
+        print("wrote splash-icon.png     512x512 ink mark, for the light splash")
+        write_png(f"{outdir}/splash-icon-dark.png", 512, 512, canvas(512, mw, mh, recolour(mark, WHITE), 0.86))
+        print("wrote splash-icon-dark    512x512 white mark, for the dark splash")
+    else:
+        # All three carry the dark ground: the mark is white, and a browser tab,
+        # an iOS home screen and an Android launcher each supply their own
+        # backdrop, none of which can be relied on to be dark.
+        white = recolour(mark, WHITE)
+        for name, size, scale, note in (
+            ("favicon-48.png", 48, 0.80, "browser tab"),
+            ("icon-192.png", 192, 0.68, "apple-touch-icon and manifest 'any'"),
+            ("icon-512.png", 512, 0.60, "manifest 'any maskable' — mark in the 80% safe circle"),
+        ):
+            out = canvas(size, mw, mh, white, scale, DARK)
+            write_png(f"{outdir}/{name}", size, size, drop_alpha(out), alpha=False)
+            print(f"wrote {name:16} {size}x{size} opaque, mark at {scale:.0%} — {note}")
