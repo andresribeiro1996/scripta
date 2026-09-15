@@ -78,7 +78,9 @@
             "image": "./assets/images/splash-icon-dark.png"
           }
         }
-      ]
+      ],
+      "expo-image",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
