@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { parseAvdNameOutput, pickSerialForAvd, shouldCreateAvd } from "./dev-emulator.mjs";
+import { metroNodeOptions, parseAvdNameOutput, pickSerialForAvd, shouldCreateAvd } from "./dev-emulator.mjs";
 
 const TWO_EMULATORS = "List of devices attached\nemulator-5554\tdevice\nemulator-5556\tdevice\n";
 
@@ -62,4 +62,17 @@ test("a timed-out avdmanager listing never recreates an existing AVD", () => {
 
 test("a failed avdmanager listing is unknown, not absent", () => {
   assert.equal(shouldCreateAvd({ status: 1, stdout: "" }, "scripta-dev-0"), false);
+});
+
+test("metroNodeOptions appends the IPv4-first flag to an empty NODE_OPTIONS", () => {
+  assert.equal(metroNodeOptions(undefined), "--dns-result-order=ipv4first");
+});
+
+test("metroNodeOptions appends to, not replaces, an existing NODE_OPTIONS", () => {
+  assert.equal(metroNodeOptions("--max-old-space-size=4096"), "--max-old-space-size=4096 --dns-result-order=ipv4first");
+});
+
+test("metroNodeOptions is idempotent — re-running does not duplicate the flag", () => {
+  const once = metroNodeOptions(undefined);
+  assert.equal(metroNodeOptions(once), once);
 });

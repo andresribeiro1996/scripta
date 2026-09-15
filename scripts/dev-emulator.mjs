@@ -54,7 +54,7 @@ import { DEV_USERNAME } from "./dev-account.mjs";
 import { upsertEnvLine } from "./devEnvFile.mjs";
 import { claimThisWorktreeSlot } from "./devClaim.mjs";
 import { recordDeviceSerial, registryPath, takeDevice } from "./devRegistry.mjs";
-import { isPortFree, worktreeIdentity } from "./devHost.mjs";
+import { isPortFree, isReachableOn, worktreeIdentity } from "./devHost.mjs";
 import { pickLanAddress } from "./lanAddress.mjs";
 
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -276,6 +276,15 @@ async function ensureBackendRunning() {
   await waitFor(() => isPortOpen(BACKEND_PORT), { timeoutMs: 30_000, label: `backend on port ${BACKEND_PORT}` });
 }
 
+// Exported and pure so the composition — appending rather than
+// clobbering an existing NODE_OPTIONS, and not duplicating the flag on a
+// second call — is unit-tested without spawning anything.
+export function metroNodeOptions(existing) {
+  const flag = "--dns-result-order=ipv4first";
+  if (existing?.includes(flag)) return existing;
+  return [existing, flag].filter(Boolean).join(" ");
+}
+
 async function ensureMetroRunning() {
   // adb reverse (below) makes the emulator's own 127.0.0.1 resolve to
   // this machine, exactly like a real device over USB — so unlike
@@ -287,8 +296,42 @@ async function ensureMetroRunning() {
     return join(runtimeDir, "metro.log");
   }
   log("Starting Metro...");
-  const logPath = spawnDetached("npx", ["expo", "start", "--port", String(METRO_PORT)], { cwd: mobileDir, env: process.env, logName: "metro.log" });
+  // `--localhost`, not Expo's default `--lan`: LAN advertisement is how
+  // Expo Go ends up connected to a DIFFERENT worktree's Metro after a
+  // reload or crash (every Metro on the network shows on every device's
+  // home screen). The emulator only ever reaches Metro through the adb
+  // reverse tunnel below, so LAN advertisement buys this path nothing.
+  //
+  // `--localhost` alone is not enough, though — measured on this
+  // machine: Expo passes the literal string "localhost" to Node's
+  // `http.Server#listen`, which resolves it to [::1] first (IPv6
+  // loopback, not dual-stack), while `adb reverse tcp:N tcp:N` forwards
+  // the device's connection to the host's IPv4 127.0.0.1. Nothing
+  // listens there, so Expo Go opens and never fetches a bundle. Forcing
+  // Node's own resolver to prefer IPv4 fixes it: verified end-to-end
+  // against a real emulator (bundle served, app loaded) with
+  // NODE_OPTIONS=--dns-result-order=ipv4first.
+  //
+  // This leans on Node's resolution order rather than an option Expo
+  // exposes, so it is verified below rather than trusted: physical-phone
+  // testing still needs LAN and has its own path (`npm run dev:mobile`,
+  // backend/scripts/dev-mobile.mjs), untouched by this.
+  const metroEnv = { ...process.env, NODE_OPTIONS: metroNodeOptions(process.env.NODE_OPTIONS) };
+  const logPath = spawnDetached("npx", ["expo", "start", "--localhost", "--port", String(METRO_PORT)], { cwd: mobileDir, env: metroEnv, logName: "metro.log" });
   await waitFor(() => isPortOpen(METRO_PORT), { timeoutMs: 60_000, label: `Metro on port ${METRO_PORT}` });
+
+  // The active check the reasoning above earns: confirm Metro actually
+  // answers on 127.0.0.1 — the address the tunnel forwards to — rather
+  // than trusting that the flag combination above bound the interface it
+  // claims to. A future Expo/Node version that stops honoring this is a
+  // loud, specific failure here, not a silent "app never bundles" a
+  // developer has to rediscover from scratch.
+  if (!(await isReachableOn(METRO_PORT, "127.0.0.1"))) {
+    throw new Error(
+      `Metro is listening on ${METRO_PORT} but not reachable on 127.0.0.1 — the emulator's adb reverse tunnel forwards there, so it would open Expo Go and never fetch a bundle. ` +
+        "This worked via NODE_OPTIONS=--dns-result-order=ipv4first when last verified; check whether Expo's --localhost handling changed.",
+    );
+  }
   return logPath;
 }
 

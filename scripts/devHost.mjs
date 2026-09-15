@@ -22,7 +22,12 @@ export const DEFAULT_LIMITS = {
 // IPv4-only probe walks right past, reporting the port free when it is
 // not. So a port only counts as free when BOTH loopback families refuse
 // the connection; either one accepting means something is there.
-function probeLoopback(port, host) {
+// Exported (not just used internally by isPortFree below) so a caller can
+// probe ONE specific family rather than "either loopback family answers" —
+// dev-emulator.mjs uses this to confirm Metro is actually reachable on
+// 127.0.0.1, the address adb reverse forwards to, rather than trusting
+// that a CLI flag bound the interface it claims to.
+export function isReachableOn(port, host) {
   return new Promise((resolve) => {
     const socket = connect({ port, host });
     const finish = (occupied) => {
@@ -41,8 +46,8 @@ function probeLoopback(port, host) {
 
 export async function isPortFree(port) {
   const [v4Occupied, v6Occupied] = await Promise.all([
-    probeLoopback(port, "127.0.0.1"),
-    probeLoopback(port, "::1"),
+    isReachableOn(port, "127.0.0.1"),
+    isReachableOn(port, "::1"),
   ]);
   return !v4Occupied && !v6Occupied;
 }
