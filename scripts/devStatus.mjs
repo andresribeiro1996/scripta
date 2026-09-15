@@ -4,8 +4,9 @@ import { collectDevices, orphanSerials, readAdbSerials } from "./devDevices.mjs"
 import { DEFAULT_LIMITS, readHost } from "./devHost.mjs";
 import { readListeners } from "./devListeners.mjs";
 import { indexProcessTable, readProcessTable, sumSubtree } from "./devProcessTable.mjs";
-import { isPidAlive, portsForSlot, readRegistry, registryPath } from "./devRegistry.mjs";
+import { isPidAlive, portsForSlot, readRegistry, registryPath, slotForWorktree } from "./devRegistry.mjs";
 import { mobileCertsExist } from "./mobileCertPaths.mjs";
+import { missingTunnels, readReverseList } from "./devTunnels.mjs";
 import { processCwd } from "./devTeardown.mjs";
 import { pickLanAddress } from "./lanAddress.mjs";
 
@@ -266,6 +267,14 @@ export function statusWarnings({ host, stacks, devices, orphans, limits = DEFAUL
         `${device.avd} has been held by ${device.holder} for ${Math.round(device.heldMs / 60000)} minutes — likely a forgotten lease.`,
       );
     }
+    // Only a held device can be missing a tunnel: a free one has no
+    // worktree whose ports should be mapped onto it.
+    if (!device.holder) continue;
+    for (const [role, port] of device.missingTunnels ?? []) {
+      warnings.push(
+        `${device.avd} is leased by ${device.holder} but has no reverse tunnel for ${role} :${port} — run \`npm run dev:tunnels\` in that worktree.`,
+      );
+    }
   }
   for (const serial of orphans) {
     warnings.push(`${serial} is running but no worktree holds a lease on it.`);
@@ -284,6 +293,7 @@ export function collectStatus({
   lanAddress = pickLanAddress(),
   limits = DEFAULT_LIMITS,
   cwdForPid = processCwd,
+  readTunnels = readReverseList,
   now = Date.now(),
 } = {}) {
   const host = {
@@ -295,7 +305,14 @@ export function collectStatus({
     cores: cpus().length,
   };
   const stacks = buildStacks({ registry, rows, listeners, lanAddress, cwdForPid });
-  const devices = collectDevices({ registry, rows, now });
+  // Only a leased device with a recorded serial can be missing a tunnel,
+  // and only its holder's slot says which ports should be mapped — so a
+  // free AVD costs no adb call at all.
+  const devices = collectDevices({ registry, rows, now }).map((device) => {
+    const slot = device.worktree === null ? undefined : slotForWorktree(registry, device.worktree);
+    if (device.serial === null || slot === undefined) return { ...device, missingTunnels: [] };
+    return { ...device, missingTunnels: missingTunnels(portsForSlot(Number(slot)), readTunnels(device.serial)) };
+  });
   const orphans = orphanSerials(registry, serials);
   const warnings = statusWarnings({ host, stacks, devices, orphans, limits });
   return { host, stacks, devices, orphans, limits, warnings };

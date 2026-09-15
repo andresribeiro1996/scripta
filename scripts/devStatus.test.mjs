@@ -553,3 +553,112 @@ test("a stack with nothing listening on its backend port is never probed", () =>
   assert.equal(probes, 0);
   assert.equal(stack.urls.apiLan, "http://192.168.1.24:3200");
 });
+
+// adb root drops every reverse mapping, and nothing notices until the app
+// fails to reach Metro minutes later. A leased device whose tunnels are
+// gone is the same shape of lie as a claimed port nothing listens on.
+test("a leased device with a missing tunnel warns, naming the role, port and remedy", () => {
+  const warnings = statusWarnings({
+    ...HEALTHY,
+    devices: [
+      { avd: "scripta-dev-0", holder: "mobile/4d", heldMs: 60_000, missingTunnels: [["metro", 8281]] },
+    ],
+  });
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /scripta-dev-0/);
+  assert.match(warnings[0], /mobile\/4d/);
+  assert.match(warnings[0], /metro :8281/);
+  assert.match(warnings[0], /dev:tunnels/);
+});
+
+test("a leased device with both tunnels missing warns once per tunnel", () => {
+  const warnings = statusWarnings({
+    ...HEALTHY,
+    devices: [
+      {
+        avd: "scripta-dev-0",
+        holder: "mobile/4d",
+        heldMs: 60_000,
+        missingTunnels: [
+          ["backend", 3200],
+          ["metro", 8281],
+        ],
+      },
+    ],
+  });
+  assert.equal(warnings.length, 2);
+});
+
+test("a device with its tunnels up warns about nothing", () => {
+  assert.deepEqual(
+    statusWarnings({
+      ...HEALTHY,
+      devices: [{ avd: "scripta-dev-0", holder: "mobile/4d", heldMs: 60_000, missingTunnels: [] }],
+    }),
+    [],
+  );
+});
+
+// collectDevices rows predate this field; a device row without it must
+// not throw or invent a warning.
+test("a device row with no missingTunnels field is tolerated", () => {
+  assert.deepEqual(
+    statusWarnings({ ...HEALTHY, devices: [{ avd: "scripta-dev-0", holder: "mobile/4d", heldMs: 60_000 }] }),
+    [],
+  );
+});
+
+test("a free device is never checked for tunnels", () => {
+  assert.deepEqual(
+    statusWarnings({
+      ...HEALTHY,
+      devices: [{ avd: "scripta-dev-1", holder: null, heldMs: null, missingTunnels: [["metro", 8281]] }],
+    }),
+    [],
+  );
+});
+
+const LEASED_REGISTRY = {
+  version: 1,
+  slots: { 2: { worktree: "/wt/4d", branch: "mobile/4d", pid: 1, session: null, claimedAt: "2026-09-14T14:00:00.000Z" } },
+  devices: {
+    "scripta-dev-0": { worktree: "/wt/4d", pid: 1, takenAt: "2026-09-14T14:00:00.000Z", serial: "emulator-5554" },
+    "scripta-dev-1": null,
+  },
+};
+
+function statusWithTunnels(readTunnels) {
+  return collectStatus({
+    repoRoot: "/wt/4d",
+    registry: LEASED_REGISTRY,
+    rows: [],
+    listeners: {},
+    serials: [],
+    hostReading: { freeBytes: 8 * 1024 ** 3, loadAvg1: 1 },
+    lanAddress: "192.168.1.24",
+    cwdForPid: () => undefined,
+    readTunnels,
+    now: Date.parse("2026-09-14T14:05:00.000Z"),
+  });
+}
+
+test("collectStatus reports the tunnels a leased device is missing", () => {
+  const status = statusWithTunnels(() => [3200]);
+  const device = status.devices.find((d) => d.avd === "scripta-dev-0");
+  assert.deepEqual(device.missingTunnels, [["metro", 8281]]);
+});
+
+test("collectStatus reports no missing tunnels when both are up", () => {
+  const status = statusWithTunnels(() => [3200, 8281]);
+  assert.deepEqual(status.devices.find((d) => d.avd === "scripta-dev-0").missingTunnels, []);
+});
+
+test("a free device is never probed for tunnels", () => {
+  let probes = 0;
+  const status = statusWithTunnels(() => {
+    probes += 1;
+    return [3200, 8281];
+  });
+  assert.equal(probes, 1);
+  assert.deepEqual(status.devices.find((d) => d.avd === "scripta-dev-1").missingTunnels, []);
+});
