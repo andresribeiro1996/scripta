@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -11,7 +10,7 @@ import { test } from "node:test";
 // import/parseImport.test.ts and the other env-reaching tests do — a static
 // import would hoist above these assignments. Nothing here is ever opened: the
 // test runs against :memory:.
-const scratch = mkdtempSync(join(tmpdir(), "library-service-test-"));
+const scratch = join(tmpdir(), "library-service-test");
 process.env.AUTH_DB_PATH = join(scratch, "auth.sqlite");
 process.env.LIBRARY_DB_PATH = join(scratch, "library.sqlite");
 process.env.GALLERY_DB_PATH = join(scratch, "gallery.sqlite");
