@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
   grow: { flex: 1 },
   strong: { fontWeight: "700" },
   row: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  list: { gap: spacing.md, paddingBottom: spacing.huge },
+  list: { gap: spacing.md, paddingBottom: spacing.huge, flexGrow: 1 },
   duel: { borderWidth: 1, borderRadius: radii.lg, padding: spacing.md, gap: spacing.sm },
   side: { minHeight: 84, borderWidth: 1, borderRadius: radii.md, padding: spacing.sm, flexDirection: "row", gap: spacing.md, alignItems: "center" },
   cover: { width: 46, height: 66, borderRadius: radii.sm },
