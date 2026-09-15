@@ -40,6 +40,14 @@ exporter/library.json
 .opencode/*
 !.opencode/skills/
 
+# rtk's project filter template. rtk is a token-compressing CLI proxy
+# installed per-machine (brew install rtk), so its config is only useful to
+# someone who has it; the generated filters.toml is commented-out examples
+# and nothing else. rtk's own header says to commit it — ignore that until
+# there's a real filter here, then add it back with
+# `git add -f .rtk/filters.toml`, same as exporter/library.json above.
+.rtk/
+
 # Dev-only scratch config for parallel sessions — see its own header.
 frontend/vite.http.config.ts
 
