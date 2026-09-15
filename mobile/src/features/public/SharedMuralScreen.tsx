@@ -24,7 +24,7 @@ export function SharedMuralScreen({ token }: { token: string }) {
   return <Screen bottom top={false}>
     <Stack.Screen options={{ headerShown: true, title: mural.name }} />
     <ScrollView contentContainerStyle={styles.screen}>
-    {mural.blocks.length ? <MuralCanvas mural={mural} books={books} images={images} tierlists={tierlists} statsOverride={query.data.stats} /> : <EmptyState title="This mural is empty" />}
+    {mural.blocks.length ? <MuralCanvas mural={mural} books={books} images={images} tierlists={tierlists} profile={query.data.profile} shelfThemeOverride={query.data.shelfTheme} statsOverride={query.data.stats} /> : <EmptyState title="This mural is empty" />}
     </ScrollView>
   </Screen>;
 }

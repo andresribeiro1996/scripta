@@ -19,6 +19,7 @@
 
 import type { LibraryData } from "./types.js";
 import { csvRowsToObjects, parseCsv } from "./csv.js";
+import { normalizeBookGenres } from "./bookGenres.js";
 
 export function looksLikeGoodreadsCsv(text: string): boolean {
   const firstLine = text.split(/\r?\n/, 1)[0] ?? "";
@@ -58,6 +59,7 @@ export function goodreadsCsvToLibraryJson(text: string): LibraryData {
     const rating = parseInt(row["My Rating"], 10);
     const review = (row["My Review"] ?? "").trim();
     const contentId = `goodreads:${row["Book Id"] || i}`;
+    const genres = normalizeBookGenres(row["Bookshelves"]);
 
     const book: Record<string, unknown> = {
       ContentID: contentId,
@@ -77,7 +79,8 @@ export function goodreadsCsvToLibraryJson(text: string): LibraryData {
       WordCount: -1,
       MimeType: null,
       ImageId: null,
-      highlights: [] as Array<Record<string, unknown>>
+      highlights: [] as Array<Record<string, unknown>>,
+      ...(genres.length ? { _genres: genres } : {})
     };
 
     if (review) {

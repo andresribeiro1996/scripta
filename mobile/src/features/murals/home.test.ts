@@ -50,6 +50,7 @@ test("starter is editable, leaves Up next intentional, and includes passages onl
   assert.equal(buildHomeBlocks(false).some((block) => block.type === "quote"), false);
   const blocks = buildHomeBlocks(true);
   assert.equal(blocks.length, 4);
+  assert.ok(blocks.some((block) => block.type === "profile"));
   assert.ok(blocks.some((block) => block.type === "shelf" && block.bookKeys.length === 0));
   assert.equal(new Set(blocks.map((block) => block.id)).size, blocks.length);
 });

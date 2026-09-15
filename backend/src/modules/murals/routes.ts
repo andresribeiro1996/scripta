@@ -23,7 +23,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { env } from "../../config/env.js";
-import { authGuard } from "../auth/index.js";
+import { authGuard, resolvePublicReaderProfile } from "../auth/index.js";
 // Cross-module dependency, same as authGuard above: resolvePublicLibraryData
 // is library's own PUBLIC surface for exactly this — see
 // modules/library/publicResolver.ts's top comment for the privacy
@@ -351,7 +351,8 @@ export function buildPublicMuralRoutes(service: MuralsService, getTierlistData?:
         collectionIds: [...refs.collectionIds],
         highlightRefs: refs.highlightRefs,
         needsCurrentlyReading: refs.needsCurrentlyReading,
-        statsMetrics: [...refs.statsMetrics]
+        statsMetrics: [...refs.statsMetrics],
+        needsShelfTheme: refs.needsShelfTheme
       });
 
       // Gallery images: no second cross-module resolver — GET
@@ -383,6 +384,8 @@ export function buildPublicMuralRoutes(service: MuralsService, getTierlistData?:
         highlights: libraryData.highlights,
         currentlyReading: libraryData.currentlyReading,
         stats: libraryData.stats,
+        shelfTheme: libraryData.shelfTheme,
+        profile: refs.needsShelfTheme ? resolvePublicReaderProfile(row.user_id) : undefined,
         imageUrls,
         tierlists
       });

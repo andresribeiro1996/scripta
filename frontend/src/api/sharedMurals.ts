@@ -10,7 +10,7 @@
 // no-shared-package duplication every other cross-boundary type in this
 // app already has (see that file's own top comment, or blockRefs.ts's).
 
-import type { MuralBlock } from "../lib/murals";
+import type { MuralBlock, ReaderProfile, ShelfTheme } from "../lib/murals";
 import { publicFetch } from "./client";
 import type { ResolvedTierlist } from "./tierlists";
 
@@ -36,6 +36,8 @@ export interface SharedMuralPayload {
   highlights: PublicHighlight[];
   currentlyReading: PublicBookData[];
   stats: Record<string, number>;
+  shelfTheme?: ShelfTheme;
+  profile?: ReaderProfile;
   imageUrls: Record<string, string | null>;
   tierlists: Record<string, ResolvedTierlist>;
 }

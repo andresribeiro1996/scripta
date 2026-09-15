@@ -54,6 +54,7 @@ export function AddBookModal({
   const [author, setAuthor] = useState("");
   const [isbn, setIsbn] = useState("");
   const [publisher, setPublisher] = useState("");
+  const [genres, setGenres] = useState<BookSearchResult["genres"]>([]);
   const [readStatus, setReadStatus] = useState(2);
   const [rating, setRating] = useState<number | null>(null);
   const [dateRead, setDateRead] = useState("");
@@ -65,6 +66,7 @@ export function AddBookModal({
     setAuthor(result.authors.join(", "));
     setIsbn(result.isbn ?? "");
     setPublisher(result.publisher ?? "");
+    setGenres(result.genres);
     setResults(null);
   }
 
@@ -156,7 +158,8 @@ export function AddBookModal({
             publisher: publisher.trim() || null,
             readStatus,
             rating,
-            dateRead: dateRead || null
+            dateRead: dateRead || null,
+            genres
           },
           crypto.randomUUID()
         )

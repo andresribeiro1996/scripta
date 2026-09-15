@@ -15,6 +15,7 @@ const BLOCK_CHOICES: Array<{ type: BlockType; description: string }> = [
   { type: "quoteCollection", description: "Several curated highlights together" },
   { type: "image", description: "A photo from your gallery" },
   { type: "text", description: "A heading or freeform note" },
+  { type: "profile", description: "Your avatar, biography, favourite genres, and shelf theme" },
   { type: "currentlyReading", description: "Auto-updates from your reading status" },
   { type: "stats", description: "Auto-computed numbers, e.g. books finished this year" },
   { type: "empty", description: "A plain styled block — no content, just background/border/etc." },

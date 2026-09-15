@@ -20,9 +20,9 @@ test("metadata lookup validates matching and handles unavailable data", async (t
   t.after(() => { globalThis.fetch = originalFetch; });
   const doc = { key: "/works/OL123W", title: "Ecotopia", author_name: ["Ernest Callenbach"], ratings_average: 3.8, ratings_count: 42 };
 
-  responses = [{ docs: [doc] }, { description: { value: "A book summary." } }];
+  responses = [{ docs: [doc] }, { description: { value: "A book summary." }, subjects: ["Science fiction", "Ecology"] }];
   const result = await fetchBookMetadata("9780553348477", "Ecotopia", "Ernest Callenbach");
-  assert.deepEqual(result, { summary: "A book summary.", rating: 3.8, ratingCount: 42, sourceUrl: "https://openlibrary.org/works/OL123W" });
+  assert.deepEqual(result, { summary: "A book summary.", rating: 3.8, ratingCount: 42, sourceUrl: "https://openlibrary.org/works/OL123W", genres: ["Science Fiction"] });
   assert.equal(new URL(requests[0]).searchParams.get("isbn"), "9780553348477");
 
   responses = [{ docs: [doc] }, { description: "**Plain summary.** Source: [Wikipedia](https://en.wikipedia.org/wiki/Ecotopia)" }];
@@ -41,6 +41,7 @@ test("metadata lookup validates matching and handles unavailable data", async (t
   assert.equal(missing?.summary, null);
   assert.equal(missing?.rating, null);
   assert.equal(missing?.ratingCount, 0);
+  assert.deepEqual(missing?.genres, []);
 
   responses = [{ docs: [] }];
   assert.equal(await fetchBookMetadata("9780553348477", "", ""), null);

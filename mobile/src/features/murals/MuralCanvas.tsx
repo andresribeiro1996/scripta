@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   BLOCK_TYPE_LABELS,
+  calculateShelfTheme,
   resolveHomeBlock,
   type Group,
   GRID_COLUMNS,
@@ -14,6 +15,8 @@ import {
   type BlockLayout,
   type Mural,
   type MuralBlock,
+  type ReaderProfile,
+  type ShelfTheme,
 } from "@scripta/shared";
 import { CoverImage } from "../library/components/CoverImage";
 import { Image } from "expo-image";
@@ -32,11 +35,23 @@ const LIFT_SPRING = { duration: 300, dampingRatio: 0.8 } as const;
 const ROW_HEIGHT = 36;
 const GAP = 8;
 
-export function BlockContent({ block, books, images, tierlists, statsOverride }: { block: MuralBlock; books: Array<Record<string, unknown>>; images: GalleryImage[]; tierlists: Tierlist[]; statsOverride?: Record<string, number> }) {
+export function BlockContent({ block, books, images, tierlists, profile, shelfThemeOverride, statsOverride }: { block: MuralBlock; books: Array<Record<string, unknown>>; images: GalleryImage[]; tierlists: Tierlist[]; profile?: ReaderProfile; shelfThemeOverride?: ShelfTheme; statsOverride?: Record<string, number> }) {
   const { colors: themeColors } = useTheme();
   const colors = { ...themeColors, text: block.style?.textColor ?? themeColors.text };
   const title = (book: Record<string, unknown> | undefined) => String(book?.Title ?? "Book unavailable");
   if (block.type === "text") return <><Text style={[styles.blockTitle, { color: colors.text }]}>{block.heading || "Note"}</Text><Text style={{ color: colors.text }}>{block.body}</Text></>;
+  if (block.type === "profile") {
+    const theme = shelfThemeOverride ?? calculateShelfTheme(books);
+    const initial = (profile?.username || "Reader")[0]?.toUpperCase();
+    return <View style={styles.profileBlock}>
+      <View style={styles.profileHeader}>
+        {profile?.avatarUrl ? <Image source={{ uri: profile.avatarUrl }} style={styles.profileAvatar} contentFit="cover" /> : <View style={[styles.profileAvatar, styles.profileInitial, { backgroundColor: colors.accentSoft }]}><Text style={[styles.profileInitialText, { color: colors.accent }]}>{initial}</Text></View>}
+        <View style={styles.profileCopy}><Text style={[styles.profileName, { color: colors.text }]}>@{profile?.username || "reader"}</Text>{block.bio ? <Text numberOfLines={3} style={{ color: colors.textDim }}>{block.bio}</Text> : null}</View>
+      </View>
+      {block.favoriteGenres.length ? <View style={styles.genreSection}><Text style={[styles.genreLabel, { color: colors.textDim }]}>What I like</Text><View style={styles.genreRow}>{block.favoriteGenres.map((genre) => <View key={genre} style={[styles.genreChip, { backgroundColor: colors.accentSoft }]}><Text style={{ color: colors.accent }}>{genre}</Text></View>)}</View></View> : null}
+      {theme.genres.length ? <View style={styles.genreSection}><Text style={[styles.genreLabel, { color: colors.textDim }]}>My shelf theme</Text><Text style={{ color: colors.text }}>{theme.genres.join(" · ")}</Text><Text style={[typography.caption, { color: colors.textDim }]}>Based on {theme.matchedBooks} of {theme.totalBooks} books</Text></View> : null}
+    </View>;
+  }
   if (block.type === "spotlight" || block.type === "shelf" || block.type === "currentlyReading") {
     const selected = block.type === "spotlight" ? books.filter((book) => bookKey(book) === block.bookKey) : block.type === "shelf" ? resolveShelfBooks(block, books) : books.filter((book) => book.ReadStatus === 1);
     return <><Text style={[styles.blockTitle, { color: colors.text }]}>{block.type === "shelf" ? block.title || "Shelf" : block.type === "currentlyReading" ? "Currently reading" : title(selected[0])}</Text>
@@ -52,7 +67,7 @@ export function BlockContent({ block, books, images, tierlists, statsOverride }:
   return <Text>{BLOCK_TYPE_LABELS[block.type]}</Text>;
 }
 
-function CanvasBlock({ block, columnWidth, editable, selected, books, images, tierlists, statsOverride, onSelect, onMove }: {
+function CanvasBlock({ block, columnWidth, editable, selected, books, images, tierlists, profile, shelfThemeOverride, statsOverride, onSelect, onMove }: {
   block: MuralBlock;
   columnWidth: number;
   editable: boolean;
@@ -60,6 +75,8 @@ function CanvasBlock({ block, columnWidth, editable, selected, books, images, ti
   books: Array<Record<string, unknown>>;
   images: GalleryImage[];
   tierlists: Tierlist[];
+  profile?: ReaderProfile;
+  shelfThemeOverride?: ShelfTheme;
   statsOverride?: Record<string, number>;
   onSelect: () => void;
   onMove: (dx: number, dy: number) => void;
@@ -106,19 +123,21 @@ function CanvasBlock({ block, columnWidth, editable, selected, books, images, ti
         animated,
       ]}>
         <Pressable accessibilityRole="button" accessibilityLabel={`${BLOCK_TYPE_LABELS[block.type]} block${editable ? ". Long press and drag to move" : ""}`} onPress={onSelect} style={styles.blockPress}>
-          <View style={{ flex: 1 }}><BlockContent block={block} books={books} images={images} tierlists={tierlists} statsOverride={statsOverride} /></View>
+          <View style={{ flex: 1 }}><BlockContent block={block} books={books} images={images} tierlists={tierlists} profile={profile} shelfThemeOverride={shelfThemeOverride} statsOverride={statsOverride} /></View>
         </Pressable>
       </Animated.View>
     </GestureDetector>
   );
 }
 
-export function MuralCanvas({ mural, books, images, tierlists, statsOverride, editable = false, selectedBlockId, onSelectBlock, onLayoutChange, groups = [] }: {
+export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThemeOverride, statsOverride, editable = false, selectedBlockId, onSelectBlock, onLayoutChange, groups = [] }: {
   mural: Mural;
   groups?: Group[];
   books: Array<Record<string, unknown>>;
   images: GalleryImage[];
   tierlists: Tierlist[];
+  profile?: ReaderProfile;
+  shelfThemeOverride?: ShelfTheme;
   statsOverride?: Record<string, number>;
   editable?: boolean;
   selectedBlockId?: string | null;
@@ -141,6 +160,8 @@ export function MuralCanvas({ mural, books, images, tierlists, statsOverride, ed
         books={books}
         images={images}
         tierlists={tierlists}
+        profile={profile}
+        shelfThemeOverride={shelfThemeOverride}
         statsOverride={statsOverride}
         onSelect={() => onSelectBlock?.(block.id)}
         onMove={(dx, dy) => onLayoutChange?.(block.id, { ...block.layout, x: block.layout.x + dx, y: block.layout.y + dy })}
@@ -158,4 +179,15 @@ const styles = StyleSheet.create({
   fill: { flex: 1, width: "100%" },
   stats: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
   stat: { fontSize: 20, fontWeight: "700" },
+  profileBlock: { flex: 1, gap: spacing.md },
+  profileHeader: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  profileAvatar: { width: 56, height: 56, borderRadius: 28 },
+  profileInitial: { alignItems: "center", justifyContent: "center" },
+  profileInitialText: { fontSize: 22, fontWeight: "700" },
+  profileCopy: { flex: 1, gap: spacing.xs },
+  profileName: { ...typography.title, fontWeight: "700" },
+  genreSection: { gap: spacing.xs },
+  genreLabel: { ...typography.caption, fontWeight: "700", textTransform: "uppercase" },
+  genreRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs },
+  genreChip: { borderRadius: 999, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
 });

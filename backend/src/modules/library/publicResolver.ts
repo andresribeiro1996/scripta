@@ -27,6 +27,7 @@
 // plugin can be reworked without this file needing to change at all.
 
 import type { DatabaseSync } from "node:sqlite";
+import { calculateShelfTheme, type ShelfTheme } from "@scripta/shared";
 // Cross-module dependency, same discipline as murals/routes.ts importing
 // this very file only from library/index.ts: peekCachedCoverUrl is
 // covers' own public surface for a synchronous, cache-only cover lookup —
@@ -60,6 +61,7 @@ export interface ResolvedPublicData {
   highlights: PublicHighlight[];
   currentlyReading: PublicBookData[];
   stats: Record<string, number>;
+  shelfTheme?: ShelfTheme;
 }
 
 export interface PublicDataRequest {
@@ -68,6 +70,7 @@ export interface PublicDataRequest {
   highlightRefs: Array<{ bookKey: string; highlightId: string }>;
   needsCurrentlyReading: boolean;
   statsMetrics: string[];
+  needsShelfTheme?: boolean;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -289,5 +292,5 @@ export function resolvePublicLibraryData(userId: string, req: PublicDataRequest)
     }
   }
 
-  return { books, highlights, currentlyReading, stats, ...(req.collectionIds ? { collectionBooks } : {}) };
+  return { books, highlights, currentlyReading, stats, ...(req.needsShelfTheme ? { shelfTheme: calculateShelfTheme(allBooks) } : {}), ...(req.collectionIds ? { collectionBooks } : {}) };
 }

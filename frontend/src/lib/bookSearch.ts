@@ -18,7 +18,7 @@ export async function searchBooks(query: string): Promise<BookSearchResult[]> {
   const trimmed = query.trim();
   if (!trimmed) return [];
   const params = new URLSearchParams({
-    fields: "key,title,author_name,first_publish_year,isbn,publisher,cover_i",
+    fields: "key,title,author_name,first_publish_year,isbn,publisher,cover_i,subject",
     limit: "12"
   });
   if (looksLikeIsbnQuery(trimmed)) params.set("isbn", trimmed.replace(/[\s-]/g, ""));

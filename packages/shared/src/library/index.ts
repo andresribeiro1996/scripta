@@ -19,3 +19,4 @@ export * from "./covers.js";
 export * from "./bookCovers.js";
 export * from "./bookMetadata.js";
 export * from "./bookSearch.js";
+export * from "./bookGenres.js";
