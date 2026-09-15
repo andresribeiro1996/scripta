@@ -7,8 +7,8 @@ import jwt from "jsonwebtoken";
 import { env } from "../../config/env.js";
 import type { AccessTokenClaims, AuthenticatedUser, UserRow } from "./domain/types.js";
 
-export function signAccessToken(user: Pick<UserRow, "id" | "email" | "username" | "avatar_id">): string {
-  const claims: AccessTokenClaims = { sub: user.id, email: user.email, username: user.username, avatarId: user.avatar_id };
+export function signAccessToken(user: Pick<UserRow, "id" | "email" | "username" | "avatar_id" | "auth_version">): string {
+  const claims: AccessTokenClaims = { authVersion: user.auth_version ?? 0, sub: user.id, email: user.email, username: user.username, avatarId: user.avatar_id };
   // jsonwebtoken's own types narrow `expiresIn` to a template-literal
   // subset of strings it doesn't export a name for; env.ACCESS_TOKEN_TTL
   // is validated at startup (config/env.ts) to already be in that shape
@@ -25,15 +25,12 @@ export function verifyAccessToken(token: string): AccessTokenClaims | null {
   }
 }
 
-/** Pure JWT verification — no repository/persistence involved, so this
- *  lives alongside the other token mechanics rather than in service.ts.
- *  Used directly by guard.ts, which therefore doesn't need the composed
- *  AuthService at all, just this. */
-export function getAuthenticatedUserFromAccessToken(accessToken: string): AuthenticatedUser | null {
+export function getAuthenticatedUserFromAccessToken(accessToken: string, findUser: (id: string) => UserRow | undefined): AuthenticatedUser | null {
   const claims = verifyAccessToken(accessToken);
-  if (!claims) return null;
-  // `?? null` — tokens issued before avatars existed carry no avatarId claim.
-  return { id: claims.sub, email: claims.email, username: claims.username, avatarId: claims.avatarId ?? null };
+  if (!claims || typeof claims.sub !== "string") return null;
+  const user = findUser(claims.sub);
+  if (!user || (claims.authVersion ?? 0) !== (user.auth_version ?? 0)) return null;
+  return { id: user.id, email: user.email, username: user.username, avatarId: user.avatar_id };
 }
 
 /** A refresh token is just high-entropy random data — it carries no

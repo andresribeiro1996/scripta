@@ -111,6 +111,9 @@ const envSchema = z.object({
   // 1 MiB is far below a real Kobo export carrying per-book highlights).
   LIBRARY_BODY_LIMIT_BYTES: z.coerce.number().int().positive().default(26214400),
 
+  RESEND_API_KEY: z.string().default(""),
+  AUTH_EMAIL_FROM: z.string().default(""),
+
   GOOGLE_CLIENT_ID: z.string().optional().default(""),
   GOOGLE_CLIENT_SECRET: z.string().optional().default(""),
   GOOGLE_CALLBACK_URL: z.string().optional().default(""),

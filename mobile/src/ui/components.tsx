@@ -132,6 +132,8 @@ export function IconButton({
 export function Input({
   label,
   error,
+  secureTextEntry,
+  hint,
   accessibilityLabel = label,
   editable = true,
   style,
@@ -139,16 +141,20 @@ export function Input({
   // it there is no way to reach the underlying TextInput.
   ref,
   ...props
-}: TextInputProps & { label: string; error?: string; ref?: Ref<TextInput> }) {
+}: TextInputProps & { label: string; error?: string; hint?: string; ref?: Ref<TextInput> }) {
   const { colors } = useTheme();
+  const [visible, setVisible] = useState(false);
+  const inputRef = useRef<TextInput>(null);
   const [focused, setFocused] = useState(false);
 
   return (
     <View style={styles.field}>
       <Text {...dynamicType} style={[styles.label, { color: colors.text }]}>{label}</Text>
+      <View style={{ position: "relative" }}>
       <TextInput
         {...props}
-        ref={ref}
+        ref={(node) => { inputRef.current = node; if (typeof ref === "function") ref(node); else if (ref) ref.current = node; }}
+        secureTextEntry={secureTextEntry && !visible}
         accessibilityLabel={accessibilityLabel}
         accessibilityState={{ disabled: !editable }}
         allowFontScaling
@@ -160,9 +166,17 @@ export function Input({
         style={[
           styles.input,
           { backgroundColor: colors.surface, borderColor: error ? colors.danger : focused ? colors.accent : colors.border, color: colors.text, opacity: editable ? 1 : 0.55 },
+          secureTextEntry ? { paddingRight: minimumTouchTarget + spacing.sm } : null,
           style,
         ]}
       />
+      {secureTextEntry && <Pressable accessibilityRole="button" accessibilityLabel={visible ? "Hide password" : "Show password"} accessibilityState={{ disabled: !editable }}
+        disabled={!editable} onPress={() => { setVisible(!visible); inputRef.current?.focus(); }}
+        style={{ position: "absolute", right: 0, top: 0, bottom: 0, minWidth: minimumTouchTarget, minHeight: minimumTouchTarget, alignItems: "center", justifyContent: "center" }}>
+        <Icon name={visible ? "hidePassword" : "showPassword"} size={20} color={colors.textDim} />
+      </Pressable>}
+      </View>
+      {hint ? <Text {...dynamicType} style={[styles.help, { color: colors.textDim }]}>{hint}</Text> : null}
       {error ? <Text accessibilityLiveRegion="polite" {...dynamicType} style={[styles.help, { color: colors.danger }]}>{error}</Text> : null}
     </View>
   );

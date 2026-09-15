@@ -25,6 +25,9 @@ import { consumeGoogleOAuthFlow, createGoogleOAuthFlow } from "./googleOAuthFlow
 import { isValidGoogleOAuthState } from "./googleOAuthState.js";
 import { validateGoogleStartRequest } from "./googleStartRequest.js";
 import { parseMobileRedirectAllowlist } from "./mobileRedirectAllowlist.js";
+import { getAuthenticatedUserFromAccessToken } from "./tokens.js";
+import { createAccountSecurity } from "./accountSecurity.js";
+import { sendAccountEmail, emailEnabled } from "./email.js";
 import { buildAuthRoutes } from "./routes.js";
 import { createAuthService, MAX_AVATAR_UPLOAD_BYTES } from "./service.js";
 
@@ -62,12 +65,18 @@ function queryParam(request: FastifyRequest, key: string): string {
   return typeof value === "string" ? value : "";
 }
 
-export async function authPlugin(app: FastifyInstance) {
+export async function authPlugin(app: FastifyInstance, options: { authRoot?: FastifyInstance } = {}) {
   // --- composition: swap this one block to change storage technology ---
   const db = openAuthDb();
   const authRepository = createSqliteAuthRepository(db);
   const avatarStore = createFsAvatarBlobStore(env.AVATAR_STORAGE_PATH);
+  const security = createAccountSecurity(authRepository, async (to, subject, text) => {
+    try { await sendAccountEmail(to, subject, text); }
+    catch (error) { app.log.error("Account email delivery failed; check email configuration and provider status."); throw error; }
+  }, env.FRONTEND_URL, emailEnabled);
   const authService = createAuthService(authRepository, avatarStore);
+  (options.authRoot ?? app).decorate("authenticateAccessToken", (token: string) => getAuthenticatedUserFromAccessToken(token, authRepository.findUserById));
+  app.addHook("onClose", async () => { db.close(); });
   // -----------------------------------------------------------------------
 
   // Scoped to this plugin only — login/signup/refresh are the endpoints
@@ -87,7 +96,7 @@ export async function authPlugin(app: FastifyInstance) {
     }
   });
 
-  await app.register(buildAuthRoutes(authService));
+  await app.register(buildAuthRoutes(authService, security));
 
   // A minimal, self-contained HTML test console for this module — not a
   // real app screen. Lets you exercise signup/login/refresh/logout/Google
@@ -178,12 +187,13 @@ export async function authPlugin(app: FastifyInstance) {
       if (!profileResponse.ok) {
         return reply.code(502).send({ error: "Could not fetch Google profile." });
       }
-      const profile = (await profileResponse.json()) as { id: string; email?: string };
-      if (!profile.email) {
+      const profile = (await profileResponse.json()) as { id: string; email?: string; verified_email?: boolean };
+      if (!profile.email || profile.verified_email !== true) {
         return reply.code(400).send({ error: "Google account has no email to sign in with." });
       }
 
       const { user, tokens } = await authService.loginWithGoogle({ googleId: profile.id, email: profile.email });
+      if (user.email === profile.email.trim().toLowerCase()) authRepository.markEmailVerified(user.id);
 
       // Never place access or refresh tokens in URLs (global constraint):
       // the tokens are already minted above, but they stay server-side —

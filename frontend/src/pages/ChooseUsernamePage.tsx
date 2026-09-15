@@ -1,3 +1,4 @@
+import { afterSignIn, getAuthReturnTo, startAuthNavigation } from "../auth/returnTo";
 import { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
@@ -30,7 +31,7 @@ export function ChooseUsernamePage() {
   const [submitting, setSubmitting] = useState(false);
 
   if (!session) return <Navigate to="/login" replace />;
-  if (session.user.username) return <Navigate to="/dashboard" replace />;
+  if (session.user.username) return <Navigate to={afterSignIn(session.user.username)} replace />;
 
   function handleInvalid(e: React.InvalidEvent<HTMLInputElement>) {
     e.preventDefault();
@@ -43,6 +44,7 @@ export function ChooseUsernamePage() {
     setFieldError(null);
     setSubmitting(true);
     try {
+      startAuthNavigation(getAuthReturnTo(), true);
       await setUsername(username);
       // Onward into the (skippable) avatar step — same signup journey a
       // password account takes after registering.

@@ -7,9 +7,12 @@
 
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type { AuthenticatedUser } from "./domain/types.js";
-import { getAuthenticatedUserFromAccessToken } from "./tokens.js";
+
 
 declare module "fastify" {
+  interface FastifyInstance {
+    authenticateAccessToken: (token: string) => AuthenticatedUser | null;
+  }
   interface FastifyRequest {
     user: AuthenticatedUser;
   }
@@ -23,7 +26,7 @@ export async function authGuard(request: FastifyRequest, reply: FastifyReply): P
     return reply.code(401).send({ error: "Missing Authorization: Bearer <token> header." });
   }
 
-  const user = getAuthenticatedUserFromAccessToken(token);
+  const user = request.server.authenticateAccessToken?.(token);
   if (!user) {
     return reply.code(401).send({ error: "Access token is invalid or expired." });
   }
@@ -42,5 +45,5 @@ export function getOptionalAuthenticatedUser(request: FastifyRequest): Authentic
   const header = request.headers.authorization;
   const token = header?.startsWith("Bearer ") ? header.slice("Bearer ".length) : null;
   if (!token) return null;
-  return getAuthenticatedUserFromAccessToken(token) ?? null;
+  return request.server.authenticateAccessToken?.(token) ?? null;
 }

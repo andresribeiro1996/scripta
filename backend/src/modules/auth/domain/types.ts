@@ -9,6 +9,8 @@ export interface UserRow {
   password_hash: string | null;
   google_id: string | null;
   avatar_id: string | null;
+  auth_version?: number;
+  email_verified_at?: string | null;
   created_at: string;
 }
 
@@ -58,6 +60,7 @@ export interface TokenPair {
 }
 
 export interface AccessTokenClaims {
+  authVersion?: number;
   sub: string; // user id
   email: string;
   username: string | null;

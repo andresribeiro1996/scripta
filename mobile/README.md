@@ -117,3 +117,9 @@ The web route tree has a native equivalent. The native tab shell uses shorter in
 - No `metro.config.js`: `@expo/metro-config` auto-detects the npm workspace root.
 - Shared logic goes in `@scripta/shared` (`packages/shared`, compiled `dist`), never duplicated between clients. Wave 1 fills it.
 - Commands: `npm run typecheck --workspace mobile` (CI runs typecheck + `expo-doctor`).
+
+### Account access
+
+The shared Input supports password visibility and field hints. Login/signup validate fields before submission, preserve autofill, scroll above the keyboard, and prevent competing sign-in attempts. Sessions continue to use SecureStore and remain signed in by default.
+
+`/forgot-password` requests a recovery email; the link completes recovery on the HTTPS web client. Settings opens `/account-security` for password changes, email verification, and correction. Existing accounts remain usable while unverified. Sign-in destinations survive username and avatar onboarding.

@@ -22,7 +22,7 @@ process.env.NODE_ENV = "test";
 const { parseImport, InvalidImportError, ImportBusyError } = await import("./parseImport.js");
 const { buildLibraryRoutes, rejectOversizedImport, sweepStaleImportDirs } = await import("../routes.js");
 const { LibraryConflictError } = await import("../domain/errors.js");
-const { signAccessToken } = await import("../../auth/tokens.js");
+const { signAccessToken, getAuthenticatedUserFromAccessToken } = await import("../../auth/tokens.js");
 
 after(async () => rm(scratch, { recursive: true, force: true }));
 
@@ -74,6 +74,9 @@ async function testApp() {
     getPublicByToken: () => null
   };
   const app = Fastify();
+  app.decorate("authenticateAccessToken", (token: string) => getAuthenticatedUserFromAccessToken(token, (id) => id === "user-1" ? {
+    id, email: "test@example.com", username: "tester", avatar_id: null, google_id: null, password_hash: null, created_at: ""
+  } : undefined));
   app.get("/health", async () => ({ status: "ok" }));
   await app.register(buildLibraryRoutes(service));
   await app.ready();

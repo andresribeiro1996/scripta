@@ -9,7 +9,22 @@
 
 import type { RefreshTokenRow, UserRow } from "./types.js";
 
+export interface AccountToken {
+  user_id: string;
+  purpose: "reset" | "verify";
+  email: string;
+  token_hash: string;
+  expires_at: string;
+  requested_at: string;
+}
+
 export interface AuthRepository {
+  saveAccountToken(token: AccountToken): boolean;
+  findAccountToken(hash: string, purpose: "reset" | "verify"): AccountToken | undefined;
+  completePasswordReset(hash: string, passwordHash: string): boolean;
+  changePassword(userId: string, previousHash: string, passwordHash: string): boolean;
+  verifyEmail(hash: string): boolean;
+  markEmailVerified(userId: string): void;
   createUser(input: { email: string; username: string | null; passwordHash: string | null; googleId: string | null }): UserRow;
   findUserByEmail(email: string): UserRow | undefined;
   findUserByUsername(username: string): UserRow | undefined;

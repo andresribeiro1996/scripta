@@ -1,3 +1,4 @@
+import { takeAuthReturnTo } from "../auth/returnTo";
 import { useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
@@ -87,7 +88,7 @@ export function WelcomeAvatarPage() {
         <button
           type="button"
           disabled={uploading}
-          onClick={() => navigate("/dashboard", { replace: true })}
+          onClick={() => navigate(takeAuthReturnTo(), { replace: true })}
           className="mt-3 w-full rounded-lg py-2.5 text-sm font-semibold transition-colors disabled:opacity-50"
           style={{ backgroundColor: GOLD, color: INK }}
         >

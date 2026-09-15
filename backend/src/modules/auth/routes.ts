@@ -19,6 +19,8 @@ import {
   OAuthAccountConflictError,
   UsernameInUseError
 } from "./domain/errors.js";
+import { RECOVERY_MESSAGE } from "@scripta/shared";
+import { AccountActionError, type AccountSecurityService } from "./accountSecurity.js";
 import type { AuthService } from "./service.js";
 import { MAX_AVATAR_UPLOAD_BYTES } from "./service.js";
 import { authGuard } from "./guard.js";
@@ -31,9 +33,9 @@ const usernameSchema = z
   .regex(/^[a-zA-Z0-9_.]+$/, "Username can only contain letters, numbers, underscores, and periods.");
 
 const signupSchema = z.object({
-  email: z.string().email(),
+  email: z.string().trim().email(),
   username: usernameSchema,
-  password: z.string().min(8, "Password must be at least 8 characters.")
+  password: z.string().min(8, "Password must be at least 8 characters.").max(128, "Use at most 128 characters.")
 });
 
 const loginSchema = z.object({
@@ -64,8 +66,52 @@ function statusForAvatarError(err: AvatarError): number {
   return 400;
 }
 
-export function buildAuthRoutes(service: AuthService) {
+export function buildAuthRoutes(service: AuthService, security?: AccountSecurityService) {
   return async function authRoutes(app: FastifyInstance) {
+    const deliveries = new Set<Promise<unknown>>();
+    function deliver(action: () => Promise<unknown>) {
+      const task = Promise.resolve().then(action).catch(() => app.log.error("Account email delivery failed; check email configuration and provider status."));
+      deliveries.add(task);
+      void task.finally(() => deliveries.delete(task));
+    }
+    app.addHook("onClose", async () => { await Promise.all(deliveries); });
+    app.addHook("onSend", async (_request, reply, payload) => { reply.header("Cache-Control", "no-store"); return payload; });
+    if (security) {
+      const emailSchema = z.object({ email: z.string().trim().email() });
+      const tokenSchema = z.string().regex(/^[A-Za-z0-9_-]{64}$/);
+      app.get("/auth/account", { preHandler: authGuard }, async (request) => security.status(request.user.id));
+      app.post("/auth/forgot-password", { config: { rateLimit: { max: 5, timeWindow: "1 minute" } } }, async (request, reply) => {
+        const parsed = emailSchema.safeParse(request.body);
+        if (!parsed.success) return reply.code(400).send({ error: "Enter a valid email address." });
+        if (!security.enabled) return reply.code(503).send({ error: "Email delivery is unavailable. Please try again later." });
+        deliver(() => security.forgotPassword(parsed.data.email));
+        return reply.code(202).send({ message: RECOVERY_MESSAGE });
+      });
+      app.post("/auth/reset-password", async (request, reply) => {
+        const parsed = z.object({ token: tokenSchema, password: signupSchema.shape.password }).safeParse(request.body);
+        if (!parsed.success) return reply.code(400).send({ error: "Use a valid reset link and a password between 8 and 128 characters." });
+        await security.resetPassword(parsed.data.token, parsed.data.password);
+        return reply.code(204).send();
+      });
+      app.post("/auth/change-password", { preHandler: authGuard }, async (request, reply) => {
+        const parsed = z.object({ currentPassword: z.string().min(1), password: signupSchema.shape.password }).safeParse(request.body);
+        if (!parsed.success) return reply.code(400).send({ error: "Enter your current password and a new password between 8 and 128 characters." });
+        await security.changePassword(request.user.id, parsed.data.currentPassword, parsed.data.password);
+        return reply.code(204).send();
+      });
+      app.post("/auth/verification-email", { preHandler: authGuard, config: { rateLimit: { max: 3, timeWindow: "1 minute" } } }, async (request, reply) => {
+        const parsed = z.object({ email: z.string().trim().email().optional(), currentPassword: z.string().optional() }).safeParse(request.body ?? {});
+        if (!parsed.success) return reply.code(400).send({ error: "Enter a valid email address." });
+        await security.requestVerification(request.user.id, parsed.data.email, parsed.data.currentPassword);
+        return reply.send({ message: "Check your inbox. You can request another email in a minute." });
+      });
+      app.post("/auth/verify-email", async (request, reply) => {
+        const parsed = z.object({ token: tokenSchema }).safeParse(request.body);
+        if (!parsed.success) return reply.code(400).send({ error: "This verification link is invalid. Request a new one." });
+        security.verifyEmail(parsed.data.token);
+        return reply.code(204).send();
+      });
+    }
     app.post("/auth/signup", async (request, reply) => {
       const parsed = signupSchema.safeParse(request.body);
       if (!parsed.success) {
@@ -73,10 +119,11 @@ export function buildAuthRoutes(service: AuthService) {
       }
       try {
         const { user, tokens } = await service.signup(parsed.data.email, parsed.data.username, parsed.data.password);
+        if (security?.enabled) deliver(() => security.requestVerification(user.id));
         return reply.code(201).send({ user, ...tokens });
       } catch (err) {
-        if (err instanceof EmailInUseError) return reply.code(409).send({ error: err.message });
-        if (err instanceof UsernameInUseError) return reply.code(409).send({ error: err.message });
+        if (err instanceof EmailInUseError) return reply.code(409).send({ error: "An account already uses this email. Log in or recover your password.", field: "identifier" });
+        if (err instanceof UsernameInUseError) return reply.code(409).send({ error: err.message, field: "username" });
         throw err;
       }
     });
@@ -166,7 +213,7 @@ export function buildAuthRoutes(service: AuthService) {
         const user = await service.setUsername(request.user.id, parsed.data.username);
         return reply.send({ user });
       } catch (err) {
-        if (err instanceof UsernameInUseError) return reply.code(409).send({ error: err.message });
+        if (err instanceof UsernameInUseError) return reply.code(409).send({ error: err.message, field: "username" });
         throw err;
       }
     });
@@ -221,6 +268,7 @@ export function buildAuthRoutes(service: AuthService) {
     });
 
     app.setErrorHandler((error, _request, reply) => {
+      if (error instanceof AccountActionError) return reply.code(error.status).send({ error: error.message });
       if (error instanceof OAuthAccountConflictError) {
         return reply.code(409).send({ error: error.message });
       }

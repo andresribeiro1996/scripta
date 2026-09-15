@@ -10,9 +10,9 @@ interface AuthTokenResponse {
 
 interface AuthContextValue {
   session: Session | null;
-  signup: (email: string, username: string, password: string) => Promise<void>;
+  signup: (email: string, username: string, password: string, remember?: boolean) => Promise<void>;
   /** `identifier` may be either the account's email or its username. */
-  login: (identifier: string, password: string) => Promise<void>;
+  login: (identifier: string, password: string, remember?: boolean) => Promise<void>;
   logout: () => Promise<void>;
   /** Claims a username for the current session — the step a Google
    *  sign-in without one yet goes through on its first login. */
@@ -32,20 +32,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // re-renders here when it changes.
   const session = useSyncExternalStore(subscribeToSession, getSession);
 
-  async function signup(email: string, username: string, password: string) {
+  async function signup(email: string, username: string, password: string, remember = false) {
     const body = (await publicFetch("/auth/signup", {
       method: "POST",
       body: JSON.stringify({ email, username, password })
     })) as AuthTokenResponse;
-    setSession({ user: body.user, accessToken: body.accessToken, refreshToken: body.refreshToken });
+    setSession({ user: body.user, accessToken: body.accessToken, refreshToken: body.refreshToken }, remember);
   }
 
-  async function login(identifier: string, password: string) {
+  async function login(identifier: string, password: string, remember = false) {
     const body = (await publicFetch("/auth/login", {
       method: "POST",
       body: JSON.stringify({ identifier, password })
     })) as AuthTokenResponse;
-    setSession({ user: body.user, accessToken: body.accessToken, refreshToken: body.refreshToken });
+    setSession({ user: body.user, accessToken: body.accessToken, refreshToken: body.refreshToken }, remember);
   }
 
   async function logout() {

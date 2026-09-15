@@ -2,6 +2,7 @@ export class ApiError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    readonly field?: string,
   ) {
     super(message);
   }
@@ -129,13 +130,13 @@ export function createApiClient(
         throw new ApiError(401, "Not signed in");
       }
 
-      let response = await rawRequest<T & { error?: string }>(path, init);
+      let response = await rawRequest<T & { error?: string; field?: string }>(path, init);
       if (response.status === 401 && init.auth) {
-        if (await recoverAccessToken(response.accessTokenUsed)) response = await rawRequest<T & { error?: string }>(path, init);
+        if (await recoverAccessToken(response.accessTokenUsed)) response = await rawRequest<T & { error?: string; field?: string }>(path, init);
       }
 
       if (response.status < 200 || response.status >= 300) {
-        throw new ApiError(response.status, response.body.error ?? `Request failed (${response.status})`);
+        throw new ApiError(response.status, response.body.error ?? `Request failed (${response.status})`, response.body.field);
       }
       return response.body as T;
     },

@@ -31,6 +31,11 @@ export function applyAuthMigrations(db: DatabaseSync): void {
   // Task 4A: same "patch an existing table, no-op on a fresh one" story as
   // avatar_id above — rotated_at/replaced_by back the refresh-rotation
   // grace window (service.ts) and didn't exist before this change.
+  if (columns.length > 0) {
+    if (!columns.some((column) => column.name === "auth_version")) db.exec("ALTER TABLE users ADD COLUMN auth_version INTEGER NOT NULL DEFAULT 0");
+    if (!columns.some((column) => column.name === "email_verified_at")) db.exec("ALTER TABLE users ADD COLUMN email_verified_at TEXT");
+  }
+
   const refreshTokenColumns = db.prepare("PRAGMA table_info(refresh_tokens)").all() as Array<{ name: string }>;
   if (refreshTokenColumns.length > 0) {
     if (!refreshTokenColumns.some((column) => column.name === "rotated_at")) {

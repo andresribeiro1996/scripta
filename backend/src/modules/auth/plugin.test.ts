@@ -146,7 +146,7 @@ test("concurrent callbacks reject the one whose flow state was already consumed"
   let profileRequests = 0;
   globalThis.fetch = async () => {
     profileRequests += 1;
-    return new Response(JSON.stringify({ id: "google-user-1", email: "google@example.com" }), {
+    return new Response(JSON.stringify({ id: "google-user-1", email: "google@example.com", verified_email: true }), {
       status: 200,
       headers: { "Content-Type": "application/json" }
     });

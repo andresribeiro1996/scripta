@@ -17,10 +17,16 @@ export interface Session {
 
 const STORAGE_KEY = "kobo_session";
 
+let persistent = false;
+
 function loadFromStorage(): Session | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as Session) : null;
+    const temporary = sessionStorage.getItem(STORAGE_KEY);
+    const saved = temporary ?? localStorage.getItem(STORAGE_KEY);
+    persistent = !temporary && Boolean(saved);
+    if (!saved) return null;
+    const value = JSON.parse(saved) as Session;
+    return value?.user?.id && typeof value.accessToken === "string" && typeof value.refreshToken === "string" ? value : null;
   } catch {
     return null;
   }
@@ -33,10 +39,12 @@ export function getSession(): Session | null {
   return session;
 }
 
-export function setSession(next: Session | null): void {
+export function setSession(next: Session | null, remember = persistent): void {
+  localStorage.removeItem(STORAGE_KEY);
+  sessionStorage.removeItem(STORAGE_KEY);
+  if (next) (remember ? localStorage : sessionStorage).setItem(STORAGE_KEY, JSON.stringify(next));
+  persistent = remember;
   session = next;
-  if (next) localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  else localStorage.removeItem(STORAGE_KEY);
   listeners.forEach((listener) => listener());
 }
 

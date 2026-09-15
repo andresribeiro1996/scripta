@@ -1,3 +1,4 @@
+import { AccountSecuritySection } from "../auth/AccountSecuritySection";
 import { useRef, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
 import { Avatar } from "../components/Avatar";
@@ -154,6 +155,7 @@ export function SettingsPage() {
         </div>
       </section>
 
+      <AccountSecuritySection />
       <SocialsSection />
     </div>
   );

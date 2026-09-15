@@ -9,9 +9,11 @@ import { API_URL } from "./baseUrl";
 
 export class ApiError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  readonly field?: string;
+  constructor(status: number, message: string, field?: string) {
     super(message);
     this.status = status;
+    this.field = field;
   }
 }
 
@@ -38,7 +40,7 @@ async function parseOrThrow(res: Response): Promise<unknown> {
       body && typeof body === "object" && "error" in body && typeof (body as { error?: unknown }).error === "string"
         ? (body as { error: string }).error
         : res.statusText;
-    throw new ApiError(res.status, message);
+    throw new ApiError(res.status, message, body && typeof body === "object" && "field" in body && typeof body.field === "string" ? body.field : undefined);
   }
   return body;
 }
@@ -53,15 +55,16 @@ function refreshSession(): Promise<boolean> {
     refreshPromise = (async () => {
       try {
         const res = await rawFetch("/auth/refresh", { method: "POST", body: JSON.stringify({ refreshToken: current.refreshToken }) }, undefined);
+        if (getSession()?.refreshToken !== current.refreshToken) return false;
         if (!res.ok) {
-          setSession(null);
+          if (res.status === 401 || res.status === 403) setSession(null);
           return false;
         }
         const body = (await res.json()) as { accessToken: string; refreshToken: string };
+        if (getSession()?.refreshToken !== current.refreshToken) return false;
         setSession({ user: current.user, accessToken: body.accessToken, refreshToken: body.refreshToken });
         return true;
       } catch {
-        setSession(null);
         return false;
       } finally {
         refreshPromise = null;

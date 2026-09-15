@@ -5,7 +5,7 @@
 
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
-import type { AuthRepository } from "../../domain/ports.js";
+import type { AccountToken, AuthRepository } from "../../domain/ports.js";
 import type { RefreshTokenRow, UserRow } from "../../domain/types.js";
 
 export function createSqliteAuthRepository(db: DatabaseSync): AuthRepository {
@@ -34,7 +34,78 @@ export function createSqliteAuthRepository(db: DatabaseSync): AuthRepository {
     `UPDATE refresh_tokens SET revoked_at = $revoked_at WHERE user_id = $user_id AND revoked_at IS NULL`
   );
 
+  function revokeSessions(userId: string) {
+    db.prepare("UPDATE users SET auth_version = auth_version + 1 WHERE id = ?").run(userId);
+    db.prepare("UPDATE refresh_tokens SET revoked_at = ?, rotated_at = NULL, replaced_by = NULL WHERE user_id = ?").run(new Date().toISOString(), userId);
+    db.prepare("DELETE FROM account_tokens WHERE user_id = ?").run(userId);
+  }
+
+  function transaction(action: () => boolean): boolean {
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      const result = action();
+      db.exec("COMMIT");
+      return result;
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
   return {
+    saveAccountToken(token) {
+      const now = new Date().toISOString();
+      db.prepare("DELETE FROM account_tokens WHERE expires_at <= ?").run(now);
+      const result = db.prepare(`INSERT INTO account_tokens (user_id, purpose, email, token_hash, expires_at, requested_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(user_id, purpose) DO UPDATE SET email = excluded.email, token_hash = excluded.token_hash,
+          expires_at = excluded.expires_at, requested_at = excluded.requested_at
+        WHERE account_tokens.requested_at <= ?`).run(token.user_id, token.purpose, token.email, token.token_hash,
+          token.expires_at, token.requested_at, new Date(Date.now() - 60_000).toISOString());
+      return result.changes === 1;
+    },
+    findAccountToken(hash, purpose) {
+      return db.prepare("SELECT * FROM account_tokens WHERE token_hash = ? AND purpose = ? AND expires_at > ?")
+        .get(hash, purpose, new Date().toISOString()) as AccountToken | undefined;
+    },
+    completePasswordReset(hash, passwordHash) {
+      return transaction(() => {
+        const token = db.prepare("SELECT * FROM account_tokens WHERE token_hash = ? AND purpose = 'reset' AND expires_at > ?")
+          .get(hash, new Date().toISOString()) as AccountToken | undefined;
+        if (!token) return false;
+        const result = db.prepare("UPDATE users SET password_hash = ? WHERE id = ? AND email = ? AND password_hash IS NOT NULL")
+          .run(passwordHash, token.user_id, token.email);
+        if (!result.changes) return false;
+        revokeSessions(token.user_id);
+        return true;
+      });
+    },
+    changePassword(userId, previousHash, passwordHash) {
+      return transaction(() => {
+        const result = db.prepare("UPDATE users SET password_hash = ? WHERE id = ? AND password_hash = ?").run(passwordHash, userId, previousHash);
+        if (!result.changes) return false;
+        revokeSessions(userId);
+        return true;
+      });
+    },
+    verifyEmail(hash) {
+      return transaction(() => {
+        const token = db.prepare("SELECT * FROM account_tokens WHERE token_hash = ? AND purpose = 'verify' AND expires_at > ?")
+          .get(hash, new Date().toISOString()) as AccountToken | undefined;
+        if (!token) return false;
+        const user = findByIdStmt.get(token.user_id) as UserRow | undefined;
+        if (!user) return false;
+        const existing = findByEmailStmt.get(token.email) as UserRow | undefined;
+        if (existing && existing.id !== user.id) return false;
+        db.prepare("UPDATE users SET email = ?, email_verified_at = ? WHERE id = ?").run(token.email, new Date().toISOString(), user.id);
+        if (user.email !== token.email) revokeSessions(user.id);
+        else db.prepare("DELETE FROM account_tokens WHERE user_id = ? AND purpose = 'verify'").run(user.id);
+        return true;
+      });
+    },
+    markEmailVerified(userId) {
+      db.prepare("UPDATE users SET email_verified_at = COALESCE(email_verified_at, ?) WHERE id = ?").run(new Date().toISOString(), userId);
+    },
     createUser(input) {
       const row: UserRow = {
         id: randomUUID(),

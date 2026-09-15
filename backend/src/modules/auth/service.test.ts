@@ -33,6 +33,12 @@ function createInMemoryRepo(): AuthRepository & { rows: Map<string, UserRow>; re
   let nextRefreshTokenId = 1;
 
   return {
+    saveAccountToken() { throw new Error("Unused in this test"); },
+    findAccountToken() { throw new Error("Unused in this test"); },
+    completePasswordReset() { throw new Error("Unused in this test"); },
+    changePassword() { throw new Error("Unused in this test"); },
+    verifyEmail() { throw new Error("Unused in this test"); },
+    markEmailVerified() { throw new Error("Unused in this test"); },
     rows,
     refreshTokens,
     createUser(input) {

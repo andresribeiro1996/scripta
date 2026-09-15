@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { publicFetch } from "../api/client";
 import { consumeGoogleOAuthState } from "../auth/googleOAuthState";
+import { useAuth } from "../auth/AuthContext";
+import { afterSignIn } from "../auth/returnTo";
 import { setSession } from "../auth/tokenStore";
 
 interface ExchangeResponse {
@@ -23,6 +25,7 @@ interface ExchangeResponse {
  *  case: RequireUsername (nested under it, see App.tsx) catches the
  *  missing username and redirects to /choose-username itself. */
 export function OAuthSuccessPage() {
+  const { session } = useAuth();
   const [status, setStatus] = useState<"working" | "done" | "error">("working");
   // React 18 StrictMode double-invokes effects in dev mode (mount, run,
   // simulate-unmount, run again) to surface exactly this class of bug:
@@ -36,8 +39,9 @@ export function OAuthSuccessPage() {
   // how many times the effect itself fires.
   const processedRef = useRef(false);
 
+
   useEffect(() => {
-    if (processedRef.current) return;
+    if (session || processedRef.current) return;
     processedRef.current = true;
 
     const params = new URLSearchParams(window.location.search);
@@ -62,13 +66,17 @@ export function OAuthSuccessPage() {
           method: "POST",
           body: JSON.stringify({ code })
         })) as ExchangeResponse;
-        setSession({ user: body.user, accessToken: body.accessToken, refreshToken: body.refreshToken });
+        setSession({ user: body.user, accessToken: body.accessToken, refreshToken: body.refreshToken }, sessionStorage.getItem("scripta_auth_remember") === "true");
+        sessionStorage.removeItem("scripta_auth_remember");
+
         setStatus("done");
       } catch {
         setStatus("error");
       }
     })();
-  }, []);
+  }, [session]);
+
+  if (session) return <Navigate to={afterSignIn(session.user.username)} replace />;
 
   if (status === "error") {
     return (
@@ -82,7 +90,7 @@ export function OAuthSuccessPage() {
     );
   }
 
-  if (status === "done") return <Navigate to="/dashboard" replace />;
+
 
   return <div className="px-5 py-20 text-center text-sm text-(--color-text-dim)">Signing you in…</div>;
 }

@@ -1,3 +1,5 @@
+import { pathWithQuery } from "../../features/auth/navigation";
+import { usePathname, useGlobalSearchParams } from "expo-router";
 import { ActivityIndicator, View } from "react-native";
 import { Redirect, Tabs } from "expo-router";
 import { useAuth } from "../../core/auth";
@@ -6,6 +8,9 @@ import { Icon } from "../../ui/icon";
 import { useTheme } from "../../ui/theme";
 
 export default function AppLayout() {
+  const pathname = usePathname();
+  const params = useGlobalSearchParams();
+  const returnTo = pathWithQuery(pathname, params);
   const { ready, user, unreachable, retry } = useAuth();
   const { colors } = useTheme();
   if (!ready) {
@@ -31,10 +36,10 @@ export default function AppLayout() {
       </View>
     );
   }
-  if (!user) return <Redirect href="/(public)/login" />;
+  if (!user) return <Redirect href={{ pathname: "/login", params: { returnTo } }} />;
   // Google sign-in without a username yet — see choose-username.tsx's own
   // top comment, mirrors the PWA's RequireUsername guard.
-  if (!user.username) return <Redirect href="/choose-username" />;
+  if (!user.username) return <Redirect href={{ pathname: "/choose-username", params: { returnTo } }} />;
 
   // Each tab is a group holding its own Stack, so a drill-down inside a tab is
   // a real push — with the platform's back chevron and swipe-back — rather than

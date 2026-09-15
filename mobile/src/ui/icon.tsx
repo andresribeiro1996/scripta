@@ -14,6 +14,8 @@ type Glyph = { ios: SFSymbol; android: string };
 /** Each entry is the outline form; `filled` picks the solid variant where the
  *  pair exists, which is how both platforms mark a selected tab. */
 const GLYPHS = {
+  showPassword: { ios: "eye", android: "visibility" },
+  hidePassword: { ios: "eye.slash", android: "visibility_off" },
   home: { ios: "house", android: "home" },
   library: { ios: "books.vertical", android: "library_books" },
   arena: { ios: "trophy", android: "trophy" },

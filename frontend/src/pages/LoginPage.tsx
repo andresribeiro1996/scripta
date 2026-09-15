@@ -1,7 +1,10 @@
-import { useEffect, useState } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { authFieldErrors, PASSWORD_HINT, USERNAME_HINT, safeAuthReturnTo } from "@scripta/shared";
+import { PasswordInput } from "../auth/PasswordInput";
+import { afterSignIn, startAuthNavigation } from "../auth/returnTo";
+import { useEffect, useRef, useState } from "react";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { API_URL } from "../api/baseUrl";
-import { publicFetch } from "../api/client";
+import { ApiError, publicFetch } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { createGoogleOAuthState } from "../auth/googleOAuthState";
 import {
@@ -50,6 +53,10 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [remember, setRemember] = useState(false);
+  const locked = useRef(false);
+  const from = (location.state as { from?: { pathname: string; search?: string; hash?: string }; returnTo?: string } | null);
+  const redirectTo = safeAuthReturnTo(from?.returnTo ?? (from?.from ? `${from.from.pathname}${from.from.search ?? ""}${from.from.hash ?? ""}` : new URLSearchParams(location.search).get("returnTo")), "/dashboard");
   const [googleAvailable, setGoogleAvailable] = useState(false);
 
   useEffect(() => {
@@ -58,27 +65,34 @@ export function LoginPage() {
       .catch(() => setGoogleAvailable(false));
   }, []);
 
+  useEffect(() => {
+    const restore = () => { locked.current = false; setSubmitting(false); };
+    window.addEventListener("pageshow", restore);
+    return () => window.removeEventListener("pageshow", restore);
+  }, []);
+
   // Already signed in — don't show the login form. (RequireUsername
   // handles routing an incomplete Google account onward from here.)
   if (session) {
-    const redirectTo = (location.state as { from?: Location } | null)?.from?.pathname ?? "/dashboard";
-    return <Navigate to={redirectTo} replace />;
-  }
-
-  // Native constraint validation, but reported inline under each field
-  // instead of a browser tooltip: preventDefault() on `invalid` (which
-  // fires per-field on a failed submit) suppresses the bubble, and the
-  // message lands in state. Cleared as soon as the user edits the field.
-  function handleInvalid(e: React.InvalidEvent<HTMLInputElement>) {
-    e.preventDefault();
-    setFieldErrors((prev) => ({ ...prev, [e.currentTarget.id]: e.currentTarget.validationMessage }));
+    return <Navigate to={afterSignIn(session.user.username)} replace />;
   }
 
   function startGoogleSignIn(e: React.MouseEvent<HTMLAnchorElement>) {
     e.preventDefault();
-    const url = new URL(`${API_URL}/auth/google`);
-    url.searchParams.set("client_state", createGoogleOAuthState());
-    window.location.assign(url.toString());
+    if (locked.current) return;
+    locked.current = true;
+    setSubmitting(true);
+    try {
+      startAuthNavigation(redirectTo, false);
+      sessionStorage.setItem("scripta_auth_remember", String(remember));
+      const url = new URL(`${API_URL}/auth/google`);
+      url.searchParams.set("client_state", createGoogleOAuthState());
+      window.location.assign(url.toString());
+    } catch {
+      locked.current = false;
+      setSubmitting(false);
+      setError("Your browser couldn’t save this sign-in. Allow site storage and try again.");
+    }
   }
 
   function clearFieldError(e: React.FormEvent<HTMLInputElement>) {
@@ -89,22 +103,34 @@ export function LoginPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (locked.current) return;
     setError(null);
+    const errors = authFieldErrors(mode, identifier, username, password);
+    setFieldErrors(errors);
+    if (Object.keys(errors).length) {
+      document.getElementById(Object.keys(errors)[0]!)?.focus();
+      return;
+    }
+    locked.current = true;
     setSubmitting(true);
     try {
+      startAuthNavigation(redirectTo, mode === "signup");
       if (mode === "login") {
-        await login(identifier, password);
-        const redirectTo = (location.state as { from?: Location } | null)?.from?.pathname ?? "/dashboard";
+        await login(identifier.trim(), password, remember);
         navigate(redirectTo, { replace: true });
       } else {
-        await signup(identifier, username, password);
+        await signup(identifier.trim(), username.trim(), password, remember);
         // New accounts continue into the (skippable) avatar step — part of
         // the signup journey, not a gate; logins never see it.
         navigate("/welcome-avatar", { replace: true });
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      if (err instanceof ApiError && err.field) {
+        setFieldErrors({ [err.field]: err.message });
+        document.getElementById(err.field)?.focus();
+      } else setError(err instanceof TypeError ? "Couldn’t connect. Check your connection and try again." : err instanceof Error ? err.message : "Something went wrong.");
     } finally {
+      locked.current = false;
       setSubmitting(false);
     }
   }
@@ -127,7 +153,8 @@ export function LoginPage() {
               type="button"
               role="tab"
               aria-selected={mode === value}
-              onClick={() => setMode(value)}
+              disabled={submitting}
+              onClick={() => { setMode(value); setError(null); setFieldErrors({}); }}
               className="flex-1 py-2 transition-colors"
               style={
                 mode === value
@@ -140,9 +167,11 @@ export function LoginPage() {
           ))}
         </div>
 
+        {(location.state as { message?: string } | null)?.message && <p role="status" className="mb-4 text-sm" style={{ color: PAPER }}>{(location.state as { message: string }).message}</p>}
         <AuthServerError message={error} />
 
-        <form onSubmit={handleSubmit} noValidate={false}>
+        <form onSubmit={handleSubmit} noValidate>
+          <fieldset disabled={submitting}>
           <div className="mb-4">
             <label className={authLabelClass} style={{ color: PAPER_DIM }} htmlFor="identifier">
               {mode === "login" ? "Email or username" : "Email"}
@@ -151,11 +180,12 @@ export function LoginPage() {
               id="identifier"
               type={mode === "login" ? "text" : "email"}
               required
-              autoComplete="username"
+              autoComplete={mode === "signup" ? "email" : "username"}
+              autoCapitalize="none" spellCheck={false}
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
-              onInvalid={handleInvalid}
               onInput={clearFieldError}
+              aria-invalid={Boolean(fieldErrors.identifier)}
               aria-describedby={fieldErrors.identifier ? "identifier-error" : undefined}
               className={fieldErrors.identifier ? authFieldErrorClass : authFieldClass}
             />
@@ -191,11 +221,12 @@ export function LoginPage() {
                   autoComplete="username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  onInvalid={handleInvalid}
-                  onInput={clearFieldError}
-                  aria-describedby={fieldErrors.username ? "username-error" : undefined}
+                      onInput={clearFieldError}
+                  aria-invalid={Boolean(fieldErrors.username)}
+              aria-describedby={fieldErrors.username ? "username-error" : undefined}
                   className={fieldErrors.username ? authFieldErrorClass : authFieldClass}
                 />
+                <p className="mt-1 text-xs" style={{ color: PAPER_DIM }}>{USERNAME_HINT}</p>
                 <AuthFieldError id="username-error" message={fieldErrors.username} />
               </div>
             </div>
@@ -205,29 +236,35 @@ export function LoginPage() {
             <label className={authLabelClass} style={{ color: PAPER_DIM }} htmlFor="password">
               Password
             </label>
-            <input
+            <PasswordInput
+              key={mode}
               id="password"
               type="password"
               required
-              minLength={8}
+              minLength={mode === "signup" ? 8 : undefined}
               autoComplete={mode === "login" ? "current-password" : "new-password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              onInvalid={handleInvalid}
               onInput={clearFieldError}
+              aria-invalid={Boolean(fieldErrors.password)}
               aria-describedby={fieldErrors.password ? "password-error" : undefined}
               className={fieldErrors.password ? authFieldErrorClass : authFieldClass}
             />
+            {mode === "signup" && <p className="mt-1 text-xs" style={{ color: PAPER_DIM }}>{PASSWORD_HINT}</p>}
             <AuthFieldError id="password-error" message={fieldErrors.password} />
           </div>
 
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3 text-xs" style={{ color: PAPER }}>
+            <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />Remember me</label>
+            {mode === "login" && <Link to={`/forgot-password?email=${encodeURIComponent(identifier.includes("@") ? identifier : "")}`} className="py-3 underline">Forgot password?</Link>}
+          </div>
           <button
             type="submit"
             disabled={submitting}
             className={authSubmitClass}
             style={{ backgroundColor: GOLD, color: INK }}
           >
-            {submitting ? "…" : mode === "login" ? "Log in" : "Create account"}
+            {submitting ? (mode === "login" ? "Logging in…" : "Creating account…") : mode === "login" ? "Log in" : "Create account"}
           </button>
 
           {googleAvailable && (
@@ -258,6 +295,7 @@ export function LoginPage() {
               </a>
             </>
           )}
+          </fieldset>
         </form>
       </AuthCard>
     </AuthStage>

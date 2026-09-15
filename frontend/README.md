@@ -432,3 +432,9 @@ Every text link/button in the app (rename-by-clicking-a-title, "Style"/"Manage b
 - X/Instagram/Threads/TikTok's connect buttons haven't been exercised against a real developer app (no credentials exist for any of the three yet) — what's verified is everything that doesn't need them: correct disabled state with no crash, and (via Bluesky's real, live-verified flow) the same storage/UI path all five platforms share. See `backend/README.md`'s own "Not built" for the same caveat from that side.
 - No "last used" or "needs reauthorization" state on a connected platform — a token can silently expire or be revoked on the platform's own end, and Settings would keep showing it as connected until the next action against it actually fails (and nothing calls out to a platform yet to trigger that).
 - Reordering within a Shelf/Quote-collection is ▲▼ buttons, not drag — a second drag surface nested inside blocks the canvas itself drags would fight for the same gesture.
+
+### Account access
+
+Login/signup share inline validation with mobile and offer password visibility and a Remember me checkbox. Checked sessions persist in localStorage; unchecked sessions use sessionStorage (tab lifetime, subject to browser session restoration). Token refresh, Google sign-in, and profile changes retain that choice. Existing saved sessions stay persistent; logout clears both stores.
+
+`/forgot-password`, `/reset-password`, and `/verify-email` are public account-action pages. Settings adds password changes, verification resend, and email correction. Password changes sign out every device. The intended local destination, including query and hash, survives Google sign-in and optional avatar onboarding.

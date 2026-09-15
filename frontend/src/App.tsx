@@ -1,3 +1,4 @@
+import { AccountActionPage } from "./pages/AccountActionPage";
 import { HomePage } from "./pages/HomePage";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { RequireAuth } from "./auth/RequireAuth";
@@ -32,6 +33,9 @@ export function App() {
       <EdgeSwipeBack />
       <Routes>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/forgot-password" element={<AccountActionPage key="forgot" action="forgot" />} />
+        <Route path="/reset-password" element={<AccountActionPage key="reset" action="reset" />} />
+        <Route path="/verify-email" element={<AccountActionPage key="verify" action="verify" />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/oauth-success" element={<OAuthSuccessPage />} />
         <Route path="/arena" element={<ArenaPublicListPage />} />

@@ -1,6 +1,7 @@
+import { authDestination, startAuthNavigation } from "../features/auth/navigation";
 import { useState } from "react";
 import { ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "react-native";
-import { Redirect } from "expo-router";
+import { Redirect, useLocalSearchParams } from "expo-router";
 import { useAuth } from "../core/auth";
 import { Button, Input, Screen } from "../ui";
 import { spacing, typography, useTheme } from "../ui/theme";
@@ -13,6 +14,7 @@ import { spacing, typography, useTheme } from "../ui/theme";
  *  set up"). A top-level route, not nested under (app)'s Tabs, so it
  *  never shows up as a tab. */
 export default function ChooseUsernamePage() {
+  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const { ready, user, setUsername } = useAuth();
   const { colors } = useTheme();
   const [continueToAvatar, setContinueToAvatar] = useState(false);
@@ -28,11 +30,13 @@ export default function ChooseUsernamePage() {
     );
   }
   if (!user) return <Redirect href="/(public)/login" />;
-  if (user.username) return <Redirect href={continueToAvatar ? "/welcome-avatar" : "/"} />;
+  if (user.username) return <Redirect href={(continueToAvatar ? "/welcome-avatar" : authDestination()) as never} />;
 
   const trimmed = value.trim();
   const tooShort = trimmed.length < 3;
   const onSubmit = async () => {
+    if (busy) return;
+    startAuthNavigation(returnTo ?? authDestination(), true);
     setBusy(true);
     setError(null);
     setContinueToAvatar(true);
@@ -47,7 +51,7 @@ export default function ChooseUsernamePage() {
 
   return (
     <Screen bottom>
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.flex}>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.flex}>
         <View style={styles.center}>
           <Text accessibilityRole="header" style={[styles.title, { color: colors.text }]}>Choose a username</Text>
           <Text style={[styles.sub, { color: colors.textDim }]}>One more step before your library loads.</Text>

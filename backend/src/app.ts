@@ -66,7 +66,7 @@ export function buildApp() {
 
   app.get("/health", async () => ({ status: "ok" }));
 
-  app.register(registerAuthModule);
+  app.register(registerAuthModule, { authRoot: app });
   app.register(registerArenaModule);
   app.register(registerLibraryModule);
   app.register(registerGalleryModule);

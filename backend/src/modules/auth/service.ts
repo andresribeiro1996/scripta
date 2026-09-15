@@ -132,7 +132,7 @@ export function createAuthService(repo: AuthRepository, avatarStore: AvatarBlobS
         throw new InvalidCredentialsError();
       }
       const valid = await argon2.verify(user.password_hash, password);
-      if (!valid) {
+      if (!valid || repo.findUserById(user.id)?.password_hash !== user.password_hash) {
         throw new InvalidCredentialsError();
       }
       const tokens = await issueTokenPair(user);

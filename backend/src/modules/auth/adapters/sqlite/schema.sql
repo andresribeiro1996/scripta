@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS users (
                                      -- the account first and prompts for one right
                                      -- after (SQLite's UNIQUE allows multiple NULLs,
                                      -- which is exactly what's needed here).
+  auth_version INTEGER NOT NULL DEFAULT 0,
+  email_verified_at TEXT,
   password_hash TEXT,              -- NULL for accounts created via Google only
   google_id     TEXT UNIQUE,       -- NULL until/unless linked to a Google account
   avatar_id     TEXT UNIQUE,       -- NULL until a profile picture is uploaded; the
@@ -54,3 +56,13 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
 
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token_hash ON refresh_tokens(token_hash);
+
+CREATE TABLE IF NOT EXISTS account_tokens (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  purpose TEXT NOT NULL CHECK (purpose IN ('reset', 'verify')),
+  token_hash TEXT NOT NULL UNIQUE,
+  email TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  requested_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, purpose)
+);

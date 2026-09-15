@@ -17,6 +17,7 @@ const { createSqliteMuralsRepository } = await import("./adapters/sqlite/sqliteM
 const { createMuralsService } = await import("./service.js");
 const { buildMuralRoutes, buildPublicMuralRoutes } = await import("./routes.js");
 const { openLibraryDb } = await import("../library/adapters/sqlite/connection.js");
+const { getAuthenticatedUserFromAccessToken } = await import("../auth/tokens.js");
 const { bookKey } = await import("@scripta/shared");
 const authorization = (sub: string) => ({ authorization: `Bearer ${jwt.sign({ sub, email: `${sub}@example.test`, username: sub }, process.env.JWT_ACCESS_SECRET!, { expiresIn: "5m" })}` });
 
@@ -25,6 +26,9 @@ test("home routes preserve ownership, retries, edits and public content boundari
   db.exec(readFileSync(new URL("./adapters/sqlite/schema.sql", import.meta.url), "utf8"));
   const service = createMuralsService(createSqliteMuralsRepository(db), (token) => `https://example.test/shared/${token}`);
   const app = Fastify();
+  app.decorate("authenticateAccessToken", (token: string) => getAuthenticatedUserFromAccessToken(token, (id) => ["owner", "stranger"].includes(id) ? {
+    id, email: `${id}@example.test`, username: id, avatar_id: null, google_id: null, password_hash: null, created_at: ""
+  } : undefined));
   await app.register(buildMuralRoutes(service));
   await app.register(buildPublicMuralRoutes(service));
   const library = openLibraryDb();

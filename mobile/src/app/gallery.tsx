@@ -1,3 +1,5 @@
+import { pathWithQuery } from "../features/auth/navigation";
+import { usePathname, useGlobalSearchParams } from "expo-router";
 import { useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
 import {
@@ -31,11 +33,14 @@ const buttonFixtures = [
 
 export default function GalleryRoute() {
   const { ui } = useLocalSearchParams<{ ui?: string }>();
+  const pathname = usePathname();
+  const params = useGlobalSearchParams();
+  const returnTo = pathWithQuery(pathname, params);
   const { ready, user } = useAuth();
   if (__DEV__ && ui === "1") return <UiGalleryScreen />;
   if (!ready) return <View style={styles.center}><ActivityIndicator size="large" /></View>;
-  if (!user) return <Redirect href="/(public)/login" />;
-  if (!user.username) return <Redirect href="/choose-username" />;
+  if (!user) return <Redirect href={{ pathname: "/login", params: { returnTo } }} />;
+  if (!user.username) return <Redirect href={{ pathname: "/choose-username", params: { returnTo } }} />;
   return <GalleryFeatureScreen />;
 }
 
