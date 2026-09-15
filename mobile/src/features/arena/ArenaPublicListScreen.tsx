@@ -25,6 +25,6 @@ const styles = StyleSheet.create({
   screen: { padding: spacing.lg, gap: spacing.lg },
   grow: { flex: 1 },
   strong: { fontWeight: "700" },
-  list: { gap: spacing.sm, paddingBottom: spacing.huge },
+  list: { gap: spacing.sm, paddingBottom: spacing.huge, flexGrow: 1 },
   card: { borderWidth: 1, borderRadius: radii.lg, padding: spacing.md, gap: spacing.xs },
 });

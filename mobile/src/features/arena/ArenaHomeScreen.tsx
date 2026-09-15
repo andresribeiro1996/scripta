@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
   screen: { padding: spacing.lg, gap: spacing.md },
   grow: { flex: 1 },
   strong: { fontWeight: "700" },
-  list: { gap: spacing.sm, paddingBottom: spacing.huge },
+  list: { gap: spacing.sm, paddingBottom: spacing.huge, flexGrow: 1 },
   card: { minHeight: 92, borderWidth: 1, borderRadius: radii.lg, padding: spacing.md, flexDirection: "row", alignItems: "center", gap: spacing.md },
   dialog: { gap: spacing.md },
 });
