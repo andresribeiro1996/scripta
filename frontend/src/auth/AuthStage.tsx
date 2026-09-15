@@ -86,7 +86,7 @@ export function AuthBrandHeading({ subtitle }: { subtitle: string }) {
         className="text-2xl tracking-[0.12em]"
         style={{ color: PAPER, fontFamily: "ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif" }}
       >
-        Scripta
+        Atmyshelf
       </h1>
       <p className="mt-2 text-[12px]" style={{ color: PAPER_DIM }}>
         {subtitle}

@@ -39,7 +39,7 @@ export function SettingsScreen() {
   }
 
   function confirmSignOut() {
-    Alert.alert("Sign out", "Sign out of Scripta on this device?", [
+    Alert.alert("Sign out", "Sign out of Atmyshelf on this device?", [
       { text: "Cancel", style: "cancel" },
       { text: "Sign out", style: "destructive", onPress: () => void signOut().then(() => router.replace("/(public)/login")) },
     ]);

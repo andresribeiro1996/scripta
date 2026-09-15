@@ -87,7 +87,7 @@ export function DashboardLayout() {
       <aside className="hidden w-56 shrink-0 flex-col border-r border-(--color-border) bg-(--color-surface) px-3 py-5 lg:flex">
         <div className="mb-6 flex items-center gap-2 px-2">
           <img src="/icon-192.png" alt="" className="h-7 w-7 rounded-md" />
-          <span className="text-lg font-bold">Scripta</span>
+          <span className="text-lg font-bold">Atmyshelf</span>
         </div>
         <nav className="flex flex-1 flex-col gap-1">
           {NAV_GROUPS.map((group, groupIndex) => (
@@ -173,7 +173,7 @@ export function DashboardLayout() {
           >
             <div className="mb-6 flex items-center gap-2 px-2">
               <img src="/icon-192.png" alt="" className="h-7 w-7 rounded-md" />
-              <span className="text-lg font-bold">Scripta</span>
+              <span className="text-lg font-bold">Atmyshelf</span>
             </div>
             <nav className="flex flex-1 flex-col gap-1">
               {NAV_GROUPS.map((group, groupIndex) => (

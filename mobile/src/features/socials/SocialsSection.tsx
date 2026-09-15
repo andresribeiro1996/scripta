@@ -36,7 +36,7 @@ export function SocialsSection() {
   }
 
   function confirmDisconnect(status: SocialStatus) {
-    Alert.alert(`Disconnect ${LABELS[status.provider]}?`, "Scripta will delete the stored access token.", [
+    Alert.alert(`Disconnect ${LABELS[status.provider]}?`, "Atmyshelf will delete the stored access token.", [
       { text: "Cancel", style: "cancel" },
       { text: "Disconnect", style: "destructive", onPress: () => {
         setBusy(status.provider);

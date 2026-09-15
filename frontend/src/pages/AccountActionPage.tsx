@@ -50,13 +50,13 @@ export function AccountActionPage({ action }: { action: "forgot" | "reset" | "ve
   return <AuthStage><AuthCard><div style={{ color: PAPER }}>
     <AuthBrandHeading subtitle={action === "forgot" ? "Recover your account" : action === "reset" ? "Choose a new password" : "Verify your email"} />
     <AuthServerError message={error} />
-    {done && <p role="status" className="mb-5 text-sm">{action === "forgot" ? RECOVERY_MESSAGE : action === "reset" ? "Password updated. Log in with your new password. Your other sessions have been signed out." : "Email verified. You can return to Scripta. If you changed your email, log in with the new address."}</p>}
+    {done && <p role="status" className="mb-5 text-sm">{action === "forgot" ? RECOVERY_MESSAGE : action === "reset" ? "Password updated. Log in with your new password. Your other sessions have been signed out." : "Email verified. You can return to Atmyshelf. If you changed your email, log in with the new address."}</p>}
     {(!done || action === "forgot") && <form onSubmit={submit} className="space-y-4">
       <fieldset disabled={busy} className="space-y-4">
         {action === "forgot" ? <div><label htmlFor="recovery-email" className={authLabelClass}>Email</label><input id="recovery-email" type="email" required autoComplete="email" autoCapitalize="none" value={email} onChange={(event) => { setEmail(event.target.value); setDone(false); }} className={authFieldClass} /></div> : action === "reset" && token ? <>
           <div><label htmlFor="new-password" className={authLabelClass}>New password</label><PasswordInput id="new-password" required minLength={8} maxLength={128} autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} className={authFieldClass} /><p className="mt-2 text-xs">{PASSWORD_HINT}</p></div>
           <div><label htmlFor="confirm-password" className={authLabelClass}>Confirm new password</label><PasswordInput id="confirm-password" required autoComplete="new-password" value={confirm} onChange={(event) => setConfirm(event.target.value)} className={authFieldClass} /></div>
-        </> : !token ? <p role="alert" className="text-sm">This link is missing its verification code. Request a new email.</p> : <p className="text-sm">Confirm this email address for your Scripta account.</p>}
+        </> : !token ? <p role="alert" className="text-sm">This link is missing its verification code. Request a new email.</p> : <p className="text-sm">Confirm this email address for your Atmyshelf account.</p>}
         {(action === "forgot" || token) && <button className={authSubmitClass} style={{ backgroundColor: GOLD, color: INK }} disabled={busy || (action === "forgot" && cooldown > 0)}>{busy ? "Working…" : action === "forgot" ? cooldown > 0 ? `Resend in ${cooldown}s` : done ? "Resend email" : "Send recovery email" : action === "reset" ? "Update password" : "Verify email"}</button>}
       </fieldset>
     </form>}

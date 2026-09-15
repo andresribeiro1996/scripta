@@ -51,7 +51,7 @@ function UiGalleryScreen() {
 
   return (
     <ScrollView style={{ backgroundColor: colors.background }} contentContainerStyle={styles.page}>
-      <Text accessibilityRole="header" {...dynamicType} style={[styles.heading, { color: colors.text }]}>Scripta UI gallery</Text>
+      <Text accessibilityRole="header" {...dynamicType} style={[styles.heading, { color: colors.text }]}>Atmyshelf UI gallery</Text>
 
       <Section title="Buttons">
         {buttonFixtures.map((fixture) => <Button key={fixture.label} {...fixture} onPress={() => undefined} />)}

@@ -111,7 +111,7 @@ export default function LoginPage() {
     <Screen bottom>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.flex}>
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.center}>
-          <Text accessibilityRole="header" style={[styles.logo, { color: colors.text }]}>Scripta</Text>
+          <Text accessibilityRole="header" style={[styles.logo, { color: colors.text }]}>Atmyshelf</Text>
           {/* Only worth the user's attention when the server is actually
               unreachable — "server ok" is a developer's line, not a reader's. */}
           {health.isError ? (

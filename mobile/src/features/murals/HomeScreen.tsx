@@ -72,7 +72,7 @@ export function HomeScreen() {
       </View>
       {error || home.choiceError ? <Text accessibilityRole="alert" style={{ color: colors.danger }}>{error ?? home.choiceError?.message}</Text> : null}
       {home.isPending || library.isPending ? <ActivityIndicator accessibilityLabel="Loading home" /> : home.isError || library.isError ? <ErrorState body="Couldn't load your home." actionLabel="Retry" onAction={() => { void home.refetch(); void library.refetch(); }} /> : <>
-        {!books.length ? <EmptyState title="Bring your books into Scripta" body="Import your library or add a book to begin." /> : null}
+        {!books.length ? <EmptyState title="Bring your books into Atmyshelf" body="Import your library or add a book to begin." /> : null}
         {mural ? <MuralCanvas mural={{ ...mural, blocks }} books={books} images={gallery.data ?? []} tierlists={tierlists.data ?? []} onSelectBlock={(id) => { const block = blocks.find((item) => item.id === id); if (block) openBlock(block); }} /> : <EmptyState title="Make yourself at home" body="Start with an editable reading space, or choose one of your murals." actionLabel={home.choosing ? "Creating…" : "Create my home"} onAction={home.choosing ? undefined : () => void choose(eligiblePassages(books).length > 0)} />}
       </>}
       {gallery.isError || tierlists.isError ? <ErrorState body="Some mural content couldn't load." actionLabel="Retry" onAction={() => { void gallery.refetch(); void tierlists.refetch(); }} /> : null}
