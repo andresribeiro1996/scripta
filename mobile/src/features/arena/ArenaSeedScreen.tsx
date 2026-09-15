@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
   form: { gap: spacing.sm },
   row: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   actions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  list: { gap: spacing.sm, paddingBottom: spacing.huge },
+  list: { gap: spacing.sm, paddingBottom: spacing.huge, flexGrow: 1 },
   slot: { minHeight: 52, borderWidth: 1, borderRadius: radii.md, padding: spacing.md, flexDirection: "row", alignItems: "center", gap: spacing.md },
   picker: { maxHeight: 420 },
   pickRow: { minHeight: 48, justifyContent: "center", paddingVertical: spacing.sm },
