@@ -45,6 +45,15 @@ the current bundle. By default, re-running **preserves** whatever you did
 in the app last time; pass `--reset` to wipe the seeded data back to its
 initial state:
 
+Metro here binds `127.0.0.1` only, closed to the LAN — the emulator
+reaches it through the `adb reverse` tunnel this script also sets up, so
+LAN advertisement buys nothing and only costs: every worktree's Metro
+that DOES advertise shows up on every device's Expo Go home screen, which
+is how a reload or crash reconnects the app to a different worktree's
+bundler. `adb root` drops that tunnel (it restarts `adbd`); `npm run
+dev:status` warns when it's gone and `npm run dev:tunnels` puts it back.
+Physical-phone testing (above) still needs LAN and is unaffected.
+
 ```bash
 node scripts/dev-emulator.mjs --reset
 ```
