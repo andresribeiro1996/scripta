@@ -3,7 +3,7 @@ import { useRef, useState } from "react";
 import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
 import { blockFontFamilyCss, resolveBlockStyle, resolveBorderColor } from "../../lib/libraryStyle";
-import { muralBlockTitle, GRID_COLUMNS, screenPointToGrid, type BlockLayout, type Mural, type MuralBlock } from "../../lib/murals";
+import { muralBlockTitle, GRID_COLUMNS, screenPointToGrid, type BlockLayout, type Mural, type MuralBlock, type ReaderProfile, type ShelfTheme } from "../../lib/murals";
 import { ActionSheet } from "../Sheet";
 import { MobileBlockPreview } from "./MobileBlockPreview";
 import { MuralBlockDetail } from "./MuralBlockDetail";
@@ -54,6 +54,8 @@ function BlockFrame({
   draggable,
   books,
   images,
+  profile,
+  shelfThemeOverride,
   statsOverride,
   tierlistData,
   onActivate,
@@ -67,6 +69,8 @@ function BlockFrame({
   draggable: boolean;
   books: Array<Record<string, unknown>>;
   images: GalleryImage[];
+  profile?: ReaderProfile;
+  shelfThemeOverride?: ShelfTheme;
   statsOverride?: Record<string, number>;
   tierlistData?: (tierlistId: string) => ResolvedTierlist | undefined;
   onActivate: () => void;
@@ -113,7 +117,7 @@ function BlockFrame({
       }}
     >
       <div className="pointer-events-none h-full origin-top-left" style={{ width: `${scale * 100}%`, height: `${scale * 100}%`, transform: `scale(${1 / scale})`, fontSize: 14 }}>
-        <MobileBlockPreview block={block} books={books} images={images} statsOverride={statsOverride} tierlistData={tierlistData} width={((CANVAS_WIDTH - PADDING * 2 + MARGIN) / GRID_COLUMNS * block.layout.w - MARGIN) * scale} height={(block.layout.h * (ROW_HEIGHT + MARGIN) - MARGIN) * scale} />
+        <MobileBlockPreview block={block} books={books} images={images} profile={profile} shelfThemeOverride={shelfThemeOverride} statsOverride={statsOverride} tierlistData={tierlistData} width={((CANVAS_WIDTH - PADDING * 2 + MARGIN) / GRID_COLUMNS * block.layout.w - MARGIN) * scale} height={(block.layout.h * (ROW_HEIGHT + MARGIN) - MARGIN) * scale} />
       </div>
     </div>
   );
@@ -124,6 +128,8 @@ export function MobileMuralCanvas({
   editMode,
   books,
   images,
+  profile,
+  shelfThemeOverride,
   selectedBlockId,
   draft,
   busy,
@@ -146,6 +152,8 @@ export function MobileMuralCanvas({
   editMode: boolean;
   books: Array<Record<string, unknown>>;
   images: GalleryImage[];
+  profile?: ReaderProfile;
+  shelfThemeOverride?: ShelfTheme;
   selectedBlockId?: string | null;
   draft?: MobileMuralDraft | null;
   busy?: boolean;
@@ -273,6 +281,8 @@ export function MobileMuralCanvas({
                     invalid={block.id === draft?.block.id && !draft.valid}
                     books={books}
                     images={images}
+                    profile={profile}
+                    shelfThemeOverride={shelfThemeOverride}
                     statsOverride={statsOverride}
                     tierlistData={tierlistData}
                     onActivate={() => activate(block)}
@@ -365,6 +375,8 @@ export function MobileMuralCanvas({
           block={focused}
           books={books}
           images={images}
+          profile={profile}
+          shelfThemeOverride={shelfThemeOverride}
           statsOverride={statsOverride}
           tierlistData={tierlistData}
           onClose={() => {

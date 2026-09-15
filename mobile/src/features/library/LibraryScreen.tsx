@@ -221,6 +221,8 @@ export function LibraryScreen() {
           body="Import a library.json, KoboReader.sqlite, Goodreads CSV, or StoryGraph CSV — or add a book by hand."
           actionLabel="Import library…"
           onAction={() => router.push("/import" as never)}
+          secondaryActionLabel="Add a book manually"
+          onSecondaryAction={() => router.push("/add-book" as never)}
         />
       )}
 

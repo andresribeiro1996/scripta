@@ -15,7 +15,7 @@ import { resolveHomeBlock, type Group } from "@scripta/shared";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import type { GalleryImage } from "../../api/gallery";
-import { ALL_STAT_METRICS, BLOCK_TYPE_LABELS, STAT_METRIC_LABELS, type MuralBlock } from "../../lib/murals";
+import { ALL_STAT_METRICS, BLOCK_TYPE_LABELS, BOOK_GENRES, STAT_METRIC_LABELS, type MuralBlock } from "../../lib/murals";
 import { bookKey } from "../../lib/merge";
 import { BookSearchList, GalleryImageGrid } from "./pickers";
 import { useDismissible } from "../../hooks/useDismissible";
@@ -96,6 +96,14 @@ export function BlockConfigPanel({
                   className="w-full rounded-lg border border-(--color-border) bg-transparent px-3 py-2 text-sm"
                 />
               </div>
+            </div>
+          )}
+
+          {draft.type === "profile" && (
+            <div className="flex flex-col gap-4">
+              <label className="text-sm">Biography<textarea value={draft.bio} onChange={(event) => setDraft({ ...draft, bio: event.target.value })} rows={4} className="mt-1 w-full rounded-lg border border-(--color-border) bg-transparent px-3 py-2" /></label>
+              <fieldset><legend className="mb-2 text-sm font-medium">What I like</legend><div className="flex flex-wrap gap-2">{BOOK_GENRES.map((genre) => { const checked = draft.favoriteGenres.includes(genre); return <label key={genre} className={`cursor-pointer rounded-full border px-3 py-1.5 text-sm ${checked ? "border-(--color-accent) bg-(--color-accent-soft) text-(--color-accent)" : "border-(--color-border)"}`}><input type="checkbox" className="sr-only" checked={checked} onChange={() => setDraft({ ...draft, favoriteGenres: checked ? draft.favoriteGenres.filter((item) => item !== genre) : [...draft.favoriteGenres, genre] })} />{genre}</label>; })}</div></fieldset>
+              <p className="text-xs text-(--color-text-dim)">My shelf theme is calculated automatically from your books.</p>
             </div>
           )}
 

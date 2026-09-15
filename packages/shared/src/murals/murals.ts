@@ -16,6 +16,7 @@
 // in LibraryPage.tsx/GroupsPage.tsx/useDeleteGalleryImage.ts).
 
 import type { BlockStyle } from "../library/libraryStyle.js";
+import type { BookGenre } from "../library/bookGenres.js";
 import { bookKey } from "../library/merge.js";
 
 export type BlockLayout = { x: number; y: number; w: number; h: number };
@@ -69,12 +70,18 @@ export type MuralBlock =
   | (MuralBlockBase & { type: "quoteCollection"; title: string; quotes: QuoteRef[] })
   | (MuralBlockBase & { type: "image"; imageId: string; caption?: string })
   | (MuralBlockBase & { type: "text"; heading?: string; body?: string })
+  | (MuralBlockBase & { type: "profile"; bio: string; favoriteGenres: BookGenre[] })
   | (MuralBlockBase & { type: "currentlyReading" })
   | (MuralBlockBase & { type: "stats"; metrics: StatMetric[] })
   | (MuralBlockBase & { type: "empty" })
   | (MuralBlockBase & { type: "tierlist"; tierlistId: string });
 
 export type BlockType = MuralBlock["type"];
+
+export interface ReaderProfile {
+  username: string;
+  avatarUrl: string | null;
+}
 
 /** Human-readable name per block type — the single source AddBlockMenu.tsx's
  *  "+ Add block" choices draw their labels from, so a type's display name
@@ -86,6 +93,7 @@ export const BLOCK_TYPE_LABELS: Record<BlockType, string> = {
   quoteCollection: "Quote collection",
   image: "Image",
   text: "Text",
+  profile: "Reader profile",
   currentlyReading: "Currently reading",
   stats: "Stats",
   empty: "Empty block",
@@ -159,6 +167,7 @@ const DEFAULT_SIZE_BY_TYPE: Record<BlockType, { w: number; h: number }> = {
   quoteCollection: { w: 6, h: 4 },
   image: { w: 4, h: 3 },
   text: { w: 4, h: 2 },
+  profile: { w: 6, h: 5 },
   currentlyReading: { w: 4, h: 4 },
   stats: { w: 6, h: 2 },
   empty: { w: 3, h: 2 },
@@ -288,6 +297,8 @@ function defaultBlockForType(id: string, type: BlockType, layout: BlockLayout): 
       return { id, type, layout, imageId: "" };
     case "text":
       return { id, type, layout, heading: "", body: "" };
+    case "profile":
+      return { id, type, layout, bio: "", favoriteGenres: [] };
     case "currentlyReading":
       return { id, type, layout };
     case "stats":

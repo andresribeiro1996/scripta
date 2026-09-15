@@ -32,6 +32,7 @@ export interface ExtractedReferences {
   imageIds: Set<string>;
   needsCurrentlyReading: boolean;
   statsMetrics: Set<string>;
+  needsShelfTheme: boolean;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -60,7 +61,8 @@ export function extractReferences(blocks: unknown): ExtractedReferences {
     highlightRefs: [],
     imageIds: new Set(),
     needsCurrentlyReading: false,
-    statsMetrics: new Set()
+    statsMetrics: new Set(),
+    needsShelfTheme: false
   };
 
   if (!Array.isArray(blocks)) return refs;
@@ -122,6 +124,11 @@ export function extractReferences(blocks: unknown): ExtractedReferences {
 
       case "stats": {
         addStringArrayEntries(refs.statsMetrics, block.metrics);
+        break;
+      }
+
+      case "profile": {
+        refs.needsShelfTheme = true;
         break;
       }
 

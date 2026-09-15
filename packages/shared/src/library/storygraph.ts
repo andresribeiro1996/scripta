@@ -31,6 +31,7 @@
 import type { LibraryData } from "./types.js";
 import { normalizeIsbn } from "./covers.js";
 import { csvRowsToObjects, parseCsv } from "./csv.js";
+import { normalizeBookGenres } from "./bookGenres.js";
 
 export function looksLikeStorygraphCsv(text: string): boolean {
   const firstLine = text.split(/\r?\n/, 1)[0] ?? "";
@@ -62,6 +63,7 @@ export function storygraphCsvToLibraryJson(text: string): LibraryData {
     const review = (row["Review"] ?? "").trim();
     const contentId = `storygraph:${isbnOrUid || i}`;
     const lastRead = row["Last Date Read"] || null;
+    const genres = normalizeBookGenres(row["Tags"]);
 
     const book: Record<string, unknown> = {
       ContentID: contentId,
@@ -81,7 +83,8 @@ export function storygraphCsvToLibraryJson(text: string): LibraryData {
       WordCount: -1,
       MimeType: null,
       ImageId: null,
-      highlights: [] as Array<Record<string, unknown>>
+      highlights: [] as Array<Record<string, unknown>>,
+      ...(genres.length ? { _genres: genres } : {})
     };
 
     if (review) {

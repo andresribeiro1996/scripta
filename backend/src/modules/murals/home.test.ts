@@ -44,12 +44,13 @@ test("home routes preserve ownership, retries, edits and public content boundari
     assert.equal(service.listMurals("owner").length, 1);
     assert.equal((await app.inject({ method: "PUT", url: "/murals/home", headers: authorization("stranger"), payload: { muralId: home.id } })).statusCode, 404);
     assert.deepEqual((await app.inject({ method: "GET", url: "/murals/home", headers: authorization("stranger") })).json(), { mural: null });
-    const book = { Title: "Shared title", Attribution: "Writer", _coverUrl: "https://example.test/cover.png", Rating: 5, highlights: [{ BookmarkID: "secret", Type: "highlight", Text: "PRIVATE PASSAGE" }] };
-    const hidden = { Title: "PRIVATE BOOK", Attribution: "Writer" };
+    const book = { Title: "Shared title", Attribution: "Writer", _coverUrl: "https://example.test/cover.png", _genres: ["Fantasy"], Rating: 5, highlights: [{ BookmarkID: "secret", Type: "highlight", Text: "PRIVATE PASSAGE" }] };
+    const hidden = { Title: "PRIVATE BOOK", Attribution: "Writer", _genres: ["History"] };
     library.prepare("INSERT INTO library_documents (user_id, data) VALUES (?, ?)").run("owner", JSON.stringify({ books: [book, hidden], groups: [{ id: "private-collection-id", type: "collection", name: "PRIVATE COLLECTION NAME", bookKeys: [bookKey(book)] }] }));
     service.updateMural("owner", home.id, { blocks: [
       { id: "s", type: "shelf", title: "", collectionId: "private-collection-id", bookKeys: [bookKey(hidden)], layout: { x: 0, y: 0, w: 8, h: 5 } },
-      { id: "q", type: "quote", mode: "rediscover", bookKey: bookKey(book), highlightId: "secret", layout: { x: 0, y: 6, w: 8, h: 5 } }
+      { id: "q", type: "quote", mode: "rediscover", bookKey: bookKey(book), highlightId: "secret", layout: { x: 0, y: 6, w: 8, h: 5 } },
+      { id: "p", type: "profile", bio: "Reader", favoriteGenres: ["Fantasy"], layout: { x: 0, y: 12, w: 8, h: 5 } }
     ], updatedAt: home.updatedAt });
     const shared = service.share("owner", home.id)!;
     const response = await app.inject({ method: "GET", url: `/murals/shared/${shared.shareToken}` });
@@ -60,8 +61,9 @@ test("home routes preserve ownership, retries, edits and public content boundari
     assert.deepEqual(body.highlights, []);
     assert.deepEqual(body.mural.blocks[0].bookKeys, [bookKey(book)]);
     assert.equal(body.mural.blocks[1].type, "text");
+    assert.deepEqual(body.shelfTheme, { genres: ["Fantasy", "History"], matchedBooks: 2, totalBooks: 2 });
     for (const privateValue of ["PRIVATE PASSAGE", "PRIVATE BOOK", "PRIVATE COLLECTION NAME", "private-collection-id", '"Rating"']) assert.equal(response.body.includes(privateValue), false);
-    assert.equal((await create()).json().blocks.length, 2);
+    assert.equal((await create()).json().blocks.length, 3);
     const stale = await app.inject({ method: "PUT", url: `/murals/${home.id}`, headers: authorization("owner"), payload: { blocks: [], updatedAt: home.updatedAt } });
     assert.equal(stale.statusCode, 409);
     assert.equal((await app.inject({ method: "DELETE", url: `/murals/${home.id}`, headers: authorization("owner") })).statusCode, 204);

@@ -13,10 +13,13 @@ import { useToast } from "../components/Toaster";
 import { ChevronLeftIcon, FullscreenIcon, PencilIcon, ShareIcon, toolbarIconClass } from "../components/Toolbar";
 import { useGalleryImages } from "../hooks/useGalleryImages";
 import { useLibrary } from "../hooks/useLibrary";
+import { useGenreEnrichment } from "../hooks/useGenreEnrichment";
 import { useMuralFullscreen } from "../hooks/useMuralFullscreen";
 import { useMurals } from "../hooks/useMurals";
 import { useTierlists } from "../hooks/useTierlists";
 import { type BlockStyle } from "../lib/libraryStyle";
+import { useAuth } from "../auth/AuthContext";
+import { avatarUrlFor } from "../components/Avatar";
 import {
   addBlock,
   createBlockCandidate,
@@ -38,10 +41,11 @@ import {
  *  (what you'd actually show someone), Edit reveals drag handles, resize
  *  corners, and each block's configure/delete controls. */
 export function MuralEditorPage() {
+  const { session } = useAuth();
   const { muralId } = useParams<{ muralId: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { data: library } = useLibrary();
+  const { data: library, updateLibrary } = useLibrary();
   const { data: muralsData, isLoading, refetch, create, rename, saveBlocks, currentMural, share, unshare } = useMurals();
   const toast = useToast();
   const { images } = useGalleryImages();
@@ -67,6 +71,7 @@ export function MuralEditorPage() {
   // it unchanged.
   const isDraft = muralId === "new";
   const mural = isDraft ? undefined : murals.find((m) => m.id === muralId);
+  const genreEnrichment = useGenreEnrichment(books, mural?.blocks.some((block) => block.type === "profile") ?? false, updateLibrary);
   // Which folder the draft belongs to, carried from the list page so a
   // mural created from inside a folder lands in it.
   const draftFolderId = searchParams.get("folder");
@@ -519,6 +524,8 @@ export function MuralEditorPage() {
         </div>
       </header>
 
+      {genreEnrichment.error && <p role="alert" className="mb-4 text-sm text-(--color-danger)">{genreEnrichment.error}</p>}
+
       {view.blocks.length === 0 && !mobileDraft && (
         // Editing is already on in the second case, so telling you to turn
         // it on — and offering a button that turns it on — is advice you
@@ -556,6 +563,7 @@ export function MuralEditorPage() {
             groups={library?.data.groups ?? []}
             books={books}
             images={images}
+            profile={session?.user.username ? { username: session.user.username, avatarUrl: session.user.avatarId ? avatarUrlFor(session.user.avatarId) : null } : undefined}
             revertNonce={revertNonce}
             onLayoutChange={(blockId, layout) => void guard(handleLayoutChange(blockId, layout), "Couldn't save that move.")}
             onConfigureBlock={(block) => setConfiguringBlockId(block.id)}

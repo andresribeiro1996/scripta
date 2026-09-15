@@ -38,6 +38,7 @@ export function AddBookForm({
   const [author, setAuthor] = useState("");
   const [isbn, setIsbn] = useState("");
   const [publisher, setPublisher] = useState("");
+  const [genres, setGenres] = useState<BookSearchResult["genres"]>([]);
   const [readStatus, setReadStatus] = useState("2");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -47,6 +48,7 @@ export function AddBookForm({
     setAuthor(result.authors.join(", "));
     setIsbn(result.isbn ?? "");
     setPublisher(result.publisher ?? "");
+    setGenres(result.genres);
     setResults(null);
   }
 
@@ -82,6 +84,7 @@ export function AddBookForm({
             readStatus: Number(readStatus),
             rating: null,
             dateRead: null,
+            genres,
           },
           `${Date.now()}-${Math.random().toString(36).slice(2)}`,
         ),
@@ -90,6 +93,7 @@ export function AddBookForm({
       setAuthor("");
       setIsbn("");
       setPublisher("");
+      setGenres([]);
       setQuery("");
       onClose();
     } catch (err) {

@@ -7,18 +7,23 @@ import {
   resolveShelfBooks,
   resolveQuote,
   resolveQuoteCollection,
-  type MuralBlock
+  type MuralBlock,
+  type ReaderProfile,
+  type ShelfTheme
 } from "../../lib/murals";
 import { bookKey } from "../../lib/merge";
 import { computeStat } from "../../lib/muralStats";
 import { CoverImage } from "../BookCard";
 import { BookSummary } from "../BookSummary";
 import { Sheet } from "../Sheet";
+import { ProfileBlockView } from "./blocks/MiscBlocks";
 
 export function MuralBlockDetail({
   block,
   books,
   images,
+  profile,
+  shelfThemeOverride,
   statsOverride,
   tierlistData,
   onClose,
@@ -27,6 +32,8 @@ export function MuralBlockDetail({
   block: MuralBlock;
   books: Array<Record<string, unknown>>;
   images: GalleryImage[];
+  profile?: ReaderProfile;
+  shelfThemeOverride?: ShelfTheme;
   statsOverride?: Record<string, number>;
   tierlistData?: (tierlistId: string) => ResolvedTierlist | undefined;
   onClose: () => void;
@@ -124,6 +131,8 @@ export function MuralBlockDetail({
               </section>
             ))}
           </div>
+        ) : block.type === "profile" ? (
+          <ProfileBlockView block={block} books={books} profile={profile} shelfThemeOverride={shelfThemeOverride} />
         ) : block.type === "stats" ? (
           <div className="grid grid-cols-2 gap-x-6 gap-y-5 py-1">
             {block.metrics.map((metric) => (

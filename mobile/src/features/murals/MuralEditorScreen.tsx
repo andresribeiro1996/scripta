@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import {
   ALL_STAT_METRICS,
+  BOOK_GENRES,
   BLOCK_TYPE_LABELS,
   bookKey,
   resolveHomeBlock,
@@ -16,20 +17,24 @@ import { Button, EmptyState, ErrorState, IconButton, Input, Screen, Sheet, Toast
 import { spacing, typography, useTheme } from "../../ui/theme";
 import { fetchGalleryImages } from "../gallery/api";
 import { useLibrary } from "../library/hooks/useLibrary";
+import { useGenreEnrichment } from "../library/hooks/useGenreEnrichment";
 import { fetchTierlists } from "../tierlists/api";
 import { changeBlockLayout } from "./layout";
 import { MuralCanvas } from "./MuralCanvas";
 import { fetchMural, updateMural } from "./api";
 import { MURALS_QUERY_KEY } from "./useMurals";
+import { useAuth } from "../../core/auth";
+import { API_URL } from "../../core/config";
 
 const BLOCK_TYPES = Object.keys(BLOCK_TYPE_LABELS) as BlockType[];
 
 export function MuralEditorScreen({ id }: { id: string }) {
   const { colors } = useTheme();
+  const { user } = useAuth();
   const router = useRouter();
   const client = useQueryClient();
   const muralQuery = useQuery({ queryKey: ["murals", id], queryFn: () => fetchMural(id), retry: false });
-  const { data: library } = useLibrary();
+  const { data: library, updateLibrary } = useLibrary();
   const gallery = useQuery({ queryKey: ["gallery"], queryFn: fetchGalleryImages });
   const tierlists = useQuery({ queryKey: ["tierlists"], queryFn: fetchTierlists });
   const [name, setName] = useState<string | null>(null);
@@ -48,6 +53,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
   const books = library?.data.books ?? [];
   const needle = search.trim().toLowerCase();
   const filteredBooks = needle ? books.filter((book) => `${book.Title ?? ""} ${book.Attribution ?? ""}`.toLowerCase().includes(needle)) : books;
+  const genreEnrichment = useGenreEnrichment(books, currentBlocks.some((block) => block.type === "profile"), updateLibrary);
 
   useFocusEffect(useCallback(() => {
     void muralQuery.refetch().then(({ data }) => {
@@ -102,9 +108,9 @@ export function MuralEditorScreen({ id }: { id: string }) {
         }}
       />
       <View style={styles.nameRow}><Input label="Mural name" value={currentName} onChangeText={setName} /></View>
-      {error ? <Toast visible message={error} tone="error" /> : null}
+      {error || genreEnrichment.error ? <Toast visible message={error ?? genreEnrichment.error ?? ""} tone="error" /> : null}
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.canvasScroll}>
-        <MuralCanvas mural={draftMural} books={books} groups={library?.data.groups ?? []} images={gallery.data ?? []} tierlists={tierlists.data ?? []} editable selectedBlockId={selectedId} onSelectBlock={setSelectedId} onLayoutChange={(blockId, layout) => setBlocks(changeBlockLayout(currentBlocks, blockId, layout))} />
+        <MuralCanvas mural={draftMural} books={books} groups={library?.data.groups ?? []} images={gallery.data ?? []} tierlists={tierlists.data ?? []} profile={user?.username ? { username: user.username, avatarUrl: user.avatarId ? `${API_URL}/auth/avatar/${user.avatarId}/file` : null } : undefined} editable selectedBlockId={selectedId} onSelectBlock={setSelectedId} onLayoutChange={(blockId, layout) => setBlocks(changeBlockLayout(currentBlocks, blockId, layout))} />
       </ScrollView>
       <View style={[styles.dock, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <Button label="Add block" onPress={() => setAdding(true)} />
@@ -122,6 +128,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
           </> : null}
           {selected.type === "quote" ? <><Button label="Rediscover a passage" variant="secondary" onPress={() => updateSelected((block) => block.type === "quote" ? { ...block, mode: "rediscover", bookKey: "", highlightId: "" } : block)} /><Text style={{ color: colors.textDim }}>Only known book passages are rediscovered. Choose books below to pin a specific highlight instead.</Text></> : null}
           {selected.type === "text" ? <><Input label="Heading" value={selected.heading} onChangeText={(heading) => updateSelected((block) => ({ ...block, heading } as MuralBlock))} /><Input label="Body" value={selected.body} multiline onChangeText={(body) => updateSelected((block) => ({ ...block, body } as MuralBlock))} /></> : null}
+          {selected.type === "profile" ? <><Input label="Biography" value={selected.bio} multiline onChangeText={(bio) => updateSelected((block) => block.type === "profile" ? { ...block, bio } : block)} /><Text style={{ color: colors.text }}>What I like</Text><View style={styles.genreChoices}>{BOOK_GENRES.map((genre) => { const checked = selected.favoriteGenres.includes(genre); return <Pressable key={genre} accessibilityRole="checkbox" accessibilityState={{ checked }} onPress={() => updateSelected((block) => block.type === "profile" ? { ...block, favoriteGenres: checked ? block.favoriteGenres.filter((item) => item !== genre) : [...block.favoriteGenres, genre] } : block)} style={[styles.genreChoice, { backgroundColor: checked ? colors.accentSoft : colors.surface, borderColor: checked ? colors.accent : colors.border }]}><Text style={{ color: checked ? colors.accent : colors.text }}>{genre}</Text></Pressable>; })}</View></> : null}
           {selected.type === "shelf" || selected.type === "quoteCollection" ? <Input label="Title" value={selected.title} onChangeText={(title) => updateSelected((block) => ({ ...block, title } as MuralBlock))} /> : null}
           {selected.type === "spotlight" || selected.type === "image" ? <Input label="Caption" value={selected.caption ?? ""} onChangeText={(caption) => updateSelected((block) => ({ ...block, caption } as MuralBlock))} /> : null}
           {selected.type === "stats" ? <View style={styles.sheet}>{ALL_STAT_METRICS.map((metric) => <Pressable accessibilityLabel={metric} accessibilityRole="checkbox" accessibilityState={{ checked: selected.metrics.includes(metric) }} key={metric} onPress={() => updateSelected((block) => block.type === "stats" ? { ...block, metrics: block.metrics.includes(metric) ? block.metrics.filter((item) => item !== metric) : [...block.metrics, metric] } : block)}><Text style={[typography.body, { color: selected.metrics.includes(metric) ? colors.accent : colors.text }]}>✓ {metric}</Text></Pressable>)}</View> : null}
@@ -163,4 +170,6 @@ const styles = StyleSheet.create({
   dock: { position: "absolute", left: 0, right: 0, bottom: 0, borderTopWidth: 1, padding: spacing.sm, flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   sheet: { gap: spacing.sm, paddingBottom: spacing.xl },
   row: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  genreChoices: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  genreChoice: { borderWidth: 1, borderRadius: 999, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
 });

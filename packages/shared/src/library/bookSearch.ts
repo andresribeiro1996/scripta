@@ -16,6 +16,8 @@
 // per-client (frontend/src/lib/bookSearch.ts); this module holds only the
 // pure query-shape and result-mapping logic.
 
+import { normalizeBookGenres, type BookGenre } from "./bookGenres.js";
+
 export interface BookSearchResult {
   title: string;
   authors: string[];
@@ -23,6 +25,7 @@ export interface BookSearchResult {
   isbn: string | null;
   publisher: string | null;
   coverUrl: string | null;
+  genres: BookGenre[];
 }
 
 /** True when the query is nothing but an ISBN (10 or 13, dashes/spaces
@@ -51,7 +54,8 @@ export function mapOpenLibraryDoc(doc: Record<string, unknown>): BookSearchResul
     year: typeof doc.first_publish_year === "number" ? doc.first_publish_year : null,
     isbn: isbn13 ?? isbn10 ?? null,
     publisher: typeof publishers[0] === "string" ? publishers[0] : null,
-    coverUrl: typeof doc.cover_i === "number" ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg` : null
+    coverUrl: typeof doc.cover_i === "number" ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg` : null,
+    genres: normalizeBookGenres(doc.subject)
   };
 }
 
@@ -65,6 +69,7 @@ export interface ManualBookFields {
   rating: number | null;
   /** YYYY-MM-DD off the form's date input, or null. */
   dateRead: string | null;
+  genres?: BookGenre[];
 }
 
 /** Builds a book record in the same shape every importer produces
@@ -93,6 +98,7 @@ export function buildManualBook(fields: ManualBookFields, id: string): Record<st
     WordCount: -1,
     MimeType: null,
     ImageId: null,
-    highlights: [] as Array<Record<string, unknown>>
+    highlights: [] as Array<Record<string, unknown>>,
+    ...(fields.genres?.length ? { _genres: fields.genres } : {})
   };
 }

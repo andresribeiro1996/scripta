@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
 import { blockFontFamilyCss, resolveBlockStyle, resolveBorderColor } from "../../lib/libraryStyle";
-import { GRID_COLUMNS, type BlockLayout, type Mural, type MuralBlock } from "../../lib/murals";
+import { GRID_COLUMNS, type BlockLayout, type Mural, type MuralBlock, type ReaderProfile, type ShelfTheme } from "../../lib/murals";
 import { useMuralBookMetadata } from "../../hooks/useMuralBookMetadata";
 import { OptionsMenu } from "../OptionsMenu";
 import { BlockRenderer } from "./BlockRenderer";
@@ -23,6 +23,8 @@ export function MuralCanvas({
   editMode,
   books,
   images,
+  profile,
+  shelfThemeOverride,
   onLayoutChange,
   onConfigureBlock,
   onStyleBlock,
@@ -46,6 +48,8 @@ export function MuralCanvas({
   editMode: boolean;
   books: Array<Record<string, unknown>>;
   images: GalleryImage[];
+  profile?: ReaderProfile;
+  shelfThemeOverride?: ShelfTheme;
   onLayoutChange?: (blockId: string, layout: BlockLayout) => void;
   onConfigureBlock?: (block: MuralBlock) => void;
   onStyleBlock?: (block: MuralBlock) => void;
@@ -90,6 +94,8 @@ export function MuralCanvas({
         editMode={editMode}
         books={books}
         images={images}
+        profile={profile}
+        shelfThemeOverride={shelfThemeOverride}
         selectedBlockId={selectedBlockId}
         draft={mobileDraft}
         busy={busy}
@@ -155,7 +161,7 @@ export function MuralCanvas({
             }}
           >
             {!editMode ? <button className="absolute inset-0 z-10 rounded-[inherit] focus-visible:outline-2 focus-visible:outline-(--color-accent)" aria-label={`Open ${block.type} block`} onClick={() => onOpenBlock ? onOpenBlock(block) : setFocusedId(block.id)} /> : null}
-            <BlockRenderer block={block} books={books} images={images} statsOverride={statsOverride} tierlistData={tierlistData} />
+            <BlockRenderer block={block} books={books} images={images} profile={profile} shelfThemeOverride={shelfThemeOverride} statsOverride={statsOverride} tierlistData={tierlistData} />
             {editMode && (
               <div className="mural-block-controls absolute top-1.5 right-1.5 opacity-0 transition-opacity group-hover:opacity-100">
                 <OptionsMenu
@@ -173,7 +179,7 @@ export function MuralCanvas({
         );
       })}
     </ResponsiveGridLayout>
-    {focusedId && mural.blocks.some((block) => block.id === focusedId) ? <MuralBlockDetail block={mural.blocks.find((block) => block.id === focusedId)!} books={books} images={images} statsOverride={statsOverride} tierlistData={tierlistData} onClose={() => setFocusedId(null)} /> : null}
+    {focusedId && mural.blocks.some((block) => block.id === focusedId) ? <MuralBlockDetail block={mural.blocks.find((block) => block.id === focusedId)!} books={books} images={images} profile={profile} shelfThemeOverride={shelfThemeOverride} statsOverride={statsOverride} tierlistData={tierlistData} onClose={() => setFocusedId(null)} /> : null}
     </>
   );
 }

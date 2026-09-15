@@ -558,20 +558,21 @@ export function Skeleton({ width = "100%", height = 16, radius = radii.sm, acces
   return <Animated.View accessibilityLabel={accessibilityLabel} accessibilityRole="progressbar" style={{ width, height, borderRadius: radius, backgroundColor: colors.border, opacity }} />;
 }
 
-function StatePanel({ title, body, actionLabel, onAction, error }: { title: string; body?: string; actionLabel?: string; onAction?: () => void; error?: boolean }) {
+function StatePanel({ title, body, actionLabel, onAction, secondaryActionLabel, onSecondaryAction, error }: { title: string; body?: string; actionLabel?: string; onAction?: () => void; secondaryActionLabel?: string; onSecondaryAction?: () => void; error?: boolean }) {
   const { colors } = useTheme();
   return (
     <View style={styles.state}>
       <View style={error ? [styles.errorCard, { backgroundColor: colors.dangerSoft }] : styles.emptyCard}>
         <Text accessibilityRole="header" {...dynamicType} style={[styles.stateTitle, { color: error ? colors.danger : colors.text }]}>{title}</Text>
         {body ? <Text {...dynamicType} style={[typography.body, styles.centerText, { color: error ? colors.text : colors.textDim }]}>{body}</Text> : null}
-        {actionLabel && onAction ? <Button label={actionLabel} onPress={onAction} variant={error ? "destructive" : "secondary"} /> : null}
+        {actionLabel && onAction ? <Button label={actionLabel} onPress={onAction} variant={error ? "destructive" : "primary"} /> : null}
+        {secondaryActionLabel && onSecondaryAction ? <Button label={secondaryActionLabel} onPress={onSecondaryAction} variant="secondary" /> : null}
       </View>
     </View>
   );
 }
 
-export function EmptyState(props: { title: string; body?: string; actionLabel?: string; onAction?: () => void }) {
+export function EmptyState(props: { title: string; body?: string; actionLabel?: string; onAction?: () => void; secondaryActionLabel?: string; onSecondaryAction?: () => void }) {
   return <StatePanel {...props} />;
 }
 

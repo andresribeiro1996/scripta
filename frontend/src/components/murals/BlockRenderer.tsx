@@ -1,8 +1,8 @@
 import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
-import type { MuralBlock } from "../../lib/murals";
+import type { MuralBlock, ReaderProfile, ShelfTheme } from "../../lib/murals";
 import { CurrentlyReadingBlockView, ShelfBlockView, SpotlightBlockView, TierListBlockView } from "./blocks/BookBlocks";
-import { ImageBlockView, StatsBlockView, TextBlockView } from "./blocks/MiscBlocks";
+import { ImageBlockView, ProfileBlockView, StatsBlockView, TextBlockView } from "./blocks/MiscBlocks";
 import { QuoteBlockView, QuoteCollectionBlockView } from "./blocks/QuoteBlocks";
 
 /** Dispatches a block to its view-mode renderer by `type` — the one place
@@ -22,12 +22,16 @@ export function BlockRenderer({
   block,
   books,
   images,
+  profile,
+  shelfThemeOverride,
   statsOverride,
   tierlistData
 }: {
   block: MuralBlock;
   books: Array<Record<string, unknown>>;
   images: GalleryImage[];
+  profile?: ReaderProfile;
+  shelfThemeOverride?: ShelfTheme;
   /** See MuralCanvas.tsx's own comment — threaded straight through to
    *  StatsBlockView, ignored by every other case. */
   statsOverride?: Record<string, number>;
@@ -49,6 +53,8 @@ export function BlockRenderer({
       return <ImageBlockView block={block} images={images} />;
     case "text":
       return <TextBlockView block={block} />;
+    case "profile":
+      return <ProfileBlockView block={block} books={books} profile={profile} shelfThemeOverride={shelfThemeOverride} />;
     case "currentlyReading":
       return <CurrentlyReadingBlockView books={books} />;
     case "stats":

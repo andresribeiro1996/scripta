@@ -12,11 +12,15 @@ import { PageContainer } from "../components/PageContainer";
 import { Sheet } from "../components/Sheet";
 import { MuralCanvas } from "../components/murals/MuralCanvas";
 import { MuralBlockDetail } from "../components/murals/MuralBlockDetail";
+import { useAuth } from "../auth/AuthContext";
+import { avatarUrlFor } from "../components/Avatar";
+import { useGenreEnrichment } from "../hooks/useGenreEnrichment";
 
 const button = "inline-flex min-h-11 items-center justify-center rounded-lg border border-(--color-border) px-4 py-2 text-sm hover:bg-(--color-surface-hover) disabled:opacity-50";
 
 export function HomePage() {
   const client = useQueryClient();
+  const { session } = useAuth();
   const home = useHome();
   const library = useLibrary();
   const murals = useMurals();
@@ -35,6 +39,8 @@ export function HomePage() {
   const selected = blocks.find((block) => block.id === selectedId);
   const original = mural?.blocks.find((block) => block.id === selectedId);
   const tierlistData = (id: string) => { const item = tierlists.data?.find((item) => item.id === id); return item ? { name: item.name, ...item.data } : undefined; };
+  const profile = session?.user.username ? { username: session.user.username, avatarUrl: session.user.avatarId ? avatarUrlFor(session.user.avatarId) : null } : undefined;
+  const genreEnrichment = useGenreEnrichment(books, mural?.blocks.some((block) => block.type === "profile") ?? false, library.updateLibrary);
 
   async function choose(choice: string | boolean) {
     try { await home.choose(choice); setChoosing(false); } catch { }
@@ -53,25 +59,24 @@ export function HomePage() {
   }
   return <PageContainer>
     <div className="space-y-5">
-      <header className="flex flex-wrap items-center justify-between gap-3"><h1 className="text-2xl font-semibold">Home</h1><div className="flex flex-wrap gap-2">
-        <Link className={button} to="/dashboard/library?action=add">Add book</Link>
-        <Link className={button} to="/dashboard/library?action=import">Import</Link>
+      <header className="flex flex-wrap items-center justify-between gap-3"><h1 className="text-2xl font-semibold">Home</h1>{mural && books.length ? <div className="flex flex-wrap gap-2">
         {mural ? <Link className={button} to={`/dashboard/murals/${mural.id}?edit=1`}>Edit home</Link> : null}
-        <button className={button} onClick={() => setChoosing(true)}>Choose mural</button>
-      </div></header>
-      <form action="/dashboard/library" className="flex gap-2"><input aria-label="Search your library" placeholder="Search your library" name="q" className="min-w-0 flex-1 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2" /><button className={button}>Search</button></form>
+        <button className={button} onClick={() => setChoosing(true)}>Change mural</button>
+      </div> : null}</header>
       {error || home.choiceError ? <p role="alert" className="text-(--color-danger)">{error ?? home.choiceError?.message}</p> : null}
       {home.isPending || library.isPending ? <p role="status">Loading home…</p> : home.isError || library.isError ? <div role="alert"><p>Couldn't load your home.</p><button className={button} onClick={() => { void home.refetch(); void library.refetch(); }}>Retry</button></div> : <>
-        {!books.length ? <p>Bring your books into Atmyshelf. Import your library or add a book to begin.</p> : null}
-        {mural ? <MuralCanvas mural={{ ...mural, blocks }} editMode={false} books={books} images={gallery.images} tierlistData={tierlistData} onOpenBlock={(block) => setSelectedId(block.id)} /> : <div className="space-y-3 rounded-xl border border-(--color-border) p-6"><h2 className="text-xl">Make yourself at home</h2><p>Start with an editable reading space, or choose one of your murals.</p><button className={button} disabled={home.choosing} onClick={() => void choose(eligiblePassages(books).length > 0)}>{home.choosing ? "Creating…" : "Create my home"}</button></div>}
+        {!books.length ? <div className="space-y-3 rounded-xl border border-(--color-border) p-6"><h2 className="text-xl">Start your library</h2><p>Import your existing collection, or add your first book manually.</p><div className="flex flex-wrap gap-2"><Link className={`${button} bg-(--color-accent) text-white`} to="/dashboard/library?action=import">Import library</Link><Link className={button} to="/dashboard/library?action=add">Add a book manually</Link></div></div>
+          : mural ? <MuralCanvas mural={{ ...mural, blocks }} editMode={false} books={books} images={gallery.images} profile={profile} tierlistData={tierlistData} onOpenBlock={(block) => setSelectedId(block.id)} />
+          : <div className="space-y-3 rounded-xl border border-(--color-border) p-6"><h2 className="text-xl">Make yourself at home</h2><p>Create an editable reading space, or use one of your murals.</p><div className="flex flex-wrap gap-2"><button className={`${button} bg-(--color-accent) text-white`} disabled={home.choosing} onClick={() => void choose(eligiblePassages(books).length > 0)}>{home.choosing ? "Creating…" : "Create my home"}</button><button className={button} onClick={() => setChoosing(true)}>Choose a mural</button></div></div>}
       </>}
+      {genreEnrichment.error ? <p role="alert" className="text-sm text-(--color-text-dim)">{genreEnrichment.error}</p> : null}
       {gallery.error || tierlists.isError ? <div role="alert">Some mural content couldn't load. <button className={button} onClick={() => { void client.invalidateQueries({ queryKey: ["gallery"] }); void tierlists.refetch(); }}>Retry</button></div> : null}
     </div>
     {choosing ? <Sheet title="Choose your home mural" onClose={() => setChoosing(false)}><div className="flex max-h-[60dvh] flex-col gap-3 overflow-y-auto p-4">
       {home.choiceError ? <p role="alert">{home.choiceError.message}</p> : null}
       {murals.isPending ? <p>Loading murals…</p> : murals.isError ? <button className={button} onClick={() => void murals.refetch()}>Couldn't load murals. Retry</button> : murals.data?.length ? murals.data.map((item) => <button key={item.id} className={button} disabled={home.choosing} onClick={() => void choose(item.id)}>{item.name}</button>) : <p>No murals yet. Create your home to get started.</p>}
     </div></Sheet> : null}
-    {selected ? <MuralBlockDetail block={selected} books={books} images={gallery.images} tierlistData={tierlistData} onClose={() => setSelectedId(null)} actions={<div className="flex flex-wrap gap-2 p-3">
+    {selected ? <MuralBlockDetail block={selected} books={books} images={gallery.images} profile={profile} tierlistData={tierlistData} onClose={() => setSelectedId(null)} actions={<div className="flex flex-wrap gap-2 p-3">
       {original?.type === "shelf" && original.collectionId ? <Link className={button} to={`/dashboard/collections?group=${encodeURIComponent(original.collectionId)}`}>Open collection</Link> : null}
       {selected.type === "tierlist" ? <Link className={button} to={`/dashboard/arena/tierlist/${selected.tierlistId}`}>Open tier list</Link> : null}
       {original?.type === "quote" && original.mode === "rediscover" ? <><button className={button} disabled={saving || selected.type !== "quote" || !resolveQuote(selected, books)} onClick={() => setOffsets({ ...offsets, [original.id]: (offsets[original.id] ?? 0) + 1 })}>Show another</button><button className={button} disabled={saving || selected.type !== "quote" || !resolveQuote(selected, books)} onClick={() => void keep()}>Keep this passage</button></> : null}
