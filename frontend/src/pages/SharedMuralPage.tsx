@@ -14,62 +14,22 @@
 // highlights — see lib/merge.ts's bookKey()), because that's the only shape
 // the authenticated editor ever hands them. The public API instead returns
 // already-redacted PublicBookData (title/author/isbn/imageId/coverUrl/
-// readStatus — backend/src/modules/library/publicResolver.ts). toPrivateBook
-// below reconstructs the private shape from those exact fields so every
-// existing resolver keeps working completely unchanged — get this field
-// mapping wrong and a block would silently fail to resolve its book instead
-// of throwing, so it's worth getting exactly right.
+// readStatus — backend/src/modules/library/publicResolver.ts). lib/
+// sharedMural.ts's toPrivateBook reconstructs the private shape from those
+// exact fields so every existing resolver keeps working completely
+// unchanged — get this field mapping wrong and a block would silently fail
+// to resolve its book instead of throwing, so it's worth getting exactly
+// right.
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
-import { fetchSharedMural, type PublicBookData, type PublicHighlight } from "../api/sharedMurals";
+import { fetchSharedMural } from "../api/sharedMurals";
 import type { GalleryImage } from "../api/gallery";
 import { MuralCanvas } from "../components/murals/MuralCanvas";
 import { FullscreenIcon, toolbarIconClass } from "../components/Toolbar";
 import { useMuralFullscreen } from "../hooks/useMuralFullscreen";
-import { bookKey } from "../lib/merge";
 import { ensureBookBlockHeights, type Mural } from "../lib/murals";
-
-/** The exact inverse of publicResolver.ts's toPublicBookData — see this
- *  file's own top comment. `highlights` starts empty; the caller
- *  (buildReconstructedBooks below) fills it in afterward once every
- *  book's own bookKey() is known, since a PublicHighlight only carries the
- *  bookKey it belongs to, not a nested position inside PublicBookData. */
-function toPrivateBook(pub: PublicBookData): Record<string, unknown> {
-  return {
-    Title: pub.title,
-    Attribution: pub.author,
-    ISBN: pub.isbn,
-    ImageId: pub.imageId,
-    _coverUrl: pub.coverUrl,
-    ReadStatus: pub.readStatus,
-    highlights: [] as Array<Record<string, unknown>>
-  };
-}
-
-/** `books` and `currentlyReading` can overlap (a book that's both
- *  spotlighted/shelved AND currently in progress) — deduped by bookKey()
- *  so CurrentlyReadingBlockView (which just filters this same list for
- *  ReadStatus === 1) never shows the same book twice. Every matching
- *  highlight is attached by its own bookKey field (see
- *  api/sharedMurals.ts's PublicHighlight — the backend already computed
- *  this against the SAME bookKey() algorithm, see that route's own
- *  comment), mapped to {BookmarkID, Text, Annotation} so resolveQuote's
- *  `String(h.BookmarkID) === highlightId` match keeps working unchanged. */
-function buildReconstructedBooks(books: PublicBookData[], currentlyReading: PublicBookData[], highlights: PublicHighlight[]): Array<Record<string, unknown>> {
-  const byKey = new Map<string, Record<string, unknown>>();
-  for (const pub of [...books, ...currentlyReading]) {
-    const book = toPrivateBook(pub);
-    const key = bookKey(book);
-    if (!byKey.has(key)) byKey.set(key, book);
-  }
-  for (const h of highlights) {
-    const book = byKey.get(h.bookKey);
-    if (!book) continue; // stale/unresolvable reference — same tolerant convention lib/murals.ts's own resolvers use
-    (book.highlights as Array<Record<string, unknown>>).push({ BookmarkID: h.highlightId, Text: h.text, Annotation: h.annotation });
-  }
-  return [...byKey.values()];
-}
+import { buildReconstructedBooks } from "../lib/sharedMural";
 
 function InfoScreen({ message }: { message: string }) {
   return (

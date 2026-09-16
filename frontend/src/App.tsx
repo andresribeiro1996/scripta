@@ -11,6 +11,7 @@ import { ArenaViewPage } from "./pages/ArenaViewPage";
 import { ChooseUsernamePage } from "./pages/ChooseUsernamePage";
 import { CollectionsPage } from "./pages/CollectionsPage";
 import { CommunityPage } from "./pages/CommunityPage";
+import { CommunityProfilePage } from "./pages/CommunityProfilePage";
 import { GalleryPage } from "./pages/GalleryPage";
 import { LibraryPage } from "./pages/LibraryPage";
 import { LibraryStylePage } from "./pages/LibraryStylePage";
@@ -77,6 +78,7 @@ export function App() {
               <Route path="/dashboard/style" element={<LibraryStylePage />} />
               <Route path="/dashboard/settings" element={<SettingsPage />} />
               <Route path="/community" element={<CommunityPage />} />
+              <Route path="/community/u/:username" element={<CommunityProfilePage />} />
             </Route>
           </Route>
         </Route>
