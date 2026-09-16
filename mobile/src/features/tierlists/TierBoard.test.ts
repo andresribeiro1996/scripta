@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { TierlistData } from "@scripta/shared";
-import { moveBook, reorderBook } from "./tierBoardData.js";
+import { moveBook, moveBookTo, reorderBook } from "./tierBoardData.js";
 
 const board: TierlistData = {
   tiers: [
@@ -18,4 +18,12 @@ test("tier board moves books between sections and within a section", () => {
   assert.deepEqual(moved.tiers.map((tier) => tier.bookKeys), [["a"], ["b"]]);
   assert.deepEqual(reorderBook(board, "b", -1).tiers[0]?.bookKeys, ["b", "a"]);
   assert.equal(moveBook(board, "a", -1), board);
+});
+
+test("tier board moves a book directly to any section", () => {
+  const moved = moveBookTo(board, "a", "pool");
+  assert.deepEqual(moved.tiers[0]?.bookKeys, ["b"]);
+  assert.deepEqual(moved.pool, ["c", "a"]);
+  assert.equal(moveBookTo(board, "a", "top"), board);
+  assert.equal(moveBookTo(board, "z", "pool"), board);
 });

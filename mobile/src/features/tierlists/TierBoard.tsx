@@ -6,8 +6,8 @@ import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-na
 import { scheduleOnRN } from "react-native-worklets";
 import { commitHaptic, liftHaptic } from "../../ui/haptics";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
-import { Button, Dialog, Input, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
-import { moveBook, reorderBook } from "./tierBoardData";
+import { Button, Dialog, IconButton, Input, Menu, type MenuItem, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { moveBook, moveBookTo, reorderBook } from "./tierBoardData";
 
 export type TierBook = Record<string, unknown>;
 
@@ -19,7 +19,7 @@ export function keyOf(book: TierBook) {
   return bookKey({ Title: book.title, Attribution: book.author, ISBN: book.isbn, ImageId: book.imageId });
 }
 
-function BookChip({ book, onDrag, onMoveUp, onMoveDown, onEarlier, onLater }: { book: TierBook; onDrag: (direction: -1 | 1) => void; onMoveUp?: () => void; onMoveDown?: () => void; onEarlier?: () => void; onLater?: () => void }) {
+function BookChip({ book, onDrag, menuItems }: { book: TierBook; onDrag: (direction: -1 | 1) => void; menuItems: MenuItem[] }) {
   const { colors } = useTheme();
   const y = useSharedValue(0);
   const dragging = useSharedValue(1);
@@ -47,12 +47,9 @@ function BookChip({ book, onDrag, onMoveUp, onMoveDown, onEarlier, onLater }: { 
           <Text numberOfLines={2} {...dynamicType} style={[typography.caption, styles.center, { color: colors.text }]}>{titleOf(book)}</Text>
         </Animated.View>
       </GestureDetector>
-      <View style={styles.miniControls}>
-        <Pressable accessibilityRole="button" accessibilityLabel={`Move ${titleOf(book)} to previous section`} disabled={!onMoveUp} onPress={onMoveUp} style={styles.mini}><Text style={{ color: onMoveUp ? colors.text : colors.textDim }}>↑</Text></Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel={`Move ${titleOf(book)} earlier`} disabled={!onEarlier} onPress={onEarlier} style={styles.mini}><Text style={{ color: onEarlier ? colors.text : colors.textDim }}>←</Text></Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel={`Move ${titleOf(book)} later`} disabled={!onLater} onPress={onLater} style={styles.mini}><Text style={{ color: onLater ? colors.text : colors.textDim }}>→</Text></Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel={`Move ${titleOf(book)} to next section`} disabled={!onMoveDown} onPress={onMoveDown} style={styles.mini}><Text style={{ color: onMoveDown ? colors.text : colors.textDim }}>↓</Text></Pressable>
-      </View>
+      <Menu title={titleOf(book)} items={menuItems}>
+        <IconButton name="more" accessibilityLabel={`Move ${titleOf(book)}`} />
+      </Menu>
     </View>
   );
 }
@@ -66,12 +63,20 @@ export function TierBoard({ data, books, onChange, structureEditable, onAddBooks
   const byKey = new Map(books.map((book) => [keyOf(book), book]));
 
   function keysFor(section: string) { return section === "pool" ? data.pool : data.tiers.find((tier) => tier.id === section)?.bookKeys ?? []; }
+  function sectionLabel(section: string) { return section === "pool" ? poolLabel : data.tiers.find((tier) => tier.id === section)?.label || "Untitled"; }
   function moveSection(key: string, direction: -1 | 1) { onChange(moveBook(data, key, direction)); }
+  function moveTo(key: string, target: string) { onChange(moveBookTo(data, key, target)); }
   function reorder(key: string, direction: -1 | 1) { onChange(reorderBook(data, key, direction)); }
   function renderBooks(section: string) {
     const keys = keysFor(section).filter((key) => byKey.has(key));
-    const index = sections.indexOf(section);
-    return <FlatList horizontal data={keys} keyExtractor={(key) => key} contentContainerStyle={styles.books} ListEmptyComponent={<Text {...dynamicType} style={[typography.caption, styles.empty, { color: colors.textDim }]}>No books here.</Text>} renderItem={({ item, index: bookIndex }) => <BookChip book={byKey.get(item)!} onDrag={(direction) => moveSection(item, direction)} onMoveUp={index > 0 ? () => moveSection(item, -1) : undefined} onMoveDown={index < sections.length - 1 ? () => moveSection(item, 1) : undefined} onEarlier={bookIndex > 0 ? () => reorder(item, -1) : undefined} onLater={bookIndex < keys.length - 1 ? () => reorder(item, 1) : undefined} />} />;
+    return <FlatList horizontal data={keys} keyExtractor={(key) => key} contentContainerStyle={styles.books} ListEmptyComponent={<Text {...dynamicType} style={[typography.caption, styles.empty, { color: colors.textDim }]}>No books here.</Text>} renderItem={({ item, index: bookIndex }) => {
+      const menuItems: MenuItem[] = [
+        ...sections.filter((candidate) => candidate !== section).map((candidate) => ({ label: `Move to ${sectionLabel(candidate)}`, onPress: () => moveTo(item, candidate) })),
+        ...(bookIndex > 0 ? [{ label: "Move earlier", onPress: () => reorder(item, -1) }] : []),
+        ...(bookIndex < keys.length - 1 ? [{ label: "Move later", onPress: () => reorder(item, 1) }] : []),
+      ];
+      return <BookChip book={byKey.get(item)!} onDrag={(direction) => moveSection(item, direction)} menuItems={menuItems} />;
+    }} />;
   }
 
   return (
@@ -112,8 +117,6 @@ const styles = StyleSheet.create({
   fallback: { alignItems: "center", justifyContent: "center" },
   center: { textAlign: "center" },
   strong: { fontWeight: "700" },
-  miniControls: { flexDirection: "row" },
-  mini: { width: 21, height: 28, alignItems: "center", justifyContent: "center" },
   empty: { padding: spacing.lg },
   footer: { gap: spacing.sm, paddingTop: spacing.md },
   row: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },

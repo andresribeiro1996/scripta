@@ -18,6 +18,14 @@ export function moveBook(data: TierlistData, key: string, direction: -1 | 1): Ti
   return replaceSection(without, target, [...sectionKeys(without, target), key]);
 }
 
+export function moveBookTo(data: TierlistData, key: string, target: string): TierlistData {
+  const sections = [...data.tiers.map((tier) => tier.id), "pool"];
+  const from = sections.find((section) => sectionKeys(data, section).includes(key));
+  if (!from || from === target || !sections.includes(target)) return data;
+  const without = replaceSection(data, from, sectionKeys(data, from).filter((candidate) => candidate !== key));
+  return replaceSection(without, target, [...sectionKeys(without, target), key]);
+}
+
 export function reorderBook(data: TierlistData, key: string, direction: -1 | 1): TierlistData {
   const section = [...data.tiers.map((tier) => tier.id), "pool"].find((candidate) => sectionKeys(data, candidate).includes(key));
   if (!section) return data;
