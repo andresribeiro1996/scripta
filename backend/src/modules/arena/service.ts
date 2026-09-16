@@ -73,6 +73,7 @@ export interface ArenaService {
   getTournamentView(id: string, voterToken?: string): TournamentView | null;
   setSlotsManual(tournamentId: string, ownerUserId: string, entries: Array<{ slotIndex: number; book: SeedBookInput }>): void;
   randomFill(tournamentId: string, ownerUserId: string, pool: SeedBookInput[]): void;
+  getPublicSummary(tournamentId: string): TournamentSummary | undefined;
   start(tournamentId: string, ownerUserId: string): void;
   vote(tournamentId: string, duelId: string, voterToken: string, bookKey: string): void;
   settleEarly(tournamentId: string, ownerUserId: string, duelId: string): void;
@@ -167,7 +168,9 @@ function buildDuelsForRound(
   return rows;
 }
 
-export function createArenaService(repo: ArenaRepository): ArenaService {
+export type EmitPublished = (tournamentId: string, ownerUserId: string) => void;
+
+export function createArenaService(repo: ArenaRepository, emitPublished?: EmitPublished): ArenaService {
   /** Checks whether every duel in a round has settled, and if so either
    *  generates the next round (from the winners, same pairing logic as
    *  the first round) or — if that round had exactly one duel — marks
@@ -271,6 +274,12 @@ export function createArenaService(repo: ArenaRepository): ArenaService {
       };
     },
 
+    getPublicSummary(tournamentId) {
+      const tournament = repo.getTournament(tournamentId);
+      if (!tournament || tournament.status === "seeding") return undefined;
+      return toTournamentSummary(tournament, previewFromSlots(repo.getSlots(tournament.id)));
+    },
+
     setSlotsManual(tournamentId, ownerUserId, entries) {
       const tournament = repo.getOwnedTournament(tournamentId, ownerUserId);
       if (!tournament) throw new TournamentNotFoundError();
@@ -333,6 +342,7 @@ export function createArenaService(repo: ArenaRepository): ArenaService {
       const duels = buildDuelsForRound(tournamentId, 1, books, nowIso, tournament.round_duration_minutes);
       repo.insertDuels(duels);
       repo.updateTournamentStatus(tournamentId, "active", 1);
+      emitPublished?.(tournamentId, ownerUserId);
     },
 
     vote(tournamentId, duelId, voterToken, bookKey) {
@@ -390,5 +400,43 @@ export function createArenaService(repo: ArenaRepository): ArenaService {
         settleDuelInternal(tournament, duel, false, nowIso);
       }
     }
+  };
+}
+
+export interface PublishedTournamentRef {
+  id: string;
+  ownerUserId: string;
+  createdAt: string;
+  name: string;
+  bracketSize: number;
+  status: "active" | "completed";
+}
+
+export interface ArenaPublicApi {
+  listPublished(limit: number, offset: number): PublishedTournamentRef[];
+  getPublished(id: string): PublishedTournamentRef | undefined;
+  listPublishedByOwner(ownerUserId: string): PublishedTournamentRef[];
+}
+
+function toPublishedRef(summary: TournamentSummary): PublishedTournamentRef {
+  return {
+    id: summary.id,
+    ownerUserId: summary.ownerUserId,
+    createdAt: summary.createdAt,
+    name: summary.name,
+    bracketSize: summary.bracketSize,
+    status: summary.status === "completed" ? "completed" : "active"
+  };
+}
+
+export function createArenaPublicApi(service: ArenaService): ArenaPublicApi {
+  return {
+    listPublished: (limit, offset) => service.listPublic(limit, offset).map(toPublishedRef),
+    getPublished: (id) => {
+      const summary = service.getPublicSummary(id);
+      return summary ? toPublishedRef(summary) : undefined;
+    },
+    listPublishedByOwner: (ownerUserId) =>
+      service.listMine(ownerUserId).filter((s) => s.status !== "seeding").map(toPublishedRef)
   };
 }

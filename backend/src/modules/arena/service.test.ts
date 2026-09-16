@@ -376,3 +376,21 @@ test("start, setSlotsManual, and randomFill all reject a tournament that isn't i
     TournamentAlreadyStartedError
   );
 });
+
+test("start emits exactly one publish event and the public summary flips", () => {
+  const repo = createInMemoryArenaRepository();
+  const emitted: Array<[string, string]> = [];
+  const service = createArenaService(repo, (tournamentId, ownerUserId) => emitted.push([tournamentId, ownerUserId]));
+  const t = service.createTournament("owner-1", { name: "Test", bracketSize: 2, roundDurationMinutes: 60 });
+  service.setSlotsManual(t.id, "owner-1", [
+    { slotIndex: 0, book: makeBook(1) },
+    { slotIndex: 1, book: makeBook(2) }
+  ]);
+
+  assert.equal(service.getPublicSummary(t.id), undefined);
+  service.start(t.id, "owner-1");
+  assert.deepEqual(emitted, [[t.id, "owner-1"]]);
+  assert.equal(service.getPublicSummary(t.id)?.status, "active");
+  assert.throws(() => service.start(t.id, "owner-1"), TournamentAlreadyStartedError);
+  assert.equal(emitted.length, 1);
+});

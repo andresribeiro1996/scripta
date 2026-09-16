@@ -11,14 +11,19 @@ import type { FastifyInstance } from "fastify";
 import { openArenaDb } from "./adapters/sqlite/connection.js";
 import { createSqliteArenaRepository } from "./adapters/sqlite/sqliteArenaRepository.js";
 import { buildArenaRoutes, buildVoteRoute } from "./routes.js";
-import { createArenaService } from "./service.js";
+import type { ArenaPublicApi, EmitPublished } from "./service.js";
+import { createArenaPublicApi, createArenaService } from "./service.js";
 
 const SWEEP_INTERVAL_MS = 30_000;
 
-export async function arenaPlugin(app: FastifyInstance) {
+export interface ArenaPluginOptions {
+  emitPublished?: EmitPublished;
+}
+
+export async function arenaPlugin(app: FastifyInstance, opts: ArenaPluginOptions = {}) {
   const db = openArenaDb();
   const repo = createSqliteArenaRepository(db);
-  const service = createArenaService(repo);
+  const service = createArenaService(repo, opts.emitPublished);
 
   const sweep = setInterval(() => {
     try {
@@ -41,4 +46,14 @@ export async function arenaPlugin(app: FastifyInstance) {
   });
 
   await app.register(buildArenaRoutes(service));
+}
+
+let cachedApi: ArenaPublicApi | null = null;
+
+export function getArenaPublicApi(): ArenaPublicApi {
+  if (!cachedApi) {
+    const service = createArenaService(createSqliteArenaRepository(openArenaDb()));
+    cachedApi = createArenaPublicApi(service);
+  }
+  return cachedApi;
 }
