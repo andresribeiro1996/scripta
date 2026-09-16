@@ -43,18 +43,20 @@
 // worktrees running this script at once land on different, non-
 // overlapping ports and never contend for the same one.
 
-import { spawn, spawnSync } from "node:child_process";
-import { existsSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { androidEnv } from "./androidSdk.mjs";
-import { devDataDir, devDataDirEnv } from "./devDataDir.mjs";
+import { devDataDirEnv } from "./devDataDir.mjs";
 import { DEV_USERNAME } from "./dev-account.mjs";
+import { ensureSharedBuilt, resetDevDataIfRequested, seedDevAccount, seedFixtureUsers } from "./devFixtureSetup.mjs";
 import { upsertEnvLine } from "./devEnvFile.mjs";
 import { claimThisWorktreeSlot } from "./devClaim.mjs";
 import { recordDeviceSerial, registryPath, takeDevice } from "./devRegistry.mjs";
-import { isPortFree, isReachableOn, worktreeIdentity } from "./devHost.mjs";
+import { isReachableOn, worktreeIdentity } from "./devHost.mjs";
+import { isPortOpen, mkdirRuntimeDir, spawnDetached, waitFor } from "./devProcess.mjs";
 import { pickLanAddress } from "./lanAddress.mjs";
 
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -69,44 +71,6 @@ let claimedSlot;
 
 function log(message) {
   console.log(`[dev-emulator] ${message}`);
-}
-
-// devHost.mjs's isPortFree already probes both loopback families (Vite
-// binds [::1] only; the backend binds "::") — this just inverts the sense
-// for the "is my own server already up" checks below, rather than the
-// codebase carrying a second, IPv4-only probe alongside it.
-async function isPortOpen(port) {
-  return !(await isPortFree(port));
-}
-
-async function waitFor(check, { timeoutMs, intervalMs = 2000, label }) {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const result = await check();
-    if (result) return result;
-    await new Promise((r) => setTimeout(r, intervalMs));
-  }
-  throw new Error(`Timed out waiting for: ${label}`);
-}
-
-/** Spawns a long-lived background process, stdout/stderr redirected to a
- *  log file under the OS tmpdir — never the repo. Detached + unref()'d so
- *  it outlives this script, matching how a developer would normally leave
- *  a dev server running in its own terminal tab. */
-function spawnDetached(command, args, { cwd, env, logName }) {
-  mkdirRuntimeDir();
-  const logPath = join(runtimeDir, logName);
-  // Truncated ("w"), not appended: a stale log from a previous run (or a
-  // previous invocation's failed attempt) must never be mistaken for
-  // output from the process this call actually just started.
-  const fd = openSync(logPath, "w");
-  const child = spawn(command, args, { cwd, env, detached: true, stdio: ["ignore", fd, fd] });
-  child.unref();
-  return logPath;
-}
-
-function mkdirRuntimeDir() {
-  spawnSync("mkdir", ["-p", runtimeDir]);
 }
 
 // Bounded, because `adb -s <serial> emu avd name` never answers for a
@@ -190,7 +154,7 @@ async function ensureAvdBooted(avd, env) {
       if (create.status !== 0) throw new Error(`Failed to create AVD:\n${create.stdout}\n${create.stderr}`);
     }
     log(`Booting ${avd}...`);
-    spawnDetached("emulator", ["-avd", avd, "-no-boot-anim", "-no-audio"], { env, logName: "emulator.log" });
+    spawnDetached("emulator", ["-avd", avd, "-no-boot-anim", "-no-audio"], { env, logName: "emulator.log", runtimeDir });
     await waitFor(() => Boolean(getEmulatorSerial(avd, env)), { timeoutMs: 120_000, label: "emulator to register with adb" });
     serial = getEmulatorSerial(avd, env);
   }
@@ -214,7 +178,7 @@ async function ensureExpoGo(serial, env) {
   const apkUrl = versions.data.sdkVersions[`${sdkMajor}.0.0`]?.androidClientUrl;
   if (!apkUrl) throw new Error(`No Expo Go APK listed for SDK ${sdkMajor}.0.0 — check https://api.expo.dev/v2/versions/latest`);
   const apkBytes = await fetch(apkUrl).then((r) => r.arrayBuffer());
-  mkdirRuntimeDir();
+  mkdirRuntimeDir(runtimeDir);
   const apkPath = join(runtimeDir, "expo-go.apk");
   writeFileSync(apkPath, Buffer.from(apkBytes));
   // The ~100 MB Expo Go APK, with dex optimisation on first install,
@@ -225,46 +189,6 @@ async function ensureExpoGo(serial, env) {
   if (!install.stdout.includes("Success")) throw new Error(`adb install failed:\n${install.stdout}\n${install.stderr}`);
 }
 
-/** `packages/shared`'s compiled `dist/` is gitignored (it's a build
- *  artifact, not source) and every existing setup story — root README,
- *  mobile/README.md — already says to `npm install` then build it. A
- *  fresh worktree just as often has skipped that step, though, and the
- *  failure mode (Metro's "Unable to resolve @scripta/shared", deep in a
- *  bundling error) doesn't say so — so this checks for it rather than
- *  letting that confusing error be the first thing the script produces. */
-function ensureSharedBuilt() {
-  if (existsSync(join(repoRoot, "packages/shared/dist/index.js"))) return;
-  log("Building @scripta/shared (first run in this worktree)...");
-  const result = spawnSync("npm", ["run", "build", "--workspace", "@scripta/shared"], { cwd: repoRoot, stdio: "inherit" });
-  if (result.status !== 0) throw new Error("Building @scripta/shared failed — see output above.");
-}
-
-function resetDevDataIfRequested() {
-  if (!resetRequested) return;
-  log(`--reset: wiping ${devDataDir}...`);
-  rmSync(devDataDir, { recursive: true, force: true });
-}
-
-function seedDevAccount() {
-  log("Seeding the dev account + fixture library...");
-  const args = ["--import", "tsx", "scripts/dev-account.mjs", ...(resetRequested ? ["--reset"] : [])];
-  const result = spawnSync("node", args, { cwd: repoRoot, stdio: "inherit" });
-  if (result.status !== 0) throw new Error("scripts/dev-account.mjs failed — see output above.");
-}
-
-/** Seeds fixture_alice/bob/charlie into the SAME backend/data/dev/
- *  database dev-account.mjs just wrote to (devDataDirEnv() below is what
- *  makes --shared mode point there instead of the isolated
- *  backend/data/three-users/ default — see three-users.mjs's own
- *  comment). --seed-only: this never starts its own server: the real
- *  backend, started next, serves both the dev account and these three. */
-function seedFixtureUsers() {
-  log("Seeding fixture_alice/bob/charlie into the same dev database...");
-  const env = { ...process.env, ...devDataDirEnv() };
-  const result = spawnSync("node", ["--import", "tsx", "scripts/three-users.mjs", "--seed-only", "--shared"], { cwd: backendDir, env, stdio: "inherit" });
-  if (result.status !== 0) throw new Error("backend/scripts/three-users.mjs --shared failed — see output above.");
-}
-
 async function ensureBackendRunning() {
   if (await isPortOpen(BACKEND_PORT)) {
     log(`Backend already listening on ${BACKEND_PORT} for this slot.`);
@@ -272,7 +196,7 @@ async function ensureBackendRunning() {
   }
   log("Starting the backend...");
   const env = { ...process.env, ...devDataDirEnv() };
-  spawnDetached("npm", ["run", "backend"], { cwd: repoRoot, env, logName: "backend.log" });
+  spawnDetached("npm", ["run", "backend"], { cwd: repoRoot, env, logName: "backend.log", runtimeDir });
   await waitFor(() => isPortOpen(BACKEND_PORT), { timeoutMs: 30_000, label: `backend on port ${BACKEND_PORT}` });
 }
 
@@ -317,7 +241,7 @@ async function ensureMetroRunning() {
   // testing still needs LAN and has its own path (`npm run dev:mobile`,
   // backend/scripts/dev-mobile.mjs), untouched by this.
   const metroEnv = { ...process.env, NODE_OPTIONS: metroNodeOptions(process.env.NODE_OPTIONS) };
-  const logPath = spawnDetached("npx", ["expo", "start", "--localhost", "--port", String(METRO_PORT)], { cwd: mobileDir, env: metroEnv, logName: "metro.log" });
+  const logPath = spawnDetached("npx", ["expo", "start", "--localhost", "--port", String(METRO_PORT)], { cwd: mobileDir, env: metroEnv, logName: "metro.log", runtimeDir });
   await waitFor(() => isPortOpen(METRO_PORT), { timeoutMs: 60_000, label: `Metro on port ${METRO_PORT}` });
 
   // The active check the reasoning above earns: confirm Metro actually
@@ -357,7 +281,7 @@ async function claimThisWorktree() {
 
 async function main() {
   await claimThisWorktree();
-  ensureSharedBuilt();
+  ensureSharedBuilt(log);
   const env = { ...process.env, ...androidEnv() };
   const { worktree } = worktreeIdentity(repoRoot);
   const path = registryPath(repoRoot);
@@ -367,9 +291,9 @@ async function main() {
   recordDeviceSerial({ path, worktree, avd, serial });
   await ensureExpoGo(serial, env);
 
-  resetDevDataIfRequested();
-  seedDevAccount();
-  seedFixtureUsers();
+  resetDevDataIfRequested(resetRequested, log);
+  seedDevAccount(resetRequested, log);
+  seedFixtureUsers(log);
   await ensureBackendRunning();
   const metroLogPath = await ensureMetroRunning();
 

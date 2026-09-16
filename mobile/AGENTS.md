@@ -4,7 +4,8 @@ Expo/React Native app. Read `README.md` before changing it.
 
 ## Commands
 
-- Start locally from the repository root: `EXPO_PUBLIC_API_URL=http://<LAN-IP>:3000 npm run mobile`
+- Test on a physical phone from the repository root: `node scripts/dev-phone.mjs` — one command, signed in, no password (see README.md's "Running")
+- Start locally by hand: `EXPO_PUBLIC_API_URL=http://<LAN-IP>:3000 npm run mobile`
 - Verify: `npm run build --workspace @scripta/shared`
 - Verify: `npm run typecheck --workspace mobile`
 - Verify: `npm test --workspace mobile`

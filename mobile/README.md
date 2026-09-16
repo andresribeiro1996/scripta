@@ -6,10 +6,18 @@ Expo / React Native client for the Scripta backend (Fastify, see `../backend`). 
 
 ```bash
 npm install                # from repo root (npm workspaces: backend, frontend, mobile, packages/*)
+node scripts/dev-phone.mjs # from repo root
+```
+
+Idempotent — safe to re-run any time. Builds `@scripta/shared` if this worktree hasn't yet, seeds a dev account with a 24-book fixture library (`scripts/dev-account.mjs`) plus `fixture_alice/bob/charlie` (password `scripta123`) into `backend/data/dev/`, starts a real backend against that same directory in plain-http LAN mode, and starts Metro advertising on the LAN. Prints an `exp://<lan-ip>:8081` url — open that in Expo Go on a phone on the same Wi-Fi. Pass `--reset` to wipe `backend/data/dev/` and reseed from scratch; `LAN_IP=192.168.1.20 node scripts/dev-phone.mjs` overrides a wrong network-interface guess. `npm run dev:release` frees the ports when done.
+
+That script exists because the manual version below has a trap: `dev-account.mjs` seeds `backend/data/dev/`, but a bare `npm run backend` serves `backend/data/*.sqlite` — a different database — so the seeded dev account 401s and the app just says it can't reach the server, with nothing pointing at why. Worth knowing about directly for troubleshooting, or to run each side by hand:
+
+```bash
 EXPO_PUBLIC_API_URL=http://<your-mac-lan-ip>:3000 npm run mobile
 ```
 
-Backend must be up (`npm run backend`). Open in Expo Go by entering `exp://<lan-ip>:8081`. `EXPO_PUBLIC_API_URL` is validated at startup — the app refuses to boot with it unset or non-http(s).
+Backend must be up, serving the SAME database `dev-account.mjs` seeded — `node --import tsx scripts/dev-account.mjs` from the repo root writes the dev account and its refresh token into `mobile/.env.local`, but only a backend started with `devDataDirEnv()`'s overrides (see `scripts/devDataDir.mjs`) reads that same `backend/data/dev/` directory. Open in Expo Go by entering `exp://<lan-ip>:8081`. `EXPO_PUBLIC_API_URL` is validated at startup — the app refuses to boot with it unset or non-http(s).
 
 ## Testing on an emulator
 
@@ -93,10 +101,16 @@ re-run; `--reset` wipes all of it back to each fixture's initial seed.
 
 Every file this workflow touches (`backend/.env`, `backend/data/dev/`,
 `mobile/.env.local`) is gitignored and worktree-local — it never touches
-your own `backend/data/*.sqlite`, and if something else is already
-listening on the backend port, `dev-emulator.mjs` verifies it's actually
-this workflow's server (logging in as the dev account) before reusing it,
-rather than silently trusting whatever is there.
+your own `backend/data/*.sqlite`. If something is already listening on
+the slot's backend port, both `dev-emulator.mjs` and `scripts/dev-
+phone.mjs` just adopt it as this workflow's own server rather than
+re-verifying who it is — true as long as it was started by one of these
+two scripts to begin with; starting a backend any other way on the same
+port (a bare `npm run backend` in this worktree) leaves something a
+re-run will wrongly trust. `npm run dev:release` first if in doubt.
+`scripts/dev-phone.mjs` runs this exact same seeding against the exact
+same directory for a physical phone over LAN instead of an emulator over
+adb — see "Running" above.
 
 ## Layout
 
