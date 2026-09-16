@@ -11,9 +11,9 @@ import { moveBook, moveBookTo, reorderBook } from "./tierBoardData";
 
 export type TierBook = Record<string, unknown>;
 
-function titleOf(book: TierBook) { return String(book.Title ?? book.title ?? "Untitled"); }
-function authorOf(book: TierBook) { return String(book.Attribution ?? book.author ?? "Unknown author"); }
-function coverOf(book: TierBook) { const value = book._coverUrl ?? book.coverUrl; return typeof value === "string" ? value : null; }
+export function titleOf(book: TierBook) { return String(book.Title ?? book.title ?? "Untitled"); }
+export function authorOf(book: TierBook) { return String(book.Attribution ?? book.author ?? "Unknown author"); }
+export function coverOf(book: TierBook) { const value = book._coverUrl ?? book.coverUrl; return typeof value === "string" ? value : null; }
 export function keyOf(book: TierBook) {
   if ("Title" in book || "ISBN" in book) return bookKey(book);
   return bookKey({ Title: book.title, Attribution: book.author, ISBN: book.isbn, ImageId: book.imageId });
