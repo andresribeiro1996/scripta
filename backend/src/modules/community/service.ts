@@ -199,3 +199,15 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
     }
   };
 }
+
+export interface CommunityPublicApi {
+  emitEvent(userId: string, type: CommunityEventType, refType: CommunityRefType, refId: string): void;
+}
+
+export function createCommunityPublicApi(repo: CommunityRepository): CommunityPublicApi {
+  return {
+    emitEvent(userId, type, refType, refId) {
+      repo.insertEvent({ id: randomUUID(), user_id: userId, type, ref_type: refType, ref_id: refId, created_at: new Date().toISOString() });
+    }
+  };
+}

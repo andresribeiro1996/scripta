@@ -13,12 +13,20 @@ import Fastify, { type FastifyInstance } from "fastify";
 import { isAllowedOrigin } from "./config/corsOrigin.js";
 import { devHttps } from "./config/devCerts.js";
 import { runStartupMigrations } from "./migrations/runStartupMigrations.js";
-import { registerAuthModule } from "./modules/auth/index.js";
-import { registerArenaModule } from "./modules/arena/index.js";
+import {
+  findUserIdByUsername,
+  registerAuthModule,
+  resolvePublicReaderProfile,
+  resolvePublicReaderProfiles,
+  searchUsernameOwners,
+  userHasUsername
+} from "./modules/auth/index.js";
+import { getArenaPublicApi, registerArenaModule } from "./modules/arena/index.js";
+import { getCommunityPublicApi, registerCommunityModule } from "./modules/community/index.js";
 import { registerCoversModule } from "./modules/covers/index.js";
 import { registerGalleryModule } from "./modules/gallery/index.js";
 import { registerLibraryModule } from "./modules/library/index.js";
-import { registerMuralsModule } from "./modules/murals/index.js";
+import { getMuralsPublicApi, registerMuralsModule } from "./modules/murals/index.js";
 import { registerSocialsModule } from "./modules/socials/index.js";
 import { registerTierlistsModule, getTierlistsPublicApi } from "./modules/tierlists/index.js";
 
@@ -67,7 +75,9 @@ export function buildApp() {
   app.get("/health", async () => ({ status: "ok" }));
 
   app.register(registerAuthModule, { authRoot: app });
-  app.register(registerArenaModule);
+  app.register(registerArenaModule, {
+    emitPublished: (tournamentId: string, ownerUserId: string) => getCommunityPublicApi().emitEvent(ownerUserId, "tournament_published", "tournament", tournamentId)
+  });
   app.register(registerLibraryModule);
   app.register(registerGalleryModule);
   app.register(registerCoversModule);
@@ -79,7 +89,27 @@ export function buildApp() {
     // mural route's tierlist block resolution (see murals/plugin.ts).
     getTierlistData: getTierlistsPublicApi().getTierlistData
   });
-  app.register(registerTierlistsModule);
+  app.register(registerCommunityModule, {
+    resolveProfile: resolvePublicReaderProfile,
+    resolveProfiles: resolvePublicReaderProfiles,
+    userHasUsername,
+    findUserIdByUsername,
+    searchUsernameOwners,
+    murals: getMuralsPublicApi(getTierlistsPublicApi().getTierlistData),
+    tierlists: {
+      list: getTierlistsPublicApi().listPublished,
+      get: getTierlistsPublicApi().getPublished,
+      listByOwner: getTierlistsPublicApi().listPublishedByOwner
+    },
+    tournaments: {
+      list: getArenaPublicApi().listPublished,
+      get: getArenaPublicApi().getPublished,
+      listByOwner: getArenaPublicApi().listPublishedByOwner
+    }
+  });
+  app.register(registerTierlistsModule, {
+    emitPublished: (copyId: string, ownerUserId: string) => getCommunityPublicApi().emitEvent(ownerUserId, "tierlist_published", "tierlist", copyId)
+  });
 
   return app;
 }

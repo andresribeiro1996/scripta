@@ -3,3 +3,4 @@
 // modules/covers/index.ts and modules/library/index.ts.
 
 export { arenaPlugin as registerArenaModule } from "./plugin.js";
+export { getArenaPublicApi } from "./plugin.js";
