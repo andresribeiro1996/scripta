@@ -64,7 +64,7 @@ export function ProfileScreen({ username }: { username: string }) {
   if (profile.isPending) return <Centered><Skeleton height={180} /></Centered>;
 
   if (profile.isError) {
-    if (isUnpublished && isOwnHandle) {
+    if (isOwnHandle && isUnpublished) {
       return (
         <Centered>
           <Stack.Screen options={{ headerShown: true, title: "My profile" }} />
@@ -83,17 +83,17 @@ export function ProfileScreen({ username }: { username: string }) {
         </Centered>
       );
     }
-    if (isUnpublished) {
+    if (isOwnHandle) {
       return (
         <Centered>
-          <Stack.Screen options={{ headerShown: true, title: username }} />
-          <EmptyState title="Not published" body="This reader hasn't published a profile." />
+          <ErrorState title="Profile unavailable" body="Couldn't load your profile." actionLabel="Retry" onAction={() => void profile.refetch()} />
         </Centered>
       );
     }
     return (
       <Centered>
-        <ErrorState title="Profile unavailable" body="Couldn't load this profile." actionLabel="Retry" onAction={() => void profile.refetch()} />
+        <Stack.Screen options={{ headerShown: true, title: username }} />
+        <EmptyState title="This profile is private" body="Only published profiles are visible in the community." />
       </Centered>
     );
   }

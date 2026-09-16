@@ -65,7 +65,7 @@ export function CommunityProfilePage() {
             onPublish={(muralId) => run(async () => void (await publishProfile(muralId)))}
           />
         ) : (
-          <EmptyState icon={CommunityIcon} title="Not published." body="This reader hasn't published a profile." />
+          <PrivateProfileState />
         )}
       </div>
     );
@@ -74,7 +74,11 @@ export function CommunityProfilePage() {
   if (!view) {
     return (
       <div className="mx-auto max-w-3xl p-6">
-        <EmptyState title="Profile unavailable." body="Couldn't load this profile." action={retryButton(refetch)} />
+        {isOwnHandle ? (
+          <EmptyState title="Profile unavailable." body="Couldn't load your profile." action={retryButton(refetch)} />
+        ) : (
+          <PrivateProfileState />
+        )}
       </div>
     );
   }
@@ -173,6 +177,10 @@ export function CommunityProfilePage() {
       )}
     </div>
   );
+}
+
+function PrivateProfileState() {
+  return <EmptyState icon={CommunityIcon} title="This profile is private." body="Only published profiles are visible in the community." />;
 }
 
 function UnpublishedOwnProfile({
