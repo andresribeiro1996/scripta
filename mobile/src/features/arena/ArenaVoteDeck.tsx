@@ -3,101 +3,123 @@ import { StyleSheet, Text, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { interpolate, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
-import { countdownLabel, type Duel } from "@scripta/shared";
+import { countdownLabel, type Duel, type DuelSide } from "@scripta/shared";
 import { commitHaptic } from "../../ui/haptics";
-import { Button, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "./BookCover";
 
-const SWIPE_THRESHOLD = 120;
+const SWIPE_THRESHOLD = 100;
 const FLY_OUT_DISTANCE = 500;
 
-function VoteCard({ duel, disabled, onVote }: { duel: Duel; disabled: boolean; onVote: (bookKey: string) => void }) {
+function VoteHalf({
+  side,
+  winKey,
+  loseKey,
+  disabled,
+  edge,
+  onVote,
+}: {
+  side: DuelSide;
+  winKey: string;
+  loseKey: string;
+  disabled: boolean;
+  edge: "left" | "right";
+  onVote: (bookKey: string) => void;
+}) {
   const { colors } = useTheme();
-  const x = useSharedValue(0);
+  const y = useSharedValue(0);
 
-  const gesture = Gesture.Pan()
+  const pan = Gesture.Pan()
     .enabled(!disabled)
-    // Horizontal only: a vertical drag belongs to the pane's own scroll.
-    .activeOffsetX([-10, 10])
-    .failOffsetY([-15, 15])
-    .onUpdate((event) => { x.value = event.translationX; })
+    // Vertical only: a horizontal drag belongs to the tab pager above.
+    .activeOffsetY([-10, 10])
+    .failOffsetX([-15, 15])
+    .onUpdate((event) => { y.value = event.translationY; })
     .onEnd((event) => {
-      if (event.translationX <= -SWIPE_THRESHOLD) {
-        x.value = withTiming(-FLY_OUT_DISTANCE, { duration: 180 });
+      if (event.translationY <= -SWIPE_THRESHOLD) {
+        y.value = withTiming(-FLY_OUT_DISTANCE, { duration: 180 });
         scheduleOnRN(commitHaptic);
-        scheduleOnRN(onVote, duel.bookA.key);
-      } else if (event.translationX >= SWIPE_THRESHOLD) {
-        x.value = withTiming(FLY_OUT_DISTANCE, { duration: 180 });
+        scheduleOnRN(onVote, winKey);
+      } else if (event.translationY >= SWIPE_THRESHOLD) {
+        y.value = withTiming(FLY_OUT_DISTANCE, { duration: 180 });
         scheduleOnRN(commitHaptic);
-        scheduleOnRN(onVote, duel.bookB.key);
+        scheduleOnRN(onVote, loseKey);
       } else {
-        x.value = withSpring(0);
+        y.value = withSpring(0);
       }
     });
+  // A tap is a drag that never crossed the pan's own activation offset, so
+  // letting the pan try first and racing a tap alongside it resolves cleanly:
+  // real drags activate the pan and the tap never fires, taps activate on
+  // release with the pan still pending.
+  const tap = Gesture.Tap().enabled(!disabled).onEnd(() => {
+    scheduleOnRN(commitHaptic);
+    scheduleOnRN(onVote, winKey);
+  });
 
-  const cardStyle = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }, { rotate: `${x.value / 20}deg` }] }));
-  const leftBadge = useAnimatedStyle(() => ({ opacity: interpolate(x.value, [-SWIPE_THRESHOLD, -20], [1, 0], "clamp") }));
-  const rightBadge = useAnimatedStyle(() => ({ opacity: interpolate(x.value, [20, SWIPE_THRESHOLD], [0, 1], "clamp") }));
+  const cardStyle = useAnimatedStyle(() => ({ transform: [{ translateY: y.value }] }));
+  const winTint = useAnimatedStyle(() => ({ opacity: interpolate(y.value, [-SWIPE_THRESHOLD, -10], [1, 0], "clamp") }));
+  const loseTint = useAnimatedStyle(() => ({ opacity: interpolate(y.value, [10, SWIPE_THRESHOLD], [0, 1], "clamp") }));
+
+  const rounding = edge === "left"
+    ? { borderTopLeftRadius: radii.lg, borderBottomLeftRadius: radii.lg }
+    : { borderTopRightRadius: radii.lg, borderBottomRightRadius: radii.lg };
 
   return (
-    <View style={styles.cardWrap}>
+    <GestureDetector gesture={Gesture.Race(pan, tap)}>
+      <Animated.View
+        accessible
+        accessibilityRole="button"
+        accessibilityLabel={`${side.title} by ${side.author}`}
+        accessibilityHint="Picks this book as the winner"
+        onAccessibilityTap={() => onVote(winKey)}
+        style={[styles.half, rounding, cardStyle]}
+      >
+        <BookCover cover={side.cover} title={side.title} fill />
+        <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: colors.success }, winTint]} />
+        <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: colors.danger }, loseTint]} />
+        <View pointerEvents="none" style={[styles.scrim, { backgroundColor: colors.scrim }]} />
+        <View pointerEvents="none" style={styles.textOverlay}>
+          <Text numberOfLines={2} {...dynamicType} style={[typography.body, styles.strong, { color: "#ffffff" }]}>{side.title}</Text>
+          <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: "rgba(255,255,255,0.8)" }]}>{side.author}</Text>
+        </View>
+        <Text {...dynamicType} pointerEvents="none" style={[typography.caption, styles.center, styles.hintTop, { color: "rgba(255,255,255,0.85)" }]}>↑ wins</Text>
+        <Text {...dynamicType} pointerEvents="none" style={[typography.caption, styles.center, styles.hintBottom, { color: "rgba(255,255,255,0.6)" }]}>↓ loses</Text>
+      </Animated.View>
+    </GestureDetector>
+  );
+}
+
+/** One card at a time, remounted per attempt: a swipe animates a half off
+ *  screen, so both the next duel and a retry of this one need fresh ones
+ *  back at rest. */
+export function ArenaVoteDeck({ duel, disabled, onVote }: { duel: Duel; disabled: boolean; onVote: (bookKey: string) => void }) {
+  const { colors } = useTheme();
+  const [attempt, setAttempt] = useState(0);
+  const vote = (bookKey: string) => { setAttempt((n) => n + 1); onVote(bookKey); };
+
+  return (
+    <View key={`${duel.id}:${attempt}`} style={styles.wrap}>
       <Text {...dynamicType} style={[typography.caption, styles.center, { color: colors.textDim }]}>Round {duel.roundNumber} · Match {duel.duelIndex + 1} · {countdownLabel(duel.closesAt)}</Text>
-      <GestureDetector gesture={gesture}>
-        <Animated.View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }, cardStyle]}>
-          <Animated.View pointerEvents="none" style={[styles.badge, styles.badgeLeft, { borderColor: colors.success, backgroundColor: colors.successSoft }, leftBadge]}>
-            <Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.success }]}>VOTE</Text>
-          </Animated.View>
-          <Animated.View pointerEvents="none" style={[styles.badge, styles.badgeRight, { borderColor: colors.success, backgroundColor: colors.successSoft }, rightBadge]}>
-            <Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.success }]}>VOTE</Text>
-          </Animated.View>
-          <View style={styles.halves}>
-            <View style={styles.half}>
-              <BookCover cover={duel.bookA.cover} title={duel.bookA.title} width={104} height={150} />
-              <Text numberOfLines={2} {...dynamicType} style={[typography.body, styles.strong, styles.center, { color: colors.text }]}>{duel.bookA.title}</Text>
-              <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.center, { color: colors.textDim }]}>{duel.bookA.author}</Text>
-            </View>
-            <Text {...dynamicType} style={[typography.title, { color: colors.textDim }]}>vs</Text>
-            <View style={styles.half}>
-              <BookCover cover={duel.bookB.cover} title={duel.bookB.title} width={104} height={150} />
-              <Text numberOfLines={2} {...dynamicType} style={[typography.body, styles.strong, styles.center, { color: colors.text }]}>{duel.bookB.title}</Text>
-              <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.center, { color: colors.textDim }]}>{duel.bookB.author}</Text>
-            </View>
-          </View>
-        </Animated.View>
-      </GestureDetector>
-      <Text {...dynamicType} style={[typography.caption, styles.center, { color: colors.textDim }]}>Swipe left or right to pick a winner</Text>
-      <View style={styles.buttonsRow}>
-        <Button label={`${duel.bookA.title} wins`} variant="secondary" loading={disabled} onPress={() => onVote(duel.bookA.key)} />
-        <Button label={`${duel.bookB.title} wins`} variant="secondary" loading={disabled} onPress={() => onVote(duel.bookB.key)} />
+      <View style={styles.row}>
+        <VoteHalf side={duel.bookA} winKey={duel.bookA.key} loseKey={duel.bookB.key} disabled={disabled} edge="left" onVote={vote} />
+        <VoteHalf side={duel.bookB} winKey={duel.bookB.key} loseKey={duel.bookA.key} disabled={disabled} edge="right" onVote={vote} />
       </View>
+      <Text {...dynamicType} style={[typography.caption, styles.center, { color: colors.textDim }]}>Swipe a cover up to pick it, down to pass — or tap it</Text>
     </View>
   );
 }
 
-/** One card at a time, remounted per attempt: a swipe animates the card off
- *  screen, so both the next duel and a retry of this one need a fresh one
- *  back at centre. */
-export function ArenaVoteDeck({ duel, disabled, onVote }: { duel: Duel; disabled: boolean; onVote: (bookKey: string) => void }) {
-  const [attempt, setAttempt] = useState(0);
-  return (
-    <VoteCard
-      key={`${duel.id}:${attempt}`}
-      duel={duel}
-      disabled={disabled}
-      onVote={(bookKey) => { setAttempt((n) => n + 1); onVote(bookKey); }}
-    />
-  );
-}
-
 const styles = StyleSheet.create({
-  cardWrap: { gap: spacing.md },
-  card: { borderWidth: 1, borderRadius: radii.lg, padding: spacing.lg },
-  halves: { flexDirection: "row", alignItems: "center", gap: spacing.md },
-  half: { flex: 1, alignItems: "center", gap: spacing.xs },
+  wrap: { gap: spacing.md, flex: 1 },
+  row: { flex: 1, flexDirection: "row", gap: 2 },
+  half: { flex: 1, overflow: "hidden" },
   strong: { fontWeight: "700" },
   center: { textAlign: "center" },
-  badge: { position: "absolute", top: spacing.md, zIndex: 1, borderWidth: 2, borderRadius: radii.md, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
-  badgeLeft: { left: spacing.md, transform: [{ rotate: "-8deg" }] },
-  badgeRight: { right: spacing.md, transform: [{ rotate: "8deg" }] },
-  buttonsRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, justifyContent: "center" },
+  hintTop: { position: "absolute", top: spacing.sm, left: 0, right: 0 },
+  // Anchored just above the scrim band (not a fixed px offset) so it never
+  // collides with the title when it wraps to two lines.
+  hintBottom: { position: "absolute", bottom: "36%", left: 0, right: 0 },
+  scrim: { position: "absolute", left: 0, right: 0, bottom: 0, height: "34%" },
+  textOverlay: { position: "absolute", left: 0, right: 0, bottom: 0, padding: spacing.sm },
 });
