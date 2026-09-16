@@ -6,7 +6,7 @@ import * as Linking from "expo-linking";
 import { FlatList, RefreshControl, ScrollView, Share, StyleSheet, Text, View } from "react-native";
 import { countdownLabel, createVoterToken, sharePercent, type Duel, type DuelSide } from "@scripta/shared";
 import { useAuth } from "../../core/auth";
-import { Button, Dialog, EmptyState, ErrorState, IconButton, Input, Menu, Screen, Segmented, Skeleton, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { Button, Dialog, EmptyState, ErrorState, IconButton, Input, Menu, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { fetchTournament, renameTournament, resolveTiebreak, settleDuelEarly, voteOnDuel } from "./api";
 import { ARENA_VIEW_TABS, bracketSlots, matchEmptyCopy, votableDuels, waitingLabel, type ArenaViewTab } from "./arenaView";
 import { ArenaVoteDeck } from "./ArenaVoteDeck";
@@ -79,18 +79,26 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
 
   const matchPane = () => {
     const empty = matchEmptyCopy(data.status, data.duels.length > 0);
+    // A vote deck owns vertical pan gestures for its own swipe-to-vote, so
+    // (unlike the other panes) it can't also sit inside a pull-to-refresh
+    // ScrollView — the two would compete for the same drag. It already
+    // refetches on the query's own interval instead. The empty state has no
+    // competing gesture, so it keeps pull-to-refresh.
+    if (next) {
+      return (
+        <View style={styles.matchWrap}>
+          <Text {...dynamicType} style={[typography.caption, styles.center, { color: colors.textDim }]}>{waitingLabel(votable.length)}</Text>
+          <ArenaVoteDeck
+            duel={next}
+            disabled={busy === next.id}
+            onVote={(bookKey) => void action(next.id, () => voteOnDuel(id, next.id, token, bookKey))}
+          />
+        </View>
+      );
+    }
     return (
       <ScrollView style={styles.grow} contentContainerStyle={styles.pane} refreshControl={<RefreshControl refreshing={tournament.isRefetching} onRefresh={refresh} />}>
-        {next
-          ? <>
-              <Text {...dynamicType} style={[typography.caption, styles.center, { color: colors.textDim }]}>{waitingLabel(votable.length)}</Text>
-              <ArenaVoteDeck
-                duel={next}
-                disabled={busy === next.id}
-                onVote={(bookKey) => void action(next.id, () => voteOnDuel(id, next.id, token, bookKey))}
-              />
-            </>
-          : <EmptyState title={empty.title} body={empty.body} />}
+        <EmptyState title={empty.title} body={empty.body} />
       </ScrollView>
     );
   };
@@ -162,8 +170,13 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
       />
       <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{data.bracketSize} books · {data.status === "active" ? `Round ${data.currentRound}` : data.status}</Text>
       {error ? <Toast visible message={error} tone="error" /> : null}
-      <Segmented accessibilityLabel="Tournament view" options={ARENA_VIEW_TABS} value={tab} onChange={setTab} />
-      {tab === "match" ? matchPane() : tab === "books" ? booksPane() : bracketPane()}
+      <SwipeableTabs
+        accessibilityLabel="Tournament view"
+        options={ARENA_VIEW_TABS}
+        value={tab}
+        onChange={setTab}
+        renderPage={(pageTab) => pageTab === "match" ? matchPane() : pageTab === "books" ? booksPane() : bracketPane()}
+      />
       <Dialog visible={renaming} title="Rename tournament" onClose={() => setRenaming(false)}><View style={styles.dialog}><Input label="Tournament name" value={name} onChangeText={setName} maxLength={200} /><Button label="Save name" disabled={!name.trim()} loading={busy === "rename"} onPress={() => void action("rename", async () => { await renameTournament(id, name.trim()); setRenaming(false); })} /></View></Dialog>
     </Screen>
   );
@@ -176,6 +189,7 @@ const styles = StyleSheet.create({
   center: { textAlign: "center" },
   row: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   pane: { gap: spacing.md, paddingBottom: spacing.huge, flexGrow: 1, justifyContent: "center" },
+  matchWrap: { flex: 1, gap: spacing.md },
   list: { gap: spacing.md, paddingBottom: spacing.huge, flexGrow: 1 },
   duel: { borderWidth: 1, borderRadius: radii.lg, padding: spacing.md, gap: spacing.sm },
   side: { minHeight: 84, borderWidth: 1, borderRadius: radii.md, padding: spacing.sm, flexDirection: "row", gap: spacing.md, alignItems: "center" },
