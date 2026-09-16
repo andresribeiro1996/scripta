@@ -9,6 +9,17 @@ export const STATUS_FILTER_OPTIONS: Array<{ value: StatusFilter; label: string }
   { value: "unread", label: "Not read" }
 ];
 
+// The three shelves a library actually has, for the swipeable status tabs
+// atop the mobile Library screen — unlike STATUS_FILTER_OPTIONS above,
+// there's no "all" tab: a shelf is always exactly one of these three.
+export const LIBRARY_STATUS_TABS = [
+  { value: "finished", label: "Read" },
+  { value: "reading", label: "Reading" },
+  { value: "unread", label: "TBR" }
+] as const;
+
+export type LibraryStatusTab = (typeof LIBRARY_STATUS_TABS)[number]["value"];
+
 export const SORT_OPTIONS: Array<{ value: SortKey; label: string }> = [
   { value: "manual", label: "My order" },
   { value: "title", label: "Title A–Z" },
