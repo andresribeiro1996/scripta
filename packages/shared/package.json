@@ -21,6 +21,10 @@
     "./tierlists/*": {
       "types": "./dist/tierlists/*.d.ts",
       "default": "./dist/tierlists/*.js"
+    },
+    "./community": {
+      "types": "./dist/community/index.d.ts",
+      "default": "./dist/community/index.js"
     }
   },
   "files": [
