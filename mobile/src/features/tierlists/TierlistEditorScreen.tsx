@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Stack, router } from "expo-router";
-import { bookKey, filterBooks, type TierlistData } from "@scripta/shared";
+import { bookKey, createTier, filterBooks, type TierlistData } from "@scripta/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Linking from "expo-linking";
 import { FlatList, Pressable, Share, StyleSheet, Text, View } from "react-native";
@@ -85,7 +85,11 @@ export function TierlistEditorScreen({ tierlist, onUpdated }: { tierlist: Tierli
       { label: current.votingOpen ? "Close voting" : "Reopen voting", onPress: () => void run(() => setVotingState(current.id, { open: !current.votingOpen })) },
       { label: current.voteAccess === "anonymous" ? "Require members" : "Allow anyone", onPress: () => void run(() => setVotingState(current.id, { access: current.voteAccess === "anonymous" ? "members" : "anonymous" })) },
     ]
-    : [{ label: "Open voting…", onPress: () => setConfirmingVoting(true) }];
+    : [
+      { label: "Add books", onPress: () => setAdding(true) },
+      { label: "Add tier", onPress: () => setData((value) => ({ ...value, tiers: [...value.tiers, createTier("New tier", "#8a8580")] })) },
+      { label: "Open voting…", onPress: () => setConfirmingVoting(true) },
+    ];
 
   return <Screen top={false} style={styles.screen}>
     <Stack.Screen options={{
@@ -100,7 +104,7 @@ export function TierlistEditorScreen({ tierlist, onUpdated }: { tierlist: Tierli
     <Input label="Tier list name" value={name} onChangeText={setName} editable={!busy} />
     {frozen ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Vote code <Text style={[styles.strong, { color: colors.text }]}>{current.voteCode}</Text> · {ballots} {ballots === 1 ? "ballot" : "ballots"} · {current.votingOpen ? "open" : "closed"} · {current.voteAccess === "anonymous" ? "anyone" : "members only"}</Text> : null}
     {frozen ? <Segmented accessibilityLabel="View" options={VIEW_OPTIONS} value={view} onChange={setView} /> : null}
-    {library.isPending ? <Skeleton height={180} /> : library.isError ? <ErrorState body="Your library couldn't be loaded." actionLabel="Retry" onAction={() => void library.refetch()} /> : !frozen || view === "board" ? <TierBoard data={data} books={books} onChange={frozen ? () => {} : setData} structureEditable={!frozen} onAddBooks={frozen ? undefined : () => setAdding(true)} /> : <View style={styles.results}>{results.isPending ? <Skeleton height={140} /> : results.isError ? <ErrorState title="Results unavailable" actionLabel="Retry" onAction={() => void results.refetch()} /> : <TierlistResults histogram={results.data.histogram} tiers={data.tiers} pool={data.pool} books={books} ballotCount={results.data.ballotCount} />}</View>}
+    {library.isPending ? <Skeleton height={180} /> : library.isError ? <ErrorState body="Your library couldn't be loaded." actionLabel="Retry" onAction={() => void library.refetch()} /> : !frozen || view === "board" ? <TierBoard data={data} books={books} onChange={frozen ? () => {} : setData} structureEditable={!frozen} /> : <View style={styles.results}>{results.isPending ? <Skeleton height={140} /> : results.isError ? <ErrorState title="Results unavailable" actionLabel="Retry" onAction={() => void results.refetch()} /> : <TierlistResults histogram={results.data.histogram} tiers={data.tiers} pool={data.pool} books={books} ballotCount={results.data.ballotCount} />}</View>}
     <Sheet visible={adding} title="Add books" onClose={() => setAdding(false)}>
       <Input label="Search books" value={bookSearch} onChangeText={setBookSearch} placeholder="Title or author" autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" returnKeyType="search" />
       <FlatList data={availableBooks} keyExtractor={bookKey} style={styles.picker} ListEmptyComponent={<EmptyState title={bookSearch ? "Nothing matches" : "No books to add"} />} renderItem={({ item }) => <Pressable accessibilityRole="button" accessibilityLabel={`Add ${String(item.Title ?? "Untitled")}`} onPress={() => setData((value) => ({ ...value, pool: [...value.pool, bookKey(item)] }))} style={styles.bookRow}><Text numberOfLines={1} {...dynamicType} style={[typography.body, { color: colors.text }]}>{String(item.Title ?? "Untitled")}</Text></Pressable>} />

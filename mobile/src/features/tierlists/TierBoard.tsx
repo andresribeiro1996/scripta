@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { bookKey, createTier, type TierDefinition, type TierlistData } from "@scripta/shared";
+import { bookKey, type TierDefinition, type TierlistData } from "@scripta/shared";
 import { Image } from "expo-image";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
@@ -54,7 +54,7 @@ function BookChip({ book, onDrag, menuItems }: { book: TierBook; onDrag: (direct
   );
 }
 
-export function TierBoard({ data, books, onChange, structureEditable, onAddBooks, poolLabel = "Pool" }: { data: TierlistData; books: TierBook[]; onChange: (data: TierlistData) => void; structureEditable: boolean; onAddBooks?: () => void; poolLabel?: string }) {
+export function TierBoard({ data, books, onChange, structureEditable, poolLabel = "Pool" }: { data: TierlistData; books: TierBook[]; onChange: (data: TierlistData) => void; structureEditable: boolean; poolLabel?: string }) {
   const { colors } = useTheme();
   const [editing, setEditing] = useState<TierDefinition | null>(null);
   const [label, setLabel] = useState("");
@@ -105,7 +105,6 @@ export function TierBoard({ data, books, onChange, structureEditable, onAddBooks
         </View> : null}
       </View>}
       ListFooterComponent={<View style={styles.footer}>
-        {structureEditable ? <View style={styles.row}><Button label="Add tier" variant="secondary" onPress={() => onChange({ ...data, tiers: [...data.tiers, createTier("New tier", "#8a8580")] })} />{onAddBooks ? <Button label="Add books" variant="secondary" onPress={onAddBooks} /> : null}</View> : null}
         <Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.textDim }]}>{poolLabel} · {data.pool.length}</Text>
         {renderBooks("pool")}
       </View>}
@@ -132,6 +131,5 @@ const styles = StyleSheet.create({
   strong: { fontWeight: "700" },
   empty: { padding: spacing.md },
   footer: { gap: spacing.sm, paddingTop: spacing.md },
-  row: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   dialog: { gap: spacing.md },
 });
