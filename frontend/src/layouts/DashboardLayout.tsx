@@ -41,7 +41,7 @@ const NAV_GROUPS: Array<{ items: NavItem[] }> = [
     items: [
       { to: "/dashboard/gallery", label: "Gallery", end: false, icon: GalleryIcon },
       { to: "/dashboard/murals", label: "Murals", end: false, description: "Freeform dashboard pages", icon: MuralsIcon },
-      { to: "/dashboard/arena", label: "Arena", end: false, description: "Book-bracket tournaments", icon: ArenaIcon }
+      { to: "/dashboard/arena", label: "Games", end: false, description: "Book-bracket tournaments", icon: ArenaIcon }
     ]
   },
   {

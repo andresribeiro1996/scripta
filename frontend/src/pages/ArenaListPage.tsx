@@ -86,7 +86,7 @@ export function ArenaListPage() {
       {/* Desktop-only title, like the other list pages — the bottom tab
           bar already says where you are, and the search row below is
           what a phone actually needs at the top. */}
-      <h2 className="mb-6 hidden text-lg font-bold sm:block">Arena</h2>
+      <h2 className="mb-6 hidden text-lg font-bold sm:block">Games</h2>
 
       {/* The two Arena contents, one segmented control — same component
           shape ArenaViewPage's round control uses, so switching between
