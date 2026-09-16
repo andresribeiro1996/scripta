@@ -12,17 +12,17 @@ import {
   bookKey,
   effectiveCardStyle,
   filterBooks,
+  LIBRARY_STATUS_TABS,
   orderLibraryBooks,
   resolveLibraryStyle,
   seriesGroupByBookKey,
   sortBooks,
   SORT_OPTIONS,
-  STATUS_FILTER_OPTIONS,
+  type LibraryStatusTab,
   type PerCardStyle,
   type SortKey,
-  type StatusFilter,
 } from "@scripta/shared";
-import { Button, EmptyState, ErrorState, IconButton, Input, Menu, Screen, Sheet, Skeleton, type MenuItem } from "../../ui/components";
+import { Button, EmptyState, ErrorState, IconButton, Input, Menu, Screen, Sheet, Skeleton, SwipeableTabs, type MenuItem } from "../../ui/components";
 import type { SearchBarCommands } from "react-native-screens";
 import { spacing } from "../../ui/theme";
 import { useMurals } from "../murals/useMurals";
@@ -49,7 +49,7 @@ export function LibraryScreen() {
     if (q) searchBar.current?.setText(q);
     else searchBar.current?.clearText();
   }, [q]);
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<LibraryStatusTab>(LIBRARY_STATUS_TABS[0].value);
   const [sortKey, setSortKey] = useState<SortKey>("manual");
 
   // Renaming stays a modal: it is one field, and a form sheet for it would be
@@ -62,14 +62,14 @@ export function LibraryScreen() {
   const books = library?.data.books ?? [];
   const style = resolveLibraryStyle(library?.data.style);
   const ordered = useMemo(() => orderLibraryBooks(library?.data.books ?? [], library?.data.groups ?? []), [library]);
-  const displayBooks = useMemo(() => sortBooks(filterBooks(ordered, query, statusFilter), sortKey), [ordered, query, statusFilter, sortKey]);
   const bookSeriesGroup = useMemo(() => seriesGroupByBookKey(library?.data.books ?? [], library?.data.groups ?? []), [library]);
-  const toolbarActive = query.trim() !== "" || statusFilter !== "all" || sortKey !== "manual";
+  // The status shown is a shelf (one of the three tabs), not a clearable
+  // filter — only search and sort get reset here.
+  const toolbarActive = query.trim() !== "" || sortKey !== "manual";
 
   function clearSearchAndFilters() {
     searchBar.current?.clearText();
     setQuery("");
-    setStatusFilter("all");
     setSortKey("manual");
   }
 
@@ -110,18 +110,11 @@ export function LibraryScreen() {
   }
 
   const actionItems: MenuItem[] = [
-    // Status and sort used to be two rows of pills above the grid, which cost
-    // roughly a third of the screen before a single cover. As submenus they
-    // read the way the platform's own library apps present the same choice,
-    // and `selected` puts the tick on the live one.
-    {
-      label: "Status",
-      items: STATUS_FILTER_OPTIONS.map((option) => ({
-        label: option.label,
-        selected: option.value === statusFilter,
-        onPress: () => setStatusFilter(option.value),
-      })),
-    },
+    // Sort used to sit above the grid as a row of pills, which cost real
+    // space before a single cover. As a submenu it reads the way the
+    // platform's own library apps present the same choice, and `selected`
+    // puts the tick on the live one. Status now lives in the swipeable
+    // tabs above the grid instead of here.
     {
       label: "Sort",
       items: SORT_OPTIONS.map((option) => ({
@@ -227,40 +220,50 @@ export function LibraryScreen() {
       )}
 
       {!isPending && !isError && books.length > 0 && (
-        <>
-          {displayBooks.length === 0 ? (
-            <EmptyState
-              title="No books match."
-              body="Every book is still here — the search or filters above just don't match any of them."
-              actionLabel={toolbarActive ? "Clear search and filters" : undefined}
-              onAction={toolbarActive ? clearSearchAndFilters : undefined}
-            />
-          ) : (
-            <LibraryGrid
-              data={displayBooks}
-              keyExtractor={(book, i) => String(book.ContentID ?? i)}
-              style={style}
-              refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} />}
-              renderItem={(book) => {
-                const seriesGroup = bookSeriesGroup.get(bookKey(book));
-                const cardStyle = effectiveCardStyle(style, seriesGroup?.style, book._style as PerCardStyle | undefined);
-                return (
-                  <BookCard
-                    book={book}
-                    onPress={() => router.push(`/book/${encodeURIComponent(bookKey(book))}` as never)}
-                    style={cardStyle}
-                    showActions
-                    onOpenStyle={selectionMode ? undefined : () => router.push(`/book/${encodeURIComponent(bookKey(book))}/style` as never)}
-                    onOpenCoverPicker={selectionMode ? undefined : () => router.push(`/book/${encodeURIComponent(bookKey(book))}/cover` as never)}
-                    selectable={selectionMode}
-                    selected={selectedKeys.has(bookKey(book))}
-                    onToggleSelect={handleToggleSelect}
-                  />
-                );
-              }}
-            />
-          )}
-        </>
+        <SwipeableTabs
+          accessibilityLabel="Library shelf"
+          options={LIBRARY_STATUS_TABS}
+          value={statusFilter}
+          onChange={setStatusFilter}
+          renderPage={(status) => {
+            const pageBooks = sortBooks(filterBooks(ordered, query, status), sortKey);
+            if (pageBooks.length === 0) {
+              return (
+                <EmptyState
+                  title="No books match."
+                  body="Every book is still here — the search above just doesn't match any of them."
+                  actionLabel={toolbarActive ? "Clear search and sort" : undefined}
+                  onAction={toolbarActive ? clearSearchAndFilters : undefined}
+                />
+              );
+            }
+            return (
+              <LibraryGrid
+                data={pageBooks}
+                keyExtractor={(book, i) => String(book.ContentID ?? i)}
+                style={style}
+                refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} />}
+                renderItem={(book) => {
+                  const seriesGroup = bookSeriesGroup.get(bookKey(book));
+                  const cardStyle = effectiveCardStyle(style, seriesGroup?.style, book._style as PerCardStyle | undefined);
+                  return (
+                    <BookCard
+                      book={book}
+                      onPress={() => router.push(`/book/${encodeURIComponent(bookKey(book))}` as never)}
+                      style={cardStyle}
+                      showActions
+                      onOpenStyle={selectionMode ? undefined : () => router.push(`/book/${encodeURIComponent(bookKey(book))}/style` as never)}
+                      onOpenCoverPicker={selectionMode ? undefined : () => router.push(`/book/${encodeURIComponent(bookKey(book))}/cover` as never)}
+                      selectable={selectionMode}
+                      selected={selectedKeys.has(bookKey(book))}
+                      onToggleSelect={handleToggleSelect}
+                    />
+                  );
+                }}
+              />
+            );
+          }}
+        />
       )}
 
       <Sheet visible={editingName} title="Rename library" onClose={() => setEditingName(false)}>
