@@ -11,6 +11,13 @@ export default function LibraryStackLayout() {
   const sheet = useSheetOptions();
   return (
     <Stack screenOptions={useScreenOptions()}>
+      {/* Declared first, and that position is what actually anchors the tab:
+          expo-router's getSortedChildren emits declared screens in this order
+          and appends undeclared ones after, so whichever is listed first here
+          becomes the stack's initial route. unstable_settings above cannot do
+          it alone — layouts/Stack.js never forwards that anchor to React
+          Navigation, it only sorts the routes left undeclared. */}
+      <Stack.Screen name="library" />
       {/* `presentation` is read when the screen is presented, so it has to be
           declared here — a <Stack.Screen> inside the route component renders
           too late to change how that screen was pushed. Those inline blocks
