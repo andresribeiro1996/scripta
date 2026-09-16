@@ -36,7 +36,11 @@
 //      emulator-only path, which reaches Metro through an adb reverse
 //      tunnel instead and would leave a physical phone unable to
 //      connect at all).
-//   6. Print the exp:// url to open in Expo Go on the phone. Unlike the
+//   6. Broadcast a reload (scripts/devReload.mjs) so a phone left open
+//      across a Metro restart stops serving the bundle it loaded before
+//      that restart. This is the step that makes re-running the script a
+//      real answer to "is my phone on current code?" rather than a no-op.
+//   7. Print the exp:// url to open in Expo Go on the phone. Unlike the
 //      emulator this can't force-launch it over adb.
 //
 // Ports come from the slot this worktree claims (scripts/devRegistry.mjs),
@@ -50,6 +54,7 @@ import { devDataDirEnv } from "./devDataDir.mjs";
 import { DEV_USERNAME } from "./dev-account.mjs";
 import { ensureSharedBuilt, resetDevDataIfRequested, seedDevAccount, seedFixtureUsers } from "./devFixtureSetup.mjs";
 import { isPortOpen, spawnDetached, waitFor } from "./devProcess.mjs";
+import { broadcastReload } from "./devReload.mjs";
 import { pickLanAddress } from "./lanAddress.mjs";
 
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -135,6 +140,16 @@ async function main() {
   seedFixtureUsers(log);
   await ensureBackendRunning();
   await ensureMetroRunning();
+  // Expo Go keeps running the bundle it already has when its Metro is
+  // replaced, so re-running this script could not fix the very thing it is
+  // most often re-run for. This says whether the reload reached METRO, not
+  // whether a phone was listening — Metro's /message broadcast gives no
+  // count of attached clients, and claiming one it can't see is how the
+  // stale bundle stayed invisible in the first place.
+  const reloadSent = await broadcastReload(METRO_PORT);
+  log(reloadSent
+    ? "Sent a reload to Metro — an Expo Go already attached picks up current code without you touching the phone."
+    : `Couldn't reach Metro's reload channel on ${METRO_PORT} — if the app is already open, shake the phone and tap Reload.`);
 
   log(`Ready. Signed in as ${DEV_USERNAME} (24-book fixture library). fixture_alice/fixture_bob/fixture_charlie (password scripta123) are also seeded on the same server.`);
   log(`On your phone (same Wi-Fi), open Expo Go and enter: exp://${lanAddress}:${METRO_PORT}`);
