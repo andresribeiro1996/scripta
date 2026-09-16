@@ -117,6 +117,7 @@ export function ProfileScreen({ username }: { username: string }) {
       <Stack.Screen options={{ headerShown: true, title: view!.profile.user.username }} />
       {error ? <Toast visible message={error} tone="error" /> : null}
       <FlatList
+        style={{ flex: 1 }}
         data={publishedRows(view!)}
         keyExtractor={(row) => `${row.kind}:${row.id}`}
         contentContainerStyle={styles.list}

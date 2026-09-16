@@ -34,7 +34,7 @@ export function CommunityScreen() {
             <IconButton
               accessibilityLabel="My profile"
               name="profile"
-              onPress={() => router.push(`/community/u/${user!.username}` as never)}
+              onPress={() => router.push(`/u/${user!.username}` as never)}
             />
           ),
         }}
@@ -69,7 +69,7 @@ function AuthorAvatar({ username, avatarUrl }: { username: string; avatarUrl: st
 }
 
 function openProfile(username: string) {
-  router.push(`/community/u/${username}` as never);
+  router.push(`/u/${username}` as never);
 }
 
 function FeedPane() {
