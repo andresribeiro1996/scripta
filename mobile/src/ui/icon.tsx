@@ -19,7 +19,9 @@ const GLYPHS = {
   home: { ios: "house", android: "home" },
   library: { ios: "books.vertical", android: "library_books" },
   arena: { ios: "trophy", android: "trophy" },
+  community: { ios: "person.3", android: "group" },
   murals: { ios: "paintpalette", android: "palette" },
+  profile: { ios: "person.circle", android: "account_circle" },
   settings: { ios: "gearshape", android: "settings" },
   add: { ios: "plus", android: "add" },
   confirm: { ios: "checkmark", android: "check" },
@@ -28,12 +30,13 @@ const GLYPHS = {
   delete: { ios: "trash", android: "delete" },
 } as const satisfies Record<string, Glyph>;
 
-/** Only these four have a solid counterpart worth using; the rest read the
+/** Only these five have a solid counterpart worth using; the rest read the
  *  same either way, and `plus.fill` etc. aren't the iOS convention anyway. */
 const FILLED = {
   home: { ios: "house.fill", android: "home" },
   library: { ios: "books.vertical.fill", android: "library_books" },
   arena: { ios: "trophy.fill", android: "trophy" },
+  community: { ios: "person.3.fill", android: "group" },
   murals: { ios: "paintpalette.fill", android: "palette" },
   settings: { ios: "gearshape.fill", android: "settings" },
 } as const satisfies Partial<Record<IconName, Glyph>>;
