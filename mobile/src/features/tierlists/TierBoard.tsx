@@ -1,19 +1,19 @@
 import { useState } from "react";
-import { bookKey, createTier, type TierDefinition, type TierlistData } from "@scripta/shared";
+import { bookKey, type TierDefinition, type TierlistData } from "@scripta/shared";
 import { Image } from "expo-image";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { commitHaptic, liftHaptic } from "../../ui/haptics";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, StyleSheet, Text, View } from "react-native";
 import { Button, Dialog, IconButton, Input, Menu, type MenuItem, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { moveBook, moveBookTo, reorderBook } from "./tierBoardData";
 
 export type TierBook = Record<string, unknown>;
 
-function titleOf(book: TierBook) { return String(book.Title ?? book.title ?? "Untitled"); }
-function authorOf(book: TierBook) { return String(book.Attribution ?? book.author ?? "Unknown author"); }
-function coverOf(book: TierBook) { const value = book._coverUrl ?? book.coverUrl; return typeof value === "string" ? value : null; }
+export function titleOf(book: TierBook) { return String(book.Title ?? book.title ?? "Untitled"); }
+export function authorOf(book: TierBook) { return String(book.Attribution ?? book.author ?? "Unknown author"); }
+export function coverOf(book: TierBook) { const value = book._coverUrl ?? book.coverUrl; return typeof value === "string" ? value : null; }
 export function keyOf(book: TierBook) {
   if ("Title" in book || "ISBN" in book) return bookKey(book);
   return bookKey({ Title: book.title, Attribution: book.author, ISBN: book.isbn, ImageId: book.imageId });
@@ -54,7 +54,7 @@ function BookChip({ book, onDrag, menuItems }: { book: TierBook; onDrag: (direct
   );
 }
 
-export function TierBoard({ data, books, onChange, structureEditable, onAddBooks, poolLabel = "Pool" }: { data: TierlistData; books: TierBook[]; onChange: (data: TierlistData) => void; structureEditable: boolean; onAddBooks?: () => void; poolLabel?: string }) {
+export function TierBoard({ data, books, onChange, structureEditable, poolLabel = "Pool" }: { data: TierlistData; books: TierBook[]; onChange: (data: TierlistData) => void; structureEditable: boolean; poolLabel?: string }) {
   const { colors } = useTheme();
   const [editing, setEditing] = useState<TierDefinition | null>(null);
   const [label, setLabel] = useState("");
@@ -65,6 +65,11 @@ export function TierBoard({ data, books, onChange, structureEditable, onAddBooks
   function keysFor(section: string) { return section === "pool" ? data.pool : data.tiers.find((tier) => tier.id === section)?.bookKeys ?? []; }
   function sectionLabel(section: string) { return section === "pool" ? poolLabel : data.tiers.find((tier) => tier.id === section)?.label || "Untitled"; }
   function moveSection(key: string, direction: -1 | 1) { onChange(moveBook(data, key, direction)); }
+  function moveTier(index: number, direction: -1 | 1) {
+    const tiers = [...data.tiers];
+    [tiers[index], tiers[index + direction]] = [tiers[index + direction]!, tiers[index]!];
+    onChange({ ...data, tiers });
+  }
   function moveTo(key: string, target: string) { onChange(moveBookTo(data, key, target)); }
   function reorder(key: string, direction: -1 | 1) { onChange(reorderBook(data, key, direction)); }
   function renderBooks(section: string) {
@@ -89,10 +94,17 @@ export function TierBoard({ data, books, onChange, structureEditable, onAddBooks
       renderItem={({ item: tier, index }) => <View style={[styles.tier, { borderColor: colors.border }]}>
         <View style={[styles.tierLabel, { backgroundColor: tier.color }]}><Text numberOfLines={1} {...dynamicType} style={[typography.title, styles.strong, { color: "#fff" }]}>{tier.label || "Untitled"}</Text></View>
         <View style={styles.grow}>{renderBooks(tier.id)}</View>
-        {structureEditable ? <View style={styles.tierActions}><Pressable accessibilityRole="button" accessibilityLabel={`Edit ${tier.label} tier`} onPress={() => { setEditing(tier); setLabel(tier.label); setColor(tier.color); }}><Text style={{ color: colors.accent }}>Edit</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel={`Move ${tier.label} tier up`} disabled={index === 0} onPress={() => { const tiers = [...data.tiers]; [tiers[index - 1], tiers[index]] = [tiers[index], tiers[index - 1]]; onChange({ ...data, tiers }); }}><Text style={{ color: colors.textDim }}>↑</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel={`Move ${tier.label} tier down`} disabled={index === data.tiers.length - 1} onPress={() => { const tiers = [...data.tiers]; [tiers[index], tiers[index + 1]] = [tiers[index + 1], tiers[index]]; onChange({ ...data, tiers }); }}><Text style={{ color: colors.textDim }}>↓</Text></Pressable></View> : null}
+        {structureEditable ? <View style={styles.tierActions}>
+          <Menu title={tier.label || "Untitled"} items={[
+            { label: "Edit tier", onPress: () => { setEditing(tier); setLabel(tier.label); setColor(tier.color); } },
+            ...(index > 0 ? [{ label: "Move up", onPress: () => moveTier(index, -1) }] : []),
+            ...(index < data.tiers.length - 1 ? [{ label: "Move down", onPress: () => moveTier(index, 1) }] : []),
+          ]}>
+            <IconButton accessibilityLabel={`Actions for ${tier.label || "Untitled"} tier`} name="more" />
+          </Menu>
+        </View> : null}
       </View>}
       ListFooterComponent={<View style={styles.footer}>
-        {structureEditable ? <View style={styles.row}><Button label="Add tier" variant="secondary" onPress={() => onChange({ ...data, tiers: [...data.tiers, createTier("New tier", "#8a8580")] })} />{onAddBooks ? <Button label="Add books" variant="secondary" onPress={onAddBooks} /> : null}</View> : null}
         <Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.textDim }]}>{poolLabel} · {data.pool.length}</Text>
         {renderBooks("pool")}
       </View>}
@@ -106,19 +118,18 @@ export function TierBoard({ data, books, onChange, structureEditable, onAddBooks
 
 const styles = StyleSheet.create({
   board: { gap: spacing.sm, paddingBottom: spacing.huge },
-  tier: { minHeight: 130, borderWidth: 1, borderRadius: radii.md, flexDirection: "row", overflow: "hidden" },
-  tierLabel: { width: 56, alignItems: "center", justifyContent: "center", padding: spacing.xs },
-  tierActions: { width: 42, alignItems: "center", justifyContent: "space-around", paddingVertical: spacing.sm },
+  tier: { minHeight: 96, borderWidth: 1, borderRadius: radii.md, flexDirection: "row", overflow: "hidden" },
+  tierLabel: { width: 48, alignItems: "center", justifyContent: "center", padding: spacing.xs },
+  tierActions: { alignItems: "center", justifyContent: "center" },
   grow: { flex: 1 },
-  books: { minHeight: 128, alignItems: "flex-start", gap: spacing.sm, padding: spacing.sm },
+  books: { minHeight: 92, alignItems: "flex-start", gap: spacing.sm, padding: spacing.sm },
   chipWrap: { width: 86, alignItems: "center", gap: spacing.xs },
   chip: { width: 82, height: 108, borderWidth: 1, borderRadius: radii.md, padding: spacing.xs, alignItems: "center", gap: spacing.xs },
   cover: { width: 42, height: 62, borderRadius: radii.sm },
   fallback: { alignItems: "center", justifyContent: "center" },
   center: { textAlign: "center" },
   strong: { fontWeight: "700" },
-  empty: { padding: spacing.lg },
+  empty: { padding: spacing.md },
   footer: { gap: spacing.sm, paddingTop: spacing.md },
-  row: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   dialog: { gap: spacing.md },
 });
