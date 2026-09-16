@@ -1,6 +1,12 @@
 import { Stack } from "expo-router";
 import { useScreenOptions, useSheetOptions } from "@/ui/navigation";
 
+// Without this, tapping the Library tab landed on whichever screen in this
+// group Expo Router picked as its default (add-book) instead of the grid.
+export const unstable_settings = {
+  initialRouteName: "library",
+};
+
 export default function LibraryStackLayout() {
   const sheet = useSheetOptions();
   return (
