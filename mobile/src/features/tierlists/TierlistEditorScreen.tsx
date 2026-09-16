@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Linking from "expo-linking";
 import { FlatList, Pressable, Share, StyleSheet, Text, View } from "react-native";
 import { apiClient } from "../../core/api";
-import { Button, Dialog, EmptyState, ErrorState, Input, Screen, Segmented, Sheet, Skeleton, Toast, dynamicType, spacing, typography, useTheme } from "../../ui";
+import { Button, Dialog, EmptyState, ErrorState, IconButton, Input, Menu, type MenuItem, Screen, Segmented, Sheet, Skeleton, Toast, dynamicType, spacing, typography, useTheme } from "../../ui";
 import { fetchTierlistResults, fetchVotingBoard, openVoting, setVotingState, updateTierlist, type Tierlist } from "./api";
 import { TierBoard } from "./TierBoard";
 import { TierlistResults } from "./TierlistResults";
@@ -75,11 +75,30 @@ export function TierlistEditorScreen({ tierlist, onUpdated }: { tierlist: Tierli
   const used = new Set([...data.pool, ...data.tiers.flatMap((tier) => tier.bookKeys)]);
   const availableBooks = filterBooks(books, bookSearch, "all").filter((book) => !used.has(bookKey(book)));
   const frozen = current.voteCode !== null;
+  const ballots = board.data?.board.ballotCount ?? 0;
+  // A community copy refuses a `data` write — its structure is frozen for the
+  // life of the poll — but still accepts a rename.
+  const save = () => run(() => updateTierlist(current.id, frozen ? { name: name.trim() || current.name } : { name: name.trim() || current.name, data }));
+  const actionItems: MenuItem[] = frozen
+    ? [
+      { label: "Share ballot", onPress: () => void Share.share({ message: Linking.createURL(`/vote/${current.voteCode}`) }) },
+      { label: current.votingOpen ? "Close voting" : "Reopen voting", onPress: () => void run(() => setVotingState(current.id, { open: !current.votingOpen })) },
+      { label: current.voteAccess === "anonymous" ? "Require members" : "Allow anyone", onPress: () => void run(() => setVotingState(current.id, { access: current.voteAccess === "anonymous" ? "members" : "anonymous" })) },
+    ]
+    : [{ label: "Open voting…", onPress: () => setConfirmingVoting(true) }];
+
   return <Screen top={false} style={styles.screen}>
-    <Stack.Screen options={{ headerShown: true, title: current.name }} />
+    <Stack.Screen options={{
+      headerShown: true,
+      title: current.name,
+      headerRight: () => <View style={styles.headerActions}>
+        <IconButton accessibilityLabel="Save changes" name="confirm" onPress={() => void save()} />
+        <Menu title={current.name} items={actionItems}><IconButton accessibilityLabel="Tier list actions" name="more" /></Menu>
+      </View>,
+    }} />
     {error ? <Toast visible message={error} tone="error" /> : null}
-    <View style={styles.form}><Input label="Tier list name" value={name} onChangeText={setName} editable={!busy} /><Button label="Save changes" loading={busy} onPress={() => void run(() => updateTierlist(current.id, { name: name.trim() || current.name, data }))} /></View>
-    {!frozen ? <View style={styles.stack}><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Open a frozen community copy for voting.</Text><Button label="Open voting" variant="secondary" onPress={() => setConfirmingVoting(true)} /></View> : <View style={styles.voting}><Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>Vote code: {current.voteCode}</Text><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{board.data?.board.ballotCount ?? 0} ballots · {current.votingOpen ? "open" : "closed"} · {current.voteAccess === "anonymous" ? "anyone" : "members only"}</Text><View style={styles.stack}><Button label="Share ballot" variant="secondary" onPress={() => void Share.share({ message: Linking.createURL(`/vote/${current.voteCode}`) })} /><Button label={current.votingOpen ? "Close voting" : "Reopen voting"} variant="secondary" loading={busy} onPress={() => void run(() => setVotingState(current.id, { open: !current.votingOpen }))} /><Button label={current.voteAccess === "anonymous" ? "Require members" : "Allow anyone"} variant="secondary" loading={busy} onPress={() => void run(() => setVotingState(current.id, { access: current.voteAccess === "anonymous" ? "members" : "anonymous" }))} /></View></View>}
+    <Input label="Tier list name" value={name} onChangeText={setName} editable={!busy} />
+    {frozen ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Vote code <Text style={[styles.strong, { color: colors.text }]}>{current.voteCode}</Text> · {ballots} {ballots === 1 ? "ballot" : "ballots"} · {current.votingOpen ? "open" : "closed"} · {current.voteAccess === "anonymous" ? "anyone" : "members only"}</Text> : null}
     {frozen ? <Segmented accessibilityLabel="View" options={VIEW_OPTIONS} value={view} onChange={setView} /> : null}
     {library.isPending ? <Skeleton height={180} /> : library.isError ? <ErrorState body="Your library couldn't be loaded." actionLabel="Retry" onAction={() => void library.refetch()} /> : !frozen || view === "board" ? <TierBoard data={data} books={books} onChange={frozen ? () => {} : setData} structureEditable={!frozen} onAddBooks={frozen ? undefined : () => setAdding(true)} /> : <View style={styles.results}>{results.isPending ? <Skeleton height={140} /> : results.isError ? <ErrorState title="Results unavailable" actionLabel="Retry" onAction={() => void results.refetch()} /> : <TierlistResults histogram={results.data.histogram} tiers={data.tiers} pool={data.pool} books={books} ballotCount={results.data.ballotCount} />}</View>}
     <Sheet visible={adding} title="Add books" onClose={() => setAdding(false)}>
@@ -99,9 +118,7 @@ export function TierlistEditorScreen({ tierlist, onUpdated }: { tierlist: Tierli
 const styles = StyleSheet.create({
   screen: { padding: spacing.lg, gap: spacing.md },
   strong: { fontWeight: "700" },
-  form: { gap: spacing.sm },
-  stack: { gap: spacing.sm },
-  voting: { gap: spacing.sm },
+  headerActions: { flexDirection: "row", alignItems: "center" },
   results: { flex: 1, gap: spacing.md },
   picker: { maxHeight: 440 },
   bookRow: { minHeight: 48, justifyContent: "center", paddingVertical: spacing.sm },
