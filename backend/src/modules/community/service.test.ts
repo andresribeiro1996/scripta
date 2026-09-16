@@ -346,3 +346,73 @@ test("an unparseable cursor is a 400-worthy error, not an empty page", () => {
   const service = createCommunityService(deps);
   assert.throws(() => service.getFeed("me", "garbage", 10), InvalidCursorError);
 });
+
+test("discover merges both content kinds newest first", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs, tournamentRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  readerProfiles.set("bob", reader("bob"));
+  tierlistRefs.set("t1", tierRef("t1", "alice", { createdAt: "2026-09-02T00:00:00.000Z" }));
+  tournamentRefs.set("g1", tournRef("g1", "bob", { createdAt: "2026-09-01T00:00:00.000Z" }));
+
+  const page = service.getDiscover("all", "", 10, 0);
+  assert.deepEqual(
+    page.items.map((item) => [item.content.kind, item.author.username]),
+    [["tierlist", "user-alice"], ["tournament", "user-bob"]]
+  );
+  assert.equal(page.nextOffset, null);
+});
+
+test("discover filters by type and by name substring, and paginates by offset", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs, tournamentRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  tierlistRefs.set("t1", tierRef("t1", "alice", { name: "Fantasy ranked" }));
+  tierlistRefs.set("t2", tierRef("t2", "alice", { createdAt: "2026-09-04T00:00:00.000Z" }));
+  tournamentRefs.set("g1", tournRef("g1", "alice"));
+
+  assert.deepEqual(service.getDiscover("tournament", "", 10, 0).items.map((i) => i.content.kind), ["tournament"]);
+  const searched = service.getDiscover("all", "fantasy", 10, 0);
+  assert.deepEqual(searched.items.map((i) => i.content.name), ["Fantasy ranked"]);
+
+  const page1 = service.getDiscover("all", "", 1, 0);
+  assert.equal(page1.items.length, 1);
+  assert.equal(page1.nextOffset, 1);
+  const page2 = service.getDiscover("all", "", 1, 1);
+  assert.equal(page2.items.length, 1);
+  assert.equal(page2.nextOffset, 2);
+  const page3 = service.getDiscover("all", "", 1, 2);
+  assert.equal(page3.items.length, 1);
+  assert.equal(page3.nextOffset, null);
+});
+
+test("discover drops rows whose author has no reader profile", () => {
+  const { repo } = createRepoFake();
+  const { deps, tierlistRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  tierlistRefs.set("t1", tierRef("t1", "alice"));
+  assert.deepEqual(service.getDiscover("all", "", 10, 0), { items: [], nextOffset: null });
+});
+
+test("people search excludes self and unpublished profiles", () => {
+  const { repo, profiles } = createRepoFake();
+  const { deps, readerProfiles, usernames } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  usernames.set("alina", "alina");
+  usernames.set("bob", "bobby");
+  readerProfiles.set("alice", reader("alice"));
+  readerProfiles.set("alina", reader("alina"));
+  profiles.set("alice", profileRow("alice"));
+  profiles.set("alina", profileRow("alina", { published: 0 }));
+
+  const results = service.searchPeople("me", "ali", 10);
+  assert.deepEqual(results.map((r) => r.user.username), ["user-alice"]);
+  assert.deepEqual(results.map((r) => r.viewerFollows), [false]);
+
+  service.follow("me", "alice");
+  const after = service.searchPeople("me", "ali", 10);
+  assert.deepEqual(after.map((r) => r.viewerFollows), [true]);
+});

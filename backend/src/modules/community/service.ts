@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { ReaderProfile } from "@scripta/shared";
 import { decodeCursor, encodeCursor } from "@scripta/shared/community";
-import type { CommunityEventType, FeedItem, FollowState, Page, PublishedProfile, TierlistSummary, TournamentSummary } from "@scripta/shared/community";
+import type { CommunityEventType, DiscoverItem, DiscoverType, FeedItem, FollowState, Page, PersonResult, PublishedContent, PublishedProfile, TierlistSummary, TournamentSummary } from "@scripta/shared/community";
 import type { PublishedTournamentRef } from "../arena/service.js";
 import type { MuralsPublicApi } from "../murals/publicApi.js";
 import type { MuralPublicPayload } from "../murals/index.js";
@@ -9,6 +9,8 @@ import type { PublishedTierlistRef } from "../tierlists/service.js";
 import { InvalidCursorError, MuralNotOwnedError, NotFollowingError, ProfileNotFoundError, SelfFollowError, UsernameRequiredError } from "./domain/errors.js";
 import type { CommunityRepository } from "./domain/ports.js";
 import type { EventRow } from "./domain/types.js";
+
+const DISCOVER_SCAN_CAP = 500;
 
 export type CommunityRefType = "tierlist" | "tournament";
 
@@ -60,6 +62,8 @@ export interface CommunityService {
   unpublishProfile(userId: string): void;
   getProfileByUsername(username: string, viewerId?: string): PublicProfileView;
   getFeed(viewerId: string, cursor: string | undefined, limit: number): Page<FeedItem>;
+  getDiscover(type: DiscoverType, q: string, limit: number, offset: number): { items: DiscoverItem[]; nextOffset: number | null };
+  searchPeople(viewerId: string, q: string, limit: number): PersonResult[];
 }
 
 export function createCommunityService(deps: CommunityDeps): CommunityService {
@@ -156,6 +160,42 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
         }
       }
       return { items, nextCursor };
+    },
+    getDiscover(type, q, limit, offset) {
+      const needle = q.trim().toLowerCase();
+      const window = Math.min(offset + limit, DISCOVER_SCAN_CAP);
+      const entries: Array<{ userId: string; content: PublishedContent; createdAt: string }> = [];
+      if (type !== "tournament") {
+        for (const ref of deps.tierlists.list(window, 0)) entries.push({ userId: ref.ownerUserId, content: toTierlistSummary(ref), createdAt: ref.createdAt });
+      }
+      if (type !== "tierlist") {
+        for (const ref of deps.tournaments.list(window, 0)) entries.push({ userId: ref.ownerUserId, content: toTournamentSummary(ref), createdAt: ref.createdAt });
+      }
+      const authors = deps.resolveProfiles([...new Set(entries.map((e) => e.userId))]);
+      const visible = entries
+        .flatMap((entry) => {
+          const author = authors.get(entry.userId);
+          if (!author) return [];
+          if (needle && !entry.content.name.toLowerCase().includes(needle)) return [];
+          return [{ userId: entry.userId, author, content: entry.content, createdAt: entry.createdAt }];
+        })
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      return {
+        items: visible.slice(offset, offset + limit).map(({ userId, author, content }) => ({ author: { ...author, userId }, content })),
+        nextOffset: offset + limit < visible.length ? offset + limit : null
+      };
+    },
+    searchPeople(viewerId, q, limit) {
+      const needle = q.trim();
+      if (!needle) return [];
+      const candidates = deps.searchUsernameOwners(needle, limit * 2).filter((id) => id !== viewerId);
+      const visible = candidates.filter((id) => repo.getProfileRow(id)?.published === 1).slice(0, limit);
+      const authors = deps.resolveProfiles(visible);
+      return visible.flatMap((id) => {
+        const user = authors.get(id);
+        if (!user) return [];
+        return [{ user: { ...user, userId: id }, followerCount: repo.countFollowers(id), viewerFollows: repo.getFollow(viewerId, id) !== undefined }];
+      });
     }
   };
 }
