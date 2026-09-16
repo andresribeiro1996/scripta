@@ -6,11 +6,11 @@ import { RequireUsername } from "./auth/RequireUsername";
 import { EdgeSwipeBack } from "./components/EdgeSwipeBack";
 import { DashboardLayout } from "./layouts/DashboardLayout";
 import { ArenaListPage } from "./pages/ArenaListPage";
-import { ArenaPublicListPage } from "./pages/ArenaPublicListPage";
 import { ArenaSeedPage } from "./pages/ArenaSeedPage";
 import { ArenaViewPage } from "./pages/ArenaViewPage";
 import { ChooseUsernamePage } from "./pages/ChooseUsernamePage";
 import { CollectionsPage } from "./pages/CollectionsPage";
+import { CommunityPage } from "./pages/CommunityPage";
 import { GalleryPage } from "./pages/GalleryPage";
 import { LibraryPage } from "./pages/LibraryPage";
 import { LibraryStylePage } from "./pages/LibraryStylePage";
@@ -38,7 +38,7 @@ export function App() {
         <Route path="/verify-email" element={<AccountActionPage key="verify" action="verify" />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/oauth-success" element={<OAuthSuccessPage />} />
-        <Route path="/arena" element={<ArenaPublicListPage />} />
+        <Route path="/arena" element={<Navigate to="/community?tab=discover" replace />} />
         <Route path="/arena/:id" element={<ArenaViewPage />} />
         {/* Public share-viewer pages — no session at all, so these must sit
             outside every RequireAuth/RequireUsername wrapper below, same as
@@ -76,6 +76,7 @@ export function App() {
               <Route path="/dashboard/arena/:id/seed" element={<ArenaSeedPage />} />
               <Route path="/dashboard/style" element={<LibraryStylePage />} />
               <Route path="/dashboard/settings" element={<SettingsPage />} />
+              <Route path="/community" element={<CommunityPage />} />
             </Route>
           </Route>
         </Route>

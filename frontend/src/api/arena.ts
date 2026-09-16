@@ -33,11 +33,6 @@ export async function fetchMyTournaments(): Promise<TournamentSummary[]> {
   return body.tournaments;
 }
 
-export async function fetchPublicTournaments(): Promise<TournamentSummary[]> {
-  const body = (await publicFetch("/arenas/public")) as { tournaments: TournamentSummary[] };
-  return body.tournaments;
-}
-
 /** Public — works with no session at all. `voterToken` lets the backend
  *  fill in each active duel's `hasVoted`. */
 export async function fetchTournament(id: string, voterToken: string): Promise<TournamentView> {

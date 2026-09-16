@@ -25,14 +25,6 @@ async function ballotFetch(path: string, init?: RequestInit): Promise<unknown> {
   return (getSession() ? apiFetch : publicFetch)(path, init);
 }
 
-export interface PublicTierlistSummary {
-  voteCode: string;
-  name: string;
-  poolSize: number;
-  ballotCount: number;
-  votingOpen: boolean;
-}
-
 export interface VotingBoard {
   name: string;
   tiers: Array<{ id: string; label: string; color: string }>;
@@ -50,12 +42,6 @@ export interface BallotResponse {
   ballotId: string;
   placements: Array<{ bookKey: string; tierId: string }>;
   results: { histogram: HistogramCell[]; ballotCount: number };
-}
-
-/** Public — the community voting directory (GET /tierlists/public). */
-export async function fetchPublicTierlists(): Promise<PublicTierlistSummary[]> {
-  const body = (await publicFetch("/tierlists/public")) as { tierlists: PublicTierlistSummary[] };
-  return body.tierlists;
 }
 
 /** Public — a voting board resolved by its vote code, books already

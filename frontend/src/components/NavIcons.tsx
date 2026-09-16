@@ -102,6 +102,17 @@ export function ArenaIcon({ size = 22 }: IconProps) {
   );
 }
 
+export function CommunityIcon({ size = 22 }: IconProps) {
+  return (
+    <svg {...svgProps(size)}>
+      <circle cx="9" cy="8.5" r="3" />
+      <path d="M3.5 19c.6-3 2.8-4.8 5.5-4.8s4.9 1.8 5.5 4.8" />
+      <circle cx="16.5" cy="9.5" r="2.4" />
+      <path d="M16.5 14.6c2.2.2 3.7 1.7 4.2 4" />
+    </svg>
+  );
+}
+
 /** A cog — settings. Toolbar.tsx's GearIcon carries the same mark (they
  *  must: it is the one settings glyph in the app), redrawn there from
  *  hub-and-spokes for the same reason. Radial ticks around a circle read
