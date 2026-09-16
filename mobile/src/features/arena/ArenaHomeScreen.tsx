@@ -65,16 +65,16 @@ export function ArenaHomeScreen() {
     <Stack.Screen
       options={{
         headerShown: true,
-        title: "Arena",
+        title: "Games",
         // The bottom tab already reads "Arena"; a large title spends a third of
         // the screen repeating it above a list that has nowhere else to go.
         headerLargeTitleEnabled: false,
-        headerRight: () => <IconButton accessibilityLabel="Browse public arena" label="Browse" name="public" onPress={() => router.push("/arena" as never)} />,
+        headerRight: () => <IconButton accessibilityLabel="Browse games" label="Browse" name="public" onPress={() => router.push("/arena" as never)} />,
       }}
     />
     {error ? <Toast visible message={error} tone="error" /> : null}
     <SwipeableTabs
-      accessibilityLabel="Arena section"
+      accessibilityLabel="Games section"
       options={ARENA_TABS}
       value={tab}
       onChange={setTab}
