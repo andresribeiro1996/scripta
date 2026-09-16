@@ -1,4 +1,4 @@
-// The six values one slot number decides. Any of them left at a default
+// The seven values one slot number decides. Any of them left at a default
 // reproduces the bug this whole scheme exists to kill: a frontend that
 // renders fine while reading another branch's database.
 
@@ -17,6 +17,15 @@ export function applySlotEnv({ repoRoot, ports, transport = "loopback", lanAddre
 
   upsertEnvLine(backendEnv, "PORT", String(ports.backend));
   upsertEnvLine(backendEnv, "FRONTEND_URL", `http://localhost:${ports.vite}`);
+  // The base every ABSOLUTE image url the API hands out is built on
+  // (covers' /covers/cached/:id/file, gallery's /gallery/:id/file, auth
+  // avatars). backend/.env.example pins it to localhost:3000 and
+  // ensureBackendEnv copies that line verbatim, so without this a
+  // non-default slot served cover urls pointing at whatever happens to
+  // own port 3000 — a 404 on a good day, another worktree's images on a
+  // bad one. Uses apiHost, not localhost, so these match the origin the
+  // mobile client is told to call in EXPO_PUBLIC_API_URL below.
+  upsertEnvLine(backendEnv, "PUBLIC_API_URL", `http://${apiHost}:${ports.backend}`);
   upsertEnvLine(frontendEnv, "VITE_API_PORT", String(ports.backend));
   // Vite's own listen port. Without this, Vite always binds the plugin
   // default (5173) no matter which slot backend/.env's FRONTEND_URL names,
