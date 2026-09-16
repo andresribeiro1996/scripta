@@ -6,7 +6,7 @@ import type { PublishedTournamentRef } from "../arena/service.js";
 import type { MuralPublicPayload } from "../murals/index.js";
 import type { CommunityRepository, CursorKeyset } from "./domain/ports.js";
 import type { EventRow, FollowRow, ProfileRow } from "./domain/types.js";
-import { NotFollowingError, ProfileNotFoundError, SelfFollowError } from "./domain/errors.js";
+import { MuralNotOwnedError, NotFollowingError, ProfileNotFoundError, SelfFollowError, UsernameRequiredError } from "./domain/errors.js";
 import { createCommunityService, type CommunityDeps } from "./service.js";
 
 function createRepoFake() {
@@ -180,4 +180,96 @@ test("emitEvent is idempotent per (ref_type, ref_id)", () => {
   service.emitEvent("alice", "tierlist_published", "tierlist", "t1");
   service.emitEvent("alice", "tournament_published", "tournament", "g1");
   assert.equal(events.length, 2);
+});
+
+const fakePayload = {} as MuralPublicPayload;
+
+test("publish requires a username, then an owned mural", () => {
+  const { repo, profiles } = createRepoFake();
+  const { deps, usernames, ownedMurals } = createDeps(repo);
+  const service = createCommunityService(deps);
+  profiles.set("alice", profileRow("alice", { published: 0 }));
+  assert.throws(() => service.publishProfile("alice", "m1"), UsernameRequiredError);
+  usernames.set("alice", "alice");
+  assert.throws(() => service.publishProfile("alice", "m1"), MuralNotOwnedError);
+  ownedMurals.add("alice:m1");
+  service.publishProfile("alice", "m1");
+  const row = repo.getProfileRow("alice")!;
+  assert.equal(row.published, 1);
+  assert.equal(row.mural_id, "m1");
+});
+
+test("republish swaps the mural and keeps the original published_at", () => {
+  const { repo } = createRepoFake();
+  const { deps, usernames, ownedMurals } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  ownedMurals.add("alice:m1");
+  ownedMurals.add("alice:m2");
+  service.publishProfile("alice", "m1");
+  const first = repo.getProfileRow("alice")!;
+  service.publishProfile("alice", "m2");
+  const second = repo.getProfileRow("alice")!;
+  assert.equal(second.mural_id, "m2");
+  assert.equal(second.published_at, first.published_at);
+});
+
+test("unpublish clears published, keeps the row, and is a no-op when never published", () => {
+  const { repo, profiles } = createRepoFake();
+  const { deps, usernames, ownedMurals } = createDeps(repo);
+  const service = createCommunityService(deps);
+  service.unpublishProfile("ghost");
+  profiles.set("alice", profileRow("alice"));
+  usernames.set("alice", "alice");
+  ownedMurals.add("alice:m1");
+  service.publishProfile("alice", "m1");
+  service.unpublishProfile("alice");
+  const row = repo.getProfileRow("alice")!;
+  assert.equal(row.published, 0);
+  assert.equal(row.mural_id, "m1");
+});
+
+test("getProfileByUsername assembles identity, mural, and published content", () => {
+  const { repo, profiles } = createRepoFake();
+  const { deps, readerProfiles, usernames, muralPayloads, tierlistRefs, tournamentRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  readerProfiles.set("alice", reader("alice"));
+  profiles.set("alice", profileRow("alice", { mural_id: "m1" }));
+  muralPayloads.set("alice:m1", fakePayload);
+  tierlistRefs.set("t1", tierRef("t1", "alice"));
+  tournamentRefs.set("g1", tournRef("g1", "alice"));
+  service.follow("bob", "alice");
+
+  const view = service.getProfileByUsername("alice", "bob");
+  assert.equal(view.profile.user.username, "user-alice");
+  assert.equal(view.profile.viewerFollows, true);
+  assert.equal(view.profile.followerCount, 1);
+  assert.equal(view.mural, fakePayload);
+  assert.deepEqual(view.published.tierlists.map((t) => t.id), ["t1"]);
+  assert.deepEqual(view.published.tournaments.map((t) => t.id), ["g1"]);
+
+  const anonymous = service.getProfileByUsername("alice");
+  assert.equal(anonymous.profile.viewerFollows, undefined);
+});
+
+test("getProfileByUsername 404s for unknown and unpublished profiles", () => {
+  const { repo, profiles } = createRepoFake();
+  const { deps } = createDeps(repo);
+  const service = createCommunityService(deps);
+  assert.throws(() => service.getProfileByUsername("ghost"), ProfileNotFoundError);
+  profiles.set("alice", profileRow("alice", { published: 0 }));
+  assert.throws(() => service.getProfileByUsername("alice"), ProfileNotFoundError);
+});
+
+test("a profile mural deleted later resolves to null without breaking the view", () => {
+  const { repo, profiles } = createRepoFake();
+  const { deps, readerProfiles, usernames } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  readerProfiles.set("alice", reader("alice"));
+  profiles.set("alice", profileRow("alice", { mural_id: "deleted" }));
+  const view = service.getProfileByUsername("alice");
+  assert.equal(view.mural, null);
+  assert.equal(view.profile.user.username, "user-alice");
 });
