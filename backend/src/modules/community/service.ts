@@ -1,12 +1,14 @@
 import { randomUUID } from "node:crypto";
 import type { ReaderProfile } from "@scripta/shared";
-import type { CommunityEventType, FollowState, PublishedProfile, TierlistSummary, TournamentSummary } from "@scripta/shared/community";
+import { decodeCursor, encodeCursor } from "@scripta/shared/community";
+import type { CommunityEventType, FeedItem, FollowState, Page, PublishedProfile, TierlistSummary, TournamentSummary } from "@scripta/shared/community";
 import type { PublishedTournamentRef } from "../arena/service.js";
 import type { MuralsPublicApi } from "../murals/publicApi.js";
 import type { MuralPublicPayload } from "../murals/index.js";
 import type { PublishedTierlistRef } from "../tierlists/service.js";
-import { MuralNotOwnedError, NotFollowingError, ProfileNotFoundError, SelfFollowError, UsernameRequiredError } from "./domain/errors.js";
+import { InvalidCursorError, MuralNotOwnedError, NotFollowingError, ProfileNotFoundError, SelfFollowError, UsernameRequiredError } from "./domain/errors.js";
 import type { CommunityRepository } from "./domain/ports.js";
+import type { EventRow } from "./domain/types.js";
 
 export type CommunityRefType = "tierlist" | "tournament";
 
@@ -22,6 +24,11 @@ function toTierlistSummary(ref: PublishedTierlistRef): TierlistSummary {
 
 function toTournamentSummary(ref: PublishedTournamentRef): TournamentSummary {
   return { kind: "tournament", id: ref.id, name: ref.name, bracketSize: ref.bracketSize, status: ref.status, bookCount: ref.bracketSize };
+}
+
+function byNewestFirst(a: EventRow, b: EventRow): number {
+  if (a.created_at !== b.created_at) return b.created_at.localeCompare(a.created_at);
+  return a.id < b.id ? 1 : -1;
 }
 
 export interface CommunityDeps {
@@ -52,6 +59,7 @@ export interface CommunityService {
   publishProfile(userId: string, muralId: string): void;
   unpublishProfile(userId: string): void;
   getProfileByUsername(username: string, viewerId?: string): PublicProfileView;
+  getFeed(viewerId: string, cursor: string | undefined, limit: number): Page<FeedItem>;
 }
 
 export function createCommunityService(deps: CommunityDeps): CommunityService {
@@ -116,6 +124,38 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
           tournaments: deps.tournaments.listByOwner(userId).map(toTournamentSummary)
         }
       };
+    },
+    getFeed(viewerId, cursor, limit) {
+      const keyset = cursor ? decodeCursor(cursor) : undefined;
+      if (cursor && !keyset) throw new InvalidCursorError();
+      const collected: EventRow[] = [];
+      for (const followeeId of repo.listFollowees(viewerId)) {
+        collected.push(...repo.listEventsByUser(followeeId, keyset, limit + 1));
+      }
+      collected.sort(byNewestFirst);
+      const items: FeedItem[] = [];
+      let nextCursor: string | null = null;
+      for (const event of collected) {
+        if (items.length === limit) {
+          const last = items[items.length - 1];
+          if (last) nextCursor = encodeCursor({ createdAt: last.createdAt, id: last.id });
+          break;
+        }
+        if (event.ref_type === "tierlist") {
+          const ref = deps.tierlists.get(event.ref_id);
+          const actor = ref && ref.ownerUserId === event.user_id ? deps.resolveProfiles([event.user_id]).get(event.user_id) : undefined;
+          if (ref && actor) {
+            items.push({ id: event.id, actor: { ...actor, userId: event.user_id }, type: event.type, content: toTierlistSummary(ref), createdAt: event.created_at });
+          }
+        } else {
+          const ref = deps.tournaments.get(event.ref_id);
+          const actor = ref && ref.ownerUserId === event.user_id ? deps.resolveProfiles([event.user_id]).get(event.user_id) : undefined;
+          if (ref && actor) {
+            items.push({ id: event.id, actor: { ...actor, userId: event.user_id }, type: event.type, content: toTournamentSummary(ref), createdAt: event.created_at });
+          }
+        }
+      }
+      return { items, nextCursor };
     }
   };
 }

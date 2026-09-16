@@ -6,7 +6,7 @@ import type { PublishedTournamentRef } from "../arena/service.js";
 import type { MuralPublicPayload } from "../murals/index.js";
 import type { CommunityRepository, CursorKeyset } from "./domain/ports.js";
 import type { EventRow, FollowRow, ProfileRow } from "./domain/types.js";
-import { MuralNotOwnedError, NotFollowingError, ProfileNotFoundError, SelfFollowError, UsernameRequiredError } from "./domain/errors.js";
+import { InvalidCursorError, MuralNotOwnedError, NotFollowingError, ProfileNotFoundError, SelfFollowError, UsernameRequiredError } from "./domain/errors.js";
 import { createCommunityService, type CommunityDeps } from "./service.js";
 
 function createRepoFake() {
@@ -272,4 +272,77 @@ test("a profile mural deleted later resolves to null without breaking the view",
   const view = service.getProfileByUsername("alice");
   assert.equal(view.mural, null);
   assert.equal(view.profile.user.username, "user-alice");
+});
+
+test("feed merges followees' events newest first and paginates by keyset", () => {
+  const { repo, profiles, events } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs, tournamentRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  profiles.set("alice", profileRow("alice"));
+  profiles.set("bob", profileRow("bob"));
+  readerProfiles.set("alice", reader("alice"));
+  readerProfiles.set("bob", reader("bob"));
+  tierlistRefs.set("t1", tierRef("t1", "alice", { createdAt: "2026-09-02T00:00:00.000Z" }));
+  tournamentRefs.set("g1", tournRef("g1", "bob", { createdAt: "2026-09-01T00:00:00.000Z" }));
+  events.push(
+    { id: "e1", user_id: "alice", type: "tierlist_published", ref_type: "tierlist", ref_id: "t1", created_at: "2026-09-02T00:00:00.000Z" },
+    { id: "e2", user_id: "bob", type: "tournament_published", ref_type: "tournament", ref_id: "g1", created_at: "2026-09-01T00:00:00.000Z" }
+  );
+  service.follow("me", "alice");
+  service.follow("me", "bob");
+
+  const page1 = service.getFeed("me", undefined, 1);
+  assert.equal(page1.items.length, 1);
+  assert.equal(page1.items[0]!.id, "e1");
+  assert.equal(page1.items[0]!.actor.username, "user-alice");
+  assert.equal(page1.items[0]!.content.kind, "tierlist");
+  assert.notEqual(page1.nextCursor, null);
+
+  const page2 = service.getFeed("me", page1.nextCursor!, 1);
+  assert.equal(page2.items.length, 1);
+  assert.equal(page2.items[0]!.id, "e2");
+  assert.equal(page2.items[0]!.content.kind, "tournament");
+  assert.equal(page2.nextCursor, null);
+});
+
+test("feed drops events whose content vanished", () => {
+  const { repo, profiles, events } = createRepoFake();
+  const { deps, readerProfiles } = createDeps(repo);
+  const service = createCommunityService(deps);
+  profiles.set("alice", profileRow("alice"));
+  readerProfiles.set("alice", reader("alice"));
+  events.push({ id: "e1", user_id: "alice", type: "tierlist_published", ref_type: "tierlist", ref_id: "gone", created_at: "2026-09-02T00:00:00.000Z" });
+  service.follow("me", "alice");
+  assert.deepEqual(service.getFeed("me", undefined, 10), { items: [], nextCursor: null });
+});
+
+test("feed drops events whose actor has no reader profile", () => {
+  const { repo, profiles, events } = createRepoFake();
+  const { deps, tierlistRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  profiles.set("alice", profileRow("alice"));
+  tierlistRefs.set("t1", tierRef("t1", "alice"));
+  events.push({ id: "e1", user_id: "alice", type: "tierlist_published", ref_type: "tierlist", ref_id: "t1", created_at: "2026-09-02T00:00:00.000Z" });
+  service.follow("me", "alice");
+  assert.deepEqual(service.getFeed("me", undefined, 10), { items: [], nextCursor: null });
+});
+
+test("feed ignores events from people you don't follow", () => {
+  const { repo, profiles, events } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  profiles.set("alice", profileRow("alice"));
+  profiles.set("bob", profileRow("bob"));
+  readerProfiles.set("bob", reader("bob"));
+  tierlistRefs.set("t1", tierRef("t1", "alice"));
+  events.push({ id: "e1", user_id: "alice", type: "tierlist_published", ref_type: "tierlist", ref_id: "t1", created_at: "2026-09-02T00:00:00.000Z" });
+  service.follow("me", "bob");
+  assert.deepEqual(service.getFeed("me", undefined, 10), { items: [], nextCursor: null });
+});
+
+test("an unparseable cursor is a 400-worthy error, not an empty page", () => {
+  const { repo } = createRepoFake();
+  const { deps } = createDeps(repo);
+  const service = createCommunityService(deps);
+  assert.throws(() => service.getFeed("me", "garbage", 10), InvalidCursorError);
 });
