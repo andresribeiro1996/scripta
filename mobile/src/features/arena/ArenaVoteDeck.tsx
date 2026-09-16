@@ -1,22 +1,15 @@
-import { useEffect, useState } from "react";
-import { Image } from "expo-image";
+import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { interpolate, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
-import type { Duel, DuelSide } from "@scripta/shared";
+import { countdownLabel, type Duel } from "@scripta/shared";
 import { commitHaptic } from "../../ui/haptics";
-import { Button, EmptyState, ModalBody, Sheet, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { Button, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { BookCover } from "./BookCover";
 
 const SWIPE_THRESHOLD = 120;
 const FLY_OUT_DISTANCE = 500;
-
-function Cover({ side }: { side: DuelSide }) {
-  const { colors } = useTheme();
-  return side.cover
-    ? <Image source={side.cover} style={styles.cover} contentFit="cover" />
-    : <View style={[styles.cover, styles.coverFallback, { backgroundColor: colors.accentSoft }]}><Text {...dynamicType} style={{ color: colors.accent }}>{side.title.charAt(0)}</Text></View>;
-}
 
 function VoteCard({ duel, disabled, onVote }: { duel: Duel; disabled: boolean; onVote: (bookKey: string) => void }) {
   const { colors } = useTheme();
@@ -24,6 +17,7 @@ function VoteCard({ duel, disabled, onVote }: { duel: Duel; disabled: boolean; o
 
   const gesture = Gesture.Pan()
     .enabled(!disabled)
+    // Horizontal only: a vertical drag belongs to the pane's own scroll.
     .activeOffsetX([-10, 10])
     .failOffsetY([-15, 15])
     .onUpdate((event) => { x.value = event.translationX; })
@@ -47,6 +41,7 @@ function VoteCard({ duel, disabled, onVote }: { duel: Duel; disabled: boolean; o
 
   return (
     <View style={styles.cardWrap}>
+      <Text {...dynamicType} style={[typography.caption, styles.center, { color: colors.textDim }]}>Round {duel.roundNumber} · Match {duel.duelIndex + 1} · {countdownLabel(duel.closesAt)}</Text>
       <GestureDetector gesture={gesture}>
         <Animated.View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }, cardStyle]}>
           <Animated.View pointerEvents="none" style={[styles.badge, styles.badgeLeft, { borderColor: colors.success, backgroundColor: colors.successSoft }, leftBadge]}>
@@ -57,13 +52,13 @@ function VoteCard({ duel, disabled, onVote }: { duel: Duel; disabled: boolean; o
           </Animated.View>
           <View style={styles.halves}>
             <View style={styles.half}>
-              <Cover side={duel.bookA} />
+              <BookCover cover={duel.bookA.cover} title={duel.bookA.title} width={104} height={150} />
               <Text numberOfLines={2} {...dynamicType} style={[typography.body, styles.strong, styles.center, { color: colors.text }]}>{duel.bookA.title}</Text>
               <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.center, { color: colors.textDim }]}>{duel.bookA.author}</Text>
             </View>
             <Text {...dynamicType} style={[typography.title, { color: colors.textDim }]}>vs</Text>
             <View style={styles.half}>
-              <Cover side={duel.bookB} />
+              <BookCover cover={duel.bookB.cover} title={duel.bookB.title} width={104} height={150} />
               <Text numberOfLines={2} {...dynamicType} style={[typography.body, styles.strong, styles.center, { color: colors.text }]}>{duel.bookB.title}</Text>
               <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.center, { color: colors.textDim }]}>{duel.bookB.author}</Text>
             </View>
@@ -72,52 +67,25 @@ function VoteCard({ duel, disabled, onVote }: { duel: Duel; disabled: boolean; o
       </GestureDetector>
       <Text {...dynamicType} style={[typography.caption, styles.center, { color: colors.textDim }]}>Swipe left or right to pick a winner</Text>
       <View style={styles.buttonsRow}>
-        <Button label={`${duel.bookA.title} wins`} variant="secondary" disabled={disabled} onPress={() => onVote(duel.bookA.key)} />
-        <Button label={`${duel.bookB.title} wins`} variant="secondary" disabled={disabled} onPress={() => onVote(duel.bookB.key)} />
+        <Button label={`${duel.bookA.title} wins`} variant="secondary" loading={disabled} onPress={() => onVote(duel.bookA.key)} />
+        <Button label={`${duel.bookB.title} wins`} variant="secondary" loading={disabled} onPress={() => onVote(duel.bookB.key)} />
       </View>
     </View>
   );
 }
 
-export function ArenaVoteModal({ visible, duels, busy, error, onVote, onClose }: {
-  visible: boolean;
-  duels: Duel[];
-  busy: string | null;
-  error: string | null;
-  onVote: (duel: Duel, bookKey: string) => Promise<boolean>;
-  onClose: () => void;
-}) {
-  const [queue, setQueue] = useState<Duel[]>(duels);
-  const [total, setTotal] = useState(duels.length);
+/** One card at a time, remounted per attempt: a swipe animates the card off
+ *  screen, so both the next duel and a retry of this one need a fresh one
+ *  back at centre. */
+export function ArenaVoteDeck({ duel, disabled, onVote }: { duel: Duel; disabled: boolean; onVote: (bookKey: string) => void }) {
   const [attempt, setAttempt] = useState(0);
-
-  useEffect(() => {
-    if (visible) {
-      setQueue(duels);
-      setTotal(duels.length);
-    }
-    // Deliberately not depending on `duels`: the queue should hold steady for
-    // the length of a voting session even as background polling refreshes it.
-  }, [visible]);
-
-  const current = queue[0] ?? null;
-
-  async function vote(bookKey: string) {
-    if (!current || busy) return;
-    setAttempt((n) => n + 1);
-    const ok = await onVote(current, bookKey);
-    if (ok) setQueue((remaining) => remaining.slice(1));
-  }
-
   return (
-    <Sheet visible={visible} title={current ? `Vote · ${total - queue.length + 1} of ${total}` : "Voting"} onClose={onClose}>
-      <ModalBody>
-        {error ? <Toast visible message={error} tone="error" /> : null}
-        {current
-          ? <VoteCard key={`${current.id}:${attempt}`} duel={current} disabled={busy === current.id} onVote={(bookKey) => void vote(bookKey)} />
-          : <EmptyState title="All caught up" body="No matches left to vote on right now." actionLabel="Done" onAction={onClose} />}
-      </ModalBody>
-    </Sheet>
+    <VoteCard
+      key={`${duel.id}:${attempt}`}
+      duel={duel}
+      disabled={disabled}
+      onVote={(bookKey) => { setAttempt((n) => n + 1); onVote(bookKey); }}
+    />
   );
 }
 
@@ -126,8 +94,6 @@ const styles = StyleSheet.create({
   card: { borderWidth: 1, borderRadius: radii.lg, padding: spacing.lg },
   halves: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   half: { flex: 1, alignItems: "center", gap: spacing.xs },
-  cover: { width: 96, height: 136, borderRadius: radii.md },
-  coverFallback: { alignItems: "center", justifyContent: "center" },
   strong: { fontWeight: "700" },
   center: { textAlign: "center" },
   badge: { position: "absolute", top: spacing.md, zIndex: 1, borderWidth: 2, borderRadius: radii.md, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
