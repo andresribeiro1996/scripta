@@ -26,6 +26,10 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
   const listPublicStmt = db.prepare(
     `SELECT * FROM tierlists WHERE vote_code IS NOT NULL ORDER BY created_at DESC LIMIT ? OFFSET ?`
   );
+  const getPublicByIdStmt = db.prepare(`SELECT * FROM tierlists WHERE id = ? AND source_tierlist_id IS NOT NULL`);
+  const listPublicByUserStmt = db.prepare(
+    `SELECT * FROM tierlists WHERE owner_user_id = ? AND source_tierlist_id IS NOT NULL ORDER BY created_at DESC`
+  );
   const setVotingStmt = db.prepare(`
     UPDATE tierlists SET vote_access = $vote_access, voting_open = $voting_open, updated_at = $updated_at
     WHERE id = $id AND owner_user_id = $owner_user_id
@@ -166,6 +170,14 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
 
     listPublic(limit, offset) {
       return listPublicStmt.all(limit, offset) as unknown as TierlistRow[];
+    },
+
+    getPublicById(id) {
+      return getPublicByIdStmt.get(id) as TierlistRow | undefined;
+    },
+
+    listPublicByUser(ownerUserId) {
+      return listPublicByUserStmt.all(ownerUserId) as unknown as TierlistRow[];
     },
 
     getBallotById(tierlistId, ballotId) {

@@ -65,6 +65,16 @@ function createInMemoryRepo(): TierlistsRepository {
         .slice(offset, offset + limit);
     },
 
+    getPublicById(id) {
+      return [...tierlists.values()].find((t) => t.id === id && t.source_tierlist_id !== null);
+    },
+
+    listPublicByUser(ownerUserId) {
+      return [...tierlists.values()]
+        .filter((t) => t.owner_user_id === ownerUserId && t.source_tierlist_id !== null)
+        .sort((a, b) => b.created_at.localeCompare(a.created_at));
+    },
+
     getBallotById(tierlistId, ballotId) {
       const b = ballots.get(ballotId);
       return b && b.tierlist_id === tierlistId ? b : undefined;
@@ -486,4 +496,32 @@ test("listPublicTierlists returns community copies only, newest first", () => {
   assert.equal(listed[0]?.poolSize, 2);
   assert.equal(listed[0]?.ballotCount, 1);
   assert.equal(listed[0]?.votingOpen, true);
+});
+
+test("openVoting emits exactly one publish event for the community copy", () => {
+  const emitted: Array<[string, string]> = [];
+  const service = createTierlistsService(createInMemoryRepo(), (copyId, ownerUserId) => {
+    emitted.push([copyId, ownerUserId]);
+  });
+  const original = service.createTierlist("u1", "Fantasy");
+
+  const copy = service.openVoting("u1", original.id, "anonymous");
+
+  assert.ok(copy);
+  assert.deepEqual(emitted, [[copy.id, "u1"]]);
+});
+
+test("published refs carry owner + timestamps; ordinary lists are excluded", () => {
+  const service = makeService();
+  const ordinary = service.createTierlist("u1", "Private list");
+  const copy = service.openVoting("u1", ordinary.id, "anonymous")!;
+
+  const refs = service.listPublishedRefs(20, 0);
+
+  assert.deepEqual(refs.map((r) => r.id), [copy.id]);
+  assert.equal(refs[0]?.ownerUserId, "u1");
+  assert.equal(refs[0]?.createdAt, copy.createdAt);
+  assert.equal(service.getPublishedRef(ordinary.id), undefined);
+  assert.equal(service.getPublishedRef(copy.id)?.name, "Private list (community)");
+  assert.deepEqual(service.listPublishedRefsByOwner("u1").map((r) => r.id), [copy.id]);
 });

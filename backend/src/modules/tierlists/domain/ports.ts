@@ -31,6 +31,8 @@ export interface TierlistsRepository {
   setVoting(id: string, userId: string, patch: { vote_access?: VoteAccess; voting_open?: number }): TierlistRow | undefined;
   /** Every community copy, newest first. Ordinary tier lists are excluded. */
   listPublic(limit: number, offset: number): TierlistRow[];
+  getPublicById(id: string): TierlistRow | undefined;
+  listPublicByUser(ownerUserId: string): TierlistRow[];
   getBallotById(tierlistId: string, ballotId: string): BallotRow | undefined;
   getBallotByVoter(tierlistId: string, voterUserId: string): BallotRow | undefined;
   /** Insert-or-replace a ballot and REPLACE its placements wholesale (a

@@ -10,6 +10,7 @@ import type { TierlistData } from "../tierlists/index.js";
 import { createSqliteMuralsRepository } from "./adapters/sqlite/sqliteMuralsRepository.js";
 import { openMuralsDb } from "./adapters/sqlite/connection.js";
 import { buildMuralRoutes, buildPublicMuralRoutes } from "./routes.js";
+import { createMuralsPublicApi, type MuralsPublicApi } from "./publicApi.js";
 import { createMuralsService } from "./service.js";
 
 /** Optional wiring handed in by app.ts when the tierlists module is
@@ -47,4 +48,13 @@ export async function muralsPlugin(app: FastifyInstance, opts: MuralsPluginOptio
     await scoped.register(fastifyRateLimit, { max: 30, timeWindow: "1 minute" });
     await scoped.register(buildPublicMuralRoutes(muralsService, opts.getTierlistData));
   });
+}
+
+let cachedPublicApi: MuralsPublicApi | null = null;
+
+export function getMuralsPublicApi(getTierlistData?: (ownerUserId: string, tierlistId: string) => TierlistData | undefined): MuralsPublicApi {
+  if (!cachedPublicApi) {
+    cachedPublicApi = createMuralsPublicApi(createSqliteMuralsRepository(openMuralsDb()), getTierlistData);
+  }
+  return cachedPublicApi;
 }

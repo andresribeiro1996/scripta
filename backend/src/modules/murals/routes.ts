@@ -22,17 +22,10 @@
 
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { env } from "../../config/env.js";
-import { authGuard, resolvePublicReaderProfile } from "../auth/index.js";
-// Cross-module dependency, same as authGuard above: resolvePublicLibraryData
-// is library's own PUBLIC surface for exactly this — see
-// modules/library/publicResolver.ts's top comment for the privacy
-// boundary it enforces. Never reach into modules/library's internals
-// (service.ts, adapters/, domain/) from here.
-import { resolvePublicLibraryData } from "../library/index.js";
+import { authGuard } from "../auth/index.js";
 import type { TierlistData } from "../tierlists/index.js";
-import { extractReferences } from "./domain/blockRefs.js";
 import { FolderCycleError, InvalidFolderReferenceError, MuralConflictError } from "./domain/errors.js";
+import { resolveMuralPublicPayload } from "./domain/publicPayload.js";
 import type { MuralsService } from "./service.js";
 
 const idParamSchema = z.object({ id: z.string().uuid() });
@@ -314,80 +307,18 @@ export function buildPublicMuralRoutes(service: MuralsService, getTierlistData?:
       // top comments (murals/domain/blockRefs.ts,
       // modules/library/publicResolver.ts) for exactly what is and isn't
       // safe to include in the response built from them.
-      const refs = extractReferences(blocks);
-
-      // Tier-list blocks: same resolve-server-side idea as the library
-      // refs — the block carries only a tierlistId, and the raw
-      // {name, tiers, pool} document goes out under `tierlists` keyed by
-      // that id. Resolved BEFORE the library call because tiers/pool
-      // hold book KEYS the library resolver must also see, or the
-      // shared page would have the tier list but none of its books. A
-      // dangling id (tier list deleted since the mural last saved) is
-      // simply omitted, which the frontend renders as the block's
-      // unavailable state — a shared mural going quietly stale beats
-      // a 500.
-      const tierlistIds: string[] = [];
-      if (Array.isArray(blocks)) {
-        for (const block of blocks) {
-          if (!block || typeof block !== "object") continue;
-          const candidate = block as { type?: unknown; tierlistId?: unknown };
-          if (candidate.type !== "tierlist" || typeof candidate.tierlistId !== "string" || !candidate.tierlistId) continue;
-          if (!tierlistIds.includes(candidate.tierlistId)) tierlistIds.push(candidate.tierlistId);
-        }
-      }
-      const tierlists = Object.fromEntries(
-        tierlistIds
-          .map((id) => [id, getTierlistData?.(row.user_id, id)] as const)
-          .filter((entry): entry is readonly [string, TierlistData] => entry[1] !== undefined)
-      );
-      const tierlistBookKeys = new Set<string>();
-      for (const tierlist of Object.values(tierlists)) {
-        for (const key of tierlist.pool) tierlistBookKeys.add(key);
-        for (const tier of tierlist.tiers) for (const key of tier.bookKeys) tierlistBookKeys.add(key);
-      }
-
-      const libraryData = resolvePublicLibraryData(row.user_id, {
-        bookKeys: [...refs.bookKeys, ...tierlistBookKeys],
-        collectionIds: [...refs.collectionIds],
-        highlightRefs: refs.highlightRefs,
-        needsCurrentlyReading: refs.needsCurrentlyReading,
-        statsMetrics: [...refs.statsMetrics],
-        needsShelfTheme: refs.needsShelfTheme
-      });
-
-      // Gallery images: no second cross-module resolver — GET
-      // /gallery/:id/file (modules/gallery/routes.ts) is already public
-      // and unauthenticated, so a referenced image id is just templated
-      // directly into that URL, with no existence check here. A deleted
-      // image's id simply 404s on load client-side, matching that
-      // route's own documented intended behavior.
-      const imageIds = [...refs.imageIds, ...(row.cover_image_id ? [row.cover_image_id] : [])];
-      const imageUrls = Object.fromEntries(imageIds.map((id) => [id, `${env.PUBLIC_API_URL}/gallery/${id}/file`]));
-
+      const payload = resolveMuralPublicPayload(row, blocks, getTierlistData);
       reply.header("Cache-Control", "no-store");
       return reply.send({
-        mural: {
-          id: row.id,
-          name: row.name,
-          blocks: Array.isArray(blocks) ? blocks.map((block) => {
-            if (!block || typeof block !== "object") return block;
-            if (block.type === "quote" && block.mode === "rediscover") return { id: block.id, type: "text", layout: block.layout, style: block.style, heading: "Private passage", body: "Rediscovered passages are only visible to the owner." };
-            if (block.type === "shelf" && typeof block.collectionId === "string") {
-              const { collectionId, ...rest } = block;
-              return { ...rest, bookKeys: libraryData.collectionBooks?.[collectionId] ?? [] };
-            }
-            return block;
-          }) : [],
-          coverImageUrl: row.cover_image_id ? imageUrls[row.cover_image_id] : row.cover_image_url
-        },
-        books: libraryData.books,
-        highlights: libraryData.highlights,
-        currentlyReading: libraryData.currentlyReading,
-        stats: libraryData.stats,
-        shelfTheme: libraryData.shelfTheme,
-        profile: refs.needsShelfTheme ? resolvePublicReaderProfile(row.user_id) : undefined,
-        imageUrls,
-        tierlists
+        mural: payload.mural,
+        books: payload.library.books,
+        highlights: payload.library.highlights,
+        currentlyReading: payload.library.currentlyReading,
+        stats: payload.library.stats,
+        shelfTheme: payload.library.shelfTheme,
+        profile: payload.profile,
+        imageUrls: payload.imageUrls,
+        tierlists: payload.tierlists
       });
     });
   };

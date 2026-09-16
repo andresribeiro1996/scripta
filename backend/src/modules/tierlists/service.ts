@@ -49,6 +49,17 @@ export interface PublicTierlistSummary {
   votingOpen: boolean;
 }
 
+export interface PublishedTierlistRef {
+  id: string;
+  ownerUserId: string;
+  createdAt: string;
+  voteCode: string;
+  name: string;
+  poolSize: number;
+  ballotCount: number;
+  votingOpen: boolean;
+}
+
 export interface TierlistsService {
   listTierlists(userId: string): Tierlist[];
   createTierlist(userId: string, name: string): Tierlist;
@@ -72,6 +83,9 @@ export interface TierlistsService {
   getResults(tierlistId: string): { histogram: HistogramCell[]; ballotCount: number };
   getVotingBoard(code: string): VotingBoard | undefined;
   listPublicTierlists(limit: number, offset: number): PublicTierlistSummary[];
+  listPublishedRefs(limit: number, offset: number): PublishedTierlistRef[];
+  getPublishedRef(id: string): PublishedTierlistRef | undefined;
+  listPublishedRefsByOwner(ownerUserId: string): PublishedTierlistRef[];
 }
 
 /** Where a new tier list starts — the familiar S–D ladder, matching the
@@ -112,7 +126,25 @@ function readDocument(tierlist: Tierlist): TierlistDocument {
   return { tiers: data.tiers ?? [], pool: data.pool ?? [] };
 }
 
-export function createTierlistsService(repo: TierlistsRepository): TierlistsService {
+function toPublishedRef(row: TierlistRow, ballotCount: number): PublishedTierlistRef {
+  const { tiers, pool } = readDocument(toTierlist(row));
+  const keys = new Set(pool);
+  for (const tier of tiers) for (const key of tier.bookKeys) keys.add(key);
+  return {
+    id: row.id,
+    ownerUserId: row.owner_user_id,
+    createdAt: row.created_at,
+    voteCode: row.vote_code!,
+    name: row.name,
+    poolSize: keys.size,
+    ballotCount,
+    votingOpen: row.voting_open === 1
+  };
+}
+
+export type EmitPublished = (communityCopyId: string, ownerUserId: string) => void;
+
+export function createTierlistsService(repo: TierlistsRepository, emitPublished?: EmitPublished): TierlistsService {
   return {
     listTierlists(userId) {
       return repo.listByUser(userId).map(toTierlist);
@@ -203,6 +235,7 @@ export function createTierlistsService(repo: TierlistsRepository): TierlistsServ
       };
 
       repo.insertCommunityCopy(copy, ballot, placements);
+      emitPublished?.(copy.id, userId);
       return toTierlist(copy);
     },
 
@@ -292,17 +325,24 @@ export function createTierlistsService(repo: TierlistsRepository): TierlistsServ
     listPublicTierlists(limit, offset) {
       const counts = repo.ballotCountsByTierlist();
       return repo.listPublic(limit, offset).map((row) => {
-        const { tiers, pool } = readDocument(toTierlist(row));
-        const keys = new Set(pool);
-        for (const tier of tiers) for (const key of tier.bookKeys) keys.add(key);
-        return {
-          voteCode: row.vote_code!,
-          name: row.name,
-          poolSize: keys.size,
-          ballotCount: counts.get(row.id) ?? 0,
-          votingOpen: row.voting_open === 1
-        };
+        const ref = toPublishedRef(row, counts.get(row.id) ?? 0);
+        return { voteCode: ref.voteCode, name: ref.name, poolSize: ref.poolSize, ballotCount: ref.ballotCount, votingOpen: ref.votingOpen };
       });
+    },
+
+    listPublishedRefs(limit, offset) {
+      const counts = repo.ballotCountsByTierlist();
+      return repo.listPublic(limit, offset).map((row) => toPublishedRef(row, counts.get(row.id) ?? 0));
+    },
+
+    getPublishedRef(id) {
+      const row = repo.getPublicById(id);
+      return row ? toPublishedRef(row, repo.ballotCount(id)) : undefined;
+    },
+
+    listPublishedRefsByOwner(ownerUserId) {
+      const counts = repo.ballotCountsByTierlist();
+      return repo.listPublicByUser(ownerUserId).map((row) => toPublishedRef(row, counts.get(row.id) ?? 0));
     }
   };
 }
@@ -326,6 +366,9 @@ export interface TierlistData {
  *  codebase already follows. */
 export interface TierlistsPublicApi {
   getTierlistData(ownerUserId: string, tierlistId: string): TierlistData | undefined;
+  listPublished(limit: number, offset: number): PublishedTierlistRef[];
+  getPublished(id: string): PublishedTierlistRef | undefined;
+  listPublishedByOwner(ownerUserId: string): PublishedTierlistRef[];
 }
 
 /** Factory over the service. app.ts can't call this directly — it has no
@@ -338,6 +381,9 @@ export function createTierlistsPublicApi(service: TierlistsService): TierlistsPu
       if (!tierlist) return undefined;
       const data = (tierlist.data ?? {}) as Partial<Pick<TierlistData, "tiers" | "pool">>;
       return { name: tierlist.name, tiers: data.tiers ?? [], pool: data.pool ?? [] };
-    }
+    },
+    listPublished: (limit, offset) => service.listPublishedRefs(limit, offset),
+    getPublished: (id) => service.getPublishedRef(id),
+    listPublishedByOwner: (ownerUserId) => service.listPublishedRefsByOwner(ownerUserId)
   };
 }
