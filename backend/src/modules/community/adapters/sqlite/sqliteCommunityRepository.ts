@@ -53,7 +53,7 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
 
   return {
     insertFollow(row) {
-      insertFollowStmt.run({ $follower_id: row.follower_id, $followee_id: row.followee_id, $created_at: row.created_at });
+      return insertFollowStmt.run({ $follower_id: row.follower_id, $followee_id: row.followee_id, $created_at: row.created_at }).changes > 0;
     },
     deleteFollow(followerId, followeeId) {
       return deleteFollowStmt.run(followerId, followeeId).changes > 0;

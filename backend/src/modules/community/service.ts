@@ -1,24 +1,35 @@
 import { randomUUID } from "node:crypto";
 import type { ReaderProfile } from "@scripta/shared";
-import { decodeCursor, encodeCursor } from "@scripta/shared/community";
-import type { CommunityEventType, DiscoverItem, DiscoverType, FollowState, PersonResult, PublishedContent, PublishedProfile, TierlistSummary, TournamentSummary } from "@scripta/shared/community";
+import { categoryFor, decodeCursor, encodeCursor, DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
+import type { ActivityEventType, ActivityItem, CommunityEventType, DiscoverItem, DiscoverType, FeedSettings, FollowState, Page, PersonResult, PublishedContent, PublishedProfile, TierlistSummary, TournamentSummary } from "@scripta/shared/community";
 import type { DashboardFeedPage, DigestItem } from "@scripta/shared/dashboard";
 import type { PublishedTournamentRef } from "../arena/service.js";
 import type { MuralsPublicApi } from "../murals/publicApi.js";
 import type { MuralPublicPayload } from "../murals/index.js";
 import type { PublishedTierlistRef } from "../tierlists/service.js";
 import { InvalidCursorError, MuralNotOwnedError, NotFollowingError, ProfileNotFoundError, SelfFollowError, UsernameRequiredError } from "./domain/errors.js";
-import type { CommunityRepository } from "./domain/ports.js";
+import type { CommunityRepository, CursorKeyset } from "./domain/ports.js";
 import type { EventRow, FollowRow } from "./domain/types.js";
 
 const DISCOVER_SCAN_CAP = 500;
 
-export type CommunityRefType = "tierlist" | "tournament";
+export type CommunityRefType = "tierlist" | "tournament" | "book" | "user" | "mural";
+
+function parseEventPayload(raw: string | null): Record<string, unknown> | undefined {
+  if (raw === null) return {};
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>) : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 export interface PublicProfileView {
   profile: PublishedProfile;
   mural: MuralPublicPayload | null;
   published: { tierlists: TierlistSummary[]; tournaments: TournamentSummary[] };
+  feedSettings?: FeedSettings;
 }
 
 function toTierlistSummary(ref: PublishedTierlistRef): TierlistSummary {
@@ -55,7 +66,7 @@ export interface CommunityService {
   follow(followerId: string, followeeId: string): void;
   unfollow(followerId: string, followeeId: string): void;
   getFollowState(viewerId: string, userId: string): FollowState;
-  emitEvent(userId: string, type: CommunityEventType, refType: CommunityRefType, refId: string): void;
+  emitEvent(userId: string, type: ActivityEventType, refType: CommunityRefType, refId: string, payload?: Record<string, unknown>): void;
   publishProfile(userId: string, muralId: string): void;
   unpublishProfile(userId: string): void;
   getProfileByUsername(username: string, viewerId?: string): PublicProfileView;
@@ -63,16 +74,27 @@ export interface CommunityService {
   markDashboardSeen(viewerId: string): void;
   getDiscover(type: DiscoverType, q: string, limit: number, offset: number): { items: DiscoverItem[]; nextOffset: number | null };
   searchPeople(viewerId: string, q: string, limit: number): PersonResult[];
+  getActivity(username: string, viewerId: string | undefined, cursor: string | undefined, limit: number): Page<ActivityItem>;
+  getFeedSettings(userId: string): FeedSettings;
+  updateFeedSettings(userId: string, settings: FeedSettings): void;
 }
 
 export function createCommunityService(deps: CommunityDeps): CommunityService {
   const { repo } = deps;
+  const emit = (userId: string, type: ActivityEventType, refType: CommunityRefType, refId: string, payload?: Record<string, unknown>): void => {
+    repo.insertEvent({ id: randomUUID(), user_id: userId, type, ref_type: refType, ref_id: refId, payload: payload ? JSON.stringify(payload) : null, created_at: new Date().toISOString() });
+  };
+  const settingsFor = (userId: string): FeedSettings => repo.getFeedSettings(userId) ?? DEFAULT_FEED_SETTINGS;
   return {
     follow(followerId, followeeId) {
       if (followerId === followeeId) throw new SelfFollowError();
       const row = repo.getProfileRow(followeeId);
       if (!row || row.published !== 1) throw new ProfileNotFoundError();
-      repo.insertFollow({ follower_id: followerId, followee_id: followeeId, created_at: new Date().toISOString() });
+      const inserted = repo.insertFollow({ follower_id: followerId, followee_id: followeeId, created_at: new Date().toISOString() });
+      if (inserted) {
+        const author = deps.resolveProfiles([followeeId]).get(followeeId);
+        emit(followerId, "following", "user", followeeId, { username: author?.username ?? "" });
+      }
     },
     unfollow(followerId, followeeId) {
       if (!repo.deleteFollow(followerId, followeeId)) throw new NotFollowingError();
@@ -84,13 +106,12 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
         followingCount: repo.countFollowing(userId)
       };
     },
-    emitEvent(userId, type, refType, refId) {
-      repo.insertEvent({ id: randomUUID(), user_id: userId, type, ref_type: refType, ref_id: refId, payload: null, created_at: new Date().toISOString() });
-    },
+    emitEvent: emit,
     publishProfile(userId, muralId) {
       if (!deps.userHasUsername(userId)) throw new UsernameRequiredError();
       if (!deps.murals.ownsMural(userId, muralId)) throw new MuralNotOwnedError();
       const existing = repo.getProfileRow(userId);
+      const previousMuralId = existing?.mural_id ?? null;
       const now = new Date().toISOString();
       repo.upsertProfile({
         user_id: userId,
@@ -100,6 +121,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
         updated_at: now,
         feed_settings: existing?.feed_settings ?? null
       });
+      if (previousMuralId !== muralId) emit(userId, "mural_published", "mural", muralId);
     },
     unpublishProfile(userId) {
       const existing = repo.getProfileRow(userId);
@@ -114,7 +136,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
       const author = deps.resolveProfiles([userId]).get(userId);
       if (!author) throw new ProfileNotFoundError();
       const mural = row.mural_id ? deps.murals.getMuralPublicPayload(userId, row.mural_id) : null;
-      return {
+      const view: PublicProfileView = {
         profile: {
           user: { ...author, userId },
           publishedAt: row.published_at ?? row.updated_at,
@@ -128,6 +150,8 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
           tournaments: deps.tournaments.listByOwner(userId).map(toTournamentSummary)
         }
       };
+      if (viewerId === userId) view.feedSettings = settingsFor(userId);
+      return view;
     },
     getDashboard(viewerId, cursor, limit) {
       const keyset = cursor ? decodeCursor(cursor) : undefined;
@@ -146,6 +170,15 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
         if (row.follow) actorIds.add(row.follow.follower_id);
       }
       const profiles = deps.resolveProfiles([...actorIds]);
+      const hiddenPublications = new Map<string, boolean>();
+      const hidesPublications = (actorId: string): boolean => {
+        let hidden = hiddenPublications.get(actorId);
+        if (hidden === undefined) {
+          hidden = !settingsFor(actorId).publications;
+          hiddenPublications.set(actorId, hidden);
+        }
+        return hidden;
+      };
       const items: DigestItem[] = [];
       let nextCursor: string | null = null;
       let lastIncluded: Row | undefined;
@@ -156,6 +189,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
         }
         if (row.event) {
           const event = row.event;
+          if (hidesPublications(event.user_id)) continue;
           if (event.ref_type === "tierlist") {
             const ref = deps.tierlists.get(event.ref_id);
             const actor = ref && ref.ownerUserId === event.user_id ? profiles.get(event.user_id) ?? (ref.promotedAt ? { username: "Original creator unavailable", avatarUrl: null, unavailable: true } : undefined) : undefined;
@@ -221,18 +255,75 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
         if (!user) return [];
         return [{ user: { ...user, userId: id }, followerCount: repo.countFollowers(id), viewerFollows: repo.getFollow(viewerId, id) !== undefined }];
       });
+    },
+    getActivity(username, viewerId, cursor, limit) {
+      const userId = deps.findUserIdByUsername(username);
+      if (!userId) throw new ProfileNotFoundError();
+      const row = repo.getProfileRow(userId);
+      if (!row || row.published !== 1) throw new ProfileNotFoundError();
+      const keyset = cursor ? decodeCursor(cursor) : undefined;
+      if (cursor && !keyset) throw new InvalidCursorError();
+      const owner = viewerId === userId;
+      const settings = settingsFor(userId);
+      const toActivityItem = (event: EventRow): ActivityItem | undefined => {
+        if (!owner && !settings[categoryFor(event.type)]) return undefined;
+        if (event.type === "tierlist_published") {
+          const ref = deps.tierlists.get(event.ref_id);
+          if (!ref || ref.ownerUserId !== event.user_id) return undefined;
+          const payload: Record<string, unknown> = { ...parseEventPayload(event.payload), name: ref.name };
+          if (ref.voteCode) payload.href = `/vote/${ref.voteCode}`;
+          return { id: event.id, type: event.type, payload, createdAt: event.created_at };
+        }
+        if (event.type === "tournament_published") {
+          const ref = deps.tournaments.get(event.ref_id);
+          if (!ref || ref.ownerUserId !== event.user_id) return undefined;
+          return { id: event.id, type: event.type, payload: { ...parseEventPayload(event.payload), name: ref.name, href: `/arena/${ref.id}` }, createdAt: event.created_at };
+        }
+        const payload = parseEventPayload(event.payload);
+        return payload === undefined ? undefined : { id: event.id, type: event.type, payload, createdAt: event.created_at };
+      };
+      const items: ActivityItem[] = [];
+      let nextCursor: string | null = null;
+      let lastIncluded: EventRow | undefined;
+      let fetchAfter: CursorKeyset | undefined = keyset;
+      for (;;) {
+        const batch = repo.listEventsByUser(userId, fetchAfter, limit + 1);
+        if (batch.length === 0) break;
+        let exhausted = false;
+        for (const event of batch) {
+          const item = toActivityItem(event);
+          if (!item) continue;
+          if (items.length === limit) {
+            if (lastIncluded) nextCursor = encodeCursor({ createdAt: lastIncluded.created_at, id: lastIncluded.id });
+            exhausted = true;
+            break;
+          }
+          items.push(item);
+          lastIncluded = event;
+        }
+        if (exhausted || batch.length <= limit) break;
+        const last = batch[batch.length - 1]!;
+        fetchAfter = { createdAt: last.created_at, id: last.id };
+      }
+      return { items, nextCursor };
+    },
+    getFeedSettings(userId) {
+      return settingsFor(userId);
+    },
+    updateFeedSettings(userId, settings) {
+      repo.updateFeedSettings(userId, settings);
     }
   };
 }
 
 export interface CommunityPublicApi {
-  emitEvent(userId: string, type: CommunityEventType, refType: CommunityRefType, refId: string): void;
+  emitEvent(userId: string, type: ActivityEventType, refType: CommunityRefType, refId: string, payload?: Record<string, unknown>): void;
 }
 
 export function createCommunityPublicApi(repo: CommunityRepository): CommunityPublicApi {
   return {
-    emitEvent(userId, type, refType, refId) {
-      repo.insertEvent({ id: randomUUID(), user_id: userId, type, ref_type: refType, ref_id: refId, payload: null, created_at: new Date().toISOString() });
+    emitEvent(userId, type, refType, refId, payload) {
+      repo.insertEvent({ id: randomUUID(), user_id: userId, type, ref_type: refType, ref_id: refId, payload: payload ? JSON.stringify(payload) : null, created_at: new Date().toISOString() });
     }
   };
 }

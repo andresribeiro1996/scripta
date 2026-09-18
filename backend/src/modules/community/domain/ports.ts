@@ -7,7 +7,7 @@ export interface CursorKeyset {
 }
 
 export interface CommunityRepository {
-  insertFollow(row: FollowRow): void;
+  insertFollow(row: FollowRow): boolean;
   deleteFollow(followerId: string, followeeId: string): boolean;
   getFollow(followerId: string, followeeId: string): FollowRow | undefined;
   listFollowees(followerId: string): string[];

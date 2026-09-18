@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { ReaderProfile } from "@scripta/shared";
+import { DEFAULT_FEED_SETTINGS, normalizeFeedSettings } from "@scripta/shared/community";
 import type { PublishedTierlistRef } from "../tierlists/service.js";
 import type { PublishedTournamentRef } from "../arena/service.js";
 import type { MuralPublicPayload } from "../murals/index.js";
@@ -16,7 +17,10 @@ function createRepoFake() {
   const key = (a: string, b: string) => `${a}:${b}`;
   const repo: CommunityRepository = {
     insertFollow(row) {
-      follows.set(key(row.follower_id, row.followee_id), { ...row });
+      const k = key(row.follower_id, row.followee_id);
+      if (follows.has(k)) return false;
+      follows.set(k, { ...row });
+      return true;
     },
     deleteFollow(followerId, followeeId) {
       return follows.delete(key(followerId, followeeId));
@@ -39,10 +43,20 @@ function createRepoFake() {
     upsertProfile(row) {
       profiles.set(row.user_id, { ...row });
     },
-    getFeedSettings() {
-      return null;
+    getFeedSettings(userId) {
+      const row = profiles.get(userId);
+      if (!row || row.feed_settings === null) return null;
+      try {
+        return normalizeFeedSettings(JSON.parse(row.feed_settings));
+      } catch {
+        return null;
+      }
     },
-    updateFeedSettings() {},
+    updateFeedSettings(userId, settings) {
+      const row = profiles.get(userId);
+      if (!row) return;
+      profiles.set(userId, { ...row, feed_settings: JSON.stringify(settings) });
+    },
     insertEvent(row) {
       if (events.some((e) => e.ref_type === row.ref_type && e.ref_id === row.ref_id)) return;
       events.push({ ...row });
@@ -468,4 +482,152 @@ test("people search excludes self and unpublished profiles", () => {
   service.follow("me", "alice");
   const after = service.searchPeople("me", "ali", 10);
   assert.deepEqual(after.map((r) => r.viewerFollows), [true]);
+});
+
+test("publishProfile emits mural_published only when the mural changes", () => {
+  const { repo, events } = createRepoFake();
+  const { deps, usernames, ownedMurals } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  ownedMurals.add("alice:m1");
+  ownedMurals.add("alice:m2");
+  repo.upsertProfile(profileRow("alice", { mural_id: "m1" }));
+  service.publishProfile("alice", "m1");
+  assert.equal(events.filter((e) => e.type === "mural_published").length, 0);
+  service.publishProfile("alice", "m2");
+  const murals = events.filter((e) => e.type === "mural_published");
+  assert.equal(murals.length, 1);
+  assert.equal(murals[0]?.ref_type, "mural");
+  assert.equal(murals[0]?.ref_id, "m2");
+});
+
+test("follow emits following once; refollow emits nothing", () => {
+  const { repo, events } = createRepoFake();
+  const { deps, readerProfiles } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("bob", reader("bob"));
+  repo.upsertProfile(profileRow("bob"));
+  service.follow("alice", "bob");
+  service.unfollow("alice", "bob");
+  service.follow("alice", "bob");
+  const following = events.filter((e) => e.type === "following");
+  assert.equal(following.length, 1);
+  assert.equal(following[0]?.ref_id, "bob");
+  assert.deepEqual(JSON.parse(following[0]?.payload ?? "null"), { username: "user-bob" });
+});
+
+test("getActivity filters categories by feed settings but not for the owner", () => {
+  const { repo } = createRepoFake();
+  const { deps, usernames } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  repo.upsertProfile(profileRow("alice"));
+  repo.updateFeedSettings("alice", { publications: true, reading: false, votes: false, follows: true });
+  service.emitEvent("alice", "book_added", "book", "b1", { title: "Dune", status: 0 });
+  service.emitEvent("alice", "voted_on", "tournament", "t9", { game: "tournament", name: "X" });
+  service.emitEvent("alice", "following", "user", "bob", { username: "mia" });
+  const stranger = service.getActivity("alice", undefined, undefined, 20);
+  assert.deepEqual(stranger.items.map((i) => i.type), ["following"]);
+  const owner = service.getActivity("alice", "alice", undefined, 20);
+  assert.equal(owner.items.length, 3);
+});
+
+test("getActivity 404s on unknown username and unpublished profile", () => {
+  const { repo, profiles } = createRepoFake();
+  const { deps, usernames } = createDeps(repo);
+  const service = createCommunityService(deps);
+  assert.throws(() => service.getActivity("ghost", undefined, undefined, 20), ProfileNotFoundError);
+  usernames.set("alice", "alice");
+  profiles.set("alice", profileRow("alice", { published: 0 }));
+  assert.throws(() => service.getActivity("alice", undefined, undefined, 20), ProfileNotFoundError);
+});
+
+test("an unparseable activity cursor is a 400-worthy error", () => {
+  const { repo } = createRepoFake();
+  const { deps, usernames } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  repo.upsertProfile(profileRow("alice"));
+  assert.throws(() => service.getActivity("alice", undefined, "###", 20), InvalidCursorError);
+});
+
+test("getActivity enriches publications, paginates by cursor, and skips vanished refs", () => {
+  const { repo } = createRepoFake();
+  const { deps, usernames, tierlistRefs, tournamentRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  repo.upsertProfile(profileRow("alice"));
+  tierlistRefs.set("t1", tierRef("t1", "alice"));
+  tournamentRefs.set("g1", tournRef("g1", "alice"));
+  repo.insertEvent({ id: "e1", user_id: "alice", type: "tierlist_published", ref_type: "tierlist", ref_id: "t1", payload: null, created_at: "2026-09-03T00:00:00.000Z" });
+  repo.insertEvent({ id: "e2", user_id: "alice", type: "tournament_published", ref_type: "tournament", ref_id: "g1", payload: null, created_at: "2026-09-02T00:00:00.000Z" });
+  repo.insertEvent({ id: "e3", user_id: "alice", type: "tierlist_published", ref_type: "tierlist", ref_id: "gone", payload: null, created_at: "2026-09-01T00:00:00.000Z" });
+  const first = service.getActivity("alice", undefined, undefined, 1);
+  assert.deepEqual(first.items[0]?.payload, { name: "List t1", href: "/vote/code-t1" });
+  assert.ok(first.nextCursor);
+  const second = service.getActivity("alice", undefined, first.nextCursor!, 1);
+  assert.deepEqual(second.items.map((i) => i.id), ["e2"]);
+  assert.deepEqual(second.items[0]?.payload, { name: "Cup g1", href: "/arena/g1" });
+  assert.equal(second.nextCursor, null);
+});
+
+test("getActivity keeps fetching past rows hidden from the viewer", () => {
+  const { repo } = createRepoFake();
+  const { deps, usernames } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  repo.upsertProfile(profileRow("alice"));
+  repo.updateFeedSettings("alice", { publications: true, reading: false, votes: false, follows: true });
+  const book = (id: string, ref: string, at: string) =>
+    ({ id, user_id: "alice", type: "book_added" as const, ref_type: "book" as const, ref_id: ref, payload: JSON.stringify({ title: "T", status: 0 }), created_at: at });
+  repo.insertEvent(book("e1", "b1", "2026-09-05T00:00:00.000Z"));
+  repo.insertEvent(book("e2", "b2", "2026-09-04T00:00:00.000Z"));
+  repo.insertEvent(book("e3", "b3", "2026-09-03T00:00:00.000Z"));
+  repo.insertEvent(book("e4", "b4", "2026-09-02T00:00:00.000Z"));
+  repo.insertEvent({ id: "e5", user_id: "alice", type: "following", ref_type: "user", ref_id: "bob", payload: JSON.stringify({ username: "mia" }), created_at: "2026-09-01T00:00:00.000Z" });
+  const page = service.getActivity("alice", undefined, undefined, 2);
+  assert.deepEqual(page.items.map((i) => i.id), ["e5"]);
+  assert.equal(page.nextCursor, null);
+  const ownerPage = service.getActivity("alice", "alice", undefined, 2);
+  assert.deepEqual(ownerPage.items.map((i) => i.id), ["e1", "e2"]);
+  assert.ok(ownerPage.nextCursor);
+});
+
+test("dashboard omits publications from actors who disabled them but keeps follow rows", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  readerProfiles.set("bob", reader("bob"));
+  readerProfiles.set("carol", reader("carol"));
+  repo.upsertProfile(profileRow("alice"));
+  repo.upsertProfile(profileRow("bob"));
+  repo.updateFeedSettings("alice", { publications: false, reading: false, votes: false, follows: false });
+  service.follow("viewer", "alice");
+  service.follow("viewer", "bob");
+  service.emitEvent("alice", "tierlist_published", "tierlist", "t1");
+  service.emitEvent("bob", "tierlist_published", "tierlist", "t2");
+  tierlistRefs.set("t1", tierRef("t1", "alice"));
+  tierlistRefs.set("t2", tierRef("t2", "bob"));
+  repo.insertFollow({ follower_id: "carol", followee_id: "viewer", created_at: "2026-09-07T00:00:00.000Z" });
+  const page = service.getDashboard("viewer", undefined, 20);
+  assert.deepEqual(
+    page.items.map((i) => (i.kind === "publication" ? i.content.id : i.id)),
+    ["t2", "carol"]
+  );
+});
+
+test("feed settings round-trip and reach only the owner's profile view", () => {
+  const { repo, profiles } = createRepoFake();
+  const { deps, usernames, readerProfiles } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  readerProfiles.set("alice", reader("alice"));
+  profiles.set("alice", profileRow("alice"));
+  assert.deepEqual(service.getFeedSettings("alice"), DEFAULT_FEED_SETTINGS);
+  const settings = { publications: false, reading: true, votes: false, follows: true };
+  service.updateFeedSettings("alice", settings);
+  assert.deepEqual(service.getFeedSettings("alice"), settings);
+  assert.deepEqual(service.getProfileByUsername("alice", "alice").feedSettings, settings);
+  assert.equal(service.getProfileByUsername("alice", "bob").feedSettings, undefined);
 });
