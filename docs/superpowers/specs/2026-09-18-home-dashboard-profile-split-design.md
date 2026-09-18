@@ -106,6 +106,22 @@ from the existing profile endpoints they already call.
   unchanged.
 - `murals/home` helpers deleted from the murals entry point.
 
+### Corrections found during implementation
+
+- `resolveHomeBlock`/`pinPassage` do **not** die with the home screen:
+  both clients' mural canvases and editors use them to resolve
+  rediscover quote and collection shelf blocks on **profile** murals.
+  They stay in `murals/home.ts` (still imported by
+  `@scripta/shared/dashboard` for the rediscover card). Only
+  `buildHomeBlocks` was deleted — it generated the default home mural,
+  which no longer exists.
+- Mobile's profile route is `/u/[username]` (group segments are
+  URL-invisible), so `digestTarget`'s `/community/u/...` is web-only;
+  mobile maps follow rows to `/u/<username>`.
+- Mobile's `MuralsScreen` had its own "Set as home" action the plan
+  missed; it got the same treatment as web's `MuralsListPage` (action
+  removed, profile badge added).
+
 ## Web
 
 - `HomePage` (`/dashboard`) becomes the dashboard: reading cards
