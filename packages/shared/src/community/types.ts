@@ -65,3 +65,35 @@ export interface Page<T> {
   items: T[];
   nextCursor: string | null;
 }
+
+export type ActivityEventType =
+  | CommunityEventType
+  | "book_added"
+  | "book_finished"
+  | "following"
+  | "mural_published"
+  | "voted_on";
+
+export interface ActivityItem {
+  id: string;
+  type: ActivityEventType;
+  payload: Record<string, unknown>;
+  createdAt: string;
+}
+
+export type FeedCategory = "publications" | "reading" | "votes" | "follows";
+
+export interface FeedSettings {
+  publications: boolean;
+  reading: boolean;
+  votes: boolean;
+  follows: boolean;
+}
+
+export interface BookRecommendationInput {
+  title: string;
+  author: string;
+  isbn?: string | null;
+  coverUrl?: string | null;
+  readStatus: 0 | 1 | 2;
+}
