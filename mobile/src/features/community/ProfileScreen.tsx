@@ -4,13 +4,16 @@ import { Stack, router } from "expo-router";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
 import { ensureBookBlockHeights, type Mural } from "@scripta/shared";
+import { DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
 import { ApiError } from "../../core/api";
 import { useAuth } from "../../core/auth";
-import { Button, Dialog, EmptyState, ErrorState, Screen, Skeleton, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { Button, Dialog, EmptyState, ErrorState, Screen, Segmented, Skeleton, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { MuralCanvas } from "../murals";
 import { useMurals } from "../murals/useMurals";
 import { reconstructBooks, reconstructTierlists } from "../public/adapters";
 import type { GalleryImage } from "../gallery/api";
+import { ActivityList } from "./ActivityList";
+import { FeedSettingsDialog } from "./FeedSettingsDialog";
 import { fetchProfile, followUser, publishProfile, unfollowUser, unpublishProfile, type CommunityProfileView } from "./api";
 import { contentDetail, contentKindLabel, contentTarget } from "./communityHome";
 
@@ -27,6 +30,8 @@ export function ProfileScreen({ username }: { username: string }) {
 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [confirmingUnpublish, setConfirmingUnpublish] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [tab, setTab] = useState<ProfileTab>("mural");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -112,88 +117,98 @@ export function ProfileScreen({ username }: { username: string }) {
       }
     : null;
 
+  const header = (
+    <View style={styles.header}>
+      <View style={styles.identityRow}>
+        {view!.profile.user.avatarUrl ? (
+          <Image source={{ uri: view!.profile.user.avatarUrl }} contentFit="cover" style={styles.bigAvatar} />
+        ) : (
+          <View style={[styles.bigAvatar, styles.avatarFallback, { backgroundColor: colors.accentSoft }]}>
+            <Text {...dynamicType} style={[typography.title, { color: colors.accent }]}>
+              {view!.profile.user.username.slice(0, 1).toUpperCase()}
+            </Text>
+          </View>
+        )}
+        <View style={styles.grow}>
+          <Text {...dynamicType} style={[typography.title, styles.strong, { color: colors.text }]}>
+            {view!.profile.user.username}
+          </Text>
+          <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
+            {view!.profile.followerCount} {view!.profile.followerCount === 1 ? "follower" : "followers"} · {view!.profile.followingCount} following
+          </Text>
+        </View>
+      </View>
+      {isSelf ? (
+        <View style={styles.ownerRow}>
+          <Button label="Switch mural" variant="secondary" loading={busy} onPress={() => setPickerOpen(true)} />
+          <Button label="Feed settings" variant="secondary" onPress={() => setSettingsOpen(true)} />
+          <Button label="Unpublish" variant="destructive" loading={busy} onPress={() => setConfirmingUnpublish(true)} />
+        </View>
+      ) : (
+        <Button
+          label={view!.profile.viewerFollows ? "Following" : "Follow"}
+          variant={view!.profile.viewerFollows ? "secondary" : "primary"}
+          loading={busy}
+          onPress={() => void toggleFollow()}
+        />
+      )}
+      <Segmented accessibilityLabel="Profile section" options={PROFILE_TABS} value={tab} onChange={setTab} />
+      {tab === "mural" && mural && mural.blocks.length > 0 ? (
+        <MuralCanvas
+          mural={mural}
+          books={books}
+          images={images}
+          tierlists={tierlists}
+          profile={view!.profile.user}
+          shelfThemeOverride={muralData?.library.shelfTheme}
+          statsOverride={muralData?.library.stats}
+        />
+      ) : null}
+      {tab === "mural" ? (
+        <Text {...dynamicType} style={[typography.title, styles.strong, styles.sectionTitle, { color: colors.text }]}>
+          Published
+        </Text>
+      ) : null}
+    </View>
+  );
+
   return (
     <Screen bottom>
       <Stack.Screen options={{ headerShown: true, title: view!.profile.user.username }} />
       {error ? <Toast visible message={error} tone="error" /> : null}
-      <FlatList
-        style={{ flex: 1 }}
-        data={publishedRows(view!)}
-        keyExtractor={(row) => `${row.kind}:${row.id}`}
-        contentContainerStyle={styles.list}
-        refreshing={profile.isRefetching}
-        onRefresh={() => void profile.refetch()}
-        ListHeaderComponent={
-          <View style={styles.header}>
-            <View style={styles.identityRow}>
-              {view!.profile.user.avatarUrl ? (
-                <Image source={{ uri: view!.profile.user.avatarUrl }} contentFit="cover" style={styles.bigAvatar} />
-              ) : (
-                <View style={[styles.bigAvatar, styles.avatarFallback, { backgroundColor: colors.accentSoft }]}>
-                  <Text {...dynamicType} style={[typography.title, { color: colors.accent }]}>
-                    {view!.profile.user.username.slice(0, 1).toUpperCase()}
-                  </Text>
-                </View>
-              )}
-              <View style={styles.grow}>
-                <Text {...dynamicType} style={[typography.title, styles.strong, { color: colors.text }]}>
-                  {view!.profile.user.username}
+      {tab === "mural" ? (
+        <FlatList
+          style={{ flex: 1 }}
+          data={publishedRows(view!)}
+          keyExtractor={(row) => `${row.kind}:${row.id}`}
+          contentContainerStyle={styles.list}
+          refreshing={profile.isRefetching}
+          onRefresh={() => void profile.refetch()}
+          ListHeaderComponent={header}
+          ListEmptyComponent={<EmptyState title="Nothing published yet" body="Tier lists and tournaments show up here." />}
+          renderItem={({ item }) => (
+            <Pressable
+              accessibilityRole="link"
+              accessibilityLabel={`Open ${item.name}`}
+              onPress={() => router.push(item.target as never)}
+            >
+              <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.accent }]}>
+                  {item.label}
+                </Text>
+                <Text numberOfLines={1} {...dynamicType} style={[typography.title, styles.strong, { color: colors.text }]}>
+                  {item.name}
                 </Text>
                 <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
-                  {view!.profile.followerCount} {view!.profile.followerCount === 1 ? "follower" : "followers"} · {view!.profile.followingCount} following
+                  {item.detail}
                 </Text>
               </View>
-            </View>
-            {isSelf ? (
-              <View style={styles.ownerRow}>
-                <Button label="Switch mural" variant="secondary" loading={busy} onPress={() => setPickerOpen(true)} />
-                <Button label="Unpublish" variant="destructive" loading={busy} onPress={() => setConfirmingUnpublish(true)} />
-              </View>
-            ) : (
-              <Button
-                label={view!.profile.viewerFollows ? "Following" : "Follow"}
-                variant={view!.profile.viewerFollows ? "secondary" : "primary"}
-                loading={busy}
-                onPress={() => void toggleFollow()}
-              />
-            )}
-            {mural && mural.blocks.length > 0 ? (
-              <MuralCanvas
-                mural={mural}
-                books={books}
-                images={images}
-                tierlists={tierlists}
-                profile={view!.profile.user}
-                shelfThemeOverride={muralData?.library.shelfTheme}
-                statsOverride={muralData?.library.stats}
-              />
-            ) : null}
-            <Text {...dynamicType} style={[typography.title, styles.strong, styles.sectionTitle, { color: colors.text }]}>
-              Published
-            </Text>
-          </View>
-        }
-        ListEmptyComponent={<EmptyState title="Nothing published yet" body="Tier lists and tournaments show up here." />}
-        renderItem={({ item }) => (
-          <Pressable
-            accessibilityRole="link"
-            accessibilityLabel={`Open ${item.name}`}
-            onPress={() => router.push(item.target as never)}
-          >
-            <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.accent }]}>
-                {item.label}
-              </Text>
-              <Text numberOfLines={1} {...dynamicType} style={[typography.title, styles.strong, { color: colors.text }]}>
-                {item.name}
-              </Text>
-              <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
-                {item.detail}
-              </Text>
-            </View>
-          </Pressable>
-        )}
-      />
+            </Pressable>
+          )}
+        />
+      ) : (
+        <ActivityList username={username} ListHeaderComponent={header} />
+      )}
       <MuralPicker
         visible={pickerOpen}
         busy={busy}
@@ -202,6 +217,14 @@ export function ProfileScreen({ username }: { username: string }) {
           await publishProfile(muralId);
           setPickerOpen(false);
         })}
+      />
+      <FeedSettingsDialog
+        visible={settingsOpen}
+        settings={view!.feedSettings ?? DEFAULT_FEED_SETTINGS}
+        onClose={() => {
+          setSettingsOpen(false);
+          void queryClient.invalidateQueries({ queryKey: ["community", "profile", username] });
+        }}
       />
       <Dialog visible={confirmingUnpublish} title="Unpublish your profile?" onClose={() => setConfirmingUnpublish(false)}>
         <View style={styles.dialogGap}>
@@ -217,6 +240,13 @@ export function ProfileScreen({ username }: { username: string }) {
     </Screen>
   );
 }
+
+const PROFILE_TABS = [
+  { value: "mural", label: "Mural" },
+  { value: "activity", label: "Activity" },
+] as const;
+
+type ProfileTab = (typeof PROFILE_TABS)[number]["value"];
 
 type PublishedRow = { kind: "tierlist" | "tournament"; id: string; name: string; detail: string; target: string; label: string };
 
@@ -298,7 +328,7 @@ const styles = StyleSheet.create({
   identityRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   bigAvatar: { width: 64, height: 64, borderRadius: radii.full },
   avatarFallback: { alignItems: "center", justifyContent: "center" },
-  ownerRow: { flexDirection: "row", gap: spacing.sm },
+  ownerRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   sectionTitle: { marginTop: spacing.md },
   card: { borderWidth: 1, borderRadius: radii.lg, padding: spacing.md, gap: spacing.xs },
   dialogGap: { gap: spacing.md },
