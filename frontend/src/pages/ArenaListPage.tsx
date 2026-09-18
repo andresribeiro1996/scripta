@@ -7,6 +7,7 @@
 
 import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { contentDetail, contentTarget } from "@scripta/shared/community";
 import type { Tierlist } from "../api/tierlists";
 import { TournamentStatusBadge } from "../components/arena/TournamentStatusBadge";
 import { useConfirm } from "../components/ConfirmDialog";
@@ -18,12 +19,17 @@ import { PlusIcon, TOOLBAR_CONTROL_CLASS, ToolbarRow } from "../components/Toolb
 import { useDelayedShow } from "../hooks/useDelayedShow";
 import { useMyTournaments } from "../hooks/useMyTournaments";
 import { useTierlists } from "../hooks/useTierlists";
+import { useVotedTierlists } from "../hooks/useVotedTierlists";
+import { useVotedTournaments } from "../hooks/useVotedTournaments";
+import type { TournamentSummary } from "../api/arena";
 
 export function ArenaListPage() {
   const { tournaments, isLoading } = useMyTournaments();
   const showSkeleton = useDelayedShow(isLoading);
-  const { data: tierlistsData, isLoading: tierlistsLoading, create, rename, remove } = useTierlists();
+  const { tournaments: votedTournaments } = useVotedTournaments();
+  const { data: tierlistsData, isLoading: tierlistsLoading, rename, remove } = useTierlists();
   const showTierlistSkeleton = useDelayedShow(tierlistsLoading);
+  const { tierlists: votedTierlists } = useVotedTierlists();
   const tierlists = tierlistsData ?? [];
   const navigate = useNavigate();
   const confirm = useConfirm();
@@ -41,11 +47,14 @@ export function ArenaListPage() {
     setSearchParams(params);
   }
 
-  const visibleTournaments = useMemo(() => {
+  const bySearch = useMemo(() => {
     const needle = search.trim().toLowerCase();
-    if (!needle) return tournaments;
-    return tournaments.filter((t) => t.name.toLowerCase().includes(needle));
-  }, [tournaments, search]);
+    const matches = (name: string) => !needle || name.toLowerCase().includes(needle);
+    return {
+      created: tournaments.filter((t) => matches(t.name)),
+      voted: votedTournaments.filter((t) => matches(t.name))
+    };
+  }, [tournaments, votedTournaments, search]);
 
   // Opens an UNSAVED tournament rather than POSTing one. Creating on
   // click left an "Untitled tournament" behind on every idle tap, and
@@ -54,15 +63,6 @@ export function ArenaListPage() {
   // and offers the size picker until then.
   function handleCreate() {
     navigate("/dashboard/arena/new/seed");
-  }
-
-  async function handleCreateTierlist() {
-    try {
-      const created = await create("Untitled tier list");
-      navigate(`/dashboard/arena/tierlist/${created.id}`);
-    } catch (err) {
-      setCreateError(err instanceof Error ? err.message : "Couldn't create that tier list.");
-    }
   }
 
   async function handleRenameTierlist(tierlist: Tierlist) {
@@ -117,7 +117,7 @@ export function ArenaListPage() {
             .
           </p>
 
-          {tournaments.length > 0 && (
+          {(tournaments.length > 0 || votedTournaments.length > 0) && (
             <ToolbarRow>
               <input
                 value={search}
@@ -130,6 +130,11 @@ export function ArenaListPage() {
           )}
 
           {showSkeleton && <SkeletonCardGrid count={3} label="Loading tournaments" tileClassName="min-h-[86px]" />}
+
+          {/* Section headers appear only once there's something in the
+              second section — until then the tab is the plain create list
+              it always was. */}
+          {votedTournaments.length > 0 && <h3 className="mb-3 text-sm font-semibold">Created by you</h3>}
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {/* Always first, always present — deliberately outside the map
@@ -145,22 +150,23 @@ export function ArenaListPage() {
               <span className="text-sm font-semibold">New tournament</span>
             </button>
 
-            {visibleTournaments.map((t) => (
-              <a
-                key={t.id}
-                href={t.status === "seeding" ? `/dashboard/arena/${t.id}/seed` : `/arena/${t.id}`}
-                className="block rounded-xl border border-(--color-border) bg-(--color-surface) p-4 hover:border-(--color-accent)"
-              >
-                <h3 className="font-semibold">{t.name}</h3>
-                <p className="flex flex-wrap items-center gap-1.5 text-sm text-(--color-text-dim)">
-                  {t.bracketSize}-book bracket
-                  <TournamentStatusBadge status={t.status} round={t.currentRound} />
-                </p>
-              </a>
+            {bySearch.created.map((t) => (
+              <TournamentCard key={t.id} t={t} />
             ))}
           </div>
 
-          {tournaments.length > 0 && visibleTournaments.length === 0 && (
+          {(bySearch.voted.length > 0 || (votedTournaments.length > 0 && !search.trim())) && (
+            <>
+              <h3 className="mb-3 mt-6 text-sm font-semibold">Voting in</h3>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {bySearch.voted.map((t) => (
+                  <TournamentCard key={t.id} t={t} />
+                ))}
+              </div>
+            </>
+          )}
+
+          {(tournaments.length > 0 || votedTournaments.length > 0) && bySearch.created.length === 0 && bySearch.voted.length === 0 && (
             <p className="mt-4 text-sm text-(--color-text-dim)">Nothing matches “{search.trim()}”.</p>
           )}
         </>
@@ -172,7 +178,7 @@ export function ArenaListPage() {
 
           {showTierlistSkeleton && <SkeletonCardGrid count={3} label="Loading tier lists" tileClassName="min-h-[86px]" />}
 
-          {!tierlistsLoading && tierlists.length === 0 && (
+          {!tierlistsLoading && tierlists.length === 0 && votedTierlists.length === 0 && (
             <EmptyState
               icon={ArenaIcon}
               title="No tier lists yet."
@@ -180,9 +186,11 @@ export function ArenaListPage() {
             />
           )}
 
+          {votedTierlists.length > 0 && <h3 className="mb-3 text-sm font-semibold">Created by you</h3>}
+
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <button
-              onClick={() => void handleCreateTierlist()}
+              onClick={() => navigate("/dashboard/arena/tierlist/new")}
               className="flex min-h-14 items-center justify-center gap-2 rounded-xl border-2 border-dashed border-(--color-border) p-4 text-(--color-text-dim) transition-colors hover:border-(--color-accent) hover:text-(--color-accent) disabled:opacity-60"
             >
               <PlusIcon />
@@ -228,13 +236,13 @@ export function ArenaListPage() {
                     title="Tier list settings"
                     triggerClassName="absolute top-3 right-3 flex h-9 w-9 items-center justify-center rounded-lg text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"
                     items={[
-                      {
+                      ...(tl.voteCode === null ? [{
                         label: "Rename",
                         onClick: () => {
                           setTierlistNameDraft(tl.name);
                           setRenamingTierlistId(tl.id);
                         }
-                      },
+                      }] : []),
                       { label: "Delete", onClick: () => void handleDeleteTierlist(tl), danger: true }
                     ]}
                   />
@@ -242,8 +250,43 @@ export function ArenaListPage() {
               )
             )}
           </div>
+
+          {votedTierlists.length > 0 && (
+            <>
+              <h3 className="mb-3 mt-6 text-sm font-semibold">Voted on</h3>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {votedTierlists.map((tl) => (
+                  <a
+                    key={tl.id}
+                    href={contentTarget({ kind: "tierlist", ...tl })}
+                    className="block rounded-xl border border-(--color-border) bg-(--color-surface) p-4 hover:border-(--color-accent)"
+                  >
+                    <h3 className="font-semibold">{tl.name}</h3>
+                    <p className="text-sm text-(--color-text-dim)">{contentDetail({ kind: "tierlist", ...tl })}</p>
+                  </a>
+                ))}
+              </div>
+            </>
+          )}
         </>
       )}
     </div>
+  );
+}
+
+// Shared by both tournament sections — a voted tournament is never
+// seeding, but the card markup is identical either way.
+function TournamentCard({ t }: { t: TournamentSummary }) {
+  return (
+    <a
+      href={t.status === "seeding" ? `/dashboard/arena/${t.id}/seed` : `/arena/${t.id}`}
+      className="block rounded-xl border border-(--color-border) bg-(--color-surface) p-4 hover:border-(--color-accent)"
+    >
+      <h3 className="font-semibold">{t.name}</h3>
+      <p className="flex flex-wrap items-center gap-1.5 text-sm text-(--color-text-dim)">
+        {t.bracketSize}-book bracket
+        <TournamentStatusBadge status={t.status} round={t.currentRound} />
+      </p>
+    </a>
   );
 }

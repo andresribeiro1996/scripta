@@ -98,7 +98,7 @@ export function VoteTierlistPage() {
         <h1 className="mb-1 text-lg font-bold">{board.name}</h1>
         <p className="mb-4 text-sm text-(--color-text-dim)">
           {alreadySubmitted && "Your ballot is in. "}
-          {board.votingOpen ? "Voting is still open." : "Voting is closed."}
+          {board.promotedAt ? "Permanent public reference." : board.votingOpen ? "Voting is still open." : "Voting is closed."}
         </p>
         <TierlistResultsView
           histogram={histogram}
@@ -142,7 +142,7 @@ export function VoteTierlistPage() {
         ) : (
           <button
             onClick={() => void handleSubmit()}
-            disabled={submitting}
+            disabled={submitting || toPlacements(data).length === 0}
             className="min-h-9 shrink-0 rounded-lg bg-(--color-accent) px-3 text-sm font-semibold text-white disabled:opacity-60"
           >
             {submitting ? "Submitting…" : "Submit ballot"}

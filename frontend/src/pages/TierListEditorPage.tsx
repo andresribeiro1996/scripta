@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useOutletContext, useParams } from "react-router-dom";
+import { Link, useOutletContext, useParams } from "react-router-dom";
 import type { TierlistData } from "../api/tierlists";
 import { openVotingApi, setVotingStateApi } from "../api/tierlistVoting";
 import { TierRow } from "../components/murals/blocks/BookBlocks";
@@ -16,7 +16,6 @@ import { ChevronLeftIcon } from "../components/Toolbar";
 
 export function TierListEditorPage() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const { data: library } = useLibrary();
   const { data: tierlistsData, isLoading, rename, saveData, refetch } = useTierlists();
   const books = library?.data.books ?? [];
@@ -38,7 +37,7 @@ export function TierListEditorPage() {
   // ownership-checked route that serves them.
   const ownerResults = useTierlistResults(tierlist?.voteCode ? tierlist.id : undefined);
 
-  // "Open for voting" and the community copy's own access/open toggles —
+  // "Open for voting" and the public tier list's access/open toggles —
   // three independent async actions sharing one error slot, since only one
   // can ever be in flight from this page at a time.
   const [openPanelOpen, setOpenPanelOpen] = useState(false);
@@ -71,15 +70,15 @@ export function TierListEditorPage() {
   // The bottom tab bar covers the pool dock and costs 3.5rem of a phone's
   // height while ranking, which is the whole activity in edit mode. Same
   // trade MuralEditorPage.tsx:89-93 already makes for its canvas. A
-  // community copy renders the same fixed-pool-dock TierBoard any time it
+  // public tier list renders the same fixed-pool-dock TierBoard any time it
   // has a vote code — never gated behind `editing`, since there's no edit
   // mode to enter there — so the nav has to stay clear of it too.
   const { setNavHidden } = useOutletContext<{ setNavHidden: (hidden: boolean) => void }>();
-  const isCommunityCopy = tierlist?.voteCode != null;
+  const isPublic = tierlist?.voteCode != null;
   useEffect(() => {
-    setNavHidden(editing || isCommunityCopy);
+    setNavHidden(editing || isPublic);
     return () => setNavHidden(false);
-  }, [editing, isCommunityCopy, setNavHidden]);
+  }, [editing, isPublic, setNavHidden]);
 
   if (isLoading) {
     return (
@@ -121,19 +120,13 @@ export function TierListEditorPage() {
     await rename(tierlistId, name);
   }
 
-  // Mints the vote code and navigates straight to the new community copy —
-  // that copy, not this original, is where the owner manages voting from
-  // (link, access, close/reopen, results) from here on. `refetch` first so
-  // the tierlists cache already has the copy by the time the new route's
-  // own `tierlist` lookup runs, avoiding a flash of "No tier list with
-  // that id" on arrival.
   async function handleOpenVoting() {
     setVotingActionError(null);
     setOpeningVoting(true);
     try {
-      const { tierlist: copy } = await openVotingApi(tierlistId, voteAccessDraft);
+      await openVotingApi(tierlistId, voteAccessDraft);
       await refetch();
-      navigate(`/dashboard/arena/tierlist/${copy.id}`);
+      setOpenPanelOpen(false);
     } catch (err) {
       setVotingActionError(err instanceof Error ? err.message : "Couldn't open voting.");
     } finally {
@@ -186,7 +179,7 @@ export function TierListEditorPage() {
           Arena
         </Link>
         <div className="flex items-center justify-between gap-3">
-          {editingName ? (
+          {editingName && voteCode === null ? (
             <input
               autoFocus
               value={nameDraft}
@@ -201,6 +194,7 @@ export function TierListEditorPage() {
             />
           ) : (
             <button
+              disabled={voteCode !== null}
               onClick={() => {
                 setNameDraft(tierlist.name);
                 setEditingName(true);
@@ -282,13 +276,13 @@ export function TierListEditorPage() {
         </div>
       ) : (
         <div className="mb-6 flex flex-col gap-3 rounded-xl border border-(--color-border) bg-(--color-surface) p-3">
-          <p className="text-sm text-(--color-text-dim)">This community tier list is frozen while people vote. Your original stays editable.</p>
+          <p className="text-sm text-(--color-text-dim)">This public tier list is locked. At 100 distinct signed-in voters, it becomes an app-owned reference.</p>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <a href={`/vote/${voteCode}`} className="text-sm font-semibold text-(--color-accent) hover:opacity-80">
               /vote/{voteCode}
             </a>
             <span className="text-xs text-(--color-text-dim)">
-              {votingBoard?.ballotCount ?? 0} {(votingBoard?.ballotCount ?? 0) === 1 ? "ballot" : "ballots"}
+              {votingBoard?.ballotCount ?? 0} {(votingBoard?.ballotCount ?? 0) === 1 ? "ballot" : "ballots"} · {votingBoard?.eligibleVoteCount ?? 0}/100 eligible voters
             </span>
           </div>
           <div className="flex flex-wrap items-center gap-2">

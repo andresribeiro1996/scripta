@@ -104,10 +104,10 @@ function DiscoverPane() {
                 <h3 className="font-semibold">{item.content.name}</h3>
                 <p className="text-sm text-(--color-text-dim)">{contentDetail(item.content)}</p>
               </Link>
-              <Link to={`/community/u/${item.author.username}`} className="mt-2 inline-flex items-center gap-1.5 text-xs text-(--color-text-dim) hover:text-(--color-accent)">
+              {item.author.unavailable ? <span className="mt-2 text-xs text-(--color-text-dim)">{item.author.username}</span> : <Link to={`/community/u/${item.author.username}`} className="mt-2 inline-flex items-center gap-1.5 text-xs text-(--color-text-dim) hover:text-(--color-accent)">
                 <AuthorAvatar author={item.author} />
                 {item.author.username}
-              </Link>
+              </Link>}
             </div>
           ))}
         </div>
@@ -129,10 +129,10 @@ function FeedPane() {
       <div className="grid grid-cols-1 gap-3">
         {items.map((item) => (
           <div key={item.id} className="rounded-xl border border-(--color-border) bg-(--color-surface) p-4">
-            <Link to={`/community/u/${item.actor.username}`} className="mb-1 flex items-center gap-1.5 text-xs text-(--color-text-dim) hover:text-(--color-accent)">
+            {item.actor.unavailable ? <span className="mb-1 text-xs text-(--color-text-dim)">{feedHeading(item)}</span> : <Link to={`/community/u/${item.actor.username}`} className="mb-1 flex items-center gap-1.5 text-xs text-(--color-text-dim) hover:text-(--color-accent)">
               <AuthorAvatar author={item.actor} />
               {feedHeading(item)}
-            </Link>
+            </Link>}
             <Link to={feedTarget(item)} className="block">
               <h3 className="font-semibold">{item.content.name}</h3>
               <p className="text-sm text-(--color-text-dim)">{contentDetail(item.content)}</p>

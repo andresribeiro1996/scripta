@@ -32,6 +32,8 @@ export interface VotingBoard {
   access: "anonymous" | "members";
   votingOpen: boolean;
   ballotCount: number;
+  eligibleVoteCount: number;
+  promotedAt: string | null;
   /** Absent while voting is open — the backend withholds the standings
    *  until you've voted (see routes.ts's board route). A closed poll's
    *  board carries the final histogram. */
@@ -42,6 +44,28 @@ export interface BallotResponse {
   ballotId: string;
   placements: Array<{ bookKey: string; tierId: string }>;
   results: { histogram: HistogramCell[]; ballotCount: number };
+}
+
+/** A published tier list the signed-in account holds a ballot on — the
+ *  backend's PublishedTierlistRef shape, minus nothing we use. */
+export interface VotedTierlist {
+  id: string;
+  ownerUserId: string;
+  createdAt: string;
+  voteCode: string;
+  name: string;
+  poolSize: number;
+  ballotCount: number;
+  eligibleVoteCount: number;
+  promotedAt: string | null;
+  votingOpen: boolean;
+}
+
+/** Polls the account has voted on (own ones excluded server-side), latest
+ *  ballot first — the "Voted on" section of the games list. */
+export async function fetchVotedTierlists(): Promise<VotedTierlist[]> {
+  const body = (await apiFetch("/tierlists/voted")) as { tierlists: VotedTierlist[] };
+  return body.tierlists;
 }
 
 /** Public — a voting board resolved by its vote code, books already

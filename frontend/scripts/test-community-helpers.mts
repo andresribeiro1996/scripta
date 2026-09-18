@@ -23,6 +23,7 @@ const tierlist: PublishedContent = {
   name: "Top fantasy",
   poolSize: 12,
   ballotCount: 4,
+  promotedAt: null,
   votingOpen: true
 };
 const tournament: PublishedContent = {

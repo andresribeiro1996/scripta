@@ -30,8 +30,8 @@ export function useTierlists() {
     setTierlists(current().map((t) => (t.id === updated.id ? updated : t)));
   }
 
-  async function create(name: string): Promise<Tierlist> {
-    const created = await createTierlistApi(name);
+  async function create(name: string, data?: TierlistData, access?: "anonymous" | "members"): Promise<Tierlist> {
+    const created = await createTierlistApi(name, data, access);
     setTierlists([...current(), created]);
     return created;
   }

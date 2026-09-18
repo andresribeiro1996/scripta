@@ -22,6 +22,8 @@ export interface Tierlist {
   voteAccess: "anonymous" | "members";
   votingOpen: boolean;
   sourceTierlistId: string | null;
+  promotedAt: string | null;
+  originCreatorId: string;
 }
 
 export async function fetchTierlists(): Promise<Tierlist[]> {
@@ -33,8 +35,8 @@ export async function fetchTierlist(id: string): Promise<Tierlist> {
   return (await apiFetch(`/tierlists/${id}`)) as Tierlist;
 }
 
-export async function createTierlistApi(name: string): Promise<Tierlist> {
-  return (await apiFetch("/tierlists", { method: "POST", body: JSON.stringify({ name }) })) as Tierlist;
+export async function createTierlistApi(name: string, data?: TierlistData, access?: "anonymous" | "members"): Promise<Tierlist> {
+  return (await apiFetch("/tierlists", { method: "POST", body: JSON.stringify({ name, data, access }) })) as Tierlist;
 }
 
 export async function updateTierlistApi(id: string, patch: { name?: string; data?: TierlistData }): Promise<Tierlist> {
