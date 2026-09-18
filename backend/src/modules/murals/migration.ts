@@ -10,6 +10,7 @@
 // not a normal CRUD write.
 
 import { createHash, randomUUID } from "node:crypto";
+import type { DatabaseSync } from "node:sqlite";
 import { openMuralsDb } from "./adapters/sqlite/connection.js";
 
 /** Mirrors modules/library/index.ts's own EmbeddedMuralRow shape — kept
@@ -114,4 +115,17 @@ export function insertMigratedMurals(rows: EmbeddedMuralRow[]): void {
   } finally {
     db.close();
   }
+}
+
+export function listHomeDesignations(db: DatabaseSync = openMuralsDb()): Array<{ userId: string; muralId: string }> {
+  const exists = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'mural_homes'").get();
+  if (!exists) return [];
+  return db.prepare(
+    "SELECT mural_homes.user_id AS userId, mural_homes.mural_id AS muralId FROM mural_homes JOIN murals ON murals.id = mural_homes.mural_id AND murals.user_id = mural_homes.user_id"
+  ).all() as Array<{ userId: string; muralId: string }>;
+}
+
+export function dropMuralHomes(db: DatabaseSync = openMuralsDb()): void {
+  db.exec("DROP TRIGGER IF EXISTS clear_mural_home");
+  db.exec("DROP TABLE IF EXISTS mural_homes");
 }

@@ -21,9 +21,14 @@
 // either module's adapters/domain/service.ts directly.
 
 import { readEmbeddedMurals, clearEmbeddedMuralsField } from "../modules/library/index.js";
-import { insertMigratedMurals } from "../modules/murals/index.js";
+import { insertMigratedMurals, listHomeDesignations, dropMuralHomes } from "../modules/murals/index.js";
+import { applyHomeMuralMigration } from "../modules/community/index.js";
 
 export function runStartupMigrations(): void {
+  const homes = listHomeDesignations();
+  if (homes.length > 0) applyHomeMuralMigration(homes);
+  dropMuralHomes();
+
   const extracted = readEmbeddedMurals();
   if (extracted.length === 0) return;
 
