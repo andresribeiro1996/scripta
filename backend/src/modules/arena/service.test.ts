@@ -495,6 +495,48 @@ test("a signed-in vote stamps the account and backfills the token's earlier anon
   );
 });
 
+test("a signed-in first vote emits voted_on with the tournament's name", () => {
+  const repo = createInMemoryArenaRepository();
+  const emitted: Array<[string, string, string | null]> = [];
+  const service = createArenaService(repo, undefined, (voterUserId, tournamentId, tournamentName) =>
+    emitted.push([voterUserId, tournamentId, tournamentName])
+  );
+  const t = startedTournament(service, "owner-1", "Best of 2025", 10);
+  const duel = service.getTournamentView(t.id)!.duels[0]!;
+
+  service.vote(t.id, duel.id, "token-a", "book-11", "voter-1");
+
+  assert.deepEqual(emitted, [["voter-1", t.id, "Best of 2025"]]);
+});
+
+test("an already-voted duel emits no voted_on event", () => {
+  const repo = createInMemoryArenaRepository();
+  const emitted: Array<[string, string, string | null]> = [];
+  const service = createArenaService(repo, undefined, (voterUserId, tournamentId, tournamentName) =>
+    emitted.push([voterUserId, tournamentId, tournamentName])
+  );
+  const t = startedTournament(service, "owner-1", "Test", 10);
+  const duel = service.getTournamentView(t.id)!.duels[0]!;
+  service.vote(t.id, duel.id, "token-a", "book-11", "voter-1");
+
+  assert.throws(() => service.vote(t.id, duel.id, "token-a", "book-12", "voter-1"), AlreadyVotedError);
+  assert.deepEqual(emitted.length, 1);
+});
+
+test("an anonymous vote emits no voted_on event", () => {
+  const repo = createInMemoryArenaRepository();
+  const emitted: Array<[string, string, string | null]> = [];
+  const service = createArenaService(repo, undefined, (voterUserId, tournamentId, tournamentName) =>
+    emitted.push([voterUserId, tournamentId, tournamentName])
+  );
+  const t = startedTournament(service, "owner-1", "Test", 10);
+  const duel = service.getTournamentView(t.id)!.duels[0]!;
+
+  service.vote(t.id, duel.id, "token-a", "book-11");
+
+  assert.deepEqual(emitted, []);
+});
+
 test("an anonymous vote leaves no participation trail, and own tournaments stay out of listVoted", () => {
   const service = createArenaService(createInMemoryArenaRepository());
   const own = startedTournament(service, "voter-1", "Mine", 0);
