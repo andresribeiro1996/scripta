@@ -85,7 +85,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
       };
     },
     emitEvent(userId, type, refType, refId) {
-      repo.insertEvent({ id: randomUUID(), user_id: userId, type, ref_type: refType, ref_id: refId, created_at: new Date().toISOString() });
+      repo.insertEvent({ id: randomUUID(), user_id: userId, type, ref_type: refType, ref_id: refId, payload: null, created_at: new Date().toISOString() });
     },
     publishProfile(userId, muralId) {
       if (!deps.userHasUsername(userId)) throw new UsernameRequiredError();
@@ -97,7 +97,8 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
         published: 1,
         mural_id: muralId,
         published_at: existing?.published_at ?? now,
-        updated_at: now
+        updated_at: now,
+        feed_settings: existing?.feed_settings ?? null
       });
     },
     unpublishProfile(userId) {
@@ -159,14 +160,14 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
             const ref = deps.tierlists.get(event.ref_id);
             const actor = ref && ref.ownerUserId === event.user_id ? profiles.get(event.user_id) ?? (ref.promotedAt ? { username: "Original creator unavailable", avatarUrl: null, unavailable: true } : undefined) : undefined;
             if (ref && actor) {
-              items.push({ kind: "publication", id: event.id, actor: { ...actor, userId: event.user_id }, type: event.type, content: toTierlistSummary(ref), createdAt: event.created_at });
+              items.push({ kind: "publication", id: event.id, actor: { ...actor, userId: event.user_id }, type: event.type as CommunityEventType, content: toTierlistSummary(ref), createdAt: event.created_at });
               lastIncluded = row;
             }
           } else {
             const ref = deps.tournaments.get(event.ref_id);
             const actor = ref && ref.ownerUserId === event.user_id ? profiles.get(event.user_id) : undefined;
             if (ref && actor) {
-              items.push({ kind: "publication", id: event.id, actor: { ...actor, userId: event.user_id }, type: event.type, content: toTournamentSummary(ref), createdAt: event.created_at });
+              items.push({ kind: "publication", id: event.id, actor: { ...actor, userId: event.user_id }, type: event.type as CommunityEventType, content: toTournamentSummary(ref), createdAt: event.created_at });
               lastIncluded = row;
             }
           }
@@ -231,7 +232,7 @@ export interface CommunityPublicApi {
 export function createCommunityPublicApi(repo: CommunityRepository): CommunityPublicApi {
   return {
     emitEvent(userId, type, refType, refId) {
-      repo.insertEvent({ id: randomUUID(), user_id: userId, type, ref_type: refType, ref_id: refId, created_at: new Date().toISOString() });
+      repo.insertEvent({ id: randomUUID(), user_id: userId, type, ref_type: refType, ref_id: refId, payload: null, created_at: new Date().toISOString() });
     }
   };
 }

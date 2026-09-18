@@ -39,6 +39,10 @@ function createRepoFake() {
     upsertProfile(row) {
       profiles.set(row.user_id, { ...row });
     },
+    getFeedSettings() {
+      return null;
+    },
+    updateFeedSettings() {},
     insertEvent(row) {
       if (events.some((e) => e.ref_type === row.ref_type && e.ref_id === row.ref_id)) return;
       events.push({ ...row });
@@ -123,6 +127,7 @@ function profileRow(userId: string, overrides: Partial<ProfileRow> = {}): Profil
     mural_id: null,
     published_at: "2026-09-01T00:00:00.000Z",
     updated_at: "2026-09-01T00:00:00.000Z",
+    feed_settings: null,
     ...overrides
   };
 }
