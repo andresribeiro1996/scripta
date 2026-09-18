@@ -14,7 +14,7 @@
 //
 //   0. Claim this worktree's port slot from the shared registry
 //      (scripts/devRegistry.mjs) and lease one of the two AVDs
-//      (scripta-dev-0/1) from the same registry — see AGENTS.md's Rules
+//      (scripta-dev-0/1) from the same registry — see docs/dev-workflow.md
 //      for when to take one. `npm run dev:release` hands both back.
 //   1. Boot the leased AVD if it isn't already running (creating it
 //      first, on a machine that's never run this before). No lock

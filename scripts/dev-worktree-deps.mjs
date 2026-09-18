@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Run right after creating a worktree (EnterWorktree, or `git worktree add`)
 // so a new agent session gets a working install without paying for a full
-// `npm install` across the monorepo. See AGENTS.md's "Working across
-// concurrent agents" for when this runs.
+// `npm install` across the monorepo. See docs/dev-workflow.md's "Concurrent
+// agents and worktrees" for when this runs.
 //
 // Fast path: symlink node_modules from the primary checkout wherever the
 // worktree's root package-lock.json matches it byte-for-byte (see
