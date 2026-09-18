@@ -3,10 +3,11 @@ import { Stack } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Linking from "expo-linking";
-import { FlatList, RefreshControl, ScrollView, Share, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Text, View } from "react-native";
 import { countdownLabel, createVoterToken, sharePercent, type Duel, type DuelSide } from "@scripta/shared";
 import { useAuth } from "../../core/auth";
 import { Button, Dialog, EmptyState, ErrorState, IconButton, Input, Menu, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { AddBookSheet } from "../community/AddBookSheet";
 import { fetchTournament, renameTournament, resolveTiebreak, settleDuelEarly, voteOnDuel } from "./api";
 import { ARENA_VIEW_TABS, bracketSlots, matchEmptyCopy, votableDuels, type ArenaViewTab } from "./arenaView";
 import { ArenaVoteDeck } from "./ArenaVoteDeck";
@@ -15,18 +16,18 @@ import { BookCover } from "./BookCover";
 
 const TOKEN_KEY = "arena-voter-token";
 
-function Side({ side, duel }: { side: DuelSide; duel: Duel }) {
+function Side({ side, duel, onAddBook }: { side: DuelSide; duel: Duel; onAddBook: (side: DuelSide) => void }) {
   const { colors } = useTheme();
   const percent = sharePercent(side.votes, duel);
   return (
-    <View accessibilityLabel={`${side.title} by ${side.author}`} style={[styles.side, { borderColor: duel.winnerKey === side.key ? colors.success : colors.border }]}>
+    <Pressable accessibilityLabel={`${side.title} by ${side.author}`} onPress={() => onAddBook(side)} style={[styles.side, { borderColor: duel.winnerKey === side.key ? colors.success : colors.border }]}>
       <BookCover cover={side.cover} title={side.title} width={46} height={66} />
       <View style={styles.grow}>
         <Text numberOfLines={2} {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{side.title}</Text>
         <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{side.author}</Text>
         <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{side.votes} votes{percent === null ? "" : ` · ${percent}%`}</Text>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -41,7 +42,13 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState("");
   const [booksOpen, setBooksOpen] = useState(false);
+  const [addBook, setAddBook] = useState<{ title: string; author: string; coverUrl?: string | null } | null>(null);
   const [, setTick] = useState(0);
+
+  function openAddBook(book: { title: string; author: string; coverUrl?: string | null }) {
+    setBooksOpen(false);
+    setAddBook(book);
+  }
 
   useEffect(() => {
     void AsyncStorage.getItem(TOKEN_KEY).then(async (stored) => {
@@ -118,8 +125,8 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
           if (!duel) return <View style={[styles.emptySlot, { borderColor: colors.border }]}><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Waiting for earlier round</Text></View>;
           return <View style={[styles.duel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Round {duel.roundNumber} · Match {duel.duelIndex + 1} · {duel.status === "active" ? countdownLabel(duel.closesAt) : duel.status === "tied_pending_tiebreak" ? "Owner tiebreak needed" : "Settled"}</Text>
-            <Side side={duel.bookA} duel={duel} />
-            <Side side={duel.bookB} duel={duel} />
+            <Side side={duel.bookA} duel={duel} onAddBook={(side) => openAddBook({ title: side.title, author: side.author, coverUrl: side.cover })} />
+            <Side side={duel.bookB} duel={duel} onAddBook={(side) => openAddBook({ title: side.title, author: side.author, coverUrl: side.cover })} />
             {isOwner && duel.status === "active" ? <Button label="Settle now" variant="secondary" loading={busy === duel.id} onPress={() => void action(duel.id, () => settleDuelEarly(id, duel.id))} /> : null}
             {isOwner && duel.status === "tied_pending_tiebreak" ? <View style={styles.row}><Button label={`${duel.bookA.title} wins`} loading={busy === duel.id} onPress={() => void action(duel.id, () => resolveTiebreak(id, duel.id, duel.bookA.key))} /><Button label={`${duel.bookB.title} wins`} loading={busy === duel.id} onPress={() => void action(duel.id, () => resolveTiebreak(id, duel.id, duel.bookB.key))} /></View> : null}
           </View>;
@@ -156,7 +163,8 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
         renderPage={(pageTab) => pageTab === "match" ? matchPane() : bracketPane()}
       />
       <Button label={data.slots.length ? `See all ${data.slots.length} books` : "View book pool"} variant="secondary" onPress={() => setBooksOpen(true)} />
-      <ArenaBooksSheet id={booksOpen ? id : null} name={data.name} onClose={() => setBooksOpen(false)} />
+      <ArenaBooksSheet id={booksOpen ? id : null} name={data.name} onAddBook={openAddBook} onClose={() => setBooksOpen(false)} />
+      {addBook ? <AddBookSheet book={addBook} onClose={() => setAddBook(null)} /> : null}
       <Dialog visible={renaming} title="Rename tournament" onClose={() => setRenaming(false)}><View style={styles.dialog}><Input label="Tournament name" value={name} onChangeText={setName} maxLength={200} /><Button label="Save name" disabled={!name.trim()} loading={busy === "rename"} onPress={() => void action("rename", async () => { await renameTournament(id, name.trim()); setRenaming(false); })} /></View></Dialog>
     </Screen>
   );

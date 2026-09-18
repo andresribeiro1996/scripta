@@ -23,18 +23,18 @@ export function useLibrary() {
   const queryClient = useQueryClient();
   const query = useQuery({ queryKey: LIBRARY_QUERY_KEY, queryFn: fetchLibrary });
 
-  async function updateLibrary(updater: (current: LibraryData) => LibraryData): Promise<LibraryDocument> {
+  async function updateLibrary(updater: (current: LibraryData) => LibraryData, source?: "import"): Promise<LibraryDocument> {
     const current = queryClient.getQueryData<LibraryDocument | null>(LIBRARY_QUERY_KEY);
     const base: LibraryData = current?.data ?? { books: [] };
     try {
-      const saved = await saveLibrary(updater(base), current?.updatedAt);
+      const saved = await saveLibrary(updater(base), current?.updatedAt, source);
       queryClient.setQueryData(LIBRARY_QUERY_KEY, saved);
       return saved;
     } catch (err) {
       if (!(err instanceof LibraryConflictError)) throw err;
       const fresh = await fetchLibrary();
       const freshBase: LibraryData = fresh?.data ?? { books: [] };
-      const saved = await saveLibrary(updater(freshBase), fresh?.updatedAt);
+      const saved = await saveLibrary(updater(freshBase), fresh?.updatedAt, source);
       queryClient.setQueryData(LIBRARY_QUERY_KEY, saved);
       return saved;
     }
