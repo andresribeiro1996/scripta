@@ -48,6 +48,14 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
   const getDuelStmt = db.prepare(`SELECT * FROM duels WHERE id = ?`);
   const getDuelsForTournamentStmt = db.prepare(`SELECT * FROM duels WHERE tournament_id = ? ORDER BY round_number ASC, duel_index ASC`);
   const getDuelsForRoundStmt = db.prepare(`SELECT * FROM duels WHERE tournament_id = ? AND round_number = ? ORDER BY duel_index ASC`);
+  // Same dynamic-IN-list idiom as seedPreviewStmt. The correlated subquery
+  // picks each tournament's own highest round_number — idx_duels_tournament_round
+  // (schema.sql) makes that cheap per row.
+  const finalDuelsStmt = (count: number) =>
+    db.prepare(
+      `SELECT * FROM duels d WHERE d.tournament_id IN (${new Array(count).fill("?").join(", ")}) ` +
+        `AND d.round_number = (SELECT MAX(d2.round_number) FROM duels d2 WHERE d2.tournament_id = d.tournament_id)`
+    );
   const updateDuelSettlementStmt = db.prepare(`
     UPDATE duels SET status = $status, winner_key = $winner_key, settled_at = $settled_at WHERE id = $id
   `);
@@ -59,11 +67,30 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
   // staying "already voted" — same reasoning modules/covers' own
   // cover_cache insert already documents.
   const insertVoteStmt = db.prepare(`
-    INSERT OR IGNORE INTO votes (id, duel_id, voter_token, book_key, created_at)
-    VALUES ($id, $duel_id, $voter_token, $book_key, $created_at)
+    INSERT OR IGNORE INTO votes (id, duel_id, voter_token, voter_user_id, book_key, created_at)
+    VALUES ($id, $duel_id, $voter_token, $voter_user_id, $book_key, $created_at)
   `);
+  // Backfill only — never overwrites an account already stamped onto a
+  // vote (voter_user_id IS NULL guard), so two accounts sharing a browser
+  // can't rewrite each other's history after the first claim.
+  const linkVotesStmt = db.prepare(
+    `UPDATE votes SET voter_user_id = $user WHERE voter_token = $token AND voter_user_id IS NULL`
+  );
   const countVotesStmt = db.prepare(`SELECT book_key, COUNT(*) as n FROM votes WHERE duel_id = ? GROUP BY book_key`);
   const hasVotedStmt = db.prepare(`SELECT 1 FROM votes WHERE duel_id = ? AND voter_token = ?`);
+  // GROUP BY t.id with the MAX aggregate in ORDER BY — SQLite allows the
+  // aggregate without selecting it. Own tournaments are excluded because
+  // they already appear in the owner list; a tournament can only be voted
+  // in once started, so no seeding-status filter is needed.
+  const listVotedByUserStmt = db.prepare(`
+    SELECT t.*, MAX(v.created_at) AS last_vote_at
+    FROM votes v
+    JOIN duels d ON d.id = v.duel_id
+    JOIN tournaments t ON t.id = d.tournament_id
+    WHERE v.voter_user_id = ? AND t.owner_user_id != ?
+    GROUP BY t.id
+    ORDER BY last_vote_at DESC
+  `);
 
   return {
     insertTournament(row) {
@@ -165,6 +192,10 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
     getDuelsForRound(tournamentId, roundNumber) {
       return getDuelsForRoundStmt.all(tournamentId, roundNumber) as unknown as DuelRow[];
     },
+    getFinalDuels(tournamentIds) {
+      if (tournamentIds.length === 0) return [];
+      return finalDuelsStmt(tournamentIds.length).all(...tournamentIds) as unknown as DuelRow[];
+    },
     updateDuelSettlement(id, status, winnerKey, settledAt) {
       updateDuelSettlementStmt.run({ $id: id, $status: status, $winner_key: winnerKey, $settled_at: settledAt });
     },
@@ -177,10 +208,14 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
         $id: row.id,
         $duel_id: row.duel_id,
         $voter_token: row.voter_token,
+        $voter_user_id: row.voter_user_id,
         $book_key: row.book_key,
         $created_at: row.created_at
       });
       return result.changes > 0;
+    },
+    linkVotesToUser(voterToken, voterUserId) {
+      linkVotesStmt.run({ $token: voterToken, $user: voterUserId });
     },
     countVotesByBook(duelId) {
       const rows = countVotesStmt.all(duelId) as unknown as Array<{ book_key: string; n: number }>;
@@ -190,6 +225,9 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
     },
     hasVoted(duelId, voterToken) {
       return hasVotedStmt.get(duelId, voterToken) !== undefined;
+    },
+    listVotedByUser(voterUserId) {
+      return listVotedByUserStmt.all(voterUserId, voterUserId) as unknown as TournamentRow[];
     }
   };
 }

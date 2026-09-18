@@ -1,6 +1,6 @@
 import type { ReaderProfile } from "../murals/murals.js";
 
-export type CommunityAuthor = ReaderProfile & { userId: string };
+export type CommunityAuthor = ReaderProfile & { userId: string; unavailable?: boolean };
 
 export interface FollowState {
   following: boolean;
@@ -16,6 +16,7 @@ export interface TierlistSummary {
   poolSize: number;
   ballotCount: number;
   votingOpen: boolean;
+  promotedAt: string | null;
 }
 
 export interface TournamentSummary {

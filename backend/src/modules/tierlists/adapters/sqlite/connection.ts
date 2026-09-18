@@ -32,6 +32,12 @@ export function applyTierlistsMigrations(db: DatabaseSync): void {
     if (!has("vote_access")) db.exec(`ALTER TABLE tierlists ADD COLUMN vote_access TEXT NOT NULL DEFAULT 'anonymous'`);
     if (!has("voting_open")) db.exec(`ALTER TABLE tierlists ADD COLUMN voting_open INTEGER NOT NULL DEFAULT 0`);
     if (!has("source_tierlist_id")) db.exec(`ALTER TABLE tierlists ADD COLUMN source_tierlist_id TEXT`);
+    if (!has("promoted_at")) db.exec(`ALTER TABLE tierlists ADD COLUMN promoted_at TEXT`);
+    if (!has("public_books")) db.exec(`ALTER TABLE tierlists ADD COLUMN public_books TEXT`);
+    if (!has("origin_user_id")) {
+      db.exec(`ALTER TABLE tierlists ADD COLUMN origin_user_id TEXT`);
+      db.exec(`UPDATE tierlists SET origin_user_id = owner_user_id WHERE origin_user_id IS NULL`);
+    }
 
     // Re-run schema to create any missing tables and indexes
     db.exec(schema);

@@ -18,7 +18,12 @@ import type { BallotOutcome, TierlistsService, Voter } from "./service.js";
 const idParamSchema = z.object({ id: z.string().uuid() });
 
 const createTierlistSchema = z.object({
-  name: z.string().min(1, "name is required and must be non-empty.")
+  name: z.string().trim().min(1, "name is required and must be non-empty.").max(200),
+  data: z.object({
+    tiers: z.array(z.object({ id: z.string().min(1), label: z.string().trim().min(1).max(30), color: z.string().regex(/^#[0-9a-f]{6}$/i), bookKeys: z.array(z.string().min(1)) })).min(1),
+    pool: z.array(z.string().min(1)).max(500)
+  }).optional(),
+  access: z.enum(["anonymous", "members"]).optional()
 });
 
 // Deliberately light-touch, same treatment modules/murals/routes.ts gives
@@ -60,12 +65,27 @@ export function buildTierlistRoutes(service: TierlistsService) {
       return reply.send({ tierlists: service.listTierlists(request.user.id) });
     });
 
+    app.get("/tierlists/voted", { preHandler: authGuard }, async (request, reply) => {
+      return reply.send({ tierlists: service.listVotedByUser(request.user.id) });
+    });
+
     app.post("/tierlists", { preHandler: authGuard }, async (request, reply) => {
       const parsed = createTierlistSchema.safeParse(request.body);
       if (!parsed.success) {
         return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? "Invalid request." });
       }
-      const tierlist = service.createTierlist(request.user.id, parsed.data.name);
+      const { name, data, access } = parsed.data;
+      if (access && !data) return reply.code(400).send({ error: "Choose books and tiers before publishing." });
+      if (data) {
+        const ids = data.tiers.map((tier) => tier.id);
+        const allKeys = [...data.pool, ...data.tiers.flatMap((tier) => tier.bookKeys)];
+        if (new Set(ids).size !== ids.length || new Set(allKeys).size !== allKeys.length) return reply.code(400).send({ error: "Duplicate tier or book." });
+        if (access && (!data.pool.length || data.tiers.some((tier) => tier.bookKeys.length))) return reply.code(400).send({ error: "Public tier lists need an unranked book pool." });
+      }
+      const keys = data ? [...new Set([...data.pool, ...data.tiers.flatMap((tier) => tier.bookKeys)])] : [];
+      const publicBooks = access ? resolvePublicLibraryData(request.user.id, { bookKeys: keys, highlightRefs: [], needsCurrentlyReading: false, statsMetrics: [] }).books : [];
+      if (access && publicBooks.length !== keys.length) return reply.code(400).send({ error: "A selected book is no longer in your library." });
+      const tierlist = service.createTierlist(request.user.id, name, data, access, publicBooks);
       return reply.code(201).send(tierlist);
     });
 
@@ -118,7 +138,12 @@ export function buildTierlistRoutes(service: TierlistsService) {
       if (!body.success) {
         return reply.code(400).send({ error: body.error.issues[0]?.message ?? "Invalid request." });
       }
-      const tierlist = service.openVoting(request.user.id, params.data.id, body.data.access);
+      const owned = service.getTierlist(request.user.id, params.data.id);
+      if (!owned) return reply.code(404).send({ error: "No tier list with that id." });
+      const data = owned.data as { pool?: string[]; tiers?: Array<{ bookKeys?: string[] }> };
+      const keys = [...new Set([...(data.pool ?? []), ...(data.tiers ?? []).flatMap((tier) => tier.bookKeys ?? [])])];
+      const publicBooks = resolvePublicLibraryData(request.user.id, { bookKeys: keys, highlightRefs: [], needsCurrentlyReading: false, statsMetrics: [] }).books;
+      const tierlist = service.openVoting(request.user.id, params.data.id, body.data.access, publicBooks);
       if (!tierlist) {
         return reply.code(404).send({ error: "No tier list with that id." });
       }
@@ -189,7 +214,7 @@ export function buildPublicTierlistRoutes(service: TierlistsService) {
       // Same privacy boundary the shared-mural route enforces: book keys
       // become redacted public book shapes via library's own resolver,
       // never a raw read of the owner's library.
-      const libraryData = resolvePublicLibraryData(board.ownerUserId, {
+      const libraryData = board.publicBooks !== null ? { books: board.publicBooks } : resolvePublicLibraryData(board.ownerUserId, {
         bookKeys: board.pool,
         highlightRefs: [],
         needsCurrentlyReading: false,
@@ -214,6 +239,8 @@ export function buildPublicTierlistRoutes(service: TierlistsService) {
           access: board.access,
           votingOpen: board.votingOpen,
           ballotCount: board.ballotCount,
+          eligibleVoteCount: board.eligibleVoteCount,
+          promotedAt: board.promotedAt,
           ...(board.votingOpen ? {} : { histogram: board.histogram })
         },
         books: libraryData.books

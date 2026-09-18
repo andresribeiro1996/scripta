@@ -15,8 +15,27 @@ export function openArenaDb(): DatabaseSync {
   const db = new DatabaseSync(env.ARENA_DB_PATH);
   db.exec("PRAGMA journal_mode = WAL");
 
-  const schema = readFileSync(`${adapterDir}/schema.sql`, "utf8");
-  db.exec(schema);
+  applyArenaMigrations(db);
 
   return db;
+}
+
+/** Schema + column migrations, split out from openArenaDb so it can run
+ *  against an in-memory database in tests — same shape as
+ *  modules/tierlists' applyTierlistsMigrations. The voter_user_id ALTER
+ *  must run BEFORE the schema: schema.sql's partial index on the column
+ *  would fail to create against a pre-existing votes table that lacks it. */
+export function applyArenaMigrations(db: DatabaseSync): void {
+  const votesExists = db
+    .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='votes'`)
+    .get() as { name: string } | undefined;
+  if (votesExists) {
+    const columns = db.prepare(`PRAGMA table_info(votes)`).all() as { name: string }[];
+    if (!columns.some((column) => column.name === "voter_user_id")) {
+      db.exec(`ALTER TABLE votes ADD COLUMN voter_user_id TEXT`);
+    }
+  }
+
+  const schema = readFileSync(`${adapterDir}/schema.sql`, "utf8");
+  db.exec(schema);
 }

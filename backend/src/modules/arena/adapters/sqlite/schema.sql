@@ -69,13 +69,22 @@ CREATE INDEX IF NOT EXISTS idx_duels_status_closes_at ON duels(status, closes_at
 -- account needed" possible at all. The UNIQUE constraint is what makes a
 -- vote lock in once cast (INSERT OR IGNORE in the adapter, same
 -- race-safe idiom modules/covers already uses for first-write-wins).
+--
+-- voter_user_id is the signed-in counterpart: NULL for a truly anonymous
+-- vote, the account id once someone votes with a session. Voting signed
+-- in also backfills it onto every earlier vote cast under the same
+-- voter_token, so the per-device history folds into the account.
 CREATE TABLE IF NOT EXISTS votes (
   id            TEXT PRIMARY KEY,
   duel_id       TEXT NOT NULL REFERENCES duels(id) ON DELETE CASCADE,
   voter_token   TEXT NOT NULL,
+  voter_user_id TEXT,
   book_key      TEXT NOT NULL,
   created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   UNIQUE (duel_id, voter_token)
 );
 
 CREATE INDEX IF NOT EXISTS idx_votes_duel_book ON votes(duel_id, book_key);
+-- Backs "tournaments I voted in" (listVotedByUser) — partial, so the
+-- anonymous majority of rows stays out of the index.
+CREATE INDEX IF NOT EXISTS idx_votes_voter_user ON votes(voter_user_id) WHERE voter_user_id IS NOT NULL;

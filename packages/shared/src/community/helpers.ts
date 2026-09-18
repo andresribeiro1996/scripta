@@ -6,7 +6,7 @@ export function contentKindLabel(content: PublishedContent): string {
 
 export function contentDetail(content: PublishedContent): string {
   if (content.kind === "tierlist") {
-    return `${content.poolSize} books · ${content.ballotCount} ballots${content.votingOpen ? "" : " · closed"}`;
+    return `${content.poolSize} books · ${content.ballotCount} ballots${content.promotedAt ? " · permanent reference" : content.votingOpen ? "" : " · closed"}`;
   }
   return `${content.bracketSize}-book bracket · ${content.status}`;
 }

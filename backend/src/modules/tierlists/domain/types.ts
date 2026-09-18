@@ -11,19 +11,22 @@ export type VoteAccess = "anonymous" | "members";
  *  object."
  *
  *  The voting columns are the one exception to that opacity, and only
- *  for community copies: see service.ts's openVoting and validatePlacements. */
+ *  for public tier lists: see service.ts's openVoting and validatePlacements. */
 export interface TierlistRow {
   id: string;
   owner_user_id: string;
+  origin_user_id: string;
   name: string;
   data: string;
-  /** NULL on an ordinary tier list; a short public code on a community copy. */
+  /** NULL on a private tier list; a short code once published. */
   vote_code: string | null;
   vote_access: VoteAccess;
   /** SQLite has no BOOLEAN — 0 or 1. */
   voting_open: number;
-  /** NULL unless this row is a community copy, then the original's id. */
+  /** Legacy link from public copies created before single-row publication. */
   source_tierlist_id: string | null;
+  promoted_at: string | null;
+  public_books: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -38,6 +41,8 @@ export interface Tierlist {
   voteAccess: VoteAccess;
   votingOpen: boolean;
   sourceTierlistId: string | null;
+  promotedAt: string | null;
+  originCreatorId: string;
   createdAt: string;
   updatedAt: string;
 }

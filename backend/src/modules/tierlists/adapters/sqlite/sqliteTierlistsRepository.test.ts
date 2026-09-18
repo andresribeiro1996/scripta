@@ -75,8 +75,8 @@ test("applyTierlistsMigrations is idempotent", () => {
 test("vote_code is unique but many rows may leave it NULL", () => {
   const db = freshDb();
   const insert = db.prepare(
-    `INSERT INTO tierlists (id, owner_user_id, name, data, created_at, updated_at, vote_code)
-     VALUES (?, 'u1', 'n', '{}', '2026-01-01', '2026-01-01', ?)`
+    `INSERT INTO tierlists (id, owner_user_id, origin_user_id, name, data, created_at, updated_at, vote_code)
+     VALUES (?, 'u1', 'u1', 'n', '{}', '2026-01-01', '2026-01-01', ?)`
   );
   insert.run("a", null);
   insert.run("b", null);
@@ -90,16 +90,24 @@ import type { BallotRow, TierlistRow } from "../../domain/types.js";
 function row(overrides: Partial<TierlistRow> & { id: string }): TierlistRow {
   return {
     owner_user_id: "u1",
+    origin_user_id: "u1",
     name: "List",
     data: JSON.stringify({ tiers: [{ id: "s", label: "S", color: "#fff", bookKeys: [] }], pool: ["b1", "b2"] }),
     vote_code: null,
     vote_access: "anonymous",
     voting_open: 0,
     source_tierlist_id: null,
+    promoted_at: null,
+    public_books: null,
     created_at: "2026-01-01T00:00:00.000Z",
     updated_at: "2026-01-01T00:00:00.000Z",
     ...overrides
   };
+}
+
+function insertPublished(repo: ReturnType<typeof createSqliteTierlistsRepository>, item: TierlistRow, vote: BallotRow, placements: { bookKey: string; tierId: string }[]) {
+  repo.insert(item);
+  repo.saveBallot(vote, placements);
 }
 
 function ballot(overrides: Partial<BallotRow> & { id: string; tierlist_id: string }): BallotRow {
@@ -111,10 +119,10 @@ function ballot(overrides: Partial<BallotRow> & { id: string; tierlist_id: strin
   };
 }
 
-test("insertCommunityCopy stores the copy with its seeded ballot atomically", () => {
+test("publish updates one row with its seeded ballot atomically", () => {
   const repo = createSqliteTierlistsRepository(freshDb());
-  repo.insertCommunityCopy(
-    row({ id: "c1", vote_code: "abc12345", voting_open: 1, source_tierlist_id: "t1" }),
+  repo.insert(row({ id: "c1" }));
+  const published = repo.publish("c1", "u1", row({ id: "c1" }).data, "anonymous", "abc12345", "[]",
     ballot({ id: "bal1", tierlist_id: "c1", voter_user_id: "u1" }),
     [
       { bookKey: "b1", tierId: "s" },
@@ -122,12 +130,38 @@ test("insertCommunityCopy stores the copy with its seeded ballot atomically", ()
     ]
   );
 
+  assert.equal(published?.id, "c1");
+  assert.equal(repo.listByUser("u1").length, 1);
   assert.equal(repo.getByVoteCode("abc12345")?.id, "c1");
   assert.equal(repo.ballotCount("c1"), 1);
   assert.deepEqual(repo.getPlacements("bal1"), [
     { bookKey: "b1", tierId: "s" },
     { bookKey: "b2", tierId: "s" }
   ]);
+  assert.equal(repo.publish("c1", "u1", "{}", "members", "second", "[]", ballot({ id: "bal2", tierlist_id: "c1" }), []), undefined);
+});
+
+test("promotion removes creator control and preserves public results", () => {
+  const repo = createSqliteTierlistsRepository(freshDb());
+  insertPublished(repo, row({ id: "c1", vote_code: "code", voting_open: 1 }), ballot({ id: "owner", tierlist_id: "c1", voter_user_id: "u1" }), []);
+  repo.saveBallot(ballot({ id: "reader", tierlist_id: "c1", voter_user_id: "u2" }), [{ bookKey: "b1", tierId: "s" }]);
+  assert.equal(repo.eligibleVoteCount("c1", "u1"), 1);
+  repo.promote("c1", "2026-02-01T00:00:00.000Z");
+  assert.equal(repo.getOwned("c1", "u1"), undefined);
+  assert.equal(repo.getPublicById("c1")?.owner_user_id, "__app__");
+  assert.equal(repo.getPublicById("c1")?.origin_user_id, "u1");
+  assert.equal(repo.delete("c1", "u1"), false);
+  assert.equal(repo.getPublicById("c1")?.promoted_at, "2026-02-01T00:00:00.000Z");
+  assert.equal(repo.histogram("c1")[0]?.votes, 1);
+});
+
+test("creator deletion removes a public list and its ballots before promotion", () => {
+  const repo = createSqliteTierlistsRepository(freshDb());
+  insertPublished(repo, row({ id: "c1", vote_code: "code", voting_open: 1 }), ballot({ id: "v1", tierlist_id: "c1", voter_user_id: "u2" }), [{ bookKey: "b1", tierId: "s" }]);
+  assert.equal(repo.delete("c1", "u1"), true);
+  assert.equal(repo.getByVoteCode("code"), undefined);
+  assert.equal(repo.ballotCount("c1"), 0);
+  assert.deepEqual(repo.histogram("c1"), []);
 });
 
 test("getByVoteCode returns undefined for an unknown code", () => {
@@ -137,7 +171,7 @@ test("getByVoteCode returns undefined for an unknown code", () => {
 
 test("histogram counts each book-tier pair across ballots", () => {
   const repo = createSqliteTierlistsRepository(freshDb());
-  repo.insertCommunityCopy(row({ id: "c1", vote_code: "code", voting_open: 1 }), ballot({ id: "bal1", tierlist_id: "c1" }), [
+  insertPublished(repo, row({ id: "c1", vote_code: "code", voting_open: 1 }), ballot({ id: "bal1", tierlist_id: "c1" }), [
     { bookKey: "b1", tierId: "s" }
   ]);
   repo.saveBallot(ballot({ id: "bal2", tierlist_id: "c1" }), [
@@ -153,7 +187,7 @@ test("histogram counts each book-tier pair across ballots", () => {
 
 test("saveBallot replaces a ballot's placements rather than appending", () => {
   const repo = createSqliteTierlistsRepository(freshDb());
-  repo.insertCommunityCopy(row({ id: "c1", vote_code: "code", voting_open: 1 }), ballot({ id: "bal1", tierlist_id: "c1" }), [
+  insertPublished(repo, row({ id: "c1", vote_code: "code", voting_open: 1 }), ballot({ id: "bal1", tierlist_id: "c1" }), [
     { bookKey: "b1", tierId: "s" }
   ]);
   repo.saveBallot(ballot({ id: "bal1", tierlist_id: "c1" }), [{ bookKey: "b1", tierId: "a" }]);
@@ -164,7 +198,7 @@ test("saveBallot replaces a ballot's placements rather than appending", () => {
 
 test("an account cannot hold two ballots on one tier list", () => {
   const repo = createSqliteTierlistsRepository(freshDb());
-  repo.insertCommunityCopy(row({ id: "c1", vote_code: "code", voting_open: 1 }), ballot({ id: "bal1", tierlist_id: "c1", voter_user_id: "u9" }), []);
+  insertPublished(repo, row({ id: "c1", vote_code: "code", voting_open: 1 }), ballot({ id: "bal1", tierlist_id: "c1", voter_user_id: "u9" }), []);
   assert.throws(() => repo.saveBallot(ballot({ id: "bal2", tierlist_id: "c1", voter_user_id: "u9" }), []));
   assert.equal(repo.getBallotByVoter("c1", "u9")?.id, "bal1");
 });
@@ -172,8 +206,8 @@ test("an account cannot hold two ballots on one tier list", () => {
 test("listPublic returns only community copies, newest first", () => {
   const repo = createSqliteTierlistsRepository(freshDb());
   repo.insert(row({ id: "private1" }));
-  repo.insertCommunityCopy(row({ id: "c1", vote_code: "aaa", created_at: "2026-01-01T00:00:00.000Z" }), ballot({ id: "b1", tierlist_id: "c1" }), []);
-  repo.insertCommunityCopy(row({ id: "c2", vote_code: "bbb", created_at: "2026-02-01T00:00:00.000Z" }), ballot({ id: "b2", tierlist_id: "c2" }), []);
+  insertPublished(repo, row({ id: "c1", vote_code: "aaa", created_at: "2026-01-01T00:00:00.000Z" }), ballot({ id: "b1", tierlist_id: "c1" }), []);
+  insertPublished(repo, row({ id: "c2", vote_code: "bbb", created_at: "2026-02-01T00:00:00.000Z" }), ballot({ id: "b2", tierlist_id: "c2" }), []);
 
   assert.deepEqual(repo.listPublic(10, 0).map((t) => t.id), ["c2", "c1"]);
   assert.deepEqual(repo.listPublic(1, 1).map((t) => t.id), ["c1"]);
@@ -182,7 +216,7 @@ test("listPublic returns only community copies, newest first", () => {
 
 test("setVoting changes access and open state, ownership-checked", () => {
   const repo = createSqliteTierlistsRepository(freshDb());
-  repo.insertCommunityCopy(row({ id: "c1", vote_code: "code", voting_open: 1 }), ballot({ id: "b1", tierlist_id: "c1" }), []);
+  insertPublished(repo, row({ id: "c1", vote_code: "code", voting_open: 1 }), ballot({ id: "b1", tierlist_id: "c1" }), []);
 
   assert.equal(repo.setVoting("c1", "u2", { voting_open: 0 }), undefined);
   const updated = repo.setVoting("c1", "u1", { vote_access: "members", voting_open: 0 });
