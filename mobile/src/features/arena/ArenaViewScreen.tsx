@@ -8,8 +8,9 @@ import { countdownLabel, createVoterToken, sharePercent, type Duel, type DuelSid
 import { useAuth } from "../../core/auth";
 import { Button, Dialog, EmptyState, ErrorState, IconButton, Input, Menu, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { fetchTournament, renameTournament, resolveTiebreak, settleDuelEarly, voteOnDuel } from "./api";
-import { ARENA_VIEW_TABS, bracketSlots, matchEmptyCopy, votableDuels, waitingLabel, type ArenaViewTab } from "./arenaView";
+import { ARENA_VIEW_TABS, bracketSlots, matchEmptyCopy, votableDuels, type ArenaViewTab } from "./arenaView";
 import { ArenaVoteDeck } from "./ArenaVoteDeck";
+import { ArenaBooksSheet } from "./ArenaBooksSheet";
 import { BookCover } from "./BookCover";
 
 const TOKEN_KEY = "arena-voter-token";
@@ -39,6 +40,7 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
   const [error, setError] = useState<string | null>(null);
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState("");
+  const [booksOpen, setBooksOpen] = useState(false);
   const [, setTick] = useState(0);
 
   useEffect(() => {
@@ -87,11 +89,10 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
     if (next) {
       return (
         <View style={styles.matchWrap}>
-          <Text {...dynamicType} style={[typography.caption, styles.center, { color: colors.textDim }]}>{waitingLabel(votable.length)}</Text>
           <ArenaVoteDeck
             duel={next}
             disabled={busy === next.id}
-            onVote={(bookKey) => void action(next.id, () => voteOnDuel(id, next.id, token, bookKey))}
+            onVote={(bookKey) => void action(next.id, () => voteOnDuel(id, next.id, token, bookKey, Boolean(user)))}
           />
         </View>
       );
@@ -100,28 +101,6 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
       <ScrollView style={styles.grow} contentContainerStyle={styles.pane} refreshControl={<RefreshControl refreshing={tournament.isRefetching} onRefresh={refresh} />}>
         <EmptyState title={empty.title} body={empty.body} />
       </ScrollView>
-    );
-  };
-
-  const booksPane = () => {
-    return (
-      <FlatList
-        data={data.slots}
-        keyExtractor={(slot) => String(slot.slotIndex)}
-        contentContainerStyle={styles.list}
-        refreshing={tournament.isRefetching}
-        onRefresh={refresh}
-        ListEmptyComponent={<EmptyState title="No books seeded" body="Seed the bracket to fill it." />}
-        renderItem={({ item }) => (
-          <View style={[styles.side, { borderColor: colors.border }]}>
-            <BookCover cover={item.cover} title={item.title} width={46} height={66} />
-            <View style={styles.grow}>
-              <Text numberOfLines={2} {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{item.title}</Text>
-              <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{item.author}</Text>
-            </View>
-          </View>
-        )}
-      />
     );
   };
 
@@ -168,15 +147,16 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
           ),
         }}
       />
-      <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{data.bracketSize} books · {data.status === "active" ? `Round ${data.currentRound}` : data.status}</Text>
       {error ? <Toast visible message={error} tone="error" /> : null}
       <SwipeableTabs
         accessibilityLabel="Tournament view"
-        options={ARENA_VIEW_TABS}
+        options={ARENA_VIEW_TABS.map((option) => option.value === "match" ? { ...option, badge: votable.length } : option)}
         value={tab}
         onChange={setTab}
-        renderPage={(pageTab) => pageTab === "match" ? matchPane() : pageTab === "books" ? booksPane() : bracketPane()}
+        renderPage={(pageTab) => pageTab === "match" ? matchPane() : bracketPane()}
       />
+      <Button label={data.slots.length ? `See all ${data.slots.length} books` : "View book pool"} variant="secondary" onPress={() => setBooksOpen(true)} />
+      <ArenaBooksSheet id={booksOpen ? id : null} name={data.name} onClose={() => setBooksOpen(false)} />
       <Dialog visible={renaming} title="Rename tournament" onClose={() => setRenaming(false)}><View style={styles.dialog}><Input label="Tournament name" value={name} onChangeText={setName} maxLength={200} /><Button label="Save name" disabled={!name.trim()} loading={busy === "rename"} onPress={() => void action("rename", async () => { await renameTournament(id, name.trim()); setRenaming(false); })} /></View></Dialog>
     </Screen>
   );
@@ -186,10 +166,9 @@ const styles = StyleSheet.create({
   screen: { padding: spacing.lg, gap: spacing.md },
   grow: { flex: 1 },
   strong: { fontWeight: "700" },
-  center: { textAlign: "center" },
   row: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   pane: { gap: spacing.md, paddingBottom: spacing.huge, flexGrow: 1, justifyContent: "center" },
-  matchWrap: { flex: 1, gap: spacing.md },
+  matchWrap: { flex: 1, paddingTop: spacing.lg, justifyContent: "center" },
   list: { gap: spacing.md, paddingBottom: spacing.huge, flexGrow: 1 },
   duel: { borderWidth: 1, borderRadius: radii.lg, padding: spacing.md, gap: spacing.sm },
   side: { minHeight: 84, borderWidth: 1, borderRadius: radii.md, padding: spacing.sm, flexDirection: "row", gap: spacing.md, alignItems: "center" },

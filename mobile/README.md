@@ -43,6 +43,10 @@ Then, from the repo root, any time:
 node scripts/dev-emulator.mjs
 ```
 
+If the primary checkout's default ports are occupied, pass `--slot 1` to use
+the next port set without stopping the existing process. Release that slot
+with `npm run dev:release` after testing.
+
 Idempotent — boots the `scripta-dev` AVD if it isn't running (creating it
 first, on a machine that's never run this before), sideloads Expo Go if
 needed, builds `@scripta/shared` if this worktree hasn't yet, seeds the dev

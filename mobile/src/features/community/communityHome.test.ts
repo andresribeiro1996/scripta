@@ -19,6 +19,7 @@ const tierlist = {
   poolSize: 12,
   ballotCount: 4,
   votingOpen: true,
+  promotedAt: null,
 } as const;
 
 const tournament = {

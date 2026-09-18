@@ -143,6 +143,9 @@ export function Input({
   error,
   secureTextEntry,
   hint,
+  // A leading glyph inside the field itself — for a search box, where the
+  // glyph already says what a label would only repeat from the placeholder.
+  icon,
   accessibilityLabel = label,
   editable = true,
   style,
@@ -150,7 +153,7 @@ export function Input({
   // it there is no way to reach the underlying TextInput.
   ref,
   ...props
-}: TextInputProps & { label: string; error?: string; hint?: string; ref?: Ref<TextInput> }) {
+}: TextInputProps & { label?: string; error?: string; hint?: string; icon?: IconName; ref?: Ref<TextInput> }) {
   const { colors } = useTheme();
   const [visible, setVisible] = useState(false);
   const inputRef = useRef<TextInput>(null);
@@ -158,8 +161,9 @@ export function Input({
 
   return (
     <View style={styles.field}>
-      <Text {...dynamicType} style={[styles.label, { color: colors.text }]}>{label}</Text>
+      {label ? <Text {...dynamicType} style={[styles.label, { color: colors.text }]}>{label}</Text> : null}
       <View style={{ position: "relative" }}>
+      {icon ? <View style={styles.inputIcon} pointerEvents="none"><Icon name={icon} size={18} color={colors.textDim} /></View> : null}
       <TextInput
         {...props}
         ref={(node) => { inputRef.current = node; if (typeof ref === "function") ref(node); else if (ref) ref.current = node; }}
@@ -175,6 +179,7 @@ export function Input({
         style={[
           styles.input,
           { backgroundColor: colors.surface, borderColor: error ? colors.danger : focused ? colors.accent : colors.border, color: colors.text, opacity: editable ? 1 : 0.55 },
+          icon ? { paddingLeft: minimumTouchTarget } : null,
           secureTextEntry ? { paddingRight: minimumTouchTarget + spacing.sm } : null,
           style,
         ]}
@@ -300,7 +305,7 @@ export function SwipeableTabs<T extends string>({
   renderPage,
   accessibilityLabel,
 }: {
-  options: readonly { readonly value: T; readonly label: string }[];
+  options: readonly { readonly value: T; readonly label: string; readonly badge?: number }[];
   value: T;
   onChange: (value: T) => void;
   renderPage: (value: T, active: boolean) => ReactNode;
@@ -316,6 +321,7 @@ export function SwipeableTabs<T extends string>({
   const position = useRef(new Animated.Value(0)).current;
   const offset = useRef(new Animated.Value(0)).current;
   const tabWidth = options.length ? rowWidth / options.length : 0;
+  const progress = Animated.add(position, offset);
 
   // The pager is the source of truth for which page is showing; tapping a tab
   // asks it to move and the selection follows from onPageSelected, so a tap and
@@ -334,15 +340,15 @@ export function SwipeableTabs<T extends string>({
         onLayout={(event) => setRowWidth(event.nativeEvent.layout.width)}
         style={[styles.tabRow, { borderBottomColor: colors.border }]}
       >
-        {options.map((option) => {
+        {options.map((option, optionIndex) => {
           const selected = option.value === value;
           return (
             <Pressable
-              accessibilityLabel={option.label}
+              accessibilityLabel={option.badge ? `${option.label}, ${option.badge} remaining` : option.label}
               accessibilityRole="tab"
               accessibilityState={{ selected }}
               key={option.value}
-              onPress={() => onChange(option.value)}
+              onPress={() => reducedMotion ? pager.current?.setPageWithoutAnimation(optionIndex) : pager.current?.setPage(optionIndex)}
               style={({ pressed }) => [
                 styles.tab,
                 { backgroundColor: pressed ? colors.surfacePressed : "transparent" },
@@ -355,6 +361,7 @@ export function SwipeableTabs<T extends string>({
               >
                 {option.label}
               </Text>
+              {option.badge ? <View style={[styles.tabBadge, { backgroundColor: colors.accent }]}><Text style={[styles.tabBadgeText, { color: colors.onAccent }]}>{option.badge}</Text></View> : null}
             </Pressable>
           );
         })}
@@ -365,7 +372,7 @@ export function SwipeableTabs<T extends string>({
               {
                 backgroundColor: colors.accent,
                 width: tabWidth,
-                transform: [{ translateX: Animated.multiply(Animated.add(position, offset), tabWidth) }],
+                transform: [{ translateX: Animated.multiply(progress, tabWidth) }],
               },
             ]}
           />
@@ -381,9 +388,11 @@ export function SwipeableTabs<T extends string>({
         ref={pager}
         style={styles.grow}
       >
-        {options.map((option) => (
+        {options.map((option, pageIndex) => (
           <View collapsable={false} key={option.value} style={styles.grow}>
-            {renderPage(option.value, option.value === value)}
+            <Animated.View style={[styles.grow, { backgroundColor: colors.background }, !reducedMotion && pageIndex < options.length - 1 ? { transformOrigin: "left center", transform: [{ perspective: 900 }, { rotateY: progress.interpolate({ inputRange: [pageIndex, pageIndex + 0.45, pageIndex + 1], outputRange: ["0deg", "-75deg", "-75deg"], extrapolate: "clamp" }) }] } : null]}>
+              {renderPage(option.value, option.value === value)}
+            </Animated.View>
           </View>
         ))}
       </AnimatedPagerView>
@@ -604,8 +613,10 @@ const styles = StyleSheet.create({
   labelledIconButton: { minHeight: minimumTouchTarget, flexDirection: "row", alignItems: "center", gap: spacing.xs, paddingHorizontal: spacing.sm, borderRadius: radii.full },
   grow: { flex: 1 },
   tabRow: { flexDirection: "row", borderBottomWidth: 1 },
-  tab: { flex: 1, minHeight: minimumTouchTarget, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.sm },
+  tab: { flex: 1, minHeight: minimumTouchTarget, flexDirection: "row", gap: spacing.xs, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.sm },
   tabLabel: { fontWeight: "700" },
+  tabBadge: { minWidth: 20, height: 20, paddingHorizontal: spacing.xs, borderRadius: radii.full, alignItems: "center", justifyContent: "center" },
+  tabBadgeText: { fontSize: 12, lineHeight: 16, fontWeight: "700" },
   tabIndicator: { position: "absolute", left: 0, bottom: 0, height: 3, borderTopLeftRadius: radii.sm, borderTopRightRadius: radii.sm },
   fab: { position: "absolute", right: spacing.lg, bottom: spacing.lg, minHeight: 56, flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingHorizontal: spacing.lg, borderRadius: radii.full, elevation: 6, shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
   fabLabel: { fontWeight: "700" },
@@ -613,6 +624,7 @@ const styles = StyleSheet.create({
   field: { gap: spacing.xs },
   label: { ...typography.body, fontWeight: "600" },
   input: { minHeight: minimumTouchTarget, borderWidth: 1, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, ...typography.input },
+  inputIcon: { position: "absolute", left: 0, top: 0, bottom: 0, width: minimumTouchTarget, alignItems: "center", justifyContent: "center" },
   help: { ...typography.caption },
   overlay: { flex: 1 },
   sheetOverlay: { justifyContent: "flex-end" },

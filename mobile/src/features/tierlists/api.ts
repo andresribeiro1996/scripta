@@ -11,6 +11,8 @@ export interface Tierlist {
   voteAccess: "anonymous" | "members";
   votingOpen: boolean;
   sourceTierlistId: string | null;
+  promotedAt: string | null;
+  originCreatorId: string;
 }
 
 export interface PublicTierlistSummary {
@@ -18,6 +20,8 @@ export interface PublicTierlistSummary {
   name: string;
   poolSize: number;
   ballotCount: number;
+  eligibleVoteCount: number;
+  promotedAt: string | null;
   votingOpen: boolean;
 }
 
@@ -28,6 +32,8 @@ export interface VotingBoard {
   access: "anonymous" | "members";
   votingOpen: boolean;
   ballotCount: number;
+  eligibleVoteCount: number;
+  promotedAt: string | null;
   histogram?: HistogramCell[];
 }
 
@@ -50,8 +56,8 @@ export async function fetchTierlists() {
   return (await apiClient.request<{ tierlists: Tierlist[] }>("/tierlists", { auth: true })).tierlists;
 }
 
-export function createTierlist(name: string) {
-  return apiClient.request<Tierlist>("/tierlists", { method: "POST", body: { name }, auth: true });
+export function createTierlist(name: string, data?: TierlistData, access?: "anonymous" | "members") {
+  return apiClient.request<Tierlist>("/tierlists", { method: "POST", body: { name, data, access }, auth: true });
 }
 
 export function updateTierlist(id: string, patch: { name?: string; data?: TierlistData }) {
@@ -64,6 +70,27 @@ export function deleteTierlist(id: string) {
 
 export async function fetchPublicTierlists() {
   return (await apiClient.request<{ tierlists: PublicTierlistSummary[] }>("/tierlists/public")).tierlists;
+}
+
+/** A published tier list the signed-in account holds a ballot on — the
+ *  backend's PublishedTierlistRef shape. */
+export interface VotedTierlist {
+  id: string;
+  ownerUserId: string;
+  createdAt: string;
+  voteCode: string;
+  name: string;
+  poolSize: number;
+  ballotCount: number;
+  eligibleVoteCount: number;
+  promotedAt: string | null;
+  votingOpen: boolean;
+}
+
+/** Polls the account has voted on (own ones excluded server-side), latest
+ *  ballot first — the "Voted on" section of the games list. */
+export async function fetchVotedTierlists() {
+  return (await apiClient.request<{ tierlists: VotedTierlist[] }>("/tierlists/voted", { auth: true })).tierlists;
 }
 
 export function fetchVotingBoard(code: string) {

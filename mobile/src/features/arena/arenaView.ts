@@ -3,7 +3,6 @@ import type { TournamentView } from "./api";
 
 export const ARENA_VIEW_TABS = [
   { value: "match", label: "Match" },
-  { value: "books", label: "Books" },
   { value: "bracket", label: "Bracket" },
 ] as const;
 
@@ -11,10 +10,6 @@ export type ArenaViewTab = (typeof ARENA_VIEW_TABS)[number]["value"];
 
 export function votableDuels(duels: Duel[]): Duel[] {
   return duels.filter(needsVote);
-}
-
-export function waitingLabel(count: number): string {
-  return `${count} ${count === 1 ? "match" : "matches"} waiting on your vote`;
 }
 
 /** Every bracket position in round order, including the ones a later round
