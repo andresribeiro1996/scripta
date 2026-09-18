@@ -152,6 +152,13 @@ test("a non-primary worktree never takes slot 0", () => {
   });
 });
 
+test("a primary checkout can explicitly use a free alternate slot", () => {
+  withTempDir((dir) => {
+    const path = join(dir, "scripta-dev.json");
+    assert.equal(claim(path, "/primary", { isPrimary: true, requestedSlot: 1, isPortFree: (port) => port !== 3000 }).slot, 1);
+  });
+});
+
 test("claiming twice from the same worktree reuses its slot", () => {
   withTempDir((dir) => {
     const path = join(dir, "scripta-dev.json");

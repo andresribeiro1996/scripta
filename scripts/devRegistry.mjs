@@ -146,18 +146,20 @@ export function isSlotLive(slot, entry, isPortFree) {
 // holds — a worktree re-claiming its own slot bypasses isSlotLive entirely,
 // since its own live servers occupying its own ports must never look like
 // contention.
-export function claimSlot({ path, worktree, branch, pid, session, isPrimary, isPortFree }) {
+export function claimSlot({ path, worktree, branch, pid, session, isPrimary, isPortFree, requestedSlot }) {
   return withLock(path, () => {
     const registry = readRegistry(path);
 
     const existing = slotForWorktree(registry, worktree);
     if (existing !== undefined) {
+      if (requestedSlot !== undefined && Number(existing) !== requestedSlot) throw new Error(`release slot ${existing} before requesting slot ${requestedSlot}`);
       registry.slots[existing] = { worktree, branch, pid, session, claimedAt: new Date().toISOString() };
       writeRegistry(path, registry);
       return { slot: Number(existing), ports: portsForSlot(Number(existing)) };
     }
 
-    const candidates = isPrimary ? [0] : Array.from({ length: MAX_SLOT }, (_, i) => i + 1);
+    if (requestedSlot !== undefined) portsForSlot(requestedSlot);
+    const candidates = requestedSlot !== undefined ? [requestedSlot] : isPrimary ? [0] : Array.from({ length: MAX_SLOT }, (_, i) => i + 1);
     for (const slot of candidates) {
       if (isSlotLive(slot, registry.slots[String(slot)], isPortFree)) continue;
       const ports = portsForSlot(slot);

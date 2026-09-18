@@ -65,6 +65,8 @@ const mobileDir = join(repoRoot, "mobile");
 const runtimeDir = join(tmpdir(), "scripta-dev-emulator");
 const resetRequested = process.argv.includes("--reset");
 const lanRequested = process.argv.includes("--lan");
+const slotArg = process.argv.indexOf("--slot");
+const requestedSlot = slotArg < 0 ? undefined : Number(process.argv[slotArg + 1]);
 let BACKEND_PORT;
 let METRO_PORT;
 let claimedSlot;
@@ -270,6 +272,7 @@ async function claimThisWorktree() {
     repoRoot,
     transport: lanRequested ? "lan" : "loopback",
     lanAddress: lanRequested ? pickLanAddress() : undefined,
+    requestedSlot,
   });
 
   claimedSlot = slot;
