@@ -9,17 +9,21 @@
 // Compact read-only tiles (cover + vote share per side) rather than full
 // DuelCards — those are ~180pt tall, so a handful of them make a bracket
 // you can vote in but never see the shape of. Tapping a tile opens the
-// full match in a sheet, where an owner also gets settle/tiebreak.
+// full match in a read-only sheet (bigger covers, exact tallies); an
+// owner's settle/tiebreak controls sit directly on the tile instead —
+// nested Pressables, so tapping one of those doesn't also open the sheet.
+// A web-style "open the sheet to act" round trip is one tap too many on a
+// phone for actions this frequent.
 
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { bracketShape, countdownLabel, needsVote, sharePercent, type BracketSlot, type Duel, type DuelSide } from "@scripta/shared";
-import { Button, Sheet, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { Icon, Sheet, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "./BookCover";
 import { DuelSideRow } from "./DuelSideRow";
 import type { TournamentView } from "./api";
 
-function MatchSide({ side, duel, isWinner, decided }: { side: DuelSide; duel: Duel; isWinner: boolean; decided: boolean }) {
+function MatchSide({ side, duel, isWinner, decided, onPick, busy }: { side: DuelSide; duel: Duel; isWinner: boolean; decided: boolean; onPick?: () => void; busy: boolean }) {
   const { colors } = useTheme();
   const pct = sharePercent(side.votes, duel);
   return (
@@ -38,9 +42,22 @@ function MatchSide({ side, duel, isWinner, decided }: { side: DuelSide; duel: Du
           </View>
         ) : null}
       </View>
-      <Text {...dynamicType} numberOfLines={1} style={[typography.caption, styles.tilePct, { color: isWinner ? colors.accent : colors.textDim, opacity: decided && !isWinner ? 0.6 : 1 }]}>
-        {pct === null ? "–" : `${pct}%`}
-      </Text>
+      {onPick ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${side.title} wins the tiebreak`}
+          disabled={busy}
+          onPress={onPick}
+          hitSlop={4}
+          style={[styles.tiebreakPill, { backgroundColor: colors.accentSoft, opacity: busy ? 0.5 : 1 }]}
+        >
+          <Text {...dynamicType} numberOfLines={1} style={[typography.caption, styles.tiebreakLabel, { color: colors.accent }]}>Wins</Text>
+        </Pressable>
+      ) : (
+        <Text {...dynamicType} numberOfLines={1} style={[typography.caption, styles.tilePct, { color: isWinner ? colors.accent : colors.textDim, opacity: decided && !isWinner ? 0.6 : 1 }]}>
+          {pct === null ? "–" : `${pct}%`}
+        </Text>
+      )}
     </View>
   );
 }
@@ -61,10 +78,25 @@ function EmptyTile() {
   );
 }
 
-function MatchTile({ duel, onOpen }: { duel: BracketSlot; onOpen: (duel: Duel) => void }) {
+function MatchTile({
+  duel,
+  isOwner,
+  busy,
+  onOpen,
+  onSettle,
+  onTiebreak,
+}: {
+  duel: BracketSlot;
+  isOwner: boolean;
+  busy: boolean;
+  onOpen: (duel: Duel) => void;
+  onSettle: (duelId: string) => void;
+  onTiebreak: (duelId: string, bookKey: string) => void;
+}) {
   const { colors } = useTheme();
   if (!duel) return <EmptyTile />;
   const decided = duel.winnerKey !== null;
+  const tiebreak = isOwner && duel.status === "tied_pending_tiebreak";
   return (
     <Pressable
       accessibilityRole="button"
@@ -73,9 +105,21 @@ function MatchTile({ duel, onOpen }: { duel: BracketSlot; onOpen: (duel: Duel) =
       style={[styles.tile, { borderColor: duel.status === "active" ? colors.accent : colors.border, backgroundColor: colors.surface }]}
     >
       {needsVote(duel) ? <View style={[styles.voteDot, { backgroundColor: colors.accent, borderColor: colors.surface }]} /> : null}
-      <MatchSide side={duel.bookA} duel={duel} isWinner={duel.winnerKey === duel.bookA.key} decided={decided} />
+      <MatchSide side={duel.bookA} duel={duel} isWinner={duel.winnerKey === duel.bookA.key} decided={decided} busy={busy} onPick={tiebreak ? () => onTiebreak(duel.id, duel.bookA.key) : undefined} />
       <View style={[styles.tileDivider, { backgroundColor: colors.border }]} />
-      <MatchSide side={duel.bookB} duel={duel} isWinner={duel.winnerKey === duel.bookB.key} decided={decided} />
+      <MatchSide side={duel.bookB} duel={duel} isWinner={duel.winnerKey === duel.bookB.key} decided={decided} busy={busy} onPick={tiebreak ? () => onTiebreak(duel.id, duel.bookB.key) : undefined} />
+      {isOwner && duel.status === "active" ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Settle this match now"
+          disabled={busy}
+          onPress={() => onSettle(duel.id)}
+          hitSlop={6}
+          style={[styles.settleButton, { backgroundColor: colors.accent, borderColor: colors.surface, opacity: busy ? 0.5 : 1 }]}
+        >
+          <Icon name="confirm" size={11} color="#fff" />
+        </Pressable>
+      ) : null}
     </Pressable>
   );
 }
@@ -90,7 +134,11 @@ function RoundRow({
   feedsInward,
   receivesFromOutside,
   widthRatio,
+  isOwner,
+  busyDuelId,
   onOpen,
+  onSettle,
+  onTiebreak,
 }: {
   slots: BracketSlot[];
   label: string;
@@ -98,7 +146,11 @@ function RoundRow({
   feedsInward: boolean;
   receivesFromOutside: boolean;
   widthRatio: number;
+  isOwner: boolean;
+  busyDuelId: string | null;
   onOpen: (duel: Duel) => void;
+  onSettle: (duelId: string) => void;
+  onTiebreak: (duelId: string, bookKey: string) => void;
 }) {
   const { colors } = useTheme();
   return (
@@ -111,7 +163,7 @@ function RoundRow({
               <View style={[styles.stub, { backgroundColor: colors.border }, mirrored ? styles.stubBottom : styles.stubTop]} />
             ) : null}
             <View style={[styles.cellInner, { width: `${widthRatio * 100}%` }]}>
-              <MatchTile duel={duel} onOpen={onOpen} />
+              <MatchTile duel={duel} isOwner={isOwner} busy={busyDuelId === duel?.id} onOpen={onOpen} onSettle={onSettle} onTiebreak={onTiebreak} />
             </View>
             {feedsInward ? (
               <>
@@ -185,7 +237,11 @@ export function BracketMap({
           feedsInward={roundIdx < top.length - 1 || hasCentre}
           receivesFromOutside={roundIdx > 0}
           widthRatio={tileRatio(slots.length)}
+          isOwner={isOwner}
+          busyDuelId={busyDuelId}
           onOpen={(duel) => setOpenId(duel.id)}
+          onSettle={onSettle}
+          onTiebreak={onTiebreak}
         />
       ))}
 
@@ -196,7 +252,7 @@ export function BracketMap({
             <View style={[styles.stub, styles.stubTop, { backgroundColor: colors.border }]} />
             <View style={[styles.stub, styles.stubBottom, { backgroundColor: colors.border }]} />
             <View style={[styles.cellInner, { width: `${tileRatio(1) * 100}%` }]}>
-              <MatchTile duel={finalDuel} onOpen={(duel) => setOpenId(duel.id)} />
+              <MatchTile duel={finalDuel} isOwner={isOwner} busy={busyDuelId === finalDuel.id} onOpen={(duel) => setOpenId(duel.id)} onSettle={onSettle} onTiebreak={onTiebreak} />
               {champion ? (
                 <Text {...dynamicType} numberOfLines={1} style={[typography.caption, styles.champion, { color: colors.accent }]}>🏆 {champion.title}</Text>
               ) : null}
@@ -216,11 +272,18 @@ export function BracketMap({
             feedsInward={roundIdx < bottom.length - 1 || hasCentre}
             receivesFromOutside={roundIdx > 0}
             widthRatio={tileRatio(slots.length)}
+            isOwner={isOwner}
+            busyDuelId={busyDuelId}
             onOpen={(duel) => setOpenId(duel.id)}
+            onSettle={onSettle}
+            onTiebreak={onTiebreak}
           />
         );
       })}
 
+      {/* Read-only: bigger covers and the exact tallies a tile has no room
+       *  for. Acting (vote, settle, tiebreak) happens on the tile itself,
+       *  not here — see the file header. */}
       <Sheet visible={Boolean(openDuel)} title="Match" onClose={() => setOpenId(null)}>
         {openDuel ? (
           <ScrollView style={styles.sheetScroll} contentContainerStyle={styles.sheetBody}>
@@ -229,15 +292,6 @@ export function BracketMap({
             </Text>
             <DuelSideRow side={openDuel.bookA} duel={openDuel} />
             <DuelSideRow side={openDuel.bookB} duel={openDuel} />
-            {isOwner && openDuel.status === "active" ? (
-              <Button label="Settle now" variant="secondary" loading={busyDuelId === openDuel.id} onPress={() => onSettle(openDuel.id)} />
-            ) : null}
-            {isOwner && openDuel.status === "tied_pending_tiebreak" ? (
-              <View style={styles.row2}>
-                <Button label={`${openDuel.bookA.title} wins`} loading={busyDuelId === openDuel.id} onPress={() => onTiebreak(openDuel.id, openDuel.bookA.key)} />
-                <Button label={`${openDuel.bookB.title} wins`} loading={busyDuelId === openDuel.id} onPress={() => onTiebreak(openDuel.id, openDuel.bookB.key)} />
-              </View>
-            ) : null}
           </ScrollView>
         ) : null}
       </Sheet>
@@ -248,7 +302,6 @@ export function BracketMap({
 const styles = StyleSheet.create({
   map: { gap: spacing.none },
   row: { flexDirection: "row", alignItems: "stretch" },
-  row2: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   center: { textAlign: "center" },
   cell: { flex: 1, position: "relative", justifyContent: "center" },
   cellInner: { alignSelf: "center", paddingVertical: spacing.xs, paddingHorizontal: 2 },
@@ -263,7 +316,7 @@ const styles = StyleSheet.create({
   hLineBottom: { bottom: 0 },
   hLineRight: { left: "50%", right: 0 },
   hLineLeft: { left: 0, right: "50%" },
-  tile: { flexDirection: "row", alignItems: "stretch", borderWidth: 1, borderRadius: radii.sm },
+  tile: { position: "relative", flexDirection: "row", alignItems: "stretch", borderWidth: 1, borderRadius: radii.sm },
   emptyTile: { borderStyle: "dashed" },
   tileDivider: { width: 1 },
   tileSide: { flex: 1, minWidth: 0, alignItems: "center", gap: 2, paddingVertical: spacing.xs, paddingHorizontal: 2 },
@@ -274,6 +327,13 @@ const styles = StyleSheet.create({
   checkBadge: { position: "absolute", top: -3, right: -3, width: 14, height: 14, borderRadius: radii.full, alignItems: "center", justifyContent: "center" },
   checkMark: { color: "#fff", fontSize: 9, fontWeight: "700" },
   voteDot: { position: "absolute", top: -3, right: -3, zIndex: 1, width: 10, height: 10, borderRadius: radii.full, borderWidth: 2 },
+  // Bottom-LEFT corner, not centred: the centre is where the round's
+  // connector lines land (see hLine/stub, both `left: "50%"`), and an
+  // absolutely positioned badge like this doesn't add to the tile's own
+  // height, so it can't nudge those connectors' math either way.
+  settleButton: { position: "absolute", left: -6, bottom: -6, zIndex: 1, width: 20, height: 20, borderRadius: radii.full, borderWidth: 2, alignItems: "center", justifyContent: "center" },
+  tiebreakPill: { paddingHorizontal: 6, paddingVertical: 1, borderRadius: radii.full },
+  tiebreakLabel: { fontSize: 9, fontWeight: "700" },
   champion: { marginTop: spacing.xs, textAlign: "center", fontWeight: "700" },
   sheetScroll: { maxHeight: 420 },
   sheetBody: { gap: spacing.md, paddingBottom: spacing.sm },
