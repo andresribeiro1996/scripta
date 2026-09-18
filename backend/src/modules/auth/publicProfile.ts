@@ -8,6 +8,8 @@ interface CachedStatements {
   find: ReturnType<DatabaseSync["prepare"]>;
   findIdByUsername: ReturnType<DatabaseSync["prepare"]>;
   search: ReturnType<DatabaseSync["prepare"]>;
+  getSeen: ReturnType<DatabaseSync["prepare"]>;
+  setSeen: ReturnType<DatabaseSync["prepare"]>;
 }
 
 let cached: CachedStatements | null = null;
@@ -19,7 +21,9 @@ function statements(): CachedStatements {
       db,
       find: db.prepare("SELECT username, avatar_id FROM users WHERE id = ?"),
       findIdByUsername: db.prepare("SELECT id FROM users WHERE username = ?"),
-      search: db.prepare("SELECT id FROM users WHERE username LIKE ? ESCAPE '\\' ORDER BY username LIMIT ?")
+      search: db.prepare("SELECT id FROM users WHERE username LIKE ? ESCAPE '\\' ORDER BY username LIMIT ?"),
+      getSeen: db.prepare("SELECT dashboard_seen_at FROM users WHERE id = ?"),
+      setSeen: db.prepare("UPDATE users SET dashboard_seen_at = ? WHERE id = ?")
     };
   }
   return cached;
@@ -56,4 +60,13 @@ export function searchUsernameOwners(query: string, limit: number): string[] {
   const escaped = query.replace(/[\\%_]/g, (ch) => `\\${ch}`);
   const rows = statements().search.all(`%${escaped}%`, limit) as Array<{ id: string }>;
   return rows.map((row) => row.id);
+}
+
+export function getDashboardSeenAt(userId: string): string | null {
+  const row = statements().getSeen.get(userId) as { dashboard_seen_at: string | null } | undefined;
+  return row?.dashboard_seen_at ?? null;
+}
+
+export function setDashboardSeenAt(userId: string, seenAt: string): void {
+  statements().setSeen.run(seenAt, userId);
 }

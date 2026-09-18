@@ -48,3 +48,14 @@ test("username search matches substrings and escapes LIKE wildcards", () => {
   assert.deepEqual(searchUsernameOwners("%", 10), []);
   assert.deepEqual(searchUsernameOwners("bobby", 10), ["u3"]);
 });
+
+test("dashboard seen marker round-trips and defaults to null", async () => {
+  insertUser.run("seen-user", "seen@test.dev", "seen");
+  const { getDashboardSeenAt, setDashboardSeenAt } = await import("./publicProfile.js");
+  assert.equal(getDashboardSeenAt("seen-user"), null);
+  setDashboardSeenAt("seen-user", "2026-09-18T10:00:00.000Z");
+  assert.equal(getDashboardSeenAt("seen-user"), "2026-09-18T10:00:00.000Z");
+  setDashboardSeenAt("seen-user", "2026-09-18T11:00:00.000Z");
+  assert.equal(getDashboardSeenAt("seen-user"), "2026-09-18T11:00:00.000Z");
+  assert.equal(getDashboardSeenAt("stranger"), null);
+});
