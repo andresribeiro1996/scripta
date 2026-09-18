@@ -17,11 +17,11 @@ function createInMemoryRepo(): TierlistsRepository {
 
   return {
     listByUser(userId) {
-      return [...tierlists.values()].filter((t) => t.owner_user_id === userId);
+      return [...tierlists.values()].filter((t) => t.owner_user_id === userId && !t.promoted_at);
     },
     getOwned(id, userId) {
       const t = tierlists.get(id);
-      return t && t.owner_user_id === userId ? t : undefined;
+      return t && t.owner_user_id === userId && !t.promoted_at ? t : undefined;
     },
     insert(row) {
       tierlists.set(row.id, { ...row });
@@ -35,7 +35,7 @@ function createInMemoryRepo(): TierlistsRepository {
     },
     delete(id, userId) {
       const existing = tierlists.get(id);
-      if (!existing || existing.owner_user_id !== userId) return false;
+      if (!existing || existing.owner_user_id !== userId || existing.promoted_at) return false;
       tierlists.delete(id);
       return true;
     },
@@ -44,10 +44,23 @@ function createInMemoryRepo(): TierlistsRepository {
       return [...tierlists.values()].find((t) => t.vote_code === code);
     },
 
-    insertCommunityCopy(row, ballot, ps) {
-      tierlists.set(row.id, { ...row });
+    publish(id, userId, data, access, code, publicBooks, ballot, ps) {
+      const row = tierlists.get(id);
+      if (!row || row.owner_user_id !== userId || row.vote_code || row.promoted_at) return undefined;
+      const published = { ...row, data, vote_access: access, vote_code: code, voting_open: 1, public_books: publicBooks };
+      tierlists.set(id, published);
       ballots.set(ballot.id, { ...ballot });
       placements.set(ballot.id, [...ps]);
+      return published;
+    },
+
+    promote(id, at) {
+      const row = tierlists.get(id)!;
+      tierlists.set(id, { ...row, owner_user_id: "__app__", promoted_at: at, voting_open: 0 });
+    },
+
+    eligibleVoteCount(id, originUserId) {
+      return [...ballots.values()].filter((b) => b.tierlist_id === id && b.voter_user_id && b.voter_user_id !== originUserId && (placements.get(b.id)?.length ?? 0) > 0).length;
     },
 
     setVoting(id, userId, patch) {
@@ -66,13 +79,28 @@ function createInMemoryRepo(): TierlistsRepository {
     },
 
     getPublicById(id) {
-      return [...tierlists.values()].find((t) => t.id === id && t.source_tierlist_id !== null);
+      return [...tierlists.values()].find((t) => t.id === id && t.vote_code !== null);
     },
 
     listPublicByUser(ownerUserId) {
       return [...tierlists.values()]
-        .filter((t) => t.owner_user_id === ownerUserId && t.source_tierlist_id !== null)
+        .filter((t) => t.origin_user_id === ownerUserId && t.vote_code !== null)
         .sort((a, b) => b.created_at.localeCompare(a.created_at));
+    },
+
+    listVotedByUser(voterUserId) {
+      const lastVoteAt = new Map<string, string>();
+      for (const b of ballots.values()) {
+        if (b.voter_user_id !== voterUserId) continue;
+        const previous = lastVoteAt.get(b.tierlist_id);
+        if (!previous || b.updated_at > previous) lastVoteAt.set(b.tierlist_id, b.updated_at);
+      }
+      return [...lastVoteAt.entries()]
+        .map(([id, at]) => ({ row: tierlists.get(id), at }))
+        .filter((entry): entry is { row: TierlistRow; at: string } => entry.row !== undefined)
+        .filter(({ row }) => row.origin_user_id !== voterUserId)
+        .sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))
+        .map(({ row }) => row);
     },
 
     getBallotById(tierlistId, ballotId) {
@@ -140,6 +168,17 @@ test("createTierlist stores a tier list and getTierlist round-trips it", () => {
   assert.deepEqual((created.data as { pool: string[] }).pool, []);
   const fetched = service.getTierlist("u1", created.id);
   assert.deepEqual(fetched, created);
+});
+
+test("public creation uses one immutable resource and a book snapshot", () => {
+  const service = makeService();
+  const data = { tiers: [{ id: "s", label: "S", color: "#c9482f", bookKeys: [] }], pool: ["b1"] };
+  const created = service.createTierlist("u1", "Books", data, "anonymous", [{ key: "b1", title: "Book one" }]);
+  assert.ok(created.voteCode);
+  assert.equal(service.listTierlists("u1").length, 1);
+  assert.equal(service.getVotingBoard(created.voteCode!)?.publicBooks?.length, 1);
+  assert.equal(service.getResults(created.id).ballotCount, 0);
+  assert.equal(service.updateTierlist("u1", created.id, { name: "Changed" }), undefined);
 });
 
 test("listTierlists is scoped per user", () => {
@@ -224,7 +263,7 @@ test("createTierlistsPublicApi resolves the raw document and defaults missing ar
   assert.equal(api.getTierlistData("u1", "00000000-0000-4000-8000-000000000000"), undefined);
 });
 
-test("openVoting duplicates the tier list without touching the original", () => {
+test("openVoting publishes the same tier list and freezes it", () => {
   const service = makeService();
   const original = service.createTierlist("u1", "Fantasy");
   const tiers = (original.data as { tiers: Array<{ id: string }> }).tiers;
@@ -235,19 +274,17 @@ test("openVoting duplicates the tier list without touching the original", () => 
   const copy = service.openVoting("u1", original.id, "anonymous");
 
   assert.ok(copy);
-  assert.notEqual(copy.id, original.id);
-  assert.equal(copy.name, "Fantasy (community)");
-  assert.equal(copy.sourceTierlistId, original.id);
+  assert.equal(copy.id, original.id);
+  assert.equal(copy.name, "Fantasy");
+  assert.equal(copy.sourceTierlistId, null);
   assert.equal(copy.votingOpen, true);
   assert.equal(copy.voteAccess, "anonymous");
   assert.ok(copy.voteCode && copy.voteCode.length >= 6);
 
-  const untouched = service.getTierlist("u1", original.id);
-  assert.deepEqual((untouched?.data as { tiers: Array<{ bookKeys: string[] }> }).tiers[0]?.bookKeys, ["b1"]);
-  assert.equal(untouched?.voteCode, null);
+  assert.equal(service.getTierlist("u1", original.id)?.voteCode, copy.voteCode);
 });
 
-test("the community copy carries structure only, with the whole pool", () => {
+test("publishing freezes the structure and keeps the whole pool", () => {
   const service = makeService();
   const original = service.createTierlist("u1", "Fantasy");
   const tiers = (original.data as { tiers: Array<{ id: string }> }).tiers;
@@ -286,17 +323,15 @@ test("openVoting returns undefined for an unowned tier list", () => {
   assert.equal(service.openVoting("u1", theirs.id, "anonymous"), undefined);
 });
 
-test("opening voting twice yields two independent community copies", () => {
+test("opening voting twice does not create another resource", () => {
   const service = makeService();
   const original = service.createTierlist("u1", "Fantasy");
   const first = service.openVoting("u1", original.id, "anonymous")!;
-  const second = service.openVoting("u1", original.id, "members")!;
-  assert.notEqual(first.id, second.id);
-  assert.notEqual(first.voteCode, second.voteCode);
-  assert.equal(second.voteAccess, "members");
+  assert.equal(service.openVoting("u1", original.id, "members"), undefined);
+  assert.equal(service.getTierlist("u1", original.id)?.voteCode, first.voteCode);
 });
 
-test("a community copy refuses data writes but still accepts a rename", () => {
+test("a public tier list refuses data and name changes", () => {
   const service = makeService();
   const original = service.createTierlist("u1", "Fantasy");
   const copy = service.openVoting("u1", original.id, "anonymous")!;
@@ -305,15 +340,15 @@ test("a community copy refuses data writes but still accepts a rename", () => {
   assert.equal(service.updateTierlist("u1", copy.id, { data: { tiers: [], pool: ["sneaky"] } }), undefined);
   assert.deepEqual(service.getTierlist("u1", copy.id)?.data, frozen);
 
-  assert.equal(service.updateTierlist("u1", copy.id, { name: "Renamed" })?.name, "Renamed");
+  assert.equal(service.updateTierlist("u1", copy.id, { name: "Renamed" }), undefined);
 });
 
-test("the original stays fully editable after its copy is voting", () => {
+test("published structure is immutable", () => {
   const service = makeService();
   const original = service.createTierlist("u1", "Fantasy");
   service.openVoting("u1", original.id, "anonymous");
   const edited = service.updateTierlist("u1", original.id, { data: { tiers: [], pool: ["b9"] } });
-  assert.deepEqual(edited?.data, { tiers: [], pool: ["b9"] });
+  assert.equal(edited, undefined);
 });
 
 test("setVotingState switches access and closes without losing ballots", () => {
@@ -462,7 +497,7 @@ test("getVotingBoard exposes structure and never the owner's placements", () => 
   const { code, tierIds } = openPoll(service);
   const board = service.getVotingBoard(code)!;
 
-  assert.equal(board.name, "Fantasy (community)");
+  assert.equal(board.name, "Fantasy");
   assert.equal(board.votingOpen, true);
   assert.equal(board.access, "anonymous");
   assert.deepEqual([...board.pool].sort(), ["b1", "b2"]);
@@ -498,7 +533,7 @@ test("listPublicTierlists returns community copies only, newest first", () => {
   assert.equal(listed[0]?.votingOpen, true);
 });
 
-test("openVoting emits exactly one publish event for the community copy", () => {
+test("openVoting emits exactly one publish event for the same tier list", () => {
   const emitted: Array<[string, string]> = [];
   const service = createTierlistsService(createInMemoryRepo(), (copyId, ownerUserId) => {
     emitted.push([copyId, ownerUserId]);
@@ -511,7 +546,7 @@ test("openVoting emits exactly one publish event for the community copy", () => 
   assert.deepEqual(emitted, [[copy.id, "u1"]]);
 });
 
-test("published refs carry owner + timestamps; ordinary lists are excluded", () => {
+test("published refs carry origin creator and timestamps", () => {
   const service = makeService();
   const ordinary = service.createTierlist("u1", "Private list");
   const copy = service.openVoting("u1", ordinary.id, "anonymous")!;
@@ -521,7 +556,64 @@ test("published refs carry owner + timestamps; ordinary lists are excluded", () 
   assert.deepEqual(refs.map((r) => r.id), [copy.id]);
   assert.equal(refs[0]?.ownerUserId, "u1");
   assert.equal(refs[0]?.createdAt, copy.createdAt);
-  assert.equal(service.getPublishedRef(ordinary.id), undefined);
-  assert.equal(service.getPublishedRef(copy.id)?.name, "Private list (community)");
+  assert.equal(service.getPublishedRef(ordinary.id)?.id, ordinary.id);
+  assert.equal(service.getPublishedRef(copy.id)?.name, "Private list");
   assert.deepEqual(service.listPublishedRefsByOwner("u1").map((r) => r.id), [copy.id]);
+});
+
+test("100 distinct member voters promote the same list and revoke creator control", () => {
+  const service = makeService();
+  const list = service.createTierlist("creator", "Reference");
+  const tiers = (list.data as { tiers: Array<{ id: string; label: string; color: string; bookKeys: string[] }> }).tiers;
+  service.updateTierlist("creator", list.id, { data: { tiers, pool: ["b1"] } });
+  const published = service.openVoting("creator", list.id, "anonymous")!;
+  const vote = [{ bookKey: "b1", tierId: tiers[0]!.id }];
+  service.submitBallot(published.voteCode!, [], { kind: "user", userId: "abstainer" });
+  for (let n = 0; n < 99; n++) {
+    assert.equal(service.submitBallot(published.voteCode!, vote, { kind: "user", userId: `reader-${n}` }).ok, true);
+  }
+  service.submitBallot(published.voteCode!, [], { kind: "anonymous", ballotId: null });
+  service.submitBallot(published.voteCode!, [], { kind: "user", userId: "creator" });
+  assert.equal(service.getVotingBoard(published.voteCode!)?.eligibleVoteCount, 99);
+  assert.equal(service.getVotingBoard(published.voteCode!)?.promotedAt, null);
+  service.submitBallot(published.voteCode!, vote, { kind: "user", userId: "reader-99" });
+  const board = service.getVotingBoard(published.voteCode!);
+  assert.ok(board?.promotedAt);
+  assert.equal(board?.eligibleVoteCount, 100);
+  assert.equal(board?.votingOpen, false);
+  assert.equal(service.getTierlist("creator", list.id), undefined);
+  assert.equal(service.deleteTierlist("creator", list.id), false);
+  assert.equal(service.getPublishedRef(list.id)?.id, list.id);
+  assert.equal(service.getPublishedRef(list.id)?.ownerUserId, "creator");
+});
+
+test("listVotedByUser lists others' polls the account balloted on, latest ballot first", async () => {
+  const service = makeService();
+  const first = openPoll(service);
+  const second = openPoll(service);
+
+  assert.deepEqual(service.listVotedByUser("u9"), []);
+
+  service.submitBallot(first.code, [], { kind: "user", userId: "u9" });
+  assert.deepEqual(service.listVotedByUser("u9").map((r) => r.voteCode), [first.code]);
+
+  // A fresh ballot on a second poll reorders by latest ballot; the delay
+  // keeps the two ballots' updated_at values comparable.
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  service.submitBallot(second.code, [], { kind: "user", userId: "u9" });
+  assert.deepEqual(service.listVotedByUser("u9").map((r) => r.voteCode), [second.code, first.code]);
+
+  // …and editing that ballot (updated_at moves) keeps it in front.
+  service.submitBallot(second.code, [], { kind: "user", userId: "u9" });
+  assert.deepEqual(service.listVotedByUser("u9").map((r) => r.voteCode), [second.code, first.code]);
+});
+
+test("listVotedByUser never lists the account's own polls", () => {
+  const service = makeService();
+  const own = openPoll(service); // openVoting seeds u1's own ballot
+  assert.deepEqual(service.listVotedByUser("u1").map((r) => r.voteCode), []);
+
+  service.submitBallot(own.code, [], { kind: "user", userId: "u2" });
+  assert.deepEqual(service.listVotedByUser("u2").map((r) => r.voteCode), [own.code]);
+  assert.deepEqual(service.listVotedByUser("u1").map((r) => r.voteCode), []);
 });

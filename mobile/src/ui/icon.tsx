@@ -26,6 +26,7 @@ const GLYPHS = {
   add: { ios: "plus", android: "add" },
   confirm: { ios: "checkmark", android: "check" },
   more: { ios: "ellipsis", android: "more_horiz" },
+  search: { ios: "magnifyingglass", android: "search" },
   public: { ios: "globe", android: "public" },
   delete: { ios: "trash", android: "delete" },
 } as const satisfies Record<string, Glyph>;

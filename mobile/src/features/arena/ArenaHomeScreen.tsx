@@ -3,10 +3,23 @@ import { useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-q
 import { Stack, router } from "expo-router";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
-import { Button, Dialog, EmptyState, ErrorState, Fab, IconButton, Input, Menu, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
-import { createTierlist, deleteTierlist, fetchTierlists, type Tierlist } from "../tierlists/api";
-import { deleteTournament, fetchMyTournaments, type TournamentSummary } from "./api";
-import { ARENA_TABS, coverRemainder, emptyCopy, filterItems, ownedItems, tierDistribution, tournamentProgress, type ArenaTab, type OwnedItem } from "./arenaHome";
+import { Button, Dialog, EmptyState, ErrorState, Fab, Icon, IconButton, Input, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { deleteTierlist, fetchTierlists, fetchVotedTierlists, type Tierlist, type VotedTierlist } from "../tierlists/api";
+import { deleteTournament, fetchMyTournaments, fetchVotedTournaments, type TournamentSummary } from "./api";
+import {
+  ARENA_TABS,
+  coverRemainder,
+  emptyCopy,
+  filterSections,
+  homeSections,
+  ownedItems,
+  tierDistribution,
+  tournamentProgress,
+  votedTierlistDetail,
+  type ArenaTab,
+  type OwnedItem,
+  type SectionedItem,
+} from "./arenaHome";
 
 type Doomed = { kind: "tournament" | "tierlist"; id: string; name: string };
 
@@ -19,20 +32,8 @@ export function ArenaHomeScreen() {
   const [error, setError] = useState<string | null>(null);
   const tournaments = useQuery({ queryKey: ["arena", "mine"], queryFn: fetchMyTournaments, retry: false });
   const tierlists = useQuery({ queryKey: ["tierlists"], queryFn: fetchTierlists, retry: false });
-
-  async function createList() {
-    setBusy(true);
-    setError(null);
-    try {
-      const created = await createTierlist("Untitled tier list");
-      queryClient.setQueryData<Tierlist[]>(["tierlists"], (items = []) => [...items, created]);
-      router.push(`/tierlist/${created.id}` as never);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Couldn't create a tier list.");
-    } finally {
-      setBusy(false);
-    }
-  }
+  const votedTournaments = useQuery({ queryKey: ["arena", "voted"], queryFn: fetchVotedTournaments, retry: false });
+  const votedTierlists = useQuery({ queryKey: ["tierlists", "voted"], queryFn: fetchVotedTierlists, retry: false });
 
   async function remove() {
     if (!deleting) return;
@@ -78,18 +79,24 @@ export function ArenaHomeScreen() {
       options={ARENA_TABS}
       value={tab}
       onChange={setTab}
-      renderPage={(pageTab) => <ArenaList
-        tab={pageTab}
-        query={pageTab === "tournaments" ? tournaments : tierlists}
-        items={ownedItems(pageTab, tournaments.data ?? [], tierlists.data ?? [])}
-        onOpen={open}
-        onDelete={setDeleting}
-      />}
+      renderPage={(pageTab) => {
+        const owned = ownedItems(pageTab, tournaments.data ?? [], tierlists.data ?? []);
+        const voted = pageTab === "tournaments" ? votedTournaments : votedTierlists;
+        return <ArenaList
+          tab={pageTab}
+          query={pageTab === "tournaments" ? tournaments : tierlists}
+          votedQuery={voted}
+          sections={homeSections(pageTab, owned, votedTournaments.data ?? [], votedTierlists.data ?? [])}
+          rowCount={owned.length + (voted.data?.length ?? 0)}
+          onOpen={open}
+          onDelete={setDeleting}
+        />;
+      }}
     />
     <Fab
       label={tab === "tournaments" ? "New tournament" : "New tier list"}
       loading={busy && !deleting}
-      onPress={() => tab === "tournaments" ? router.push("/seed/new" as never) : void createList()}
+      onPress={() => tab === "tournaments" ? router.push("/seed/new" as never) : router.push("/tierlist/new" as never)}
     />
     <Dialog visible={deleting !== null} title={`Delete “${deleting?.name ?? ""}”?`} onClose={() => setDeleting(null)}><View style={styles.dialog}><Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>This cannot be undone.</Text><Button label="Delete" variant="destructive" loading={busy} onPress={() => void remove()} /></View></Dialog>
   </Screen>;
@@ -101,47 +108,71 @@ export function ArenaHomeScreen() {
 function ArenaList({
   tab,
   query,
-  items,
+  votedQuery,
+  sections,
+  rowCount,
   onOpen,
   onDelete,
 }: {
   tab: ArenaTab;
   query: UseQueryResult<unknown>;
-  items: OwnedItem[];
+  votedQuery: UseQueryResult<unknown>;
+  sections: SectionedItem[];
+  rowCount: number;
   onOpen: (item: OwnedItem) => void;
   onDelete: (doomed: Doomed) => void;
 }) {
   const { colors } = useTheme();
   const [search, setSearch] = useState("");
-  const visible = filterItems(items, search);
-  const empty = emptyCopy(tab, items.length > 0);
+  const visible = filterSections(sections, search);
+  const empty = emptyCopy(tab, rowCount > 0);
 
   if (query.isPending) return <View style={styles.page}><Skeleton height={160} /></View>;
   if (query.isError) return <View style={styles.page}><ErrorState body={query.error instanceof Error ? query.error.message : "Couldn't load this list."} actionLabel="Retry" onAction={() => void query.refetch()} /></View>;
 
   return <FlatList
     data={visible}
-    keyExtractor={(item) => item.id}
+    keyExtractor={(item) => item.key}
     contentContainerStyle={styles.list}
-    refreshing={query.isRefetching}
-    onRefresh={() => void query.refetch()}
+    refreshing={query.isRefetching || votedQuery.isRefetching}
+    onRefresh={() => {
+      void query.refetch();
+      void votedQuery.refetch();
+    }}
     keyboardShouldPersistTaps="handled"
     // In the list header rather than pinned above it: searching is something
     // you reach for, and as fixed chrome it appearing with the first item
     // shoved the whole screen down.
-    ListHeaderComponent={items.length ? <Input label="Search" value={search} onChangeText={setSearch} placeholder={`Search ${tab === "tournaments" ? "tournaments" : "tier lists"}`} autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" returnKeyType="search" /> : null}
+    ListHeaderComponent={rowCount ? <Input icon="search" accessibilityLabel={`Search ${tab === "tournaments" ? "tournaments" : "tier lists"}`} value={search} onChangeText={setSearch} placeholder={`Search ${tab === "tournaments" ? "tournaments" : "tier lists"}`} autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" returnKeyType="search" /> : null}
     ListEmptyComponent={<EmptyState title={empty.title} body={empty.body} />}
-    renderItem={({ item }) => <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <Pressable accessibilityRole="button" accessibilityLabel={`Open ${item.name}`} onPress={() => onOpen(item)} style={styles.grow}>
-        {item.kind === "tournament" ? <TournamentBody tournament={item.source} /> : <TierlistBody item={item} />}
-      </Pressable>
-      <Menu
-        title={item.name}
-        items={[{ label: "Delete", destructive: true, onPress: () => onDelete({ kind: item.kind, id: item.id, name: item.name }) }]}
+    ListFooterComponent={votedQuery.isError ? <ErrorState body="Couldn't load the games you voted in." actionLabel="Retry" onAction={() => void votedQuery.refetch()} /> : null}
+    renderItem={({ item }) => {
+      if (item.kind === "header") {
+        return <Text {...dynamicType} style={[typography.caption, styles.sectionHeader, styles.strong, { color: colors.textDim }]}>{item.title}</Text>;
+      }
+      if (item.kind === "owned") {
+        return <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Pressable accessibilityRole="button" accessibilityLabel={`Open ${item.item.name}`} onPress={() => onOpen(item.item)} style={styles.grow}>
+            {item.item.kind === "tournament" ? <TournamentBody tournament={item.item.source} /> : <TierlistBody item={item.item} />}
+          </Pressable>
+          <IconButton
+            accessibilityLabel={`Delete ${item.item.name}`}
+            name="delete"
+            tone="danger"
+            onPress={() => onDelete({ kind: item.item.kind, id: item.item.id, name: item.item.name })}
+          />
+        </View>;
+      }
+      const name = item.kind === "votedTournament" ? item.tournament.name : item.tierlist.name;
+      return <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Open ${name}`}
+        onPress={() => router.push(item.target as never)}
+        style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
       >
-        <IconButton accessibilityLabel={`Actions for ${item.name}`} name="more" />
-      </Menu>
-    </View>}
+        {item.kind === "votedTournament" ? <TournamentBody tournament={item.tournament} /> : <VotedTierlistBody tierlist={item.tierlist} />}
+      </Pressable>;
+    }}
   />;
 }
 
@@ -160,7 +191,16 @@ function TournamentBody({ tournament }: { tournament: TournamentSummary }) {
       : { backgroundColor: colors.border, color: colors.textDim };
 
   return <View style={styles.row}>
-    {tournament.covers.length === 0 ? <View style={[styles.tile, { backgroundColor: colors.accentSoft }]}>
+    {tournament.winner ? (
+      tournament.winner.cover ? <Image
+        accessibilityLabel={`Winner: ${tournament.winner.title}`}
+        source={{ uri: tournament.winner.cover }}
+        contentFit="cover"
+        style={[styles.tile, { borderWidth: 2, borderColor: colors.success }]}
+      /> : <View accessibilityLabel={`Winner: ${tournament.winner.title}`} style={[styles.tile, { backgroundColor: colors.successSoft, borderWidth: 2, borderColor: colors.success }]}>
+        <Icon filled name="arena" size={24} color={colors.success} />
+      </View>
+    ) : tournament.covers.length === 0 ? <View style={[styles.tile, { backgroundColor: colors.accentSoft }]}>
       <Text {...dynamicType} style={[styles.tileCount, { color: colors.accent }]}>{tournament.bracketSize}</Text>
       <Text {...dynamicType} style={[styles.tileLabel, { color: colors.accent }]}>BOOKS</Text>
     </View> : null}
@@ -205,6 +245,16 @@ function TierlistBody({ item }: { item: Extract<OwnedItem, { kind: "tierlist" }>
   </View>;
 }
 
+// Someone else's poll the account voted on — its ladder is the owner's
+// answer key, not the viewer's ballot, so no tier distribution here.
+function VotedTierlistBody({ tierlist }: { tierlist: VotedTierlist }) {
+  const { colors } = useTheme();
+  return <View style={styles.grow}>
+    <Text numberOfLines={1} {...dynamicType} style={[typography.title, styles.strong, { color: colors.text }]}>{tierlist.name}</Text>
+    <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{votedTierlistDetail(tierlist)}</Text>
+  </View>;
+}
+
 const styles = StyleSheet.create({
   grow: { flex: 1 },
   strong: { fontWeight: "700" },
@@ -221,6 +271,7 @@ const styles = StyleSheet.create({
   coverOverlap: { marginLeft: -9 },
   coverMore: { marginLeft: spacing.sm },
   statusLine: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginTop: spacing.xs },
+  sectionHeader: { marginTop: spacing.lg, marginBottom: spacing.xs, textTransform: "uppercase", letterSpacing: 0.8 },
   pill: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radii.full },
   pillText: { fontSize: 11, lineHeight: 15, fontWeight: "700", letterSpacing: 0.5 },
   tile: { width: 56, height: 56, borderRadius: radii.md, alignItems: "center", justifyContent: "center" },

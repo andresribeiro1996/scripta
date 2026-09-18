@@ -93,6 +93,14 @@ function createInMemoryArenaRepository(): ArenaRepository {
     getDuelsForRound(tournamentId, roundNumber) {
       return [...duels.values()].filter((d) => d.tournament_id === tournamentId && d.round_number === roundNumber);
     },
+    getFinalDuels(tournamentIds) {
+      return tournamentIds.flatMap((id) => {
+        const rows = [...duels.values()].filter((d) => d.tournament_id === id);
+        if (rows.length === 0) return [];
+        const maxRound = Math.max(...rows.map((d) => d.round_number));
+        return rows.filter((d) => d.round_number === maxRound);
+      });
+    },
     updateDuelSettlement(id, status, winnerKey, settledAt) {
       const d = duels.get(id);
       if (d) {
@@ -111,6 +119,9 @@ function createInMemoryArenaRepository(): ArenaRepository {
       votes.push({ ...row });
       return true;
     },
+    linkVotesToUser(voterToken, voterUserId) {
+      for (const v of votes) if (v.voter_token === voterToken && v.voter_user_id === null) v.voter_user_id = voterUserId;
+    },
     countVotesByBook(duelId) {
       const counts: Record<string, number> = {};
       for (const v of votes) if (v.duel_id === duelId) counts[v.book_key] = (counts[v.book_key] ?? 0) + 1;
@@ -118,6 +129,22 @@ function createInMemoryArenaRepository(): ArenaRepository {
     },
     hasVoted(duelId, voterToken) {
       return votes.some((v) => v.duel_id === duelId && v.voter_token === voterToken);
+    },
+    listVotedByUser(voterUserId) {
+      const lastVoteAt = new Map<string, string>();
+      for (const v of votes) {
+        if (v.voter_user_id !== voterUserId) continue;
+        const tournamentId = duels.get(v.duel_id)?.tournament_id;
+        if (!tournamentId) continue;
+        const previous = lastVoteAt.get(tournamentId);
+        if (!previous || v.created_at > previous) lastVoteAt.set(tournamentId, v.created_at);
+      }
+      return [...lastVoteAt.entries()]
+        .map(([id, at]) => ({ tournament: tournaments.get(id), at }))
+        .filter((entry): entry is { tournament: TournamentRow; at: string } => entry.tournament !== undefined)
+        .filter(({ tournament }) => tournament.owner_user_id !== voterUserId)
+        .sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))
+        .map(({ tournament }) => tournament);
     }
   };
 }
@@ -269,6 +296,37 @@ test("a full round of voting settles duels and advances to the next round, endin
   assert.equal(view?.duels.find((d) => d.roundNumber === 2)?.winnerKey, "book-1");
 });
 
+test("a completed tournament's summary carries the champion book", () => {
+  const service = createArenaService(createInMemoryArenaRepository());
+  const tournament = service.createTournament("owner-1", { name: "Test", bracketSize: 2, roundDurationMinutes: 60 });
+  service.setSlotsManual(tournament.id, "owner-1", [
+    { slotIndex: 0, book: makeBookWithCover(1) },
+    { slotIndex: 1, book: makeBook(2) }
+  ]);
+  service.start(tournament.id, "owner-1");
+  const duel = service.getTournamentView(tournament.id)!.duels[0]!;
+  service.vote(tournament.id, duel.id, "voter-1", "book-1");
+  service.settleEarly(tournament.id, "owner-1", duel.id);
+
+  const summary = service.listMine("owner-1")[0];
+  assert.equal(summary?.status, "completed");
+  assert.deepEqual(summary?.winner, makeBookWithCover(1));
+});
+
+test("a seeding or active tournament's summary has no winner yet", () => {
+  const service = createArenaService(createInMemoryArenaRepository());
+  const fresh = service.createTournament("owner-1", { name: "Fresh", bracketSize: 2, roundDurationMinutes: 60 });
+  assert.equal(service.listMine("owner-1").find((t) => t.id === fresh.id)?.winner, null);
+
+  const running = service.createTournament("owner-1", { name: "Running", bracketSize: 2, roundDurationMinutes: 60 });
+  service.setSlotsManual(running.id, "owner-1", [
+    { slotIndex: 0, book: makeBook(1) },
+    { slotIndex: 1, book: makeBook(2) }
+  ]);
+  service.start(running.id, "owner-1");
+  assert.equal(service.listMine("owner-1").find((t) => t.id === running.id)?.winner, null);
+});
+
 test("a tied duel waits for the owner's tie-break instead of auto-advancing", () => {
   const service = createArenaService(createInMemoryArenaRepository());
   const tournament = service.createTournament("owner-1", { name: "Test", bracketSize: 2, roundDurationMinutes: 60 });
@@ -393,4 +451,64 @@ test("start emits exactly one publish event and the public summary flips", () =>
   assert.equal(service.getPublicSummary(t.id)?.status, "active");
   assert.throws(() => service.start(t.id, "owner-1"), TournamentAlreadyStartedError);
   assert.equal(emitted.length, 1);
+});
+
+function startedTournament(service: ReturnType<typeof createArenaService>, owner: string, name: string, books: number) {
+  const tournament = service.createTournament(owner, { name, bracketSize: 2, roundDurationMinutes: 60 });
+  service.setSlotsManual(
+    tournament.id,
+    owner,
+    Array.from({ length: 2 }, (_, i) => ({ slotIndex: i, book: makeBook(i + 1 + books) }))
+  );
+  service.start(tournament.id, owner);
+  return tournament;
+}
+
+test("a signed-in vote stamps the account and backfills the token's earlier anonymous votes", async () => {
+  const service = createArenaService(createInMemoryArenaRepository());
+  const first = startedTournament(service, "owner-1", "First", 0);
+  const second = startedTournament(service, "owner-1", "Second", 10);
+  const duelA = service.getTournamentView(first.id)!.duels[0]!;
+  const duelB = service.getTournamentView(second.id)!.duels[0]!;
+
+  // Anonymous vote today, signed-in vote tomorrow, same browser token.
+  service.vote(first.id, duelA.id, "voter-token-1", "book-1");
+  assert.equal(service.listVoted("voter-1").length, 0);
+
+  // Distinct wall-clock times: "most recent vote first" needs comparable
+  // created_at values, and two synchronous votes can land in one
+  // millisecond.
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  service.vote(second.id, duelB.id, "voter-token-1", "book-11", "voter-1");
+
+  const voted = service.listVoted("voter-1");
+  assert.deepEqual(
+    voted.map((t) => t.name),
+    ["Second", "First"] // most recent vote first
+  );
+  // The backfill only claims unclaimed votes — re-voting the same duel
+  // (a 409) must not reshuffle anything.
+  assert.throws(() => service.vote(first.id, duelA.id, "voter-token-1", "book-1", "voter-1"), AlreadyVotedError);
+  assert.deepEqual(
+    service.listVoted("voter-1").map((t) => t.name),
+    ["Second", "First"]
+  );
+});
+
+test("an anonymous vote leaves no participation trail, and own tournaments stay out of listVoted", () => {
+  const service = createArenaService(createInMemoryArenaRepository());
+  const own = startedTournament(service, "voter-1", "Mine", 0);
+  const other = startedTournament(service, "owner-1", "Theirs", 10);
+  const ownDuel = service.getTournamentView(own.id)!.duels[0]!;
+  const otherDuel = service.getTournamentView(other.id)!.duels[0]!;
+
+  service.vote(other.id, otherDuel.id, "token-a", "book-11", "voter-1");
+  service.vote(own.id, ownDuel.id, "token-a", "book-1", "voter-1");
+
+  assert.deepEqual(
+    service.listVoted("voter-1").map((t) => t.name),
+    ["Theirs"]
+  );
+  service.vote(other.id, otherDuel.id, "token-b", "book-12");
+  assert.equal(service.listVoted("voter-2").length, 0);
 });

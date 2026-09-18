@@ -13,6 +13,8 @@ export interface TournamentSummary {
   /** Up to four cover URLs from the seeded pool, for the list card. */
   covers: string[];
   filledSlots: number;
+  /** The champion book, once this tournament's final duel has settled. */
+  winner: SeedBook | null;
 }
 
 export interface TournamentView extends TournamentSummary {
@@ -32,12 +34,18 @@ export async function fetchMyTournaments() {
   return (await apiClient.request<{ tournaments: TournamentSummary[] }>("/arenas/mine", { auth: true })).tournaments;
 }
 
+/** Tournaments the account has voted in (own ones excluded server-side),
+ *  most recent vote first. */
+export async function fetchVotedTournaments() {
+  return (await apiClient.request<{ tournaments: TournamentSummary[] }>("/arenas/voted", { auth: true })).tournaments;
+}
+
 export async function fetchPublicTournaments() {
   return (await apiClient.request<{ tournaments: TournamentSummary[] }>("/arenas/public")).tournaments;
 }
 
-export async function fetchTournament(id: string, voterToken: string) {
-  return (await apiClient.request<{ tournament: TournamentView }>(`/arenas/${id}?voterToken=${encodeURIComponent(voterToken)}`)).tournament;
+export async function fetchTournament(id: string, voterToken?: string) {
+  return (await apiClient.request<{ tournament: TournamentView }>(`/arenas/${id}${voterToken ? `?voterToken=${encodeURIComponent(voterToken)}` : ""}`)).tournament;
 }
 
 export function setTournamentSlots(id: string, slots: Array<{ slotIndex: number; book: SeedBook }>) {
@@ -52,8 +60,16 @@ export function startTournament(id: string) {
   return apiClient.request(`/arenas/${id}/start`, { method: "POST", auth: true });
 }
 
-export function voteOnDuel(tournamentId: string, duelId: string, voterToken: string, bookKey: string) {
-  return apiClient.request(`/arenas/${tournamentId}/duels/${duelId}/vote`, { method: "POST", body: { voterToken, bookKey } });
+/** Public route, but `authenticated` controls whether the caller's access
+ *  token rides along — a signed-in voter's vote (and the browser token's
+ *  whole history) is claimed for the account, an anonymous one stays
+ *  anonymous. Same split submitBallot in features/tierlists/api.ts uses. */
+export function voteOnDuel(tournamentId: string, duelId: string, voterToken: string, bookKey: string, authenticated: boolean) {
+  return apiClient.request(`/arenas/${tournamentId}/duels/${duelId}/vote`, {
+    method: "POST",
+    body: { voterToken, bookKey },
+    auth: authenticated,
+  });
 }
 
 export function settleDuelEarly(tournamentId: string, duelId: string) {

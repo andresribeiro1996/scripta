@@ -38,6 +38,10 @@ export interface ArenaRepository {
   getDuel(id: string): DuelRow | undefined;
   getDuelsForTournament(tournamentId: string): DuelRow[];
   getDuelsForRound(tournamentId: string, roundNumber: number): DuelRow[];
+  /** Each tournament's highest-round duel(s) — for a completed tournament
+   *  that's its single settled final, whose winner is the champion. One
+   *  query for a whole page of cards, mirroring getSeedPreviews. */
+  getFinalDuels(tournamentIds: string[]): DuelRow[];
   updateDuelSettlement(id: string, status: DuelRow["status"], winnerKey: string | null, settledAt: string | null): void;
   /** Backs the scheduler's sweep (service.ts's runScheduledSweep) —
    *  every `status = 'active'` duel whose closes_at has passed. */
@@ -48,7 +52,17 @@ export interface ArenaRepository {
    *  SQLite adapter's own comment for why (INSERT OR IGNORE, same
    *  race-safe idiom modules/covers already uses for first-write-wins). */
   insertVote(row: VoteRow): boolean;
+  /** Claims a voter_token's votes for an account: stamps voter_user_id
+   *  onto every vote cast under that token that doesn't have one yet.
+   *  Called when a signed-in user votes, so their past per-device votes
+   *  fold into the account's history in one statement. */
+  linkVotesToUser(voterToken: string, voterUserId: string): void;
   /** `{ [book_key]: count }` — only keys with at least one vote appear. */
   countVotesByBook(duelId: string): Record<string, number>;
   hasVoted(duelId: string, voterToken: string): boolean;
+  /** Every tournament the account has cast at least one vote in, most
+   *  recent vote first. Own tournaments are excluded — they already show
+   *  under listTournamentsByOwner, and "Voting in" means other people's
+   *  content. */
+  listVotedByUser(voterUserId: string): TournamentRow[];
 }

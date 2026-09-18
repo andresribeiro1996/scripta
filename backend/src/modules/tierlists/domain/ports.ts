@@ -24,15 +24,20 @@ export interface TierlistsRepository {
   /** Lookup by public code — NOT ownership-checked: this backs the public
    *  voting routes, where the caller has no session at all. */
   getByVoteCode(code: string): TierlistRow | undefined;
-  /** The community copy and its seeded owner ballot in ONE transaction —
-   *  a copy that exists without its owner's vote, or a ballot orphaned by
-   *  a failed insert, would both be corrupt states no caller can repair. */
-  insertCommunityCopy(row: TierlistRow, ballot: BallotRow, placements: Placement[]): void;
+  /** Publish the existing row and seed its owner ballot in one transaction. */
+  publish(id: string, userId: string, data: string, access: VoteAccess, code: string, publicBooks: string, ballot: BallotRow, placements: Placement[]): TierlistRow | undefined;
+  promote(id: string, at: string): void;
+  eligibleVoteCount(id: string, originUserId: string): number;
   setVoting(id: string, userId: string, patch: { vote_access?: VoteAccess; voting_open?: number }): TierlistRow | undefined;
-  /** Every community copy, newest first. Ordinary tier lists are excluded. */
+  /** Every public tier list, newest first. */
   listPublic(limit: number, offset: number): TierlistRow[];
   getPublicById(id: string): TierlistRow | undefined;
   listPublicByUser(ownerUserId: string): TierlistRow[];
+  /** Public tier lists the account has a ballot on, latest ballot first.
+   *  Own lists are excluded — they already show under listByUser, and
+   *  "Voted on" means other people's content (the owner's seeded ballot
+   *  on their own poll must not count as participation). */
+  listVotedByUser(voterUserId: string): TierlistRow[];
   getBallotById(tierlistId: string, ballotId: string): BallotRow | undefined;
   getBallotByVoter(tierlistId: string, voterUserId: string): BallotRow | undefined;
   /** Insert-or-replace a ballot and REPLACE its placements wholesale (a

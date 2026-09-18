@@ -1,5 +1,5 @@
 import type { TierDefinition } from "@scripta/shared";
-import type { Tierlist } from "../tierlists/api";
+import type { Tierlist, VotedTierlist } from "../tierlists/api";
 import type { TournamentSummary } from "./api";
 
 export const ARENA_TABS = [
@@ -15,6 +15,17 @@ export type ArenaTab = (typeof ARENA_TABS)[number]["value"];
 export type OwnedItem =
   | { id: string; name: string; kind: "tournament"; source: TournamentSummary }
   | { id: string; name: string; detail: string; kind: "tierlist"; source: Tierlist };
+
+/** One FlatList row: either a plain-text section header, one of the
+ *  account's own items, or content from someone else the account voted
+ *  in. Voted rows carry their push target and never a delete action. */
+export type SectionedItem =
+  | { kind: "header"; key: string; title: string }
+  | { kind: "owned"; key: string; item: OwnedItem }
+  | { kind: "votedTournament"; key: string; target: string; tournament: TournamentSummary }
+  | { kind: "votedTierlist"; key: string; target: string; tierlist: VotedTierlist };
+
+export const CREATED_BY_YOU = "Created by you";
 
 export function tabIndex(tab: ArenaTab): number {
   return Math.max(0, ARENA_TABS.findIndex((option) => option.value === tab));
@@ -50,6 +61,58 @@ export function ownedItems(tab: ArenaTab, tournaments: TournamentSummary[], tier
 export function filterItems(items: OwnedItem[], search: string): OwnedItem[] {
   const needle = search.trim().toLowerCase();
   return needle ? items.filter((item) => item.name.toLowerCase().includes(needle)) : items;
+}
+
+/** With no participation the tab stays the flat owned list it always was;
+ *  section headers only appear around a non-empty voted section. */
+export function homeSections(
+  tab: ArenaTab,
+  owned: OwnedItem[],
+  votedTournaments: TournamentSummary[],
+  votedTierlists: VotedTierlist[]
+): SectionedItem[] {
+  const voted = tab === "tournaments" ? votedTournaments : votedTierlists;
+  if (voted.length === 0) return owned.map((item) => ({ kind: "owned", key: item.id, item }));
+
+  const sectionTitle = tab === "tournaments" ? "Voting in" : "Voted on";
+  const votedRows: SectionedItem[] =
+    tab === "tournaments"
+      ? votedTournaments.map((tournament) => ({
+          kind: "votedTournament" as const,
+          key: `voted:${tournament.id}`,
+          target: `/arena/${tournament.id}`,
+          tournament,
+        }))
+      : votedTierlists.map((tierlist) => ({
+          kind: "votedTierlist" as const,
+          key: `voted:${tierlist.id}`,
+          target: `/vote/${tierlist.voteCode}`,
+          tierlist,
+        }));
+  return [
+    { kind: "header", key: "created", title: CREATED_BY_YOU },
+    ...owned.map((item) => ({ kind: "owned" as const, key: item.id, item })),
+    { kind: "header", key: "participating", title: sectionTitle },
+    ...votedRows,
+  ];
+}
+
+function sectionItemName(item: SectionedItem): string | null {
+  if (item.kind === "header") return null;
+  if (item.kind === "owned") return item.item.name;
+  if (item.kind === "votedTournament") return item.tournament.name;
+  return item.tierlist.name;
+}
+
+/** Active search collapses to a flat hit list — headers would leave
+ *  orphaned titles above sections the needle emptied. */
+export function filterSections(sections: SectionedItem[], search: string): SectionedItem[] {
+  const needle = search.trim().toLowerCase();
+  if (!needle) return sections;
+  return sections.filter((item) => {
+    const name = sectionItemName(item);
+    return name !== null && name.toLowerCase().includes(needle);
+  });
 }
 
 export function emptyCopy(tab: ArenaTab, searching: boolean): { title: string; body: string } {
@@ -92,4 +155,10 @@ export function tournamentProgress(tournament: TournamentSummary): {
  *  from the bracket size. */
 export function coverRemainder(tournament: TournamentSummary): number {
   return Math.max(0, tournament.filledSlots - tournament.covers.length);
+}
+
+/** Card caption for someone else's poll the account voted on — same
+ *  format the public directory uses. */
+export function votedTierlistDetail(tierlist: VotedTierlist): string {
+  return `${tierlist.poolSize} books · ${tierlist.ballotCount} ballots${tierlist.votingOpen ? "" : " · closed"}`;
 }

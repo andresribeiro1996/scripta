@@ -62,11 +62,14 @@ export interface DuelRow {
 
 /** voter_token is a random UUID the frontend generates once per browser
  *  (see frontend/src/lib/arenaVoter.ts) — this is what makes "anyone can
- *  vote, no account needed" possible at all. */
+ *  vote, no account needed" possible at all. voter_user_id is set when
+ *  the same vote was cast signed-in (and backfilled onto the token's
+ *  earlier votes), which is what powers "tournaments I voted in". */
 export interface VoteRow {
   id: string;
   duel_id: string;
   voter_token: string;
+  voter_user_id: string | null;
   book_key: string;
   created_at: string;
 }

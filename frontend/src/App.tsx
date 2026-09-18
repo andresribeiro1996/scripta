@@ -6,6 +6,7 @@ import { RequireUsername } from "./auth/RequireUsername";
 import { EdgeSwipeBack } from "./components/EdgeSwipeBack";
 import { DashboardLayout } from "./layouts/DashboardLayout";
 import { ArenaListPage } from "./pages/ArenaListPage";
+import { TierListCreatePage } from "./pages/TierListCreatePage";
 import { ArenaSeedPage } from "./pages/ArenaSeedPage";
 import { ArenaViewPage } from "./pages/ArenaViewPage";
 import { ChooseUsernamePage } from "./pages/ChooseUsernamePage";
@@ -73,6 +74,7 @@ export function App() {
               <Route path="/dashboard/murals" element={<MuralsListPage />} />
               <Route path="/dashboard/murals/:muralId" element={<MuralEditorPage />} />
               <Route path="/dashboard/arena" element={<ArenaListPage />} />
+              <Route path="/dashboard/arena/tierlist/new" element={<TierListCreatePage />} />
               <Route path="/dashboard/arena/tierlist/:id" element={<TierListEditorPage />} />
               <Route path="/dashboard/arena/:id/seed" element={<ArenaSeedPage />} />
               <Route path="/dashboard/style" element={<LibraryStylePage />} />

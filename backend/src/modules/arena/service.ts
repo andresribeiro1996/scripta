@@ -42,6 +42,9 @@ export interface TournamentSummary {
    *  Empty when nothing is seeded yet, or when no seeded book had art. */
   covers: string[];
   filledSlots: number;
+  /** The champion book, once this tournament's final duel has settled —
+   *  null for anything still seeding or in progress. */
+  winner: SeedBookInput | null;
 }
 
 export interface DuelSideView extends SeedBookInput {
@@ -75,7 +78,15 @@ export interface ArenaService {
   randomFill(tournamentId: string, ownerUserId: string, pool: SeedBookInput[]): void;
   getPublicSummary(tournamentId: string): TournamentSummary | undefined;
   start(tournamentId: string, ownerUserId: string): void;
-  vote(tournamentId: string, duelId: string, voterToken: string, bookKey: string): void;
+  /** Casts one vote. `voterUserId` is the signed-in caller's account id,
+   *  or null for an anonymous vote — when present, the vote is stamped
+   *  with it AND every earlier vote under the same voter_token is claimed
+   *  for the account (linkVotesToUser), so a person's pre-sign-in voting
+   *  history joins their "voted in" list on their first signed-in vote. */
+  vote(tournamentId: string, duelId: string, voterToken: string, bookKey: string, voterUserId?: string | null): void;
+  /** Tournaments the account has voted in, most recent vote first —
+   *  own tournaments excluded (listMine already shows those). */
+  listVoted(voterUserId: string): TournamentSummary[];
   settleEarly(tournamentId: string, ownerUserId: string, duelId: string): void;
   tiebreak(tournamentId: string, ownerUserId: string, duelId: string, winnerBookKey: string): void;
   /** Renames a tournament. Allowed at ANY status, unlike seeding or
@@ -94,10 +105,10 @@ function isPowerOfTwo(n: number): boolean {
 const COVER_PREVIEW_LIMIT = 4;
 const EMPTY_PREVIEW: SeedPreview = { covers: [], filledSlots: 0 };
 
-// The preview is a required argument rather than an optional one: every
-// caller has to say what a card should show, so a new list endpoint can't
-// quietly ship summaries with no covers and no error to notice.
-function toTournamentSummary(row: TournamentRow, preview: SeedPreview): TournamentSummary {
+// The preview and winner are required arguments rather than optional ones:
+// every caller has to say what a card should show, so a new list endpoint
+// can't quietly ship summaries with no covers/winner and no error to notice.
+function toTournamentSummary(row: TournamentRow, preview: SeedPreview, winner: SeedBookInput | null): TournamentSummary {
   return {
     id: row.id,
     name: row.name,
@@ -108,8 +119,18 @@ function toTournamentSummary(row: TournamentRow, preview: SeedPreview): Tourname
     createdAt: row.created_at,
     ownerUserId: row.owner_user_id,
     covers: preview.covers,
-    filledSlots: preview.filledSlots
+    filledSlots: preview.filledSlots,
+    winner
   };
+}
+
+// Only the final round's duel can produce a champion — an early round's
+// settled duel just fed its winner into the next round, not the title.
+function winnerFromDuels(duels: DuelRow[]): SeedBookInput | null {
+  if (duels.length === 0) return null;
+  const maxRound = Math.max(...duels.map((d) => d.round_number));
+  const final = duels.find((d) => d.round_number === maxRound && d.winner_key);
+  return final ? winnerBookFromDuel(final) : null;
 }
 
 export function previewFromSlots(slots: TournamentSlotRow[]): SeedPreview {
@@ -124,7 +145,12 @@ export function previewFromSlots(slots: TournamentSlotRow[]): SeedPreview {
 function summariesWithPreviews(repo: ArenaRepository, rows: TournamentRow[]): TournamentSummary[] {
   if (rows.length === 0) return [];
   const previews = repo.getSeedPreviews(rows.map((row) => row.id), COVER_PREVIEW_LIMIT);
-  return rows.map((row) => toTournamentSummary(row, previews.get(row.id) ?? EMPTY_PREVIEW));
+  const completedIds = rows.filter((row) => row.status === "completed").map((row) => row.id);
+  const winners = new Map<string, SeedBookInput>();
+  for (const duel of repo.getFinalDuels(completedIds)) {
+    if (duel.winner_key) winners.set(duel.tournament_id, winnerBookFromDuel(duel));
+  }
+  return rows.map((row) => toTournamentSummary(row, previews.get(row.id) ?? EMPTY_PREVIEW, winners.get(row.id) ?? null));
 }
 
 function winnerBookFromDuel(d: DuelRow): SeedBookInput {
@@ -249,11 +275,15 @@ export function createArenaService(repo: ArenaRepository, emitPublished?: EmitPu
         updated_at: now
       };
       repo.insertTournament(row);
-      return toTournamentSummary(row, EMPTY_PREVIEW);
+      return toTournamentSummary(row, EMPTY_PREVIEW, null);
     },
 
     listMine(ownerUserId) {
       return summariesWithPreviews(repo, repo.listTournamentsByOwner(ownerUserId));
+    },
+
+    listVoted(voterUserId) {
+      return summariesWithPreviews(repo, repo.listVotedByUser(voterUserId));
     },
 
     listPublic(limit, offset) {
@@ -268,7 +298,7 @@ export function createArenaService(repo: ArenaRepository, emitPublished?: EmitPu
         .getDuelsForTournament(id)
         .sort((a, b) => a.round_number - b.round_number || a.duel_index - b.duel_index);
       return {
-        ...toTournamentSummary(tournament, previewFromSlots(slots)),
+        ...toTournamentSummary(tournament, previewFromSlots(slots), winnerFromDuels(duels)),
         slots: slots.map((s) => ({ slotIndex: s.slot_index, key: s.book_key, title: s.title, author: s.author, cover: s.cover_url })),
         duels: duels.map((d) => toDuelView(d, voterToken))
       };
@@ -277,7 +307,8 @@ export function createArenaService(repo: ArenaRepository, emitPublished?: EmitPu
     getPublicSummary(tournamentId) {
       const tournament = repo.getTournament(tournamentId);
       if (!tournament || tournament.status === "seeding") return undefined;
-      return toTournamentSummary(tournament, previewFromSlots(repo.getSlots(tournament.id)));
+      const winner = winnerFromDuels(repo.getDuelsForTournament(tournament.id));
+      return toTournamentSummary(tournament, previewFromSlots(repo.getSlots(tournament.id)), winner);
     },
 
     setSlotsManual(tournamentId, ownerUserId, entries) {
@@ -345,7 +376,7 @@ export function createArenaService(repo: ArenaRepository, emitPublished?: EmitPu
       emitPublished?.(tournamentId, ownerUserId);
     },
 
-    vote(tournamentId, duelId, voterToken, bookKey) {
+    vote(tournamentId, duelId, voterToken, bookKey, voterUserId = null) {
       const duel = repo.getDuel(duelId);
       if (!duel || duel.tournament_id !== tournamentId) throw new DuelNotFoundError();
       if (duel.status !== "active" || new Date() >= new Date(duel.closes_at)) throw new DuelNotVotableError();
@@ -355,9 +386,13 @@ export function createArenaService(repo: ArenaRepository, emitPublished?: EmitPu
         id: randomUUID(),
         duel_id: duelId,
         voter_token: voterToken,
+        voter_user_id: voterUserId,
         book_key: bookKey,
         created_at: new Date().toISOString()
       });
+      // Backfill runs even when THIS duel was already voted: the token's
+      // other votes should still join the account on a signed-in revisit.
+      if (voterUserId) repo.linkVotesToUser(voterToken, voterUserId);
       if (!inserted) throw new AlreadyVotedError();
     },
 

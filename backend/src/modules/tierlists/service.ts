@@ -3,6 +3,7 @@
 // module's service.ts.
 
 import { randomBytes, randomUUID } from "node:crypto";
+import { DEFAULT_TIER_PRESET } from "@scripta/shared";
 import type { TierlistsRepository } from "./domain/ports.js";
 import type { BallotRow, HistogramCell, Placement, Tierlist, TierlistRow, VoteAccess } from "./domain/types.js";
 
@@ -16,6 +17,8 @@ function toTierlist(row: TierlistRow): Tierlist {
     voteAccess: row.vote_access,
     votingOpen: row.voting_open === 1,
     sourceTierlistId: row.source_tierlist_id,
+    promotedAt: row.promoted_at,
+    originCreatorId: row.origin_user_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -39,6 +42,9 @@ export interface VotingBoard {
   votingOpen: boolean;
   histogram: HistogramCell[];
   ballotCount: number;
+  eligibleVoteCount: number;
+  promotedAt: string | null;
+  publicBooks: unknown[] | null;
 }
 
 export interface PublicTierlistSummary {
@@ -46,6 +52,8 @@ export interface PublicTierlistSummary {
   name: string;
   poolSize: number;
   ballotCount: number;
+  eligibleVoteCount: number;
+  promotedAt: string | null;
   votingOpen: boolean;
 }
 
@@ -57,12 +65,14 @@ export interface PublishedTierlistRef {
   name: string;
   poolSize: number;
   ballotCount: number;
+  eligibleVoteCount: number;
+  promotedAt: string | null;
   votingOpen: boolean;
 }
 
 export interface TierlistsService {
   listTierlists(userId: string): Tierlist[];
-  createTierlist(userId: string, name: string): Tierlist;
+  createTierlist(userId: string, name: string, data?: TierlistDocument, access?: VoteAccess, publicBooks?: unknown[]): Tierlist;
   /** undefined if no tier list with that id is owned by userId — a
    *  caller-facing 404, not a server error. Same convention as
    *  modules/murals/service.ts's getMural. */
@@ -73,10 +83,8 @@ export interface TierlistsService {
   /** Returns false if no tier list with that id was owned by userId —
    *  same convention as modules/murals/service.ts's deleteMural. */
   deleteTierlist(userId: string, id: string): boolean;
-  /** Duplicates the tier list into a public community copy whose structure
-   *  is frozen, seeding the owner's current ranking as its first ballot.
-   *  undefined if not owned. */
-  openVoting(userId: string, id: string, access: VoteAccess): Tierlist | undefined;
+  /** Publishes the existing tier list and seeds the owner's ranking. */
+  openVoting(userId: string, id: string, access: VoteAccess, publicBooks?: unknown[]): Tierlist | undefined;
   setVotingState(userId: string, id: string, patch: { access?: VoteAccess; open?: boolean }): Tierlist | undefined;
   submitBallot(code: string, placements: Placement[], voter: Voter): BallotOutcome;
   getBallot(code: string, voter: Voter): BallotOutcome;
@@ -86,6 +94,10 @@ export interface TierlistsService {
   listPublishedRefs(limit: number, offset: number): PublishedTierlistRef[];
   getPublishedRef(id: string): PublishedTierlistRef | undefined;
   listPublishedRefsByOwner(ownerUserId: string): PublishedTierlistRef[];
+  /** Public tier lists the account has a ballot on, latest ballot first —
+   *  own polls excluded (openVoting seeds the owner's ballot, which is
+   *  not participation). Feeds the "Voted on" section of the games list. */
+  listVotedByUser(voterUserId: string): PublishedTierlistRef[];
 }
 
 /** Where a new tier list starts — the familiar S–D ladder, matching the
@@ -94,14 +106,6 @@ export interface TierlistsService {
  *  delete every one of these and add more — this is just the starting
  *  point, so "New tier list" opens on a recognizable board instead of
  *  an empty one. */
-const DEFAULT_TIER_PRESET: Array<{ label: string; color: string }> = [
-  { label: "S", color: "#c9482f" },
-  { label: "A", color: "#d98a3d" },
-  { label: "B", color: "#c9a53d" },
-  { label: "C", color: "#5c9e5c" },
-  { label: "D", color: "#4a7fc9" }
-];
-
 // Unambiguous alphabet: no 0/O/1/I/L, because these codes get read aloud
 // and typed by hand. 8 chars over 32 symbols is ~10^12 combinations —
 // enough that a poll isn't stumbled upon, though it is an identifier and
@@ -132,17 +136,19 @@ function toPublishedRef(row: TierlistRow, ballotCount: number): PublishedTierlis
   for (const tier of tiers) for (const key of tier.bookKeys) keys.add(key);
   return {
     id: row.id,
-    ownerUserId: row.owner_user_id,
+    ownerUserId: row.origin_user_id,
     createdAt: row.created_at,
     voteCode: row.vote_code!,
     name: row.name,
     poolSize: keys.size,
     ballotCount,
+    eligibleVoteCount: 0,
+    promotedAt: row.promoted_at,
     votingOpen: row.voting_open === 1
   };
 }
 
-export type EmitPublished = (communityCopyId: string, ownerUserId: string) => void;
+export type EmitPublished = (tierlistId: string, ownerUserId: string) => void;
 
 export function createTierlistsService(repo: TierlistsRepository, emitPublished?: EmitPublished): TierlistsService {
   return {
@@ -150,24 +156,28 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
       return repo.listByUser(userId).map(toTierlist);
     },
 
-    createTierlist(userId, name) {
+    createTierlist(userId, name, data, access, publicBooks) {
       const now = new Date().toISOString();
       const row: TierlistRow = {
         id: randomUUID(),
         owner_user_id: userId,
+        origin_user_id: userId,
         name,
-        data: JSON.stringify({
+        data: JSON.stringify(data ?? {
           tiers: DEFAULT_TIER_PRESET.map((t) => ({ id: randomUUID(), label: t.label, color: t.color, bookKeys: [] })),
           pool: []
         }),
-        vote_code: null,
-        vote_access: "anonymous",
-        voting_open: 0,
+        vote_code: access ? generateVoteCode() : null,
+        vote_access: access ?? "anonymous",
+        voting_open: access ? 1 : 0,
         source_tierlist_id: null,
+        promoted_at: null,
+        public_books: access ? JSON.stringify(publicBooks ?? []) : null,
         created_at: now,
         updated_at: now
       };
       repo.insert(row);
+      if (access) emitPublished?.(row.id, userId);
       return toTierlist(row);
     },
 
@@ -177,12 +187,7 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
     },
 
     updateTierlist(userId, id, patch) {
-      // A community copy's tiers and pool are frozen for the life of the
-      // vote — that's what makes ballots comparable, and it's why the
-      // owner's ORIGINAL is left untouched and editable when voting opens.
-      // Renaming stays allowed: the name is not part of the structure any
-      // ballot was cast against.
-      if (patch.data !== undefined) {
+      if (patch.data !== undefined || patch.name !== undefined) {
         const existing = repo.getOwned(id, userId);
         if (!existing) return undefined;
         if (existing.vote_code !== null) return undefined;
@@ -198,9 +203,9 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
       return repo.delete(id, userId);
     },
 
-    openVoting(userId, id, access) {
+    openVoting(userId, id, access, publicBooks = []) {
       const row = repo.getOwned(id, userId);
-      if (!row) return undefined;
+      if (!row || row.vote_code !== null) return undefined;
       const original = toTierlist(row);
 
       const { tiers, pool } = readDocument(original);
@@ -214,29 +219,18 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
       }
 
       const now = new Date().toISOString();
-      const copy: TierlistRow = {
-        id: randomUUID(),
-        owner_user_id: userId,
-        name: `${original.name} (community)`,
-        data: JSON.stringify({ tiers: tiers.map((t) => ({ ...t, bookKeys: [] })), pool: [...poolKeys] }),
-        vote_code: generateVoteCode(),
-        vote_access: access,
-        voting_open: 1,
-        source_tierlist_id: original.id,
-        created_at: now,
-        updated_at: now
-      };
       const ballot: BallotRow = {
         id: randomUUID(),
-        tierlist_id: copy.id,
+        tierlist_id: original.id,
         voter_user_id: userId,
         created_at: now,
         updated_at: now
       };
 
-      repo.insertCommunityCopy(copy, ballot, placements);
-      emitPublished?.(copy.id, userId);
-      return toTierlist(copy);
+      const published = repo.publish(original.id, userId, JSON.stringify({ tiers: tiers.map((t) => ({ ...t, bookKeys: [] })), pool: [...poolKeys] }), access, generateVoteCode(), JSON.stringify(publicBooks), ballot, placements);
+      if (!published) return undefined;
+      emitPublished?.(original.id, userId);
+      return toTierlist(published);
     },
 
     setVotingState(userId, id, patch) {
@@ -283,6 +277,9 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
           };
 
       repo.saveBallot(ballot, placements);
+      if (voter.kind === "user" && voter.userId !== row.origin_user_id && row.promoted_at === null && repo.eligibleVoteCount(row.id, row.origin_user_id) >= 100) {
+        repo.promote(row.id, now);
+      }
       return { ok: true, ballotId: ballot.id, placements };
     },
 
@@ -311,14 +308,17 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
       const { tiers, pool } = readDocument(toTierlist(row));
       return {
         id: row.id,
-        ownerUserId: row.owner_user_id,
+        ownerUserId: row.origin_user_id,
         name: row.name,
         tiers: tiers.map((t) => ({ id: t.id, label: t.label, color: t.color })),
         pool,
         access: row.vote_access,
         votingOpen: row.voting_open === 1,
         histogram: repo.histogram(row.id),
-        ballotCount: repo.ballotCount(row.id)
+        ballotCount: repo.ballotCount(row.id),
+        eligibleVoteCount: repo.eligibleVoteCount(row.id, row.origin_user_id),
+        promotedAt: row.promoted_at,
+        publicBooks: row.public_books ? JSON.parse(row.public_books) as unknown[] : null
       };
     },
 
@@ -326,23 +326,28 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
       const counts = repo.ballotCountsByTierlist();
       return repo.listPublic(limit, offset).map((row) => {
         const ref = toPublishedRef(row, counts.get(row.id) ?? 0);
-        return { voteCode: ref.voteCode, name: ref.name, poolSize: ref.poolSize, ballotCount: ref.ballotCount, votingOpen: ref.votingOpen };
+        return { voteCode: ref.voteCode, name: ref.name, poolSize: ref.poolSize, ballotCount: ref.ballotCount, eligibleVoteCount: repo.eligibleVoteCount(row.id, row.origin_user_id), promotedAt: ref.promotedAt, votingOpen: ref.votingOpen };
       });
     },
 
     listPublishedRefs(limit, offset) {
       const counts = repo.ballotCountsByTierlist();
-      return repo.listPublic(limit, offset).map((row) => toPublishedRef(row, counts.get(row.id) ?? 0));
+      return repo.listPublic(limit, offset).map((row) => ({ ...toPublishedRef(row, counts.get(row.id) ?? 0), eligibleVoteCount: repo.eligibleVoteCount(row.id, row.origin_user_id) }));
     },
 
     getPublishedRef(id) {
       const row = repo.getPublicById(id);
-      return row ? toPublishedRef(row, repo.ballotCount(id)) : undefined;
+      return row ? { ...toPublishedRef(row, repo.ballotCount(id)), eligibleVoteCount: repo.eligibleVoteCount(row.id, row.origin_user_id) } : undefined;
     },
 
     listPublishedRefsByOwner(ownerUserId) {
       const counts = repo.ballotCountsByTierlist();
-      return repo.listPublicByUser(ownerUserId).map((row) => toPublishedRef(row, counts.get(row.id) ?? 0));
+      return repo.listPublicByUser(ownerUserId).map((row) => ({ ...toPublishedRef(row, counts.get(row.id) ?? 0), eligibleVoteCount: repo.eligibleVoteCount(row.id, row.origin_user_id) }));
+    },
+
+    listVotedByUser(voterUserId) {
+      const counts = repo.ballotCountsByTierlist();
+      return repo.listVotedByUser(voterUserId).map((row) => ({ ...toPublishedRef(row, counts.get(row.id) ?? 0), eligibleVoteCount: repo.eligibleVoteCount(row.id, row.origin_user_id) }));
     }
   };
 }

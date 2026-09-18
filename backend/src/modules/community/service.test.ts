@@ -122,6 +122,8 @@ export function tierRef(id: string, owner: string, overrides: Partial<PublishedT
     name: `List ${id}`,
     poolSize: 5,
     ballotCount: 2,
+    eligibleVoteCount: 1,
+    promotedAt: null,
     votingOpen: true,
     ...overrides
   };
@@ -394,6 +396,16 @@ test("discover drops rows whose author has no reader profile", () => {
   const service = createCommunityService(deps);
   tierlistRefs.set("t1", tierRef("t1", "alice"));
   assert.deepEqual(service.getDiscover("all", "", 10, 0), { items: [], nextOffset: null });
+});
+
+test("promoted references remain discoverable after the creator disappears", () => {
+  const { repo } = createRepoFake();
+  const { deps, tierlistRefs } = createDeps(repo);
+  tierlistRefs.set("t1", tierRef("t1", "alice", { promotedAt: "2026-09-03T00:00:00.000Z", votingOpen: false }));
+  const items = createCommunityService(deps).getDiscover("tierlist", "", 10, 0).items;
+  assert.equal(items.length, 1);
+  assert.equal(items[0]?.author.unavailable, true);
+  assert.equal(items[0]?.content.kind, "tierlist");
 });
 
 test("people search excludes self and unpublished profiles", () => {

@@ -3,6 +3,7 @@
 // not a field on the account's library document).
 
 import { apiFetch, publicFetch } from "./client";
+import { getSession } from "../auth/tokenStore";
 import type { Duel, SeedBook } from "@scripta/shared";
 
 export type { Duel, DuelSide, SeedBook } from "@scripta/shared";
@@ -33,6 +34,13 @@ export async function fetchMyTournaments(): Promise<TournamentSummary[]> {
   return body.tournaments;
 }
 
+/** Tournaments the account has cast at least one vote in (own ones
+ *  excluded server-side), most recent vote first. */
+export async function fetchVotedTournaments(): Promise<TournamentSummary[]> {
+  const body = (await apiFetch("/arenas/voted")) as { tournaments: TournamentSummary[] };
+  return body.tournaments;
+}
+
 /** Public — works with no session at all. `voterToken` lets the backend
  *  fill in each active duel's `hasVoted`. */
 export async function fetchTournament(id: string, voterToken: string): Promise<TournamentView> {
@@ -54,9 +62,15 @@ export async function startTournament(id: string): Promise<void> {
   await apiFetch(`/arenas/${id}/start`, { method: "POST" });
 }
 
-/** Public — no session required, this is the whole point of BookArena. */
+/** Public — no session required, this is the whole point of BookArena.
+ *  A caller who HAS a session still sends its token, so the vote (and the
+ *  browser token's whole history) is claimed for the account — same
+ *  treatment api/tierlistVoting.ts's ballotFetch gives ballots. */
 export async function voteOnDuel(tournamentId: string, duelId: string, voterToken: string, bookKey: string): Promise<void> {
-  await publicFetch(`/arenas/${tournamentId}/duels/${duelId}/vote`, { method: "POST", body: JSON.stringify({ voterToken, bookKey }) });
+  await (getSession() ? apiFetch : publicFetch)(`/arenas/${tournamentId}/duels/${duelId}/vote`, {
+    method: "POST",
+    body: JSON.stringify({ voterToken, bookKey })
+  });
 }
 
 export async function settleDuelEarly(tournamentId: string, duelId: string): Promise<void> {

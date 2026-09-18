@@ -2,9 +2,9 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { Tierlist } from "../tierlists/api.js";
+import type { Tierlist, VotedTierlist } from "../tierlists/api.js";
 import type { TournamentSummary } from "./api.js";
-import { ARENA_TABS, coverRemainder, emptyCopy, filterItems, ownedItems, tabAtIndex, tabIndex, tierDistribution, tournamentProgress, type OwnedItem } from "./arenaHome.js";
+import { ARENA_TABS, coverRemainder, emptyCopy, filterItems, filterSections, homeSections, ownedItems, tabAtIndex, tabIndex, tierDistribution, tournamentProgress, votedTierlistDetail, type OwnedItem, type SectionedItem } from "./arenaHome.js";
 
 const tierDetail = (items: OwnedItem[]): string | undefined => {
   const first = items[0];
@@ -22,6 +22,7 @@ const tournament = (over: Partial<TournamentSummary> = {}): TournamentSummary =>
   ownerUserId: "u1",
   covers: [],
   filledSlots: 0,
+  winner: null,
   ...over,
 });
 
@@ -35,6 +36,8 @@ const tierlist = (over: Partial<Tierlist> = {}): Tierlist => ({
   voteAccess: "anonymous",
   votingOpen: false,
   sourceTierlistId: null,
+  promotedAt: null,
+  originCreatorId: "u1",
   ...over,
 });
 
@@ -117,4 +120,54 @@ test("the cover remainder counts seeded books with no thumbnail shown", () => {
   assert.equal(coverRemainder(tournament({ filledSlots: 3, covers: ["a", "b", "c"] })), 0);
   // A pool seeded entirely without art must not report a negative remainder.
   assert.equal(coverRemainder(tournament({ filledSlots: 0, covers: [] })), 0);
+});
+
+const votedTierlist = (over: Partial<VotedTierlist> = {}): VotedTierlist => ({
+  id: "p1",
+  ownerUserId: "u2",
+  createdAt: "2026-01-01T00:00:00.000Z",
+  voteCode: "abc12345",
+  name: "Space ranked",
+  poolSize: 6,
+  ballotCount: 3,
+  eligibleVoteCount: 2,
+  promotedAt: null,
+  votingOpen: true,
+  ...over,
+});
+
+const kinds = (sections: SectionedItem[]): string[] => sections.map((s) => ("title" in s ? `header:${s.title}` : s.kind));
+
+test("a tab with no participation stays the flat owned list it always was", () => {
+  const owned = ownedItems("tournaments", [tournament()], []);
+  assert.deepEqual(kinds(homeSections("tournaments", owned, [], [])), ["owned"]);
+  assert.deepEqual(kinds(homeSections("tierlists", ownedItems("tierlists", [], [tierlist()]), [], [])), ["owned"]);
+});
+
+test("a non-empty voted section gains headers on both sides", () => {
+  const sections = homeSections("tournaments", ownedItems("tournaments", [tournament()], []), [tournament({ id: "t2", name: "Public cup" })], []);
+  assert.deepEqual(kinds(sections), ["header:Created by you", "owned", "header:Voting in", "votedTournament"]);
+
+  const tierlistSections = homeSections("tierlists", ownedItems("tierlists", [], [tierlist()]), [], [votedTierlist()]);
+  assert.deepEqual(kinds(tierlistSections), ["header:Created by you", "owned", "header:Voted on", "votedTierlist"]);
+
+  const voted = tierlistSections[3];
+  assert.ok(voted && voted.kind === "votedTierlist");
+  assert.equal(voted.target, "/vote/abc12345");
+});
+
+test("an active search collapses to a flat hit list across both sections", () => {
+  const sections = homeSections(
+    "tournaments",
+    ownedItems("tournaments", [tournament({ id: "mine", name: "My cup" })], []),
+    [tournament({ id: "theirs", name: "Public cup" })],
+    []
+  );
+  assert.deepEqual(filterSections(sections, "cup").map((s) => s.key), ["mine", "voted:theirs"]);
+  assert.deepEqual(filterSections(sections, "   "), sections);
+});
+
+test("voted tier list cards read like the public directory's", () => {
+  assert.equal(votedTierlistDetail(votedTierlist()), "6 books · 3 ballots");
+  assert.equal(votedTierlistDetail(votedTierlist({ votingOpen: false })), "6 books · 3 ballots · closed");
 });

@@ -3,7 +3,7 @@
 
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { authGuard } from "../auth/index.js";
+import { authGuard, getOptionalAuthenticatedUser } from "../auth/index.js";
 import {
   AlreadyVotedError,
   ArenaError,
@@ -75,6 +75,10 @@ export function buildArenaRoutes(service: ArenaService) {
 
     app.get("/arenas/mine", { preHandler: authGuard }, async (request, reply) => {
       return reply.send({ tournaments: service.listMine(request.user.id) });
+    });
+
+    app.get("/arenas/voted", { preHandler: authGuard }, async (request, reply) => {
+      return reply.send({ tournaments: service.listVoted(request.user.id) });
     });
 
     app.get("/arenas/public", async (request, reply) => {
@@ -205,8 +209,12 @@ export function buildVoteRoute(service: ArenaService) {
       if (!params.success) return reply.code(400).send({ error: "Invalid id." });
       const body = voteSchema.safeParse(request.body);
       if (!body.success) return reply.code(400).send({ error: "Expected {voterToken, bookKey}." });
+      // Same optional-session treatment the tier-list ballot routes give
+      // (see routes.ts there): the route is public, but a valid session
+      // claims the vote — and the token's whole history — for the account.
+      const user = getOptionalAuthenticatedUser(request);
       try {
-        service.vote(params.data.id, params.data.duelId, body.data.voterToken, body.data.bookKey);
+        service.vote(params.data.id, params.data.duelId, body.data.voterToken, body.data.bookKey, user?.id ?? null);
         return reply.code(204).send();
       } catch (err) {
         if (err instanceof ArenaError) return reply.code(statusForArenaError(err)).send({ error: err.message });

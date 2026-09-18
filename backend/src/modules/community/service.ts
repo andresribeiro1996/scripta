@@ -21,7 +21,7 @@ export interface PublicProfileView {
 }
 
 function toTierlistSummary(ref: PublishedTierlistRef): TierlistSummary {
-  return { kind: "tierlist", id: ref.id, voteCode: ref.voteCode, name: ref.name, poolSize: ref.poolSize, ballotCount: ref.ballotCount, votingOpen: ref.votingOpen };
+  return { kind: "tierlist", id: ref.id, voteCode: ref.voteCode, name: ref.name, poolSize: ref.poolSize, ballotCount: ref.ballotCount, votingOpen: ref.votingOpen, promotedAt: ref.promotedAt };
 }
 
 function toTournamentSummary(ref: PublishedTournamentRef): TournamentSummary {
@@ -147,7 +147,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
         }
         if (event.ref_type === "tierlist") {
           const ref = deps.tierlists.get(event.ref_id);
-          const actor = ref && ref.ownerUserId === event.user_id ? deps.resolveProfiles([event.user_id]).get(event.user_id) : undefined;
+          const actor = ref && ref.ownerUserId === event.user_id ? deps.resolveProfiles([event.user_id]).get(event.user_id) ?? (ref.promotedAt ? { username: "Original creator unavailable", avatarUrl: null, unavailable: true } : undefined) : undefined;
           if (ref && actor) {
             items.push({ id: event.id, actor: { ...actor, userId: event.user_id }, type: event.type, content: toTierlistSummary(ref), createdAt: event.created_at });
           }
@@ -174,7 +174,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
       const authors = deps.resolveProfiles([...new Set(entries.map((e) => e.userId))]);
       const visible = entries
         .flatMap((entry) => {
-          const author = authors.get(entry.userId);
+          const author = authors.get(entry.userId) ?? (entry.content.kind === "tierlist" && entry.content.promotedAt ? { username: "Original creator unavailable", avatarUrl: null, unavailable: true } : undefined);
           if (!author) return [];
           if (needle && !entry.content.name.toLowerCase().includes(needle)) return [];
           return [{ userId: entry.userId, author, content: entry.content, createdAt: entry.createdAt }];

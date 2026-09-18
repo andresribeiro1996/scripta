@@ -7,10 +7,11 @@
 CREATE TABLE IF NOT EXISTS tierlists (
   id                 TEXT PRIMARY KEY,
   owner_user_id      TEXT NOT NULL,
+  origin_user_id     TEXT NOT NULL,
   name               TEXT NOT NULL,
   data               TEXT NOT NULL DEFAULT '{}',
-  -- NULL on an ordinary private tier list; set once when a community
-  -- copy is created and never rotated. Deliberately NOT declared UNIQUE
+  -- NULL on a private tier list; set once when published and never rotated.
+  -- Deliberately NOT declared UNIQUE
   -- inline: SQLite cannot ADD COLUMN with a UNIQUE constraint, so the
   -- migration path in connection.ts could never match this. The separate
   -- unique index below is what enforces it on BOTH paths.
@@ -18,6 +19,8 @@ CREATE TABLE IF NOT EXISTS tierlists (
   vote_access        TEXT NOT NULL DEFAULT 'anonymous',
   voting_open        INTEGER NOT NULL DEFAULT 0,
   source_tierlist_id TEXT,
+  promoted_at        TEXT,
+  public_books       TEXT,
   created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );

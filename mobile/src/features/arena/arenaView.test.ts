@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Duel } from "@scripta/shared";
-import { arenaViewTabs, bracketSlots, matchEmptyCopy, votableDuels, waitingLabel } from "./arenaView.js";
+import { arenaViewTabs, bracketSlots, matchEmptyCopy, votableDuels } from "./arenaView.js";
 
 const duel = (over: Partial<Duel> = {}): Duel => ({
   id: "d1",
@@ -20,9 +20,9 @@ const duel = (over: Partial<Duel> = {}): Duel => ({
 });
 
 test("a finished tournament drops the Match tab — there's nothing left to vote on", () => {
-  assert.deepEqual(arenaViewTabs("seeding").map((option) => option.value), ["match", "books", "bracket"]);
-  assert.deepEqual(arenaViewTabs("active").map((option) => option.value), ["match", "books", "bracket"]);
-  assert.deepEqual(arenaViewTabs("completed").map((option) => option.value), ["books", "bracket"]);
+  assert.deepEqual(arenaViewTabs("seeding").map((option) => option.value), ["match", "bracket"]);
+  assert.deepEqual(arenaViewTabs("active").map((option) => option.value), ["match", "bracket"]);
+  assert.deepEqual(arenaViewTabs("completed").map((option) => option.value), ["bracket"]);
 });
 
 test("the match deck only queues duels still open to this voter", () => {
@@ -36,11 +36,6 @@ test("the match deck only queues duels still open to this voter", () => {
   // the filter — round 1 match 1 comes up before round 1 match 2.
   const second = duel({ id: "second", duelIndex: 1 });
   assert.deepEqual(votableDuels([open, second]).map((item) => item.id), ["open", "second"]);
-});
-
-test("the waiting label counts matches, not books", () => {
-  assert.equal(waitingLabel(1), "1 match waiting on your vote");
-  assert.equal(waitingLabel(4), "4 matches waiting on your vote");
 });
 
 test("bracket slots keep a stable key for rounds nobody has reached yet", () => {
