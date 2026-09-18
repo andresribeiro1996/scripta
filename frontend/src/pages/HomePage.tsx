@@ -51,7 +51,7 @@ export function HomePage() {
               <h2 className="text-xl">Rediscover</h2>
               <blockquote className="space-y-2 rounded-xl border border-(--color-border) bg-(--color-surface) p-4">
                 <p>{String(quote.highlight.Text ?? "")}</p>
-                <footer className="text-sm text-(--color-text-dim)">{String(quote.book.Title ?? "")}{quote.book.Author ? ` — ${String(quote.book.Author)}` : ""}</footer>
+                <footer className="text-sm text-(--color-text-dim)">{String(quote.book.Title ?? "")}{quote.book.Attribution ? ` — ${String(quote.book.Attribution)}` : ""}</footer>
               </blockquote>
             </section>;
           })}
