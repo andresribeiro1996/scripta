@@ -1,0 +1,99 @@
+<div id="book-swipe-preview">
+  <div class="phone">
+    <div class="topline">Round 1 · Match 2</div>
+    <div class="covers">
+      <div class="cover left" data-book="left" tabindex="0" role="button" aria-label="Swipe The Night Archive up to pick it or down to pick the other book">
+        <div class="art"><span>THE<br>NIGHT<br>ARCHIVE</span><small>MARA VALE</small></div>
+        <div class="tint"></div><div class="badge pick">WINS</div><div class="badge other">LOSES</div>
+        <div class="hint up">↑ wins</div><div class="hint down">↓ loses</div>
+        <div class="label"><strong>The Night Archive</strong><small>Mara Vale</small></div>
+      </div>
+      <div class="cover right" data-book="right" tabindex="0" role="button" aria-label="Swipe Paper Moons up to pick it or down to pick the other book">
+        <div class="art"><span>PAPER<br>MOONS</span><small>ELI ROWAN</small></div>
+        <div class="tint"></div><div class="badge pick">WINS</div><div class="badge other">LOSES</div>
+        <div class="hint up">↑ wins</div><div class="hint down">↓ loses</div>
+        <div class="label"><strong>Paper Moons</strong><small>Eli Rowan</small></div>
+      </div>
+      <div class="vs">VS</div>
+    </div>
+    <div class="caption">Swipe a cover up to pick it, down to pass — or tap it</div>
+  </div>
+  <div class="actions"><button type="button" data-direction="-1">↑ Swipe up</button><button type="button" data-direction="1">↓ Swipe down</button></div>
+</div>
+<style>
+#book-swipe-preview { display:grid; justify-items:center; gap:18px; padding:12px 0 20px; color:#201e1c; font:14px/1.4 system-ui,sans-serif; user-select:none }
+#book-swipe-preview .phone { width:min(100%,340px); padding:24px 16px; background:#f5f4f2; border-radius:28px; box-shadow:0 12px 40px #201e1c18; box-sizing:border-box }
+#book-swipe-preview .topline { text-align:center; font-size:14px; font-weight:600; margin-bottom:12px }
+#book-swipe-preview .covers { position:relative; display:flex; gap:2px; aspect-ratio:1.3 }
+#book-swipe-preview .cover { position:relative; flex:1; min-width:0; overflow:hidden; touch-action:none; cursor:grab; transform-origin:center; box-shadow:0 2px 7px #0002 }
+#book-swipe-preview .cover:active { cursor:grabbing }
+#book-swipe-preview .cover.left { border-radius:12px 0 0 12px }
+#book-swipe-preview .cover.right { border-radius:0 12px 12px 0 }
+#book-swipe-preview .art { position:absolute; inset:0; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; gap:14px; color:#f7f1df; font:700 18px/1.05 Georgia,serif; letter-spacing:.09em; background:radial-gradient(circle at 70% 23%,#d3ad69 0 5%,transparent 6%),linear-gradient(135deg,#1c3348,#496477 58%,#1d2e3d) }
+#book-swipe-preview .right .art { color:#3b2a32; background:radial-gradient(circle at 70% 23%,#f4e3c7 0 18%,transparent 19%),linear-gradient(135deg,#bd9694,#e9d7cb 65%,#b77b79) }
+#book-swipe-preview .art small { font:500 8px/1 system-ui,sans-serif; letter-spacing:.22em }
+#book-swipe-preview .tint { position:absolute; inset:0; background:#47713c; opacity:0; pointer-events:none }
+#book-swipe-preview .badge { position:absolute; left:50%; transform:translateX(-50%); padding:4px 8px; border-radius:99px; color:white; font-size:10px; font-weight:800; letter-spacing:.05em; white-space:nowrap; opacity:0; pointer-events:none }
+#book-swipe-preview .badge.pick { top:38%; background:#47713c }
+#book-swipe-preview .badge.other { bottom:38%; background:#b3432f }
+#book-swipe-preview .hint { position:absolute; left:0; right:0; text-align:center; color:#fff; font-size:12px; pointer-events:none }
+#book-swipe-preview .hint.up { top:8px }
+#book-swipe-preview .hint.down { bottom:30% }
+#book-swipe-preview .label { position:absolute; left:0; right:0; bottom:0; display:grid; gap:2px; padding:8px; color:white; background:linear-gradient(transparent,#101315bd); pointer-events:none }
+#book-swipe-preview .label strong { font-size:13px; line-height:1.15 }
+#book-swipe-preview .label small { font-size:10px; opacity:.8 }
+#book-swipe-preview .vs { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); display:grid; place-items:center; width:38px; height:38px; border-radius:50%; background:white; border:1px solid #e4e0da; font-size:12px; font-weight:700; pointer-events:none }
+#book-swipe-preview .caption { text-align:center; color:#6b6560; font-size:12px; margin-top:12px }
+#book-swipe-preview .actions { display:flex; gap:8px; flex-wrap:wrap; justify-content:center }
+#book-swipe-preview button { border:1px solid #e4e0da; border-radius:9px; background:white; color:#201e1c; font:600 13px system-ui,sans-serif; padding:10px 12px; cursor:pointer }
+#book-swipe-preview button:hover,#book-swipe-preview button:focus-visible { border-color:#a85c32; outline:none }
+@media (prefers-reduced-motion: reduce) { #book-swipe-preview .cover { transition:none!important } }
+</style>
+<script>
+(() => {
+  const root = document.getElementById('book-swipe-preview');
+  const covers = [...root.querySelectorAll('.cover')];
+  let busy = false;
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  function paint(card, y) {
+    const amount = Math.min(Math.abs(y) / 100, 1);
+    if (!reduced.matches) card.style.transform = `translateY(${y}px) rotate(${Math.max(-5, Math.min(5, y / 20))}deg) scale(${1 + amount * .03})`;
+    card.querySelector('.tint').style.cssText = `background:${y < 0 ? '#47713c' : '#b3432f'};opacity:${amount * .25}`;
+    card.querySelector('.pick').style.opacity = y < -25 ? Math.min((-y - 25) / 75, 1) : 0;
+    card.querySelector('.other').style.opacity = y > 25 ? Math.min((y - 25) / 75, 1) : 0;
+  }
+  async function choose(card, direction, start = 0) {
+    if (busy) return;
+    busy = true;
+    if (!reduced.matches) {
+      if (!start) {
+        await card.animate([{ transform:'translateY(0) rotate(0deg) scale(1)' }, { transform:`translateY(${direction * 100}px) rotate(${direction * 5}deg) scale(1.03)` }], { duration:180, fill:'forwards', easing:'ease-out' }).finished;
+      }
+      paint(card, direction * 100);
+      await card.animate([{ transform:`translateY(${start || direction * 100}px) rotate(${direction * 5}deg) scale(1.03)` }, { transform:`translateY(${direction * 500}px) rotate(${direction * 5}deg) scale(1.03)` }], { duration:180, fill:'forwards', easing:'ease-in' }).finished;
+    } else {
+      paint(card, direction * 100);
+      await new Promise(resolve => setTimeout(resolve, 180));
+    }
+    await new Promise(resolve => setTimeout(resolve, 280));
+    card.getAnimations().forEach(animation => animation.cancel());
+    paint(card, 0);
+    busy = false;
+  }
+  covers.forEach(card => {
+    let startY = null;
+    card.addEventListener('pointerdown', event => { if (busy) return; startY = event.clientY; card.setPointerCapture(event.pointerId); });
+    card.addEventListener('pointermove', event => { if (startY !== null && !busy) paint(card, event.clientY - startY); });
+    card.addEventListener('pointerup', event => {
+      if (startY === null || busy) return;
+      const y = event.clientY - startY;
+      startY = null;
+      if (Math.abs(y) >= 100) void choose(card, Math.sign(y), y);
+      else { card.style.transition = 'transform 300ms cubic-bezier(.23,1,.32,1)'; paint(card, 0); setTimeout(() => card.style.transition = '', 300); }
+    });
+    card.addEventListener('pointercancel', () => { startY = null; paint(card, 0); });
+    card.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); void choose(card, -1); } });
+  });
+  root.querySelectorAll('[data-direction]').forEach(button => button.addEventListener('click', () => void choose(covers[0], Number(button.dataset.direction))));
+})();
+</script>

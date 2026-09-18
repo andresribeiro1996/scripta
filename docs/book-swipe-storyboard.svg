@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="420" height="1260" viewBox="0 0 420 1260" role="img" aria-label="Three frames showing book covers at rest, a swipe up to pick one, and a swipe down to pick the other">
+  <defs>
+    <linearGradient id="blue" x2="1" y2="1"><stop stop-color="#1c3348"/><stop offset=".65" stop-color="#496477"/><stop offset="1" stop-color="#1d2e3d"/></linearGradient>
+    <linearGradient id="pink" x2="1" y2="1"><stop stop-color="#bd9694"/><stop offset=".65" stop-color="#e9d7cb"/><stop offset="1" stop-color="#b77b79"/></linearGradient>
+    <linearGradient id="scrim" x2="0" y2="1"><stop stop-color="#101315" stop-opacity="0"/><stop offset="1" stop-color="#101315" stop-opacity=".8"/></linearGradient>
+    <g id="left-book">
+      <rect width="154" height="230" rx="10" fill="url(#blue)"/>
+      <circle cx="114" cy="43" r="9" fill="#d3ad69"/>
+      <text x="77" y="91" text-anchor="middle" fill="#f7f1df" font-family="Georgia,serif" font-weight="700" font-size="21" letter-spacing="2"><tspan x="77">THE</tspan><tspan x="77" dy="24">NIGHT</tspan><tspan x="77" dy="24">ARCHIVE</tspan></text>
+      <rect y="165" width="154" height="65" fill="url(#scrim)"/>
+      <text x="10" y="203" fill="white" font-family="Arial,sans-serif" font-size="13" font-weight="700">The Night Archive</text>
+      <text x="10" y="219" fill="white" fill-opacity=".75" font-family="Arial,sans-serif" font-size="11">Mara Vale</text>
+    </g>
+    <g id="right-book">
+      <rect width="154" height="230" rx="10" fill="url(#pink)"/>
+      <circle cx="113" cy="46" r="25" fill="#f4e3c7"/>
+      <text x="77" y="106" text-anchor="middle" fill="#3b2a32" font-family="Georgia,serif" font-weight="700" font-size="22" letter-spacing="2"><tspan x="77">PAPER</tspan><tspan x="77" dy="25">MOONS</tspan></text>
+      <rect y="165" width="154" height="65" fill="url(#scrim)"/>
+      <text x="10" y="203" fill="white" font-family="Arial,sans-serif" font-size="13" font-weight="700">Paper Moons</text>
+      <text x="10" y="219" fill="white" fill-opacity=".75" font-family="Arial,sans-serif" font-size="11">Eli Rowan</text>
+    </g>
+  </defs>
+  <rect width="420" height="1260" fill="#f5f4f2"/>
+  <text x="30" y="49" font-family="Arial,sans-serif" font-size="26" font-weight="700" fill="#201e1c">Book swipe</text>
+  <text x="30" y="72" font-family="Arial,sans-serif" font-size="14" fill="#6b6560">Arena voting motion · illustrative frames</text>
+  <g transform="translate(0 93)">
+    <text x="30" y="32" font-family="Arial,sans-serif" font-size="18" font-weight="700" fill="#201e1c">1  At rest</text>
+    <text x="30" y="53" font-family="Arial,sans-serif" font-size="13" fill="#6b6560">Drag either cover up or down</text>
+    <use href="#left-book" x="53" y="76"/><use href="#right-book" x="213" y="76"/>
+    <circle cx="210" cy="191" r="22" fill="white" stroke="#e4e0da"/><text x="210" y="196" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" font-weight="700" fill="#201e1c">VS</text>
+  </g>
+  <line x1="30" y1="425" x2="390" y2="425" stroke="#e4e0da"/>
+  <g transform="translate(0 450)">
+    <text x="30" y="32" font-family="Arial,sans-serif" font-size="18" font-weight="700" fill="#201e1c">2  Swipe up · this book wins</text>
+    <text x="30" y="53" font-family="Arial,sans-serif" font-size="13" fill="#6b6560">The cover lifts, tilts and turns green</text>
+    <use href="#right-book" x="213" y="104"/>
+    <g transform="translate(53 64) rotate(-5 77 115)"><use href="#left-book"/><rect width="154" height="230" rx="10" fill="#47713c" fill-opacity=".25"/><rect x="45" y="87" width="64" height="26" rx="13" fill="#47713c"/><text x="77" y="104" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" font-weight="700" fill="white">WINS</text></g>
+    <path d="M 45 194 Q 24 132 45 82" fill="none" stroke="#47713c" stroke-width="4" stroke-linecap="round"/><path d="M 45 82 l -9 13 M 45 82 l 7 14" fill="none" stroke="#47713c" stroke-width="4" stroke-linecap="round"/>
+  </g>
+  <line x1="30" y1="842" x2="390" y2="842" stroke="#e4e0da"/>
+  <g transform="translate(0 864)">
+    <text x="30" y="32" font-family="Arial,sans-serif" font-size="18" font-weight="700" fill="#201e1c">3  Swipe down · this book loses</text>
+    <text x="30" y="53" font-family="Arial,sans-serif" font-size="13" fill="#6b6560">The cover dips, tilts and turns red</text>
+    <use href="#right-book" x="213" y="87"/>
+    <g transform="translate(53 126) rotate(5 77 115)"><use href="#left-book"/><rect width="154" height="230" rx="10" fill="#b3432f" fill-opacity=".25"/><rect x="42" y="118" width="70" height="26" rx="13" fill="#b3432f"/><text x="77" y="135" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" font-weight="700" fill="white">LOSES</text></g>
+    <path d="M 45 159 Q 24 222 45 275" fill="none" stroke="#b3432f" stroke-width="4" stroke-linecap="round"/><path d="M 45 275 l -9 -13 M 45 275 l 7 -14" fill="none" stroke="#b3432f" stroke-width="4" stroke-linecap="round"/>
+  </g>
+</svg>
