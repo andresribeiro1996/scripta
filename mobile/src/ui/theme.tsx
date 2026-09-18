@@ -1,5 +1,5 @@
 import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
-import { AccessibilityInfo, useColorScheme } from "react-native";
+import { AccessibilityInfo, PixelRatio, useColorScheme } from "react-native";
 
 export const palettes = {
   light: {
@@ -40,12 +40,18 @@ export const palettes = {
 
 export const spacing = { none: 0, xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 24, xxxl: 32, huge: 48 } as const;
 export const radii = { sm: 6, md: 8, lg: 12, xl: 16, full: 999 } as const;
+// React Native scales `fontSize` by the system font scale but leaves
+// `lineHeight` at whatever the style says, so a reader on large text gets 18pt
+// glyphs in a 20pt line: crowded lines, and a first line whose ascenders are
+// clipped by the container. Scaling the leading with the type keeps the rhythm
+// the sizes below describe at every text size.
+const leading = (fontSize: number, lineHeight: number) => ({ fontSize, lineHeight: Math.round(lineHeight * PixelRatio.getFontScale()) });
 export const typography = {
-  caption: { fontSize: 12, lineHeight: 16 },
-  body: { fontSize: 14, lineHeight: 20 },
-  input: { fontSize: 16, lineHeight: 22 },
-  title: { fontSize: 18, lineHeight: 24 },
-  heading: { fontSize: 24, lineHeight: 30 },
+  caption: leading(12, 16),
+  body: leading(14, 20),
+  input: leading(16, 22),
+  title: leading(18, 24),
+  heading: leading(24, 30),
 } as const;
 export const minimumTouchTarget = 44;
 export const dynamicType = { allowFontScaling: true } as const;
