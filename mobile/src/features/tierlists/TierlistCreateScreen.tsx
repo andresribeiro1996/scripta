@@ -85,7 +85,7 @@ export function TierlistCreateScreen() {
     </View> : null}
     <View style={styles.actions}>
       {step > 0 ? <Button label="Back" variant="secondary" onPress={() => setStep((value) => value - 1)} /> : null}
-      {step < 2 ? <Button label="Next" disabled={step === 0 ? pool.length === 0 || library.isError : tiers.some((tier) => !tier.label.trim())} onPress={() => setStep((value) => value + 1)} /> : <Button label="Create tier list" loading={busy} onPress={() => void create()} />}
+      <View style={styles.grow}>{step < 2 ? <Button label="Next" disabled={step === 0 ? pool.length === 0 || library.isError : tiers.some((tier) => !tier.label.trim())} onPress={() => setStep((value) => value + 1)} /> : <Button label="Create tier list" loading={busy} onPress={() => void create()} />}</View>
     </View>
   </Screen>;
 }
@@ -98,5 +98,5 @@ const styles = StyleSheet.create({
   tier: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   swatch: { width: 20, alignSelf: "stretch", borderRadius: radii.sm },
   settings: { flex: 1, gap: spacing.md },
-  actions: { flexDirection: "row", justifyContent: "flex-end", gap: spacing.sm },
+  actions: { flexDirection: "row", alignItems: "stretch", gap: spacing.sm },
 });
