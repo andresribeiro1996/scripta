@@ -10,8 +10,11 @@ export interface CommunityRepository {
   deleteFollow(followerId: string, followeeId: string): boolean;
   getFollow(followerId: string, followeeId: string): FollowRow | undefined;
   listFollowees(followerId: string): string[];
+  listFollowersByFollowee(followeeId: string, keyset: CursorKeyset | undefined, limit: number): FollowRow[];
   countFollowers(userId: string): number;
   countFollowing(userId: string): number;
+  countEventsByUsersSince(userIds: string[], since: string): number;
+  countFollowersSince(followeeId: string, since: string): number;
 
   getProfileRow(userId: string): ProfileRow | undefined;
   upsertProfile(row: ProfileRow): void;

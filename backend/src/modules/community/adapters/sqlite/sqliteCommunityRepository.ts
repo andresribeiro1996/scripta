@@ -10,6 +10,12 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
   const deleteFollowStmt = db.prepare(`DELETE FROM follows WHERE follower_id = ? AND followee_id = ?`);
   const getFollowStmt = db.prepare(`SELECT * FROM follows WHERE follower_id = ? AND followee_id = ?`);
   const listFolloweesStmt = db.prepare(`SELECT followee_id FROM follows WHERE follower_id = ? ORDER BY created_at DESC`);
+  const listFollowersStmt = db.prepare(`SELECT * FROM follows WHERE followee_id = ? ORDER BY created_at DESC, follower_id DESC LIMIT ?`);
+  const listFollowersBeforeStmt = db.prepare(`
+    SELECT * FROM follows
+    WHERE followee_id = ? AND (created_at < ? OR (created_at = ? AND follower_id < ?))
+    ORDER BY created_at DESC, follower_id DESC LIMIT ?
+  `);
   const countFollowersStmt = db.prepare(`SELECT COUNT(*) AS n FROM follows WHERE followee_id = ?`);
   const countFollowingStmt = db.prepare(`SELECT COUNT(*) AS n FROM follows WHERE follower_id = ?`);
 
@@ -50,11 +56,26 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
     listFollowees(followerId) {
       return (listFolloweesStmt.all(followerId) as Array<{ followee_id: string }>).map((row) => row.followee_id);
     },
+    listFollowersByFollowee(followeeId, keyset, limit) {
+      if (keyset) {
+        return listFollowersBeforeStmt.all(followeeId, keyset.createdAt, keyset.createdAt, keyset.id, limit) as unknown as FollowRow[];
+      }
+      return listFollowersStmt.all(followeeId, limit) as unknown as FollowRow[];
+    },
     countFollowers(userId) {
       return (countFollowersStmt.get(userId) as { n: number }).n;
     },
     countFollowing(userId) {
       return (countFollowingStmt.get(userId) as { n: number }).n;
+    },
+    countEventsByUsersSince(userIds, since) {
+      if (userIds.length === 0) return 0;
+      const placeholders = userIds.map(() => "?").join(",");
+      const row = db.prepare(`SELECT COUNT(*) AS n FROM events WHERE user_id IN (${placeholders}) AND created_at > ?`).get(...userIds, since) as { n: number };
+      return row.n;
+    },
+    countFollowersSince(followeeId, since) {
+      return (db.prepare(`SELECT COUNT(*) AS n FROM follows WHERE followee_id = ? AND created_at > ?`).get(followeeId, since) as { n: number }).n;
     },
     getProfileRow(userId) {
       return getProfileStmt.get(userId) as ProfileRow | undefined;
