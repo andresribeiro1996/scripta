@@ -4,6 +4,15 @@
 // sheet, so each one is a real UISheetPresentationController the user can drag
 // away. Search now lives in the native header bar and the status/sort choices
 // in the overflow menu, so what is left here is the grid and selection mode.
+//
+// "Collections" is one more page in the same swipeable strip as the shelf
+// tabs, not a separate destination behind the overflow menu — Series and
+// Collections were easy to miss there. It renders GroupsView, which lists
+// both (they're the same underlying resource) as tappable rows into
+// GroupDetail; the standalone /collections route still exists for deep
+// links (e.g. Home's "Open collection", which goes straight to a group's
+// detail screen). The header search bar and its "+" button are re-pointed
+// at groups instead of books while this tab is active.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, RefreshControl, StyleSheet, View } from "react-native";
@@ -29,7 +38,12 @@ import { useMurals } from "../murals/useMurals";
 import { useLibrary } from "./hooks/useLibrary";
 import { useLibraryActions } from "./hooks/useLibraryActions";
 import { BookCard } from "./components/BookCard";
+import { GroupsView, type GroupsViewHandle } from "./components/GroupsView";
 import { LibraryGrid } from "./components/LibraryGrid";
+
+type LibraryTab = LibraryStatusTab | "collections";
+
+const LIBRARY_TABS: readonly { value: LibraryTab; label: string }[] = [...LIBRARY_STATUS_TABS, { value: "collections", label: "Collections" }];
 
 export function LibraryScreen() {
   const { data: library, isPending, isError, error, refetch, isRefetching } = useLibrary();
@@ -49,8 +63,18 @@ export function LibraryScreen() {
     if (q) searchBar.current?.setText(q);
     else searchBar.current?.clearText();
   }, [q]);
-  const [statusFilter, setStatusFilter] = useState<LibraryStatusTab>(LIBRARY_STATUS_TABS[0].value);
+  const [statusFilter, setStatusFilter] = useState<LibraryTab>(LIBRARY_STATUS_TABS[0].value);
   const [sortKey, setSortKey] = useState<SortKey>("manual");
+  const [groupQuery, setGroupQuery] = useState("");
+  const groupsView = useRef<GroupsViewHandle>(null);
+  const onCollectionsTab = statusFilter === "collections";
+  // The header search bar is one physical field shared by every tab; switch
+  // its displayed text to match whichever domain (books vs. groups) is now
+  // showing, same as the `q` sync above.
+  useEffect(() => {
+    searchBar.current?.setText(onCollectionsTab ? groupQuery : query);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onCollectionsTab]);
 
   // Renaming stays a modal: it is one field, and a form sheet for it would be
   // more ceremony than the edit.
@@ -110,19 +134,25 @@ export function LibraryScreen() {
   }
 
   const actionItems: MenuItem[] = [
-    // Sort used to sit above the grid as a row of pills, which cost real
-    // space before a single cover. As a submenu it reads the way the
-    // platform's own library apps present the same choice, and `selected`
-    // puts the tick on the live one. Status now lives in the swipeable
-    // tabs above the grid instead of here.
-    {
-      label: "Sort",
-      items: SORT_OPTIONS.map((option) => ({
-        label: option.label,
-        selected: option.value === sortKey,
-        onPress: () => setSortKey(option.value),
-      })),
-    },
+    // Sort and Select act on the book grid, which isn't showing on the
+    // Collections tab — GroupsView has its own search and selection.
+    ...(onCollectionsTab
+      ? []
+      : [
+          {
+            // Sort used to sit above the grid as a row of pills, which cost
+            // real space before a single cover. As a submenu it reads the
+            // way the platform's own library apps present the same choice,
+            // and `selected` puts the tick on the live one. Status now
+            // lives in the swipeable tabs above the grid instead of here.
+            label: "Sort",
+            items: SORT_OPTIONS.map((option) => ({
+              label: option.label,
+              selected: option.value === sortKey,
+              onPress: () => setSortKey(option.value),
+            })),
+          },
+        ]),
     {
       label: "Rename library…",
       onPress: () => {
@@ -133,9 +163,7 @@ export function LibraryScreen() {
     { label: "Add book…", onPress: () => router.push("/add-book" as never) },
     { label: "Import / sync…", onPress: () => router.push("/import" as never) },
     ...(books.length > 1 ? [{ label: "Reorder…", onPress: () => router.push("/reorder" as never) }] : []),
-    ...(books.length > 0 ? [{ label: "Select…", onPress: () => setSelectionMode(true) }] : []),
-    { label: "Series…", onPress: () => router.push("/series" as never) },
-    { label: "Collections…", onPress: () => router.push("/collections" as never) },
+    ...(!onCollectionsTab && books.length > 0 ? [{ label: "Select…", onPress: () => setSelectionMode(true) }] : []),
     { label: "Library style…", onPress: () => router.push("/style" as never) },
     { label: "Share…", onPress: () => router.push("/share" as never) },
   ];
@@ -170,23 +198,37 @@ export function LibraryScreen() {
               headerShown: true,
               title: library?.data.name || "Library",
               // Only worth a search field once there is something to search;
-              // an empty library gets the plain header instead.
+              // an empty library gets the plain header instead. It's the
+              // same physical field on every tab, just re-pointed at book
+              // search or group search (see the sync effect above).
               headerSearchBarOptions: books.length > 0
-                ? {
-                    ref: searchBar,
-                    autoCapitalize: "none",
-                    placeholder: "Search title or author",
-                    // iOS only: the bar tucks under the large title until the
-                    // grid is pulled back down.
-                    hideWhenScrolling: true,
-                    onChangeText: (event) => setQuery(event.nativeEvent.text),
-                    onCancelButtonPress: () => setQuery(""),
-                  }
+                ? onCollectionsTab
+                  ? {
+                      ref: searchBar,
+                      autoCapitalize: "none",
+                      placeholder: "Search collections",
+                      hideWhenScrolling: true,
+                      onChangeText: (event) => setGroupQuery(event.nativeEvent.text),
+                      onCancelButtonPress: () => setGroupQuery(""),
+                    }
+                  : {
+                      ref: searchBar,
+                      autoCapitalize: "none",
+                      placeholder: "Search title or author",
+                      // iOS only: the bar tucks under the large title until the
+                      // grid is pulled back down.
+                      hideWhenScrolling: true,
+                      onChangeText: (event) => setQuery(event.nativeEvent.text),
+                      onCancelButtonPress: () => setQuery(""),
+                    }
                 : undefined,
               headerRight: () => (
-                <Menu title={library?.data.name || "Library"} items={actionItems}>
-                  <IconButton accessibilityLabel="Library actions" name="more" />
-                </Menu>
+                <View style={styles.headerActions}>
+                  {onCollectionsTab && <IconButton accessibilityLabel="New collection" name="add" onPress={() => groupsView.current?.startCreating()} />}
+                  <Menu title={library?.data.name || "Library"} items={actionItems}>
+                    <IconButton accessibilityLabel="Library actions" name="more" />
+                  </Menu>
+                </View>
               ),
             }}
       />
@@ -222,10 +264,11 @@ export function LibraryScreen() {
       {!isPending && !isError && books.length > 0 && (
         <SwipeableTabs
           accessibilityLabel="Library shelf"
-          options={LIBRARY_STATUS_TABS}
+          options={LIBRARY_TABS}
           value={statusFilter}
           onChange={setStatusFilter}
           renderPage={(status) => {
+            if (status === "collections") return <GroupsView ref={groupsView} search={groupQuery} />;
             const pageBooks = sortBooks(filterBooks(ordered, query, status), sortKey);
             if (pageBooks.length === 0) {
               return (
@@ -277,4 +320,5 @@ export function LibraryScreen() {
 const styles = StyleSheet.create({
   loading: { padding: spacing.lg, gap: spacing.md },
   loadingRow: { flexDirection: "row", gap: spacing.md },
+  headerActions: { flexDirection: "row", alignItems: "center" },
 });

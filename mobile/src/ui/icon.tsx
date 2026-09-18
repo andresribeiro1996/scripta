@@ -29,6 +29,7 @@ const GLYPHS = {
   search: { ios: "magnifyingglass", android: "search" },
   public: { ios: "globe", android: "public" },
   delete: { ios: "trash", android: "delete" },
+  chevronRight: { ios: "chevron.right", android: "chevron_right" },
 } as const satisfies Record<string, Glyph>;
 
 /** Only these five have a solid counterpart worth using; the rest read the
