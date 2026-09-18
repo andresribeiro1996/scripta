@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Duel } from "@scripta/shared";
-import { ARENA_VIEW_TABS, bracketSlots, matchEmptyCopy, votableDuels, waitingLabel } from "./arenaView.js";
+import { arenaViewTabs, bracketSlots, matchEmptyCopy, votableDuels, waitingLabel } from "./arenaView.js";
 
 const duel = (over: Partial<Duel> = {}): Duel => ({
   id: "d1",
@@ -19,9 +19,13 @@ const duel = (over: Partial<Duel> = {}): Duel => ({
   ...over,
 });
 
-test("the match deck only queues duels still open to this voter", () => {
-  assert.deepEqual(ARENA_VIEW_TABS.map((option) => option.value), ["match", "books", "bracket"]);
+test("a finished tournament drops the Match tab — there's nothing left to vote on", () => {
+  assert.deepEqual(arenaViewTabs("seeding").map((option) => option.value), ["match", "books", "bracket"]);
+  assert.deepEqual(arenaViewTabs("active").map((option) => option.value), ["match", "books", "bracket"]);
+  assert.deepEqual(arenaViewTabs("completed").map((option) => option.value), ["books", "bracket"]);
+});
 
+test("the match deck only queues duels still open to this voter", () => {
   const open = duel({ id: "open" });
   const voted = duel({ id: "voted", hasVoted: true });
   const settled = duel({ id: "settled", status: "settled", winnerKey: "a" });
