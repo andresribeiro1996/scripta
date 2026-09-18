@@ -1,7 +1,9 @@
 import type {
+  ActivityItem,
   DiscoverItem,
   DiscoverType,
   FeedItem,
+  FeedSettings,
   Page,
   PersonResult,
   PublishedProfile,
@@ -9,7 +11,7 @@ import type {
   TournamentSummary
 } from "@scripta/shared/community";
 import type { MuralBlock, ShelfTheme } from "../lib/murals";
-import { apiFetch } from "./client";
+import { apiFetch, publicFetch } from "./client";
 import type { PublicBookData, PublicHighlight } from "./sharedMurals";
 import type { ResolvedTierlist } from "./tierlists";
 
@@ -28,6 +30,7 @@ export interface CommunityProfileView {
     tierlists: Record<string, ResolvedTierlist>;
   } | null;
   published: { tierlists: TierlistSummary[]; tournaments: TournamentSummary[] };
+  feedSettings?: FeedSettings;
 }
 
 export async function fetchFeed(cursor?: string): Promise<Page<FeedItem>> {
@@ -47,6 +50,15 @@ export async function fetchPeople(q: string): Promise<PersonResult[]> {
 
 export async function fetchCommunityProfile(username: string): Promise<CommunityProfileView> {
   return (await apiFetch(`/community/profiles/${encodeURIComponent(username)}`)) as CommunityProfileView;
+}
+
+export async function fetchActivity(username: string, cursor?: string): Promise<Page<ActivityItem>> {
+  const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
+  return (await publicFetch(`/community/profiles/${encodeURIComponent(username)}/activity${query}`)) as Page<ActivityItem>;
+}
+
+export async function updateFeedSettings(settings: FeedSettings): Promise<void> {
+  await apiFetch("/community/profile/feed-settings", { method: "PUT", body: JSON.stringify(settings) });
 }
 
 export async function followUser(userId: string): Promise<void> {
