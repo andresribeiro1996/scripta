@@ -1,8 +1,6 @@
 import type {
   DiscoverItem,
   DiscoverType,
-  FeedItem,
-  Page,
   PersonResult,
   PublishedProfile,
   TierlistSummary,
@@ -29,11 +27,6 @@ export interface CommunityProfileView {
     tierlists: Record<string, ResolvedTierlist>;
   } | null;
   published: { tierlists: TierlistSummary[]; tournaments: TournamentSummary[] };
-}
-
-export async function fetchFeed(cursor?: string): Promise<Page<FeedItem>> {
-  const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
-  return (await apiFetch(`/community/feed${query}`)) as Page<FeedItem>;
 }
 
 export async function fetchDashboard(cursor?: string): Promise<DashboardFeedPage> {

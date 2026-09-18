@@ -1,11 +1,10 @@
 import { Fragment, useState, type ComponentType } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { Avatar } from "../components/Avatar";
 import {
   ArenaIcon,
   CollectionsIcon,
-  CommunityIcon,
   GalleryIcon,
   LibraryIcon,
   MoreIcon,
@@ -42,8 +41,7 @@ const NAV_GROUPS: Array<{ items: NavItem[] }> = [
     items: [
       { to: "/dashboard/gallery", label: "Gallery", end: false, icon: GalleryIcon },
       { to: "/dashboard/murals", label: "Murals", end: false, description: "Freeform dashboard pages", icon: MuralsIcon },
-      { to: "/dashboard/arena", label: "Games", end: false, description: "Book-bracket tournaments", icon: ArenaIcon },
-      { to: "/community", label: "Community", end: false, description: "Follow readers and their published games", icon: CommunityIcon }
+      { to: "/dashboard/arena", label: "Games", end: false, description: "Book-bracket tournaments", icon: ArenaIcon }
     ]
   },
   {
@@ -112,7 +110,11 @@ export function DashboardLayout() {
         </nav>
         <div className="mt-auto border-t border-(--color-border) pt-3">
           <div className="mb-2 flex items-center gap-2 px-2">
-            {session && <Avatar user={session.user} size={24} />}
+            {session && (
+              <Link to={`/community/u/${session.user.username}`} aria-label="Your profile" className="shrink-0 rounded-full transition-opacity hover:opacity-80">
+                <Avatar user={session.user} size={24} />
+              </Link>
+            )}
             <p className="truncate text-xs text-(--color-text-dim)">@{session?.user.username ?? session?.user.email}</p>
           </div>
           <button
@@ -205,7 +207,16 @@ export function DashboardLayout() {
             </nav>
             <div className="mt-6 border-t border-(--color-border) pt-3">
               <div className="mb-2 flex items-center gap-2 px-2">
-                {session && <Avatar user={session.user} size={24} />}
+                {session && (
+                  <Link
+                    to={`/community/u/${session.user.username}`}
+                    aria-label="Your profile"
+                    onClick={() => setDrawerOpen(false)}
+                    className="shrink-0 rounded-full transition-opacity hover:opacity-80"
+                  >
+                    <Avatar user={session.user} size={24} />
+                  </Link>
+                )}
                 <p className="truncate text-xs text-(--color-text-dim)">@{session?.user.username ?? session?.user.email}</p>
               </div>
               <button
