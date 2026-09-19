@@ -38,12 +38,15 @@ export function pinPassage(block: MuralBlock, resolved: MuralBlock, books: Array
 export function buildHomeBlocks(withPassage: boolean): MuralBlock[] {
   // Stacked with no empty grid row between them: the canvas already draws
   // a gap, and an extra row made the space BETWEEN cards larger than the
-  // padding inside them, which reads as a page that failed to load.
+  // padding inside them, which reads as a page that failed to load. The
+  // book blocks are six rows rather than seven and eight — enough for a
+  // row of covers, without reserving a screenful for a block that is empty
+  // until something is marked as reading.
   const blocks: MuralBlock[] = [
     { id: newId(), type: "profile", bio: "", favoriteGenres: [], layout: { x: 0, y: 0, w: 12, h: 5 } },
-    { id: newId(), type: "currentlyReading", layout: { x: 0, y: 5, w: 12, h: 8 } },
-    { id: newId(), type: "shelf", title: "Up next", bookKeys: [], layout: { x: 0, y: 13, w: 12, h: 7 } }
+    { id: newId(), type: "currentlyReading", layout: { x: 0, y: 5, w: 12, h: 6 } },
+    { id: newId(), type: "shelf", title: "Up next", bookKeys: [], layout: { x: 0, y: 11, w: 12, h: 6 } }
   ];
-  if (withPassage) blocks.push({ id: newId(), type: "quote", mode: "rediscover", bookKey: "", highlightId: "", layout: { x: 0, y: 20, w: 12, h: 7 } });
+  if (withPassage) blocks.push({ id: newId(), type: "quote", mode: "rediscover", bookKey: "", highlightId: "", layout: { x: 0, y: 17, w: 12, h: 7 } });
   return blocks;
 }

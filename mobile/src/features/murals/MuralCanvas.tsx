@@ -68,7 +68,7 @@ function blockTextStyles(style: BlockStyle, color: string) {
     title: step(1.1, "700"),
     body: step(1),
     bio: step(0.9),
-    caption: step(0.8),
+    caption: step(0.85),
     label: step(0.7, "700"),
   };
 }
