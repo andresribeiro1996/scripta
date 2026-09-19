@@ -14,3 +14,4 @@ React/Vite/TypeScript + Tailwind, installable as a PWA. Read `README.md` before 
 
 - Put logic shared with the mobile client in `@scripta/shared`; do not duplicate it.
 - Style tests live in `scripts/test-*.mts` and assert real resolved layout — fix the CSS, not the assertion.
+- For UI/UX changes, check `../DESIGN.md` (or the live Scripta Design System artifact it mirrors) for existing tokens/components before introducing new colors, spacing, or radii.

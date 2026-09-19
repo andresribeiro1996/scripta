@@ -21,3 +21,4 @@ Expo/React Native app. Read `README.md` before changing it.
 - Rebuild the development client only when native dependencies or native configuration change and the user explicitly requests it.
 - Never run `expo prebuild --clean` unless explicitly requested.
 - Production builds and submissions require an explicit release request, a clean release ref, and passing checks.
+- For UI/UX changes, check `../DESIGN.md` (or the live Scripta Design System artifact it mirrors) for existing tokens/components before introducing new colors, spacing, or radii.
