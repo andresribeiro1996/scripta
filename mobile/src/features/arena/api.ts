@@ -10,7 +10,7 @@ export interface TournamentSummary {
   currentRound: number;
   createdAt: string;
   ownerUserId: string;
-  /** Up to four cover URLs from the seeded pool, for the list card. */
+  /** Up to eight cover URLs from the seeded pool, for the list card. */
   covers: string[];
   filledSlots: number;
   /** The champion book, once this tournament's final duel has settled. */

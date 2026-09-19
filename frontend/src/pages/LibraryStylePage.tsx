@@ -125,7 +125,7 @@ export function LibraryStylePage() {
                         // than some arbitrary default color, so turning
                         // this on isn't a jarring color jump to fix.
                         const computed = getComputedStyle(document.documentElement).getPropertyValue("--color-bg").trim();
-                        saveNow({ ...draft, backgroundColor: computed || "#1a1815" });
+                        saveNow({ ...draft, backgroundColor: computed || "#141210" });
                       } else {
                         saveNow({ ...draft, backgroundColor: null });
                       }
@@ -137,7 +137,7 @@ export function LibraryStylePage() {
               {usingCustomBackground && (
                 <input
                   type="color"
-                  value={draft.backgroundColor ?? "#1a1815"}
+                  value={draft.backgroundColor ?? "#141210"}
                   onChange={(e) => applyDraft({ ...draft, backgroundColor: e.target.value })}
                   className="mt-1 h-9 w-20 rounded border border-(--color-border) bg-transparent"
                 />

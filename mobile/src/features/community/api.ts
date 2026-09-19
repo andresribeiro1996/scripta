@@ -1,9 +1,9 @@
 import type { MuralBlock, ResolvedTierlist, ShelfTheme } from "@scripta/shared";
+import type { DashboardFeedPage } from "@scripta/shared/dashboard";
 import type {
   ActivityItem,
   DiscoverItem,
   DiscoverType,
-  FeedItem,
   FeedSettings,
   Page,
   PersonResult,
@@ -34,9 +34,13 @@ export interface CommunityProfileView {
 
 export type CommunityPage<T> = Page<T>;
 
-export async function fetchFeed(cursor?: string) {
+export async function fetchDashboard(cursor?: string) {
   const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
-  return apiClient.request<Page<FeedItem>>(`/community/feed${query}`, { auth: true });
+  return apiClient.request<DashboardFeedPage>(`/community/dashboard${query}`, { auth: true });
+}
+
+export function markDashboardSeen() {
+  return apiClient.request("/community/dashboard/seen", { method: "POST", auth: true });
 }
 
 export async function fetchDiscover(type: DiscoverType, q: string, offset = 0) {

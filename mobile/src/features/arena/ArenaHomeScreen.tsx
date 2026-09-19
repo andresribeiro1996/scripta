@@ -13,6 +13,7 @@ import {
   filterSections,
   homeSections,
   ownedItems,
+  previewCovers,
   tierDistribution,
   tournamentProgress,
   votedTierlistDetail,
@@ -184,6 +185,7 @@ function TournamentBody({ tournament }: { tournament: TournamentSummary }) {
   const { colors } = useTheme();
   const progress = tournamentProgress(tournament);
   const remainder = coverRemainder(tournament);
+  const covers = previewCovers(tournament);
   const tone = tournament.status === "active"
     ? { backgroundColor: colors.accentSoft, color: colors.accent }
     : tournament.status === "completed"
@@ -196,8 +198,8 @@ function TournamentBody({ tournament }: { tournament: TournamentSummary }) {
         accessibilityLabel={`Winner: ${tournament.winner.title}`}
         source={{ uri: tournament.winner.cover }}
         contentFit="cover"
-        style={[styles.tile, { borderWidth: 2, borderColor: colors.success }]}
-      /> : <View accessibilityLabel={`Winner: ${tournament.winner.title}`} style={[styles.tile, { backgroundColor: colors.successSoft, borderWidth: 2, borderColor: colors.success }]}>
+        style={[styles.tile, styles.winnerTile, { borderWidth: 2, borderColor: colors.success }]}
+      /> : <View accessibilityLabel={`Winner: ${tournament.winner.title}`} style={[styles.tile, styles.winnerTile, { backgroundColor: colors.successSoft, borderWidth: 2, borderColor: colors.success }]}>
         <Icon filled name="arena" size={24} color={colors.success} />
       </View>
     ) : tournament.covers.length === 0 ? <View style={[styles.tile, { backgroundColor: colors.accentSoft }]}>
@@ -206,8 +208,8 @@ function TournamentBody({ tournament }: { tournament: TournamentSummary }) {
     </View> : null}
     <View style={styles.grow}>
       <Text numberOfLines={1} {...dynamicType} style={[typography.title, styles.strong, { color: colors.text }]}>{tournament.name}</Text>
-      {tournament.covers.length ? <View style={styles.covers}>
-        {tournament.covers.map((cover, index) => <Image
+      {covers.length ? <View style={styles.covers}>
+        {covers.map((cover, index) => <Image
           key={cover}
           source={{ uri: cover }}
           contentFit="cover"
@@ -219,7 +221,7 @@ function TournamentBody({ tournament }: { tournament: TournamentSummary }) {
         <View style={[styles.pill, { backgroundColor: tone.backgroundColor }]}>
           <Text {...dynamicType} style={[styles.pillText, { color: tone.color }]}>{tournament.status.toUpperCase()}</Text>
         </View>
-        <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.grow, { color: colors.textDim }]}>{progress.label}</Text>
+        {progress.label ? <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.grow, { color: colors.textDim }]}>{progress.label}</Text> : null}
       </View>
     </View>
   </View>;
@@ -275,6 +277,7 @@ const styles = StyleSheet.create({
   pill: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radii.full },
   pillText: { fontSize: 11, lineHeight: 15, fontWeight: "700", letterSpacing: 0.5 },
   tile: { width: 56, height: 56, borderRadius: radii.md, alignItems: "center", justifyContent: "center" },
+  winnerTile: { height: 84 },
   tileCount: { fontSize: 20, lineHeight: 24, fontWeight: "700" },
   tileLabel: { fontSize: 9, lineHeight: 12, letterSpacing: 0.8 },
   distribution: { flexDirection: "row", gap: 2, height: 6, marginTop: spacing.sm },

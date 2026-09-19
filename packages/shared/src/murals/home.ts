@@ -1,6 +1,6 @@
 import { bookKey } from "../library/merge.js";
 import type { Group } from "../library/groups.js";
-import { newId, resolveQuote, type MuralBlock } from "./murals.js";
+import { resolveQuote, type MuralBlock } from "./murals.js";
 
 export function eligiblePassages(books: Array<Record<string, unknown>>) {
   return books.flatMap((book) => (Array.isArray(book.highlights) ? book.highlights : [])
@@ -35,12 +35,3 @@ export function pinPassage(block: MuralBlock, resolved: MuralBlock, books: Array
   return { ...block, mode: undefined, bookKey: resolved.bookKey, highlightId: resolved.highlightId };
 }
 
-export function buildHomeBlocks(withPassage: boolean): MuralBlock[] {
-  const blocks: MuralBlock[] = [
-    { id: newId(), type: "profile", bio: "", favoriteGenres: [], layout: { x: 0, y: 0, w: 12, h: 5 } },
-    { id: newId(), type: "currentlyReading", layout: { x: 0, y: 6, w: 12, h: 8 } },
-    { id: newId(), type: "shelf", title: "Up next", bookKeys: [], layout: { x: 0, y: 15, w: 12, h: 7 } }
-  ];
-  if (withPassage) blocks.push({ id: newId(), type: "quote", mode: "rediscover", bookKey: "", highlightId: "", layout: { x: 0, y: 23, w: 12, h: 7 } });
-  return blocks;
-}

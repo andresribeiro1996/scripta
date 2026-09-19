@@ -3,12 +3,12 @@ import { AccessibilityInfo, useColorScheme } from "react-native";
 
 export const palettes = {
   light: {
-    background: "#f5f4f2",
+    background: "#f2f0ec",
     surface: "#ffffff",
-    surfacePressed: "#fbfaf8",
+    surfacePressed: "#f7f5f1",
     text: "#201e1c",
     textDim: "#6b6560",
-    border: "#e4e0da",
+    border: "#ddd8d0",
     accent: "#a85c32",
     accentSoft: "#f1e2d8",
     danger: "#b3432f",
@@ -20,12 +20,12 @@ export const palettes = {
     onDanger: "#ffffff",
   },
   dark: {
-    background: "#1a1815",
-    surface: "#242220",
-    surfacePressed: "#2b2926",
+    background: "#141210",
+    surface: "#2a2724",
+    surfacePressed: "#333029",
     text: "#ece8e3",
-    textDim: "#a39c93",
-    border: "#38342f",
+    textDim: "#a8a199",
+    border: "#45403a",
     accent: "#e08a52",
     accentSoft: "#3a2c22",
     danger: "#e08072",
@@ -33,8 +33,8 @@ export const palettes = {
     success: "#8fbf7f",
     successSoft: "#262f21",
     scrim: "rgba(0, 0, 0, 0.64)",
-    onAccent: "#1a1815",
-    onDanger: "#1a1815",
+    onAccent: "#141210",
+    onDanger: "#141210",
   },
 } as const;
 

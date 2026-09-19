@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { DiscoverItem, FeedItem } from "@scripta/shared/community";
 import {
-  COMMUNITY_TABS,
   DISCOVER_FILTERS,
   contentDetail,
   contentKindLabel,
@@ -33,8 +32,7 @@ const tournament = {
 
 const actor = { userId: "u1", username: "andre", avatarUrl: null };
 
-test("tab and filter option tables", () => {
-  assert.deepEqual(COMMUNITY_TABS.map((t) => t.value), ["feed", "discover", "people"]);
+test("filter option table", () => {
   assert.deepEqual(DISCOVER_FILTERS.map((f) => f.value), ["all", "tierlist", "tournament"]);
 });
 

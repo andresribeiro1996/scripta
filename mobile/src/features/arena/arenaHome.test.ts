@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Tierlist, VotedTierlist } from "../tierlists/api.js";
 import type { TournamentSummary } from "./api.js";
-import { ARENA_TABS, coverRemainder, emptyCopy, filterItems, filterSections, homeSections, ownedItems, tabAtIndex, tabIndex, tierDistribution, tournamentProgress, votedTierlistDetail, type OwnedItem, type SectionedItem } from "./arenaHome.js";
+import { ARENA_TABS, coverRemainder, emptyCopy, filterItems, filterSections, homeSections, ownedItems, previewCovers, tabAtIndex, tabIndex, tierDistribution, tournamentProgress, votedTierlistDetail, type OwnedItem, type SectionedItem } from "./arenaHome.js";
 
 const tierDetail = (items: OwnedItem[]): string | undefined => {
   const first = items[0];
@@ -103,7 +103,8 @@ test("a tier list with nothing sorted yet draws an even ladder, not an empty bar
 
 test("tournament progress reads differently at each stage", () => {
   assert.equal(tournamentProgress(tournament({ status: "seeding", bracketSize: 8, filledSlots: 3 })).label, "3 of 8 slots filled");
-  assert.equal(tournamentProgress(tournament({ status: "completed", bracketSize: 8 })).label, "Winner decided");
+  // Completed says nothing: the card's status pill and winner cover do.
+  assert.equal(tournamentProgress(tournament({ status: "completed", bracketSize: 8 })).label, "");
 
   // 16 books is four rounds; round 2 is halfway.
   const active = tournamentProgress(tournament({ status: "active", bracketSize: 16, currentRound: 2 }));
@@ -120,6 +121,19 @@ test("the cover remainder counts seeded books with no thumbnail shown", () => {
   assert.equal(coverRemainder(tournament({ filledSlots: 3, covers: ["a", "b", "c"] })), 0);
   // A pool seeded entirely without art must not report a negative remainder.
   assert.equal(coverRemainder(tournament({ filledSlots: 0, covers: [] })), 0);
+});
+
+test("the champion is drawn once — as the card's cover, not in the stack too", () => {
+  const champion = { key: "b", title: "Hyperion", author: "Simmons", cover: "b" };
+  const finished = tournament({ status: "completed", filledSlots: 4, covers: ["a", "b", "c"], winner: champion });
+  assert.deepEqual(previewCovers(finished), ["a", "c"]);
+  // Two in the stack, one as the winner cover, one seeded without art.
+  assert.equal(coverRemainder(finished), 1);
+
+  // A champion seeded without art still occupies the card's cover slot.
+  const artless = tournament({ status: "completed", filledSlots: 3, covers: ["a", "b"], winner: { ...champion, cover: null } });
+  assert.deepEqual(previewCovers(artless), ["a", "b"]);
+  assert.equal(coverRemainder(artless), 0);
 });
 
 const votedTierlist = (over: Partial<VotedTierlist> = {}): VotedTierlist => ({

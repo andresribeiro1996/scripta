@@ -16,18 +16,26 @@ import type { SearchBarCommands } from "react-native-screens";
 import { buildMuralPreset, buildTree, MURAL_PRESETS, type Mural, type MuralFolder } from "@scripta/shared";
 import { Button, EmptyState, ErrorState, IconButton, Input, Menu, ModalBody, Screen, Sheet, type MenuItem } from "../../ui";
 import { radii, spacing, typography, useTheme } from "../../ui/theme";
+import { useAuth } from "../../core/auth";
 import { fetchGalleryImages } from "../gallery/api";
 import { useLibrary } from "../library/hooks/useLibrary";
 import { ShareActions } from "../socials";
-import { useHome } from "./useHome";
+import { fetchProfile } from "../community/api";
 import { useMuralFolders, useMurals } from "./useMurals";
 
 export function MuralsScreen() {
   const { colors } = useTheme();
   const router = useRouter();
+  const { user } = useAuth();
   const murals = useMurals();
-  const home = useHome();
   const folders = useMuralFolders();
+  const username = user?.username ?? null;
+  const ownProfile = useQuery({
+    queryKey: ["community", "profile", username],
+    queryFn: () => fetchProfile(username!),
+    enabled: Boolean(username),
+    retry: false,
+  });
   const { data: library } = useLibrary();
   const gallery = useQuery({ queryKey: ["gallery"], queryFn: fetchGalleryImages });
   const [folderId, setFolderId] = useState<string | null | undefined>(undefined);
@@ -153,11 +161,10 @@ export function MuralsScreen() {
         onRefresh={() => void murals.refetch()}
         ListEmptyComponent={!murals.isPending ? <EmptyState title={search ? "Nothing matches" : "No murals here"} body={search ? "Search covers every folder — nothing in your murals matches this." : "Create a freeform mural or start from a preset."} actionLabel={search ? "Clear search" : undefined} onAction={search ? clearSearch : undefined} /> : null}
         renderItem={({ item }) => <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Pressable accessibilityLabel={`Open ${item.name}`} accessibilityRole="button" style={styles.open} onPress={() => router.push(`/murals/${item.id}` as never)}>{item.coverImageUrl ? <Image source={{ uri: item.coverImageUrl }} style={styles.cover} contentFit="cover" /> : null}<View style={styles.grow}><Text style={[typography.title, { color: colors.text, fontWeight: "700" }]}>{item.name}</Text><Text style={[typography.caption, { color: colors.textDim }]}>{item.blocks.length} blocks</Text></View></Pressable>
+          <Pressable accessibilityLabel={`Open ${item.name}`} accessibilityRole="button" style={styles.open} onPress={() => router.push(`/murals/${item.id}` as never)}>{item.coverImageUrl ? <Image source={{ uri: item.coverImageUrl }} style={styles.cover} contentFit="cover" /> : null}<View style={styles.grow}><View style={styles.nameRow}><Text numberOfLines={1} style={[typography.title, { color: colors.text, fontWeight: "700" }]}>{item.name}</Text>{ownProfile.data?.mural?.mural.id === item.id ? <View style={[styles.profileBadge, { borderColor: colors.border, backgroundColor: colors.accentSoft }]}><Text style={[typography.caption, { color: colors.accent }]}>Profile</Text></View> : null}</View><Text style={[typography.caption, { color: colors.textDim }]}>{item.blocks.length} blocks</Text></View></Pressable>
           <Menu
             title={item.name}
             items={[
-              { label: "Set as home", onPress: () => { void home.choose(item.id).then(() => router.push("/")).catch((error) => Alert.alert("Could not set home", error.message)); } },
               { label: "Move to folder…", onPress: () => setMoveFor(item) },
               { label: "Change cover…", onPress: () => setCoverFor(item) },
               { label: "Share…", onPress: () => setShareFor(item) },
@@ -185,6 +192,8 @@ const styles = StyleSheet.create({
   open: { flex: 1, flexDirection: "row", alignItems: "center", gap: spacing.md },
   cover: { width: 64, height: 64, borderRadius: radii.md },
   grow: { flex: 1 },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  profileBadge: { borderWidth: 1, borderRadius: radii.full, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
   sheet: { gap: spacing.sm, paddingBottom: spacing.xl },
   imageChoice: { width: "100%", height: 120, borderRadius: radii.md },
 });

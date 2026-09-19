@@ -1,84 +1,81 @@
-import { useLocalSearchParams } from "expo-router";
-// Mirrors frontend's pages/GroupsPage.tsx — backs both the Series and
-// Collections in-tab views (LibraryScreen.tsx's `view` state; see this
-// task's handoff notes for why these are in-tab views rather than
-// separate Expo Router routes). Same underlying resource either way
-// (@scripta/shared's Group / groups.ts), differing only in copy and in
-// that series also get auto-seeded from book metadata (deriveSeriesGroups,
-// called from lib/mergeAndSave.ts after every import/add).
+// Lists Series and Collections together — they're the same underlying
+// resource (@scripta/shared's Group / groups.ts), differing only in that
+// series also get auto-seeded from book metadata (deriveSeriesGroups,
+// called from lib/mergeAndSave.ts after every import/add). The type filter
+// below narrows the list; it doesn't gate which resource is loaded.
+//
+// Rows only navigate — renaming, Style, Manage books, Select/Delete, and
+// deleting the group itself all live on the detail screen
+// (app/(app)/(library)/collection/[id].tsx), which is also the deep-link
+// target for e.g. the Home mural's "Open collection" button.
+//
+// Rendered both as the Library screen's "Collections" tab and as the
+// standalone /collections route. Both hosts own the native header search
+// bar and a "+" button themselves (see LibraryScreen.tsx and
+// app/(app)/(library)/collections.tsx) — `search` is a controlled prop and
+// `startCreating` is exposed via ref so those headers can drive this list
+// without it needing its own header.
 
-import { useMemo, useState } from "react";
+import { forwardRef, useImperativeHandle, useMemo, useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import {
-  addBookToGroup,
-  deleteGroup,
-  makeGroup,
-  orderedGroupBooks,
-  removeBookFromGroup,
-  removeBooksFromAllGroups,
-  renameGroup,
-  resolveLibraryStyle,
-  seriesGroupByBookKey,
-  setGroupStyle,
-  bookKey,
-  effectiveCardStyle,
-  clearBookCover,
-  setBookCover,
-  type Group,
-  type GroupType,
-  type LibraryData,
-  type PerCardStyle,
-} from "@scripta/shared";
-import { Button, EmptyState, Input, Sheet } from "../../../ui/components";
+import { router } from "expo-router";
+import { makeGroup, orderedGroupBooks, type GroupType } from "@scripta/shared";
+import { EmptyState, Input, Segmented } from "../../../ui/components";
+import { Icon } from "../../../ui/icon";
 import { spacing, typography, useTheme } from "../../../ui/theme";
-import type { GalleryImage } from "../../gallery/api";
-import { useMurals } from "../../murals/useMurals";
 import { useLibrary } from "../hooks/useLibrary";
 import { attemptUpdate } from "../lib/attemptUpdate";
-import { BookCard } from "./BookCard";
-import { BookWrapGrid } from "./BookWrapGrid";
-import { CoverPickerSheet } from "./CoverPicker";
-import { PerCardStyleSheet } from "./PerCardStyleForm";
+import { CoverImage } from "./CoverImage";
 
-const COPY: Record<GroupType, { title: string; noun: string; emptyTitle: string; emptyBody: string }> = {
-  series: {
-    title: "Series",
-    noun: "series",
-    emptyTitle: "No series yet.",
-    emptyBody: "Series are picked up automatically from your books' Series field on import — or add one below.",
-  },
-  collection: {
-    title: "Collections",
+type TypeFilter = GroupType | "all";
+
+const TYPE_FILTER_OPTIONS: readonly { value: TypeFilter; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "series", label: "Series" },
+  { value: "collection", label: "Collections" },
+];
+
+const COPY: Record<TypeFilter, { noun: string; emptyTitle: string; emptyBody: string }> = {
+  all: {
     noun: "collection",
     emptyTitle: "No collections yet.",
-    emptyBody: "Create one to start organizing your books your own way.",
+    emptyBody: "Series are picked up automatically from your books' Series field on import — or create your own collection with the + button above.",
+  },
+  series: {
+    noun: "series",
+    emptyTitle: "No series yet.",
+    emptyBody: "Series are picked up automatically from your books' Series field on import — or add one with the + button above.",
+  },
+  collection: {
+    noun: "collection",
+    emptyTitle: "No collections yet.",
+    emptyBody: "Use the + button above to start organizing your books your own way.",
   },
 };
 
-export function GroupsView({ type }: { type: GroupType }) {
+const GROUP_TYPE_LABEL: Record<GroupType, string> = { series: "Series", collection: "Collection" };
+
+export type GroupsViewHandle = { startCreating: () => void };
+
+export const GroupsView = forwardRef<GroupsViewHandle, { search: string }>(function GroupsView({ search }, ref) {
   const { data: library, updateLibrary } = useLibrary();
-  const murals = useMurals();
-  const { group: selectedGroupId } = useLocalSearchParams<{ group?: string }>();
-  const copy = COPY[type];
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
+  // "All" has no single creatable type; a manually-added group there is a
+  // collection like any other — series are meant to come from import.
+  const draftType: GroupType = typeFilter === "series" ? "series" : "collection";
+  const copy = COPY[typeFilter];
   const { colors } = useTheme();
 
-  const [search, setSearch] = useState("");
   const [drafting, setDrafting] = useState(false);
   const [draftName, setDraftName] = useState("");
   const [creating, setCreating] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingName, setEditingName] = useState("");
-  const [pickerGroupId, setPickerGroupId] = useState<string | null>(null);
-  const [styleGroupId, setStyleGroupId] = useState<string | null>(null);
-  const [styleBookKey, setStyleBookKey] = useState<string | null>(null);
-  const [coverBookKey, setCoverBookKey] = useState<string | null>(null);
-  const [selectionMode, setSelectionMode] = useState(false);
-  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+
+  useImperativeHandle(ref, () => ({ startCreating: () => setDrafting(true) }), []);
 
   const books = library?.data.books ?? [];
   const allGroups = useMemo(
-    () => (library?.data.groups ?? []).filter((g) => g.type === type && (!selectedGroupId || g.id === selectedGroupId)).sort((a, b) => a.name.localeCompare(b.name)),
-    [library, type, selectedGroupId],
+    () => (library?.data.groups ?? []).filter((g) => typeFilter === "all" || g.type === typeFilter).sort((a, b) => a.name.localeCompare(b.name)),
+    [library, typeFilter],
   );
   const groups = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -87,12 +84,6 @@ export function GroupsView({ type }: { type: GroupType }) {
       (group) => group.name.toLowerCase().includes(needle) || orderedGroupBooks(group, books).some((b) => String(b.Title ?? "").toLowerCase().includes(needle)),
     );
   }, [allGroups, books, search]);
-  const bookSeriesGroup = useMemo(() => seriesGroupByBookKey(library?.data.books ?? [], library?.data.groups ?? []), [library]);
-  const style = resolveLibraryStyle(library?.data.style);
-
-  async function runUpdate(mutate: (data: LibraryData) => LibraryData, onSuccess?: () => void) {
-    return attemptUpdate(() => updateLibrary(mutate), () => Alert.alert("Couldn't save — check your connection."), onSuccess);
-  }
 
   async function handleCommitDraft() {
     const name = draftName.trim();
@@ -100,126 +91,20 @@ export function GroupsView({ type }: { type: GroupType }) {
     setDraftName("");
     if (!name || creating) return;
     setCreating(true);
-    try {
-      await updateLibrary((data) => ({ ...data, groups: [...(data.groups ?? []), makeGroup(type, name)] }));
-    } catch {
-      Alert.alert("Couldn't save — check your connection.");
-    } finally {
-      setCreating(false);
-    }
+    const group = makeGroup(draftType, name);
+    await attemptUpdate(
+      () => updateLibrary((data) => ({ ...data, groups: [...(data.groups ?? []), group] })),
+      () => Alert.alert("Couldn't save — check your connection."),
+      () => router.push(`/collection/${group.id}` as never),
+    );
+    setCreating(false);
   }
-
-  function handleRename(id: string) {
-    const name = editingName.trim();
-    setEditingId(null);
-    if (!name) return;
-    void runUpdate((data) => ({ ...data, groups: renameGroup(data.groups ?? [], id, name) }));
-  }
-
-  function handleDelete(group: Group) {
-    Alert.alert(`Delete "${group.name}"?`, "The books stay in your library — this only removes the grouping.", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: () => void runUpdate((data) => ({ ...data, groups: deleteGroup(data.groups ?? [], group.id) })) },
-    ]);
-  }
-
-  function handleToggleBook(groupId: string, book: Record<string, unknown>, inGroup: boolean) {
-    void runUpdate((data) => ({
-      ...data,
-      groups: inGroup ? removeBookFromGroup(data.groups ?? [], groupId, book) : addBookToGroup(data.groups ?? [], groupId, book),
-    }));
-  }
-
-  function handleSaveGroupStyle(groupId: string, groupStyle: PerCardStyle | undefined) {
-    void runUpdate((data) => ({ ...data, groups: setGroupStyle(data.groups ?? [], groupId, groupStyle) }));
-  }
-
-  function handleSaveBookStyle(book: Record<string, unknown>, bookStyle: PerCardStyle | undefined) {
-    const key = bookKey(book);
-    void runUpdate((data) => ({ ...data, books: data.books.map((b) => (bookKey(b) === key ? { ...b, _style: bookStyle } : b)) }));
-  }
-
-  function handleSaveBookCover(book: Record<string, unknown>, image: GalleryImage) {
-    const key = bookKey(book);
-    void runUpdate((data) => ({ ...data, books: data.books.map((b) => (bookKey(b) === key ? setBookCover(b, image.id, image.url) : b)) }));
-  }
-
-  function handleRemoveBookCover(book: Record<string, unknown>) {
-    const key = bookKey(book);
-    void runUpdate((data) => ({ ...data, books: data.books.map((b) => (bookKey(b) === key ? clearBookCover(b) : b)) }));
-  }
-
-  function handleToggleSelect(book: Record<string, unknown>) {
-    const key = bookKey(book);
-    setSelectedKeys((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }
-
-  function handleDeleteSelected() {
-    if (selectedKeys.size === 0) return;
-    const keys = selectedKeys;
-    Alert.alert(`Delete ${keys.size} book${keys.size === 1 ? "" : "s"}?`, "This removes them from your library entirely, not just this group.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: () => {
-          void runUpdate(
-            (data) => ({
-              ...data,
-              books: data.books.filter((b) => !keys.has(bookKey(b))),
-              groups: removeBooksFromAllGroups(data.groups ?? [], keys),
-            }),
-            () => {
-              void murals.scrubBooks(keys).catch(() => Alert.alert("The books were deleted, but some mural references couldn't be updated."));
-              setSelectedKeys(new Set());
-              setSelectionMode(false);
-            },
-          );
-        },
-      },
-    ]);
-  }
-
-  const pickerGroup = groups.find((g) => g.id === pickerGroupId) ?? null;
-  const styleGroup = groups.find((g) => g.id === styleGroupId) ?? null;
-  const styleBook = styleBookKey ? books.find((b) => bookKey(b) === styleBookKey) ?? null : null;
-  const coverBook = coverBookKey ? books.find((b) => bookKey(b) === coverBookKey) ?? null : null;
 
   return (
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
-      {/* No title here: the route above this owns it, and the native header
-          already shows it. Rendering it again printed "Series" twice. */}
-      <View style={styles.header}>
-        {books.length > 0 &&
-          (selectionMode ? (
-            <View style={styles.headerActions}>
-              <Text style={[typography.body, { color: colors.textDim }]}>{selectedKeys.size} selected</Text>
-              <Button label="Delete" variant="destructive" disabled={selectedKeys.size === 0} onPress={handleDeleteSelected} />
-              <Button
-                label="Cancel"
-                variant="secondary"
-                onPress={() => {
-                  setSelectionMode(false);
-                  setSelectedKeys(new Set());
-                }}
-              />
-            </View>
-          ) : (
-            <Button label="Select…" variant="secondary" onPress={() => setSelectionMode(true)} />
-          ))}
-      </View>
+      <Segmented accessibilityLabel="Filter by type" options={TYPE_FILTER_OPTIONS} value={typeFilter} onChange={setTypeFilter} />
 
-      {books.length > 0 && <Input label="Search" placeholder={`Search ${copy.title.toLowerCase()}`} value={search} onChangeText={setSearch} autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" returnKeyType="search" />}
-
-      {!allGroups.length && <EmptyState title={copy.emptyTitle} body={copy.emptyBody} />}
-      {allGroups.length > 0 && groups.length === 0 && <Text style={[typography.body, { color: colors.textDim }]}>Nothing matches "{search.trim()}".</Text>}
-
-      {drafting ? (
+      {drafting && (
         <View style={[styles.draftRow, { borderColor: colors.accent }]}>
           <Input
             autoFocus
@@ -230,177 +115,43 @@ export function GroupsView({ type }: { type: GroupType }) {
             onSubmitEditing={() => void handleCommitDraft()}
           />
         </View>
-      ) : (
-        <Button label={creating ? "Adding…" : `New ${copy.noun}`} variant="secondary" loading={creating} onPress={() => setDrafting(true)} />
       )}
+
+      {!allGroups.length && !drafting && <EmptyState title={copy.emptyTitle} body={copy.emptyBody} />}
+      {allGroups.length > 0 && groups.length === 0 && <Text style={[typography.body, { color: colors.textDim }]}>Nothing matches "{search.trim()}".</Text>}
 
       {groups.map((group) => {
         const members = orderedGroupBooks(group, books);
         return (
-          <View key={group.id} style={[styles.section, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-            <View style={styles.sectionHeader}>
-              {editingId === group.id ? (
-                <Input
-                  autoFocus
-                  label="Name"
-                  value={editingName}
-                  onChangeText={setEditingName}
-                  onBlur={() => handleRename(group.id)}
-                  onSubmitEditing={() => handleRename(group.id)}
-                />
-              ) : (
-                <Pressable
-                  accessibilityLabel={`Rename ${group.name}`}
-                  accessibilityRole="button"
-                  onPress={() => {
-                    setEditingId(group.id);
-                    setEditingName(group.name);
-                  }}
-                >
-                  <Text style={[typography.title, { color: colors.text, fontWeight: "700" }]}>
-                    {group.name} {group.style ? "· custom style" : ""}
-                  </Text>
-                </Pressable>
-              )}
+          <Pressable
+            key={group.id}
+            accessibilityLabel={`Open ${group.name}`}
+            accessibilityRole="button"
+            onPress={() => router.push(`/collection/${group.id}` as never)}
+            style={({ pressed }) => [styles.row, { borderColor: colors.border, backgroundColor: pressed ? colors.surfacePressed : colors.surface }]}
+          >
+            <View style={[styles.thumb, { backgroundColor: colors.border }]}>{members[0] && <CoverImage book={members[0]} />}</View>
+            <View style={styles.rowText}>
+              <Text style={[typography.body, { color: colors.text, fontWeight: "600" }]} numberOfLines={1}>
+                {group.name}
+              </Text>
               <Text style={[typography.caption, { color: colors.textDim }]}>
+                {typeFilter === "all" ? `${GROUP_TYPE_LABEL[group.type]} · ` : ""}
                 {members.length} book{members.length === 1 ? "" : "s"}
               </Text>
             </View>
-            <View style={styles.sectionActions}>
-              {type === "series" && <Button label="Style" variant="secondary" onPress={() => setStyleGroupId(group.id)} />}
-              <Button label="Manage books" variant="secondary" onPress={() => setPickerGroupId(group.id)} />
-              <Button label="Delete" variant="destructive" onPress={() => handleDelete(group)} />
-            </View>
-
-            {members.length === 0 ? (
-              <Text style={[typography.body, { color: colors.textDim }]}>No books here yet — use "Manage books" to add some.</Text>
-            ) : (
-              <BookWrapGrid
-                books={members}
-                style={style}
-                renderBook={(book) => (
-                  <BookCard
-                    book={book}
-                    onPress={() => {}}
-                    style={effectiveCardStyle(style, bookSeriesGroup.get(bookKey(book))?.style, book._style as PerCardStyle | undefined)}
-                    onOpenStyle={selectionMode ? undefined : () => setStyleBookKey(bookKey(book))}
-                    onOpenCoverPicker={selectionMode ? undefined : () => setCoverBookKey(bookKey(book))}
-                    showActions
-                    selectable={selectionMode}
-                    selected={selectedKeys.has(bookKey(book))}
-                    onToggleSelect={handleToggleSelect}
-                  />
-                )}
-              />
-            )}
-          </View>
+            <Icon name="chevronRight" size={18} color={colors.textDim} />
+          </Pressable>
         );
       })}
-
-      {pickerGroup && (
-        <BookPickerSheet
-          key={pickerGroup.id}
-          group={pickerGroup}
-          allBooks={books}
-          onToggle={(book, inGroup) => handleToggleBook(pickerGroup.id, book, inGroup)}
-          onClose={() => setPickerGroupId(null)}
-        />
-      )}
-
-      {/* Keyed on the target id — PerCardStyleSheet seeds its draft from
-          props only on mount (see its own top comment), so switching
-          which series/book is being styled without a remount would leave
-          the sheet showing the PREVIOUS target's draft. */}
-      <PerCardStyleSheet
-        key={`group-${styleGroupId ?? "none"}`}
-        visible={styleGroup !== null}
-        name={styleGroup?.name ?? ""}
-        priorityText="the library-wide"
-        currentOverride={styleGroup?.style}
-        seedStyle={style}
-        onSave={(groupStyle) => styleGroup && handleSaveGroupStyle(styleGroup.id, groupStyle)}
-        onClose={() => setStyleGroupId(null)}
-      />
-
-      <PerCardStyleSheet
-        key={`book-${styleBookKey ?? "none"}`}
-        visible={styleBook !== null}
-        name={String(styleBook?.Title ?? "")}
-        priorityText="the series and library-wide"
-        currentOverride={styleBook?._style as PerCardStyle | undefined}
-        seedStyle={effectiveCardStyle(style, bookSeriesGroup.get(styleBookKey ?? "")?.style)}
-        onSave={(bookStyle) => styleBook && handleSaveBookStyle(styleBook, bookStyle)}
-        onClose={() => setStyleBookKey(null)}
-      />
-
-      <CoverPickerSheet
-        visible={coverBook !== null}
-        title={String(coverBook?.Title ?? "")}
-        currentImageId={typeof coverBook?._coverImageId === "string" ? (coverBook._coverImageId as string) : null}
-        onSelect={(image) => coverBook && handleSaveBookCover(coverBook, image)}
-        onRemoveCover={() => coverBook && handleRemoveBookCover(coverBook)}
-        onClose={() => setCoverBookKey(null)}
-      />
     </ScrollView>
   );
-}
-
-function BookPickerSheet({
-  group,
-  allBooks,
-  onToggle,
-  onClose,
-}: {
-  group: Group;
-  allBooks: Array<Record<string, unknown>>;
-  onToggle: (book: Record<string, unknown>, inGroup: boolean) => void;
-  onClose: () => void;
-}) {
-  const { colors } = useTheme();
-  const [search, setSearch] = useState("");
-  const memberKeys = useMemo(() => new Set(group.bookKeys), [group]);
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return allBooks;
-    return allBooks.filter((b) => String(b.Title ?? "").toLowerCase().includes(q) || String(b.Attribution ?? "").toLowerCase().includes(q));
-  }, [allBooks, search]);
-
-  return (
-    <Sheet visible title={`Books in "${group.name}"`} onClose={onClose}>
-      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: spacing.xs, paddingBottom: spacing.xl }}>
-        <Input label="Search your library" value={search} onChangeText={setSearch} autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" returnKeyType="search" />
-        {filtered.length === 0 && <Text style={[typography.body, { color: colors.textDim }]}>No books match.</Text>}
-        {filtered.map((book, i) => {
-          const key = bookKey(book);
-          const inGroup = memberKeys.has(key);
-          return (
-            <Pressable
-              accessibilityLabel={`${inGroup ? "Remove" : "Add"} ${String(book.Title ?? "book")}`}
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: inGroup }}
-              key={String(book.ContentID ?? i)}
-              onPress={() => onToggle(book, inGroup)}
-              style={[styles.pickerRow, { backgroundColor: inGroup ? colors.accentSoft : "transparent" }]}
-            >
-              <Text style={[typography.body, { color: colors.text, flex: 1 }]} numberOfLines={1}>
-                {String(book.Title ?? "Untitled")} — <Text style={{ color: colors.textDim }}>{String(book.Attribution ?? "Unknown author")}</Text>
-              </Text>
-              <Text style={{ color: colors.accent, fontWeight: "700" }}>{inGroup ? "✓" : ""}</Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-    </Sheet>
-  );
-}
+});
 
 const styles = StyleSheet.create({
-  content: { padding: spacing.lg, gap: spacing.lg, paddingBottom: spacing.huge },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: spacing.md },
-  headerActions: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  content: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.huge },
   draftRow: { borderWidth: 2, borderStyle: "dashed", borderRadius: 12, padding: spacing.md },
-  section: { borderWidth: 1, borderRadius: 12, padding: spacing.lg, gap: spacing.md },
-  sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
-  sectionActions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  pickerRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, minHeight: 44, paddingHorizontal: spacing.sm, borderRadius: 8 },
+  row: { flexDirection: "row", alignItems: "center", gap: spacing.md, borderWidth: 1, borderRadius: 12, padding: spacing.sm },
+  thumb: { width: 44, height: 66, borderRadius: 6, overflow: "hidden" },
+  rowText: { flex: 1, gap: 2 },
 });

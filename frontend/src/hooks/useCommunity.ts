@@ -1,25 +1,7 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import type { DiscoverType } from "@scripta/shared/community";
 import { ApiError } from "../api/client";
-import { fetchActivity, fetchCommunityProfile, fetchDiscover, fetchFeed, fetchPeople } from "../api/community";
-
-export function useCommunityFeed() {
-  const query = useInfiniteQuery({
-    queryKey: ["community", "feed"],
-    queryFn: ({ pageParam }) => fetchFeed(pageParam),
-    initialPageParam: undefined as string | undefined,
-    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined
-  });
-  return {
-    items: query.data?.pages.flatMap((page) => page.items) ?? [],
-    isLoading: query.isPending,
-    error: query.error,
-    hasNextPage: query.hasNextPage,
-    isFetchingNextPage: query.isFetchingNextPage,
-    fetchNextPage: query.fetchNextPage,
-    refetch: query.refetch
-  };
-}
+import { fetchActivity, fetchCommunityProfile, fetchDiscover, fetchPeople } from "../api/community";
 
 export function useCommunityActivity(username: string) {
   const query = useInfiniteQuery({

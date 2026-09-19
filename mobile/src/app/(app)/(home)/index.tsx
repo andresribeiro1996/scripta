@@ -1,3 +1,3 @@
-import { HomeScreen } from "@/features/murals/HomeScreen";
+import { HomeScreen } from "@/features/home/HomeScreen";
 
 export default HomeScreen;

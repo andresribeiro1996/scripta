@@ -57,10 +57,11 @@ function openPoll(access: "anonymous" | "members" = "anonymous") {
   return { service, copy, code: copy.voteCode!, topTierId: tiers[0]!.id };
 }
 
-async function call(service: Service, options: InjectOptions) {
+async function call(service: Service, options: InjectOptions, signedInAs?: string) {
   const app = Fastify();
+  if (signedInAs) app.decorate("authenticateAccessToken", (token: string) => token === signedInAs ? { id: signedInAs, email: `${signedInAs}@example.test`, username: signedInAs, avatarId: null } : null);
   await app.register(buildPublicTierlistRoutes(service));
-  const res = await app.inject(options);
+  const res = await app.inject(signedInAs ? { ...options, headers: { ...options.headers, authorization: `Bearer ${signedInAs}` } } : options);
   await app.close();
   return { status: res.statusCode, body: res.json() as Record<string, never> };
 }
@@ -115,6 +116,24 @@ test("a submitted ballot answers with ballotId/placements/results, never the int
   const results = body.results as unknown as { histogram: unknown[]; ballotCount: number };
   assert.equal(results.ballotCount, 2);
   assert.equal(results.histogram.length, 2);
+});
+
+// openVoting moves the owner's ranking out of the tier list document and
+// into their seeded ballot, so the owner's own editor has to be able to
+// read that ballot back — and it never sees a ballot id, because nothing
+// on their device ever stored one.
+test("a signed-in voter reads their own ballot without knowing its id", async () => {
+  const { service, code, topTierId } = openPoll();
+  const { status, body } = await call(service, { method: "GET", url: `/tierlists/voting/${code}/ballot` }, "u1");
+
+  assert.equal(status, 200);
+  assert.deepEqual(body.placements, [{ bookKey: "b1", tierId: topTierId }]);
+});
+
+test("an anonymous caller has no id-less ballot to read", async () => {
+  const { service, code } = openPoll();
+  const { status } = await call(service, { method: "GET", url: `/tierlists/voting/${code}/ballot` });
+  assert.equal(status, 404);
 });
 
 test("a members-only poll refuses an anonymous ballot with 401 {error}", async () => {

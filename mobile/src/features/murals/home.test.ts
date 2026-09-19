@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { bookKey, buildHomeBlocks, eligiblePassages, pinPassage, rediscoverPassage, resolveHomeBlock, scrubBooksFromMurals, type Group, type Mural, type MuralBlock } from "@scripta/shared";
+import { bookKey, eligiblePassages, pinPassage, rediscoverPassage, resolveHomeBlock, scrubBooksFromMurals, type Group, type Mural, type MuralBlock } from "@scripta/shared";
 
 const book = { Title: "One", Attribution: "Author", highlights: [
   { BookmarkID: "passage", Type: "highlight", Text: "A passage" },
@@ -44,13 +44,4 @@ test("collection shelves follow membership and preserve title/layout; missing so
   assert.equal(resolveHomeBlock(manual, books, [], ""), manual);
   const mural = { blocks: [shelf] } as Mural;
   assert.equal(scrubBooksFromMurals([mural], [bookKey(book)])[0], mural);
-});
-
-test("starter is editable, leaves Up next intentional, and includes passages only when available", () => {
-  assert.equal(buildHomeBlocks(false).some((block) => block.type === "quote"), false);
-  const blocks = buildHomeBlocks(true);
-  assert.equal(blocks.length, 4);
-  assert.ok(blocks.some((block) => block.type === "profile"));
-  assert.ok(blocks.some((block) => block.type === "shelf" && block.bookKeys.length === 0));
-  assert.equal(new Set(blocks.map((block) => block.id)).size, blocks.length);
 });

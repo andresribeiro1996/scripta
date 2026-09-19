@@ -159,24 +159,16 @@ function makeBookWithCover(n: number) {
 
 test("a summary carries the seeded cover preview and how many slots are filled", () => {
   const service = createArenaService(createInMemoryArenaRepository());
-  const tournament = service.createTournament("owner-1", { name: "Best of 2025", bracketSize: 8, roundDurationMinutes: 60 });
-  service.setSlotsManual(tournament.id, "owner-1", [
-    { slotIndex: 0, book: makeBookWithCover(1) },
-    { slotIndex: 1, book: makeBookWithCover(2) },
-    { slotIndex: 2, book: makeBookWithCover(3) },
-    { slotIndex: 3, book: makeBookWithCover(4) },
-    { slotIndex: 4, book: makeBookWithCover(5) }
-  ]);
+  const tournament = service.createTournament("owner-1", { name: "Best of 2025", bracketSize: 16, roundDurationMinutes: 60 });
+  service.setSlotsManual(tournament.id, "owner-1", Array.from({ length: 9 }, (_, index) => ({
+    slotIndex: index,
+    book: makeBookWithCover(index + 1)
+  })));
 
   const summary = service.listMine("owner-1")[0];
-  assert.equal(summary?.filledSlots, 5);
-  // Capped at four: the card shows four thumbnails and a remainder.
-  assert.deepEqual(summary?.covers, [
-    "https://covers.test/1.jpg",
-    "https://covers.test/2.jpg",
-    "https://covers.test/3.jpg",
-    "https://covers.test/4.jpg"
-  ]);
+  assert.equal(summary?.filledSlots, 9);
+  // Capped at eight: the card shows eight thumbnails and a remainder.
+  assert.deepEqual(summary?.covers, Array.from({ length: 8 }, (_, index) => `https://covers.test/${index + 1}.jpg`));
 });
 
 test("a cover preview skips slots seeded without art but still counts them", () => {

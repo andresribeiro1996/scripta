@@ -3,36 +3,20 @@ import { Stack } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Linking from "expo-linking";
-import { FlatList, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Text, View } from "react-native";
-import { countdownLabel, createVoterToken, sharePercent, type Duel, type DuelSide } from "@scripta/shared";
+import { RefreshControl, ScrollView, Share, StyleSheet, View } from "react-native";
+import { createVoterToken } from "@scripta/shared";
 import { useAuth } from "../../core/auth";
-import { Button, Dialog, EmptyState, ErrorState, IconButton, Input, Menu, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { Button, Dialog, EmptyState, ErrorState, IconButton, Input, Menu, Screen, Skeleton, SwipeableTabs, Toast, spacing } from "../../ui";
 import { AddBookSheet } from "../community/AddBookSheet";
 import { fetchTournament, renameTournament, resolveTiebreak, settleDuelEarly, voteOnDuel } from "./api";
-import { ARENA_VIEW_TABS, bracketSlots, matchEmptyCopy, votableDuels, type ArenaViewTab } from "./arenaView";
+import { arenaViewTabs, matchEmptyCopy, votableDuels, type ArenaViewTab } from "./arenaView";
 import { ArenaVoteDeck } from "./ArenaVoteDeck";
 import { ArenaBooksSheet } from "./ArenaBooksSheet";
-import { BookCover } from "./BookCover";
+import { BracketMap } from "./BracketMap";
 
 const TOKEN_KEY = "arena-voter-token";
 
-function Side({ side, duel, onAddBook }: { side: DuelSide; duel: Duel; onAddBook: (side: DuelSide) => void }) {
-  const { colors } = useTheme();
-  const percent = sharePercent(side.votes, duel);
-  return (
-    <Pressable accessibilityLabel={`${side.title} by ${side.author}`} onPress={() => onAddBook(side)} style={[styles.side, { borderColor: duel.winnerKey === side.key ? colors.success : colors.border }]}>
-      <BookCover cover={side.cover} title={side.title} width={46} height={66} />
-      <View style={styles.grow}>
-        <Text numberOfLines={2} {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{side.title}</Text>
-        <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{side.author}</Text>
-        <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{side.votes} votes{percent === null ? "" : ` · ${percent}%`}</Text>
-      </View>
-    </Pressable>
-  );
-}
-
 export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => void }) {
-  const { colors } = useTheme();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [token, setToken] = useState<string | null>(null);
@@ -85,6 +69,8 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
   const votable = votableDuels(data.duels);
   const next = votable[0];
   const refresh = () => void tournament.refetch();
+  const tabs = arenaViewTabs(data.status);
+  const activeTab = tabs.some((option) => option.value === tab) ? tab : tabs[0]!.value;
 
   const matchPane = () => {
     const empty = matchEmptyCopy(data.status, data.duels.length > 0);
@@ -112,26 +98,23 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
   };
 
   const bracketPane = () => {
+    if (data.status === "seeding") {
+      return (
+        <ScrollView style={styles.grow} contentContainerStyle={styles.pane} refreshControl={<RefreshControl refreshing={tournament.isRefetching} onRefresh={refresh} />}>
+          <EmptyState title="Tournament is being seeded" body="Pull to refresh for updates." />
+        </ScrollView>
+      );
+    }
     return (
-      <FlatList
-        data={bracketSlots(data.bracketSize, data.duels)}
-        keyExtractor={(item) => item.key}
-        contentContainerStyle={styles.list}
-        refreshing={tournament.isRefetching}
-        onRefresh={refresh}
-        ListEmptyComponent={<EmptyState title={data.status === "seeding" ? "Tournament is being seeded" : "No matches yet"} body="Pull to refresh for updates." />}
-        renderItem={({ item }) => {
-          const duel = item.duel;
-          if (!duel) return <View style={[styles.emptySlot, { borderColor: colors.border }]}><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Waiting for earlier round</Text></View>;
-          return <View style={[styles.duel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Round {duel.roundNumber} · Match {duel.duelIndex + 1} · {duel.status === "active" ? countdownLabel(duel.closesAt) : duel.status === "tied_pending_tiebreak" ? "Owner tiebreak needed" : "Settled"}</Text>
-            <Side side={duel.bookA} duel={duel} onAddBook={(side) => openAddBook({ title: side.title, author: side.author, coverUrl: side.cover })} />
-            <Side side={duel.bookB} duel={duel} onAddBook={(side) => openAddBook({ title: side.title, author: side.author, coverUrl: side.cover })} />
-            {isOwner && duel.status === "active" ? <Button label="Settle now" variant="secondary" loading={busy === duel.id} onPress={() => void action(duel.id, () => settleDuelEarly(id, duel.id))} /> : null}
-            {isOwner && duel.status === "tied_pending_tiebreak" ? <View style={styles.row}><Button label={`${duel.bookA.title} wins`} loading={busy === duel.id} onPress={() => void action(duel.id, () => resolveTiebreak(id, duel.id, duel.bookA.key))} /><Button label={`${duel.bookB.title} wins`} loading={busy === duel.id} onPress={() => void action(duel.id, () => resolveTiebreak(id, duel.id, duel.bookB.key))} /></View> : null}
-          </View>;
-        }}
-      />
+      <ScrollView style={styles.grow} contentContainerStyle={styles.list} refreshControl={<RefreshControl refreshing={tournament.isRefetching} onRefresh={refresh} />}>
+        <BracketMap
+          tournament={data}
+          isOwner={isOwner}
+          busyDuelId={busy}
+          onSettle={(duelId) => void action(duelId, () => settleDuelEarly(id, duelId))}
+          onTiebreak={(duelId, bookKey) => void action(duelId, () => resolveTiebreak(id, duelId, bookKey))}
+        />
+      </ScrollView>
     );
   };
 
@@ -157,8 +140,8 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
       {error ? <Toast visible message={error} tone="error" /> : null}
       <SwipeableTabs
         accessibilityLabel="Tournament view"
-        options={ARENA_VIEW_TABS.map((option) => option.value === "match" ? { ...option, badge: votable.length } : option)}
-        value={tab}
+        options={tabs.map((option) => option.value === "match" ? { ...option, badge: votable.length } : option)}
+        value={activeTab}
         onChange={setTab}
         renderPage={(pageTab) => pageTab === "match" ? matchPane() : bracketPane()}
       />
@@ -173,13 +156,8 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
 const styles = StyleSheet.create({
   screen: { padding: spacing.lg, gap: spacing.md },
   grow: { flex: 1 },
-  strong: { fontWeight: "700" },
-  row: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   pane: { gap: spacing.md, paddingBottom: spacing.huge, flexGrow: 1, justifyContent: "center" },
   matchWrap: { flex: 1, paddingTop: spacing.lg, justifyContent: "center" },
   list: { gap: spacing.md, paddingBottom: spacing.huge, flexGrow: 1 },
-  duel: { borderWidth: 1, borderRadius: radii.lg, padding: spacing.md, gap: spacing.sm },
-  side: { minHeight: 84, borderWidth: 1, borderRadius: radii.md, padding: spacing.sm, flexDirection: "row", gap: spacing.md, alignItems: "center" },
-  emptySlot: { minHeight: 72, borderWidth: 1, borderStyle: "dashed", borderRadius: radii.md, alignItems: "center", justifyContent: "center" },
   dialog: { gap: spacing.md },
 });

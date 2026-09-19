@@ -253,7 +253,7 @@ export function CardBorderSection({ idPrefix, draft, onApply, onSaveNow }: CardB
             onChange={(e) => {
               if (e.target.checked) {
                 const computed = getComputedStyle(document.documentElement).getPropertyValue("--color-border").trim();
-                onSaveNow({ cardBorderColor: computed || "#38342f" });
+                onSaveNow({ cardBorderColor: computed || "#45403a" });
               } else {
                 onSaveNow({ cardBorderColor: null });
               }
@@ -264,7 +264,7 @@ export function CardBorderSection({ idPrefix, draft, onApply, onSaveNow }: CardB
         {usingCustomBorderColor && (
           <input
             type="color"
-            value={draft.cardBorderColor ?? "#38342f"}
+            value={draft.cardBorderColor ?? "#45403a"}
             onChange={(e) => onApply({ cardBorderColor: e.target.value })}
             className="h-8 w-16 rounded border border-(--color-border) bg-transparent"
           />

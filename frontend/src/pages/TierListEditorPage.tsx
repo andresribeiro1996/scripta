@@ -1,3 +1,4 @@
+import { ballotBoard } from "@scripta/shared";
 import { useEffect, useState } from "react";
 import { Link, useOutletContext, useParams } from "react-router-dom";
 import type { TierlistData } from "../api/tierlists";
@@ -30,7 +31,11 @@ export function TierListEditorPage() {
   // (GET /tierlists/voting/:code). Called unconditionally (hook rules),
   // with "" when there's no code yet — the hook itself declines to fire on
   // an empty code rather than spending the public rate limit on a 404.
-  const { board: votingBoard } = useTierlistVoting(tierlist?.voteCode ?? "");
+  // `ownBallot`: opening voting MOVES the owner's ranking out of the tier
+  // list document and into a seeded ballot, leaving `tierlist.data` as the
+  // blank template every voter ranks. Rendering that alone showed the owner
+  // an empty board and looked like their ranking had been thrown away.
+  const { board: votingBoard, ballot: ownBallot } = useTierlistVoting(tierlist?.voteCode ?? "");
   // The histogram does NOT come from that board: it's withheld while voting
   // is open, so nobody reads the standings before voting. The owner is the
   // exception the spec grants ("owner sees them any time"), and this is the
@@ -285,6 +290,12 @@ export function TierListEditorPage() {
               {votingBoard?.ballotCount ?? 0} {(votingBoard?.ballotCount ?? 0) === 1 ? "ballot" : "ballots"} · {votingBoard?.eligibleVoteCount ?? 0}/100 eligible voters
             </span>
           </div>
+          <a
+            href={`/vote/${voteCode}`}
+            className="min-h-9 self-start rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm font-semibold hover:bg-(--color-surface-hover) flex items-center"
+          >
+            {ownBallot?.placements.length ? "Edit your ballot" : "Rank your ballot"}
+          </a>
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-stretch overflow-hidden rounded-lg border border-(--color-border) bg-(--color-surface)">
               {(["anonymous", "members"] as const).map((access, i) => (
@@ -317,7 +328,7 @@ export function TierListEditorPage() {
       )}
 
       {voteCode !== null ? (
-        <TierBoard data={data} books={books} onChange={() => {}} structureEditable={false} />
+        <TierBoard data={ownBallot ? ballotBoard(data, ownBallot.placements) : data} books={books} onChange={() => {}} structureEditable={false} />
       ) : !editing ? (
         <div className="flex flex-col gap-2">
           {data.tiers.length === 0 ? (
