@@ -36,11 +36,14 @@ export function pinPassage(block: MuralBlock, resolved: MuralBlock, books: Array
 }
 
 export function buildHomeBlocks(withPassage: boolean): MuralBlock[] {
+  // Stacked with no empty grid row between them: the canvas already draws
+  // a gap, and an extra row made the space BETWEEN cards larger than the
+  // padding inside them, which reads as a page that failed to load.
   const blocks: MuralBlock[] = [
     { id: newId(), type: "profile", bio: "", favoriteGenres: [], layout: { x: 0, y: 0, w: 12, h: 5 } },
-    { id: newId(), type: "currentlyReading", layout: { x: 0, y: 6, w: 12, h: 8 } },
-    { id: newId(), type: "shelf", title: "Up next", bookKeys: [], layout: { x: 0, y: 15, w: 12, h: 7 } }
+    { id: newId(), type: "currentlyReading", layout: { x: 0, y: 5, w: 12, h: 8 } },
+    { id: newId(), type: "shelf", title: "Up next", bookKeys: [], layout: { x: 0, y: 13, w: 12, h: 7 } }
   ];
-  if (withPassage) blocks.push({ id: newId(), type: "quote", mode: "rediscover", bookKey: "", highlightId: "", layout: { x: 0, y: 23, w: 12, h: 7 } });
+  if (withPassage) blocks.push({ id: newId(), type: "quote", mode: "rediscover", bookKey: "", highlightId: "", layout: { x: 0, y: 20, w: 12, h: 7 } });
   return blocks;
 }
