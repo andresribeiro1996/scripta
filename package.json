@@ -21,6 +21,7 @@
     "dev:release": "node scripts/dev-release.mjs",
     "dev:status": "node scripts/dev-status.mjs",
     "dev:tunnels": "node scripts/dev-tunnels.mjs",
+    "dev:link-deps": "node scripts/dev-worktree-deps.mjs",
     "test:scripts": "node --test scripts/*.test.mjs",
     "test": "npm run test:scripts && npm test --workspaces --if-present",
     "check:agents": "node scripts/sync-agent-table.mjs --check",

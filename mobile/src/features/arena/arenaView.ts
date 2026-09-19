@@ -1,12 +1,19 @@
 import { bracketShape, needsVote, type Duel } from "@scripta/shared";
 import type { TournamentView } from "./api";
 
-export const ARENA_VIEW_TABS = [
+const ALL_ARENA_VIEW_TABS = [
   { value: "match", label: "Match" },
   { value: "bracket", label: "Bracket" },
 ] as const;
 
-export type ArenaViewTab = (typeof ARENA_VIEW_TABS)[number]["value"];
+export type ArenaViewTab = (typeof ALL_ARENA_VIEW_TABS)[number]["value"];
+
+/** A finished tournament has nothing left to vote on, so Match — the pane
+ *  built entirely around casting the next vote — drops out, leaving just
+ *  the final Bracket. */
+export function arenaViewTabs(status: TournamentView["status"]): Array<{ value: ArenaViewTab; label: string }> {
+  return status === "completed" ? ALL_ARENA_VIEW_TABS.filter((tab) => tab.value !== "match") : [...ALL_ARENA_VIEW_TABS];
+}
 
 export function votableDuels(duels: Duel[]): Duel[] {
   return duels.filter(needsVote);

@@ -27,6 +27,7 @@ export default function LibraryStackLayout() {
       <Stack.Screen name="reorder" options={{ ...sheet, title: "Reorder books" }} />
       <Stack.Screen name="share" options={{ ...sheet, title: "Share library" }} />
       <Stack.Screen name="book/[key]/index" options={{ ...sheet, title: "Book details" }} />
+      <Stack.Screen name="collection/[id]" options={{ ...sheet, title: "Collection" }} />
       <Stack.Screen name="book/[key]/style" options={{ ...sheet, title: "Card style" }} />
       <Stack.Screen name="book/[key]/cover" options={{ ...sheet, title: "Cover" }} />
     </Stack>
