@@ -110,6 +110,13 @@ export function fetchBallot(code: string, ballotId: string, authenticated: boole
   return apiClient.request<BallotResponse>(`/tierlists/voting/${encodeURIComponent(code)}/ballot/${encodeURIComponent(ballotId)}`, { auth: authenticated });
 }
 
+/** The signed-in account's own ballot, which it holds no id for: openVoting
+ *  seeds the owner's ballot server-side, so the owner's editor has never
+ *  stored one. Resolved from the account, not from the path. */
+export function fetchMyBallot(code: string) {
+  return apiClient.request<BallotResponse>(`/tierlists/voting/${encodeURIComponent(code)}/ballot`, { auth: true });
+}
+
 export function openVoting(id: string, access: "anonymous" | "members") {
   return apiClient.request<{ tierlist: Tierlist; voteCode: string }>(`/tierlists/${id}/open-voting`, { method: "POST", body: { access }, auth: true });
 }

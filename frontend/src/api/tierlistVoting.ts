@@ -88,9 +88,14 @@ export async function submitBallotApi(
   return (await ballotFetch(path, { method: ballotId === null ? "POST" : "PUT", body: JSON.stringify({ placements }) })) as BallotResponse;
 }
 
-/** Public — re-fetches an existing ballot by id. */
-export async function fetchBallotApi(code: string, ballotId: string): Promise<BallotResponse> {
-  return (await ballotFetch(`/tierlists/voting/${encodeURIComponent(code)}/ballot/${encodeURIComponent(ballotId)}`)) as BallotResponse;
+/** Public — re-fetches an existing ballot. A null `ballotId` asks for the
+ *  signed-in account's own ballot, which is the only way the owner can read
+ *  theirs: openVoting seeds it server-side, so no browser ever stored its
+ *  id. 404s when the caller holds no ballot on this poll. */
+export async function fetchBallotApi(code: string, ballotId: string | null): Promise<BallotResponse> {
+  const encodedCode = encodeURIComponent(code);
+  const path = ballotId === null ? `/tierlists/voting/${encodedCode}/ballot` : `/tierlists/voting/${encodedCode}/ballot/${encodeURIComponent(ballotId)}`;
+  return (await ballotFetch(path)) as BallotResponse;
 }
 
 /** Owner-only — the poll's full results, ownership-checked server-side.

@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { Stack, router } from "expo-router";
-import { bookKey, createTier, filterBooks, type TierlistData } from "@scripta/shared";
+import { ballotBoard, bookKey, createTier, filterBooks, type TierlistData } from "@scripta/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Linking from "expo-linking";
 import { FlatList, Pressable, Share, StyleSheet, Text, View } from "react-native";
 import { apiClient } from "../../core/api";
 import { Button, Dialog, EmptyState, ErrorState, IconButton, Input, Menu, type MenuItem, Screen, Segmented, Sheet, Skeleton, Toast, dynamicType, spacing, typography, useTheme } from "../../ui";
-import { fetchTierlistResults, fetchVotingBoard, openVoting, setVotingState, updateTierlist, type Tierlist } from "./api";
+import { fetchMyBallot, fetchTierlistResults, fetchVotingBoard, openVoting, setVotingState, updateTierlist, type Tierlist } from "./api";
 import { moveBookTo } from "./tierBoardData";
 import { TierBoard } from "./TierBoard";
 import { TierlistResults } from "./TierlistResults";
@@ -35,6 +35,10 @@ export function TierlistEditorScreen({ tierlist, onUpdated, startInRank = false 
   const library = useQuery({ queryKey: ["library"], queryFn: () => apiClient.request<LibraryResponse>("/library", { auth: true }), retry: false });
   const board = useQuery({ queryKey: ["tierlists", "voting", current.voteCode], queryFn: () => fetchVotingBoard(current.voteCode!), enabled: Boolean(current.voteCode), retry: false });
   const results = useQuery({ queryKey: ["tierlists", "results", current.id], queryFn: () => fetchTierlistResults(current.id), enabled: Boolean(current.voteCode), retry: false });
+  // Opening voting blanks the tier list document and keeps the owner's own
+  // ranking as a seeded ballot, so `data` alone renders an empty board for
+  // someone who spent an evening sorting it.
+  const myBallot = useQuery({ queryKey: ["tierlists", "ballot", current.voteCode], queryFn: () => fetchMyBallot(current.voteCode!), enabled: Boolean(current.voteCode), retry: false });
 
   // Keyed on the server's own version, not the object: a background refetch
   // hands back an equal-but-new tierlist, and resetting on that threw away
@@ -83,10 +87,11 @@ export function TierlistEditorScreen({ tierlist, onUpdated, startInRank = false 
   const availableBooks = filterBooks(books, bookSearch, "all").filter((book) => !used.has(bookKey(book)));
   const frozen = current.voteCode !== null;
   const ballots = board.data?.board.ballotCount ?? 0;
+  const myPlacements = myBallot.data?.placements ?? null;
+  const boardData = frozen && myPlacements ? ballotBoard(data, myPlacements) : data;
   const save = () => run(() => updateTierlist(current.id, { data }));
   const actionItems: MenuItem[] = frozen
     ? [
-      { label: "Rank a ballot", onPress: () => router.push(`/vote/${current.voteCode}` as never) },
       { label: "Share ballot", onPress: () => void Share.share({ message: Linking.createURL(`/vote/${current.voteCode}`) }) },
       { label: current.votingOpen ? "Close voting" : "Reopen voting", onPress: () => void run(() => setVotingState(current.id, { open: !current.votingOpen })) },
       { label: current.voteAccess === "anonymous" ? "Require members" : "Allow anyone", onPress: () => void run(() => setVotingState(current.id, { access: current.voteAccess === "anonymous" ? "members" : "anonymous" })) },
@@ -109,8 +114,8 @@ export function TierlistEditorScreen({ tierlist, onUpdated, startInRank = false 
     }} />
     {error ? <Toast visible message={error} tone="error" /> : null}
     {frozen ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Vote code <Text style={[styles.strong, { color: colors.text }]}>{current.voteCode}</Text> · {ballots} {ballots === 1 ? "ballot" : "ballots"} · {board.data?.board.eligibleVoteCount ?? 0}/100 eligible voters · {current.votingOpen ? "open" : "closed"}</Text> : null}
-    {frozen ? <Segmented accessibilityLabel="View" options={VOTE_VIEWS} value={view === "results" ? "results" : "board"} onChange={setView} /> : view === "sort" ? <Pressable accessibilityRole="button" accessibilityLabel="Back to board" onPress={() => { setSelectedBookKey(null); setView("board"); }}><Text {...dynamicType} style={[typography.body, { color: colors.accent }]}>‹ Board</Text></Pressable> : data.pool.length > 0 ? <Pressable accessibilityRole="button" accessibilityLabel={`Rank ${data.pool.length} remaining books`} onPress={() => setView("sort")} style={styles.rankLink}><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{data.pool.length} {data.pool.length === 1 ? "book" : "books"} left</Text><Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.accent }]}>Rank remaining →</Text></Pressable> : null}
-    {library.isPending ? <Skeleton height={180} /> : library.isError ? <ErrorState body="Your library couldn't be loaded." actionLabel="Retry" onAction={() => void library.refetch()} /> : frozen && view === "results" ? <View style={styles.results}>{results.isPending ? <Skeleton height={140} /> : results.isError ? <ErrorState title="Results unavailable" actionLabel="Retry" onAction={() => void results.refetch()} /> : <TierlistResults histogram={results.data.histogram} tiers={data.tiers} pool={data.pool} books={books} ballotCount={results.data.ballotCount} />}</View> : !frozen && view === "sort" ? <TierSortDeck data={data} books={books} selectedBookKey={selectedBookKey} onAssign={(key, tierId) => { setData((value) => moveBookTo(value, key, tierId)); if (selectedBookKey || (data.pool.length === 1 && data.pool.includes(key))) { setSelectedBookKey(null); setView("board"); } }} /> : <TierBoard data={data} books={books} onChange={frozen ? () => {} : setData} structureEditable={!frozen} onReassign={frozen ? undefined : (key) => { setSelectedBookKey(key); setView("sort"); }} />}
+    {frozen ? <><Segmented accessibilityLabel="View" options={VOTE_VIEWS} value={view === "results" ? "results" : "board"} onChange={setView} /><Button label={myPlacements?.length ? "Edit your ballot" : "Rank your ballot"} variant="secondary" onPress={() => router.push(`/vote/${current.voteCode}` as never)} /></> : view === "sort" ? <Pressable accessibilityRole="button" accessibilityLabel="Back to board" onPress={() => { setSelectedBookKey(null); setView("board"); }}><Text {...dynamicType} style={[typography.body, { color: colors.accent }]}>‹ Board</Text></Pressable> : data.pool.length > 0 ? <Pressable accessibilityRole="button" accessibilityLabel={`Rank ${data.pool.length} remaining books`} onPress={() => setView("sort")} style={styles.rankLink}><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{data.pool.length} {data.pool.length === 1 ? "book" : "books"} left</Text><Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.accent }]}>Rank remaining →</Text></Pressable> : null}
+    {library.isPending || (frozen && myBallot.isPending) ? <Skeleton height={180} /> : library.isError ? <ErrorState body="Your library couldn't be loaded." actionLabel="Retry" onAction={() => void library.refetch()} /> : frozen && view === "results" ? <View style={styles.results}>{results.isPending ? <Skeleton height={140} /> : results.isError ? <ErrorState title="Results unavailable" actionLabel="Retry" onAction={() => void results.refetch()} /> : <TierlistResults histogram={results.data.histogram} tiers={data.tiers} pool={data.pool} books={books} ballotCount={results.data.ballotCount} />}</View> : !frozen && view === "sort" ? <TierSortDeck data={data} books={books} selectedBookKey={selectedBookKey} onAssign={(key, tierId) => { setData((value) => moveBookTo(value, key, tierId)); if (selectedBookKey || (data.pool.length === 1 && data.pool.includes(key))) { setSelectedBookKey(null); setView("board"); } }} /> : <TierBoard data={boardData} books={books} onChange={frozen ? () => {} : setData} structureEditable={!frozen} poolLabel={frozen ? "Unranked" : "Pool"} onReassign={frozen ? undefined : (key) => { setSelectedBookKey(key); setView("sort"); }} />}
     <Sheet visible={adding} title="Add books" onClose={() => setAdding(false)}>
       <Input label="Search books" value={bookSearch} onChangeText={setBookSearch} placeholder="Title or author" autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" returnKeyType="search" />
       <FlatList data={availableBooks} keyExtractor={bookKey} style={styles.picker} ListEmptyComponent={<EmptyState title={bookSearch ? "Nothing matches" : "No books to add"} />} renderItem={({ item }) => <Pressable accessibilityRole="button" accessibilityLabel={`Add ${String(item.Title ?? "Untitled")}`} onPress={() => setData((value) => ({ ...value, pool: [...value.pool, bookKey(item)] }))} style={styles.bookRow}><Text numberOfLines={1} {...dynamicType} style={[typography.body, { color: colors.text }]}>{String(item.Title ?? "Untitled")}</Text></Pressable>} />

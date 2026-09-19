@@ -12,15 +12,17 @@
 //  3. members-only, signed out — same board, but a "sign in to vote" link
 //                             stands in for Submit (voting itself requires
 //                             an account; ranking locally first doesn't).
-//  4. submitted, or closed  — TierlistResultsView (Task 9's pure aggregate,
-//                             no further network calls to switch modes).
+//  4. already voted, or closed — TierlistResultsView (Task 9's pure
+//                             aggregate, no further network calls to switch
+//                             modes), plus an "Edit ballot" button while
+//                             voting is open.
 //
-// "Submitted" here means THIS SESSION explicitly submitted (the hook's
-// `ballot` state) — a returning voter in a fresh session sees the board
-// again and can resubmit; the backend resolves that to an edit of their
-// existing ballot (by account, or by the localStorage ballot id for an
-// anonymous voter — see useTierlistVoting.ts's own comment), never a
-// second ballot, so this is a UX simplification, not a correctness gap.
+// "Already voted" covers any earlier session too, not just this one: the
+// hook re-fetches whatever ballot the caller holds (by account, or by the
+// localStorage ballot id for an anonymous voter). Editing one loads it back
+// onto the board, so a returning voter adjusts their ranking instead of
+// rebuilding it from an empty board.
+import { ballotBoard, blankBoard } from "@scripta/shared";
 import { useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import type { PublicBookData } from "../api/sharedMurals";
@@ -49,15 +51,6 @@ function toPrivateBook(pub: PublicBookData): Record<string, unknown> {
   };
 }
 
-/** The board a voter starts from: the frozen tier structure with every
- *  tier emptied, so every pool book starts unranked. */
-function blankBoard(board: { tiers: Array<{ id: string; label: string; color: string }>; pool: string[] }): TierlistData {
-  return {
-    tiers: board.tiers.map((t) => ({ ...t, bookKeys: [] })),
-    pool: board.pool
-  };
-}
-
 function InfoScreen({ message }: { message: string }) {
   return (
     <div className="flex min-h-screen items-center justify-center px-5 text-center">
@@ -70,8 +63,9 @@ export function VoteTierlistPage() {
   const { code } = useParams<{ code: string }>();
   const location = useLocation();
   const { session } = useAuth();
-  const { board, books: publicBooks, isLoading, error, ballot, submit } = useTierlistVoting(code ?? "");
+  const { board, books: publicBooks, isLoading, error, ballot, justSubmitted, submit } = useTierlistVoting(code ?? "");
   const [working, setWorking] = useState<TierlistData | null>(null);
+  const [editing, setEditing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -85,19 +79,32 @@ export function VoteTierlistPage() {
   const books = publicBooks.map((b) => toPrivateBook(b as unknown as PublicBookData));
   const signedIn = Boolean(session);
   const alreadySubmitted = ballot !== null;
-  const showResults = alreadySubmitted || !board.votingOpen;
+  const showResults = (alreadySubmitted || !board.votingOpen) && !editing;
 
   if (showResults) {
     // board.histogram is only ever present on a CLOSED poll — while voting
     // is open the backend withholds it, and the only histogram this page
-    // has is the one that came back with the ballot it just submitted.
+    // has is the one that came back with the caller's own ballot.
     const histogram = ballot?.results.histogram ?? board.histogram ?? [];
     const ballotCount = ballot?.results.ballotCount ?? board.ballotCount;
     return (
       <div className="mx-auto max-w-5xl px-5 py-8">
-        <h1 className="mb-1 text-lg font-bold">{board.name}</h1>
+        <header className="mb-1 flex items-center justify-between gap-3">
+          <h1 className="min-w-0 flex-1 truncate text-lg font-bold">{board.name}</h1>
+          {ballot && board.votingOpen && (
+            <button
+              onClick={() => {
+                setWorking(ballotBoard(board, ballot.placements));
+                setEditing(true);
+              }}
+              className="min-h-9 shrink-0 rounded-lg border border-(--color-border) px-3 text-sm font-semibold"
+            >
+              Edit ballot
+            </button>
+          )}
+        </header>
         <p className="mb-4 text-sm text-(--color-text-dim)">
-          {alreadySubmitted && "Your ballot is in. "}
+          {justSubmitted ? "Your ballot is in. " : alreadySubmitted ? "You've already ranked this one. " : ""}
           {board.promotedAt ? "Permanent public reference." : board.votingOpen ? "Voting is still open." : "Voting is closed."}
         </p>
         <TierlistResultsView
@@ -112,7 +119,7 @@ export function VoteTierlistPage() {
     );
   }
 
-  const data = working ?? blankBoard(board);
+  const data = working ?? (ballot && editing ? ballotBoard(board, ballot.placements) : blankBoard(board));
   const membersOnlyBlocked = board.access === "members" && !signedIn;
 
   async function handleSubmit() {
@@ -120,6 +127,7 @@ export function VoteTierlistPage() {
     setSubmitting(true);
     try {
       await submit(toPlacements(data));
+      setEditing(false);
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "Couldn't submit your ballot.");
     } finally {
@@ -140,13 +148,26 @@ export function VoteTierlistPage() {
             Sign in to vote
           </Link>
         ) : (
-          <button
-            onClick={() => void handleSubmit()}
-            disabled={submitting || toPlacements(data).length === 0}
-            className="min-h-9 shrink-0 rounded-lg bg-(--color-accent) px-3 text-sm font-semibold text-white disabled:opacity-60"
-          >
-            {submitting ? "Submitting…" : "Submit ballot"}
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            {editing && (
+              <button
+                onClick={() => {
+                  setWorking(null);
+                  setEditing(false);
+                }}
+                className="min-h-9 rounded-lg border border-(--color-border) px-3 text-sm font-semibold"
+              >
+                Cancel
+              </button>
+            )}
+            <button
+              onClick={() => void handleSubmit()}
+              disabled={submitting || toPlacements(data).length === 0}
+              className="min-h-9 rounded-lg bg-(--color-accent) px-3 text-sm font-semibold text-white disabled:opacity-60"
+            >
+              {submitting ? "Submitting…" : editing ? "Update ballot" : "Submit ballot"}
+            </button>
+          </div>
         )}
       </header>
       <p className="mb-4 text-sm text-(--color-text-dim)">
