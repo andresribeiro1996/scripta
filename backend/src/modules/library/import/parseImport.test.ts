@@ -71,6 +71,7 @@ async function testApp() {
     },
     share: () => { throw new Error("not used"); },
     unshare: () => undefined,
+    addBook: () => { throw new Error("not used"); },
     getPublicByToken: () => null
   };
   const app = Fastify();

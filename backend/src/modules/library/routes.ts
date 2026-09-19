@@ -59,11 +59,20 @@ export function rejectOversizedImport(
 // blob; it doesn't try to understand a book's shape.
 const saveLibrarySchema = z.object({
   updatedAt: z.string().datetime().optional(),
+  source: z.enum(["import"]).optional(),
   data: z
     .object({
       books: z.array(z.unknown())
     })
     .passthrough()
+});
+
+const addBookSchema = z.object({
+  title: z.string().min(1),
+  author: z.string().min(1),
+  isbn: z.string().min(1).nullable().optional(),
+  coverUrl: z.string().min(1).nullable().optional(),
+  readStatus: z.union([z.literal(0), z.literal(1), z.literal(2)])
 });
 
 /** The authenticated surface — get/save/share/unshare, all behind
@@ -101,11 +110,26 @@ export function buildLibraryRoutes(service: LibraryService) {
         });
       }
       try {
-        const library = service.saveLibrary(request.user.id, parsed.data.data, parsed.data.updatedAt);
+        const library = service.saveLibrary(request.user.id, parsed.data.data, parsed.data.updatedAt, parsed.data.source);
         return reply.send(library);
       } catch (error) {
         if (error instanceof LibraryConflictError) {
           return reply.code(409).send({ error: error.message, current: service.getLibrary(request.user.id) });
+        }
+        throw error;
+      }
+    });
+
+    app.post("/library/books", { preHandler: authGuard }, async (request, reply) => {
+      const parsed = addBookSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: "Expected { title, author, readStatus } — isbn/coverUrl optional." });
+      }
+      try {
+        return reply.send(service.addBook(request.user.id, parsed.data));
+      } catch (error) {
+        if (error instanceof LibraryConflictError) {
+          return reply.code(409).send({ error: error.message });
         }
         throw error;
       }

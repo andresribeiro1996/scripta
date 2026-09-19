@@ -19,55 +19,76 @@ function DuelSideCard({
   totalVotes,
   isWinner,
   canVote,
-  onVote
+  onVote,
+  onAddBook
 }: {
   side: DuelSide;
   totalVotes: number;
   isWinner: boolean;
   canVote: boolean;
   onVote: () => void;
+  onAddBook?: (side: DuelSide) => void;
 }) {
   const pct = totalVotes > 0 ? Math.round((side.votes / totalVotes) * 100) : 0;
   const coverImageBook = useMemo(
     () => ({ Title: side.title, Attribution: side.author, _coverUrl: side.cover ?? undefined }),
     [side.title, side.author, side.cover]
   );
+  // The vote button cannot also host the "+" affordance — a button
+  // can't nest another button — so the wrapper carries the flex sizing
+  // the button used to hold and the "+" sits as an absolute sibling.
   return (
-    <button
-      onClick={onVote}
-      disabled={!canVote}
-      className={`group relative flex flex-1 flex-col overflow-hidden rounded-xl border-2 text-left transition-colors ${
-        isWinner ? "border-(--color-accent)" : "border-(--color-border)"
-      } ${canVote ? "cursor-pointer hover:border-(--color-accent)" : "cursor-default"}`}
-    >
-      {/* max-h caps how tall a full-width 2:3 cover can get. Two of
-          these sit side by side, so on a phone each is ~160px wide and
-          the untamed aspect ratio made it ~240px tall — a single duel
-          then filled most of the viewport, and a round of eight was an
-          enormous scroll. The cap crops rather than letterboxes
-          (CoverImage uses object-cover), which loses a little art but
-          keeps a whole match on screen. */}
-      <div className="relative aspect-2/3 max-h-36 w-full bg-(--color-border) sm:max-h-56">
-        <CoverImage book={coverImageBook} />
-      </div>
-      <div className="p-2.5 sm:p-3">
-        <h4 className="truncate text-sm font-semibold">{side.title}</h4>
-        <p className="truncate text-xs text-(--color-text-dim)">{side.author}</p>
-        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-(--color-border)">
-          <div className="h-full bg-(--color-accent)" style={{ width: `${pct}%` }} />
+    <div className="relative flex flex-1 flex-col">
+      <button
+        onClick={onVote}
+        disabled={!canVote}
+        className={`group relative flex w-full flex-1 flex-col overflow-hidden rounded-xl border-2 text-left transition-colors ${
+          isWinner ? "border-(--color-accent)" : "border-(--color-border)"
+        } ${canVote ? "cursor-pointer hover:border-(--color-accent)" : "cursor-default"}`}
+      >
+        {/* max-h caps how tall a full-width 2:3 cover can get. Two of
+            these sit side by side, so on a phone each is ~160px wide and
+            the untamed aspect ratio made it ~240px tall — a single duel
+            then filled most of the viewport, and a round of eight was an
+            enormous scroll. The cap crops rather than letterboxes
+            (CoverImage uses object-cover), which loses a little art but
+            keeps a whole match on screen. */}
+        <div className="relative aspect-2/3 max-h-36 w-full bg-(--color-border) sm:max-h-56">
+          <CoverImage book={coverImageBook} />
         </div>
-        <p className="mt-1 text-xs text-(--color-text-dim)">
-          {side.votes} vote{side.votes === 1 ? "" : "s"} ({pct}%)
-        </p>
-      </div>
-    </button>
+        <div className="p-2.5 sm:p-3">
+          <h4 className="truncate text-sm font-semibold">{side.title}</h4>
+          <p className="truncate text-xs text-(--color-text-dim)">{side.author}</p>
+          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-(--color-border)">
+            <div className="h-full bg-(--color-accent)" style={{ width: `${pct}%` }} />
+          </div>
+          <p className="mt-1 text-xs text-(--color-text-dim)">
+            {side.votes} vote{side.votes === 1 ? "" : "s"} ({pct}%)
+          </p>
+        </div>
+      </button>
+      {onAddBook && (
+        <button
+          type="button"
+          aria-label={`Add ${side.title} to your library`}
+          onClick={(event) => {
+            event.stopPropagation();
+            onAddBook(side);
+          }}
+          className="absolute right-1.5 top-1.5 z-10 rounded-full bg-black/50 px-2 py-0.5 text-sm font-bold text-white"
+        >
+          +
+        </button>
+      )}
+    </div>
   );
 }
 
 export function DuelCard({
   duel,
   onVote,
-  votingDisabledReason
+  votingDisabledReason,
+  onAddBook
 }: {
   duel: Duel;
   onVote: (bookKey: string) => void;
@@ -75,6 +96,9 @@ export function DuelCard({
    *  duel settled, tournament not active) — shown instead of the
    *  countdown. */
   votingDisabledReason: string | null;
+  /** Present on each side card as the "+" overlay opening the host
+   *  page's AddBookSheet — omitted by any host that doesn't want it. */
+  onAddBook?: (side: DuelSide) => void;
 }) {
   const countdown = useCountdown(duel.closesAt);
   const totalVotes = duel.bookA.votes + duel.bookB.votes;
@@ -101,6 +125,7 @@ export function DuelCard({
           isWinner={duel.winnerKey === duel.bookA.key}
           canVote={canVote}
           onVote={() => onVote(duel.bookA.key)}
+          onAddBook={onAddBook}
         />
         <div className="flex items-center px-1 text-sm font-bold text-(--color-text-dim)">VS</div>
         <DuelSideCard
@@ -109,6 +134,7 @@ export function DuelCard({
           isWinner={duel.winnerKey === duel.bookB.key}
           canVote={canVote}
           onVote={() => onVote(duel.bookB.key)}
+          onAddBook={onAddBook}
         />
       </div>
     </div>

@@ -6,8 +6,9 @@
 
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { renameTournament, resolveTiebreak, settleDuelEarly } from "../api/arena";
+import { renameTournament, resolveTiebreak, settleDuelEarly, type DuelSide } from "../api/arena";
 import { useAuth } from "../auth/AuthContext";
+import { AddBookSheet } from "../components/AddBookSheet";
 import { BracketMap } from "../components/arena/BracketMap";
 import { TournamentStatusBadge } from "../components/arena/TournamentStatusBadge";
 import { BracketTree } from "../components/arena/BracketTree";
@@ -25,6 +26,7 @@ export function ArenaViewPage() {
   const [view, setView] = useState<"matches" | "bracket">("matches");
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
+  const [picked, setPicked] = useState<DuelSide | null>(null);
 
   if (isLoading) {
     return (
@@ -203,7 +205,12 @@ export function ArenaViewPage() {
           const votingDisabledReason = duel.hasVoted ? "You already voted" : tournament.status !== "active" ? "Tournament not active" : null;
           return (
             <div>
-              <DuelCard duel={duel} onVote={(bookKey) => void handleVote(duel.id, bookKey)} votingDisabledReason={votingDisabledReason} />
+              <DuelCard
+                duel={duel}
+                onVote={(bookKey) => void handleVote(duel.id, bookKey)}
+                votingDisabledReason={votingDisabledReason}
+                onAddBook={setPicked}
+              />
               {isOwner && duel.status === "active" && (
                 <button
                   onClick={() => void handleSettle(duel.id)}
@@ -235,6 +242,12 @@ export function ArenaViewPage() {
           );
         }}
       />
+      )}
+      {picked && (
+        <AddBookSheet
+          book={{ title: picked.title, author: picked.author, isbn: null, coverUrl: picked.cover ?? null }}
+          onClose={() => setPicked(null)}
+        />
       )}
     </div>
   );

@@ -8,9 +8,13 @@ export function useLibrary() {
   const queryClient = useQueryClient();
   const query = useQuery({ queryKey: ["library"], queryFn: fetchLibrary });
 
-  async function updateLibrary(updater: (current: LibraryData) => LibraryData, base?: LibraryDocument): Promise<LibraryDocument> {
+  async function updateLibrary(
+    updater: (current: LibraryData) => LibraryData,
+    base?: LibraryDocument,
+    source?: "import"
+  ): Promise<LibraryDocument> {
     const current = base ?? queryClient.getQueryData<LibraryDocument | null>(["library"]);
-    const saved = await saveLibraryUpdate(current, updater, fetchLibrary, saveLibrary);
+    const saved = await saveLibraryUpdate(current, updater, fetchLibrary, saveLibrary, source);
     queryClient.setQueryData(["library"], saved);
     return saved;
   }

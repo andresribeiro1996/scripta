@@ -7,6 +7,7 @@ import { RefreshControl, ScrollView, Share, StyleSheet, View } from "react-nativ
 import { createVoterToken } from "@scripta/shared";
 import { useAuth } from "../../core/auth";
 import { Button, Dialog, EmptyState, ErrorState, IconButton, Input, Menu, Screen, Skeleton, SwipeableTabs, Toast, spacing } from "../../ui";
+import { AddBookSheet } from "../community/AddBookSheet";
 import { fetchTournament, renameTournament, resolveTiebreak, settleDuelEarly, voteOnDuel } from "./api";
 import { arenaViewTabs, matchEmptyCopy, votableDuels, type ArenaViewTab } from "./arenaView";
 import { ArenaVoteDeck } from "./ArenaVoteDeck";
@@ -25,7 +26,13 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState("");
   const [booksOpen, setBooksOpen] = useState(false);
+  const [addBook, setAddBook] = useState<{ title: string; author: string; coverUrl?: string | null } | null>(null);
   const [, setTick] = useState(0);
+
+  function openAddBook(book: { title: string; author: string; coverUrl?: string | null }) {
+    setBooksOpen(false);
+    setAddBook(book);
+  }
 
   useEffect(() => {
     void AsyncStorage.getItem(TOKEN_KEY).then(async (stored) => {
@@ -139,7 +146,8 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
         renderPage={(pageTab) => pageTab === "match" ? matchPane() : bracketPane()}
       />
       <Button label={data.slots.length ? `See all ${data.slots.length} books` : "View book pool"} variant="secondary" onPress={() => setBooksOpen(true)} />
-      <ArenaBooksSheet id={booksOpen ? id : null} name={data.name} onClose={() => setBooksOpen(false)} />
+      <ArenaBooksSheet id={booksOpen ? id : null} name={data.name} onAddBook={openAddBook} onClose={() => setBooksOpen(false)} />
+      {addBook ? <AddBookSheet book={addBook} onClose={() => setAddBook(null)} /> : null}
       <Dialog visible={renaming} title="Rename tournament" onClose={() => setRenaming(false)}><View style={styles.dialog}><Input label="Tournament name" value={name} onChangeText={setName} maxLength={200} /><Button label="Save name" disabled={!name.trim()} loading={busy === "rename"} onPress={() => void action("rename", async () => { await renameTournament(id, name.trim()); setRenaming(false); })} /></View></Dialog>
     </Screen>
   );

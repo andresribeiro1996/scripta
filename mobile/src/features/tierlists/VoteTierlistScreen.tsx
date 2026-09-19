@@ -3,10 +3,11 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ballotBoard, blankBoard, toPlacements, type TierlistData } from "@scripta/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { router, Stack } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { useAuth } from "../../core/auth";
-import { Button, ErrorState, Screen, Skeleton, Toast, dynamicType, spacing, typography, useTheme } from "../../ui";
-import { fetchBallot, fetchMyBallot, fetchVotingBoard, submitBallot, type BallotResponse } from "./api";
+import { Button, ErrorState, Screen, Sheet, Skeleton, Toast, dynamicType, spacing, typography, useTheme } from "../../ui";
+import { AddBookSheet } from "../community/AddBookSheet";
+import { fetchBallot, fetchMyBallot, fetchVotingBoard, submitBallot, type BallotResponse, type PublicBook } from "./api";
 import { keyOf, TierBoard, type TierBook } from "./TierBoard";
 import { TierlistResults } from "./TierlistResults";
 import { TierSortDeck } from "./TierSortDeck";
@@ -26,6 +27,8 @@ export function VoteTierlistScreen({ code }: { code: string }) {
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [booksOpen, setBooksOpen] = useState(false);
+  const [addBook, setAddBook] = useState<PublicBook | null>(null);
   const boardQuery = useQuery({ queryKey: ["tierlists", "voting", code], queryFn: () => fetchVotingBoard(code), enabled: Boolean(code), retry: false });
 
   useEffect(() => { void AsyncStorage.getItem(storageKey(code)).then(setStoredId); }, [code]);
@@ -67,15 +70,33 @@ export function VoteTierlistScreen({ code }: { code: string }) {
     }
   }
 
+  function openAddBook(book: PublicBook) {
+    setBooksOpen(false);
+    setAddBook(book);
+  }
+
   return <Screen bottom top={false} style={styles.screen}>
     <Stack.Screen options={{ headerShown: true, title: board.name }} />
     <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{board.promotedAt ? "Permanent public reference" : board.votingOpen ? "Voting is open." : "Voting is closed."}</Text>
     {error ? <Toast visible message={error} tone="error" /> : null}
-    {showResults ? <><View style={styles.row}>{ballot && board.votingOpen ? <Button label="Edit ballot" variant="secondary" onPress={() => { setWorking(ballotBoard(cleanBoard, ballot.placements)); setEditing(true); }} /> : null}</View><TierlistResults histogram={ballot?.results.histogram ?? board.histogram ?? []} tiers={board.tiers} pool={cleanBoard.pool} books={books} ballotCount={ballot?.results.ballotCount ?? board.ballotCount} /></> : <>
-      <View style={styles.row}>{blocked ? <Button label="Sign in to vote" onPress={() => router.push({ pathname: "/(public)/login", params: { returnTo: `/vote/${code}` } } as never)} /> : <Button label={storedId ? "Update ballot" : "Submit ballot"} loading={busy} disabled={!toPlacements(data).length} onPress={submit} />}{editing ? <Button label="Cancel edit" variant="secondary" onPress={() => setEditing(false)} /> : null}</View>
+    {showResults ? <><View style={styles.row}>{ballot && board.votingOpen ? <Button label="Edit ballot" variant="secondary" onPress={() => { setWorking(ballotBoard(cleanBoard, ballot.placements)); setEditing(true); }} /> : null}<Button label="Books" variant="secondary" onPress={() => setBooksOpen(true)} /></View><TierlistResults histogram={ballot?.results.histogram ?? board.histogram ?? []} tiers={board.tiers} pool={cleanBoard.pool} books={books} ballotCount={ballot?.results.ballotCount ?? board.ballotCount} /></> : <>
+      <View style={styles.row}>{blocked ? <Button label="Sign in to vote" onPress={() => router.push({ pathname: "/(public)/login", params: { returnTo: `/vote/${code}` } } as never)} /> : <Button label={storedId ? "Update ballot" : "Submit ballot"} loading={busy} disabled={!toPlacements(data).length} onPress={submit} />}{editing ? <Button label="Cancel edit" variant="secondary" onPress={() => setEditing(false)} /> : null}<Button label="Books" variant="secondary" onPress={() => setBooksOpen(true)} /></View>
       {view === "rank" ? <Pressable accessibilityRole="button" accessibilityLabel="Back to board" onPress={() => { setSelectedBookKey(null); setView("board"); }}><Text {...dynamicType} style={[typography.body, { color: colors.accent }]}>‹ Board</Text></Pressable> : data.pool.length > 0 ? <Pressable accessibilityRole="button" accessibilityLabel={`Rank ${data.pool.length} remaining books`} onPress={() => setView("rank")} style={styles.rankLink}><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{data.pool.length} {data.pool.length === 1 ? "book" : "books"} left</Text><Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.accent }]}>Rank remaining →</Text></Pressable> : null}
       {view === "rank" ? <TierSortDeck data={data} books={books} selectedBookKey={selectedBookKey} onAssign={(key, tierId) => { setWorking(moveBookTo(data, key, tierId)); if (selectedBookKey || (data.pool.length === 1 && data.pool.includes(key))) { setSelectedBookKey(null); setView("board"); } }} /> : <TierBoard data={data} books={books} onChange={setWorking} structureEditable={false} poolLabel="Unranked" onReassign={(key) => { setSelectedBookKey(key); setView("rank"); }} />}
     </>}
+    <Sheet visible={booksOpen} title="Books" onClose={() => setBooksOpen(false)}>
+      <FlatList
+        data={boardQuery.data.books}
+        keyExtractor={(book, index) => book.key ?? `${book.title}-${index}`}
+        style={styles.list}
+        contentContainerStyle={styles.listContent}
+        renderItem={({ item }) => <Pressable accessibilityLabel={`${item.title} by ${item.author ?? ""}`} onPress={() => openAddBook(item)} style={styles.bookRow}>
+          <Text numberOfLines={2} {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{item.title}</Text>
+          <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{item.author ?? ""}</Text>
+        </Pressable>}
+      />
+    </Sheet>
+    {addBook ? <AddBookSheet book={{ title: addBook.title, author: addBook.author ?? "", isbn: addBook.isbn ?? null, coverUrl: addBook.coverUrl ?? null }} onClose={() => setAddBook(null)} /> : null}
   </Screen>;
 }
 
@@ -84,4 +105,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   rankLink: { minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   strong: { fontWeight: "700" },
+  list: { flexGrow: 0 },
+  listContent: { gap: spacing.md, paddingBottom: spacing.md },
+  bookRow: { gap: spacing.xs },
 });

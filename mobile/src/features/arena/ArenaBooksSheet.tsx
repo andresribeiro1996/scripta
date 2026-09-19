@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { FlatList, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { EmptyState, ErrorState, Sheet, Skeleton, dynamicType, spacing, typography, useTheme } from "../../ui";
 import { fetchTournament } from "./api";
 import { BookCover } from "./BookCover";
 
-export function ArenaBooksSheet({ id, name, onClose }: { id: string | null; name: string; onClose: () => void }) {
+export function ArenaBooksSheet({ id, name, onAddBook, onClose }: { id: string | null; name: string; onAddBook: (book: { title: string; author: string; coverUrl?: string | null }) => void; onClose: () => void }) {
   const { colors } = useTheme();
   const tournament = useQuery({ queryKey: ["arena", id, "preview"], queryFn: () => fetchTournament(id!), enabled: Boolean(id), retry: false });
 
@@ -16,13 +16,13 @@ export function ArenaBooksSheet({ id, name, onClose }: { id: string | null; name
         style={styles.list}
         contentContainerStyle={styles.content}
         ListEmptyComponent={<EmptyState title="No books seeded" body="Books will appear when the bracket is filled." />}
-        renderItem={({ item }) => <View style={styles.book}>
+        renderItem={({ item }) => <Pressable accessibilityLabel={`${item.title} by ${item.author}`} onPress={() => onAddBook({ title: item.title, author: item.author, coverUrl: item.cover ?? null })} style={styles.book}>
           <BookCover cover={item.cover} title={item.title} width={46} height={66} />
           <View style={styles.text}>
             <Text numberOfLines={2} {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{item.title}</Text>
             <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{item.author}</Text>
           </View>
-        </View>}
+        </Pressable>}
       />}
   </Sheet>;
 }

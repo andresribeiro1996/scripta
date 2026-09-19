@@ -20,6 +20,11 @@ const discoverQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20),
   offset: z.coerce.number().int().min(0).default(0)
 });
+const feedSettingsSchema = z.object({ publications: z.boolean(), reading: z.boolean(), votes: z.boolean(), follows: z.boolean() });
+const activityQuerySchema = z.object({
+  cursor: z.string().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(20)
+});
 
 function statusForCommunityError(err: CommunityError): number {
   if (err instanceof ProfileNotFoundError) return 404;
@@ -69,6 +74,13 @@ export function buildCommunityRoutes(service: CommunityService) {
       return reply.code(204).send();
     });
 
+    app.put("/community/profile/feed-settings", { preHandler: authGuard }, async (request, reply) => {
+      const parsed = feedSettingsSchema.safeParse(request.body);
+      if (!parsed.success) return reply.code(400).send({ error: "Expected { publications, reading, votes, follows } booleans." });
+      service.updateFeedSettings(request.user.id, parsed.data);
+      return reply.code(204).send();
+    });
+
     app.get("/community/dashboard", { preHandler: authGuard }, async (request, reply) => {
       const parsed = dashboardQuerySchema.safeParse(request.query);
       if (!parsed.success) return reply.code(400).send({ error: "Invalid cursor/limit." });
@@ -104,6 +116,21 @@ export function buildPublicCommunityRoutes(service: CommunityService) {
         return reply.send(view);
       } catch (err) {
         if (err instanceof ProfileNotFoundError) return reply.code(404).send({ error: "No published profile at that address." });
+        throw err;
+      }
+    });
+
+    app.get("/community/profiles/:username/activity", async (request, reply) => {
+      const { username } = request.params as { username: string };
+      const parsed = activityQuerySchema.safeParse(request.query);
+      if (!parsed.success) return reply.code(400).send({ error: "Invalid activity query." });
+      try {
+        const viewer = getOptionalAuthenticatedUser(request);
+        const page = service.getActivity(username, viewer?.id, parsed.data.cursor, parsed.data.limit);
+        reply.header("Cache-Control", "no-store");
+        return reply.send(page);
+      } catch (err) {
+        if (err instanceof CommunityError) return reply.code(statusForCommunityError(err)).send({ error: err.message });
         throw err;
       }
     });

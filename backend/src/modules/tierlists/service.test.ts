@@ -546,6 +546,53 @@ test("openVoting emits exactly one publish event for the same tier list", () => 
   assert.deepEqual(emitted, [[copy.id, "u1"]]);
 });
 
+test("a first signed-in ballot emits voted_on once", () => {
+  const emitted: Array<[string, string, string, number]> = [];
+  const service = createTierlistsService(createInMemoryRepo(), undefined, (voterUserId, tierlistId, tierlistName, placementCount) => {
+    emitted.push([voterUserId, tierlistId, tierlistName, placementCount]);
+  });
+  const { code, tierIds } = openPoll(service);
+  const tierlistId = service.getVotingBoard(code)!.id;
+
+  const outcome = service.submitBallot(
+    code,
+    [
+      { bookKey: "b1", tierId: tierIds[0]! },
+      { bookKey: "b2", tierId: tierIds[1]! }
+    ],
+    { kind: "user", userId: "u7" }
+  );
+
+  assert.equal(outcome.ok, true);
+  assert.deepEqual(emitted, [["u7", tierlistId, "Fantasy", 2]]);
+});
+
+test("editing a signed-in ballot emits no second voted_on", () => {
+  const emitted: Array<[string, string, string, number]> = [];
+  const service = createTierlistsService(createInMemoryRepo(), undefined, (voterUserId, tierlistId, tierlistName, placementCount) => {
+    emitted.push([voterUserId, tierlistId, tierlistName, placementCount]);
+  });
+  const { code, tierIds } = openPoll(service);
+
+  service.submitBallot(code, [{ bookKey: "b1", tierId: tierIds[0]! }], { kind: "user", userId: "u7" });
+  service.submitBallot(code, [{ bookKey: "b1", tierId: tierIds[1]! }], { kind: "user", userId: "u7" });
+
+  assert.equal(emitted.length, 1);
+});
+
+test("an anonymous first ballot emits no voted_on", () => {
+  const emitted: Array<[string, string, string, number]> = [];
+  const service = createTierlistsService(createInMemoryRepo(), undefined, (voterUserId, tierlistId, tierlistName, placementCount) => {
+    emitted.push([voterUserId, tierlistId, tierlistName, placementCount]);
+  });
+  const { code, tierIds } = openPoll(service);
+
+  const outcome = service.submitBallot(code, [{ bookKey: "b1", tierId: tierIds[0]! }], { kind: "anonymous", ballotId: null });
+
+  assert.equal(outcome.ok, true);
+  assert.deepEqual(emitted, []);
+});
+
 test("published refs carry origin creator and timestamps", () => {
   const service = makeService();
   const ordinary = service.createTierlist("u1", "Private list");

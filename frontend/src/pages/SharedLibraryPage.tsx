@@ -17,10 +17,11 @@
 // Style/Cover button or selection checkbox renders at all) rather than
 // duplicating a second copy of that markup with a "read-only" flag bolted
 // on.
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 import { fetchSharedLibrary } from "../api/sharedLibrary";
+import { AddBookSheet } from "../components/AddBookSheet";
 import { BookCard } from "../components/BookCard";
 import { BookGrid } from "../components/BookGrid";
 import { LibraryCanvas } from "../components/LibraryCanvas";
@@ -39,6 +40,7 @@ function InfoScreen({ message }: { message: string }) {
 
 export function SharedLibraryPage() {
   const { token } = useParams<{ token: string }>();
+  const [selected, setSelected] = useState<Record<string, unknown> | null>(null);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["sharedLibrary", token],
@@ -75,10 +77,21 @@ export function SharedLibraryPage() {
         <LibraryCanvas style={style}>
           <BookGrid style={style}>
             {displayBooks.map((book, i) => (
-              <BookCard key={String(book.ContentID ?? bookKey(book) ?? i)} book={book} onClick={() => {}} style={style} />
+              <BookCard key={String(book.ContentID ?? bookKey(book) ?? i)} book={book} onClick={() => setSelected(book)} style={style} />
             ))}
           </BookGrid>
         </LibraryCanvas>
+      )}
+      {selected && (
+        <AddBookSheet
+          book={{
+            title: String(selected.Title ?? ""),
+            author: String(selected.Attribution ?? ""),
+            isbn: selected.ISBN == null ? null : String(selected.ISBN),
+            coverUrl: typeof selected._coverUrl === "string" ? selected._coverUrl : null
+          }}
+          onClose={() => setSelected(null)}
+        />
       )}
     </PageContainer>
   );

@@ -123,14 +123,23 @@ export function LibraryPage() {
   // additive series auto-seed (lib/groups.ts), and one PUT. Because the
   // manual-add path funnels through here too, adding a book you already
   // have updates it in place instead of duplicating it.
-  async function mergeAndSave(parsed: LibraryData) {
+  //
+  // `source: "import"` marks the bulk paths (file import, Goodreads
+  // re-sync) so the backend's save diff skips book-event emission for
+  // them — a re-import of the same file is housekeeping, not reading
+  // activity. The manual add passes no source, so its save still emits.
+  async function mergeAndSave(parsed: LibraryData, source?: "import") {
     // Read the freshest cached copy, not a stale closure — same
     // reasoning as handleRenameLibrary above.
-    await updateLibrary((existing) => {
-      const merged = mergeLibraryData(existing, parsed);
-      const ordered = { ...merged, books: assignBookOrder(merged.books) };
-      return { ...ordered, groups: deriveSeriesGroups(ordered.books, ordered.groups ?? []) };
-    });
+    await updateLibrary(
+      (existing) => {
+        const merged = mergeLibraryData(existing, parsed);
+        const ordered = { ...merged, books: assignBookOrder(merged.books) };
+        return { ...ordered, groups: deriveSeriesGroups(ordered.books, ordered.groups ?? []) };
+      },
+      undefined,
+      source
+    );
   }
 
   async function handleFileChosen(file: File) {
@@ -139,7 +148,7 @@ export function LibraryPage() {
     // a beat — worth a status message rather than a silent pause.
     setImportStatus(file.name.toLowerCase().endsWith(".sqlite") || file.name.toLowerCase().endsWith(".db") ? "Reading SQLite database…" : "Reading file…");
     try {
-      await mergeAndSave(await parseImportedFile(file));
+      await mergeAndSave(await parseImportedFile(file), "import");
     } catch (err) {
       setImportError(err instanceof Error ? err.message : "Couldn't import that file.");
     } finally {
@@ -681,7 +690,7 @@ export function LibraryPage() {
 
       {syncingGoodreads && (
         <SyncGoodreadsModal
-          onFile={async (file) => mergeAndSave(await parseImportedFile(file))}
+          onFile={async (file) => mergeAndSave(await parseImportedFile(file), "import")}
           onClose={() => setSyncingGoodreads(false)}
         />
       )}

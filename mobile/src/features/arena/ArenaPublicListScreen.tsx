@@ -4,6 +4,7 @@ import { Stack, router } from "expo-router";
 import { Image } from "expo-image";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { Button, EmptyState, ErrorState, Screen, Skeleton, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { AddBookSheet } from "../community/AddBookSheet";
 import { fetchPublicTierlists } from "../tierlists/api";
 import { fetchPublicTournaments } from "./api";
 import { ArenaBooksSheet } from "./ArenaBooksSheet";
@@ -13,6 +14,7 @@ type PublicItem = { key: string; name: string; detail: string; kind: "tournament
 export function ArenaPublicListScreen() {
   const { colors } = useTheme();
   const [preview, setPreview] = useState<PublicItem | null>(null);
+  const [addBook, setAddBook] = useState<{ title: string; author: string; coverUrl?: string | null } | null>(null);
   const tournaments = useQuery({ queryKey: ["arena", "public"], queryFn: fetchPublicTournaments, retry: false });
   const tierlists = useQuery({ queryKey: ["tierlists", "public"], queryFn: fetchPublicTierlists, retry: false });
   const items: PublicItem[] = [...(tournaments.data ?? []).map((item) => ({ key: `a:${item.id}`, name: item.name, detail: `${item.bracketSize} books · ${item.status}`, kind: "tournament" as const, target: `/arena/${item.id}`, covers: item.covers, bookCount: item.filledSlots, tournamentId: item.id })), ...(tierlists.data ?? []).map((item) => ({ key: `t:${item.voteCode}`, name: item.name, detail: `${item.poolSize} books · ${item.ballotCount} ballots${item.votingOpen ? "" : " · closed"}`, kind: "tierlist" as const, target: `/vote/${item.voteCode}` }))];
@@ -30,7 +32,8 @@ export function ArenaPublicListScreen() {
       </Pressable>
       {item.tournamentId ? <Pressable accessibilityRole="button" accessibilityLabel={`See all ${item.bookCount} books in ${item.name}`} onPress={() => setPreview(item)} style={styles.previewAction}><Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.accent }]}>See all {item.bookCount} books</Text></Pressable> : null}
     </View>} />}
-    <ArenaBooksSheet id={preview?.tournamentId ?? null} name={preview?.name ?? "Tournament"} onClose={() => setPreview(null)} />
+    <ArenaBooksSheet id={preview?.tournamentId ?? null} name={preview?.name ?? "Tournament"} onAddBook={(book) => { setPreview(null); setAddBook(book); }} onClose={() => setPreview(null)} />
+    {addBook ? <AddBookSheet book={addBook} onClose={() => setAddBook(null)} /> : null}
   </Screen>;
 }
 

@@ -1,4 +1,5 @@
 import type { LibraryData } from "@scripta/shared";
+import type { BookRecommendationInput } from "@scripta/shared/community";
 import { ApiError, apiFetch } from "./client";
 
 // LibraryData moved to packages/shared/src/library/types.ts (Task 3A) —
@@ -29,8 +30,15 @@ export async function fetchLibrary(): Promise<LibraryDocument | null> {
   }
 }
 
-export async function saveLibrary(data: LibraryData, updatedAt?: string): Promise<LibraryDocument> {
-  return (await apiFetch("/library", { method: "PUT", body: JSON.stringify({ data, updatedAt }) })) as LibraryDocument;
+export async function saveLibrary(data: LibraryData, updatedAt?: string, source?: "import"): Promise<LibraryDocument> {
+  return (await apiFetch("/library", { method: "PUT", body: JSON.stringify({ data, updatedAt, source }) })) as LibraryDocument;
+}
+
+/** Same-shelf upsert behind POST /library/books — adding a book you
+ *  already have updates it in place instead of duplicating it, which is
+ *  why the response reports which of the two happened. */
+export async function addBookToLibrary(rec: BookRecommendationInput): Promise<{ key: string; updated: boolean }> {
+  return (await apiFetch("/library/books", { method: "POST", body: JSON.stringify(rec) })) as { key: string; updated: boolean };
 }
 
 export async function shareLibrary(): Promise<LibraryDocument> {

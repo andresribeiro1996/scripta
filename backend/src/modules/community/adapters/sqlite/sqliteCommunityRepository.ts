@@ -1,4 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
+import { normalizeFeedSettings, type FeedSettings } from "@scripta/shared/community";
 import type { CommunityRepository, CursorKeyset } from "../../domain/ports.js";
 import type { EventRow, FollowRow, ProfileRow } from "../../domain/types.js";
 
@@ -31,9 +32,16 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
   `);
 
   const insertEventStmt = db.prepare(`
-    INSERT OR IGNORE INTO events (id, user_id, type, ref_type, ref_id, created_at)
-    VALUES ($id, $user_id, $type, $ref_type, $ref_id, $created_at)
+    INSERT OR IGNORE INTO events (id, user_id, type, ref_type, ref_id, payload, created_at)
+    VALUES ($id, $user_id, $type, $ref_type, $ref_id, $payload, $created_at)
   `);
+  const getFeedSettingsStmt = db.prepare(`SELECT feed_settings FROM profiles WHERE user_id = ?`);
+  const updateFeedSettingsStmt = db.prepare(`
+    INSERT INTO profiles (user_id, published, mural_id, published_at, updated_at, feed_settings)
+    VALUES ($user_id, 0, NULL, NULL, $updated_at, $feed_settings)
+    ON CONFLICT(user_id) DO UPDATE SET feed_settings = excluded.feed_settings, updated_at = excluded.updated_at
+  `);
+
   const listEventsStmt = db.prepare(`
     SELECT * FROM events WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT ?
   `);
@@ -45,7 +53,7 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
 
   return {
     insertFollow(row) {
-      insertFollowStmt.run({ $follower_id: row.follower_id, $followee_id: row.followee_id, $created_at: row.created_at });
+      return insertFollowStmt.run({ $follower_id: row.follower_id, $followee_id: row.followee_id, $created_at: row.created_at }).changes > 0;
     },
     deleteFollow(followerId, followeeId) {
       return deleteFollowStmt.run(followerId, followeeId).changes > 0;
@@ -89,6 +97,18 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
         $updated_at: row.updated_at
       });
     },
+    getFeedSettings(userId) {
+      const row = getFeedSettingsStmt.get(userId) as { feed_settings: string | null } | undefined;
+      if (!row || row.feed_settings === null) return null;
+      try {
+        return normalizeFeedSettings(JSON.parse(row.feed_settings));
+      } catch {
+        return null;
+      }
+    },
+    updateFeedSettings(userId, settings) {
+      updateFeedSettingsStmt.run({ $user_id: userId, $updated_at: new Date().toISOString(), $feed_settings: JSON.stringify(settings) });
+    },
     insertEvent(row) {
       insertEventStmt.run({
         $id: row.id,
@@ -96,6 +116,7 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
         $type: row.type,
         $ref_type: row.ref_type,
         $ref_id: row.ref_id,
+        $payload: row.payload,
         $created_at: row.created_at
       });
     },

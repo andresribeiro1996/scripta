@@ -41,7 +41,7 @@ export function useLibraryActions() {
     renameLibrary: (name: string) => run((data) => ({ ...data, name }), "Couldn't save the new name."),
 
     merge: async (parsed: LibraryData) => {
-      await updateLibrary((data) => buildMergedLibrary(data, parsed));
+      await updateLibrary((data) => buildMergedLibrary(data, parsed), "import");
     },
 
     addBook: async (book: Record<string, unknown>) => {
