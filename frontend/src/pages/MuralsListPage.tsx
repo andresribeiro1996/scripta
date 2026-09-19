@@ -1,8 +1,7 @@
-import { useToast } from "../components/Toaster";
-import { useHome } from "../hooks/useHome";
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import type { GalleryImage } from "../api/gallery";
+import { useAuth } from "../auth/AuthContext";
 import { useConfirm } from "../components/ConfirmDialog";
 import { CoverPickerModal } from "../components/CoverPickerModal";
 import { EmptyState } from "../components/EmptyState";
@@ -17,6 +16,7 @@ import { OptionSheet } from "../components/Sheet";
 import { SkeletonCardGrid } from "../components/Skeleton";
 import { FolderIcon, PlusIcon, SortIcon, TOOLBAR_CONTROL_CLASS, ToolbarRow, toolbarIconClass } from "../components/Toolbar";
 import { useDelayedShow } from "../hooks/useDelayedShow";
+import { useCommunityProfile } from "../hooks/useCommunity";
 import { useMuralFolders } from "../hooks/useMuralFolders";
 import { useMurals } from "../hooks/useMurals";
 import { buildTree, collectSubtreeIds, folderPath } from "../lib/muralFolders";
@@ -44,8 +44,8 @@ const SORT_OPTIONS: Array<{ value: SortBy; label: string }> = [
  *  its own full page rather than an inline expandable section — a
  *  freeform canvas needs real room. */
 export function MuralsListPage() {
-  const home = useHome();
-  const toast = useToast();
+  const { session } = useAuth();
+  const ownProfile = useCommunityProfile(session?.user.username ?? "");
   const { data: muralsData, isLoading, rename, remove, move: moveMural, setCover, clearCover, share, unshare } = useMurals();
   const showSkeleton = useDelayedShow(isLoading);
   const { data: foldersData, create: createFolder, rename: renameFolder, move: moveFolderApi, remove: removeFolder } = useMuralFolders();
@@ -430,12 +430,17 @@ export function MuralsListPage() {
                         // cover image, where it sits on arbitrary artwork
                         // rather than a flat theme surface) keeps it legible
                         // the same way BookCard's own title treatment does.
-                        <span
-                          className={`text-left text-lg leading-tight font-bold transition-colors ${
-                            hasCover ? "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.5)]" : "group-hover:text-(--color-accent)"
-                          }`}
-                        >
-                          {mural.name}
+                        <span className="flex min-w-0 items-center gap-1.5">
+                          <span
+                            className={`text-left text-lg leading-tight font-bold transition-colors ${
+                              hasCover ? "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.5)]" : "group-hover:text-(--color-accent)"
+                            }`}
+                          >
+                            {mural.name}
+                          </span>
+                          {ownProfile.view?.mural?.mural.id === mural.id && (
+                            <span className="shrink-0 rounded-full bg-(--color-accent-soft) px-1.5 py-0.5 text-[10px] font-semibold text-(--color-accent)">Profile</span>
+                          )}
                         </span>
                       )}
                       <OptionsMenu
@@ -446,7 +451,6 @@ export function MuralsListPage() {
                             : "flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"
                         }
                         items={[
-                          { label: "Set as home", onClick: () => { void home.choose(mural.id).then(() => navigate("/dashboard")).catch((error) => toast({ message: error.message, kind: "error" })); } },
                           {
                             label: "Rename",
                             onClick: () => {

@@ -17,8 +17,9 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash TEXT,              -- NULL for accounts created via Google only
   google_id     TEXT UNIQUE,       -- NULL until/unless linked to a Google account
   avatar_id     TEXT UNIQUE,       -- NULL until a profile picture is uploaded; the
-                                   -- id changes on every replacement, which doubles
-                                   -- as the cache-buster for the immutable file route
+                                    -- id changes on every replacement, which doubles
+                                    -- as the cache-buster for the immutable file route
+  dashboard_seen_at TEXT,          -- last time this user consumed their Home digest
   created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 

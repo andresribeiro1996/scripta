@@ -61,13 +61,3 @@ export async function updateMuralFolderApi(id: string, patch: { name?: string; p
 export async function deleteMuralFolderApi(id: string): Promise<void> {
   await apiFetch(`/murals/folders/${id}`, { method: "DELETE" });
 }
-
-export async function fetchHome(): Promise<Mural | null> {
-  return ((await apiFetch("/murals/home")) as { mural: Mural | null }).mural;
-}
-export async function selectHome(muralId: string): Promise<Mural> {
-  return (await apiFetch("/murals/home", { method: "PUT", body: JSON.stringify({ muralId }) })) as Mural;
-}
-export async function initializeHome(withPassage: boolean): Promise<Mural> {
-  return (await apiFetch("/murals/home", { method: "POST", body: JSON.stringify({ withPassage }) })) as Mural;
-}

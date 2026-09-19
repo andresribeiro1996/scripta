@@ -49,6 +49,19 @@ function createRepoFake() {
         .filter((e) => !keyset || e.created_at < keyset.createdAt || (e.created_at === keyset.createdAt && e.id < keyset.id))
         .sort((a, b) => (a.created_at === b.created_at ? (a.id > b.id ? -1 : 1) : b.created_at.localeCompare(a.created_at)))
         .slice(0, limit);
+    },
+    listFollowersByFollowee(followeeId, keyset, limit) {
+      return [...follows.values()]
+        .filter((row) => row.followee_id === followeeId)
+        .filter((row) => !keyset || row.created_at < keyset.createdAt || (row.created_at === keyset.createdAt && row.follower_id < keyset.id))
+        .sort((a, b) => (a.created_at === b.created_at ? (a.follower_id > b.follower_id ? -1 : 1) : b.created_at.localeCompare(a.created_at)))
+        .slice(0, limit);
+    },
+    countEventsByUsersSince(userIds, since) {
+      return events.filter((e) => userIds.includes(e.user_id) && e.created_at > since).length;
+    },
+    countFollowersSince(followeeId, since) {
+      return [...follows.values()].filter((row) => row.followee_id === followeeId && row.created_at > since).length;
     }
   };
   return { repo, follows, profiles, events };
@@ -62,8 +75,13 @@ function createDeps(repo: CommunityRepository) {
   const tierlistRefs = new Map<string, PublishedTierlistRef>();
   const tournamentRefs = new Map<string, PublishedTournamentRef>();
   const byNewest = <T extends { createdAt: string }>(a: T, b: T) => b.createdAt.localeCompare(a.createdAt);
+  const seenAt = { value: null as string | null };
   const deps: CommunityDeps = {
     repo,
+    getDashboardSeenAt: () => seenAt.value,
+    setDashboardSeenAt: (_userId, value) => {
+      seenAt.value = value;
+    },
     resolveProfile: (id) => readerProfiles.get(id),
     resolveProfiles: (ids) => {
       const out = new Map<string, ReaderProfile>();
@@ -95,7 +113,7 @@ function createDeps(repo: CommunityRepository) {
       listByOwner: (owner) => [...tournamentRefs.values()].filter((r) => r.ownerUserId === owner).sort(byNewest)
     }
   };
-  return { deps, readerProfiles, usernames, ownedMurals, muralPayloads, tierlistRefs, tournamentRefs };
+  return { deps, readerProfiles, usernames, ownedMurals, muralPayloads, tierlistRefs, tournamentRefs, seenAt };
 }
 
 function profileRow(userId: string, overrides: Partial<ProfileRow> = {}): ProfileRow {
@@ -276,77 +294,95 @@ test("a profile mural deleted later resolves to null without breaking the view",
   assert.equal(view.profile.user.username, "user-alice");
 });
 
-test("feed merges followees' events newest first and paginates by keyset", () => {
-  const { repo, profiles, events } = createRepoFake();
+test("dashboard merges followees' publications and incoming follows newest first", () => {
+  const { repo } = createRepoFake();
   const { deps, readerProfiles, tierlistRefs, tournamentRefs } = createDeps(repo);
   const service = createCommunityService(deps);
-  profiles.set("alice", profileRow("alice"));
-  profiles.set("bob", profileRow("bob"));
   readerProfiles.set("alice", reader("alice"));
   readerProfiles.set("bob", reader("bob"));
-  tierlistRefs.set("t1", tierRef("t1", "alice", { createdAt: "2026-09-02T00:00:00.000Z" }));
-  tournamentRefs.set("g1", tournRef("g1", "bob", { createdAt: "2026-09-01T00:00:00.000Z" }));
-  events.push(
-    { id: "e1", user_id: "alice", type: "tierlist_published", ref_type: "tierlist", ref_id: "t1", created_at: "2026-09-02T00:00:00.000Z" },
-    { id: "e2", user_id: "bob", type: "tournament_published", ref_type: "tournament", ref_id: "g1", created_at: "2026-09-01T00:00:00.000Z" }
-  );
-  service.follow("me", "alice");
-  service.follow("me", "bob");
-
-  const page1 = service.getFeed("me", undefined, 1);
-  assert.equal(page1.items.length, 1);
-  assert.equal(page1.items[0]!.id, "e1");
-  assert.equal(page1.items[0]!.actor.username, "user-alice");
-  assert.equal(page1.items[0]!.content.kind, "tierlist");
-  assert.notEqual(page1.nextCursor, null);
-
-  const page2 = service.getFeed("me", page1.nextCursor!, 1);
-  assert.equal(page2.items.length, 1);
-  assert.equal(page2.items[0]!.id, "e2");
-  assert.equal(page2.items[0]!.content.kind, "tournament");
-  assert.equal(page2.nextCursor, null);
+  readerProfiles.set("carol", reader("carol"));
+  repo.upsertProfile(profileRow("alice"));
+  service.follow("viewer", "alice");
+  repo.insertFollow({ follower_id: "bob", followee_id: "viewer", created_at: "2026-09-05T00:00:00.000Z" });
+  service.emitEvent("alice", "tierlist_published", "tierlist", "t1");
+  service.emitEvent("alice", "tournament_published", "tournament", "g1");
+  tierlistRefs.set("t1", tierRef("t1", "alice"));
+  tournamentRefs.set("g1", tournRef("g1", "alice"));
+  repo.insertFollow({ follower_id: "carol", followee_id: "alice", created_at: "2026-09-06T00:00:00.000Z" });
+  const page = service.getDashboard("viewer", undefined, 20);
+  assert.equal(page.items[0]?.kind, "publication");
+  assert.equal((page.items[0] as { actor: { userId: string } }).actor.userId, "alice");
+  assert.ok(page.items.some((item) => item.kind === "follow" && item.id === "bob"));
+  assert.ok(!page.items.some((item) => item.kind === "follow" && item.id === "carol"));
 });
 
-test("feed drops events whose content vanished", () => {
-  const { repo, profiles, events } = createRepoFake();
+test("follow rows surface only to the followee and retract on unfollow", () => {
+  const { repo } = createRepoFake();
   const { deps, readerProfiles } = createDeps(repo);
   const service = createCommunityService(deps);
-  profiles.set("alice", profileRow("alice"));
-  readerProfiles.set("alice", reader("alice"));
-  events.push({ id: "e1", user_id: "alice", type: "tierlist_published", ref_type: "tierlist", ref_id: "gone", created_at: "2026-09-02T00:00:00.000Z" });
-  service.follow("me", "alice");
-  assert.deepEqual(service.getFeed("me", undefined, 10), { items: [], nextCursor: null });
+  readerProfiles.set("bob", reader("bob"));
+  repo.upsertProfile(profileRow("viewer"));
+  repo.insertFollow({ follower_id: "bob", followee_id: "viewer", created_at: "2026-09-05T00:00:00.000Z" });
+  assert.equal(service.getDashboard("viewer", undefined, 20).items.length, 1);
+  assert.equal(service.getDashboard("bob", undefined, 20).items.length, 0);
+  repo.deleteFollow("bob", "viewer");
+  assert.equal(service.getDashboard("viewer", undefined, 20).items.length, 0);
 });
 
-test("feed drops events whose actor has no reader profile", () => {
-  const { repo, profiles, events } = createRepoFake();
-  const { deps, tierlistRefs } = createDeps(repo);
+test("newCount counts unseen rows and the seen marker resets it", () => {
+  const { repo } = createRepoFake();
+  const { deps, seenAt, readerProfiles } = createDeps(repo);
   const service = createCommunityService(deps);
-  profiles.set("alice", profileRow("alice"));
-  tierlistRefs.set("t1", tierRef("t1", "alice"));
-  events.push({ id: "e1", user_id: "alice", type: "tierlist_published", ref_type: "tierlist", ref_id: "t1", created_at: "2026-09-02T00:00:00.000Z" });
-  service.follow("me", "alice");
-  assert.deepEqual(service.getFeed("me", undefined, 10), { items: [], nextCursor: null });
+  readerProfiles.set("alice", reader("alice"));
+  readerProfiles.set("bob", reader("bob"));
+  repo.upsertProfile(profileRow("viewer"));
+  repo.insertFollow({ follower_id: "alice", followee_id: "viewer", created_at: "2026-09-05T00:00:00.000Z" });
+  repo.insertFollow({ follower_id: "bob", followee_id: "viewer", created_at: "2026-09-06T00:00:00.000Z" });
+  assert.equal(service.getDashboard("viewer", undefined, 20).newCount, 0);
+  seenAt.value = "2026-09-05T12:00:00.000Z";
+  assert.equal(service.getDashboard("viewer", undefined, 20).newCount, 1);
+  service.markDashboardSeen("viewer");
+  assert.equal(service.getDashboard("viewer", undefined, 20).newCount, 0);
 });
 
-test("feed ignores events from people you don't follow", () => {
-  const { repo, profiles, events } = createRepoFake();
+test("dashboard pagination by keyset spans both sources", () => {
+  const { repo } = createRepoFake();
   const { deps, readerProfiles, tierlistRefs } = createDeps(repo);
   const service = createCommunityService(deps);
-  profiles.set("alice", profileRow("alice"));
-  profiles.set("bob", profileRow("bob"));
+  readerProfiles.set("alice", reader("alice"));
   readerProfiles.set("bob", reader("bob"));
+  repo.upsertProfile(profileRow("alice"));
+  repo.upsertProfile(profileRow("viewer"));
+  service.follow("viewer", "alice");
+  repo.insertFollow({ follower_id: "bob", followee_id: "viewer", created_at: "2026-09-04T00:00:00.000Z" });
+  service.emitEvent("alice", "tierlist_published", "tierlist", "t1");
   tierlistRefs.set("t1", tierRef("t1", "alice"));
-  events.push({ id: "e1", user_id: "alice", type: "tierlist_published", ref_type: "tierlist", ref_id: "t1", created_at: "2026-09-02T00:00:00.000Z" });
-  service.follow("me", "bob");
-  assert.deepEqual(service.getFeed("me", undefined, 10), { items: [], nextCursor: null });
+  const first = service.getDashboard("viewer", undefined, 1);
+  assert.equal(first.items.length, 1);
+  assert.ok(first.nextCursor);
+  const second = service.getDashboard("viewer", first.nextCursor!, 1);
+  assert.equal(second.items.length, 1);
+  assert.notEqual(second.items[0]?.id, first.items[0]?.id);
 });
 
-test("an unparseable cursor is a 400-worthy error, not an empty page", () => {
+test("dashboard drops publications whose content or actor vanished", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tournamentRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  repo.insertFollow({ follower_id: "viewer", followee_id: "alice", created_at: "2026-09-01T00:00:00.000Z" });
+  repo.insertFollow({ follower_id: "viewer", followee_id: "ghost", created_at: "2026-09-01T00:00:00.000Z" });
+  service.emitEvent("alice", "tierlist_published", "tierlist", "gone");
+  service.emitEvent("ghost", "tournament_published", "tournament", "g1");
+  tournamentRefs.set("g1", tournRef("g1", "ghost"));
+  assert.equal(service.getDashboard("viewer", undefined, 20).items.length, 0);
+});
+
+test("an unparseable dashboard cursor is a 400-worthy error", () => {
   const { repo } = createRepoFake();
   const { deps } = createDeps(repo);
   const service = createCommunityService(deps);
-  assert.throws(() => service.getFeed("me", "garbage", 10), InvalidCursorError);
+  assert.throws(() => service.getDashboard("viewer", "###", 20), InvalidCursorError);
 });
 
 test("discover merges both content kinds newest first", () => {

@@ -10,7 +10,6 @@ import { CommunityIcon } from "../components/NavIcons";
 import { MuralCanvas } from "../components/murals/MuralCanvas";
 import { SkeletonCardGrid } from "../components/Skeleton";
 import { useCommunityProfile } from "../hooks/useCommunity";
-import { useHome } from "../hooks/useHome";
 import { useMurals } from "../hooks/useMurals";
 import { ensureBookBlockHeights, type Mural } from "../lib/murals";
 import { buildReconstructedBooks } from "../lib/sharedMural";
@@ -193,9 +192,8 @@ function UnpublishedOwnProfile({
   onPublish: (muralId: string) => void;
 }) {
   const { data: murals } = useMurals();
-  const { data: homeMural } = useHome();
   const [muralId, setMuralId] = useState<string>("");
-  const effectiveId = muralId || homeMural?.id || murals?.[0]?.id || "";
+  const effectiveId = muralId || murals?.[0]?.id || "";
   return (
     <div className="mx-auto max-w-md text-center">
       <EmptyState icon={CommunityIcon} title="Your profile isn't published." body="Publish one of your murals to appear in the community." />

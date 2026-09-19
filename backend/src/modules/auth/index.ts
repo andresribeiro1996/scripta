@@ -23,5 +23,7 @@ export {
   resolvePublicReaderProfiles,
   userHasUsername,
   findUserIdByUsername,
-  searchUsernameOwners
+  searchUsernameOwners,
+  getDashboardSeenAt,
+  setDashboardSeenAt
 } from "./publicProfile.js";

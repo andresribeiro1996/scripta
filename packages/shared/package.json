@@ -25,6 +25,10 @@
     "./community": {
       "types": "./dist/community/index.d.ts",
       "default": "./dist/community/index.js"
+    },
+    "./dashboard": {
+      "types": "./dist/dashboard.d.ts",
+      "default": "./dist/dashboard.js"
     }
   },
   "files": [

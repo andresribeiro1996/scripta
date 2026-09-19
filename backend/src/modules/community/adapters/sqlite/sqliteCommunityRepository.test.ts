@@ -55,3 +55,18 @@ test("events ignore duplicate (ref_type, ref_id) and paginate by keyset", () => 
   assert.deepEqual(page.map((e) => e.id), ["e3"]);
   assert.deepEqual(r.listEventsByUser("bob", undefined, 10), []);
 });
+
+test("followers order newest first per (created_at, follower_id), paginate by keyset, and drop unfollowed rows", () => {
+  const r = repo();
+  r.insertFollow({ follower_id: "bob", followee_id: "alice", created_at: "2026-09-02T00:00:00.000Z" });
+  r.insertFollow({ follower_id: "adam", followee_id: "alice", created_at: "2026-09-02T00:00:00.000Z" });
+  r.insertFollow({ follower_id: "carol", followee_id: "alice", created_at: "2026-09-03T00:00:00.000Z" });
+  r.insertFollow({ follower_id: "dave", followee_id: "alice", created_at: "2026-09-01T00:00:00.000Z" });
+  assert.deepEqual(r.listFollowersByFollowee("alice", undefined, 10).map((f) => f.follower_id), ["carol", "bob", "adam", "dave"]);
+
+  const page = r.listFollowersByFollowee("alice", { createdAt: "2026-09-02T00:00:00.000Z", id: "bob" }, 10);
+  assert.deepEqual(page.map((f) => f.follower_id), ["adam", "dave"]);
+  assert.deepEqual(r.listFollowersByFollowee("ghost", undefined, 10), []);
+  r.deleteFollow("dave", "alice");
+  assert.deepEqual(r.listFollowersByFollowee("alice", undefined, 10).map((f) => f.follower_id), ["carol", "bob", "adam"]);
+});

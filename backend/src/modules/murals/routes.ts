@@ -75,18 +75,6 @@ const updateFolderSchema = z
  *  see plugin.ts's own comment for which. */
 export function buildMuralRoutes(service: MuralsService) {
   return async function muralRoutes(app: FastifyInstance) {
-    app.get("/murals/home", { preHandler: authGuard }, async (request) => ({ mural: service.getHome(request.user.id) }));
-    app.put("/murals/home", { preHandler: authGuard }, async (request, reply) => {
-      const body = z.object({ muralId: z.string().uuid() }).safeParse(request.body);
-      if (!body.success) return reply.code(400).send({ error: "Choose a valid mural." });
-      const mural = service.setHome(request.user.id, body.data.muralId);
-      return mural ? reply.send(mural) : reply.code(404).send({ error: "Mural unavailable." });
-    });
-    app.post("/murals/home", { preHandler: authGuard }, async (request, reply) => {
-      const body = z.object({ withPassage: z.boolean() }).safeParse(request.body);
-      if (!body.success) return reply.code(400).send({ error: "Invalid home request." });
-      return reply.send(service.initializeHome(request.user.id, body.data.withPassage));
-    });
     app.get("/murals", { preHandler: authGuard }, async (request, reply) => {
       return reply.send({ murals: service.listMurals(request.user.id) });
     });

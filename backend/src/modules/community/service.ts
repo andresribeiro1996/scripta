@@ -1,14 +1,15 @@
 import { randomUUID } from "node:crypto";
 import type { ReaderProfile } from "@scripta/shared";
 import { decodeCursor, encodeCursor } from "@scripta/shared/community";
-import type { CommunityEventType, DiscoverItem, DiscoverType, FeedItem, FollowState, Page, PersonResult, PublishedContent, PublishedProfile, TierlistSummary, TournamentSummary } from "@scripta/shared/community";
+import type { CommunityEventType, DiscoverItem, DiscoverType, FollowState, PersonResult, PublishedContent, PublishedProfile, TierlistSummary, TournamentSummary } from "@scripta/shared/community";
+import type { DashboardFeedPage, DigestItem } from "@scripta/shared/dashboard";
 import type { PublishedTournamentRef } from "../arena/service.js";
 import type { MuralsPublicApi } from "../murals/publicApi.js";
 import type { MuralPublicPayload } from "../murals/index.js";
 import type { PublishedTierlistRef } from "../tierlists/service.js";
 import { InvalidCursorError, MuralNotOwnedError, NotFollowingError, ProfileNotFoundError, SelfFollowError, UsernameRequiredError } from "./domain/errors.js";
 import type { CommunityRepository } from "./domain/ports.js";
-import type { EventRow } from "./domain/types.js";
+import type { EventRow, FollowRow } from "./domain/types.js";
 
 const DISCOVER_SCAN_CAP = 500;
 
@@ -28,13 +29,10 @@ function toTournamentSummary(ref: PublishedTournamentRef): TournamentSummary {
   return { kind: "tournament", id: ref.id, name: ref.name, bracketSize: ref.bracketSize, status: ref.status, bookCount: ref.bracketSize };
 }
 
-function byNewestFirst(a: EventRow, b: EventRow): number {
-  if (a.created_at !== b.created_at) return b.created_at.localeCompare(a.created_at);
-  return a.id < b.id ? 1 : -1;
-}
-
 export interface CommunityDeps {
   repo: CommunityRepository;
+  getDashboardSeenAt(userId: string): string | null;
+  setDashboardSeenAt(userId: string, seenAt: string): void;
   resolveProfile(userId: string): ReaderProfile | undefined;
   resolveProfiles(userIds: string[]): Map<string, ReaderProfile>;
   userHasUsername(userId: string): boolean;
@@ -61,7 +59,8 @@ export interface CommunityService {
   publishProfile(userId: string, muralId: string): void;
   unpublishProfile(userId: string): void;
   getProfileByUsername(username: string, viewerId?: string): PublicProfileView;
-  getFeed(viewerId: string, cursor: string | undefined, limit: number): Page<FeedItem>;
+  getDashboard(viewerId: string, cursor: string | undefined, limit: number): DashboardFeedPage;
+  markDashboardSeen(viewerId: string): void;
   getDiscover(type: DiscoverType, q: string, limit: number, offset: number): { items: DiscoverItem[]; nextOffset: number | null };
   searchPeople(viewerId: string, q: string, limit: number): PersonResult[];
 }
@@ -129,37 +128,62 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
         }
       };
     },
-    getFeed(viewerId, cursor, limit) {
+    getDashboard(viewerId, cursor, limit) {
       const keyset = cursor ? decodeCursor(cursor) : undefined;
       if (cursor && !keyset) throw new InvalidCursorError();
-      const collected: EventRow[] = [];
-      for (const followeeId of repo.listFollowees(viewerId)) {
-        collected.push(...repo.listEventsByUser(followeeId, keyset, limit + 1));
+      type Row = { id: string; createdAt: string; event?: EventRow; follow?: FollowRow };
+      const rows: Row[] = [];
+      const followees = repo.listFollowees(viewerId);
+      for (const followeeId of followees) {
+        rows.push(...repo.listEventsByUser(followeeId, keyset, limit + 1).map((event) => ({ id: event.id, createdAt: event.created_at, event })));
       }
-      collected.sort(byNewestFirst);
-      const items: FeedItem[] = [];
+      rows.push(...repo.listFollowersByFollowee(viewerId, keyset, limit + 1).map((follow) => ({ id: follow.follower_id, createdAt: follow.created_at, follow })));
+      rows.sort((a, b) => (a.createdAt !== b.createdAt ? b.createdAt.localeCompare(a.createdAt) : a.id < b.id ? 1 : -1));
+      const actorIds = new Set<string>();
+      for (const row of rows) {
+        if (row.event) actorIds.add(row.event.user_id);
+        if (row.follow) actorIds.add(row.follow.follower_id);
+      }
+      const profiles = deps.resolveProfiles([...actorIds]);
+      const items: DigestItem[] = [];
       let nextCursor: string | null = null;
-      for (const event of collected) {
+      let lastIncluded: Row | undefined;
+      for (const row of rows) {
         if (items.length === limit) {
-          const last = items[items.length - 1];
-          if (last) nextCursor = encodeCursor({ createdAt: last.createdAt, id: last.id });
+          if (lastIncluded) nextCursor = encodeCursor({ createdAt: lastIncluded.createdAt, id: lastIncluded.id });
           break;
         }
-        if (event.ref_type === "tierlist") {
-          const ref = deps.tierlists.get(event.ref_id);
-          const actor = ref && ref.ownerUserId === event.user_id ? deps.resolveProfiles([event.user_id]).get(event.user_id) ?? (ref.promotedAt ? { username: "Original creator unavailable", avatarUrl: null, unavailable: true } : undefined) : undefined;
-          if (ref && actor) {
-            items.push({ id: event.id, actor: { ...actor, userId: event.user_id }, type: event.type, content: toTierlistSummary(ref), createdAt: event.created_at });
+        if (row.event) {
+          const event = row.event;
+          if (event.ref_type === "tierlist") {
+            const ref = deps.tierlists.get(event.ref_id);
+            const actor = ref && ref.ownerUserId === event.user_id ? profiles.get(event.user_id) ?? (ref.promotedAt ? { username: "Original creator unavailable", avatarUrl: null, unavailable: true } : undefined) : undefined;
+            if (ref && actor) {
+              items.push({ kind: "publication", id: event.id, actor: { ...actor, userId: event.user_id }, type: event.type, content: toTierlistSummary(ref), createdAt: event.created_at });
+              lastIncluded = row;
+            }
+          } else {
+            const ref = deps.tournaments.get(event.ref_id);
+            const actor = ref && ref.ownerUserId === event.user_id ? profiles.get(event.user_id) : undefined;
+            if (ref && actor) {
+              items.push({ kind: "publication", id: event.id, actor: { ...actor, userId: event.user_id }, type: event.type, content: toTournamentSummary(ref), createdAt: event.created_at });
+              lastIncluded = row;
+            }
           }
-        } else {
-          const ref = deps.tournaments.get(event.ref_id);
-          const actor = ref && ref.ownerUserId === event.user_id ? deps.resolveProfiles([event.user_id]).get(event.user_id) : undefined;
-          if (ref && actor) {
-            items.push({ id: event.id, actor: { ...actor, userId: event.user_id }, type: event.type, content: toTournamentSummary(ref), createdAt: event.created_at });
+        } else if (row.follow) {
+          const author = profiles.get(row.follow.follower_id);
+          if (author) {
+            items.push({ kind: "follow", id: row.follow.follower_id, actor: { ...author, userId: row.follow.follower_id }, createdAt: row.follow.created_at });
+            lastIncluded = row;
           }
         }
       }
-      return { items, nextCursor };
+      const seen = keyset ? null : deps.getDashboardSeenAt(viewerId);
+      const newCount = !keyset && seen ? repo.countEventsByUsersSince(followees, seen) + repo.countFollowersSince(viewerId, seen) : 0;
+      return { items, nextCursor, newCount };
+    },
+    markDashboardSeen(viewerId) {
+      deps.setDashboardSeenAt(viewerId, new Date().toISOString());
     },
     getDiscover(type, q, limit, offset) {
       const needle = q.trim().toLowerCase();

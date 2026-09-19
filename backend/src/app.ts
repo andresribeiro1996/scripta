@@ -15,10 +15,12 @@ import { devHttps } from "./config/devCerts.js";
 import { runStartupMigrations } from "./migrations/runStartupMigrations.js";
 import {
   findUserIdByUsername,
+  getDashboardSeenAt,
   registerAuthModule,
   resolvePublicReaderProfile,
   resolvePublicReaderProfiles,
   searchUsernameOwners,
+  setDashboardSeenAt,
   userHasUsername
 } from "./modules/auth/index.js";
 import { getArenaPublicApi, registerArenaModule } from "./modules/arena/index.js";
@@ -95,6 +97,8 @@ export function buildApp() {
     userHasUsername,
     findUserIdByUsername,
     searchUsernameOwners,
+    getDashboardSeenAt,
+    setDashboardSeenAt,
     murals: getMuralsPublicApi(getTierlistsPublicApi().getTierlistData),
     tierlists: {
       list: getTierlistsPublicApi().listPublished,

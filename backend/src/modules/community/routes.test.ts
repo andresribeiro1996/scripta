@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import Fastify from "fastify";
 import { ProfileNotFoundError } from "./domain/errors.js";
-import { buildPublicCommunityRoutes } from "./routes.js";
+import { buildCommunityRoutes, buildPublicCommunityRoutes } from "./routes.js";
 import type { CommunityService } from "./service.js";
 
 function fakeService(overrides: Partial<CommunityService> = {}): CommunityService {
@@ -15,7 +15,8 @@ function fakeService(overrides: Partial<CommunityService> = {}): CommunityServic
     getProfileByUsername: () => {
       throw new ProfileNotFoundError();
     },
-    getFeed: () => ({ items: [], nextCursor: null }),
+    getDashboard: () => ({ items: [], nextCursor: null, newCount: 0 }),
+    markDashboardSeen: () => {},
     getDiscover: () => ({ items: [], nextOffset: null }),
     searchPeople: () => [],
     emitEvent: () => {},
@@ -55,5 +56,33 @@ test("discover rejects a bad type with 400", async () => {
   await app.register(buildPublicCommunityRoutes(fakeService()));
   const res = await app.inject({ method: "GET", url: "/community/discover?type=nope" });
   assert.equal(res.statusCode, 400);
+  await app.close();
+});
+
+test("dashboard routes pass cursor/limit through and mark seen", async () => {
+  const seen: Array<Record<string, unknown>> = [];
+  let marked = 0;
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", () => ({ id: "viewer", email: "v@example.test", username: "v", avatarId: null }));
+  await app.register(
+    buildCommunityRoutes(
+      fakeService({
+        getDashboard: (_viewerId, cursor, limit) => {
+          seen.push({ cursor, limit });
+          return { items: [], nextCursor: null, newCount: 0 };
+        },
+        markDashboardSeen: () => {
+          marked += 1;
+        }
+      })
+    )
+  );
+  const auth = { authorization: "Bearer x" };
+  const res = await app.inject({ method: "GET", url: "/community/dashboard?cursor=abc&limit=5", headers: auth });
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(seen, [{ cursor: "abc", limit: 5 }]);
+  const seenRes = await app.inject({ method: "POST", url: "/community/dashboard/seen", headers: auth });
+  assert.equal(seenRes.statusCode, 204);
+  assert.equal(marked, 1);
   await app.close();
 });

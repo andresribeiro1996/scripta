@@ -6,7 +6,7 @@ import type { CommunityService } from "./service.js";
 
 const followSchema = z.object({ userId: z.string().min(1) });
 const publishSchema = z.object({ muralId: z.string().min(1) });
-const feedQuerySchema = z.object({
+const dashboardQuerySchema = z.object({
   cursor: z.string().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(50).default(20)
 });
@@ -69,15 +69,20 @@ export function buildCommunityRoutes(service: CommunityService) {
       return reply.code(204).send();
     });
 
-    app.get("/community/feed", { preHandler: authGuard }, async (request, reply) => {
-      const parsed = feedQuerySchema.safeParse(request.query);
+    app.get("/community/dashboard", { preHandler: authGuard }, async (request, reply) => {
+      const parsed = dashboardQuerySchema.safeParse(request.query);
       if (!parsed.success) return reply.code(400).send({ error: "Invalid cursor/limit." });
       try {
-        return reply.send(service.getFeed(request.user.id, parsed.data.cursor, parsed.data.limit));
+        return reply.send(service.getDashboard(request.user.id, parsed.data.cursor, parsed.data.limit));
       } catch (err) {
         if (err instanceof CommunityError) return reply.code(statusForCommunityError(err)).send({ error: err.message });
         throw err;
       }
+    });
+
+    app.post("/community/dashboard/seen", { preHandler: authGuard }, async (request, reply) => {
+      service.markDashboardSeen(request.user.id);
+      return reply.code(204).send();
     });
 
     app.get("/community/people", { preHandler: authGuard }, async (request, reply) => {

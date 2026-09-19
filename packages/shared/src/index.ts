@@ -4,6 +4,7 @@
 // subdirectory; Task 3A landed `library` first, Tasks 3B (`arena`) and 3C
 // (`murals`/`tierlists`) add their own alongside it.
 export * from "./auth.js";
+export * from "./dashboard.js";
 export * from "./library/index.js";
 export * from "./arena/index.js";
 export * from "./murals/index.js";

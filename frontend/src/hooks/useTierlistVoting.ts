@@ -1,6 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { fetchTierlistResultsApi, fetchVotingBoard, submitBallotApi, type BallotResponse, type HistogramCell } from "../api/tierlistVoting";
+import { fetchBallotApi, fetchTierlistResultsApi, fetchVotingBoard, submitBallotApi, type BallotResponse, type HistogramCell } from "../api/tierlistVoting";
+import { getSession } from "../auth/tokenStore";
 
 // The anonymous voter's ONLY handle on their ballot. A signed-in voter
 // doesn't need it: the backend keys their ballot to their account, and
@@ -11,6 +12,7 @@ function ballotStorageKey(code: string) {
 }
 
 export function useTierlistVoting(code: string) {
+  const queryClient = useQueryClient();
   // `enabled`: callers pass "" for a tier list that has no vote code at all
   // (TierListEditorPage does, on every ordinary tier list), and a request
   // for an empty code can only ever 404 — while still spending the public
@@ -24,23 +26,45 @@ export function useTierlistVoting(code: string) {
     enabled: code.length > 0,
     retry: false
   });
-  const [ballot, setBallot] = useState<BallotResponse | null>(null);
+  const [submitted, setSubmitted] = useState<BallotResponse | null>(null);
+  const storedBallotId = localStorage.getItem(ballotStorageKey(code));
+  // A ballot the caller already holds, from any earlier session. The owner
+  // of a poll always holds one without ever having voted through this page:
+  // openVoting moves their ranking out of the tier list document and seeds
+  // it as their ballot, so this is the only route back to it. `retry: false`
+  // because "you have no ballot here" comes back as a 404, not a blip.
+  const existing = useQuery({
+    queryKey: ["tierlists", "ballot", code, storedBallotId],
+    queryFn: () => fetchBallotApi(code, storedBallotId),
+    enabled: code.length > 0 && (storedBallotId !== null || Boolean(getSession())),
+    retry: false
+  });
 
   async function submit(placements: Array<{ bookKey: string; tierId: string }>): Promise<BallotResponse> {
-    const stored = localStorage.getItem(ballotStorageKey(code));
-    const response = await submitBallotApi(code, placements, stored);
+    const response = await submitBallotApi(code, placements, storedBallotId);
     localStorage.setItem(ballotStorageKey(code), response.ballotId);
-    setBallot(response);
+    setSubmitted(response);
+    // The owner's editor reads this ballot too, and its ballot count and
+    // standings both just moved.
+    await queryClient.invalidateQueries({ queryKey: ["tierlists"] });
     return response;
   }
 
   return {
     board: query.data?.board,
     books: query.data?.books ?? [],
-    isLoading: query.isLoading,
+    // The ballot query counts: without it a returning voter is shown a blank
+    // board for a frame before it flips to their results, which reads as the
+    // very "my ranking is gone" bug this fetch exists to fix.
+    isLoading: query.isLoading || existing.isLoading,
     error: query.error,
-    ballot,
-    storedBallotId: localStorage.getItem(ballotStorageKey(code)),
+    /** This session's submission if there was one, else whatever ballot the
+     *  caller already held. */
+    ballot: submitted ?? existing.data ?? null,
+    /** True only for a ballot cast through THIS page, this session — what
+     *  the "Your ballot is in." confirmation is about. */
+    justSubmitted: submitted !== null,
+    storedBallotId,
     submit
   };
 }

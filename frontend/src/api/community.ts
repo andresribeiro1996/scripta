@@ -1,13 +1,12 @@
 import type {
   DiscoverItem,
   DiscoverType,
-  FeedItem,
-  Page,
   PersonResult,
   PublishedProfile,
   TierlistSummary,
   TournamentSummary
 } from "@scripta/shared/community";
+import type { DashboardFeedPage } from "@scripta/shared/dashboard";
 import type { MuralBlock, ShelfTheme } from "../lib/murals";
 import { apiFetch } from "./client";
 import type { PublicBookData, PublicHighlight } from "./sharedMurals";
@@ -30,9 +29,13 @@ export interface CommunityProfileView {
   published: { tierlists: TierlistSummary[]; tournaments: TournamentSummary[] };
 }
 
-export async function fetchFeed(cursor?: string): Promise<Page<FeedItem>> {
+export async function fetchDashboard(cursor?: string): Promise<DashboardFeedPage> {
   const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
-  return (await apiFetch(`/community/feed${query}`)) as Page<FeedItem>;
+  return (await apiFetch(`/community/dashboard${query}`)) as DashboardFeedPage;
+}
+
+export async function markDashboardSeen(): Promise<void> {
+  await apiFetch("/community/dashboard/seen", { method: "POST" });
 }
 
 export async function fetchDiscover(type: DiscoverType, q: string, offset = 0): Promise<{ items: DiscoverItem[]; nextOffset: number | null }> {

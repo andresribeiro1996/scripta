@@ -21,7 +21,7 @@ const { getAuthenticatedUserFromAccessToken } = await import("../auth/tokens.js"
 const { bookKey } = await import("@scripta/shared");
 const authorization = (sub: string) => ({ authorization: `Bearer ${jwt.sign({ sub, email: `${sub}@example.test`, username: sub }, process.env.JWT_ACCESS_SECRET!, { expiresIn: "5m" })}` });
 
-test("home routes preserve ownership, retries, edits and public content boundaries", async () => {
+test("murals routes preserve ownership, edits and public content boundaries", async () => {
   const db = new DatabaseSync(":memory:");
   db.exec(readFileSync(new URL("./adapters/sqlite/schema.sql", import.meta.url), "utf8"));
   const service = createMuralsService(createSqliteMuralsRepository(db), (token) => `https://example.test/shared/${token}`);
@@ -33,17 +33,15 @@ test("home routes preserve ownership, retries, edits and public content boundari
   await app.register(buildPublicMuralRoutes(service));
   const library = openLibraryDb();
   try {
-    assert.equal((await app.inject({ method: "GET", url: "/murals/home" })).statusCode, 401);
-    assert.deepEqual((await app.inject({ method: "GET", url: "/murals/home", headers: authorization("owner") })).json(), { mural: null });
-    assert.equal((await app.inject({ method: "POST", url: "/murals/home", headers: authorization("owner"), payload: { withPassage: "yes" } })).statusCode, 400);
-    const create = () => app.inject({ method: "POST", url: "/murals/home", headers: authorization("owner"), payload: { withPassage: true } });
+    assert.equal((await app.inject({ method: "GET", url: "/murals" })).statusCode, 401);
+    assert.equal((await app.inject({ method: "POST", url: "/murals", headers: authorization("owner"), payload: { name: "" } })).statusCode, 400);
+    const create = () => app.inject({ method: "POST", url: "/murals", headers: authorization("owner"), payload: { name: "My reading space" } });
     const [a, b] = await Promise.all([create(), create()]);
-    assert.equal(a.statusCode, 200);
+    assert.equal(a.statusCode, 201);
+    assert.equal(b.statusCode, 201);
     const home = a.json();
-    assert.equal(home.id, b.json().id);
-    assert.equal(service.listMurals("owner").length, 1);
-    assert.equal((await app.inject({ method: "PUT", url: "/murals/home", headers: authorization("stranger"), payload: { muralId: home.id } })).statusCode, 404);
-    assert.deepEqual((await app.inject({ method: "GET", url: "/murals/home", headers: authorization("stranger") })).json(), { mural: null });
+    assert.equal(service.listMurals("owner").length, 2);
+    assert.equal((await app.inject({ method: "PUT", url: `/murals/${home.id}`, headers: authorization("stranger"), payload: { name: "Hijacked" } })).statusCode, 404);
     const book = { Title: "Shared title", Attribution: "Writer", _coverUrl: "https://example.test/cover.png", _genres: ["Fantasy"], Rating: 5, highlights: [{ BookmarkID: "secret", Type: "highlight", Text: "PRIVATE PASSAGE" }] };
     const hidden = { Title: "PRIVATE BOOK", Attribution: "Writer", _genres: ["History"] };
     library.prepare("INSERT INTO library_documents (user_id, data) VALUES (?, ?)").run("owner", JSON.stringify({ books: [book, hidden], groups: [{ id: "private-collection-id", type: "collection", name: "PRIVATE COLLECTION NAME", bookKeys: [bookKey(book)] }] }));
@@ -63,11 +61,11 @@ test("home routes preserve ownership, retries, edits and public content boundari
     assert.equal(body.mural.blocks[1].type, "text");
     assert.deepEqual(body.shelfTheme, { genres: ["Fantasy", "History"], matchedBooks: 2, totalBooks: 2 });
     for (const privateValue of ["PRIVATE PASSAGE", "PRIVATE BOOK", "PRIVATE COLLECTION NAME", "private-collection-id", '"Rating"']) assert.equal(response.body.includes(privateValue), false);
-    assert.equal((await create()).json().blocks.length, 3);
     const stale = await app.inject({ method: "PUT", url: `/murals/${home.id}`, headers: authorization("owner"), payload: { blocks: [], updatedAt: home.updatedAt } });
     assert.equal(stale.statusCode, 409);
     assert.equal((await app.inject({ method: "DELETE", url: `/murals/${home.id}`, headers: authorization("owner") })).statusCode, 204);
-    assert.deepEqual((await app.inject({ method: "GET", url: "/murals/home", headers: authorization("owner") })).json(), { mural: null });
+    assert.equal(service.deleteMural("owner", b.json().id), true);
+    assert.deepEqual(service.listMurals("owner"), []);
   } finally {
     await app.close();
     library.close();

@@ -2,14 +2,6 @@ import { contentDetail, contentKindLabel, contentTarget, feedHeading, feedTarget
 
 export { contentDetail, contentKindLabel, contentTarget, feedHeading, feedTarget };
 
-export const COMMUNITY_TABS = [
-  { value: "feed", label: "Feed" },
-  { value: "discover", label: "Discover" },
-  { value: "people", label: "People" },
-] as const;
-
-export type CommunityTab = (typeof COMMUNITY_TABS)[number]["value"];
-
 export const DISCOVER_FILTERS = [
   { value: "all", label: "All" },
   { value: "tierlist", label: "Tier lists" },
