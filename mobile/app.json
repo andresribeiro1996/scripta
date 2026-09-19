@@ -54,7 +54,7 @@
         }
       ],
       "adaptiveIcon": {
-        "backgroundColor": "#1a1815",
+        "backgroundColor": "#141210",
         "foregroundImage": "./assets/images/adaptive-foreground.png",
         "monochromeImage": "./assets/images/adaptive-monochrome.png"
       },
@@ -70,11 +70,11 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#f5f4f2",
+          "backgroundColor": "#f2f0ec",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 180,
           "dark": {
-            "backgroundColor": "#1a1815",
+            "backgroundColor": "#141210",
             "image": "./assets/images/splash-icon-dark.png"
           }
         }
