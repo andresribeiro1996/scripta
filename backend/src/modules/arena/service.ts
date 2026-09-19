@@ -38,7 +38,7 @@ export interface TournamentSummary {
   currentRound: number;
   createdAt: string;
   ownerUserId: string;
-  /** Up to four cover URLs from the seeded pool, for the list card.
+  /** Up to eight cover URLs from the seeded pool, for the list card.
    *  Empty when nothing is seeded yet, or when no seeded book had art. */
   covers: string[];
   filledSlots: number;
@@ -102,7 +102,7 @@ function isPowerOfTwo(n: number): boolean {
   return n >= 2 && (n & (n - 1)) === 0;
 }
 
-const COVER_PREVIEW_LIMIT = 4;
+const COVER_PREVIEW_LIMIT = 8;
 const EMPTY_PREVIEW: SeedPreview = { covers: [], filledSlots: 0 };
 
 // The preview and winner are required arguments rather than optional ones:

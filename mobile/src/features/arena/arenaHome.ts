@@ -143,18 +143,29 @@ export function tournamentProgress(tournament: TournamentSummary): {
   if (tournament.status === "seeding") {
     return { label: `${tournament.filledSlots} of ${tournament.bracketSize} slots filled`, totalRounds, completedRounds: 0 };
   }
+  // No caption: the COMPLETED pill beside it already says this, and the
+  // champion is on the card as its own cover.
   if (tournament.status === "completed") {
-    return { label: "Winner decided", totalRounds, completedRounds: totalRounds };
+    return { label: "", totalRounds, completedRounds: totalRounds };
   }
   const round = Math.min(totalRounds, Math.max(1, tournament.currentRound));
   return { label: `Round ${round} of ${totalRounds}`, totalRounds, completedRounds: round - 1 };
 }
 
-/** Seeded books beyond the four thumbnails the card shows. Slots seeded
- *  without art are counted but never previewed, so this can't be derived
- *  from the bracket size. */
+/** The thumbnail stack under the name. A finished tournament draws its
+ *  champion as the card's own cover, so keeping it in the stack too spends
+ *  a slot on a book already shown. */
+export function previewCovers(tournament: TournamentSummary): string[] {
+  const champion = tournament.winner?.cover;
+  return champion ? tournament.covers.filter((cover) => cover !== champion) : tournament.covers;
+}
+
+/** Seeded books beyond what the card shows — the stack plus the winner
+ *  cover, which is one of them. Slots seeded without art are counted but
+ *  never previewed, so this can't be derived from the bracket size. */
 export function coverRemainder(tournament: TournamentSummary): number {
-  return Math.max(0, tournament.filledSlots - tournament.covers.length);
+  const shown = previewCovers(tournament).length + (tournament.winner ? 1 : 0);
+  return Math.max(0, tournament.filledSlots - shown);
 }
 
 /** Card caption for someone else's poll the account voted on — same
