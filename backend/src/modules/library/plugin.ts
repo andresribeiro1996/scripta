@@ -8,9 +8,14 @@ import { env } from "../../config/env.js";
 import { createSqliteLibraryRepository } from "./adapters/sqlite/sqliteLibraryRepository.js";
 import { openLibraryDb } from "./adapters/sqlite/connection.js";
 import { buildLibraryRoutes, buildPublicLibraryRoutes } from "./routes.js";
+import type { EmitBookEvents } from "./service.js";
 import { createLibraryService } from "./service.js";
 
-export async function libraryPlugin(app: FastifyInstance) {
+export interface LibraryPluginOptions {
+  emitBookEvents?: EmitBookEvents;
+}
+
+export async function libraryPlugin(app: FastifyInstance, opts: LibraryPluginOptions = {}) {
   // --- composition: swap this one block to change storage technology ---
   const db = openLibraryDb();
   const libraryRepository = createSqliteLibraryRepository(db);
@@ -18,7 +23,7 @@ export async function libraryPlugin(app: FastifyInstance) {
   // the FRONTEND's own share-viewer page (not this API) — the token lands
   // in a link a person opens in their browser, not an <img src>.
   const publicUrlFor = (token: string) => `${env.FRONTEND_URL}/shared/library/${token}`;
-  const libraryService = createLibraryService(libraryRepository, publicUrlFor);
+  const libraryService = createLibraryService(libraryRepository, publicUrlFor, opts.emitBookEvents);
   // -----------------------------------------------------------------------
 
   // No rate limit on the authenticated CRUD surface — ordinary library

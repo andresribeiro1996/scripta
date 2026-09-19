@@ -7,18 +7,19 @@ import type { FastifyInstance } from "fastify";
 import { openTierlistsDb } from "./adapters/sqlite/connection.js";
 import { createSqliteTierlistsRepository } from "./adapters/sqlite/sqliteTierlistsRepository.js";
 import { buildPublicTierlistRoutes, buildTierlistRoutes } from "./routes.js";
-import type { EmitPublished, TierlistsPublicApi } from "./service.js";
+import type { EmitPublished, EmitVotedOn, TierlistsPublicApi } from "./service.js";
 import { createTierlistsPublicApi, createTierlistsService } from "./service.js";
 
 export interface TierlistsPluginOptions {
   emitPublished?: EmitPublished;
+  emitVotedOn?: EmitVotedOn;
 }
 
 export async function tierlistsPlugin(app: FastifyInstance, opts: TierlistsPluginOptions = {}) {
   // --- composition: swap this one block to change storage technology ---
   const db = openTierlistsDb();
   const tierlistsRepository = createSqliteTierlistsRepository(db);
-  const tierlistsService = createTierlistsService(tierlistsRepository, opts.emitPublished);
+  const tierlistsService = createTierlistsService(tierlistsRepository, opts.emitPublished, opts.emitVotedOn);
   // -----------------------------------------------------------------------
 
   // No rate limit on the authenticated CRUD surface — ordinary tier-list

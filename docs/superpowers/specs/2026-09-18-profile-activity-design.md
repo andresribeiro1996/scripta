@@ -50,6 +50,16 @@ Two gaps, decided together because one feeds the other:
   standalone collection browsing are out of scope.
 - **The followees feed stays publications-only in v1**, except that the
   `publications` toggle also filters it (one privacy surface).
+- **Imports save through the same `PUT /library` as normal edits**, so
+  the no-event rule is an explicit, optional `source: "import"` field
+  on that request, emitted only by the app's own import flows. This
+  supersedes the earlier "Import endpoints bypass the diff" wording.
+- **`voted_on` emission is best-effort.** The event insert cannot be
+  transactional with the vote (separate module databases), and failing
+  the vote after its row commits makes the missing event permanent (a
+  retry hits the already-voted error). Vote row first, event second —
+  no phantom event; emission failures are logged and swallowed. This
+  supersedes "a failed event insert must fail the vote response."
 
 ## Shared: `@scripta/shared/community`
 

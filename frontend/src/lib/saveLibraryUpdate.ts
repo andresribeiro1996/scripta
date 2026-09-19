@@ -4,12 +4,13 @@ export async function saveLibraryUpdate(
   current: LibraryDocument | null | undefined,
   updater: (data: LibraryData) => LibraryData,
   fetchLibrary: () => Promise<LibraryDocument | null>,
-  saveLibrary: (data: LibraryData, updatedAt?: string) => Promise<LibraryDocument>,
+  saveLibrary: (data: LibraryData, updatedAt?: string, source?: "import") => Promise<LibraryDocument>,
+  source?: "import",
 ): Promise<LibraryDocument> {
   const persist = (document: LibraryDocument | null | undefined) => {
     const base = document?.data ?? { books: [] };
     const updated = updater(base);
-    return document && updated === base ? Promise.resolve(document) : saveLibrary(updated, document?.updatedAt);
+    return document && updated === base ? Promise.resolve(document) : saveLibrary(updated, document?.updatedAt, source);
   };
   try {
     return await persist(current);

@@ -196,7 +196,9 @@ function buildDuelsForRound(
 
 export type EmitPublished = (tournamentId: string, ownerUserId: string) => void;
 
-export function createArenaService(repo: ArenaRepository, emitPublished?: EmitPublished): ArenaService {
+export type EmitVotedOn = (voterUserId: string, tournamentId: string, tournamentName: string | null) => void;
+
+export function createArenaService(repo: ArenaRepository, emitPublished?: EmitPublished, emitVotedOn?: EmitVotedOn): ArenaService {
   /** Checks whether every duel in a round has settled, and if so either
    *  generates the next round (from the winners, same pairing logic as
    *  the first round) or — if that round had exactly one duel — marks
@@ -394,6 +396,9 @@ export function createArenaService(repo: ArenaRepository, emitPublished?: EmitPu
       // other votes should still join the account on a signed-in revisit.
       if (voterUserId) repo.linkVotesToUser(voterToken, voterUserId);
       if (!inserted) throw new AlreadyVotedError();
+      if (voterUserId && emitVotedOn) {
+        emitVotedOn(voterUserId, tournamentId, repo.getTournament(tournamentId)?.name ?? null);
+      }
     },
 
     settleEarly(tournamentId, ownerUserId, duelId) {

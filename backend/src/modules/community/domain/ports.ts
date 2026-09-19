@@ -1,3 +1,4 @@
+import type { FeedSettings } from "@scripta/shared/community";
 import type { EventRow, FollowRow, ProfileRow } from "./types.js";
 
 export interface CursorKeyset {
@@ -6,7 +7,7 @@ export interface CursorKeyset {
 }
 
 export interface CommunityRepository {
-  insertFollow(row: FollowRow): void;
+  insertFollow(row: FollowRow): boolean;
   deleteFollow(followerId: string, followeeId: string): boolean;
   getFollow(followerId: string, followeeId: string): FollowRow | undefined;
   listFollowees(followerId: string): string[];
@@ -18,6 +19,8 @@ export interface CommunityRepository {
 
   getProfileRow(userId: string): ProfileRow | undefined;
   upsertProfile(row: ProfileRow): void;
+  getFeedSettings(userId: string): FeedSettings | null;
+  updateFeedSettings(userId: string, settings: FeedSettings): void;
 
   insertEvent(row: EventRow): void;
   listEventsByUser(userId: string, keyset: CursorKeyset | undefined, limit: number): EventRow[];

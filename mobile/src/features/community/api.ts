@@ -1,8 +1,10 @@
 import type { MuralBlock, ResolvedTierlist, ShelfTheme } from "@scripta/shared";
 import type { DashboardFeedPage } from "@scripta/shared/dashboard";
 import type {
+  ActivityItem,
   DiscoverItem,
   DiscoverType,
+  FeedSettings,
   Page,
   PersonResult,
   PublishedProfile,
@@ -27,6 +29,7 @@ export interface CommunityProfileView {
     tierlists: Record<string, ResolvedTierlist>;
   } | null;
   published: { tierlists: TierlistSummary[]; tournaments: TournamentSummary[] };
+  feedSettings?: FeedSettings;
 }
 
 export type CommunityPage<T> = Page<T>;
@@ -51,6 +54,15 @@ export async function searchPeople(q: string) {
 
 export async function fetchProfile(username: string) {
   return apiClient.request<CommunityProfileView>(`/community/profiles/${encodeURIComponent(username)}`, { auth: true });
+}
+
+export async function fetchActivity(username: string, cursor?: string): Promise<Page<ActivityItem>> {
+  const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
+  return apiClient.request<Page<ActivityItem>>(`/community/profiles/${encodeURIComponent(username)}/activity${query}`);
+}
+
+export function updateFeedSettings(settings: FeedSettings) {
+  return apiClient.request("/community/profile/feed-settings", { method: "PUT", body: settings, auth: true });
 }
 
 export function followUser(userId: string) {

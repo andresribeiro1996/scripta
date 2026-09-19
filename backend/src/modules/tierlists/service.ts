@@ -150,7 +150,9 @@ function toPublishedRef(row: TierlistRow, ballotCount: number): PublishedTierlis
 
 export type EmitPublished = (tierlistId: string, ownerUserId: string) => void;
 
-export function createTierlistsService(repo: TierlistsRepository, emitPublished?: EmitPublished): TierlistsService {
+export type EmitVotedOn = (voterUserId: string, tierlistId: string, tierlistName: string, placementCount: number) => void;
+
+export function createTierlistsService(repo: TierlistsRepository, emitPublished?: EmitPublished, emitVotedOn?: EmitVotedOn): TierlistsService {
   return {
     listTierlists(userId) {
       return repo.listByUser(userId).map(toTierlist);
@@ -277,6 +279,9 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
           };
 
       repo.saveBallot(ballot, placements);
+      if (!existing && voter.kind === "user" && emitVotedOn) {
+        emitVotedOn(voter.userId, row.id, row.name, placements.length);
+      }
       if (voter.kind === "user" && voter.userId !== row.origin_user_id && row.promoted_at === null && repo.eligibleVoteCount(row.id, row.origin_user_id) >= 100) {
         repo.promote(row.id, now);
       }

@@ -27,7 +27,7 @@ import { getArenaPublicApi, registerArenaModule } from "./modules/arena/index.js
 import { getCommunityPublicApi, registerCommunityModule } from "./modules/community/index.js";
 import { registerCoversModule } from "./modules/covers/index.js";
 import { registerGalleryModule } from "./modules/gallery/index.js";
-import { registerLibraryModule } from "./modules/library/index.js";
+import { registerLibraryModule, type BookEvent } from "./modules/library/index.js";
 import { getMuralsPublicApi, registerMuralsModule } from "./modules/murals/index.js";
 import { registerSocialsModule } from "./modules/socials/index.js";
 import { registerTierlistsModule, getTierlistsPublicApi } from "./modules/tierlists/index.js";
@@ -78,9 +78,26 @@ export function buildApp() {
 
   app.register(registerAuthModule, { authRoot: app });
   app.register(registerArenaModule, {
-    emitPublished: (tournamentId: string, ownerUserId: string) => getCommunityPublicApi().emitEvent(ownerUserId, "tournament_published", "tournament", tournamentId)
+    emitPublished: (tournamentId: string, ownerUserId: string) => getCommunityPublicApi().emitEvent(ownerUserId, "tournament_published", "tournament", tournamentId),
+    emitVotedOn: (voterUserId: string, tournamentId: string, name: string | null) => {
+      try {
+        getCommunityPublicApi().emitEvent(voterUserId, "voted_on", "tournament", tournamentId, { game: "tournament", id: tournamentId, name: name ?? "" });
+      } catch (error) {
+        app.log.error(error, "failed to record voted_on for tournament");
+      }
+    }
   });
-  app.register(registerLibraryModule);
+  app.register(registerLibraryModule, {
+    emitBookEvents: (userId: string, events: BookEvent[]) => {
+      for (const event of events) {
+        try {
+          getCommunityPublicApi().emitEvent(userId, event.type, "book", event.refId, event.payload);
+        } catch (error) {
+          app.log.error(error, "failed to record book activity event");
+        }
+      }
+    }
+  });
   app.register(registerGalleryModule);
   app.register(registerCoversModule);
   app.register(registerSocialsModule);
@@ -112,7 +129,14 @@ export function buildApp() {
     }
   });
   app.register(registerTierlistsModule, {
-    emitPublished: (copyId: string, ownerUserId: string) => getCommunityPublicApi().emitEvent(ownerUserId, "tierlist_published", "tierlist", copyId)
+    emitPublished: (copyId: string, ownerUserId: string) => getCommunityPublicApi().emitEvent(ownerUserId, "tierlist_published", "tierlist", copyId),
+    emitVotedOn: (voterUserId: string, tierlistId: string, tierlistName: string) => {
+      try {
+        getCommunityPublicApi().emitEvent(voterUserId, "voted_on", "tierlist", tierlistId, { game: "tierlist", id: tierlistId, name: tierlistName });
+      } catch (error) {
+        app.log.error(error, "failed to record voted_on for tierlist");
+      }
+    }
   });
 
   return app;

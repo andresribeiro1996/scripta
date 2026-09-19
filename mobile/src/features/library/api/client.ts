@@ -2,6 +2,7 @@
 // shareLibrary/unshareLibrary, on top of this app's own apiClient
 // (auth:true — refresh is handled inside, see core/apiClient.ts).
 //
+import type { BookRecommendationInput } from "@scripta/shared/community";
 import { apiClient, ApiError } from "../../../core/api";
 import type { LibraryData, LibraryDocument } from "./types";
 
@@ -22,17 +23,21 @@ export async function fetchLibrary(): Promise<LibraryDocument | null> {
   }
 }
 
-export async function saveLibrary(data: LibraryData, expectedUpdatedAt?: string): Promise<LibraryDocument> {
+export async function saveLibrary(data: LibraryData, expectedUpdatedAt?: string, source?: "import"): Promise<LibraryDocument> {
   try {
     return await apiClient.request<LibraryDocument>("/library", {
       method: "PUT",
       auth: true,
-      body: expectedUpdatedAt === undefined ? { data } : { data, updatedAt: expectedUpdatedAt },
+      body: expectedUpdatedAt === undefined ? { data, source } : { data, updatedAt: expectedUpdatedAt, source },
     });
   } catch (err) {
     if (err instanceof ApiError && err.status === 409) throw new LibraryConflictError();
     throw err;
   }
+}
+
+export async function addBookToLibrary(rec: BookRecommendationInput): Promise<{ key: string; updated: boolean }> {
+  return apiClient.request("/library/books", { method: "POST", body: rec, auth: true });
 }
 
 export async function shareLibrary(): Promise<LibraryDocument> {
