@@ -268,7 +268,11 @@ export function buildPublicTierlistRoutes(service: TierlistsService) {
       return sendBallotOutcome(reply, service, params.data.code, outcome);
     });
 
-    app.get("/tierlists/voting/:code/ballot/:ballotId", async (request, reply) => {
+    // Two shapes because the caller may hold either half of what voterFor
+    // needs: an anonymous voter has only the ballot id their device stored,
+    // while a signed-in one is resolved from their account and never has an
+    // id to send — openVoting seeded their ballot server-side.
+    const readBallot = async (request: FastifyRequest, reply: FastifyReply) => {
       const params = codeParamSchema.safeParse(request.params);
       const ballotId = (request.params as { ballotId?: string }).ballotId ?? null;
       if (!params.success) {
@@ -276,7 +280,9 @@ export function buildPublicTierlistRoutes(service: TierlistsService) {
       }
       const outcome = service.getBallot(params.data.code, voterFor(request, ballotId));
       return sendBallotOutcome(reply, service, params.data.code, outcome);
-    });
+    };
+    app.get("/tierlists/voting/:code/ballot", readBallot);
+    app.get("/tierlists/voting/:code/ballot/:ballotId", readBallot);
   };
 }
 
