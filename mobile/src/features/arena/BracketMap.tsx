@@ -6,10 +6,11 @@
 // a phone is tall and narrow, and the widest row this way is only half of
 // round 1, not the full round-1-to-final span.
 //
-// Compact read-only tiles (cover + vote share per side) rather than full
-// DuelCards — those are ~180pt tall, so a handful of them make a bracket
-// you can vote in but never see the shape of. Tapping a tile opens the
-// full match in a read-only sheet (bigger covers, exact tallies); an
+// Compact read-only tiles (just the two covers, no card chrome or vote
+// text) rather than full DuelCards — those are ~180pt tall, so a handful
+// of them make a bracket you can vote in but never see the shape of.
+// Tapping a tile opens the full match in a read-only sheet (bigger
+// covers, exact tallies); an
 // owner's settle/tiebreak controls sit directly on the tile instead —
 // nested Pressables, so tapping one of those doesn't also open the sheet.
 // A web-style "open the sheet to act" round trip is one tap too many on a
@@ -17,15 +18,14 @@
 
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { bracketShape, countdownLabel, needsVote, sharePercent, type BracketSlot, type Duel, type DuelSide } from "@scripta/shared";
+import { bracketShape, countdownLabel, needsVote, type BracketSlot, type Duel, type DuelSide } from "@scripta/shared";
 import { Icon, Sheet, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "./BookCover";
 import { DuelSideRow } from "./DuelSideRow";
 import type { TournamentView } from "./api";
 
-function MatchSide({ side, duel, isWinner, decided, onPick, busy }: { side: DuelSide; duel: Duel; isWinner: boolean; decided: boolean; onPick?: () => void; busy: boolean }) {
+function MatchSide({ side, isWinner, decided, onPick, busy }: { side: DuelSide; isWinner: boolean; decided: boolean; onPick?: () => void; busy: boolean }) {
   const { colors } = useTheme();
-  const pct = sharePercent(side.votes, duel);
   return (
     <View style={styles.tileSide}>
       {/* The badge sits on this OUTER box, which never clips — only the
@@ -33,7 +33,7 @@ function MatchSide({ side, duel, isWinner, decided, onPick, busy }: { side: Duel
        *  cover image itself. A badge clipped by its own cover's rounding
        *  would lose its corner. */}
       <View style={styles.tileCoverOuter}>
-        <View style={[styles.tileCoverImage, isWinner ? { borderColor: colors.accent, borderWidth: 2 } : null]}>
+        <View style={[styles.tileCoverImage, isWinner ? { borderColor: colors.accent, borderWidth: 2 } : null, decided && !isWinner ? styles.loserCover : null]}>
           <BookCover cover={side.cover} title={side.title} fill />
         </View>
         {isWinner ? (
@@ -53,11 +53,7 @@ function MatchSide({ side, duel, isWinner, decided, onPick, busy }: { side: Duel
         >
           <Text {...dynamicType} numberOfLines={1} style={[typography.caption, styles.tiebreakLabel, { color: colors.accent }]}>Wins</Text>
         </Pressable>
-      ) : (
-        <Text {...dynamicType} numberOfLines={1} style={[typography.caption, styles.tilePct, { color: isWinner ? colors.accent : colors.textDim, opacity: decided && !isWinner ? 0.6 : 1 }]}>
-          {pct === null ? "–" : `${pct}%`}
-        </Text>
-      )}
+      ) : null}
     </View>
   );
 }
@@ -65,15 +61,20 @@ function MatchSide({ side, duel, isWinner, decided, onPick, busy }: { side: Duel
 function EmptyTile() {
   const { colors } = useTheme();
   return (
-    <View style={[styles.tile, styles.emptyTile, { borderColor: colors.border }]}>
-      {[0, 1].map((i) => (
-        <View key={i} style={styles.tileSide}>
-          <View style={styles.tileCoverOuter}>
-            <View style={[styles.tileCoverImage, styles.emptyCover, { backgroundColor: colors.border }]} />
-          </View>
-          <Text {...dynamicType} style={[typography.caption, { color: colors.textDim, opacity: 0.6 }]}>–</Text>
+    <View style={styles.tile}>
+      <View style={styles.tileSide}>
+        <View style={styles.tileCoverOuter}>
+          <View style={[styles.tileCoverImage, styles.emptyCover, { backgroundColor: colors.border }]} />
         </View>
-      ))}
+      </View>
+      <View style={styles.vsWrap}>
+        <Text {...dynamicType} style={[typography.caption, styles.vsLabel, { color: colors.textDim, opacity: 0.5 }]}>vs</Text>
+      </View>
+      <View style={styles.tileSide}>
+        <View style={styles.tileCoverOuter}>
+          <View style={[styles.tileCoverImage, styles.emptyCover, { backgroundColor: colors.border }]} />
+        </View>
+      </View>
     </View>
   );
 }
@@ -102,12 +103,14 @@ function MatchTile({
       accessibilityRole="button"
       accessibilityLabel={`${duel.bookA.title} versus ${duel.bookB.title}`}
       onPress={() => onOpen(duel)}
-      style={[styles.tile, { borderColor: duel.status === "active" ? colors.accent : colors.border, backgroundColor: colors.surface }]}
+      style={styles.tile}
     >
       {needsVote(duel) ? <View style={[styles.voteDot, { backgroundColor: colors.accent, borderColor: colors.surface }]} /> : null}
-      <MatchSide side={duel.bookA} duel={duel} isWinner={duel.winnerKey === duel.bookA.key} decided={decided} busy={busy} onPick={tiebreak ? () => onTiebreak(duel.id, duel.bookA.key) : undefined} />
-      <View style={[styles.tileDivider, { backgroundColor: colors.border }]} />
-      <MatchSide side={duel.bookB} duel={duel} isWinner={duel.winnerKey === duel.bookB.key} decided={decided} busy={busy} onPick={tiebreak ? () => onTiebreak(duel.id, duel.bookB.key) : undefined} />
+      <MatchSide side={duel.bookA} isWinner={duel.winnerKey === duel.bookA.key} decided={decided} busy={busy} onPick={tiebreak ? () => onTiebreak(duel.id, duel.bookA.key) : undefined} />
+      <View style={styles.vsWrap}>
+        <Text {...dynamicType} style={[typography.caption, styles.vsLabel, { color: duel.status === "active" ? colors.accent : colors.textDim }]}>vs</Text>
+      </View>
+      <MatchSide side={duel.bookB} isWinner={duel.winnerKey === duel.bookB.key} decided={decided} busy={busy} onPick={tiebreak ? () => onTiebreak(duel.id, duel.bookB.key) : undefined} />
       {isOwner && duel.status === "active" ? (
         <Pressable
           accessibilityRole="button"
@@ -316,14 +319,14 @@ const styles = StyleSheet.create({
   hLineBottom: { bottom: 0 },
   hLineRight: { left: "50%", right: 0 },
   hLineLeft: { left: 0, right: "50%" },
-  tile: { position: "relative", flexDirection: "row", alignItems: "stretch", borderWidth: 1, borderRadius: radii.sm },
-  emptyTile: { borderStyle: "dashed" },
-  tileDivider: { width: 1 },
-  tileSide: { flex: 1, minWidth: 0, alignItems: "center", gap: 2, paddingVertical: spacing.xs, paddingHorizontal: 2 },
+  tile: { position: "relative", flexDirection: "row", alignItems: "stretch", borderRadius: radii.sm },
+  vsWrap: { justifyContent: "center", alignItems: "center", paddingHorizontal: 1 },
+  vsLabel: { fontSize: 9, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.3 },
+  tileSide: { flex: 1, minWidth: 0, alignItems: "center", gap: 2 },
   tileCoverOuter: { width: "100%", aspectRatio: 2 / 3, maxWidth: 56 },
   tileCoverImage: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, borderRadius: 3, overflow: "hidden" },
   emptyCover: { opacity: 0.4 },
-  tilePct: { fontSize: 10 },
+  loserCover: { opacity: 0.45 },
   checkBadge: { position: "absolute", top: -3, right: -3, width: 14, height: 14, borderRadius: radii.full, alignItems: "center", justifyContent: "center" },
   checkMark: { color: "#fff", fontSize: 9, fontWeight: "700" },
   voteDot: { position: "absolute", top: -3, right: -3, zIndex: 1, width: 10, height: 10, borderRadius: radii.full, borderWidth: 2 },
