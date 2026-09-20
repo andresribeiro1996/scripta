@@ -3,21 +3,23 @@ import { Stack } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Linking from "expo-linking";
-import { RefreshControl, ScrollView, Share, StyleSheet, View } from "react-native";
+import { RefreshControl, ScrollView, Share, StyleSheet, Text, View } from "react-native";
 import { createVoterToken } from "@scripta/shared";
 import { useAuth } from "../../core/auth";
-import { Button, Dialog, EmptyState, ErrorState, IconButton, Input, Menu, Screen, Skeleton, SwipeableTabs, Toast, spacing } from "../../ui";
+import { Button, Dialog, EmptyState, ErrorState, IconButton, Input, Menu, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, spacing, typography, useTheme } from "../../ui";
 import { AddBookSheet } from "../community/AddBookSheet";
 import { fetchTournament, renameTournament, resolveTiebreak, settleDuelEarly, voteOnDuel } from "./api";
-import { arenaViewTabs, matchEmptyCopy, votableDuels, type ArenaViewTab } from "./arenaView";
+import { arenaViewTabs, matchEmptyCopy, tournamentChampion, votableDuels, type ArenaViewTab } from "./arenaView";
 import { ArenaVoteDeck } from "./ArenaVoteDeck";
 import { ArenaBooksSheet } from "./ArenaBooksSheet";
-import { BracketMap } from "./BracketMap";
+import { BracketRounds } from "./BracketRounds";
+import { ChampionBanner } from "./ChampionBanner";
 
 const TOKEN_KEY = "arena-voter-token";
 
 export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => void }) {
   const { user } = useAuth();
+  const { colors } = useTheme();
   const queryClient = useQueryClient();
   const [token, setToken] = useState<string | null>(null);
   const [tab, setTab] = useState<ArenaViewTab>("match");
@@ -26,6 +28,7 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState("");
   const [booksOpen, setBooksOpen] = useState(false);
+  const [scrolling, setScrolling] = useState(false);
   const [addBook, setAddBook] = useState<{ title: string; author: string; coverUrl?: string | null } | null>(null);
   const [, setTick] = useState(0);
 
@@ -68,6 +71,7 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
 
   const votable = votableDuels(data.duels);
   const next = votable[0];
+  const champion = tournamentChampion(data.bracketSize, data.duels);
   const refresh = () => void tournament.refetch();
   const tabs = arenaViewTabs(data.status);
   const activeTab = tabs.some((option) => option.value === tab) ? tab : tabs[0]!.value;
@@ -92,7 +96,14 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
     }
     return (
       <ScrollView style={styles.grow} contentContainerStyle={styles.pane} refreshControl={<RefreshControl refreshing={tournament.isRefetching} onRefresh={refresh} />}>
-        <EmptyState title={empty.title} body={empty.body} />
+        {champion ? (
+          <>
+            <Text {...dynamicType} style={[typography.caption, styles.note, { color: colors.textDim }]}>{empty.title}</Text>
+            <ChampionBanner champion={champion} />
+          </>
+        ) : (
+          <EmptyState title={empty.title} body={empty.body} />
+        )}
       </ScrollView>
     );
   };
@@ -105,16 +116,19 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
         </ScrollView>
       );
     }
+    // Owns its own ScrollView so its round bar can stay pinned to the
+    // bottom of the pane instead of scrolling away with the matches.
     return (
-      <ScrollView style={styles.grow} contentContainerStyle={styles.list} refreshControl={<RefreshControl refreshing={tournament.isRefetching} onRefresh={refresh} />}>
-        <BracketMap
-          tournament={data}
-          isOwner={isOwner}
-          busyDuelId={busy}
-          onSettle={(duelId) => void action(duelId, () => settleDuelEarly(id, duelId))}
-          onTiebreak={(duelId, bookKey) => void action(duelId, () => resolveTiebreak(id, duelId, bookKey))}
-        />
-      </ScrollView>
+      <BracketRounds
+        tournament={data}
+        isOwner={isOwner}
+        busyDuelId={busy}
+        refreshing={tournament.isRefetching}
+        onRefresh={refresh}
+        onScrolling={setScrolling}
+        onSettle={(duelId) => void action(duelId, () => settleDuelEarly(id, duelId))}
+        onTiebreak={(duelId, bookKey) => void action(duelId, () => resolveTiebreak(id, duelId, bookKey))}
+      />
     );
   };
 
@@ -128,11 +142,12 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
             <Menu
               title={data.name}
               items={[
+                { label: data.slots.length ? `See all ${data.slots.length} books` : "View book pool", onPress: () => setBooksOpen(true) },
                 ...(isOwner ? [{ label: "Rename…", onPress: () => { setName(data.name); setRenaming(true); } }] : []),
                 { label: "Share…", onPress: () => void Share.share({ message: Linking.createURL(`/arena/${id}`) }) },
               ]}
             >
-              <IconButton accessibilityLabel={`Actions for ${data.name}`} name="more" />
+              <IconButton accessibilityLabel={`Actions for ${data.name}`} framed name="more" />
             </Menu>
           ),
         }}
@@ -143,9 +158,9 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
         options={tabs.map((option) => option.value === "match" ? { ...option, badge: votable.length } : option)}
         value={activeTab}
         onChange={setTab}
+        tabsHidden={scrolling}
         renderPage={(pageTab) => pageTab === "match" ? matchPane() : bracketPane()}
       />
-      <Button label={data.slots.length ? `See all ${data.slots.length} books` : "View book pool"} variant="secondary" onPress={() => setBooksOpen(true)} />
       <ArenaBooksSheet id={booksOpen ? id : null} name={data.name} onAddBook={openAddBook} onClose={() => setBooksOpen(false)} />
       {addBook ? <AddBookSheet book={addBook} onClose={() => setAddBook(null)} /> : null}
       <Dialog visible={renaming} title="Rename tournament" onClose={() => setRenaming(false)}><View style={styles.dialog}><Input label="Tournament name" value={name} onChangeText={setName} maxLength={200} /><Button label="Save name" disabled={!name.trim()} loading={busy === "rename"} onPress={() => void action("rename", async () => { await renameTournament(id, name.trim()); setRenaming(false); })} /></View></Dialog>
@@ -158,6 +173,6 @@ const styles = StyleSheet.create({
   grow: { flex: 1 },
   pane: { gap: spacing.md, paddingBottom: spacing.huge, flexGrow: 1, justifyContent: "center" },
   matchWrap: { flex: 1, paddingTop: spacing.lg, justifyContent: "center" },
-  list: { gap: spacing.md, paddingBottom: spacing.huge, flexGrow: 1 },
+  note: { textAlign: "center", textTransform: "uppercase", letterSpacing: 1, fontWeight: "700" },
   dialog: { gap: spacing.md },
 });

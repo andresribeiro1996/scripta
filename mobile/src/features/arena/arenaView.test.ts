@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Duel } from "@scripta/shared";
-import { arenaViewTabs, bracketSlots, matchEmptyCopy, votableDuels } from "./arenaView.js";
+import { arenaViewTabs, bracketSlots, matchEmptyCopy, tournamentChampion, votableDuels } from "./arenaView.js";
 
 const duel = (over: Partial<Duel> = {}): Duel => ({
   id: "d1",
@@ -19,10 +19,10 @@ const duel = (over: Partial<Duel> = {}): Duel => ({
   ...over,
 });
 
-test("a finished tournament drops the Match tab — there's nothing left to vote on", () => {
-  assert.deepEqual(arenaViewTabs("seeding").map((option) => option.value), ["match", "bracket"]);
-  assert.deepEqual(arenaViewTabs("active").map((option) => option.value), ["match", "bracket"]);
-  assert.deepEqual(arenaViewTabs("completed").map((option) => option.value), ["bracket"]);
+test("both tabs stay put at every status — a finished tournament shows its winner on Match", () => {
+  assert.deepEqual(arenaViewTabs("seeding").map((option) => option.value), ["bracket", "match"]);
+  assert.deepEqual(arenaViewTabs("active").map((option) => option.value), ["bracket", "match"]);
+  assert.deepEqual(arenaViewTabs("completed").map((option) => option.value), ["bracket", "match"]);
 });
 
 test("the match deck only queues duels still open to this voter", () => {
@@ -54,9 +54,22 @@ test("bracket slots keep a stable key for rounds nobody has reached yet", () => 
   assert.equal(filled[2]?.duel?.id, "final");
 });
 
+test("there's no champion until the final itself is decided", () => {
+  const semiA = duel({ id: "s1", roundNumber: 1, duelIndex: 0, winnerKey: "a", status: "settled" });
+  const semiB = duel({ id: "s2", roundNumber: 1, duelIndex: 1, winnerKey: "b", status: "settled" });
+  // Both semis done but the final still open: a decided earlier round is
+  // not a tournament winner.
+  const openFinal = duel({ id: "f", roundNumber: 2, duelIndex: 0 });
+  assert.equal(tournamentChampion(4, [semiA, semiB, openFinal]), null);
+  assert.equal(tournamentChampion(4, [semiA, semiB]), null);
+
+  const wonFinal = duel({ id: "f", roundNumber: 2, duelIndex: 0, winnerKey: "b", status: "settled" });
+  assert.equal(tournamentChampion(4, [semiA, semiB, wonFinal])?.title, "B");
+});
+
 test("the match pane explains an empty deck by what the tournament is doing", () => {
   assert.equal(matchEmptyCopy("seeding", false).title, "Not started yet");
-  assert.equal(matchEmptyCopy("completed", true).title, "Tournament over");
+  assert.equal(matchEmptyCopy("completed", true).title, "No matches");
   assert.equal(matchEmptyCopy("active", false).title, "No matches yet");
   // Active, matches drawn, nothing left to vote on: this voter is done until
   // the round closes — not the same as a tournament with no matches at all.

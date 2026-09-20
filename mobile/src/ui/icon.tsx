@@ -19,6 +19,9 @@ const GLYPHS = {
   home: { ios: "house", android: "home" },
   library: { ios: "books.vertical", android: "library_books" },
   arena: { ios: "trophy", android: "trophy" },
+  // Solid on purpose: it marks one book as having won the whole thing, not
+  // a link to the Arena feature.
+  champion: { ios: "trophy.fill", android: "trophy" },
   community: { ios: "person.3", android: "group" },
   murals: { ios: "paintpalette", android: "palette" },
   profile: { ios: "person.circle", android: "account_circle" },
