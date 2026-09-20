@@ -69,7 +69,7 @@ if (!shared) {
     SOCIALS_ENCRYPTION_KEY: "", X_CLIENT_ID: "", INSTAGRAM_CLIENT_ID: "", THREADS_CLIENT_ID: "", TIKTOK_CLIENT_KEY: "",
     ALLOW_LAN_ORIGINS: "true"
   });
-  for (const module of ["auth", "library", "gallery", "covers", "socials", "arena", "murals", "tierlists"]) {
+  for (const module of ["auth", "library", "gallery", "covers", "socials", "arena", "murals", "tierlists", "community"]) {
     process.env[`${module.toUpperCase()}_DB_PATH`] = join(directory, `${module}.sqlite`);
   }
   for (const storage of ["gallery", "avatar", "covers"]) process.env[`${storage.toUpperCase()}_STORAGE_PATH`] = join(directory, `${storage}-files`);
@@ -112,16 +112,45 @@ async function seed() {
     users[name] = { username, email, id: session.user.id };
     tokens[name] = session.accessToken;
   }
-  const books = Array.from({ length: 16 }, (_, index) => ({
-    ContentID: `fixture-book-${index + 1}`, Title: `The ${["Amber", "Silver", "Quiet", "Hidden"][index % 4]} ${["Harbor", "Garden", "Archive", "Journey"][Math.floor(index / 4)]}`,
-    Attribution: `Fixture Author ${index % 4 + 1}`, ReadStatus: index % 3, ___PercentRead: [0, 45, 100][index % 3],
+  // Real titles/authors/ISBNs, taken from the same book list the dev
+  // account's own library is seeded from, because covers are resolved by
+  // ISBN and cached per data directory: sharing the list means a published
+  // tier list's snapshot finds a cached cover instead of a null, and the
+  // feed has something to show. Everything privacy-related about these
+  // books (the highlights, the annotation) stays synthetic.
+  const titles = JSON.parse(readFileSync(fileURLToPath(new URL("../../scripts/fixtures/library.json", import.meta.url)), "utf8")).books;
+  assert(titles.length >= 16, "The shared library fixture needs at least 16 books for this fixture's 12/8/0 split.");
+  const books = titles.slice(0, 16).map((book, index) => ({
+    ContentID: `fixture-book-${index + 1}`, Title: book.Title, Attribution: book.Attribution, ISBN: book.ISBN ?? null,
+    ReadStatus: index % 3, ___PercentRead: [0, 45, 100][index % 3],
     highlights: [{ BookmarkID: `fixture-highlight-${index + 1}`, Text: "A synthetic passage for testing.", Annotation: "PRIVATE_FIXTURE_NOTE" }]
   }));
   for (const [name, libraryBooks] of [["alice", books.slice(0, 12)], ["bob", [...books.slice(0, 4), ...books.slice(12)]], ["charlie", []]]) {
     await request("PUT", "/library", { data: { source: "three-user-fixture", schema_version: 1, name: `${name}'s library`, book_count: libraryBooks.length, books: libraryBooks } }, tokens[name]);
   }
   const library = await request("POST", "/library/share", {}, tokens.alice);
-  const keys = books.slice(0, 4).map(bookKey);
+  // Warm the cover cache BEFORE anything is published: publishing snapshots
+  // the public view of a book, so a cover that lands in the cache afterwards
+  // never reaches the snapshot. Best-effort on purpose — resolving covers
+  // reaches the network, and a fixture that only works online would be worse
+  // than one that occasionally seeds without cover art.
+  const covers = new Map();
+  for (const book of books.slice(0, 8)) {
+    if (!book.ISBN) continue;
+    const response = await app.inject({ method: "GET", url: `/covers/resolve?isbn=${encodeURIComponent(book.ISBN)}`, headers: { authorization: `Bearer ${tokens.alice}` } });
+    const url = response.statusCode === 200 ? response.json().url : null;
+    if (url) covers.set(bookKey(book), url);
+  }
+  // Prefer books whose covers actually resolved, so the four that end up in
+  // the poll and the bracket are four the feed can draw. Not every ISBN has
+  // art behind it, and a pool picked by position alone kept landing on the
+  // ones that don't.
+  // Alice's own 12 books only — everything the pool feeds (her murals, her
+  // polls, her bracket) is rejected for a book she doesn't own.
+  const aliceBooks = books.slice(0, 12);
+  const withCovers = aliceBooks.filter((book) => covers.has(bookKey(book)));
+  const pool = [...withCovers, ...aliceBooks.filter((book) => !covers.has(bookKey(book)))].slice(0, 4);
+  const keys = pool.map(bookKey);
   const murals = {};
   for (const visibility of ["shared", "private"]) {
     let mural = await request("POST", "/murals", { name: `Alice's ${visibility} reading room` }, tokens.alice, 201);
@@ -143,7 +172,7 @@ async function seed() {
     polls[access] = { id: tierlist.id, code: tierlist.voteCode, bobBallotId: ballot.ballotId };
   }
   const { tournament } = await request("POST", "/arenas", { name: "Alice's weekend bracket", bracketSize: 4, roundDurationMinutes: 10080 }, tokens.alice, 201);
-  await request("PUT", `/arenas/${tournament.id}/slots`, { slots: books.slice(0, 4).map((book, slotIndex) => ({ slotIndex, book: { key: bookKey(book), title: book.Title, author: book.Attribution, cover: null } })) }, tokens.alice, 204);
+  await request("PUT", `/arenas/${tournament.id}/slots`, { slots: pool.map((book, slotIndex) => ({ slotIndex, book: { key: bookKey(book), title: book.Title, author: book.Attribution, cover: covers.get(bookKey(book)) ?? null } })) }, tokens.alice, 204);
   await request("POST", `/arenas/${tournament.id}/start`, {}, tokens.alice, 204);
   const { tournament: arena } = await request("GET", `/arenas/${tournament.id}`);
   const voterToken = "scripta-fixture-bob";

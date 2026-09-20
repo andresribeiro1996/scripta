@@ -162,6 +162,7 @@ export function tierRef(id: string, owner: string, overrides: Partial<PublishedT
     eligibleVoteCount: 1,
     promotedAt: null,
     votingOpen: true,
+    covers: [],
     ...overrides
   };
 }
@@ -174,6 +175,7 @@ export function tournRef(id: string, owner: string, overrides: Partial<Published
     name: `Cup ${id}`,
     bracketSize: 8,
     status: "active",
+    covers: [],
     ...overrides
   };
 }

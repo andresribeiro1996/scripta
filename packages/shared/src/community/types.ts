@@ -17,6 +17,7 @@ export interface TierlistSummary {
   ballotCount: number;
   votingOpen: boolean;
   promotedAt: string | null;
+  covers: string[];
 }
 
 export interface TournamentSummary {
@@ -26,6 +27,7 @@ export interface TournamentSummary {
   bracketSize: number;
   status: "active" | "completed";
   bookCount: number;
+  covers: string[];
 }
 
 export type PublishedContent = TierlistSummary | TournamentSummary;

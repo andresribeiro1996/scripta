@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { Image } from "expo-image";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
-import { bookKey, buildDashboardCards, digestHeading, digestTarget, effectiveCardStyle, resolveLibraryStyle, resolveQuote, type DigestItem, type LibraryStyleSettings, type PerCardStyle } from "@scripta/shared";
-import { Button, EmptyState, ErrorState, IconButton, Screen, Skeleton, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { buildDashboardCards, digestHeading, digestTarget, resolveQuote, type DigestItem } from "@scripta/shared";
+import { Button, EmptyState, ErrorState, Icon, IconButton, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { useAuth } from "../../core/auth";
 import { useLibrary } from "../library/hooks/useLibrary";
-import { BookCard } from "../library/components/BookCard";
-import { useLibraryGridColumns } from "../library/components/LibraryGrid";
 import { AuthorAvatar } from "../community/AuthorAvatar";
-import { fetchDashboard, markDashboardSeen } from "../community/api";
+import { DiscoverPane } from "../community/DiscoverPane";
+import { PeoplePane } from "../community/PeoplePane";
+import { fetchDashboard, followUser, markDashboardSeen } from "../community/api";
+import { defaultHomeTab, homeTabOptions, type HomeTab } from "./homeTabs";
+import { feedRowModel, relativeTime } from "./feedRow";
 
 export function HomeScreen() {
   const { colors } = useTheme();
@@ -18,6 +21,10 @@ export function HomeScreen() {
   const library = useLibrary();
   const [day, setDay] = useState(() => new Date().toISOString().slice(0, 10));
   const [offset, setOffset] = useState(0);
+  const [tab, setTab] = useState<HomeTab>("activity");
+  const [followingId, setFollowingId] = useState<string | null>(null);
+  const [followError, setFollowError] = useState<string | null>(null);
+  const tabInitedRef = useRef(false);
   const markedRef = useRef(false);
   const dashboard = useInfiniteQuery({
     queryKey: ["community", "dashboard"],
@@ -39,19 +46,42 @@ export function HomeScreen() {
     }
   }, [dashboard.data]);
 
-  const style = resolveLibraryStyle(library.data?.data.style);
-  const { columns, contentWidth } = useLibraryGridColumns(style);
-  // Half a tile short of a whole column, so the row shows the edge of the next
-  // cover and reads as something to swipe rather than as everything there is.
-  const coverWidth = Math.max(72, Math.round((contentWidth - spacing.lg * 2 - style.cardGap * columns) / (columns + 0.5)));
   const books = library.data?.data.books ?? [];
   const items = dashboard.data?.pages.flatMap((page) => page.items) ?? [];
   const newCount = dashboard.data?.pages[0]?.newCount ?? 0;
-  const byKey = new Map(books.map((book) => [bookKey(book), book] as const));
   const cards = user ? buildDashboardCards(books, day, `${user.id}:${offset}`) : [];
+  const rediscoverCard = cards.find((card) => card.kind === "rediscover");
+  const quote = rediscoverCard ? resolveQuote({ type: "quote", bookKey: rediscoverCard.bookKey, highlightId: rediscoverCard.highlightId } as never, books) : null;
 
+  // Picks the opening tab once real data has arrived, then leaves the user's
+  // own tab choice alone — otherwise a later refetch could yank them back to
+  // Discover mid-swipe just because Activity happened to be empty on load.
+  useEffect(() => {
+    if (!tabInitedRef.current && dashboard.data) {
+      tabInitedRef.current = true;
+      setTab(defaultHomeTab(items.length));
+    }
+  }, [dashboard.data, items.length]);
+
+  // Refetches rather than patching the row in place: the follow lands as an
+  // event of its own, so the feed has more to say afterwards than just this
+  // row's new state.
+  async function followBack(userId: string) {
+    setFollowingId(userId);
+    try {
+      await followUser(userId);
+      await dashboard.refetch();
+    } catch {
+      setFollowError("Couldn't follow them. Try again.");
+    } finally {
+      setFollowingId(null);
+    }
+  }
+
+  // Mobile's profile route is /u/<name>; the shared target is the web app's
+  // /community/u/<name>, so the two kinds that point at a person are remapped.
   function digestRoute(item: DigestItem): string {
-    return item.kind === "follow" ? `/u/${item.actor.username}` : digestTarget(item);
+    return item.kind === "follow" || item.kind === "reading" ? `/u/${item.actor.username}` : digestTarget(item);
   }
 
   return (
@@ -74,137 +104,172 @@ export function HomeScreen() {
           <ErrorState body="Couldn't load your home." actionLabel="Retry" onAction={() => { void dashboard.refetch(); void library.refetch(); }} />
         </View>
       ) : (
-        <FlatList
-          data={items}
-          keyExtractor={(item) => `${item.kind}:${item.id}`}
-          contentContainerStyle={styles.list}
-          keyboardShouldPersistTaps="handled"
-          refreshing={dashboard.isRefetching}
-          onRefresh={() => void dashboard.refetch()}
-          onEndReached={() => {
-            if (dashboard.hasNextPage && !dashboard.isFetchingNextPage) void dashboard.fetchNextPage();
-          }}
-          onEndReachedThreshold={0.4}
-          ListFooterComponent={dashboard.isFetchingNextPage ? <Skeleton height={80} /> : null}
-          ListHeaderComponent={
+        <View style={styles.grow}>
+          {followError ? <Toast visible message={followError} tone="error" /> : null}
+          {!books.length ? (
             <View style={styles.page}>
-              {!books.length ? (
-                <EmptyState title="Start your library" body="Import your existing collection, or add your first book manually." actionLabel="Import library" onAction={() => router.push("/import" as never)} secondaryActionLabel="Add a book manually" onSecondaryAction={() => router.push("/add-book" as never)} />
-              ) : cards.map((card) => {
-                if (card.kind === "currentlyReading" || card.kind === "upNext") {
-                  // Reading is every book at ReadStatus 1 and Up next everything
-                  // unstarted, so both are capped: a row scrolls, but a library's
-                  // worth of covers is still a library's worth of cover lookups.
-                  const keys = card.bookKeys.slice(0, card.kind === "currentlyReading" ? 12 : 6);
-                  const sectionBooks = keys.flatMap((key) => { const book = byKey.get(key); return book ? [book] : []; });
-                  if (!sectionBooks.length) return null;
-                  return (
-                    <View key={card.kind} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                      <Text {...dynamicType} style={[typography.title, styles.heading, { color: colors.text }]}>
-                        {card.kind === "currentlyReading" ? "Currently reading" : "Up next"}
-                      </Text>
-                      <BookRail books={sectionBooks} width={coverWidth} style={style} onOpen={(book) => router.push(`/book/${encodeURIComponent(bookKey(book))}` as never)} />
-                    </View>
-                  );
-                }
-                const quote = resolveQuote({ type: "quote", bookKey: card.bookKey, highlightId: card.highlightId } as never, books);
-                if (!quote) return null;
-                return (
-                  <View key="rediscover" style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                    <Text {...dynamicType} style={[typography.title, styles.heading, { color: colors.text }]}>Rediscover</Text>
-                    <Text {...dynamicType} style={[typography.title, { color: colors.text }]}>{String(quote.highlight.Text)}</Text>
-                    <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
-                      {String(quote.book.Title)} · {String(quote.book.Attribution ?? "")}
-                    </Text>
-                    <Button label="Show another" variant="secondary" onPress={() => setOffset((value) => value + 1)} />
-                  </View>
-                );
-              })}
-              <View style={styles.section}>
-                <View style={styles.followingRow}>
-                  <Text {...dynamicType} style={[typography.title, styles.heading, { color: colors.text }]}>Following</Text>
-                  {newCount > 0 ? (
-                    <View style={[styles.newBadge, { backgroundColor: colors.accentSoft }]}>
-                      <Text {...dynamicType} style={[typography.caption, { color: colors.accent }]}>{newCount} new</Text>
-                    </View>
-                  ) : null}
-                </View>
-                {items.length === 0 ? (
-                  <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
-                    Nothing here yet. Follow people to see what they publish.
-                  </Text>
-                ) : null}
-                {/* Under the section they act on, rather than above the whole
-                    page: finding people is what an empty feed needs next. */}
-                <View style={styles.entryRow}>
-                  <Button label="Find people" variant="secondary" onPress={() => router.push("/people" as never)} />
-                  <Button label="Discover" variant="secondary" onPress={() => router.push("/discover" as never)} />
-                </View>
+              <EmptyState title="Start your library" body="Import your existing collection, or add your first book manually." actionLabel="Import library" onAction={() => router.push("/import" as never)} secondaryActionLabel="Add a book manually" onSecondaryAction={() => router.push("/add-book" as never)} />
+            </View>
+          ) : quote ? (
+            <View style={styles.page}>
+              <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <Text {...dynamicType} style={[typography.title, styles.heading, { color: colors.text }]}>Rediscover</Text>
+                <Text {...dynamicType} style={[typography.title, { color: colors.text }]}>{String(quote.highlight.Text)}</Text>
+                <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
+                  {String(quote.book.Title)} · {String(quote.book.Attribution ?? "")}
+                </Text>
+                <Button label="Show another" variant="secondary" onPress={() => setOffset((value) => value + 1)} />
               </View>
             </View>
-          }
-          renderItem={({ item }) => (
-            <Pressable accessibilityRole="link" accessibilityLabel={digestHeading(item)} onPress={() => router.push(digestRoute(item) as never)}>
-              {({ pressed }) => <View style={[styles.card, { backgroundColor: pressed ? colors.surfacePressed : colors.surface, borderColor: colors.border }]}>
-                <View style={styles.actorRow}>
-                  <AuthorAvatar username={item.actor.username} avatarUrl={item.actor.avatarUrl} />
-                  <View style={styles.grow}>
-                    <Text numberOfLines={1} {...dynamicType} style={[typography.body, { color: colors.text }]}>
-                      {digestHeading(item)}
+          ) : null}
+          <SwipeableTabs
+            accessibilityLabel="Home sections"
+            options={homeTabOptions(newCount)}
+            value={tab}
+            onChange={setTab}
+            renderPage={(value) => {
+              if (value === "discover") return <DiscoverPane />;
+              if (value === "people") return <PeoplePane />;
+              return (
+                <FlatList
+                  data={items}
+                  keyExtractor={(item) => `${item.kind}:${item.id}`}
+                  contentContainerStyle={styles.list}
+                  keyboardShouldPersistTaps="handled"
+                  refreshing={dashboard.isRefetching}
+                  onRefresh={() => void dashboard.refetch()}
+                  onEndReached={() => {
+                    if (dashboard.hasNextPage && !dashboard.isFetchingNextPage) void dashboard.fetchNextPage();
+                  }}
+                  onEndReachedThreshold={0.4}
+                  ListFooterComponent={dashboard.isFetchingNextPage ? <Skeleton height={80} /> : null}
+                  ListEmptyComponent={
+                    <Text {...dynamicType} style={[typography.caption, styles.emptyFeed, { color: colors.textDim }]}>
+                      Nothing here yet. Follow people to see what they publish.
                     </Text>
-                    {item.kind === "publication" ? (
-                      <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
-                        {item.content.name}
-                      </Text>
-                    ) : null}
-                  </View>
-                </View>
-              </View>}
-            </Pressable>
-          )}
-        />
+                  }
+                  renderItem={({ item }) => (
+                    <FeedRow
+                      item={item}
+                      onOpen={() => router.push(digestRoute(item) as never)}
+                      onFollowBack={() => void followBack(item.actor.userId)}
+                      following={followingId === item.actor.userId}
+                    />
+                  )}
+                />
+              );
+            }}
+          />
+        </View>
       )}
     </Screen>
   );
 }
 
-/** A horizontal row of the library's own cards, so a cover on Home is the
- *  same object it is in the library — per-book style overrides included. */
-function BookRail({ books, width, style, onOpen }: {
-  books: Array<Record<string, unknown>>;
-  width: number;
-  style: LibraryStyleSettings;
-  onOpen: (book: Record<string, unknown>) => void;
-}) {
+/** One activity row. The leading slot is always the same width and always
+ *  starts at the same edge, so names line up down the feed; what fills it
+ *  says how much the event is worth — a fan of covers for a publication, one
+ *  for a book, the actor's avatar for anything that is only about them. */
+function FeedRow({ item, onOpen, onFollowBack, following }: { item: DigestItem; onOpen: () => void; onFollowBack: () => void; following: boolean }) {
+  const { colors } = useTheme();
+  const row = feedRowModel(item);
+  const labelColor = row.tone === "accent" ? colors.accent : row.tone === "success" ? colors.success : colors.textDim;
+
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
-      contentContainerStyle={{ gap: style.cardGap }}
-    >
-      {books.map((book) => (
-        <View key={bookKey(book)} style={{ width }}>
-          <BookCard
-            book={book}
-            style={effectiveCardStyle(style, undefined, book._style as PerCardStyle | undefined)}
-            onPress={() => onOpen(book)}
-          />
+    <Pressable accessibilityRole="link" accessibilityLabel={digestHeading(item)} onPress={onOpen}>
+      {({ pressed }) => (
+        <View style={[styles.feedRow, { backgroundColor: pressed ? colors.surfacePressed : "transparent", borderBottomColor: colors.border }]}>
+          <View style={styles.slot}>
+            {row.covers.length ? (
+              <>
+                {row.covers.map((cover, index) => (
+                  <Image
+                    key={cover}
+                    source={{ uri: cover }}
+                    contentFit="cover"
+                    style={[styles.cover, { left: COVER_INSET + index * COVER_STEP, top: (row.covers.length - 1 - index) * COVER_RISE, zIndex: index }]}
+                  />
+                ))}
+                <View style={[styles.slotAvatar, { borderColor: colors.background }]}>
+                  <AuthorAvatar username={item.actor.username} avatarUrl={item.actor.avatarUrl} />
+                </View>
+              </>
+            ) : (
+              // Nothing to preview, so the actor fills the slot the covers
+              // would have taken rather than leaving it mostly empty.
+              <AuthorAvatar username={item.actor.username} avatarUrl={item.actor.avatarUrl} size={SLOT_HEIGHT} />
+            )}
+          </View>
+          <View style={styles.grow}>
+            <View style={styles.labelRow}>
+              <Icon name={row.icon} size={14} color={labelColor} />
+              <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.heading, { color: labelColor }]}>
+                {row.label}
+              </Text>
+              <Text {...dynamicType} style={[typography.caption, styles.timestamp, { color: colors.textDim }]}>
+                {relativeTime(item.createdAt)}
+              </Text>
+            </View>
+            {row.title ? (
+              <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.heading, { color: colors.text }]}>
+                {row.title}
+              </Text>
+            ) : null}
+            <Text numberOfLines={2} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
+              {row.meta}
+            </Text>
+            {row.action === "followBack" ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Follow ${item.actor.username} back`}
+                accessibilityState={{ busy: following }}
+                disabled={following}
+                hitSlop={spacing.sm}
+                onPress={onFollowBack}
+                style={styles.rowAction}
+              >
+                <Text {...dynamicType} style={[typography.caption, styles.heading, { color: following ? colors.textDim : colors.accent }]}>
+                  {following ? "Following…" : "Follow back"}
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
         </View>
-      ))}
-    </ScrollView>
+      )}
+    </Pressable>
   );
 }
+
+const COVER_WIDTH = 42;
+const COVER_HEIGHT = 64;
+const COVER_STEP = 15;
+const COVER_RISE = 4;
+const BADGE_SIZE = 32;
+// The fan starts inset rather than at the slot's edge, which buys the badge
+// room on the left: it then sits on the same edge as the avatar a follow or
+// a vote row shows, so every row in the feed starts on one line.
+const COVER_INSET = 14;
+const SLOT_WIDTH = COVER_INSET + COVER_WIDTH + COVER_STEP * 2;
+const SLOT_HEIGHT = COVER_HEIGHT + COVER_RISE * 2;
 
 const styles = StyleSheet.create({
   page: { padding: spacing.lg, gap: spacing.md },
   heading: { fontWeight: "700" },
   list: { paddingBottom: spacing.huge, flexGrow: 1 },
-  entryRow: { flexDirection: "row", gap: spacing.sm },
-  section: { gap: spacing.sm },
   card: { borderWidth: 1, borderRadius: radii.lg, padding: spacing.lg, gap: spacing.sm },
-  actorRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   grow: { flex: 1 },
-  followingRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  newBadge: { borderRadius: radii.full, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
+  feedRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1 },
+  slot: { width: SLOT_WIDTH, height: SLOT_HEIGHT, justifyContent: "center" },
+  cover: { position: "absolute", width: COVER_WIDTH, height: COVER_HEIGHT, borderRadius: radii.sm },
+  // Sized explicitly rather than left to the avatar inside it: a box that
+  // takes its height from its child sits flush against the slot's bottom
+  // edge, where the ring reads as a flattened circle.
+  slotAvatar: { position: "absolute", left: 0, bottom: 4, width: BADGE_SIZE, height: BADGE_SIZE, alignItems: "center", justifyContent: "center", borderRadius: radii.full, borderWidth: 2, overflow: "hidden", zIndex: 10 },
+  // Centred, not baseline-aligned: a native symbol view has no text
+  // baseline, and aligning to one collapses it to nothing.
+  labelRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
+  timestamp: { flexShrink: 0, marginLeft: "auto" },
+  emptyFeed: { padding: spacing.lg },
+  // Padded to clear the 44px floor: the label alone is a 16px-tall target.
+  rowAction: { minHeight: minimumTouchTarget - spacing.lg, justifyContent: "center", paddingVertical: spacing.xs },
 });

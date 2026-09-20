@@ -30,6 +30,10 @@ const GLYPHS = {
   public: { ios: "globe", android: "public" },
   delete: { ios: "trash", android: "delete" },
   chevronRight: { ios: "chevron.right", android: "chevron_right" },
+  tierlist: { ios: "list.number", android: "format_list_numbered" },
+  vote: { ios: "checkmark.circle", android: "how_to_vote" },
+  book: { ios: "book.closed", android: "book" },
+  follow: { ios: "person.badge.plus", android: "person_add" },
 } as const satisfies Record<string, Glyph>;
 
 /** Only these five have a solid counterpart worth using; the rest read the

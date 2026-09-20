@@ -51,7 +51,7 @@ import { fileURLToPath } from "node:url";
 import { androidEnv } from "./androidSdk.mjs";
 import { devDataDirEnv } from "./devDataDir.mjs";
 import { DEV_USERNAME } from "./dev-account.mjs";
-import { ensureSharedBuilt, resetDevDataIfRequested, seedDevAccount, seedFixtureUsers } from "./devFixtureSetup.mjs";
+import { assertAdoptedBackendMatches, ensureSharedBuilt, resetDevDataIfRequested, seedCommunityGraph, seedDevAccount, seedFixtureUsers } from "./devFixtureSetup.mjs";
 import { upsertEnvLine } from "./devEnvFile.mjs";
 import { claimThisWorktreeSlot } from "./devClaim.mjs";
 import { recordDeviceSerial, registryPath, takeDevice } from "./devRegistry.mjs";
@@ -194,6 +194,7 @@ async function ensureExpoGo(serial, env) {
 
 async function ensureBackendRunning() {
   if (await isPortOpen(BACKEND_PORT)) {
+    assertAdoptedBackendMatches(BACKEND_PORT, log);
     log(`Backend already listening on ${BACKEND_PORT} for this slot.`);
     return;
   }
@@ -305,6 +306,7 @@ async function main() {
   resetDevDataIfRequested(resetRequested, log);
   seedDevAccount(resetRequested, log);
   seedFixtureUsers(log);
+  seedCommunityGraph(log);
   await ensureBackendRunning();
   const metroLogPath = await ensureMetroRunning();
 

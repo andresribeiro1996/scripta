@@ -1,14 +1,14 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Stack, router } from "expo-router";
+import { router } from "expo-router";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
-import { EmptyState, ErrorState, Input, Screen, Skeleton, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { EmptyState, ErrorState, Input, Skeleton, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import type { DiscoverItem } from "@scripta/shared/community";
 import { fetchDiscover } from "./api";
 import { DISCOVER_FILTERS, contentDetail, contentKindLabel, contentTarget, type DiscoverFilter } from "./communityHome";
 import { AuthorAvatar, openProfile } from "./AuthorAvatar";
 
-export function DiscoverScreen() {
+export function DiscoverPane() {
   const { colors } = useTheme();
   const [filter, setFilter] = useState<DiscoverFilter>("all");
   const [search, setSearch] = useState("");
@@ -21,8 +21,7 @@ export function DiscoverScreen() {
   const items = discover.data?.items ?? [];
 
   return (
-    <Screen top={false}>
-      <Stack.Screen options={{ title: "Discover", headerShown: true, headerLargeTitleEnabled: false }} />
+    <>
       {discover.isPending ? (
         <View style={styles.page}>
           <Skeleton height={160} />
@@ -75,7 +74,7 @@ export function DiscoverScreen() {
           renderItem={({ item }) => <DiscoverCard item={item} />}
         />
       )}
-    </Screen>
+    </>
   );
 }
 

@@ -42,7 +42,7 @@ function DragBook({ book, x, y, lifted }: {
       { scale: withSpring(lifted.get() ? 1.08 : 1, { duration: 400, dampingRatio: 1, reduceMotion: ReduceMotion.System }) },
     ],
   }));
-  return <Animated.View accessibilityLabel={`${titleOf(book)} by ${authorOf(book)}. Long press in the lower half, then drag into a tier; or tap a tier.`} style={style}>
+  return <Animated.View accessibilityLabel={`${titleOf(book)} by ${authorOf(book)}. Swipe up from the lower half to drag into a tier; or tap a tier.`} style={style}>
     {cover ? <Image source={cover} style={styles.cover} contentFit="cover" /> : <View style={[styles.cover, styles.fallback, { backgroundColor: colors.accentSoft }]}><Text numberOfLines={4} {...dynamicType} style={[typography.caption, styles.center, { color: colors.accent }]}>{titleOf(book)}</Text></View>}
   </Animated.View>;
 }
@@ -80,25 +80,26 @@ export function TierSortDeck({ data, books, onAssign, selectedBookKey }: { data:
   }
 
   const gesture = Gesture.Pan()
-    .activateAfterLongPress(220)
     .onStart((event) => {
       if (event.absoluteY < center.get().y) return;
       lifted.set(true);
-      x.set(event.absoluteX - center.get().x);
-      y.set(event.absoluteY - center.get().y);
+      x.set(0);
+      y.set(0);
       scheduleOnRN(liftHaptic);
     })
     .onUpdate((event) => {
       if (!lifted.get()) return;
-      x.set(event.absoluteX - center.get().x);
-      y.set(event.absoluteY - center.get().y);
+      x.set(event.translationX);
+      y.set(event.translationY);
       let next = -1;
       let nearest = 56 * 56;
       const targets = zones.get();
+      const bookX = center.get().x + event.translationX;
+      const bookY = center.get().y + event.translationY;
       for (let index = 0; index < data.tiers.length; index++) {
         const zone = targets[index];
         if (!zone) continue;
-        const distance = (event.absoluteX - zone.x) ** 2 + (event.absoluteY - zone.y) ** 2;
+        const distance = (bookX - zone.x) ** 2 + (bookY - zone.y) ** 2;
         if (distance < nearest) { nearest = distance; next = index; }
       }
       targeted.set(next);
@@ -118,7 +119,7 @@ export function TierSortDeck({ data, books, onAssign, selectedBookKey }: { data:
   if (!book) return <EmptyState title="Nothing left to rank" body="Every book in this list already sits in a tier." />;
 
   return <View style={styles.deck}>
-    <Text {...dynamicType} style={[typography.caption, styles.center]}>{selectedBookKey ? "Choose a new tier · drag or tap a circle" : `${pending.length} ${pending.length === 1 ? "book" : "books"} left · long press below, then drag up`}</Text>
+    <Text {...dynamicType} style={[typography.caption, styles.center]}>{selectedBookKey ? "Choose a new tier · drag or tap a circle" : `${pending.length} ${pending.length === 1 ? "book" : "books"} left · swipe up from below`}</Text>
     <GestureDetector gesture={gesture}><View ref={ringRef} style={styles.ring} onLayout={(event) => setRing(event.nativeEvent.layout)}>
       <DragBook key={current} book={book} x={x} y={y} lifted={lifted} />
       {data.tiers.map((tier, index) => <View key={tier.id} style={[styles.targetWrap, { transform: [{ translateX: radius * Math.sin(index * 2 * Math.PI / data.tiers.length) }, { translateY: -radius * Math.cos(index * 2 * Math.PI / data.tiers.length) }] }]}>

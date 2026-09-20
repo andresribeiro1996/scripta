@@ -13,6 +13,8 @@ import { existsSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { devDataDir, devDataDirEnv } from "./devDataDir.mjs";
+import { describeMismatch, mismatchedEnv, readProcessEnv } from "./devBackendEnv.mjs";
+import { readListeners } from "./devListeners.mjs";
 
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const backendDir = join(repoRoot, "backend");
@@ -25,6 +27,22 @@ const backendDir = join(repoRoot, "backend");
  *  to resolve @scripta/shared", or the backend crashing on an import it
  *  expects to exist) doesn't say so — so this checks for it rather than
  *  letting that confusing error be the first thing a caller produces. */
+/** Refuses a backend on this slot's port that was started against a
+ *  different data directory. Silent about the normal case, and silent when
+ *  the running environment can't be read at all — see devBackendEnv.mjs. */
+export function assertAdoptedBackendMatches(port, log) {
+  const listeners = readListeners();
+  const pid = listeners[port]?.[0];
+  if (pid === undefined) return;
+  const running = readProcessEnv(pid);
+  if (!running) {
+    log(`Adopting the backend on ${port} without checking its data directory — couldn't read the environment of pid ${pid}.`);
+    return;
+  }
+  const rows = mismatchedEnv(running, devDataDirEnv());
+  if (rows.length) throw new Error(describeMismatch(port, rows));
+}
+
 export function ensureSharedBuilt(log) {
   if (existsSync(join(repoRoot, "packages/shared/dist/index.js"))) return;
   log("Building @scripta/shared (first run in this worktree)...");
@@ -56,4 +74,15 @@ export function seedFixtureUsers(log) {
   const env = { ...process.env, ...devDataDirEnv() };
   const result = spawnSync("node", ["--import", "tsx", "scripts/three-users.mjs", "--seed-only", "--shared"], { cwd: backendDir, env, stdio: "inherit" });
   if (result.status !== 0) throw new Error("backend/scripts/three-users.mjs --shared failed — see output above.");
+}
+
+/** Publishes profiles and wires follows between the dev account and the
+ *  fixture users. Separate from the two seeds above because it needs both
+ *  to exist first: the feed is other people's events, so it has nothing to
+ *  show until somebody follows somebody. */
+export function seedCommunityGraph(log) {
+  log("Wiring profiles and follows between the dev account and the fixture users...");
+  const env = { ...process.env, ...devDataDirEnv() };
+  const result = spawnSync("node", ["--import", "tsx", "scripts/dev-community.mjs"], { cwd: repoRoot, env, stdio: "inherit" });
+  if (result.status !== 0) throw new Error("scripts/dev-community.mjs failed — see output above.");
 }

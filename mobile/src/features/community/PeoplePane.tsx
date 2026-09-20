@@ -1,13 +1,12 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Stack } from "expo-router";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
-import { Button, EmptyState, Input, Screen, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { Button, EmptyState, Input, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import type { PersonResult } from "@scripta/shared/community";
 import { followUser, searchPeople, unfollowUser } from "./api";
 import { AuthorAvatar, openProfile } from "./AuthorAvatar";
 
-export function PeopleScreen() {
+export function PeoplePane() {
   const { colors } = useTheme();
   const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
@@ -40,8 +39,7 @@ export function PeopleScreen() {
   }
 
   return (
-    <Screen top={false}>
-      <Stack.Screen options={{ title: "People", headerShown: true, headerLargeTitleEnabled: false }} />
+    <>
       <View style={styles.page}>
         {error ? <Toast visible message={error} tone="error" /> : null}
         <FlatList
@@ -96,7 +94,7 @@ export function PeopleScreen() {
           )}
         />
       </View>
-    </Screen>
+    </>
   );
 }
 

@@ -3,7 +3,7 @@ import { AppState } from "react-native";
 import { File } from "expo-file-system";
 import { GoogleSignInCancelledError, startGoogleSignIn } from "../features/auth/googleSignIn";
 import { apiClient, logout, refreshAccessToken, setSessionExpiredHandler } from "./api";
-import { seedDevSession } from "./devSession";
+import { recoverDevSession, seedDevSession } from "./devSession";
 import { getAccessToken, secureTokenStore, setAccessToken } from "./tokenStore";
 
 interface AuthUser {
@@ -72,7 +72,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Shared with api.ts's own 401 retry — see refreshAccessToken's
       // own comment for why this must be the SAME coalesced call rather
       // than a second, independent refresh done inline here.
-      const refreshed = await refreshAccessToken();
+      let refreshed = await refreshAccessToken();
+      // A dev store left holding a token from before the fixture was reseeded
+      // fails here; swapping in the current one costs a second refresh and
+      // saves typing a password on every reset.
+      if (!refreshed && await recoverDevSession(secureTokenStore, { isDev: __DEV__, devToken: process.env.EXPO_PUBLIC_DEV_REFRESH_TOKEN })) {
+        refreshed = await refreshAccessToken();
+      }
       if (refreshed) {
         // /auth/refresh returns tokens only — the user has to come from
         // a separate /auth/me call (found during Task 2's own on-device

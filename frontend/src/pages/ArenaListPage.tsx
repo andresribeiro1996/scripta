@@ -258,11 +258,11 @@ export function ArenaListPage() {
                 {votedTierlists.map((tl) => (
                   <a
                     key={tl.id}
-                    href={contentTarget({ kind: "tierlist", ...tl })}
+                    href={contentTarget({ kind: "tierlist", covers: [], ...tl })}
                     className="block rounded-xl border border-(--color-border) bg-(--color-surface) p-4 hover:border-(--color-accent)"
                   >
                     <h3 className="font-semibold">{tl.name}</h3>
-                    <p className="text-sm text-(--color-text-dim)">{contentDetail({ kind: "tierlist", ...tl })}</p>
+                    <p className="text-sm text-(--color-text-dim)">{contentDetail({ kind: "tierlist", covers: [], ...tl })}</p>
                   </a>
                 ))}
               </div>

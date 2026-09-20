@@ -19,6 +19,7 @@ const tierlist = {
   ballotCount: 4,
   votingOpen: true,
   promotedAt: null,
+  covers: [] as string[],
 } as const;
 
 const tournament = {
@@ -28,6 +29,7 @@ const tournament = {
   bracketSize: 8,
   status: "active",
   bookCount: 8,
+  covers: [] as string[],
 } as const;
 
 const actor = { userId: "u1", username: "andre", avatarUrl: null };

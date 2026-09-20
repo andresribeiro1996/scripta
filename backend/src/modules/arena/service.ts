@@ -450,6 +450,7 @@ export interface PublishedTournamentRef {
   name: string;
   bracketSize: number;
   status: "active" | "completed";
+  covers: string[];
 }
 
 export interface ArenaPublicApi {
@@ -465,7 +466,8 @@ function toPublishedRef(summary: TournamentSummary): PublishedTournamentRef {
     createdAt: summary.createdAt,
     name: summary.name,
     bracketSize: summary.bracketSize,
-    status: summary.status === "completed" ? "completed" : "active"
+    status: summary.status === "completed" ? "completed" : "active",
+    covers: summary.covers
   };
 }
 

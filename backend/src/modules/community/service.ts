@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { ReaderProfile } from "@scripta/shared";
 import { categoryFor, decodeCursor, encodeCursor, DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
-import type { ActivityEventType, ActivityItem, CommunityEventType, DiscoverItem, DiscoverType, FeedSettings, FollowState, Page, PersonResult, PublishedContent, PublishedProfile, TierlistSummary, TournamentSummary } from "@scripta/shared/community";
+import type { ActivityEventType, ActivityItem, CommunityEventType, DiscoverItem, DiscoverType, FeedCategory, FeedSettings, FollowState, Page, PersonResult, PublishedContent, PublishedProfile, TierlistSummary, TournamentSummary } from "@scripta/shared/community";
 import type { DashboardFeedPage, DigestItem } from "@scripta/shared/dashboard";
 import type { PublishedTournamentRef } from "../arena/service.js";
 import type { MuralsPublicApi } from "../murals/publicApi.js";
@@ -32,12 +32,16 @@ export interface PublicProfileView {
   feedSettings?: FeedSettings;
 }
 
+/** What a feed row can show at a glance — the rest of a pool's covers are
+ *  a page the reader taps through to, not a thumbnail. */
+const FEED_COVER_LIMIT = 3;
+
 function toTierlistSummary(ref: PublishedTierlistRef): TierlistSummary {
-  return { kind: "tierlist", id: ref.id, voteCode: ref.voteCode, name: ref.name, poolSize: ref.poolSize, ballotCount: ref.ballotCount, votingOpen: ref.votingOpen, promotedAt: ref.promotedAt };
+  return { kind: "tierlist", id: ref.id, voteCode: ref.voteCode, name: ref.name, poolSize: ref.poolSize, ballotCount: ref.ballotCount, votingOpen: ref.votingOpen, promotedAt: ref.promotedAt, covers: ref.covers.slice(0, FEED_COVER_LIMIT) };
 }
 
 function toTournamentSummary(ref: PublishedTournamentRef): TournamentSummary {
-  return { kind: "tournament", id: ref.id, name: ref.name, bracketSize: ref.bracketSize, status: ref.status, bookCount: ref.bracketSize };
+  return { kind: "tournament", id: ref.id, name: ref.name, bracketSize: ref.bracketSize, status: ref.status, bookCount: ref.bracketSize, covers: ref.covers.slice(0, FEED_COVER_LIMIT) };
 }
 
 export interface CommunityDeps {
@@ -170,14 +174,16 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
         if (row.follow) actorIds.add(row.follow.follower_id);
       }
       const profiles = deps.resolveProfiles([...actorIds]);
-      const hiddenPublications = new Map<string, boolean>();
-      const hidesPublications = (actorId: string): boolean => {
-        let hidden = hiddenPublications.get(actorId);
-        if (hidden === undefined) {
-          hidden = !settingsFor(actorId).publications;
-          hiddenPublications.set(actorId, hidden);
+      // The publisher's own switches, the same ones their profile's activity
+      // list obeys — a category they broadcast there, they broadcast here.
+      const settingsCache = new Map<string, FeedSettings>();
+      const broadcasts = (actorId: string, category: FeedCategory): boolean => {
+        let settings = settingsCache.get(actorId);
+        if (!settings) {
+          settings = settingsFor(actorId);
+          settingsCache.set(actorId, settings);
         }
-        return hidden;
+        return settings[category];
       };
       const items: DigestItem[] = [];
       let nextCursor: string | null = null;
@@ -189,26 +195,57 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
         }
         if (row.event) {
           const event = row.event;
-          if (hidesPublications(event.user_id)) continue;
-          if (event.ref_type === "tierlist") {
-            const ref = deps.tierlists.get(event.ref_id);
-            const actor = ref && ref.ownerUserId === event.user_id ? profiles.get(event.user_id) ?? (ref.promotedAt ? { username: "Original creator unavailable", avatarUrl: null, unavailable: true } : undefined) : undefined;
-            if (ref && actor) {
-              items.push({ kind: "publication", id: event.id, actor: { ...actor, userId: event.user_id }, type: event.type as CommunityEventType, content: toTierlistSummary(ref), createdAt: event.created_at });
+          const category = categoryFor(event.type as ActivityEventType);
+          if (!broadcasts(event.user_id, category)) continue;
+          const actor = profiles.get(event.user_id);
+          if (event.type === "tierlist_published" || event.type === "tournament_published") {
+            if (event.ref_type === "tierlist") {
+              const ref = deps.tierlists.get(event.ref_id);
+              // A promoted tier list outlives its creator's profile, so it keeps
+              // a placeholder author rather than dropping out of the feed.
+              const author = ref && ref.ownerUserId === event.user_id ? actor ?? (ref.promotedAt ? { username: "Original creator unavailable", avatarUrl: null, unavailable: true } : undefined) : undefined;
+              if (ref && author) {
+                items.push({ kind: "publication", id: event.id, actor: { ...author, userId: event.user_id }, type: event.type as CommunityEventType, content: toTierlistSummary(ref), createdAt: event.created_at });
+                lastIncluded = row;
+              }
+            } else {
+              const ref = deps.tournaments.get(event.ref_id);
+              if (ref && ref.ownerUserId === event.user_id && actor) {
+                items.push({ kind: "publication", id: event.id, actor: { ...actor, userId: event.user_id }, type: event.type as CommunityEventType, content: toTournamentSummary(ref), createdAt: event.created_at });
+                lastIncluded = row;
+              }
+            }
+          } else if (event.type === "voted_on") {
+            // The voter is not the owner here, so there is no ownership check to
+            // make — only that the thing voted on is still published.
+            const content = event.ref_type === "tierlist"
+              ? (() => { const ref = deps.tierlists.get(event.ref_id); return ref ? toTierlistSummary(ref) : undefined; })()
+              : (() => { const ref = deps.tournaments.get(event.ref_id); return ref ? toTournamentSummary(ref) : undefined; })();
+            if (content && actor) {
+              items.push({ kind: "vote", id: event.id, actor: { ...actor, userId: event.user_id }, content, createdAt: event.created_at });
               lastIncluded = row;
             }
-          } else {
-            const ref = deps.tournaments.get(event.ref_id);
-            const actor = ref && ref.ownerUserId === event.user_id ? profiles.get(event.user_id) : undefined;
-            if (ref && actor) {
-              items.push({ kind: "publication", id: event.id, actor: { ...actor, userId: event.user_id }, type: event.type as CommunityEventType, content: toTournamentSummary(ref), createdAt: event.created_at });
+          } else if (event.type === "book_added" || event.type === "book_finished") {
+            const payload = parseEventPayload(event.payload);
+            if (payload && actor) {
+              const coverUrl = typeof payload.coverUrl === "string" ? payload.coverUrl : null;
+              items.push({
+                kind: "reading",
+                id: event.id,
+                actor: { ...actor, userId: event.user_id },
+                book: { title: String(payload.title ?? ""), author: String(payload.author ?? ""), coverUrl },
+                finished: event.type === "book_finished",
+                createdAt: event.created_at
+              });
               lastIncluded = row;
             }
           }
         } else if (row.follow) {
           const author = profiles.get(row.follow.follower_id);
           if (author) {
-            items.push({ kind: "follow", id: row.follow.follower_id, actor: { ...author, userId: row.follow.follower_id }, createdAt: row.follow.created_at });
+            // followees is already loaded for the event half of this feed, so
+            // knowing whether this is mutual costs nothing extra.
+            items.push({ kind: "follow", id: row.follow.follower_id, actor: { ...author, userId: row.follow.follower_id }, createdAt: row.follow.created_at, viewerFollows: followees.includes(row.follow.follower_id) });
             lastIncluded = row;
           }
         }

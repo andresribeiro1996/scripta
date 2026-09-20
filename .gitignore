@@ -51,6 +51,9 @@ exporter/library.json
 # Dev-only scratch config for parallel sessions — see its own header.
 frontend/vite.http.config.ts
 
+# zcode editor's machine-local project config.
+.zcode/
+
 # Personal remote-workflow notes — machine-specific, not project source.
 todo/
 

@@ -52,7 +52,7 @@ import { fileURLToPath } from "node:url";
 import { claimThisWorktreeSlot } from "./devClaim.mjs";
 import { devDataDirEnv } from "./devDataDir.mjs";
 import { DEV_USERNAME } from "./dev-account.mjs";
-import { ensureSharedBuilt, resetDevDataIfRequested, seedDevAccount, seedFixtureUsers } from "./devFixtureSetup.mjs";
+import { assertAdoptedBackendMatches, ensureSharedBuilt, resetDevDataIfRequested, seedCommunityGraph, seedDevAccount, seedFixtureUsers } from "./devFixtureSetup.mjs";
 import { isPortOpen, spawnDetached, waitFor } from "./devProcess.mjs";
 import { metroCacheEnv } from "./devMetroCache.mjs";
 import { broadcastReload } from "./devReload.mjs";
@@ -109,6 +109,7 @@ async function claimThisWorktree() {
 // that has nothing to do with the account or database underneath it.
 async function ensureBackendRunning() {
   if (await isPortOpen(BACKEND_PORT)) {
+    assertAdoptedBackendMatches(BACKEND_PORT, log);
     log(`Backend already listening on ${BACKEND_PORT} for this slot.`);
     return;
   }
@@ -143,6 +144,7 @@ async function main() {
   resetDevDataIfRequested(resetRequested, log);
   seedDevAccount(resetRequested, log);
   seedFixtureUsers(log);
+  seedCommunityGraph(log);
   await ensureBackendRunning();
   await ensureMetroRunning();
   // Expo Go keeps running the bundle it already has when its Metro is

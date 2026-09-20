@@ -1,11 +1,21 @@
-import type { CommunityAuthor, FeedItem } from "./community/types.js";
-import { feedHeading, feedTarget } from "./community/helpers.js";
+import type { CommunityAuthor, FeedItem, PublishedContent } from "./community/types.js";
+import { contentTarget, feedHeading, feedTarget } from "./community/helpers.js";
 import { bookKey } from "./library/merge.js";
 import { rediscoverPassage } from "./murals/home.js";
 
+export interface DigestBook {
+  title: string;
+  author: string;
+  coverUrl: string | null;
+}
+
 export type DigestItem =
   | ({ kind: "publication" } & FeedItem)
-  | { kind: "follow"; id: string; actor: CommunityAuthor; createdAt: string };
+  | { kind: "vote"; id: string; actor: CommunityAuthor; content: PublishedContent; createdAt: string }
+  | { kind: "reading"; id: string; actor: CommunityAuthor; book: DigestBook; finished: boolean; createdAt: string }
+  // `viewerFollows` is what lets the row offer following back, and it is the
+  // viewer's relationship to the actor, not the actor's to them.
+  | { kind: "follow"; id: string; actor: CommunityAuthor; createdAt: string; viewerFollows: boolean };
 
 export interface DashboardFeedPage {
   items: DigestItem[];
@@ -30,9 +40,30 @@ export function buildDashboardCards(books: Array<Record<string, unknown>>, day: 
 }
 
 export function digestHeading(item: DigestItem): string {
-  return item.kind === "follow" ? `${item.actor.username} started following you` : feedHeading(item);
+  switch (item.kind) {
+    case "publication":
+      return feedHeading(item);
+    case "vote":
+      return item.content.kind === "tierlist"
+        ? `${item.actor.username} ranked books on ${item.content.name}`
+        : `${item.actor.username} voted in ${item.content.name}`;
+    case "reading":
+      return `${item.actor.username} ${item.finished ? "finished" : "added"} ${item.book.title}`;
+    case "follow":
+      return `${item.actor.username} started following you`;
+  }
 }
 
+// A book someone else read is not a page this reader can open — their
+// profile is the nearest thing the tap can lead to.
 export function digestTarget(item: DigestItem): string {
-  return item.kind === "follow" ? `/community/u/${item.actor.username}` : feedTarget(item);
+  switch (item.kind) {
+    case "publication":
+      return feedTarget(item);
+    case "vote":
+      return contentTarget(item.content);
+    case "reading":
+    case "follow":
+      return `/community/u/${item.actor.username}`;
+  }
 }

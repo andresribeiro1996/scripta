@@ -23,3 +23,26 @@ export async function seedDevSession(
   if (existing) return;
   await tokenStore.setRefreshToken(devToken);
 }
+
+/** The other half of seedDevSession, for the case it deliberately refuses:
+ *  a store holding a token that no longer works. Reseeding the dev fixture
+ *  rebuilds the auth database, which leaves every token issued before it
+ *  dead — and because the store is not empty, seedDevSession steps aside and
+ *  the app lands on the login screen, looking like the dev account broke.
+ *
+ *  Call this ONLY after a refresh has actually failed: a session that can
+ *  still refresh is a real one, including a fixture user signed in by hand
+ *  to test something, and must survive. Returns whether the caller should
+ *  retry the refresh. */
+export async function recoverDevSession(
+  tokenStore: Pick<TokenStore, "getRefreshToken" | "setRefreshToken">,
+  { isDev, devToken }: { isDev: boolean; devToken: string | undefined },
+): Promise<boolean> {
+  if (!isDev || !devToken) return false;
+  // Already the dev token: the failure is the backend's, not a stale store,
+  // and writing it again would only buy an identical second failure.
+  const existing = await tokenStore.getRefreshToken();
+  if (existing === devToken) return false;
+  await tokenStore.setRefreshToken(devToken);
+  return true;
+}

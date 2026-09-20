@@ -68,6 +68,7 @@ export interface PublishedTierlistRef {
   eligibleVoteCount: number;
   promotedAt: string | null;
   votingOpen: boolean;
+  covers: string[];
 }
 
 export interface TierlistsService {
@@ -130,6 +131,29 @@ function readDocument(tierlist: Tierlist): TierlistDocument {
   return { tiers: data.tiers ?? [], pool: data.pool ?? [] };
 }
 
+const COVER_PREVIEW_LIMIT = 8;
+
+/** Covers come from the published snapshot rather than the owner's live
+ *  library: a stranger reading the feed can't resolve the owner's books,
+ *  and the snapshot is what the vote page already shows them. */
+function publishedCovers(publicBooks: string | null): string[] {
+  if (!publicBooks) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(publicBooks);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+  const covers: string[] = [];
+  for (const book of parsed) {
+    if (covers.length >= COVER_PREVIEW_LIMIT) break;
+    const url = (book as Record<string, unknown> | null)?.coverUrl;
+    if (typeof url === "string" && url) covers.push(url);
+  }
+  return covers;
+}
+
 function toPublishedRef(row: TierlistRow, ballotCount: number): PublishedTierlistRef {
   const { tiers, pool } = readDocument(toTierlist(row));
   const keys = new Set(pool);
@@ -144,7 +168,8 @@ function toPublishedRef(row: TierlistRow, ballotCount: number): PublishedTierlis
     ballotCount,
     eligibleVoteCount: 0,
     promotedAt: row.promoted_at,
-    votingOpen: row.voting_open === 1
+    votingOpen: row.voting_open === 1,
+    covers: publishedCovers(row.public_books)
   };
 }
 

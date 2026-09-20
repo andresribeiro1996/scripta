@@ -404,7 +404,7 @@ export function SwipeableTabs<T extends string>({
   renderPage,
   accessibilityLabel,
 }: {
-  options: readonly { readonly value: T; readonly label: string; readonly badge?: number }[];
+  options: readonly { readonly value: T; readonly label: string; readonly badge?: number; readonly accessibilityLabel?: string }[];
   value: T;
   onChange: (value: T) => void;
   renderPage: (value: T, active: boolean) => ReactNode;
@@ -443,7 +443,7 @@ export function SwipeableTabs<T extends string>({
           const selected = option.value === value;
           return (
             <Pressable
-              accessibilityLabel={option.badge ? `${option.label}, ${option.badge} remaining` : option.label}
+              accessibilityLabel={option.accessibilityLabel ?? (option.badge ? `${option.label}, ${option.badge} remaining` : option.label)}
               accessibilityRole="tab"
               accessibilityState={{ selected }}
               key={option.value}

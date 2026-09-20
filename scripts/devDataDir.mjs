@@ -17,7 +17,12 @@ const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
 export const devDataDir = join(repoRoot, "backend", "data", "dev");
 
-const DB_MODULES = ["auth", "library", "gallery", "covers", "socials", "arena", "murals", "tierlists"];
+// `community` belongs here for the same reason as every other module, and
+// its absence was invisible in a way the others' would not be: the feed
+// still rendered, just out of the developer's own backend/data/community.
+// sqlite, so follows and events resolved against ids from a different
+// auth database than the one the dev account lives in.
+const DB_MODULES = ["auth", "library", "gallery", "covers", "socials", "arena", "murals", "tierlists", "community"];
 const STORAGE_MODULES = ["gallery", "avatar", "covers"];
 
 /** Env var overrides that point a backend process (spawned or dynamically
