@@ -1,8 +1,11 @@
-import { type ReactNode, type Ref, useEffect, useRef, useState } from "react";
+import { createContext, type ReactNode, type Ref, type RefObject, useCallback, useContext, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
+  Keyboard,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,6 +21,7 @@ import { Icon, type IconName } from "./icon";
 import SegmentedControl from "@expo/ui/community/segmented-control";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { errorHaptic, successHaptic } from "./haptics";
+import { revealOffset } from "./keyboardScroll";
 import { dynamicType, minimumTouchTarget, radii, spacing, typography, useReducedMotion, useTheme } from "./theme";
 
 const AnimatedPagerView = Animated.createAnimatedComponent(PagerView);
@@ -53,6 +57,99 @@ export function Screen({
     >
       {children}
     </View>
+  );
+}
+
+// Every Input inside a FormScroll asks to be shown when it takes focus. Null
+// outside one — an Input in a sheet or a filter row scrolls with whatever
+// contains it, and must not reach for a scroll view that isn't there.
+const RevealField = createContext<((field: View) => void) | null>(null);
+
+// A scroll view that keeps the focused field above the keyboard.
+//
+// KeyboardAvoidingView alone only shrinks its container, and shrinking is not
+// scrolling: move to the next field while the keyboard is already up and
+// nothing re-runs, so that field stays under it. Android's own
+// scroll-to-focused-child lands the field flush against the keyboard's top
+// edge — its hint and error text still hidden underneath — and iOS has no
+// equivalent at all. So the avoiding view stays (without it a device where
+// this measurement fails would have no keyboard handling at all) and the
+// scroll below adds what it doesn't do. Measuring the keyboard rather than
+// assuming the window resized is what makes the two compose: where the frame
+// did shrink, the overlap comes out at zero and only the margin is added.
+export function FormScroll({
+  children,
+  contentContainerStyle,
+}: {
+  children: ReactNode;
+  contentContainerStyle?: ViewStyle;
+}) {
+  const frame = useRef<View>(null);
+  const scroll = useRef<ScrollView>(null);
+  // The content view, not the scroll view: a field's offset has to be measured
+  // against what scrolls, or every measurement moves with the scroll itself.
+  const content = useRef<View>(null);
+  const focused = useRef<View | null>(null);
+  const scrollY = useRef(0);
+  const [overlap, setOverlap] = useState(0);
+  const overlapRef = useRef(0);
+  overlapRef.current = overlap;
+
+  const reveal = useCallback((field: View | null) => {
+    if (field) focused.current = field;
+    const target = focused.current;
+    if (!target || !content.current || !frame.current) return;
+    frame.current.measureInWindow((_x, _y, _width, height) => {
+      target.measureLayout(
+        content.current!,
+        (_left, top, _fieldWidth, fieldHeight) => {
+          const next = revealOffset(
+            { top, height: fieldHeight },
+            { scrollY: scrollY.current, height: Math.max(0, height - overlapRef.current) },
+            spacing.lg,
+          );
+          if (next !== null) scroll.current?.scrollTo({ y: next, animated: true });
+        },
+        () => {},
+      );
+    });
+  }, []);
+
+  useEffect(() => {
+    const measureOverlap = (keyboardTop: number) => {
+      frame.current?.measureInWindow((_x, y, _width, height) => {
+        setOverlap(Math.max(0, Math.min(height, y + height - keyboardTop)));
+        // The scroll has to wait for the padding below to exist, or there is
+        // nothing to scroll into.
+        requestAnimationFrame(() => reveal(null));
+      });
+    };
+    const shown = Keyboard.addListener("keyboardDidShow", (event) => measureOverlap(event.endCoordinates.screenY));
+    const hidden = Keyboard.addListener("keyboardDidHide", () => {
+      focused.current = null;
+      setOverlap(0);
+    });
+    return () => {
+      shown.remove();
+      hidden.remove();
+    };
+  }, [reveal]);
+
+  return (
+    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.grow}>
+      <View ref={frame} style={styles.grow}>
+        <ScrollView
+          ref={scroll}
+          innerViewRef={content as RefObject<View>}
+          keyboardShouldPersistTaps="handled"
+          onScroll={(event) => { scrollY.current = event.nativeEvent.contentOffset.y; }}
+          scrollEventThrottle={16}
+          contentContainerStyle={[contentContainerStyle, overlap > 0 ? { paddingBottom: overlap } : null]}
+        >
+          <RevealField.Provider value={reveal}>{children}</RevealField.Provider>
+        </ScrollView>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -157,10 +254,12 @@ export function Input({
   const { colors } = useTheme();
   const [visible, setVisible] = useState(false);
   const inputRef = useRef<TextInput>(null);
+  const fieldRef = useRef<View>(null);
+  const reveal = useContext(RevealField);
   const [focused, setFocused] = useState(false);
 
   return (
-    <View style={styles.field}>
+    <View ref={fieldRef} style={styles.field}>
       {label ? <Text {...dynamicType} style={[styles.label, { color: colors.text }]}>{label}</Text> : null}
       <View style={{ position: "relative" }}>
       {icon ? <View style={styles.inputIcon} pointerEvents="none"><Icon name={icon} size={18} color={colors.textDim} /></View> : null}
@@ -173,7 +272,7 @@ export function Input({
         allowFontScaling
         editable={editable}
         onBlur={(event) => { setFocused(false); props.onBlur?.(event); }}
-        onFocus={(event) => { setFocused(true); props.onFocus?.(event); }}
+        onFocus={(event) => { setFocused(true); if (fieldRef.current) reveal?.(fieldRef.current); props.onFocus?.(event); }}
         placeholderTextColor={colors.textDim}
         selectionColor={colors.accent}
         style={[
