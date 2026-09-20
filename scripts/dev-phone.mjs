@@ -54,6 +54,7 @@ import { devDataDirEnv } from "./devDataDir.mjs";
 import { DEV_USERNAME } from "./dev-account.mjs";
 import { ensureSharedBuilt, resetDevDataIfRequested, seedDevAccount, seedFixtureUsers } from "./devFixtureSetup.mjs";
 import { isPortOpen, spawnDetached, waitFor } from "./devProcess.mjs";
+import { metroCacheEnv } from "./devMetroCache.mjs";
 import { broadcastReload } from "./devReload.mjs";
 import { pickLanAddress } from "./lanAddress.mjs";
 
@@ -128,7 +129,11 @@ async function ensureMetroRunning() {
     return;
   }
   log("Starting Metro, advertising on the LAN...");
-  spawnDetached("npx", ["expo", "start", "--port", String(METRO_PORT)], { cwd: mobileDir, env: process.env, logName: "metro.log", runtimeDir });
+  // Same worktree-scoped bundler cache as dev-emulator.mjs — see
+  // devMetroCache.mjs. A phone is the harder case to catch it on: there is no
+  // adb to dump the screen and prove which branch's code is running.
+  const metroEnv = { ...process.env, ...metroCacheEnv(repoRoot) };
+  spawnDetached("npx", ["expo", "start", "--port", String(METRO_PORT)], { cwd: mobileDir, env: metroEnv, logName: "metro.log", runtimeDir });
   await waitFor(() => isPortOpen(METRO_PORT), { timeoutMs: 60_000, label: `Metro on port ${METRO_PORT}` });
 }
 

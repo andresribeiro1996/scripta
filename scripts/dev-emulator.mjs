@@ -56,6 +56,7 @@ import { upsertEnvLine } from "./devEnvFile.mjs";
 import { claimThisWorktreeSlot } from "./devClaim.mjs";
 import { recordDeviceSerial, registryPath, takeDevice } from "./devRegistry.mjs";
 import { isReachableOn, worktreeIdentity } from "./devHost.mjs";
+import { metroCacheEnv } from "./devMetroCache.mjs";
 import { isPortOpen, mkdirRuntimeDir, spawnDetached, waitFor } from "./devProcess.mjs";
 import { pickLanAddress } from "./lanAddress.mjs";
 
@@ -242,7 +243,14 @@ async function ensureMetroRunning() {
   // exposes, so it is verified below rather than trusted: physical-phone
   // testing still needs LAN and has its own path (`npm run dev:mobile`,
   // backend/scripts/dev-mobile.mjs), untouched by this.
-  const metroEnv = { ...process.env, NODE_OPTIONS: metroNodeOptions(process.env.NODE_OPTIONS) };
+  const metroEnv = {
+    ...process.env,
+    NODE_OPTIONS: metroNodeOptions(process.env.NODE_OPTIONS),
+    // Keeps this worktree's bundler cache out of every other worktree's —
+    // see devMetroCache.mjs for what sharing it does, which is serve the
+    // emulator another branch's code with no sign that it has.
+    ...metroCacheEnv(repoRoot),
+  };
   const logPath = spawnDetached("npx", ["expo", "start", "--localhost", "--port", String(METRO_PORT)], { cwd: mobileDir, env: metroEnv, logName: "metro.log", runtimeDir });
   await waitFor(() => isPortOpen(METRO_PORT), { timeoutMs: 60_000, label: `Metro on port ${METRO_PORT}` });
 
