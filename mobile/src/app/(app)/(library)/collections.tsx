@@ -22,7 +22,7 @@ export default function CollectionsRoute() {
             onChangeText: (event) => setSearch(event.nativeEvent.text),
             onCancelButtonPress: () => setSearch(""),
           },
-          headerRight: () => <IconButton accessibilityLabel="New collection" name="add" onPress={() => groupsView.current?.startCreating()} />,
+          headerRight: () => <IconButton framed accessibilityLabel="New collection" name="add" onPress={() => groupsView.current?.startCreating()} />,
         }}
       />
       <GroupsView ref={groupsView} search={search} />

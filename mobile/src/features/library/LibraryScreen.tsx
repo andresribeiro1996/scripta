@@ -186,7 +186,7 @@ export function LibraryScreen() {
                 />
               ),
               headerRight: () => (
-                <IconButton
+                <IconButton framed
                   accessibilityLabel={`Delete ${selectedKeys.size} selected`}
                   name="delete"
                   onPress={selectedKeys.size === 0 ? undefined : handleDeleteSelected}
@@ -224,9 +224,9 @@ export function LibraryScreen() {
                 : undefined,
               headerRight: () => (
                 <View style={styles.headerActions}>
-                  {onCollectionsTab && <IconButton accessibilityLabel="New collection" name="add" onPress={() => groupsView.current?.startCreating()} />}
+                  {onCollectionsTab && <IconButton framed accessibilityLabel="New collection" name="add" onPress={() => groupsView.current?.startCreating()} />}
                   <Menu title={library?.data.name || "Library"} items={actionItems}>
-                    <IconButton accessibilityLabel="Library actions" name="more" />
+                    <IconButton framed accessibilityLabel="Library actions" name="more" />
                   </Menu>
                 </View>
               ),
@@ -320,5 +320,5 @@ export function LibraryScreen() {
 const styles = StyleSheet.create({
   loading: { padding: spacing.lg, gap: spacing.md },
   loadingRow: { flexDirection: "row", gap: spacing.md },
-  headerActions: { flexDirection: "row", alignItems: "center" },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
 });

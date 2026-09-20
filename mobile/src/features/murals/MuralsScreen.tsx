@@ -138,7 +138,7 @@ export function MuralsScreen() {
           headerRight: () => (
             <View style={styles.headerActions}>
               <Menu title={title} items={actionItems}>
-                <IconButton accessibilityLabel="Folders" name="more" />
+                <IconButton framed accessibilityLabel="Folders" name="more" />
               </Menu>
               <Menu
                 title="New mural"
@@ -147,7 +147,7 @@ export function MuralsScreen() {
                   { label: "Start from a preset…", onPress: () => setPresets(true) },
                 ]}
               >
-                <IconButton accessibilityLabel="New mural" name="add" />
+                <IconButton framed accessibilityLabel="New mural" name="add" />
               </Menu>
             </View>
           ),
@@ -186,7 +186,7 @@ export function MuralsScreen() {
 
 const styles = StyleSheet.create({
   screen: { padding: spacing.lg, gap: spacing.md },
-  headerActions: { flexDirection: "row", alignItems: "center" },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   list: { gap: spacing.md, paddingBottom: spacing.huge, flexGrow: 1 },
   card: { borderWidth: 1, borderRadius: radii.lg, padding: spacing.md, gap: spacing.sm, flexDirection: "row", alignItems: "center" },
   open: { flex: 1, flexDirection: "row", alignItems: "center", gap: spacing.md },

@@ -108,8 +108,8 @@ export function TierlistEditorScreen({ tierlist, onUpdated, startInRank = false 
       headerShown: true,
       title: current.name,
       headerRight: () => <View style={styles.headerActions}>
-        {!frozen ? <IconButton accessibilityLabel="Save changes" name="confirm" onPress={() => void save()} /> : null}
-        <Menu title={current.name} items={actionItems}><IconButton accessibilityLabel="Tier list actions" name="more" /></Menu>
+        {!frozen ? <IconButton framed accessibilityLabel="Save changes" name="confirm" onPress={() => void save()} /> : null}
+        <Menu title={current.name} items={actionItems}><IconButton framed accessibilityLabel="Tier list actions" name="more" /></Menu>
       </View>,
     }} />
     {error ? <Toast visible message={error} tone="error" /> : null}
@@ -136,7 +136,7 @@ export function TierlistEditorScreen({ tierlist, onUpdated, startInRank = false 
 const styles = StyleSheet.create({
   screen: { padding: spacing.lg, gap: spacing.md },
   strong: { fontWeight: "700" },
-  headerActions: { flexDirection: "row", alignItems: "center" },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   results: { flex: 1, gap: spacing.md },
   rankLink: { minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   picker: { maxHeight: 440 },

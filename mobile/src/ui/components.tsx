@@ -207,6 +207,7 @@ export function IconButton({
   label,
   onPress,
   tone = "default",
+  framed = false,
 }: {
   name: IconName;
   accessibilityLabel: string;
@@ -215,6 +216,11 @@ export function IconButton({
   label?: string;
   onPress?: () => void;
   tone?: "default" | "danger";
+  /** Draws the 44pt target instead of leaving it implied. A bare glyph in a
+   *  header reads as smaller than it is and people aim at the ink, not the
+   *  box; a row's own overflow button doesn't want the chrome, so this is
+   *  off unless asked for. */
+  framed?: boolean;
 }) {
   const { colors } = useTheme();
   const color = tone === "danger" ? colors.danger : colors.textDim;
@@ -226,7 +232,8 @@ export function IconButton({
       onPress={onPress}
       style={({ pressed }) => [
         label ? styles.labelledIconButton : styles.iconButton,
-        { backgroundColor: pressed ? colors.surfacePressed : "transparent" },
+        framed ? { borderWidth: 1, borderColor: colors.border } : null,
+        { backgroundColor: pressed ? colors.surfacePressed : framed ? colors.surface : "transparent" },
       ]}
     >
       <Icon color={color} name={name} size={22} />
@@ -403,17 +410,24 @@ export function SwipeableTabs<T extends string>({
   onChange,
   renderPage,
   accessibilityLabel,
+  tabsHidden = false,
 }: {
   options: readonly { readonly value: T; readonly label: string; readonly badge?: number; readonly accessibilityLabel?: string }[];
   value: T;
   onChange: (value: T) => void;
   renderPage: (value: T, active: boolean) => ReactNode;
   accessibilityLabel?: string;
+  /** Collapses the tab strip, handing its height to the page — for a page
+   *  that wants the room back while its own content is moving. Off unless a
+   *  screen asks for it. */
+  tabsHidden?: boolean;
 }) {
   const { colors } = useTheme();
   const reducedMotion = useReducedMotion();
   const pager = useRef<PagerView>(null);
   const [rowWidth, setRowWidth] = useState(0);
+  const [rowHeight, setRowHeight] = useState(0);
+  const collapse = useRef(new Animated.Value(0)).current;
   const index = Math.max(0, options.findIndex((option) => option.value === value));
   // position and offset arrive as separate keys on one native event, so they
   // are two values added together rather than one.
@@ -431,12 +445,36 @@ export function SwipeableTabs<T extends string>({
     else pager.current.setPage(index);
   }, [index, reducedMotion]);
 
+  // Height, not a transform: the point is to give the page the space, and a
+  // strip that merely slid away would leave a gap where it had been.
+  useEffect(() => {
+    const toValue = tabsHidden ? 1 : 0;
+    if (reducedMotion) {
+      collapse.setValue(toValue);
+      return;
+    }
+    const animation = Animated.timing(collapse, { toValue, duration: 140, useNativeDriver: false });
+    animation.start();
+    return () => animation.stop();
+  }, [collapse, reducedMotion, tabsHidden]);
+
   return (
     <View style={styles.grow}>
+      <Animated.View
+        pointerEvents={tabsHidden ? "none" : "auto"}
+        style={rowHeight ? {
+          height: collapse.interpolate({ inputRange: [0, 1], outputRange: [rowHeight, 0] }),
+          opacity: collapse.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }),
+          overflow: "hidden",
+        } : null}
+      >
       <View
         accessibilityLabel={accessibilityLabel}
         accessibilityRole="tablist"
-        onLayout={(event) => setRowWidth(event.nativeEvent.layout.width)}
+        onLayout={(event) => {
+          setRowWidth(event.nativeEvent.layout.width);
+          setRowHeight(event.nativeEvent.layout.height);
+        }}
         style={[styles.tabRow, { borderBottomColor: colors.border }]}
       >
         {options.map((option, optionIndex) => {
@@ -477,6 +515,7 @@ export function SwipeableTabs<T extends string>({
           />
         ) : null}
       </View>
+      </Animated.View>
       <AnimatedPagerView
         initialPage={index}
         onPageScroll={Animated.event([{ nativeEvent: { position, offset } }], { useNativeDriver: true })}
