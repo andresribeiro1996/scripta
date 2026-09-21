@@ -36,6 +36,9 @@ const GLYPHS = {
   delete: { ios: "trash", android: "delete" },
   chevronRight: { ios: "chevron.right", android: "chevron_right" },
   tierlist: { ios: "list.number", android: "format_list_numbered" },
+  // The branching draw itself, not a trophy: this marks the view that shows
+  // the whole tree, next to an Arena that already owns the trophy.
+  bracket: { ios: "arrow.triangle.branch", android: "account_tree" },
   vote: { ios: "checkmark.circle", android: "how_to_vote" },
   book: { ios: "book.closed", android: "book" },
   follow: { ios: "person.badge.plus", android: "person_add" },

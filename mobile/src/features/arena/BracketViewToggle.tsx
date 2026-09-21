@@ -1,36 +1,43 @@
-// Switches the bracket pane between the round-by-round draw and the
-// classic whole-tree map. Labelled with the view it switches TO, not the
-// one you are on: it sits in the round bar among chips that name what
-// they select, and a chip reading "Rounds" while you are already looking
-// at rounds would be the odd one out.
+// Switches the bracket pane between the round-by-round draw and the classic
+// whole-tree map, as a floating button rather than a chip in the round bar:
+// the bar has to fit a 32-book bracket's five rounds without scrolling, and
+// a sixth item there either wrapped to a second row or ran off the edge.
+//
+// It is a toggle, so it carries its state the way a selected chip does —
+// filled while the map is up, outlined while it isn't — instead of relying
+// on the icon alone to say which view you would get.
+//
+// Positioning is the caller's: the two panes float it at different heights,
+// since only one of them has a round bar underneath it.
 
-import { Pressable, StyleSheet, Text } from "react-native";
-import { dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { Pressable, StyleSheet } from "react-native";
+import { Icon, radii, useTheme } from "../../ui";
 
 export type BracketView = "rounds" | "classic";
 
-const COPY: Record<BracketView, { label: string; hint: string }> = {
-  rounds: { label: "Rounds", hint: "Show the bracket round by round" },
-  classic: { label: "Classic", hint: "Show the whole bracket at once" },
-};
-
 export function BracketViewToggle({ to, onPress }: { to: BracketView; onPress: () => void }) {
   const { colors } = useTheme();
-  const copy = COPY[to];
+  const showingClassic = to === "rounds";
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={copy.hint}
-      hitSlop={6}
+      accessibilityState={{ selected: showingClassic }}
+      accessibilityLabel={showingClassic ? "Show the bracket round by round" : "Show the whole bracket at once"}
+      hitSlop={8}
       onPress={onPress}
-      style={[styles.chip, { backgroundColor: colors.background, borderColor: colors.border }]}
+      style={({ pressed }) => [
+        styles.fab,
+        {
+          backgroundColor: showingClassic ? colors.accent : pressed ? colors.surfacePressed : colors.surface,
+          borderColor: showingClassic ? colors.accent : colors.border,
+        },
+      ]}
     >
-      <Text {...dynamicType} style={[typography.caption, styles.bold, { color: colors.textDim }]}>{copy.label}</Text>
+      <Icon name="bracket" size={22} color={showingClassic ? colors.onAccent : colors.accent} />
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  chip: { flexDirection: "row", alignItems: "center", gap: spacing.xs, paddingHorizontal: spacing.md, paddingVertical: 7, borderRadius: radii.full, borderWidth: 1 },
-  bold: { fontWeight: "700" },
+  fab: { width: 48, height: 48, borderRadius: radii.full, alignItems: "center", justifyContent: "center", borderWidth: 1, elevation: 6, shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
 });

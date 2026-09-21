@@ -144,7 +144,7 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
               onTiebreak={(duelId, bookKey) => void action(duelId, () => resolveTiebreak(id, duelId, bookKey))}
             />
           </ScrollView>
-          <View style={[styles.classicBar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+          <View style={styles.classicDock} pointerEvents="box-none">
             <BracketViewToggle to="rounds" onPress={() => setBracketView("rounds")} />
           </View>
         </View>
@@ -207,7 +207,7 @@ const styles = StyleSheet.create({
   pane: { gap: spacing.md, paddingBottom: spacing.huge, flexGrow: 1, justifyContent: "center" },
   matchWrap: { flex: 1, paddingTop: spacing.lg, justifyContent: "center" },
   list: { gap: spacing.md, paddingBottom: spacing.huge, flexGrow: 1 },
-  classicBar: { position: "absolute", left: 0, right: 0, bottom: 0, flexDirection: "row", justifyContent: "center", paddingTop: spacing.sm, paddingBottom: spacing.xs, borderTopWidth: 1 },
+  classicDock: { position: "absolute", right: spacing.lg, bottom: spacing.lg },
   note: { textAlign: "center", textTransform: "uppercase", letterSpacing: 1, fontWeight: "700" },
   dialog: { gap: spacing.md },
 });
