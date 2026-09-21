@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { bookKey, type TierDefinition, type TierlistData } from "@scripta/shared";
 import { Image } from "expo-image";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Button, Dialog, IconButton, Input, Menu, type MenuItem, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 
 export type TierBook = Record<string, unknown>;
@@ -40,17 +40,16 @@ export function TierBoard({ data, books, onChange, structureEditable, poolLabel 
   function renderBooks(section: string) {
     const keys = keysFor(section).filter((key) => byKey.has(key));
     if (!keys.length) return <Text {...dynamicType} style={[typography.caption, styles.empty, { color: colors.textDim }]}>{section === "pool" ? "Books unavailable" : "–"}</Text>;
-    return <View style={styles.books}>{keys.map((key) => <BookChip key={key} book={byKey.get(key)!} onReassign={onReassign ? () => onReassign(key) : undefined} />)}</View>;
+    return <ScrollView horizontal showsHorizontalScrollIndicator={false} style={section === "pool" ? styles.poolBooks : styles.booksScroll} contentContainerStyle={styles.books}>{keys.map((key) => <BookChip key={key} book={byKey.get(key)!} onReassign={onReassign ? () => onReassign(key) : undefined} />)}</ScrollView>;
   }
 
   return (
     <>
-    <FlatList
+    <ScrollView
       style={styles.grow}
-      data={data.tiers}
-      keyExtractor={(tier) => tier.id}
       contentContainerStyle={styles.board}
-      renderItem={({ item: tier, index }) => <View style={[styles.tier, !tier.bookKeys.some((key) => byKey.has(key)) && styles.emptyTier, { backgroundColor: colors.surface }, index === 0 && styles.topCorners, index === data.tiers.length - 1 && styles.bottomCorners]}>
+    >
+      {data.tiers.map((tier, index) => <View key={tier.id} style={[styles.tier, { backgroundColor: colors.surface }, index === 0 && styles.topCorners, index === data.tiers.length - 1 && styles.bottomCorners]}>
         <View style={[styles.tierLabel, { backgroundColor: tier.color }]}><Text numberOfLines={3} {...dynamicType} style={[typography.caption, styles.strong, styles.center, { color: "#fff" }]}>{tier.label || "Untitled"}</Text></View>
         <View style={styles.grow}>{renderBooks(tier.id)}</View>
         {structureEditable ? <View style={styles.tierActions}>
@@ -62,12 +61,12 @@ export function TierBoard({ data, books, onChange, structureEditable, poolLabel 
             <IconButton accessibilityLabel={`Actions for ${tier.label || "Untitled"} tier`} name="more" />
           </Menu>
         </View> : null}
-      </View>}
-      ListFooterComponent={data.pool.length ? <View style={styles.footer}>
+      </View>)}
+      {data.pool.length ? <View style={styles.footer}>
         <Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.textDim }]}>{poolLabel} · {data.pool.length}</Text>
         {renderBooks("pool")}
       </View> : null}
-    />
+    </ScrollView>
     <Dialog visible={editing !== null} title="Edit tier" onClose={() => setEditing(null)}>
       <View style={styles.dialog}><Input label="Label" value={label} onChangeText={setLabel} /><Input label="Color" value={color} onChangeText={setColor} autoCapitalize="none" /><Button label="Save tier" onPress={() => { if (!editing) return; onChange({ ...data, tiers: data.tiers.map((tier) => tier.id === editing.id ? { ...tier, label: label.trim() || "Untitled", color: /^#[0-9a-f]{6}$/i.test(color) ? color : tier.color } : tier) }); setEditing(null); }} /><Button label="Delete tier" variant="destructive" onPress={() => { if (!editing) return; onChange({ tiers: data.tiers.filter((tier) => tier.id !== editing.id), pool: [...data.pool, ...editing.bookKeys] }); setEditing(null); }} /></View>
     </Dialog>
@@ -76,23 +75,24 @@ export function TierBoard({ data, books, onChange, structureEditable, poolLabel 
 }
 
 const styles = StyleSheet.create({
-  board: { paddingBottom: spacing.huge },
-  tier: { minHeight: 74, flexDirection: "row", overflow: "hidden" },
-  emptyTier: { minHeight: 46 },
+  board: { flexGrow: 1 },
+  tier: { flex: 1, minHeight: 74, flexDirection: "row", overflow: "hidden" },
   topCorners: { borderTopLeftRadius: radii.md, borderTopRightRadius: radii.md },
   bottomCorners: { borderBottomLeftRadius: radii.md, borderBottomRightRadius: radii.md },
   tierLabel: { width: 42, alignItems: "center", justifyContent: "center", padding: 2 },
   tierActions: { width: 44, alignItems: "center", justifyContent: "center" },
   grow: { flex: 1 },
-  books: { minHeight: 84, flexDirection: "row", flexWrap: "wrap", alignItems: "flex-start", gap: 2, padding: 2 },
-  chipWrap: { width: 58, height: 82 },
-  cover: { width: 58, height: 82, borderRadius: 2 },
+  booksScroll: { flex: 1 },
+  poolBooks: { height: 84 },
+  books: { flexGrow: 1, alignItems: "stretch", gap: 2 },
+  chipWrap: { height: "100%", aspectRatio: 2 / 3 },
+  cover: { width: "100%", height: "100%", borderRadius: 2 },
   fallback: { justifyContent: "space-between", padding: 5 },
   fallbackTitle: { fontFamily: "serif", fontSize: 11, lineHeight: 13, fontWeight: "700" },
   fallbackAuthor: { fontSize: 8, lineHeight: 10, fontWeight: "700" },
   center: { textAlign: "center" },
   strong: { fontWeight: "700" },
-  empty: { padding: spacing.sm },
+  empty: { height: "100%", paddingHorizontal: spacing.sm, textAlignVertical: "center" },
   footer: { gap: spacing.xs, paddingTop: spacing.sm },
   dialog: { gap: spacing.md },
 });
