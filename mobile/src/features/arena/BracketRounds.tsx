@@ -99,14 +99,17 @@ function Brace({ winnerSide }: { winnerSide: "a" | "b" | null }) {
   );
 }
 
-// The word alone, no rules flanking it. A round of eight matches drew 16 of
-// those hairlines, and the brace already groups the pair — the rules were a
-// third line-based cue for something two others had covered.
+// A badge rather than a word between two rules: it echoes the VS the vote
+// deck already puts between the two covers, so a match looks the same
+// wherever you meet it, and it carries the pairing without drawing the 16
+// hairlines a round of eight rules cost.
 function VersusRule() {
   const { colors } = useTheme();
   return (
     <View style={styles.versus}>
-      <Text {...dynamicType} style={[typography.caption, styles.bold, styles.versusText, { color: colors.textDim }]}>vs</Text>
+      <View style={[styles.versusBadge, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Text {...dynamicType} style={[typography.caption, styles.bold, styles.versusText, { color: colors.text }]}>VS</Text>
+      </View>
     </View>
   );
 }
@@ -221,10 +224,13 @@ function MatchCard({
       />
       </View>
       </View>
-      {/* Only once someone has voted — before that the two tallies are
-       *  both 0 and a half-empty bar would imply a contest that hasn't
-       *  started. */}
-      {shareA === null ? null : (
+      {/* Only while the match is still open, and only once someone has
+       *  voted: before a vote the two tallies are both 0 and a half-empty
+       *  bar implies a contest that hasn't started, and after the result is
+       *  in the fill and the tallies already say who won — leaving the
+       *  loudest line on the screen under the one match that had no
+       *  argument left to make. */}
+      {shareA === null || decided ? null : (
         <View style={[styles.shareTrack, { backgroundColor: colors.border }]}>
           <View style={[styles.shareFill, { width: `${shareA}%`, backgroundColor: colors.accent }]} />
         </View>
@@ -402,15 +408,18 @@ const styles = StyleSheet.create({
   braceFill: { position: "absolute", left: 0, width: 3, height: "50%", borderRadius: 2 },
   braceTop: { top: 0 },
   braceBottom: { bottom: 0 },
-  versus: { alignItems: "center", paddingVertical: 1 },
-  versusText: { fontSize: 9, letterSpacing: 1, textTransform: "uppercase" },
+  versus: { alignItems: "center", paddingVertical: 2 },
+  versusBadge: { paddingHorizontal: spacing.sm, paddingVertical: 1, borderRadius: radii.full, borderWidth: 1 },
+  versusText: { fontSize: 10, letterSpacing: 1 },
   // Both rows carry the padding, tinted or not, so the covers stay on one
   // vertical line.
   row: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingVertical: spacing.xs, paddingHorizontal: spacing.xs, borderRadius: radii.sm },
   rowText: { flex: 1, minWidth: 0 },
   pendingCover: { width: COVER_WIDTH, height: COVER_HEIGHT, borderRadius: radii.sm, opacity: 0.4 },
-  shareTrack: { height: 3, borderRadius: radii.full, overflow: "hidden", marginLeft: COVER_WIDTH + spacing.sm, marginTop: spacing.xs },
-  shareFill: { height: 3, borderRadius: radii.full },
+  // Thinner, and indented past the cover like the rows it belongs to, so it
+  // reads as one match's detail rather than a rule across the screen.
+  shareTrack: { height: 2, borderRadius: radii.full, overflow: "hidden", marginLeft: COVER_WIDTH + spacing.md, marginRight: spacing.xs, marginTop: spacing.xs },
+  shareFill: { height: 2, borderRadius: radii.full },
   bold: { fontWeight: "700" },
   votes: { minWidth: 22, textAlign: "right" },
   winsPill: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radii.full },
