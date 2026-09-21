@@ -73,7 +73,9 @@ function MatchRow({ side, isWinner, isChampion, decided, busy, blankTally, onPic
           onPress={onPick}
           style={[styles.winsPill, { backgroundColor: colors.accentSoft, opacity: busy ? 0.5 : 1 }]}
         >
-          <Text {...dynamicType} style={[typography.caption, styles.bold, { color: colors.accent }]}>Wins</Text>
+          {/* Near-black, not accent: accent on accentSoft is 3.92:1, and a
+            *  caption is nowhere near the size that would excuse it. */}
+          <Text {...dynamicType} style={[typography.caption, styles.bold, { color: colors.text }]}>Wins</Text>
         </Pressable>
       ) : null}
       {/* No tick beside the tint: the row's fill, the brace's filled half and
@@ -390,9 +392,7 @@ const styles = StyleSheet.create({
   rail: { flex: 1, height: 2, marginBottom: 14, marginHorizontal: 2 },
   // The home feed's row recipe: a hairline under each block and nothing
   // else, so a round reads as one list of results.
-  // A notch tighter than the feed's rows: the brace and the tint's own
-  // padding take from the same width the titles need.
-  block: { paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderBottomWidth: 1 },
+  block: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1 },
   labelRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs, paddingBottom: spacing.xs, paddingHorizontal: spacing.xs },
   meta: { fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6 },
   roundHead: { paddingTop: spacing.md, paddingBottom: spacing.sm, paddingHorizontal: spacing.lg, gap: 2 },

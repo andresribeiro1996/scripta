@@ -75,8 +75,8 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
     }
   }
 
-  if (!token || tournament.isPending) return <Screen bottom top={false} style={styles.screen}><Skeleton height={160} /></Screen>;
-  if (tournament.isError || !data) return <Screen bottom top={false} style={styles.screen}><ErrorState title="Tournament unavailable" body={tournament.error instanceof Error ? tournament.error.message : "No such tournament."} actionLabel="Retry" onAction={() => void tournament.refetch()} /></Screen>;
+  if (!token || tournament.isPending) return <Screen bottom top={false} style={styles.centered}><Skeleton height={160} /></Screen>;
+  if (tournament.isError || !data) return <Screen bottom top={false} style={styles.centered}><ErrorState title="Tournament unavailable" body={tournament.error instanceof Error ? tournament.error.message : "No such tournament."} actionLabel="Retry" onAction={() => void tournament.refetch()} /></Screen>;
 
   const votable = votableDuels(data.duels);
   const next = votable[0];
@@ -167,7 +167,7 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
   };
 
   return (
-    <Screen bottom top={false} style={styles.screen}>
+    <Screen bottom top={false}>
       <Stack.Screen
         options={{
           headerShown: true,
@@ -202,11 +202,14 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
 }
 
 const styles = StyleSheet.create({
-  screen: { padding: spacing.lg, gap: spacing.md },
+  // No padding on the screen itself — the tab strip, the match rows and the
+  // bottom strip all run edge to edge, the way the home feed and library do.
+  // Each pane carries its own gutter instead.
+  centered: { padding: spacing.lg, gap: spacing.md },
   grow: { flex: 1 },
-  pane: { gap: spacing.md, paddingBottom: spacing.huge, flexGrow: 1, justifyContent: "center" },
-  matchWrap: { flex: 1, paddingTop: spacing.lg, justifyContent: "center" },
-  list: { gap: spacing.md, paddingBottom: spacing.huge, flexGrow: 1 },
+  pane: { gap: spacing.md, paddingHorizontal: spacing.lg, paddingBottom: spacing.huge, flexGrow: 1, justifyContent: "center" },
+  matchWrap: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, justifyContent: "center" },
+  list: { gap: spacing.md, paddingHorizontal: spacing.lg, paddingBottom: spacing.huge, flexGrow: 1 },
   // The same bottom strip the round rail sits in, so the toggle keeps its
   // place between the two views.
   classicBar: { position: "absolute", left: 0, right: 0, bottom: 0, minHeight: 64, flexDirection: "row", alignItems: "center", justifyContent: "flex-end", paddingHorizontal: spacing.lg, borderTopWidth: 1 },
