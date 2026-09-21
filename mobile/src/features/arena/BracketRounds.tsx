@@ -41,11 +41,9 @@ import { BracketViewToggle } from "./BracketViewToggle";
 import { matchNote, roundHeadline, roundLabel, tournamentChampion } from "./arenaView";
 import type { TournamentView } from "./api";
 
-const BAR_HEIGHT = 56;
-const FAB_SIZE = 48;
-// Enough for the bar AND the button floating above it, so the last match
-// scrolls clear of both rather than under them.
-const BAR_RESERVE = BAR_HEIGHT + FAB_SIZE + 40;
+const BAR_HEIGHT = 64;
+// The strip's own height plus a gap, so the last match scrolls clear of it.
+const BAR_RESERVE = BAR_HEIGHT + 24;
 
 const COVER_WIDTH = 32;
 const COVER_HEIGHT = 48;
@@ -318,8 +316,7 @@ export function BracketRounds({
             </Fragment>
           );
         })}
-      </View>
-      <View style={styles.fabDock} pointerEvents="box-none">
+        <View style={[styles.barRule, { backgroundColor: colors.border }]} />
         <BracketViewToggle to="classic" onPress={onShowClassic} />
       </View>
 
@@ -345,7 +342,7 @@ const styles = StyleSheet.create({
   pane: { flex: 1 },
   list: { paddingBottom: BAR_RESERVE, flexGrow: 1 },
   bar: { position: "absolute", left: 0, right: 0, bottom: 0, minHeight: BAR_HEIGHT, flexDirection: "row", alignItems: "center", paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm, borderTopWidth: 1 },
-  fabDock: { position: "absolute", right: spacing.lg, bottom: BAR_HEIGHT + spacing.md },
+  barRule: { width: 1, height: 24, marginLeft: spacing.md, marginRight: spacing.sm, marginBottom: 8 },
   node: { alignItems: "center", gap: 3, flexShrink: 0 },
   nodeDot: { width: 14, height: 14, borderRadius: radii.full },
   nodeLabel: { fontSize: 10 },
