@@ -6,6 +6,7 @@
 - Keep replies terse. Code and commands stay exact — they get pasted verbatim, and an approximated flag fails without saying whether the tool or the transcription was wrong.
 - No comments in code unless asked. A comment restating the line under it goes stale the moment that line changes and nothing checks it; put the non-obvious *why* in the commit message, where it stays attached to the change that needed it.
 - Dev servers, the emulator lease, and how concurrent agent sessions avoid stepping on each other (worktrees, `dev:link-deps`) are in [`docs/dev-workflow.md`](docs/dev-workflow.md) — read it before starting a dev server or a new agent session.
+- Before optional emulator verification, run `node scripts/dev-status.mjs --json` once. If another worktree holds the emulator, skip the optional capture immediately; do not wait, retry, take the lease, start a second emulator, or recreate fixture data just for a screenshot.
 
 # Project
 

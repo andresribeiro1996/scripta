@@ -42,6 +42,8 @@ No marker means you are looking at stale code. `cd mobile && npx expo start --cl
 
 The emulator is leased, two at a time. Take one only to verify a change that must be rendered — layout, navigation, touch behaviour, animation, native modules. Not for backend, shared-package, type or refactor work. Write, typecheck and test with no device, then take the lease for one verification pass at the end.
 
+For an optional screenshot or visual confirmation, run `node scripts/dev-status.mjs --json` once before trying to take a device. If another worktree holds the emulator, stop the optional check immediately. Do not poll, retry, take the held lease, start the second emulator, or reseed/recreate data to approximate the requested screen. Report that the device is occupied and continue with the checks that do not require it. Required device acceptance may wait for a lease, but the agent must say so before waiting.
+
 ## Concurrent agents and worktrees
 
 Never edit directly in the primary checkout (`~/Documents/scripta` itself, whatever branch it happens to be on) — treat it as what new worktrees branch off, not a workspace. Two sessions in the same checkout share one git index; a `git add`/`commit` there can silently sweep up the other session's staged files.
