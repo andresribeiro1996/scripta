@@ -19,6 +19,11 @@
 // Each node is still a button; changing the view is the floating button's
 // job, not a sixth node's.
 //
+// The two books are braced together and split by a VS rule, so a match
+// reads as one contest rather than two rows that happen to be adjacent.
+// The brace fills on the winner's side and the winning row is tinted —
+// bold text alone was doing all the work and losing.
+//
 // A match is a flat block on the page separated by a hairline, not a card:
 // the same shape the home feed's activity rows use — an uppercase label row
 // carrying the state in colour, then the content under it. Boxes around
@@ -51,8 +56,9 @@ const COVER_HEIGHT = 48;
 function MatchRow({ side, isWinner, isChampion, decided, busy, blankTally, onPick }: { side: DuelSide; isWinner: boolean; isChampion: boolean; decided: boolean; busy: boolean; blankTally: boolean; onPick?: () => void }) {
   const { colors } = useTheme();
   const faded = decided && !isWinner;
+  const won = decided && isWinner;
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, won ? { backgroundColor: colors.accentSoft } : null]}>
       <BookCover cover={side.cover} title={side.title} width={COVER_WIDTH} height={COVER_HEIGHT} />
       <View style={styles.rowText}>
         <Text numberOfLines={1} {...dynamicType} style={[typography.body, isWinner && styles.bold, { color: faded ? colors.textDim : colors.text }]}>{side.title}</Text>
@@ -70,12 +76,34 @@ function MatchRow({ side, isWinner, isChampion, decided, busy, blankTally, onPic
           <Text {...dynamicType} style={[typography.caption, styles.bold, { color: colors.accent }]}>Wins</Text>
         </Pressable>
       ) : null}
-      {/* Weight alone is a thin cue for "this one went through" — the mark
-       *  gives it a second, non-typographic one, and the trophy says this
-       *  book didn't just win a round, it won the tournament. */}
+      {/* No tick beside the tint: the row's fill, the brace's filled half and
+       *  the accent tally already say this one went through, and a fourth
+       *  mark was taking the width the title needed. The trophy stays — it
+       *  says this book didn't just win a round, it won the tournament. */}
       {isChampion ? <Icon name="champion" size={14} color={colors.accent} /> : null}
-      {isWinner && !isChampion ? <Text {...dynamicType} style={[typography.caption, styles.bold, { color: colors.accent }]}>✓</Text> : null}
       <Text {...dynamicType} style={[typography.body, isWinner && styles.bold, styles.votes, { color: faded || blankTally ? colors.textDim : colors.text }]}>{blankTally ? "—" : side.votes}</Text>
+    </View>
+  );
+}
+
+/** The brace a bracket draws down the left of a pairing, filled on the half
+ *  that went through. */
+function Brace({ winnerSide }: { winnerSide: "a" | "b" | null }) {
+  const { colors } = useTheme();
+  return (
+    <View style={[styles.brace, { backgroundColor: colors.border }]}>
+      {winnerSide ? <View style={[styles.braceFill, winnerSide === "a" ? styles.braceTop : styles.braceBottom, { backgroundColor: colors.accent }]} /> : null}
+    </View>
+  );
+}
+
+function VersusRule() {
+  const { colors } = useTheme();
+  return (
+    <View style={styles.versus}>
+      <View style={[styles.versusRule, { backgroundColor: colors.border }]} />
+      <Text {...dynamicType} style={[typography.caption, styles.bold, styles.versusText, { color: colors.textDim }]}>VS</Text>
+      <View style={[styles.versusRule, { backgroundColor: colors.border }]} />
     </View>
   );
 }
@@ -118,8 +146,14 @@ function MatchCard({
         <View style={styles.labelRow}>
           <Text {...dynamicType} numberOfLines={1} style={[typography.caption, styles.meta, styles.grow, { color: colors.textDim }]}>Match {matchNumber}</Text>
         </View>
-        <PendingRow label={feeders ? feeders[0] : "Not decided yet"} />
-        <PendingRow label={feeders ? feeders[1] : "Not decided yet"} />
+        <View style={styles.pair}>
+          <Brace winnerSide={null} />
+          <View style={styles.grow}>
+            <PendingRow label={feeders ? feeders[0] : "Not decided yet"} />
+            <VersusRule />
+            <PendingRow label={feeders ? feeders[1] : "Not decided yet"} />
+          </View>
+        </View>
       </View>
     );
   }
@@ -160,6 +194,9 @@ function MatchCard({
           </Pressable>
         ) : null}
       </View>
+      <View style={styles.pair}>
+      <Brace winnerSide={duel.winnerKey === duel.bookA.key ? "a" : duel.winnerKey === duel.bookB.key ? "b" : null} />
+      <View style={styles.grow}>
       <MatchRow
         side={duel.bookA}
         isWinner={duel.winnerKey === duel.bookA.key}
@@ -169,6 +206,7 @@ function MatchCard({
         blankTally={unvoted}
         onPick={tiebreak ? () => onTiebreak(duel.id, duel.bookA.key) : undefined}
       />
+      <VersusRule />
       <MatchRow
         side={duel.bookB}
         isWinner={duel.winnerKey === duel.bookB.key}
@@ -178,6 +216,8 @@ function MatchCard({
         blankTally={unvoted}
         onPick={tiebreak ? () => onTiebreak(duel.id, duel.bookB.key) : undefined}
       />
+      </View>
+      </View>
       {/* Only once someone has voted — before that the two tallies are
        *  both 0 and a half-empty bar would imply a contest that hasn't
        *  started. */}
@@ -350,11 +390,23 @@ const styles = StyleSheet.create({
   rail: { flex: 1, height: 2, marginBottom: 14, marginHorizontal: 2 },
   // The home feed's row recipe: a hairline under each block and nothing
   // else, so a round reads as one list of results.
-  block: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1 },
-  labelRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs, paddingBottom: spacing.xs },
+  // A notch tighter than the feed's rows: the brace and the tint's own
+  // padding take from the same width the titles need.
+  block: { paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderBottomWidth: 1 },
+  labelRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs, paddingBottom: spacing.xs, paddingHorizontal: spacing.xs },
   meta: { fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6 },
   roundHead: { paddingTop: spacing.md, paddingBottom: spacing.sm, paddingHorizontal: spacing.lg, gap: 2 },
-  row: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingVertical: spacing.xs },
+  pair: { flexDirection: "row", alignItems: "stretch", gap: spacing.sm },
+  brace: { width: 3, borderRadius: 2 },
+  braceFill: { position: "absolute", left: 0, width: 3, height: "50%", borderRadius: 2 },
+  braceTop: { top: 0 },
+  braceBottom: { bottom: 0 },
+  versus: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  versusRule: { flex: 1, height: 1 },
+  versusText: { fontSize: 9, letterSpacing: 1 },
+  // Both rows carry the padding, tinted or not, so the covers stay on one
+  // vertical line.
+  row: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingVertical: spacing.xs, paddingHorizontal: spacing.xs, borderRadius: radii.sm },
   rowText: { flex: 1, minWidth: 0 },
   pendingCover: { width: COVER_WIDTH, height: COVER_HEIGHT, borderRadius: radii.sm, opacity: 0.4 },
   shareTrack: { height: 3, borderRadius: radii.full, overflow: "hidden", marginLeft: COVER_WIDTH + spacing.sm, marginTop: spacing.xs },
