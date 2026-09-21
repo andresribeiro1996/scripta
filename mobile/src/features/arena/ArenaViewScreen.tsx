@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Stack } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -24,13 +24,16 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
   const { colors } = useTheme();
   const queryClient = useQueryClient();
   const [token, setToken] = useState<string | null>(null);
-  const [tab, setTab] = useState<ArenaViewTab>("match");
+  const [tab, setTab] = useState<ArenaViewTab | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState("");
   const [booksOpen, setBooksOpen] = useState(false);
-  const [scrolling, setScrolling] = useState(false);
+  // Frozen on the first render that has data, never recomputed: casting the
+  // last vote empties `votable`, and a landing tab that kept recalculating
+  // would yank the pane out from under the finger that just voted.
+  const landing = useRef<ArenaViewTab | null>(null);
   // Deliberately not persisted: the classic map is a peek at the shape of
   // the draw, not a way to live in it — at 32 slots its round 1 is 16
   // matches wide. Every visit starts on the round-by-round view.
@@ -80,7 +83,12 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
   const champion = tournamentChampion(data.bracketSize, data.duels);
   const refresh = () => void tournament.refetch();
   const tabs = arenaViewTabs(data.status);
-  const activeTab = tabs.some((option) => option.value === tab) ? tab : tabs[0]!.value;
+  // Open on the pane with something to do: the deck when there are votes to
+  // cast, the bracket otherwise — landing a finished tournament on "No
+  // matches" wasted the one screen that had anything to show.
+  landing.current ??= votable.length ? "match" : "bracket";
+  const chosen = tab ?? landing.current;
+  const activeTab = tabs.some((option) => option.value === chosen) ? chosen : tabs[0]!.value;
 
   const matchPane = () => {
     const empty = matchEmptyCopy(data.status, data.duels.length > 0);
@@ -151,7 +159,6 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
         busyDuelId={busy}
         refreshing={tournament.isRefetching}
         onRefresh={refresh}
-        onScrolling={setScrolling}
         onShowClassic={() => setBracketView("classic")}
         onSettle={(duelId) => void action(duelId, () => settleDuelEarly(id, duelId))}
         onTiebreak={(duelId, bookKey) => void action(duelId, () => resolveTiebreak(id, duelId, bookKey))}
@@ -185,7 +192,6 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
         options={tabs.map((option) => option.value === "match" ? { ...option, badge: votable.length } : option)}
         value={activeTab}
         onChange={setTab}
-        tabsHidden={scrolling}
         renderPage={(pageTab) => pageTab === "match" ? matchPane() : bracketPane()}
       />
       <ArenaBooksSheet id={booksOpen ? id : null} name={data.name} onAddBook={openAddBook} onClose={() => setBooksOpen(false)} />

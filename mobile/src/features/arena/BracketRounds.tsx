@@ -3,10 +3,19 @@
 // width and leave the covers legible — the two-sided map this replaced
 // shrank them to ~28pt and they collided.
 //
-// The round bar is pinned to the BOTTOM of the pane, not the top: round 1
-// of a big bracket is eight cards long, and a bar that scrolled away would
-// be unreachable exactly when you want it. That's also why this component
-// owns its own ScrollView instead of sitting inside the screen's.
+// The round bar is pinned to the BOTTOM of the pane, not the top: it is
+// where the thumb already is. That's also why this component owns its own
+// ScrollView instead of sitting inside the screen's.
+//
+// The bar does not hide while the list moves. It used to slide away on
+// every scroll and come back on a settle timer, which meant two pieces of
+// chrome animating on each flick and a control that was missing whenever
+// you reached for it.
+//
+// Its chips scroll horizontally, with the view toggle at the head of the
+// row past a divider: selecting a round and changing the view no longer
+// compete for one wrapped row, and the toggle stays on screen on a 16-book
+// bracket whose rounds run off the right edge.
 //
 // Each match is a full-width card holding its two books stacked, winner in
 // bold, tally on the right. Rounds whose duels don't exist yet still get a
@@ -16,9 +25,8 @@
 // author, exact share). An owner's settle/tiebreak controls sit on the card
 // as nested Pressables, so tapping one doesn't also open the sheet.
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
-import Animated, { ReduceMotion, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { bracketShape, countdownLabel, needsVote, sharePercent, type BracketSlot, type Duel, type DuelSide } from "@scripta/shared";
 import { Icon, Sheet, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "./BookCover";
@@ -26,6 +34,10 @@ import { DuelSideRow } from "./DuelSideRow";
 import { BracketViewToggle } from "./BracketViewToggle";
 import { tournamentChampion } from "./arenaView";
 import type { TournamentView } from "./api";
+
+// One row of chips plus its padding, with room for the largest dynamic
+// type step before it starts covering the last card.
+const BAR_RESERVE = 88;
 
 const COVER_WIDTH = 32;
 const COVER_HEIGHT = 48;
@@ -172,7 +184,6 @@ export function BracketRounds({
   busyDuelId,
   refreshing,
   onRefresh,
-  onScrolling,
   onShowClassic,
   onSettle,
   onTiebreak,
@@ -182,9 +193,6 @@ export function BracketRounds({
   busyDuelId: string | null;
   refreshing: boolean;
   onRefresh: () => void;
-  /** Fires while the list is moving, so the screen's own chrome can get out
-   *  of the way too. */
-  onScrolling: (scrolling: boolean) => void;
   /** Hands the pane over to the classic whole-tree map. */
   onShowClassic: () => void;
   onSettle: (duelId: string) => void;
@@ -193,44 +201,8 @@ export function BracketRounds({
   const { colors } = useTheme();
   const [openId, setOpenId] = useState<string | null>(null);
   const [picked, setPicked] = useState<number | null>(null);
-  const [barHeight, setBarHeight] = useState(0);
-  const [barTappable, setBarTappable] = useState(true);
   const scroller = useRef<ScrollView>(null);
-  const settle = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const tucked = useSharedValue(0);
   const openDuel = openId ? (tournament.duels.find((d) => d.id === openId) ?? null) : null;
-
-  // Leaving the screen mid-scroll leaves the settle timer pending, and it
-  // would wake up to set state on a component that is gone.
-  useEffect(() => () => {
-    if (settle.current) clearTimeout(settle.current);
-  }, []);
-
-  // Out of the way while the list is moving, back as soon as it stops. The
-  // lift is the bar's own height plus the screen's bottom padding, so it
-  // clears the edge rather than half-sitting on it.
-  const barStyle = useAnimatedStyle(() => ({
-    opacity: withTiming(1 - tucked.get(), { duration: 140, reduceMotion: ReduceMotion.System }),
-    transform: [{ translateY: withTiming(tucked.get() * (barHeight + spacing.lg), { duration: 140, reduceMotion: ReduceMotion.System }) }],
-  }));
-
-  function tuckBar() {
-    if (settle.current) clearTimeout(settle.current);
-    tucked.set(1);
-    setBarTappable(false);
-    onScrolling(true);
-  }
-
-  // A lifted finger may still hand off to momentum, so give that a moment
-  // to start before deciding the list has actually stopped.
-  function releaseBar(delay: number) {
-    if (settle.current) clearTimeout(settle.current);
-    settle.current = setTimeout(() => {
-      tucked.set(0);
-      setBarTappable(true);
-      onScrolling(false);
-    }, delay);
-  }
 
   const byRound = bracketShape(tournament.bracketSize, tournament.duels);
   if (byRound.length === 0) return null;
@@ -272,15 +244,13 @@ export function BracketRounds({
       <ScrollView
         ref={scroller}
         style={styles.grow}
-        // The bar floats over the list rather than sitting beside it, so
-        // tucking it away hands its space back to the matches instead of
-        // leaving a hole. The padding keeps the last card clear of it.
-        contentContainerStyle={[styles.list, { paddingBottom: barHeight + spacing.md }]}
+        // The bar floats over the list, so the padding is what keeps the
+        // last card clear of it. A fixed reserve rather than the bar's
+        // measured height: measuring it fed an onLayout setState back into
+        // this list's padding, and with the chips in their own scroller
+        // that update landed before the bar had mounted.
+        contentContainerStyle={styles.list}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        onScrollBeginDrag={tuckBar}
-        onScrollEndDrag={() => releaseBar(160)}
-        onMomentumScrollBegin={tuckBar}
-        onMomentumScrollEnd={() => releaseBar(0)}
       >
         <Text {...dynamicType} numberOfLines={1} style={[typography.caption, styles.meta, styles.roundHead, { color: colors.textDim }]}>
           {labelFor(roundIdx)}{closesAt ? ` · ${countdownLabel(closesAt)}` : ""}
@@ -306,11 +276,14 @@ export function BracketRounds({
 
       </ScrollView>
 
-      <Animated.View
-        onLayout={(event) => setBarHeight(event.nativeEvent.layout.height)}
-        pointerEvents={barTappable ? "auto" : "none"}
-        style={[styles.bar, barStyle, { backgroundColor: colors.surface, borderTopColor: colors.border }]}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={[styles.bar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}
+        contentContainerStyle={styles.barContent}
       >
+        <BracketViewToggle to="classic" onPress={onShowClassic} />
+        <View style={[styles.barRule, { backgroundColor: colors.border }]} />
         {byRound.map((_, i) => {
           const on = i === roundIdx;
           const live = i === liveRound;
@@ -329,8 +302,7 @@ export function BracketRounds({
             </Pressable>
           );
         })}
-        <BracketViewToggle to="classic" onPress={onShowClassic} />
-      </Animated.View>
+      </ScrollView>
 
       {/* Read-only: bigger covers and the exact share a card has no room
        *  for. Acting (vote, settle, tiebreak) happens on the card itself,
@@ -352,8 +324,13 @@ export function BracketRounds({
 
 const styles = StyleSheet.create({
   pane: { flex: 1 },
-  list: { paddingTop: spacing.md, flexGrow: 1 },
-  bar: { position: "absolute", left: 0, right: 0, bottom: 0, flexDirection: "row", flexWrap: "wrap", gap: spacing.xs, justifyContent: "center", paddingTop: spacing.sm, paddingBottom: spacing.xs, borderTopWidth: 1 },
+  list: { paddingTop: spacing.md, paddingBottom: BAR_RESERVE, flexGrow: 1 },
+  // The bar IS the scroller: a scroller nested inside it warned about a
+  // state update before mount, and one row that scrolls as a whole carries
+  // the toggle along at its end.
+  bar: { position: "absolute", left: 0, right: 0, bottom: 0, borderTopWidth: 1 },
+  barContent: { flexDirection: "row", alignItems: "center", gap: spacing.xs, paddingHorizontal: spacing.md, paddingTop: spacing.sm, paddingBottom: spacing.xs },
+  barRule: { width: 1, height: 20 },
   chip: { flexDirection: "row", alignItems: "center", gap: spacing.xs, paddingHorizontal: spacing.md, paddingVertical: 7, borderRadius: radii.full, borderWidth: 1 },
   liveDot: { width: 6, height: 6, borderRadius: radii.full },
   // One bordered block ruled into matches rather than a stack of floating
