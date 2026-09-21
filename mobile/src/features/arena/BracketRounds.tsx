@@ -58,7 +58,7 @@ function MatchRow({ side, isWinner, isChampion, decided, busy, blankTally, onPic
   const faded = decided && !isWinner;
   const won = decided && isWinner;
   return (
-    <View style={[styles.row, won ? { backgroundColor: colors.accentSoft } : null]}>
+    <View style={[styles.row, won ? { backgroundColor: colors.accentFill } : null]}>
       <BookCover cover={side.cover} title={side.title} width={COVER_WIDTH} height={COVER_HEIGHT} />
       <View style={styles.rowText}>
         <Text numberOfLines={1} {...dynamicType} style={[typography.body, isWinner && styles.bold, { color: faded ? colors.textDim : colors.text }]}>{side.title}</Text>
@@ -99,13 +99,14 @@ function Brace({ winnerSide }: { winnerSide: "a" | "b" | null }) {
   );
 }
 
+// The word alone, no rules flanking it. A round of eight matches drew 16 of
+// those hairlines, and the brace already groups the pair — the rules were a
+// third line-based cue for something two others had covered.
 function VersusRule() {
   const { colors } = useTheme();
   return (
     <View style={styles.versus}>
-      <View style={[styles.versusRule, { backgroundColor: colors.border }]} />
-      <Text {...dynamicType} style={[typography.caption, styles.bold, styles.versusText, { color: colors.textDim }]}>VS</Text>
-      <View style={[styles.versusRule, { backgroundColor: colors.border }]} />
+      <Text {...dynamicType} style={[typography.caption, styles.bold, styles.versusText, { color: colors.textDim }]}>vs</Text>
     </View>
   );
 }
@@ -401,9 +402,8 @@ const styles = StyleSheet.create({
   braceFill: { position: "absolute", left: 0, width: 3, height: "50%", borderRadius: 2 },
   braceTop: { top: 0 },
   braceBottom: { bottom: 0 },
-  versus: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  versusRule: { flex: 1, height: 1 },
-  versusText: { fontSize: 9, letterSpacing: 1 },
+  versus: { alignItems: "center", paddingVertical: 1 },
+  versusText: { fontSize: 9, letterSpacing: 1, textTransform: "uppercase" },
   // Both rows carry the padding, tinted or not, so the covers stay on one
   // vertical line.
   row: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingVertical: spacing.xs, paddingHorizontal: spacing.xs, borderRadius: radii.sm },

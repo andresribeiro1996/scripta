@@ -11,6 +11,15 @@ export const palettes = {
     border: "#ddd8d0",
     accent: "#a85c32",
     accentSoft: "#f1e2d8",
+    // A fill that has to outrank a border. accentSoft is a wash for things
+    // that sit behind accent-coloured text (avatars, cover fallbacks,
+    // badges), so it is deliberately weak — at 1.11:1 in light and 1.39:1
+    // in dark it separates from the page LESS than a hairline does (1.25
+    // and 1.82), which puts structure above meaning wherever it marks a
+    // selection. This one carries more of the accent: 24% in light, 34% in
+    // dark, both landing just above their borders with body text still over
+    // 8:1 on top.
+    accentFill: "#e0ccbf",
     danger: "#b3432f",
     dangerSoft: "#f6dfda",
     success: "#47713c",
@@ -28,6 +37,7 @@ export const palettes = {
     border: "#45403a",
     accent: "#e08a52",
     accentSoft: "#3a2c22",
+    accentFill: "#593b26",
     danger: "#e08072",
     dangerSoft: "#3a2420",
     success: "#8fbf7f",
