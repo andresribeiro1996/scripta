@@ -12,11 +12,12 @@
 // chrome animating on each flick and a control that was missing whenever
 // you reached for it.
 //
-// Its chips are the short forms a sports page uses — R1, QF, SF, F — so
-// even a 32-book bracket's five rounds fit one row without scrolling. The
-// round header above the list spells the current one out in full, and the
-// accessibility label always carries the long name. Changing the view is
-// the floating button's job, not a sixth chip's.
+// The bar is a progress rail rather than a row of chips: nodes joined by a
+// line, filled as far as the draw has actually got. Chips said which round
+// you were looking at but never which were finished — a rail is the one
+// shape that answers both, and it fits any bracket size without scrolling.
+// Each node is still a button; changing the view is the floating button's
+// job, not a sixth node's.
 //
 // A match is a flat block on the page separated by a hairline, not a card:
 // the same shape the home feed's activity rows use — an uppercase label row
@@ -30,14 +31,14 @@
 // author, exact share). An owner's settle/tiebreak controls sit on the card
 // as nested Pressables, so tapping one doesn't also open the sheet.
 
-import { useRef, useState } from "react";
+import { Fragment, useRef, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { bracketShape, countdownLabel, needsVote, sharePercent, type BracketSlot, type Duel, type DuelSide } from "@scripta/shared";
 import { Icon, Sheet, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "./BookCover";
 import { DuelSideRow } from "./DuelSideRow";
 import { BracketViewToggle } from "./BracketViewToggle";
-import { tournamentChampion } from "./arenaView";
+import { matchNote, roundHeadline, roundLabel, tournamentChampion } from "./arenaView";
 import type { TournamentView } from "./api";
 
 const BAR_HEIGHT = 56;
@@ -49,7 +50,7 @@ const BAR_RESERVE = BAR_HEIGHT + FAB_SIZE + 40;
 const COVER_WIDTH = 32;
 const COVER_HEIGHT = 48;
 
-function MatchRow({ side, isWinner, isChampion, decided, busy, onPick }: { side: DuelSide; isWinner: boolean; isChampion: boolean; decided: boolean; busy: boolean; onPick?: () => void }) {
+function MatchRow({ side, isWinner, isChampion, decided, busy, blankTally, onPick }: { side: DuelSide; isWinner: boolean; isChampion: boolean; decided: boolean; busy: boolean; blankTally: boolean; onPick?: () => void }) {
   const { colors } = useTheme();
   const faded = decided && !isWinner;
   return (
@@ -76,7 +77,7 @@ function MatchRow({ side, isWinner, isChampion, decided, busy, onPick }: { side:
        *  book didn't just win a round, it won the tournament. */}
       {isChampion ? <Icon name="champion" size={14} color={colors.accent} /> : null}
       {isWinner && !isChampion ? <Text {...dynamicType} style={[typography.caption, styles.bold, { color: colors.accent }]}>✓</Text> : null}
-      <Text {...dynamicType} style={[typography.body, isWinner && styles.bold, styles.votes, { color: faded ? colors.textDim : colors.text }]}>{side.votes}</Text>
+      <Text {...dynamicType} style={[typography.body, isWinner && styles.bold, styles.votes, { color: faded || blankTally ? colors.textDim : colors.text }]}>{blankTally ? "—" : side.votes}</Text>
     </View>
   );
 }
@@ -131,7 +132,10 @@ function MatchCard({
   // Every duel in a round shares one deadline, so the countdown belongs to
   // the round header, not to each card. Only a match that has left the
   // round's own state behind says anything here.
-  const state = duel.status === "settled" ? "Settled" : duel.status === "tied_pending_tiebreak" ? "Tiebreak needed" : null;
+  const note = matchNote(duel);
+  // A settled match nobody voted in shows dashes: a pair of zeroes next to a
+  // winner's tick reads as a bug rather than as an empty ballot.
+  const unvoted = duel.status === "settled" && duel.bookA.votes + duel.bookB.votes === 0;
   return (
     <Pressable
       accessibilityRole="button"
@@ -144,7 +148,7 @@ function MatchCard({
         <Text {...dynamicType} numberOfLines={1} style={[typography.caption, styles.meta, styles.grow, { color: needsVote(duel) ? colors.accent : colors.textDim }]}>
           Match {matchNumber}
         </Text>
-        {state ? <Text {...dynamicType} numberOfLines={1} style={[typography.caption, styles.meta, { color: colors.textDim }]}>{state}</Text> : null}
+        {note ? <Text {...dynamicType} numberOfLines={1} style={[typography.caption, styles.meta, { color: colors.textDim }]}>{note}</Text> : null}
         {isOwner && duel.status === "active" ? (
           <Pressable
             accessibilityRole="button"
@@ -164,6 +168,7 @@ function MatchCard({
         isChampion={championKey !== null && championKey === duel.bookA.key}
         decided={decided}
         busy={busy}
+        blankTally={unvoted}
         onPick={tiebreak ? () => onTiebreak(duel.id, duel.bookA.key) : undefined}
       />
       <MatchRow
@@ -172,6 +177,7 @@ function MatchCard({
         isChampion={championKey !== null && championKey === duel.bookB.key}
         decided={decided}
         busy={busy}
+        blankTally={unvoted}
         onPick={tiebreak ? () => onTiebreak(duel.id, duel.bookB.key) : undefined}
       />
       {/* Only once someone has voted — before that the two tallies are
@@ -215,22 +221,16 @@ export function BracketRounds({
   const byRound = bracketShape(tournament.bracketSize, tournament.duels);
   if (byRound.length === 0) return null;
 
-  // Sports-page short forms for the chips; labelFor stays the long name for
-  // the round header, prose and accessibility labels.
-  function shortLabelFor(roundIdx: number): string {
+  function labelFor(roundIdx: number): string {
+    return roundLabel(byRound, roundIdx);
+  }
+
+  function nodeLabel(roundIdx: number): string {
     const count = byRound[roundIdx]?.length ?? 0;
     if (count === 1) return "F";
     if (count === 2) return "SF";
     if (count === 4) return "QF";
     return `R${roundIdx + 1}`;
-  }
-
-  function labelFor(roundIdx: number): string {
-    const count = byRound[roundIdx]?.length ?? 0;
-    if (count === 1) return "Final";
-    if (count === 2) return "Semis";
-    if (count === 4) return "Quarters";
-    return `Round ${roundIdx + 1}`;
   }
 
   // Named rounds read as "Winner of Quarters 2"; the early numbered ones
@@ -246,9 +246,7 @@ export function BracketRounds({
   const slots = byRound[roundIdx]!;
 
   const champion = tournamentChampion(tournament.bracketSize, tournament.duels);
-  // One deadline per round, set when the round's duels are built, so any
-  // still-open duel in it carries the same one.
-  const closesAt = slots.find((duel) => duel?.status === "active")?.closesAt ?? null;
+  const headline = roundHeadline(byRound, roundIdx);
 
   // A round you switch into is shorter than the one you left as often as
   // not, so keeping the old offset can land you in empty space.
@@ -270,9 +268,10 @@ export function BracketRounds({
         contentContainerStyle={styles.list}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        <Text {...dynamicType} numberOfLines={1} style={[typography.caption, styles.meta, styles.roundHead, { color: colors.textDim }]}>
-          {labelFor(roundIdx)}{closesAt ? ` · ${countdownLabel(closesAt)}` : ""}
-        </Text>
+        <View style={styles.roundHead}>
+          <Text {...dynamicType} numberOfLines={1} style={[typography.caption, styles.meta, { color: colors.text }]}>{headline.title}</Text>
+          <Text {...dynamicType} numberOfLines={1} style={[typography.caption, { color: colors.textDim }]}>{headline.status}</Text>
+        </View>
         <View>
           {slots.map((duel, i) => (
             <View key={duel?.id ?? `pending-${roundIdx}-${i}`}>
@@ -294,22 +293,29 @@ export function BracketRounds({
       </ScrollView>
 
       <View style={[styles.bar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
-        {byRound.map((_, i) => {
+        {byRound.map((roundSlots, i) => {
           const on = i === roundIdx;
-          const live = i === liveRound;
+          const done = roundSlots.every((duel) => duel?.status === "settled");
+          const reached = liveRound === -1 || i <= liveRound;
+          // Done rounds are solid, the one in play is a ring, rounds the draw
+          // hasn't got to are hollow — so the rail fills as the tournament does.
+          const nodeColor = done ? colors.accent : reached ? colors.surface : colors.border;
+          const state = done ? "complete" : i === liveRound ? "in play" : "not started";
           return (
-            <Pressable
-              key={i}
-              accessibilityRole="button"
-              accessibilityState={{ selected: on }}
-              accessibilityLabel={live ? `${labelFor(i)}, current round` : labelFor(i)}
-              hitSlop={6}
-              onPress={() => pickRound(i)}
-              style={[styles.chip, { backgroundColor: on ? colors.accent : colors.background, borderColor: on ? colors.accent : colors.border }]}
-            >
-              {live ? <View style={[styles.liveDot, { backgroundColor: on ? colors.onAccent : colors.accent }]} /> : null}
-              <Text {...dynamicType} numberOfLines={1} style={[typography.caption, styles.bold, { color: on ? colors.onAccent : colors.textDim }]}>{shortLabelFor(i)}</Text>
-            </Pressable>
+            <Fragment key={i}>
+              {i > 0 ? <View style={[styles.rail, { backgroundColor: reached ? colors.accent : colors.border }]} /> : null}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ selected: on }}
+                accessibilityLabel={`${labelFor(i)}, ${state}`}
+                hitSlop={10}
+                onPress={() => pickRound(i)}
+                style={styles.node}
+              >
+                <View style={[styles.nodeDot, { backgroundColor: nodeColor, borderColor: reached ? colors.accent : colors.border, borderWidth: done ? 0 : 3 }]} />
+                <Text {...dynamicType} numberOfLines={1} style={[typography.caption, styles.bold, styles.nodeLabel, { color: on ? colors.accent : colors.textDim }]}>{nodeLabel(i)}</Text>
+              </Pressable>
+            </Fragment>
           );
         })}
       </View>
@@ -338,18 +344,19 @@ export function BracketRounds({
 const styles = StyleSheet.create({
   pane: { flex: 1 },
   list: { paddingBottom: BAR_RESERVE, flexGrow: 1 },
-  bar: { position: "absolute", left: 0, right: 0, bottom: 0, minHeight: BAR_HEIGHT, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.xs, paddingHorizontal: spacing.md, paddingTop: spacing.sm, paddingBottom: spacing.xs, borderTopWidth: 1 },
-  // flexShrink, not a scroller: the row must fit whatever the bracket size
-  // and the type scale hand it.
+  bar: { position: "absolute", left: 0, right: 0, bottom: 0, minHeight: BAR_HEIGHT, flexDirection: "row", alignItems: "center", paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm, borderTopWidth: 1 },
   fabDock: { position: "absolute", right: spacing.lg, bottom: BAR_HEIGHT + spacing.md },
-  chip: { flexShrink: 1, flexDirection: "row", alignItems: "center", gap: spacing.xs, paddingHorizontal: spacing.md, paddingVertical: 7, borderRadius: radii.full, borderWidth: 1 },
-  liveDot: { width: 6, height: 6, borderRadius: radii.full },
+  node: { alignItems: "center", gap: 3, flexShrink: 0 },
+  nodeDot: { width: 14, height: 14, borderRadius: radii.full },
+  nodeLabel: { fontSize: 10 },
+  // Sits on the dots' centre line, not the labels'.
+  rail: { flex: 1, height: 2, marginBottom: 14, marginHorizontal: 2 },
   // The home feed's row recipe: a hairline under each block and nothing
   // else, so a round reads as one list of results.
   block: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1 },
   labelRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs, paddingBottom: spacing.xs },
   meta: { fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6 },
-  roundHead: { paddingTop: spacing.md, paddingBottom: spacing.xs, paddingHorizontal: spacing.lg },
+  roundHead: { paddingTop: spacing.md, paddingBottom: spacing.sm, paddingHorizontal: spacing.lg, gap: 2 },
   row: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingVertical: spacing.xs },
   rowText: { flex: 1, minWidth: 0 },
   pendingCover: { width: COVER_WIDTH, height: COVER_HEIGHT, borderRadius: radii.sm, opacity: 0.4 },
