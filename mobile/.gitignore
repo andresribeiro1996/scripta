@@ -1,7 +1,8 @@
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
-# dependencies
-node_modules/
+# dependencies — no trailing slash, so it also covers the symlink a
+# worktree gets from scripts/dev-worktree-deps.mjs
+node_modules
 
 # Expo
 .expo/

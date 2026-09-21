@@ -19,13 +19,18 @@ const GLYPHS = {
   home: { ios: "house", android: "home" },
   library: { ios: "books.vertical", android: "library_books" },
   arena: { ios: "trophy", android: "trophy" },
+  // Solid on purpose: it marks one book as having won the whole thing, not
+  // a link to the Arena feature.
+  champion: { ios: "trophy.fill", android: "trophy" },
   community: { ios: "person.3", android: "group" },
   murals: { ios: "paintpalette", android: "palette" },
   profile: { ios: "person.circle", android: "account_circle" },
   settings: { ios: "gearshape", android: "settings" },
   add: { ios: "plus", android: "add" },
   confirm: { ios: "checkmark", android: "check" },
-  more: { ios: "ellipsis", android: "more_horiz" },
+  // Vertical on Android: a toolbar or row overflow is drawn that way there,
+  // so it's where the thumb already goes. iOS spells the same thing sideways.
+  more: { ios: "ellipsis", android: "more_vert" },
   search: { ios: "magnifyingglass", android: "search" },
   public: { ios: "globe", android: "public" },
   delete: { ios: "trash", android: "delete" },

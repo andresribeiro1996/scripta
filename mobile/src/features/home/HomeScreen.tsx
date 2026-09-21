@@ -91,7 +91,7 @@ export function HomeScreen() {
           title: "Home",
           headerShown: true,
           headerRight: user?.username ? () => (
-            <IconButton accessibilityLabel="Your profile" name="profile" onPress={() => router.push(`/u/${user.username}` as never)} />
+            <IconButton framed accessibilityLabel="Your profile" name="profile" onPress={() => router.push(`/u/${user.username}` as never)} />
           ) : undefined,
         }}
       />
