@@ -8,8 +8,8 @@ import Fastify from "fastify";
 import rateLimit from "@fastify/rate-limit";
 
 const scratch = mkdtempSync(join(tmpdir(), "scripta-account-test-"));
-process.env.JWT_ACCESS_SECRET ??= "a".repeat(40);
-process.env.JWT_REFRESH_SECRET ??= "b".repeat(40);
+process.env.JWT_ACCESS_SECRET ??= "a".repeat(64);
+process.env.JWT_REFRESH_SECRET ??= "b".repeat(64);
 for (const key of ["AUTH_DB_PATH", "LIBRARY_DB_PATH", "GALLERY_DB_PATH", "GALLERY_STORAGE_PATH"]) process.env[key] ??= join(scratch, key);
 const { applyAuthMigrations } = await import("./adapters/sqlite/connection.js");
 const { createSqliteAuthRepository } = await import("./adapters/sqlite/sqliteAuthRepository.js");

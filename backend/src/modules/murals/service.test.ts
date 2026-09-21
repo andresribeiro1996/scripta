@@ -221,8 +221,8 @@ test("createMural carries folderId and defaults to root", () => {
 });
 
 test("openMuralsDb migration is idempotent and preserves data", async () => {
-  process.env.JWT_ACCESS_SECRET ??= "a".repeat(40);
-  process.env.JWT_REFRESH_SECRET ??= "b".repeat(40);
+  process.env.JWT_ACCESS_SECRET ??= "a".repeat(64);
+  process.env.JWT_REFRESH_SECRET ??= "b".repeat(64);
   const tmpDir = mkdtempSync(join(tmpdir(), "murals-test-"));
   process.env.MURALS_DB_PATH = join(tmpDir, "murals.sqlite");
 

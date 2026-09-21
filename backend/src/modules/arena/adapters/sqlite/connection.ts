@@ -34,6 +34,21 @@ export function applyArenaMigrations(db: DatabaseSync): void {
     if (!columns.some((column) => column.name === "voter_user_id")) {
       db.exec(`ALTER TABLE votes ADD COLUMN voter_user_id TEXT`);
     }
+    // One-time, before schema.sql creates idx_votes_duel_user: the same
+    // account may legitimately hold several votes on one duel already
+    // (one per device token, backfilled by linkVotesToUser), and the
+    // unique index refuses to create over those. Keep the earliest vote
+    // of each (duel, account) group — the one that locked the duel in
+    // for that voter at the time — and drop the later duplicates.
+    const duelUserIndexExists = db
+      .prepare(`SELECT 1 FROM sqlite_master WHERE type='index' AND name='idx_votes_duel_user'`)
+      .get();
+    if (!duelUserIndexExists) {
+      db.exec(
+        `DELETE FROM votes WHERE voter_user_id IS NOT NULL AND rowid NOT IN ` +
+          `(SELECT MIN(rowid) FROM votes WHERE voter_user_id IS NOT NULL GROUP BY duel_id, voter_user_id)`
+      );
+    }
   }
 
   const schema = readFileSync(`${adapterDir}/schema.sql`, "utf8");

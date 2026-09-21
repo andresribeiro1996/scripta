@@ -35,11 +35,23 @@ function loadFromStorage(): Session | null {
 let session: Session | null = loadFromStorage();
 const listeners = new Set<() => void>();
 
+// vite.config.ts's service worker caches the authed /library response and
+// cover/gallery images (Cache Storage, keyed by URL only — it knows nothing
+// about which account fetched it). Without this, a second account on the
+// same browser is served the previous user's library stale-first.
+const ACCOUNT_SCOPED_SW_CACHES = ["api-library", "media-covers"];
+
+function clearAccountScopedCaches(previousUserId: string | null, nextUserId: string | null): void {
+  if (typeof caches === "undefined" || previousUserId === nextUserId) return;
+  for (const name of ACCOUNT_SCOPED_SW_CACHES) void caches.delete(name);
+}
+
 export function getSession(): Session | null {
   return session;
 }
 
 export function setSession(next: Session | null, remember = persistent): void {
+  clearAccountScopedCaches(session?.user.id ?? null, next?.user.id ?? null);
   localStorage.removeItem(STORAGE_KEY);
   sessionStorage.removeItem(STORAGE_KEY);
   if (next) (remember ? localStorage : sessionStorage).setItem(STORAGE_KEY, JSON.stringify(next));

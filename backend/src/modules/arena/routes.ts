@@ -98,7 +98,12 @@ export function buildArenaRoutes(service: ArenaService) {
       if (!params.success) return reply.code(400).send({ error: "Invalid tournament id." });
       const query = getTournamentQuerySchema.safeParse(request.query);
       if (!query.success) return reply.code(400).send({ error: "Invalid voterToken." });
-      const tournament = service.getTournamentView(params.data.id, query.data.voterToken);
+      // Optional session, same as the vote route below: a signed-in
+      // viewer's "you voted" badges must reflect the account's votes, not
+      // just this browser's token, now that the account-level dedup locks
+      // those duels.
+      const viewer = getOptionalAuthenticatedUser(request);
+      const tournament = service.getTournamentView(params.data.id, query.data.voterToken, viewer?.id ?? null);
       if (!tournament) return reply.code(404).send({ error: "No such tournament." });
       return reply.send({ tournament });
     });

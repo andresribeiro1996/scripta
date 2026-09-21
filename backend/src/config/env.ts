@@ -15,6 +15,15 @@ const durationString = z
   .string()
   .regex(/^\d+[smhd]$/, 'must look like "15m", "1h", or "30d" — a number followed by s/m/h/d');
 
+function hexSecret(name: string) {
+  return z
+    .string()
+    .regex(
+      /^[0-9a-f]{64,}$/i,
+      `${name} must be a hex string of at least 64 chars (32 bytes) — generate with node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
+    );
+}
+
 const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
 
@@ -93,8 +102,12 @@ const envSchema = z.object({
   // backend's own address; set this to the real deployed origin in prod.
   PUBLIC_API_URL: z.string().url().default("http://localhost:3000"),
 
-  JWT_ACCESS_SECRET: z.string().min(32, "JWT_ACCESS_SECRET should be at least 32 chars"),
-  JWT_REFRESH_SECRET: z.string().min(32, "JWT_REFRESH_SECRET should be at least 32 chars"),
+  // Hex, not just "long": a copied-but-unedited .env booted fine under
+  // min(32) with the publicly-known .env.example placeholder, letting
+  // anyone forge tokens. Same stance as SOCIALS_ENCRYPTION_KEY below.
+  // Generate with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+  JWT_ACCESS_SECRET: hexSecret("JWT_ACCESS_SECRET"),
+  JWT_REFRESH_SECRET: hexSecret("JWT_REFRESH_SECRET"),
   ACCESS_TOKEN_TTL: durationString.default("15m"),
   REFRESH_TOKEN_TTL: durationString.default("30d"),
 

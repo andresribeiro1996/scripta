@@ -10,8 +10,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const scratchDir = mkdtempSync(join(tmpdir(), "arena-repo-test-"));
-process.env.JWT_ACCESS_SECRET ??= "a".repeat(40);
-process.env.JWT_REFRESH_SECRET ??= "b".repeat(40);
+process.env.JWT_ACCESS_SECRET ??= "a".repeat(64);
+process.env.JWT_REFRESH_SECRET ??= "b".repeat(64);
 process.env.AUTH_DB_PATH ??= join(scratchDir, "auth.sqlite");
 process.env.LIBRARY_DB_PATH ??= join(scratchDir, "library.sqlite");
 process.env.GALLERY_DB_PATH ??= join(scratchDir, "gallery.sqlite");
@@ -34,6 +34,7 @@ test("a fresh database has the voter_user_id column and its partial index", () =
   assert.ok(columnNames(db, "votes").includes("voter_user_id"));
   const indexes = db.prepare(`SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='votes'`).all() as unknown as Array<{ name: string }>;
   assert.ok(indexes.some((i) => i.name === "idx_votes_voter_user"));
+  assert.ok(indexes.some((i) => i.name === "idx_votes_duel_user"), "the one-vote-per-account unique index must exist");
 });
 
 test("migrating a pre-existing votes table adds the column without losing rows", () => {
@@ -139,4 +140,72 @@ test("linkVotesToUser claims only the token's unclaimed votes and never steals c
     { id: "v1", voter_user_id: "voter-1" },
     { id: "v2", voter_user_id: "voter-2" }
   ]);
+});
+
+test("a signed-in voter's second token cannot vote a duel the account already voted", () => {
+  const db = freshDb();
+  seedTournament(db, "t1", "u1", "One");
+  const repo = createSqliteArenaRepository(db);
+
+  assert.equal(repo.insertVote(vote("v1", "duel-t1", "token-a", "voter-1", "2026-01-01T00:00:00.000Z")), true);
+  assert.equal(repo.insertVote(vote("v2", "duel-t1", "token-b", "voter-1", "2026-01-02T00:00:00.000Z")), false);
+  // Anonymous tokens are still one-vote-per-token, nothing stricter.
+  assert.equal(repo.insertVote(vote("v3", "duel-t1", "token-c", null, "2026-01-03T00:00:00.000Z")), true);
+  // A different account on the same fresh token votes normally.
+  assert.equal(repo.insertVote(vote("v4", "duel-t1", "token-b", "voter-2", "2026-01-04T00:00:00.000Z")), true);
+});
+
+test("linkVotesToUser leaves a duel's anonymous vote alone when the account already voted it", () => {
+  const db = freshDb();
+  seedTournament(db, "t1", "u1", "One");
+  seedTournament(db, "t2", "u1", "Two");
+  const repo = createSqliteArenaRepository(db);
+
+  // token-b's old anonymous vote on duel-t1, and the account's own vote
+  // on the same duel from another device — the backfill must skip the
+  // collision rather than violate idx_votes_duel_user.
+  repo.insertVote(vote("v1", "duel-t1", "token-b", null, "2026-01-01T00:00:00.000Z"));
+  repo.insertVote(vote("v2", "duel-t1", "token-a", "voter-1", "2026-01-02T00:00:00.000Z"));
+  repo.insertVote(vote("v3", "duel-t2", "token-b", null, "2026-01-03T00:00:00.000Z"));
+  repo.linkVotesToUser("token-b", "voter-1");
+
+  const rows = db.prepare(`SELECT id, voter_user_id FROM votes ORDER BY id`).all() as unknown as Array<{ id: string; voter_user_id: string | null }>;
+  assert.deepEqual(rows.map((row) => ({ ...row })), [
+    { id: "v1", voter_user_id: null },
+    { id: "v2", voter_user_id: "voter-1" },
+    { id: "v3", voter_user_id: "voter-1" }
+  ]);
+});
+
+test("hasVoted matches the account on any token, or the token alone when anonymous", () => {
+  const db = freshDb();
+  seedTournament(db, "t1", "u1", "One");
+  const repo = createSqliteArenaRepository(db);
+  repo.insertVote(vote("v1", "duel-t1", "token-a", "voter-1", "2026-01-01T00:00:00.000Z"));
+
+  assert.equal(repo.hasVoted("duel-t1", "token-a", null), true);
+  assert.equal(repo.hasVoted("duel-t1", "token-b", "voter-1"), true);
+  assert.equal(repo.hasVoted("duel-t1", "token-b", null), false);
+  assert.equal(repo.hasVoted("duel-t1", null, "voter-1"), true);
+  assert.equal(repo.hasVoted("duel-t1", null, null), false);
+});
+
+test("the boot migration dedupes pre-existing multi-votes before creating idx_votes_duel_user", () => {
+  const db = freshDb();
+  seedTournament(db, "t1", "u1", "One");
+  db.exec(`DROP INDEX idx_votes_duel_user`);
+  db.exec(`
+    INSERT INTO votes (id, duel_id, voter_token, voter_user_id, book_key, created_at) VALUES
+      ('keep',   'duel-t1', 'token-a', 'voter-1', 'a', '2026-01-01T00:00:00.000Z'),
+      ('first',  'duel-t1', 'token-b', 'voter-1', 'b', '2026-01-02T00:00:00.000Z'),
+      ('second', 'duel-t1', 'token-c', 'voter-1', 'a', '2026-01-03T00:00:00.000Z'),
+      ('anon',   'duel-t1', 'token-d', NULL,      'a', '2026-01-04T00:00:00.000Z')
+  `);
+
+  applyArenaMigrations(db);
+
+  const ids = (db.prepare(`SELECT id FROM votes ORDER BY id`).all() as unknown as Array<{ id: string }>).map((r) => r.id);
+  assert.deepEqual(ids, ["anon", "keep"]);
+  const index = db.prepare(`SELECT name FROM sqlite_master WHERE type='index' AND name='idx_votes_duel_user'`).get() as unknown as { name: string } | undefined;
+  assert.ok(index, "the unique index is recreated");
 });

@@ -286,7 +286,15 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
     getPublicByToken(token) {
       const row = repo.getByShareToken(token);
       if (!row) return null;
-      const parsed: unknown = JSON.parse(row.data);
+      // Corrupt JSON in a stored row reads as "no such share" (murals'
+      // shared route treats it the same way) — this is a public,
+      // unauthenticated read path, not a place to 500 with parser details.
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(row.data);
+      } catch {
+        return null;
+      }
       if (!isRecord(parsed)) return { data: parsed };
       return { data: toPublicLibraryData(parsed) };
     }

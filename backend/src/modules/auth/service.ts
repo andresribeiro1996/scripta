@@ -7,7 +7,7 @@
 // contained entirely to adapters/, never touching this file.
 
 import * as argon2 from "argon2";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import sharp from "sharp";
 import {
   AvatarDimensionsTooLargeError,
@@ -68,6 +68,12 @@ const AVATAR_SIZE = 256;
 const AVATAR_QUALITY = 85;
 const AVATAR_MIME_TYPE = "image/webp";
 
+// The login miss path verifies against this instead of a real hash, so
+// "no such user" costs the same argon2 work as "wrong password" — see
+// login()'s own comment. Lazy + memoized: nothing pays for it until the
+// first unknown-identifier login, and then only once per process.
+let dummyHashPromise: Promise<string> | undefined;
+
 function toAuthenticatedUser(row: UserRow): AuthenticatedUser {
   return { id: row.id, email: row.email, username: row.username, avatarId: row.avatar_id };
 }
@@ -127,8 +133,13 @@ export function createAuthService(repo: AuthRepository, avatarStore: AvatarBlobS
       const normalized = identifier.trim().toLowerCase();
       const user = repo.findUserByEmail(normalized) ?? repo.findUserByUsername(normalized);
       // Same error for "no such user" and "wrong password" — don't leak
-      // which one it was, that's an account-enumeration side channel.
+      // which one it was, that's an account-enumeration side channel. The
+      // message alone isn't enough: a missing account returns in ~0ms while
+      // a real one pays the full argon2 verify, so burn the same work
+      // against a dummy hash before throwing on the miss path.
       if (!user || !user.password_hash) {
+        dummyHashPromise ??= argon2.hash(randomBytes(32).toString("hex"));
+        await argon2.verify(await dummyHashPromise, password);
         throw new InvalidCredentialsError();
       }
       const valid = await argon2.verify(user.password_hash, password);

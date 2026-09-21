@@ -73,7 +73,7 @@ export interface ArenaService {
   createTournament(ownerUserId: string, input: { name: string; bracketSize: number; roundDurationMinutes: number }): TournamentSummary;
   listMine(ownerUserId: string): TournamentSummary[];
   listPublic(limit: number, offset: number): TournamentSummary[];
-  getTournamentView(id: string, voterToken?: string): TournamentView | null;
+  getTournamentView(id: string, voterToken?: string, viewerUserId?: string | null): TournamentView | null;
   setSlotsManual(tournamentId: string, ownerUserId: string, entries: Array<{ slotIndex: number; book: SeedBookInput }>): void;
   randomFill(tournamentId: string, ownerUserId: string, pool: SeedBookInput[]): void;
   getPublicSummary(tournamentId: string): TournamentSummary | undefined;
@@ -245,7 +245,7 @@ export function createArenaService(repo: ArenaRepository, emitPublished?: EmitPu
     maybeAdvanceRound(tournament, duel.round_number, nowIso);
   }
 
-  function toDuelView(d: DuelRow, voterToken: string | undefined): DuelView {
+  function toDuelView(d: DuelRow, voterToken: string | undefined, viewerUserId: string | null | undefined): DuelView {
     const counts = repo.countVotesByBook(d.id);
     return {
       id: d.id,
@@ -257,7 +257,11 @@ export function createArenaService(repo: ArenaRepository, emitPublished?: EmitPu
       status: d.status,
       opensAt: d.opens_at,
       closesAt: d.closes_at,
-      hasVoted: voterToken ? repo.hasVoted(d.id, voterToken) : false
+      // Account-wide, not just this token: a signed-in voter on a fresh
+      // browser already had their vote locked in (idx_votes_duel_user),
+      // and the badge must say so instead of dangling a vote the API
+      // would reject as already cast.
+      hasVoted: repo.hasVoted(d.id, voterToken ?? null, viewerUserId ?? null)
     };
   }
 
@@ -292,7 +296,7 @@ export function createArenaService(repo: ArenaRepository, emitPublished?: EmitPu
       return summariesWithPreviews(repo, repo.listPublicTournaments(limit, offset));
     },
 
-    getTournamentView(id, voterToken) {
+    getTournamentView(id, voterToken, viewerUserId) {
       const tournament = repo.getTournament(id);
       if (!tournament) return null;
       const slots = repo.getSlots(id).sort((a, b) => a.slot_index - b.slot_index);
@@ -302,7 +306,7 @@ export function createArenaService(repo: ArenaRepository, emitPublished?: EmitPu
       return {
         ...toTournamentSummary(tournament, previewFromSlots(slots), winnerFromDuels(duels)),
         slots: slots.map((s) => ({ slotIndex: s.slot_index, key: s.book_key, title: s.title, author: s.author, cover: s.cover_url })),
-        duels: duels.map((d) => toDuelView(d, voterToken))
+        duels: duels.map((d) => toDuelView(d, voterToken, viewerUserId))
       };
     },
 

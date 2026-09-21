@@ -5,8 +5,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 const tempRoot = mkdtempSync(join(tmpdir(), "community-repo-"));
-process.env.JWT_ACCESS_SECRET = "test-access-secret-0123456789abcdef";
-process.env.JWT_REFRESH_SECRET = "test-refresh-secret-0123456789abcdef";
+process.env.JWT_ACCESS_SECRET = "a".repeat(64);
+process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 process.env.AUTH_DB_PATH = join(tempRoot, "auth.sqlite");
 process.env.LIBRARY_DB_PATH = join(tempRoot, "library.sqlite");
 process.env.GALLERY_DB_PATH = join(tempRoot, "gallery.sqlite");

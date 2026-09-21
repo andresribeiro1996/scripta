@@ -15,8 +15,8 @@ process.env.AUTH_DB_PATH = join(scratch, "auth.sqlite");
 process.env.LIBRARY_DB_PATH = join(scratch, "library.sqlite");
 process.env.GALLERY_DB_PATH = join(scratch, "gallery.sqlite");
 process.env.GALLERY_STORAGE_PATH = join(scratch, "gallery-files");
-process.env.JWT_ACCESS_SECRET = "test-access-secret-at-least-32-characters";
-process.env.JWT_REFRESH_SECRET = "test-refresh-secret-at-least-32-characters";
+process.env.JWT_ACCESS_SECRET = "a".repeat(64);
+process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
 const { createSqliteLibraryRepository } = await import("./adapters/sqlite/sqliteLibraryRepository.js");
 const { LibraryConflictError } = await import("./domain/errors.js");

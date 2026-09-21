@@ -88,3 +88,12 @@ CREATE INDEX IF NOT EXISTS idx_votes_duel_book ON votes(duel_id, book_key);
 -- Backs "tournaments I voted in" (listVotedByUser) — partial, so the
 -- anonymous majority of rows stays out of the index.
 CREATE INDEX IF NOT EXISTS idx_votes_voter_user ON votes(voter_user_id) WHERE voter_user_id IS NOT NULL;
+-- One vote per ACCOUNT per duel, enforced for signed-in voters: without
+-- this, the UNIQUE(duel_id, voter_token) above was the only brake, and a
+-- signed-in voter minting a fresh client token per request cast a fresh
+-- counted vote each time. Partial (voter_user_id IS NOT NULL) so the
+-- anonymous one-vote-per-browser-token rule stays exactly as it was;
+-- INSERT OR IGNORE in the adapter folds this conflict into the same
+-- "already voted" path as the token one. connection.ts's boot migration
+-- dedupes any pre-existing multi-votes before creating the index.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_votes_duel_user ON votes(duel_id, voter_user_id) WHERE voter_user_id IS NOT NULL;

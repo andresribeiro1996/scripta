@@ -10,8 +10,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const scratchDir = mkdtempSync(join(tmpdir(), "auth-repo-test-"));
-process.env.JWT_ACCESS_SECRET ??= "a".repeat(40);
-process.env.JWT_REFRESH_SECRET ??= "b".repeat(40);
+process.env.JWT_ACCESS_SECRET ??= "a".repeat(64);
+process.env.JWT_REFRESH_SECRET ??= "b".repeat(64);
 process.env.AUTH_DB_PATH ??= join(scratchDir, "auth.sqlite");
 process.env.LIBRARY_DB_PATH ??= join(scratchDir, "library.sqlite");
 process.env.GALLERY_DB_PATH ??= join(scratchDir, "gallery.sqlite");

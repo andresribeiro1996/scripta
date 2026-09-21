@@ -9,7 +9,8 @@
 // imports between modules at all."
 
 import fastifyCors from "@fastify/cors";
-import Fastify, { type FastifyInstance } from "fastify";
+import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
+import { STATUS_CODES } from "node:http";
 import { isAllowedOrigin } from "./config/corsOrigin.js";
 import { devHttps } from "./config/devCerts.js";
 import { runStartupMigrations } from "./migrations/runStartupMigrations.js";
@@ -75,6 +76,22 @@ export function buildApp() {
   });
 
   app.get("/health", async () => ({ status: "ok" }));
+
+  // Fastify's default 500 serializer forwards the raw error message to
+  // the client — SQLite constraint text, file paths, JSON.parse details —
+  // on any unhandled throw (a corrupt row on a public share route, a
+  // signup TOCTOU race hitting a UNIQUE constraint). Expected 4xx errors
+  // keep the default {statusCode, error, message} shape clients already
+  // parse; everything else becomes an opaque 500 with the detail logged
+  // server-side only.
+  app.setErrorHandler((error: FastifyError, request, reply) => {
+    const statusCode = typeof error.statusCode === "number" && error.statusCode >= 400 && error.statusCode < 500 ? error.statusCode : 500;
+    if (statusCode === 500) {
+      request.log.error(error);
+      return reply.code(500).send({ error: "Internal server error" });
+    }
+    return reply.code(statusCode).send({ statusCode, error: STATUS_CODES[statusCode] ?? "Error", message: error.message });
+  });
 
   app.register(registerAuthModule, { authRoot: app });
   app.register(registerArenaModule, {

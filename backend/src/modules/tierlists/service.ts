@@ -154,6 +154,17 @@ function publishedCovers(publicBooks: string | null): string[] {
   return covers;
 }
 
+/** The public voting board's book snapshot — null when absent or corrupt
+ *  (see publishedCovers above for the same defensive JSON.parse stance). */
+function parsePublicBooks(value: string | null): unknown[] | null {
+  if (!value) return null;
+  try {
+    return JSON.parse(value) as unknown[];
+  } catch {
+    return null;
+  }
+}
+
 function toPublishedRef(row: TierlistRow, ballotCount: number): PublishedTierlistRef {
   const { tiers, pool } = readDocument(toTierlist(row));
   const keys = new Set(pool);
@@ -348,7 +359,10 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
         ballotCount: repo.ballotCount(row.id),
         eligibleVoteCount: repo.eligibleVoteCount(row.id, row.origin_user_id),
         promotedAt: row.promoted_at,
-        publicBooks: row.public_books ? JSON.parse(row.public_books) as unknown[] : null
+        // Corrupt JSON here omits the field rather than 500ing the whole
+        // public voting board — same defensive stance as murals' shared
+        // route and library's getPublicByToken.
+        publicBooks: parsePublicBooks(row.public_books)
       };
     },
 

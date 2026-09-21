@@ -48,18 +48,24 @@ export interface ArenaRepository {
   findActiveDuelsPastDeadline(nowIso: string): DuelRow[];
 
   /** Returns `true` if this call actually inserted the vote, `false` if
-   *  this exact (duel_id, voter_token) pair already voted — see the
-   *  SQLite adapter's own comment for why (INSERT OR IGNORE, same
-   *  race-safe idiom modules/covers already uses for first-write-wins). */
+   *  this duel was already voted — by this exact (duel_id, voter_token)
+   *  pair OR, when voter_user_id is set, by that account on any token
+   *  (idx_votes_duel_user in the SQLite adapter makes the second case a
+   *  constraint, same INSERT OR IGNORE race-safety as modules/covers). */
   insertVote(row: VoteRow): boolean;
   /** Claims a voter_token's votes for an account: stamps voter_user_id
-   *  onto every vote cast under that token that doesn't have one yet.
-   *  Called when a signed-in user votes, so their past per-device votes
-   *  fold into the account's history in one statement. */
+   *  onto every vote cast under that token that doesn't have one yet and
+   *  doesn't collide with a vote the account already holds on the same
+   *  duel. Called when a signed-in user votes, so their past per-device
+   *  votes fold into the account's history in one statement. */
   linkVotesToUser(voterToken: string, voterUserId: string): void;
   /** `{ [book_key]: count }` — only keys with at least one vote appear. */
   countVotesByBook(duelId: string): Record<string, number>;
-  hasVoted(duelId: string, voterToken: string): boolean;
+  /** True when this token — or, when signed in, this account on any
+   *  token — has voted the duel. Keeps the view's "you voted" badge
+   *  consistent with the insert-time dedup above for a signed-in voter
+   *  on a fresh browser. */
+  hasVoted(duelId: string, voterToken: string | null | undefined, voterUserId?: string | null): boolean;
   /** Every tournament the account has cast at least one vote in, most
    *  recent vote first. Own tournaments are excluded — they already show
    *  under listTournamentsByOwner, and "Voting in" means other people's

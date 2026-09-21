@@ -65,19 +65,31 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
   // voter_token) racing (a double-click, a retried request) would
   // otherwise throw on the UNIQUE constraint instead of just quietly
   // staying "already voted" — same reasoning modules/covers' own
-  // cover_cache insert already documents.
+  // cover_cache insert already documents. Since idx_votes_duel_user
+  // (schema.sql), OR IGNORE equally absorbs the signed-in case: a second
+  // token voting a duel the ACCOUNT already voted conflicts on that
+  // partial unique index, so a signed-in voter can't inflate a tally by
+  // minting fresh tokens.
   const insertVoteStmt = db.prepare(`
     INSERT OR IGNORE INTO votes (id, duel_id, voter_token, voter_user_id, book_key, created_at)
     VALUES ($id, $duel_id, $voter_token, $voter_user_id, $book_key, $created_at)
   `);
   // Backfill only — never overwrites an account already stamped onto a
   // vote (voter_user_id IS NULL guard), so two accounts sharing a browser
-  // can't rewrite each other's history after the first claim.
+  // can't rewrite each other's history after the first claim. The NOT
+  // EXISTS guard keeps the backfill clear of idx_votes_duel_user: a token
+  // whose old anonymous vote shares a duel with a vote the account
+  // already holds stays anonymous rather than violating the index.
   const linkVotesStmt = db.prepare(
-    `UPDATE votes SET voter_user_id = $user WHERE voter_token = $token AND voter_user_id IS NULL`
+    `UPDATE votes SET voter_user_id = $user WHERE voter_token = $token AND voter_user_id IS NULL ` +
+      `AND NOT EXISTS (SELECT 1 FROM votes v2 WHERE v2.duel_id = votes.duel_id AND v2.voter_user_id = $user)`
   );
   const countVotesStmt = db.prepare(`SELECT book_key, COUNT(*) as n FROM votes WHERE duel_id = ? GROUP BY book_key`);
-  const hasVotedStmt = db.prepare(`SELECT 1 FROM votes WHERE duel_id = ? AND voter_token = ?`);
+  // Token match OR account match: "" and NULL binds can never equal a
+  // stored value, so each dimension simply doesn't constrain when absent.
+  const hasVotedStmt = db.prepare(
+    `SELECT 1 FROM votes WHERE duel_id = ? AND (voter_token = ? OR voter_user_id = ?) LIMIT 1`
+  );
   // GROUP BY t.id with the MAX aggregate in ORDER BY — SQLite allows the
   // aggregate without selecting it. Own tournaments are excluded because
   // they already appear in the owner list; a tournament can only be voted
@@ -223,8 +235,8 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
       for (const row of rows) counts[row.book_key] = row.n;
       return counts;
     },
-    hasVoted(duelId, voterToken) {
-      return hasVotedStmt.get(duelId, voterToken) !== undefined;
+    hasVoted(duelId, voterToken, voterUserId) {
+      return hasVotedStmt.get(duelId, voterToken ?? "", voterUserId ?? null) !== undefined;
     },
     listVotedByUser(voterUserId) {
       return listVotedByUserStmt.all(voterUserId, voterUserId) as unknown as TournamentRow[];

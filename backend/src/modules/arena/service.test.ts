@@ -114,21 +114,35 @@ function createInMemoryArenaRepository(): ArenaRepository {
     },
 
     insertVote(row) {
-      const alreadyVoted = votes.some((v) => v.duel_id === row.duel_id && v.voter_token === row.voter_token);
+      const alreadyVoted = votes.some(
+        (v) =>
+          v.duel_id === row.duel_id &&
+          (v.voter_token === row.voter_token ||
+            (row.voter_user_id !== null && v.voter_user_id === row.voter_user_id))
+      );
       if (alreadyVoted) return false;
       votes.push({ ...row });
       return true;
     },
     linkVotesToUser(voterToken, voterUserId) {
-      for (const v of votes) if (v.voter_token === voterToken && v.voter_user_id === null) v.voter_user_id = voterUserId;
+      for (const v of votes) {
+        if (v.voter_token !== voterToken || v.voter_user_id !== null) continue;
+        if (votes.some((other) => other.duel_id === v.duel_id && other.voter_user_id === voterUserId)) continue;
+        v.voter_user_id = voterUserId;
+      }
     },
     countVotesByBook(duelId) {
       const counts: Record<string, number> = {};
       for (const v of votes) if (v.duel_id === duelId) counts[v.book_key] = (counts[v.book_key] ?? 0) + 1;
       return counts;
     },
-    hasVoted(duelId, voterToken) {
-      return votes.some((v) => v.duel_id === duelId && v.voter_token === voterToken);
+    hasVoted(duelId, voterToken, voterUserId) {
+      return votes.some(
+        (v) =>
+          v.duel_id === duelId &&
+          ((voterToken !== null && voterToken !== undefined && v.voter_token === voterToken) ||
+            (voterUserId !== null && voterUserId !== undefined && v.voter_user_id === voterUserId))
+      );
     },
     listVotedByUser(voterUserId) {
       const lastVoteAt = new Map<string, string>();
@@ -513,6 +527,32 @@ test("an already-voted duel emits no voted_on event", () => {
 
   assert.throws(() => service.vote(t.id, duel.id, "token-a", "book-12", "voter-1"), AlreadyVotedError);
   assert.deepEqual(emitted.length, 1);
+});
+
+test("a signed-in voter cannot vote the same duel twice by switching tokens", () => {
+  const service = createArenaService(createInMemoryArenaRepository());
+  const t = startedTournament(service, "owner-1", "Test", 10);
+  const duel = service.getTournamentView(t.id)!.duels[0]!;
+
+  service.vote(t.id, duel.id, "token-a", "book-11", "voter-1");
+
+  assert.throws(() => service.vote(t.id, duel.id, "token-b", "book-12", "voter-1"), AlreadyVotedError);
+  // A different account on the same fresh token is a different voter.
+  service.vote(t.id, duel.id, "token-b", "book-12", "voter-2");
+});
+
+test("the view's hasVoted follows the account, not just the browser token", () => {
+  const service = createArenaService(createInMemoryArenaRepository());
+  const t = startedTournament(service, "owner-1", "Test", 10);
+  const duel = service.getTournamentView(t.id)!.duels[0]!;
+  service.vote(t.id, duel.id, "token-a", "book-11", "voter-1");
+
+  const anonymous = service.getTournamentView(t.id)!.duels[0]!;
+  assert.equal(anonymous.hasVoted, false);
+  const freshBrowser = service.getTournamentView(t.id, "token-b", "voter-1")!.duels[0]!;
+  assert.equal(freshBrowser.hasVoted, true);
+  const sameBrowser = service.getTournamentView(t.id, "token-a")!.duels[0]!;
+  assert.equal(sameBrowser.hasVoted, true);
 });
 
 test("an anonymous vote emits no voted_on event", () => {

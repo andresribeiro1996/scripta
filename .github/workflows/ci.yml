@@ -28,5 +28,9 @@ jobs:
       - run: npm run typecheck --workspace mobile
         env:
           EXPO_PUBLIC_API_URL: http://localhost:3000
+      - run: npm test --workspace mobile
+        env:
+          EXPO_PUBLIC_API_URL: http://localhost:3000
+      - run: npm run test:scripts
       - run: npx expo-doctor@latest
         working-directory: mobile
