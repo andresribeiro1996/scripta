@@ -434,6 +434,8 @@ export function SwipeableTabs<T extends string>({
   const offset = useRef(new Animated.Value(0)).current;
   const tabWidth = options.length ? rowWidth / options.length : 0;
   const progress = Animated.add(position, offset);
+  const nextCurl = progress.interpolate({ inputRange: [index, index + 0.03, index + 0.5, index + 0.7], outputRange: [0, 1, 1, 0], extrapolate: "clamp" });
+  const previousCurl = progress.interpolate({ inputRange: [index - 0.7, index - 0.5, index - 0.03, index], outputRange: [0, 1, 1, 0], extrapolate: "clamp" });
 
   // The pager is the source of truth for which page is showing; tapping a tab
   // asks it to move and the selection follows from onPageSelected, so a tap and
@@ -490,24 +492,28 @@ export function SwipeableTabs<T extends string>({
           />
         ) : null}
       </View>
-      <AnimatedPagerView
-        initialPage={index}
-        onPageScroll={Animated.event([{ nativeEvent: { position, offset } }], { useNativeDriver: true })}
-        onPageSelected={(event) => {
-          const picked = options[event.nativeEvent.position];
-          if (picked && picked.value !== value) onChange(picked.value);
-        }}
-        ref={pager}
-        style={styles.grow}
-      >
-        {options.map((option, pageIndex) => (
-          <View collapsable={false} key={option.value} style={styles.grow}>
-            <Animated.View style={[styles.grow, { backgroundColor: colors.background }, !reducedMotion && pageIndex < options.length - 1 ? { transformOrigin: "left center", transform: [{ perspective: 900 }, { rotateY: progress.interpolate({ inputRange: [pageIndex, pageIndex + 0.45, pageIndex + 1], outputRange: ["0deg", "-75deg", "-75deg"], extrapolate: "clamp" }) }] } : null]}>
+      <View style={styles.grow}>
+        <AnimatedPagerView
+          initialPage={index}
+          onPageScroll={Animated.event([{ nativeEvent: { position, offset } }], { useNativeDriver: true })}
+          onPageSelected={(event) => {
+            const picked = options[event.nativeEvent.position];
+            if (picked && picked.value !== value) onChange(picked.value);
+          }}
+          ref={pager}
+          style={styles.grow}
+        >
+          {options.map((option) => (
+            <View collapsable={false} key={option.value} style={styles.grow}>
               {renderPage(option.value, option.value === value)}
-            </Animated.View>
-          </View>
-        ))}
-      </AnimatedPagerView>
+            </View>
+          ))}
+        </AnimatedPagerView>
+        {!reducedMotion && options.length > 1 ? <>
+          <Animated.View pointerEvents="none" accessible={false} style={[styles.pageCurl, styles.pageCurlRight, { opacity: nextCurl, transformOrigin: "right top", transform: [{ scale: progress.interpolate({ inputRange: [index, index + 0.45], outputRange: [0.08, 1], extrapolate: "clamp" }) }] }]}><View style={[styles.pageCurlFold, styles.pageCurlFoldRight, { backgroundColor: colors.surfacePressed }]} /><View style={[styles.pageCurlCrease, styles.pageCurlCreaseRight, { backgroundColor: colors.border }]} /></Animated.View>
+          <Animated.View pointerEvents="none" accessible={false} style={[styles.pageCurl, styles.pageCurlLeft, { opacity: previousCurl, transformOrigin: "left top", transform: [{ scale: progress.interpolate({ inputRange: [index - 0.45, index], outputRange: [1, 0.08], extrapolate: "clamp" }) }] }]}><View style={[styles.pageCurlFold, styles.pageCurlFoldLeft, { backgroundColor: colors.surfacePressed }]} /><View style={[styles.pageCurlCrease, styles.pageCurlCreaseLeft, { backgroundColor: colors.border }]} /></Animated.View>
+        </> : null}
+      </View>
     </View>
   );
 }
@@ -730,6 +736,15 @@ const styles = StyleSheet.create({
   tabBadge: { minWidth: 20, height: 20, paddingHorizontal: spacing.xs, borderRadius: radii.full, alignItems: "center", justifyContent: "center" },
   tabBadgeText: { fontSize: 12, lineHeight: 16, fontWeight: "700" },
   tabIndicator: { position: "absolute", left: 0, bottom: 0, height: 3, borderTopLeftRadius: radii.sm, borderTopRightRadius: radii.sm },
+  pageCurl: { position: "absolute", top: 0, width: 112, height: 112, overflow: "hidden" },
+  pageCurlLeft: { left: 0 },
+  pageCurlRight: { right: 0 },
+  pageCurlFold: { position: "absolute", top: -80, width: 160, height: 160, borderRadius: 32, transform: [{ rotate: "45deg" }], shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 6 },
+  pageCurlFoldLeft: { left: -80 },
+  pageCurlFoldRight: { right: -80 },
+  pageCurlCrease: { position: "absolute", top: 55, width: 160, height: 2 },
+  pageCurlCreaseLeft: { left: -24, transform: [{ rotate: "-45deg" }] },
+  pageCurlCreaseRight: { right: -24, transform: [{ rotate: "45deg" }] },
   fab: { position: "absolute", right: spacing.lg, bottom: spacing.lg, minHeight: 56, flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingHorizontal: spacing.lg, borderRadius: radii.full, elevation: 6, shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
   fabLabel: { fontWeight: "700" },
   iconButton: { minHeight: minimumTouchTarget, minWidth: minimumTouchTarget, alignItems: "center", justifyContent: "center", borderRadius: radii.full },
