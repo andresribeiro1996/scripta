@@ -12,7 +12,9 @@ import { fetchTournament, renameTournament, resolveTiebreak, settleDuelEarly, vo
 import { arenaViewTabs, matchEmptyCopy, tournamentChampion, votableDuels, type ArenaViewTab } from "./arenaView";
 import { ArenaVoteDeck } from "./ArenaVoteDeck";
 import { ArenaBooksSheet } from "./ArenaBooksSheet";
+import { BracketMap } from "./BracketMap";
 import { BracketRounds } from "./BracketRounds";
+import { BracketViewToggle, type BracketView } from "./BracketViewToggle";
 import { ChampionBanner } from "./ChampionBanner";
 
 const TOKEN_KEY = "arena-voter-token";
@@ -29,6 +31,10 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
   const [name, setName] = useState("");
   const [booksOpen, setBooksOpen] = useState(false);
   const [scrolling, setScrolling] = useState(false);
+  // Deliberately not persisted: the classic map is a peek at the shape of
+  // the draw, not a way to live in it — at 32 slots its round 1 is 16
+  // matches wide. Every visit starts on the round-by-round view.
+  const [bracketView, setBracketView] = useState<BracketView>("rounds");
   const [addBook, setAddBook] = useState<{ title: string; author: string; coverUrl?: string | null } | null>(null);
   const [, setTick] = useState(0);
 
@@ -116,6 +122,26 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
         </ScrollView>
       );
     }
+    if (bracketView === "classic") {
+      // The map draws every round at once, so the round bar's chips have
+      // nothing to select here — the toggle back is all that pane keeps.
+      return (
+        <View style={styles.grow}>
+          <ScrollView style={styles.grow} contentContainerStyle={styles.list} refreshControl={<RefreshControl refreshing={tournament.isRefetching} onRefresh={refresh} />}>
+            <BracketMap
+              tournament={data}
+              isOwner={isOwner}
+              busyDuelId={busy}
+              onSettle={(duelId) => void action(duelId, () => settleDuelEarly(id, duelId))}
+              onTiebreak={(duelId, bookKey) => void action(duelId, () => resolveTiebreak(id, duelId, bookKey))}
+            />
+          </ScrollView>
+          <View style={[styles.classicBar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+            <BracketViewToggle to="rounds" onPress={() => setBracketView("rounds")} />
+          </View>
+        </View>
+      );
+    }
     // Owns its own ScrollView so its round bar can stay pinned to the
     // bottom of the pane instead of scrolling away with the matches.
     return (
@@ -126,6 +152,7 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
         refreshing={tournament.isRefetching}
         onRefresh={refresh}
         onScrolling={setScrolling}
+        onShowClassic={() => setBracketView("classic")}
         onSettle={(duelId) => void action(duelId, () => settleDuelEarly(id, duelId))}
         onTiebreak={(duelId, bookKey) => void action(duelId, () => resolveTiebreak(id, duelId, bookKey))}
       />
@@ -173,6 +200,8 @@ const styles = StyleSheet.create({
   grow: { flex: 1 },
   pane: { gap: spacing.md, paddingBottom: spacing.huge, flexGrow: 1, justifyContent: "center" },
   matchWrap: { flex: 1, paddingTop: spacing.lg, justifyContent: "center" },
+  list: { gap: spacing.md, paddingBottom: spacing.huge, flexGrow: 1 },
+  classicBar: { position: "absolute", left: 0, right: 0, bottom: 0, flexDirection: "row", justifyContent: "center", paddingTop: spacing.sm, paddingBottom: spacing.xs, borderTopWidth: 1 },
   note: { textAlign: "center", textTransform: "uppercase", letterSpacing: 1, fontWeight: "700" },
   dialog: { gap: spacing.md },
 });

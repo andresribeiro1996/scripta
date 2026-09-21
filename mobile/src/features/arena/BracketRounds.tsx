@@ -23,6 +23,7 @@ import { bracketShape, countdownLabel, needsVote, sharePercent, type BracketSlot
 import { Icon, Sheet, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "./BookCover";
 import { DuelSideRow } from "./DuelSideRow";
+import { BracketViewToggle } from "./BracketViewToggle";
 import { tournamentChampion } from "./arenaView";
 import type { TournamentView } from "./api";
 
@@ -172,6 +173,7 @@ export function BracketRounds({
   refreshing,
   onRefresh,
   onScrolling,
+  onShowClassic,
   onSettle,
   onTiebreak,
 }: {
@@ -183,6 +185,8 @@ export function BracketRounds({
   /** Fires while the list is moving, so the screen's own chrome can get out
    *  of the way too. */
   onScrolling: (scrolling: boolean) => void;
+  /** Hands the pane over to the classic whole-tree map. */
+  onShowClassic: () => void;
   onSettle: (duelId: string) => void;
   onTiebreak: (duelId: string, bookKey: string) => void;
 }) {
@@ -325,6 +329,7 @@ export function BracketRounds({
             </Pressable>
           );
         })}
+        <BracketViewToggle to="classic" onPress={onShowClassic} />
       </Animated.View>
 
       {/* Read-only: bigger covers and the exact share a card has no room
