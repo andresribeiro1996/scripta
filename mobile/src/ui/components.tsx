@@ -410,28 +410,27 @@ export function SwipeableTabs<T extends string>({
   onChange,
   renderPage,
   accessibilityLabel,
-  tabsHidden = false,
 }: {
   options: readonly { readonly value: T; readonly label: string; readonly badge?: number; readonly accessibilityLabel?: string }[];
   value: T;
   onChange: (value: T) => void;
   renderPage: (value: T, active: boolean) => ReactNode;
   accessibilityLabel?: string;
-  /** Collapses the tab strip, handing its height to the page — for a page
-   *  that wants the room back while its own content is moving. Off unless a
-   *  screen asks for it. */
-  tabsHidden?: boolean;
 }) {
   const { colors } = useTheme();
   const reducedMotion = useReducedMotion();
   const pager = useRef<PagerView>(null);
   const [rowWidth, setRowWidth] = useState(0);
-  const [rowHeight, setRowHeight] = useState(0);
-  const collapse = useRef(new Animated.Value(0)).current;
   const index = Math.max(0, options.findIndex((option) => option.value === value));
   // position and offset arrive as separate keys on one native event, so they
   // are two values added together rather than one.
-  const position = useRef(new Animated.Value(0)).current;
+  //
+  // Seeded with the mount index, NOT 0: these only ever move on a native page
+  // scroll, and mounting straight onto a non-first page never fires one. Left
+  // at 0, the indicator sat under the first tab while the pager, the value and
+  // the page itself were all somewhere else, until the first swipe knocked it
+  // into place.
+  const position = useRef(new Animated.Value(index)).current;
   const offset = useRef(new Animated.Value(0)).current;
   const tabWidth = options.length ? rowWidth / options.length : 0;
   const progress = Animated.add(position, offset);
@@ -445,36 +444,12 @@ export function SwipeableTabs<T extends string>({
     else pager.current.setPage(index);
   }, [index, reducedMotion]);
 
-  // Height, not a transform: the point is to give the page the space, and a
-  // strip that merely slid away would leave a gap where it had been.
-  useEffect(() => {
-    const toValue = tabsHidden ? 1 : 0;
-    if (reducedMotion) {
-      collapse.setValue(toValue);
-      return;
-    }
-    const animation = Animated.timing(collapse, { toValue, duration: 140, useNativeDriver: false });
-    animation.start();
-    return () => animation.stop();
-  }, [collapse, reducedMotion, tabsHidden]);
-
   return (
     <View style={styles.grow}>
-      <Animated.View
-        pointerEvents={tabsHidden ? "none" : "auto"}
-        style={rowHeight ? {
-          height: collapse.interpolate({ inputRange: [0, 1], outputRange: [rowHeight, 0] }),
-          opacity: collapse.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }),
-          overflow: "hidden",
-        } : null}
-      >
       <View
         accessibilityLabel={accessibilityLabel}
         accessibilityRole="tablist"
-        onLayout={(event) => {
-          setRowWidth(event.nativeEvent.layout.width);
-          setRowHeight(event.nativeEvent.layout.height);
-        }}
+        onLayout={(event) => setRowWidth(event.nativeEvent.layout.width)}
         style={[styles.tabRow, { borderBottomColor: colors.border }]}
       >
         {options.map((option, optionIndex) => {
@@ -515,7 +490,6 @@ export function SwipeableTabs<T extends string>({
           />
         ) : null}
       </View>
-      </Animated.View>
       <AnimatedPagerView
         initialPage={index}
         onPageScroll={Animated.event([{ nativeEvent: { position, offset } }], { useNativeDriver: true })}

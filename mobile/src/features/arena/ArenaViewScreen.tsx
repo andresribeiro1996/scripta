@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Stack } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -12,7 +12,9 @@ import { fetchTournament, renameTournament, resolveTiebreak, settleDuelEarly, vo
 import { arenaViewTabs, matchEmptyCopy, tournamentChampion, votableDuels, type ArenaViewTab } from "./arenaView";
 import { ArenaVoteDeck } from "./ArenaVoteDeck";
 import { ArenaBooksSheet } from "./ArenaBooksSheet";
+import { BracketMap } from "./BracketMap";
 import { BracketRounds } from "./BracketRounds";
+import { BracketViewToggle, type BracketView } from "./BracketViewToggle";
 import { ChampionBanner } from "./ChampionBanner";
 
 const TOKEN_KEY = "arena-voter-token";
@@ -22,13 +24,20 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
   const { colors } = useTheme();
   const queryClient = useQueryClient();
   const [token, setToken] = useState<string | null>(null);
-  const [tab, setTab] = useState<ArenaViewTab>("match");
+  const [tab, setTab] = useState<ArenaViewTab | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState("");
   const [booksOpen, setBooksOpen] = useState(false);
-  const [scrolling, setScrolling] = useState(false);
+  // Frozen on the first render that has data, never recomputed: casting the
+  // last vote empties `votable`, and a landing tab that kept recalculating
+  // would yank the pane out from under the finger that just voted.
+  const landing = useRef<ArenaViewTab | null>(null);
+  // Deliberately not persisted: the classic map is a peek at the shape of
+  // the draw, not a way to live in it — at 32 slots its round 1 is 16
+  // matches wide. Every visit starts on the round-by-round view.
+  const [bracketView, setBracketView] = useState<BracketView>("rounds");
   const [addBook, setAddBook] = useState<{ title: string; author: string; coverUrl?: string | null } | null>(null);
   const [, setTick] = useState(0);
 
@@ -66,15 +75,20 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
     }
   }
 
-  if (!token || tournament.isPending) return <Screen bottom top={false} style={styles.screen}><Skeleton height={160} /></Screen>;
-  if (tournament.isError || !data) return <Screen bottom top={false} style={styles.screen}><ErrorState title="Tournament unavailable" body={tournament.error instanceof Error ? tournament.error.message : "No such tournament."} actionLabel="Retry" onAction={() => void tournament.refetch()} /></Screen>;
+  if (!token || tournament.isPending) return <Screen bottom top={false} style={styles.centered}><Skeleton height={160} /></Screen>;
+  if (tournament.isError || !data) return <Screen bottom top={false} style={styles.centered}><ErrorState title="Tournament unavailable" body={tournament.error instanceof Error ? tournament.error.message : "No such tournament."} actionLabel="Retry" onAction={() => void tournament.refetch()} /></Screen>;
 
   const votable = votableDuels(data.duels);
   const next = votable[0];
   const champion = tournamentChampion(data.bracketSize, data.duels);
   const refresh = () => void tournament.refetch();
   const tabs = arenaViewTabs(data.status);
-  const activeTab = tabs.some((option) => option.value === tab) ? tab : tabs[0]!.value;
+  // Open on the pane with something to do: the deck when there are votes to
+  // cast, the bracket otherwise — landing a finished tournament on "No
+  // matches" wasted the one screen that had anything to show.
+  landing.current ??= votable.length ? "match" : "bracket";
+  const chosen = tab ?? landing.current;
+  const activeTab = tabs.some((option) => option.value === chosen) ? chosen : tabs[0]!.value;
 
   const matchPane = () => {
     const empty = matchEmptyCopy(data.status, data.duels.length > 0);
@@ -116,6 +130,26 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
         </ScrollView>
       );
     }
+    if (bracketView === "classic") {
+      // The map draws every round at once, so the round bar's chips have
+      // nothing to select here — the toggle back is all that pane keeps.
+      return (
+        <View style={styles.grow}>
+          <ScrollView style={styles.grow} contentContainerStyle={styles.list} refreshControl={<RefreshControl refreshing={tournament.isRefetching} onRefresh={refresh} />}>
+            <BracketMap
+              tournament={data}
+              isOwner={isOwner}
+              busyDuelId={busy}
+              onSettle={(duelId) => void action(duelId, () => settleDuelEarly(id, duelId))}
+              onTiebreak={(duelId, bookKey) => void action(duelId, () => resolveTiebreak(id, duelId, bookKey))}
+            />
+          </ScrollView>
+          <View style={[styles.classicBar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+            <BracketViewToggle to="rounds" onPress={() => setBracketView("rounds")} />
+          </View>
+        </View>
+      );
+    }
     // Owns its own ScrollView so its round bar can stay pinned to the
     // bottom of the pane instead of scrolling away with the matches.
     return (
@@ -125,7 +159,7 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
         busyDuelId={busy}
         refreshing={tournament.isRefetching}
         onRefresh={refresh}
-        onScrolling={setScrolling}
+        onShowClassic={() => setBracketView("classic")}
         onSettle={(duelId) => void action(duelId, () => settleDuelEarly(id, duelId))}
         onTiebreak={(duelId, bookKey) => void action(duelId, () => resolveTiebreak(id, duelId, bookKey))}
       />
@@ -133,7 +167,7 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
   };
 
   return (
-    <Screen bottom top={false} style={styles.screen}>
+    <Screen bottom top={false}>
       <Stack.Screen
         options={{
           headerShown: true,
@@ -158,7 +192,6 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
         options={tabs.map((option) => option.value === "match" ? { ...option, badge: votable.length } : option)}
         value={activeTab}
         onChange={setTab}
-        tabsHidden={scrolling}
         renderPage={(pageTab) => pageTab === "match" ? matchPane() : bracketPane()}
       />
       <ArenaBooksSheet id={booksOpen ? id : null} name={data.name} onAddBook={openAddBook} onClose={() => setBooksOpen(false)} />
@@ -169,10 +202,17 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
 }
 
 const styles = StyleSheet.create({
-  screen: { padding: spacing.lg, gap: spacing.md },
+  // No padding on the screen itself — the tab strip, the match rows and the
+  // bottom strip all run edge to edge, the way the home feed and library do.
+  // Each pane carries its own gutter instead.
+  centered: { padding: spacing.lg, gap: spacing.md },
   grow: { flex: 1 },
-  pane: { gap: spacing.md, paddingBottom: spacing.huge, flexGrow: 1, justifyContent: "center" },
-  matchWrap: { flex: 1, paddingTop: spacing.lg, justifyContent: "center" },
+  pane: { gap: spacing.md, paddingHorizontal: spacing.lg, paddingBottom: spacing.huge, flexGrow: 1, justifyContent: "center" },
+  matchWrap: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, justifyContent: "center" },
+  list: { gap: spacing.md, paddingHorizontal: spacing.lg, paddingBottom: spacing.huge, flexGrow: 1 },
+  // The same bottom strip the round rail sits in, so the toggle keeps its
+  // place between the two views.
+  classicBar: { position: "absolute", left: 0, right: 0, bottom: 0, minHeight: 64, flexDirection: "row", alignItems: "center", justifyContent: "flex-end", paddingHorizontal: spacing.lg, borderTopWidth: 1 },
   note: { textAlign: "center", textTransform: "uppercase", letterSpacing: 1, fontWeight: "700" },
   dialog: { gap: spacing.md },
 });

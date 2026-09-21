@@ -2,8 +2,8 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { Duel } from "@scripta/shared";
-import { arenaViewTabs, bracketSlots, matchEmptyCopy, tournamentChampion, votableDuels } from "./arenaView.js";
+import { bracketShape, type Duel } from "@scripta/shared";
+import { arenaViewTabs, bracketSlots, matchEmptyCopy, matchNote, roundHeadline, tournamentChampion, votableDuels } from "./arenaView.js";
 
 const duel = (over: Partial<Duel> = {}): Duel => ({
   id: "d1",
@@ -74,4 +74,38 @@ test("the match pane explains an empty deck by what the tournament is doing", ()
   // Active, matches drawn, nothing left to vote on: this voter is done until
   // the round closes — not the same as a tournament with no matches at all.
   assert.equal(matchEmptyCopy("active", true).title, "All caught up");
+});
+
+test("the round headline places the round, its progress and its deadline", () => {
+  const now = Date.parse("2026-09-21T12:00:00.000Z");
+  const settled = (i: number) => duel({ id: `s${i}`, roundNumber: 1, duelIndex: i, status: "settled", winnerKey: "a" });
+  const open = duel({ id: "open", roundNumber: 1, duelIndex: 2, closesAt: "2026-09-26T18:00:00.000Z" });
+  const byRound = bracketShape(8, [settled(0), settled(1), open]);
+
+  const head = roundHeadline(byRound, 0, now);
+  // Four matches deep in an 8-book draw is the quarter-final, whatever its
+  // index says — the name comes from the back of the bracket.
+  assert.equal(head.title, "Quarters · Round 1 of 3");
+  assert.equal(head.status, "2 of 4 settled · Closes Sat 26 Sep");
+});
+
+test("a deadline inside the last day counts down instead of naming a date", () => {
+  const now = Date.parse("2026-09-21T12:00:00.000Z");
+  const open = duel({ id: "open", roundNumber: 1, duelIndex: 0, closesAt: "2026-09-21T17:30:00.000Z" });
+  const byRound = bracketShape(2, [open]);
+
+  assert.equal(roundHeadline(byRound, 0, now).status, "0 of 1 settled · 5h 30m left");
+});
+
+test("a named round keeps its name alongside its position", () => {
+  const final = duel({ id: "f", roundNumber: 2, duelIndex: 0 });
+  const byRound = bracketShape(4, [duel({ id: "a", roundNumber: 1, duelIndex: 0 }), duel({ id: "b", roundNumber: 1, duelIndex: 1 }), final]);
+  assert.equal(roundHeadline(byRound, 1, Date.parse("2026-01-01T00:00:00.000Z")).title, "Final · Round 2 of 2");
+});
+
+test("a settled match with nothing in it says so, and claims nothing about who settled it", () => {
+  assert.equal(matchNote(duel({ status: "settled", winnerKey: "a" })), "Settled · no votes");
+  assert.equal(matchNote(duel({ status: "settled", winnerKey: "a", bookA: { key: "a", title: "A", author: "Author A", cover: null, votes: 3 } })), "Settled");
+  assert.equal(matchNote(duel({ status: "tied_pending_tiebreak" })), "Tiebreak needed");
+  assert.equal(matchNote(duel()), null);
 });

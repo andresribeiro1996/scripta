@@ -3,37 +3,62 @@
 // width and leave the covers legible — the two-sided map this replaced
 // shrank them to ~28pt and they collided.
 //
-// The round bar is pinned to the BOTTOM of the pane, not the top: round 1
-// of a big bracket is eight cards long, and a bar that scrolled away would
-// be unreachable exactly when you want it. That's also why this component
-// owns its own ScrollView instead of sitting inside the screen's.
+// The round bar is pinned to the BOTTOM of the pane, not the top: it is
+// where the thumb already is. That's also why this component owns its own
+// ScrollView instead of sitting inside the screen's.
 //
-// Each match is a full-width card holding its two books stacked, winner in
-// bold, tally on the right. Rounds whose duels don't exist yet still get a
-// card, with each side naming the match whose winner will land there.
+// The bar does not hide while the list moves. It used to slide away on
+// every scroll and come back on a settle timer, which meant two pieces of
+// chrome animating on each flick and a control that was missing whenever
+// you reached for it.
+//
+// The bar is a progress rail rather than a row of chips: nodes joined by a
+// line, filled as far as the draw has actually got. Chips said which round
+// you were looking at but never which were finished — a rail is the one
+// shape that answers both, and it fits any bracket size without scrolling.
+// Each node is still a button; changing the view is the floating button's
+// job, not a sixth node's.
+//
+// The two books are braced together and split by a VS rule, so a match
+// reads as one contest rather than two rows that happen to be adjacent.
+// The brace fills on the winner's side and the winning row is tinted —
+// bold text alone was doing all the work and losing.
+//
+// A match is a flat block on the page separated by a hairline, not a card:
+// the same shape the home feed's activity rows use — an uppercase label row
+// carrying the state in colour, then the content under it. Boxes around
+// every match made a results table look like a stack of widgets.
+//
+// Rounds whose duels don't exist yet still get a block, with each side
+// naming the match whose winner will land there.
 //
 // Tapping a card opens the same read-only sheet as before (bigger covers,
 // author, exact share). An owner's settle/tiebreak controls sit on the card
 // as nested Pressables, so tapping one doesn't also open the sheet.
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useRef, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
-import Animated, { ReduceMotion, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { bracketShape, countdownLabel, needsVote, sharePercent, type BracketSlot, type Duel, type DuelSide } from "@scripta/shared";
 import { Icon, Sheet, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "./BookCover";
 import { DuelSideRow } from "./DuelSideRow";
-import { tournamentChampion } from "./arenaView";
+import { BracketViewToggle } from "./BracketViewToggle";
+import { matchNote, roundHeadline, roundLabel, tournamentChampion } from "./arenaView";
 import type { TournamentView } from "./api";
+
+const BAR_HEIGHT = 64;
+// The strip's own height plus a gap, so the last match scrolls clear of it.
+const BAR_RESERVE = BAR_HEIGHT + 24;
 
 const COVER_WIDTH = 32;
 const COVER_HEIGHT = 48;
 
-function MatchRow({ side, isWinner, isChampion, decided, busy, onPick }: { side: DuelSide; isWinner: boolean; isChampion: boolean; decided: boolean; busy: boolean; onPick?: () => void }) {
+function MatchRow({ side, isWinner, isChampion, decided, busy, blankTally, onPick }: { side: DuelSide; isWinner: boolean; isChampion: boolean; decided: boolean; busy: boolean; blankTally: boolean; onPick?: () => void }) {
   const { colors } = useTheme();
   const faded = decided && !isWinner;
+  const won = decided && isWinner;
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, won ? { backgroundColor: colors.accentSoft } : null]}>
       <BookCover cover={side.cover} title={side.title} width={COVER_WIDTH} height={COVER_HEIGHT} />
       <View style={styles.rowText}>
         <Text numberOfLines={1} {...dynamicType} style={[typography.body, isWinner && styles.bold, { color: faded ? colors.textDim : colors.text }]}>{side.title}</Text>
@@ -48,15 +73,39 @@ function MatchRow({ side, isWinner, isChampion, decided, busy, onPick }: { side:
           onPress={onPick}
           style={[styles.winsPill, { backgroundColor: colors.accentSoft, opacity: busy ? 0.5 : 1 }]}
         >
-          <Text {...dynamicType} style={[typography.caption, styles.bold, { color: colors.accent }]}>Wins</Text>
+          {/* Near-black, not accent: accent on accentSoft is 3.92:1, and a
+            *  caption is nowhere near the size that would excuse it. */}
+          <Text {...dynamicType} style={[typography.caption, styles.bold, { color: colors.text }]}>Wins</Text>
         </Pressable>
       ) : null}
-      {/* Weight alone is a thin cue for "this one went through" — the mark
-       *  gives it a second, non-typographic one, and the trophy says this
-       *  book didn't just win a round, it won the tournament. */}
+      {/* No tick beside the tint: the row's fill, the brace's filled half and
+       *  the accent tally already say this one went through, and a fourth
+       *  mark was taking the width the title needed. The trophy stays — it
+       *  says this book didn't just win a round, it won the tournament. */}
       {isChampion ? <Icon name="champion" size={14} color={colors.accent} /> : null}
-      {isWinner && !isChampion ? <Text {...dynamicType} style={[typography.caption, styles.bold, { color: colors.accent }]}>✓</Text> : null}
-      <Text {...dynamicType} style={[typography.body, isWinner && styles.bold, styles.votes, { color: faded ? colors.textDim : colors.text }]}>{side.votes}</Text>
+      <Text {...dynamicType} style={[typography.body, isWinner && styles.bold, styles.votes, { color: faded || blankTally ? colors.textDim : colors.text }]}>{blankTally ? "—" : side.votes}</Text>
+    </View>
+  );
+}
+
+/** The brace a bracket draws down the left of a pairing, filled on the half
+ *  that went through. */
+function Brace({ winnerSide }: { winnerSide: "a" | "b" | null }) {
+  const { colors } = useTheme();
+  return (
+    <View style={[styles.brace, { backgroundColor: colors.border }]}>
+      {winnerSide ? <View style={[styles.braceFill, winnerSide === "a" ? styles.braceTop : styles.braceBottom, { backgroundColor: colors.accent }]} /> : null}
+    </View>
+  );
+}
+
+function VersusRule() {
+  const { colors } = useTheme();
+  return (
+    <View style={styles.versus}>
+      <View style={[styles.versusRule, { backgroundColor: colors.border }]} />
+      <Text {...dynamicType} style={[typography.caption, styles.bold, styles.versusText, { color: colors.textDim }]}>VS</Text>
+      <View style={[styles.versusRule, { backgroundColor: colors.border }]} />
     </View>
   );
 }
@@ -95,12 +144,17 @@ function MatchCard({
   const { colors } = useTheme();
   if (!duel) {
     return (
-      <View style={styles.card}>
-        <PendingRow label={feeders ? feeders[0] : "Not decided yet"} />
-        <View style={[styles.divider, { backgroundColor: colors.border }]} />
-        <PendingRow label={feeders ? feeders[1] : "Not decided yet"} />
-        <View style={styles.footer}>
+      <View style={[styles.block, { borderBottomColor: colors.border }]}>
+        <View style={styles.labelRow}>
           <Text {...dynamicType} numberOfLines={1} style={[typography.caption, styles.meta, styles.grow, { color: colors.textDim }]}>Match {matchNumber}</Text>
+        </View>
+        <View style={styles.pair}>
+          <Brace winnerSide={null} />
+          <View style={styles.grow}>
+            <PendingRow label={feeders ? feeders[0] : "Not decided yet"} />
+            <VersusRule />
+            <PendingRow label={feeders ? feeders[1] : "Not decided yet"} />
+          </View>
         </View>
       </View>
     );
@@ -112,42 +166,23 @@ function MatchCard({
   // Every duel in a round shares one deadline, so the countdown belongs to
   // the round header, not to each card. Only a match that has left the
   // round's own state behind says anything here.
-  const state = duel.status === "settled" ? "Settled" : duel.status === "tied_pending_tiebreak" ? "Tiebreak needed" : null;
+  const note = matchNote(duel);
+  // A settled match nobody voted in shows dashes: a pair of zeroes next to a
+  // winner's tick reads as a bug rather than as an empty ballot.
+  const unvoted = duel.status === "settled" && duel.bookA.votes + duel.bookB.votes === 0;
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`Match ${matchNumber}, ${duel.bookA.title} versus ${duel.bookB.title}${winner ? `, ${winner.title} won` : ""}`}
       onPress={() => onOpen(duel)}
-      style={styles.card}
+      style={({ pressed }) => [styles.block, { borderBottomColor: colors.border, backgroundColor: pressed ? colors.surfacePressed : "transparent" }]}
     >
-      <MatchRow
-        side={duel.bookA}
-        isWinner={duel.winnerKey === duel.bookA.key}
-        isChampion={championKey !== null && championKey === duel.bookA.key}
-        decided={decided}
-        busy={busy}
-        onPick={tiebreak ? () => onTiebreak(duel.id, duel.bookA.key) : undefined}
-      />
-      <View style={[styles.divider, { backgroundColor: colors.border }]} />
-      <MatchRow
-        side={duel.bookB}
-        isWinner={duel.winnerKey === duel.bookB.key}
-        isChampion={championKey !== null && championKey === duel.bookB.key}
-        decided={decided}
-        busy={busy}
-        onPick={tiebreak ? () => onTiebreak(duel.id, duel.bookB.key) : undefined}
-      />
-      {/* Only once someone has voted — before that the two tallies are
-       *  both 0 and a half-empty bar would imply a contest that hasn't
-       *  started. */}
-      {shareA === null ? null : (
-        <View style={[styles.shareTrack, { backgroundColor: colors.border }]}>
-          <View style={[styles.shareFill, { width: `${shareA}%`, backgroundColor: colors.accent }]} />
-        </View>
-      )}
-      <View style={styles.footer}>
+      <View style={styles.labelRow}>
         {needsVote(duel) ? <View style={[styles.voteDot, { backgroundColor: colors.accent }]} /> : null}
-        <Text {...dynamicType} numberOfLines={1} style={[typography.caption, styles.meta, styles.grow, { color: colors.textDim }]}>Match {matchNumber}{state ? ` · ${state}` : ""}</Text>
+        <Text {...dynamicType} numberOfLines={1} style={[typography.caption, styles.meta, styles.grow, { color: needsVote(duel) ? colors.accent : colors.textDim }]}>
+          Match {matchNumber}
+        </Text>
+        {note ? <Text {...dynamicType} numberOfLines={1} style={[typography.caption, styles.meta, { color: colors.textDim }]}>{note}</Text> : null}
         {isOwner && duel.status === "active" ? (
           <Pressable
             accessibilityRole="button"
@@ -161,6 +196,38 @@ function MatchCard({
           </Pressable>
         ) : null}
       </View>
+      <View style={styles.pair}>
+      <Brace winnerSide={duel.winnerKey === duel.bookA.key ? "a" : duel.winnerKey === duel.bookB.key ? "b" : null} />
+      <View style={styles.grow}>
+      <MatchRow
+        side={duel.bookA}
+        isWinner={duel.winnerKey === duel.bookA.key}
+        isChampion={championKey !== null && championKey === duel.bookA.key}
+        decided={decided}
+        busy={busy}
+        blankTally={unvoted}
+        onPick={tiebreak ? () => onTiebreak(duel.id, duel.bookA.key) : undefined}
+      />
+      <VersusRule />
+      <MatchRow
+        side={duel.bookB}
+        isWinner={duel.winnerKey === duel.bookB.key}
+        isChampion={championKey !== null && championKey === duel.bookB.key}
+        decided={decided}
+        busy={busy}
+        blankTally={unvoted}
+        onPick={tiebreak ? () => onTiebreak(duel.id, duel.bookB.key) : undefined}
+      />
+      </View>
+      </View>
+      {/* Only once someone has voted — before that the two tallies are
+       *  both 0 and a half-empty bar would imply a contest that hasn't
+       *  started. */}
+      {shareA === null ? null : (
+        <View style={[styles.shareTrack, { backgroundColor: colors.border }]}>
+          <View style={[styles.shareFill, { width: `${shareA}%`, backgroundColor: colors.accent }]} />
+        </View>
+      )}
     </Pressable>
   );
 }
@@ -171,7 +238,7 @@ export function BracketRounds({
   busyDuelId,
   refreshing,
   onRefresh,
-  onScrolling,
+  onShowClassic,
   onSettle,
   onTiebreak,
 }: {
@@ -180,63 +247,30 @@ export function BracketRounds({
   busyDuelId: string | null;
   refreshing: boolean;
   onRefresh: () => void;
-  /** Fires while the list is moving, so the screen's own chrome can get out
-   *  of the way too. */
-  onScrolling: (scrolling: boolean) => void;
+  /** Hands the pane over to the classic whole-tree map. */
+  onShowClassic: () => void;
   onSettle: (duelId: string) => void;
   onTiebreak: (duelId: string, bookKey: string) => void;
 }) {
   const { colors } = useTheme();
   const [openId, setOpenId] = useState<string | null>(null);
   const [picked, setPicked] = useState<number | null>(null);
-  const [barHeight, setBarHeight] = useState(0);
-  const [barTappable, setBarTappable] = useState(true);
   const scroller = useRef<ScrollView>(null);
-  const settle = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const tucked = useSharedValue(0);
   const openDuel = openId ? (tournament.duels.find((d) => d.id === openId) ?? null) : null;
-
-  // Leaving the screen mid-scroll leaves the settle timer pending, and it
-  // would wake up to set state on a component that is gone.
-  useEffect(() => () => {
-    if (settle.current) clearTimeout(settle.current);
-  }, []);
-
-  // Out of the way while the list is moving, back as soon as it stops. The
-  // lift is the bar's own height plus the screen's bottom padding, so it
-  // clears the edge rather than half-sitting on it.
-  const barStyle = useAnimatedStyle(() => ({
-    opacity: withTiming(1 - tucked.get(), { duration: 140, reduceMotion: ReduceMotion.System }),
-    transform: [{ translateY: withTiming(tucked.get() * (barHeight + spacing.lg), { duration: 140, reduceMotion: ReduceMotion.System }) }],
-  }));
-
-  function tuckBar() {
-    if (settle.current) clearTimeout(settle.current);
-    tucked.set(1);
-    setBarTappable(false);
-    onScrolling(true);
-  }
-
-  // A lifted finger may still hand off to momentum, so give that a moment
-  // to start before deciding the list has actually stopped.
-  function releaseBar(delay: number) {
-    if (settle.current) clearTimeout(settle.current);
-    settle.current = setTimeout(() => {
-      tucked.set(0);
-      setBarTappable(true);
-      onScrolling(false);
-    }, delay);
-  }
 
   const byRound = bracketShape(tournament.bracketSize, tournament.duels);
   if (byRound.length === 0) return null;
 
   function labelFor(roundIdx: number): string {
+    return roundLabel(byRound, roundIdx);
+  }
+
+  function nodeLabel(roundIdx: number): string {
     const count = byRound[roundIdx]?.length ?? 0;
-    if (count === 1) return "Final";
-    if (count === 2) return "Semis";
-    if (count === 4) return "Quarters";
-    return `Round ${roundIdx + 1}`;
+    if (count === 1) return "F";
+    if (count === 2) return "SF";
+    if (count === 4) return "QF";
+    return `R${roundIdx + 1}`;
   }
 
   // Named rounds read as "Winner of Quarters 2"; the early numbered ones
@@ -252,9 +286,7 @@ export function BracketRounds({
   const slots = byRound[roundIdx]!;
 
   const champion = tournamentChampion(tournament.bracketSize, tournament.duels);
-  // One deadline per round, set when the round's duels are built, so any
-  // still-open duel in it carries the same one.
-  const closesAt = slots.find((duel) => duel?.status === "active")?.closesAt ?? null;
+  const headline = roundHeadline(byRound, roundIdx);
 
   // A round you switch into is shorter than the one you left as often as
   // not, so keeping the old offset can land you in empty space.
@@ -268,23 +300,21 @@ export function BracketRounds({
       <ScrollView
         ref={scroller}
         style={styles.grow}
-        // The bar floats over the list rather than sitting beside it, so
-        // tucking it away hands its space back to the matches instead of
-        // leaving a hole. The padding keeps the last card clear of it.
-        contentContainerStyle={[styles.list, { paddingBottom: barHeight + spacing.md }]}
+        // The bar floats over the list, so the padding is what keeps the
+        // last card clear of it. A fixed reserve rather than the bar's
+        // measured height: measuring it fed an onLayout setState back into
+        // this list's padding, and with the chips in their own scroller
+        // that update landed before the bar had mounted.
+        contentContainerStyle={styles.list}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        onScrollBeginDrag={tuckBar}
-        onScrollEndDrag={() => releaseBar(160)}
-        onMomentumScrollBegin={tuckBar}
-        onMomentumScrollEnd={() => releaseBar(0)}
       >
-        <Text {...dynamicType} numberOfLines={1} style={[typography.caption, styles.meta, styles.roundHead, { color: colors.textDim }]}>
-          {labelFor(roundIdx)}{closesAt ? ` · ${countdownLabel(closesAt)}` : ""}
-        </Text>
-        <View style={[styles.group, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <View style={styles.roundHead}>
+          <Text {...dynamicType} numberOfLines={1} style={[typography.caption, styles.meta, { color: colors.text }]}>{headline.title}</Text>
+          <Text {...dynamicType} numberOfLines={1} style={[typography.caption, { color: colors.textDim }]}>{headline.status}</Text>
+        </View>
+        <View>
           {slots.map((duel, i) => (
             <View key={duel?.id ?? `pending-${roundIdx}-${i}`}>
-              {i > 0 ? <View style={[styles.groupRule, { backgroundColor: colors.border }]} /> : null}
               <MatchCard
                 duel={duel}
                 matchNumber={i + 1}
@@ -302,30 +332,35 @@ export function BracketRounds({
 
       </ScrollView>
 
-      <Animated.View
-        onLayout={(event) => setBarHeight(event.nativeEvent.layout.height)}
-        pointerEvents={barTappable ? "auto" : "none"}
-        style={[styles.bar, barStyle, { backgroundColor: colors.surface, borderTopColor: colors.border }]}
-      >
-        {byRound.map((_, i) => {
+      <View style={[styles.bar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+        {byRound.map((roundSlots, i) => {
           const on = i === roundIdx;
-          const live = i === liveRound;
+          const done = roundSlots.every((duel) => duel?.status === "settled");
+          const reached = liveRound === -1 || i <= liveRound;
+          // Done rounds are solid, the one in play is a ring, rounds the draw
+          // hasn't got to are hollow — so the rail fills as the tournament does.
+          const nodeColor = done ? colors.accent : reached ? colors.surface : colors.border;
+          const state = done ? "complete" : i === liveRound ? "in play" : "not started";
           return (
-            <Pressable
-              key={i}
-              accessibilityRole="button"
-              accessibilityState={{ selected: on }}
-              accessibilityLabel={live ? `${labelFor(i)}, current round` : labelFor(i)}
-              hitSlop={6}
-              onPress={() => pickRound(i)}
-              style={[styles.chip, { backgroundColor: on ? colors.accent : colors.background, borderColor: on ? colors.accent : colors.border }]}
-            >
-              {live ? <View style={[styles.liveDot, { backgroundColor: on ? colors.onAccent : colors.accent }]} /> : null}
-              <Text {...dynamicType} style={[typography.caption, styles.bold, { color: on ? colors.onAccent : colors.textDim }]}>{labelFor(i)}</Text>
-            </Pressable>
+            <Fragment key={i}>
+              {i > 0 ? <View style={[styles.rail, { backgroundColor: reached ? colors.accent : colors.border }]} /> : null}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ selected: on }}
+                accessibilityLabel={`${labelFor(i)}, ${state}`}
+                hitSlop={10}
+                onPress={() => pickRound(i)}
+                style={styles.node}
+              >
+                <View style={[styles.nodeDot, { backgroundColor: nodeColor, borderColor: reached ? colors.accent : colors.border, borderWidth: done ? 0 : 3 }]} />
+                <Text {...dynamicType} numberOfLines={1} style={[typography.caption, styles.bold, styles.nodeLabel, { color: on ? colors.accent : colors.textDim }]}>{nodeLabel(i)}</Text>
+              </Pressable>
+            </Fragment>
           );
         })}
-      </Animated.View>
+        <View style={[styles.barRule, { backgroundColor: colors.border }]} />
+        <BracketViewToggle to="classic" onPress={onShowClassic} />
+      </View>
 
       {/* Read-only: bigger covers and the exact share a card has no room
        *  for. Acting (vote, settle, tiebreak) happens on the card itself,
@@ -347,30 +382,38 @@ export function BracketRounds({
 
 const styles = StyleSheet.create({
   pane: { flex: 1 },
-  list: { paddingTop: spacing.md, flexGrow: 1 },
-  bar: { position: "absolute", left: 0, right: 0, bottom: 0, flexDirection: "row", flexWrap: "wrap", gap: spacing.xs, justifyContent: "center", paddingTop: spacing.sm, paddingBottom: spacing.xs, borderTopWidth: 1 },
-  chip: { flexDirection: "row", alignItems: "center", gap: spacing.xs, paddingHorizontal: spacing.md, paddingVertical: 7, borderRadius: radii.full, borderWidth: 1 },
-  liveDot: { width: 6, height: 6, borderRadius: radii.full },
-  // One bordered block ruled into matches rather than a stack of floating
-  // cards: the round reads as a table of results, which is the register a
-  // draw belongs in.
-  group: { borderWidth: 1, borderRadius: radii.md, overflow: "hidden" },
-  groupRule: { height: 1 },
-  card: { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
+  list: { paddingBottom: BAR_RESERVE, flexGrow: 1 },
+  bar: { position: "absolute", left: 0, right: 0, bottom: 0, minHeight: BAR_HEIGHT, flexDirection: "row", alignItems: "center", paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm, borderTopWidth: 1 },
+  barRule: { width: 1, height: 24, marginLeft: spacing.md, marginRight: spacing.sm, marginBottom: 8 },
+  node: { alignItems: "center", gap: 3, flexShrink: 0 },
+  nodeDot: { width: 14, height: 14, borderRadius: radii.full },
+  nodeLabel: { fontSize: 10 },
+  // Sits on the dots' centre line, not the labels'.
+  rail: { flex: 1, height: 2, marginBottom: 14, marginHorizontal: 2 },
+  // The home feed's row recipe: a hairline under each block and nothing
+  // else, so a round reads as one list of results.
+  block: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1 },
+  labelRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs, paddingBottom: spacing.xs, paddingHorizontal: spacing.xs },
   meta: { fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6 },
-  roundHead: { paddingBottom: spacing.xs, paddingLeft: 2 },
-  row: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingVertical: spacing.xs },
+  roundHead: { paddingTop: spacing.md, paddingBottom: spacing.sm, paddingHorizontal: spacing.lg, gap: 2 },
+  pair: { flexDirection: "row", alignItems: "stretch", gap: spacing.sm },
+  brace: { width: 3, borderRadius: 2 },
+  braceFill: { position: "absolute", left: 0, width: 3, height: "50%", borderRadius: 2 },
+  braceTop: { top: 0 },
+  braceBottom: { bottom: 0 },
+  versus: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  versusRule: { flex: 1, height: 1 },
+  versusText: { fontSize: 9, letterSpacing: 1 },
+  // Both rows carry the padding, tinted or not, so the covers stay on one
+  // vertical line.
+  row: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingVertical: spacing.xs, paddingHorizontal: spacing.xs, borderRadius: radii.sm },
   rowText: { flex: 1, minWidth: 0 },
-  // Indented past the cover so the two sides read as one match, the way a
-  // list row's rule sits under its text rather than the whole card.
-  divider: { height: 1, marginLeft: COVER_WIDTH + spacing.sm },
   pendingCover: { width: COVER_WIDTH, height: COVER_HEIGHT, borderRadius: radii.sm, opacity: 0.4 },
   shareTrack: { height: 3, borderRadius: radii.full, overflow: "hidden", marginLeft: COVER_WIDTH + spacing.sm, marginTop: spacing.xs },
   shareFill: { height: 3, borderRadius: radii.full },
   bold: { fontWeight: "700" },
   votes: { minWidth: 22, textAlign: "right" },
   winsPill: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radii.full },
-  footer: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingTop: spacing.xs },
   grow: { flex: 1 },
   voteDot: { width: 8, height: 8, borderRadius: radii.full },
   settle: { paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: radii.full, borderWidth: 1 },
