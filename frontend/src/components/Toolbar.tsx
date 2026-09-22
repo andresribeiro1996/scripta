@@ -24,7 +24,7 @@ import type { ReactNode } from "react";
  *  scarce. */
 export function ToolbarRow({ children }: { children: ReactNode }) {
   return (
-    <div className="sticky top-0 z-30 -mx-4 -mt-5 mb-4 bg-(--color-bg) px-4 pt-5 pb-2 sm:static sm:mx-0 sm:mt-0 sm:mb-5 sm:bg-transparent sm:px-0 sm:pt-0 sm:pb-0">
+    <div className="sticky top-0 z-30 -mx-4 -mt-5 mb-6 bg-(--color-bg) px-4 pt-5 pb-2 sm:static sm:mx-0 sm:mt-0 sm:mb-5 sm:bg-transparent sm:px-0 sm:pt-0 sm:pb-0">
       {children}
     </div>
   );
