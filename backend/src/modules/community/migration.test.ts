@@ -1,8 +1,20 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { test } from "node:test";
-import { applyHomeMuralMigration } from "./migration.js";
+
+const scratch = mkdtempSync(join(tmpdir(), "community-migration-test-"));
+process.env.AUTH_DB_PATH = join(scratch, "auth.sqlite");
+process.env.LIBRARY_DB_PATH = join(scratch, "library.sqlite");
+process.env.GALLERY_DB_PATH = join(scratch, "gallery.sqlite");
+process.env.GALLERY_STORAGE_PATH = join(scratch, "gallery-files");
+process.env.JWT_ACCESS_SECRET = "a".repeat(64);
+process.env.JWT_REFRESH_SECRET = "b".repeat(64);
+process.env.NODE_ENV = "test";
+
+const { applyHomeMuralMigration } = await import("./migration.js");
 
 function communityDb(): DatabaseSync {
   const db = new DatabaseSync(":memory:");

@@ -57,6 +57,10 @@
      system-green alert. */
   --color-success: #47713c;
   --color-success-soft: #e4efdf;
+  --color-info: #285f7a;
+  --color-info-soft: #dcebf2;
+  --color-reference: #6b4f8f;
+  --color-reference-soft: #ebe4f3;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -73,6 +77,10 @@
     --color-danger-soft: #3a2420;
     --color-success: #8fbf7f;
     --color-success-soft: #262f21;
+    --color-info: #7fb8d4;
+    --color-info-soft: #1f2d33;
+    --color-reference: #b9a3d6;
+    --color-reference-soft: #2c2536;
   }
 }
 

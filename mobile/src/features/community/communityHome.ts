@@ -1,6 +1,6 @@
-import { contentDetail, contentKindLabel, contentTarget, feedHeading, feedTarget } from "@scripta/shared/community";
+import { contentDetail, contentKindLabel, contentStats, contentStatus, contentTarget, feedHeading, feedTarget } from "@scripta/shared/community";
 
-export { contentDetail, contentKindLabel, contentTarget, feedHeading, feedTarget };
+export { contentDetail, contentKindLabel, contentStats, contentStatus, contentTarget, feedHeading, feedTarget };
 
 export const DISCOVER_FILTERS = [
   { value: "all", label: "All" },

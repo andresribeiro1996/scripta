@@ -137,7 +137,8 @@ export function buildApp() {
     tierlists: {
       list: getTierlistsPublicApi().listPublished,
       get: getTierlistsPublicApi().getPublished,
-      listByOwner: getTierlistsPublicApi().listPublishedByOwner
+      listByOwner: getTierlistsPublicApi().listPublishedByOwner,
+      listVotedByUser: getTierlistsPublicApi().listVotedByUser
     },
     tournaments: {
       list: getArenaPublicApi().listPublished,

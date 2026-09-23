@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { ReaderProfile } from "@scripta/shared";
+import type { DiscoverItem } from "@scripta/shared/community";
 import { DEFAULT_FEED_SETTINGS, normalizeFeedSettings } from "@scripta/shared/community";
 import type { PublishedTierlistRef } from "../tierlists/service.js";
 import type { PublishedTournamentRef } from "../arena/service.js";
@@ -94,6 +95,7 @@ function createDeps(repo: CommunityRepository) {
   const tournamentRefs = new Map<string, PublishedTournamentRef>();
   const byNewest = <T extends { createdAt: string }>(a: T, b: T) => b.createdAt.localeCompare(a.createdAt);
   const seenAt = { value: null as string | null };
+  const votes = new Set<string>();
   const deps: CommunityDeps = {
     repo,
     getDashboardSeenAt: () => seenAt.value,
@@ -123,7 +125,8 @@ function createDeps(repo: CommunityRepository) {
     tierlists: {
       list: (limit, offset) => [...tierlistRefs.values()].sort(byNewest).slice(offset, offset + limit),
       get: (id) => tierlistRefs.get(id),
-      listByOwner: (owner) => [...tierlistRefs.values()].filter((r) => r.ownerUserId === owner).sort(byNewest)
+      listByOwner: (owner) => [...tierlistRefs.values()].filter((r) => r.ownerUserId === owner).sort(byNewest),
+      listVotedByUser: (voter) => [...tierlistRefs.values()].filter((r) => votes.has(`${voter}:${r.id}`))
     },
     tournaments: {
       list: (limit, offset) => [...tournamentRefs.values()].sort(byNewest).slice(offset, offset + limit),
@@ -131,7 +134,7 @@ function createDeps(repo: CommunityRepository) {
       listByOwner: (owner) => [...tournamentRefs.values()].filter((r) => r.ownerUserId === owner).sort(byNewest)
     }
   };
-  return { deps, readerProfiles, usernames, ownedMurals, muralPayloads, tierlistRefs, tournamentRefs, seenAt };
+  return { deps, readerProfiles, usernames, ownedMurals, muralPayloads, tierlistRefs, tournamentRefs, seenAt, votes };
 }
 
 function profileRow(userId: string, overrides: Partial<ProfileRow> = {}): ProfileRow {
@@ -463,6 +466,21 @@ test("promoted references remain discoverable after the creator disappears", () 
   assert.equal(items.length, 1);
   assert.equal(items[0]?.author.unavailable, true);
   assert.equal(items[0]?.content.kind, "tierlist");
+});
+
+test("discover marks the tier lists the viewer has voted in, and only for a signed-in viewer", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs, tournamentRefs, votes } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  tierlistRefs.set("t1", tierRef("t1", "alice", { createdAt: "2026-09-03T00:00:00.000Z" }));
+  tierlistRefs.set("t2", tierRef("t2", "alice", { createdAt: "2026-09-02T00:00:00.000Z" }));
+  tournamentRefs.set("g1", tournRef("g1", "alice", { createdAt: "2026-09-01T00:00:00.000Z" }));
+  votes.add("viewer:t1");
+
+  const voted = (items: DiscoverItem[]) => items.map((item) => (item.content.kind === "tierlist" ? item.content.viewerVoted : "n/a"));
+  assert.deepEqual(voted(service.getDiscover("all", "", 10, 0, "viewer").items), [true, false, "n/a"]);
+  assert.deepEqual(voted(service.getDiscover("all", "", 10, 0).items), [undefined, undefined, "n/a"]);
 });
 
 test("people search excludes self and unpublished profiles", () => {

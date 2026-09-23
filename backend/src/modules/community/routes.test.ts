@@ -1,10 +1,23 @@
 import assert from "node:assert/strict";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
 import Fastify from "fastify";
 import { DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
-import { ProfileNotFoundError } from "./domain/errors.js";
-import { buildCommunityRoutes, buildPublicCommunityRoutes } from "./routes.js";
 import type { CommunityService } from "./service.js";
+
+const scratch = mkdtempSync(join(tmpdir(), "community-routes-test-"));
+process.env.AUTH_DB_PATH = join(scratch, "auth.sqlite");
+process.env.LIBRARY_DB_PATH = join(scratch, "library.sqlite");
+process.env.GALLERY_DB_PATH = join(scratch, "gallery.sqlite");
+process.env.GALLERY_STORAGE_PATH = join(scratch, "gallery-files");
+process.env.JWT_ACCESS_SECRET = "a".repeat(64);
+process.env.JWT_REFRESH_SECRET = "b".repeat(64);
+process.env.NODE_ENV = "test";
+
+const { ProfileNotFoundError } = await import("./domain/errors.js");
+const { buildCommunityRoutes, buildPublicCommunityRoutes } = await import("./routes.js");
 
 function fakeService(overrides: Partial<CommunityService> = {}): CommunityService {
   return {
@@ -52,6 +65,26 @@ test("discover passes type/q/limit/offset through", async () => {
   const res = await app.inject({ method: "GET", url: "/community/discover?type=tierlist&q=fantasy&limit=5&offset=5" });
   assert.equal(res.statusCode, 200);
   assert.deepEqual(seen, [{ type: "tierlist", q: "fantasy", limit: 5, offset: 5 }]);
+  await app.close();
+});
+
+test("discover passes the viewer through when signed in", async () => {
+  const seen: Array<string | undefined> = [];
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", () => ({ id: "viewer", email: "v@example.test", username: "v", avatarId: null }));
+  await app.register(
+    buildPublicCommunityRoutes(
+      fakeService({
+        getDiscover: (_type, _q, _limit, _offset, viewerId) => {
+          seen.push(viewerId);
+          return { items: [], nextOffset: null };
+        }
+      })
+    )
+  );
+  await app.inject({ method: "GET", url: "/community/discover", headers: { authorization: "Bearer x" } });
+  await app.inject({ method: "GET", url: "/community/discover" });
+  assert.deepEqual(seen, ["viewer", undefined]);
   await app.close();
 });
 

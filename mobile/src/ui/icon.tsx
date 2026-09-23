@@ -32,6 +32,7 @@ const GLYPHS = {
   // so it's where the thumb already goes. iOS spells the same thing sideways.
   more: { ios: "ellipsis", android: "more_vert" },
   search: { ios: "magnifyingglass", android: "search" },
+  filter: { ios: "line.3.horizontal.decrease", android: "filter_list" },
   public: { ios: "globe", android: "public" },
   delete: { ios: "trash", android: "delete" },
   chevronRight: { ios: "chevron.right", android: "chevron_right" },
