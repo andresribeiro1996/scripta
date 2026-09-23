@@ -10,6 +10,8 @@ import { StyleSheet, View } from "react-native";
 import { Image } from "expo-image";
 import { normalizeImageId, normalizeIsbn } from "@scripta/shared";
 import { useTheme } from "../../../ui/theme";
+import { API_URL } from "../../../core/config";
+import { coverUrlForApi } from "../lib/coverUrl";
 import { ensureCoversHydrated, forgetResolvedCover, peekResolvedCover, resolveCover, type ResolveCoverParams } from "../api/covers";
 
 function coverParamsFor(book: Record<string, unknown>): ResolveCoverParams {
@@ -83,7 +85,7 @@ export function CoverImage({
 
   return (
     <Image
-      source={{ uri: currentSrc }}
+      source={{ uri: coverUrlForApi(currentSrc, API_URL) }}
       style={StyleSheet.absoluteFill}
       contentFit={contentFit}
       transition={150}

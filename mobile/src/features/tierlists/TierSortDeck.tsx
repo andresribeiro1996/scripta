@@ -1,13 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import type { TierDefinition, TierlistData } from "@scripta/shared";
-import { Image } from "expo-image";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { ReduceMotion, useAnimatedStyle, useSharedValue, withSpring, type SharedValue } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { commitHaptic, liftHaptic } from "../../ui/haptics";
 import { EmptyState, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
-import { authorOf, coverOf, keyOf, titleOf, type TierBook } from "./TierBoard";
+import { authorOf, keyOf, TierCover, titleOf, type TierBook } from "./TierBoard";
 
 const TARGET_SIZE = 56;
 
@@ -33,8 +32,6 @@ function DragBook({ book, x, y, lifted }: {
   y: SharedValue<number>;
   lifted: SharedValue<boolean>;
 }) {
-  const { colors } = useTheme();
-  const cover = coverOf(book);
   const style = useAnimatedStyle(() => ({
     transform: [
       { translateX: x.get() },
@@ -43,11 +40,12 @@ function DragBook({ book, x, y, lifted }: {
     ],
   }));
   return <Animated.View accessibilityLabel={`${titleOf(book)} by ${authorOf(book)}. Swipe up from the lower half to drag into a tier; or tap a tier.`} style={style}>
-    {cover ? <Image source={cover} style={styles.cover} contentFit="cover" /> : <View style={[styles.cover, styles.fallback, { backgroundColor: colors.accentSoft }]}><Text numberOfLines={4} {...dynamicType} style={[typography.caption, styles.center, { color: colors.accent }]}>{titleOf(book)}</Text></View>}
+    <TierCover book={book} style={styles.cover} />
   </Animated.View>;
 }
 
 export function TierSortDeck({ data, books, onAssign, selectedBookKey }: { data: TierlistData; books: TierBook[]; onAssign: (bookKey: string, tierId: string) => void; selectedBookKey?: string | null }) {
+  const { colors } = useTheme();
   const ringRef = useRef<View>(null);
   const zones = useSharedValue<Array<{ x: number; y: number }>>([]);
   const center = useSharedValue({ x: 0, y: 0 });
@@ -119,7 +117,7 @@ export function TierSortDeck({ data, books, onAssign, selectedBookKey }: { data:
   if (!book) return <EmptyState title="Nothing left to rank" body="Every book in this list already sits in a tier." />;
 
   return <View style={styles.deck}>
-    <Text {...dynamicType} style={[typography.caption, styles.center]}>{selectedBookKey ? "Choose a new tier · drag or tap a circle" : `${pending.length} ${pending.length === 1 ? "book" : "books"} left · swipe up from below`}</Text>
+    <Text {...dynamicType} style={[typography.caption, styles.center, { color: colors.textDim }]}>{selectedBookKey ? "Choose a new tier · drag or tap a circle" : `${pending.length} ${pending.length === 1 ? "book" : "books"} left · swipe up from below`}</Text>
     <GestureDetector gesture={gesture}><View ref={ringRef} style={styles.ring} onLayout={(event) => setRing(event.nativeEvent.layout)}>
       <DragBook key={current} book={book} x={x} y={y} lifted={lifted} />
       {data.tiers.map((tier, index) => <View key={tier.id} style={[styles.targetWrap, { transform: [{ translateX: radius * Math.sin(index * 2 * Math.PI / data.tiers.length) }, { translateY: -radius * Math.cos(index * 2 * Math.PI / data.tiers.length) }] }]}>

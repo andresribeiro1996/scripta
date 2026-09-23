@@ -1,30 +1,36 @@
 import { useState } from "react";
 import { bookKey, type TierDefinition, type TierlistData } from "@scripta/shared";
-import { Image } from "expo-image";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
 import { Button, Dialog, IconButton, Input, Menu, type MenuItem, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { CoverImage } from "../library/components/CoverImage";
 
 export type TierBook = Record<string, unknown>;
 
 export function titleOf(book: TierBook) { return String(book.Title ?? book.title ?? "Untitled"); }
 export function authorOf(book: TierBook) { return String(book.Attribution ?? book.author ?? "Unknown author"); }
-export function coverOf(book: TierBook) { const value = book._coverUrl ?? book.coverUrl; return typeof value === "string" ? value : null; }
 export function keyOf(book: TierBook) {
   if ("Title" in book || "ISBN" in book) return bookKey(book);
   return bookKey({ Title: book.title, Attribution: book.author, ISBN: book.isbn, ImageId: book.imageId });
 }
 
-function BookChip({ book, onReassign }: { book: TierBook; onReassign?: () => void }) {
+export function TierCover({ book, style }: { book: TierBook; style?: StyleProp<ViewStyle> }) {
   const { colors } = useTheme();
-  const cover = coverOf(book);
+  const [hasCover, setHasCover] = useState(false);
+  return <View style={[styles.cover, style]}>
+    <CoverImage book={book} onHasCoverChange={setHasCover} />
+    {!hasCover ? <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.fallback, { backgroundColor: colors.accentSoft }]}><Text numberOfLines={3} {...dynamicType} style={[styles.fallbackTitle, { color: colors.accent }]}>{titleOf(book)}</Text><Text numberOfLines={1} {...dynamicType} style={[styles.fallbackAuthor, { color: colors.textDim }]}>{authorOf(book)}</Text></View> : null}
+  </View>;
+}
+
+function BookChip({ book, onReassign }: { book: TierBook; onReassign?: () => void }) {
   return (
     <Pressable disabled={!onReassign} accessibilityRole={onReassign ? "button" : undefined} accessibilityLabel={`${titleOf(book)} by ${authorOf(book)}`} accessibilityHint={onReassign ? "Opens the tier ring to reassign this book" : undefined} onPress={onReassign} onLongPress={onReassign} style={styles.chipWrap}>
-      {cover ? <Image source={cover} style={styles.cover} contentFit="cover" /> : <View style={[styles.cover, styles.fallback, { backgroundColor: colors.accentSoft }]}><Text numberOfLines={3} {...dynamicType} style={[styles.fallbackTitle, { color: colors.accent }]}>{titleOf(book)}</Text><Text numberOfLines={1} {...dynamicType} style={[styles.fallbackAuthor, { color: colors.textDim }]}>{authorOf(book)}</Text></View>}
+      <TierCover book={book} />
     </Pressable>
   );
 }
 
-export function TierBoard({ data, books, onChange, structureEditable, poolLabel = "Pool", onReassign }: { data: TierlistData; books: TierBook[]; onChange: (data: TierlistData) => void; structureEditable: boolean; poolLabel?: string; onReassign?: (bookKey: string) => void }) {
+export function TierBoard({ data, books, onChange, structureEditable, poolLabel = "Pool", onReassign, bottomClearance = 0 }: { data: TierlistData; books: TierBook[]; onChange: (data: TierlistData) => void; structureEditable: boolean; poolLabel?: string; onReassign?: (bookKey: string) => void; bottomClearance?: number }) {
   const { colors } = useTheme();
   const [editing, setEditing] = useState<TierDefinition | null>(null);
   const [label, setLabel] = useState("");
@@ -46,8 +52,8 @@ export function TierBoard({ data, books, onChange, structureEditable, poolLabel 
   return (
     <>
     <ScrollView
-      style={styles.grow}
-      contentContainerStyle={styles.board}
+      style={[styles.grow, { marginTop: spacing.md }]}
+      contentContainerStyle={[styles.board, { paddingBottom: bottomClearance }]}
     >
       {data.tiers.map((tier, index) => <View key={tier.id} style={[styles.tier, { backgroundColor: colors.surface }, index === 0 && styles.topCorners, index === data.tiers.length - 1 && styles.bottomCorners]}>
         <View style={[styles.tierLabel, { backgroundColor: tier.color }]}><Text numberOfLines={3} {...dynamicType} style={[typography.caption, styles.strong, styles.center, { color: "#fff" }]}>{tier.label || "Untitled"}</Text></View>
@@ -76,7 +82,7 @@ export function TierBoard({ data, books, onChange, structureEditable, poolLabel 
 
 const styles = StyleSheet.create({
   board: { flexGrow: 1 },
-  tier: { flex: 1, minHeight: 74, flexDirection: "row", overflow: "hidden" },
+  tier: { height: 84, flexDirection: "row", overflow: "hidden" },
   topCorners: { borderTopLeftRadius: radii.md, borderTopRightRadius: radii.md },
   bottomCorners: { borderBottomLeftRadius: radii.md, borderBottomRightRadius: radii.md },
   tierLabel: { width: 42, alignItems: "center", justifyContent: "center", padding: 2 },
@@ -85,8 +91,8 @@ const styles = StyleSheet.create({
   booksScroll: { flex: 1 },
   poolBooks: { height: 84 },
   books: { flexGrow: 1, alignItems: "stretch", gap: 2 },
-  chipWrap: { height: "100%", aspectRatio: 2 / 3 },
-  cover: { width: "100%", height: "100%", borderRadius: 2 },
+  chipWrap: { width: 56, height: 84 },
+  cover: { width: "100%", height: "100%", borderRadius: 2, overflow: "hidden" },
   fallback: { justifyContent: "space-between", padding: 5 },
   fallbackTitle: { fontFamily: "serif", fontSize: 11, lineHeight: 13, fontWeight: "700" },
   fallbackAuthor: { fontSize: 8, lineHeight: 10, fontWeight: "700" },
