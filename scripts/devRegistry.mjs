@@ -205,12 +205,22 @@ export function deviceHolders(registry) {
 // both are live-held, the error names both holders and when each was taken
 // — contention must be loud and attributable, never a silent steal of
 // someone else's adb tunnel.
-export function takeDevice({ path, worktree, pid, avd }) {
+//
+// A lease is live while its pid is alive OR its holder's slot is live, for
+// the same reason isSlotLive doesn't trust the pid alone: the pid is
+// dev-emulator.mjs's, which exits once the app is up, while the holder
+// keeps driving the device until `npm run dev:release`. Pid-only liveness
+// let a second worktree reclaim a lease seconds after the first one's run
+// finished and then point both at one emulator.
+export function takeDevice({ path, worktree, pid, avd, isPortFree }) {
   return withLock(path, () => {
     const registry = readRegistry(path);
     const free = (name) => {
       const lease = registry.devices[name];
-      return lease === null || lease === undefined || !isPidAlive(lease.pid);
+      if (lease === null || lease === undefined) return true;
+      if (isPidAlive(lease.pid)) return false;
+      const holderSlot = slotForWorktree(registry, lease.worktree);
+      return holderSlot === undefined || !isSlotLive(holderSlot, registry.slots[holderSlot], isPortFree);
     };
     const mine = AVDS.find((name) => registry.devices[name]?.worktree === worktree);
     if (mine !== undefined) return { avd: mine };
@@ -232,19 +242,28 @@ export function takeDevice({ path, worktree, pid, avd }) {
 // Records the adb serial ensureAvdBooted resolved for this worktree's
 // leased AVD, so the lease is self-describing instead of something later
 // code (dev-release.mjs's tunnel cleanup) has to re-derive from scratch.
-// A no-op — never throws, never resurrects a lease — when this worktree
-// no longer holds `avd`: the lease may have been released or stolen by a
-// dead-pid reclaim between takeDevice and this call, and recording a
-// serial onto someone else's (or nobody's) lease would be exactly the
-// kind of guess this whole module exists to avoid.
+// Throws, never resurrects a lease, when this worktree no longer holds
+// `avd`: the caller is about to drive that device, and recording a serial
+// onto someone else's (or nobody's) lease would be exactly the kind of
+// guess this whole module exists to avoid.
 export function recordDeviceSerial({ path, worktree, avd, serial }) {
   withLock(path, () => {
     const registry = readRegistry(path);
-    const lease = registry.devices[avd];
-    if (lease?.worktree !== worktree) return;
-    registry.devices[avd] = { ...lease, serial };
+    assertLeaseHeld(registry, avd, worktree);
+    registry.devices[avd] = { ...registry.devices[avd], serial };
     writeRegistry(path, registry);
   });
+}
+
+function assertLeaseHeld(registry, avd, worktree) {
+  const holder = registry.devices[avd]?.worktree;
+  if (holder !== worktree) {
+    throw new Error(`${avd} is leased to ${holder ?? "nobody"}, not ${worktree} — refusing to drive it. See \`node scripts/dev-status.mjs --json\`.`);
+  }
+}
+
+export function assertHoldsDevice({ path, worktree, avd }) {
+  assertLeaseHeld(readRegistry(path), avd, worktree);
 }
 
 // Releases only the lease(s) this worktree holds — pass `avd` to release a

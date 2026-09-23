@@ -38,7 +38,7 @@ export function assertResourceGate({ registry, worktree, isPortFree, limits = DE
 
 // Claims this worktree's slot (or reuses the one it already holds) and
 // writes the six derived env values (scripts/devSlotEnv.mjs) for it.
-// Returns { slot, ports, branch, worktree }. Idempotent: calling this
+// Returns { slot, ports, branch, worktree, isPortFree }. Idempotent: calling this
 // twice from the same worktree returns the same slot both times.
 export async function claimThisWorktreeSlot({ repoRoot, transport = "loopback", lanAddress, requestedSlot } = {}) {
   const path = registryPath(repoRoot);
@@ -76,5 +76,5 @@ export async function claimThisWorktreeSlot({ repoRoot, transport = "loopback", 
 
   applySlotEnv({ repoRoot, ports, transport, lanAddress });
 
-  return { slot, ports, branch, worktree };
+  return { slot, ports, branch, worktree, isPortFree };
 }
