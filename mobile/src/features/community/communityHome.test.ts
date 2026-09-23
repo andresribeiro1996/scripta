@@ -50,9 +50,11 @@ test("content labels and detail lines", () => {
 
 test("content status names the state and its tone", () => {
   assert.deepEqual(contentStatus(tierlist), { label: "Voting open", tone: "accent" });
+  assert.deepEqual(contentStatus({ ...tierlist, viewerVoted: true }), { label: "Voted", tone: "info" });
   assert.deepEqual(contentStatus({ ...tierlist, votingOpen: false }), { label: "Closed", tone: "neutral" });
-  assert.deepEqual(contentStatus({ ...tierlist, votingOpen: false, promotedAt: "2026-09-01T00:00:00.000Z" }), { label: "Reference", tone: "success" });
-  assert.deepEqual(contentStatus(tournament), { label: "In progress", tone: "accent" });
+  assert.deepEqual(contentStatus({ ...tierlist, votingOpen: false, viewerVoted: true }), { label: "Closed", tone: "neutral" });
+  assert.deepEqual(contentStatus({ ...tierlist, votingOpen: false, promotedAt: "2026-09-01T00:00:00.000Z" }), { label: "Reference", tone: "reference" });
+  assert.deepEqual(contentStatus(tournament), { label: "In progress", tone: "info" });
   assert.deepEqual(contentStatus({ ...tournament, status: "completed" }), { label: "Completed", tone: "success" });
 });
 

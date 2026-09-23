@@ -22,6 +22,10 @@ Extracted from real app source (`frontend/src/index.css`, `mobile/src/ui/theme.t
 | `danger-soft` | `#f6dfda` | `#3a2420` | Error banner bg — `danger` text on it is 4.38:1 light (just under AA; short labels only) |
 | `success` | `#47713c` | `#8fbf7f` | The one "done"/positive state (e.g. finished tournament) — use sparingly |
 | `success-soft` | `#e4efdf` | `#262f21` | Success chip bg, paired with `success` text |
+| `info` | `#285f7a` | `#7fb8d4` | Running with nothing asked of you (tournament in progress) — never an action colour |
+| `info-soft` | `#dcebf2` | `#1f2d33` | Info chip bg, paired with `info` text |
+| `reference` | `#6b4f8f` | `#b9a3d6` | Kept permanently as the canonical result (promoted tier list) — distinct from merely finished |
+| `reference-soft` | `#ebe4f3` | `#2c2536` | Reference chip bg, paired with `reference` text |
 | `scrim` | `rgba(32,30,28,.48)` | `rgba(0,0,0,.64)` | Modal/sheet backdrop |
 | `on-accent` | `#ffffff` | `#1a1815` | Text on filled `accent` |
 | `on-danger` | `#ffffff` | `#1a1815` | Text on filled `danger` |

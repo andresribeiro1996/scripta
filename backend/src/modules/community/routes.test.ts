@@ -55,6 +55,26 @@ test("discover passes type/q/limit/offset through", async () => {
   await app.close();
 });
 
+test("discover passes the viewer through when signed in", async () => {
+  const seen: Array<string | undefined> = [];
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", () => ({ id: "viewer", email: "v@example.test", username: "v", avatarId: null }));
+  await app.register(
+    buildPublicCommunityRoutes(
+      fakeService({
+        getDiscover: (_type, _q, _limit, _offset, viewerId) => {
+          seen.push(viewerId);
+          return { items: [], nextOffset: null };
+        }
+      })
+    )
+  );
+  await app.inject({ method: "GET", url: "/community/discover", headers: { authorization: "Bearer x" } });
+  await app.inject({ method: "GET", url: "/community/discover" });
+  assert.deepEqual(seen, ["viewer", undefined]);
+  await app.close();
+});
+
 test("discover rejects a bad type with 400", async () => {
   const app = Fastify();
   await app.register(buildPublicCommunityRoutes(fakeService()));

@@ -19,13 +19,14 @@ export function contentDetail(content: PublishedContent): string {
   return `${content.bracketSize}-book bracket · ${content.status}`;
 }
 
-export type ContentTone = "neutral" | "accent" | "success";
+export type ContentTone = "neutral" | "accent" | "info" | "success" | "reference";
 
 export function contentStatus(content: PublishedContent): { label: string; tone: ContentTone } {
   if (content.kind === "tournament") {
-    return content.status === "active" ? { label: "In progress", tone: "accent" } : { label: "Completed", tone: "success" };
+    return content.status === "active" ? { label: "In progress", tone: "info" } : { label: "Completed", tone: "success" };
   }
-  if (content.promotedAt) return { label: "Reference", tone: "success" };
+  if (content.promotedAt) return { label: "Reference", tone: "reference" };
+  if (content.votingOpen && content.viewerVoted) return { label: "Voted", tone: "info" };
   return content.votingOpen ? { label: "Voting open", tone: "accent" } : { label: "Closed", tone: "neutral" };
 }
 

@@ -418,6 +418,7 @@ export interface TierlistsPublicApi {
   listPublished(limit: number, offset: number): PublishedTierlistRef[];
   getPublished(id: string): PublishedTierlistRef | undefined;
   listPublishedByOwner(ownerUserId: string): PublishedTierlistRef[];
+  listVotedByUser(voterUserId: string): PublishedTierlistRef[];
 }
 
 /** Factory over the service. app.ts can't call this directly — it has no
@@ -433,6 +434,7 @@ export function createTierlistsPublicApi(service: TierlistsService): TierlistsPu
     },
     listPublished: (limit, offset) => service.listPublishedRefs(limit, offset),
     getPublished: (id) => service.getPublishedRef(id),
-    listPublishedByOwner: (ownerUserId) => service.listPublishedRefsByOwner(ownerUserId)
+    listPublishedByOwner: (ownerUserId) => service.listPublishedRefsByOwner(ownerUserId),
+    listVotedByUser: (voterUserId) => service.listVotedByUser(voterUserId)
   };
 }

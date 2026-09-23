@@ -139,7 +139,8 @@ export function buildPublicCommunityRoutes(service: CommunityService) {
       const parsed = discoverQuerySchema.safeParse(request.query);
       if (!parsed.success) return reply.code(400).send({ error: "Invalid type/q/limit/offset." });
       reply.header("Cache-Control", "no-store");
-      return reply.send(service.getDiscover(parsed.data.type, parsed.data.q, parsed.data.limit, parsed.data.offset));
+      const viewer = getOptionalAuthenticatedUser(request);
+      return reply.send(service.getDiscover(parsed.data.type, parsed.data.q, parsed.data.limit, parsed.data.offset, viewer?.id));
     });
   };
 }

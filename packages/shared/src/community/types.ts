@@ -18,6 +18,7 @@ export interface TierlistSummary {
   votingOpen: boolean;
   promotedAt: string | null;
   covers: string[];
+  viewerVoted?: boolean;
 }
 
 export interface TournamentSummary {

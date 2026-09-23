@@ -22,7 +22,9 @@ const segmented = (active: boolean, first: boolean) =>
 const STATUS_TONES: Record<ContentTone, string> = {
   neutral: "border-(--color-border) bg-(--color-surface) text-(--color-text-dim)",
   accent: "border-(--color-accent) bg-(--color-accent-soft) text-(--color-accent)",
-  success: "border-(--color-success) bg-(--color-success-soft) text-(--color-success)"
+  info: "border-(--color-info) bg-(--color-info-soft) text-(--color-info)",
+  success: "border-(--color-success) bg-(--color-success-soft) text-(--color-success)",
+  reference: "border-(--color-reference) bg-(--color-reference-soft) text-(--color-reference)"
 };
 
 const THUMB_WIDTH = 64;

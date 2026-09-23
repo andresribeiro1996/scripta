@@ -175,7 +175,9 @@ function StatusBadge({ label, tone }: { label: string; tone: ContentTone }) {
   const palette = {
     neutral: { borderColor: colors.border, backgroundColor: colors.surface, color: colors.textDim },
     accent: { borderColor: colors.accent, backgroundColor: colors.accentSoft, color: colors.accent },
+    info: { borderColor: colors.info, backgroundColor: colors.infoSoft, color: colors.info },
     success: { borderColor: colors.success, backgroundColor: colors.successSoft, color: colors.success },
+    reference: { borderColor: colors.reference, backgroundColor: colors.referenceSoft, color: colors.reference },
   }[tone];
   return (
     <View style={[styles.badge, { borderColor: palette.borderColor, backgroundColor: palette.backgroundColor }]}>

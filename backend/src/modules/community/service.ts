@@ -58,6 +58,7 @@ export interface CommunityDeps {
     list(limit: number, offset: number): PublishedTierlistRef[];
     get(id: string): PublishedTierlistRef | undefined;
     listByOwner(ownerUserId: string): PublishedTierlistRef[];
+    listVotedByUser(voterUserId: string): PublishedTierlistRef[];
   };
   tournaments: {
     list(limit: number, offset: number): PublishedTournamentRef[];
@@ -76,7 +77,7 @@ export interface CommunityService {
   getProfileByUsername(username: string, viewerId?: string): PublicProfileView;
   getDashboard(viewerId: string, cursor: string | undefined, limit: number): DashboardFeedPage;
   markDashboardSeen(viewerId: string): void;
-  getDiscover(type: DiscoverType, q: string, limit: number, offset: number): { items: DiscoverItem[]; nextOffset: number | null };
+  getDiscover(type: DiscoverType, q: string, limit: number, offset: number, viewerId?: string): { items: DiscoverItem[]; nextOffset: number | null };
   searchPeople(viewerId: string, q: string, limit: number): PersonResult[];
   getActivity(username: string, viewerId: string | undefined, cursor: string | undefined, limit: number): Page<ActivityItem>;
   getFeedSettings(userId: string): FeedSettings;
@@ -257,12 +258,16 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
     markDashboardSeen(viewerId) {
       deps.setDashboardSeenAt(viewerId, new Date().toISOString());
     },
-    getDiscover(type, q, limit, offset) {
+    getDiscover(type, q, limit, offset, viewerId) {
       const needle = q.trim().toLowerCase();
       const window = Math.min(offset + limit, DISCOVER_SCAN_CAP);
       const entries: Array<{ userId: string; content: PublishedContent; createdAt: string }> = [];
       if (type !== "tournament") {
-        for (const ref of deps.tierlists.list(window, 0)) entries.push({ userId: ref.ownerUserId, content: toTierlistSummary(ref), createdAt: ref.createdAt });
+        const voted = viewerId ? new Set(deps.tierlists.listVotedByUser(viewerId).map((ref) => ref.id)) : null;
+        for (const ref of deps.tierlists.list(window, 0)) {
+          const content = voted ? { ...toTierlistSummary(ref), viewerVoted: voted.has(ref.id) } : toTierlistSummary(ref);
+          entries.push({ userId: ref.ownerUserId, content, createdAt: ref.createdAt });
+        }
       }
       if (type !== "tierlist") {
         for (const ref of deps.tournaments.list(window, 0)) entries.push({ userId: ref.ownerUserId, content: toTournamentSummary(ref), createdAt: ref.createdAt });
