@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { MAX_SLOT, portsForSlot, readRegistry, withLock, writeRegistry } from "./devRegistry.mjs";
 import { claimSlot, isSlotLive, releaseSlot, slotForWorktree } from "./devRegistry.mjs";
-import { AVDS, deviceHolders, recordDeviceSerial, releaseDevice, takeDevice } from "./devRegistry.mjs";
+import { AVDS, assertHoldsDevice, deviceHolders, recordDeviceSerial, releaseDevice, takeDevice } from "./devRegistry.mjs";
 
 test("isSlotLive: a dead pid with an occupied port is live", () => {
   const occupied = (port) => port !== 3100;
@@ -301,6 +301,39 @@ test("a lease whose pid is dead is reclaimable", () => {
   });
 });
 
+test("a lease outlives the dev-emulator run that took it while the holder's stack is up", () => {
+  withTempDir((dir) => {
+    const path = join(dir, "scripta-dev.json");
+    const deadPid = 2147483646;
+    claim(path, "/wt/profile-tabs", { pid: deadPid, requestedSlot: 3 });
+    takeDevice({ path, worktree: "/wt/profile-tabs", pid: deadPid, isPortFree: allFree });
+    recordDeviceSerial({ path, worktree: "/wt/profile-tabs", avd: AVDS[0], serial: "emulator-5554" });
+
+    const slotThreePorts = Object.values(portsForSlot(3));
+    const isPortFree = (port) => !slotThreePorts.includes(port);
+    assert.equal(takeDevice({ path, worktree: "/wt/discover-rows", pid: process.pid, isPortFree }).avd, AVDS[1]);
+    assert.doesNotThrow(() => assertHoldsDevice({ path, worktree: "/wt/profile-tabs", avd: AVDS[0] }));
+  });
+});
+
+test("a dead holder whose stack is down gives its lease up", () => {
+  withTempDir((dir) => {
+    const path = join(dir, "scripta-dev.json");
+    claim(path, "/wt/crashed", { pid: 2147483646, requestedSlot: 3 });
+    takeDevice({ path, worktree: "/wt/crashed", pid: 2147483646, isPortFree: allFree });
+    assert.equal(takeDevice({ path, worktree: "/wt/b", pid: process.pid, isPortFree: allFree }).avd, AVDS[0]);
+  });
+});
+
+test("assertHoldsDevice names the worktree that took the device instead", () => {
+  withTempDir((dir) => {
+    const path = join(dir, "scripta-dev.json");
+    takeDevice({ path, worktree: "/wt/a", pid: 2147483646 });
+    takeDevice({ path, worktree: "/wt/b", pid: process.pid });
+    assert.throws(() => assertHoldsDevice({ path, worktree: "/wt/a", avd: AVDS[0] }), /\/wt\/b/);
+  });
+});
+
 test("a specific AVD can be requested", () => {
   withTempDir((dir) => {
     const path = join(dir, "scripta-dev.json");
@@ -329,13 +362,12 @@ test("recordDeviceSerial round-trips through the registry", () => {
   });
 });
 
-test("recordDeviceSerial is a no-op when this worktree no longer holds the lease", () => {
+test("recordDeviceSerial refuses a lease this worktree no longer holds", () => {
   withTempDir((dir) => {
     const path = join(dir, "scripta-dev.json");
     const { avd } = takeDevice({ path, worktree: "/wt/a", pid: process.pid });
     releaseDevice({ path, worktree: "/wt/a" });
-    // Must not resurrect a released lease, and must not throw.
-    assert.doesNotThrow(() => recordDeviceSerial({ path, worktree: "/wt/a", avd, serial: "emulator-5554" }));
+    assert.throws(() => recordDeviceSerial({ path, worktree: "/wt/a", avd, serial: "emulator-5554" }), /nobody/);
     assert.deepEqual(deviceHolders(readRegistry(path)), []);
   });
 });

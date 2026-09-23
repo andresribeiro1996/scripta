@@ -54,7 +54,7 @@ import { DEV_USERNAME } from "./dev-account.mjs";
 import { assertAdoptedBackendMatches, ensureSharedBuilt, resetDevDataIfRequested, seedCommunityGraph, seedDevAccount, seedFixtureUsers } from "./devFixtureSetup.mjs";
 import { upsertEnvLine } from "./devEnvFile.mjs";
 import { claimThisWorktreeSlot } from "./devClaim.mjs";
-import { recordDeviceSerial, registryPath, takeDevice } from "./devRegistry.mjs";
+import { assertHoldsDevice, recordDeviceSerial, registryPath, takeDevice } from "./devRegistry.mjs";
 import { isReachableOn, worktreeIdentity } from "./devHost.mjs";
 import { metroCacheEnv } from "./devMetroCache.mjs";
 import { isPortOpen, mkdirRuntimeDir, spawnDetached, waitFor } from "./devProcess.mjs";
@@ -71,6 +71,7 @@ const requestedSlot = slotArg < 0 ? undefined : Number(process.argv[slotArg + 1]
 let BACKEND_PORT;
 let METRO_PORT;
 let claimedSlot;
+let isPortFree;
 
 function log(message) {
   console.log(`[dev-emulator] ${message}`);
@@ -277,14 +278,16 @@ async function ensureMetroRunning() {
 // probe, registry write, env files) is the shared step in
 // scripts/devClaim.mjs — `npm run backend`/`frontend` run the same one.
 async function claimThisWorktree() {
-  const { slot, ports, branch } = await claimThisWorktreeSlot({
+  const claim = await claimThisWorktreeSlot({
     repoRoot,
     transport: lanRequested ? "lan" : "loopback",
     lanAddress: lanRequested ? pickLanAddress() : undefined,
     requestedSlot,
   });
+  const { slot, ports, branch } = claim;
 
   claimedSlot = slot;
+  isPortFree = claim.isPortFree;
   BACKEND_PORT = ports.backend;
   METRO_PORT = ports.metro;
 
@@ -297,7 +300,7 @@ async function main() {
   const env = { ...process.env, ...androidEnv() };
   const { worktree } = worktreeIdentity(repoRoot);
   const path = registryPath(repoRoot);
-  const { avd } = takeDevice({ path, worktree, pid: process.pid });
+  const { avd } = takeDevice({ path, worktree, pid: process.pid, isPortFree });
   log(`Holding ${avd}. Release it with \`npm run dev:release\` when you're done verifying.`);
   const serial = await ensureAvdBooted(avd, env);
   recordDeviceSerial({ path, worktree, avd, serial });
@@ -310,6 +313,7 @@ async function main() {
   await ensureBackendRunning();
   const metroLogPath = await ensureMetroRunning();
 
+  assertHoldsDevice({ path, worktree, avd });
   run("adb", ["-s", serial, "reverse", `tcp:${METRO_PORT}`, `tcp:${METRO_PORT}`], { env });
   run("adb", ["-s", serial, "reverse", `tcp:${BACKEND_PORT}`, `tcp:${BACKEND_PORT}`], { env });
 
