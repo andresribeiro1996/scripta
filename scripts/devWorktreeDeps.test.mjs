@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readlinkSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -24,16 +24,31 @@ function seedWorkspace(root, { lockfile = "lock-a" } = {}) {
   for (const dir of ["frontend", "packages/shared"]) {
     mkdirSync(join(root, dir, "node_modules"), { recursive: true });
   }
-  mkdirSync(join(root, "node_modules"), { recursive: true });
+  mkdirSync(join(root, "node_modules", "react"), { recursive: true });
+  mkdirSync(join(root, "node_modules", "@types", "node"), { recursive: true });
+  mkdirSync(join(root, "node_modules", "@scripta"), { recursive: true });
+  symlinkSync("../../packages/shared", join(root, "node_modules", "@scripta", "shared"), "dir");
+  symlinkSync("../frontend", join(root, "node_modules", "frontend"), "dir");
 }
 
 // A worktree has every workspace directory checked out (they hold tracked
 // source), just not node_modules — unlike seedWorkspace, which is only ever
 // used for the primary checkout side of these tests.
 function seedCheckout(root) {
-  for (const dir of ["frontend", "packages/shared"]) {
+  writeFileSync(join(root, "package.json"), JSON.stringify({ workspaces: ["frontend", "packages/*"] }));
+  for (const [dir, name] of [["frontend", "frontend"], ["packages/shared", "@scripta/shared"]]) {
     mkdirSync(join(root, dir), { recursive: true });
+    writeFileSync(join(root, dir, "package.json"), JSON.stringify({ name }));
   }
+}
+
+function assertRootLinkedToOwnWorkspaces({ primaryRoot, worktreeRoot }) {
+  const nodeModules = join(worktreeRoot, "node_modules");
+  assert.ok(!lstatSync(nodeModules).isSymbolicLink());
+  assert.equal(realpathSync(join(nodeModules, "@scripta", "shared")), realpathSync(join(worktreeRoot, "packages", "shared")));
+  assert.equal(realpathSync(join(nodeModules, "frontend")), realpathSync(join(worktreeRoot, "frontend")));
+  assert.equal(readlinkSync(join(nodeModules, "react")), join(primaryRoot, "node_modules", "react"));
+  assert.equal(readlinkSync(join(nodeModules, "@types", "node")), join(primaryRoot, "node_modules", "@types", "node"));
 }
 
 test("symlinks every workspace's node_modules when the lockfiles match", () => {
@@ -45,11 +60,26 @@ test("symlinks every workspace's node_modules when the lockfiles match", () => {
     const result = linkWorktreeDeps({ primaryRoot, worktreeRoot });
 
     assert.deepEqual(result, { linked: [".", "frontend", "packages/shared"], skipped: [], reason: null });
-    for (const dir of [".", "frontend", "packages/shared"]) {
+    assertRootLinkedToOwnWorkspaces({ primaryRoot, worktreeRoot });
+    for (const dir of ["frontend", "packages/shared"]) {
       const target = join(worktreeRoot, dir, "node_modules");
       assert.ok(lstatSync(target).isSymbolicLink());
       assert.equal(readlinkSync(target), join(primaryRoot, dir, "node_modules"));
     }
+  });
+});
+
+test("replaces a root node_modules symlinked wholesale by an earlier version of this script", () => {
+  withRoots(({ primaryRoot, worktreeRoot }) => {
+    seedWorkspace(primaryRoot);
+    seedCheckout(worktreeRoot);
+    writeFileSync(join(worktreeRoot, "package-lock.json"), "lock-a");
+    symlinkSync(join(primaryRoot, "node_modules"), join(worktreeRoot, "node_modules"), "dir");
+
+    const result = linkWorktreeDeps({ primaryRoot, worktreeRoot });
+
+    assert.ok(result.linked.includes("."));
+    assertRootLinkedToOwnWorkspaces({ primaryRoot, worktreeRoot });
   });
 });
 
