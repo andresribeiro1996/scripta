@@ -5,6 +5,8 @@ import {
   DISCOVER_FILTERS,
   contentDetail,
   contentKindLabel,
+  contentStats,
+  contentStatus,
   contentTarget,
   feedHeading,
   feedTarget,
@@ -44,6 +46,20 @@ test("content labels and detail lines", () => {
   assert.equal(contentDetail(tierlist), "12 books · 4 ballots");
   assert.equal(contentDetail({ ...tierlist, votingOpen: false }), "12 books · 4 ballots · closed");
   assert.equal(contentDetail(tournament), "8-book bracket · active");
+});
+
+test("content status names the state and its tone", () => {
+  assert.deepEqual(contentStatus(tierlist), { label: "Voting open", tone: "accent" });
+  assert.deepEqual(contentStatus({ ...tierlist, votingOpen: false }), { label: "Closed", tone: "neutral" });
+  assert.deepEqual(contentStatus({ ...tierlist, votingOpen: false, promotedAt: "2026-09-01T00:00:00.000Z" }), { label: "Reference", tone: "success" });
+  assert.deepEqual(contentStatus(tournament), { label: "In progress", tone: "accent" });
+  assert.deepEqual(contentStatus({ ...tournament, status: "completed" }), { label: "Completed", tone: "success" });
+});
+
+test("content stats count books, and ballots for tier lists", () => {
+  assert.deepEqual(contentStats(tierlist), [{ value: 12, label: "books" }, { value: 4, label: "ballots" }]);
+  assert.deepEqual(contentStats({ ...tierlist, poolSize: 1, ballotCount: 1 }), [{ value: 1, label: "book" }, { value: 1, label: "ballot" }]);
+  assert.deepEqual(contentStats(tournament), [{ value: 8, label: "books" }]);
 });
 
 test("content targets route by kind", () => {

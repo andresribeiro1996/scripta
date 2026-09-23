@@ -19,6 +19,23 @@ export function contentDetail(content: PublishedContent): string {
   return `${content.bracketSize}-book bracket · ${content.status}`;
 }
 
+export type ContentTone = "neutral" | "accent" | "success";
+
+export function contentStatus(content: PublishedContent): { label: string; tone: ContentTone } {
+  if (content.kind === "tournament") {
+    return content.status === "active" ? { label: "In progress", tone: "accent" } : { label: "Completed", tone: "success" };
+  }
+  if (content.promotedAt) return { label: "Reference", tone: "success" };
+  return content.votingOpen ? { label: "Voting open", tone: "accent" } : { label: "Closed", tone: "neutral" };
+}
+
+export function contentStats(content: PublishedContent): Array<{ value: number; label: string }> {
+  const books = content.kind === "tierlist" ? content.poolSize : content.bracketSize;
+  const stats = [{ value: books, label: books === 1 ? "book" : "books" }];
+  if (content.kind === "tierlist") stats.push({ value: content.ballotCount, label: content.ballotCount === 1 ? "ballot" : "ballots" });
+  return stats;
+}
+
 export function contentTarget(content: PublishedContent): string {
   return content.kind === "tierlist" ? `/vote/${content.voteCode}` : `/arena/${content.id}`;
 }

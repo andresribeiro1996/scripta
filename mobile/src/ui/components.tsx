@@ -751,7 +751,7 @@ const styles = StyleSheet.create({
   field: { gap: spacing.xs },
   label: { ...typography.body, fontWeight: "600" },
   input: { minHeight: minimumTouchTarget, borderWidth: 1, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, ...typography.input },
-  inputIcon: { position: "absolute", left: 0, top: 0, bottom: 0, width: minimumTouchTarget, alignItems: "center", justifyContent: "center" },
+  inputIcon: { position: "absolute", left: 0, top: 0, bottom: 0, width: minimumTouchTarget, alignItems: "center", justifyContent: "center", zIndex: 1 },
   help: { ...typography.caption },
   overlay: { flex: 1 },
   sheetOverlay: { justifyContent: "flex-end" },
