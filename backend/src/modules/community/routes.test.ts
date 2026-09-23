@@ -35,6 +35,9 @@ function fakeService(overrides: Partial<CommunityService> = {}): CommunityServic
     searchPeople: () => [],
     emitEvent: () => {},
     getActivity: () => ({ items: [], nextCursor: null }),
+    getLibrary: () => {
+      throw new ProfileNotFoundError();
+    },
     getFeedSettings: () => DEFAULT_FEED_SETTINGS,
     updateFeedSettings: () => {},
     ...overrides
@@ -185,4 +188,19 @@ test("dashboard routes pass cursor/limit through and mark seen", async () => {
   assert.equal(seenRes.statusCode, 204);
   assert.equal(marked, 1);
   await app.close();
+});
+
+test("library endpoint returns the owner's library and 404s when unpublished", async () => {
+  const app = Fastify();
+  await app.register(buildPublicCommunityRoutes(fakeService({ getLibrary: (username) => ({ data: username === "alice" ? { books: [] } : null }) })));
+  const ok = await app.inject({ method: "GET", url: "/community/profiles/alice/library" });
+  assert.equal(ok.statusCode, 200);
+  assert.deepEqual(ok.json(), { data: { books: [] } });
+  await app.close();
+
+  const hidden = Fastify();
+  await hidden.register(buildPublicCommunityRoutes(fakeService()));
+  const res = await hidden.inject({ method: "GET", url: "/community/profiles/ghost/library" });
+  assert.equal(res.statusCode, 404);
+  await hidden.close();
 });

@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
-import { Image } from "expo-image";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
 import { buildDashboardCards, digestHeading, digestTarget, resolveQuote, type DigestItem } from "@scripta/shared";
-import { Button, EmptyState, ErrorState, Icon, IconButton, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
+import { Button, EmptyState, ErrorState, Icon, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { useAuth } from "../../core/auth";
 import { useLibrary } from "../library/hooks/useLibrary";
 import { AuthorAvatar } from "../community/AuthorAvatar";
+import { CoverFan, SLOT_HEIGHT, SLOT_WIDTH } from "../community/CoverFan";
 import { DiscoverPane } from "../community/DiscoverPane";
 import { PeoplePane } from "../community/PeoplePane";
 import { fetchDashboard, followUser, markDashboardSeen } from "../community/api";
@@ -90,9 +90,6 @@ export function HomeScreen() {
         options={{
           title: "Home",
           headerShown: true,
-          headerRight: user?.username ? () => (
-            <IconButton framed accessibilityLabel="Your profile" name="profile" onPress={() => router.push(`/u/${user.username}` as never)} />
-          ) : undefined,
         }}
       />
       {dashboard.isPending || library.isPending ? (
@@ -182,14 +179,7 @@ function FeedRow({ item, onOpen, onFollowBack, following }: { item: DigestItem; 
           <View style={styles.slot}>
             {row.covers.length ? (
               <>
-                {row.covers.map((cover, index) => (
-                  <Image
-                    key={cover}
-                    source={{ uri: cover }}
-                    contentFit="cover"
-                    style={[styles.cover, { left: COVER_INSET + index * COVER_STEP, top: (row.covers.length - 1 - index) * COVER_RISE, zIndex: index }]}
-                  />
-                ))}
+                <CoverFan covers={row.covers} />
                 <View style={[styles.slotAvatar, { borderColor: colors.background }]}>
                   <AuthorAvatar username={item.actor.username} avatarUrl={item.actor.avatarUrl} />
                 </View>
@@ -240,17 +230,7 @@ function FeedRow({ item, onOpen, onFollowBack, following }: { item: DigestItem; 
   );
 }
 
-const COVER_WIDTH = 42;
-const COVER_HEIGHT = 64;
-const COVER_STEP = 15;
-const COVER_RISE = 4;
 const BADGE_SIZE = 32;
-// The fan starts inset rather than at the slot's edge, which buys the badge
-// room on the left: it then sits on the same edge as the avatar a follow or
-// a vote row shows, so every row in the feed starts on one line.
-const COVER_INSET = 14;
-const SLOT_WIDTH = COVER_INSET + COVER_WIDTH + COVER_STEP * 2;
-const SLOT_HEIGHT = COVER_HEIGHT + COVER_RISE * 2;
 
 const styles = StyleSheet.create({
   page: { padding: spacing.lg, gap: spacing.md },
@@ -260,7 +240,6 @@ const styles = StyleSheet.create({
   grow: { flex: 1 },
   feedRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1 },
   slot: { width: SLOT_WIDTH, height: SLOT_HEIGHT, justifyContent: "center" },
-  cover: { position: "absolute", width: COVER_WIDTH, height: COVER_HEIGHT, borderRadius: radii.sm },
   // Sized explicitly rather than left to the avatar inside it: a box that
   // takes its height from its child sits flush against the slot's bottom
   // edge, where the ring reads as a flattened circle.

@@ -315,6 +315,11 @@ export function createBlockCandidate(type: BlockType, blocks: MuralBlock[]): Mur
   return defaultBlockForType(newId(), type, findAvailableLayout(blocks, w, h));
 }
 
+export function profileOnlyMural(): Mural {
+  const block = createBlockCandidate("profile", []);
+  return { id: "profile", name: "", blocks: [{ ...block, layout: { x: 0, y: 0, w: GRID_COLUMNS, h: 3 } }], createdAt: "", updatedAt: "", shareToken: null, shareUrl: null, folderId: null };
+}
+
 export function createDuplicateCandidate(block: MuralBlock, blocks: MuralBlock[]): MuralBlock {
   return { ...block, id: newId(), layout: findAvailableLayout(blocks, block.layout.w, block.layout.h) };
 }

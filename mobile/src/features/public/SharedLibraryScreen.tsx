@@ -1,33 +1,23 @@
-import { useMemo, useState } from "react";
 import { Stack } from "expo-router";
-import { bookKey, orderLibraryBooks, resolveLibraryStyle } from "@scripta/shared";
 import { useQuery } from "@tanstack/react-query";
-import { StyleSheet, Text, View } from "react-native";
-import { EmptyState, ErrorState, Screen, Skeleton } from "../../ui";
-import { spacing, typography, useTheme } from "../../ui/theme";
-import { AddBookSheet } from "../community/AddBookSheet";
-import { BookCard } from "../library/components/BookCard";
-import { LibraryGrid } from "../library/components/LibraryGrid";
+import { StyleSheet, View } from "react-native";
+import { ErrorState, Screen, Skeleton } from "../../ui";
+import { spacing, useTheme } from "../../ui/theme";
 import { fetchSharedLibrary } from "./api";
+import { PublicLibraryGrid } from "./PublicLibraryGrid";
 
 export function SharedLibraryScreen({ token }: { token: string }) {
   const { colors } = useTheme();
-  const [selected, setSelected] = useState<Record<string, unknown> | null>(null);
   const query = useQuery({ queryKey: ["shared-library", token], queryFn: () => fetchSharedLibrary(token), enabled: Boolean(token), retry: false });
-  const style = resolveLibraryStyle(query.data?.data.style);
-  const books = query.data?.data.books ?? [];
-  const ordered = useMemo(() => orderLibraryBooks(books, query.data?.data.groups ?? []), [books, query.data?.data.groups]);
 
   if (query.isPending) return <View style={[styles.center, { backgroundColor: colors.background }]}><Skeleton height={180} /></View>;
   if (query.isError || !query.data) return <View style={[styles.center, { backgroundColor: colors.background }]}><ErrorState title="Library unavailable" body="This link is invalid or no longer active." /></View>;
-  return <Screen bottom top={false} style={styles.screen}>
+  return <Screen bottom top={false}>
     <Stack.Screen options={{ headerShown: true, title: query.data.data.name || "Library" }} />
-    <LibraryGrid data={ordered} style={style} keyExtractor={(book, index) => bookKey(book) || String(index)} ListEmptyComponent={<EmptyState title="This library is empty" />} renderItem={(book) => <BookCard book={book} onPress={() => setSelected(book)} style={style} />} />
-    {selected ? <AddBookSheet book={{ title: String(selected.Title ?? ""), author: String(selected.Attribution ?? ""), isbn: selected.ISBN == null ? null : String(selected.ISBN), coverUrl: typeof selected._coverUrl === "string" ? selected._coverUrl : null }} onClose={() => setSelected(null)} /> : null}
+    <PublicLibraryGrid library={query.data.data} />
   </Screen>;
 }
 
 const styles = StyleSheet.create({
-  screen: {},
   center: { flex: 1, justifyContent: "center", padding: spacing.lg },
 });

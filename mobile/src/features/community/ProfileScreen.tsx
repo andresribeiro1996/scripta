@@ -1,20 +1,20 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Stack, router } from "expo-router";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
-import { Image } from "expo-image";
-import { ensureBookBlockHeights, type Mural } from "@scripta/shared";
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { bookKey, ensureBookBlockHeights, profileOnlyMural, type Mural } from "@scripta/shared";
 import { DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
 import { ApiError } from "../../core/api";
 import { useAuth } from "../../core/auth";
-import { Button, Dialog, EmptyState, ErrorState, Screen, Segmented, Skeleton, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { Button, Dialog, EmptyState, ErrorState, Icon, IconButton, Menu, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { MuralCanvas } from "../murals";
 import { useMurals } from "../murals/useMurals";
 import { reconstructBooks, reconstructTierlists } from "../public/adapters";
+import { PublicLibraryGrid } from "../public/PublicLibraryGrid";
 import type { GalleryImage } from "../gallery/api";
 import { ActivityList } from "./ActivityList";
 import { FeedSettingsDialog } from "./FeedSettingsDialog";
-import { fetchProfile, followUser, publishProfile, unfollowUser, unpublishProfile, type CommunityProfileView } from "./api";
+import { fetchProfile, fetchProfileLibrary, followUser, publishProfile, unfollowUser, unpublishProfile, type CommunityProfileView } from "./api";
 import { contentDetail, contentKindLabel, contentTarget } from "./communityHome";
 
 export function ProfileScreen({ username }: { username: string }) {
@@ -44,6 +44,12 @@ export function ProfileScreen({ username }: { username: string }) {
   const books = useMemo(() => (muralData ? reconstructBooks(muralData.library.books, muralData.library.currentlyReading, muralData.library.highlights) : []), [muralData]);
   const images = useMemo<GalleryImage[]>(() => (muralData ? Object.entries(muralData.imageUrls).filter((entry): entry is [string, string] => entry[1] !== null).map(([id, url]) => ({ id, url, filename: "", mimeType: "", width: 0, height: 0, byteSize: 0, createdAt: "" })) : []), [muralData]);
   const tierlists = useMemo(() => reconstructTierlists(muralData?.tierlists ?? {}), [muralData]);
+  const library = useQuery({
+    queryKey: ["community", "profile-library", username],
+    queryFn: () => fetchProfileLibrary(username),
+    enabled: profile.isSuccess,
+    retry: false,
+  });
 
   async function run(action: () => Promise<void>) {
     setBusy(true);
@@ -75,6 +81,7 @@ export function ProfileScreen({ username }: { username: string }) {
           <Stack.Screen options={{ headerShown: true, title: "My profile" }} />
           <EmptyState title="Your profile isn't published" body="Publish one of your murals to appear in the community." />
           <Button label="Publish profile" loading={busy} onPress={() => setPickerOpen(true)} />
+          <Button label="Open your library" variant="secondary" onPress={() => router.push("/library" as never)} />
           {error ? <Toast visible message={error} tone="error" /> : null}
           <MuralPicker
             visible={pickerOpen}
@@ -117,98 +124,112 @@ export function ProfileScreen({ username }: { username: string }) {
       }
     : null;
 
-  const header = (
-    <View style={styles.header}>
-      <View style={styles.identityRow}>
-        {view!.profile.user.avatarUrl ? (
-          <Image source={{ uri: view!.profile.user.avatarUrl }} contentFit="cover" style={styles.bigAvatar} />
-        ) : (
-          <View style={[styles.bigAvatar, styles.avatarFallback, { backgroundColor: colors.accentSoft }]}>
-            <Text {...dynamicType} style={[typography.title, { color: colors.accent }]}>
-              {view!.profile.user.username.slice(0, 1).toUpperCase()}
-            </Text>
-          </View>
-        )}
-        <View style={styles.grow}>
-          <Text {...dynamicType} style={[typography.title, styles.strong, { color: colors.text }]}>
-            {view!.profile.user.username}
-          </Text>
-          <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
-            {view!.profile.followerCount} {view!.profile.followerCount === 1 ? "follower" : "followers"} · {view!.profile.followingCount} following
-          </Text>
-        </View>
-      </View>
-      {isSelf ? (
-        <View style={styles.ownerRow}>
-          <Button label="Switch mural" variant="secondary" loading={busy} onPress={() => setPickerOpen(true)} />
-          <Button label="Feed settings" variant="secondary" onPress={() => setSettingsOpen(true)} />
-          <Button label="Unpublish" variant="destructive" loading={busy} onPress={() => setConfirmingUnpublish(true)} />
-        </View>
-      ) : (
-        <Button
-          label={view!.profile.viewerFollows ? "Following" : "Follow"}
-          variant={view!.profile.viewerFollows ? "secondary" : "primary"}
-          loading={busy}
-          onPress={() => void toggleFollow()}
-        />
-      )}
-      <Segmented accessibilityLabel="Profile section" options={PROFILE_TABS} value={tab} onChange={setTab} />
-      {tab === "mural" && mural && mural.blocks.length > 0 ? (
-        <MuralCanvas
-          mural={mural}
-          books={books}
-          images={images}
-          tierlists={tierlists}
-          profile={view!.profile.user}
-          shelfThemeOverride={muralData?.library.shelfTheme}
-          statsOverride={muralData?.library.stats}
-        />
-      ) : null}
-      {tab === "mural" ? (
-        <Text {...dynamicType} style={[typography.title, styles.strong, styles.sectionTitle, { color: colors.text }]}>
-          Published
-        </Text>
-      ) : null}
-    </View>
-  );
+  const profileUser = view!.profile.user;
 
   return (
-    <Screen bottom>
-      <Stack.Screen options={{ headerShown: true, title: view!.profile.user.username }} />
+    <Screen bottom top={false}>
+      <Stack.Screen
+        options={{
+          headerShown: true,
+          title: profileUser.username,
+          headerRight: isSelf
+            ? () => (
+                <Menu
+                  title="Your profile"
+                  items={[
+                    { label: "Manage library…", onPress: () => router.push("/library" as never) },
+                    { label: "Switch mural…", onPress: () => setPickerOpen(true) },
+                    { label: "Feed settings…", onPress: () => setSettingsOpen(true) },
+                    { label: "Unpublish profile…", destructive: true, onPress: () => setConfirmingUnpublish(true) },
+                  ]}
+                >
+                  <IconButton framed accessibilityLabel="Profile options" name="more" />
+                </Menu>
+              )
+            : () => <FollowPill following={view!.profile.viewerFollows === true} busy={busy} onPress={() => void toggleFollow()} />,
+        }}
+      />
       {error ? <Toast visible message={error} tone="error" /> : null}
-      {tab === "mural" ? (
-        <FlatList
-          style={{ flex: 1 }}
-          data={publishedRows(view!)}
-          keyExtractor={(row) => `${row.kind}:${row.id}`}
-          contentContainerStyle={styles.list}
-          refreshing={profile.isRefetching}
-          onRefresh={() => void profile.refetch()}
-          ListHeaderComponent={header}
-          ListEmptyComponent={<EmptyState title="Nothing published yet" body="Tier lists and tournaments show up here." />}
-          renderItem={({ item }) => (
-            <Pressable
-              accessibilityRole="link"
-              accessibilityLabel={`Open ${item.name}`}
-              onPress={() => router.push(item.target as never)}
-            >
-              <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.accent }]}>
-                  {item.label}
-                </Text>
-                <Text numberOfLines={1} {...dynamicType} style={[typography.title, styles.strong, { color: colors.text }]}>
-                  {item.name}
-                </Text>
-                <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
-                  {item.detail}
-                </Text>
-              </View>
-            </Pressable>
-          )}
-        />
-      ) : (
-        <ActivityList username={username} ListHeaderComponent={header} />
-      )}
+      <SwipeableTabs
+        accessibilityLabel="Profile sections"
+        options={PROFILE_TABS}
+        value={tab}
+        onChange={setTab}
+        renderPage={(value) => {
+          if (value === "activity") return <ActivityList username={username} />;
+          if (value === "library") {
+            if (library.isPending) return <View style={styles.page}><Skeleton height={180} /></View>;
+            if (library.isError) return <View style={styles.page}><ErrorState body="Couldn't load this library." actionLabel="Retry" onAction={() => void library.refetch()} /></View>;
+            return <PublicLibraryGrid library={library.data.data} onPressBook={isSelf ? (book) => router.push(`/book/${encodeURIComponent(bookKey(book))}` as never) : undefined} />;
+          }
+          return (
+            <FlatList
+              data={publishedRows(view!)}
+              keyExtractor={(row) => `${row.kind}:${row.id}`}
+              contentContainerStyle={styles.list}
+              refreshing={profile.isRefetching}
+              onRefresh={() => void profile.refetch()}
+              ListHeaderComponent={
+                <View style={styles.muralHeader}>
+                  {mural && mural.blocks.length > 0 ? (
+                    <MuralCanvas
+                      mural={mural}
+                      books={books}
+                      images={images}
+                      tierlists={tierlists}
+                      profile={profileUser}
+                      shelfThemeOverride={muralData?.library.shelfTheme}
+                      statsOverride={muralData?.library.stats}
+                    />
+                  ) : isSelf ? (
+                    <View style={[styles.muralPrompt, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+                      <View style={styles.muralPromptRow}>
+                        <Icon name="murals" size={22} color={colors.accent} />
+                        <View style={styles.grow}>
+                          <Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>
+                            {mural ? "Your mural is empty" : "No profile mural yet"}
+                          </Text>
+                          <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
+                            It's the first thing people see on your profile.
+                          </Text>
+                        </View>
+                      </View>
+                      <Button label={mural ? "Edit mural" : "Create a mural"} onPress={() => router.push((mural ? `/murals/${mural.id}` : "/murals") as never)} />
+                    </View>
+                  ) : (
+                    <MuralCanvas mural={profileOnlyMural()} books={[]} images={[]} tierlists={[]} profile={profileUser} />
+                  )}
+                  <Text {...dynamicType} style={[typography.caption, styles.eyebrow, { color: colors.textDim }]}>
+                    Published
+                  </Text>
+                </View>
+              }
+              ListEmptyComponent={<EmptyState title="Nothing published yet" body="Tier lists and tournaments show up here." />}
+              renderItem={({ item }) => (
+                <Pressable
+                  accessibilityRole="link"
+                  accessibilityLabel={`Open ${item.name}`}
+                  onPress={() => router.push(item.target as never)}
+                  style={({ pressed }) => [styles.card, { backgroundColor: pressed ? colors.surfacePressed : colors.surface, borderColor: colors.border }]}
+                >
+                  <View style={styles.grow}>
+                    <Text {...dynamicType} style={[typography.caption, styles.eyebrow, { color: colors.accent }]}>
+                      {item.label}
+                    </Text>
+                    <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>
+                      {item.name}
+                    </Text>
+                    <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
+                      {item.detail}
+                    </Text>
+                  </View>
+                  <Icon name="chevronRight" size={16} color={colors.textDim} />
+                </Pressable>
+              )}
+            />
+          );
+        }}
+      />
       <MuralPicker
         visible={pickerOpen}
         busy={busy}
@@ -244,6 +265,7 @@ export function ProfileScreen({ username }: { username: string }) {
 const PROFILE_TABS = [
   { value: "mural", label: "Mural" },
   { value: "activity", label: "Activity" },
+  { value: "library", label: "Library" },
 ] as const;
 
 type ProfileTab = (typeof PROFILE_TABS)[number]["value"];
@@ -259,6 +281,33 @@ function publishedRows(view: CommunityProfileView): PublishedRow[] {
     rows.push({ kind: "tournament", id: item.id, name: item.name, detail: contentDetail(item), target: contentTarget(item), label: contentKindLabel(item) });
   }
   return rows;
+}
+
+function FollowPill({ following, busy, onPress }: { following: boolean; busy: boolean; onPress: () => void }) {
+  const { colors } = useTheme();
+  const tint = following ? colors.text : colors.onAccent;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={following ? "Following. Tap to unfollow" : "Follow"}
+      accessibilityState={{ busy, selected: following }}
+      disabled={busy}
+      hitSlop={spacing.sm}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.pill,
+        following
+          ? { backgroundColor: pressed ? colors.surfacePressed : colors.surface, borderColor: colors.border }
+          : { backgroundColor: colors.accent, borderColor: colors.accent, opacity: pressed ? 0.85 : 1 },
+        busy ? { opacity: 0.55 } : null,
+      ]}
+    >
+      {busy ? <ActivityIndicator size="small" color={tint} /> : <>
+        <Icon name={following ? "confirm" : "add"} size={14} color={tint} />
+        <Text {...dynamicType} style={[typography.caption, styles.strong, { color: tint }]}>{following ? "Following" : "Follow"}</Text>
+      </>}
+    </Pressable>
+  );
 }
 
 function Centered({ children }: { children: ReactNode }) {
@@ -323,14 +372,14 @@ const styles = StyleSheet.create({
   grow: { flex: 1 },
   strong: { fontWeight: "700" },
   centered: { flex: 1, justifyContent: "center", padding: spacing.lg, gap: spacing.md },
+  page: { flex: 1, padding: spacing.lg },
   list: { padding: spacing.lg, gap: spacing.sm, paddingBottom: spacing.huge },
-  header: { gap: spacing.md, marginBottom: spacing.sm },
-  identityRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
-  bigAvatar: { width: 64, height: 64, borderRadius: radii.full },
-  avatarFallback: { alignItems: "center", justifyContent: "center" },
-  ownerRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  sectionTitle: { marginTop: spacing.md },
-  card: { borderWidth: 1, borderRadius: radii.lg, padding: spacing.md, gap: spacing.xs },
+  pill: { flexDirection: "row", alignItems: "center", gap: spacing.xs, height: 32, paddingHorizontal: spacing.md + 2, borderRadius: radii.full, borderWidth: 1 },
+  eyebrow: { textTransform: "uppercase", letterSpacing: 0.8, fontWeight: "600" },
+  muralHeader: { gap: spacing.lg, marginBottom: spacing.xs },
+  muralPrompt: { borderWidth: 1, borderRadius: radii.lg, padding: spacing.lg, gap: spacing.md },
+  muralPromptRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  card: { flexDirection: "row", alignItems: "center", gap: spacing.md, borderWidth: 1, borderRadius: radii.lg, paddingVertical: spacing.md, paddingHorizontal: spacing.lg },
   dialogGap: { gap: spacing.md },
   pickerList: { maxHeight: 240, flexGrow: 0 },
   pickerRow: { borderWidth: 1, borderRadius: radii.md, padding: spacing.md, marginBottom: spacing.sm },

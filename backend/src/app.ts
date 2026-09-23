@@ -28,7 +28,7 @@ import { getArenaPublicApi, registerArenaModule } from "./modules/arena/index.js
 import { getCommunityPublicApi, registerCommunityModule } from "./modules/community/index.js";
 import { registerCoversModule } from "./modules/covers/index.js";
 import { registerGalleryModule } from "./modules/gallery/index.js";
-import { registerLibraryModule, type BookEvent } from "./modules/library/index.js";
+import { registerLibraryModule, resolvePublicLibrary, type BookEvent } from "./modules/library/index.js";
 import { getMuralsPublicApi, registerMuralsModule } from "./modules/murals/index.js";
 import { registerSocialsModule } from "./modules/socials/index.js";
 import { registerTierlistsModule, getTierlistsPublicApi } from "./modules/tierlists/index.js";
@@ -128,6 +128,7 @@ export function buildApp() {
   app.register(registerCommunityModule, {
     resolveProfile: resolvePublicReaderProfile,
     resolveProfiles: resolvePublicReaderProfiles,
+    resolveLibrary: resolvePublicLibrary,
     userHasUsername,
     findUserIdByUsername,
     searchUsernameOwners,

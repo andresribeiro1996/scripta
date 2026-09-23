@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import type { DiscoverType } from "@scripta/shared/community";
 import { ApiError } from "../api/client";
-import { fetchActivity, fetchCommunityProfile, fetchDiscover, fetchPeople } from "../api/community";
+import { fetchActivity, fetchCommunityProfile, fetchDiscover, fetchPeople, fetchProfileLibrary } from "../api/community";
 
 export function useCommunityActivity(username: string) {
   const query = useInfiniteQuery({
@@ -41,4 +41,9 @@ export function useCommunityProfile(username: string) {
     isNotFound: query.error instanceof ApiError && query.error.status === 404,
     refetch: query.refetch
   };
+}
+
+export function useCommunityLibrary(username: string, enabled: boolean) {
+  const query = useQuery({ queryKey: ["community", "profile-library", username], queryFn: () => fetchProfileLibrary(username), enabled: enabled && Boolean(username), retry: false });
+  return { library: query.data?.data, isLoading: query.isPending, error: query.error, refetch: query.refetch };
 }

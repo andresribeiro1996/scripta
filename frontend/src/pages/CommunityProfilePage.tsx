@@ -2,18 +2,21 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import type { FeedCategory, FeedSettings } from "@scripta/shared/community";
-import { activityText, contentDetail, contentKindLabel, contentTarget, DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
+import { contentDetail, contentKindLabel, contentTarget, DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
 import { followUser, publishProfile, unfollowUser, unpublishProfile, updateFeedSettings } from "../api/community";
 import type { GalleryImage } from "../api/gallery";
 import { useAuth } from "../auth/AuthContext";
 import { EmptyState } from "../components/EmptyState";
-import { CommunityIcon } from "../components/NavIcons";
+import { CommunityIcon, MuralsIcon } from "../components/NavIcons";
 import { MuralCanvas } from "../components/murals/MuralCanvas";
+import { ProfileActivity } from "../components/ProfileActivity";
+import { PublicLibraryGrid } from "../components/PublicLibraryGrid";
 import { Sheet } from "../components/Sheet";
 import { SkeletonCardGrid } from "../components/Skeleton";
-import { useCommunityActivity, useCommunityProfile } from "../hooks/useCommunity";
+import { SwipeTabs } from "../components/SwipeTabs";
+import { useCommunityActivity, useCommunityLibrary, useCommunityProfile } from "../hooks/useCommunity";
 import { useMurals } from "../hooks/useMurals";
-import { ensureBookBlockHeights, type Mural } from "../lib/murals";
+import { ensureBookBlockHeights, profileOnlyMural, type Mural } from "../lib/murals";
 import { buildReconstructedBooks } from "../lib/sharedMural";
 
 function retryButton(refetch: () => void) {
@@ -30,9 +33,10 @@ export function CommunityProfilePage() {
   const queryClient = useQueryClient();
   const { view, isLoading, isNotFound, refetch } = useCommunityProfile(username ?? "");
   const activity = useCommunityActivity(username ?? "");
+  const library = useCommunityLibrary(username ?? "", Boolean(view));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<"mural" | "activity">("mural");
+  const [tab, setTab] = useState<ProfileTab>("mural");
 
   const isOwnHandle = Boolean(username) && session?.user.username === username;
   const isSelf = view?.profile.user.userId === session?.user.id;
@@ -111,24 +115,12 @@ export function CommunityProfilePage() {
     ...view.published.tournaments.map((item) => ({ kind: contentKindLabel(item), name: item.name, detail: contentDetail(item), target: contentTarget(item) }))
   ];
 
+  const user = view.profile.user;
+
   return (
-    <div className="mx-auto max-w-3xl p-6">
-      <div className="mb-6 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          {view.profile.user.avatarUrl ? (
-            <img src={view.profile.user.avatarUrl} alt="" className="h-14 w-14 rounded-full object-cover" />
-          ) : (
-            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-(--color-accent-soft) text-lg font-bold text-(--color-accent)">
-              {view.profile.user.username.slice(0, 1).toUpperCase()}
-            </span>
-          )}
-          <span>
-            <span className="block text-lg font-bold">{view.profile.user.username}</span>
-            <span className="block text-sm text-(--color-text-dim)">
-              {view.profile.followerCount} {view.profile.followerCount === 1 ? "follower" : "followers"} · {view.profile.followingCount} following
-            </span>
-          </span>
-        </div>
+    <div className="mx-auto max-w-4xl px-4 pt-3 pb-10 sm:px-6 sm:pt-6">
+      <header className="flex items-center justify-between gap-4 pb-3">
+        <h1 className="min-w-0 truncate text-xl font-bold tracking-tight sm:text-2xl">{user.username}</h1>
         {isSelf ? (
           <OwnerControls
             busy={busy}
@@ -144,108 +136,91 @@ export function CommunityProfilePage() {
             following={view.profile.viewerFollows === true}
             onToggle={(next) =>
               run(async () => {
-                if (next === "unfollow") await unfollowUser(view.profile.user.userId);
-                else await followUser(view.profile.user.userId);
+                if (next === "unfollow") await unfollowUser(user.userId);
+                else await followUser(user.userId);
               })
             }
           />
         )}
-      </div>
+      </header>
       {error && <p className="mb-4 text-sm text-(--color-danger)">{error}</p>}
-      <div className="mb-5 flex gap-1 border-b border-(--color-border)" role="tablist">
-        {(["mural", "activity"] as const).map((t) => (
-          <button
-            key={t}
-            role="tab"
-            aria-selected={tab === t}
-            onClick={() => setTab(t)}
-            className={`-mb-px border-b-2 px-3 py-2 text-sm font-semibold ${
-              tab === t ? "border-(--color-accent) text-(--color-text)" : "border-transparent text-(--color-text-dim)"
-            }`}
-          >
-            {t === "mural" ? "Mural" : "Activity"}
-          </button>
-        ))}
-      </div>
-      {tab === "mural" && (
-        <>
-          {mural && mural.blocks.length > 0 && muralData && (
-            <div className="mb-8">
-              <MuralCanvas
-                mural={mural}
-                editMode={false}
-                books={books}
-                images={images}
-                profile={view.profile.user}
-                shelfThemeOverride={muralData.library.shelfTheme}
-                statsOverride={muralData.library.stats}
-                tierlistData={(tierlistId) => muralData.tierlists[tierlistId]}
-              />
-            </div>
-          )}
-          <h3 className="mb-3 text-lg font-bold">Published</h3>
-          {publishedRows.length === 0 ? (
-            <EmptyState title="Nothing published yet." body="Tier lists and tournaments show up here." />
-          ) : (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {publishedRows.map((row) => (
-                <Link key={`${row.kind}:${row.target}`} to={row.target} className="rounded-xl border border-(--color-border) bg-(--color-surface) p-4 hover:border-(--color-accent)">
-                  <p className="text-xs font-semibold text-(--color-accent)">{row.kind}</p>
-                  <h4 className="font-semibold">{row.name}</h4>
-                  <p className="text-sm text-(--color-text-dim)">{row.detail}</p>
-                </Link>
-              ))}
-            </div>
-          )}
-        </>
-      )}
-      {tab === "activity" && <ActivityTab activity={activity} />}
+      <SwipeTabs tabs={PROFILE_TABS} value={tab} onChange={setTab} label="Profile sections">
+        {(panel) => {
+          if (panel === "activity") return <ProfileActivity activity={activity} />;
+          if (panel === "library") {
+            if (library.isLoading) return <SkeletonCardGrid count={6} label="Loading library" tileClassName="aspect-[2/3]" />;
+            if (library.error || !library.library) {
+              return library.error ? <EmptyState title="Couldn't load this library." action={retryButton(library.refetch)} /> : <p className="text-sm text-(--color-text-dim)">This library is empty.</p>;
+            }
+            return <PublicLibraryGrid library={library.library} />;
+          }
+          return (
+            <>
+              <div className="mb-8">
+                {mural && mural.blocks.length > 0 && muralData ? (
+                  <MuralCanvas
+                    mural={mural}
+                    editMode={false}
+                    books={books}
+                    images={images}
+                    profile={user}
+                    shelfThemeOverride={muralData.library.shelfTheme}
+                    statsOverride={muralData.library.stats}
+                    tierlistData={(tierlistId) => muralData.tierlists[tierlistId]}
+                  />
+                ) : isSelf ? (
+                  <EmptyState
+                    icon={MuralsIcon}
+                    title={mural ? "Your mural is empty." : "No profile mural yet."}
+                    body="Your mural is the first thing people see on your profile."
+                    action={
+                      <Link to={mural ? `/dashboard/murals/${mural.id}` : "/dashboard/murals"} className="rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-white">
+                        {mural ? "Edit mural" : "Create a mural"}
+                      </Link>
+                    }
+                  />
+                ) : (
+                  <MuralCanvas mural={profileOnlyMural()} editMode={false} books={[]} images={[]} profile={user} />
+                )}
+              </div>
+              <h2 className="mb-3 text-[11px] font-semibold tracking-wider text-(--color-text-dim) uppercase">Published</h2>
+              {publishedRows.length === 0 ? (
+                <EmptyState title="Nothing published yet." body="Tier lists and tournaments show up here." />
+              ) : (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {publishedRows.map((row) => (
+                    <Link
+                      key={`${row.kind}:${row.target}`}
+                      to={row.target}
+                      className="group flex items-center gap-3 rounded-xl border border-(--color-border) bg-(--color-surface) px-4 py-3.5 transition-colors hover:border-(--color-accent)"
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[11px] font-semibold tracking-wider text-(--color-accent) uppercase">{row.kind}</span>
+                        <span className="block truncate font-semibold">{row.name}</span>
+                        <span className="block text-sm text-(--color-text-dim)">{row.detail}</span>
+                      </span>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-(--color-text-dim) transition-transform group-hover:translate-x-0.5" aria-hidden>
+                        <path d="m9 18 6-6-6-6" />
+                      </svg>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </>
+          );
+        }}
+      </SwipeTabs>
     </div>
   );
 }
 
-function ActivityTab({ activity }: { activity: ReturnType<typeof useCommunityActivity> }) {
-  if (activity.isLoading) return <SkeletonCardGrid count={3} label="Loading activity" tileClassName="min-h-[72px]" />;
-  if (activity.error) return <EmptyState title="Couldn't load activity." action={retryButton(activity.refetch)} />;
-  if (activity.items.length === 0) return <p className="text-sm text-(--color-text-dim)">No activity yet.</p>;
-  return (
-    <div>
-      <div className="flex flex-col gap-3">
-        {activity.items.map((item) => {
-          const row = activityText(item);
-          const date = new Date(item.createdAt).toLocaleDateString();
-          const body = (
-            <>
-              <p className="text-sm">
-                {row.verb} {row.target}
-              </p>
-              <p className="text-xs text-(--color-text-dim)">{date}</p>
-            </>
-          );
-          const className = "rounded-xl border border-(--color-border) bg-(--color-surface) p-4 hover:border-(--color-accent)";
-          return row.href ? (
-            <Link key={item.id} to={row.href} className={className}>
-              {body}
-            </Link>
-          ) : (
-            <div key={item.id} className={className}>
-              {body}
-            </div>
-          );
-        })}
-      </div>
-      {activity.hasNextPage && (
-        <button
-          onClick={() => void activity.fetchNextPage()}
-          disabled={activity.isFetchingNextPage}
-          className="mt-4 w-full rounded-lg border border-(--color-border) px-3 py-2 text-sm text-(--color-text-dim) hover:border-(--color-accent) disabled:opacity-50"
-        >
-          {activity.isFetchingNextPage ? "Loading…" : "Load more"}
-        </button>
-      )}
-    </div>
-  );
-}
+const PROFILE_TABS = [
+  { value: "mural", label: "Mural" },
+  { value: "activity", label: "Activity" },
+  { value: "library", label: "Library" }
+] as const;
+
+type ProfileTab = (typeof PROFILE_TABS)[number]["value"];
 
 function PrivateProfileState() {
   return <EmptyState icon={CommunityIcon} title="This profile is private." body="Only published profiles are visible in the community." />;
@@ -315,55 +290,44 @@ function OwnerControls({
   onSaveSettings: (settings: FeedSettings) => void;
 }) {
   const { data: murals } = useMurals();
+  const [open, setOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [muralId, setMuralId] = useState<string>(currentMuralId ?? "");
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [next, setNext] = useState<FeedSettings>(feedSettings ?? DEFAULT_FEED_SETTINGS);
+  const sectionLabel = "px-3 pt-4 pb-2 text-[11px] font-semibold tracking-wider text-(--color-text-dim) uppercase";
   return (
-    <div className="flex flex-col items-end gap-2">
-      <div className="flex items-center gap-2">
-        <select
-          value={muralId}
-          onChange={(e) => setMuralId(e.target.value)}
-          aria-label="Profile mural"
-          className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
-        >
-          {(murals ?? []).map((mural) => (
-            <option key={mural.id} value={mural.id}>
-              {mural.name}
-            </option>
-          ))}
-        </select>
-        <button
-          onClick={() => muralId && muralId !== currentMuralId && onSwitch(muralId)}
-          disabled={busy || !muralId || muralId === currentMuralId}
-          className="rounded-lg border border-(--color-border) px-3 py-2 text-sm hover:border-(--color-accent) disabled:opacity-50"
-        >
-          {busy ? "Working…" : "Switch mural"}
-        </button>
-      </div>
-      {confirming ? (
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-(--color-text-dim)">Hide your profile?</span>
-          <button onClick={onUnpublish} disabled={busy} className="rounded-lg bg-(--color-danger) px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">
-            Unpublish
-          </button>
-          <button onClick={() => setConfirming(false)} className="text-xs text-(--color-text-dim) hover:text-(--color-text)">
-            Cancel
-          </button>
-        </div>
-      ) : (
-        <div className="flex items-center gap-3">
-          <button onClick={() => setSettingsOpen(true)} className="text-xs text-(--color-text-dim) hover:text-(--color-text)">
-            Feed settings
-          </button>
-          <button onClick={() => setConfirming(true)} className="text-xs text-(--color-text-dim) hover:text-(--color-text)">
-            Unpublish profile
-          </button>
-        </div>
-      )}
-      {settingsOpen && (
-        <Sheet title="Feed settings" onClose={() => setSettingsOpen(false)}>
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="shrink-0 rounded-full border border-(--color-border) bg-(--color-surface) px-4 py-1.5 text-sm font-semibold hover:border-(--color-accent)"
+      >
+        Manage profile
+      </button>
+      {open && (
+        <Sheet title="Manage profile" onClose={() => setOpen(false)}>
+          <p className={sectionLabel}>Profile mural</p>
+          <div className="flex items-center gap-2 px-3">
+            <select
+              value={muralId}
+              onChange={(e) => setMuralId(e.target.value)}
+              aria-label="Profile mural"
+              className="min-w-0 flex-1 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
+            >
+              {(murals ?? []).map((mural) => (
+                <option key={mural.id} value={mural.id}>
+                  {mural.name}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={() => muralId && muralId !== currentMuralId && onSwitch(muralId)}
+              disabled={busy || !muralId || muralId === currentMuralId}
+              className="rounded-lg border border-(--color-border) px-3 py-2 text-sm font-semibold hover:border-(--color-accent) disabled:opacity-50"
+            >
+              {busy ? "Working…" : "Switch"}
+            </button>
+          </div>
+          <p className={sectionLabel}>Shown in your feed</p>
           {FEED_SETTING_ROWS.map(({ key, label }) => (
             <button
               key={key}
@@ -381,21 +345,37 @@ function OwnerControls({
               )}
             </button>
           ))}
-          <div className="p-3">
+          <div className="px-3 pt-2">
             <button
-              onClick={() => {
-                onSaveSettings(next);
-                setSettingsOpen(false);
-              }}
+              onClick={() => onSaveSettings(next)}
               disabled={busy}
               className="w-full rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
             >
-              {busy ? "Saving…" : "Save"}
+              {busy ? "Saving…" : "Save feed settings"}
             </button>
+          </div>
+          <div className="mt-4 border-t border-(--color-border) p-3">
+            {confirming ? (
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm text-(--color-text-dim)">Hide your profile from the community?</span>
+                <span className="flex shrink-0 items-center gap-2">
+                  <button onClick={() => setConfirming(false)} className="px-2 py-1.5 text-sm text-(--color-text-dim) hover:text-(--color-text)">
+                    Cancel
+                  </button>
+                  <button onClick={onUnpublish} disabled={busy} className="rounded-lg bg-(--color-danger) px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50">
+                    Unpublish
+                  </button>
+                </span>
+              </div>
+            ) : (
+              <button onClick={() => setConfirming(true)} className="text-sm font-semibold text-(--color-danger)">
+                Unpublish profile
+              </button>
+            )}
           </div>
         </Sheet>
       )}
-    </div>
+    </>
   );
 }
 

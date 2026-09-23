@@ -1,4 +1,4 @@
-import { contentDetail, contentKindLabel } from "@scripta/shared/community";
+import { contentDetail, contentKindLabel, relativeTime } from "@scripta/shared/community";
 import type { DigestItem } from "@scripta/shared";
 import type { IconName } from "../../ui";
 
@@ -22,24 +22,7 @@ export interface FeedRowModel {
   action: "followBack" | null;
 }
 
-const DAY_MS = 86_400_000;
-
-/** Relative for the span a feed is actually read over, absolute past it: "412d
- *  ago" is arithmetic the reader has to undo, while a date is just a date. */
-export function relativeTime(iso: string, now: number = Date.now()): string {
-  const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return "";
-  const elapsed = now - then;
-  if (elapsed < 0) return "now";
-  const minutes = Math.floor(elapsed / 60_000);
-  if (minutes < 1) return "now";
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(elapsed / 3_600_000);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(elapsed / DAY_MS);
-  if (days < 30) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString();
-}
+export { relativeTime };
 
 export function feedRowModel(item: DigestItem): FeedRowModel {
   switch (item.kind) {

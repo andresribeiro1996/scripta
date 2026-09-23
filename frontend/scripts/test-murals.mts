@@ -13,6 +13,7 @@ import {
   ensureBookBlockHeights,
   findAvailableLayout,
   isValidBlockLayout,
+  profileOnlyMural,
   removeBlock,
   resolveQuote,
   resolveQuoteCollection,
@@ -421,6 +422,12 @@ console.log("\n18. scrubBooksFromMurals — a tierlist block is never touched by
   check("nothing about it changed", JSON.stringify(block) === JSON.stringify(originalTierlist));
   check("its link is intact", (block as Extract<MuralBlock, { type: "tierlist" }>).tierlistId === "list-1");
   check("the block that DID reference the deleted book is gone", !result[0].blocks.some((b) => b.id === "sp1"));
+}
+
+{
+  const mural = profileOnlyMural();
+  check("profileOnlyMural holds one profile block", mural.blocks.length === 1 && mural.blocks[0]?.type === "profile");
+  check("spanning the full grid, three rows tall", JSON.stringify(mural.blocks[0]?.layout) === JSON.stringify({ x: 0, y: 0, w: 12, h: 3 }));
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

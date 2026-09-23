@@ -135,6 +135,18 @@ export function buildPublicCommunityRoutes(service: CommunityService) {
       }
     });
 
+    app.get("/community/profiles/:username/library", async (request, reply) => {
+      const { username } = request.params as { username: string };
+      try {
+        const library = service.getLibrary(username);
+        reply.header("Cache-Control", "no-store");
+        return reply.send(library);
+      } catch (err) {
+        if (err instanceof ProfileNotFoundError) return reply.code(404).send({ error: "No published profile at that address." });
+        throw err;
+      }
+    });
+
     app.get("/community/discover", async (request, reply) => {
       const parsed = discoverQuerySchema.safeParse(request.query);
       if (!parsed.success) return reply.code(400).send({ error: "Invalid type/q/limit/offset." });
