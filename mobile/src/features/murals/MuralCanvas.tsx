@@ -197,7 +197,7 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThe
   const [width, setWidth] = useState(0);
   const [day] = useState(() => new Date().toISOString().slice(0, 10));
   const columnWidth = width / GRID_COLUMNS;
-  const height = muralCanvasHeight(mural.blocks, ROW_HEIGHT);
+  const height = muralCanvasHeight(mural.blocks, ROW_HEIGHT, editable ? undefined : 0);
   return (
     <View onLayout={(event) => setWidth(event.nativeEvent.layout.width)} style={[styles.canvas, { height, backgroundColor: colors.background }]}>
       {width > 0 ? mural.blocks.map((block) => <CanvasBlock

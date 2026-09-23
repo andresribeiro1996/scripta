@@ -17,17 +17,11 @@
 // Style/Cover button or selection checkbox renders at all) rather than
 // duplicating a second copy of that markup with a "read-only" flag bolted
 // on.
-import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 import { fetchSharedLibrary } from "../api/sharedLibrary";
-import { AddBookSheet } from "../components/AddBookSheet";
-import { BookCard } from "../components/BookCard";
-import { BookGrid } from "../components/BookGrid";
-import { LibraryCanvas } from "../components/LibraryCanvas";
 import { PageContainer } from "../components/PageContainer";
-import { orderLibraryBooks } from "../lib/libraryOrder";
-import { bookKey } from "../lib/merge";
+import { PublicLibraryGrid } from "../components/PublicLibraryGrid";
 import { resolveLibraryStyle } from "../lib/libraryStyle";
 
 function InfoScreen({ message }: { message: string }) {
@@ -40,7 +34,6 @@ function InfoScreen({ message }: { message: string }) {
 
 export function SharedLibraryPage() {
   const { token } = useParams<{ token: string }>();
-  const [selected, setSelected] = useState<Record<string, unknown> | null>(null);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["sharedLibrary", token],
@@ -52,12 +45,6 @@ export function SharedLibraryPage() {
   });
 
   const style = resolveLibraryStyle(data?.data.style);
-  const books = data?.data.books ?? [];
-  // Same display order (series clustered ahead of standalone books) the
-  // authenticated LibraryPage.tsx itself uses — kept via useMemo for the
-  // same "don't look 'new' to a memo every render" reason that page's own
-  // displayBooks does.
-  const displayBooks = useMemo(() => orderLibraryBooks(books, data?.data.groups ?? []), [data]);
 
   if (!token || isError) {
     return <InfoScreen message="This link is invalid or no longer active." />;
@@ -71,28 +58,7 @@ export function SharedLibraryPage() {
       <header className="mb-6">
         <h1 className="text-lg font-bold">{data.data.name || "Library"}</h1>
       </header>
-      {books.length === 0 ? (
-        <p className="text-sm text-(--color-text-dim)">This library is empty.</p>
-      ) : (
-        <LibraryCanvas style={style}>
-          <BookGrid style={style}>
-            {displayBooks.map((book, i) => (
-              <BookCard key={String(book.ContentID ?? bookKey(book) ?? i)} book={book} onClick={() => setSelected(book)} style={style} />
-            ))}
-          </BookGrid>
-        </LibraryCanvas>
-      )}
-      {selected && (
-        <AddBookSheet
-          book={{
-            title: String(selected.Title ?? ""),
-            author: String(selected.Attribution ?? ""),
-            isbn: selected.ISBN == null ? null : String(selected.ISBN),
-            coverUrl: typeof selected._coverUrl === "string" ? selected._coverUrl : null
-          }}
-          onClose={() => setSelected(null)}
-        />
-      )}
+      <PublicLibraryGrid library={data.data} />
     </PageContainer>
   );
 }

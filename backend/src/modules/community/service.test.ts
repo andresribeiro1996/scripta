@@ -91,6 +91,7 @@ function createDeps(repo: CommunityRepository) {
   const usernames = new Map<string, string>();
   const ownedMurals = new Set<string>();
   const muralPayloads = new Map<string, MuralPublicPayload | null>();
+  const libraries = new Map<string, Record<string, unknown>>();
   const tierlistRefs = new Map<string, PublishedTierlistRef>();
   const tournamentRefs = new Map<string, PublishedTournamentRef>();
   const byNewest = <T extends { createdAt: string }>(a: T, b: T) => b.createdAt.localeCompare(a.createdAt);
@@ -111,6 +112,7 @@ function createDeps(repo: CommunityRepository) {
       }
       return out;
     },
+    resolveLibrary: (id) => libraries.get(id) ?? null,
     userHasUsername: (id) => usernames.has(id),
     findUserIdByUsername: (name) => [...usernames.entries()].find(([, n]) => n === name)?.[0],
     searchUsernameOwners: (q, limit) =>
@@ -134,7 +136,7 @@ function createDeps(repo: CommunityRepository) {
       listByOwner: (owner) => [...tournamentRefs.values()].filter((r) => r.ownerUserId === owner).sort(byNewest)
     }
   };
-  return { deps, readerProfiles, usernames, ownedMurals, muralPayloads, tierlistRefs, tournamentRefs, seenAt, votes };
+  return { deps, readerProfiles, usernames, ownedMurals, muralPayloads, libraries, tierlistRefs, tournamentRefs, seenAt, votes };
 }
 
 function profileRow(userId: string, overrides: Partial<ProfileRow> = {}): ProfileRow {
@@ -583,11 +585,11 @@ test("getActivity enriches publications, paginates by cursor, and skips vanished
   repo.insertEvent({ id: "e2", user_id: "alice", type: "tournament_published", ref_type: "tournament", ref_id: "g1", payload: null, created_at: "2026-09-02T00:00:00.000Z" });
   repo.insertEvent({ id: "e3", user_id: "alice", type: "tierlist_published", ref_type: "tierlist", ref_id: "gone", payload: null, created_at: "2026-09-01T00:00:00.000Z" });
   const first = service.getActivity("alice", undefined, undefined, 1);
-  assert.deepEqual(first.items[0]?.payload, { name: "List t1", href: "/vote/code-t1" });
+  assert.deepEqual(first.items[0]?.payload, { name: "List t1", href: "/vote/code-t1", detail: "5 books · 2 ballots", covers: [] });
   assert.ok(first.nextCursor);
   const second = service.getActivity("alice", undefined, first.nextCursor!, 1);
   assert.deepEqual(second.items.map((i) => i.id), ["e2"]);
-  assert.deepEqual(second.items[0]?.payload, { name: "Cup g1", href: "/arena/g1" });
+  assert.deepEqual(second.items[0]?.payload, { name: "Cup g1", href: "/arena/g1", detail: "8-book bracket · active", covers: [] });
   assert.equal(second.nextCursor, null);
 });
 
@@ -650,4 +652,45 @@ test("feed settings round-trip and reach only the owner's profile view", () => {
   assert.deepEqual(service.getFeedSettings("alice"), settings);
   assert.deepEqual(service.getProfileByUsername("alice", "alice").feedSettings, settings);
   assert.equal(service.getProfileByUsername("alice", "bob").feedSettings, undefined);
+});
+
+test("getLibrary serves a published owner's library and 404s otherwise", () => {
+  const { repo, profiles } = createRepoFake();
+  const { deps, usernames, libraries } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  usernames.set("bob", "bob");
+  libraries.set("alice", { books: [{ Title: "Dune" }] });
+  libraries.set("bob", { books: [{ Title: "Emma" }] });
+  profiles.set("alice", profileRow("alice"));
+  profiles.set("bob", profileRow("bob", { published: 0 }));
+  assert.deepEqual(service.getLibrary("alice"), { data: { books: [{ Title: "Dune" }] } });
+  assert.throws(() => service.getLibrary("bob"), ProfileNotFoundError);
+  assert.throws(() => service.getLibrary("ghost"), ProfileNotFoundError);
+});
+
+test("getLibrary reads a published owner with no library as null", () => {
+  const { repo, profiles } = createRepoFake();
+  const { deps, usernames } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  profiles.set("alice", profileRow("alice"));
+  assert.deepEqual(service.getLibrary("alice"), { data: null });
+});
+
+test("getActivity links votes to what was voted on, and leaves vanished ones plain", () => {
+  const { repo } = createRepoFake();
+  const { deps, usernames, tierlistRefs, tournamentRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  repo.upsertProfile(profileRow("alice"));
+  tierlistRefs.set("t1", tierRef("t1", "bob", { covers: ["a", "b", "c", "d"] }));
+  tournamentRefs.set("g1", tournRef("g1", "bob", { covers: ["x"] }));
+  service.emitEvent("alice", "voted_on", "tierlist", "t1", { game: "tierlist", id: "t1", name: "List t1" });
+  service.emitEvent("alice", "voted_on", "tournament", "g1", { game: "tournament", id: "g1", name: "Cup g1" });
+  service.emitEvent("alice", "voted_on", "tournament", "gone", { game: "tournament", id: "gone", name: "Old cup" });
+  const payloads = Object.fromEntries(service.getActivity("alice", "alice", undefined, 20).items.map((item) => [String(item.payload.id), item.payload]));
+  assert.deepEqual(payloads.t1, { game: "tierlist", id: "t1", name: "List t1", covers: ["a", "b", "c"], href: "/vote/code-t1" });
+  assert.deepEqual(payloads.g1, { game: "tournament", id: "g1", name: "Cup g1", covers: ["x"], href: "/arena/g1" });
+  assert.deepEqual(payloads.gone, { game: "tournament", id: "gone", name: "Old cup" });
 });

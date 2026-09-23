@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { ReaderProfile } from "@scripta/shared";
-import { categoryFor, decodeCursor, encodeCursor, DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
+import { categoryFor, contentDetail, decodeCursor, encodeCursor, DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
 import type { ActivityEventType, ActivityItem, CommunityEventType, DiscoverItem, DiscoverType, FeedCategory, FeedSettings, FollowState, Page, PersonResult, PublishedContent, PublishedProfile, TierlistSummary, TournamentSummary } from "@scripta/shared/community";
 import type { DashboardFeedPage, DigestItem } from "@scripta/shared/dashboard";
 import type { PublishedTournamentRef } from "../arena/service.js";
@@ -50,6 +50,7 @@ export interface CommunityDeps {
   setDashboardSeenAt(userId: string, seenAt: string): void;
   resolveProfile(userId: string): ReaderProfile | undefined;
   resolveProfiles(userIds: string[]): Map<string, ReaderProfile>;
+  resolveLibrary(userId: string): Record<string, unknown> | null;
   userHasUsername(userId: string): boolean;
   findUserIdByUsername(username: string): string | undefined;
   searchUsernameOwners(query: string, limit: number): string[];
@@ -80,6 +81,7 @@ export interface CommunityService {
   getDiscover(type: DiscoverType, q: string, limit: number, offset: number, viewerId?: string): { items: DiscoverItem[]; nextOffset: number | null };
   searchPeople(viewerId: string, q: string, limit: number): PersonResult[];
   getActivity(username: string, viewerId: string | undefined, cursor: string | undefined, limit: number): Page<ActivityItem>;
+  getLibrary(username: string): { data: Record<string, unknown> | null };
   getFeedSettings(userId: string): FeedSettings;
   updateFeedSettings(userId: string, settings: FeedSettings): void;
 }
@@ -90,6 +92,13 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
     repo.insertEvent({ id: randomUUID(), user_id: userId, type, ref_type: refType, ref_id: refId, payload: payload ? JSON.stringify(payload) : null, created_at: new Date().toISOString() });
   };
   const settingsFor = (userId: string): FeedSettings => repo.getFeedSettings(userId) ?? DEFAULT_FEED_SETTINGS;
+  const publishedUserId = (username: string): string => {
+    const userId = deps.findUserIdByUsername(username);
+    if (!userId) throw new ProfileNotFoundError();
+    const row = repo.getProfileRow(userId);
+    if (!row || row.published !== 1) throw new ProfileNotFoundError();
+    return userId;
+  };
   return {
     follow(followerId, followeeId) {
       if (followerId === followeeId) throw new SelfFollowError();
@@ -298,11 +307,11 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
         return [{ user: { ...user, userId: id }, followerCount: repo.countFollowers(id), viewerFollows: repo.getFollow(viewerId, id) !== undefined }];
       });
     },
+    getLibrary(username) {
+      return { data: deps.resolveLibrary(publishedUserId(username)) };
+    },
     getActivity(username, viewerId, cursor, limit) {
-      const userId = deps.findUserIdByUsername(username);
-      if (!userId) throw new ProfileNotFoundError();
-      const row = repo.getProfileRow(userId);
-      if (!row || row.published !== 1) throw new ProfileNotFoundError();
+      const userId = publishedUserId(username);
       const keyset = cursor ? decodeCursor(cursor) : undefined;
       if (cursor && !keyset) throw new InvalidCursorError();
       const owner = viewerId === userId;
@@ -312,16 +321,27 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
         if (event.type === "tierlist_published") {
           const ref = deps.tierlists.get(event.ref_id);
           if (!ref || ref.ownerUserId !== event.user_id) return undefined;
-          const payload: Record<string, unknown> = { ...parseEventPayload(event.payload), name: ref.name };
+          const summary = toTierlistSummary(ref);
+          const payload: Record<string, unknown> = { ...parseEventPayload(event.payload), name: ref.name, detail: contentDetail(summary), covers: summary.covers };
           if (ref.voteCode) payload.href = `/vote/${ref.voteCode}`;
           return { id: event.id, type: event.type, payload, createdAt: event.created_at };
         }
         if (event.type === "tournament_published") {
           const ref = deps.tournaments.get(event.ref_id);
           if (!ref || ref.ownerUserId !== event.user_id) return undefined;
-          return { id: event.id, type: event.type, payload: { ...parseEventPayload(event.payload), name: ref.name, href: `/arena/${ref.id}` }, createdAt: event.created_at };
+          const summary = toTournamentSummary(ref);
+          return { id: event.id, type: event.type, payload: { ...parseEventPayload(event.payload), name: ref.name, href: `/arena/${ref.id}`, detail: contentDetail(summary), covers: summary.covers }, createdAt: event.created_at };
         }
         const payload = parseEventPayload(event.payload);
+        if (payload !== undefined && event.type === "voted_on") {
+          if (payload.game === "tierlist") {
+            const ref = deps.tierlists.get(event.ref_id);
+            if (ref) Object.assign(payload, { covers: ref.covers.slice(0, FEED_COVER_LIMIT), ...(ref.voteCode ? { href: `/vote/${ref.voteCode}` } : {}) });
+          } else {
+            const ref = deps.tournaments.get(event.ref_id);
+            if (ref) Object.assign(payload, { covers: ref.covers.slice(0, FEED_COVER_LIMIT), href: `/arena/${ref.id}` });
+          }
+        }
         return payload === undefined ? undefined : { id: event.id, type: event.type, payload, createdAt: event.created_at };
       };
       const items: ActivityItem[] = [];

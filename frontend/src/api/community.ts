@@ -11,6 +11,7 @@ import type {
 } from "@scripta/shared/community";
 import type { DashboardFeedPage } from "@scripta/shared/dashboard";
 import type { MuralBlock, ShelfTheme } from "../lib/murals";
+import type { LibraryData } from "./library";
 import { apiFetch, publicFetch } from "./client";
 import type { PublicBookData, PublicHighlight } from "./sharedMurals";
 import type { ResolvedTierlist } from "./tierlists";
@@ -59,6 +60,10 @@ export async function fetchCommunityProfile(username: string): Promise<Community
 export async function fetchActivity(username: string, cursor?: string): Promise<Page<ActivityItem>> {
   const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
   return (await publicFetch(`/community/profiles/${encodeURIComponent(username)}/activity${query}`)) as Page<ActivityItem>;
+}
+
+export async function fetchProfileLibrary(username: string): Promise<{ data: LibraryData | null }> {
+  return (await publicFetch(`/community/profiles/${encodeURIComponent(username)}/library`)) as { data: LibraryData | null };
 }
 
 export async function updateFeedSettings(settings: FeedSettings): Promise<void> {

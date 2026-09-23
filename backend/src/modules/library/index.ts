@@ -12,5 +12,5 @@ export type { EmbeddedMuralRow } from "./migration.js";
 // Cross-module public-data resolver for murals' public
 // GET /murals/shared/:token route — see publicResolver.ts's own top
 // comment for the privacy boundary this enforces.
-export { resolvePublicLibraryData } from "./publicResolver.js";
+export { resolvePublicLibrary, resolvePublicLibraryData } from "./publicResolver.js";
 export type { PublicBookData, PublicHighlight, ResolvedPublicData, PublicDataRequest } from "./publicResolver.js";

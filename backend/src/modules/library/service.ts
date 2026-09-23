@@ -3,20 +3,12 @@
 // modules/auth/service.ts.
 
 import { randomUUID } from "node:crypto";
-// Cross-module dependency, same discipline as modules/murals/routes.ts
-// importing resolvePublicLibraryData only from library/index.ts:
-// peekCachedCoverUrl is covers' own public surface for a synchronous,
-// cache-only cover lookup — never covers' internals. See
-// publicResolver.ts's own top comment (which already uses this for
-// mural sharing) for why a public, unauthenticated resolver may use this
-// but not the authGuard'd, network-calling GET /covers/resolve path.
-import { peekCachedCoverUrl } from "../covers/index.js";
 import { buildManualBook } from "@scripta/shared";
 import type { BookRecommendationInput } from "@scripta/shared/community";
 import { LibraryConflictError, NoLibraryDocumentError } from "./domain/errors.js";
 import type { LibraryRepository } from "./domain/ports.js";
 import type { LibraryDocument, LibraryDocumentRow } from "./domain/types.js";
-import { normalizeImageId, normalizeIsbn } from "./publicResolver.js";
+import { toPublicLibraryData } from "./publicResolver.js";
 
 export type BookEvent = { type: "book_added" | "book_finished"; refId: string; payload: Record<string, unknown> };
 
@@ -24,73 +16,6 @@ export type EmitBookEvents = (userId: string, events: BookEvent[]) => void;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
-}
-
-/** The ONLY fields of a private book object that ever reach an anonymous
- *  visitor of GET /library/shared/:token. Read from frontend/src/pages/
- *  SharedLibraryPage.tsx, components/BookCard.tsx, lib/libraryOrder.ts
- *  and lib/groups.ts to determine exactly what that page renders/needs:
- *
- *   - Title, Attribution, ReadStatus — rendered directly on the card.
- *   - ISBN, ImageId — needed by lib/merge.ts's bookKey() (isbn-keyed when
- *     present) so this book still matches its own entries in `data.groups`
- *     (series/collections reference books by bookKey, not by index) —
- *     and by CoverImage's own cover-resolution fallback.
- *   - _coverUrl — a manual gallery-cover override, or (via
- *     peekCachedCoverUrl below) an already-cached auto-resolved cover; see
- *     that function's own comment for why this doesn't need a live network
- *     call. Kept even when null/absent so CoverImage falls back to its own
- *     (401ing, for an anonymous visitor) resolve call — same intentional
- *     "no cover" outcome a book with a genuine cache miss already has.
- *   - SeriesNumber, _order — the two fields lib/libraryOrder.ts's
- *     buildUnits()/orderedGroupBooks() actually read to reproduce the same
- *     series-clustered display order the authenticated LibraryPage uses.
- *
- *  Deliberately dropped: `highlights` (a reader's private notes/quotes —
- *  Text/Annotation), ContentID, ___PercentRead, DateLastRead, `_style`/
- *  `_coverImageId` (only ever read by the Style/Cover buttons, which
- *  SharedLibraryPage never renders — it passes neither onOpenStyle nor
- *  onOpenCoverPicker), `Series` (only used by the frontend's own
- *  auto-seeding on import, never at display time), and every other raw
- *  Kobo/Goodreads field — nothing outside the list above, ever. */
-function toPublicLibraryBook(book: Record<string, unknown>): Record<string, unknown> {
-  const isbn = normalizeIsbn(book.ISBN) || null;
-  const imageId = normalizeImageId(book.ImageId) || null;
-  const manualCoverUrl = typeof book._coverUrl === "string" ? book._coverUrl : null;
-  return {
-    Title: typeof book.Title === "string" ? book.Title : undefined,
-    Attribution: typeof book.Attribution === "string" ? book.Attribution : undefined,
-    ISBN: typeof book.ISBN === "string" ? book.ISBN : undefined,
-    ImageId: typeof book.ImageId === "string" ? book.ImageId : undefined,
-    ReadStatus: typeof book.ReadStatus === "number" ? book.ReadStatus : undefined,
-    SeriesNumber: typeof book.SeriesNumber === "number" ? book.SeriesNumber : undefined,
-    _order: typeof book._order === "number" ? book._order : undefined,
-    _coverUrl: manualCoverUrl ?? peekCachedCoverUrl({ isbn, imageId })
-  };
-}
-
-/** Projects a full private library document down to the public-safe shape
- *  GET /library/shared/:token actually returns — see toPublicLibraryBook's
- *  own comment for the per-book field allowlist. `name`/`groups`/`style`
- *  (plus the exporter's own `source`/`schema_version`/`book_count`
- *  metadata) pass through unchanged: none of them carry private per-book
- *  content the way the raw `books` array does, and SharedLibraryPage.tsx
- *  needs `name`/`groups`/`style` verbatim to render the same grouped/
- *  styled view the authenticated LibraryPage uses. Builds a NEW object —
- *  never mutates `doc` or anything reachable from it, so this can never
- *  accidentally write a redacted/peeked value back into the private,
- *  stored document. */
-function toPublicLibraryData(doc: Record<string, unknown>): Record<string, unknown> {
-  const books = Array.isArray(doc.books) ? doc.books.filter(isRecord).map(toPublicLibraryBook) : [];
-  return {
-    source: doc.source,
-    schema_version: doc.schema_version,
-    book_count: doc.book_count,
-    name: doc.name,
-    groups: doc.groups,
-    style: doc.style,
-    books
-  };
 }
 
 function bookPayload(book: Record<string, unknown>, status: number): Record<string, unknown> {

@@ -1,10 +1,10 @@
 import { Stack } from "expo-router";
 import { useScreenOptions, useSheetOptions } from "@/ui/navigation";
 
-// Without this, tapping the Library tab landed on whichever screen in this
-// group Expo Router picked as its default (add-book) instead of the grid.
+// Without this, tapping the Profile tab landed on whichever screen in this
+// group Expo Router picked as its default (add-book) instead of the profile.
 export const unstable_settings = {
-  initialRouteName: "library",
+  initialRouteName: "me",
 };
 
 export default function LibraryStackLayout() {
@@ -17,6 +17,7 @@ export default function LibraryStackLayout() {
           becomes the stack's initial route. unstable_settings above cannot do
           it alone — layouts/Stack.js never forwards that anchor to React
           Navigation, it only sorts the routes left undeclared. */}
+      <Stack.Screen name="me" />
       <Stack.Screen name="library" />
       {/* `presentation` is read when the screen is presented, so it has to be
           declared here — a <Stack.Screen> inside the route component renders

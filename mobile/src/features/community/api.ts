@@ -1,4 +1,4 @@
-import type { MuralBlock, ResolvedTierlist, ShelfTheme } from "@scripta/shared";
+import type { LibraryData, MuralBlock, ResolvedTierlist, ShelfTheme } from "@scripta/shared";
 import type { DashboardFeedPage } from "@scripta/shared/dashboard";
 import type {
   ActivityItem,
@@ -59,6 +59,10 @@ export async function fetchProfile(username: string) {
 export async function fetchActivity(username: string, cursor?: string): Promise<Page<ActivityItem>> {
   const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
   return apiClient.request<Page<ActivityItem>>(`/community/profiles/${encodeURIComponent(username)}/activity${query}`);
+}
+
+export async function fetchProfileLibrary(username: string) {
+  return apiClient.request<{ data: LibraryData | null }>(`/community/profiles/${encodeURIComponent(username)}/library`);
 }
 
 export function updateFeedSettings(settings: FeedSettings) {

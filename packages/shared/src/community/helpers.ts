@@ -76,23 +76,74 @@ export function categoryFor(type: ActivityEventType): FeedCategory {
   return "publications";
 }
 
-export function activityText(item: ActivityItem): { verb: string; target: string; href: string | null } {
+export interface ActivityRow {
+  kind: "publication" | "vote" | "reading" | "follow" | "mural";
+  label: string;
+  tone: "accent" | "success" | "dim";
+  title: string;
+  meta: string;
+  covers: string[];
+  href: string | null;
+  username: string | null;
+}
+
+function text(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function covers(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((cover): cover is string => typeof cover === "string" && cover.length > 0).slice(0, 3) : [];
+}
+
+export function activityRow(item: ActivityItem): ActivityRow {
+  const p = item.payload;
+  const base = { covers: covers(p.covers), href: text(p.href) || null, username: null };
   switch (item.type) {
     case "tierlist_published":
-      return { verb: "Published a tierlist", target: String(item.payload.name ?? ""), href: (item.payload.href as string | undefined) ?? null };
+      return { ...base, kind: "publication", label: "Published a tier list", tone: "accent", title: text(p.name), meta: text(p.detail) };
     case "tournament_published":
-      return { verb: "Published a tournament", target: String(item.payload.name ?? ""), href: (item.payload.href as string | undefined) ?? null };
-    case "book_added":
-      return { verb: "Added", target: `${String(item.payload.title ?? "")} — ${statusLabel(Number(item.payload.status ?? 0))}`, href: null };
-    case "book_finished":
-      return { verb: "Finished", target: String(item.payload.title ?? ""), href: null };
+      return { ...base, kind: "publication", label: "Started a tournament", tone: "accent", title: text(p.name), meta: text(p.detail) };
+    case "book_added": {
+      const cover = text(p.coverUrl);
+      return { ...base, kind: "reading", label: "Added to library", tone: "dim", title: text(p.title), meta: [text(p.author), statusLabel(Number(p.status ?? 0))].filter(Boolean).join(" · "), covers: cover ? [cover] : [] };
+    }
+    case "book_finished": {
+      const cover = text(p.coverUrl);
+      return { ...base, kind: "reading", label: "Finished reading", tone: "success", title: text(p.title), meta: text(p.author), covers: cover ? [cover] : [] };
+    }
     case "following":
-      return { verb: "Followed", target: `@${String(item.payload.username ?? "")}`, href: null };
+      return { ...base, kind: "follow", label: "Followed", tone: "dim", title: `@${text(p.username)}`, meta: "", username: text(p.username) || null };
     case "mural_published":
-      return { verb: "Published", target: "a mural", href: null };
+      return { ...base, kind: "mural", label: "Updated profile", tone: "accent", title: "Published a new profile mural", meta: "" };
     case "voted_on":
-      return item.payload.game === "tierlist"
-        ? { verb: "Ranked books on", target: String(item.payload.name ?? ""), href: null }
-        : { verb: "Voted in", target: String(item.payload.name ?? ""), href: null };
+      return { ...base, kind: "vote", label: p.game === "tierlist" ? "Ranked a tier list" : "Voted in a tournament", tone: "accent", title: text(p.name), meta: "" };
   }
+}
+
+const DAY_MS = 86_400_000;
+
+export function relativeTime(iso: string, now: number = Date.now()): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "";
+  const elapsed = now - then;
+  if (elapsed < 0) return "now";
+  const minutes = Math.floor(elapsed / 60_000);
+  if (minutes < 1) return "now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(elapsed / 3_600_000);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(elapsed / DAY_MS);
+  if (days < 30) return `${days}d ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
+export function activityDay(iso: string, now: Date = new Date()): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const startOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const days = Math.round((startOf(now) - startOf(date)) / DAY_MS);
+  if (days <= 0) return "Today";
+  if (days === 1) return "Yesterday";
+  if (days < 7) return date.toLocaleDateString(undefined, { weekday: "long" });
+  return date.toLocaleDateString(undefined, { month: "long", day: "numeric", ...(date.getFullYear() === now.getFullYear() ? {} : { year: "numeric" }) });
 }
