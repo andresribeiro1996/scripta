@@ -30,7 +30,7 @@ import { parseImportedFile } from "../lib/fileImport";
 import { deriveSeriesGroups, removeBooksFromAllGroups } from "../lib/groups";
 import { assignBookOrder, orderLibraryBooks, reorderOnDrop, seriesGroupByBookKey } from "../lib/libraryOrder";
 import { effectiveCardStyle, resolveLibraryStyle, type PerCardStyle } from "../lib/libraryStyle";
-import { filterBooks, nextReadStatus, sortBooks, type SortKey, type StatusFilter } from "../lib/libraryView";
+import { filterBooks, localDay, setReadStatus, sortBooks, type ReadStatus, type SortKey, type StatusFilter } from "../lib/libraryView";
 import { bookKey, mergeLibraryData } from "../lib/merge";
 import { restoreDeletedBooks } from "../lib/restoreDeletedBooks";
 
@@ -219,14 +219,15 @@ export function LibraryPage() {
     }
   }
 
-  async function handleSetBookStatus(book: Record<string, unknown>) {
+  async function handleSetBookStatus(book: Record<string, unknown>, status: ReadStatus) {
     const current = queryClient.getQueryData<LibraryDocument>(["library"]);
     if (!current) return;
     const key = bookKey(book);
+    const day = localDay();
     try {
       await updateLibrary((data) => ({
         ...data,
-        books: data.books.map((b) => (bookKey(b) === key ? { ...b, ReadStatus: nextReadStatus(b.ReadStatus) } : b))
+        books: data.books.map((b) => (bookKey(b) === key ? setReadStatus(b, status, day) : b))
       }));
     } catch {
       toast({ message: "Couldn't save the status change.", kind: "error" });
@@ -656,7 +657,7 @@ export function LibraryPage() {
           book={detailBook}
           onOpenStyle={(b) => setStyleBookKey(bookKey(b))}
           onOpenCoverPicker={(b) => setCoverBookKey(bookKey(b))}
-          onSetStatus={(b) => void handleSetBookStatus(b)}
+          onSetStatus={(b, status) => void handleSetBookStatus(b, status)}
           onClose={() => {
             setDetailBookKey(null);
             if (searchParams.has("book")) {

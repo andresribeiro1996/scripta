@@ -7,7 +7,7 @@ import { ErrorState, Screen, Skeleton } from "@/ui";
 export default function BookDetailRoute() {
   const { key } = useLocalSearchParams<{ key: string }>();
   const { book, loading } = useBook(key);
-  const { cycleStatus } = useLibraryActions();
+  const { setStatus } = useLibraryActions();
   const to = (suffix: string) => router.push(`/book/${encodeURIComponent(key ?? "")}/${suffix}` as never);
 
   return (
@@ -21,7 +21,7 @@ export default function BookDetailRoute() {
           book={book}
           onOpenStyle={() => to("style")}
           onOpenCoverPicker={() => to("cover")}
-          onSetStatus={cycleStatus}
+          onSetStatus={setStatus}
           onClose={() => router.back()}
         />
       )}
