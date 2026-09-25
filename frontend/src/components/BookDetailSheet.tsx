@@ -68,15 +68,14 @@ export function BookDetailSheet({
               </button>
             </div>
 
-            <div role="radiogroup" aria-label="Reading status" className="mt-3 inline-flex rounded-lg border border-(--color-border) p-0.5">
+            <div role="group" aria-label="Reading status" className="mt-3 inline-flex rounded-lg border border-(--color-border) p-0.5">
               {([0, 1, 2] as const).map((status) => {
                 const checked = (book.ReadStatus === 1 || book.ReadStatus === 2 ? book.ReadStatus : 0) === status;
                 return (
                   <button
                     key={status}
                     type="button"
-                    role="radio"
-                    aria-checked={checked}
+                    aria-pressed={checked}
                     onClick={() => { if (!checked) onSetStatus(book, status); }}
                     className={`min-h-11 rounded-md px-3 text-sm font-medium ${checked ? "bg-(--color-accent) text-white" : "text-(--color-text-dim) hover:bg-(--color-surface-hover)"}`}
                   >
