@@ -66,15 +66,19 @@ export function MyShelfScreen() {
     setTab(next);
   }
 
-  async function run(action: () => Promise<void>) {
+  async function run(action: () => Promise<void>): Promise<boolean> {
     setBusy(true);
     setError(null);
     try {
       await action();
       await queryClient.invalidateQueries({ queryKey: ["community", "own-profile"] });
       await queryClient.invalidateQueries({ queryKey: ["community", "profile", username] });
+      return true;
     } catch {
       setError("Something went wrong. Try again.");
+      await queryClient.invalidateQueries({ queryKey: ["community", "own-profile"] });
+      await queryClient.invalidateQueries({ queryKey: ["murals"] });
+      return false;
     } finally {
       setBusy(false);
     }
@@ -92,13 +96,14 @@ export function MyShelfScreen() {
       router.push(`/murals/${own.data.muralId}` as never);
       return;
     }
-    let createdId: string | null = null;
-    await run(async () => {
-      const created = await murals.create("My shelf");
-      createdId = created.id;
-      await setShelfMural(created.id);
+    let targetId: string | null = null;
+    const ok = await run(async () => {
+      const existing = murals.data?.find((item) => item.name === "My shelf");
+      const target = existing ?? (await murals.create("My shelf"));
+      targetId = target.id;
+      await setShelfMural(target.id);
     });
-    if (createdId) router.push(`/murals/${createdId}` as never);
+    if (ok && targetId) router.push(`/murals/${targetId}` as never);
   }
 
   if (own.isPending) {
