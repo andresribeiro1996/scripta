@@ -27,45 +27,219 @@ export const PLATES = [
   { key: "loyal", name: "Loyalist", epithet: "returns to the same voices", numeral: "VIII" },
 ];
 
-let uidCount = 0;
-const uid = (prefix) => `${prefix}-${++uidCount}`;
+const STEP = 0.9;
+const SHADOW = [-Math.SQRT1_2, Math.SQRT1_2];
 
+const dist = (a, b) => Math.hypot(b[0] - a[0], b[1] - a[1]);
+const lerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+const quad = (a, c, b, t) => [(1 - t) ** 2 * a[0] + 2 * (1 - t) * t * c[0] + t * t * b[0], (1 - t) ** 2 * a[1] + 2 * (1 - t) * t * c[1] + t * t * b[1]];
+const cubic = (a, c1, c2, b, t) => [0, 1].map((k) => (1 - t) ** 3 * a[k] + 3 * (1 - t) ** 2 * t * c1[k] + 3 * (1 - t) * t * t * c2[k] + t ** 3 * b[k]);
+
+function arcSegment(p0, rx, ry, degrees, largeArc, sweep, p1) {
+  const phi = (degrees * Math.PI) / 180, cos = Math.cos(phi), sin = Math.sin(phi);
+  const dx = (p0[0] - p1[0]) / 2, dy = (p0[1] - p1[1]) / 2;
+  const x1 = cos * dx + sin * dy, y1 = -sin * dx + cos * dy;
+  rx = Math.abs(rx); ry = Math.abs(ry);
+  const lambda = (x1 * x1) / (rx * rx) + (y1 * y1) / (ry * ry);
+  if (lambda > 1) { rx *= Math.sqrt(lambda); ry *= Math.sqrt(lambda); }
+  const num = rx * rx * ry * ry - rx * rx * y1 * y1 - ry * ry * x1 * x1;
+  const den = rx * rx * y1 * y1 + ry * ry * x1 * x1;
+  const coef = (largeArc === sweep ? -1 : 1) * Math.sqrt(Math.max(0, num / den));
+  const cx1 = (coef * rx * y1) / ry, cy1 = (-coef * ry * x1) / rx;
+  const cx = cos * cx1 - sin * cy1 + (p0[0] + p1[0]) / 2, cy = sin * cx1 + cos * cy1 + (p0[1] + p1[1]) / 2;
+  const angle = (ux, uy, vx, vy) => Math.atan2(ux * vy - uy * vx, ux * vx + uy * vy);
+  const start = angle(1, 0, (x1 - cx1) / rx, (y1 - cy1) / ry);
+  let delta = angle((x1 - cx1) / rx, (y1 - cy1) / ry, (-x1 - cx1) / rx, (-y1 - cy1) / ry);
+  if (!sweep && delta > 0) delta -= 2 * Math.PI;
+  if (sweep && delta < 0) delta += 2 * Math.PI;
+  return {
+    at: (t) => {
+      const a = start + delta * t, x = rx * Math.cos(a), y = ry * Math.sin(a);
+      return [cx + cos * x - sin * y, cy + sin * x + cos * y];
+    },
+    length: (Math.abs(delta) * (rx + ry)) / 2,
+  };
+}
+
+function subpaths(d) {
+  const tokens = d.match(/[a-zA-Z]|[-+]?(?:\d*\.\d+|\d+\.?)(?:[eE][-+]?\d+)?/g) ?? [];
+  const out = [];
+  let i = 0, cmd = "", cur = [0, 0], start = [0, 0], control = null, points = null;
+  const num = () => Number(tokens[i++]);
+  const add = (at, length) => {
+    const n = Math.max(2, Math.ceil(length / STEP));
+    for (let k = 1; k <= n; k++) points.push(at(k / n));
+  };
+  const flush = (closed) => {
+    if (points && closed) {
+      add((t) => lerp(cur, start, t), dist(cur, start));
+      if (dist(points[0], points[points.length - 1]) < 0.01) points.pop();
+    }
+    if (points && points.length > 1) out.push({ points, closed });
+    points = null;
+  };
+  while (i < tokens.length) {
+    if (/[a-zA-Z]/.test(tokens[i])) cmd = tokens[i++];
+    const upper = cmd.toUpperCase();
+    const [ox, oy] = cmd === upper ? [0, 0] : cur;
+    if (upper === "Z") {
+      flush(true);
+      cur = start;
+      control = null;
+      continue;
+    }
+    if (upper === "M") {
+      flush(false);
+      cur = start = [num() + ox, num() + oy];
+      points = [cur];
+      cmd = cmd === upper ? "L" : "l";
+      control = null;
+      continue;
+    }
+    if (!points) points = [cur];
+    const from = cur;
+    if (upper === "L" || upper === "H" || upper === "V") {
+      cur = upper === "L" ? [num() + ox, num() + oy] : upper === "H" ? [num() + ox, from[1]] : [from[0], num() + oy];
+      add((t) => lerp(from, cur, t), dist(from, cur));
+      control = null;
+    } else if (upper === "Q" || upper === "T") {
+      const c = upper === "Q" ? [num() + ox, num() + oy] : control ? [2 * from[0] - control[0], 2 * from[1] - control[1]] : from;
+      cur = [num() + ox, num() + oy];
+      const to = cur;
+      add((t) => quad(from, c, to, t), dist(from, c) + dist(c, to));
+      control = c;
+    } else if (upper === "C") {
+      const c1 = [num() + ox, num() + oy], c2 = [num() + ox, num() + oy];
+      cur = [num() + ox, num() + oy];
+      const to = cur;
+      add((t) => cubic(from, c1, c2, to, t), dist(from, c1) + dist(c1, c2) + dist(c2, to));
+      control = null;
+    } else if (upper === "A") {
+      const rx = num(), ry = num(), rotation = num(), largeArc = num(), sweep = num();
+      cur = [num() + ox, num() + oy];
+      const arc = arcSegment(from, rx, ry, rotation, largeArc, sweep, cur);
+      add(arc.at, arc.length);
+      control = null;
+    } else {
+      throw new Error(`Unsupported path command "${cmd}" in ${d}`);
+    }
+  }
+  flush(false);
+  return out;
+}
+
+const round = (n) => Math.round(n * 10) / 10;
+const pointList = (points) => points.map(([x, y]) => `${round(x)} ${round(y)}`).join("L");
+const lengths = (points) => points.reduce((acc, p, i) => [...acc, i ? acc[i - 1] + dist(points[i - 1], p) : 0], []);
+
+function tangents(points, closed) {
+  const n = points.length;
+  return points.map((_, i) => {
+    const a = points[closed ? (i - 1 + n) % n : Math.max(0, i - 1)];
+    const b = points[closed ? (i + 1) % n : Math.min(n - 1, i + 1)];
+    const length = dist(a, b) || 1;
+    return [(b[0] - a[0]) / length, (b[1] - a[1]) / length];
+  });
+}
+
+function ribbon(points, widths, closed = false) {
+  const tangent = tangents(points, closed);
+  const side = (s) => points.map(([x, y], i) => [x - (s * tangent[i][1] * widths[i]) / 2, y + (s * tangent[i][0] * widths[i]) / 2]);
+  const left = side(1), right = side(-1).reverse();
+  return closed ? `M${pointList(left)}ZM${pointList(right)}Z` : `M${pointList([...left, ...right])}Z`;
+}
+
+function shadowWidths(points, min, max) {
+  const area = points.reduce((sum, [x, y], i) => {
+    const [x2, y2] = points[(i + 1) % points.length];
+    return sum + x * y2 - x2 * y;
+  }, 0);
+  const sign = area > 0 ? 1 : -1;
+  return tangents(points, true).map(([tx, ty]) => min + (max - min) * Math.max(0, sign * ty * SHADOW[0] - sign * tx * SHADOW[1]));
+}
+
+function swellWidths(points, min, max) {
+  const s = lengths(points), total = s[s.length - 1] || 1;
+  return s.map((d) => min + (max - min) * Math.sin((Math.PI * d) / total) ** 0.7);
+}
+
+function inside([x, y], polygon) {
+  let hit = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const [xi, yi] = polygon[i], [xj, yj] = polygon[j];
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) hit = !hit;
+  }
+  return hit;
+}
+
+function runsInside(points, polygon) {
+  const runs = [];
+  let run = [];
+  for (const p of points) {
+    if (inside(p, polygon)) run.push(p);
+    else {
+      if (run.length > 1) runs.push(run);
+      run = [];
+    }
+  }
+  if (run.length > 1) runs.push(run);
+  return runs;
+}
+
+const inkPath = (d, w) => subpaths(d)
+  .map(({ points, closed }) => closed ? ribbon(points, shadowWidths(points, 0.45 * w, 1.75 * w), true) : ribbon(points, swellWidths(points, 0.15 * w, 1.45 * w)))
+  .join("");
+
+const ink = (d, w, attrs = "") => `<path class="pf" d="${inkPath(d, w)}"${attrs}/>`;
+const cut = (d, w, attrs = "") => `<path class="pgf" d="${inkPath(d, w)}"${attrs}/>`;
+const form = (d, w, attrs = "") => `<path class="pgf" d="${d}"${attrs}/>${ink(d, w, attrs)}`;
+
+function hatch(d, max, clip, weight = () => max) {
+  const polygon = clip ? subpaths(clip)[0].points : null;
+  let out = "";
+  for (const { points } of subpaths(d)) {
+    for (const run of polygon ? runsInside(points, polygon) : [points]) {
+      const s = lengths(run), total = s[s.length - 1];
+      if (total < 1.5) continue;
+      out += ribbon(run, run.map((p, i) => Math.max(0.04, weight(p) * Math.sqrt(Math.min(1, s[i] / 2.2) * Math.min(1, (total - s[i]) / 2.2)))));
+    }
+  }
+  return `<path class="pf" d="${out}"/>`;
+}
+
+const rect = (x, y, w, h) => `M${x} ${y}H${x + w}V${y + h}H${x}Z`;
+const ellipse = (cx, cy, rx, ry) => `M${cx - rx} ${cy}A${rx} ${ry} 0 1 0 ${cx + rx} ${cy}A${rx} ${ry} 0 1 0 ${cx - rx} ${cy}Z`;
+const circle = (cx, cy, r) => ellipse(cx, cy, r, r);
 const fourPointStar = (x, y, r = 4) => `M${x} ${y - r}L${x + r / 4} ${y - r / 4}L${x + r} ${y}L${x + r / 4} ${y + r / 4}L${x} ${y + r}L${x - r / 4} ${y + r / 4}L${x - r} ${y}L${x - r / 4} ${y - r / 4}Z`;
 
 export const emblems = {
   carto: () => {
-    const graticule = [
-      `<ellipse class="pl" cx="125" cy="134" rx="55" ry="20" stroke-width=".5"/>`,
-      `<ellipse class="pl" cx="125" cy="134" rx="55" ry="40" stroke-width=".5"/>`,
-      `<ellipse class="pl" cx="125" cy="134" rx="20" ry="55" stroke-width=".5"/>`,
-      `<ellipse class="pl" cx="125" cy="134" rx="40" ry="55" stroke-width=".5"/>`,
-      `<path class="pl" d="M70 134H180M125 79V189" stroke-width=".5"/>`,
-    ];
+    const graticule = [ellipse(125, 134, 55, 20), ellipse(125, 134, 55, 40), ellipse(125, 134, 20, 55), ellipse(125, 134, 40, 55), "M70 134H180M125 79V189"].map((d) => ink(d, 0.5));
     const s = 21.2;
     const shorts = [
       `M125 134L125 127L${125 + s} ${134 - s}L132 134Z`,
       `M125 134L132 134L${125 + s} ${134 + s}L125 141Z`,
       `M125 134L125 141L${125 - s} ${134 + s}L118 134Z`,
       `M125 134L118 134L${125 - s} ${134 - s}L125 127Z`,
-    ].map((d) => `<path class="pgl" d="${d}" stroke-width="1" stroke-linejoin="round"/>`);
+    ].map((d) => form(d, 1));
     const a = 120.05, b = 129.95, u = 129.05, v = 138.95;
     const longs = [
       [`M125 134L125 84L${a} ${u}Z`, `M125 134L125 84L${b} ${u}Z`],
       [`M125 134L175 134L${b} ${u}Z`, `M125 134L175 134L${b} ${v}Z`],
       [`M125 134L125 184L${b} ${v}Z`, `M125 134L125 184L${a} ${v}Z`],
       [`M125 134L75 134L${a} ${v}Z`, `M125 134L75 134L${a} ${u}Z`],
-    ].map(([fill, open]) => `<path class="pf" d="${fill}"/><path class="pgl" d="${open}" stroke-width="1" stroke-linejoin="round"/>`);
-    return [...graticule, ...shorts, ...longs, `<circle class="pgl" cx="125" cy="134" r="5" stroke-width="1"/><circle class="pf" cx="125" cy="134" r="2"/>`].join("");
+    ].map(([fill, open]) => `<path class="pf" d="${fill}"/>${form(open, 1)}`);
+    return [...graticule, ...shorts, ...longs, form(circle(125, 134, 5), 1), `<circle class="pf" cx="125" cy="134" r="2"/>`].join("");
   },
   anno: () => [
-    `<path class="pgl" d="M76 152Q100 143 125 151L125 178Q100 170 76 179Z" stroke-width="1.3" stroke-linejoin="round"/>`,
-    `<path class="pgl" d="M125 151Q150 143 174 152L174 179Q150 170 125 178Z" stroke-width="1.3" stroke-linejoin="round"/>`,
-    `<path class="pl" d="M84 158Q101 152 118 157M84 164Q101 158 118 163M84 170Q101 164 118 169M134 157Q150 152 166 158M134 169Q150 164 166 170" stroke-width=".6"/>`,
-    `<path class="pl" d="M134 163.2Q150 158 166 164" stroke-width="2.4" stroke-linecap="round"/>`,
-    `<path class="pl" d="M131 154.5h-2.6v19h2.6" stroke-width="1.2"/>`,
+    form("M76 152Q100 143 125 151L125 178Q100 170 76 179Z", 1.3),
+    form("M125 151Q150 143 174 152L174 179Q150 170 125 178Z", 1.3),
+    ink("M84 158Q101 152 118 157M84 164Q101 158 118 163M84 170Q101 164 118 169M134 157Q150 152 166 158M134 169Q150 164 166 170", 0.6),
+    ink("M134 163.2Q150 158 166 164", 1.8),
+    ink("M131 154.5h-2.6v19h2.6", 1.2),
     `<path class="pf" d="M141 142Q98 130 92 86Q128 104 141 142Z"/>`,
-    `<path class="pgs" d="M131 131L117 133M124 120L108 121M117 109L101 108M109 98L96 96M134 126L137 112M126 114L128 100M118 103L119 92" stroke-width=".9" stroke-linecap="round"/>`,
-    `<path class="pl" d="M149 153L90 83" stroke-width="1.3" stroke-linecap="round"/>`,
+    cut("M131 131L117 133M124 120L108 121M117 109L101 108M109 98L96 96M134 126L137 112M126 114L128 100M118 103L119 92", 0.9),
+    ink("M149 153L90 83", 1.3),
     `<path class="pf" d="M145.5 148.5L151.5 157.5L149 150.5Z"/>`,
   ].join(""),
   lamp: () => {
@@ -75,30 +249,34 @@ export const emblems = {
       return `M${p(29)}L${p(39)}`;
     }).join("");
     return [
-      `<path class="pl" d="${rays}" stroke-width=".9" stroke-linecap="round"/>`,
-      `<circle class="pl" cx="125" cy="84" r="6" stroke-width="1.4"/>`,
+      ink(rays, 0.9),
+      ink(circle(125, 84, 6), 1.4),
       `<path class="pf" d="M109 101L141 101L134 90L116 90Z"/>`,
-      `<rect class="pgl" x="107" y="101" width="36" height="50" stroke-width="1.4"/>`,
-      `<path class="pl" d="M113 101V151M137 101V151" stroke-width=".7"/>`,
+      form(rect(107, 101, 36, 50), 1.4),
+      ink("M113 101V151M137 101V151", 0.7),
       `<path class="pf" d="M125 110C133 121 134 131 125 140C116 131 117 121 125 110Z"/>`,
       `<path class="pgf" d="M125 123C128 128 128 132 125 136C122 132 122 128 125 123Z"/>`,
       `<path class="pf" d="M105 151L145 151L141 159L109 159Z"/>`,
-      `<path class="pl" d="M113 159V164H137V159" stroke-width="1.2"/>`,
+      ink("M113 159V164H137V159", 1.2),
       `<path class="pf" d="${fourPointStar(152, 92)}${fourPointStar(98, 176)}"/>`,
     ].join("");
   },
   star: () => {
-    const id = uid("cres");
-    const cres = "M121.96 90.19A40 40 0 1 0 152.22 150.71A34 34 0 1 1 121.96 90.19Z";
-    let hatch = "";
-    for (let k = 166; k <= 332; k += 3.1) hatch += `M${(k - 174).toFixed(1)} 174L${(k - 86).toFixed(1)} 86`;
+    const crescent = "M121.96 90.19A40 40 0 1 0 152.22 150.71A34 34 0 1 1 121.96 90.19Z";
+    const belly = [Math.cos((153.5 * Math.PI) / 180), Math.sin((153.5 * Math.PI) / 180)];
+    const shade = ([x, y]) => {
+      const dx = x - 118, dy = y - 130, r = Math.hypot(dx, dy) || 1;
+      const tone = 0.2 + 0.6 * (r / 40) ** 2 + (0.35 * (dx * belly[0] + dy * belly[1])) / r;
+      return 0.16 + Math.min(1, Math.max(0.1, tone));
+    };
+    let lines = "";
+    for (let k = 166; k <= 332; k += 3.1) lines += `M${(k - 174).toFixed(1)} 174L${(k - 86).toFixed(1)} 86`;
     return [
-      `<clipPath id="${id}"><path d="${cres}"/></clipPath>`,
-      `<g clip-path="url(#${id})"><path class="pl" d="${hatch}" stroke-width=".55"/></g>`,
-      `<path class="pl" d="${cres}" stroke-width="1.4" stroke-linejoin="round"/>`,
-      `<g transform="rotate(-18 147 106)"><path class="pl" d="M133 106A14 3.8 0 0 1 161 106" stroke-width="1"/></g>`,
+      hatch(lines, 1, crescent, shade),
+      ink(crescent, 1.3),
+      `<g transform="rotate(-18 147 106)">${ink("M133 106A14 3.8 0 0 1 161 106", 0.8)}</g>`,
       `<circle class="pf" cx="147" cy="106" r="7"/>`,
-      `<g transform="rotate(-18 147 106)"><path class="pgs" d="M133 106A14 3.8 0 0 0 161 106" stroke-width="2.8"/><path class="pl" d="M133 106A14 3.8 0 0 0 161 106" stroke-width="1"/></g>`,
+      `<g transform="rotate(-18 147 106)"><path class="pgs" d="M133 106A14 3.8 0 0 0 161 106" stroke-width="2.8"/>${ink("M133 106A14 3.8 0 0 0 161 106", 1.1)}</g>`,
       `<path class="pf" d="${fourPointStar(166, 128)}${fourPointStar(157, 153, 3.2)}"/>`,
       `<circle class="pf" cx="139" cy="85" r="1.2"/><circle class="pf" cx="171" cy="146" r="1.1"/>`,
     ].join("");
@@ -107,16 +285,16 @@ export const emblems = {
     let caps = "";
     for (let x = 102; x <= 148; x += 3) caps += `M${x} 86.5V90.5M${x} 173.5V177.5`;
     return [
-      `<rect class="pgl" x="99" y="85" width="52" height="7" rx="1.5" stroke-width="1.3"/>`,
-      `<rect class="pgl" x="99" y="172" width="52" height="7" rx="1.5" stroke-width="1.3"/>`,
-      `<path class="pl" d="${caps}" stroke-width=".5"/>`,
-      `<path class="pl" d="M104 92V172M146 92V172" stroke-width="1.3"/>`,
+      form(rect(99, 85, 52, 7), 1.3),
+      form(rect(99, 172, 52, 7), 1.3),
+      hatch(caps, 0.75),
+      ink("M104 92V172M146 92V172", 1.3),
       `<circle class="pf" cx="104" cy="132" r="2.4"/><circle class="pf" cx="146" cy="132" r="2.4"/>`,
-      `<path class="pgl" d="M110 92C110 114 120 124 123 132C120 140 110 150 110 172H140C140 150 130 140 127 132C130 124 140 114 140 92Z" stroke-width="1.3" stroke-linejoin="round"/>`,
+      form("M110 92C110 114 120 124 123 132C120 140 110 150 110 172H140C140 150 130 140 127 132C130 124 140 114 140 92Z", 1.3),
       `<path class="pf" d="M113.5 106C116 117 121 125 124 130H126C129 125 134 117 136.5 106Z"/>`,
       `<path class="pl" d="M125 130V160" stroke-width=".8" stroke-dasharray="1.5 1.5"/>`,
       `<path class="pf" d="M112 172C114 163 119 158 125 157C131 158 136 163 138 172Z"/>`,
-      `<path class="pl" d="M114.5 96C114.5 104 116 110 118.5 115M114.5 168C114.5 160 116 154 118.5 149" stroke-width=".6" stroke-linecap="round"/>`,
+      ink("M114.5 96C114.5 104 116 110 118.5 115M114.5 168C114.5 160 116 154 118.5 149", 0.6),
     ].join("");
   },
   corr: () => {
@@ -127,18 +305,18 @@ export const emblems = {
     }
     const leaf = "M0 0Q3.4-4.8 0-10.5Q-3.4-4.8 0 0Z";
     const leaves = [[101.9, 96.7], [111.8, 93.9], [119.7, 92.7]].flatMap(([x, y]) => [
-      `<path class="pgl" d="${leaf}" stroke-width=".9" transform="translate(${x} ${y}) rotate(-52)"/>`,
-      `<path class="pgl" d="${leaf}" stroke-width=".9" transform="translate(${250 - x} ${y}) rotate(52)"/>`,
-      `<path class="pgl" d="${leaf}" stroke-width=".9" transform="translate(${x} ${y}) rotate(-128) scale(.8)"/>`,
-      `<path class="pgl" d="${leaf}" stroke-width=".9" transform="translate(${250 - x} ${y}) rotate(128) scale(.8)"/>`,
+      form(leaf, 0.9, ` transform="translate(${x} ${y}) rotate(-52)"`),
+      form(leaf, 0.9, ` transform="translate(${250 - x} ${y}) rotate(52)"`),
+      form(leaf, 0.9, ` transform="translate(${x} ${y}) rotate(-128) scale(.8)"`),
+      form(leaf, 0.9, ` transform="translate(${250 - x} ${y}) rotate(128) scale(.8)"`),
     ]).join("");
     return [
-      `<path class="pl" d="M92 101Q125 84 158 101" stroke-width="1"/>`,
+      ink("M92 101Q125 84 158 101", 1),
       leaves,
-      `<rect class="pgl" x="82" y="110" width="86" height="54" rx="1.5" stroke-width="1.4"/>`,
-      `<path class="pl" d="${flap}" stroke-width=".55"/>`,
-      `<path class="pl" d="M82 164L115 137M168 164L135 137" stroke-width=".6"/>`,
-      `<path class="pl" d="M82 110L125 142L168 110" stroke-width="1.2" stroke-linejoin="round"/>`,
+      form(rect(82, 110, 86, 54), 1.4),
+      hatch(flap, 0.8),
+      ink("M82 164L115 137M168 164L135 137", 0.6),
+      ink("M82 110L125 142L168 110", 1.2),
       `<circle class="pf" cx="125" cy="142" r="11"/><path class="pf" d="M117.5 149.5Q116 156 119.5 157Q121.5 153 120.5 150ZM132 150.5Q134 155 131.5 156.5Q129.5 154 129.8 151.5Z"/>`,
       `<circle class="pgs" cx="125" cy="142" r="7.6" stroke-width=".8"/><path class="pgf" d="M125 137.6L128.4 142L125 146.4L121.6 142Z"/>`,
     ].join("");
@@ -146,31 +324,31 @@ export const emblems = {
   way: () => {
     const jib = [[100, 131.5], [104, 123.5], [108, 116], [112, 109.5], [116, 103.5], [120, 97.5]].map(([x, y]) => `M${x} ${y + 1.8}V142.5`).join("");
     return [
-      `<path class="pl" d="M125 83V149" stroke-width="1.4"/>`,
+      ink("M125 83V149", 1.4),
       `<path class="pf" d="M125 83L139 86.5L125 90Z"/>`,
-      `<path class="pgl" d="M127 90L127 144L160 144Q151 114 127 90Z" stroke-width="1.3" stroke-linejoin="round"/>`,
-      `<path class="pl" d="M127 109H142.5M127 125H151.5" stroke-width=".6"/>`,
-      `<path class="pgl" d="M123 94L123 144L94 144Q104 118 123 94Z" stroke-width="1.3" stroke-linejoin="round"/>`,
-      `<path class="pl" d="${jib}" stroke-width=".55"/>`,
+      form("M127 90L127 144L160 144Q151 114 127 90Z", 1.3),
+      ink("M127 109H142.5M127 125H151.5", 0.6),
+      form("M123 94L123 144L94 144Q104 118 123 94Z", 1.3),
+      hatch(jib, 0.8),
       `<path class="pf" d="M86 148H164L153 163H97Z"/>`,
-      `<path class="pgs" d="M93 152.5H157" stroke-width=".9"/>`,
-      `<path class="pl" d="M84 170q8-5 16 0t16 0t16 0t16 0t16 0" stroke-width="1.1"/>`,
-      `<path class="pl" d="M96 177q7-4 14 0t14 0t14 0t14 0" stroke-width=".6"/>`,
+      cut("M93 152.5H157", 0.9),
+      ink("M84 170q8-5 16 0t16 0t16 0t16 0t16 0", 1.1),
+      ink("M96 177q7-4 14 0t14 0t14 0t14 0", 0.6),
     ].join("");
   },
   loyal: () => {
-    const up = uid("wing"), down = uid("wing");
     const wingUp = "M-18-5Q-12-30 12-44Q2-24-2-4Z";
     const wingDown = "M-18 5Q-12 30 12 44Q2 24-2 4Z";
     let lines = "";
     for (let x = -18; x <= 13; x += 2.8) lines += `M${x.toFixed(1)}-46V46`;
     return [
       `<path class="pl" d="M164.3 161.5A48 48 0 0 1 85.7 161.5" stroke-width=".9" stroke-dasharray="1.4 3.2" stroke-linecap="round"/>`,
-      `<path class="pl" d="M86.1 166.5L85.7 161.5L90.2 163.6" stroke-width=".9" stroke-linecap="round" stroke-linejoin="round"/>`,
+      ink("M86.1 166.5L85.7 161.5L90.2 163.6", 0.9),
       `<g transform="translate(125 131) rotate(-22)">`,
-      `<clipPath id="${up}"><path d="${wingUp}"/></clipPath><clipPath id="${down}"><path d="${wingDown}"/></clipPath>`,
-      `<path class="pgl" d="${wingUp}" stroke-width="1.3" stroke-linejoin="round"/><g clip-path="url(#${up})"><path class="pl" d="${lines}" stroke-width=".55"/></g>`,
-      `<path class="pgl" d="${wingDown}" stroke-width="1.3" stroke-linejoin="round"/><g clip-path="url(#${down})"><path class="pl" d="${lines}" stroke-width=".55"/></g>`,
+      form(wingUp, 1.3),
+      hatch(lines, 0.75, wingUp),
+      form(wingDown, 1.3),
+      hatch(lines, 0.75, wingDown),
       `<path class="pf" d="M2-3L44-15L15 1L44 17L2 5Z"/>`,
       `<path class="pf" d="M-40-1Q-20-9 6-3Q11 1 6 5Q-18 9-40 3Z"/>`,
       `<circle class="pf" cx="-35" cy="1" r="6"/><circle class="pgf" cx="-37" cy="-.5" r="1.2"/>`,
