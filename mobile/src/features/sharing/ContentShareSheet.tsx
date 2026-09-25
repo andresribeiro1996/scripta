@@ -13,6 +13,7 @@ type Props = {
   visible: boolean;
   onClose: () => void;
   title: string;
+  description?: string;
   url?: string | null;
   children?: ReactNode;
   previewControls?: ReactNode;
@@ -24,7 +25,7 @@ type Props = {
   onRetryLink?: () => void;
 };
 
-export function ContentShareSheet({ visible, onClose, title, url, children, previewControls, imageReady = true, onEnableLink, enableLinkLabel = "Create share link", onDisableLink, linkError, onRetryLink }: Props) {
+export function ContentShareSheet({ visible, onClose, title, description, url, children, previewControls, imageReady = true, onEnableLink, enableLinkLabel = "Create share link", onDisableLink, linkError, onRetryLink }: Props) {
   const { colors } = useTheme();
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -81,6 +82,7 @@ export function ContentShareSheet({ visible, onClose, title, url, children, prev
           <Text accessibilityRole="header" {...dynamicType} style={[typography.heading, { color: colors.text, flex: 1 }]}>Share {title}</Text>
           <Button label="Close" variant="secondary" disabled={busy} onPress={onClose} />
         </View>
+        {description ? <Text style={[typography.caption, { color: colors.textDim }]}>{description}</Text> : null}
         {view === "image" ? <>
           {previewControls}
           <ScrollView style={{ flex: 1 }} removeClippedSubviews={false}>
