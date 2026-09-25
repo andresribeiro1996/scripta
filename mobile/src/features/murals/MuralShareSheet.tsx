@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import type { Group, Mural, ReaderProfile } from "@scripta/shared";
 import { Text, View } from "react-native";
+import { Button } from "../../ui";
 import { spacing, typography, useTheme } from "../../ui/theme";
 import { ContentShareSheet } from "../sharing/ContentShareSheet";
 import type { GalleryImage } from "../gallery/api";
 import type { Tierlist } from "../tierlists/api";
 import { MuralCanvas } from "./MuralCanvas";
 
-export function MuralShareSheet({ mural, books, groups, images, tierlists, profile, onClose, onEnableLink, onDisableLink, draft = false, contentReady = true, contentError }: {
+export function MuralShareSheet({ mural, books, groups, images, tierlists, profile, onClose, onEnableLink, onDisableLink, draft = false, contentReady = true, contentError, onRetryContent }: {
   mural: Mural | null;
   books: Array<Record<string, unknown>>;
   groups: Group[];
@@ -20,6 +21,7 @@ export function MuralShareSheet({ mural, books, groups, images, tierlists, profi
   draft?: boolean;
   contentReady?: boolean;
   contentError?: string;
+  onRetryContent: () => void;
 }) {
   const { colors } = useTheme();
   const [imageReady, setImageReady] = useState(false);
@@ -34,7 +36,7 @@ export function MuralShareSheet({ mural, books, groups, images, tierlists, profi
     enableLinkLabel="Create public link"
     onDisableLink={onDisableLink}
     imageReady={contentReady && !contentError && imageReady}
-    previewControls={contentError ? <Text accessibilityRole="alert" style={[typography.caption, { color: colors.danger }]}>{contentError}</Text> : undefined}
+    previewControls={contentError ? <View style={{ gap: spacing.sm }}><Text accessibilityRole="alert" style={[typography.caption, { color: colors.danger }]}>{contentError}</Text><Button label="Retry preview" variant="secondary" onPress={onRetryContent} /></View> : undefined}
   >
     {mural ? <View style={{ backgroundColor: colors.background, padding: spacing.sm }}><MuralCanvas mural={mural} books={books} groups={groups} images={images} tierlists={tierlists} profile={profile} onImageReadyChange={setImageReady} /></View> : null}
   </ContentShareSheet>;

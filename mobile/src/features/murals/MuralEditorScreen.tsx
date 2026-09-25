@@ -129,7 +129,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
         <Button label="Share" variant="secondary" onPress={() => setShareFor(draftMural)} />
         {selected ? <><Button label="Configure" variant="secondary" onPress={() => setPicking(selected.type === "image" ? "image" : selected.type === "tierlist" ? "tierlist" : selected.type === "spotlight" || selected.type === "shelf" || selected.type === "quote" || selected.type === "quoteCollection" ? "book" : null)} /><Button label="Duplicate" variant="secondary" onPress={() => setBlocks([...currentBlocks, createDuplicateCandidate(selected, currentBlocks)])} /><Button label="Delete" variant="destructive" onPress={() => { setBlocks(currentBlocks.filter((block) => block.id !== selected.id)); setSelectedId(null); }} /></> : null}
       </View>
-      <MuralShareSheet mural={shareFor} books={books} groups={library?.data.groups ?? []} images={gallery.data ?? []} tierlists={tierlists.data ?? []} profile={user?.username ? { username: user.username, avatarUrl: user.avatarId ? `${API_URL}/auth/avatar/${user.avatarId}/file` : null } : undefined} draft={shareFor !== null && (shareFor.name !== mural.name || shareFor.blocks !== mural.blocks)} contentReady={Boolean(library) && !gallery.isPending && !tierlists.isPending} contentError={libraryQuery.error?.message ?? gallery.error?.message ?? tierlists.error?.message ?? undefined} onClose={() => setShareFor(null)} onEnableLink={async () => {
+      <MuralShareSheet mural={shareFor} books={books} groups={library?.data.groups ?? []} images={gallery.data ?? []} tierlists={tierlists.data ?? []} profile={user?.username ? { username: user.username, avatarUrl: user.avatarId ? `${API_URL}/auth/avatar/${user.avatarId}/file` : null } : undefined} draft={shareFor !== null && (shareFor.name !== mural.name || shareFor.blocks !== mural.blocks)} contentReady={!libraryQuery.isPending && !gallery.isPending && !tierlists.isPending} contentError={libraryQuery.error?.message ?? gallery.error?.message ?? tierlists.error?.message ?? undefined} onRetryContent={() => { void libraryQuery.refetch(); void gallery.refetch(); void tierlists.refetch(); }} onClose={() => setShareFor(null)} onEnableLink={async () => {
         if (shareFor === null) return;
         if (shareFor.name !== mural.name || shareFor.blocks !== mural.blocks) setShareFor(await persist());
         const updated = await shareMural(id);
@@ -139,7 +139,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
       }} onDisableLink={async () => {
         const updated = await unshareMural(id);
         cacheMural(updated);
-        setShareFor(updated);
+        setShareFor({ ...updated, name: currentName, blocks: currentBlocks });
       }} />
       <Sheet visible={adding} title="Add block" onClose={() => setAdding(false)}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheet}>{BLOCK_TYPES.map((type) => <Button key={type} label={BLOCK_TYPE_LABELS[type]} variant="secondary" onPress={() => add(type)} />)}</ScrollView></Sheet>
       <Sheet visible={selected !== null && picking === null} title="Block settings" onClose={() => setSelectedId(null)}>
