@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { digestHeading, digestTarget, type DigestItem } from "@scripta/shared";
+import { ApiError } from "../../core/api";
 import { Icon, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { AuthorAvatar } from "../community/AuthorAvatar";
 import { CoverFan, SLOT_HEIGHT, SLOT_WIDTH } from "../community/CoverFan";
@@ -24,8 +25,8 @@ export function useFollowBack(refetch: () => Promise<unknown>) {
     try {
       await followUser(userId);
       await refetch();
-    } catch {
-      setFollowError("Couldn't follow them. Try again.");
+    } catch (reason) {
+      setFollowError(reason instanceof ApiError ? reason.message : "Couldn't follow them. Try again.");
     } finally {
       setFollowingId(null);
     }
@@ -55,9 +56,9 @@ export function FeedRow({ item, onOpen, onFollowBack, following }: { item: Diges
                 </View>
               </>
             ) : (
-              // Nothing to preview, so the actor fills the slot the covers
-              // would have taken rather than leaving it mostly empty.
-              <AuthorAvatar username={item.actor.username} avatarUrl={item.actor.avatarUrl} size={SLOT_HEIGHT} />
+              // Nothing to preview, so the actor stands in for the covers —
+              // at avatar size, not the fan-sized slot, which dwarfed a face.
+              <AuthorAvatar username={item.actor.username} avatarUrl={item.actor.avatarUrl} size={AVATAR_SIZE} />
             )}
           </View>
           <View style={styles.grow}>
@@ -101,11 +102,12 @@ export function FeedRow({ item, onOpen, onFollowBack, following }: { item: Diges
 }
 
 const BADGE_SIZE = 32;
+const AVATAR_SIZE = 44;
 
 const styles = StyleSheet.create({
   grow: { flex: 1 },
   feedRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1 },
-  slot: { width: SLOT_WIDTH, height: SLOT_HEIGHT, justifyContent: "center" },
+  slot: { width: SLOT_WIDTH, height: SLOT_HEIGHT, justifyContent: "center", alignItems: "center" },
   // Sized explicitly rather than left to the avatar inside it: a box that
   // takes its height from its child sits flush against the slot's bottom
   // edge, where the ring reads as a flattened circle.

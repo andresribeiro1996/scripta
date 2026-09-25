@@ -56,6 +56,8 @@ test("content status names the state and its tone", () => {
   assert.deepEqual(contentStatus({ ...tierlist, votingOpen: false, promotedAt: "2026-09-01T00:00:00.000Z" }), { label: "Reference", tone: "reference" });
   assert.deepEqual(contentStatus(tournament), { label: "In progress", tone: "info" });
   assert.deepEqual(contentStatus({ ...tournament, status: "completed" }), { label: "Completed", tone: "success" });
+  assert.deepEqual(contentStatus({ ...tournament, viewerVoted: true }), { label: "In progress", tone: "info", votedBadge: true });
+  assert.deepEqual(contentStatus({ ...tournament, status: "completed", viewerVoted: true }), { label: "Completed", tone: "success", votedBadge: true });
 });
 
 test("content stats count books, and ballots for tier lists", () => {

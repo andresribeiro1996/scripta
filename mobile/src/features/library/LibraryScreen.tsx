@@ -2,8 +2,9 @@
 // panel it used to present as a modal (book detail, add, import, reorder,
 // share, per-book style and cover) is now a sibling route presented as a form
 // sheet, so each one is a real UISheetPresentationController the user can drag
-// away. Search now lives in the native header bar and the status/sort choices
-// in the overflow menu, so what is left here is the grid and selection mode.
+// away. Search lives in the native header bar, status in the swipeable tabs,
+// and sort in a pill above the grid it acts on, so what is left here is the
+// grid and selection mode.
 //
 // "Collections" is one more page in the same swipeable strip as the shelf
 // tabs, not a separate destination behind the overflow menu — Series and
@@ -11,11 +12,11 @@
 // both (they're the same underlying resource) as tappable rows into
 // GroupDetail; the standalone /collections route still exists for deep
 // links (e.g. Home's "Open collection", which goes straight to a group's
-// detail screen). The header search bar and its "+" button are re-pointed
+// detail screen). The header search bar and its "New" button are re-pointed
 // at groups instead of books while this tab is active.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, RefreshControl, StyleSheet, View } from "react-native";
+import { Alert, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import {
   bookKey,
@@ -32,8 +33,9 @@ import {
   type SortKey,
 } from "@scripta/shared";
 import { Button, EmptyState, ErrorState, IconButton, Input, Menu, Screen, Sheet, Skeleton, SwipeableTabs, type MenuItem } from "../../ui/components";
+import { Icon, dynamicType, useTheme } from "../../ui";
 import type { SearchBarCommands } from "react-native-screens";
-import { spacing } from "../../ui/theme";
+import { radii, spacing, typography } from "../../ui/theme";
 import { useMurals } from "../murals/useMurals";
 import { useLibrary } from "./hooks/useLibrary";
 import { useLibraryActions } from "./hooks/useLibraryActions";
@@ -46,6 +48,7 @@ type LibraryTab = LibraryStatusTab | "collections";
 const LIBRARY_TABS: readonly { value: LibraryTab; label: string }[] = [...LIBRARY_STATUS_TABS, { value: "collections", label: "Collections" }];
 
 export function LibraryScreen() {
+  const { colors } = useTheme();
   const { data: library, isPending, isError, error, refetch, isRefetching } = useLibrary();
   const actions = useLibraryActions();
   const murals = useMurals();
@@ -134,25 +137,6 @@ export function LibraryScreen() {
   }
 
   const actionItems: MenuItem[] = [
-    // Sort and Select act on the book grid, which isn't showing on the
-    // Collections tab — GroupsView has its own search and selection.
-    ...(onCollectionsTab
-      ? []
-      : [
-          {
-            // Sort used to sit above the grid as a row of pills, which cost
-            // real space before a single cover. As a submenu it reads the
-            // way the platform's own library apps present the same choice,
-            // and `selected` puts the tick on the live one. Status now
-            // lives in the swipeable tabs above the grid instead of here.
-            label: "Sort",
-            items: SORT_OPTIONS.map((option) => ({
-              label: option.label,
-              selected: option.value === sortKey,
-              onPress: () => setSortKey(option.value),
-            })),
-          },
-        ]),
     {
       label: "Rename library…",
       onPress: () => {
@@ -160,13 +144,19 @@ export function LibraryScreen() {
         setEditingName(true);
       },
     },
-    { label: "Add book…", onPress: () => router.push("/add-book" as never) },
     { label: "Import / sync…", onPress: () => router.push("/import" as never) },
     ...(books.length > 1 ? [{ label: "Reorder…", onPress: () => router.push("/reorder" as never) }] : []),
     ...(!onCollectionsTab && books.length > 0 ? [{ label: "Select…", onPress: () => setSelectionMode(true) }] : []),
     { label: "Library style…", onPress: () => router.push("/style" as never) },
     { label: "Share…", onPress: () => router.push("/share" as never) },
   ];
+
+  const sortLabel = SORT_OPTIONS.find((option) => option.value === sortKey)?.label ?? sortKey;
+  const sortItems: MenuItem[] = SORT_OPTIONS.map((option) => ({
+    label: option.label,
+    selected: option.value === sortKey,
+    onPress: () => setSortKey(option.value),
+  }));
 
   return (
     <Screen top={false}>
@@ -224,7 +214,9 @@ export function LibraryScreen() {
                 : undefined,
               headerRight: () => (
                 <View style={styles.headerActions}>
-                  {onCollectionsTab && <IconButton framed accessibilityLabel="New collection" name="add" onPress={() => groupsView.current?.startCreating()} />}
+                  {onCollectionsTab
+                    ? <IconButton framed accessibilityLabel="New collection" label="New" name="add" onPress={() => groupsView.current?.startCreating()} />
+                    : <IconButton framed accessibilityLabel="Add book" label="Add" name="add" onPress={() => router.push("/add-book" as never)} />}
                   <Menu title={library?.data.name || "Library"} items={actionItems}>
                     <IconButton framed accessibilityLabel="Library actions" name="more" />
                   </Menu>
@@ -267,45 +259,62 @@ export function LibraryScreen() {
           options={LIBRARY_TABS}
           value={statusFilter}
           onChange={setStatusFilter}
-          renderPage={(status) => {
-            if (status === "collections") return <GroupsView ref={groupsView} search={groupQuery} />;
-            const pageBooks = sortBooks(filterBooks(ordered, query, status), sortKey);
-            if (pageBooks.length === 0) {
-              return (
+        renderPage={(status) => {
+          if (status === "collections") return <GroupsView ref={groupsView} search={groupQuery} />;
+          const pageBooks = sortBooks(filterBooks(ordered, query, status), sortKey);
+          return (
+            <View style={styles.shelfPage}>
+              {/* Sort sits above the grid, not in the overflow menu: it acts on
+                  the shelf you're looking at, so it belongs next to it. */}
+              <View style={styles.shelfToolbar}>
+                <Menu title="Sort books" items={sortItems}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Sort books, currently ${sortLabel}`}
+                    style={({ pressed }) => [styles.sortPill, { borderColor: colors.border }, pressed ? { backgroundColor: colors.surfacePressed } : null]}
+                  >
+                    <Icon name="filter" size={14} color={colors.textDim} />
+                    <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.strong, { color: colors.text }]}>
+                      Sort · {sortLabel}
+                    </Text>
+                  </Pressable>
+                </Menu>
+              </View>
+              {pageBooks.length === 0 ? (
                 <EmptyState
                   title="No books match."
                   body="Every book is still here — the search above just doesn't match any of them."
                   actionLabel={toolbarActive ? "Clear search and sort" : undefined}
                   onAction={toolbarActive ? clearSearchAndFilters : undefined}
                 />
-              );
-            }
-            return (
-              <LibraryGrid
-                data={pageBooks}
-                keyExtractor={(book, i) => String(book.ContentID ?? i)}
-                style={style}
-                refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} />}
-                renderItem={(book) => {
-                  const seriesGroup = bookSeriesGroup.get(bookKey(book));
-                  const cardStyle = effectiveCardStyle(style, seriesGroup?.style, book._style as PerCardStyle | undefined);
-                  return (
-                    <BookCard
-                      book={book}
-                      onPress={() => router.push(`/book/${encodeURIComponent(bookKey(book))}` as never)}
-                      style={cardStyle}
-                      showActions
-                      onOpenStyle={selectionMode ? undefined : () => router.push(`/book/${encodeURIComponent(bookKey(book))}/style` as never)}
-                      onOpenCoverPicker={selectionMode ? undefined : () => router.push(`/book/${encodeURIComponent(bookKey(book))}/cover` as never)}
-                      selectable={selectionMode}
-                      selected={selectedKeys.has(bookKey(book))}
-                      onToggleSelect={handleToggleSelect}
-                    />
-                  );
-                }}
-              />
-            );
-          }}
+              ) : (
+                <LibraryGrid
+                  data={pageBooks}
+                  keyExtractor={(book, i) => String(book.ContentID ?? i)}
+                  style={style}
+                  refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} />}
+                  renderItem={(book) => {
+                    const seriesGroup = bookSeriesGroup.get(bookKey(book));
+                    const cardStyle = effectiveCardStyle(style, seriesGroup?.style, book._style as PerCardStyle | undefined);
+                    return (
+                      <BookCard
+                        book={book}
+                        onPress={() => router.push(`/book/${encodeURIComponent(bookKey(book))}` as never)}
+                        style={cardStyle}
+                        showActions
+                        onOpenStyle={selectionMode ? undefined : () => router.push(`/book/${encodeURIComponent(bookKey(book))}/style` as never)}
+                        onOpenCoverPicker={selectionMode ? undefined : () => router.push(`/book/${encodeURIComponent(bookKey(book))}/cover` as never)}
+                        selectable={selectionMode}
+                        selected={selectedKeys.has(bookKey(book))}
+                        onToggleSelect={handleToggleSelect}
+                      />
+                    );
+                  }}
+                />
+              )}
+            </View>
+          );
+        }}
         />
       )}
 
@@ -321,4 +330,8 @@ const styles = StyleSheet.create({
   loading: { padding: spacing.lg, gap: spacing.md },
   loadingRow: { flexDirection: "row", gap: spacing.md },
   headerActions: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  shelfPage: { flex: 1 },
+  shelfToolbar: { flexDirection: "row", paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
+  sortPill: { flexDirection: "row", alignItems: "center", gap: spacing.xs, alignSelf: "flex-start", minHeight: 32, paddingHorizontal: spacing.md, borderRadius: radii.full, borderWidth: 1 },
+  strong: { fontWeight: "700" },
 });

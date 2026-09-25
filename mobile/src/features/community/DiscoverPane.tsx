@@ -157,6 +157,7 @@ function DiscoverRow({ item }: { item: DiscoverItem }) {
             </View>
             <View style={styles.statusRow}>
               <StatusBadge label={status.label} tone={status.tone} />
+              {status.votedBadge ? <StatusBadge label="Voted" tone="info" /> : null}
               {contentStats(content).map((stat) => (
                 <Text key={stat.label} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
                   <Text style={[styles.strong, { color: colors.text }]}>{stat.value}</Text> {stat.label}
