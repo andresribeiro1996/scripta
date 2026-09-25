@@ -71,7 +71,13 @@ replace />`, otherwise → `<LandingPage />`. Sits outside every
 Byte-identical to the DESIGN.md tokens already in `frontend/src/index.css`:
 `bg #f5f4f2` page, `surface` cards, `text`/`text-dim`, `accent #a85c32`
 single primary action, `border` hairlines, `radius-xl` covers, `radius-md`
-buttons. Light theme only — the marketing page has no theme switch. Type:
+buttons. No theme switch — like every other screen, the page styles through
+the same `--color-*` token classes, so it follows the OS light/dark
+preference automatically and both palettes come free; the one token the page
+needs that `index.css` doesn't have yet is DESIGN.md's `on-accent` (CTA
+label color), added to both theme blocks. The nav/footer mark is
+`icon-512.png` (white glyph on dark square) — the only brand asset readable
+in both themes; `logo.png`/`scriptap.png` are dark-ink-on-transparent. Type:
 system stack everywhere except the hero display line, which uses the
 already-self-hosted Playfair Display from `frontend/public/fonts/`. Motion:
 existing 130–200ms `cubic-bezier(0.32, 0.72, 0, 1)` on hover/entrance,
@@ -87,6 +93,11 @@ breakpoints (stock Tailwind `sm`/`md`/`lg`).
   indirection)
 - `frontend/src/pages/LoginPage.tsx` — initialize mode from `?mode=`
 - `frontend/src/App.tsx` — the `/` route change
+- `frontend/src/lib/landing.ts` — both pure helpers (`landingDestination`,
+  `modeFromSearch`) in one importable module. Not inside the components:
+  node:test can't import a page module (`import.meta.env` access at module
+  load — the same reason `test-baseUrl.mts` tests `resolveApiUrl.ts` rather
+  than `baseUrl.ts`).
 - `frontend/scripts/test-landing.mts` — new test file, added to the `npm
   test` glob automatically (`scripts/test-*.mts`)
 
@@ -94,12 +105,10 @@ breakpoints (stock Tailwind `sm`/`md`/`lg`).
 
 The page has no data fetching and no forms — nothing to swallow. CTAs are
 plain anchors/`Link`s; store badges are external anchors with
-`rel="noreferrer"` and aria-labels. The only stateful logic is the
-logged-in redirect decision, which lives in a small exported pure helper
-(`landingDestination(session)` in `LandingPage.tsx`) so the route element
-stays trivial and the branch is unit-testable. The same trick pins the
-LoginPage param parse: an exported `modeFromSearch(params)` next to the
-component.
+`rel="noreferrer"` and aria-labels. The only stateful logic — the
+logged-in redirect decision and the LoginPage param parse — lives in
+`src/lib/landing.ts` as exported pure functions, so the components stay
+trivial and the branches are unit-testable.
 
 ## Testing & verification
 
