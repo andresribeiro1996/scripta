@@ -107,11 +107,14 @@ export function ArenaShowcase() {
     <section id="arena" className="scroll-mt-14">
       <div className="mx-auto max-w-6xl px-4 py-16 lg:py-24">
         <div className="max-w-2xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-(--color-accent)">The arena</p>
+          <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-(--color-text-dim)">
+            <span aria-hidden className="h-px w-4 bg-(--color-accent)" />
+            The arena
+          </p>
           <h2 className="mt-3 text-3xl font-bold sm:text-4xl" style={{ fontFamily: '"Playfair Display", serif' }}>
             Settle it with tournaments
           </h2>
-          <p className="mt-3 text-lg text-(--color-text-dim)">
+          <p className="text-pretty mt-3 text-lg text-(--color-text-dim)">
             Seed a tournament bracket with your books and vote through the
             duels until a champion emerges. Drag your shelf onto a tier list.
             Every tournament ends ranked, with a result worth sharing.

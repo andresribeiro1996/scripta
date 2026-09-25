@@ -78,11 +78,14 @@ export function FeatureGrid() {
   return (
     <section id="features" className="scroll-mt-14">
       <div className="mx-auto max-w-6xl px-4 py-16 lg:py-24">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-(--color-accent)">The essentials</p>
+        <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-(--color-text-dim)">
+          <span aria-hidden className="h-px w-4 bg-(--color-accent)" />
+          The essentials
+        </p>
         <h2 className="mt-3 text-3xl font-bold sm:text-4xl" style={{ fontFamily: '"Playfair Display", serif' }}>
           A library taken seriously
         </h2>
-        <p className="mt-3 max-w-2xl text-lg text-(--color-text-dim)">
+        <p className="text-pretty mt-3 max-w-2xl text-lg text-(--color-text-dim)">
           Import once, then shape everything — Scripta is built around what a
           personal library can do that a spreadsheet can't.
         </p>

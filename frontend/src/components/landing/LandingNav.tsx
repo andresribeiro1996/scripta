@@ -23,7 +23,7 @@ export function LandingNav() {
         </nav>
         <Link
           to="/login"
-          className="rounded-lg bg-(--color-accent) px-4 py-2 text-sm font-semibold text-(--color-on-accent) transition-opacity hover:opacity-90"
+          className="flex min-h-11 items-center rounded-lg bg-(--color-accent) px-4 text-sm font-semibold text-(--color-on-accent) transition-opacity hover:opacity-90"
         >
           Sign in
         </Link>

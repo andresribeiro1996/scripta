@@ -46,7 +46,7 @@ export function LandingHero() {
               >
                 The library behind your Kobo, finally on display.
               </h1>
-              <p className="mt-5 max-w-lg text-lg leading-relaxed text-(--color-bg)/70">
+              <p className="mt-5 max-w-lg text-pretty text-lg leading-relaxed text-(--color-bg)/70">
                 Scripta imports your reading history and keeps it the way a
                 private library deserves — styled book cards, murals worth
                 publishing, and tournaments that settle what's best.
@@ -54,13 +54,13 @@ export function LandingHero() {
               <div className="mt-9 flex flex-wrap items-center gap-3">
                 <Link
                   to="/login?mode=signup"
-                  className="rounded-lg bg-(--color-accent) px-6 py-3 text-base font-semibold text-(--color-on-accent) transition-opacity hover:opacity-90"
+                  className="rounded-lg bg-(--color-accent) px-6 py-3 text-base font-semibold text-(--color-on-accent) transition-opacity hover:opacity-90 focus-visible:outline-(--color-bg)"
                 >
                   Create your library
                 </Link>
                 <a
                   href="#features"
-                  className="rounded-lg border border-(--color-bg)/30 px-6 py-3 text-base font-semibold transition-colors hover:bg-(--color-bg)/10"
+                  className="rounded-lg border border-(--color-bg)/30 px-6 py-3 text-base font-semibold transition-colors hover:bg-(--color-bg)/10 focus-visible:outline-(--color-bg)"
                 >
                   See how it works
                 </a>

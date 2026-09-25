@@ -23,11 +23,14 @@ export function ReaderCards() {
     <section className="scroll-mt-14">
       <div className="mx-auto max-w-6xl px-4 py-16 lg:py-24">
         <div className="max-w-2xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-(--color-accent)">Reader cards</p>
+          <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-(--color-text-dim)">
+            <span aria-hidden className="h-px w-4 bg-(--color-accent)" />
+            Reader cards
+          </p>
           <h2 className="mt-3 text-3xl font-bold sm:text-4xl" style={{ fontFamily: '"Playfair Display", serif' }}>
             Eight reader identities, engraved
           </h2>
-          <p className="mt-3 text-lg text-(--color-text-dim)">
+          <p className="text-pretty mt-3 text-lg text-(--color-text-dim)">
             Scripta marks a reading life the way books used to be signed — with
             a plate. Yours reflects how you read: the notes you keep, the maps
             you draw, the tournaments you take.
