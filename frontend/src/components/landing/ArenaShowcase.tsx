@@ -5,21 +5,15 @@ const tiers = [
   { label: "C", color: "#5c9e5c" },
 ];
 
-function MiniCover({ from, to, className = "" }: { from: string; to: string; className?: string }) {
-  return (
-    <div
-      className={`h-12 w-8 shrink-0 rounded-md ${className}`}
-      style={{ background: `linear-gradient(160deg, ${from}, ${to})` }}
-    />
-  );
+function MiniCover({ src, className = "" }: { src: string; className?: string }) {
+  return <img src={`/covers/${src}.jpg`} alt="" loading="lazy" className={`h-12 w-8 shrink-0 rounded-md object-cover ${className}`} />;
 }
 
-function SmallCover({ from, to, winner }: { from: string; to: string; winner: boolean }) {
+function SmallCover({ src, winner }: { src: string; winner: boolean }) {
   return (
     <MiniCover
-      from={from}
-      to={to}
-      className={winner ? "h-9 w-6 rounded ring-2 ring-(--color-accent)" : "h-9 w-6 rounded opacity-45"}
+      src={src}
+      className={winner ? "h-9 w-6 ring-2 ring-(--color-accent)" : "h-9 w-6 opacity-45"}
     />
   );
 }
@@ -31,10 +25,10 @@ function DuelMockup() {
       <div className="mt-4 flex flex-1 items-center">
         <div className="flex flex-1 items-stretch justify-center gap-3">
           <div className="flex flex-1 items-center justify-center rounded-lg border-2 border-(--color-accent) p-3">
-            <MiniCover from="#a85c32" to="#5c3a24" />
+            <MiniCover src="piranesi" />
           </div>
           <div className="flex flex-1 items-center justify-center rounded-lg border-2 border-(--color-border) p-3">
-            <MiniCover from="#285f7a" to="#173544" />
+            <MiniCover src="hail-mary" />
           </div>
         </div>
       </div>
@@ -49,8 +43,8 @@ function DuelMockup() {
 function BracketMatch({ winnerLeft }: { winnerLeft: boolean }) {
   return (
     <div className="flex items-center justify-center gap-1.5 rounded-lg border border-(--color-border) bg-(--color-bg) px-2 py-1.5">
-      <SmallCover from="#6b4f8f" to="#3c2d54" winner={winnerLeft} />
-      <SmallCover from="#47713c" to="#2a4224" winner={!winnerLeft} />
+      <SmallCover src="circe" winner={winnerLeft} />
+      <SmallCover src="normal-people" winner={!winnerLeft} />
     </div>
   );
 }
@@ -92,9 +86,9 @@ function TierRowsMockup() {
             {tier.label}
           </span>
           <div className="flex gap-1.5">
-            <MiniCover from="#6b4f8f" to="#3c2d54" />
-            <MiniCover from="#47713c" to="#2a4224" />
-            <MiniCover from="#b3432f" to="#5f241a" />
+            <MiniCover src="gilead" />
+            <MiniCover src="sapiens" />
+            <MiniCover src="achilles" />
           </div>
         </div>
       ))}
@@ -114,7 +108,7 @@ export function ArenaShowcase() {
           <h2 className="mt-3 text-3xl font-bold sm:text-4xl" style={{ fontFamily: '"Playfair Display", serif' }}>
             Settle it with tournaments
           </h2>
-          <p className="text-pretty mt-3 text-lg text-(--color-text-dim)">
+          <p className="mt-3 text-pretty text-lg text-(--color-text-dim)">
             Seed a tournament bracket with your books and vote through the
             duels until a champion emerges. Drag your shelf onto a tier list.
             Every tournament ends ranked, with a result worth sharing.

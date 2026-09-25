@@ -9,28 +9,16 @@ const identities = [
   { numeral: "VIII", name: "The Loyalist", slug: "viii-loyal" },
 ];
 
-function Plate({ slug }: { slug: string }) {
-  return (
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcSet={`/reader-cards/${slug}-reversed.svg`} />
-      <img src={`/reader-cards/${slug}-paper.svg`} alt="" loading="lazy" className="w-full" />
-    </picture>
-  );
-}
-
 export function ReaderCards() {
   return (
-    <section className="scroll-mt-14">
+    <section className="scroll-mt-14 bg-(--color-text) text-(--color-bg)">
       <div className="mx-auto max-w-6xl px-4 py-16 lg:py-24">
         <div className="max-w-2xl">
-          <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-(--color-text-dim)">
-            <span aria-hidden className="h-px w-4 bg-(--color-accent)" />
-            Reader cards
-          </p>
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-(--color-accent-soft)">Ex libris — reader cards</p>
           <h2 className="mt-3 text-3xl font-bold sm:text-4xl" style={{ fontFamily: '"Playfair Display", serif' }}>
             Eight reader identities, engraved
           </h2>
-          <p className="text-pretty mt-3 text-lg text-(--color-text-dim)">
+          <p className="mt-3 text-pretty text-lg text-(--color-bg)/70">
             Scripta marks a reading life the way books used to be signed — with
             a plate. Yours reflects how you read: the notes you keep, the maps
             you draw, the tournaments you take.
@@ -38,10 +26,15 @@ export function ReaderCards() {
         </div>
         <div className="mt-12 grid grid-cols-2 gap-x-4 gap-y-10 sm:grid-cols-3 lg:grid-cols-4">
           {identities.map((identity) => (
-            <figure key={identity.slug}>
-              <Plate slug={identity.slug} />
+            <figure key={identity.slug} className="transition-transform duration-150 hover:-translate-y-1">
+              <img
+                src={`/reader-cards/${identity.slug}-paper.svg`}
+                alt=""
+                loading="lazy"
+                className="w-full shadow-[0_14px_40px_rgba(0,0,0,0.45)]"
+              />
               <figcaption className="mt-3 text-center">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-(--color-text-dim)">{identity.numeral}</span>
+                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-(--color-bg)/60">{identity.numeral}</span>
                 <span className="mt-0.5 block text-sm font-semibold" style={{ fontFamily: '"Playfair Display", serif' }}>
                   {identity.name}
                 </span>

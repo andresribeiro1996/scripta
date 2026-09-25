@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 export const APP_STORE_URL = "#";
 export const PLAY_STORE_URL = "#";
 
-const gridCovers = ["#a85c32", "#285f7a", "#6b4f8f", "#47713c", "#b3432f", "#a85c32"];
+const gridCovers = ["piranesi", "hail-mary", "circe", "gilead", "achilles", "normal-people"];
 
 function StoreBadge({ href, store, label }: { href: string; store: string; label: string }) {
   return (
@@ -57,8 +57,8 @@ export function GetApp() {
                 Scripta
               </div>
               <div className="grid grid-cols-3 gap-1.5 p-2">
-                {gridCovers.map((hex, index) => (
-                  <div key={index} className="aspect-[2/3] rounded-md" style={{ background: `linear-gradient(160deg, ${hex}, rgba(0,0,0,0.45)), ${hex}` }} />
+                {gridCovers.map((cover) => (
+                  <img key={cover} src={`/covers/${cover}.jpg`} alt="" loading="lazy" className="aspect-[2/3] rounded-md object-cover" />
                 ))}
               </div>
             </div>

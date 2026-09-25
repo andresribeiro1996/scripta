@@ -68,9 +68,11 @@ const features: { title: string; body: string; icon: ReactNode }[] = [
 
 function FeatureIcon({ children }: { children: ReactNode }) {
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      {children}
-    </svg>
+    <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-(--color-accent-soft)">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        {children}
+      </svg>
+    </span>
   );
 }
 
@@ -89,9 +91,9 @@ export function FeatureGrid() {
           Import once, then shape everything — Scripta is built around what a
           personal library can do that a spreadsheet can't.
         </p>
-        <div className="mt-12 grid gap-x-10 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {features.map((feature) => (
-            <div key={feature.title} className="border-t border-(--color-border) pt-6">
+            <div key={feature.title} className="rounded-xl border border-(--color-border) bg-(--color-surface) p-6">
               <FeatureIcon>{feature.icon}</FeatureIcon>
               <h3 className="mt-4 text-lg font-semibold" style={{ fontFamily: '"Playfair Display", serif' }}>
                 {feature.title}

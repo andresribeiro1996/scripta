@@ -22,7 +22,7 @@ export function LandingFooter() {
           </div>
         </div>
         <p className="mt-10 border-t border-(--color-border) pt-6 text-[11px] font-semibold uppercase tracking-[0.18em] text-(--color-text-dim)">
-          Atmyshelf.com · set in Playfair Display
+          Atmyshelf.com · set in Playfair Display · cover art via Open Library
         </p>
       </div>
     </footer>

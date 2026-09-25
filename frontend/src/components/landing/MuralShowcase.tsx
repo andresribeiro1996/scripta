@@ -1,10 +1,4 @@
-const shelfCovers = [
-  { from: "#a85c32", to: "#5c3a24" },
-  { from: "#285f7a", to: "#173544" },
-  { from: "#47713c", to: "#2a4224" },
-  { from: "#6b4f8f", to: "#3c2d54" },
-  { from: "#b3432f", to: "#5f241a" },
-];
+const shelfCovers = ["piranesi", "circe", "hail-mary", "sapiens", "achilles"];
 
 export function MuralShowcase() {
   return (
@@ -27,12 +21,8 @@ export function MuralShowcase() {
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="rounded-xl border border-(--color-border) bg-(--color-surface) p-4 sm:col-span-2">
             <div className="flex gap-2 overflow-hidden">
-              {shelfCovers.map((cover, index) => (
-                <div
-                  key={index}
-                  className="aspect-[2/3] w-14 shrink-0 rounded-md"
-                  style={{ background: `linear-gradient(160deg, ${cover.from}, ${cover.to})` }}
-                />
+              {shelfCovers.map((cover) => (
+                <img key={cover} src={`/covers/${cover}.jpg`} alt="" loading="lazy" className="aspect-[2/3] w-14 shrink-0 rounded-md object-cover" />
               ))}
             </div>
           </div>
