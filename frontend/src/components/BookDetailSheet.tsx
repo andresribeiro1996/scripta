@@ -1,7 +1,7 @@
 import { CoverImage } from "./BookCard";
 import { BookSummary } from "./BookSummary";
 import { statusLabel } from "../lib/covers";
-import { nextReadStatus } from "../lib/libraryView";
+import type { ReadStatus } from "../lib/libraryView";
 import { useDismissible } from "../hooks/useDismissible";
 import { useScrollLock } from "../hooks/useScrollLock";
 
@@ -15,7 +15,7 @@ export function BookDetailSheet({
   book: Record<string, unknown>;
   onOpenStyle: (book: Record<string, unknown>) => void;
   onOpenCoverPicker: (book: Record<string, unknown>) => void;
-  onSetStatus: (book: Record<string, unknown>) => void;
+  onSetStatus: (book: Record<string, unknown>, status: ReadStatus) => void;
   onClose: () => void;
 }) {
   useScrollLock();
@@ -66,9 +66,24 @@ export function BookDetailSheet({
               <button onClick={() => onOpenCoverPicker(book)} className={actionClass}>
                 Cover
               </button>
-              <button onClick={() => onSetStatus(book)} className={actionClass}>
-                Mark as {statusLabel(nextReadStatus(book.ReadStatus))}
-              </button>
+            </div>
+
+            <div role="radiogroup" aria-label="Reading status" className="mt-3 inline-flex rounded-lg border border-(--color-border) p-0.5">
+              {([0, 1, 2] as const).map((status) => {
+                const checked = (book.ReadStatus === 1 || book.ReadStatus === 2 ? book.ReadStatus : 0) === status;
+                return (
+                  <button
+                    key={status}
+                    type="button"
+                    role="radio"
+                    aria-checked={checked}
+                    onClick={() => { if (!checked) onSetStatus(book, status); }}
+                    className={`min-h-11 rounded-md px-3 text-sm font-medium ${checked ? "bg-(--color-accent) text-white" : "text-(--color-text-dim) hover:bg-(--color-surface-hover)"}`}
+                  >
+                    {statusLabel(status)}
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
