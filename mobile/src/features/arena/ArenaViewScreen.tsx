@@ -2,8 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Stack } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import * as Linking from "expo-linking";
-import { RefreshControl, ScrollView, Share, StyleSheet, Text, View } from "react-native";
+import { RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { createVoterToken } from "@scripta/shared";
 import { useAuth } from "../../core/auth";
 import { Button, Dialog, EmptyState, ErrorState, IconButton, Input, Menu, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, spacing, typography, useTheme } from "../../ui";
@@ -15,6 +14,8 @@ import { ArenaBooksSheet } from "./ArenaBooksSheet";
 import { BracketMap } from "./BracketMap";
 import { BracketRounds } from "./BracketRounds";
 import { BracketViewToggle, type BracketView } from "./BracketViewToggle";
+import { ContentShareSheet } from "../sharing/ContentShareSheet";
+import { publicContentUrl } from "../sharing/links";
 import { ChampionBanner } from "./ChampionBanner";
 
 const TOKEN_KEY = "arena-voter-token";
@@ -29,6 +30,7 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
   const [error, setError] = useState<string | null>(null);
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState("");
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [booksOpen, setBooksOpen] = useState(false);
   // Frozen on the first render that has data, never recomputed: casting the
   // last vote empties `votable`, and a landing tab that kept recalculating
@@ -173,16 +175,18 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
           headerShown: true,
           title: data.name,
           headerRight: () => (
+            <View style={{ flexDirection: "row", gap: spacing.sm }}>
+            <IconButton framed name="share" accessibilityLabel="Share tournament" onPress={() => void action("share", async () => setShareUrl(await publicContentUrl(`/arena/${encodeURIComponent(id)}`)))} />
             <Menu
               title={data.name}
               items={[
                 { label: data.slots.length ? `See all ${data.slots.length} books` : "View book pool", onPress: () => setBooksOpen(true) },
                 ...(isOwner ? [{ label: "Rename…", onPress: () => { setName(data.name); setRenaming(true); } }] : []),
-                { label: "Share…", onPress: () => void Share.share({ message: Linking.createURL(`/arena/${id}`) }) },
               ]}
             >
               <IconButton accessibilityLabel={`Actions for ${data.name}`} framed name="more" />
             </Menu>
+            </View>
           ),
         }}
       />
@@ -194,6 +198,7 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
         onChange={setTab}
         renderPage={(pageTab) => pageTab === "match" ? matchPane() : bracketPane()}
       />
+      <ContentShareSheet visible={shareUrl !== null} onClose={() => setShareUrl(null)} title={data.name} url={shareUrl} />
       <ArenaBooksSheet id={booksOpen ? id : null} name={data.name} onAddBook={openAddBook} onClose={() => setBooksOpen(false)} />
       {addBook ? <AddBookSheet book={addBook} onClose={() => setAddBook(null)} /> : null}
       <Dialog visible={renaming} title="Rename tournament" onClose={() => setRenaming(false)}><View style={styles.dialog}><Input label="Tournament name" value={name} onChangeText={setName} maxLength={200} /><Button label="Save name" disabled={!name.trim()} loading={busy === "rename"} onPress={() => void action("rename", async () => { await renameTournament(id, name.trim()); setRenaming(false); })} /></View></Dialog>
