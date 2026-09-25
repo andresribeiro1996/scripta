@@ -70,7 +70,7 @@ function updateWithViewTransition(applyUpdate: () => void) {
 export function LibraryPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { scrubBooks } = useMurals();
   const { data: library, isLoading, updateLibrary, share: shareLibraryDoc, unshare: unshareLibraryDoc } = useLibrary();
   const toast = useToast();
@@ -95,6 +95,10 @@ export function LibraryPage() {
   const [sharing, setSharing] = useState(false);
   const [query, setQuery] = useState(searchParams.get("q") ?? "");
   useEffect(() => { setQuery(searchParams.get("q") ?? ""); setAddingBook(searchParams.get("action") === "add"); }, [searchParams]);
+  const bookParam = searchParams.get("book");
+  useEffect(() => {
+    if (bookParam) setDetailBookKey(bookParam);
+  }, [bookParam]);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sortKey, setSortKey] = useState<SortKey>("manual");
 
@@ -656,7 +660,14 @@ export function LibraryPage() {
           onOpenStyle={(b) => setStyleBookKey(bookKey(b))}
           onOpenCoverPicker={(b) => setCoverBookKey(bookKey(b))}
           onSetStatus={(b) => void handleSetBookStatus(b)}
-          onClose={() => setDetailBookKey(null)}
+          onClose={() => {
+            setDetailBookKey(null);
+            if (searchParams.has("book")) {
+              const next = new URLSearchParams(searchParams);
+              next.delete("book");
+              setSearchParams(next, { replace: true });
+            }
+          }}
         />
       )}
 
