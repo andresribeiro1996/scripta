@@ -26,6 +26,12 @@ function fakeService(overrides: Partial<CommunityService> = {}): CommunityServic
     getFollowState: () => ({ following: false, followerCount: 0, followingCount: 0 }),
     publishProfile: () => {},
     unpublishProfile: () => {},
+    getOwnProfile: () => {
+      throw new ProfileNotFoundError();
+    },
+    setShelfMural: () => {
+      throw new ProfileNotFoundError();
+    },
     getProfileByUsername: () => {
       throw new ProfileNotFoundError();
     },
@@ -159,6 +165,32 @@ test("feed-settings PUT validates the body and records the update", async () => 
   });
   assert.equal(good.statusCode, 204);
   assert.deepEqual(calls, [{ userId: "viewer", settings: { publications: false, reading: true, votes: false, follows: true } }]);
+  await app.close();
+});
+
+test("own profile GET and shelf mural PUT are authed and validate the body", async () => {
+  const calls: Array<Record<string, unknown>> = [];
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", () => ({ id: "viewer", email: "v@example.test", username: "v", avatarId: null }));
+  await app.register(
+    buildCommunityRoutes(
+      fakeService({
+        getOwnProfile: (userId) => ({ muralId: userId === "viewer" ? "m1" : null, published: false, feedSettings: { publications: true, reading: false, votes: true, follows: true } }),
+        setShelfMural: (userId, muralId) => {
+          calls.push({ userId, muralId });
+        }
+      })
+    )
+  );
+  const auth = { authorization: "Bearer x" };
+  const own = await app.inject({ method: "GET", url: "/community/profile", headers: auth });
+  assert.equal(own.statusCode, 200);
+  assert.equal(own.json().muralId, "m1");
+  const bad = await app.inject({ method: "PUT", url: "/community/profile/mural", headers: auth, payload: {} });
+  assert.equal(bad.statusCode, 400);
+  const good = await app.inject({ method: "PUT", url: "/community/profile/mural", headers: auth, payload: { muralId: "m2" } });
+  assert.equal(good.statusCode, 204);
+  assert.deepEqual(calls, [{ userId: "viewer", muralId: "m2" }]);
   await app.close();
 });
 

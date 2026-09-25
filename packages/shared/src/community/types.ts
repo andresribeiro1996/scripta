@@ -93,6 +93,12 @@ export interface FeedSettings {
   follows: boolean;
 }
 
+export interface OwnProfile {
+  muralId: string | null;
+  published: boolean;
+  feedSettings: FeedSettings;
+}
+
 export interface BookRecommendationInput {
   title: string;
   author: string;
