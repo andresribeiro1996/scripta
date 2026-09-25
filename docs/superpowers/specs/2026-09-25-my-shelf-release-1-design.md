@@ -299,6 +299,11 @@ API.
   moment's Done/undo design should account for that.
 - Device pass: include a failed or slow status save. iOS's native picker
   keeps the tapped option after a failure.
+- From PR 2's final review: book routes live in the shared
+  `(home,library)` group. `book/[key]/finished` must go there too and be
+  declared as a sheet in both `(home)/_layout.tsx` and
+  `(library)/_layout.tsx`. Without the Home declaration, it opens as a
+  plain pushed screen instead of a sheet.
 
 ## Delivery
 
