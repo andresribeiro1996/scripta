@@ -11,8 +11,11 @@ export function MuralShowcase() {
     <section id="murals" className="scroll-mt-14 border-y border-(--color-border)">
       <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-16 lg:grid-cols-2 lg:py-24">
         <div>
-          <h2 className="text-3xl font-bold">Murals: your library, composed</h2>
-          <p className="mt-3 max-w-xl text-lg text-(--color-text-dim)">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-(--color-accent)">Murals</p>
+          <h2 className="mt-3 text-3xl font-bold sm:text-4xl" style={{ fontFamily: '"Playfair Display", serif' }}>
+            Your library, composed
+          </h2>
+          <p className="mt-3 text-lg text-(--color-text-dim)">
             Drag shelves, quotes, stats and photos onto a freeform canvas.
             Publish it at a link that shows your reading life the way you want
             it told.

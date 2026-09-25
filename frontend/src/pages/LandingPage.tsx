@@ -2,12 +2,13 @@ import { Navigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { landingDestination } from "../lib/landing";
 import { LandingNav } from "../components/landing/LandingNav";
-import { LandingFooter } from "../components/landing/LandingFooter";
 import { LandingHero } from "../components/landing/LandingHero";
 import { FeatureGrid } from "../components/landing/FeatureGrid";
+import { ReaderCards } from "../components/landing/ReaderCards";
 import { MuralShowcase } from "../components/landing/MuralShowcase";
 import { ArenaShowcase } from "../components/landing/ArenaShowcase";
 import { GetApp } from "../components/landing/GetApp";
+import { LandingFooter } from "../components/landing/LandingFooter";
 
 export function LandingPage() {
   const { session } = useAuth();
@@ -19,6 +20,7 @@ export function LandingPage() {
       <main>
         <LandingHero />
         <FeatureGrid />
+        <ReaderCards />
         <MuralShowcase />
         <ArenaShowcase />
         <GetApp />

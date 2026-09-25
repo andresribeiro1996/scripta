@@ -24,8 +24,11 @@ export function GetApp() {
     <section id="app" className="scroll-mt-14 border-t border-(--color-border)">
       <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-16 lg:grid-cols-2 lg:py-24">
         <div>
-          <h2 className="text-3xl font-bold">Take your library off the desk</h2>
-          <p className="mt-3 max-w-xl text-lg text-(--color-text-dim)">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-(--color-accent)">Get the app</p>
+          <h2 className="mt-3 text-3xl font-bold sm:text-4xl" style={{ fontFamily: '"Playfair Display", serif' }}>
+            Your library, in your pocket
+          </h2>
+          <p className="mt-3 text-lg text-(--color-text-dim)">
             The mobile app puts your shelves, murals and arena votes in your
             pocket — or keep using Scripta right in the browser.
           </p>

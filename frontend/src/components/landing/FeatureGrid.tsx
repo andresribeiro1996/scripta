@@ -2,8 +2,8 @@ import type { ReactNode } from "react";
 
 const features: { title: string; body: string; icon: ReactNode }[] = [
   {
-    title: "Import from Kobo & Goodreads",
-    body: "The exporter reads your Kobo's own database right off its USB drive; Goodreads comes in as a CSV. Your ratings, shelves and notes come with you.",
+    title: "Import from Kobo, Goodreads & StoryGraph",
+    body: "The exporter reads your Kobo's own database right off its USB drive; Goodreads and StoryGraph come in as CSVs. Your ratings, shelves and notes come with you.",
     icon: (
       <>
         <path d="M12 3v11m0 0 4-4m-4 4-4-4" />
@@ -68,11 +68,9 @@ const features: { title: string; body: string; icon: ReactNode }[] = [
 
 function FeatureIcon({ children }: { children: ReactNode }) {
   return (
-    <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-(--color-accent-soft) text-(--color-accent)">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        {children}
-      </svg>
-    </span>
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {children}
+    </svg>
   );
 }
 
@@ -80,16 +78,21 @@ export function FeatureGrid() {
   return (
     <section id="features" className="scroll-mt-14">
       <div className="mx-auto max-w-6xl px-4 py-16 lg:py-24">
-        <h2 className="text-3xl font-bold">Everything your reading history wants to be</h2>
-        <p className="mt-3 max-w-xl text-lg text-(--color-text-dim)">
-          Import once, then shape it — Scripta is built around what a personal
-          library can do that a spreadsheet can't.
+        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-(--color-accent)">The essentials</p>
+        <h2 className="mt-3 text-3xl font-bold sm:text-4xl" style={{ fontFamily: '"Playfair Display", serif' }}>
+          A library taken seriously
+        </h2>
+        <p className="mt-3 max-w-2xl text-lg text-(--color-text-dim)">
+          Import once, then shape everything — Scripta is built around what a
+          personal library can do that a spreadsheet can't.
         </p>
-        <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-12 grid gap-x-10 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
           {features.map((feature) => (
-            <div key={feature.title} className="rounded-xl border border-(--color-border) bg-(--color-surface) p-6">
+            <div key={feature.title} className="border-t border-(--color-border) pt-6">
               <FeatureIcon>{feature.icon}</FeatureIcon>
-              <h3 className="mt-4 font-semibold">{feature.title}</h3>
+              <h3 className="mt-4 text-lg font-semibold" style={{ fontFamily: '"Playfair Display", serif' }}>
+                {feature.title}
+              </h3>
               <p className="mt-2 text-sm leading-relaxed text-(--color-text-dim)">{feature.body}</p>
             </div>
           ))}
