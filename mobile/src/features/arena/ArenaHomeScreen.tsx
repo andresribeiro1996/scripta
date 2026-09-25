@@ -71,7 +71,7 @@ export function ArenaHomeScreen() {
         // The bottom tab already reads "Arena"; a large title spends a third of
         // the screen repeating it above a list that has nowhere else to go.
         headerLargeTitleEnabled: false,
-        headerRight: () => <IconButton accessibilityLabel="Browse games" label="Browse" name="public" onPress={() => router.push("/arena" as never)} />,
+        headerRight: () => <IconButton framed accessibilityLabel="Browse games" label="Browse" name="public" onPress={() => router.push("/arena" as never)} />,
       }}
     />
     {error ? <Toast visible message={error} tone="error" /> : null}
@@ -95,7 +95,8 @@ export function ArenaHomeScreen() {
       }}
     />
     <Fab
-      label={tab === "tournaments" ? "New tournament" : "New tier list"}
+      label="New"
+      accessibilityLabel={tab === "tournaments" ? "New tournament" : "New tier list"}
       loading={busy && !deleting}
       onPress={() => tab === "tournaments" ? router.push("/seed/new" as never) : router.push("/tierlist/new" as never)}
     />

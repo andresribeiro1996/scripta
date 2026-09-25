@@ -97,6 +97,7 @@ function createDeps(repo: CommunityRepository) {
   const byNewest = <T extends { createdAt: string }>(a: T, b: T) => b.createdAt.localeCompare(a.createdAt);
   const seenAt = { value: null as string | null };
   const votes = new Set<string>();
+  const tournamentVotes = new Set<string>();
   const deps: CommunityDeps = {
     repo,
     getDashboardSeenAt: () => seenAt.value,
@@ -133,10 +134,11 @@ function createDeps(repo: CommunityRepository) {
     tournaments: {
       list: (limit, offset) => [...tournamentRefs.values()].sort(byNewest).slice(offset, offset + limit),
       get: (id) => tournamentRefs.get(id),
-      listByOwner: (owner) => [...tournamentRefs.values()].filter((r) => r.ownerUserId === owner).sort(byNewest)
+      listByOwner: (owner) => [...tournamentRefs.values()].filter((r) => r.ownerUserId === owner).sort(byNewest),
+      listVotedByUser: (voter) => [...tournamentRefs.values()].filter((r) => tournamentVotes.has(`${voter}:${r.id}`)).sort(byNewest)
     }
   };
-  return { deps, readerProfiles, usernames, ownedMurals, muralPayloads, libraries, tierlistRefs, tournamentRefs, seenAt, votes };
+  return { deps, readerProfiles, usernames, ownedMurals, muralPayloads, libraries, tierlistRefs, tournamentRefs, seenAt, votes, tournamentVotes };
 }
 
 function profileRow(userId: string, overrides: Partial<ProfileRow> = {}): ProfileRow {
@@ -185,13 +187,12 @@ export function tournRef(id: string, owner: string, overrides: Partial<Published
   };
 }
 
-test("follow requires the target to have a published profile", () => {
-  const { repo, profiles } = createRepoFake();
-  const { deps } = createDeps(repo);
+test("follow needs an existing user, not a published profile", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles } = createDeps(repo);
   const service = createCommunityService(deps);
-  profiles.set("alice", profileRow("alice", { published: 0 }));
-  assert.throws(() => service.follow("bob", "alice"), ProfileNotFoundError);
-  profiles.set("alice", profileRow("alice"));
+  assert.throws(() => service.follow("bob", "ghost"), ProfileNotFoundError);
+  readerProfiles.set("alice", reader("alice"));
   service.follow("bob", "alice");
   assert.throws(() => service.follow("bob", "bob"), SelfFollowError);
   service.follow("bob", "alice");
@@ -206,11 +207,11 @@ test("unfollow without an existing follow throws", () => {
 });
 
 test("follow state reports direction-specific counts", () => {
-  const { repo, profiles } = createRepoFake();
-  const { deps } = createDeps(repo);
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles } = createDeps(repo);
   const service = createCommunityService(deps);
-  profiles.set("alice", profileRow("alice"));
-  profiles.set("dave", profileRow("dave"));
+  readerProfiles.set("alice", reader("alice"));
+  readerProfiles.set("dave", reader("dave"));
   service.follow("bob", "alice");
   service.follow("carol", "alice");
   service.follow("alice", "dave");
@@ -470,19 +471,21 @@ test("promoted references remain discoverable after the creator disappears", () 
   assert.equal(items[0]?.content.kind, "tierlist");
 });
 
-test("discover marks the tier lists the viewer has voted in, and only for a signed-in viewer", () => {
+test("discover marks the content the viewer has voted in, and only for a signed-in viewer", () => {
   const { repo } = createRepoFake();
-  const { deps, readerProfiles, tierlistRefs, tournamentRefs, votes } = createDeps(repo);
+  const { deps, readerProfiles, tierlistRefs, tournamentRefs, votes, tournamentVotes } = createDeps(repo);
   const service = createCommunityService(deps);
   readerProfiles.set("alice", reader("alice"));
   tierlistRefs.set("t1", tierRef("t1", "alice", { createdAt: "2026-09-03T00:00:00.000Z" }));
   tierlistRefs.set("t2", tierRef("t2", "alice", { createdAt: "2026-09-02T00:00:00.000Z" }));
   tournamentRefs.set("g1", tournRef("g1", "alice", { createdAt: "2026-09-01T00:00:00.000Z" }));
+  tournamentRefs.set("g2", tournRef("g2", "alice", { createdAt: "2026-08-31T00:00:00.000Z" }));
   votes.add("viewer:t1");
+  tournamentVotes.add("viewer:g1");
 
-  const voted = (items: DiscoverItem[]) => items.map((item) => (item.content.kind === "tierlist" ? item.content.viewerVoted : "n/a"));
-  assert.deepEqual(voted(service.getDiscover("all", "", 10, 0, "viewer").items), [true, false, "n/a"]);
-  assert.deepEqual(voted(service.getDiscover("all", "", 10, 0).items), [undefined, undefined, "n/a"]);
+  const voted = (items: DiscoverItem[]) => items.map((item) => item.content.viewerVoted ?? false);
+  assert.deepEqual(voted(service.getDiscover("all", "", 10, 0, "viewer").items), [true, false, true, false]);
+  assert.deepEqual(voted(service.getDiscover("all", "", 10, 0).items), [false, false, false, false]);
 });
 
 test("people search excludes self and unpublished profiles", () => {

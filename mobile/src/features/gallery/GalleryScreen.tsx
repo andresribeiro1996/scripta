@@ -97,7 +97,7 @@ export function GalleryScreen() {
         options={{
           headerShown: true,
           title: "Gallery",
-          headerRight: () => <IconButton framed accessibilityLabel="Upload image" name="add" onPress={() => void pickImage()} />,
+          headerRight: () => <IconButton framed accessibilityLabel="Upload image" label="Upload" name="add" onPress={() => void pickImage()} />,
         }}
       />
       {upload.isPending ? <Text style={[typography.caption, styles.uploading, { color: colors.textDim }]}>Uploading…</Text> : null}

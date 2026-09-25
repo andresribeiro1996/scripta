@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Stack, router } from "expo-router";
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { bookKey, ensureBookBlockHeights, profileOnlyMural, type Mural } from "@scripta/shared";
 import { DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
 import { ApiError } from "../../core/api";
@@ -134,19 +134,21 @@ export function ProfileScreen({ username }: { username: string }) {
           title: profileUser.username,
           headerRight: isSelf
             ? () => (
-                <Menu
-                  title="Your profile"
-                  items={[
-                    { label: "Manage library…", onPress: () => router.push("/library" as never) },
-                    { label: "Switch mural…", onPress: () => setPickerOpen(true) },
-                    { label: "Feed settings…", onPress: () => setSettingsOpen(true) },
-                    { label: "Unpublish profile…", destructive: true, onPress: () => setConfirmingUnpublish(true) },
-                  ]}
-                >
-                  <IconButton framed accessibilityLabel="Profile options" name="more" />
-                </Menu>
+                <View style={styles.headerActions}>
+                  <IconButton framed accessibilityLabel="Your library" label="Library" name="library" onPress={() => router.push("/library" as never)} />
+                  <Menu
+                    title="Your profile"
+                    items={[
+                      { label: "Switch mural…", onPress: () => setPickerOpen(true) },
+                      { label: "Feed settings…", onPress: () => setSettingsOpen(true) },
+                      { label: "Unpublish profile…", destructive: true, onPress: () => setConfirmingUnpublish(true) },
+                    ]}
+                  >
+                    <IconButton framed accessibilityLabel="Profile options" name="more" />
+                  </Menu>
+                </View>
               )
-            : () => <FollowPill following={view!.profile.viewerFollows === true} busy={busy} onPress={() => void toggleFollow()} />,
+            : undefined,
         }}
       />
       {error ? <Toast visible message={error} tone="error" /> : null}
@@ -199,6 +201,14 @@ export function ProfileScreen({ username }: { username: string }) {
                   ) : (
                     <MuralCanvas mural={profileOnlyMural()} books={[]} images={[]} tierlists={[]} profile={profileUser} />
                   )}
+                  {!isSelf ? (
+                    <Button
+                      label={view!.profile.viewerFollows === true ? "Following" : "Follow"}
+                      variant={view!.profile.viewerFollows === true ? "secondary" : "primary"}
+                      loading={busy}
+                      onPress={() => void toggleFollow()}
+                    />
+                  ) : null}
                   <Text {...dynamicType} style={[typography.caption, styles.eyebrow, { color: colors.textDim }]}>
                     Published
                   </Text>
@@ -283,33 +293,6 @@ function publishedRows(view: CommunityProfileView): PublishedRow[] {
   return rows;
 }
 
-function FollowPill({ following, busy, onPress }: { following: boolean; busy: boolean; onPress: () => void }) {
-  const { colors } = useTheme();
-  const tint = following ? colors.text : colors.onAccent;
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={following ? "Following. Tap to unfollow" : "Follow"}
-      accessibilityState={{ busy, selected: following }}
-      disabled={busy}
-      hitSlop={spacing.sm}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.pill,
-        following
-          ? { backgroundColor: pressed ? colors.surfacePressed : colors.surface, borderColor: colors.border }
-          : { backgroundColor: colors.accent, borderColor: colors.accent, opacity: pressed ? 0.85 : 1 },
-        busy ? { opacity: 0.55 } : null,
-      ]}
-    >
-      {busy ? <ActivityIndicator size="small" color={tint} /> : <>
-        <Icon name={following ? "confirm" : "add"} size={14} color={tint} />
-        <Text {...dynamicType} style={[typography.caption, styles.strong, { color: tint }]}>{following ? "Following" : "Follow"}</Text>
-      </>}
-    </Pressable>
-  );
-}
-
 function Centered({ children }: { children: ReactNode }) {
   const { colors } = useTheme();
   return <View style={[styles.centered, { backgroundColor: colors.background }]}>{children}</View>;
@@ -371,10 +354,10 @@ function MuralPicker({
 const styles = StyleSheet.create({
   grow: { flex: 1 },
   strong: { fontWeight: "700" },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   centered: { flex: 1, justifyContent: "center", padding: spacing.lg, gap: spacing.md },
   page: { flex: 1, padding: spacing.lg },
   list: { padding: spacing.lg, gap: spacing.sm, paddingBottom: spacing.huge },
-  pill: { flexDirection: "row", alignItems: "center", gap: spacing.xs, height: 32, paddingHorizontal: spacing.md + 2, borderRadius: radii.full, borderWidth: 1 },
   eyebrow: { textTransform: "uppercase", letterSpacing: 0.8, fontWeight: "600" },
   muralHeader: { gap: spacing.lg, marginBottom: spacing.xs },
   muralPrompt: { borderWidth: 1, borderRadius: radii.lg, padding: spacing.lg, gap: spacing.md },

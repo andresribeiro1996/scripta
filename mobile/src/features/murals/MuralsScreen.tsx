@@ -147,7 +147,7 @@ export function MuralsScreen() {
                   { label: "Start from a preset…", onPress: () => setPresets(true) },
                 ]}
               >
-                <IconButton framed accessibilityLabel="New mural" name="add" />
+                <IconButton framed accessibilityLabel="New mural" label="New" name="add" />
               </Menu>
             </View>
           ),

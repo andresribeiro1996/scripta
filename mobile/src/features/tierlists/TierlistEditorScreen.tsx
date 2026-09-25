@@ -118,7 +118,7 @@ export function TierlistEditorScreen({ tierlist, onUpdated, startInRank = false 
       headerShown: true,
       title: current.name,
       headerRight: () => <View style={styles.headerActions}>
-        {!frozen ? <IconButton framed accessibilityLabel="Save changes" name="confirm" onPress={() => void save()} /> : null}
+        {!frozen ? <IconButton framed accessibilityLabel="Save changes" label="Save" name="confirm" onPress={() => void save()} /> : null}
         <Menu title={current.name} items={actionItems}><IconButton framed accessibilityLabel="Tier list actions" name="more" /></Menu>
       </View>,
     }} />
