@@ -1,14 +1,12 @@
 import { useCallback, useState } from "react";
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
-import { useInfiniteQuery } from "@tanstack/react-query";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
 import { bookKey, buildDashboardCards, resolveQuote } from "@scripta/shared";
 import { Button, EmptyState, ErrorState, Screen, Skeleton, Toast, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { useAuth } from "../../core/auth";
 import { useLibrary } from "../library/hooks/useLibrary";
-import { fetchDashboard } from "../community/api";
 import { CoverImage } from "../library/components/CoverImage";
-import { FeedRow, digestRoute, useFollowBack } from "./FeedRow";
+import { FeedRow, digestRoute, useDashboardFeed, useFollowBack } from "./FeedRow";
 
 export function HomeScreen() {
   const { colors } = useTheme();
@@ -17,21 +15,19 @@ export function HomeScreen() {
   const library = useLibrary();
   const [day, setDay] = useState(() => new Date().toISOString().slice(0, 10));
   const [offset, setOffset] = useState(0);
-  const dashboard = useInfiniteQuery({
-    queryKey: ["community", "dashboard"],
-    queryFn: ({ pageParam }) => fetchDashboard(pageParam),
-    initialPageParam: undefined as string | undefined,
-    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-    refetchOnMount: "always",
-  });
+  const [pulling, setPulling] = useState(false);
+  const dashboard = useDashboardFeed();
   const { followingId, followError, followBack } = useFollowBack(dashboard.refetch);
 
   useFocusEffect(useCallback(() => {
-    setDay(new Date().toISOString().slice(0, 10));
-    setOffset(0);
+    const today = new Date().toISOString().slice(0, 10);
+    if (today !== day) {
+      setDay(today);
+      setOffset(0);
+    }
     void library.refetch();
     void dashboard.refetch();
-  }, [library.refetch, dashboard.refetch]));
+  }, [day, library.refetch, dashboard.refetch]));
 
   const books = library.data?.data.books ?? [];
   const cards = user ? buildDashboardCards(books, day, `${user.id}:${offset}`) : [];
@@ -44,6 +40,15 @@ export function HomeScreen() {
   const newCount = dashboard.data?.pages[0]?.newCount ?? 0;
 
   const openBook = (key: string) => router.push(`/book/${encodeURIComponent(key)}` as never);
+
+  async function onRefresh() {
+    setPulling(true);
+    try {
+      await Promise.all([library.refetch(), dashboard.refetch()]);
+    } finally {
+      setPulling(false);
+    }
+  }
 
   return (
     <Screen top={false}>
@@ -64,86 +69,80 @@ export function HomeScreen() {
       ) : (
         <View style={styles.grow}>
           {followError ? <Toast visible message={followError} tone="error" /> : null}
-          {!books.length ? (
-            <View style={styles.page}>
-              <EmptyState title="Start your library" body="Import your existing collection, or add your first book manually." actionLabel="Import library" onAction={() => router.push("/import" as never)} secondaryActionLabel="Add a book manually" onSecondaryAction={() => router.push("/add-book" as never)} />
-            </View>
-          ) : (
-            <ScrollView
-              contentContainerStyle={styles.sections}
-              refreshControl={
-                <RefreshControl
-                  refreshing={library.isRefetching || dashboard.isRefetching}
-                  onRefresh={() => {
-                    void library.refetch();
-                    void dashboard.refetch();
-                  }}
-                />
-              }
-            >
-              {readingCard ? (
-                <View style={styles.section}>
-                  <SectionHeader title="Reading now" count={String(readingCard.bookKeys.length)} />
-                  <BookRow keys={readingCard.bookKeys} books={books} onOpen={openBook} />
-                </View>
-              ) : null}
-              {quote ? (
-                <View style={styles.page}>
-                  <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                    <Text {...dynamicType} style={[typography.title, styles.heading, { color: colors.text }]}>Rediscover</Text>
-                    <Text {...dynamicType} style={[typography.title, { color: colors.text }]}>{String(quote.highlight.Text)}</Text>
-                    <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
-                      {String(quote.book.Title)} · {String(quote.book.Attribution ?? "")}
-                    </Text>
-                    <Button label="Show another" variant="secondary" onPress={() => setOffset((value) => value + 1)} />
-                  </View>
-                </View>
-              ) : null}
-              {upNextCard ? (
-                <View style={styles.section}>
-                  <SectionHeader title="Up next" count={String(upNextCard.bookKeys.length)} />
-                  <BookRow keys={upNextCard.bookKeys.slice(0, 10)} books={books} onOpen={openBook} />
-                </View>
-              ) : null}
-              <View style={styles.section}>
-                {dashboard.isPending ? (
-                  <>
-                    <SectionHeader title="From people you follow" />
-                    <View style={styles.page}>
-                      <Skeleton height={80} />
-                    </View>
-                  </>
-                ) : dashboard.isError ? (
-                  <>
-                    <SectionHeader title="From people you follow" />
-                    <View style={styles.page}>
-                      <ErrorState body="Couldn't load activity from people you follow." actionLabel="Retry" onAction={() => void dashboard.refetch()} />
-                    </View>
-                  </>
-                ) : feedItems.length ? (
-                  <>
-                    <SectionHeader title="From people you follow" count={newCount > 0 ? `· ${newCount} new` : undefined} />
-                    {feedItems.map((item) => (
-                      <FeedRow
-                        key={`${item.kind}:${item.id}`}
-                        item={item}
-                        onOpen={() => router.push(digestRoute(item) as never)}
-                        onFollowBack={() => void followBack(item.actor.userId)}
-                        following={followingId === item.actor.userId}
-                      />
-                    ))}
-                    <Pressable accessibilityRole="button" onPress={() => router.push("/activity" as never)} style={styles.linkRow}>
-                      <Text {...dynamicType} style={[typography.body, styles.heading, { color: colors.accent }]}>All activity</Text>
-                    </Pressable>
-                  </>
-                ) : (
-                  <Pressable accessibilityRole="button" onPress={() => router.push("/activity?tab=people" as never)} style={styles.linkRow}>
-                    <Text {...dynamicType} style={[typography.body, styles.heading, { color: colors.accent }]}>Find readers</Text>
-                  </Pressable>
-                )}
+          <ScrollView
+            contentContainerStyle={styles.sections}
+            refreshControl={<RefreshControl refreshing={pulling} onRefresh={() => void onRefresh()} />}
+          >
+            {!books.length ? (
+              <View style={styles.page}>
+                <EmptyState title="Start your library" body="Import your existing collection, or add your first book manually." actionLabel="Import library" onAction={() => router.push("/import" as never)} secondaryActionLabel="Add a book manually" onSecondaryAction={() => router.push("/add-book" as never)} />
               </View>
-            </ScrollView>
-          )}
+            ) : (
+              <>
+                {readingCard ? (
+                  <View style={styles.section}>
+                    <SectionHeader title="Reading now" count={String(readingCard.bookKeys.length)} />
+                    <BookRow keys={readingCard.bookKeys} books={books} onOpen={openBook} />
+                  </View>
+                ) : null}
+                {quote ? (
+                  <View style={styles.sectionPad}>
+                    <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                      <Text {...dynamicType} style={[typography.title, styles.heading, { color: colors.text }]}>Rediscover</Text>
+                      <Text {...dynamicType} style={[typography.title, { color: colors.text }]}>{String(quote.highlight.Text)}</Text>
+                      <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
+                        {String(quote.book.Title)} · {String(quote.book.Attribution ?? "")}
+                      </Text>
+                      <Button label="Show another" variant="secondary" onPress={() => setOffset((value) => value + 1)} />
+                    </View>
+                  </View>
+                ) : null}
+                {upNextCard ? (
+                  <View style={styles.section}>
+                    <SectionHeader title="Up next" count={String(upNextCard.bookKeys.length)} />
+                    <BookRow keys={upNextCard.bookKeys.slice(0, 10)} books={books} onOpen={openBook} />
+                  </View>
+                ) : null}
+              </>
+            )}
+            <View style={styles.section}>
+              {dashboard.isPending ? (
+                <>
+                  <SectionHeader title="From people you follow" />
+                  <View style={styles.sectionPad}>
+                    <Skeleton height={80} />
+                  </View>
+                </>
+              ) : dashboard.isError ? (
+                <>
+                  <SectionHeader title="From people you follow" />
+                  <View style={styles.sectionPad}>
+                    <ErrorState body="Couldn't load activity from people you follow." actionLabel="Retry" onAction={() => void dashboard.refetch()} />
+                  </View>
+                </>
+              ) : feedItems.length ? (
+                <>
+                  <SectionHeader title="From people you follow" count={newCount > 0 ? `· ${newCount} new` : undefined} />
+                  {feedItems.map((item) => (
+                    <FeedRow
+                      key={`${item.kind}:${item.id}`}
+                      item={item}
+                      onOpen={() => router.push(digestRoute(item) as never)}
+                      onFollowBack={() => void followBack(item.actor.userId)}
+                      following={followingId === item.actor.userId}
+                    />
+                  ))}
+                  <Pressable accessibilityRole="button" onPress={() => router.push("/activity" as never)} style={styles.linkRow}>
+                    <Text {...dynamicType} style={[typography.body, styles.heading, { color: colors.accent }]}>All activity</Text>
+                  </Pressable>
+                </>
+              ) : (
+                <Pressable accessibilityRole="button" onPress={() => router.push("/activity?tab=people" as never)} style={styles.linkRow}>
+                  <Text {...dynamicType} style={[typography.body, styles.heading, { color: colors.accent }]}>Find readers</Text>
+                </Pressable>
+              )}
+            </View>
+          </ScrollView>
         </View>
       )}
     </Screen>
@@ -154,7 +153,7 @@ function SectionHeader({ title, count }: { title: string; count?: string }) {
   const { colors } = useTheme();
   return (
     <View style={styles.sectionHeader}>
-      <Text {...dynamicType} style={[typography.body, styles.heading, { color: colors.text }]}>{title}</Text>
+      <Text accessibilityRole="header" {...dynamicType} style={[typography.body, styles.heading, { color: colors.text }]}>{title}</Text>
       {count ? <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{count}</Text> : null}
     </View>
   );
@@ -182,6 +181,7 @@ function BookRow({ keys, books, onOpen }: { keys: string[]; books: Array<Record<
 
 const styles = StyleSheet.create({
   page: { padding: spacing.lg, gap: spacing.md },
+  sectionPad: { paddingHorizontal: spacing.lg },
   heading: { fontWeight: "700" },
   card: { borderWidth: 1, borderRadius: radii.lg, padding: spacing.lg, gap: spacing.sm },
   grow: { flex: 1 },

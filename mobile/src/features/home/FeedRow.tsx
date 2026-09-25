@@ -1,17 +1,28 @@
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { digestHeading, digestTarget, type DigestItem } from "@scripta/shared";
 import { ApiError } from "../../core/api";
 import { Icon, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { AuthorAvatar } from "../community/AuthorAvatar";
 import { CoverFan, SLOT_HEIGHT, SLOT_WIDTH } from "../community/CoverFan";
-import { followUser } from "../community/api";
+import { fetchDashboard, followUser } from "../community/api";
 import { feedRowModel, relativeTime } from "./feedRowModel";
 
 // Mobile's profile route is /u/<name>; the shared target is the web app's
 // /community/u/<name>, so the two kinds that point at a person are remapped.
 export function digestRoute(item: DigestItem): string {
   return item.kind === "follow" || item.kind === "reading" ? `/u/${item.actor.username}` : digestTarget(item);
+}
+
+export function useDashboardFeed() {
+  return useInfiniteQuery({
+    queryKey: ["community", "dashboard"],
+    queryFn: ({ pageParam }) => fetchDashboard(pageParam),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    refetchOnMount: "always",
+  });
 }
 
 export function useFollowBack(refetch: () => Promise<unknown>) {

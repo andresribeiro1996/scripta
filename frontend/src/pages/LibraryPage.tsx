@@ -95,10 +95,6 @@ export function LibraryPage() {
   const [sharing, setSharing] = useState(false);
   const [query, setQuery] = useState(searchParams.get("q") ?? "");
   useEffect(() => { setQuery(searchParams.get("q") ?? ""); setAddingBook(searchParams.get("action") === "add"); }, [searchParams]);
-  const bookParam = searchParams.get("book");
-  useEffect(() => {
-    if (bookParam) setDetailBookKey(bookParam);
-  }, [bookParam]);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sortKey, setSortKey] = useState<SortKey>("manual");
 
@@ -362,7 +358,8 @@ export function LibraryPage() {
   const bookSeriesGroup = useMemo(() => seriesGroupByBookKey(library?.data.books ?? [], library?.data.groups ?? []), [library]);
   const styleBook = styleBookKey ? books.find((b) => bookKey(b) === styleBookKey) : null;
   const coverBook = coverBookKey ? books.find((b) => bookKey(b) === coverBookKey) : null;
-  const detailBook = detailBookKey ? books.find((b) => bookKey(b) === detailBookKey) : null;
+  const detailKey = detailBookKey ?? searchParams.get("book");
+  const detailBook = detailKey ? books.find((b) => bookKey(b) === detailKey) : null;
 
   // The phone's only route to these actions — there is no header on a
   // phone to hold them. Passed to LibraryToolbar as ITEMS rather than a

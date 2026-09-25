@@ -1,13 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, FlatList, StyleSheet, Text, View } from "react-native";
-import { useInfiniteQuery } from "@tanstack/react-query";
 import { Stack, useRouter } from "expo-router";
 import { ErrorState, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, spacing, typography, useTheme } from "../../ui";
 import { DiscoverPane } from "../community/DiscoverPane";
 import { PeoplePane } from "../community/PeoplePane";
-import { fetchDashboard, markDashboardSeen } from "../community/api";
+import { markDashboardSeen } from "../community/api";
 import { defaultHomeTab, homeTabOptions, type HomeTab } from "./homeTabs";
-import { FeedRow, digestRoute, useFollowBack } from "./FeedRow";
+import { FeedRow, digestRoute, useDashboardFeed, useFollowBack } from "./FeedRow";
 
 export function ActivityScreen({ initialTab }: { initialTab?: HomeTab }) {
   const { colors } = useTheme();
@@ -15,13 +14,7 @@ export function ActivityScreen({ initialTab }: { initialTab?: HomeTab }) {
   const [tab, setTab] = useState<HomeTab>(initialTab ?? "activity");
   const tabInitedRef = useRef(Boolean(initialTab));
   const markedRef = useRef(false);
-  const dashboard = useInfiniteQuery({
-    queryKey: ["community", "dashboard"],
-    queryFn: ({ pageParam }) => fetchDashboard(pageParam),
-    initialPageParam: undefined as string | undefined,
-    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-    refetchOnMount: "always",
-  });
+  const dashboard = useDashboardFeed();
   useEffect(() => {
     if (!markedRef.current && dashboard.data) {
       markedRef.current = true;
@@ -64,7 +57,7 @@ export function ActivityScreen({ initialTab }: { initialTab?: HomeTab }) {
         <View style={styles.grow}>
           {followError ? <Toast visible message={followError} tone="error" /> : null}
           <SwipeableTabs
-            accessibilityLabel="Home sections"
+            accessibilityLabel="Activity sections"
             options={homeTabOptions(newCount)}
             value={tab}
             onChange={setTab}
