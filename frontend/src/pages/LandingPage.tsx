@@ -6,6 +6,8 @@ import { LandingFooter } from "../components/landing/LandingFooter";
 import { LandingHero } from "../components/landing/LandingHero";
 import { FeatureGrid } from "../components/landing/FeatureGrid";
 import { MuralShowcase } from "../components/landing/MuralShowcase";
+import { ArenaShowcase } from "../components/landing/ArenaShowcase";
+import { GetApp } from "../components/landing/GetApp";
 
 export function LandingPage() {
   const { session } = useAuth();
@@ -18,6 +20,8 @@ export function LandingPage() {
         <LandingHero />
         <FeatureGrid />
         <MuralShowcase />
+        <ArenaShowcase />
+        <GetApp />
       </main>
       <LandingFooter />
     </div>
