@@ -1,6 +1,7 @@
 import { authFieldErrors, PASSWORD_HINT, USERNAME_HINT, safeAuthReturnTo } from "@scripta/shared";
 import { PasswordInput } from "../auth/PasswordInput";
 import { afterSignIn, startAuthNavigation } from "../auth/returnTo";
+import { modeFromSearch, type AuthMode as Mode } from "../lib/landing";
 import { useEffect, useRef, useState } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { API_URL } from "../api/baseUrl";
@@ -37,14 +38,12 @@ const GoogleLogo = () => (
   </svg>
 );
 
-type Mode = "login" | "signup";
-
 export function LoginPage() {
   const { session, login, signup } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [mode, setMode] = useState<Mode>("login");
+  const [mode, setMode] = useState<Mode>(() => modeFromSearch(new URLSearchParams(location.search)));
   // In login mode this doubles as "email or username"; in signup mode
   // it's strictly the email (username gets its own field below).
   const [identifier, setIdentifier] = useState("");
