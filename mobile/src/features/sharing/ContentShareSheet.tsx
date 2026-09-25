@@ -1,12 +1,12 @@
 import { BottomSheet, RNHostView } from "@expo/ui";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Pressable, ScrollView, Share, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, Share, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { captureRef, releaseCapture } from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
 import { requestPermissionsAsync, saveToLibraryAsync } from "expo-media-library/legacy";
 import QRCode from "react-native-qrcode-svg";
-import { Button, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
+import { Button, Icon, type IconName, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { snapshotSize } from "./shareImage";
 
 type Props = {
@@ -27,7 +27,7 @@ type Props = {
 
 export function ContentShareSheet({ visible, onClose, title, description, url, children, previewControls, imageReady = true, onEnableLink, enableLinkLabel = "Create share link", onDisableLink, linkError, onRetryLink }: Props) {
   const { colors } = useTheme();
-  const { height } = useWindowDimensions();
+  const { height, width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const capture = useRef<View>(null);
   const size = useRef({ width: 0, height: 0 });
@@ -77,63 +77,88 @@ export function ContentShareSheet({ visible, onClose, title, description, url, c
 
   return <BottomSheet isPresented={visible} onDismiss={() => { if (!busy) onClose(); }} snapPoints={view === "image" ? ["full"] : undefined} containerColor={colors.surface} contentPadding={0} shouldDismissOnBackPress={!busy} shouldDismissOnClickOutside={!busy}>
     <RNHostView matchContents>
-      <View style={{ height: view === "image" ? height * 0.8 : Math.min(height * 0.75, view === "qr" ? 520 : 440), padding: spacing.lg, paddingBottom: Math.max(insets.bottom, spacing.lg), gap: spacing.lg }}>
+      <View style={{ height: view === "image" ? height * 0.82 : Math.min(height * 0.82, 620), paddingHorizontal: spacing.xl, paddingTop: spacing.sm, paddingBottom: Math.max(insets.bottom, spacing.lg), gap: spacing.lg }}>
         <View style={styles.header}>
-          <View style={{ flex: 1, gap: spacing.xs }}>
-            <Text accessibilityRole="header" {...dynamicType} style={[typography.heading, { color: colors.text, fontWeight: "600" }]}>{view === "image" ? "Image preview" : view === "qr" ? "Scan to open" : "Share"}</Text>
-            <Text numberOfLines={2} {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{title}</Text>
-          </View>
-          <Pressable accessibilityRole="button" accessibilityLabel={view === "actions" ? "Close share sheet" : "Back to share options"} disabled={busy} onPress={view === "actions" ? onClose : () => { setView("actions"); setError(null); setNotice(null); }} style={styles.textAction}>
-            <Text {...dynamicType} style={[typography.body, { color: colors.accent, opacity: busy ? 0.5 : 1 }]}>{view === "actions" ? "Close" : "Back"}</Text>
-          </Pressable>
+          {view !== "actions" ? <Pressable accessibilityRole="button" accessibilityLabel="Back to share options" accessibilityState={{ disabled: busy }} disabled={busy} onPress={() => { setView("actions"); setError(null); setNotice(null); }} style={({ pressed }) => [styles.iconAction, { backgroundColor: pressed ? colors.border : colors.background, opacity: busy ? 0.5 : 1 }]}><Icon name="back" size={20} color={colors.text} /></Pressable> : null}
+          <Text accessibilityRole="header" {...dynamicType} style={[typography.title, { color: colors.text, flex: 1, fontWeight: "600" }]}>{view === "image" ? "Image preview" : view === "qr" ? "Scan to open" : "Share your creation"}</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel="Close share sheet" accessibilityState={{ disabled: busy }} disabled={busy} onPress={onClose} style={({ pressed }) => [styles.iconAction, { backgroundColor: pressed ? colors.border : colors.background, opacity: busy ? 0.5 : 1 }]}><Icon name="close" size={18} color={colors.textDim} /></Pressable>
         </View>
-        {description ? <Text style={[typography.caption, { color: colors.textDim }]}>{description}</Text> : null}
         {view === "image" ? <>
           {previewControls}
-          <ScrollView style={{ flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: radii.lg, backgroundColor: colors.background }} removeClippedSubviews={false}>
+          {description ? <Text style={[typography.caption, { color: colors.textDim }]}>{description}</Text> : null}
+          <ScrollView style={{ flex: 1, borderRadius: radii.xl, backgroundColor: colors.background }} contentContainerStyle={{ padding: spacing.sm }} removeClippedSubviews={false}>
             <View ref={capture} collapsable={false} onLayout={(event) => { size.current = event.nativeEvent.layout; }} style={{ backgroundColor: colors.background }}>
               {children}
             </View>
           </ScrollView>
-          {!imageReady ? <Text style={{ color: colors.textDim }}>Loading image preview…</Text> : null}
-          <View style={styles.actions}>
-            <View style={styles.imageAction}><Button label="Send image" disabled={busy || !imageReady} onPress={() => void run(() => exportImage(false))} /></View>
-            <View style={styles.imageAction}><Button label="Save image" variant="secondary" disabled={busy || !imageReady} onPress={() => void run(() => exportImage(true))} /></View>
+          <View style={{ gap: spacing.md }}>
+            <View style={styles.header}>
+              {!imageReady || busy ? <ActivityIndicator size="small" color={colors.accent} /> : <Icon name="confirm" size={16} color={colors.textDim} />}
+              <Text accessibilityLiveRegion="polite" style={[typography.caption, { color: colors.textDim, flex: 1 }]}>{busy ? "Preparing your image…" : imageReady ? "Full image · Ready to share" : "Loading your image…"}</Text>
+            </View>
+            <View style={styles.actions}>
+              <View style={styles.imageAction}><Button label="Save image" variant="secondary" disabled={busy || !imageReady} onPress={() => void run(() => exportImage(true))} /></View>
+              <View style={styles.imageAction}><Button label="Send image" disabled={busy || !imageReady} onPress={() => void run(() => exportImage(false))} /></View>
+            </View>
           </View>
-        </> : <ScrollView contentContainerStyle={{ gap: spacing.lg }}>
+        </> : <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: spacing.lg, paddingBottom: spacing.sm }}>
+          <View style={{ gap: spacing.sm, paddingVertical: spacing.sm }}>
+            <Text numberOfLines={3} selectable {...dynamicType} style={[typography.heading, { color: colors.text, fontWeight: "700" }]}>{title}</Text>
+            <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{view === "qr" ? "Let someone nearby scan this with their camera." : children ? "A picture to post. A link to explore." : "Invite someone to explore and take part."}</Text>
+          </View>
+          {description ? <View style={[styles.note, { backgroundColor: colors.background }]}><Text style={[typography.caption, { color: colors.textDim }]}>{description}</Text></View> : null}
           {linkError ? <Text accessibilityRole="alert" selectable style={{ color: colors.danger }}>{linkError}</Text> : null}
           {linkError && onRetryLink ? <Button label="Retry link" variant="secondary" disabled={busy} onPress={onRetryLink} /> : null}
-          {view === "qr" && shareUrl ? <View style={styles.qr}>
-            <QRCode value={shareUrl} size={220} quietZone={16} backgroundColor="white" color="black" />
-            <Text style={[typography.body, { color: colors.textDim, textAlign: "center" }]}>Use another phone’s camera to open the link.</Text>
-            <Text selectable style={[typography.caption, { color: colors.textDim, textAlign: "center" }]}>{shareUrl}</Text>
-          </View> : null}
-          {children && view === "actions" ? <View style={{ gap: spacing.sm }}>
-            <Button label="Share as image" disabled={busy} onPress={() => setView("image")} />
-            <Text style={[typography.caption, { color: colors.textDim, textAlign: "center" }]}>Preview, send, or save. Your visibility stays the same.</Text>
-          </View> : null}
-          {shareUrl ? <>
-            <Button label="Send link" variant={children && view === "actions" ? "secondary" : "primary"} disabled={busy} onPress={() => void run(async () => { await Share.share({ message: shareUrl, title }); })} />
-          </> : onEnableLink ? <>
-            <View style={{ gap: spacing.sm, borderTopWidth: 1, borderColor: colors.border, paddingTop: spacing.lg }}>
-              <Text style={[typography.body, { color: colors.textDim }]}>Want people to open it too? Create a public link.</Text>
-              <Button label={enableLinkLabel} variant="secondary" disabled={busy} onPress={() => void run(async () => { const next = await onEnableLink(); if (next) setCreatedUrl(next); })} />
+          {view === "qr" && shareUrl ? <>
+            <View style={[styles.qr, { backgroundColor: colors.background }]}>
+              <View style={{ padding: spacing.md, backgroundColor: "white", borderRadius: radii.xl }}>
+                <QRCode value={shareUrl} size={Math.min(220, width - 112)} quietZone={8} backgroundColor="white" color="black" />
+              </View>
+              <Text style={[typography.caption, { color: colors.textDim }]}>OPEN IN ATMYSHELF</Text>
             </View>
-          </> : null}
-          {shareUrl && view !== "qr" ? <Pressable accessibilityRole="button" disabled={busy} onPress={() => setView("qr")} style={styles.textAction}><Text {...dynamicType} style={[typography.body, { color: colors.accent }]}>Show QR code</Text></Pressable> : null}
-          {shareUrl && onDisableLink && view === "actions" ? <Pressable accessibilityRole="button" disabled={busy} onPress={() => void run(async () => { await onDisableLink(); setCreatedUrl(null); })} style={styles.textAction}><Text {...dynamicType} style={[typography.caption, { color: colors.danger }]}>Stop sharing link</Text></Pressable> : null}
+            <Text selectable numberOfLines={2} style={[typography.caption, { color: colors.textDim, textAlign: "center" }]}>{shareUrl}</Text>
+            <Button label="Send link instead" disabled={busy} onPress={() => void run(async () => { await Share.share({ message: shareUrl, title }); })} />
+          </> : <>
+            {children ? <ShareChoice icon="image" label="Share as image" detail="Made for stories, posts & group chats" primary disabled={busy} onPress={() => setView("image")} /> : null}
+            {shareUrl ? <View style={styles.actions}>
+              <ShareChoice icon="link" label="Send link" detail="Open the live version" disabled={busy} onPress={() => void run(async () => { await Share.share({ message: shareUrl, title }); })} />
+              <ShareChoice icon="qr" label="QR code" detail="Share face to face" disabled={busy} onPress={() => setView("qr")} />
+            </View> : onEnableLink ? <ShareChoice icon="link" label={enableLinkLabel} detail="Let others open the live version" disabled={busy} onPress={() => void run(async () => { const next = await onEnableLink(); if (next) setCreatedUrl(next); })} /> : null}
+            {children ? <Text style={[typography.caption, { color: colors.textDim, textAlign: "center" }]}>Sharing an image keeps your visibility unchanged.</Text> : null}
+            {shareUrl && onDisableLink ? <Pressable accessibilityRole="button" accessibilityState={{ disabled: busy }} disabled={busy} onPress={() => void run(async () => { await onDisableLink(); setCreatedUrl(null); })} style={({ pressed }) => [styles.textAction, { opacity: busy || pressed ? 0.5 : 1 }]}><Text {...dynamicType} style={[typography.caption, { color: colors.danger }]}>Stop sharing link</Text></Pressable> : null}
+          </>}
+          {busy ? <ActivityIndicator accessibilityLabel="Working" color={colors.accent} /> : null}
         </ScrollView>}
-        {error ? <Text accessibilityRole="alert" selectable style={{ color: colors.danger }}>{error}</Text> : null}
-        {notice ? <Text accessibilityLiveRegion="polite" style={{ color: colors.text }}>{notice}</Text> : null}
+        {error ? <View style={[styles.note, { backgroundColor: colors.dangerSoft }]}><Text accessibilityRole="alert" selectable style={{ color: colors.text }}>{error}</Text></View> : null}
+        {notice ? <View style={[styles.note, { backgroundColor: colors.successSoft }]}><Text accessibilityLiveRegion="polite" style={{ color: colors.text }}>{notice}</Text></View> : null}
       </View>
     </RNHostView>
   </BottomSheet>;
 }
 
+function ShareChoice({ icon, label, detail, primary = false, disabled, onPress }: { icon: IconName; label: string; detail: string; primary?: boolean; disabled: boolean; onPress: () => void }) {
+  const { colors } = useTheme();
+  const foreground = primary ? colors.onAccent : colors.text;
+  return <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityHint={detail} accessibilityState={{ disabled }} disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.choice, { backgroundColor: primary ? colors.accent : pressed ? colors.surfacePressed : colors.background, opacity: disabled ? 0.5 : pressed ? 0.85 : 1 }]}>
+    <View style={styles.header}>
+      <View style={[styles.choiceIcon, { backgroundColor: primary ? colors.onAccent : colors.surface }]}><Icon name={icon} size={24} color={colors.accent} /></View>
+      {primary ? <View style={{ flex: 1, alignItems: "flex-end" }}><Icon name="chevronRight" size={20} color={foreground} /></View> : null}
+    </View>
+    <View style={{ gap: spacing.xs }}>
+      <Text {...dynamicType} style={[primary ? typography.title : typography.body, { color: foreground, fontWeight: "600" }]}>{label}</Text>
+      <Text {...dynamicType} style={[typography.caption, { color: primary ? foreground : colors.textDim }]}>{detail}</Text>
+    </View>
+  </Pressable>;
+}
+
 const styles = StyleSheet.create({
-  header: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  actions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  header: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  actions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
   imageAction: { flex: 1, minWidth: 120 },
-  textAction: { minHeight: minimumTouchTarget, minWidth: minimumTouchTarget, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.sm },
-  qr: { alignItems: "center", gap: spacing.md, paddingVertical: spacing.sm },
+  iconAction: { width: minimumTouchTarget, height: minimumTouchTarget, borderRadius: radii.full, alignItems: "center", justifyContent: "center" },
+  textAction: { minHeight: minimumTouchTarget, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.sm },
+  choice: { flexGrow: 1, minWidth: 130, padding: spacing.lg, gap: spacing.lg, borderRadius: radii.xl, borderCurve: "continuous" },
+  choiceIcon: { width: minimumTouchTarget, height: minimumTouchTarget, borderRadius: radii.lg, alignItems: "center", justifyContent: "center" },
+  note: { padding: spacing.md, borderRadius: radii.lg },
+  qr: { alignItems: "center", gap: spacing.lg, paddingVertical: spacing.xxl, borderRadius: radii.xl },
 });
