@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, T
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
 import { bookKey, buildDashboardCards, resolveQuote } from "@scripta/shared";
-import { Button, EmptyState, ErrorState, Screen, Toast, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
+import { Button, EmptyState, ErrorState, Screen, Skeleton, Toast, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { useAuth } from "../../core/auth";
 import { useLibrary } from "../library/hooks/useLibrary";
 import { fetchDashboard } from "../community/api";
@@ -106,7 +106,21 @@ export function HomeScreen() {
                 </View>
               ) : null}
               <View style={styles.section}>
-                {feedItems.length ? (
+                {dashboard.isPending ? (
+                  <>
+                    <SectionHeader title="From people you follow" />
+                    <View style={styles.page}>
+                      <Skeleton height={80} />
+                    </View>
+                  </>
+                ) : dashboard.isError ? (
+                  <>
+                    <SectionHeader title="From people you follow" />
+                    <View style={styles.page}>
+                      <ErrorState body="Couldn't load activity from people you follow." actionLabel="Retry" onAction={() => void dashboard.refetch()} />
+                    </View>
+                  </>
+                ) : feedItems.length ? (
                   <>
                     <SectionHeader title="From people you follow" count={newCount > 0 ? `· ${newCount} new` : undefined} />
                     {feedItems.map((item) => (
