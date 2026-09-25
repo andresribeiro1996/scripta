@@ -65,7 +65,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  @theme {
+  :root {
     --color-bg: #141210;
     --color-surface: #2a2724;
     --color-surface-hover: #333029;
