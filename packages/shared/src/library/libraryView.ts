@@ -53,12 +53,6 @@ export function sortBooks(books: LibraryBook[], key: SortKey): LibraryBook[] {
   return sorted;
 }
 
-export function nextReadStatus(current: unknown): number {
-  if (current === 1) return 2;
-  if (current === 2) return 0;
-  return 1;
-}
-
 export type ReadStatus = 0 | 1 | 2;
 
 export function localDay(now: Date = new Date()): string {
