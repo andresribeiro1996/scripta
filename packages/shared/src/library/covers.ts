@@ -40,5 +40,5 @@ export function normalizeImageId(raw: unknown): string {
 export function statusLabel(status: unknown): string {
   if (status === 2) return "Finished";
   if (status === 1) return "Reading";
-  return "Not read";
+  return "To read";
 }
