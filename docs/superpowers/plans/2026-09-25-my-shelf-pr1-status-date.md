@@ -231,6 +231,8 @@ Expected: the new checks pass. If the script fails to import, rebuild shared fir
 
 - [ ] **Step 3: Replace the button in `BookDetailSheet`**
 
+> Changed during implementation: the radio-group markup below was replaced with `role="group"` + `aria-pressed` toggle buttons in the existing segmented style (see the spec). A radio group promises arrow-key selection, which would save a status on every keypress.
+
 - Change the prop type to `onSetStatus: (book: Record<string, unknown>, status: ReadStatus) => void`.
 - Remove the `nextReadStatus` import, and import `type ReadStatus` from `../lib/libraryView`.
 - Delete the `Mark as …` button. Keep Style and Cover.

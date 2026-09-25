@@ -75,8 +75,10 @@ stay as they are.
 
 ### Web
 
-`BookDetailSheet` replaces its "Mark as …" button with a three-option
-`role="radiogroup"` built from the existing button tokens.
+`BookDetailSheet` replaces its "Mark as …" button with three toggle
+buttons (`role="group"`, `aria-pressed`) in the web's existing segmented
+style, the one `TierlistResultsView` and `ArenaViewPage` use. There's no
+arrow-key selection, because every selection saves.
 `LibraryPage.handleSetBookStatus(book, status)` uses `setReadStatus`.
 
 No backfill: finished books without a date stay as they are.
@@ -283,6 +285,20 @@ API.
 - Mobile: a `book/[key]/finished` route presented as a sheet, in whichever
   stack hosts the book sheet. Web: a `FinishSheet` component opened by
   `LibraryPage`.
+
+### Carried over from PR 1's final review
+
+- Open the moment only after the save succeeds. Web's
+  `handleSetBookStatus` currently turns failures into a toast and returns
+  nothing, so it needs to report success first. Mobile's `run` already
+  does.
+- Parse `DateLastRead` as a local date (`new Date(y, m - 1, d)`), not
+  `new Date("YYYY-MM-DD")`, which reads as UTC and shows the previous day
+  west of UTC.
+- A mis-tap on Finished overwrites `DateLastRead` and progress. The
+  moment's Done/undo design should account for that.
+- Device pass: include a failed or slow status save. iOS's native picker
+  keeps the tapped option after a failure.
 
 ## Delivery
 
