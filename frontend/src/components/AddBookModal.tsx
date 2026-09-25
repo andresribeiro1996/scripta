@@ -25,7 +25,7 @@ import { buildManualBook, searchBooks, type BookSearchResult } from "../lib/book
 const STATUS_OPTIONS = [
   { value: 2, label: "Finished" },
   { value: 1, label: "Reading" },
-  { value: 0, label: "Not read" }
+  { value: 0, label: "To read" }
 ];
 
 export function AddBookModal({

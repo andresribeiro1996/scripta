@@ -9,7 +9,7 @@ import { toRecommendation } from "../library/lib/recommendation";
 import { pathWithQuery } from "../auth/navigation";
 
 const STATUS_OPTIONS: ReadonlyArray<{ value: 0 | 1 | 2; label: string }> = [
-  { value: 0, label: "Not read" },
+  { value: 0, label: "To read" },
   { value: 1, label: "Reading" },
   { value: 2, label: "Finished" },
 ];
