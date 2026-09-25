@@ -14,6 +14,7 @@ import { CollectionsPage } from "./pages/CollectionsPage";
 import { CommunityProfilePage } from "./pages/CommunityProfilePage";
 import { DiscoverPage } from "./pages/DiscoverPage";
 import { GalleryPage } from "./pages/GalleryPage";
+import { LandingPage } from "./pages/LandingPage";
 import { LibraryPage } from "./pages/LibraryPage";
 import { LibraryStylePage } from "./pages/LibraryStylePage";
 import { LoginPage } from "./pages/LoginPage";
@@ -35,7 +36,7 @@ export function App() {
     <>
       <EdgeSwipeBack />
       <Routes>
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/" element={<LandingPage />} />
         <Route path="/forgot-password" element={<AccountActionPage key="forgot" action="forgot" />} />
         <Route path="/reset-password" element={<AccountActionPage key="reset" action="reset" />} />
         <Route path="/verify-email" element={<AccountActionPage key="verify" action="verify" />} />

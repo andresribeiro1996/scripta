@@ -61,6 +61,7 @@
   --color-info-soft: #dcebf2;
   --color-reference: #6b4f8f;
   --color-reference-soft: #ebe4f3;
+  --color-on-accent: #ffffff;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -81,6 +82,7 @@
     --color-info-soft: #1f2d33;
     --color-reference: #b9a3d6;
     --color-reference-soft: #2c2536;
+    --color-on-accent: #1a1815;
   }
 }
 
@@ -401,6 +403,9 @@ input[type="range"]:focus-visible::-moz-range-thumb {
    forever. Measured, not guessed — it left every dialog in the app at
    opacity 0. */
 @media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
   /* One class on the backdrop covers both halves: the scrim fades and
      its panel child rises. Saves adding a second class to ten separate
      dialogs, all of which are a full-screen backdrop wrapping exactly
