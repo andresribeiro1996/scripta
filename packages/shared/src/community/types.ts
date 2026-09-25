@@ -29,6 +29,7 @@ export interface TournamentSummary {
   status: "active" | "completed";
   bookCount: number;
   covers: string[];
+  viewerVoted?: boolean;
 }
 
 export type PublishedContent = TierlistSummary | TournamentSummary;

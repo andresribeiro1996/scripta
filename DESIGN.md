@@ -118,6 +118,13 @@ Full guidelines, states and prop shapes live in the artifact's per-component REA
 - **ToggleSwitch** (inline in `SocialsSection.tsx`, worth extracting) — 44×24 pill, `accent` fill when on (not `success` — this is a settings toggle, not a status indicator).
 - **TierColorPicker** (`components/tierlist/TierColorPicker.tsx`) — 6 preset swatches (S/A/B/C/D/Grey) + custom `<input type="color">` in a dashed tile. Commits on **blur**, not `change`, so dragging the native color wheel doesn't spam re-renders.
 
+### Headers (mobile — native stack bar via `useScreenOptions()`)
+
+- A header carries the back chevron, the title, at most **two** labelled actions and the `⋯` overflow menu — everything else belongs in the menu or in screen content.
+- Every header action is an **`IconButton` with `label` + `framed`** (icon + word in a drawn 44pt target), so the visible target matches the touch target — a bare glyph reads smaller than its hit area and people aim at the ink. The `⋯` menu trigger stays glyph-only (platform convention).
+- Creation stays on **FABs** (thumb zone), not the header; header buttons navigate (`Browse`, `Library`) or open modals (`Add`, `Upload`, `Save`).
+- A screen's primary social action (Follow) is a full-width `Button` in the profile content, never a header pill.
+
 ### Gesture components (mobile only — Reanimated + haptics, not reproducible in a static doc)
 
 - **ArenaVoteDeck** (`mobile/src/features/arena/ArenaVoteDeck.tsx`) — drag up to vote win, down to vote lose. Commit threshold 100px drag OR velocity >850px/s + 30px travel. Rotation ±5° at threshold, tint (`success`/`danger`) ramps 0→0.25 opacity, "WINS"/"LOSES" pill fades in only in the last ~25px before commit. Spring back `dampingRatio 0.8` if released early. Always pair with a tap-to-vote fallback.

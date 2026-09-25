@@ -65,6 +65,7 @@ export interface CommunityDeps {
     list(limit: number, offset: number): PublishedTournamentRef[];
     get(id: string): PublishedTournamentRef | undefined;
     listByOwner(ownerUserId: string): PublishedTournamentRef[];
+    listVotedByUser(voterUserId: string): PublishedTournamentRef[];
   };
 }
 
@@ -106,8 +107,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
   return {
     follow(followerId, followeeId) {
       if (followerId === followeeId) throw new SelfFollowError();
-      const row = repo.getProfileRow(followeeId);
-      if (!row || row.published !== 1) throw new ProfileNotFoundError();
+      if (!deps.resolveProfiles([followeeId]).has(followeeId)) throw new ProfileNotFoundError();
       const inserted = repo.insertFollow({ follower_id: followerId, followee_id: followeeId, created_at: new Date().toISOString() });
       if (inserted) {
         const author = deps.resolveProfiles([followeeId]).get(followeeId);
@@ -300,7 +300,11 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
         }
       }
       if (type !== "tierlist") {
-        for (const ref of deps.tournaments.list(window, 0)) entries.push({ userId: ref.ownerUserId, content: toTournamentSummary(ref), createdAt: ref.createdAt });
+        const voted = viewerId ? new Set(deps.tournaments.listVotedByUser(viewerId).map((ref) => ref.id)) : null;
+        for (const ref of deps.tournaments.list(window, 0)) {
+          const content = voted ? { ...toTournamentSummary(ref), viewerVoted: voted.has(ref.id) } : toTournamentSummary(ref);
+          entries.push({ userId: ref.ownerUserId, content, createdAt: ref.createdAt });
+        }
       }
       const authors = deps.resolveProfiles([...new Set(entries.map((e) => e.userId))]);
       const visible = entries

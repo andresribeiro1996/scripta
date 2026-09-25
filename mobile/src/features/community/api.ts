@@ -46,7 +46,7 @@ export function markDashboardSeen() {
 
 export async function fetchDiscover(type: DiscoverType, q: string, offset = 0) {
   const params = new URLSearchParams({ type, q, offset: String(offset) });
-  return apiClient.request<{ items: DiscoverItem[]; nextOffset: number | null }>(`/community/discover?${params}`);
+  return apiClient.request<{ items: DiscoverItem[]; nextOffset: number | null }>(`/community/discover?${params}`, { auth: true });
 }
 
 export async function searchPeople(q: string) {
