@@ -38,6 +38,8 @@ export function TierlistShareImage({ title, data, books, community, histogram, b
       <Text style={[typography.caption, { color: colors.textDim }]}>{community ? "No votes" : "Unranked"} · {extra.length}</Text>
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 3 }}>{extra.map(cover)}</View>
     </View> : null}
-    <Text style={[typography.caption, { color: colors.textDim, textAlign: "right" }]}>Atmyshelf</Text>
+    <View style={{ borderTopWidth: 1, borderColor: colors.border, paddingTop: spacing.md }}>
+      <Text style={[typography.caption, { color: colors.textDim, textAlign: "right" }]}>Created with: <Text style={{ color: colors.text, fontWeight: "600" }}>Atmyshelf</Text></Text>
+    </View>
   </View>;
 }
