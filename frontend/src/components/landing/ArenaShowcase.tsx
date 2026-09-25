@@ -1,10 +1,3 @@
-const tiers = [
-  { label: "S", color: "#c9482f" },
-  { label: "A", color: "#d98a3d" },
-  { label: "B", color: "#c9a53d" },
-  { label: "C", color: "#5c9e5c" },
-];
-
 function MiniCover({ src, className = "" }: { src: string; className?: string }) {
   return <img src={`/covers/${src}.jpg`} alt="" loading="lazy" className={`h-12 w-8 shrink-0 rounded-md object-cover ${className}`} />;
 }
@@ -74,28 +67,6 @@ function BracketMockup() {
   );
 }
 
-function TierRowsMockup() {
-  return (
-    <div className="flex h-full flex-col overflow-hidden rounded-xl border border-(--color-border)">
-      {tiers.map((tier) => (
-        <div key={tier.label} className="flex flex-1 items-center gap-3 border-b border-(--color-border) p-2 last:border-b-0">
-          <span
-            className="flex h-9 w-11 shrink-0 items-center justify-center rounded-md text-sm font-bold text-white"
-            style={{ backgroundColor: tier.color }}
-          >
-            {tier.label}
-          </span>
-          <div className="flex gap-1.5">
-            <MiniCover src="gilead" />
-            <MiniCover src="sapiens" />
-            <MiniCover src="achilles" />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export function ArenaShowcase() {
   return (
     <section id="arena" className="scroll-mt-14">
@@ -114,10 +85,9 @@ export function ArenaShowcase() {
             Every tournament ends ranked, with a result worth sharing.
           </p>
         </div>
-        <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mx-auto mt-12 grid max-w-3xl gap-4 sm:grid-cols-2">
           <DuelMockup />
           <BracketMockup />
-          <TierRowsMockup />
         </div>
       </div>
     </section>

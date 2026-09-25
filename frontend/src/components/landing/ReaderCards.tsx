@@ -1,12 +1,7 @@
 const identities = [
   { numeral: "I", name: "The Cartographer", slug: "i-carto" },
-  { numeral: "II", name: "The Annotator", slug: "ii-anno" },
   { numeral: "III", name: "The Lamplighter", slug: "iii-lamp" },
-  { numeral: "IV", name: "The Stargazer", slug: "iv-star" },
   { numeral: "V", name: "The Archivist", slug: "v-arch" },
-  { numeral: "VI", name: "The Correspondent", slug: "vi-corr" },
-  { numeral: "VII", name: "The Wayfarer", slug: "vii-way" },
-  { numeral: "VIII", name: "The Loyalist", slug: "viii-loyal" },
 ];
 
 export function ReaderCards() {
@@ -41,6 +36,17 @@ export function ReaderCards() {
               </figcaption>
             </figure>
           ))}
+          <figure className="flex flex-col">
+            <div className="flex aspect-[250/350] items-center justify-center rounded-sm border border-dashed border-(--color-bg)/30">
+              <span className="text-sm font-semibold text-(--color-bg)/60">+5 more</span>
+            </div>
+            <figcaption className="mt-3 text-center">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-(--color-bg)/60">VI—VIII</span>
+              <span className="mt-0.5 block text-sm font-semibold text-(--color-bg)/60" style={{ fontFamily: '"Playfair Display", serif' }}>
+                earned by how you read
+              </span>
+            </figcaption>
+          </figure>
         </div>
       </div>
     </section>

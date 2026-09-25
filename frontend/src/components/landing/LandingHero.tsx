@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 
-const shelf = ["piranesi", "hail-mary", "circe", "gilead", "achilles", "normal-people"];
+const shelf = ["piranesi", "hail-mary", "circe", "normal-people"];
 
 export function LandingHero() {
   return (
@@ -40,19 +40,40 @@ export function LandingHero() {
             Imports from <span className="text-(--color-text)">Kobo</span> · <span className="text-(--color-text)">Goodreads</span> · <span className="text-(--color-text)">StoryGraph</span>
           </p>
         </div>
-        <div className="rounded-2xl border border-(--color-border) bg-(--color-surface) p-4 shadow-[0_24px_60px_rgba(32,30,28,0.12)]">
-          <div className="mb-3 flex gap-1.5 px-1">
-            <span className="h-2 w-2 rounded-full bg-(--color-border)" />
-            <span className="h-2 w-2 rounded-full bg-(--color-border)" />
-            <span className="h-2 w-2 rounded-full bg-(--color-accent)" />
+        <div className="relative px-2 pb-10 pt-8 sm:px-8">
+          <div className="absolute -top-1 right-0 z-10 flex items-center gap-2 rounded-full border border-(--color-border) bg-(--color-surface) px-3 py-1.5 shadow-[0_8px_20px_rgba(32,30,28,0.10)] sm:-right-2">
+            <span className="text-xs font-bold text-(--color-accent)">62%</span>
+            <span className="text-xs font-semibold text-(--color-text-dim)">The Duel — semis</span>
           </div>
-          <div className="grid grid-cols-3 gap-2.5">
+          <div className="absolute bottom-14 left-0 z-10 rounded-full border border-(--color-border) bg-(--color-surface) px-3 py-1.5 shadow-[0_8px_20px_rgba(32,30,28,0.10)] sm:-left-2">
+            <span className="text-xs font-bold text-(--color-accent)">+312</span>
+            <span className="text-xs font-semibold text-(--color-text-dim)"> books imported</span>
+          </div>
+          <div className="flex items-end justify-center">
             {shelf.map((cover) => (
-              <img key={cover} src={`/covers/${cover}.jpg`} alt="" className="aspect-[2/3] w-full rounded-lg object-cover" />
+              <img
+                key={cover}
+                src={`/covers/${cover}.jpg`}
+                alt=""
+                className="mr-1 w-[19%] rounded-md shadow-[0_10px_24px_rgba(32,30,28,0.18)] transition-transform duration-150 hover:-translate-y-2"
+              />
             ))}
+            <img
+              src="/covers/gilead.jpg"
+              alt=""
+              className="relative z-10 -ml-2 w-[15%] origin-bottom-left rounded-md shadow-[0_10px_24px_rgba(32,30,28,0.22)] transition-transform duration-150 hover:-translate-y-2"
+              style={{ transform: "rotate(-9deg)", marginBottom: "2px" }}
+            />
+            <div className="ml-3 hidden flex-col gap-[3px] sm:flex">
+              <img src="/covers/sapiens.jpg" alt="" className="h-5 w-[92px] rounded-[3px] object-cover shadow-[0_4px_10px_rgba(32,30,28,0.18)]" />
+              <img src="/covers/achilles.jpg" alt="" className="h-5 w-[84px] rounded-[3px] object-cover shadow-[0_4px_10px_rgba(32,30,28,0.18)]" />
+            </div>
           </div>
+          <div className="mt-1 h-1.5 rounded-full bg-(--color-text) opacity-80" />
+          <div className="mt-1 h-2 rounded-full bg-(--color-border) opacity-60" />
         </div>
       </div>
     </section>
   );
 }
+

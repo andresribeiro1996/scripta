@@ -7,6 +7,7 @@ import { FeatureGrid } from "../components/landing/FeatureGrid";
 import { ReaderCards } from "../components/landing/ReaderCards";
 import { MuralShowcase } from "../components/landing/MuralShowcase";
 import { ArenaShowcase } from "../components/landing/ArenaShowcase";
+import { TierSort } from "../components/landing/TierSort";
 import { GetApp } from "../components/landing/GetApp";
 import { LandingFooter } from "../components/landing/LandingFooter";
 
@@ -23,6 +24,7 @@ export function LandingPage() {
         <ReaderCards />
         <MuralShowcase />
         <ArenaShowcase />
+        <TierSort />
         <GetApp />
       </main>
       <LandingFooter />
