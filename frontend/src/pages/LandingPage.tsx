@@ -4,6 +4,7 @@ import { landingDestination } from "../lib/landing";
 import { LandingNav } from "../components/landing/LandingNav";
 import { LandingFooter } from "../components/landing/LandingFooter";
 import { LandingHero } from "../components/landing/LandingHero";
+import { FeatureGrid } from "../components/landing/FeatureGrid";
 
 export function LandingPage() {
   const { session } = useAuth();
@@ -14,6 +15,7 @@ export function LandingPage() {
       <LandingNav />
       <main>
         <LandingHero />
+        <FeatureGrid />
       </main>
       <LandingFooter />
     </div>
