@@ -4,7 +4,7 @@ import { ScrollView, Share, StyleSheet, Text, View, useWindowDimensions } from "
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { captureRef, releaseCapture } from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
-import { Asset, requestPermissionsAsync } from "expo-media-library";
+import { requestPermissionsAsync, saveToLibraryAsync } from "expo-media-library/legacy";
 import QRCode from "react-native-qrcode-svg";
 import { Button, dynamicType, spacing, typography, useTheme } from "../../ui";
 import { snapshotSize } from "./shareImage";
@@ -67,7 +67,7 @@ export function ContentShareSheet({ visible, onClose, title, description, url, c
     const uri = await captureRef(capture, { format: "png", result: "tmpfile", ...snapshotSize(size.current.width, size.current.height) });
     try {
       if (save) {
-        await Asset.create(uri);
+        await saveToLibraryAsync(uri);
         setNotice("Image saved to Photos.");
       } else {
         await Sharing.shareAsync(uri, { mimeType: "image/png", UTI: "public.png", dialogTitle: title });
