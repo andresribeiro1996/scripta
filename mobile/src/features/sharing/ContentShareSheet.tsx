@@ -20,9 +20,11 @@ type Props = {
   onEnableLink?: () => Promise<string | void>;
   enableLinkLabel?: string;
   onDisableLink?: () => Promise<void>;
+  linkError?: string | null;
+  onRetryLink?: () => void;
 };
 
-export function ContentShareSheet({ visible, onClose, title, url, children, previewControls, imageReady = true, onEnableLink, enableLinkLabel = "Create share link", onDisableLink }: Props) {
+export function ContentShareSheet({ visible, onClose, title, url, children, previewControls, imageReady = true, onEnableLink, enableLinkLabel = "Create share link", onDisableLink, linkError, onRetryLink }: Props) {
   const { colors } = useTheme();
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -92,6 +94,8 @@ export function ContentShareSheet({ visible, onClose, title, url, children, prev
             <Button label="Save image" variant="secondary" disabled={busy || !imageReady} onPress={() => void run(() => exportImage(true))} />
           </View>
         </> : <ScrollView contentContainerStyle={{ gap: spacing.md }}>
+          {linkError ? <Text accessibilityRole="alert" selectable style={{ color: colors.danger }}>{linkError}</Text> : null}
+          {linkError && onRetryLink ? <Button label="Retry link" variant="secondary" disabled={busy} onPress={onRetryLink} /> : null}
           {view === "qr" && shareUrl ? <View style={styles.qr}>
             <QRCode value={shareUrl} size={220} quietZone={16} backgroundColor="white" color="black" />
             <Text selectable style={[typography.caption, { color: colors.text, textAlign: "center" }]}>Scan to open {title}</Text>
