@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   BLOCK_TYPE_LABELS,
   calculateShelfTheme,
@@ -25,7 +25,7 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { commitHaptic, liftHaptic } from "../../ui/haptics";
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View, type StyleProp, type TextStyle } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, View, type StyleProp, type TextStyle } from "react-native";
 import { blockFontFamily, resolveBorderColor, resolveBorderStyle } from "../../ui/libraryStyle";
 import { minimumTouchTarget, spacing, useTheme } from "../../ui/theme";
 import type { GalleryImage } from "../gallery/api";
@@ -80,8 +80,9 @@ function EmptyBlock({ message, style }: { message: string; style: StyleProp<Text
   return <View style={styles.emptyBlock}><Text style={style}>{message}</Text></View>;
 }
 
-export function BlockContent({ block, books, images, tierlists, profile, shelfThemeOverride, statsOverride }: { block: MuralBlock; books: Array<Record<string, unknown>>; images: GalleryImage[]; tierlists: Tierlist[]; profile?: ReaderProfile; shelfThemeOverride?: ShelfTheme; statsOverride?: Record<string, number> }) {
+export function BlockContent({ block, books, images, tierlists, profile, shelfThemeOverride, statsOverride, onAssetReady }: { block: MuralBlock; books: Array<Record<string, unknown>>; images: GalleryImage[]; tierlists: Tierlist[]; profile?: ReaderProfile; shelfThemeOverride?: ShelfTheme; statsOverride?: Record<string, number>; onAssetReady?: (key: string) => void }) {
   const { colors: themeColors } = useTheme();
+  const [failedSource, setFailedSource] = useState<string | null>(null);
   const style = resolveBlockStyle(block.style);
   const colors = { ...themeColors, text: style.textColor ?? themeColors.text };
   const text = blockTextStyles(style, colors.text);
@@ -93,7 +94,7 @@ export function BlockContent({ block, books, images, tierlists, profile, shelfTh
     const initial = (profile?.username || "Reader")[0]?.toUpperCase();
     return <View style={styles.profileBlock}>
       <View style={styles.profileHeader}>
-        {profile?.avatarUrl ? <Image source={{ uri: profile.avatarUrl }} style={styles.profileAvatar} contentFit="cover" /> : <View style={[styles.profileAvatar, styles.profileInitial, { backgroundColor: colors.accentSoft }]}><Text style={[styles.profileInitialText, { color: colors.accent }]}>{initial}</Text></View>}
+        {profile?.avatarUrl && failedSource !== profile.avatarUrl ? <Image source={{ uri: profile.avatarUrl }} style={styles.profileAvatar} contentFit="cover" onDisplay={() => onAssetReady?.(`avatar:${block.id}:${profile.avatarUrl}`)} onError={() => { setFailedSource(profile.avatarUrl!); onAssetReady?.(`avatar:${block.id}:${profile.avatarUrl}`); }} /> : <View style={[styles.profileAvatar, styles.profileInitial, { backgroundColor: colors.accentSoft }]}><Text style={[styles.profileInitialText, { color: colors.accent }]}>{initial}</Text></View>}
         <View style={styles.profileCopy}><Text numberOfLines={1} style={text.name}>@{profile?.username || "reader"}</Text>{block.bio ? <Text numberOfLines={3} style={[text.bio, dim]}>{block.bio}</Text> : null}</View>
       </View>
       {block.favoriteGenres.length ? <View style={styles.genreSection}><Text style={[text.label, styles.genreLabel, dim]}>What I like</Text><View style={styles.genreRow}>{block.favoriteGenres.map((genre) => <View key={genre} style={[styles.genreChip, { backgroundColor: colors.accentSoft }]}><Text style={[text.caption, { color: colors.accent }]}>{genre}</Text></View>)}</View></View> : null}
@@ -103,19 +104,19 @@ export function BlockContent({ block, books, images, tierlists, profile, shelfTh
   if (block.type === "spotlight" || block.type === "shelf" || block.type === "currentlyReading") {
     const selected = block.type === "spotlight" ? books.filter((book) => bookKey(book) === block.bookKey) : block.type === "shelf" ? resolveShelfBooks(block, books) : books.filter((book) => book.ReadStatus === 1);
     return <><Text numberOfLines={1} style={text.title}>{block.type === "shelf" ? block.title || "Shelf" : block.type === "currentlyReading" ? "Currently reading" : title(selected[0])}</Text>
-      {selected.length ? <View style={styles.bookRow}>{selected.slice(0, 3).map((book) => <View key={bookKey(book)} style={styles.bookColumn}><View style={styles.bookCover}><CoverImage book={book} contentFit="contain" /></View><Text numberOfLines={2} style={text.caption}>{title(book)}</Text></View>)}</View> : <EmptyBlock message="Choose books or connect a collection in Edit." style={[text.caption, dim]} />}
+      {selected.length ? <View style={styles.bookRow}>{selected.slice(0, 3).map((book) => <View key={bookKey(book)} style={styles.bookColumn}><View style={styles.bookCover}><CoverImage book={book} contentFit="contain" onLoadEnd={onAssetReady ? () => onAssetReady(`cover:${block.id}:${bookKey(book)}:${String(book._coverUrl ?? "")}`) : undefined} /></View><Text numberOfLines={2} style={text.caption}>{title(book)}</Text></View>)}</View> : <EmptyBlock message="Choose books or connect a collection in Edit." style={[text.caption, dim]} />}
     </>;
   }
   if (block.type === "quote") { const value = resolveQuote(block, books); return <><Text numberOfLines={6} style={text.body}>“{String(value?.highlight.Text ?? "No eligible passage available")}”</Text>{value ? <Text style={[text.caption, dim]}>{String(value.book.Title)} · {String(value.book.Attribution ?? "")}</Text> : null}</>; }
   if (block.type === "quoteCollection") return <><Text style={text.title}>{block.title || "Quotes"}</Text>{resolveQuoteCollection(block, books).map(({ highlight }, index) => <Text key={index} style={text.body}>“{String(highlight.Text ?? highlight.Annotation ?? "")}”</Text>)}</>;
-  if (block.type === "image") { const image = images.find((item) => item.id === block.imageId); return image ? <><Image source={{ uri: image.url }} style={styles.fill} contentFit="cover" />{block.caption ? <Text style={[text.caption, dim]}>{block.caption}</Text> : null}</> : <EmptyBlock message="Image unavailable" style={[text.caption, dim]} />; }
+  if (block.type === "image") { const image = images.find((item) => item.id === block.imageId); return image && failedSource !== image.url ? <><Image source={{ uri: image.url }} style={styles.fill} contentFit="cover" onDisplay={() => onAssetReady?.(`image:${block.id}:${image.url}`)} onError={() => { setFailedSource(image.url); onAssetReady?.(`image:${block.id}:${image.url}`); }} />{block.caption ? <Text style={[text.caption, dim]}>{block.caption}</Text> : null}</> : <EmptyBlock message="Image unavailable" style={[text.caption, dim]} />; }
 
   if (block.type === "stats") return <View style={styles.stats}>{block.metrics.map((metric) => <View key={metric}><Text style={text.stat}>{statsOverride?.[metric] ?? computeStat(metric, books)}</Text><Text style={[text.caption, dim]}>{STAT_METRIC_LABELS[metric]}</Text></View>)}</View>;
   if (block.type === "tierlist") { const tierlist = tierlists.find((item) => item.id === block.tierlistId); return <><Text numberOfLines={1} style={text.title}>{tierlist?.name ?? "Tier list unavailable"}</Text>{tierlist?.data.tiers.map((tier) => <Text key={tier.id} style={text.body}>{tier.label}: {tier.bookKeys.length}</Text>)}</>; }
   return <Text style={text.body}>{BLOCK_TYPE_LABELS[block.type]}</Text>;
 }
 
-function CanvasBlock({ block, columnWidth, editable, selected, books, images, tierlists, profile, shelfThemeOverride, statsOverride, onSelect, onMove }: {
+function CanvasBlock({ block, columnWidth, editable, selected, books, images, tierlists, profile, shelfThemeOverride, statsOverride, onSelect, onMove, onAssetReady }: {
   block: MuralBlock;
   columnWidth: number;
   editable: boolean;
@@ -128,6 +129,7 @@ function CanvasBlock({ block, columnWidth, editable, selected, books, images, ti
   statsOverride?: Record<string, number>;
   onSelect: () => void;
   onMove: (dx: number, dy: number) => void;
+  onAssetReady?: (key: string) => void;
 }) {
   const { colors } = useTheme();
   const x = useSharedValue(0);
@@ -152,9 +154,8 @@ function CanvasBlock({ block, columnWidth, editable, selected, books, images, ti
     transform: [{ translateX: x.value }, { translateY: y.value }, { scale: 1 + lifted.value * 0.03 }],
   }));
   const style = resolveBlockStyle(block.style);
-  return (
-    <GestureDetector gesture={gesture}>
-      <Animated.View style={[
+  const body = <View style={styles.blockBody}><BlockContent block={block} books={books} images={images} tierlists={tierlists} profile={profile} shelfThemeOverride={shelfThemeOverride} statsOverride={statsOverride} onAssetReady={onAssetReady} /></View>;
+  const content = <Animated.View style={[
         styles.block,
         style.cardShadow ? blockShadow : null,
         {
@@ -171,15 +172,12 @@ function CanvasBlock({ block, columnWidth, editable, selected, books, images, ti
         },
         animated,
       ]}>
-        <Pressable accessibilityRole="button" accessibilityLabel={`${BLOCK_TYPE_LABELS[block.type]} block${editable ? ". Long press and drag to move" : ""}`} onPress={onSelect} style={styles.blockPress}>
-          <View style={styles.blockBody}><BlockContent block={block} books={books} images={images} tierlists={tierlists} profile={profile} shelfThemeOverride={shelfThemeOverride} statsOverride={statsOverride} /></View>
-        </Pressable>
-      </Animated.View>
-    </GestureDetector>
-  );
+        {editable ? <Pressable accessibilityRole="button" accessibilityLabel={`${BLOCK_TYPE_LABELS[block.type]} block. Long press and drag to move`} onPress={onSelect} style={styles.blockPress}>{body}</Pressable> : <View style={styles.blockPress}>{body}</View>}
+      </Animated.View>;
+  return editable ? <GestureDetector gesture={gesture}>{content}</GestureDetector> : content;
 }
 
-export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThemeOverride, statsOverride, editable = false, selectedBlockId, onSelectBlock, onLayoutChange, groups = [] }: {
+export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThemeOverride, statsOverride, editable = false, selectedBlockId, onSelectBlock, onLayoutChange, onImageReadyChange, groups = [] }: {
   mural: Mural;
   groups?: Group[];
   books: Array<Record<string, unknown>>;
@@ -192,17 +190,30 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThe
   selectedBlockId?: string | null;
   onSelectBlock?: (id: string) => void;
   onLayoutChange?: (id: string, layout: BlockLayout) => void;
+  onImageReadyChange?: (ready: boolean) => void;
 }) {
   const { colors } = useTheme();
   const [width, setWidth] = useState(0);
   const [day] = useState(() => new Date().toISOString().slice(0, 10));
+  const [readyAssets, setReadyAssets] = useState<Set<string>>(() => new Set());
+  const onAssetReady = useCallback((key: string) => setReadyAssets((current) => current.has(key) ? current : new Set(current).add(key)), []);
+  const resolvedBlocks = useMemo(() => mural.blocks.map((block) => resolveHomeBlock(block, books, groups, day)), [mural.blocks, books, groups, day]);
+  const assetKeys = resolvedBlocks.flatMap((block) => {
+    if (block.type === "profile" && profile?.avatarUrl) return [`avatar:${block.id}:${profile.avatarUrl}`];
+    if (block.type === "image") { const image = images.find((item) => item.id === block.imageId); return image ? [`image:${block.id}:${image.url}`] : []; }
+    if (block.type !== "spotlight" && block.type !== "shelf" && block.type !== "currentlyReading") return [];
+    const selected = block.type === "spotlight" ? books.filter((book) => bookKey(book) === block.bookKey) : block.type === "shelf" ? resolveShelfBooks(block, books) : books.filter((book) => book.ReadStatus === 1);
+    return selected.slice(0, 3).map((book) => `cover:${block.id}:${bookKey(book)}:${String(book._coverUrl ?? "")}`);
+  });
+  const imageReady = width > 0 && assetKeys.every((key) => readyAssets.has(key));
+  useEffect(() => { onImageReadyChange?.(imageReady); }, [imageReady, onImageReadyChange]);
   const columnWidth = width / GRID_COLUMNS;
-  const height = muralCanvasHeight(mural.blocks, ROW_HEIGHT, editable ? undefined : 0);
+  const height = muralCanvasHeight(mural.blocks, ROW_HEIGHT, onImageReadyChange && mural.blocks.length ? 0 : undefined);
   return (
     <View onLayout={(event) => setWidth(event.nativeEvent.layout.width)} style={[styles.canvas, { height, backgroundColor: colors.background }]}>
-      {width > 0 ? mural.blocks.map((block) => <CanvasBlock
+      {width > 0 ? resolvedBlocks.map((block) => <CanvasBlock
         key={block.id}
-        block={resolveHomeBlock(block, books, groups, day)}
+        block={block}
         columnWidth={columnWidth}
         editable={editable}
         selected={block.id === selectedBlockId}
@@ -214,6 +225,7 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThe
         statsOverride={statsOverride}
         onSelect={() => onSelectBlock?.(block.id)}
         onMove={(dx, dy) => onLayoutChange?.(block.id, { ...block.layout, x: block.layout.x + dx, y: block.layout.y + dy })}
+        onAssetReady={onImageReadyChange ? onAssetReady : undefined}
       />) : null}
     </View>
   );
