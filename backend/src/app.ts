@@ -144,7 +144,8 @@ export function buildApp() {
     tournaments: {
       list: getArenaPublicApi().listPublished,
       get: getArenaPublicApi().getPublished,
-      listByOwner: getArenaPublicApi().listPublishedByOwner
+      listByOwner: getArenaPublicApi().listPublishedByOwner,
+      listVotedByUser: getArenaPublicApi().listVotedByUser
     }
   });
   app.register(registerTierlistsModule, {

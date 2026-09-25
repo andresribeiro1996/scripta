@@ -104,7 +104,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
         options={{
           headerShown: true,
           title: currentName || "Mural",
-          headerRight: () => <IconButton framed accessibilityLabel="Save mural" name="confirm" onPress={() => void save()} />,
+          headerRight: () => <IconButton framed accessibilityLabel="Save mural" label="Save" name="confirm" onPress={() => void save()} />,
         }}
       />
       <View style={styles.nameRow}><Input label="Mural name" value={currentName} onChangeText={setName} /></View>

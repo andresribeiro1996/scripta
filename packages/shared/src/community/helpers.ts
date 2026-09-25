@@ -21,9 +21,12 @@ export function contentDetail(content: PublishedContent): string {
 
 export type ContentTone = "neutral" | "accent" | "info" | "success" | "reference";
 
-export function contentStatus(content: PublishedContent): { label: string; tone: ContentTone } {
+export function contentStatus(content: PublishedContent): { label: string; tone: ContentTone; votedBadge?: boolean } {
   if (content.kind === "tournament") {
-    return content.status === "active" ? { label: "In progress", tone: "info" } : { label: "Completed", tone: "success" };
+    const base = content.status === "active" ? { label: "In progress", tone: "info" as const } : { label: "Completed", tone: "success" as const };
+    // Tier lists fold the vote into the status itself ("Voted"); a tournament's
+    // status still matters after voting, so it travels as a second badge.
+    return content.viewerVoted ? { ...base, votedBadge: true } : base;
   }
   if (content.promotedAt) return { label: "Reference", tone: "reference" };
   if (content.votingOpen && content.viewerVoted) return { label: "Voted", tone: "info" };

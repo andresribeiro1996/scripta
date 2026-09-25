@@ -461,6 +461,7 @@ export interface ArenaPublicApi {
   listPublished(limit: number, offset: number): PublishedTournamentRef[];
   getPublished(id: string): PublishedTournamentRef | undefined;
   listPublishedByOwner(ownerUserId: string): PublishedTournamentRef[];
+  listVotedByUser(voterUserId: string): PublishedTournamentRef[];
 }
 
 function toPublishedRef(summary: TournamentSummary): PublishedTournamentRef {
@@ -483,6 +484,7 @@ export function createArenaPublicApi(service: ArenaService): ArenaPublicApi {
       return summary ? toPublishedRef(summary) : undefined;
     },
     listPublishedByOwner: (ownerUserId) =>
-      service.listMine(ownerUserId).filter((s) => s.status !== "seeding").map(toPublishedRef)
+      service.listMine(ownerUserId).filter((s) => s.status !== "seeding").map(toPublishedRef),
+    listVotedByUser: (voterUserId) => service.listVoted(voterUserId).map(toPublishedRef)
   };
 }
