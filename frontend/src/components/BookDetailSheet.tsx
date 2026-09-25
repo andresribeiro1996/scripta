@@ -68,8 +68,12 @@ export function BookDetailSheet({
               </button>
             </div>
 
-            <div role="group" aria-label="Reading status" className="mt-3 inline-flex rounded-lg border border-(--color-border) p-0.5">
-              {([0, 1, 2] as const).map((status) => {
+            <div
+              role="group"
+              aria-label="Reading status"
+              className="mt-3 flex items-stretch overflow-hidden rounded-lg border border-(--color-border) bg-(--color-surface)"
+            >
+              {([0, 1, 2] as const).map((status, i) => {
                 const checked = (book.ReadStatus === 1 || book.ReadStatus === 2 ? book.ReadStatus : 0) === status;
                 return (
                   <button
@@ -77,7 +81,9 @@ export function BookDetailSheet({
                     type="button"
                     aria-pressed={checked}
                     onClick={() => { if (!checked) onSetStatus(book, status); }}
-                    className={`min-h-11 rounded-md px-3 text-sm font-medium ${checked ? "bg-(--color-accent) text-white" : "text-(--color-text-dim) hover:bg-(--color-surface-hover)"}`}
+                    className={`flex min-h-11 flex-1 items-center justify-center gap-1.5 px-3 text-sm font-semibold ${
+                      i > 0 ? "border-l border-(--color-border)" : ""
+                    } ${checked ? "bg-(--color-accent-soft) text-(--color-accent)" : "text-(--color-text-dim) hover:bg-(--color-surface-hover)"}`}
                   >
                     {statusLabel(status)}
                   </button>

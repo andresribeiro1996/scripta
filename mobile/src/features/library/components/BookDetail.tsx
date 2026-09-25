@@ -1,6 +1,6 @@
 // Mirrors frontend's components/BookDetailSheet.tsx — cover, title/
-// author/status, the Style/Cover/mark-as-read actions, and the highlight
-// list.
+// author/status, the Style/Cover actions, the status control, and the
+// highlight list.
 
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { statusLabel, type ReadStatus } from "@scripta/shared";
