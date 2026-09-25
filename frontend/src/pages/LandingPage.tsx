@@ -3,6 +3,7 @@ import { useAuth } from "../auth/AuthContext";
 import { landingDestination } from "../lib/landing";
 import { LandingNav } from "../components/landing/LandingNav";
 import { LandingFooter } from "../components/landing/LandingFooter";
+import { LandingHero } from "../components/landing/LandingHero";
 
 export function LandingPage() {
   const { session } = useAuth();
@@ -11,7 +12,9 @@ export function LandingPage() {
   return (
     <div className="min-h-screen bg-(--color-bg) text-(--color-text)">
       <LandingNav />
-      <main />
+      <main>
+        <LandingHero />
+      </main>
       <LandingFooter />
     </div>
   );
