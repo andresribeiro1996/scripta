@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" class="plate id-way" viewBox="0 0 250 350" width="250" height="350" role="img" aria-label="The Wayfarer reader card"><style>.pg,.pgf,.gg{fill:#f1eadb}.pl{stroke:#2b6664;fill:none}.pf,.pt,.gd,.gi{fill:#2b6664}.pgl{fill:#f1eadb;stroke:#2b6664}.pgs,.gr,.gs{stroke:#f1eadb;fill:none}.gk{stroke:#2b6664;fill:none}</style>
+<rect class="pg" width="250" height="350" rx="4"/>
+<rect class="pl" x="10" y="10" width="230" height="330" stroke-width="1.6"/>
+<rect class="pl" x="16" y="16" width="218" height="318" stroke-width=".6"/>
+<path class="pf" d="M16 11.5L20.5 16L16 20.5L11.5 16ZM234 11.5L238.5 16L234 20.5L229.5 16ZM16 329.5L20.5 334L16 338.5L11.5 334ZM234 329.5L238.5 334L234 338.5L229.5 334Z"/>
+<text class="pt" x="125" y="45" text-anchor="middle" font-size="8.5" letter-spacing="3.4" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="600">EX LIBRIS</text>
+<circle class="pl" cx="125" cy="134" r="60" stroke-width="1.4"/>
+<circle class="pl" cx="125" cy="134" r="55" stroke-width=".6"/>
+<path class="pl" d="M125 83V149" stroke-width="1.4"/><path class="pf" d="M125 83L139 86.5L125 90Z"/><path class="pgl" d="M127 90L127 144L160 144Q151 114 127 90Z" stroke-width="1.3" stroke-linejoin="round"/><path class="pl" d="M127 109H142.5M127 125H151.5" stroke-width=".6"/><path class="pgl" d="M123 94L123 144L94 144Q104 118 123 94Z" stroke-width="1.3" stroke-linejoin="round"/><path class="pl" d="M100 133.3V142.5M104 125.3V142.5M108 117.8V142.5M112 111.3V142.5M116 105.3V142.5M120 99.3V142.5" stroke-width=".55"/><path class="pf" d="M86 148H164L153 163H97Z"/><path class="pgs" d="M93 152.5H157" stroke-width=".9"/><path class="pl" d="M84 170q8-5 16 0t16 0t16 0t16 0t16 0" stroke-width="1.1"/><path class="pl" d="M96 177q7-4 14 0t14 0t14 0t14 0" stroke-width=".6"/>
+<text class="pt" x="125" y="220" text-anchor="middle" font-size="8" letter-spacing="3" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="600">THE</text>
+<text class="pt" x="125" y="247" text-anchor="middle" font-size="25" font-family="'Playfair Display', Georgia, 'Times New Roman', serif">Wayfarer</text>
+<path class="pl" d="M82 263H117M133 263H168" stroke-width=".8"/><circle class="pf" cx="125" cy="263" r="2"/>
+<text class="pt" x="125" y="283" text-anchor="middle" font-size="11" font-style="italic" font-family="'Playfair Display', Georgia, 'Times New Roman', serif">never the same shelf twice</text>
+<path class="pl" d="M30 305H220" stroke-width=".5"/>
+<text class="pt" x="30" y="321" font-size="7.5" letter-spacing="1.8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="600">PLATE VII</text>
+<text class="pt" x="220" y="321" text-anchor="end" font-size="7.5" letter-spacing="1.8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="600">EXAMPLE READER</text>
+</svg>

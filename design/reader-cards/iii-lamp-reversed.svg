@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" class="plate id-lamp" viewBox="0 0 250 350" width="250" height="350" role="img" aria-label="The Lamplighter reader card"><style>.pg,.pgf,.gg{fill:#173524}.pl{stroke:#efe5d1;fill:none}.pf,.pt,.gd,.gi{fill:#efe5d1}.pgl{fill:#173524;stroke:#efe5d1}.pgs,.gr,.gs{stroke:#173524;fill:none}.gk{stroke:#efe5d1;fill:none}</style>
+<rect class="pg" width="250" height="350" rx="4"/>
+<rect class="pl" x="10" y="10" width="230" height="330" stroke-width="1.6"/>
+<rect class="pl" x="16" y="16" width="218" height="318" stroke-width=".6"/>
+<path class="pf" d="M16 11.5L20.5 16L16 20.5L11.5 16ZM234 11.5L238.5 16L234 20.5L229.5 16ZM16 329.5L20.5 334L16 338.5L11.5 334ZM234 329.5L238.5 334L234 338.5L229.5 334Z"/>
+<text class="pt" x="125" y="45" text-anchor="middle" font-size="8.5" letter-spacing="3.4" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="600">EX LIBRIS</text>
+<circle class="pl" cx="125" cy="134" r="60" stroke-width="1.4"/>
+<circle class="pl" cx="125" cy="134" r="55" stroke-width=".6"/>
+<path class="pl" d="M154.0 126.0L164.0 126.0M96.0 126.0L86.0 126.0M152.3 116.1L161.6 112.7M97.7 116.1L88.4 112.7M152.3 135.9L161.6 139.3M97.7 135.9L88.4 139.3M145.5 105.5L152.6 98.4M104.5 105.5L97.4 98.4" stroke-width=".9" stroke-linecap="round"/><circle class="pl" cx="125" cy="84" r="6" stroke-width="1.4"/><path class="pf" d="M109 101L141 101L134 90L116 90Z"/><rect class="pgl" x="107" y="101" width="36" height="50" stroke-width="1.4"/><path class="pl" d="M113 101V151M137 101V151" stroke-width=".7"/><path class="pf" d="M125 110C133 121 134 131 125 140C116 131 117 121 125 110Z"/><path class="pgf" d="M125 123C128 128 128 132 125 136C122 132 122 128 125 123Z"/><path class="pf" d="M105 151L145 151L141 159L109 159Z"/><path class="pl" d="M113 159V164H137V159" stroke-width="1.2"/><path class="pf" d="M152 88L153 91L156 92L153 93L152 96L151 93L148 92L151 91ZM98 172L99 175L102 176L99 177L98 180L97 177L94 176L97 175Z"/>
+<text class="pt" x="125" y="220" text-anchor="middle" font-size="8" letter-spacing="3" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="600">THE</text>
+<text class="pt" x="125" y="247" text-anchor="middle" font-size="25" font-family="'Playfair Display', Georgia, 'Times New Roman', serif">Lamplighter</text>
+<path class="pl" d="M82 263H117M133 263H168" stroke-width=".8"/><circle class="pf" cx="125" cy="263" r="2"/>
+<text class="pt" x="125" y="283" text-anchor="middle" font-size="11" font-style="italic" font-family="'Playfair Display', Georgia, 'Times New Roman', serif">keeps company with mysteries</text>
+<path class="pl" d="M30 305H220" stroke-width=".5"/>
+<text class="pt" x="30" y="321" font-size="7.5" letter-spacing="1.8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="600">PLATE III</text>
+<text class="pt" x="220" y="321" text-anchor="end" font-size="7.5" letter-spacing="1.8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="600">EXAMPLE READER</text>
+</svg>

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" class="plate id-loyal" viewBox="0 0 250 350" width="250" height="350" role="img" aria-label="The Loyalist reader card"><style>.pg,.pgf,.gg{fill:#4d1c28}.pl{stroke:#efe5d1;fill:none}.pf,.pt,.gd,.gi{fill:#efe5d1}.pgl{fill:#4d1c28;stroke:#efe5d1}.pgs,.gr,.gs{stroke:#4d1c28;fill:none}.gk{stroke:#efe5d1;fill:none}</style>
+<rect class="pg" width="250" height="350" rx="4"/>
+<rect class="pl" x="10" y="10" width="230" height="330" stroke-width="1.6"/>
+<rect class="pl" x="16" y="16" width="218" height="318" stroke-width=".6"/>
+<path class="pf" d="M16 11.5L20.5 16L16 20.5L11.5 16ZM234 11.5L238.5 16L234 20.5L229.5 16ZM16 329.5L20.5 334L16 338.5L11.5 334ZM234 329.5L238.5 334L234 338.5L229.5 334Z"/>
+<text class="pt" x="125" y="45" text-anchor="middle" font-size="8.5" letter-spacing="3.4" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="600">EX LIBRIS</text>
+<circle class="pl" cx="125" cy="134" r="60" stroke-width="1.4"/>
+<circle class="pl" cx="125" cy="134" r="55" stroke-width=".6"/>
+<path class="pl" d="M164.3 161.5A48 48 0 0 1 85.7 161.5" stroke-width=".9" stroke-dasharray="1.4 3.2" stroke-linecap="round"/><path class="pl" d="M86.1 166.5L85.7 161.5L90.2 163.6" stroke-width=".9" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(125 131) rotate(-22)"><clipPath id="wing-2"><path d="M-18-5Q-12-30 12-44Q2-24-2-4Z"/></clipPath><clipPath id="wing-3"><path d="M-18 5Q-12 30 12 44Q2 24-2 4Z"/></clipPath><path class="pgl" d="M-18-5Q-12-30 12-44Q2-24-2-4Z" stroke-width="1.3" stroke-linejoin="round"/><g clip-path="url(#wing-2)"><path class="pl" d="M-18.0-46V46M-15.2-46V46M-12.4-46V46M-9.6-46V46M-6.8-46V46M-4.0-46V46M-1.2-46V46M1.6-46V46M4.4-46V46M7.2-46V46M10.0-46V46M12.8-46V46" stroke-width=".55"/></g><path class="pgl" d="M-18 5Q-12 30 12 44Q2 24-2 4Z" stroke-width="1.3" stroke-linejoin="round"/><g clip-path="url(#wing-3)"><path class="pl" d="M-18.0-46V46M-15.2-46V46M-12.4-46V46M-9.6-46V46M-6.8-46V46M-4.0-46V46M-1.2-46V46M1.6-46V46M4.4-46V46M7.2-46V46M10.0-46V46M12.8-46V46" stroke-width=".55"/></g><path class="pf" d="M2-3L44-15L15 1L44 17L2 5Z"/><path class="pf" d="M-40-1Q-20-9 6-3Q11 1 6 5Q-18 9-40 3Z"/><circle class="pf" cx="-35" cy="1" r="6"/><circle class="pgf" cx="-37" cy="-.5" r="1.2"/><path class="pf" d="M-41 0L-47 1.5L-41 3Z"/></g>
+<text class="pt" x="125" y="220" text-anchor="middle" font-size="8" letter-spacing="3" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="600">THE</text>
+<text class="pt" x="125" y="247" text-anchor="middle" font-size="25" font-family="'Playfair Display', Georgia, 'Times New Roman', serif">Loyalist</text>
+<path class="pl" d="M82 263H117M133 263H168" stroke-width=".8"/><circle class="pf" cx="125" cy="263" r="2"/>
+<text class="pt" x="125" y="283" text-anchor="middle" font-size="11" font-style="italic" font-family="'Playfair Display', Georgia, 'Times New Roman', serif">returns to the same voices</text>
+<path class="pl" d="M30 305H220" stroke-width=".5"/>
+<text class="pt" x="30" y="321" font-size="7.5" letter-spacing="1.8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="600">PLATE VIII</text>
+<text class="pt" x="220" y="321" text-anchor="end" font-size="7.5" letter-spacing="1.8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="600">EXAMPLE READER</text>
+</svg>

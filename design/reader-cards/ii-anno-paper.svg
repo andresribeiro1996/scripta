@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" class="plate id-anno" viewBox="0 0 250 350" width="250" height="350" role="img" aria-label="The Annotator reader card"><style>.pg,.pgf,.gg{fill:#f1eadb}.pl{stroke:#7a2e2a;fill:none}.pf,.pt,.gd,.gi{fill:#7a2e2a}.pgl{fill:#f1eadb;stroke:#7a2e2a}.pgs,.gr,.gs{stroke:#f1eadb;fill:none}.gk{stroke:#7a2e2a;fill:none}</style>
+<rect class="pg" width="250" height="350" rx="4"/>
+<rect class="pl" x="10" y="10" width="230" height="330" stroke-width="1.6"/>
+<rect class="pl" x="16" y="16" width="218" height="318" stroke-width=".6"/>
+<path class="pf" d="M16 11.5L20.5 16L16 20.5L11.5 16ZM234 11.5L238.5 16L234 20.5L229.5 16ZM16 329.5L20.5 334L16 338.5L11.5 334ZM234 329.5L238.5 334L234 338.5L229.5 334Z"/>
+<text class="pt" x="125" y="45" text-anchor="middle" font-size="8.5" letter-spacing="3.4" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="600">EX LIBRIS</text>
+<circle class="pl" cx="125" cy="134" r="60" stroke-width="1.4"/>
+<circle class="pl" cx="125" cy="134" r="55" stroke-width=".6"/>
+<path class="pgl" d="M76 152Q100 143 125 151L125 178Q100 170 76 179Z" stroke-width="1.3" stroke-linejoin="round"/><path class="pgl" d="M125 151Q150 143 174 152L174 179Q150 170 125 178Z" stroke-width="1.3" stroke-linejoin="round"/><path class="pl" d="M84 158Q101 152 118 157M84 164Q101 158 118 163M84 170Q101 164 118 169M134 157Q150 152 166 158M134 169Q150 164 166 170" stroke-width=".6"/><path class="pl" d="M134 163.2Q150 158 166 164" stroke-width="2.4" stroke-linecap="round"/><path class="pl" d="M131 154.5h-2.6v19h2.6" stroke-width="1.2"/><path class="pf" d="M141 142Q98 130 92 86Q128 104 141 142Z"/><path class="pgs" d="M131 131L117 133M124 120L108 121M117 109L101 108M109 98L96 96M134 126L137 112M126 114L128 100M118 103L119 92" stroke-width=".9" stroke-linecap="round"/><path class="pl" d="M149 153L90 83" stroke-width="1.3" stroke-linecap="round"/><path class="pf" d="M145.5 148.5L151.5 157.5L149 150.5Z"/>
+<text class="pt" x="125" y="220" text-anchor="middle" font-size="8" letter-spacing="3" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="600">THE</text>
+<text class="pt" x="125" y="247" text-anchor="middle" font-size="25" font-family="'Playfair Display', Georgia, 'Times New Roman', serif">Annotator</text>
+<path class="pl" d="M82 263H117M133 263H168" stroke-width=".8"/><circle class="pf" cx="125" cy="263" r="2"/>
+<text class="pt" x="125" y="283" text-anchor="middle" font-size="11" font-style="italic" font-family="'Playfair Display', Georgia, 'Times New Roman', serif">reads with a pencil</text>
+<path class="pl" d="M30 305H220" stroke-width=".5"/>
+<text class="pt" x="30" y="321" font-size="7.5" letter-spacing="1.8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="600">PLATE II</text>
+<text class="pt" x="220" y="321" text-anchor="end" font-size="7.5" letter-spacing="1.8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="600">EXAMPLE READER</text>
+</svg>
