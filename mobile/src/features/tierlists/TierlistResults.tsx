@@ -10,7 +10,7 @@ const descriptions: Record<AggregationMode, string> = {
   median: "Uses the middle vote in tier order.",
 };
 
-export function TierlistResults({ histogram, tiers, pool, books, ballotCount, eligibleVoteCount, votingOpen, promoted, ownPlacements = [], active = true }: {
+export function TierlistResults({ histogram, tiers, pool, books, ballotCount, eligibleVoteCount, votingOpen, promoted, ownPlacements = [], active = true, mode = "average", onModeChange }: {
   histogram: HistogramCell[];
   tiers: Array<{ id: string; label: string; color: string }>;
   pool: string[];
@@ -21,10 +21,11 @@ export function TierlistResults({ histogram, tiers, pool, books, ballotCount, el
   promoted?: boolean;
   ownPlacements?: Array<{ bookKey: string; tierId: string }>;
   active?: boolean;
+  mode?: AggregationMode;
+  onModeChange?: (mode: AggregationMode) => void;
 }) {
   const { colors } = useTheme();
   const boardScroll = useRef<ScrollView>(null);
-  const [mode, setMode] = useState<AggregationMode>("average");
   const [selected, setSelected] = useState<string | null>(null);
   const [showMine, setShowMine] = useState(false);
   const [explain, setExplain] = useState(false);
@@ -74,7 +75,7 @@ export function TierlistResults({ histogram, tiers, pool, books, ballotCount, el
       {unrankedBooks.length ? <View style={styles.footer}><Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.textDim }]}>No votes · {unrankedBooks.length}</Text>{renderBooks(unrankedBooks)}</View> : null}
     </ScrollView>
     <View style={[styles.dock, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <View accessibilityRole="radiogroup" accessibilityLabel="Ranking method" style={[styles.methods, { backgroundColor: colors.background }]}>{AGGREGATION_MODES.map((item) => <Pressable key={item.mode} accessibilityRole="radio" accessibilityState={{ checked: mode === item.mode }} onPress={() => setMode(item.mode)} style={[styles.method, mode === item.mode && { backgroundColor: colors.accentSoft }]}><Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.strong, { color: mode === item.mode ? colors.text : colors.textDim }]}>{item.label === "Most-voted" ? "Most voted" : item.label}</Text></Pressable>)}</View>
+      <View accessibilityRole="radiogroup" accessibilityLabel="Ranking method" style={[styles.methods, { backgroundColor: colors.background }]}>{AGGREGATION_MODES.map((item) => <Pressable key={item.mode} accessibilityRole="radio" accessibilityState={{ checked: mode === item.mode }} onPress={() => onModeChange?.(item.mode)} style={[styles.method, mode === item.mode && { backgroundColor: colors.accentSoft }]}><Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.strong, { color: mode === item.mode ? colors.text : colors.textDim }]}>{item.label === "Most-voted" ? "Most voted" : item.label}</Text></Pressable>)}</View>
       <Pressable accessibilityRole="button" accessibilityLabel="About ranking methods" onPress={() => setExplain(true)} style={styles.infoButton}><Text {...dynamicType} style={[typography.body, { color: colors.accent }]}>ⓘ</Text></Pressable>
     </View>
     <Sheet visible={explain} title="Ranking methods" onClose={() => setExplain(false)}><View style={styles.detailBody}>{AGGREGATION_MODES.map((item) => <Text key={item.mode} {...dynamicType} style={[typography.body, { color: colors.text }]}><Text style={styles.strong}>{item.label}: </Text>{descriptions[item.mode]} Ties favour the higher tier.</Text>)}</View></Sheet>
