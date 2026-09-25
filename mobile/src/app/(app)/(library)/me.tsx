@@ -1,7 +1,5 @@
-import { useAuth } from "@/core/auth";
-import { ProfileScreen } from "@/features/community/ProfileScreen";
+import { MyShelfScreen } from "@/features/community/MyShelfScreen";
 
-export default function MyProfileTab() {
-  const { user } = useAuth();
-  return <ProfileScreen username={user?.username ?? ""} />;
+export default function MyShelfTab() {
+  return <MyShelfScreen />;
 }

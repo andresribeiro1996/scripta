@@ -86,6 +86,9 @@ export function ProfileScreen({ username }: { username: string }) {
           <MuralPicker
             visible={pickerOpen}
             busy={busy}
+            title="Publish profile"
+            description="Pick the mural that becomes your public page."
+            actionLabel="Publish"
             onClose={() => setPickerOpen(false)}
             onPick={(muralId) => run(async () => {
               await publishProfile(muralId);
@@ -233,6 +236,9 @@ export function ProfileScreen({ username }: { username: string }) {
       <MuralPicker
         visible={pickerOpen}
         busy={busy}
+        title="Publish profile"
+        description="Pick the mural that becomes your public page."
+        actionLabel="Publish"
         onClose={() => setPickerOpen(false)}
         onPick={(muralId) => run(async () => {
           await publishProfile(muralId);
@@ -315,14 +321,20 @@ function Centered({ children }: { children: ReactNode }) {
   return <View style={[styles.centered, { backgroundColor: colors.background }]}>{children}</View>;
 }
 
-function MuralPicker({
+export function MuralPicker({
   visible,
   busy,
+  title,
+  description,
+  actionLabel,
   onClose,
   onPick,
 }: {
   visible: boolean;
   busy: boolean;
+  title: string;
+  description: string;
+  actionLabel: string;
   onClose: () => void;
   onPick: (muralId: string) => void;
 }) {
@@ -331,10 +343,10 @@ function MuralPicker({
   const [selected, setSelected] = useState<string | null>(null);
   const items = murals.data ?? [];
   return (
-    <Dialog visible={visible} title="Publish profile" onClose={onClose}>
+    <Dialog visible={visible} title={title} onClose={onClose}>
       <View style={styles.dialogGap}>
         <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>
-          Pick the mural that becomes your public page.
+          {description}
         </Text>
         {murals.isPending ? (
           <Skeleton height={120} />
@@ -358,7 +370,7 @@ function MuralPicker({
           />
         )}
         <Button
-          label="Publish"
+          label={actionLabel}
           disabled={!selected}
           loading={busy}
           onPress={() => selected && onPick(selected)}
