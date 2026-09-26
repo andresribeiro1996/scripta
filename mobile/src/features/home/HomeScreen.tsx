@@ -164,7 +164,7 @@ function SectionHeader({ title, count, action }: { title: string; count?: string
       {count ? <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{count}</Text> : null}
       {action ? (
         <Pressable accessibilityRole="button" hitSlop={8} onPress={action.onPress} style={styles.sectionAction}>
-          <Text {...dynamicType} style={[typography.body, { color: colors.accent }]}>{action.label}</Text>
+          <Text {...dynamicType} numberOfLines={1} style={[typography.body, { color: colors.accent }]}>{action.label}</Text>
         </Pressable>
       ) : null}
     </View>
