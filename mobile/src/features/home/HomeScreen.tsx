@@ -74,7 +74,7 @@ export function HomeScreen() {
             refreshControl={<RefreshControl refreshing={pulling} onRefresh={() => void onRefresh()} />}
           >
             {!books.length ? (
-              <View style={styles.page}>
+              <View style={styles.sectionPad}>
                 <EmptyState title="Start your library" body="Import your existing collection, or add your first book manually." actionLabel="Import library" onAction={() => router.push("/import" as never)} secondaryActionLabel="Add a book manually" onSecondaryAction={() => router.push("/add-book" as never)} />
               </View>
             ) : (
