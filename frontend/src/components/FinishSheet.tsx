@@ -1,27 +1,31 @@
 import { useEffect, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   bookKey,
+  createShelfSession,
   favouriteOpponent,
   formatFinishDay,
   localDay,
-  promoteFavourite,
-  shelfAfterFinish,
   type FinishRating,
+  type Landing,
+  type Mural,
   type MuralBlock,
-  type ReadSnapshot
+  type ReadSnapshot,
+  type ShelfSession
 } from "@scripta/shared";
 import { fetchOwnProfile } from "../api/community";
-import { useMurals } from "../hooks/useMurals";
+import { fetchMural, updateMuralApi } from "../api/murals";
 import { CoverImage } from "./BookCard";
 import { FeelingChips } from "./FeelingChips";
 import { Sheet } from "./Sheet";
+import { useToast } from "./Toaster";
 
-type Shelf = { id: string; original: MuralBlock[]; blocks: MuralBlock[] };
-type Landing = "finished" | "favourites";
+type Shelf = { blocks: MuralBlock[]; landed: Landing[] };
 
 const secondaryButtonClass =
   "min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm font-semibold hover:bg-(--color-surface-hover)";
+const duelButtonClass =
+  "flex min-h-16 flex-1 items-center justify-center rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-center text-sm font-semibold hover:bg-(--color-surface-hover)";
 
 export function FinishSheet({
   book,
@@ -34,61 +38,69 @@ export function FinishSheet({
 }: {
   book: Record<string, unknown>;
   books: Array<Record<string, unknown>>;
-  before: ReadSnapshot;
+  before: ReadSnapshot | null;
   onSetRating: (book: Record<string, unknown>, rating: FinishRating) => Promise<boolean>;
   onAddNote: (book: Record<string, unknown>, text: string) => Promise<boolean>;
   onRestoreRead: (book: Record<string, unknown>, before: ReadSnapshot) => Promise<boolean>;
   onClose: () => void;
 }) {
-  const murals = useMurals();
+  const queryClient = useQueryClient();
   const own = useQuery({ queryKey: ["community", "own-profile"], queryFn: fetchOwnProfile });
+  const toast = useToast();
 
   const key = bookKey(book);
   const [savedRating, setSavedRating] = useState(false);
   const [note, setNote] = useState("");
   const noteRef = useRef("");
   const settled = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => () => { mounted.current = false; }, []);
 
+  const sessionRef = useRef<ShelfSession | null>(null);
+  const startedShelfUpdate = useRef(false);
   const [shelf, setShelf] = useState<Shelf | null>(null);
-  const [landed, setLanded] = useState<Landing[]>([]);
   const [shelfError, setShelfError] = useState<string | null>(null);
   const [favouriteChoiceMade, setFavouriteChoiceMade] = useState(false);
-  const startedShelfUpdate = useRef(false);
 
-  async function saveShelf(id: string, blocks: MuralBlock[]) {
-    try {
-      await murals.saveBlocks(id, blocks);
-    } catch {
-      setShelfError("Couldn't update your shelf.");
-    }
-  }
-
-  async function updateShelf(rating: number | null) {
-    const muralId = own.data?.muralId;
-    if (!muralId) return;
-    const current: Shelf = shelf ?? { id: muralId, original: murals.data?.find((m) => m.id === muralId)?.blocks ?? [], blocks: [] };
-    const base = shelf ? shelf.blocks : current.original;
-    const result = shelfAfterFinish(base, key, rating);
-    setLanded((prev) => [...new Set([...prev, ...result.landed])]);
-    setShelf({ ...current, blocks: result.blocks });
-    if (result.blocks !== base) await saveShelf(muralId, result.blocks);
+  // While the sheet is still open the in-sheet banner is enough; a save that
+  // fails after Done/Undo already closed it (a queued finish/promote settling
+  // late) has no banner left to show it, so that case also gets a toast.
+  function reportShelfError() {
+    if (mounted.current) setShelfError("Couldn't update your shelf.");
+    else toast({ message: "Couldn't update your shelf.", kind: "error" });
   }
 
   useEffect(() => {
     const muralId = own.data?.muralId;
-    const muralBlocks = murals.data?.find((m) => m.id === muralId)?.blocks;
-    if (!muralId || !muralBlocks || startedShelfUpdate.current) return;
+    if (!muralId || startedShelfUpdate.current) return;
     startedShelfUpdate.current = true;
-    void updateShelf(typeof book.Rating === "number" ? book.Rating : null);
+    const session = createShelfSession({
+      load: async () => {
+        const mural = await fetchMural(muralId);
+        return { id: mural.id, blocks: mural.blocks, updatedAt: mural.updatedAt };
+      },
+      save: async (id, blocks, updatedAt) => {
+        const updated = await updateMuralApi(id, { blocks, updatedAt });
+        queryClient.setQueryData<Mural[]>(["murals"], (list) => list?.map((m) => (m.id === id ? updated : m)));
+        return updated;
+      },
+      onChange: (state) => { if (mounted.current) setShelf(state); }
+    });
+    sessionRef.current = session;
+    void session.finish(key, typeof book.Rating === "number" ? book.Rating : null).catch(reportShelfError);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [own.data?.muralId, murals.data]);
+  }, [own.data?.muralId]);
+
+  useEffect(() => () => sessionRef.current?.stop(), []);
 
   function finish() {
-    if (settled.current) return;
-    settled.current = true;
     const text = noteRef.current.trim();
-    if (text) void onAddNote(book, text);
+    if (settled.current || !text) return;
+    settled.current = true;
+    void onAddNote(book, text);
   }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => () => finish(), []);
 
   function close() {
     finish();
@@ -100,32 +112,39 @@ export function FinishSheet({
     const ok = await onSetRating(book, rating);
     if (ok) {
       setSavedRating(true);
-      void updateShelf(rating);
+      sessionRef.current?.finish(key, rating).catch(reportShelfError);
     }
   }
 
   async function chooseThisOne() {
-    if (!shelf) return;
-    const nextBlocks = promoteFavourite(shelf.blocks, key);
     setFavouriteChoiceMade(true);
-    if (nextBlocks !== shelf.blocks) {
-      setShelf({ ...shelf, blocks: nextBlocks });
-      await saveShelf(shelf.id, nextBlocks);
+    try {
+      await sessionRef.current?.promote(key);
+    } catch {
+      reportShelfError();
     }
   }
 
-  async function undo() {
+  async function undo(snapshot: ReadSnapshot) {
     settled.current = true;
-    const restored = await onRestoreRead(book, before);
-    if (!restored) return;
-    if (shelf && shelf.blocks !== shelf.original) await saveShelf(shelf.id, shelf.original);
+    const ok = await onRestoreRead(book, snapshot);
+    if (!ok) {
+      settled.current = false;
+      return;
+    }
+    const shelfOk = (await sessionRef.current?.restore()) ?? true;
+    if (!shelfOk) {
+      setShelfError("Couldn't update your shelf.");
+      return;
+    }
     onClose();
   }
 
   const opponentKey = shelf ? favouriteOpponent(shelf.blocks, key) : null;
   const opponentBook = opponentKey ? (books.find((candidate) => bookKey(candidate) === opponentKey) ?? null) : null;
 
-  const day = formatFinishDay(String(book.DateLastRead ?? localDay()));
+  const day = formatFinishDay(typeof book.DateLastRead === "string" ? book.DateLastRead : localDay());
+  const landed = shelf?.landed ?? [];
   const footer =
     landed.length === 0
       ? null
@@ -179,6 +198,7 @@ export function FinishSheet({
               }}
               placeholder="What stuck with you?"
               rows={4}
+              aria-label="A thought to keep"
               className="w-full resize-none rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
             />
           </div>
@@ -191,7 +211,7 @@ export function FinishSheet({
                   <div className="aspect-[2/3] w-full overflow-hidden rounded-lg bg-(--color-border)">
                     <CoverImage book={book} />
                   </div>
-                  <button type="button" onClick={() => void chooseThisOne()} className={secondaryButtonClass}>
+                  <button type="button" onClick={() => void chooseThisOne()} className={duelButtonClass}>
                     This one
                   </button>
                 </div>
@@ -199,8 +219,8 @@ export function FinishSheet({
                   <div className="aspect-[2/3] w-full overflow-hidden rounded-lg bg-(--color-border)">
                     <CoverImage book={opponentBook} />
                   </div>
-                  <button type="button" onClick={() => setFavouriteChoiceMade(true)} className={secondaryButtonClass}>
-                    {`Still ${String(opponentBook.Title ?? "this one")}`}
+                  <button type="button" onClick={() => setFavouriteChoiceMade(true)} className={duelButtonClass}>
+                    <span className="line-clamp-2">{`Still ${String(opponentBook.Title ?? "this one")}`}</span>
                   </button>
                 </div>
               </div>
@@ -209,9 +229,11 @@ export function FinishSheet({
 
           {footer && <p className="text-sm text-(--color-text-dim)">{footer}</p>}
 
-          <button type="button" onClick={() => void undo()} className={secondaryButtonClass}>
-            Not finished? Undo
-          </button>
+          {before && (
+            <button type="button" onClick={() => void undo(before)} className={secondaryButtonClass}>
+              Not finished? Undo
+            </button>
+          )}
         </div>
       </Sheet>
     </div>

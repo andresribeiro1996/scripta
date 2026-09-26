@@ -7,6 +7,7 @@ import {
   addReaderNote,
   newId,
   readSnapshot,
+  removeReaderNote,
   restoreReadState,
   setRating,
   type FinishRating,
@@ -251,6 +252,7 @@ export function LibraryPage() {
     const current = queryClient.getQueryData<LibraryDocument>(["library"]);
     if (!current) return false;
     const key = bookKey(book);
+    if (setRating(book, rating) === book) return true;
     try {
       await updateLibrary((data) => ({
         ...data,
@@ -275,6 +277,22 @@ export function LibraryPage() {
       return true;
     } catch {
       toast({ message: "Couldn't save your note.", kind: "error" });
+      return false;
+    }
+  }
+
+  async function handleDeleteNote(book: Record<string, unknown>, bookmarkId: string): Promise<boolean> {
+    const current = queryClient.getQueryData<LibraryDocument>(["library"]);
+    if (!current) return false;
+    const key = bookKey(book);
+    try {
+      await updateLibrary((data) => ({
+        ...data,
+        books: data.books.map((b) => (bookKey(b) === key ? removeReaderNote(b, bookmarkId) : b))
+      }));
+      return true;
+    } catch {
+      toast({ message: "Couldn't delete the note.", kind: "error" });
       return false;
     }
   }
@@ -725,6 +743,7 @@ export function LibraryPage() {
             if ((await handleSetBookStatus(b, status)) && status === 2 && !wasFinished) setFinishing({ key: bookKey(b), before });
           }}
           onSetRating={(b, rating) => void handleSetRating(b, rating)}
+          onDeleteNote={(b, bookmarkId) => void handleDeleteNote(b, bookmarkId)}
           onClose={() => {
             setDetailBookKey(null);
             if (searchParams.has("book")) {

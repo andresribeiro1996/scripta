@@ -1,9 +1,17 @@
 import { FINISH_FEELINGS, type FinishRating } from "@scripta/shared";
 
-export function FeelingChips({ value, onChange }: { value: number | null; onChange: (rating: FinishRating) => void }) {
+export function FeelingChips({
+  value,
+  onChange,
+  label = "How did it land?"
+}: {
+  value: number | null;
+  onChange: (rating: FinishRating) => void;
+  label?: string;
+}) {
   return (
-    <div role="radiogroup" className="flex flex-wrap gap-2">
-      {FINISH_FEELINGS.map(({ rating, label }) => {
+    <div role="radiogroup" aria-label={label} className="flex flex-wrap gap-2">
+      {FINISH_FEELINGS.map(({ rating, label: feelingLabel }) => {
         const selected = value === rating;
         return (
           <button
@@ -14,7 +22,7 @@ export function FeelingChips({ value, onChange }: { value: number | null; onChan
             onClick={() => onChange(rating)}
             className={`min-h-9 rounded-full border px-3 text-sm font-semibold ${selected ? "border-(--color-accent) bg-(--color-accent-soft) text-(--color-accent)" : "border-(--color-border) bg-(--color-surface) hover:bg-(--color-surface-hover)"}`}
           >
-            {label}
+            {feelingLabel}
           </button>
         );
       })}
