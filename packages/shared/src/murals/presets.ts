@@ -56,11 +56,12 @@ export function presetAvailability(id: MuralPresetId, books: Book[]): string | n
   return presetBooks(id, titledBooks(books)).length ? null : UNAVAILABLE[id];
 }
 
-export function shelfPresetSummary(books: Book[]) {
+export function shelfPresetSummary(books: Book[], published: boolean) {
   const library = titledBooks(books);
   const reading = library.filter((book) => book.ReadStatus === 1).length;
   const finished = library.filter((book) => book.ReadStatus === 2).length;
-  return `Made from your ${library.length} ${library.length === 1 ? "book" : "books"}: ${reading} you're reading and ${finished} you've finished. Only you can see it.`;
+  const visibility = published ? "Your page is published, so visitors will see it once you keep it." : "Only you can see it.";
+  return `Made from your ${library.length} ${library.length === 1 ? "book" : "books"}: ${reading} you're reading and ${finished} you've finished. ${visibility}`;
 }
 
 export function buildMuralPreset(id: MuralPresetId, books: Book[]) {
@@ -80,8 +81,8 @@ export function buildMuralPreset(id: MuralPresetId, books: Book[]) {
     const loved = favourites(library).slice(0, SHELF_SIZE);
     const hasPassage = eligiblePassages(library).length > 0;
     blocks.push({ ...at(0, 0, 12, 4), type: "profile", bio: "", favoriteGenres: [] });
-    blocks.push({ ...at(0, 4, 12, 2), type: "stats", metrics: ["totalBooks", "booksFinished", "booksInProgress"] });
-    let y = 6;
+    blocks.push({ ...at(0, 4, 12, 4), type: "stats", metrics: ["totalBooks", "booksFinished", "booksInProgress"] });
+    let y = 8;
     if (reading.length) { blocks.push({ ...at(0, y, 12, 4), type: "currentlyReading" }); y += 4; }
     if (finished.length) { blocks.push({ ...at(0, y, 12, 5), type: "shelf", title: "Finished", role: "finished", bookKeys: keys(finished) }); y += 5; }
     const width = hasPassage && loved.length ? 6 : 12;

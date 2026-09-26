@@ -69,6 +69,7 @@ test("the My shelf preset stacks profile, stats, reading, finished, then passage
   assert.equal(quote.layout.w + favourites.layout.w, 12);
   const stats = blocks.find((block) => block.type === "stats")!;
   assert.deepEqual(stats.type === "stats" ? stats.metrics : [], ["totalBooks", "booksFinished", "booksInProgress"]);
+  assert.equal(stats.layout.h, 4);
 });
 
 test("the My shelf preset leaves out blocks with no data and widens a lone bottom block", () => {
@@ -91,8 +92,12 @@ test("preset blocks never overlap", () => {
 });
 
 test("shelfPresetSummary counts the reader's books", () => {
-  assert.equal(shelfPresetSummary(library), "Made from your 5 books: 1 you're reading and 3 you've finished. Only you can see it.");
-  assert.equal(shelfPresetSummary([book("One", { ReadStatus: 1 })]), "Made from your 1 book: 1 you're reading and 0 you've finished. Only you can see it.");
+  assert.equal(shelfPresetSummary(library, false), "Made from your 5 books: 1 you're reading and 3 you've finished. Only you can see it.");
+  assert.equal(shelfPresetSummary([book("One", { ReadStatus: 1 })], false), "Made from your 1 book: 1 you're reading and 0 you've finished. Only you can see it.");
+});
+
+test("shelfPresetSummary warns a published profile that visitors will see the kept shelf", () => {
+  assert.equal(shelfPresetSummary(library, true), "Made from your 5 books: 1 you're reading and 3 you've finished. Your page is published, so visitors will see it once you keep it.");
 });
 
 test("editing a shelf block through updateBlock keeps its role", () => {
