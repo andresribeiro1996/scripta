@@ -54,7 +54,10 @@ export function FinishSheet({
   const noteRef = useRef("");
   const settled = useRef(false);
   const mounted = useRef(true);
-  useEffect(() => () => { mounted.current = false; }, []);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
 
   const sessionRef = useRef<ShelfSession | null>(null);
   const startedShelfUpdate = useRef(false);
