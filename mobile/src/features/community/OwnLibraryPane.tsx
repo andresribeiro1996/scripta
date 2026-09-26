@@ -5,6 +5,7 @@ import {
   bookKey,
   effectiveCardStyle,
   filterBooks,
+  orderLibraryBooks,
   resolveLibraryStyle,
   seriesGroupByBookKey,
   STATUS_FILTER_OPTIONS,
@@ -22,7 +23,7 @@ export function OwnLibraryPane() {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
 
-  const books = library?.data.books ?? [];
+  const books = useMemo(() => orderLibraryBooks(library?.data.books ?? [], library?.data.groups ?? []), [library]);
   const style = resolveLibraryStyle(library?.data.style);
   const bookSeriesGroup = useMemo(() => seriesGroupByBookKey(library?.data.books ?? [], library?.data.groups ?? []), [library]);
   const filtered = filterBooks(books, query, status);

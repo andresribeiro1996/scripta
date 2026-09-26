@@ -73,6 +73,7 @@ export function MyShelfScreen() {
       await action();
       await queryClient.invalidateQueries({ queryKey: ["community", "own-profile"] });
       await queryClient.invalidateQueries({ queryKey: ["community", "profile", username] });
+      await queryClient.invalidateQueries({ queryKey: ["community", "activity", username] });
       return true;
     } catch {
       setError("Something went wrong. Try again.");
@@ -166,6 +167,7 @@ export function MyShelfScreen() {
           if (value === "library") return <OwnLibraryPane />;
           if (value === "activity") return <ActivityList username={username} />;
           if (hasMural && mural.isPending) return <View style={styles.tabPad}><Skeleton height={240} /></View>;
+          if (hasMural && mural.isError) return <ErrorState body="Couldn't load your shelf." actionLabel="Retry" onAction={() => void mural.refetch()} />;
           if (hasMural && muralHasBlocks) {
             return (
               <ScrollView contentContainerStyle={styles.canvasScroll}>
@@ -196,6 +198,7 @@ export function MyShelfScreen() {
         title={pickerMode === "switch" ? "Choose your shelf" : "Publish profile"}
         description={pickerMode === "switch" ? "Pick the mural that becomes your shelf." : "Pick the mural that becomes your public page."}
         actionLabel={pickerMode === "switch" ? "Use this mural" : "Publish"}
+        error={error}
         onClose={() => setPickerMode(null)}
         onPick={(muralId) => {
           if (pickerMode === "switch") {
@@ -216,6 +219,7 @@ export function MyShelfScreen() {
           <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>
             {`It becomes a public page at /u/${username}, and people can follow you.`}
           </Text>
+          {error ? <Toast visible message={error} tone="error" /> : null}
           <Button
             label="Publish"
             loading={busy}
@@ -231,6 +235,7 @@ export function MyShelfScreen() {
           <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>
             Your page disappears and people stop finding you in search. You can publish again any time.
           </Text>
+          {error ? <Toast visible message={error} tone="error" /> : null}
           <Button
             label="Unpublish"
             variant="destructive"
