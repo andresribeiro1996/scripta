@@ -526,6 +526,32 @@ test("publishProfile emits mural_published only when the mural changes", () => {
   assert.equal(murals[0]?.ref_id, "m2");
 });
 
+test("publishing a privately chosen shelf for the first time announces it", () => {
+  const { repo, events } = createRepoFake();
+  const { deps, usernames, ownedMurals } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  ownedMurals.add("alice:m1");
+  service.setShelfMural("alice", "m1");
+  service.publishProfile("alice", "m1");
+  const announcements = events.filter((event) => event.type === "mural_published");
+  assert.equal(announcements.length, 1);
+  assert.equal(announcements[0]?.ref_id, "m1");
+});
+
+test("republishing the same mural after unpublish stays silent", () => {
+  const { repo, events } = createRepoFake();
+  const { deps, usernames, ownedMurals } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  ownedMurals.add("alice:m1");
+  service.publishProfile("alice", "m1");
+  service.unpublishProfile("alice");
+  const before = events.filter((event) => event.type === "mural_published").length;
+  service.publishProfile("alice", "m1");
+  assert.equal(events.filter((event) => event.type === "mural_published").length, before);
+});
+
 test("follow emits following once; refollow emits nothing", () => {
   const { repo, events } = createRepoFake();
   const { deps, readerProfiles } = createDeps(repo);
@@ -700,6 +726,16 @@ test("choosing the shelf mural keeps the profile private and checks ownership", 
   assert.equal(row.mural_id, "m1");
   assert.equal(row.published_at, null);
   assert.deepEqual(service.getOwnProfile("alice"), { muralId: "m1", published: false, feedSettings: DEFAULT_FEED_SETTINGS });
+});
+
+test("getOwnProfile clears a dangling muralId once the mural is gone", () => {
+  const { repo } = createRepoFake();
+  const { deps, ownedMurals } = createDeps(repo);
+  const service = createCommunityService(deps);
+  ownedMurals.add("alice:m1");
+  service.setShelfMural("alice", "m1");
+  ownedMurals.delete("alice:m1");
+  assert.deepEqual(service.getOwnProfile("alice"), { muralId: null, published: false, feedSettings: DEFAULT_FEED_SETTINGS });
 });
 
 test("switching a published shelf announces the new mural once", () => {

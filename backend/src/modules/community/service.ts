@@ -139,7 +139,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
         updated_at: now,
         feed_settings: existing?.feed_settings ?? null
       });
-      if (previousMuralId !== muralId) emit(userId, "mural_published", "mural", muralId);
+      if (!existing?.published_at || previousMuralId !== muralId) emit(userId, "mural_published", "mural", muralId);
     },
     unpublishProfile(userId) {
       const existing = repo.getProfileRow(userId);
@@ -148,7 +148,8 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
     },
     getOwnProfile(userId) {
       const row = repo.getProfileRow(userId);
-      return { muralId: row?.mural_id ?? null, published: row?.published === 1, feedSettings: settingsFor(userId) };
+      const muralId = row?.mural_id && deps.murals.ownsMural(userId, row.mural_id) ? row.mural_id : null;
+      return { muralId, published: row?.published === 1, feedSettings: settingsFor(userId) };
     },
     setShelfMural(userId, muralId) {
       if (!deps.murals.ownsMural(userId, muralId)) throw new MuralNotOwnedError();

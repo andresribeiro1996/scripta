@@ -16,7 +16,7 @@ process.env.JWT_ACCESS_SECRET = "a".repeat(64);
 process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 process.env.NODE_ENV = "test";
 
-const { ProfileNotFoundError } = await import("./domain/errors.js");
+const { MuralNotOwnedError, ProfileNotFoundError } = await import("./domain/errors.js");
 const { buildCommunityRoutes, buildPublicCommunityRoutes } = await import("./routes.js");
 
 function fakeService(overrides: Partial<CommunityService> = {}): CommunityService {
@@ -130,6 +130,25 @@ test("activity endpoint returns the page and passes the viewer through when sign
   await app.close();
 });
 
+test("activity endpoint derives the viewer from the bearer token, not a fixed user", async () => {
+  const seen: Array<string | undefined> = [];
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", (token: string) => ({ id: `user-${token}`, email: "u@example.test", username: `user-${token}`, avatarId: null }));
+  await app.register(
+    buildPublicCommunityRoutes(
+      fakeService({
+        getActivity: (_username, viewerId) => {
+          seen.push(viewerId);
+          return { items: [], nextCursor: null };
+        }
+      })
+    )
+  );
+  await app.inject({ method: "GET", url: "/community/profiles/alice/activity", headers: { authorization: "Bearer abc123" } });
+  assert.deepEqual(seen, ["user-abc123"]);
+  await app.close();
+});
+
 test("activity endpoint rejects a bad limit with 400", async () => {
   const app = Fastify();
   await app.register(buildPublicCommunityRoutes(fakeService()));
@@ -177,17 +196,22 @@ test("own profile GET and shelf mural PUT are authed and validate the body", asy
       fakeService({
         getOwnProfile: (userId) => ({ muralId: userId === "viewer" ? "m1" : null, published: false, feedSettings: { publications: true, reading: false, votes: true, follows: true } }),
         setShelfMural: (userId, muralId) => {
+          if (muralId === "not-owned") throw new MuralNotOwnedError();
           calls.push({ userId, muralId });
         }
       })
     )
   );
+  const noAuth = await app.inject({ method: "GET", url: "/community/profile" });
+  assert.equal(noAuth.statusCode, 401);
   const auth = { authorization: "Bearer x" };
   const own = await app.inject({ method: "GET", url: "/community/profile", headers: auth });
   assert.equal(own.statusCode, 200);
   assert.equal(own.json().muralId, "m1");
   const bad = await app.inject({ method: "PUT", url: "/community/profile/mural", headers: auth, payload: {} });
   assert.equal(bad.statusCode, 400);
+  const notOwned = await app.inject({ method: "PUT", url: "/community/profile/mural", headers: auth, payload: { muralId: "not-owned" } });
+  assert.equal(notOwned.statusCode, 400);
   const good = await app.inject({ method: "PUT", url: "/community/profile/mural", headers: auth, payload: { muralId: "m2" } });
   assert.equal(good.statusCode, 204);
   assert.deepEqual(calls, [{ userId: "viewer", muralId: "m2" }]);
