@@ -49,6 +49,7 @@ export function OwnShelfView({ username }: { username: string }) {
   const preview = useMemo(() => buildMuralPreset("shelf", ordered), [ordered]);
   const previewMural: Mural = { id: "shelf-preview", name: preview.name, blocks: preview.blocks, createdAt: "", updatedAt: "", shareToken: null, shareUrl: null, folderId: null };
   const pendingShelf = useRef<string | null>(null);
+  const working = useRef(false);
 
   async function run(action: () => Promise<void>): Promise<boolean> {
     setBusy(true);
@@ -87,20 +88,32 @@ export function OwnShelfView({ username }: { username: string }) {
   }
 
   async function keepShelf() {
-    await run(async () => {
-      const id = await shelfTargetId();
-      await murals.saveBlocks(id, preview.blocks);
-      if (own.data?.muralId !== id) await setShelfMural(id);
-    });
+    if (working.current) return;
+    working.current = true;
+    try {
+      await run(async () => {
+        const id = await shelfTargetId();
+        await murals.saveBlocks(id, preview.blocks);
+        if (own.data?.muralId !== id) await setShelfMural(id);
+      });
+    } finally {
+      working.current = false;
+    }
   }
 
   async function startBlank() {
-    let id: string | null = null;
-    const ok = await run(async () => {
-      id = await shelfTargetId();
-      if (own.data?.muralId !== id) await setShelfMural(id);
-    });
-    if (ok && id) navigate(`/dashboard/murals/${id}`);
+    if (working.current) return;
+    working.current = true;
+    try {
+      let id: string | null = null;
+      const ok = await run(async () => {
+        id = await shelfTargetId();
+        if (own.data?.muralId !== id) await setShelfMural(id);
+      });
+      if (ok && id) navigate(`/dashboard/murals/${id}`);
+    } finally {
+      working.current = false;
+    }
   }
 
   if (own.isPending || murals.isLoading) {
@@ -180,7 +193,7 @@ export function OwnShelfView({ username }: { username: string }) {
             <div className="mb-8">
               {shelfMural && muralHasBlocks ? (
                 <MuralCanvas mural={shelfMural} editMode={false} groups={groups} books={books} images={images} profile={profile} />
-              ) : libraryQuery.isLoading ? (
+              ) : libraryQuery.isPending ? (
                 <SkeletonCardGrid count={2} label="Loading your library" tileClassName="min-h-[120px]" />
               ) : libraryQuery.isError ? (
                 <EmptyState
@@ -210,7 +223,7 @@ export function OwnShelfView({ username }: { username: string }) {
                 />
               ) : (
                 <div className="space-y-4">
-                  <p className="text-sm text-(--color-text-dim)">{shelfPresetSummary(books)}</p>
+                  <p className="text-sm text-(--color-text-dim)">{shelfPresetSummary(books, ownData.published)}</p>
                   <div className="flex flex-wrap gap-2">
                     <button onClick={() => void keepShelf()} disabled={busy} className="rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">
                       Keep this shelf
