@@ -39,6 +39,14 @@ export function buildDashboardCards(books: Array<Record<string, unknown>>, day: 
   return cards;
 }
 
+export function upNextPair(keys: string[], offset: number): string[] {
+  const n = keys.length;
+  if (n < 2) return [];
+  const first = keys[offset % n];
+  const second = keys[(offset + 1) % n];
+  return first === second ? [first] : [first, second];
+}
+
 export function digestHeading(item: DigestItem): string {
   switch (item.kind) {
     case "publication":
