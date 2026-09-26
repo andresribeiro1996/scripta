@@ -13,6 +13,7 @@ import {
   localDay,
   newId,
   removeBooksFromAllGroups,
+  removeReaderNote,
   reorderOnDrop,
   restoreReadState,
   setBookCover,
@@ -75,6 +76,9 @@ export function useLibraryActions() {
 
     addNote: (book: Record<string, unknown>, text: string) =>
       run(mapBook(bookKey(book), (b) => addReaderNote(b, text, localDay(), newId())), "Couldn't save your note."),
+
+    deleteNote: (book: Record<string, unknown>, bookmarkId: string) =>
+      run(mapBook(bookKey(book), (b) => removeReaderNote(b, bookmarkId)), "Couldn't delete the note."),
 
     restoreRead: (book: Record<string, unknown>, before: ReadSnapshot) =>
       run(mapBook(bookKey(book), (b) => restoreReadState(b, before)), "Couldn't undo the status change."),

@@ -12,7 +12,7 @@ export function FeelingChips({ value, onChange }: { value: number | null; onChan
           <Pressable
             key={rating}
             accessibilityRole="radio"
-            accessibilityState={{ selected }}
+            accessibilityState={{ checked: selected }}
             onPress={() => onChange(rating)}
             style={[styles.chip, { borderColor: selected ? colors.accent : colors.border, backgroundColor: selected ? colors.accentSoft : colors.surface }]}
           >
