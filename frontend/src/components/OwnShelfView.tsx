@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useMemo, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { FeedCategory, FeedSettings } from "@scripta/shared/community";
 import { DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
@@ -18,6 +18,9 @@ import { useCommunityActivity } from "../hooks/useCommunity";
 import { useGalleryImages } from "../hooks/useGalleryImages";
 import { useLibrary } from "../hooks/useLibrary";
 import { useMurals } from "../hooks/useMurals";
+import { orderLibraryBooks } from "../lib/libraryOrder";
+import { buildMuralPreset, shelfPresetSummary } from "../lib/muralPresets";
+import type { Mural } from "../lib/murals";
 
 const OWN_SHELF_TABS = [
   { value: "mural", label: "Mural" },
@@ -33,12 +36,20 @@ export function OwnShelfView({ username }: { username: string }) {
   const navigate = useNavigate();
   const own = useQuery({ queryKey: ["community", "own-profile"], queryFn: fetchOwnProfile });
   const murals = useMurals();
-  const { data: library } = useLibrary();
+  const libraryQuery = useLibrary();
+  const library = libraryQuery.data;
   const { images } = useGalleryImages();
   const activity = useCommunityActivity(username);
   const [tab, setTab] = useState<OwnShelfTab>("mural");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const books = useMemo(() => library?.data.books ?? [], [library]);
+  const groups = useMemo(() => library?.data.groups ?? [], [library]);
+  const ordered = useMemo(() => orderLibraryBooks(books, groups), [books, groups]);
+  const preview = useMemo(() => buildMuralPreset("shelf", ordered), [ordered]);
+  const previewMural: Mural = { id: "shelf-preview", name: preview.name, blocks: preview.blocks, createdAt: "", updatedAt: "", shareToken: null, shareUrl: null, folderId: null };
+  const pendingShelf = useRef<string | null>(null);
+  const working = useRef(false);
 
   async function run(action: () => Promise<void>): Promise<boolean> {
     setBusy(true);
@@ -70,19 +81,39 @@ export function OwnShelfView({ username }: { username: string }) {
     await run(() => publishProfile(muralId));
   }
 
-  async function createShelf() {
-    if (own.data?.muralId) {
-      navigate(`/dashboard/murals/${own.data.muralId}`);
-      return;
+  async function shelfTargetId() {
+    const id = own.data?.muralId ?? pendingShelf.current ?? (await murals.create("My shelf")).id;
+    pendingShelf.current = id;
+    return id;
+  }
+
+  async function keepShelf() {
+    if (working.current) return;
+    working.current = true;
+    try {
+      await run(async () => {
+        const id = await shelfTargetId();
+        await murals.saveBlocks(id, preview.blocks);
+        if (own.data?.muralId !== id) await setShelfMural(id);
+      });
+    } finally {
+      working.current = false;
     }
-    let targetId: string | null = null;
-    const ok = await run(async () => {
-      const existing = murals.data?.find((item) => item.name === "My shelf");
-      const target = existing ?? (await murals.create("My shelf"));
-      targetId = target.id;
-      await setShelfMural(target.id);
-    });
-    if (ok && targetId) navigate(`/dashboard/murals/${targetId}`);
+  }
+
+  async function startBlank() {
+    if (working.current) return;
+    working.current = true;
+    try {
+      let id: string | null = null;
+      const ok = await run(async () => {
+        id = await shelfTargetId();
+        if (own.data?.muralId !== id) await setShelfMural(id);
+      });
+      if (ok && id) navigate(`/dashboard/murals/${id}`);
+    } finally {
+      working.current = false;
+    }
   }
 
   if (own.isPending || murals.isLoading) {
@@ -118,8 +149,6 @@ export function OwnShelfView({ username }: { username: string }) {
   const ownData = own.data;
   const shelfMural = murals.data?.find((item) => item.id === ownData.muralId) ?? null;
   const muralHasBlocks = Boolean(shelfMural && shelfMural.blocks.length > 0);
-  const books = library?.data.books ?? [];
-  const groups = library?.data.groups ?? [];
   const profile = session?.user.username
     ? { username: session.user.username, avatarUrl: session.user.avatarId ? avatarUrlFor(session.user.avatarId) : null }
     : undefined;
@@ -164,17 +193,47 @@ export function OwnShelfView({ username }: { username: string }) {
             <div className="mb-8">
               {shelfMural && muralHasBlocks ? (
                 <MuralCanvas mural={shelfMural} editMode={false} groups={groups} books={books} images={images} profile={profile} />
-              ) : (
+              ) : libraryQuery.isPending ? (
+                <SkeletonCardGrid count={2} label="Loading your library" tileClassName="min-h-[120px]" />
+              ) : libraryQuery.isError ? (
                 <EmptyState
-                  icon={MuralsIcon}
-                  title="Your shelf is empty"
-                  body="Build a private page from your books. Only you can see it until you publish."
+                  title="Library unavailable."
+                  body="Couldn't load your library."
                   action={
-                    <button onClick={() => void createShelf()} className="rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-white">
-                      Create your shelf
+                    <button onClick={() => void libraryQuery.refetch()} className="rounded-lg border border-(--color-border) px-3 py-1.5 text-sm hover:border-(--color-accent)">
+                      Retry
                     </button>
                   }
                 />
+              ) : books.length === 0 ? (
+                <EmptyState
+                  icon={MuralsIcon}
+                  title="Start your library"
+                  body="Import your existing collection, or add your first book manually."
+                  action={
+                    <div className="flex flex-wrap justify-center gap-2">
+                      <Link to="/dashboard/library?action=import" className="rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-white">
+                        Import library
+                      </Link>
+                      <Link to="/dashboard/library?action=add" className="rounded-lg border border-(--color-border) px-3 py-2 text-sm">
+                        Add a book manually
+                      </Link>
+                    </div>
+                  }
+                />
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-sm text-(--color-text-dim)">{shelfPresetSummary(books, ownData.published)}</p>
+                  <div className="flex flex-wrap gap-2">
+                    <button onClick={() => void keepShelf()} disabled={busy} className="rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                      Keep this shelf
+                    </button>
+                    <button onClick={() => void startBlank()} disabled={busy} className="rounded-lg border border-(--color-border) px-3 py-2 text-sm disabled:opacity-50">
+                      Start blank
+                    </button>
+                  </div>
+                  <MuralCanvas mural={previewMural} editMode={false} groups={groups} books={books} images={images} profile={profile} />
+                </div>
               )}
             </div>
           );

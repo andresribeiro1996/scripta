@@ -148,7 +148,7 @@ export function MuralsListPage() {
   return (
     <PageContainer>
       <button onClick={() => setPresetsOpen(true)} className="mb-4 flex min-h-11 w-full items-center justify-between rounded-xl border border-(--color-border) bg-(--color-surface) px-4 text-left text-sm font-semibold hover:bg-(--color-surface-hover)">
-        <span>Começar com um preset</span><span aria-hidden="true">→</span>
+        <span>Start from a preset</span><span aria-hidden="true">→</span>
       </button>
       {presetsOpen && <MuralPresetPicker folderId={selectedFolderId} onClose={() => setPresetsOpen(false)} />}
       {/* Desktop-only. On a phone this row held nothing but the word
@@ -196,6 +196,11 @@ export function MuralsListPage() {
               icon={MuralsIcon}
               title="No murals yet."
               body={'A mural is a freeform dashboard you build yourself \u2014 a "Top 5 Books This Year" shelf, a favorite quote, a photo, whatever you want on the wall. Use the + below to start.'}
+              action={
+                <button onClick={() => setPresetsOpen(true)} className="rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-white">
+                  Start from a preset
+                </button>
+              }
             />
           )}
 

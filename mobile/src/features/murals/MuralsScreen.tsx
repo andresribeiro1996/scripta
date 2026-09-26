@@ -13,8 +13,8 @@ import { Image } from "expo-image";
 import { useQuery } from "@tanstack/react-query";
 import { Stack, useRouter } from "expo-router";
 import type { SearchBarCommands } from "react-native-screens";
-import { buildMuralPreset, buildTree, MURAL_PRESETS, type Mural, type MuralFolder } from "@scripta/shared";
-import { Button, EmptyState, ErrorState, IconButton, Input, Menu, ModalBody, Screen, Sheet, type MenuItem } from "../../ui";
+import { buildMuralPreset, buildTree, MURAL_PRESETS, presetAvailability, type Mural, type MuralFolder, type MuralPresetId } from "@scripta/shared";
+import { Button, dynamicType, EmptyState, ErrorState, IconButton, Input, Menu, ModalBody, Screen, Sheet, Toast, type MenuItem } from "../../ui";
 import { radii, spacing, typography, useTheme } from "../../ui/theme";
 import { fetchGalleryImages } from "../gallery/api";
 import { useLibrary } from "../library/hooks/useLibrary";
@@ -28,12 +28,15 @@ export function MuralsScreen() {
   const murals = useMurals();
   const folders = useMuralFolders();
   const ownProfile = useQuery({ queryKey: ["community", "own-profile"], queryFn: fetchOwnProfile });
-  const { data: library } = useLibrary();
+  const libraryQuery = useLibrary();
   const gallery = useQuery({ queryKey: ["gallery"], queryFn: fetchGalleryImages });
   const [folderId, setFolderId] = useState<string | null | undefined>(undefined);
   const searchBar = useRef<SearchBarCommands>(null);
   const [search, setSearch] = useState("");
   const [presets, setPresets] = useState(false);
+  const pendingPreset = useRef<{ id: string; preset: MuralPresetId } | null>(null);
+  const working = useRef(false);
+  const [presetError, setPresetError] = useState<string | null>(null);
   const [coverFor, setCoverFor] = useState<Mural | null>(null);
   const [shareFor, setShareFor] = useState<Mural | null>(null);
   const [moveFor, setMoveFor] = useState<Mural | null>(null);
@@ -48,12 +51,28 @@ export function MuralsScreen() {
     return (murals.data ?? []).filter((mural) => needle ? mural.name.toLowerCase().includes(needle) : folderId === undefined || mural.folderId === folderId).sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
   }, [murals.data, folderId, search]);
 
-  async function createFromPreset(id: (typeof MURAL_PRESETS)[number]["id"]) {
-    const preset = buildMuralPreset(id, library?.data.books ?? []);
-    const mural = await murals.create(preset.name, folderId ?? null);
-    const updated = await murals.update(mural.id, { blocks: preset.blocks });
-    setPresets(false);
-    router.push(`/murals/${updated.id}` as never);
+  function openPresets() {
+    setPresetError(null);
+    setPresets(true);
+  }
+
+  async function createFromPreset(id: MuralPresetId) {
+    if (working.current) return;
+    working.current = true;
+    setPresetError(null);
+    try {
+      const preset = buildMuralPreset(id, libraryQuery.data?.data.books ?? []);
+      const target = pendingPreset.current?.preset === id ? pendingPreset.current : { id: (await murals.create(preset.name, folderId ?? null)).id, preset: id };
+      pendingPreset.current = target;
+      const updated = await murals.update(target.id, { blocks: preset.blocks });
+      pendingPreset.current = null;
+      setPresets(false);
+      router.push(`/murals/${updated.id}` as never);
+    } catch {
+      setPresetError("Couldn't create the mural. Try again.");
+    } finally {
+      working.current = false;
+    }
   }
 
   function clearSearch() {
@@ -136,7 +155,7 @@ export function MuralsScreen() {
                 title="New mural"
                 items={[
                   { label: "Blank mural", onPress: () => void murals.create("Untitled mural", folderId ?? null).then((mural) => router.push(`/murals/${mural.id}` as never)) },
-                  { label: "Start from a preset…", onPress: () => setPresets(true) },
+                  { label: "Start from a preset…", onPress: openPresets },
                 ]}
               >
                 <IconButton framed accessibilityLabel="New mural" label="New" name="add" />
@@ -151,7 +170,7 @@ export function MuralsScreen() {
         contentContainerStyle={styles.list}
         refreshing={murals.isRefetching}
         onRefresh={() => void murals.refetch()}
-        ListEmptyComponent={!murals.isPending ? <EmptyState title={search ? "Nothing matches" : "No murals here"} body={search ? "Search covers every folder — nothing in your murals matches this." : "Create a freeform mural or start from a preset."} actionLabel={search ? "Clear search" : undefined} onAction={search ? clearSearch : undefined} /> : null}
+        ListEmptyComponent={!murals.isPending ? <EmptyState title={search ? "Nothing matches" : "No murals here"} body={search ? "Search covers every folder — nothing in your murals matches this." : "Create a freeform mural or start from a preset."} actionLabel={search ? "Clear search" : "Start from a preset"} onAction={search ? clearSearch : openPresets} /> : null}
         renderItem={({ item }) => <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Pressable accessibilityLabel={`Open ${item.name}`} accessibilityRole="button" style={styles.open} onPress={() => router.push(`/murals/${item.id}` as never)}>{item.coverImageUrl ? <Image source={{ uri: item.coverImageUrl }} style={styles.cover} contentFit="cover" /> : null}<View style={styles.grow}><View style={styles.nameRow}><Text numberOfLines={1} style={[typography.title, styles.name, { color: colors.text, fontWeight: "700" }]}>{item.name}</Text>{ownProfile.data?.muralId === item.id ? <View style={[styles.profileBadge, { borderColor: colors.border, backgroundColor: colors.accentSoft }]}><Text numberOfLines={1} style={[typography.caption, { color: colors.accent }]}>My shelf</Text></View> : null}</View><Text style={[typography.caption, { color: colors.textDim }]}>{item.blocks.length} blocks</Text></View></Pressable>
           <Menu
@@ -167,7 +186,22 @@ export function MuralsScreen() {
           </Menu>
         </View>}
       />
-      <Sheet visible={presets} title="Start with a preset" onClose={() => setPresets(false)}><View style={styles.sheet}>{MURAL_PRESETS.map((preset) => <Button key={preset.id} label={preset.name} variant="secondary" onPress={() => void createFromPreset(preset.id)} />)}</View></Sheet>
+      <Sheet visible={presets} title="Start from a preset" onClose={() => setPresets(false)}>
+        <View style={styles.sheet}>
+          {presetError ? <Toast visible message={presetError} tone="error" /> : null}
+          {libraryQuery.isError ? <><Toast visible message="Couldn't load your library." tone="error" /><Button label="Retry" variant="secondary" onPress={() => void libraryQuery.refetch()} /></> : null}
+          {MURAL_PRESETS.map((preset) => {
+            const reason = libraryQuery.isPending ? "Loading library…" : libraryQuery.isError ? undefined : presetAvailability(preset.id, libraryQuery.data?.data.books ?? []);
+            return (
+              <View key={preset.id} style={styles.presetRow}>
+                <Button label={preset.name} variant="secondary" disabled={libraryQuery.isPending || libraryQuery.isError || Boolean(reason)} onPress={() => void createFromPreset(preset.id)} />
+                <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{preset.description}</Text>
+                {reason ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{reason}</Text> : null}
+              </View>
+            );
+          })}
+        </View>
+      </Sheet>
       <Sheet visible={coverFor !== null} title="Mural cover" onClose={() => setCoverFor(null)}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheet}>{coverFor?.coverImageId ? <Button label="Remove cover" variant="destructive" onPress={() => void murals.clearCover(coverFor.id).then(() => setCoverFor(null))} /> : null}{(gallery.data ?? []).map((image) => <Pressable accessibilityLabel={`Use ${image.filename} as mural cover`} accessibilityRole="button" key={image.id} onPress={() => void murals.setCover(coverFor!.id, image.id, image.url).then(() => setCoverFor(null))}><Image source={{ uri: image.url }} style={styles.imageChoice} /></Pressable>)}</ScrollView></Sheet>
       <Sheet visible={shareFor !== null} title="Share mural" onClose={() => setShareFor(null)}><View style={styles.sheet}>{shareFor?.shareUrl ? <><ShareActions message={shareFor.shareUrl} title={shareFor.name} /><Button label="Stop sharing" variant="destructive" onPress={() => void murals.unshare(shareFor.id).then(() => setShareFor(null))} /></> : <Button label="Create share link" onPress={() => void murals.share(shareFor!.id).then(setShareFor)} />}</View></Sheet>
       <Sheet visible={moveFor !== null} title="Move mural" onClose={() => setMoveFor(null)}><ModalBody><Button label="Unfiled" variant={moveFor?.folderId === null ? "primary" : "secondary"} onPress={() => void murals.update(moveFor!.id, { folderId: null }).then(() => setMoveFor(null))} />{tree.map(({ folder, depth }) => <Button key={folder.id} label={`${"  ".repeat(depth)}${folder.name}`} variant={moveFor?.folderId === folder.id ? "primary" : "secondary"} onPress={() => void murals.update(moveFor!.id, { folderId: folder.id }).then(() => setMoveFor(null))} />)}</ModalBody></Sheet>
@@ -188,5 +222,6 @@ const styles = StyleSheet.create({
   name: { flexShrink: 1 },
   profileBadge: { borderWidth: 1, borderRadius: radii.full, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
   sheet: { gap: spacing.sm, paddingBottom: spacing.xl },
+  presetRow: { gap: spacing.xs },
   imageChoice: { width: "100%", height: 120, borderRadius: radii.md },
 });
