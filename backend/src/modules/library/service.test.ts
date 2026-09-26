@@ -138,6 +138,17 @@ test("addBook with no match appends a manual book and emits book_added", () => {
   db.close();
 });
 
+test("addBook with no match, finished with a given day, records that day", () => {
+  const { db, service } = setup();
+
+  const result = service.addBook("user-1", { title: "Stoner", author: "John Williams", readStatus: 2, day: "2026-01-01" });
+
+  const books = booksOf(service, "user-1");
+  assert.equal(books[0]?.ContentID, result.key);
+  assert.equal(books[0]?.DateLastRead, "2026-01-01");
+  db.close();
+});
+
 test("addBook matches by trimmed ISBN, finishing records the given day and 100%", () => {
   const { db, service, events } = setup();
   service.saveLibrary("user-1", {
