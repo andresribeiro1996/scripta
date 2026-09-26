@@ -220,6 +220,14 @@ test("createMural carries folderId and defaults to root", () => {
   assert.throws(() => service.createMural("u1", "Bad", UNKNOWN_UUID), InvalidFolderReferenceError);
 });
 
+test("updateMural stores a shelf block's role as sent", () => {
+  const service = makeService();
+  const mural = service.createMural("u1", "M");
+  service.updateMural("u1", mural.id, { blocks: [{ id: "b1", type: "shelf", layout: { x: 0, y: 0, w: 12, h: 5 }, title: "Finished", bookKeys: [], role: "finished" }] });
+  const blocks = service.getMural("u1", mural.id)?.blocks as Array<{ role?: string }>;
+  assert.equal(blocks[0]!.role, "finished");
+});
+
 test("openMuralsDb migration is idempotent and preserves data", async () => {
   process.env.JWT_ACCESS_SECRET ??= "a".repeat(64);
   process.env.JWT_REFRESH_SECRET ??= "b".repeat(64);

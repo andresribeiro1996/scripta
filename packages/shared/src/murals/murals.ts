@@ -65,7 +65,7 @@ interface MuralBlockBase {
  *  content of its own to configure. */
 export type MuralBlock =
   | (MuralBlockBase & { type: "spotlight"; bookKey: string; caption?: string })
-  | (MuralBlockBase & { type: "shelf"; title: string; bookKeys: string[]; collectionId?: string })
+  | (MuralBlockBase & { type: "shelf"; title: string; bookKeys: string[]; collectionId?: string; role?: "finished" | "favourites" })
   | (MuralBlockBase & { type: "quote"; bookKey: string; highlightId: string; mode?: "rediscover" })
   | (MuralBlockBase & { type: "quoteCollection"; title: string; quotes: QuoteRef[] })
   | (MuralBlockBase & { type: "image"; imageId: string; caption?: string })
