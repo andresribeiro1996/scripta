@@ -409,8 +409,3 @@ const glyphShapes: Record<IdentityKey, string> = {
 export const glyph = (key: IdentityKey, size: number, extra = "") => `<svg xmlns="http://www.w3.org/2000/svg" class="glyph id-${key} ${extra}" viewBox="0 0 48 48" width="${size}" height="${size}" aria-hidden="true"><circle class="gd" cx="24" cy="24" r="23.5"/><circle class="gr" cx="24" cy="24" r="20.5" fill="none" stroke-width=".8"/>${glyphShapes[key]}</svg>`;
 
 export const printStyle = (ground: string, line: string) => `<style>.pg,.pgf,.gg{fill:${ground}}.pl{stroke:${line};fill:none}.pf,.pt,.gd,.gi{fill:${line}}.pgl{fill:${ground};stroke:${line}}.pgs,.gr,.gs{stroke:${ground};fill:none}.gk{stroke:${line};fill:none}</style>`;
-
-export const READER_PLATES = PLATES;
-export const PLATE_INKS = INKS;
-export const PLATE_PAPER = PAPER;
-export const PLATE_REVERSED_LINE = REVERSED_LINE;
