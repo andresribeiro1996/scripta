@@ -5,16 +5,28 @@ import { dynamicType, radii, spacing, typography, useTheme } from "../../../ui/t
 // line) and "Still <a long title>" (up to two) would render at different
 // heights side by side. A fixed two-line-tall box with a clamped label
 // keeps both halves of the duel the same size regardless of content.
-export function DuelButton({ label, onPress }: { label: string; onPress: () => void }) {
+export function DuelButton({
+  label,
+  accessibilityLabel,
+  onPress,
+  disabled,
+}: {
+  label: string;
+  accessibilityLabel?: string;
+  onPress: () => void;
+  disabled?: boolean;
+}) {
   const { colors } = useTheme();
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [
         styles.duelButton,
-        { borderColor: colors.border, backgroundColor: pressed ? colors.surfacePressed : colors.surface },
+        { borderColor: colors.border, backgroundColor: pressed ? colors.surfacePressed : colors.surface, opacity: disabled ? 0.5 : 1 },
       ]}
     >
       <Text {...dynamicType} numberOfLines={2} style={[typography.body, styles.duelButtonText, { color: colors.text }]}>{label}</Text>
@@ -24,5 +36,5 @@ export function DuelButton({ label, onPress }: { label: string; onPress: () => v
 
 const styles = StyleSheet.create({
   duelButton: { minHeight: 64, borderWidth: 1, borderRadius: radii.md, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.md },
-  duelButtonText: { fontWeight: "600", textAlign: "center" },
+  duelButtonText: { fontWeight: "600", textAlign: "center", alignSelf: "stretch" },
 });

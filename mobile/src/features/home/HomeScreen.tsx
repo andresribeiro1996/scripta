@@ -151,7 +151,7 @@ export function HomeScreen() {
           </ScrollView>
         </View>
       )}
-      {upNextCard ? <PickNextSheet visible={picking} keys={upNextCard.bookKeys} books={books} onClose={() => setPicking(false)} /> : null}
+      {upNextCard ? <PickNextSheet visible={picking && upNextCard.bookKeys.length >= 2} keys={upNextCard.bookKeys} books={books} onClose={() => setPicking(false)} /> : null}
     </Screen>
   );
 }
@@ -160,7 +160,7 @@ function SectionHeader({ title, count, action }: { title: string; count?: string
   const { colors } = useTheme();
   return (
     <View style={styles.sectionHeader}>
-      <Text accessibilityRole="header" {...dynamicType} style={[typography.body, styles.heading, { color: colors.text }]}>{title}</Text>
+      <Text accessibilityRole="header" {...dynamicType} numberOfLines={1} style={[typography.body, styles.heading, styles.headerTitle, { color: colors.text }]}>{title}</Text>
       {count ? <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{count}</Text> : null}
       {action ? (
         <Pressable accessibilityRole="button" hitSlop={8} onPress={action.onPress} style={styles.sectionAction}>
@@ -195,6 +195,7 @@ const styles = StyleSheet.create({
   page: { padding: spacing.lg, gap: spacing.md },
   sectionPad: { paddingHorizontal: spacing.lg },
   heading: { fontWeight: "700" },
+  headerTitle: { flexShrink: 1 },
   card: { borderWidth: 1, borderRadius: radii.lg, padding: spacing.lg, gap: spacing.sm },
   grow: { flex: 1 },
   sections: { paddingVertical: spacing.lg, gap: spacing.lg },
