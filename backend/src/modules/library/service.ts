@@ -168,7 +168,7 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
           publisher: null,
           readStatus: input.readStatus,
           rating: null,
-          dateRead: input.readStatus === 2 ? new Date().toISOString().slice(0, 10) : null
+          dateRead: input.readStatus === 2 ? (input.day ?? localDay()) : null
         },
         id
       );
