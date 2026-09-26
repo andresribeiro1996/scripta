@@ -7,6 +7,7 @@ import { useAuth } from "../../core/auth";
 import { useLibrary } from "../library/hooks/useLibrary";
 import { CoverImage } from "../library/components/CoverImage";
 import { FeedRow, digestRoute, useDashboardFeed, useFollowBack } from "./FeedRow";
+import { PickNextSheet } from "./PickNextSheet";
 
 export function HomeScreen() {
   const { colors } = useTheme();
@@ -16,6 +17,7 @@ export function HomeScreen() {
   const [day, setDay] = useState(() => new Date().toISOString().slice(0, 10));
   const [offset, setOffset] = useState(0);
   const [pulling, setPulling] = useState(false);
+  const [picking, setPicking] = useState(false);
   const dashboard = useDashboardFeed();
   const { followingId, followError, followBack } = useFollowBack(dashboard.refetch);
 
@@ -99,7 +101,11 @@ export function HomeScreen() {
                 ) : null}
                 {upNextCard ? (
                   <View style={styles.section}>
-                    <SectionHeader title="Up next" count={String(upNextCard.bookKeys.length)} />
+                    <SectionHeader
+                      title="Up next"
+                      count={String(upNextCard.bookKeys.length)}
+                      action={upNextCard.bookKeys.length >= 2 ? { label: "Can't choose?", onPress: () => setPicking(true) } : undefined}
+                    />
                     <BookRow keys={upNextCard.bookKeys.slice(0, 10)} books={books} onOpen={openBook} />
                   </View>
                 ) : null}
@@ -145,16 +151,22 @@ export function HomeScreen() {
           </ScrollView>
         </View>
       )}
+      {upNextCard ? <PickNextSheet visible={picking} keys={upNextCard.bookKeys} books={books} onClose={() => setPicking(false)} /> : null}
     </Screen>
   );
 }
 
-function SectionHeader({ title, count }: { title: string; count?: string }) {
+function SectionHeader({ title, count, action }: { title: string; count?: string; action?: { label: string; onPress: () => void } }) {
   const { colors } = useTheme();
   return (
     <View style={styles.sectionHeader}>
       <Text accessibilityRole="header" {...dynamicType} style={[typography.body, styles.heading, { color: colors.text }]}>{title}</Text>
       {count ? <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{count}</Text> : null}
+      {action ? (
+        <Pressable accessibilityRole="button" hitSlop={8} onPress={action.onPress} style={styles.sectionAction}>
+          <Text {...dynamicType} style={[typography.body, { color: colors.accent }]}>{action.label}</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -188,6 +200,7 @@ const styles = StyleSheet.create({
   sections: { paddingVertical: spacing.lg, gap: spacing.lg },
   section: { gap: spacing.sm },
   sectionHeader: { flexDirection: "row", alignItems: "baseline", gap: spacing.xs, paddingHorizontal: spacing.lg },
+  sectionAction: { marginLeft: "auto" },
   row: { gap: spacing.sm, paddingHorizontal: spacing.lg },
   cover: { width: 72, aspectRatio: 2 / 3, borderRadius: radii.md, overflow: "hidden" },
   linkRow: { minHeight: minimumTouchTarget, justifyContent: "center", paddingHorizontal: spacing.lg },
