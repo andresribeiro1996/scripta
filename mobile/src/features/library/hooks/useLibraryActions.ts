@@ -7,15 +7,22 @@
 // being reported as a success.
 import { Alert } from "react-native";
 import {
+  addReaderNote,
   bookKey,
   clearBookCover,
   localDay,
+  newId,
   removeBooksFromAllGroups,
+  removeReaderNote,
   reorderOnDrop,
+  restoreReadState,
   setBookCover,
   setReadStatus,
+  setRating as rateBook,
+  type FinishRating,
   type LibraryData,
   type PerCardStyle,
+  type ReadSnapshot,
   type ReadStatus,
 } from "@scripta/shared";
 import type { GalleryImage } from "../../gallery/api";
@@ -61,6 +68,20 @@ export function useLibraryActions() {
       if (setReadStatus(book, status, day) === book) return;
       return run(mapBook(bookKey(book), (b) => setReadStatus(b, status, day)), "Couldn't save the status change.");
     },
+
+    setRating: (book: Record<string, unknown>, rating: FinishRating) => {
+      if (rateBook(book, rating) === book) return Promise.resolve(true);
+      return run(mapBook(bookKey(book), (b) => rateBook(b, rating)), "Couldn't save the rating.");
+    },
+
+    addNote: (book: Record<string, unknown>, text: string) =>
+      run(mapBook(bookKey(book), (b) => addReaderNote(b, text, localDay(), newId())), "Couldn't save your note."),
+
+    deleteNote: (book: Record<string, unknown>, bookmarkId: string) =>
+      run(mapBook(bookKey(book), (b) => removeReaderNote(b, bookmarkId)), "Couldn't delete the note."),
+
+    restoreRead: (book: Record<string, unknown>, before: ReadSnapshot) =>
+      run(mapBook(bookKey(book), (b) => restoreReadState(b, before)), "Couldn't undo the status change."),
 
     saveBookStyle: (book: Record<string, unknown>, style: PerCardStyle | undefined) =>
       run(mapBook(bookKey(book), (b) => ({ ...b, _style: style })), "Couldn't save the style change."),

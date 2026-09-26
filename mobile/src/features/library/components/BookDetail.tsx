@@ -2,11 +2,19 @@
 // author/status, the Style/Cover actions, the status control, and the
 // highlight list.
 
-import { ScrollView, StyleSheet, Text, View } from "react-native";
-import { statusLabel, type ReadStatus } from "@scripta/shared";
+import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
+import { statusLabel, type FinishRating, type ReadStatus } from "@scripta/shared";
 import { Button, Segmented } from "../../../ui/components";
 import { spacing, typography, useTheme } from "../../../ui/theme";
 import { CoverImage } from "./CoverImage";
+import { FeelingChips } from "./FeelingChips";
+
+function confirmDeleteNote(onConfirm: () => void) {
+  Alert.alert("Delete this note?", "This can't be undone.", [
+    { text: "Cancel", style: "cancel" },
+    { text: "Delete", style: "destructive", onPress: onConfirm },
+  ]);
+}
 
 const STATUS_OPTIONS = [
   { value: "0", label: statusLabel(0) },
@@ -20,12 +28,16 @@ export function BookDetail({
   onOpenStyle,
   onOpenCoverPicker,
   onSetStatus,
+  onSetRating,
+  onDeleteNote,
   onClose,
 }: {
   book: Record<string, unknown> | null;
   onOpenStyle: (book: Record<string, unknown>) => void;
   onOpenCoverPicker: (book: Record<string, unknown>) => void;
-  onSetStatus: (book: Record<string, unknown>, status: ReadStatus) => void;
+  onSetStatus: (book: Record<string, unknown>, status: ReadStatus) => void | Promise<void>;
+  onSetRating: (book: Record<string, unknown>, rating: FinishRating) => void;
+  onDeleteNote: (book: Record<string, unknown>, bookmarkId: string) => void;
   onClose: () => void;
 }) {
   const { colors } = useTheme();
@@ -62,6 +74,13 @@ export function BookDetail({
           onChange={(value) => onSetStatus(book, Number(value) as ReadStatus)}
         />
 
+        {book.ReadStatus === 2 ? (
+          <View style={{ gap: spacing.sm }}>
+            <Text style={[typography.title, { color: colors.text }]}>How it landed</Text>
+            <FeelingChips value={typeof book.Rating === "number" ? book.Rating : null} onChange={(rating) => onSetRating(book, rating)} />
+          </View>
+        ) : null}
+
         <View style={styles.actions}>
           <Button label="Style" variant="secondary" onPress={() => onOpenStyle(book)} />
           <Button label="Cover" variant="secondary" onPress={() => onOpenCoverPicker(book)} />
@@ -73,14 +92,27 @@ export function BookDetail({
           </Text>
           {highlights.length === 0 && <Text style={[typography.body, { color: colors.textDim }]}>No highlights yet.</Text>}
           <View style={{ gap: spacing.md }}>
-            {highlights.map((h, i) => (
-              <View key={String(h.BookmarkID ?? i)} style={[styles.highlight, { borderColor: colors.border }]}>
-                <Text style={[typography.body, { color: colors.text, fontStyle: "italic" }]}>{String(h.Text)}</Text>
-                {String(h.Annotation ?? "").trim() !== "" && (
-                  <Text style={[typography.caption, { color: colors.textDim, marginTop: spacing.xs }]}>{String(h.Annotation)}</Text>
-                )}
-              </View>
-            ))}
+            {highlights.map((h, i) => {
+              const bookmarkId = String(h.BookmarkID ?? "");
+              const isNote = bookmarkId.startsWith("note:");
+              return (
+                <View key={bookmarkId || i} style={[styles.highlight, { borderColor: colors.border }]}>
+                  <Text style={[typography.body, { color: colors.text, fontStyle: "italic" }]}>{String(h.Text)}</Text>
+                  {String(h.Annotation ?? "").trim() !== "" && (
+                    <Text style={[typography.caption, { color: colors.textDim, marginTop: spacing.xs }]}>{String(h.Annotation)}</Text>
+                  )}
+                  {isNote && (
+                    <Text
+                      accessibilityRole="button"
+                      onPress={() => confirmDeleteNote(() => onDeleteNote(book, bookmarkId))}
+                      style={[typography.caption, { color: colors.danger, fontWeight: "700", marginTop: spacing.xs }]}
+                    >
+                      Delete
+                    </Text>
+                  )}
+                </View>
+              );
+            })}
           </View>
         </View>
       </ScrollView>

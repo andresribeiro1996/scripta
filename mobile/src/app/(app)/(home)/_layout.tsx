@@ -13,6 +13,7 @@ export default function HomeLayout() {
       <Stack.Screen name="book/[key]/index" options={{ ...sheet, title: "Book details" }} />
       <Stack.Screen name="book/[key]/style" options={{ ...sheet, title: "Card style" }} />
       <Stack.Screen name="book/[key]/cover" options={{ ...sheet, title: "Cover" }} />
+      <Stack.Screen name="book/[key]/finished" options={{ ...sheet, title: "Finished" }} />
     </Stack>
   );
 }

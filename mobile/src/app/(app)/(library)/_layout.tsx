@@ -31,6 +31,7 @@ export default function LibraryStackLayout() {
       <Stack.Screen name="collection/[id]" options={{ ...sheet, title: "Collection" }} />
       <Stack.Screen name="book/[key]/style" options={{ ...sheet, title: "Card style" }} />
       <Stack.Screen name="book/[key]/cover" options={{ ...sheet, title: "Cover" }} />
+      <Stack.Screen name="book/[key]/finished" options={{ ...sheet, title: "Finished" }} />
     </Stack>
   );
 }

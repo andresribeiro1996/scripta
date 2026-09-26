@@ -1,5 +1,8 @@
+import type { FinishRating } from "@scripta/shared";
 import { CoverImage } from "./BookCard";
 import { BookSummary } from "./BookSummary";
+import { useConfirm } from "./ConfirmDialog";
+import { FeelingChips } from "./FeelingChips";
 import { statusLabel } from "../lib/covers";
 import type { ReadStatus } from "../lib/libraryView";
 import { useDismissible } from "../hooks/useDismissible";
@@ -10,16 +13,27 @@ export function BookDetailSheet({
   onOpenStyle,
   onOpenCoverPicker,
   onSetStatus,
+  onSetRating,
+  onDeleteNote,
   onClose
 }: {
   book: Record<string, unknown>;
   onOpenStyle: (book: Record<string, unknown>) => void;
   onOpenCoverPicker: (book: Record<string, unknown>) => void;
   onSetStatus: (book: Record<string, unknown>, status: ReadStatus) => void;
+  onSetRating: (book: Record<string, unknown>, rating: FinishRating) => void;
+  onDeleteNote: (book: Record<string, unknown>, bookmarkId: string) => void;
   onClose: () => void;
 }) {
   useScrollLock();
   useDismissible(onClose);
+  const confirm = useConfirm();
+
+  async function handleDeleteNote(bookmarkId: string) {
+    if (await confirm({ title: "Delete this note?", body: "This can't be undone.", confirmLabel: "Delete" })) {
+      onDeleteNote(book, bookmarkId);
+    }
+  }
 
   const highlights = Array.isArray(book.highlights)
     ? (book.highlights as Array<Record<string, unknown>>).filter((h) => String(h.Text ?? "").trim() !== "")
@@ -90,6 +104,19 @@ export function BookDetailSheet({
                 );
               })}
             </div>
+
+            {book.ReadStatus === 2 && (
+              <div className="mt-4">
+                <p className="text-sm font-semibold">How it landed</p>
+                <div className="mt-2">
+                  <FeelingChips
+                    value={typeof book.Rating === "number" ? book.Rating : null}
+                    onChange={(rating) => onSetRating(book, rating)}
+                    label="How it landed"
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -100,14 +127,27 @@ export function BookDetailSheet({
           </h3>
           {highlights.length === 0 && <p className="text-sm text-(--color-text-dim)">No highlights yet.</p>}
           <div className="flex flex-col gap-3">
-            {highlights.map((h, i) => (
-              <div key={String(h.BookmarkID ?? i)} className="border-l-2 border-(--color-border) pl-3">
-                <p className="text-sm italic">{String(h.Text)}</p>
-                {String(h.Annotation ?? "").trim() !== "" && (
-                  <p className="mt-1 text-xs text-(--color-text-dim)">{String(h.Annotation)}</p>
-                )}
-              </div>
-            ))}
+            {highlights.map((h, i) => {
+              const bookmarkId = String(h.BookmarkID ?? "");
+              const isNote = bookmarkId.startsWith("note:");
+              return (
+                <div key={bookmarkId || i} className="border-l-2 border-(--color-border) pl-3">
+                  <p className="text-sm italic">{String(h.Text)}</p>
+                  {String(h.Annotation ?? "").trim() !== "" && (
+                    <p className="mt-1 text-xs text-(--color-text-dim)">{String(h.Annotation)}</p>
+                  )}
+                  {isNote && (
+                    <button
+                      type="button"
+                      onClick={() => void handleDeleteNote(bookmarkId)}
+                      className="mt-1 text-xs font-semibold text-(--color-danger) hover:opacity-80"
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
