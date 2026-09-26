@@ -1,4 +1,4 @@
-import { filterBooks, nextReadStatus, sortBooks } from "../src/lib/libraryView";
+import { filterBooks, setReadStatus, sortBooks } from "../src/lib/libraryView";
 
 let failed = 0;
 function check(name: string, ok: boolean) {
@@ -25,7 +25,10 @@ check("query and status combine (AND)", filterBooks(books, "ancillary", "finishe
 check("sort by title", sortBooks(books, "title")[0].Title === "Ancillary Justice");
 check("sort by author", sortBooks(books, "author")[0].Attribution === "Ann Leckie");
 check("manual sort returns the same reference", sortBooks(books, "manual") === books);
-check("nextReadStatus cycles 0->1->2->0", nextReadStatus(0) === 1 && nextReadStatus(1) === 2 && nextReadStatus(2) === 0 && nextReadStatus(undefined) === 1);
+const finishedBook = setReadStatus({ ReadStatus: 1 }, 2, "2026-09-25");
+check("setReadStatus records the finish day", finishedBook.ReadStatus === 2 && finishedBook.DateLastRead === "2026-09-25" && finishedBook.___PercentRead === 100);
+const same = { ReadStatus: 2 };
+check("setReadStatus returns the same book when nothing changes", setReadStatus(same, 2, "2026-09-25") === same);
 
 if (failed > 0) {
   console.error(`${failed} check(s) failed`);

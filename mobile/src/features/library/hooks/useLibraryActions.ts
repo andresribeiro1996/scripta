@@ -9,12 +9,14 @@ import { Alert } from "react-native";
 import {
   bookKey,
   clearBookCover,
-  nextReadStatus,
+  localDay,
   removeBooksFromAllGroups,
   reorderOnDrop,
   setBookCover,
+  setReadStatus,
   type LibraryData,
   type PerCardStyle,
+  type ReadStatus,
 } from "@scripta/shared";
 import type { GalleryImage } from "../../gallery/api";
 import { attemptUpdate } from "../lib/attemptUpdate";
@@ -54,8 +56,11 @@ export function useLibraryActions() {
         return books === data.books ? data : { ...data, books };
       }, "Couldn't save the new order."),
 
-    cycleStatus: (book: Record<string, unknown>) =>
-      run(mapBook(bookKey(book), (b) => ({ ...b, ReadStatus: nextReadStatus(b.ReadStatus) })), "Couldn't save the status change."),
+    setStatus: (book: Record<string, unknown>, status: ReadStatus) => {
+      const day = localDay();
+      if (setReadStatus(book, status, day) === book) return;
+      return run(mapBook(bookKey(book), (b) => setReadStatus(b, status, day)), "Couldn't save the status change.");
+    },
 
     saveBookStyle: (book: Record<string, unknown>, style: PerCardStyle | undefined) =>
       run(mapBook(bookKey(book), (b) => ({ ...b, _style: style })), "Couldn't save the style change."),
