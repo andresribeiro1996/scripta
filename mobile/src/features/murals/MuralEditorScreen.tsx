@@ -8,6 +8,7 @@ import {
   createBlockCandidate,
   createDuplicateCandidate,
   type BlockType,
+  type Mural,
   type MuralBlock,
 } from "@scripta/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -21,7 +22,8 @@ import { useGenreEnrichment } from "../library/hooks/useGenreEnrichment";
 import { fetchTierlists } from "../tierlists/api";
 import { changeBlockLayout } from "./layout";
 import { MuralCanvas } from "./MuralCanvas";
-import { fetchMural, updateMural } from "./api";
+import { MuralShareSheet } from "./MuralShareSheet";
+import { fetchMural, shareMural, unshareMural, updateMural } from "./api";
 import { MURALS_QUERY_KEY } from "./useMurals";
 import { useAuth } from "../../core/auth";
 import { API_URL } from "../../core/config";
@@ -34,7 +36,8 @@ export function MuralEditorScreen({ id }: { id: string }) {
   const router = useRouter();
   const client = useQueryClient();
   const muralQuery = useQuery({ queryKey: ["murals", id], queryFn: () => fetchMural(id), retry: false });
-  const { data: library, updateLibrary } = useLibrary();
+  const libraryQuery = useLibrary();
+  const { data: library, updateLibrary } = libraryQuery;
   const gallery = useQuery({ queryKey: ["gallery"], queryFn: fetchGalleryImages });
   const tierlists = useQuery({ queryKey: ["tierlists"], queryFn: fetchTierlists });
   const [name, setName] = useState<string | null>(null);
@@ -45,6 +48,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
   const [search, setSearch] = useState("");
   const [quoteBook, setQuoteBook] = useState<Record<string, unknown> | null>(null);
   const [busy, setBusy] = useState(false);
+  const [shareFor, setShareFor] = useState<Mural | null>(null);
   const [error, setError] = useState<string | null>(null);
   const mural = muralQuery.data;
   const currentBlocks = blocks ?? mural?.blocks ?? [];
@@ -77,17 +81,25 @@ export function MuralEditorScreen({ id }: { id: string }) {
     setAdding(false);
   }
 
+  function cacheMural(updated: Mural) {
+    client.setQueryData(["murals", id], updated);
+    client.setQueryData<Mural[]>(MURALS_QUERY_KEY, (items = []) => items.map((item) => item.id === updated.id ? updated : item));
+    void client.invalidateQueries({ queryKey: ["home"] });
+  }
+
+  async function persist() {
+    const updated = await updateMural(id, { name: currentName.trim() || mural!.name, blocks: currentBlocks, updatedAt: mural!.updatedAt });
+    cacheMural(updated);
+    setName(updated.name);
+    setBlocks(updated.blocks);
+    return updated;
+  }
+
   async function save() {
-    if (!mural) return;
     setBusy(true);
     setError(null);
     try {
-      const updated = await updateMural(mural.id, { name: currentName.trim() || mural.name, blocks: currentBlocks, updatedAt: mural.updatedAt });
-      client.setQueryData(["murals", id], updated);
-      client.setQueryData<typeof updated[]>(MURALS_QUERY_KEY, (items = []) => items.map((item) => item.id === updated.id ? updated : item));
-      void client.invalidateQueries({ queryKey: ["home"] });
-      setName(updated.name);
-      setBlocks(updated.blocks);
+      await persist();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Couldn't save this mural.");
     } finally {
@@ -104,7 +116,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
         options={{
           headerShown: true,
           title: currentName || "Mural",
-          headerRight: () => <IconButton framed accessibilityLabel="Save mural" label="Save" name="confirm" onPress={() => void save()} />,
+          headerRight: () => <IconButton framed accessibilityLabel="Save mural" label="Save" name="confirm" onPress={() => { if (!busy) void save(); }} />,
         }}
       />
       <View style={styles.nameRow}><Input label="Mural name" value={currentName} onChangeText={setName} /></View>
@@ -114,8 +126,21 @@ export function MuralEditorScreen({ id }: { id: string }) {
       </ScrollView>
       <View style={[styles.dock, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <Button label="Add block" onPress={() => setAdding(true)} />
+        <Button label="Share" variant="secondary" onPress={() => setShareFor(draftMural)} />
         {selected ? <><Button label="Configure" variant="secondary" onPress={() => setPicking(selected.type === "image" ? "image" : selected.type === "tierlist" ? "tierlist" : selected.type === "spotlight" || selected.type === "shelf" || selected.type === "quote" || selected.type === "quoteCollection" ? "book" : null)} /><Button label="Duplicate" variant="secondary" onPress={() => setBlocks([...currentBlocks, createDuplicateCandidate(selected, currentBlocks)])} /><Button label="Delete" variant="destructive" onPress={() => { setBlocks(currentBlocks.filter((block) => block.id !== selected.id)); setSelectedId(null); }} /></> : null}
       </View>
+      <MuralShareSheet mural={shareFor} books={books} groups={library?.data.groups ?? []} images={gallery.data ?? []} tierlists={tierlists.data ?? []} profile={user?.username ? { username: user.username, avatarUrl: user.avatarId ? `${API_URL}/auth/avatar/${user.avatarId}/file` : null } : undefined} draft={shareFor !== null && (shareFor.name !== mural.name || shareFor.blocks !== mural.blocks)} contentReady={!libraryQuery.isPending && !gallery.isPending && !tierlists.isPending} contentError={libraryQuery.error?.message ?? gallery.error?.message ?? tierlists.error?.message ?? undefined} onRetryContent={() => { void libraryQuery.refetch(); void gallery.refetch(); void tierlists.refetch(); }} onClose={() => setShareFor(null)} onEnableLink={async () => {
+        if (shareFor === null) return;
+        if (shareFor.name !== mural.name || shareFor.blocks !== mural.blocks) setShareFor(await persist());
+        const updated = await shareMural(id);
+        cacheMural(updated);
+        setShareFor(updated);
+        return updated.shareUrl ?? undefined;
+      }} onDisableLink={async () => {
+        const updated = await unshareMural(id);
+        cacheMural(updated);
+        setShareFor({ ...updated, name: currentName, blocks: currentBlocks });
+      }} />
       <Sheet visible={adding} title="Add block" onClose={() => setAdding(false)}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheet}>{BLOCK_TYPES.map((type) => <Button key={type} label={BLOCK_TYPE_LABELS[type]} variant="secondary" onPress={() => add(type)} />)}</ScrollView></Sheet>
       <Sheet visible={selected !== null && picking === null} title="Block settings" onClose={() => setSelectedId(null)}>
         {selected ? <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheet}>

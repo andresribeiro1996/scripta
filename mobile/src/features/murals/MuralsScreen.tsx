@@ -17,9 +17,12 @@ import { buildMuralPreset, buildTree, MURAL_PRESETS, presetAvailability, type Mu
 import { Button, dynamicType, EmptyState, ErrorState, IconButton, Input, Menu, ModalBody, Screen, Sheet, Toast, type MenuItem } from "../../ui";
 import { radii, spacing, typography, useTheme } from "../../ui/theme";
 import { fetchGalleryImages } from "../gallery/api";
+import { fetchTierlists } from "../tierlists/api";
 import { useLibrary } from "../library/hooks/useLibrary";
-import { ShareActions } from "../socials";
+import { API_URL } from "../../core/config";
+import { useAuth } from "../../core/auth";
 import { fetchOwnProfile } from "../community/api";
+import { MuralShareSheet } from "./MuralShareSheet";
 import { useMuralFolders, useMurals } from "./useMurals";
 
 export function MuralsScreen() {
@@ -27,9 +30,12 @@ export function MuralsScreen() {
   const router = useRouter();
   const murals = useMurals();
   const folders = useMuralFolders();
+  const { user } = useAuth();
   const ownProfile = useQuery({ queryKey: ["community", "own-profile"], queryFn: fetchOwnProfile });
   const libraryQuery = useLibrary();
+  const { data: library } = libraryQuery;
   const gallery = useQuery({ queryKey: ["gallery"], queryFn: fetchGalleryImages });
+  const tierlists = useQuery({ queryKey: ["tierlists"], queryFn: fetchTierlists });
   const [folderId, setFolderId] = useState<string | null | undefined>(undefined);
   const searchBar = useRef<SearchBarCommands>(null);
   const [search, setSearch] = useState("");
@@ -203,7 +209,15 @@ export function MuralsScreen() {
         </View>
       </Sheet>
       <Sheet visible={coverFor !== null} title="Mural cover" onClose={() => setCoverFor(null)}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheet}>{coverFor?.coverImageId ? <Button label="Remove cover" variant="destructive" onPress={() => void murals.clearCover(coverFor.id).then(() => setCoverFor(null))} /> : null}{(gallery.data ?? []).map((image) => <Pressable accessibilityLabel={`Use ${image.filename} as mural cover`} accessibilityRole="button" key={image.id} onPress={() => void murals.setCover(coverFor!.id, image.id, image.url).then(() => setCoverFor(null))}><Image source={{ uri: image.url }} style={styles.imageChoice} /></Pressable>)}</ScrollView></Sheet>
-      <Sheet visible={shareFor !== null} title="Share mural" onClose={() => setShareFor(null)}><View style={styles.sheet}>{shareFor?.shareUrl ? <><ShareActions message={shareFor.shareUrl} title={shareFor.name} /><Button label="Stop sharing" variant="destructive" onPress={() => void murals.unshare(shareFor.id).then(() => setShareFor(null))} /></> : <Button label="Create share link" onPress={() => void murals.share(shareFor!.id).then(setShareFor)} />}</View></Sheet>
+      <MuralShareSheet mural={shareFor} books={library?.data.books ?? []} groups={library?.data.groups ?? []} images={gallery.data ?? []} tierlists={tierlists.data ?? []} profile={user?.username ? { username: user.username, avatarUrl: user.avatarId ? `${API_URL}/auth/avatar/${user.avatarId}/file` : null } : undefined} contentReady={!libraryQuery.isPending && !gallery.isPending && !tierlists.isPending} contentError={libraryQuery.error?.message ?? gallery.error?.message ?? tierlists.error?.message ?? undefined} onRetryContent={() => { void libraryQuery.refetch(); void gallery.refetch(); void tierlists.refetch(); }} onClose={() => setShareFor(null)} onEnableLink={async () => {
+        if (!shareFor) return;
+        const updated = await murals.share(shareFor.id);
+        setShareFor(updated);
+        return updated.shareUrl ?? undefined;
+      }} onDisableLink={async () => {
+        if (!shareFor) return;
+        setShareFor(await murals.unshare(shareFor.id));
+      }} />
       <Sheet visible={moveFor !== null} title="Move mural" onClose={() => setMoveFor(null)}><ModalBody><Button label="Unfiled" variant={moveFor?.folderId === null ? "primary" : "secondary"} onPress={() => void murals.update(moveFor!.id, { folderId: null }).then(() => setMoveFor(null))} />{tree.map(({ folder, depth }) => <Button key={folder.id} label={`${"  ".repeat(depth)}${folder.name}`} variant={moveFor?.folderId === folder.id ? "primary" : "secondary"} onPress={() => void murals.update(moveFor!.id, { folderId: folder.id }).then(() => setMoveFor(null))} />)}</ModalBody></Sheet>
       <Sheet visible={editingFolderId !== null} title="Folder" onClose={() => setEditingFolderId(null)}><ModalBody><Input label="Folder name" value={folderName} onChangeText={setFolderName} /><Text style={[typography.caption, { color: colors.textDim }]}>Parent folder</Text><Button label="Top level" variant={folderParentId === null ? "primary" : "secondary"} onPress={() => setFolderParentId(null)} />{tree.filter(({ folder }) => folder.id !== editingFolderId).map(({ folder, depth }) => <Button key={folder.id} label={`${"  ".repeat(depth)}${folder.name}`} variant={folderParentId === folder.id ? "primary" : "secondary"} onPress={() => setFolderParentId(folder.id)} />)}<Button label="Save folder" onPress={() => void saveFolder()} /></ModalBody></Sheet>
     </Screen>
