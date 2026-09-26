@@ -37,6 +37,13 @@ export function restoreReadState(book: Book, before: ReadSnapshot): Book {
 }
 
 export function formatFinishDay(day: string, locale?: string): string {
-  const [y, m, d] = day.split("-").map(Number);
+  const [y, m, d] = day.slice(0, 10).split("-").map(Number);
   return new Date(y!, m! - 1, d!).toLocaleDateString(locale, { day: "numeric", month: "long", year: "numeric" });
+}
+
+export function removeReaderNote(book: Book, bookmarkId: string): Book {
+  if (!bookmarkId.startsWith("note:") || !Array.isArray(book.highlights)) return book;
+  const highlights = book.highlights as Array<Record<string, unknown>>;
+  const next = highlights.filter((h) => h.BookmarkID !== bookmarkId);
+  return next.length === highlights.length ? book : { ...book, highlights: next };
 }

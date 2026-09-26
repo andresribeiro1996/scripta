@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 process.env.TZ = "America/Sao_Paulo";
-const { FINISH_FEELINGS, addReaderNote, formatFinishDay, readSnapshot, restoreReadState, setRating } = await import("./finish.js");
+const { FINISH_FEELINGS, addReaderNote, formatFinishDay, readSnapshot, removeReaderNote, restoreReadState, setRating } = await import("./finish.js");
 
 test("the five feelings map to ratings 1 through 5", () => {
   assert.deepEqual(FINISH_FEELINGS.map(({ rating, label }) => [rating, label]), [
@@ -35,4 +35,20 @@ test("restoreReadState puts back exactly the snapshot, removing fields that were
 
 test("formatFinishDay reads a date-only day in local time", () => {
   assert.equal(formatFinishDay("2027-01-01", "en-US"), "January 1, 2027");
+});
+
+test("formatFinishDay reads only the date portion of a Kobo-style timestamp", () => {
+  assert.equal(formatFinishDay("2024-05-01T12:34:56", "en-US"), "May 1, 2024");
+});
+
+test("removeReaderNote removes a reader note by id, and is a no-op when absent", () => {
+  const book = { highlights: [{ BookmarkID: "note:n1", Text: "Stayed with me." }, { BookmarkID: "h1", Type: "highlight", Text: "Stayed with me." }] };
+  const next = removeReaderNote(book, "note:n1");
+  assert.deepEqual(next.highlights, [{ BookmarkID: "h1", Type: "highlight", Text: "Stayed with me." }]);
+  assert.equal(removeReaderNote(book, "note:missing"), book);
+});
+
+test("removeReaderNote refuses to remove anything that isn't a reader note", () => {
+  const book = { highlights: [{ BookmarkID: "h1", Type: "highlight", Text: "A" }] };
+  assert.equal(removeReaderNote(book, "h1"), book);
 });

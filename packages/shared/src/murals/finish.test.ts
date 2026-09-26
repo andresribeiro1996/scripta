@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { favouriteOpponent, promoteFavourite, shelfAfterFinish } from "./finish.js";
+import { createShelfSession, favouriteOpponent, promoteFavourite, shelfAfterFinish } from "./finish.js";
 import type { MuralBlock } from "./murals.js";
 
 const shelf = (id: string, role: "finished" | "favourites" | undefined, bookKeys: string[], y: number): MuralBlock =>
@@ -44,10 +44,11 @@ test("a 3 or an existing Favourites shelf adds nothing to Favourites", () => {
   assert.deepEqual(result.landed, ["finished"]);
 });
 
-test("running it twice is stable", () => {
+test("running it twice is stable — and the second run is a pure no-op", () => {
   const once = shelfAfterFinish([shelf("f", "finished", ["a"], 0)], "b", 5).blocks;
-  const twice = shelfAfterFinish(once, "b", 5).blocks;
-  assert.deepEqual(twice.map((b) => b.type === "shelf" ? b.bookKeys : []), once.map((b) => b.type === "shelf" ? b.bookKeys : []));
+  const twice = shelfAfterFinish(once, "b", 5);
+  assert.equal(twice.blocks, once);
+  assert.deepEqual(twice.landed, ["finished"]);
 });
 
 test("favouriteOpponent returns the first favourite that isn't the book", () => {
@@ -60,4 +61,96 @@ test("favouriteOpponent returns the first favourite that isn't the book", () => 
 test("promoteFavourite moves or inserts the book at the front of Favourites", () => {
   assert.deepEqual(keysOf(promoteFavourite([shelf("v", "favourites", ["x", "b"], 0)], "b"), "favourites"), ["b", "x"]);
   assert.deepEqual(keysOf(promoteFavourite([shelf("v", "favourites", ["x"], 0)], "b"), "favourites"), ["b", "x"]);
+});
+
+test("promoteFavourite is a no-op (same reference) when already at the front", () => {
+  const blocks = [shelf("v", "favourites", ["b", "x"], 0)];
+  assert.equal(promoteFavourite(blocks, "b"), blocks);
+});
+
+function fakeShelf(bookKeys: string[]): MuralBlock[] {
+  return [shelf("f", "finished", bookKeys, 0)];
+}
+
+test("createShelfSession serializes a rating then a promote, keeping the promotion", async () => {
+  let blocks: MuralBlock[] = [shelf("f", "finished", ["a"], 0), shelf("v", "favourites", ["x"], 5)];
+  const session = createShelfSession({
+    load: async () => ({ id: "m1", blocks, updatedAt: "t0" }),
+    save: async (_id, next) => { blocks = next; return {}; },
+    onChange: () => {}
+  });
+  await Promise.all([session.finish("b", 5), session.promote("b")]);
+  assert.deepEqual(keysOf(blocks, "favourites"), ["b", "x"]);
+});
+
+test("restore after a queued rating doesn't let the rating re-add the book", async () => {
+  let blocks = fakeShelf(["a"]);
+  let saveCalls = 0;
+  const session = createShelfSession({
+    load: async () => ({ id: "m1", blocks, updatedAt: "t0" }),
+    save: async (_id, next) => { saveCalls++; blocks = next; return {}; },
+    onChange: () => {}
+  });
+  const finishing = session.finish("b", null);
+  const restoring = session.restore();
+  await Promise.all([finishing, restoring]);
+  assert.equal(saveCalls, 0);
+  assert.deepEqual(keysOf(blocks, "finished"), ["a"]);
+});
+
+test("restore before load resolves still restores (nothing saved)", async () => {
+  const original = fakeShelf(["a"]);
+  let resolveLoad!: (result: { id: string; blocks: MuralBlock[]; updatedAt?: string }) => void;
+  const loadPromise = new Promise<{ id: string; blocks: MuralBlock[]; updatedAt?: string }>((resolve) => { resolveLoad = resolve; });
+  let saveCalls = 0;
+  const session = createShelfSession({
+    load: () => loadPromise,
+    save: async (_id, next) => { saveCalls++; return {}; },
+    onChange: () => {}
+  });
+  const finishing = session.finish("b", null);
+  const restoring = session.restore();
+  resolveLoad({ id: "m1", blocks: original, updatedAt: "t0" });
+  const [, restored] = await Promise.all([finishing, restoring]);
+  assert.equal(saveCalls, 0);
+  assert.equal(restored, true);
+});
+
+test("no save when nothing changed", async () => {
+  const blocks = fakeShelf(["b", "a"]);
+  let saveCalls = 0;
+  const session = createShelfSession({
+    load: async () => ({ id: "m1", blocks, updatedAt: "t0" }),
+    save: async (_id, next) => { saveCalls++; return {}; },
+    onChange: () => {}
+  });
+  await session.finish("b", null);
+  assert.equal(saveCalls, 0);
+});
+
+test("updatedAt threads from load into saves, then from each save into the next", async () => {
+  let blocks = fakeShelf(["a"]);
+  const seenUpdatedAt: Array<string | undefined> = [];
+  const session = createShelfSession({
+    load: async () => ({ id: "m1", blocks, updatedAt: "t0" }),
+    save: async (_id, next, updatedAt) => {
+      seenUpdatedAt.push(updatedAt);
+      blocks = next;
+      return { updatedAt: `t${seenUpdatedAt.length}` };
+    },
+    onChange: () => {}
+  });
+  await session.finish("b", 4);
+  await session.finish("c", 4);
+  assert.deepEqual(seenUpdatedAt, ["t0", "t1"]);
+});
+
+test("a failed save surfaces to the caller", async () => {
+  const blocks = fakeShelf(["a"]);
+  const session = createShelfSession({
+    load: async () => ({ id: "m1", blocks, updatedAt: "t0" }),
+    save: async () => { throw new Error("boom"); },
+    onChange: () => {}
+  });
+  await assert.rejects(session.finish("b", null), /boom/);
 });
