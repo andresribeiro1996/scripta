@@ -687,7 +687,7 @@ function StatePanel({ title, body, actionLabel, onAction, secondaryActionLabel, 
   return (
     <View style={styles.state}>
       <View style={error ? [styles.errorCard, { backgroundColor: colors.dangerSoft }] : styles.emptyCard}>
-        <Text accessibilityRole="header" {...dynamicType} numberOfLines={1} style={[styles.stateTitle, { color: error ? colors.danger : colors.text }]}>{title}</Text>
+        <Text accessibilityRole="header" {...dynamicType} style={[styles.stateTitle, { color: error ? colors.danger : colors.text }]}>{title}</Text>
         {body ? <Text {...dynamicType} style={[typography.body, styles.centerText, { color: error ? colors.text : colors.textDim }]}>{body}</Text> : null}
         {actionLabel && onAction ? <Button label={actionLabel} onPress={onAction} variant={error ? "destructive" : "primary"} /> : null}
         {secondaryActionLabel && onSecondaryAction ? <Button label={secondaryActionLabel} onPress={onSecondaryAction} variant="secondary" /> : null}
@@ -754,7 +754,7 @@ const styles = StyleSheet.create({
   state: { flexGrow: 1, justifyContent: "center", paddingVertical: spacing.xxl, paddingHorizontal: spacing.lg },
   emptyCard: { alignItems: "center", gap: spacing.md },
   errorCard: { alignItems: "center", gap: spacing.md, borderRadius: radii.lg, padding: spacing.lg },
-  stateTitle: { ...typography.title, fontWeight: "700", textAlign: "center" },
+  stateTitle: { ...typography.title, fontWeight: "700", textAlign: "center", alignSelf: "stretch" },
   centerText: { textAlign: "center" },
   banner: { minHeight: minimumTouchTarget, justifyContent: "center", paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
   bannerText: { fontWeight: "600", textAlign: "center" },
