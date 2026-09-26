@@ -100,8 +100,9 @@ player's own stored answers plus the key, server-side).
 
 1. Validate: ≥4 books total (options need distractors) and ≥
    `questionCount` books eligible under `allowedTypes` (eligibility:
-   cover→title needs `coverUrl`; quote→title needs `quote`; blurb→title
-   needs `blurb`; title→title always eligible).
+   cover→title and title→cover both need `coverUrl` — the latter's
+   options are cover URLs; quote→title needs `quote`; blurb→title needs
+   `blurb`).
 2. Mint the vote code, then generate `questions` via the shared seeded
    draw (seed = hash of vote code) and store them on the document.
 3. Set `play_open = 1`.
