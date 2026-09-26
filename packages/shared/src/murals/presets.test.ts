@@ -70,6 +70,8 @@ test("the My shelf preset stacks profile, stats, reading, finished, then passage
   const stats = blocks.find((block) => block.type === "stats")!;
   assert.deepEqual(stats.type === "stats" ? stats.metrics : [], ["totalBooks", "booksFinished", "booksInProgress"]);
   assert.equal(stats.layout.h, 4);
+  const profile = blocks.find((block) => block.type === "profile")!;
+  assert.equal(profile.layout.h, 5);
 });
 
 test("the My shelf preset leaves out blocks with no data and widens a lone bottom block", () => {

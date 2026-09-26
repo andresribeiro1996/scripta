@@ -80,9 +80,9 @@ export function buildMuralPreset(id: MuralPresetId, books: Book[]) {
     const finished = finishedNewestFirst(library).slice(0, SHELF_SIZE);
     const loved = favourites(library).slice(0, SHELF_SIZE);
     const hasPassage = eligiblePassages(library).length > 0;
-    blocks.push({ ...at(0, 0, 12, 4), type: "profile", bio: "", favoriteGenres: [] });
-    blocks.push({ ...at(0, 4, 12, 4), type: "stats", metrics: ["totalBooks", "booksFinished", "booksInProgress"] });
-    let y = 8;
+    blocks.push({ ...at(0, 0, 12, 5), type: "profile", bio: "", favoriteGenres: [] });
+    blocks.push({ ...at(0, 5, 12, 4), type: "stats", metrics: ["totalBooks", "booksFinished", "booksInProgress"] });
+    let y = 9;
     if (reading.length) { blocks.push({ ...at(0, y, 12, 4), type: "currentlyReading" }); y += 4; }
     if (finished.length) { blocks.push({ ...at(0, y, 12, 5), type: "shelf", title: "Finished", role: "finished", bookKeys: keys(finished) }); y += 5; }
     const width = hasPassage && loved.length ? 6 : 12;
