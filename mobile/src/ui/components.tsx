@@ -754,7 +754,7 @@ const styles = StyleSheet.create({
   state: { flexGrow: 1, justifyContent: "center", paddingVertical: spacing.xxl, paddingHorizontal: spacing.lg },
   emptyCard: { alignItems: "center", gap: spacing.md },
   errorCard: { alignItems: "center", gap: spacing.md, borderRadius: radii.lg, padding: spacing.lg },
-  stateTitle: { ...typography.title, fontWeight: "700", textAlign: "center" },
+  stateTitle: { ...typography.title, fontWeight: "700", textAlign: "center", alignSelf: "stretch" },
   centerText: { textAlign: "center" },
   banner: { minHeight: minimumTouchTarget, justifyContent: "center", paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
   bannerText: { fontWeight: "600", textAlign: "center" },

@@ -1,21 +1,19 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import type { FeedCategory, FeedSettings } from "@scripta/shared/community";
-import { contentDetail, contentKindLabel, contentTarget, DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
-import { followUser, publishProfile, unfollowUser, unpublishProfile, updateFeedSettings } from "../api/community";
+import { contentDetail, contentKindLabel, contentTarget } from "@scripta/shared/community";
+import { followUser, unfollowUser } from "../api/community";
 import type { GalleryImage } from "../api/gallery";
 import { useAuth } from "../auth/AuthContext";
 import { EmptyState } from "../components/EmptyState";
-import { CommunityIcon, MuralsIcon } from "../components/NavIcons";
+import { CommunityIcon } from "../components/NavIcons";
 import { MuralCanvas } from "../components/murals/MuralCanvas";
+import { OwnShelfView } from "../components/OwnShelfView";
 import { ProfileActivity } from "../components/ProfileActivity";
 import { PublicLibraryGrid } from "../components/PublicLibraryGrid";
-import { Sheet } from "../components/Sheet";
 import { SkeletonCardGrid } from "../components/Skeleton";
 import { SwipeTabs } from "../components/SwipeTabs";
 import { useCommunityActivity, useCommunityLibrary, useCommunityProfile } from "../hooks/useCommunity";
-import { useMurals } from "../hooks/useMurals";
 import { ensureBookBlockHeights, profileOnlyMural, type Mural } from "../lib/murals";
 import { buildReconstructedBooks } from "../lib/sharedMural";
 
@@ -31,7 +29,7 @@ export function CommunityProfilePage() {
   const { username } = useParams<{ username: string }>();
   const { session } = useAuth();
   const queryClient = useQueryClient();
-  const { view, isLoading, isNotFound, refetch } = useCommunityProfile(username ?? "");
+  const { view, isLoading, isNotFound } = useCommunityProfile(username ?? "");
   const activity = useCommunityActivity(username ?? "");
   const library = useCommunityLibrary(username ?? "", Boolean(view));
   const [busy, setBusy] = useState(false);
@@ -39,7 +37,6 @@ export function CommunityProfilePage() {
   const [tab, setTab] = useState<ProfileTab>("mural");
 
   const isOwnHandle = Boolean(username) && session?.user.username === username;
-  const isSelf = view?.profile.user.userId === session?.user.id;
 
   async function run(action: () => Promise<void>) {
     setBusy(true);
@@ -54,6 +51,10 @@ export function CommunityProfilePage() {
     }
   }
 
+  if (isOwnHandle) {
+    return <OwnShelfView username={username ?? ""} />;
+  }
+
   if (!session || isLoading || (!view && !isNotFound && !error)) {
     return (
       <div className="mx-auto max-w-3xl p-6">
@@ -62,30 +63,10 @@ export function CommunityProfilePage() {
     );
   }
 
-  if (isNotFound) {
+  if (isNotFound || !view) {
     return (
       <div className="mx-auto max-w-3xl p-6">
-        {isOwnHandle ? (
-          <UnpublishedOwnProfile
-            busy={busy}
-            error={error}
-            onPublish={(muralId) => run(async () => void (await publishProfile(muralId)))}
-          />
-        ) : (
-          <PrivateProfileState />
-        )}
-      </div>
-    );
-  }
-
-  if (!view) {
-    return (
-      <div className="mx-auto max-w-3xl p-6">
-        {isOwnHandle ? (
-          <EmptyState title="Profile unavailable." body="Couldn't load your profile." action={retryButton(refetch)} />
-        ) : (
-          <PrivateProfileState />
-        )}
+        <PrivateProfileState />
       </div>
     );
   }
@@ -121,27 +102,16 @@ export function CommunityProfilePage() {
     <div className="mx-auto max-w-4xl px-4 pt-3 pb-10 sm:px-6 sm:pt-6">
       <header className="flex items-center justify-between gap-4 pb-3">
         <h1 className="min-w-0 truncate text-xl font-bold tracking-tight sm:text-2xl">{user.username}</h1>
-        {isSelf ? (
-          <OwnerControls
-            busy={busy}
-            currentMuralId={muralData?.mural.id ?? null}
-            feedSettings={view.feedSettings}
-            onSwitch={(muralId) => run(async () => void (await publishProfile(muralId)))}
-            onUnpublish={() => run(async () => void (await unpublishProfile()))}
-            onSaveSettings={(settings) => run(async () => void (await updateFeedSettings(settings)))}
-          />
-        ) : (
-          <FollowControls
-            busy={busy}
-            following={view.profile.viewerFollows === true}
-            onToggle={(next) =>
-              run(async () => {
-                if (next === "unfollow") await unfollowUser(user.userId);
-                else await followUser(user.userId);
-              })
-            }
-          />
-        )}
+        <FollowControls
+          busy={busy}
+          following={view.profile.viewerFollows === true}
+          onToggle={(next) =>
+            run(async () => {
+              if (next === "unfollow") await unfollowUser(user.userId);
+              else await followUser(user.userId);
+            })
+          }
+        />
       </header>
       {error && <p className="mb-4 text-sm text-(--color-danger)">{error}</p>}
       <SwipeTabs tabs={PROFILE_TABS} value={tab} onChange={setTab} label="Profile sections">
@@ -167,17 +137,6 @@ export function CommunityProfilePage() {
                     shelfThemeOverride={muralData.library.shelfTheme}
                     statsOverride={muralData.library.stats}
                     tierlistData={(tierlistId) => muralData.tierlists[tierlistId]}
-                  />
-                ) : isSelf ? (
-                  <EmptyState
-                    icon={MuralsIcon}
-                    title={mural ? "Your mural is empty." : "No profile mural yet."}
-                    body="Your mural is the first thing people see on your profile."
-                    action={
-                      <Link to={mural ? `/dashboard/murals/${mural.id}` : "/dashboard/murals"} className="rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-white">
-                        {mural ? "Edit mural" : "Create a mural"}
-                      </Link>
-                    }
                   />
                 ) : (
                   <MuralCanvas mural={profileOnlyMural()} editMode={false} books={[]} images={[]} profile={user} />
@@ -224,159 +183,6 @@ type ProfileTab = (typeof PROFILE_TABS)[number]["value"];
 
 function PrivateProfileState() {
   return <EmptyState icon={CommunityIcon} title="This profile is private." body="Only published profiles are visible in the community." />;
-}
-
-function UnpublishedOwnProfile({
-  busy,
-  error,
-  onPublish
-}: {
-  busy: boolean;
-  error: string | null;
-  onPublish: (muralId: string) => void;
-}) {
-  const { data: murals } = useMurals();
-  const [muralId, setMuralId] = useState<string>("");
-  const effectiveId = muralId || murals?.[0]?.id || "";
-  return (
-    <div className="mx-auto max-w-md text-center">
-      <EmptyState icon={CommunityIcon} title="Your profile isn't published." body="Publish one of your murals to appear in the community." />
-      {error && <p className="mb-3 text-sm text-(--color-danger)">{error}</p>}
-      <div className="flex items-center justify-center gap-2">
-        <select
-          value={effectiveId}
-          onChange={(e) => setMuralId(e.target.value)}
-          aria-label="Mural to publish"
-          className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
-        >
-          {(murals ?? []).map((mural) => (
-            <option key={mural.id} value={mural.id}>
-              {mural.name}
-            </option>
-          ))}
-        </select>
-        <button
-          onClick={() => effectiveId && onPublish(effectiveId)}
-          disabled={!effectiveId || busy}
-          className="rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
-        >
-          {busy ? "Publishing…" : "Publish profile"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-const FEED_SETTING_ROWS: Array<{ key: FeedCategory; label: string }> = [
-  { key: "publications", label: "Publications" },
-  { key: "reading", label: "Reading activity" },
-  { key: "votes", label: "Votes" },
-  { key: "follows", label: "Follows" }
-];
-
-function OwnerControls({
-  busy,
-  currentMuralId,
-  feedSettings,
-  onSwitch,
-  onUnpublish,
-  onSaveSettings
-}: {
-  busy: boolean;
-  currentMuralId: string | null;
-  feedSettings?: FeedSettings;
-  onSwitch: (muralId: string) => void;
-  onUnpublish: () => void;
-  onSaveSettings: (settings: FeedSettings) => void;
-}) {
-  const { data: murals } = useMurals();
-  const [open, setOpen] = useState(false);
-  const [confirming, setConfirming] = useState(false);
-  const [muralId, setMuralId] = useState<string>(currentMuralId ?? "");
-  const [next, setNext] = useState<FeedSettings>(feedSettings ?? DEFAULT_FEED_SETTINGS);
-  const sectionLabel = "px-3 pt-4 pb-2 text-[11px] font-semibold tracking-wider text-(--color-text-dim) uppercase";
-  return (
-    <>
-      <button
-        onClick={() => setOpen(true)}
-        className="shrink-0 rounded-full border border-(--color-border) bg-(--color-surface) px-4 py-1.5 text-sm font-semibold hover:border-(--color-accent)"
-      >
-        Manage profile
-      </button>
-      {open && (
-        <Sheet title="Manage profile" onClose={() => setOpen(false)}>
-          <p className={sectionLabel}>Profile mural</p>
-          <div className="flex items-center gap-2 px-3">
-            <select
-              value={muralId}
-              onChange={(e) => setMuralId(e.target.value)}
-              aria-label="Profile mural"
-              className="min-w-0 flex-1 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
-            >
-              {(murals ?? []).map((mural) => (
-                <option key={mural.id} value={mural.id}>
-                  {mural.name}
-                </option>
-              ))}
-            </select>
-            <button
-              onClick={() => muralId && muralId !== currentMuralId && onSwitch(muralId)}
-              disabled={busy || !muralId || muralId === currentMuralId}
-              className="rounded-lg border border-(--color-border) px-3 py-2 text-sm font-semibold hover:border-(--color-accent) disabled:opacity-50"
-            >
-              {busy ? "Working…" : "Switch"}
-            </button>
-          </div>
-          <p className={sectionLabel}>Shown in your feed</p>
-          {FEED_SETTING_ROWS.map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => setNext((settings) => ({ ...settings, [key]: !settings[key] }))}
-              aria-pressed={next[key]}
-              className={`flex min-h-12 w-full items-center justify-between rounded-lg px-3 text-left text-[15px] hover:bg-(--color-surface-hover) ${
-                next[key] ? "" : "text-(--color-text-dim)"
-              }`}
-            >
-              {label}
-              {next[key] && (
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 6 9 17l-5-5" />
-                </svg>
-              )}
-            </button>
-          ))}
-          <div className="px-3 pt-2">
-            <button
-              onClick={() => onSaveSettings(next)}
-              disabled={busy}
-              className="w-full rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
-            >
-              {busy ? "Saving…" : "Save feed settings"}
-            </button>
-          </div>
-          <div className="mt-4 border-t border-(--color-border) p-3">
-            {confirming ? (
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm text-(--color-text-dim)">Hide your profile from the community?</span>
-                <span className="flex shrink-0 items-center gap-2">
-                  <button onClick={() => setConfirming(false)} className="px-2 py-1.5 text-sm text-(--color-text-dim) hover:text-(--color-text)">
-                    Cancel
-                  </button>
-                  <button onClick={onUnpublish} disabled={busy} className="rounded-lg bg-(--color-danger) px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50">
-                    Unpublish
-                  </button>
-                </span>
-              </div>
-            ) : (
-              <button onClick={() => setConfirming(true)} className="text-sm font-semibold text-(--color-danger)">
-                Unpublish profile
-              </button>
-            )}
-          </div>
-        </Sheet>
-      )}
-    </>
-  );
 }
 
 function FollowControls({
