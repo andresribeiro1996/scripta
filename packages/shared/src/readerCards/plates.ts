@@ -4,7 +4,10 @@ const SANS = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
 export const PAPER = "#f1eadb";
 export const REVERSED_LINE = "#efe5d1";
 
-export const INKS = {
+export type IdentityKey = "carto" | "anno" | "lamp" | "star" | "arch" | "corr" | "way" | "loyal";
+type Point = [number, number];
+
+export const INKS: Record<IdentityKey | "graph", readonly [string, string, string]> = {
   carto: ["Prussian", "#1f4e6b", "#13324a"],
   anno: ["Oxblood", "#7a2e2a", "#4a1c19"],
   lamp: ["Bottle", "#2f5a3d", "#173524"],
@@ -16,7 +19,7 @@ export const INKS = {
   graph: ["Graphite", "#3b3a38", "#2a2826"],
 };
 
-export const PLATES = [
+export const PLATES: readonly { key: IdentityKey; name: string; epithet: string; numeral: string }[] = [
   { key: "carto", name: "Cartographer", epithet: "follows a world to its last page", numeral: "I" },
   { key: "anno", name: "Annotator", epithet: "reads with a pencil", numeral: "II" },
   { key: "lamp", name: "Lamplighter", epithet: "keeps company with mysteries", numeral: "III" },
@@ -30,12 +33,12 @@ export const PLATES = [
 const STEP = 0.9;
 const SHADOW = [-Math.SQRT1_2, Math.SQRT1_2];
 
-const dist = (a, b) => Math.hypot(b[0] - a[0], b[1] - a[1]);
-const lerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
-const quad = (a, c, b, t) => [(1 - t) ** 2 * a[0] + 2 * (1 - t) * t * c[0] + t * t * b[0], (1 - t) ** 2 * a[1] + 2 * (1 - t) * t * c[1] + t * t * b[1]];
-const cubic = (a, c1, c2, b, t) => [0, 1].map((k) => (1 - t) ** 3 * a[k] + 3 * (1 - t) ** 2 * t * c1[k] + 3 * (1 - t) * t * t * c2[k] + t ** 3 * b[k]);
+const dist = (a: Point, b: Point) => Math.hypot(b[0] - a[0], b[1] - a[1]);
+const lerp = (a: Point, b: Point, t: number): Point => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+const quad = (a: Point, c: Point, b: Point, t: number): Point => [(1 - t) ** 2 * a[0] + 2 * (1 - t) * t * c[0] + t * t * b[0], (1 - t) ** 2 * a[1] + 2 * (1 - t) * t * c[1] + t * t * b[1]];
+const cubic = (a: Point, c1: Point, c2: Point, b: Point, t: number): Point => [0, 1].map((k) => (1 - t) ** 3 * a[k] + 3 * (1 - t) ** 2 * t * c1[k] + 3 * (1 - t) * t * t * c2[k] + t ** 3 * b[k]) as Point;
 
-function arcSegment(p0, rx, ry, degrees, largeArc, sweep, p1) {
+function arcSegment(p0: Point, rx: number, ry: number, degrees: number, largeArc: number, sweep: number, p1: Point) {
   const phi = (degrees * Math.PI) / 180, cos = Math.cos(phi), sin = Math.sin(phi);
   const dx = (p0[0] - p1[0]) / 2, dy = (p0[1] - p1[1]) / 2;
   const x1 = cos * dx + sin * dy, y1 = -sin * dx + cos * dy;
@@ -47,13 +50,13 @@ function arcSegment(p0, rx, ry, degrees, largeArc, sweep, p1) {
   const coef = (largeArc === sweep ? -1 : 1) * Math.sqrt(Math.max(0, num / den));
   const cx1 = (coef * rx * y1) / ry, cy1 = (-coef * ry * x1) / rx;
   const cx = cos * cx1 - sin * cy1 + (p0[0] + p1[0]) / 2, cy = sin * cx1 + cos * cy1 + (p0[1] + p1[1]) / 2;
-  const angle = (ux, uy, vx, vy) => Math.atan2(ux * vy - uy * vx, ux * vx + uy * vy);
+  const angle = (ux: number, uy: number, vx: number, vy: number) => Math.atan2(ux * vy - uy * vx, ux * vx + uy * vy);
   const start = angle(1, 0, (x1 - cx1) / rx, (y1 - cy1) / ry);
   let delta = angle((x1 - cx1) / rx, (y1 - cy1) / ry, (-x1 - cx1) / rx, (-y1 - cy1) / ry);
   if (!sweep && delta > 0) delta -= 2 * Math.PI;
   if (sweep && delta < 0) delta += 2 * Math.PI;
   return {
-    at: (t) => {
+    at: (t: number): Point => {
       const a = start + delta * t, x = rx * Math.cos(a), y = ry * Math.sin(a);
       return [cx + cos * x - sin * y, cy + sin * x + cos * y];
     },
@@ -61,16 +64,16 @@ function arcSegment(p0, rx, ry, degrees, largeArc, sweep, p1) {
   };
 }
 
-function subpaths(d) {
+function subpaths(d: string): { points: Point[]; closed: boolean }[] {
   const tokens = d.match(/[a-zA-Z]|[-+]?(?:\d*\.\d+|\d+\.?)(?:[eE][-+]?\d+)?/g) ?? [];
-  const out = [];
-  let i = 0, cmd = "", cur = [0, 0], start = [0, 0], control = null, points = null;
+  const out: { points: Point[]; closed: boolean }[] = [];
+  let i = 0, cmd = "", cur: Point = [0, 0], start: Point = [0, 0], control: Point | null = null, points: Point[] | null = null;
   const num = () => Number(tokens[i++]);
-  const add = (at, length) => {
+  const add = (at: (t: number) => Point, length: number) => {
     const n = Math.max(2, Math.ceil(length / STEP));
-    for (let k = 1; k <= n; k++) points.push(at(k / n));
+    for (let k = 1; k <= n; k++) points!.push(at(k / n));
   };
-  const flush = (closed) => {
+  const flush = (closed: boolean) => {
     if (points && closed) {
       add((t) => lerp(cur, start, t), dist(cur, start));
       if (dist(points[0], points[points.length - 1]) < 0.01) points.pop();
@@ -103,13 +106,13 @@ function subpaths(d) {
       add((t) => lerp(from, cur, t), dist(from, cur));
       control = null;
     } else if (upper === "Q" || upper === "T") {
-      const c = upper === "Q" ? [num() + ox, num() + oy] : control ? [2 * from[0] - control[0], 2 * from[1] - control[1]] : from;
+      const c: Point = upper === "Q" ? [num() + ox, num() + oy] : control ? [2 * from[0] - control[0], 2 * from[1] - control[1]] : from;
       cur = [num() + ox, num() + oy];
       const to = cur;
       add((t) => quad(from, c, to, t), dist(from, c) + dist(c, to));
       control = c;
     } else if (upper === "C") {
-      const c1 = [num() + ox, num() + oy], c2 = [num() + ox, num() + oy];
+      const c1: Point = [num() + ox, num() + oy], c2: Point = [num() + ox, num() + oy];
       cur = [num() + ox, num() + oy];
       const to = cur;
       add((t) => cubic(from, c1, c2, to, t), dist(from, c1) + dist(c1, c2) + dist(c2, to));
@@ -128,13 +131,13 @@ function subpaths(d) {
   return out;
 }
 
-const round = (n) => Math.round(n * 10) / 10;
-const pointList = (points) => points.map(([x, y]) => `${round(x)} ${round(y)}`).join("L");
-const lengths = (points) => points.reduce((acc, p, i) => [...acc, i ? acc[i - 1] + dist(points[i - 1], p) : 0], []);
+const round = (n: number) => Math.round(n * 10) / 10;
+const pointList = (points: Point[]) => points.map(([x, y]) => `${round(x)} ${round(y)}`).join("L");
+const lengths = (points: Point[]) => points.reduce<number[]>((acc, p, i) => [...acc, i ? acc[i - 1] + dist(points[i - 1], p) : 0], []);
 
-function tangents(points, closed) {
+function tangents(points: Point[], closed: boolean): Point[] {
   const n = points.length;
-  return points.map((_, i) => {
+  return points.map((_, i): Point => {
     const a = points[closed ? (i - 1 + n) % n : Math.max(0, i - 1)];
     const b = points[closed ? (i + 1) % n : Math.min(n - 1, i + 1)];
     const length = dist(a, b) || 1;
@@ -142,14 +145,14 @@ function tangents(points, closed) {
   });
 }
 
-function ribbon(points, widths, closed = false) {
+function ribbon(points: Point[], widths: number[], closed = false): string {
   const tangent = tangents(points, closed);
-  const side = (s) => points.map(([x, y], i) => [x - (s * tangent[i][1] * widths[i]) / 2, y + (s * tangent[i][0] * widths[i]) / 2]);
+  const side = (s: number): Point[] => points.map(([x, y], i) => [x - (s * tangent[i][1] * widths[i]) / 2, y + (s * tangent[i][0] * widths[i]) / 2]);
   const left = side(1), right = side(-1).reverse();
   return closed ? `M${pointList(left)}ZM${pointList(right)}Z` : `M${pointList([...left, ...right])}Z`;
 }
 
-function shadowWidths(points, min, max) {
+function shadowWidths(points: Point[], min: number, max: number): number[] {
   const area = points.reduce((sum, [x, y], i) => {
     const [x2, y2] = points[(i + 1) % points.length];
     return sum + x * y2 - x2 * y;
@@ -158,12 +161,12 @@ function shadowWidths(points, min, max) {
   return tangents(points, true).map(([tx, ty]) => min + (max - min) * Math.max(0, sign * ty * SHADOW[0] - sign * tx * SHADOW[1]));
 }
 
-function swellWidths(points, min, max) {
+function swellWidths(points: Point[], min: number, max: number): number[] {
   const s = lengths(points), total = s[s.length - 1] || 1;
   return s.map((d) => min + (max - min) * Math.sin((Math.PI * d) / total) ** 0.7);
 }
 
-function inside([x, y], polygon) {
+function inside([x, y]: Point, polygon: Point[]): boolean {
   let hit = false;
   for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
     const [xi, yi] = polygon[i], [xj, yj] = polygon[j];
@@ -172,9 +175,9 @@ function inside([x, y], polygon) {
   return hit;
 }
 
-function runsInside(points, polygon) {
-  const runs = [];
-  let run = [];
+function runsInside(points: Point[], polygon: Point[]): Point[][] {
+  const runs: Point[][] = [];
+  let run: Point[] = [];
   for (const p of points) {
     if (inside(p, polygon)) run.push(p);
     else {
@@ -186,15 +189,15 @@ function runsInside(points, polygon) {
   return runs;
 }
 
-const inkPath = (d, w) => subpaths(d)
+const inkPath = (d: string, w: number) => subpaths(d)
   .map(({ points, closed }) => closed ? ribbon(points, shadowWidths(points, 0.45 * w, 1.75 * w), true) : ribbon(points, swellWidths(points, 0.15 * w, 1.45 * w)))
   .join("");
 
-const ink = (d, w, attrs = "") => `<path class="pf" d="${inkPath(d, w)}"${attrs}/>`;
-const cut = (d, w, attrs = "") => `<path class="pgf" d="${inkPath(d, w)}"${attrs}/>`;
-const form = (d, w, attrs = "") => `<path class="pgf" d="${d}"${attrs}/>${ink(d, w, attrs)}`;
+const ink = (d: string, w: number, attrs = "") => `<path class="pf" d="${inkPath(d, w)}"${attrs}/>`;
+const cut = (d: string, w: number, attrs = "") => `<path class="pgf" d="${inkPath(d, w)}"${attrs}/>`;
+const form = (d: string, w: number, attrs = "") => `<path class="pgf" d="${d}"${attrs}/>${ink(d, w, attrs)}`;
 
-function hatch(d, max, clip, weight = () => max) {
+function hatch(d: string, max: number, clip?: string, weight: (p: Point) => number = () => max): string {
   const polygon = clip ? subpaths(clip)[0].points : null;
   let out = "";
   for (const { points } of subpaths(d)) {
@@ -207,12 +210,12 @@ function hatch(d, max, clip, weight = () => max) {
   return `<path class="pf" d="${out}"/>`;
 }
 
-const rect = (x, y, w, h) => `M${x} ${y}H${x + w}V${y + h}H${x}Z`;
-const ellipse = (cx, cy, rx, ry) => `M${cx - rx} ${cy}A${rx} ${ry} 0 1 0 ${cx + rx} ${cy}A${rx} ${ry} 0 1 0 ${cx - rx} ${cy}Z`;
-const circle = (cx, cy, r) => ellipse(cx, cy, r, r);
-const fourPointStar = (x, y, r = 4) => `M${x} ${y - r}L${x + r / 4} ${y - r / 4}L${x + r} ${y}L${x + r / 4} ${y + r / 4}L${x} ${y + r}L${x - r / 4} ${y + r / 4}L${x - r} ${y}L${x - r / 4} ${y - r / 4}Z`;
+const rect = (x: number, y: number, w: number, h: number) => `M${x} ${y}H${x + w}V${y + h}H${x}Z`;
+const ellipse = (cx: number, cy: number, rx: number, ry: number) => `M${cx - rx} ${cy}A${rx} ${ry} 0 1 0 ${cx + rx} ${cy}A${rx} ${ry} 0 1 0 ${cx - rx} ${cy}Z`;
+const circle = (cx: number, cy: number, r: number) => ellipse(cx, cy, r, r);
+const fourPointStar = (x: number, y: number, r = 4) => `M${x} ${y - r}L${x + r / 4} ${y - r / 4}L${x + r} ${y}L${x + r / 4} ${y + r / 4}L${x} ${y + r}L${x - r / 4} ${y + r / 4}L${x - r} ${y}L${x - r / 4} ${y - r / 4}Z`;
 
-export const emblems = {
+export const emblems: Record<IdentityKey | "none", () => string> = {
   carto: () => {
     const graticule = [ellipse(125, 134, 55, 20), ellipse(125, 134, 55, 40), ellipse(125, 134, 20, 55), ellipse(125, 134, 40, 55), "M70 134H180M125 79V189"].map((d) => ink(d, 0.5));
     const s = 21.2;
@@ -245,7 +248,7 @@ export const emblems = {
   lamp: () => {
     const rays = [0, 180, -20, -160, 20, 160, -45, -135].map((deg) => {
       const t = (deg * Math.PI) / 180;
-      const p = (r) => [125 + r * Math.cos(t), 126 + r * Math.sin(t)].map((n) => n.toFixed(1)).join(" ");
+      const p = (r: number) => [125 + r * Math.cos(t), 126 + r * Math.sin(t)].map((n) => n.toFixed(1)).join(" ");
       return `M${p(29)}L${p(39)}`;
     }).join("");
     return [
@@ -264,7 +267,7 @@ export const emblems = {
   star: () => {
     const crescent = "M121.96 90.19A40 40 0 1 0 152.22 150.71A34 34 0 1 1 121.96 90.19Z";
     const belly = [Math.cos((153.5 * Math.PI) / 180), Math.sin((153.5 * Math.PI) / 180)];
-    const shade = ([x, y]) => {
+    const shade = ([x, y]: Point) => {
       const dx = x - 118, dy = y - 130, r = Math.hypot(dx, dy) || 1;
       const tone = 0.2 + 0.6 * (r / 40) ** 2 + (0.35 * (dx * belly[0] + dy * belly[1])) / r;
       return 0.16 + Math.min(1, Math.max(0.1, tone));
@@ -359,7 +362,19 @@ export const emblems = {
   none: () => `<circle class="pl" cx="125" cy="134" r="38" stroke-width=".8" stroke-dasharray="2 4"/><text class="pt" x="125" y="137.5" text-anchor="middle" font-size="9" letter-spacing="2.4" font-family="${SANS}">NOT YET</text>`,
 };
 
-export function plate({ key, emblem = key, name, eyebrow = "THE", epithet, numeral, reader = "EXAMPLE READER", width = 250, label }) {
+interface PlateOptions {
+  key: IdentityKey | "none";
+  emblem?: IdentityKey | "none";
+  name: string;
+  eyebrow?: string;
+  epithet: string;
+  numeral: string;
+  reader?: string;
+  width?: number;
+  label?: string;
+}
+
+export function plate({ key, emblem = key, name, eyebrow = "THE", epithet, numeral, reader = "EXAMPLE READER", width = 250, label }: PlateOptions): string {
   const corners = [[16, 16], [234, 16], [16, 334], [234, 334]].map(([x, y]) => `M${x} ${y - 4.5}L${x + 4.5} ${y}L${x} ${y + 4.5}L${x - 4.5} ${y}Z`).join("");
   return `<svg xmlns="http://www.w3.org/2000/svg" class="plate id-${key}" viewBox="0 0 250 350" width="${width}" height="${+(width * 1.4).toFixed(2)}" role="img" aria-label="${label ?? `${eyebrow.toLowerCase()} ${name} identity plate`}">
 <rect class="pg" width="250" height="350" rx="4"/>
@@ -380,7 +395,7 @@ ${emblems[emblem]()}
 </svg>`;
 }
 
-const glyphShapes = {
+const glyphShapes: Record<IdentityKey, string> = {
   carto: `<path class="gg" d="M24 7.5L27.2 20.8L40.5 24L27.2 27.2L24 40.5L20.8 27.2L7.5 24L20.8 20.8Z"/><path class="gg" d="M24 24L31.5 16.5L28 24ZM24 24L31.5 31.5L24 28ZM24 24L16.5 31.5L20 24ZM24 24L16.5 16.5L24 20Z" opacity=".55"/><circle class="gi" cx="24" cy="24" r="2"/>`,
   anno: `<path class="gg" d="M35 9.5Q34 26 18.5 34Q20.5 18 35 9.5Z"/><path class="gs" d="M35.5 9L13.5 38.5" stroke-width="1.6" stroke-linecap="round"/><path class="gs" d="M31 37h-2.5v-6" stroke-width="1.4" fill="none"/>`,
   lamp: `<circle class="gs" cx="24" cy="10.5" r="2.4" stroke-width="1.3" fill="none"/><path class="gg" d="M17.5 17H30.5L28 13.2H20Z"/><rect class="gg" x="17" y="17" width="14" height="15.5"/><path class="gi" d="M24 19.5C27 23.5 27 27.2 24 30.2C21 27.2 21 23.5 24 19.5Z"/><path class="gg" d="M15.5 32.5H32.5L30.5 36H17.5Z"/>`,
@@ -391,6 +406,6 @@ const glyphShapes = {
   loyal: `<g transform="translate(24 23.5) rotate(-22) scale(.36)"><path class="gg" d="M-18-5Q-12-30 12-44Q2-24-2-4ZM-18 5Q-12 30 12 44Q2 24-2 4ZM2-3L44-15L15 1L44 17L2 5ZM-40-1Q-20-9 6-3Q11 1 6 5Q-18 9-40 3Z"/><circle class="gg" cx="-35" cy="1" r="7"/></g>`,
 };
 
-export const glyph = (key, size, extra = "") => `<svg xmlns="http://www.w3.org/2000/svg" class="glyph id-${key} ${extra}" viewBox="0 0 48 48" width="${size}" height="${size}" aria-hidden="true"><circle class="gd" cx="24" cy="24" r="23.5"/><circle class="gr" cx="24" cy="24" r="20.5" fill="none" stroke-width=".8"/>${glyphShapes[key]}</svg>`;
+export const glyph = (key: IdentityKey, size: number, extra = "") => `<svg xmlns="http://www.w3.org/2000/svg" class="glyph id-${key} ${extra}" viewBox="0 0 48 48" width="${size}" height="${size}" aria-hidden="true"><circle class="gd" cx="24" cy="24" r="23.5"/><circle class="gr" cx="24" cy="24" r="20.5" fill="none" stroke-width=".8"/>${glyphShapes[key]}</svg>`;
 
-export const printStyle = (ground, line) => `<style>.pg,.pgf,.gg{fill:${ground}}.pl{stroke:${line};fill:none}.pf,.pt,.gd,.gi{fill:${line}}.pgl{fill:${ground};stroke:${line}}.pgs,.gr,.gs{stroke:${ground};fill:none}.gk{stroke:${line};fill:none}</style>`;
+export const printStyle = (ground: string, line: string) => `<style>.pg,.pgf,.gg{fill:${ground}}.pl{stroke:${line};fill:none}.pf,.pt,.gd,.gi{fill:${line}}.pgl{fill:${ground};stroke:${line}}.pgs,.gr,.gs{stroke:${ground};fill:none}.gk{stroke:${line};fill:none}</style>`;
