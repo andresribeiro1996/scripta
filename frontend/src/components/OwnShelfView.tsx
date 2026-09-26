@@ -47,6 +47,7 @@ export function OwnShelfView({ username }: { username: string }) {
       await action();
       await queryClient.invalidateQueries({ queryKey: ["community", "own-profile"] });
       await queryClient.invalidateQueries({ queryKey: ["community", "profile", username] });
+      await queryClient.invalidateQueries({ queryKey: ["community", "activity", username] });
       return true;
     } catch {
       setError("Something went wrong. Try again.");
@@ -141,7 +142,7 @@ export function OwnShelfView({ username }: { username: string }) {
               disabled={busy || !ownData.muralId}
               className="rounded-full bg-(--color-accent) px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
             >
-              {busy ? "Publishing…" : "Publish…"}
+              Publish…
             </button>
           )}
           <OwnerControls
@@ -216,7 +217,11 @@ function OwnerControls({
   return (
     <>
       <button
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          setMuralId(currentMuralId ?? murals?.[0]?.id ?? "");
+          setNext(feedSettings ?? DEFAULT_FEED_SETTINGS);
+          setOpen(true);
+        }}
         className="shrink-0 rounded-full border border-(--color-border) bg-(--color-surface) px-4 py-1.5 text-sm font-semibold hover:border-(--color-accent)"
       >
         Manage profile
