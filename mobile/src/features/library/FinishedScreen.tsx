@@ -156,7 +156,7 @@ export function FinishedScreen({ book, before, onClose }: { book: Record<string,
       </View>
 
       <View style={styles.section}>
-        <Text style={[typography.title, { color: colors.text }]}>A thought to keep</Text>
+        <Text style={[typography.title, { color: colors.text }]}>A thought to keep.</Text>
         <Input
           multiline
           numberOfLines={4}
@@ -168,7 +168,7 @@ export function FinishedScreen({ book, before, onClose }: { book: Record<string,
 
       {opponentBook && !favouriteChoiceMade ? (
         <View style={styles.section}>
-          <Text style={[typography.title, { color: colors.text }]}>Against your favourite</Text>
+          <Text style={[typography.title, { color: colors.text }]}>Against your favourite.</Text>
           <View style={styles.opponentRow}>
             <View style={styles.opponentItem}>
               <View style={[styles.opponentCover, { backgroundColor: colors.border }]}>
