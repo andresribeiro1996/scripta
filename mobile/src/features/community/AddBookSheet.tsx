@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { router, useGlobalSearchParams, usePathname } from "expo-router";
 import { StyleSheet, Text, View } from "react-native";
+import { localDay } from "@scripta/shared";
 import { useAuth } from "../../core/auth";
 import { Button, Sheet, Toast, dynamicType, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "../arena/BookCover";
@@ -43,7 +44,7 @@ export function AddBookSheet({
     setBusyStatus(readStatus);
     setToast(null);
     try {
-      const { updated } = await addBookToLibrary(toRecommendation(book, readStatus));
+      const { updated } = await addBookToLibrary({ ...toRecommendation(book, readStatus), day: localDay() });
       setToast({ message: updated ? "Updated in your library." : "Added to your library.", tone: "success" });
       setTimeout(onClose, 1600);
     } catch {

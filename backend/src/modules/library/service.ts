@@ -3,7 +3,7 @@
 // modules/auth/service.ts.
 
 import { randomUUID } from "node:crypto";
-import { buildManualBook } from "@scripta/shared";
+import { buildManualBook, localDay, setReadStatus } from "@scripta/shared";
 import type { BookRecommendationInput } from "@scripta/shared/community";
 import { LibraryConflictError, NoLibraryDocumentError } from "./domain/errors.js";
 import type { LibraryRepository } from "./domain/ports.js";
@@ -146,12 +146,7 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
       if (match) {
         const key = contentId(match);
         if (Number(match.ReadStatus ?? 0) === input.readStatus) return { key, updated: false };
-        const updatedBook = {
-          ...match,
-          ReadStatus: input.readStatus,
-          ___PercentRead: input.readStatus === 2 ? 100 : 0,
-          DateLastRead: input.readStatus === 2 ? new Date().toISOString().slice(0, 10) : null
-        };
+        const updatedBook = setReadStatus(match, input.readStatus, input.day ?? localDay());
         const saved = repo.upsertDocument(userId, JSON.stringify({ ...doc, books: books.map((b) => (b === match ? updatedBook : b)) }), row?.updated_at);
         if (!saved) throw new LibraryConflictError();
         if (input.readStatus === 2 && emitBookEvents) {

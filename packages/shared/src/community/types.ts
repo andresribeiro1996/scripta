@@ -100,4 +100,5 @@ export interface BookRecommendationInput {
   isbn?: string | null;
   coverUrl?: string | null;
   readStatus: 0 | 1 | 2;
+  day?: string;
 }
