@@ -1,3 +1,4 @@
+import { RankingMethodSelector } from "./RankingMethodSelector";
 import { useEffect, useRef, useState } from "react";
 import { aggregate, AGGREGATION_MODES, type AggregationMode, type HistogramCell } from "@scripta/shared";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -75,7 +76,7 @@ export function TierlistResults({ histogram, tiers, pool, books, ballotCount, el
       {unrankedBooks.length ? <View style={styles.footer}><Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.textDim }]}>No votes · {unrankedBooks.length}</Text>{renderBooks(unrankedBooks)}</View> : null}
     </ScrollView>
     <View style={[styles.dock, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <View accessibilityRole="radiogroup" accessibilityLabel="Ranking method" style={[styles.methods, { backgroundColor: colors.background }]}>{AGGREGATION_MODES.map((item) => <Pressable key={item.mode} accessibilityRole="radio" accessibilityState={{ checked: mode === item.mode }} onPress={() => onModeChange?.(item.mode)} style={[styles.method, mode === item.mode && { backgroundColor: colors.accentSoft }]}><Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.strong, { color: mode === item.mode ? colors.text : colors.textDim }]}>{item.label === "Most-voted" ? "Most voted" : item.label}</Text></Pressable>)}</View>
+      <RankingMethodSelector mode={mode} onChange={(next) => onModeChange?.(next)} />
       <Pressable accessibilityRole="button" accessibilityLabel="About ranking methods" onPress={() => setExplain(true)} style={styles.infoButton}><Text {...dynamicType} style={[typography.body, { color: colors.accent }]}>ⓘ</Text></Pressable>
     </View>
     <Sheet visible={explain} title="Ranking methods" onClose={() => setExplain(false)}><View style={styles.detailBody}>{AGGREGATION_MODES.map((item) => <Text key={item.mode} {...dynamicType} style={[typography.body, { color: colors.text }]}><Text style={styles.strong}>{item.label}: </Text>{descriptions[item.mode]} Ties favour the higher tier.</Text>)}</View></Sheet>
@@ -109,8 +110,6 @@ const styles = StyleSheet.create({
   footer: { gap: spacing.xs, paddingTop: spacing.sm },
   badge: { position: "absolute", bottom: 2, alignSelf: "center", paddingHorizontal: 3, borderRadius: radii.sm },
   dock: { flexDirection: "row", alignItems: "center", gap: spacing.xs, padding: spacing.xs, borderWidth: 1, borderRadius: radii.lg },
-  methods: { flex: 1, flexDirection: "row", borderRadius: radii.md, padding: 2 },
-  method: { flex: 1, minWidth: 0, minHeight: 44, alignItems: "center", justifyContent: "center", borderRadius: radii.sm },
   infoButton: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
   detailBody: { gap: spacing.md, paddingBottom: spacing.md },
   detailHead: { flexDirection: "row", gap: spacing.md },

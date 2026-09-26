@@ -1,3 +1,4 @@
+import { RankingMethodSelector } from "./RankingMethodSelector";
 import { useEffect, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ballotBoard, blankBoard, toPlacements, type AggregationMode, type TierlistData } from "@scripta/shared";
@@ -147,7 +148,7 @@ export function VoteTierlistScreen({ code, startInRank = false }: { code: string
       />
     </Sheet>
     {addBook ? <AddBookSheet book={{ title: addBook.title, author: addBook.author ?? "", isbn: addBook.isbn ?? null, coverUrl: addBook.coverUrl ?? null }} onClose={() => setAddBook(null)} /> : null}
-    <ContentShareSheet visible={sharing} onClose={() => setSharing(false)} title={board.name} description={dirty && shareView === "board" ? "Image includes unsubmitted votes. Sharing it won't submit them." : undefined} url={shareUrl} linkError={linkError} onRetryLink={() => setLinkAttempt((value) => value + 1)} imageReady={imageReady && (shareView === "community" ? hasCommunity : hasMyBoard)} previewControls={hasCommunity && hasMyBoard ? <View style={styles.shareOptions}><Button label="My ranking" variant={shareView === "board" ? "primary" : "secondary"} onPress={() => { if (shareView !== "board") { setImageReady(false); setShareView("board"); } }} /><Button label="Community ranking" variant={shareView === "community" ? "primary" : "secondary"} onPress={() => { if (shareView !== "community") { setImageReady(false); setShareView("community"); } }} /></View> : undefined}>
+    <ContentShareSheet visible={sharing} onClose={() => setSharing(false)} title={board.name} url={shareUrl} linkError={linkError} onRetryLink={() => setLinkAttempt((value) => value + 1)} imageReady={imageReady && (shareView === "community" ? hasCommunity : hasMyBoard)} previewControls={<>{hasCommunity && hasMyBoard ? <View style={styles.shareOptions}><Button label="My ranking" variant={shareView === "board" ? "primary" : "secondary"} onPress={() => { if (shareView !== "board") { setImageReady(false); setShareView("board"); } }} /><Button label="Community" variant={shareView === "community" ? "primary" : "secondary"} onPress={() => { if (shareView !== "community") { setImageReady(false); setShareView("community"); } }} /></View> : undefined}{shareView === "community" ? <View style={{ flexDirection: "row" }}><RankingMethodSelector mode={resultMode} onChange={(next) => { if (next !== resultMode) { setImageReady(false); setResultMode(next); } }} /></View> : null}</>}>
       {hasCommunity || hasMyBoard ? <TierlistShareImage key={`${shareView}:${resultMode}`} title={board.name} data={shareView === "community" ? blankBoard(cleanBoard) : data} books={books} community={shareView === "community"} histogram={histogram ?? undefined} ballotCount={board.ballotCount} mode={resultMode} onReadyChange={setImageReady} /> : null}
     </ContentShareSheet>
   </Screen>;
@@ -162,5 +163,5 @@ const styles = StyleSheet.create({
   list: { flexGrow: 0 },
   listContent: { gap: spacing.md, paddingBottom: spacing.md },
   bookRow: { gap: spacing.xs },
-  shareOptions: { flexDirection: "row", gap: spacing.sm },
+  shareOptions: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: spacing.sm },
 });

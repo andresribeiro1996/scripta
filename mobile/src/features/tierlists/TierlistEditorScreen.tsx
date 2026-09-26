@@ -1,3 +1,4 @@
+import { RankingMethodSelector } from "./RankingMethodSelector";
 import { useEffect, useState } from "react";
 import { Stack, router } from "expo-router";
 import { ballotBoard, bookKey, createTier, filterBooks, type AggregationMode, type TierlistData } from "@scripta/shared";
@@ -160,7 +161,7 @@ export function TierlistEditorScreen({ tierlist, onUpdated, startInRank = false 
         <Button label="Members only" variant="secondary" loading={busy} onPress={() => void openCommunityVoting("members")} />
       </View>
     </Dialog>
-    <ContentShareSheet visible={sharing} onClose={() => setSharing(false)} title={current.name} description={dirty ? "Image includes unsaved changes. Sharing it won't save or publish them." : undefined} url={shareUrl} linkError={linkError} onRetryLink={() => setLinkAttempt((value) => value + 1)} onEnableLink={!frozen ? async () => { setSharing(false); setConfirmingVoting(true); } : undefined} enableLinkLabel="Open voting" imageReady={imageReady && shareDataReady && !shareDataError} previewControls={shareDataError ? <ErrorState body={shareDataError.message} actionLabel="Retry preview" onAction={() => { void (frozen ? board.refetch() : library.refetch()); if (frozen) { void results.refetch(); void myBallot.refetch(); } }} /> : frozen && results.data?.ballotCount ? <View style={styles.shareOptions}><Button label="My ranking" variant={shareView === "board" ? "primary" : "secondary"} onPress={() => { if (shareView !== "board") { setImageReady(false); setShareView("board"); } }} /><Button label="Community ranking" variant={shareView === "results" ? "primary" : "secondary"} onPress={() => { if (shareView !== "results") { setImageReady(false); setShareView("results"); } }} /></View> : undefined}>
+    <ContentShareSheet visible={sharing} onClose={() => setSharing(false)} title={current.name} description={dirty ? "Image includes unsaved changes. Sharing it won't save or publish them." : undefined} url={shareUrl} linkError={linkError} onRetryLink={() => setLinkAttempt((value) => value + 1)} onEnableLink={!frozen ? async () => { setSharing(false); setConfirmingVoting(true); } : undefined} enableLinkLabel="Open voting" imageReady={imageReady && shareDataReady && !shareDataError} previewControls={<>{shareDataError ? <ErrorState body={shareDataError.message} actionLabel="Retry preview" onAction={() => { void (frozen ? board.refetch() : library.refetch()); if (frozen) { void results.refetch(); void myBallot.refetch(); } }} /> : frozen && results.data?.ballotCount ? <View style={styles.shareOptions}><Button label="My ranking" variant={shareView === "board" ? "primary" : "secondary"} onPress={() => { if (shareView !== "board") { setImageReady(false); setShareView("board"); } }} /><Button label="Community" variant={shareView === "results" ? "primary" : "secondary"} onPress={() => { if (shareView !== "results") { setImageReady(false); setShareView("results"); } }} /></View> : undefined}{shareView === "results" ? <View style={{ flexDirection: "row" }}><RankingMethodSelector mode={resultMode} onChange={(next) => { if (next !== resultMode) { setImageReady(false); setResultMode(next); } }} /></View> : null}</>}>
       <TierlistShareImage key={`${shareView}:${resultMode}`} title={current.name} data={shareView === "results" && board.data ? { tiers: board.data.board.tiers.map((tier) => ({ ...tier, bookKeys: [] })), pool: board.data.board.pool } : boardData} books={books} community={shareView === "results"} histogram={results.data?.histogram} ballotCount={results.data?.ballotCount} mode={resultMode} onReadyChange={setImageReady} />
     </ContentShareSheet>
   </Screen>;
@@ -174,5 +175,5 @@ const styles = StyleSheet.create({
   picker: { maxHeight: 440 },
   bookRow: { minHeight: 48, justifyContent: "center", paddingVertical: spacing.sm },
   dialog: { gap: spacing.md },
-  shareOptions: { flexDirection: "row", gap: spacing.sm },
+  shareOptions: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: spacing.sm },
 });

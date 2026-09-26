@@ -27,7 +27,7 @@ type Props = {
 
 export function ContentShareSheet({ visible, onClose, title, description, url, children, previewControls, imageReady = true, onEnableLink, enableLinkLabel = "Create share link", onDisableLink, linkError, onRetryLink }: Props) {
   const { colors } = useTheme();
-  const { height, width } = useWindowDimensions();
+  const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const capture = useRef<View>(null);
   const size = useRef({ width: 0, height: 0 });
@@ -75,12 +75,12 @@ export function ContentShareSheet({ visible, onClose, title, description, url, c
     } finally { releaseCapture(uri); }
   }
 
-  return <BottomSheet isPresented={visible} onDismiss={() => { if (!busy) onClose(); }} snapPoints={view === "image" ? ["full"] : undefined} containerColor={colors.surface} contentPadding={0} shouldDismissOnBackPress={!busy} shouldDismissOnClickOutside={!busy}>
-    <RNHostView matchContents>
-      <View style={{ height: view === "image" ? height * 0.82 : Math.min(height * 0.82, 620), paddingHorizontal: spacing.xl, paddingTop: spacing.sm, paddingBottom: Math.max(insets.bottom, spacing.lg), gap: spacing.lg }}>
+  return <BottomSheet isPresented={visible} onDismiss={() => { if (!busy) onClose(); }} snapPoints={["full"]} containerColor={colors.surface} contentPadding={0} shouldDismissOnBackPress={!busy} shouldDismissOnClickOutside={!busy}>
+    <RNHostView>
+      <View style={{ width: Math.min(width, 560), alignSelf: "center", flexGrow: 1, height: 0, paddingHorizontal: spacing.xl, paddingTop: spacing.sm, paddingBottom: Math.max(insets.bottom, spacing.lg), gap: spacing.lg }}>
         <View style={styles.header}>
           {view !== "actions" ? <Pressable accessibilityRole="button" accessibilityLabel="Back to share options" accessibilityState={{ disabled: busy }} disabled={busy} onPress={() => { setView("actions"); setError(null); setNotice(null); }} style={({ pressed }) => [styles.iconAction, { backgroundColor: pressed ? colors.border : colors.background, opacity: busy ? 0.5 : 1 }]}><Icon name="back" size={20} color={colors.text} /></Pressable> : null}
-          <Text accessibilityRole="header" {...dynamicType} style={[typography.title, { color: colors.text, flex: 1, fontWeight: "600" }]}>{view === "image" ? "Image preview" : view === "qr" ? "Scan to open" : "Share your creation"}</Text>
+          {view === "actions" ? <View style={{ flex: 1 }} /> : <Text accessibilityRole="header" {...dynamicType} style={[typography.title, { color: colors.text, flex: 1, textAlign: "center", fontWeight: "600" }]}>{view === "image" ? "Image preview" : "Scan to open"}</Text>}
           <Pressable accessibilityRole="button" accessibilityLabel="Close share sheet" accessibilityState={{ disabled: busy }} disabled={busy} onPress={onClose} style={({ pressed }) => [styles.iconAction, { backgroundColor: pressed ? colors.border : colors.background, opacity: busy ? 0.5 : 1 }]}><Icon name="close" size={18} color={colors.textDim} /></Pressable>
         </View>
         {view === "image" ? <>
@@ -103,7 +103,7 @@ export function ContentShareSheet({ visible, onClose, title, description, url, c
           </View>
         </> : <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: spacing.lg, paddingBottom: spacing.sm }}>
           <View style={{ gap: spacing.sm, paddingVertical: spacing.sm }}>
-            <Text numberOfLines={3} selectable {...dynamicType} style={[typography.heading, { color: colors.text, fontWeight: "700" }]}>{title}</Text>
+            <Text numberOfLines={3} {...dynamicType} style={[typography.heading, { color: colors.text, fontWeight: "700" }]}>{title}</Text>
             <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{view === "qr" ? "Let someone nearby scan this with their camera." : children ? "A picture to post. A link to explore." : "Invite someone to explore and take part."}</Text>
           </View>
           {description ? <View style={[styles.note, { backgroundColor: colors.background }]}><Text style={[typography.caption, { color: colors.textDim }]}>{description}</Text></View> : null}
