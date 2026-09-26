@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { bookKey, buildDashboardCards, digestHeading, digestTarget, resolveQuote } from "@scripta/shared";
 import { useDashboard } from "../hooks/useDashboard";
 import { useLibrary } from "../hooks/useLibrary";
@@ -13,6 +13,7 @@ import { resolveLibraryStyle } from "../lib/libraryStyle";
 const button = "inline-flex min-h-11 items-center justify-center rounded-lg border border-(--color-border) px-4 py-2 text-sm hover:bg-(--color-surface-hover) disabled:opacity-50";
 
 export function HomePage() {
+  const navigate = useNavigate();
   const { session } = useAuth();
   const dashboard = useDashboard();
   const library = useLibrary();
@@ -41,7 +42,7 @@ export function HomePage() {
               return <section key={card.kind} aria-label={card.kind === "currentlyReading" ? "Currently reading" : "Up next"} className="space-y-3">
                 <h2 className="text-xl">{card.kind === "currentlyReading" ? "Currently reading" : "Up next"}</h2>
                 <BookGrid style={style}>
-                  {sectionBooks.map((book) => <BookCard key={bookKey(book)} book={book} onClick={() => {}} style={style} />)}
+                  {sectionBooks.map((book) => <BookCard key={bookKey(book)} book={book} onClick={() => navigate(`/dashboard/library?book=${encodeURIComponent(bookKey(book))}`)} style={style} />)}
                 </BookGrid>
               </section>;
             }

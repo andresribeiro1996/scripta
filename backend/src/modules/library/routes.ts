@@ -72,7 +72,8 @@ const addBookSchema = z.object({
   author: z.string().min(1),
   isbn: z.string().min(1).nullable().optional(),
   coverUrl: z.string().min(1).nullable().optional(),
-  readStatus: z.union([z.literal(0), z.literal(1), z.literal(2)])
+  readStatus: z.union([z.literal(0), z.literal(1), z.literal(2)]),
+  day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()
 });
 
 /** The authenticated surface — get/save/share/unshare, all behind
