@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Stack, router } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { ensureBookBlockHeights } from "@scripta/shared";
+import { buildMuralPreset, ensureBookBlockHeights, orderLibraryBooks, shelfPresetSummary, type Mural } from "@scripta/shared";
 import { useAuth } from "../../core/auth";
 import { API_URL } from "../../core/config";
 import { Button, Dialog, dynamicType, EmptyState, ErrorState, IconButton, Menu, radii, Screen, Skeleton, spacing, SwipeableTabs, Toast, typography, useTheme, type MenuItem } from "../../ui";
@@ -15,6 +15,7 @@ import { fetchTierlists } from "../tierlists/api";
 import { ActivityList } from "./ActivityList";
 import { FeedSettingsDialog } from "./FeedSettingsDialog";
 import { OwnLibraryPane } from "./OwnLibraryPane";
+import { ShelfPreview } from "./ShelfPreview";
 import { fetchOwnProfile, publishProfile, setShelfMural, unpublishProfile } from "./api";
 import { MuralPicker } from "./ProfileScreen";
 
@@ -40,7 +41,8 @@ export function MyShelfScreen() {
     queryFn: () => fetchMural(own.data!.muralId!),
     enabled: Boolean(own.data?.muralId),
   });
-  const { data: library } = useLibrary();
+  const libraryQuery = useLibrary();
+  const library = libraryQuery.data;
   const gallery = useQuery({ queryKey: ["gallery"], queryFn: fetchGalleryImages });
   const tierlistsQuery = useQuery({ queryKey: ["tierlists"], queryFn: fetchTierlists });
   const murals = useMurals();
@@ -60,6 +62,11 @@ export function MyShelfScreen() {
   const profile = user?.username
     ? { username: user.username, avatarUrl: user.avatarId ? `${API_URL}/auth/avatar/${user.avatarId}/file` : null }
     : undefined;
+
+  const ordered = useMemo(() => orderLibraryBooks(books, groups), [books, groups]);
+  const preview = useMemo(() => buildMuralPreset("shelf", ordered), [ordered]);
+  const previewMural: Mural = { id: "shelf-preview", name: preview.name, blocks: preview.blocks, createdAt: "", updatedAt: "", shareToken: null, shareUrl: null, folderId: null };
+  const pendingShelf = useRef<string | null>(null);
 
   function handleTabChange(next: MyShelfTab) {
     lastTab = next;
@@ -92,21 +99,6 @@ export function MyShelfScreen() {
     else setPickerMode("publish");
   }
 
-  async function createShelf() {
-    if (own.data?.muralId) {
-      router.push(`/murals/${own.data.muralId}` as never);
-      return;
-    }
-    let targetId: string | null = null;
-    const ok = await run(async () => {
-      const existing = murals.data?.find((item) => item.name === "My shelf");
-      const target = existing ?? (await murals.create("My shelf"));
-      targetId = target.id;
-      await setShelfMural(target.id);
-    });
-    if (ok && targetId) router.push(`/murals/${targetId}` as never);
-  }
-
   if (own.isPending) {
     return (
       <Screen bottom top={false}>
@@ -128,6 +120,30 @@ export function MyShelfScreen() {
   const ownData = own.data;
   const hasMural = Boolean(ownData.muralId);
   const muralHasBlocks = Boolean(mural.data && mural.data.blocks.length > 0);
+
+  async function shelfTargetId() {
+    const id = ownData.muralId ?? pendingShelf.current ?? (await murals.create("My shelf")).id;
+    pendingShelf.current = id;
+    return id;
+  }
+
+  async function keepShelf() {
+    const ok = await run(async () => {
+      const id = await shelfTargetId();
+      await murals.update(id, { blocks: preview.blocks });
+      if (ownData.muralId !== id) await setShelfMural(id);
+    });
+    if (ok) await queryClient.invalidateQueries({ queryKey: ["murals"] });
+  }
+
+  async function startBlank() {
+    let id: string | null = null;
+    const ok = await run(async () => {
+      id = await shelfTargetId();
+      if (ownData.muralId !== id) await setShelfMural(id);
+    });
+    if (ok && id) router.push(`/murals/${id}` as never);
+  }
 
   const menuItems: MenuItem[] = [
     ...(hasMural ? [{ label: "Edit shelf", onPress: () => router.push(`/murals/${ownData.muralId}` as never) }] : []),
@@ -182,14 +198,21 @@ export function MyShelfScreen() {
               </ScrollView>
             );
           }
-          return (
-            <EmptyState
-              title="Your shelf is empty"
-              body="Build a private page from your books. Only you can see it until you publish."
-              actionLabel="Create your shelf"
-              onAction={() => void createShelf()}
-            />
-          );
+          if (libraryQuery.isPending) return <View style={styles.tabPad}><Skeleton height={240} /></View>;
+          if (libraryQuery.isError) return <ErrorState body="Couldn't load your library." actionLabel="Retry" onAction={() => void libraryQuery.refetch()} />;
+          if (!books.length) {
+            return (
+              <EmptyState
+                title="Start your library"
+                body="Import your existing collection, or add your first book manually."
+                actionLabel="Import library"
+                onAction={() => router.push("/import" as never)}
+                secondaryActionLabel="Add a book manually"
+                onSecondaryAction={() => router.push("/add-book" as never)}
+              />
+            );
+          }
+          return <ShelfPreview mural={previewMural} summary={shelfPresetSummary(books)} busy={busy} books={books} groups={groups} images={images} tierlists={tierlists} profile={profile} onKeep={() => void keepShelf()} onBlank={() => void startBlank()} />;
         }}
       />
       <MuralPicker
