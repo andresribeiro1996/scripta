@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLibrary } from "../../hooks/useLibrary";
 import { useMurals } from "../../hooks/useMurals";
-import { buildMuralPreset, MURAL_PRESETS, type MuralPresetId } from "../../lib/muralPresets";
+import { buildMuralPreset, MURAL_PRESETS, presetAvailability, type MuralPresetId } from "../../lib/muralPresets";
 import { bookKey } from "../../lib/merge";
 import { Sheet } from "../Sheet";
 
@@ -28,7 +28,7 @@ export function MuralPresetPicker({ folderId, onClose }: { folderId: string | nu
       await saveBlocks(target.id, preset.blocks);
       navigate(`/dashboard/murals/${target.id}`);
     } catch {
-      setError("Não foi possível guardar o preset. Tenta novamente na mesma opção para completar o mural.");
+      setError("Couldn't save the preset. Choose the same option again to finish the mural.");
     } finally {
       working.current = false;
       setBusy(false);
@@ -36,16 +36,17 @@ export function MuralPresetPicker({ folderId, onClose }: { folderId: string | nu
   }
 
   return (
-    <Sheet title="Começar com um preset" onClose={() => { if (!working.current) onClose(); }}>
-      <p className="px-3 pb-4 text-sm text-(--color-text-dim)">Preenchidos com a tua biblioteca. Todos os blocos podem ser movidos e personalizados.</p>
+    <Sheet title="Start from a preset" onClose={() => { if (!working.current) onClose(); }}>
+      <p className="px-3 pb-4 text-sm text-(--color-text-dim)">Filled from your library. Every block can be moved and edited.</p>
       {error && <p role="alert" className="px-3 pb-3 text-sm text-(--color-danger)">{error}</p>}
-      {isError && <p role="alert" className="px-3 pb-3 text-sm text-(--color-danger)">Não foi possível carregar a biblioteca. Volta a abrir os presets para tentar novamente.</p>}
+      {isError && <p role="alert" className="px-3 pb-3 text-sm text-(--color-danger)">Couldn't load your library. Reopen presets to try again.</p>}
       <div className="space-y-4 px-3 pb-4">
         {MURAL_PRESETS.map((preset) => {
           const built = buildMuralPreset(preset.id, books);
           const bottom = Math.max(...built.blocks.map((block) => block.layout.y + block.layout.h));
+          const reason = presetAvailability(preset.id, books);
           return (
-            <button key={preset.id} disabled={busy || isLoading || isError || Boolean(pending && pending.preset !== preset.id)} onClick={() => void choose(preset.id)} className="block w-full overflow-hidden rounded-2xl border border-(--color-border) text-left transition-colors hover:border-(--color-accent) disabled:opacity-50">
+            <button key={preset.id} disabled={busy || isLoading || isError || Boolean(reason) || Boolean(pending && pending.preset !== preset.id)} onClick={() => void choose(preset.id)} className="block w-full overflow-hidden rounded-2xl border border-(--color-border) text-left transition-colors hover:border-(--color-accent) disabled:opacity-50">
               <div aria-hidden="true" className="relative h-44 overflow-hidden bg-[#151719]">
                 {built.blocks.map((block) => (
                   <div key={block.id} className="absolute overflow-hidden rounded p-1.5" style={{ left: `${block.layout.x / 12 * 100}%`, top: `${block.layout.y / bottom * 100}%`, width: `calc(${block.layout.w / 12 * 100}% - 4px)`, height: `calc(${block.layout.h / bottom * 100}% - 4px)`, backgroundColor: block.style?.backgroundColor ?? preset.color, color: block.style?.textColor ?? preset.accent }}>
@@ -65,7 +66,7 @@ export function MuralPresetPicker({ folderId, onClose }: { folderId: string | nu
               <div className="p-3">
                 <p className="text-sm font-semibold">{preset.name}</p>
                 <p className="mt-1 text-xs text-(--color-text-dim)">{preset.description}</p>
-                <p className="mt-3 text-xs font-medium text-(--color-accent)">{busy ? "A guardar…" : isLoading ? "A carregar biblioteca…" : `${built.bookCount} livros · Usar preset →`}</p>
+                <p className="mt-3 text-xs font-medium text-(--color-accent)">{busy ? "Saving…" : isLoading ? "Loading library…" : reason ?? `${built.bookCount} ${built.bookCount === 1 ? "book" : "books"} · Use preset →`}</p>
               </div>
             </button>
           );

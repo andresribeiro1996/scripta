@@ -526,6 +526,32 @@ test("publishProfile emits mural_published only when the mural changes", () => {
   assert.equal(murals[0]?.ref_id, "m2");
 });
 
+test("publishing a privately chosen shelf for the first time announces it", () => {
+  const { repo, events } = createRepoFake();
+  const { deps, usernames, ownedMurals } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  ownedMurals.add("alice:m1");
+  service.setShelfMural("alice", "m1");
+  service.publishProfile("alice", "m1");
+  const announcements = events.filter((event) => event.type === "mural_published");
+  assert.equal(announcements.length, 1);
+  assert.equal(announcements[0]?.ref_id, "m1");
+});
+
+test("republishing the same mural after unpublish stays silent", () => {
+  const { repo, events } = createRepoFake();
+  const { deps, usernames, ownedMurals } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  ownedMurals.add("alice:m1");
+  service.publishProfile("alice", "m1");
+  service.unpublishProfile("alice");
+  const before = events.filter((event) => event.type === "mural_published").length;
+  service.publishProfile("alice", "m1");
+  assert.equal(events.filter((event) => event.type === "mural_published").length, before);
+});
+
 test("follow emits following once; refollow emits nothing", () => {
   const { repo, events } = createRepoFake();
   const { deps, readerProfiles } = createDeps(repo);
@@ -679,6 +705,65 @@ test("getLibrary reads a published owner with no library as null", () => {
   usernames.set("alice", "alice");
   profiles.set("alice", profileRow("alice"));
   assert.deepEqual(service.getLibrary("alice"), { data: null });
+});
+
+test("own profile reports a private shelf without a profiles row", () => {
+  const { repo } = createRepoFake();
+  const { deps } = createDeps(repo);
+  const service = createCommunityService(deps);
+  assert.deepEqual(service.getOwnProfile("alice"), { muralId: null, published: false, feedSettings: DEFAULT_FEED_SETTINGS });
+});
+
+test("choosing the shelf mural keeps the profile private and checks ownership", () => {
+  const { repo } = createRepoFake();
+  const { deps, ownedMurals } = createDeps(repo);
+  const service = createCommunityService(deps);
+  ownedMurals.add("alice:m1");
+  assert.throws(() => service.setShelfMural("alice", "m2"), MuralNotOwnedError);
+  service.setShelfMural("alice", "m1");
+  const row = repo.getProfileRow("alice")!;
+  assert.equal(row.published, 0);
+  assert.equal(row.mural_id, "m1");
+  assert.equal(row.published_at, null);
+  assert.deepEqual(service.getOwnProfile("alice"), { muralId: "m1", published: false, feedSettings: DEFAULT_FEED_SETTINGS });
+});
+
+test("getOwnProfile clears a dangling muralId once the mural is gone", () => {
+  const { repo } = createRepoFake();
+  const { deps, ownedMurals } = createDeps(repo);
+  const service = createCommunityService(deps);
+  ownedMurals.add("alice:m1");
+  service.setShelfMural("alice", "m1");
+  ownedMurals.delete("alice:m1");
+  assert.deepEqual(service.getOwnProfile("alice"), { muralId: null, published: false, feedSettings: DEFAULT_FEED_SETTINGS });
+});
+
+test("switching a published shelf announces the new mural once", () => {
+  const { repo, events } = createRepoFake();
+  const { deps, usernames, ownedMurals } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  ownedMurals.add("alice:m1");
+  ownedMurals.add("alice:m2");
+  service.publishProfile("alice", "m1");
+  const announcements = () => events.filter((event) => event.type === "mural_published").length;
+  const before = announcements();
+  service.setShelfMural("alice", "m2");
+  service.setShelfMural("alice", "m2");
+  assert.equal(announcements(), before + 1);
+  assert.equal(repo.getProfileRow("alice")!.published, 1);
+});
+
+test("owners read their own activity before publishing; visitors still get 404", () => {
+  const { repo } = createRepoFake();
+  const { deps, usernames, ownedMurals } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  ownedMurals.add("alice:m1");
+  service.setShelfMural("alice", "m1");
+  assert.doesNotThrow(() => service.getActivity("alice", "alice", undefined, 20));
+  assert.throws(() => service.getActivity("alice", "bob", undefined, 20), ProfileNotFoundError);
+  assert.throws(() => service.getActivity("alice", undefined, undefined, 20), ProfileNotFoundError);
 });
 
 test("getActivity links votes to what was voted on, and leaves vanished ones plain", () => {

@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { test } from "node:test";
+import { localDay } from "@scripta/shared";
 
 // service.js reaches config/env.ts through covers/index.js (peekCachedCoverUrl),
 // and that module process.exit(1)s on an unsatisfied schema at import time. Set
@@ -137,7 +138,7 @@ test("addBook with no match appends a manual book and emits book_added", () => {
   db.close();
 });
 
-test("addBook matches by trimmed ISBN and updates status in place", () => {
+test("addBook matches by trimmed ISBN, finishing records the given day and 100%", () => {
   const { db, service, events } = setup();
   service.saveLibrary("user-1", {
     books: [{ ContentID: "k1", Title: "Stoner", Attribution: "John Williams", ISBN: " 9780394729685 ", ReadStatus: 1, ___PercentRead: 40, DateLastRead: null }],
@@ -145,16 +146,47 @@ test("addBook matches by trimmed ISBN and updates status in place", () => {
   });
   events.length = 0;
 
-  const result = service.addBook("user-1", { title: "Stoner", author: "John Williams", isbn: "9780394729685", readStatus: 2 });
+  const result = service.addBook("user-1", { title: "Stoner", author: "John Williams", isbn: "9780394729685", readStatus: 2, day: "2024-03-02" });
 
   assert.deepEqual(result, { key: "k1", updated: true });
   const books = booksOf(service, "user-1");
   assert.equal(books.length, 1);
   assert.equal(books[0]?.ReadStatus, 2);
   assert.equal(books[0]?.___PercentRead, 100);
-  assert.equal(books[0]?.DateLastRead, new Date().toISOString().slice(0, 10));
+  assert.equal(books[0]?.DateLastRead, "2024-03-02");
   assert.deepEqual((service.getLibrary("user-1")?.data as { groups?: unknown }).groups, [{ name: "g" }]);
   assert.deepEqual(events.map(({ type, refId }) => ({ type, refId })), [{ type: "book_finished", refId: "k1" }]);
+  db.close();
+});
+
+test("addBook finishing without a day falls back to the server's local day", () => {
+  const { db, service } = setup();
+  service.saveLibrary("user-1", {
+    books: [{ ContentID: "k1", Title: "Stoner", Attribution: "John Williams", ReadStatus: 0 }]
+  });
+
+  const result = service.addBook("user-1", { title: "Stoner", author: "John Williams", readStatus: 2 });
+
+  assert.deepEqual(result, { key: "k1", updated: true });
+  assert.equal(booksOf(service, "user-1")[0]?.DateLastRead, localDay());
+  db.close();
+});
+
+test("addBook moving out of Finished keeps DateLastRead and ___PercentRead", () => {
+  const { db, service, events } = setup();
+  service.saveLibrary("user-1", {
+    books: [{ ContentID: "k1", Title: "Stoner", Attribution: "John Williams", ReadStatus: 2, ___PercentRead: 100, DateLastRead: "2020-06-01" }]
+  });
+  events.length = 0;
+
+  const result = service.addBook("user-1", { title: "Stoner", author: "John Williams", readStatus: 0 });
+
+  assert.deepEqual(result, { key: "k1", updated: true });
+  const book = booksOf(service, "user-1")[0];
+  assert.equal(book?.ReadStatus, 0);
+  assert.equal(book?.___PercentRead, 100);
+  assert.equal(book?.DateLastRead, "2020-06-01");
+  assert.deepEqual(events, []);
   db.close();
 });
 

@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import type { GalleryImage } from "../api/gallery";
-import { useAuth } from "../auth/AuthContext";
+import { fetchOwnProfile } from "../api/community";
 import { useConfirm } from "../components/ConfirmDialog";
 import { CoverPickerModal } from "../components/CoverPickerModal";
 import { EmptyState } from "../components/EmptyState";
@@ -16,7 +17,6 @@ import { OptionSheet } from "../components/Sheet";
 import { SkeletonCardGrid } from "../components/Skeleton";
 import { FolderIcon, PlusIcon, SortIcon, TOOLBAR_CONTROL_CLASS, ToolbarRow, toolbarIconClass } from "../components/Toolbar";
 import { useDelayedShow } from "../hooks/useDelayedShow";
-import { useCommunityProfile } from "../hooks/useCommunity";
 import { useMuralFolders } from "../hooks/useMuralFolders";
 import { useMurals } from "../hooks/useMurals";
 import { buildTree, collectSubtreeIds, folderPath } from "../lib/muralFolders";
@@ -44,8 +44,7 @@ const SORT_OPTIONS: Array<{ value: SortBy; label: string }> = [
  *  its own full page rather than an inline expandable section — a
  *  freeform canvas needs real room. */
 export function MuralsListPage() {
-  const { session } = useAuth();
-  const ownProfile = useCommunityProfile(session?.user.username ?? "");
+  const ownProfile = useQuery({ queryKey: ["community", "own-profile"], queryFn: fetchOwnProfile });
   const { data: muralsData, isLoading, rename, remove, move: moveMural, setCover, clearCover, share, unshare } = useMurals();
   const showSkeleton = useDelayedShow(isLoading);
   const { data: foldersData, create: createFolder, rename: renameFolder, move: moveFolderApi, remove: removeFolder } = useMuralFolders();
@@ -149,7 +148,7 @@ export function MuralsListPage() {
   return (
     <PageContainer>
       <button onClick={() => setPresetsOpen(true)} className="mb-4 flex min-h-11 w-full items-center justify-between rounded-xl border border-(--color-border) bg-(--color-surface) px-4 text-left text-sm font-semibold hover:bg-(--color-surface-hover)">
-        <span>Começar com um preset</span><span aria-hidden="true">→</span>
+        <span>Start from a preset</span><span aria-hidden="true">→</span>
       </button>
       {presetsOpen && <MuralPresetPicker folderId={selectedFolderId} onClose={() => setPresetsOpen(false)} />}
       {/* Desktop-only. On a phone this row held nothing but the word
@@ -197,6 +196,11 @@ export function MuralsListPage() {
               icon={MuralsIcon}
               title="No murals yet."
               body={'A mural is a freeform dashboard you build yourself \u2014 a "Top 5 Books This Year" shelf, a favorite quote, a photo, whatever you want on the wall. Use the + below to start.'}
+              action={
+                <button onClick={() => setPresetsOpen(true)} className="rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-white">
+                  Start from a preset
+                </button>
+              }
             />
           )}
 
@@ -438,8 +442,8 @@ export function MuralsListPage() {
                           >
                             {mural.name}
                           </span>
-                          {ownProfile.view?.mural?.mural.id === mural.id && (
-                            <span className="shrink-0 rounded-full bg-(--color-accent-soft) px-1.5 py-0.5 text-[10px] font-semibold text-(--color-accent)">Profile</span>
+                          {ownProfile.data?.muralId === mural.id && (
+                            <span className="shrink-0 rounded-full bg-(--color-accent-soft) px-1.5 py-0.5 text-[10px] font-semibold text-(--color-accent)">My shelf</span>
                           )}
                         </span>
                       )}

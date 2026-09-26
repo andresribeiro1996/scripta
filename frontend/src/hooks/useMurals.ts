@@ -73,6 +73,7 @@ export function useMurals() {
   async function remove(id: string): Promise<void> {
     await deleteMuralApi(id);
     setMurals(current().filter((m) => m.id !== id));
+    await queryClient.invalidateQueries({ queryKey: ["community", "own-profile"] });
   }
 
   async function setCover(id: string, imageId: string, url: string): Promise<Mural> {

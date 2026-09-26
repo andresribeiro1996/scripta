@@ -719,7 +719,7 @@ export function ModalBody({ children }: { children: ReactNode }) {
 
 const styles = StyleSheet.create({
   button: { minHeight: minimumTouchTarget, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: radii.md, borderWidth: 1, alignItems: "center", justifyContent: "center" },
-  buttonText: { ...typography.body, fontWeight: "600" },
+  buttonText: { ...typography.body, fontWeight: "600", textAlign: "center", alignSelf: "stretch" },
   // 48 is Material's minimum and clears HIG's 44. It is also the ceiling here:
   // padding past it measured as having no effect, because the native header
   // clamps its subview's width — verified by probing taps either side of the
@@ -754,7 +754,7 @@ const styles = StyleSheet.create({
   state: { flexGrow: 1, justifyContent: "center", paddingVertical: spacing.xxl, paddingHorizontal: spacing.lg },
   emptyCard: { alignItems: "center", gap: spacing.md },
   errorCard: { alignItems: "center", gap: spacing.md, borderRadius: radii.lg, padding: spacing.lg },
-  stateTitle: { ...typography.title, fontWeight: "700", textAlign: "center" },
+  stateTitle: { ...typography.title, fontWeight: "700", textAlign: "center", alignSelf: "stretch" },
   centerText: { textAlign: "center" },
   banner: { minHeight: minimumTouchTarget, justifyContent: "center", paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
   bannerText: { fontWeight: "600", textAlign: "center" },

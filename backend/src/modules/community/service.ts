@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { ReaderProfile } from "@scripta/shared";
 import { categoryFor, contentDetail, decodeCursor, encodeCursor, DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
-import type { ActivityEventType, ActivityItem, CommunityEventType, DiscoverItem, DiscoverType, FeedCategory, FeedSettings, FollowState, Page, PersonResult, PublishedContent, PublishedProfile, TierlistSummary, TournamentSummary } from "@scripta/shared/community";
+import type { ActivityEventType, ActivityItem, CommunityEventType, DiscoverItem, DiscoverType, FeedCategory, FeedSettings, FollowState, OwnProfile, Page, PersonResult, PublishedContent, PublishedProfile, TierlistSummary, TournamentSummary } from "@scripta/shared/community";
 import type { DashboardFeedPage, DigestItem } from "@scripta/shared/dashboard";
 import type { PublishedTournamentRef } from "../arena/service.js";
 import type { MuralsPublicApi } from "../murals/publicApi.js";
@@ -76,6 +76,8 @@ export interface CommunityService {
   emitEvent(userId: string, type: ActivityEventType, refType: CommunityRefType, refId: string, payload?: Record<string, unknown>): void;
   publishProfile(userId: string, muralId: string): void;
   unpublishProfile(userId: string): void;
+  getOwnProfile(userId: string): OwnProfile;
+  setShelfMural(userId: string, muralId: string): void;
   getProfileByUsername(username: string, viewerId?: string): PublicProfileView;
   getDashboard(viewerId: string, cursor: string | undefined, limit: number): DashboardFeedPage;
   markDashboardSeen(viewerId: string): void;
@@ -93,13 +95,15 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
     repo.insertEvent({ id: randomUUID(), user_id: userId, type, ref_type: refType, ref_id: refId, payload: payload ? JSON.stringify(payload) : null, created_at: new Date().toISOString() });
   };
   const settingsFor = (userId: string): FeedSettings => repo.getFeedSettings(userId) ?? DEFAULT_FEED_SETTINGS;
-  const publishedUserId = (username: string): string => {
+  const visibleUserId = (username: string, viewerId: string | undefined): string => {
     const userId = deps.findUserIdByUsername(username);
     if (!userId) throw new ProfileNotFoundError();
+    if (userId === viewerId) return userId;
     const row = repo.getProfileRow(userId);
     if (!row || row.published !== 1) throw new ProfileNotFoundError();
     return userId;
   };
+  const publishedUserId = (username: string): string => visibleUserId(username, undefined);
   return {
     follow(followerId, followeeId) {
       if (followerId === followeeId) throw new SelfFollowError();
@@ -135,12 +139,30 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
         updated_at: now,
         feed_settings: existing?.feed_settings ?? null
       });
-      if (previousMuralId !== muralId) emit(userId, "mural_published", "mural", muralId);
+      if (!existing?.published_at || previousMuralId !== muralId) emit(userId, "mural_published", "mural", muralId);
     },
     unpublishProfile(userId) {
       const existing = repo.getProfileRow(userId);
       if (!existing) return;
       repo.upsertProfile({ ...existing, published: 0, updated_at: new Date().toISOString() });
+    },
+    getOwnProfile(userId) {
+      const row = repo.getProfileRow(userId);
+      const muralId = row?.mural_id && deps.murals.ownsMural(userId, row.mural_id) ? row.mural_id : null;
+      return { muralId, published: row?.published === 1, feedSettings: settingsFor(userId) };
+    },
+    setShelfMural(userId, muralId) {
+      if (!deps.murals.ownsMural(userId, muralId)) throw new MuralNotOwnedError();
+      const existing = repo.getProfileRow(userId);
+      repo.upsertProfile({
+        user_id: userId,
+        published: existing?.published ?? 0,
+        mural_id: muralId,
+        published_at: existing?.published_at ?? null,
+        updated_at: new Date().toISOString(),
+        feed_settings: existing?.feed_settings ?? null
+      });
+      if (existing?.published === 1 && existing.mural_id !== muralId) emit(userId, "mural_published", "mural", muralId);
     },
     getProfileByUsername(username, viewerId) {
       const userId = deps.findUserIdByUsername(username);
@@ -315,7 +337,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
       return { data: deps.resolveLibrary(publishedUserId(username)) };
     },
     getActivity(username, viewerId, cursor, limit) {
-      const userId = publishedUserId(username);
+      const userId = visibleUserId(username, viewerId);
       const keyset = cursor ? decodeCursor(cursor) : undefined;
       if (cursor && !keyset) throw new InvalidCursorError();
       const owner = viewerId === userId;

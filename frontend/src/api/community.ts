@@ -3,6 +3,7 @@ import type {
   DiscoverItem,
   DiscoverType,
   FeedSettings,
+  OwnProfile,
   Page,
   PersonResult,
   PublishedProfile,
@@ -59,7 +60,7 @@ export async function fetchCommunityProfile(username: string): Promise<Community
 
 export async function fetchActivity(username: string, cursor?: string): Promise<Page<ActivityItem>> {
   const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
-  return (await publicFetch(`/community/profiles/${encodeURIComponent(username)}/activity${query}`)) as Page<ActivityItem>;
+  return (await apiFetch(`/community/profiles/${encodeURIComponent(username)}/activity${query}`)) as Page<ActivityItem>;
 }
 
 export async function fetchProfileLibrary(username: string): Promise<{ data: LibraryData | null }> {
@@ -84,4 +85,12 @@ export async function publishProfile(muralId: string): Promise<void> {
 
 export async function unpublishProfile(): Promise<void> {
   await apiFetch("/community/profile/publish", { method: "DELETE" });
+}
+
+export async function fetchOwnProfile(): Promise<OwnProfile> {
+  return (await apiFetch("/community/profile")) as OwnProfile;
+}
+
+export async function setShelfMural(muralId: string): Promise<void> {
+  await apiFetch("/community/profile/mural", { method: "PUT", body: JSON.stringify({ muralId }) });
 }

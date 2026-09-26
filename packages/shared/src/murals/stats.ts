@@ -18,11 +18,16 @@ function isInProgress(book: Record<string, unknown>): boolean {
   return book.ReadStatus === 1;
 }
 
+const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
+
 function finishedInYear(book: Record<string, unknown>, year: number): boolean {
   if (!isFinished(book)) return false;
   const raw = book.DateLastRead;
   if (typeof raw !== "string" || !raw) return false;
-  const parsed = new Date(raw);
+  const dateOnly = DATE_ONLY.exec(raw);
+  const parsed = dateOnly
+    ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
+    : new Date(raw);
   return !Number.isNaN(parsed.getTime()) && parsed.getFullYear() === year;
 }
 

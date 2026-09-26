@@ -5,6 +5,7 @@ import type {
   DiscoverItem,
   DiscoverType,
   FeedSettings,
+  OwnProfile,
   Page,
   PersonResult,
   PublishedProfile,
@@ -58,7 +59,7 @@ export async function fetchProfile(username: string) {
 
 export async function fetchActivity(username: string, cursor?: string): Promise<Page<ActivityItem>> {
   const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
-  return apiClient.request<Page<ActivityItem>>(`/community/profiles/${encodeURIComponent(username)}/activity${query}`);
+  return apiClient.request<Page<ActivityItem>>(`/community/profiles/${encodeURIComponent(username)}/activity${query}`, { auth: true });
 }
 
 export async function fetchProfileLibrary(username: string) {
@@ -83,4 +84,12 @@ export function publishProfile(muralId: string) {
 
 export function unpublishProfile() {
   return apiClient.request("/community/profile/publish", { method: "DELETE", auth: true });
+}
+
+export function fetchOwnProfile() {
+  return apiClient.request<OwnProfile>("/community/profile", { auth: true });
+}
+
+export function setShelfMural(muralId: string) {
+  return apiClient.request("/community/profile/mural", { method: "PUT", body: { muralId }, auth: true });
 }
