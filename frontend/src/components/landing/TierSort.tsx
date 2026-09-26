@@ -10,6 +10,7 @@ const TIERS = [
 
 const RING_RADIUS = 92;
 const CATCH_RADIUS = 76;
+const LONG_PRESS_MS = 220;
 
 const pool = ["circe", "hail-mary", "piranesi", "sapiens", "achilles"];
 
@@ -26,14 +27,20 @@ const targetPosition = (index: number) => {
   return { x: Math.cos(angle) * RING_RADIUS, y: Math.sin(angle) * RING_RADIUS };
 };
 
+function buzz(ms: number) {
+  if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate(ms);
+}
+
 export function TierSort() {
   const stageRef = useRef<HTMLDivElement>(null);
+  const armTimer = useRef<ReturnType<typeof setTimeout>>(null);
   const [placed, setPlaced] = useState<Record<string, string[]>>(defaultPlaced);
   const [poolIndex, setPoolIndex] = useState(0);
+  const [armed, setArmed] = useState(false);
   const [drag, setDrag] = useState<{ x: number; y: number } | null>(null);
   const [hoverTier, setHoverTier] = useState<string | null>(null);
   const [dropCount, setDropCount] = useState(0);
-  const active = drag !== null;
+  const dragging = armed && drag !== null;
   const done = poolIndex >= pool.length;
 
   function locate(e: React.PointerEvent) {
@@ -44,11 +51,14 @@ export function TierSort() {
   function onPointerDown(e: React.PointerEvent) {
     if (done) return;
     e.currentTarget.setPointerCapture(e.pointerId);
-    setDrag(locate(e));
+    armTimer.current = setTimeout(() => {
+      setArmed(true);
+      buzz(10);
+    }, LONG_PRESS_MS);
   }
 
   function onPointerMove(e: React.PointerEvent) {
-    if (!active) return;
+    if (!armed) return;
     const pos = locate(e);
     setDrag(pos);
     let nearest: string | null = null;
@@ -61,16 +71,20 @@ export function TierSort() {
         nearest = tier.id;
       }
     }
+    if (nearest !== hoverTier && nearest) buzz(5);
     setHoverTier(nearest);
   }
 
   function onPointerUp() {
-    if (active && hoverTier) {
+    if (armTimer.current) clearTimeout(armTimer.current);
+    if (dragging && hoverTier) {
       const src = pool[poolIndex];
       setPlaced((prev) => ({ ...prev, [hoverTier]: [...prev[hoverTier], src] }));
       setPoolIndex((i) => i + 1);
       setDropCount((n) => n + 1);
+      buzz(20);
     }
+    setArmed(false);
     setDrag(null);
     setHoverTier(null);
   }
@@ -94,9 +108,10 @@ export function TierSort() {
               Rank your shelf by hand
             </h2>
             <p className="mt-3 text-pretty text-lg text-(--color-text-dim)">
-              Drag the book toward the ring — the nearest tier catches it, and
-              the list re-ranks below. The same gesture sorts a thousand books
-              on mobile, with haptics when a tier takes hold.
+              Press and hold the book until the ring wakes up, then drag it
+              toward a tier — the nearest one catches it and the list re-ranks
+              below. The same gesture sorts a thousand books on mobile, with
+              haptics when a tier takes hold.
             </p>
             <p className="mt-4 text-sm font-semibold text-(--color-text-dim)">
               {done ? (
@@ -104,14 +119,14 @@ export function TierSort() {
                   Shelf ranked — reset the demo
                 </button>
               ) : (
-                `${pool.length - poolIndex} book${pool.length - poolIndex === 1 ? "" : "s"} left on the pile — drag one in`
+                `${pool.length - poolIndex} book${pool.length - poolIndex === 1 ? "" : "s"} left on the pile`
               )}
             </p>
           </div>
           <div>
             <div
               ref={stageRef}
-              aria-label="Interactive tier sort demo — drag the book into a tier ring"
+              aria-label="Interactive tier sort demo — press and hold the book, then drag it into a tier ring"
               className="relative mx-auto h-[300px] w-[300px] rounded-2xl border border-(--color-border) bg-(--color-surface)"
             >
               <span aria-hidden className="absolute left-1/2 top-1/2 h-36 w-36 -translate-x-1/2 -translate-y-1/2 rounded-full border border-(--color-border)" />
@@ -121,9 +136,9 @@ export function TierSort() {
                 return (
                   <span
                     key={tier.id}
-                    className={`absolute flex h-12 w-12 items-center justify-center rounded-full text-sm font-bold text-white transition-transform duration-150 ${
-                      hot ? "scale-125" : ""
-                    }`}
+                    className={`absolute flex h-12 w-12 items-center justify-center rounded-full text-sm font-bold text-white transition-all duration-150 ${
+                      armed ? "opacity-100" : "opacity-30"
+                    } ${hot ? "scale-[1.18]" : ""}`}
                     style={{ left: `calc(50% + ${x}px - 24px)`, top: `calc(50% + ${y}px - 24px)`, backgroundColor: tier.color, boxShadow: hot ? `0 0 0 3px var(--color-surface), 0 0 0 5px ${tier.color}` : undefined }}
                   >
                     {tier.id}
@@ -138,13 +153,13 @@ export function TierSort() {
                 onPointerMove={onPointerMove}
                 onPointerUp={onPointerUp}
                 onPointerCancel={onPointerUp}
-                className={`absolute left-1/2 top-1/2 h-28 w-[76px] -translate-x-1/2 -translate-y-1/2 cursor-grab rounded-md object-cover shadow-[0_10px_24px_rgba(0,0,0,0.25)] active:cursor-grabbing ${
-                  active ? "z-10" : ""
-                }`}
+                className={`absolute left-1/2 top-1/2 h-28 w-[76px] -translate-x-1/2 -translate-y-1/2 rounded-md object-cover shadow-[0_10px_24px_rgba(0,0,0,0.25)] ${dragging ? "z-10 cursor-grabbing" : done ? "cursor-default opacity-40" : "cursor-grab"}`}
                 style={{
                   touchAction: "none",
-                  transform: `translate(calc(-50% + ${drag?.x ?? 0}px), calc(-50% + ${drag?.y ?? 0}px)) rotate(${active ? 3 : 0}deg)`,
-                  transition: active ? "none" : "transform 200ms cubic-bezier(0.32, 0.72, 0, 1)",
+                  transform: `translate(calc(-50% + ${drag?.x ?? 0}px), calc(-50% + ${drag?.y ?? 0}px)) rotate(${dragging ? 3 : 0}deg) scale(${armed ? 1.06 : 1})`,
+                  transition: dragging
+                    ? "none"
+                    : "transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 200ms",
                 }}
               />
             </div>
