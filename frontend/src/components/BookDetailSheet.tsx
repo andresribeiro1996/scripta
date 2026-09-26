@@ -1,5 +1,7 @@
+import type { FinishRating } from "@scripta/shared";
 import { CoverImage } from "./BookCard";
 import { BookSummary } from "./BookSummary";
+import { FeelingChips } from "./FeelingChips";
 import { statusLabel } from "../lib/covers";
 import type { ReadStatus } from "../lib/libraryView";
 import { useDismissible } from "../hooks/useDismissible";
@@ -10,12 +12,14 @@ export function BookDetailSheet({
   onOpenStyle,
   onOpenCoverPicker,
   onSetStatus,
+  onSetRating,
   onClose
 }: {
   book: Record<string, unknown>;
   onOpenStyle: (book: Record<string, unknown>) => void;
   onOpenCoverPicker: (book: Record<string, unknown>) => void;
   onSetStatus: (book: Record<string, unknown>, status: ReadStatus) => void;
+  onSetRating: (book: Record<string, unknown>, rating: FinishRating) => void;
   onClose: () => void;
 }) {
   useScrollLock();
@@ -90,6 +94,18 @@ export function BookDetailSheet({
                 );
               })}
             </div>
+
+            {book.ReadStatus === 2 && (
+              <div className="mt-4">
+                <p className="text-sm font-semibold">How it landed</p>
+                <div className="mt-2">
+                  <FeelingChips
+                    value={typeof book.Rating === "number" ? book.Rating : null}
+                    onChange={(rating) => onSetRating(book, rating)}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

@@ -3,6 +3,15 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import {
+  addReaderNote,
+  newId,
+  readSnapshot,
+  restoreReadState,
+  setRating,
+  type FinishRating,
+  type ReadSnapshot
+} from "@scripta/shared";
 import type { GalleryImage } from "../api/gallery";
 import type { LibraryData, LibraryDocument } from "../api/library";
 import { AddBookModal } from "../components/AddBookModal";
@@ -11,6 +20,7 @@ import { BookDetailSheet } from "../components/BookDetailSheet";
 import { BookGrid } from "../components/BookGrid";
 import { CoverPickerModal } from "../components/CoverPickerModal";
 import { EmptyState } from "../components/EmptyState";
+import { FinishSheet } from "../components/FinishSheet";
 import { LibraryCanvas } from "../components/LibraryCanvas";
 import { LibraryToolbar } from "../components/LibraryToolbar";
 import { LibraryIcon } from "../components/NavIcons";
@@ -90,6 +100,7 @@ export function LibraryPage() {
   const [styleBookKey, setStyleBookKey] = useState<string | null>(null);
   const [coverBookKey, setCoverBookKey] = useState<string | null>(null);
   const [detailBookKey, setDetailBookKey] = useState<string | null>(null);
+  const [finishing, setFinishing] = useState<{ key: string; before: ReadSnapshot } | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [sharing, setSharing] = useState(false);
@@ -219,9 +230,9 @@ export function LibraryPage() {
     }
   }
 
-  async function handleSetBookStatus(book: Record<string, unknown>, status: ReadStatus) {
+  async function handleSetBookStatus(book: Record<string, unknown>, status: ReadStatus): Promise<boolean> {
     const current = queryClient.getQueryData<LibraryDocument>(["library"]);
-    if (!current) return;
+    if (!current) return false;
     const key = bookKey(book);
     const day = localDay();
     try {
@@ -229,8 +240,58 @@ export function LibraryPage() {
         ...data,
         books: data.books.map((b) => (bookKey(b) === key ? setReadStatus(b, status, day) : b))
       }));
+      return true;
     } catch {
       toast({ message: "Couldn't save the status change.", kind: "error" });
+      return false;
+    }
+  }
+
+  async function handleSetRating(book: Record<string, unknown>, rating: FinishRating): Promise<boolean> {
+    const current = queryClient.getQueryData<LibraryDocument>(["library"]);
+    if (!current) return false;
+    const key = bookKey(book);
+    try {
+      await updateLibrary((data) => ({
+        ...data,
+        books: data.books.map((b) => (bookKey(b) === key ? setRating(b, rating) : b))
+      }));
+      return true;
+    } catch {
+      toast({ message: "Couldn't save the rating.", kind: "error" });
+      return false;
+    }
+  }
+
+  async function handleAddNote(book: Record<string, unknown>, text: string): Promise<boolean> {
+    const current = queryClient.getQueryData<LibraryDocument>(["library"]);
+    if (!current) return false;
+    const key = bookKey(book);
+    try {
+      await updateLibrary((data) => ({
+        ...data,
+        books: data.books.map((b) => (bookKey(b) === key ? addReaderNote(b, text, localDay(), newId()) : b))
+      }));
+      return true;
+    } catch {
+      toast({ message: "Couldn't save your note.", kind: "error" });
+      return false;
+    }
+  }
+
+  async function handleRestoreRead(book: Record<string, unknown>, before: ReadSnapshot): Promise<boolean> {
+    const current = queryClient.getQueryData<LibraryDocument>(["library"]);
+    if (!current) return false;
+    const key = bookKey(book);
+    try {
+      await updateLibrary((data) => ({
+        ...data,
+        books: data.books.map((b) => (bookKey(b) === key ? restoreReadState(b, before) : b))
+      }));
+      return true;
+    } catch {
+      toast({ message: "Couldn't undo the status change.", kind: "error" });
+      return false;
     }
   }
 
@@ -361,6 +422,7 @@ export function LibraryPage() {
   const coverBook = coverBookKey ? books.find((b) => bookKey(b) === coverBookKey) : null;
   const detailKey = detailBookKey ?? searchParams.get("book");
   const detailBook = detailKey ? books.find((b) => bookKey(b) === detailKey) : null;
+  const finishingBook = finishing ? books.find((b) => bookKey(b) === finishing.key) : null;
 
   // The phone's only route to these actions — there is no header on a
   // phone to hold them. Passed to LibraryToolbar as ITEMS rather than a
@@ -657,7 +719,12 @@ export function LibraryPage() {
           book={detailBook}
           onOpenStyle={(b) => setStyleBookKey(bookKey(b))}
           onOpenCoverPicker={(b) => setCoverBookKey(bookKey(b))}
-          onSetStatus={(b, status) => void handleSetBookStatus(b, status)}
+          onSetStatus={async (b, status) => {
+            const before = readSnapshot(b);
+            const wasFinished = b.ReadStatus === 2;
+            if ((await handleSetBookStatus(b, status)) && status === 2 && !wasFinished) setFinishing({ key: bookKey(b), before });
+          }}
+          onSetRating={(b, rating) => void handleSetRating(b, rating)}
           onClose={() => {
             setDetailBookKey(null);
             if (searchParams.has("book")) {
@@ -666,6 +733,18 @@ export function LibraryPage() {
               setSearchParams(next, { replace: true });
             }
           }}
+        />
+      )}
+
+      {finishingBook && finishing && (
+        <FinishSheet
+          book={finishingBook}
+          books={books}
+          before={finishing.before}
+          onSetRating={handleSetRating}
+          onAddNote={handleAddNote}
+          onRestoreRead={handleRestoreRead}
+          onClose={() => setFinishing(null)}
         />
       )}
 
