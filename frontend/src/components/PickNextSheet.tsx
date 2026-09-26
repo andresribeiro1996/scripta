@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { bookKey, localDay, setReadStatus } from "@scripta/shared";
+import { bookKey, localDay, setReadStatus, upNextPair } from "@scripta/shared";
 import { useLibrary } from "../hooks/useLibrary";
 import { CoverImage } from "./BookCard";
 import { DuelButton } from "./DuelButton";
@@ -11,9 +11,12 @@ export function PickNextSheet({ keys, books, onClose }: { keys: string[]; books:
   const toast = useToast();
   const [offset, setOffset] = useState(0);
   const [saving, setSaving] = useState(false);
-  const pair = [keys[offset % keys.length], keys[(offset + 1) % keys.length]]
+  const pairKeys = upNextPair(keys, offset);
+  const pair = pairKeys
     .map((key) => books.find((book) => bookKey(book) === key))
     .filter((book): book is Record<string, unknown> => Boolean(book));
+
+  if (pairKeys.length < 2) return null;
 
   async function choose(book: Record<string, unknown>) {
     if (saving) return;
@@ -36,8 +39,10 @@ export function PickNextSheet({ keys, books, onClose }: { keys: string[]; books:
         {pair.map((book) => (
           <div key={bookKey(book)} className="flex flex-col gap-2">
             <div className="aspect-[2/3] overflow-hidden rounded-md bg-(--color-border)"><CoverImage book={book} /></div>
-            <p className="line-clamp-2 text-center text-sm">{String(book.Title ?? "Untitled")}</p>
-            <DuelButton onClick={() => void choose(book)} disabled={saving}>This one</DuelButton>
+            <p className="line-clamp-2 min-h-[2lh] text-center text-sm">{String(book.Title ?? "Untitled")}</p>
+            <DuelButton onClick={() => void choose(book)} disabled={saving}>
+              This one<span className="sr-only">: {String(book.Title ?? "Untitled")}</span>
+            </DuelButton>
           </div>
         ))}
       </div>

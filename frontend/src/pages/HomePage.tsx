@@ -46,7 +46,7 @@ export function HomePage() {
                 <div className="flex items-baseline justify-between">
                   <h2 className="text-xl">{card.kind === "currentlyReading" ? "Currently reading" : "Up next"}</h2>
                   {card.kind === "upNext" && card.bookKeys.length >= 2 ? (
-                    <button type="button" className="text-sm text-(--color-text-dim) hover:text-(--color-accent)" onClick={() => setPicking(true)}>Can't choose?</button>
+                    <button type="button" className="inline-flex min-h-11 items-center text-sm text-(--color-text-dim) hover:text-(--color-accent)" onClick={() => setPicking(true)}>Can't choose?</button>
                   ) : null}
                 </div>
                 <BookGrid style={style}>
@@ -93,7 +93,7 @@ export function HomePage() {
           )}
         </section>
       </>}
-      {picking ? <PickNextSheet keys={upNextKeys} books={books} onClose={() => setPicking(false)} /> : null}
+      {picking && upNextKeys.length >= 2 ? <PickNextSheet keys={upNextKeys} books={books} onClose={() => setPicking(false)} /> : null}
     </div>
   </PageContainer>;
 }
