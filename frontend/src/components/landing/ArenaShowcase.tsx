@@ -1,3 +1,4 @@
+import { DuelSwipe } from "./DuelSwipe";
 function MiniCover({ src, className = "" }: { src: string; className?: string }) {
   return <img src={`/covers/${src}.jpg`} alt="" loading="lazy" className={`h-12 w-8 shrink-0 rounded-md object-cover ${className}`} />;
 }
@@ -8,28 +9,6 @@ function SmallCover({ src, winner }: { src: string; winner: boolean }) {
       src={src}
       className={winner ? "h-9 w-6 ring-2 ring-(--color-accent)" : "h-9 w-6 opacity-45"}
     />
-  );
-}
-
-function DuelMockup() {
-  return (
-    <div className="flex h-full flex-col rounded-xl border border-(--color-border) bg-(--color-surface) p-4">
-      <p className="text-center text-xs font-semibold uppercase tracking-[0.14em] text-(--color-text-dim)">The duel</p>
-      <div className="mt-4 flex flex-1 items-center">
-        <div className="flex flex-1 items-stretch justify-center gap-3">
-          <div className="flex flex-1 items-center justify-center rounded-lg border-2 border-(--color-accent) p-3">
-            <MiniCover src="piranesi" />
-          </div>
-          <div className="flex flex-1 items-center justify-center rounded-lg border-2 border-(--color-border) p-3">
-            <MiniCover src="hail-mary" />
-          </div>
-        </div>
-      </div>
-      <div className="mt-4 h-2 rounded-full bg-(--color-border)">
-        <div className="h-2 w-[62%] rounded-full bg-(--color-accent)" />
-      </div>
-      <p className="mt-1 text-right text-xs text-(--color-text-dim)">62% · 34 votes</p>
-    </div>
   );
 }
 
@@ -86,7 +65,7 @@ export function ArenaShowcase() {
           </p>
         </div>
         <div className="mx-auto mt-12 grid max-w-3xl gap-4 sm:grid-cols-2">
-          <DuelMockup />
+          <DuelSwipe />
           <BracketMockup />
         </div>
       </div>
