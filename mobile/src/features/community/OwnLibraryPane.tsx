@@ -65,7 +65,7 @@ export function OwnLibraryPane() {
                   onPress={() => setStatus(option.value)}
                   style={[styles.chip, { borderColor: colors.border, backgroundColor: selected ? colors.accentSoft : colors.surface }]}
                 >
-                  <Text {...dynamicType} style={[typography.caption, styles.strong, { color: selected ? colors.accent : colors.text }]}>
+                  <Text {...dynamicType} numberOfLines={1} style={[typography.caption, styles.strong, { color: selected ? colors.accent : colors.text }]}>
                     {label} {count}
                   </Text>
                 </Pressable>
