@@ -148,7 +148,7 @@ export function MuralsListPage() {
   return (
     <PageContainer>
       <button onClick={() => setPresetsOpen(true)} className="mb-4 flex min-h-11 w-full items-center justify-between rounded-xl border border-(--color-border) bg-(--color-surface) px-4 text-left text-sm font-semibold hover:bg-(--color-surface-hover)">
-        <span>Começar com um preset</span><span aria-hidden="true">→</span>
+        <span>Start from a preset</span><span aria-hidden="true">→</span>
       </button>
       {presetsOpen && <MuralPresetPicker folderId={selectedFolderId} onClose={() => setPresetsOpen(false)} />}
       {/* Desktop-only. On a phone this row held nothing but the word

@@ -43,8 +43,8 @@ export function OwnShelfView({ username }: { username: string }) {
   const [tab, setTab] = useState<OwnShelfTab>("mural");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const books = library?.data.books ?? [];
-  const groups = library?.data.groups ?? [];
+  const books = useMemo(() => library?.data.books ?? [], [library]);
+  const groups = useMemo(() => library?.data.groups ?? [], [library]);
   const ordered = useMemo(() => orderLibraryBooks(books, groups), [books, groups]);
   const preview = useMemo(() => buildMuralPreset("shelf", ordered), [ordered]);
   const previewMural: Mural = { id: "shelf-preview", name: preview.name, blocks: preview.blocks, createdAt: "", updatedAt: "", shareToken: null, shareUrl: null, folderId: null };
