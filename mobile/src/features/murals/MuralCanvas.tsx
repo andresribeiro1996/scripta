@@ -110,7 +110,7 @@ export function BlockContent({ block, books, images, tierlists, profile, shelfTh
   if (block.type === "quoteCollection") return <><Text style={text.title}>{block.title || "Quotes"}</Text>{resolveQuoteCollection(block, books).map(({ highlight }, index) => <Text key={index} style={text.body}>“{String(highlight.Text ?? highlight.Annotation ?? "")}”</Text>)}</>;
   if (block.type === "image") { const image = images.find((item) => item.id === block.imageId); return image ? <><Image source={{ uri: image.url }} style={styles.fill} contentFit="cover" />{block.caption ? <Text style={[text.caption, dim]}>{block.caption}</Text> : null}</> : <EmptyBlock message="Image unavailable" style={[text.caption, dim]} />; }
 
-  if (block.type === "stats") return <View style={styles.stats}>{block.metrics.map((metric) => <View key={metric}><Text style={text.stat}>{statsOverride?.[metric] ?? computeStat(metric, books)}</Text><Text style={[text.caption, dim]}>{STAT_METRIC_LABELS[metric]}</Text></View>)}</View>;
+  if (block.type === "stats") return <View style={styles.stats}>{block.metrics.map((metric) => <View key={metric}><Text numberOfLines={1} style={text.stat}>{statsOverride?.[metric] ?? computeStat(metric, books)}</Text><Text numberOfLines={1} style={[text.caption, dim]}>{STAT_METRIC_LABELS[metric]}</Text></View>)}</View>;
   if (block.type === "tierlist") { const tierlist = tierlists.find((item) => item.id === block.tierlistId); return <><Text numberOfLines={1} style={text.title}>{tierlist?.name ?? "Tier list unavailable"}</Text>{tierlist?.data.tiers.map((tier) => <Text key={tier.id} style={text.body}>{tier.label}: {tier.bookKeys.length}</Text>)}</>; }
   return <Text style={text.body}>{BLOCK_TYPE_LABELS[block.type]}</Text>;
 }

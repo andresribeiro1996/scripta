@@ -67,6 +67,7 @@ export function MyShelfScreen() {
   const preview = useMemo(() => buildMuralPreset("shelf", ordered), [ordered]);
   const previewMural: Mural = { id: "shelf-preview", name: preview.name, blocks: preview.blocks, createdAt: "", updatedAt: "", shareToken: null, shareUrl: null, folderId: null };
   const pendingShelf = useRef<string | null>(null);
+  const working = useRef(false);
 
   function handleTabChange(next: MyShelfTab) {
     lastTab = next;
@@ -128,21 +129,33 @@ export function MyShelfScreen() {
   }
 
   async function keepShelf() {
-    const ok = await run(async () => {
-      const id = await shelfTargetId();
-      await murals.update(id, { blocks: preview.blocks });
-      if (ownData.muralId !== id) await setShelfMural(id);
-    });
-    if (ok) await queryClient.invalidateQueries({ queryKey: ["murals"] });
+    if (working.current) return;
+    working.current = true;
+    try {
+      const ok = await run(async () => {
+        const id = await shelfTargetId();
+        await murals.update(id, { blocks: preview.blocks });
+        if (ownData.muralId !== id) await setShelfMural(id);
+      });
+      if (ok) await queryClient.invalidateQueries({ queryKey: ["murals"] });
+    } finally {
+      working.current = false;
+    }
   }
 
   async function startBlank() {
-    let id: string | null = null;
-    const ok = await run(async () => {
-      id = await shelfTargetId();
-      if (ownData.muralId !== id) await setShelfMural(id);
-    });
-    if (ok && id) router.push(`/murals/${id}` as never);
+    if (working.current) return;
+    working.current = true;
+    try {
+      let id: string | null = null;
+      const ok = await run(async () => {
+        id = await shelfTargetId();
+        if (ownData.muralId !== id) await setShelfMural(id);
+      });
+      if (ok && id) router.push(`/murals/${id}` as never);
+    } finally {
+      working.current = false;
+    }
   }
 
   const menuItems: MenuItem[] = [
@@ -212,7 +225,7 @@ export function MyShelfScreen() {
               />
             );
           }
-          return <ShelfPreview mural={previewMural} summary={shelfPresetSummary(books)} busy={busy} books={books} groups={groups} images={images} tierlists={tierlists} profile={profile} onKeep={() => void keepShelf()} onBlank={() => void startBlank()} />;
+          return <ShelfPreview mural={previewMural} summary={shelfPresetSummary(books, ownData.published)} busy={busy} books={books} groups={groups} images={images} tierlists={tierlists} profile={profile} onKeep={() => void keepShelf()} onBlank={() => void startBlank()} />;
         }}
       />
       <MuralPicker
