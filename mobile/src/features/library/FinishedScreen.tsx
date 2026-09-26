@@ -69,6 +69,7 @@ export function FinishedScreen({ book, before, onClose }: { book: Record<string,
       save: async (id, blocks, updatedAt) => {
         const updated = await updateMural(id, { blocks, updatedAt });
         queryClient.setQueryData<Mural[]>(["murals"], (list) => list?.map((m) => (m.id === id ? updated : m)));
+        queryClient.setQueryData<Mural>(["murals", id], updated);
         return updated;
       },
       onChange: (state) => { if (mounted.current) setShelf(state); },
