@@ -31,15 +31,13 @@ The plates are already drawn. `design/reader-cards/plates.mjs` generates them, w
 
 ## 1. `readerIdentity()`
 
-A pure function in `packages/shared/src/library/readerIdentity.ts`, next to `calculateShelfTheme`:
+A pure function in `packages/shared/src/library/readerIdentity.ts`, next to `calculateShelfTheme`. It imports `IdentityKey` (`"carto" | "anno" | "lamp" | "star" | "arch" | "corr" | "way" | "loyal"`) and `CardState` from `../readerCards/index.js`, where PR 0 defines them; it doesn't redefine them.
 
 ```ts
 readerIdentity(books: Array<Record<string, unknown>>, groups: Group[]): ReaderIdentity
 
-type IdentityKey = "carto" | "anno" | "lamp" | "star" | "arch" | "corr" | "way" | "loyal";
-
 interface ReaderIdentity {
-  state: "settled" | "leaning" | "unwritten";
+  state: CardState;
   identity: IdentityKey | null;          // null only when unwritten
   runnerUp: IdentityKey | null;          // set when leaning on a tie
   signal: { counted: number; of: number; label: string } | null;
@@ -89,7 +87,10 @@ It looks only at finished books (`ReadStatus === 2`) and never needs dates, so i
   - Paper print in the light theme, reversed in dark.
   - The accessible label reads like "Reader card: the Stargazer, leaning".
   - Finishing a book updates the card the next time it renders; there is no extra moment in this release.
-- **Mobile rendering:** `SvgXml`. The first mobile task checks on the emulator that Playfair Display resolves inside `SvgXml`. If it doesn't, the plate's text is drawn as React Native `Text` over the SVG art, and the shared API is unchanged.
+- **Mobile rendering:** `SvgXml`. `renderPlate` output carries its colours as inline styles, because `SvgXml` drops `<style>` blocks (PR 0's final review).
+  - The first mobile task checks on the emulator that the colours are right and that the fonts resolve. `SvgXml` keeps only the first family in a font list, so that means Playfair Display for the name and epithet, and the sans labels (EX LIBRIS, the eyebrow, the plate foot).
+  - If the fonts fail, the plate's text is drawn as React Native `Text` over the SVG art, and the shared API is unchanged.
+- **Accessible labels on the wrapper:** `SvgXml` drops ARIA attributes, and glyphs are `aria-hidden`. The label goes on the element around the SVG: web `<span role="img" aria-label>`, mobile `View accessibilityLabel`.
 - **Public rendering:**
   - `blockRefs` sets `needsReaderCard` when a mural has the block.
   - `publicResolver` adds `readerCard: publicReaderCard(readerIdentity(allBooks, groups))` to the public data, as it does for `shelfTheme`. The reader's name comes from the public profile the payload already carries.
@@ -117,7 +118,7 @@ It looks only at finished books (`ReadStatus === 2`) and never needs dates, so i
   - People search;
   - a published profile's header.
 
-  It has an accessible label ("the Stargazer") and does nothing when tapped.
+  Its accessible label ("the Stargazer") goes on the wrapper, as for the card. It does nothing when tapped.
 - **Data:**
   - Community payloads that carry another reader's username gain an optional `readerGlyph?: IdentityKey`.
   - The library module exposes `readerGlyphFor(userId): IdentityKey | null`, which runs `readerIdentity` and returns a key only when Settled.
