@@ -196,6 +196,11 @@ export function MuralsListPage() {
               icon={MuralsIcon}
               title="No murals yet."
               body={'A mural is a freeform dashboard you build yourself \u2014 a "Top 5 Books This Year" shelf, a favorite quote, a photo, whatever you want on the wall. Use the + below to start.'}
+              action={
+                <button onClick={() => setPresetsOpen(true)} className="rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-white">
+                  Start from a preset
+                </button>
+              }
             />
           )}
 
