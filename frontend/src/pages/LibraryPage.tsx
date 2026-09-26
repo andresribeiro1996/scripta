@@ -70,7 +70,7 @@ function updateWithViewTransition(applyUpdate: () => void) {
 export function LibraryPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { scrubBooks } = useMurals();
   const { data: library, isLoading, updateLibrary, share: shareLibraryDoc, unshare: unshareLibraryDoc } = useLibrary();
   const toast = useToast();
@@ -359,7 +359,8 @@ export function LibraryPage() {
   const bookSeriesGroup = useMemo(() => seriesGroupByBookKey(library?.data.books ?? [], library?.data.groups ?? []), [library]);
   const styleBook = styleBookKey ? books.find((b) => bookKey(b) === styleBookKey) : null;
   const coverBook = coverBookKey ? books.find((b) => bookKey(b) === coverBookKey) : null;
-  const detailBook = detailBookKey ? books.find((b) => bookKey(b) === detailBookKey) : null;
+  const detailKey = detailBookKey ?? searchParams.get("book");
+  const detailBook = detailKey ? books.find((b) => bookKey(b) === detailKey) : null;
 
   // The phone's only route to these actions — there is no header on a
   // phone to hold them. Passed to LibraryToolbar as ITEMS rather than a
@@ -657,7 +658,14 @@ export function LibraryPage() {
           onOpenStyle={(b) => setStyleBookKey(bookKey(b))}
           onOpenCoverPicker={(b) => setCoverBookKey(bookKey(b))}
           onSetStatus={(b, status) => void handleSetBookStatus(b, status)}
-          onClose={() => setDetailBookKey(null)}
+          onClose={() => {
+            setDetailBookKey(null);
+            if (searchParams.has("book")) {
+              const next = new URLSearchParams(searchParams);
+              next.delete("book");
+              setSearchParams(next, { replace: true });
+            }
+          }}
         />
       )}
 

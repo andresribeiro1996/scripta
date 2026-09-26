@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { DigestItem } from "@scripta/shared";
-import { feedRowModel, relativeTime } from "./feedRow.js";
+import { feedRowModel, relativeTime } from "./feedRowModel.js";
 
 const actor = { userId: "u1", username: "alice", avatarUrl: null };
 
