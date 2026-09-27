@@ -224,3 +224,17 @@ test("setVoting changes access and open state, ownership-checked", () => {
   assert.equal(updated?.voting_open, 0);
   assert.equal(repo.getOwned("c1", "u1")?.vote_access, "members");
 });
+
+
+test("deleteUserData removes the user's tier lists with their ballots and unlinks their ballots on anyone else's", async () => {
+  const { createSqliteTierlistsRepository } = await import("./sqliteTierlistsRepository.js");
+  const db = freshDb();
+  const repo = createSqliteTierlistsRepository(db);
+  db.prepare(`INSERT INTO tierlists (id, owner_user_id, origin_user_id, name) VALUES ('mine', 'leaver', 'leaver', 'Mine'), ('theirs', 'stayer', 'stayer', 'Theirs'), ('copy', 'stayer', 'leaver', 'Copy')`).run();
+  db.prepare(`INSERT INTO tierlist_ballots (id, tierlist_id, voter_user_id) VALUES ('b1', 'mine', 'stayer'), ('b2', 'theirs', 'leaver')`).run();
+  db.prepare(`INSERT INTO tierlist_ballot_placements (ballot_id, tierlist_id, book_key, tier_id) VALUES ('b1', 'mine', 'k', 'S'), ('b2', 'theirs', 'k', 'A')`).run();
+  repo.deleteUserData("leaver");
+  assert.deepEqual(db.prepare(`SELECT id FROM tierlists ORDER BY id`).all().map((r) => r.id), ["copy", "theirs"]);
+  assert.deepEqual(db.prepare(`SELECT id, voter_user_id FROM tierlist_ballots`).all().map((r) => ({ ...r })), [{ id: "b2", voter_user_id: null }]);
+  assert.deepEqual(db.prepare(`SELECT ballot_id FROM tierlist_ballot_placements`).all().map((r) => r.ballot_id), ["b2"]);
+});

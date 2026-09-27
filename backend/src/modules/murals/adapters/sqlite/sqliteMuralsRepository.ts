@@ -47,6 +47,17 @@ export function createSqliteMuralsRepository(db: DatabaseSync): MuralsRepository
   const deleteFolderStmt = db.prepare(`DELETE FROM mural_folders WHERE id = ? AND user_id = ?`);
 
   return {
+    deleteUserData(userId) {
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        db.prepare("DELETE FROM murals WHERE user_id = ?").run(userId);
+        db.prepare("DELETE FROM mural_folders WHERE user_id = ?").run(userId);
+        db.exec("COMMIT");
+      } catch (error) {
+        db.exec("ROLLBACK");
+        throw error;
+      }
+    },
     listByUser(userId) {
       return listStmt.all(userId) as unknown as MuralRow[];
     },

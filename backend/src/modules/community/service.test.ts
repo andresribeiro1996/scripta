@@ -17,6 +17,7 @@ function createRepoFake() {
   const events: EventRow[] = [];
   const key = (a: string, b: string) => `${a}:${b}`;
   const repo: CommunityRepository = {
+    deleteUserData() {},
     insertFollow(row) {
       const k = key(row.follower_id, row.followee_id);
       if (follows.has(k)) return false;

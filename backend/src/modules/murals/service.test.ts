@@ -19,6 +19,7 @@ function createInMemoryRepo(): MuralsRepository {
   const folders = new Map<string, MuralFolderRow>();
 
   return {
+    deleteUserData() {},
     listByUser(userId) {
       return [...murals.values()].filter((m) => m.user_id === userId);
     },

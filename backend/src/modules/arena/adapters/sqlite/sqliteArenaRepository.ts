@@ -105,6 +105,17 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
   `);
 
   return {
+    deleteUserData(userId) {
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        db.prepare("DELETE FROM tournaments WHERE owner_user_id = ?").run(userId);
+        db.prepare("UPDATE votes SET voter_user_id = NULL WHERE voter_user_id = ?").run(userId);
+        db.exec("COMMIT");
+      } catch (error) {
+        db.exec("ROLLBACK");
+        throw error;
+      }
+    },
     insertTournament(row) {
       insertTournamentStmt.run({
         $id: row.id,

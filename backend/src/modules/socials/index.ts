@@ -3,5 +3,5 @@
 // import from domain/, adapters/, service.ts, providerConfig.ts, or
 // linkSessions.ts directly.
 
-export { socialsPlugin as registerSocialsModule } from "./plugin.js";
+export { socialsPlugin as registerSocialsModule, deleteSocialsUserData } from "./plugin.js";
 export type { SocialProvider, SocialStatus } from "./domain/types.js";
