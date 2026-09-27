@@ -232,7 +232,11 @@ function PublishedSection({ quiz, shareLink, copied, setCopied }: { quiz: Quiz; 
         {ownerQuestions.map((question, index) => (
           <li key={question.id} className="rounded-xl border border-(--color-border) bg-(--color-surface) p-3 text-sm">
             <span className="text-(--color-text-dim)">{index + 1}. {TYPE_LABELS[question.type]}</span>
-            <span className="ml-2 font-semibold">{String(question.options[question.answerIndex])}</span>
+            {question.type === "title_cover" ? (
+              <img src={String(question.options[question.answerIndex])} alt="Answer cover" className="ml-2 inline-block h-10 w-7 rounded object-cover align-middle" />
+            ) : (
+              <span className="ml-2 font-semibold">{String(question.options[question.answerIndex])}</span>
+            )}
           </li>
         ))}
       </ol>
