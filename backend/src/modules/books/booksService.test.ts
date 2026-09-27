@@ -205,3 +205,108 @@ test("getCoverFile serves the thumbnail and falls back to the full file", () => 
   assert.equal(h.service.getCoverFile("legacy", "file")!.mimeType, "image/webp");
   assert.equal(h.service.getCoverFile("unknown", "file"), null);
 });
+
+type Catalog = Deps["catalog"];
+
+function recordingCatalog(overrides: Partial<Catalog> = {}) {
+  const calls: string[] = [];
+  const catalog: Catalog = {
+    fetchDetails: async (lookup) => {
+      calls.push(`details:${lookup.isbn ?? lookup.title}`);
+      return { summary: "Spice.", rating: 4.2, ratingCount: 10, sourceUrl: "https://openlibrary.org/works/OL1W", genres: ["Science Fiction"] };
+    },
+    search: async (query) => {
+      calls.push("isbn" in query ? `search-isbn:${query.isbn}` : `search:${query.text}`);
+      return [
+        { result: { title: "Dune", authors: ["Frank Herbert"], year: 1965, isbn: "9780441013593", publisher: "Ace", coverUrl: "https://covers.openlibrary.org/b/id/7-M.jpg", genres: [] }, olCoverId: 7 },
+        { result: { title: "Dune Encyclopedia", authors: ["Willis E. McNelly"], year: 1984, isbn: null, publisher: null, coverUrl: null, genres: [] }, olCoverId: null }
+      ];
+    },
+    ...overrides
+  };
+  return { calls, catalog };
+}
+
+const dune = { isbn: "9780441013593", title: "Dune", author: "Frank Herbert" };
+
+test("details are fetched once and then served from the database", async () => {
+  const { calls, catalog } = recordingCatalog();
+  const h = harness({ catalog });
+  assert.equal((await h.service.getDetails(dune))?.summary, "Spice.");
+  assert.deepEqual(await h.service.getDetails(dune), { summary: "Spice.", rating: 4.2, ratingCount: 10, sourceUrl: "https://openlibrary.org/works/OL1W", genres: ["Science Fiction"] });
+  assert.deepEqual(calls, ["details:9780441013593"]);
+});
+
+test("a details miss is remembered for 30 days", async () => {
+  const { calls, catalog } = recordingCatalog({ fetchDetails: async () => { calls.push("details"); return null; } });
+  const h = harness({ catalog });
+  assert.equal(await h.service.getDetails(dune), null);
+  assert.equal(await h.service.getDetails(dune), null);
+  assert.equal(calls.length, 1);
+  h.advance(30 * DAY);
+  await h.service.getDetails(dune);
+  assert.equal(calls.length, 2);
+});
+
+test("a details failure propagates and records nothing", async () => {
+  const h = harness({ catalog: recordingCatalog({ fetchDetails: async () => { throw new SourceUnavailableError("openlibrary", "HTTP 503"); } }).catalog });
+  await assert.rejects(h.service.getDetails(dune), SourceUnavailableError);
+  assert.equal(h.repo.findBookByKey("isbn:9780441013593")!.details_status, null);
+});
+
+test("an ISBN search is answered from a saved book without calling Open Library", async () => {
+  const { calls, catalog } = recordingCatalog();
+  const h = harness({ catalog });
+  h.service.resolveCover(dune);
+  const results = await h.service.search("978-0-441-01359-3");
+  assert.equal(results[0]!.title, "Dune");
+  assert.deepEqual(calls, []);
+});
+
+test("an unknown ISBN goes to Open Library and the results are saved", async () => {
+  const { calls, catalog } = recordingCatalog();
+  const h = harness({ catalog });
+  await h.service.search("9780441013593");
+  assert.deepEqual(calls, ["search-isbn:9780441013593"]);
+  assert.ok(h.repo.findBookByKey("isbn:9780441013593"));
+  await h.service.search("9780441013593");
+  assert.equal(calls.length, 1);
+});
+
+test("free text returns saved matches first and falls back to Open Library, saving every result", async () => {
+  const { calls, catalog } = recordingCatalog();
+  const h = harness({ catalog });
+  const fromOpenLibrary = await h.service.search("dune");
+  assert.deepEqual(calls, ["search:dune"]);
+  assert.equal(fromOpenLibrary.length, 2);
+  assert.equal(fromOpenLibrary[0]!.coverUrl, "https://covers.openlibrary.org/b/id/7-M.jpg");
+  assert.ok(h.repo.findBookByKey("ta:dune encyclopedia|willis e mcnelly"));
+
+  const saved = await h.service.search("Dune");
+  assert.equal(calls.length, 1);
+  assert.deepEqual(saved.map((result) => result.title).sort(), ["Dune", "Dune Encyclopedia"]);
+  const book = saved.find((result) => result.title === "Dune")!;
+  assert.deepEqual(book.authors, ["Frank Herbert"]);
+  assert.equal(book.year, 1965);
+  assert.equal(book.coverUrl, "https://covers.openlibrary.org/b/id/7-M.jpg");
+});
+
+test("a saved book's own cover is used in search results", async () => {
+  const { catalog } = recordingCatalog();
+  const h = harness({ catalog, sources: { isbndb: null, apple: isbnSource("https://a/1"), openlibrary: emptySource } });
+  h.sizes.set("https://a/1", [900, 1400]);
+  h.service.resolveCover(dune);
+  await h.service.processBook(h.bookId("isbn:9780441013593"));
+  const [result] = await h.service.search("dune herbert");
+  assert.match(result!.coverUrl!, /\/covers\/cached\/.+\/thumb$/);
+});
+
+test("search strips FTS syntax and ignores punctuation-only queries", async () => {
+  const { calls, catalog } = recordingCatalog();
+  const h = harness({ catalog });
+  await h.service.search("dune");
+  assert.equal((await h.service.search('"Dune" -herbert* (')).length, 1);
+  assert.deepEqual(await h.service.search("***"), []);
+  assert.deepEqual(await h.service.search("   "), []);
+  assert.equal(calls.length, 1);
+});
