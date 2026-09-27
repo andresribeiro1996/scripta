@@ -111,7 +111,7 @@ export function DashboardLayout() {
         <div className="mt-auto border-t border-(--color-border) pt-3">
           <div className="mb-2 flex items-center gap-2 px-2">
             {session && (
-              <Link to={`/community/u/${session.user.username}`} aria-label="Your profile" className="shrink-0 rounded-full transition-opacity hover:opacity-80">
+              <Link to={`/community/u/${session.user.username}`} aria-label="My shelf" title="My shelf" className="shrink-0 rounded-full transition-opacity hover:opacity-80">
                 <Avatar user={session.user} size={24} />
               </Link>
             )}
@@ -210,7 +210,8 @@ export function DashboardLayout() {
                 {session && (
                   <Link
                     to={`/community/u/${session.user.username}`}
-                    aria-label="Your profile"
+                    aria-label="My shelf"
+                    title="My shelf"
                     onClick={() => setDrawerOpen(false)}
                     className="shrink-0 rounded-full transition-opacity hover:opacity-80"
                   >

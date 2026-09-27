@@ -12,6 +12,7 @@ import fastifyCors from "@fastify/cors";
 import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
 import { STATUS_CODES } from "node:http";
 import { isAllowedOrigin } from "./config/corsOrigin.js";
+import { env } from "./config/env.js";
 import { devHttps } from "./config/devCerts.js";
 import { runStartupMigrations } from "./migrations/runStartupMigrations.js";
 import {
@@ -76,6 +77,7 @@ export function buildApp() {
   });
 
   app.get("/health", async () => ({ status: "ok" }));
+  app.get("/public-config", async () => ({ frontendUrl: env.FRONTEND_URL }));
 
   // Fastify's default 500 serializer forwards the raw error message to
   // the client — SQLite constraint text, file paths, JSON.parse details —

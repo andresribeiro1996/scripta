@@ -74,6 +74,23 @@ export function buildCommunityRoutes(service: CommunityService) {
       return reply.code(204).send();
     });
 
+    app.get("/community/profile", { preHandler: authGuard }, async (request, reply) => {
+      reply.header("Cache-Control", "no-store");
+      return reply.send(service.getOwnProfile(request.user.id));
+    });
+
+    app.put("/community/profile/mural", { preHandler: authGuard }, async (request, reply) => {
+      const parsed = publishSchema.safeParse(request.body);
+      if (!parsed.success) return reply.code(400).send({ error: "Expected {muralId}." });
+      try {
+        service.setShelfMural(request.user.id, parsed.data.muralId);
+        return reply.code(204).send();
+      } catch (err) {
+        if (err instanceof CommunityError) return reply.code(statusForCommunityError(err)).send({ error: err.message });
+        throw err;
+      }
+    });
+
     app.put("/community/profile/feed-settings", { preHandler: authGuard }, async (request, reply) => {
       const parsed = feedSettingsSchema.safeParse(request.body);
       if (!parsed.success) return reply.code(400).send({ error: "Expected { publications, reading, votes, follows } booleans." });

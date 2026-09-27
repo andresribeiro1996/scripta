@@ -29,6 +29,10 @@
     "./dashboard": {
       "types": "./dist/dashboard.d.ts",
       "default": "./dist/dashboard.js"
+    },
+    "./readerCards": {
+      "types": "./dist/readerCards/index.d.ts",
+      "default": "./dist/readerCards/index.js"
     }
   },
   "files": [
