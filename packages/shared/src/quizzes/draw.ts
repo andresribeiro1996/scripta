@@ -61,7 +61,18 @@ export function generateQuizQuestions(books: QuizBook[], config: QuizConfig, see
     const valueOf = (b: QuizBook): string => (coverOptions ? b.coverUrl ?? "" : b.title);
     const distractorPool = coverOptions ? withCover : books;
     const answerValue = valueOf(book);
-    const distractors = shuffle(distractorPool.filter((b) => b.key !== book.key && valueOf(b) !== answerValue), rand).slice(0, 3);
+    // Dedupe by displayed value, not just by book: two books may share a
+    // title or cover URL, and options A,B,B,B make the answer index pick
+    // an arbitrary one of the duplicates.
+    const seenValues = new Set<string>([answerValue]);
+    const distractors: QuizBook[] = [];
+    for (const candidate of shuffle(distractorPool.filter((b) => b.key !== book.key), rand)) {
+      if (distractors.length === 3) break;
+      const value = valueOf(candidate);
+      if (seenValues.has(value)) continue;
+      seenValues.add(value);
+      distractors.push(candidate);
+    }
     if (distractors.length < 3) continue;
     const ordered = shuffle([...distractors.map(valueOf), answerValue], rand);
     questions.push({ id: `q${questions.length}`, type, bookKey: book.key, options: ordered, answerIndex: ordered.indexOf(answerValue) });

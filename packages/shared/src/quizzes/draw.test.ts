@@ -65,3 +65,17 @@ test("mulberry32 is deterministic and hashSeed is stable", () => {
   const b = mulberry32(hashSeed("abc"));
   assert.deepEqual([a(), a(), a()], [b(), b(), b()]);
 });
+
+test("options stay distinct when several books share a title", () => {
+  const dupes = [book("a"), book("b"), book("b2", { title: "Title b" }), book("b3", { title: "Title b" }), book("c"), book("d")];
+  const questions = generateQuizQuestions(dupes, { questionCount: 6, allowedTypes: ["cover_title", "title_cover"] }, "s");
+  for (const q of questions) {
+    assert.equal(q.options.length, 4);
+    assert.equal(new Set(q.options).size, 4, `options should be distinct: ${q.options.join(", ")}`);
+  }
+});
+
+test("a pool whose titles cannot fill 4 distinct options draws nothing rather than duplicating", () => {
+  const dupes = [book("a"), book("b"), book("b2", { title: "Title b" }), book("b3", { title: "Title b" })];
+  assert.equal(generateQuizQuestions(dupes, { questionCount: 4, allowedTypes: ["cover_title"] }, "s").length, 0);
+});
