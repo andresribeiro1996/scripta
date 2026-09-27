@@ -63,6 +63,7 @@
   --color-reference: #6b4f8f;
   --color-reference-soft: #ebe4f3;
   --color-on-accent: #ffffff;
+  --color-on-danger: #ffffff;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -84,6 +85,7 @@
     --color-reference: #b9a3d6;
     --color-reference-soft: #2c2536;
     --color-on-accent: #141210;
+    --color-on-danger: #141210;
   }
 }
 

@@ -1,6 +1,6 @@
 import { authFieldErrors, PASSWORD_HINT, USERNAME_HINT, safeAuthReturnTo } from "@scripta/shared";
 import { PasswordInput } from "../auth/PasswordInput";
-import { afterSignIn, startAuthNavigation } from "../auth/returnTo";
+import { afterSignIn, clearAuthNotice, readAuthNotice, startAuthNavigation } from "../auth/returnTo";
 import { modeFromSearch, type AuthMode as Mode } from "../lib/landing";
 import { useEffect, useRef, useState } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
@@ -55,12 +55,15 @@ export function LoginPage() {
   const from = (location.state as { from?: { pathname: string; search?: string; hash?: string }; returnTo?: string } | null);
   const redirectTo = safeAuthReturnTo(from?.returnTo ?? (from?.from ? `${from.from.pathname}${from.from.search ?? ""}${from.from.hash ?? ""}` : new URLSearchParams(location.search).get("returnTo")), "/dashboard");
   const [googleAvailable, setGoogleAvailable] = useState(false);
+  const [notice] = useState(readAuthNotice);
 
   useEffect(() => {
     publicFetch("/auth/providers")
       .then((body) => setGoogleAvailable(Boolean((body as { google?: boolean }).google)))
       .catch(() => setGoogleAvailable(false));
   }, []);
+
+  useEffect(() => clearAuthNotice(), []);
 
   useEffect(() => {
     const restore = () => { locked.current = false; setSubmitting(false); };
@@ -132,7 +135,7 @@ export function LoginPage() {
     }
   }
 
-  const message = (location.state as { message?: string } | null)?.message;
+  const message = (location.state as { message?: string } | null)?.message ?? notice;
 
   function switchMode() {
     setMode(mode === "login" ? "signup" : "login");

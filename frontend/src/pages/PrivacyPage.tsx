@@ -131,20 +131,18 @@ export function PrivacyPage() {
 
           <Section title="How long we keep it">
             <p>
-              We keep your data while your account exists. When you ask us to delete your account, we delete it along
-              with your library, images and everything else linked to it. Server logs are kept for a limited period by
-              our hosting provider.
+              We keep your data while your account exists. When you delete your account, in Settings, we delete it along
+              with your library, images and everything else linked to it straight away. Votes you cast on other people's
+              tier lists and tournaments stay counted but are no longer linked to you. Server logs are kept for a limited
+              period by our hosting provider.
             </p>
           </Section>
 
           <Section title="Your choices and rights">
             <ul>
               <li>Edit or remove books, murals, gallery images and your profile picture in the app at any time.</li>
-              <li>Change your email or password, stop sharing, and disconnect social accounts in Settings.</li>
-              <li>
-                To get a copy of your data, correct it, or delete your account, write to {contactLink}. Account deletion
-                is handled by request for now.
-              </li>
+              <li>Change your email or password, stop sharing, disconnect social accounts, or delete your account in Settings.</li>
+              <li>To get a copy of your data or correct it, write to {contactLink}.</li>
               <li>
                 If you're in the EU or UK, you can also complain to your local data protection authority.
               </li>
