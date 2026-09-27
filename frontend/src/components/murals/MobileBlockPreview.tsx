@@ -5,8 +5,7 @@ import { bookKey } from "../../lib/merge";
 import { computeStat } from "../../lib/muralStats";
 import { calculateShelfTheme, muralBlockTitle, resolveQuote, resolveQuoteCollection, resolveShelfBooks, type MuralBlock, type ReaderProfile, type ShelfTheme } from "../../lib/murals";
 import { CoverImage } from "../BookCard";
-import { ReaderCardPlate } from "./blocks/ReaderCardBlock";
-import { useReaderCard } from "../../hooks/useReaderCard";
+import { ReaderCardBlockView } from "./blocks/ReaderCardBlock";
 
 const PREVIEW_STAT_LABELS = {
   totalBooks: "Library",
@@ -42,7 +41,6 @@ export function MobileBlockPreview({
   tierlistData?: (id: string) => ResolvedTierlist | undefined;
 }) {
   const title = muralBlockTitle(block, books, block.type === "tierlist" ? tierlistData?.(block.tierlistId)?.name : undefined);
-  const { card: readerCard, own: readerOwn } = useReaderCard(books, groups ?? [], readerCardOverride);
   const compact = height < 64 || width < 80;
   const heading = <p className="shrink-0 truncate text-[14px] leading-5 font-semibold">{title}</p>;
   const placeholder = (
@@ -59,7 +57,7 @@ export function MobileBlockPreview({
   if (block.type === "readerCard") {
     return (
       <div className="flex h-full items-center justify-center overflow-hidden p-1">
-        <ReaderCardPlate card={readerCard} own={readerOwn} readerName={profile?.username || "reader"} />
+        <ReaderCardBlockView books={books} groups={groups ?? []} readerCardOverride={readerCardOverride} readerName={profile?.username || "reader"} />
       </div>
     );
   }

@@ -15,10 +15,11 @@ import { MobileMuralCanvas, type MobileMuralDraft } from "./MobileMuralCanvas";
 
 const ResponsiveGridLayout = GridLayout.WidthProvider(GridLayout);
 const ROW_HEIGHT = 28;
+const NO_GROUPS: Group[] = [];
 
 export function MuralCanvas({
   mural: originalMural,
-  groups = [],
+  groups = NO_GROUPS,
   onOpenBlock,
   editMode,
   books,

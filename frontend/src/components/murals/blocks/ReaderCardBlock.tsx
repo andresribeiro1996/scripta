@@ -1,9 +1,10 @@
 import { useMemo } from "react";
-import { READER_PLATES, readerCardLabel, readerCardPlateLine, renderPlate, type PublicReaderCard, type ReaderIdentity } from "@scripta/shared";
+import { READER_PLATES, readerCardLabel, readerCardPlateLine, renderPlate, type Group, type PublicReaderCard, type ReaderIdentity } from "@scripta/shared";
+import { useReaderCard } from "../../../hooks/useReaderCard";
 
-export function ReaderCardPlate({ card, own, readerName }: { card: PublicReaderCard; own: ReaderIdentity | null; readerName: string }) {
+export function ReaderCardPlate({ card, own, readerName, fill = true }: { card: PublicReaderCard; own: ReaderIdentity | null; readerName: string; fill?: boolean }) {
   const label = readerCardLabel(card);
-  const unwrittenLine = readerCardPlateLine(own?.missing ?? null);
+  const unwrittenLine = own ? readerCardPlateLine(own.missing) : "yet to be written";
   const { paper, reversed } = useMemo(
     () => ({
       paper: renderPlate({ identity: card.identity, state: card.state, readerName, print: "paper", label, unwrittenLine }),
@@ -11,12 +12,18 @@ export function ReaderCardPlate({ card, own, readerName }: { card: PublicReaderC
     }),
     [card, readerName, label, unwrittenLine]
   );
+  const innerClass = fill ? "block h-full w-full [&>svg]:h-full [&>svg]:w-full" : "block w-full [&>svg]:h-full [&>svg]:w-full";
   return (
-    <span className="mx-auto block aspect-[5/7] h-full max-w-full">
-      <span className="block h-full w-full [&>svg]:h-full [&>svg]:w-full dark:hidden" dangerouslySetInnerHTML={{ __html: paper }} />
-      <span className="hidden h-full w-full [&>svg]:h-full [&>svg]:w-full dark:block" dangerouslySetInnerHTML={{ __html: reversed }} />
+    <span className={`mx-auto block aspect-[5/7] max-w-full ${fill ? "h-full" : "w-full"}`}>
+      <span className={`${innerClass} dark:hidden`} dangerouslySetInnerHTML={{ __html: paper }} />
+      <span className={`hidden ${innerClass} dark:block`} dangerouslySetInnerHTML={{ __html: reversed }} />
     </span>
   );
+}
+
+export function ReaderCardBlockView({ books, groups, readerCardOverride, readerName }: { books: Array<Record<string, unknown>>; groups: Group[]; readerCardOverride?: PublicReaderCard; readerName: string }) {
+  const { card, own } = useReaderCard(books, groups, readerCardOverride);
+  return <ReaderCardPlate card={card} own={own} readerName={readerName} />;
 }
 
 export function ReaderCardDetail({ card, own }: { card: PublicReaderCard; own: ReaderIdentity | null }) {
