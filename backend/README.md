@@ -264,7 +264,7 @@ Adding a third module means repeating both shapes: its own `domain/ports.ts` + `
 
 ## Why node:sqlite instead of better-sqlite3
 
-`better-sqlite3` needs a native C++ toolchain (node-gyp) to compile on install, which isn't available on every machine this might run on — it failed outright on the machine this was built on. Node 22.5+ ships a built-in `node:sqlite` module with a very similar synchronous API and no native build step at all. It's still flagged experimental by Node itself (a runtime warning, not an error) — worth knowing, and easy to swap later: thanks to the hexagonal split above, that would mean a new `adapters/sqlite/` implementation (or, given the name would no longer fit, a rename) rather than touching `service.ts` or `routes.ts` in either module.
+`better-sqlite3` needs a native C++ toolchain (node-gyp) to compile on install, which isn't available on every machine this might run on — it failed outright on the machine this was built on. Node 22.5+ ships a built-in `node:sqlite` module with a very similar synchronous API and no native build step at all — though this backend requires Node 24+, since the books module's FTS5 table needs a `node:sqlite` build with FTS5 compiled in, which only later releases have. It's still flagged experimental by Node itself (a runtime warning, not an error) — worth knowing, and easy to swap later: thanks to the hexagonal split above, that would mean a new `adapters/sqlite/` implementation (or, given the name would no longer fit, a rename) rather than touching `service.ts` or `routes.ts` in either module.
 
 ## Security notes
 

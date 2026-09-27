@@ -53,7 +53,9 @@ export function buildApp() {
   // plain-http one — this app never touches request.raw/reply.raw (the
   // only APIs that would actually differ between an http.Server and an
   // https.Server), so nothing downstream needs the more specific type.
-  const app: FastifyInstance = devHttps ? (Fastify({ logger: true, https: devHttps }) as FastifyInstance) : Fastify({ logger: true });
+  const app: FastifyInstance = devHttps
+    ? (Fastify({ logger: true, https: devHttps, trustProxy: true }) as FastifyInstance)
+    : Fastify({ logger: true, trustProxy: true });
 
   // Genuinely app-wide (unlike each module's own rate limiter) — the
   // frontend is a separate origin from this API in dev (Vite on 5173,
