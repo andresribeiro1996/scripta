@@ -1,4 +1,4 @@
-import type { LibraryData, MuralBlock, ReaderProfile, ResolvedTierlist, ShelfTheme } from "@scripta/shared";
+import type { LibraryData, MuralBlock, PublicReaderCard, ReaderProfile, ResolvedTierlist, ShelfTheme } from "@scripta/shared";
 import { apiClient } from "../../core/api";
 
 export interface PublicBookData {
@@ -24,6 +24,7 @@ export interface SharedMuralPayload {
   currentlyReading: PublicBookData[];
   stats: Record<string, number>;
   shelfTheme?: ShelfTheme;
+  readerCard?: PublicReaderCard;
   profile?: ReaderProfile;
   imageUrls: Record<string, string | null>;
   tierlists: Record<string, ResolvedTierlist>;

@@ -134,6 +134,12 @@ export function BlockConfigPanel({
             </p>
           )}
 
+          {draft.type === "readerCard" && (
+            <p className="text-sm text-(--color-text-dim)">
+              Nothing to configure — the card is drawn from your finished books.
+            </p>
+          )}
+
           {draft.type === "empty" && (
             <p className="text-sm text-(--color-text-dim)">
               Nothing to configure — this is just a styled block, no content of its own. Use its own 🎨 Style option to set a

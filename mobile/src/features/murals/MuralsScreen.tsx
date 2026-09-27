@@ -67,7 +67,7 @@ export function MuralsScreen() {
     working.current = true;
     setPresetError(null);
     try {
-      const preset = buildMuralPreset(id, libraryQuery.data?.data.books ?? []);
+      const preset = buildMuralPreset(id, libraryQuery.data?.data.books ?? [], libraryQuery.data?.data.groups ?? []);
       const target = pendingPreset.current?.preset === id ? pendingPreset.current : { id: (await murals.create(preset.name, folderId ?? null)).id, preset: id };
       pendingPreset.current = target;
       const updated = await murals.update(target.id, { blocks: preset.blocks });

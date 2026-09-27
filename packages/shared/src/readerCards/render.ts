@@ -20,6 +20,8 @@ function inks(key: IdentityKey | "graph", print: PlatePrint): [string, string] {
 
 const escape = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
+const truncateName = (name: string) => (name.length > 16 ? `${name.slice(0, 16)}…` : name);
+
 const rules = (g: string, l: string): Record<string, string> => ({
   pg: `fill:${g}`, pgf: `fill:${g}`, gg: `fill:${g}`,
   pf: `fill:${l}`, pt: `fill:${l}`, gd: `fill:${l}`, gi: `fill:${l}`,
@@ -38,7 +40,7 @@ const withStyle = (svg: string, [g, l]: [string, string]) => {
 };
 
 export function renderPlate({ identity, state, readerName, print, label, unwrittenLine, width }: RenderPlateOptions): string {
-  const reader = escape(readerName.toUpperCase());
+  const reader = escape(truncateName(readerName).toUpperCase());
   const safeLabel = escape(label);
   if (state === "unwritten" || !identity) {
     const svg = plate({ key: "none", emblem: "none", name: "Unwritten", eyebrow: "NOT YET", epithet: escape(unwrittenLine ?? "five finished books to begin"), numeral: "—", reader, width, label: safeLabel });

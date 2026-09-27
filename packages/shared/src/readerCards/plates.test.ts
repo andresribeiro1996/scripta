@@ -57,6 +57,14 @@ test("readerName is escaped after uppercasing", () => {
   assert.match(svg, />A&lt;B</);
 });
 
+test("a long reader name is truncated before it can overprint the plate foot", () => {
+  const svg = renderPlate({ identity: "carto", state: "settled", readerName: "a".repeat(30), print: "paper", label: "x" });
+  const [, printed] = svg.match(/>(A+…?)<\/text>\s*<\/svg>/) ?? [];
+  assert.ok(printed, "reader name text not found");
+  assert.ok(printed!.length <= 17, `printed name is ${printed!.length} chars`);
+  assert.match(svg, />PLATE /);
+});
+
 test("a label containing a quote doesn't break the aria-label attribute", () => {
   const svg = renderPlate({ identity: "carto", state: "settled", readerName: "a", print: "paper", label: 'Reader "quill" card' });
   assert.match(svg, /aria-label="Reader &quot;quill&quot; card"/);
@@ -90,6 +98,13 @@ function luminance(hex: string) {
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
   return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
 }
+
+test("no plate or glyph path carries a NaN coordinate — react-native-svg throws on one where a browser silently drops it", () => {
+  for (const p of READER_PLATES) {
+    assert.doesNotMatch(renderPlate({ identity: p.key, state: "settled", readerName: "a", print: "paper", label: "x" }), /NaN/);
+    assert.doesNotMatch(renderGlyph(p.key, 24, "paper"), /NaN/);
+  }
+});
 
 test("every ink clears 5:1 against paper", () => {
   for (const [key, [, ink]] of Object.entries(PLATE_INKS)) {

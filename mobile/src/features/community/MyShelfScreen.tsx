@@ -64,7 +64,7 @@ export function MyShelfScreen() {
     : undefined;
 
   const ordered = useMemo(() => orderLibraryBooks(books, groups), [books, groups]);
-  const preview = useMemo(() => buildMuralPreset("shelf", ordered), [ordered]);
+  const preview = useMemo(() => buildMuralPreset("shelf", ordered, groups), [ordered, groups]);
   const previewMural: Mural = { id: "shelf-preview", name: preview.name, blocks: preview.blocks, createdAt: "", updatedAt: "", shareToken: null, shareUrl: null, folderId: null };
   const pendingShelf = useRef<string | null>(null);
   const working = useRef(false);

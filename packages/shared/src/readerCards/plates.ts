@@ -1,6 +1,8 @@
 const SERIF = "'Playfair Display', Georgia, 'Times New Roman', serif";
 const SANS = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 
+export const PLATE_FONTS = { serif: SERIF, sans: SANS };
+
 export const PAPER = "#f1eadb";
 export const REVERSED_LINE = "#efe5d1";
 
@@ -163,7 +165,7 @@ function shadowWidths(points: Point[], min: number, max: number): number[] {
 
 function swellWidths(points: Point[], min: number, max: number): number[] {
   const s = lengths(points), total = s[s.length - 1] || 1;
-  return s.map((d) => min + (max - min) * Math.sin((Math.PI * d) / total) ** 0.7);
+  return s.map((d) => min + (max - min) * Math.max(0, Math.sin((Math.PI * d) / total)) ** 0.7);
 }
 
 function inside([x, y]: Point, polygon: Point[]): boolean {

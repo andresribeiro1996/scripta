@@ -121,6 +121,7 @@ export function ProfileScreen({ username }: { username: string }) {
                       tierlists={tierlists}
                       profile={profileUser}
                       shelfThemeOverride={muralData?.library.shelfTheme}
+                      readerCardOverride={muralData?.library.readerCard}
                       statsOverride={muralData?.library.stats}
                     />
                   ) : (

@@ -1,9 +1,11 @@
+import type { Group, PublicReaderCard } from "@scripta/shared";
 import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
 import type { MuralBlock, ReaderProfile, ShelfTheme } from "../../lib/murals";
 import { CurrentlyReadingBlockView, ShelfBlockView, SpotlightBlockView, TierListBlockView } from "./blocks/BookBlocks";
 import { ImageBlockView, ProfileBlockView, StatsBlockView, TextBlockView } from "./blocks/MiscBlocks";
 import { QuoteBlockView, QuoteCollectionBlockView } from "./blocks/QuoteBlocks";
+import { ReaderCardBlockView } from "./blocks/ReaderCardBlock";
 
 /** Dispatches a block to its view-mode renderer by `type` — the one place
  *  that knows every block type exists, so adding a new type later means
@@ -23,7 +25,9 @@ export function BlockRenderer({
   books,
   images,
   profile,
+  groups,
   shelfThemeOverride,
+  readerCardOverride,
   statsOverride,
   tierlistData
 }: {
@@ -31,7 +35,9 @@ export function BlockRenderer({
   books: Array<Record<string, unknown>>;
   images: GalleryImage[];
   profile?: ReaderProfile;
+  groups?: Group[];
   shelfThemeOverride?: ShelfTheme;
+  readerCardOverride?: PublicReaderCard;
   /** See MuralCanvas.tsx's own comment — threaded straight through to
    *  StatsBlockView, ignored by every other case. */
   statsOverride?: Record<string, number>;
@@ -61,6 +67,8 @@ export function BlockRenderer({
       return <StatsBlockView block={block} books={books} statsOverride={statsOverride} />;
     case "tierlist":
       return <TierListBlockView tierlist={tierlistData?.(block.tierlistId)} books={books} />;
+    case "readerCard":
+      return <ReaderCardBlockView books={books} groups={groups ?? []} readerCardOverride={readerCardOverride} readerName={profile?.username || "reader"} />;
     case "empty":
       // Genuinely nothing to render — the block wrapper itself
       // (MuralCanvas.tsx) already carries the whole BlockStyle

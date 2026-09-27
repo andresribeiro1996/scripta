@@ -15,6 +15,7 @@ export function MuralPresetPicker({ folderId, onClose }: { folderId: string | nu
   const [pending, setPending] = useState<{ id: string; preset: MuralPresetId } | null>(null);
   const working = useRef(false);
   const books = library?.data.books ?? [];
+  const groups = library?.data.groups ?? [];
 
   async function choose(id: MuralPresetId) {
     if (working.current) return;
@@ -22,7 +23,7 @@ export function MuralPresetPicker({ folderId, onClose }: { folderId: string | nu
     setBusy(true);
     setError("");
     try {
-      const preset = buildMuralPreset(id, books);
+      const preset = buildMuralPreset(id, books, groups);
       const target = pending ?? { id: (await create(preset.name, folderId)).id, preset: id };
       setPending(target);
       await saveBlocks(target.id, preset.blocks);
@@ -42,7 +43,7 @@ export function MuralPresetPicker({ folderId, onClose }: { folderId: string | nu
       {isError && <p role="alert" className="px-3 pb-3 text-sm text-(--color-danger)">Couldn't load your library. Reopen presets to try again.</p>}
       <div className="space-y-4 px-3 pb-4">
         {MURAL_PRESETS.map((preset) => {
-          const built = buildMuralPreset(preset.id, books);
+          const built = buildMuralPreset(preset.id, books, groups);
           const bottom = Math.max(...built.blocks.map((block) => block.layout.y + block.layout.h));
           const reason = presetAvailability(preset.id, books);
           return (
