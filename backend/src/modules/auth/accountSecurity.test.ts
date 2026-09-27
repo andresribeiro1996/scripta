@@ -24,10 +24,15 @@ function setup(enabled = true) {
   applyAuthMigrations(db);
   const repo = createSqliteAuthRepository(db);
   const emails: { to: string; subject: string; text: string }[] = [];
-  const security = createAccountSecurity(repo, async (to, subject, text) => { emails.push({ to, subject, text }); }, "https://scripta.example", enabled);
-  const auth = createAuthService(repo, { save() {}, read() { return null; }, delete() {} });
+  const erased: string[] = [];
+  let eraseFails = false;
+  const security = createAccountSecurity(repo, async (to, subject, text) => { emails.push({ to, subject, text }); }, "https://scripta.example", enabled, (userId) => {
+    if (eraseFails) throw new Error("erase failed");
+    erased.push(userId);
+  });
+  const auth = createAuthService(repo, { save() {}, read() { return null; }, delete() {}, deleteAll() {} });
   const token = () => new URLSearchParams(new URL(emails.at(-1)!.text.match(/https:\/\/\S+/)![0]).hash.slice(1)).get("token")!;
-  return { db, repo, emails, security, auth, token };
+  return { db, repo, emails, erased, security, auth, token, failErase: () => { eraseFails = true; } };
 }
 
 test("reset revokes required and optional access, refresh rotation grace, and reused links", async () => {
@@ -138,4 +143,48 @@ test("recovery responses hide account existence, validate input and enforce IP t
     assert.equal((await app.inject({ method: "POST", url: "/auth/forgot-password", payload: { email: "missing@example.com" } })).statusCode, 429);
     assert.equal((await app.inject({ method: "POST", url: "/auth/reset-password", payload: { token: "invalid", password: "short" } })).statusCode, 400);
   } finally { await app.close(); db.close(); }
+});
+
+test("deleting an account needs the password, signs out everywhere, erases every module and removes the user", async () => {
+  const { db, repo, auth, security, emails, erased } = setup();
+  try {
+    const session = await auth.signup("reader@example.com", "reader", "a password");
+    const userId = session.user.id;
+    await assert.rejects(security.deleteAccount(userId, "wrong password"), { status: 403 });
+    await assert.rejects(security.deleteAccount(userId), { status: 403 });
+    assert.deepEqual(erased, []);
+    assert.ok(repo.findUserById(userId));
+    await security.deleteAccount(userId, "a password");
+    assert.deepEqual(erased, [userId]);
+    assert.equal(repo.findUserById(userId), undefined);
+    assert.equal(getAuthenticatedUserFromAccessToken(session.tokens.accessToken, repo.findUserById), null);
+    await assert.rejects(auth.refresh(session.tokens.refreshToken));
+    await assert.rejects(auth.login("reader", "a password"));
+    assert.equal(emails.at(-1)?.subject, "Your Atmyshelf account was deleted");
+    assert.ok(await auth.signup("reader@example.com", "reader", "a password"));
+  } finally { db.close(); }
+});
+
+test("an account without a password confirms deletion by typing its username", async () => {
+  const { db, repo, security, erased } = setup(false);
+  try {
+    const user = repo.createUser({ email: "google@example.com", username: "Reader", passwordHash: null, googleId: "google-1" });
+    await assert.rejects(security.deleteAccount(user.id, "a password"), { status: 403 });
+    await assert.rejects(security.deleteAccount(user.id, undefined, "someone"), { status: 403 });
+    await security.deleteAccount(user.id, undefined, " reader ");
+    assert.deepEqual(erased, [user.id]);
+    assert.equal(repo.findUserById(user.id), undefined);
+  } finally { db.close(); }
+});
+
+test("a failed erase keeps the account so deleting again can finish the job", async () => {
+  const { db, repo, auth, security, failErase } = setup();
+  try {
+    const session = await auth.signup("reader@example.com", "reader", "a password");
+    failErase();
+    await assert.rejects(security.deleteAccount(session.user.id, "a password"), /erase failed/);
+    assert.ok(repo.findUserById(session.user.id));
+    assert.equal(getAuthenticatedUserFromAccessToken(session.tokens.accessToken, repo.findUserById), null);
+    assert.ok(await auth.login("reader", "a password"));
+  } finally { db.close(); }
 });

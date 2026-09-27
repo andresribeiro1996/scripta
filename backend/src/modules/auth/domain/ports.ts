@@ -19,6 +19,8 @@ export interface AccountToken {
 }
 
 export interface AuthRepository {
+  revokeSessions(userId: string): void;
+  deleteUser(userId: string): void;
   saveAccountToken(token: AccountToken): boolean;
   findAccountToken(hash: string, purpose: "reset" | "verify"): AccountToken | undefined;
   completePasswordReset(hash: string, passwordHash: string): boolean;
@@ -63,6 +65,7 @@ export interface AuthRepository {
  *  addressed by a server-generated id — see types.ts's AuthenticatedUser.
  *  Output format is fixed (webp) by the service, so no extension parameter. */
 export interface AvatarBlobStore {
+  deleteAll(userId: string): void;
   save(userId: string, avatarId: string, bytes: Buffer): void;
   read(userId: string, avatarId: string): Buffer | null;
   delete(userId: string, avatarId: string): void;

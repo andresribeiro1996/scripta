@@ -18,6 +18,10 @@ function pathFor(root: string, userId: string, id: string, extension: string): s
 
 export function createFsImageBlobStore(root: string): ImageBlobStore {
   return {
+    deleteAll(userId) {
+      if (!/^[A-Za-z0-9-]+$/.test(userId)) throw new Error("Refusing to delete files for an unexpected user id.");
+      rmSync(join(root, userId), { recursive: true, force: true });
+    },
     save(userId, id, extension, bytes) {
       const path = pathFor(root, userId, id, extension);
       mkdirSync(join(root, userId), { recursive: true });

@@ -34,6 +34,8 @@ function createInMemoryRepo(): AuthRepository & { rows: Map<string, UserRow>; re
 
   return {
     saveAccountToken() { throw new Error("Unused in this test"); },
+    revokeSessions() { throw new Error("Unused in this test"); },
+    deleteUser() { throw new Error("Unused in this test"); },
     findAccountToken() { throw new Error("Unused in this test"); },
     completePasswordReset() { throw new Error("Unused in this test"); },
     changePassword() { throw new Error("Unused in this test"); },
@@ -137,6 +139,7 @@ function createInMemoryBlobStore(): AvatarBlobStore & { saved: Map<string, Buffe
     save(userId, avatarId, bytes) {
       saved.set(key(userId, avatarId), bytes);
     },
+    deleteAll() { throw new Error("Unused in this test"); },
     read(userId, avatarId) {
       return saved.get(key(userId, avatarId)) ?? null;
     },

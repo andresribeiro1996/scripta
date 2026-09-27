@@ -29,6 +29,7 @@ function createInMemoryArenaRepository(): ArenaRepository {
   const votes: VoteRow[] = [];
 
   return {
+    deleteUserData() {},
     insertTournament(row) {
       tournaments.set(row.id, { ...row });
     },

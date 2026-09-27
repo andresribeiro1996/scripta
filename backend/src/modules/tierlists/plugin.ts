@@ -57,3 +57,9 @@ export function getTierlistsPublicApi(): TierlistsPublicApi {
   }
   return cachedApi;
 }
+
+let erasingTierlists: ReturnType<typeof createSqliteTierlistsRepository> | undefined;
+
+export function deleteTierlistsUserData(userId: string) {
+  (erasingTierlists ??= createSqliteTierlistsRepository(openTierlistsDb())).deleteUserData(userId);
+}
