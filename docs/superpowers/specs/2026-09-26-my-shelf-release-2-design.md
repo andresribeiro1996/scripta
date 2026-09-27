@@ -52,13 +52,13 @@ It looks only at finished books (`ReadStatus === 2`) and never needs dates, so i
 | Key | Name | Signal over finished books | Threshold |
 |---|---|---|---|
 | carto | The Cartographer | share in a `series` group | ≥30% and ≥3 books |
-| anno | The Annotator | share with a highlight or review (`Type` "highlight" or "review") | ≥30% and ≥20 marks |
+| anno | The Annotator | share with a highlight, a Kobo note or a review (`Type` "highlight", "note" or "review" with text or an annotation) | ≥30% and ≥20 marks |
 | lamp | The Lamplighter | Mystery, Crime, Thriller, Horror | ≥35% |
 | star | The Stargazer | Fantasy, Science Fiction | ≥40% |
 | arch | The Archivist | History, Biography & Memoir, Politics | ≥35% |
 | corr | The Correspondent | Classics, Literary Fiction, Poetry | ≥40% |
 | way | The Wayfarer | genres above 5% | ≥6 genres, none over 25% |
-| loyal | The Loyalist | share by the top 3 authors (`Attribution`) | ≥40% |
+| loyal | The Loyalist | share by the top 3 authors (`Attribution`) with at least 2 finished books each | ≥40% and ≥3 books |
 
 - Genres come from the same `_genres` enrichment `calculateShelfTheme` uses. The four genre signals and the Wayfarer count only when genres are known for at least half of the finished books. The Wayfarer checks both of its conditions, and its strength is the lower of genre count ÷ 6 and 25% ÷ the largest share. The largest share includes the four genre signals' grouped shares as well as single genres, so a reader with 40% fantasy and science fiction together is a Stargazer, not a Wayfarer (decided with the user).
 - Strength is share ÷ threshold, and the strongest signal wins.
