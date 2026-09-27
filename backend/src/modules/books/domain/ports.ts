@@ -1,4 +1,5 @@
-import type { CachedCoverRow } from "./types.js";
+import type { BookMetadata } from "@scripta/shared";
+import type { BookRow, CachedCoverRow, CoverImageRow, CoverStatus, NewBook } from "./types.js";
 
 // The one seam Hardcover specifically needs — something that can look up
 // a cover image URL for a book, given its ISBN. Written in terms the
@@ -35,4 +36,19 @@ export interface CoverCacheRepository {
 export interface CoverBlobStore {
   save(id: string, extension: string, bytes: Buffer): void;
   read(id: string, extension: string): Buffer | null;
+}
+
+export interface BooksRepository {
+  findBookByKey(key: string): BookRow | undefined;
+  getBook(id: string): BookRow | undefined;
+  createBook(input: NewBook, key: string, createdAt: string): BookRow;
+  fillIdentity(id: string, title: string, author: string): void;
+  getImage(id: string): CoverImageRow | undefined;
+  insertImage(row: CoverImageRow): void;
+  setCover(bookId: string, cover: { imageId: string | null; status: CoverStatus | null; checkedAt: string | null }): void;
+  addRejection(bookId: string, sourceUrl: string, createdAt: string): void;
+  listRejectedUrls(bookId: string): Set<string>;
+  saveDetails(bookId: string, details: BookMetadata, checkedAt: string): void;
+  markDetailsMissing(bookId: string, checkedAt: string): void;
+  searchBooks(tokens: string[], limit: number): BookRow[];
 }
