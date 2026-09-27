@@ -97,3 +97,23 @@ test("per-IP rate limit 429s after 5 requests in a minute", async () => {
     await app.close();
   }
 });
+
+test("the repository lists every stored address oldest first, normalised as the route stored it", async () => {
+  const app = Fastify();
+  await app.register(waitlistPlugin);
+  await app.ready();
+  try {
+    await app.inject({ method: "POST", url: "/waitlist", payload: { email: "  Listed-One@Example.com" } });
+    await app.inject({ method: "POST", url: "/waitlist", payload: { email: "listed-two@example.com" } });
+  } finally {
+    await app.close();
+  }
+  const { createSqliteWaitlistRepository } = await import("./adapters/sqlite/sqliteWaitlistRepository.js");
+  const db = new DatabaseSync(dbPath);
+  try {
+    const listed = createSqliteWaitlistRepository(db).list().map((entry) => entry.email).filter((email) => email.startsWith("listed-"));
+    assert.deepEqual(listed, ["listed-one@example.com", "listed-two@example.com"]);
+  } finally {
+    db.close();
+  }
+});
