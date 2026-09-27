@@ -8,7 +8,8 @@ Skim layer over the detailed sections below. Everything under `/dashboard/*` sit
 
 | Route | Page | What |
 |---|---|---|
-| `/login` | `LoginPage.tsx` | signup / login (email or username), Google sign-in if configured |
+| `/` | `LandingPage.tsx` | public landing page; a signed-in visitor goes straight to `/dashboard` |
+| `/login` | `LoginPage.tsx` | signup (`?mode=signup`) / login (email or username), Google sign-in if configured |
 | `/oauth-success` | `OAuthSuccessPage.tsx` | where Google's login flow lands back |
 | `/choose-username` | `ChooseUsernamePage.tsx` | first-login username claim for Google sign-ins |
 | `/welcome-avatar` | `WelcomeAvatarPage.tsx` | skippable profile-picture step of the signup journey (password signups land here right after registering; Google signups after choosing a username) |
@@ -38,7 +39,7 @@ If you change the frontend's port or domain, update the backend's `FRONTEND_URL`
 
 ## What's here
 
-- **`/login`** — signup collects email + username + password; login takes one field (either email or username) + password. Toggle between the two modes. Also a "Sign in with Google" link if the backend reports it's configured (`GET /auth/providers`).
+- **`/login`** — signup collects email + username + password; login takes one field (either email or username) + password. Switch modes with the link under the form; `?mode=signup` (the landing page's CTAs) opens it in signup mode. Also a "Continue with Google" link if the backend reports it's configured (`GET /auth/providers`).
 - **`/oauth-success`** — where Google's login flow lands back; reads the tokens out of the URL fragment (see `backend/src/modules/auth/plugin.ts` for why they ride there instead of a request body) and decodes the access token's own claims locally rather than spending a `/auth/me` round trip.
 - **`/choose-username`** — where a Google sign-in without a username yet gets routed on its first login (Google doesn't hand you one the way a signup form does). `RequireUsername` (nested inside `RequireAuth`, see `App.tsx`) is what redirects there — a password-signup account never sees this screen, since it picks a username at signup time.
 - Everything past that point (`RequireAuth` *and* `RequireUsername`, so: `/login` if not signed in, `/choose-username` if signed in but without one) sits inside `src/layouts/DashboardLayout.tsx` — a persistent left sidebar whose nav is grouped (library content: Library / Series / Collections; more tools: Gallery / Murals / Arena; preferences: Library style / Settings) with hairline dividers between groups, plus account name and "Log out", wrapping a routed `<Outlet>`. Murals and Arena carry one-line descriptions — tooltips in the sidebar, rendered under the label in the mobile drawer. Below `lg` there's no sidebar at all: a bottom tab bar (the library-content group's three items) plus a "More" drawer with the full grouped nav (Phases 0–2 behavior, documented here). The pages (see "Pages at a glance" above), each with its own section or bullet here:
