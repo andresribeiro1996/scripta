@@ -9,6 +9,9 @@ export function AuthStage({ children }: { children: ReactNode }) {
         <BrandLockup />
       </Link>
       <main className="w-full max-w-[400px]">{children}</main>
+      <Link to="/privacy" className="mt-6 flex min-h-11 items-center text-xs text-(--color-text-dim) transition-colors hover:text-(--color-text)">
+        Privacy
+      </Link>
     </div>
   );
 }

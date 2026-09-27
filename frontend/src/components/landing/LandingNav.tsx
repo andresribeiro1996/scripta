@@ -3,9 +3,9 @@ import { BrandLockup } from "../BrandLockup";
 import { container } from "./ui";
 
 const anchors = [
-  ["How it works", "#how"],
-  ["Sharing", "#sharing"],
-  ["Games", "#games"],
+  ["How it works", "/#how"],
+  ["Sharing", "/#sharing"],
+  ["Games", "/#games"],
 ] as const;
 
 export function LandingNav() {

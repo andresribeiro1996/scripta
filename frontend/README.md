@@ -9,6 +9,7 @@ Skim layer over the detailed sections below. Everything under `/dashboard/*` sit
 | Route | Page | What |
 |---|---|---|
 | `/` | `LandingPage.tsx` | public landing page; a signed-in visitor goes straight to `/dashboard` |
+| `/privacy` | `PrivacyPage.tsx` | privacy notice, public; linked from the landing footer and every auth screen |
 | `/login` | `LoginPage.tsx` | signup (`?mode=signup`) / login (email or username), Google sign-in if configured |
 | `/oauth-success` | `OAuthSuccessPage.tsx` | where Google's login flow lands back |
 | `/choose-username` | `ChooseUsernamePage.tsx` | first-login username claim for Google sign-ins |

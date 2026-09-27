@@ -21,6 +21,7 @@ import { LoginPage } from "./pages/LoginPage";
 import { MuralEditorPage } from "./pages/MuralEditorPage";
 import { MuralsListPage } from "./pages/MuralsListPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
+import { PrivacyPage } from "./pages/PrivacyPage";
 import { OAuthSuccessPage } from "./pages/OAuthSuccessPage";
 import { PeoplePage } from "./pages/PeoplePage";
 import { SeriesPage } from "./pages/SeriesPage";
@@ -41,6 +42,7 @@ export function App() {
         <Route path="/reset-password" element={<AccountActionPage key="reset" action="reset" />} />
         <Route path="/verify-email" element={<AccountActionPage key="verify" action="verify" />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/oauth-success" element={<OAuthSuccessPage />} />
         <Route path="/arena" element={<Navigate to="/community/discover" replace />} />
         <Route path="/arena/:id" element={<ArenaViewPage />} />

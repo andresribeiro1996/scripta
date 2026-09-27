@@ -11,12 +11,15 @@ export function LandingFooter() {
             <BrandLockup />
             <p className="mt-2 text-sm text-(--color-text-dim)">A personal library for everything you read.</p>
           </div>
-          <nav aria-label="Account" className="flex gap-6 text-sm font-semibold">
+          <nav aria-label="Footer" className="flex flex-wrap gap-x-6 text-sm font-semibold">
             <Link to="/login" className="flex min-h-11 items-center transition-colors hover:text-(--color-text-dim)">
               Sign in
             </Link>
             <Link to="/login?mode=signup" className="flex min-h-11 items-center transition-colors hover:text-(--color-text-dim)">
               Create account
+            </Link>
+            <Link to="/privacy" className="flex min-h-11 items-center transition-colors hover:text-(--color-text-dim)">
+              Privacy
             </Link>
           </nav>
         </div>

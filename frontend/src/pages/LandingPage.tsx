@@ -1,4 +1,5 @@
-import { Navigate } from "react-router-dom";
+import { useEffect } from "react";
+import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { landingDestination } from "../lib/landing";
 import { LandingNav } from "../components/landing/LandingNav";
@@ -11,6 +12,10 @@ import { LandingFooter } from "../components/landing/LandingFooter";
 
 export function LandingPage() {
   const { session } = useAuth();
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (hash) document.getElementById(hash.slice(1))?.scrollIntoView();
+  }, [hash]);
   const destination = landingDestination(session);
   if (destination) return <Navigate to={destination} replace />;
   return (
