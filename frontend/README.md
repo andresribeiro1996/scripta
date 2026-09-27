@@ -38,6 +38,17 @@ Opens at `http://localhost:5173`. `VITE_API_URL` in `.env` points at the backend
 
 If you change the frontend's port or domain, update the backend's `FRONTEND_URL` in `backend/.env` to match — the backend's CORS policy only allows that one origin.
 
+### Landing page screenshots
+
+The hero images in `public/landing/` are real screenshots of the app, not mockups, so they need retaking when the Library or Home screen changes:
+
+```bash
+npx playwright install chromium   # once per machine
+npm run screenshots:landing --workspace frontend
+```
+
+The script starts the three-user fixture API and a Vite server on free ports, seeds a demo reader (`eleanor`, 19 books with Open Library covers cached in the OS temp directory), and rewrites the four WebP files: the desktop Library and the phone Home, each in light and dark. Stop a running `npm run backend:fixture` first; both use the fixture's data directory and lock.
+
 ## What's here
 
 - **`/login`** — signup collects email + username + password; login takes one field (either email or username) + password. Switch modes with the link under the form; `?mode=signup` (the landing page's CTAs) opens it in signup mode. Also a "Continue with Google" link if the backend reports it's configured (`GET /auth/providers`).
