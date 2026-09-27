@@ -2,7 +2,8 @@ import { randomUUID } from "node:crypto";
 import { looksLikeIsbnQuery, normalizeIsbn, type BookGenre, type BookMetadata, type BookSearchResult } from "@scripta/shared";
 import { findBestCover, type CoverSources, type FetchCoverImage } from "./coverResolver.js";
 import { MIN_GOOD_WIDTH } from "./domain/constants.js";
-import type { EncodedCover } from "./domain/images.js";
+import { BookNotFoundError, FileTooLargeError, InvalidImageError } from "./domain/errors.js";
+import { encodeCover, type EncodedCover } from "./domain/images.js";
 import { lookupIdentity, searchTokens, type BookLookup } from "./domain/normalize.js";
 import type { BookCatalog, BooksRepository, CatalogSearchHit, CoverBlobStore } from "./domain/ports.js";
 import type { BookRow, CoverSourceName, CoverStatus } from "./domain/types.js";
@@ -13,6 +14,8 @@ const SEARCH_LIMIT = 12;
 const COVER_EXTENSION = "webp";
 const COVER_MIME_TYPE = "image/webp";
 const NO_COVER: ResolvedCover = { url: null, fullUrl: null, pending: false };
+
+export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 
 export type CoverFileSize = "file" | "thumb";
 
@@ -40,6 +43,9 @@ export interface BooksService {
   getCoverFile(id: string, size: CoverFileSize): { buffer: Buffer; mimeType: string } | null;
   getDetails(lookup: BookLookup): Promise<BookMetadata | null>;
   search(query: string): Promise<BookSearchResult[]>;
+  isAdmin(userId: string): boolean;
+  rejectCover(lookup: BookLookup): ResolvedCover;
+  uploadCover(lookup: BookLookup, bytes: Buffer): Promise<ResolvedCover>;
 }
 
 export function createBooksService(deps: BooksServiceDeps): BooksService {
@@ -197,6 +203,36 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       const saved = deps.repo.searchBooks(tokens, SEARCH_LIMIT);
       if (saved.length > 0) return saved.map(toSearchResult);
       return saveHits(await deps.catalog.search({ text: trimmed }));
+    },
+
+    isAdmin(userId) {
+      return deps.adminUserId !== "" && userId === deps.adminUserId;
+    },
+
+    rejectCover(lookup) {
+      const identity = lookupIdentity(lookup);
+      const book = identity ? deps.repo.findBookByKey(identity.key) : undefined;
+      if (!book) throw new BookNotFoundError();
+      const image = book.cover_image_id ? deps.repo.getImage(book.cover_image_id) : undefined;
+      if (image?.source_url) deps.repo.addRejection(book.id, image.source_url, now().toISOString());
+      deps.repo.setCover(book.id, { imageId: null, status: null, checkedAt: null });
+      backoffUntil.delete(book.id);
+      deps.enqueue(book.id, true);
+      return { url: null, fullUrl: null, pending: true };
+    },
+
+    async uploadCover(lookup, bytes) {
+      if (bytes.byteLength > MAX_UPLOAD_BYTES) throw new FileTooLargeError(MAX_UPLOAD_BYTES);
+      if (!lookupIdentity(lookup)) throw new BookNotFoundError();
+      const image = await encodeCover(bytes);
+      if (!image) throw new InvalidImageError();
+      const book = findOrCreate(lookup);
+      if (!book) throw new BookNotFoundError();
+      const at = now().toISOString();
+      const imageId = storeImage(book.id, "upload", null, image, at);
+      deps.repo.setCover(book.id, { imageId, status: "manual", checkedAt: at });
+      backoffUntil.delete(book.id);
+      return coverOf(deps.repo.getBook(book.id) ?? book);
     }
   };
 }

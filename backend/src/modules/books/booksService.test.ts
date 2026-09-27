@@ -310,3 +310,82 @@ test("search strips FTS syntax and ignores punctuation-only queries", async () =
   assert.deepEqual(await h.service.search("   "), []);
   assert.equal(calls.length, 1);
 });
+
+const { default: sharp } = await import("sharp");
+const { BookNotFoundError, FileTooLargeError, InvalidImageError } = await import("./domain/errors.js");
+
+test("nobody is admin when ADMIN_USER_ID is blank", () => {
+  assert.equal(harness().service.isAdmin(""), false);
+  assert.equal(harness().service.isAdmin("u1"), false);
+  const h = harness({ adminUserId: "u1" });
+  assert.equal(h.service.isAdmin("u1"), true);
+  assert.equal(h.service.isAdmin("u2"), false);
+});
+
+test("rejecting a cover blocks its URL, clears the pointer and queues the book first", async () => {
+  const h = harness({ sources: { isbndb: null, apple: isbnSource("https://a/1"), openlibrary: emptySource } });
+  h.sizes.set("https://a/1", [900, 1400]);
+  h.service.resolveCover(orlando);
+  const id = h.bookId("isbn:9780141184272");
+  await h.service.processBook(id);
+  h.enqueued.length = 0;
+
+  assert.deepEqual(h.service.rejectCover(orlando), { url: null, fullUrl: null, pending: true });
+  assert.deepEqual(h.enqueued, [{ bookId: id, front: true }]);
+  assert.equal(h.repo.getBook(id)!.cover_image_id, null);
+  assert.deepEqual([...h.repo.listRejectedUrls(id)], ["https://a/1"]);
+
+  await h.service.processBook(id);
+  assert.equal(h.repo.getBook(id)!.cover_status, "missing");
+});
+
+test("rejecting a migrated cover with no recorded URL just clears it", () => {
+  const h = harness();
+  const book = h.repo.createBook({ title: "", author: "", isbn: "9780141184272" }, "isbn:9780141184272", "2026-01-01T00:00:00.000Z");
+  h.repo.insertImage({ id: "legacy", book_id: book.id, source: "openlibrary", source_url: null, width: 300, height: 460, byte_size: 1, created_at: "2026-01-01T00:00:00.000Z" });
+  h.repo.setCover(book.id, { imageId: "legacy", status: "low_res", checkedAt: "1970-01-01T00:00:00.000Z" });
+  h.service.rejectCover(orlando);
+  assert.equal(h.repo.getBook(book.id)!.cover_image_id, null);
+  assert.equal(h.repo.listRejectedUrls(book.id).size, 0);
+});
+
+test("rejecting an unknown book fails", () => {
+  assert.throws(() => harness().service.rejectCover(orlando), BookNotFoundError);
+});
+
+test("an uploaded cover becomes manual and the worker leaves it alone", async () => {
+  const calls: string[] = [];
+  const h = harness({ sources: { isbndb: null, apple: isbnSource("https://a/1", calls), openlibrary: emptySource } });
+  const photo = await sharp({ create: { width: 600, height: 900, channels: 3, background: "#224466" } }).jpeg().toBuffer();
+  const cover = await h.service.uploadCover(orlando, photo);
+  const id = h.bookId("isbn:9780141184272");
+  const book = h.repo.getBook(id)!;
+  assert.equal(book.cover_status, "manual");
+  assert.equal(cover.url, `https://api.test/covers/cached/${book.cover_image_id}/thumb`);
+  assert.equal(h.repo.getImage(book.cover_image_id!)!.source, "upload");
+  await h.service.processBook(id);
+  assert.deepEqual(calls, []);
+});
+
+test("uploads that are too large or not images are refused", async () => {
+  const h = harness();
+  await assert.rejects(h.service.uploadCover(orlando, Buffer.alloc(20 * 1024 * 1024 + 1)), FileTooLargeError);
+  await assert.rejects(h.service.uploadCover(orlando, Buffer.from("not an image")), InvalidImageError);
+  await assert.rejects(h.service.uploadCover({ title: "?!" }, Buffer.from("x")), BookNotFoundError);
+});
+
+test("a lookup running while the admin uploads does not overwrite the upload", async () => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const slow: CoverSource = { byIsbn: async () => { await gate; return [{ source: "apple", url: "https://a/1" }]; }, byTitle: async () => [] };
+  const h = harness({ sources: { isbndb: null, apple: slow, openlibrary: emptySource } });
+  h.sizes.set("https://a/1", [900, 1400]);
+  h.service.resolveCover(orlando);
+  const id = h.bookId("isbn:9780141184272");
+  const running = h.service.processBook(id);
+  const photo = await sharp({ create: { width: 600, height: 900, channels: 3, background: "#224466" } }).jpeg().toBuffer();
+  await h.service.uploadCover(orlando, photo);
+  release();
+  await running;
+  assert.equal(h.repo.getBook(id)!.cover_status, "manual");
+});
