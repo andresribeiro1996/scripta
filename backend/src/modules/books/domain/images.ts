@@ -29,17 +29,21 @@ async function decodedSize(input: Buffer): Promise<{ width: number; height: numb
 export async function encodeCover(input: Buffer): Promise<EncodedCover | null> {
   const size = await decodedSize(input);
   if (!size || size.width > MAX_INPUT_DIMENSION || size.height > MAX_INPUT_DIMENSION) return null;
-  const full = await sharp(input)
-    .rotate()
-    .resize({ width: FULL_MAX_DIMENSION, height: FULL_MAX_DIMENSION, fit: "inside", withoutEnlargement: true })
-    .webp({ quality: FULL_QUALITY })
-    .toBuffer({ resolveWithObject: true });
-  const thumb = await sharp(input)
-    .rotate()
-    .resize({ width: THUMB_MAX_WIDTH, height: THUMB_MAX_HEIGHT, fit: "inside", withoutEnlargement: true })
-    .webp({ quality: THUMB_QUALITY })
-    .toBuffer();
-  return { full: full.data, thumb, width: full.info.width, height: full.info.height };
+  try {
+    const full = await sharp(input)
+      .rotate()
+      .resize({ width: FULL_MAX_DIMENSION, height: FULL_MAX_DIMENSION, fit: "inside", withoutEnlargement: true })
+      .webp({ quality: FULL_QUALITY })
+      .toBuffer({ resolveWithObject: true });
+    const thumb = await sharp(input)
+      .rotate()
+      .resize({ width: THUMB_MAX_WIDTH, height: THUMB_MAX_HEIGHT, fit: "inside", withoutEnlargement: true })
+      .webp({ quality: THUMB_QUALITY })
+      .toBuffer();
+    return { full: full.data, thumb, width: full.info.width, height: full.info.height };
+  } catch {
+    return null;
+  }
 }
 
 export function isAcceptableCover(source: string, width: number, height: number): boolean {

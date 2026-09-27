@@ -147,27 +147,32 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
     async processBook(bookId) {
       const book = deps.repo.getBook(bookId);
       if (!book || book.cover_status === "manual") return;
-      const outcome = await findBestCover({ isbn: book.isbn, title: book.title, author: book.author }, deps.repo.listRejectedUrls(bookId), deps.sources, deps.fetchImage);
+      try {
+        const outcome = await findBestCover({ isbn: book.isbn, title: book.title, author: book.author }, deps.repo.listRejectedUrls(bookId), deps.sources, deps.fetchImage);
 
-      const latest = deps.repo.getBook(bookId);
-      if (!latest || latest.cover_status === "manual") return;
-      const current = latest.cover_image_id ? deps.repo.getImage(latest.cover_image_id) : undefined;
-      const at = now().toISOString();
-      let imageId = latest.cover_image_id;
-      let width = current?.width ?? 0;
-      if (outcome.found && outcome.found.image.width > width) {
-        imageId = storeImage(bookId, outcome.found.candidate.source, outcome.found.candidate.url, outcome.found.image, at);
-        width = outcome.found.image.width;
-      }
-      const status: CoverStatus = imageId === null ? "missing" : width >= MIN_GOOD_WIDTH ? "good" : "low_res";
+        const latest = deps.repo.getBook(bookId);
+        if (!latest || latest.cover_image_id !== book.cover_image_id || latest.cover_status !== book.cover_status) return;
+        const current = latest.cover_image_id ? deps.repo.getImage(latest.cover_image_id) : undefined;
+        const at = now().toISOString();
+        let imageId = latest.cover_image_id;
+        let width = current?.width ?? 0;
+        if (outcome.found && outcome.found.image.width > width) {
+          imageId = storeImage(bookId, outcome.found.candidate.source, outcome.found.candidate.url, outcome.found.image, at);
+          width = outcome.found.image.width;
+        }
+        const status: CoverStatus = imageId === null ? "missing" : width >= MIN_GOOD_WIDTH ? "good" : "low_res";
 
-      if (outcome.complete) {
-        backoffUntil.delete(bookId);
-        deps.repo.setCover(bookId, { imageId, status, checkedAt: at });
-        return;
+        if (outcome.complete) {
+          backoffUntil.delete(bookId);
+          deps.repo.setCover(bookId, { imageId, status, checkedAt: at });
+          return;
+        }
+        backoffUntil.set(bookId, now().getTime() + UNAVAILABLE_BACKOFF_MS);
+        if (imageId !== latest.cover_image_id) deps.repo.setCover(bookId, { imageId, status, checkedAt: latest.cover_checked_at });
+      } catch (error) {
+        backoffUntil.set(bookId, now().getTime() + UNAVAILABLE_BACKOFF_MS);
+        throw error;
       }
-      backoffUntil.set(bookId, now().getTime() + UNAVAILABLE_BACKOFF_MS);
-      if (imageId !== latest.cover_image_id) deps.repo.setCover(bookId, { imageId, status, checkedAt: latest.cover_checked_at });
     },
 
     getCoverFile(id, size) {

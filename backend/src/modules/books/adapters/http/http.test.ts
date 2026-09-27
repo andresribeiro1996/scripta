@@ -46,6 +46,24 @@ test("fetchBytes skips a missing or forbidden image but reports a server error",
   await assert.rejects(fetchBytes("apple", "https://img.test/a"), SourceUnavailableError);
 });
 
+test("a body read that fails mid-stream is reported as unavailable, not a bug", async () => {
+  function okWithFailingBody(makeError: () => Error) {
+    return { ok: true, status: 200, json: () => Promise.reject(makeError()), arrayBuffer: () => Promise.reject(makeError()) } as unknown as Response;
+  }
+  const timeout = () => Object.assign(new Error("The operation timed out."), { name: "TimeoutError" });
+  const reset = () => new TypeError("terminated");
+
+  stub(() => okWithFailingBody(timeout));
+  await assert.rejects(fetchJson("apple", "https://api.test/a"), SourceUnavailableError);
+  stub(() => okWithFailingBody(timeout));
+  await assert.rejects(fetchBytes("apple", "https://img.test/a"), SourceUnavailableError);
+
+  stub(() => okWithFailingBody(reset));
+  await assert.rejects(fetchJson("apple", "https://api.test/a"), SourceUnavailableError);
+  stub(() => okWithFailingBody(reset));
+  await assert.rejects(fetchBytes("apple", "https://img.test/a"), SourceUnavailableError);
+});
+
 test("the throttle spaces task starts and survives a failing task", async () => {
   let clock = 0;
   const throttle = createThrottle(1000, () => clock, async (ms) => {

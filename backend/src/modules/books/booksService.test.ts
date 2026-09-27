@@ -158,11 +158,34 @@ test("a low-res image found while a source was down is stored without advancing 
   const h = harness({ sources: { isbndb: null, apple: failing, openlibrary: isbnSource("https://o/1") } });
   h.sizes.set("https://o/1", [320, 480]);
   h.service.resolveCover(orlando);
-  await h.service.processBook(h.bookId("isbn:9780141184272"));
+  const id = h.bookId("isbn:9780141184272");
+  await h.service.processBook(id);
   const book = h.repo.findBookByKey("isbn:9780141184272")!;
   assert.notEqual(book.cover_image_id, null);
   assert.equal(book.cover_status, "low_res");
   assert.equal(book.cover_checked_at, null);
+
+  h.enqueued.length = 0;
+  h.service.resolveCover(orlando);
+  assert.equal(h.enqueued.length, 0);
+  h.advance(10 * 60 * 1000);
+  h.service.resolveCover(orlando);
+  assert.equal(h.enqueued.length, 1);
+});
+
+test("an unexpected error during processing sets a 10-minute backoff and rethrows", async () => {
+  const h = harness({
+    sources: { isbndb: null, apple: isbnSource("https://a/1"), openlibrary: emptySource },
+    fetchImage: async () => { throw new Error("disk full"); }
+  });
+  h.service.resolveCover(orlando);
+  const id = h.bookId("isbn:9780141184272");
+  await assert.rejects(h.service.processBook(id), /disk full/);
+  h.enqueued.length = 0;
+  assert.equal(h.service.resolveCover(orlando).pending, false);
+  assert.equal(h.enqueued.length, 0);
+  h.advance(10 * 60 * 1000);
+  assert.equal(h.service.resolveCover(orlando).pending, true);
 });
 
 test("manual covers are never processed", async () => {
@@ -388,4 +411,34 @@ test("a lookup running while the admin uploads does not overwrite the upload", a
   release();
   await running;
   assert.equal(h.repo.getBook(id)!.cover_status, "manual");
+});
+
+test("an admin reject during an in-flight lookup is not undone by that lookup", async () => {
+  let gate: Promise<void> = Promise.resolve();
+  let release: () => void = () => {};
+  const slow: CoverSource = { byIsbn: async () => { await gate; return [{ source: "apple", url: "https://a/wrong" }]; }, byTitle: async () => [] };
+  const h = harness({ sources: { isbndb: null, apple: slow, openlibrary: emptySource } });
+  h.sizes.set("https://a/wrong", [300, 460]);
+  h.service.resolveCover(orlando);
+  const id = h.bookId("isbn:9780141184272");
+  await h.service.processBook(id);
+  assert.equal(h.repo.getBook(id)!.cover_status, "low_res");
+
+  h.sizes.set("https://a/wrong", [350, 520]);
+  gate = new Promise((resolve) => { release = resolve; });
+  const running = h.service.processBook(id);
+  h.service.rejectCover(orlando);
+  release();
+  await running;
+
+  const rejected = h.repo.getBook(id)!;
+  assert.equal(rejected.cover_image_id, null);
+  assert.equal(rejected.cover_status, null);
+  assert.deepEqual([...h.repo.listRejectedUrls(id)], ["https://a/wrong"]);
+
+  gate = Promise.resolve();
+  await h.service.processBook(id);
+  const rerun = h.repo.getBook(id)!;
+  assert.equal(rerun.cover_image_id, null);
+  assert.equal(rerun.cover_status, "missing");
 });

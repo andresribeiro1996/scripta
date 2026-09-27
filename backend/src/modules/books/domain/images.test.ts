@@ -33,6 +33,12 @@ test("non-images and oversized images are refused", async () => {
   assert.equal(await encodeCover(await jpeg(8001, 10)), null);
 });
 
+test("a JPEG truncated after its header decodes metadata but fails to encode, and is refused", async () => {
+  const full = await jpeg(2000, 3000);
+  const truncated = full.subarray(0, Math.floor(full.byteLength / 2));
+  assert.equal(await encodeCover(truncated), null);
+});
+
 test("only portrait covers are acceptable", () => {
   assert.equal(isAcceptableCover("apple", 900, 1400), true);
   assert.equal(isAcceptableCover("apple", 500, 500), false);

@@ -5,9 +5,9 @@ const USER_AGENT = "Atmyshelf/1.0 (book covers)";
 
 export type Throttle = <T>(task: () => Promise<T>) => Promise<T>;
 
-async function request(source: string, url: string, headers: Record<string, string> = {}): Promise<Response> {
+async function readBody<T>(source: string, read: () => Promise<T>): Promise<T> {
   try {
-    return await fetch(url, { headers: { "User-Agent": USER_AGENT, ...headers }, signal: AbortSignal.timeout(TIMEOUT_MS) });
+    return await read();
   } catch (error) {
     if (error instanceof TypeError || (error instanceof Error && error.name === "TimeoutError")) {
       throw new SourceUnavailableError(source, error.message);
@@ -16,12 +16,16 @@ async function request(source: string, url: string, headers: Record<string, stri
   }
 }
 
+async function request(source: string, url: string, headers: Record<string, string> = {}): Promise<Response> {
+  return readBody(source, () => fetch(url, { headers: { "User-Agent": USER_AGENT, ...headers }, signal: AbortSignal.timeout(TIMEOUT_MS) }));
+}
+
 export async function fetchJson(source: string, url: string, headers?: Record<string, string>): Promise<unknown> {
   const res = await request(source, url, headers);
   if (res.status === 404) return null;
   if (!res.ok) throw new SourceUnavailableError(source, `HTTP ${res.status}`);
   try {
-    return await res.json();
+    return await readBody(source, () => res.json());
   } catch (error) {
     if (error instanceof SyntaxError) throw new SourceUnavailableError(source, "invalid JSON");
     throw error;
@@ -32,7 +36,7 @@ export async function fetchBytes(source: string, url: string): Promise<Buffer | 
   const res = await request(source, url);
   if (res.status === 429 || res.status >= 500) throw new SourceUnavailableError(source, `HTTP ${res.status}`);
   if (!res.ok) return null;
-  return Buffer.from(await res.arrayBuffer());
+  return Buffer.from(await readBody(source, () => res.arrayBuffer()));
 }
 
 export function createThrottle(
