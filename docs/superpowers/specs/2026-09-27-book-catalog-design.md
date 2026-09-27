@@ -70,7 +70,7 @@ imported directly, so tests can use fakes; `plugin.ts` wires the real ones.
 New tables in the existing covers SQLite file:
 
 - **`books`** — `id`, `title`, `author`, `year`, `publisher`, `isbn`,
-  `ol_work_key`, `ol_cover_id`, `summary`, `rating`, `rating_count`,
+  `ol_cover_id`, `summary`, `rating`, `rating_count`,
   `genres` (JSON), `source_url`, `details_status` (`found` | `missing` |
   null = never fetched), `details_checked_at`, `cover_image_id`,
   `cover_status` (`good` | `low_res` | `missing` | `manual` | null = never
@@ -118,7 +118,7 @@ images, which are ~300px anyway).
    `{url: null, pending: false}`; otherwise enqueue it and return
    `{url: null, pending: true}`.
 
-`imageId` is dropped from the route and from both clients' calls.
+The route ignores `imageId`; clients may keep sending it.
 
 **Worker.** One in-process queue, deduplicated by book id, processed one
 book at a time — the same "plain in-process timer, no job queue" approach
@@ -134,7 +134,9 @@ next client request re-enqueues any book still due.
   `default=false`).
 - Same book, other edition: Apple search by title + author (`media=ebook`;
   `pt`, `us`, `br`) → ISBNdb title search → Open Library search. A result is
-  used only if title and author match after normalization.
+  used only if title and author match after normalization. Title searches
+  send the title alone (records often list a translator first, which breaks
+  author-filtered queries) and filter results locally.
 
 Acceptance rules for every downloaded image, applied after the existing
 validate-and-re-encode pipeline:
@@ -154,17 +156,19 @@ retried after 30 days. A `manual` cover is never retried or replaced.
 
 **Source failures vs. misses.** Each source distinguishes "answered, no
 cover" from "failed" (network error, timeout, 429, 5xx). If any source in
-the chain failed and no ≥400px image was found, the book keeps its previous
-status and `cover_checked_at` is not advanced, so the next request retries
-it instead of recording a false miss.
+the chain failed and no ≥400px image was found, `cover_checked_at` is not
+advanced and no miss is recorded; a low-res image found on the way is still
+stored when it beats the current one. The book then gets a 10-minute
+in-memory backoff (resolve answers `pending: false` meanwhile) so a failing
+source is not hammered by polling clients.
 
 `ISBNDB_API_KEY` is optional, like `HARDCOVER_API_KEY` was: unset means the
 ISBNdb steps are skipped.
 
 ## Details
 
-`GET /books/details?isbn=&title=&author=` (auth required) returns the
-existing `BookMetadata` shape, or `null`.
+`GET /books/details?isbn=&title=&author=` (auth required) returns
+`{ metadata: BookMetadata | null }`.
 
 - Finds or creates the book. Stored details are returned directly.
 - Never fetched, or `missing` and older than 30 days: runs today's two-step
@@ -177,7 +181,8 @@ existing `BookMetadata` shape, or `null`.
 
 ## Search
 
-`GET /books/search?q=` (auth required) returns `BookSearchResult[]`.
+`GET /books/search?q=` (auth required) returns
+`{ results: BookSearchResult[] }`.
 
 - **ISBN query** (`looksLikeIsbnQuery`): a saved book with that `isbn:` key
   is returned without any external call; otherwise Open Library is searched
@@ -198,9 +203,8 @@ existing `BookMetadata` shape, or `null`.
 - `ADMIN_USER_ID` (optional env var) names the owner's account id. An id,
   not an email, because an unregistered email could be claimed by anyone
   signing up with it. Unset means nobody is admin.
-- `isAdmin` is added to the user object auth already returns (`publicUser`
-  and `getAuthenticatedUserFromAccessToken`), computed per request, not
-  stored in the JWT.
+- `GET /books/admin` (auth required) returns `{isAdmin}`. The check lives
+  in the books module, so auth's user object and JWT are unchanged.
 - `POST /books/cover/reject` `{isbn?, title, author}`: records the current
   image's `source_url` in `cover_rejections` (an upload has none; rejecting
   it just clears it), clears the book's cover pointer and status, and
@@ -238,8 +242,11 @@ pages too.
   - A `pending: true` answer is not cached; the client re-asks after 5s,
     doubling to a 5-minute cap, and gives up after 10 tries (the next mount
     asks again). The in-flight map still de-duplicates.
-  - The TTL and backoff schedule live in `@scripta/shared`
-    (`library/covers.ts`) so both clients use the same values.
+  - This logic (cache entries, TTL, polling, in-flight de-duplication)
+    lives once in `@scripta/shared` as `createCoverResolver`; each client
+    only supplies its fetch and its storage.
+  - Arena seeding resolves without polling (`poll: false`): it stores
+    whatever URL exists at seed time instead of waiting on a pending book.
 - `CoverImage` (web `BookCard.tsx`, mobile `CoverImage.tsx`) renders `url`
   by default; the book detail views (web `BookDetailSheet`, mobile
   `BookDetail`) ask it for `fullUrl`.
