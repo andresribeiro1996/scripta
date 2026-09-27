@@ -5,6 +5,7 @@ import type { ContentTone, DiscoverItem, DiscoverType } from "@scripta/shared/co
 import { contentKindLabel, contentStats, contentStatus, contentTarget } from "@scripta/shared/community";
 import { EmptyState } from "../components/EmptyState";
 import { CommunityIcon } from "../components/NavIcons";
+import { ReaderGlyph } from "../components/ReaderGlyph";
 import { SkeletonCardGrid } from "../components/Skeleton";
 import { useCommunityDiscover } from "../hooks/useCommunity";
 
@@ -111,6 +112,7 @@ function DiscoverRow({ item }: { item: DiscoverItem }) {
               {author.username}
             </Link>
           )}
+          <ReaderGlyph identity={author.readerGlyph} />
         </p>
         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-(--color-text-dim)">
           <span className={`rounded-full border px-2 font-semibold ${STATUS_TONES[status.tone]}`}>{status.label}</span>

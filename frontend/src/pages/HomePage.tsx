@@ -9,6 +9,7 @@ import { BookGrid } from "../components/BookGrid";
 import { BookCard } from "../components/BookCard";
 import { AuthorAvatar } from "../components/CommunityAuthorAvatar";
 import { PickNextSheet } from "../components/PickNextSheet";
+import { ReaderGlyph } from "../components/ReaderGlyph";
 import { resolveLibraryStyle } from "../lib/libraryStyle";
 
 const button = "inline-flex min-h-11 items-center justify-center rounded-lg border border-(--color-border) px-4 py-2 text-sm hover:bg-(--color-surface-hover) disabled:opacity-50";
@@ -69,17 +70,31 @@ export function HomePage() {
           {dashboard.newCount > 0 ? <p className="text-sm font-semibold text-(--color-accent)">You have {dashboard.newCount} new</p> : null}
           {dashboard.items.length === 0 ? <p className="text-sm text-(--color-text-dim)">Nothing here yet. Follow people to see what they publish.</p> : (
             <div className="space-y-3">
-              {dashboard.items.map((item) => (
-                <div key={`${item.kind}:${item.id}`} className="rounded-xl border border-(--color-border) bg-(--color-surface) p-4">
-                  <Link to={digestTarget(item)} className="flex items-center gap-2">
-                    <AuthorAvatar author={item.actor} />
-                    <span>
-                      <span className="block text-sm font-semibold">{digestHeading(item)}</span>
-                      {item.kind === "publication" ? <span className="block text-sm text-(--color-text-dim)">{item.content.name}</span> : null}
-                    </span>
-                  </Link>
-                </div>
-              ))}
+              {dashboard.items.map((item) => {
+                const heading = digestHeading(item);
+                const rest = heading.startsWith(item.actor.username) ? heading.slice(item.actor.username.length) : null;
+                return (
+                  <div key={`${item.kind}:${item.id}`} className="rounded-xl border border-(--color-border) bg-(--color-surface) p-4">
+                    <Link to={digestTarget(item)} className="flex items-center gap-2">
+                      <AuthorAvatar author={item.actor} />
+                      <span>
+                        <span className="block text-sm font-semibold">
+                          {rest !== null ? (
+                            <>
+                              {item.actor.username}
+                              <ReaderGlyph identity={item.actor.readerGlyph} />
+                              {rest}
+                            </>
+                          ) : (
+                            heading
+                          )}
+                        </span>
+                        {item.kind === "publication" ? <span className="block text-sm text-(--color-text-dim)">{item.content.name}</span> : null}
+                      </span>
+                    </Link>
+                  </div>
+                );
+              })}
             </div>
           )}
           {dashboard.hasNextPage && (
