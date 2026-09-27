@@ -16,6 +16,7 @@ export * from "./csv.js";
 export * from "./goodreads.js";
 export * from "./storygraph.js";
 export * from "./covers.js";
+export * from "./coverResolver.js";
 export * from "./bookCovers.js";
 export * from "./bookMetadata.js";
 export * from "./bookSearch.js";
