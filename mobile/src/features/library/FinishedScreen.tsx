@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import {
   bookKey,
   createShelfSession,
@@ -17,8 +17,9 @@ import {
 import { fetchOwnProfile } from "../community/api";
 import { fetchMural, updateMural } from "../murals/api";
 import { Button, Input, Toast } from "../../ui/components";
-import { dynamicType, radii, spacing, typography, useTheme } from "../../ui/theme";
+import { dynamicType, spacing, typography, useTheme } from "../../ui/theme";
 import { CoverImage } from "./components/CoverImage";
+import { DuelButton } from "./components/DuelButton";
 import { FeelingChips } from "./components/FeelingChips";
 import { useLibrary } from "./hooks/useLibrary";
 import { useLibraryActions } from "./hooks/useLibraryActions";
@@ -205,27 +206,6 @@ export function FinishedScreen({ book, before, onClose }: { book: Record<string,
   );
 }
 
-// Not the shared Button — that one sizes to its text, so "This one" (one
-// line) and "Still <a long title>" (up to two) would render at different
-// heights side by side. A fixed two-line-tall box with a clamped label
-// keeps both halves of the duel the same size regardless of content.
-function DuelButton({ label, onPress }: { label: string; onPress: () => void }) {
-  const { colors } = useTheme();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.duelButton,
-        { borderColor: colors.border, backgroundColor: pressed ? colors.surfacePressed : colors.surface },
-      ]}
-    >
-      <Text {...dynamicType} numberOfLines={2} style={[typography.body, styles.duelButtonText, { color: colors.text }]}>{label}</Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   content: { gap: spacing.lg, paddingBottom: spacing.xl },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md },
@@ -237,6 +217,4 @@ const styles = StyleSheet.create({
   opponentRow: { flexDirection: "row", gap: spacing.lg },
   opponentItem: { flex: 1, gap: spacing.sm },
   opponentCover: { width: "100%", aspectRatio: 2 / 3, borderRadius: 8, overflow: "hidden" },
-  duelButton: { minHeight: 64, borderWidth: 1, borderRadius: radii.md, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.md },
-  duelButtonText: { fontWeight: "600", textAlign: "center" },
 });

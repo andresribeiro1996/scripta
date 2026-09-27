@@ -16,6 +16,7 @@ import {
 import { fetchOwnProfile } from "../api/community";
 import { fetchMural, updateMuralApi } from "../api/murals";
 import { CoverImage } from "./BookCard";
+import { DuelButton } from "./DuelButton";
 import { FeelingChips } from "./FeelingChips";
 import { Sheet } from "./Sheet";
 import { useToast } from "./Toaster";
@@ -24,8 +25,6 @@ type Shelf = { blocks: MuralBlock[]; landed: Landing[] };
 
 const secondaryButtonClass =
   "min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm font-semibold hover:bg-(--color-surface-hover)";
-const duelButtonClass =
-  "flex min-h-16 flex-1 items-center justify-center rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-center text-sm font-semibold hover:bg-(--color-surface-hover)";
 
 export function FinishSheet({
   book,
@@ -214,17 +213,15 @@ export function FinishSheet({
                   <div className="aspect-[2/3] w-full overflow-hidden rounded-lg bg-(--color-border)">
                     <CoverImage book={book} />
                   </div>
-                  <button type="button" onClick={() => void chooseThisOne()} className={duelButtonClass}>
-                    This one
-                  </button>
+                  <DuelButton onClick={() => void chooseThisOne()}>This one</DuelButton>
                 </div>
                 <div className="flex flex-1 flex-col gap-2">
                   <div className="aspect-[2/3] w-full overflow-hidden rounded-lg bg-(--color-border)">
                     <CoverImage book={opponentBook} />
                   </div>
-                  <button type="button" onClick={() => setFavouriteChoiceMade(true)} className={duelButtonClass}>
+                  <DuelButton onClick={() => setFavouriteChoiceMade(true)}>
                     <span className="line-clamp-2">{`Still ${String(opponentBook.Title ?? "this one")}`}</span>
-                  </button>
+                  </DuelButton>
                 </div>
               </div>
             </div>
