@@ -163,7 +163,7 @@ function shadowWidths(points: Point[], min: number, max: number): number[] {
 
 function swellWidths(points: Point[], min: number, max: number): number[] {
   const s = lengths(points), total = s[s.length - 1] || 1;
-  return s.map((d) => min + (max - min) * Math.sin((Math.PI * d) / total) ** 0.7);
+  return s.map((d) => min + (max - min) * Math.max(0, Math.sin((Math.PI * d) / total)) ** 0.7);
 }
 
 function inside([x, y]: Point, polygon: Point[]): boolean {

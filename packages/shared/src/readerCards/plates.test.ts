@@ -91,6 +91,13 @@ function luminance(hex: string) {
   return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
 }
 
+test("no plate or glyph path carries a NaN coordinate — react-native-svg throws on one where a browser silently drops it", () => {
+  for (const p of READER_PLATES) {
+    assert.doesNotMatch(renderPlate({ identity: p.key, state: "settled", readerName: "a", print: "paper", label: "x" }), /NaN/);
+    assert.doesNotMatch(renderGlyph(p.key, 24, "paper"), /NaN/);
+  }
+});
+
 test("every ink clears 5:1 against paper", () => {
   for (const [key, [, ink]] of Object.entries(PLATE_INKS)) {
     const ratio = (luminance(PAPER) + 0.05) / (luminance(ink) + 0.05);
