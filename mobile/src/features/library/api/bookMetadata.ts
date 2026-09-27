@@ -1,18 +1,14 @@
-import { buildBookMetadata, findOpenLibraryMatch, normalizeIsbn, type BookMetadata } from "@scripta/shared";
+import { normalizeIsbn, type BookMetadata } from "@scripta/shared";
+import { apiClient } from "../../../core/api";
 
-export async function fetchBookMetadata(book: Record<string, unknown>, signal?: AbortSignal): Promise<BookMetadata | null> {
+export async function fetchBookMetadata(book: Record<string, unknown>): Promise<BookMetadata | null> {
   const isbn = normalizeIsbn(book.ISBN);
   const title = String(book.Title ?? "");
   const author = String(book.Attribution ?? "");
   if (!isbn && (!title || !author)) return null;
-  const query = new URLSearchParams({ fields: "key,title,author_name,ratings_average,ratings_count,subject", limit: "5" });
+  const query = new URLSearchParams();
   if (isbn) query.set("isbn", isbn);
-  else { query.set("title", title); query.set("author", author); }
-  const response = await fetch(`https://openlibrary.org/search.json?${query}`, { signal });
-  if (!response.ok) throw new Error("Book information is unavailable.");
-  const match = findOpenLibraryMatch(await response.json(), isbn, title, author);
-  if (!match) return null;
-  const workResponse = await fetch(`https://openlibrary.org${String(match.key)}.json`, { signal });
-  if (!workResponse.ok) throw new Error("Book information is unavailable.");
-  return buildBookMetadata(match, await workResponse.json());
+  if (title) query.set("title", title);
+  if (author) query.set("author", author);
+  return (await apiClient.request<{ metadata: BookMetadata | null }>(`/books/details?${query}`, { auth: true })).metadata;
 }

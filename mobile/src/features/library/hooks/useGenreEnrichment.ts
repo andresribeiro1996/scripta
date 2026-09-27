@@ -19,7 +19,7 @@ export function useGenreEnrichment(
     if (!signature) return;
     const controller = new AbortController();
     setLoading(true);
-    void Promise.allSettled(candidates.map(async (book) => ({ key: bookKey(book), metadata: await fetchBookMetadata(book, controller.signal) }))).then(async (results) => {
+    void Promise.allSettled(candidates.map(async (book) => ({ key: bookKey(book), metadata: await fetchBookMetadata(book) }))).then(async (results) => {
       if (controller.signal.aborted) return;
       const updates = new Map(results.flatMap((result) => result.status === "fulfilled" ? [[result.value.key, result.value.metadata?.genres ?? []] as const] : []));
       if (updates.size) await save.current((current) => ({ ...current, books: current.books.map((book) => updates.has(bookKey(book)) ? { ...book, _genres: updates.get(bookKey(book)) } : book) }));
