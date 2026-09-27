@@ -1,25 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
-import { bookKey, genreLookupOrder, GENRE_LOOKUP_BATCH, type LibraryData } from "@scripta/shared";
+import { bookKey, genreLookupOrder, settleWithConcurrency, GENRE_LOOKUP_BATCH, GENRE_LOOKUP_CONCURRENCY, type LibraryData } from "@scripta/shared";
 import { fetchBookMetadata } from "../api/bookMetadata";
-
-const CONCURRENCY = 4;
-
-async function withConcurrency<T, R>(items: T[], limit: number, run: (item: T) => Promise<R>): Promise<PromiseSettledResult<R>[]> {
-  const results: PromiseSettledResult<R>[] = new Array(items.length);
-  let next = 0;
-  const worker = async () => {
-    while (next < items.length) {
-      const index = next++;
-      try {
-        results[index] = { status: "fulfilled", value: await run(items[index]!) };
-      } catch (reason) {
-        results[index] = { status: "rejected", reason };
-      }
-    }
-  };
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
-  return results;
-}
 
 export function useGenreEnrichment(
   books: Array<Record<string, unknown>>,
@@ -35,7 +16,7 @@ export function useGenreEnrichment(
   useEffect(() => {
     if (!signature || stopped.current) return;
     const controller = new AbortController();
-    void withConcurrency(candidates, CONCURRENCY, async (book) => ({ key: bookKey(book), metadata: await fetchBookMetadata(book, controller.signal) })).then(async (results) => {
+    void settleWithConcurrency(candidates, GENRE_LOOKUP_CONCURRENCY, async (book) => ({ key: bookKey(book), metadata: await fetchBookMetadata(book, controller.signal) })).then(async (results) => {
       if (controller.signal.aborted) return;
       const updates = new Map(results.flatMap((result) => result.status === "fulfilled" ? [[result.value.key, result.value.metadata?.genres ?? []] as const] : []));
       if (!updates.size) return;
