@@ -127,7 +127,6 @@ export function MuralEditorScreen({ id }: { id: string }) {
       <View style={[styles.dock, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <Button label="Add block" onPress={() => setAdding(true)} />
         <Button label="Share" variant="secondary" onPress={() => setShareFor(draftMural)} />
-        {selected ? <><Button label="Configure" variant="secondary" onPress={() => setPicking(selected.type === "image" ? "image" : selected.type === "tierlist" ? "tierlist" : selected.type === "spotlight" || selected.type === "shelf" || selected.type === "quote" || selected.type === "quoteCollection" ? "book" : null)} /><Button label="Duplicate" variant="secondary" onPress={() => setBlocks([...currentBlocks, createDuplicateCandidate(selected, currentBlocks)])} /><Button label="Delete" variant="destructive" onPress={() => { setBlocks(currentBlocks.filter((block) => block.id !== selected.id)); setSelectedId(null); }} /></> : null}
       </View>
       <MuralShareSheet mural={shareFor} books={books} groups={library?.data.groups ?? []} images={gallery.data ?? []} tierlists={tierlists.data ?? []} profile={user?.username ? { username: user.username, avatarUrl: user.avatarId ? `${API_URL}/auth/avatar/${user.avatarId}/file` : null } : undefined} draft={shareFor !== null && (shareFor.name !== mural.name || shareFor.blocks !== mural.blocks)} contentReady={!libraryQuery.isPending && !gallery.isPending && !tierlists.isPending} contentError={libraryQuery.error?.message ?? gallery.error?.message ?? tierlists.error?.message ?? undefined} onRetryContent={() => { void libraryQuery.refetch(); void gallery.refetch(); void tierlists.refetch(); }} onClose={() => setShareFor(null)} onEnableLink={async () => {
         if (shareFor === null) return;
@@ -163,6 +162,8 @@ export function MuralEditorScreen({ id }: { id: string }) {
           {selected.type === "spotlight" || (selected.type === "shelf" && !selected.collectionId) || selected.type === "quote" || selected.type === "quoteCollection" ? <Button label="Choose books" onPress={() => setPicking("book")} /> : null}
           {selected.type === "image" ? <Button label="Choose image" onPress={() => setPicking("image")} /> : null}
           {selected.type === "tierlist" ? <Button label="Choose tier list" onPress={() => setPicking("tierlist")} /> : null}
+          <Button label="Duplicate" variant="secondary" onPress={() => setBlocks([...currentBlocks, createDuplicateCandidate(selected, currentBlocks)])} />
+          <Button label="Delete" variant="destructive" onPress={() => { setBlocks(currentBlocks.filter((block) => block.id !== selected.id)); setSelectedId(null); }} />
         </ScrollView> : null}
       </Sheet>
       <Sheet visible={picking !== null} title={quoteBook ? "Choose a passage" : `Choose ${picking ?? "content"}`} onClose={() => { setPicking(null); setQuoteBook(null); }}>
