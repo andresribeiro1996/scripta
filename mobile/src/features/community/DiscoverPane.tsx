@@ -127,11 +127,7 @@ function DiscoverRow({ item }: { item: DiscoverItem }) {
   const status = contentStatus(content);
   const glyphLabel = readerGlyphLabel(author.readerGlyph);
   return (
-    <Pressable
-      accessibilityRole="link"
-      accessibilityLabel={glyphLabel ? `Open ${content.name}, ${glyphLabel}` : `Open ${content.name}`}
-      onPress={() => router.push(contentTarget(content) as never)}
-    >
+    <Pressable accessibilityRole="link" accessibilityLabel={`Open ${content.name}`} onPress={() => router.push(contentTarget(content) as never)}>
       {({ pressed }) => (
         <View style={[styles.row, { backgroundColor: pressed ? colors.surfacePressed : "transparent", borderBottomColor: colors.border }]}>
           {content.kind === "tierlist" ? <TierlistThumb covers={content.covers} /> : <TournamentThumb covers={content.covers} />}
