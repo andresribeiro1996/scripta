@@ -81,9 +81,11 @@ New tables in the existing covers SQLite file:
 - **`cover_images`** — replaces `cover_cache`: `id`, `book_id`, `source`
   (`isbndb` | `apple` | `openlibrary` | `upload`), `source_url` (null for
   uploads and migrated rows), `width`, `height`, `byte_size`, `created_at`.
-  Images are never deleted or overwritten: a better cover adds a row and
-  moves the book's pointer, so every `/covers/cached/:id/file` URL already
-  stored (arena snapshots, client caches) keeps serving.
+  Each image is two files in the blob directory: `<id>.webp` (the existing
+  pipeline, ≤1600px long edge, quality 85) and `<id>-thumb.webp` (≤600×900,
+  quality 80). Images are never deleted or overwritten: a better cover adds
+  a row and moves the book's pointer, so every `/covers/cached/:id/file` URL
+  already stored (arena snapshots, client caches) keeps serving.
 - **`cover_rejections`** — `book_id`, `source_url`: images the admin
   rejected for that book.
 - **`books_fts`** — FTS5 index over `books.title` and `books.author`
@@ -99,8 +101,14 @@ names, since records often list the translator first.
 ## Cover resolution
 
 `GET /covers/resolve?isbn=&title=&author=` (auth required) now answers from
-the database only and returns `{ url: string | null, pending: boolean }`
-immediately:
+the database only and returns
+`{ url: string | null, fullUrl: string | null, pending: boolean }`
+immediately. `url` is the thumbnail (`/covers/cached/:id/thumb`), used by
+every grid, card, arena and share view; `fullUrl` is the full image
+(`/covers/cached/:id/file`), used only by the book detail views. The new
+`/thumb` route has the same trust model, headers and (absent) rate limit as
+`/file`, and serves the full file when an image has no thumbnail (migrated
+images, which are ~300px anyway).
 
 1. Find the book by key, creating the row if needed.
 2. If it has a cover, return it (`pending: false`). If the cover is
@@ -136,6 +144,9 @@ validate-and-re-encode pipeline:
 - ISBNdb images of exactly 200×248 are its placeholder and are rejected.
 - A URL listed in `cover_rejections` for this book is skipped.
 - Apple artwork URLs are requested at `1400x1400bb`.
+
+The accepted image is written as both files (full and thumbnail) before
+the book's pointer moves to it.
 
 If nothing reaches 400px, the largest acceptable image is stored as
 `low_res`. If nothing is acceptable, the book is `missing`. Both are
@@ -198,8 +209,9 @@ existing `BookMetadata` shape, or `null`.
   after that.
 - `PUT /books/cover` (multipart: `image` plus `isbn?`, `title`, `author`):
   runs gallery's validation pipeline (size cap, real-format sniff, dimension
-  cap, WebP re-encode), stores a `cover_images` row with source `upload`, and
-  sets the book's status to `manual`. Returns `{url}`.
+  cap, WebP re-encode), writes the full and thumbnail files, stores a
+  `cover_images` row with source `upload`, and sets the book's status to
+  `manual`. Returns `{url, fullUrl}`.
 - Both return 403 for any account other than `ADMIN_USER_ID`.
 - The web `BookDetailSheet` shows **Wrong cover** and **Replace cover** when
   `isAdmin` is true. Mobile is unchanged.
@@ -208,8 +220,9 @@ existing `BookMetadata` shape, or `null`.
 
 `peekCachedCoverUrl` (used by `library/publicResolver.ts` for public share
 views) keeps its synchronous, database-only contract but reads
-`book_keys` → `books.cover_image_id`, and gains `title`/`author` parameters
-so books without an ISBN get covers on shared pages too.
+`book_keys` → `books.cover_image_id`, returns the thumbnail URL, and gains
+`title`/`author` parameters so books without an ISBN get covers on shared
+pages too.
 
 ## Clients (web and mobile)
 
@@ -217,7 +230,8 @@ so books without an ISBN get covers on shared pages too.
   `/books/search`. Both clients stop calling Open Library directly.
 - `resolveCover` (`frontend/src/api/covers.ts`,
   `mobile/src/features/library/api/covers.ts`):
-  - Stored entries become `{url, at}` under storage key `…resolved.v2`, and
+  - Stored entries become `{url, fullUrl, at}` under storage key
+    `…resolved.v2`, and
     an entry older than 7 days is re-asked. This is what carries background
     upgrades and admin replacements to devices, which today keep a URL
     forever. The key bump makes every device re-ask once after deploy.
@@ -226,9 +240,33 @@ so books without an ISBN get covers on shared pages too.
     asks again). The in-flight map still de-duplicates.
   - The TTL and backoff schedule live in `@scripta/shared`
     (`library/covers.ts`) so both clients use the same values.
+- `CoverImage` (web `BookCard.tsx`, mobile `CoverImage.tsx`) renders `url`
+  by default; the book detail views (web `BookDetailSheet`, mobile
+  `BookDetail`) ask it for `fullUrl`.
 - Because `/covers/resolve` no longer calls third parties inside the
   request, its rate limit rises from 300 to 1200 per minute; details and
   search share a separate 300/min scope.
+
+## Storage and bandwidth
+
+Measured by re-encoding the cover the chain would pick for 58 of the 65
+sampled books (Pillow's WebP output matched the backend's `sharp` within
+3% on the existing cache):
+
+| | Today (Open Library) | Full (≤1600px) | Thumbnail (≤600×900) |
+|---|---|---|---|
+| Average per cover | 22 KB | 105 KB (p90 212 KB) | 42 KB |
+| Typical dimensions | ~300×460 | 933×1400 | 600×900 |
+
+At ~150 KB per book (both files, plus ~10% for superseded images kept
+alive) and a few KB of rows: 283 books ≈ 45 MB, 1,500 ≈ 240 MB, 15,000 ≈
+2.3 GB, 100,000 ≈ 15 GB. The current cache is 2.9 MB. Railway volumes
+default to 5 GB (Hobby) and cost $0.15/GB-month.
+
+A 283-book grid's first load is ~12 MB with thumbnails, against ~30 MB if
+grids used full images and ~6 MB today. Each device downloads a cover once:
+URLs are immutable, and the PWA's `media-covers` cache keeps up to 400
+entries for 60 days.
 
 ## Migration and rollout
 
@@ -258,6 +296,8 @@ clock; new files added to `backend/package.json`'s `test` list):
 - Search: a saved ISBN makes no external call; a free-text local match makes
   no external call; a local miss saves every Open Library result.
 - Details: stored details make no external call; a failure records nothing.
+- Every stored image gets both files; `/thumb` falls back to the full file
+  when the thumbnail is missing.
 - Migration: copies rows with their ids, and running it twice is a no-op.
 - Admin routes return 403 for a non-admin account.
 
