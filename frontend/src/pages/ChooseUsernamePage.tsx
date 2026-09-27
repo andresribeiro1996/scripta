@@ -1,27 +1,24 @@
+import { USERNAME_HINT } from "@scripta/shared";
 import { afterSignIn, getAuthReturnTo, startAuthNavigation } from "../auth/returnTo";
 import { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import {
-  GOLD,
-  INK,
-  PAPER_DIM,
-  AuthBrandHeading,
   AuthCard,
   AuthFieldError,
+  AuthHeading,
   AuthServerError,
   AuthStage,
   authFieldClass,
   authFieldErrorClass,
+  authHintClass,
   authLabelClass,
   authSubmitClass
 } from "../auth/AuthStage";
 
 /** Where a Google sign-in without a username yet gets routed (see
  *  RequireUsername). Not shown to password-signup accounts — they pick a
- *  username at signup time and never have a null one to begin with. Same
- *  cover-stage-plus-card treatment as LoginPage, so the whole first-run
- *  journey reads as one designed sequence. */
+ *  username at signup time and never have a null one to begin with. */
 export function ChooseUsernamePage() {
   const { session, setUsername } = useAuth();
   const navigate = useNavigate();
@@ -59,17 +56,15 @@ export function ChooseUsernamePage() {
   return (
     <AuthStage>
       <AuthCard>
-        <AuthBrandHeading subtitle="One more thing before your library" />
-
-        <p className="mb-6 text-center text-[12px]" style={{ color: PAPER_DIM }}>
-          Choose a username for your account ({session.user.email}). You'll be able to log in with either it or your
-          email from now on.
-        </p>
+        <AuthHeading
+          title="One more thing"
+          subtitle={`Choose a username for ${session.user.email}. You'll be able to log in with it or your email from now on.`}
+        />
 
         <AuthServerError message={error} />
 
         <form onSubmit={handleSubmit}>
-          <label className={authLabelClass} style={{ color: PAPER_DIM }} htmlFor="username">
+          <label className={authLabelClass} htmlFor="username">
             Username
           </label>
           <input
@@ -90,15 +85,11 @@ export function ChooseUsernamePage() {
             aria-describedby={fieldError ? "username-error" : undefined}
             className={fieldError ? authFieldErrorClass : authFieldClass}
           />
+          <p className={authHintClass}>{USERNAME_HINT}</p>
           <AuthFieldError id="username-error" message={fieldError} />
 
-          <button
-            type="submit"
-            disabled={submitting}
-            className={`${authSubmitClass} mt-6`}
-            style={{ backgroundColor: GOLD, color: INK }}
-          >
-            {submitting ? "…" : "Continue"}
+          <button type="submit" disabled={submitting} className={`${authSubmitClass} mt-6`}>
+            {submitting ? "Saving…" : "Continue"}
           </button>
         </form>
       </AuthCard>

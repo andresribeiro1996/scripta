@@ -7,7 +7,7 @@ export class AccountActionError extends Error {
   constructor(message: string, readonly status = 400) { super(message); }
 }
 
-export function createAccountSecurity(repo: AuthRepository, send: (to: string, subject: string, text: string) => Promise<void>, frontendUrl: string, enabled: boolean) {
+export function createAccountSecurity(repo: AuthRepository, send: (to: string, subject: string, text: string) => Promise<void>, frontendUrl: string, enabled: boolean, eraseUserData: (userId: string) => void) {
   function requireEmail() {
     if (!enabled) throw new AccountActionError("Email delivery is unavailable. Please try again later.", 503);
   }
@@ -70,6 +70,19 @@ export function createAccountSecurity(repo: AuthRepository, send: (to: string, s
         if (repo.findUserByEmail(target)) throw new AccountActionError("That email cannot be used. Try another address.");
       } else if (user.email_verified_at) return;
       await sendLink(user.id, target, "verify");
+    },
+    async deleteAccount(userId: string, password?: string, confirmation?: string) {
+      const user = repo.findUserById(userId);
+      if (!user) throw new AccountActionError("Please log in again.", 401);
+      if (user.password_hash) {
+        if (!password || !await argon2.verify(user.password_hash, password)) throw new AccountActionError("Your password is incorrect.", 403);
+      } else if (confirmation?.trim().toLowerCase() !== (user.username ?? user.email).toLowerCase()) {
+        throw new AccountActionError(user.username ? "Type your username to confirm." : "Type your email address to confirm.", 403);
+      }
+      repo.revokeSessions(userId);
+      eraseUserData(userId);
+      repo.deleteUser(userId);
+      if (enabled) await send(user.email, "Your Atmyshelf account was deleted", "Your Atmyshelf account and everything in it — your library, murals, images, lists and connections — have been deleted. This can't be undone.").catch(() => undefined);
     },
     verifyEmail(token: string) {
       if (!repo.verifyEmail(hashRefreshToken(token))) throw new AccountActionError("This link has expired, was already used, or the email cannot be used. Request a new one.");

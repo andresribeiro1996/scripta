@@ -40,3 +40,10 @@ export async function galleryPlugin(app: FastifyInstance) {
 
   await app.register(buildGalleryRoutes(galleryService));
 }
+
+let erasingGallery: ReturnType<typeof createSqliteGalleryRepository> | undefined;
+
+export function deleteGalleryUserData(userId: string) {
+  (erasingGallery ??= createSqliteGalleryRepository(openGalleryDb())).deleteUserData(userId);
+  createFsImageBlobStore(env.GALLERY_STORAGE_PATH).deleteAll(userId);
+}

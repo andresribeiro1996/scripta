@@ -147,3 +147,9 @@ export async function socialsPlugin(app: FastifyInstance) {
     await registerOAuthProvider(app, config, socialsService);
   }
 }
+
+let erasingSocials: ReturnType<typeof createSqliteSocialsRepository> | undefined;
+
+export function deleteSocialsUserData(userId: string) {
+  (erasingSocials ??= createSqliteSocialsRepository(openSocialsDb())).deleteUserData(userId);
+}

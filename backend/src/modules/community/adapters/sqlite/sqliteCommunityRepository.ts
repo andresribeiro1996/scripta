@@ -52,6 +52,18 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
   `);
 
   return {
+    deleteUserData(userId) {
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        db.prepare("DELETE FROM follows WHERE follower_id = ? OR followee_id = ?").run(userId, userId);
+        db.prepare("DELETE FROM profiles WHERE user_id = ?").run(userId);
+        db.prepare("DELETE FROM events WHERE user_id = ? OR (ref_type = 'user' AND ref_id = ?)").run(userId, userId);
+        db.exec("COMMIT");
+      } catch (error) {
+        db.exec("ROLLBACK");
+        throw error;
+      }
+    },
     insertFollow(row) {
       return insertFollowStmt.run({ $follower_id: row.follower_id, $followee_id: row.followee_id, $created_at: row.created_at }).changes > 0;
     },

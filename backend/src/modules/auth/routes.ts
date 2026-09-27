@@ -99,6 +99,12 @@ export function buildAuthRoutes(service: AuthService, security?: AccountSecurity
         await security.changePassword(request.user.id, parsed.data.currentPassword, parsed.data.password);
         return reply.code(204).send();
       });
+      app.post("/auth/delete-account", { preHandler: authGuard, config: { rateLimit: { max: 5, timeWindow: "1 minute" } } }, async (request, reply) => {
+        const parsed = z.object({ password: z.string().max(128).optional(), confirmation: z.string().max(320).optional() }).safeParse(request.body ?? {});
+        if (!parsed.success) return reply.code(400).send({ error: "Confirm with your password, or your username if you sign in with Google." });
+        await security.deleteAccount(request.user.id, parsed.data.password, parsed.data.confirmation);
+        return reply.code(204).send();
+      });
       app.post("/auth/verification-email", { preHandler: authGuard, config: { rateLimit: { max: 3, timeWindow: "1 minute" } } }, async (request, reply) => {
         const parsed = z.object({ email: z.string().trim().email().optional(), currentPassword: z.string().optional() }).safeParse(request.body ?? {});
         if (!parsed.success) return reply.code(400).send({ error: "Enter a valid email address." });

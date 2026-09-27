@@ -1,6 +1,7 @@
 import { authFieldErrors, PASSWORD_HINT, USERNAME_HINT, safeAuthReturnTo } from "@scripta/shared";
 import { PasswordInput } from "../auth/PasswordInput";
-import { afterSignIn, startAuthNavigation } from "../auth/returnTo";
+import { afterSignIn, clearAuthNotice, readAuthNotice, startAuthNavigation } from "../auth/returnTo";
+import { modeFromSearch, type AuthMode as Mode } from "../lib/landing";
 import { useEffect, useRef, useState } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { API_URL } from "../api/baseUrl";
@@ -8,19 +9,17 @@ import { ApiError, publicFetch } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { createGoogleOAuthState } from "../auth/googleOAuthState";
 import {
-  GOLD,
-  INK,
-  PAPER,
-  PAPER_DIM,
-  PAPER_FAINT,
-  AuthBrandHeading,
   AuthCard,
   AuthFieldError,
+  AuthHeading,
   AuthServerError,
   AuthStage,
   authFieldClass,
   authFieldErrorClass,
+  authHintClass,
   authLabelClass,
+  authLinkClass,
+  authSecondaryClass,
   authSubmitClass
 } from "../auth/AuthStage";
 
@@ -37,14 +36,12 @@ const GoogleLogo = () => (
   </svg>
 );
 
-type Mode = "login" | "signup";
-
 export function LoginPage() {
   const { session, login, signup } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [mode, setMode] = useState<Mode>("login");
+  const [mode, setMode] = useState<Mode>(() => modeFromSearch(new URLSearchParams(location.search)));
   // In login mode this doubles as "email or username"; in signup mode
   // it's strictly the email (username gets its own field below).
   const [identifier, setIdentifier] = useState("");
@@ -58,12 +55,15 @@ export function LoginPage() {
   const from = (location.state as { from?: { pathname: string; search?: string; hash?: string }; returnTo?: string } | null);
   const redirectTo = safeAuthReturnTo(from?.returnTo ?? (from?.from ? `${from.from.pathname}${from.from.search ?? ""}${from.from.hash ?? ""}` : new URLSearchParams(location.search).get("returnTo")), "/dashboard");
   const [googleAvailable, setGoogleAvailable] = useState(false);
+  const [notice] = useState(readAuthNotice);
 
   useEffect(() => {
     publicFetch("/auth/providers")
       .then((body) => setGoogleAvailable(Boolean((body as { google?: boolean }).google)))
       .catch(() => setGoogleAvailable(false));
   }, []);
+
+  useEffect(() => clearAuthNotice(), []);
 
   useEffect(() => {
     const restore = () => { locked.current = false; setSubmitting(false); };
@@ -135,45 +135,29 @@ export function LoginPage() {
     }
   }
 
+  const message = (location.state as { message?: string } | null)?.message ?? notice;
+
+  function switchMode() {
+    setMode(mode === "login" ? "signup" : "login");
+    setError(null);
+    setFieldErrors({});
+  }
+
   return (
     <AuthStage>
       <AuthCard>
-        <AuthBrandHeading subtitle={mode === "login" ? "Welcome back to your library" : "Set up your library account"} />
+        <AuthHeading
+          title={mode === "login" ? "Log in" : "Create your library"}
+          subtitle={mode === "login" ? "Welcome back to your library." : "You can import your books from Kobo, Goodreads or StoryGraph right after."}
+        />
 
-        {/* Segmented mode toggle — one containing border, active half tinted gold. */}
-        <div
-          className="mb-6 flex overflow-hidden rounded-lg text-[12px] font-semibold"
-          style={{ border: `1px solid ${PAPER_FAINT}`, backgroundColor: "rgba(242, 237, 230, 0.04)" }}
-          role="tablist"
-          aria-label="Log in or sign up"
-        >
-          {(["login", "signup"] as const).map((value) => (
-            <button
-              key={value}
-              type="button"
-              role="tab"
-              aria-selected={mode === value}
-              disabled={submitting}
-              onClick={() => { setMode(value); setError(null); setFieldErrors({}); }}
-              className="flex-1 py-2 transition-colors"
-              style={
-                mode === value
-                  ? { backgroundColor: "rgba(224, 138, 82, 0.16)", color: GOLD }
-                  : { color: PAPER_DIM }
-              }
-            >
-              {value === "login" ? "Log in" : "Sign up"}
-            </button>
-          ))}
-        </div>
-
-        {(location.state as { message?: string } | null)?.message && <p role="status" className="mb-4 text-sm" style={{ color: PAPER }}>{(location.state as { message: string }).message}</p>}
+        {message && <p role="status" className="mb-5 text-sm">{message}</p>}
         <AuthServerError message={error} />
 
         <form onSubmit={handleSubmit} noValidate>
           <fieldset disabled={submitting}>
           <div className="mb-4">
-            <label className={authLabelClass} style={{ color: PAPER_DIM }} htmlFor="identifier">
+            <label className={authLabelClass} htmlFor="identifier">
               {mode === "login" ? "Email or username" : "Email"}
             </label>
             <input
@@ -206,7 +190,7 @@ export function LoginPage() {
           >
             <div className="overflow-hidden">
               <div className="mb-4">
-                <label className={authLabelClass} style={{ color: PAPER_DIM }} htmlFor="username">
+                <label className={authLabelClass} htmlFor="username">
                   Username
                 </label>
                 <input
@@ -221,19 +205,18 @@ export function LoginPage() {
                   autoComplete="username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                      onInput={clearFieldError}
+                  onInput={clearFieldError}
                   aria-invalid={Boolean(fieldErrors.username)}
-              aria-describedby={fieldErrors.username ? "username-error" : undefined}
+                  aria-describedby={fieldErrors.username ? "username-error" : undefined}
                   className={fieldErrors.username ? authFieldErrorClass : authFieldClass}
                 />
-                <p className="mt-1 text-xs" style={{ color: PAPER_DIM }}>{USERNAME_HINT}</p>
-                <AuthFieldError id="username-error" message={fieldErrors.username} />
+                {fieldErrors.username ? <AuthFieldError id="username-error" message={fieldErrors.username} /> : <p className={authHintClass}>{USERNAME_HINT}</p>}
               </div>
             </div>
           </div>
 
-          <div className="mb-6">
-            <label className={authLabelClass} style={{ color: PAPER_DIM }} htmlFor="password">
+          <div>
+            <label className={authLabelClass} htmlFor="password">
               Password
             </label>
             <PasswordInput
@@ -250,53 +233,39 @@ export function LoginPage() {
               aria-describedby={fieldErrors.password ? "password-error" : undefined}
               className={fieldErrors.password ? authFieldErrorClass : authFieldClass}
             />
-            {mode === "signup" && <p className="mt-1 text-xs" style={{ color: PAPER_DIM }}>{PASSWORD_HINT}</p>}
-            <AuthFieldError id="password-error" message={fieldErrors.password} />
+            {fieldErrors.password ? <AuthFieldError id="password-error" message={fieldErrors.password} /> : mode === "signup" && <p className={authHintClass}>{PASSWORD_HINT}</p>}
           </div>
 
-          <div className="mb-5 flex flex-wrap items-center justify-between gap-3 text-xs" style={{ color: PAPER }}>
-            <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />Remember me</label>
-            {mode === "login" && <Link to={`/forgot-password?email=${encodeURIComponent(identifier.includes("@") ? identifier : "")}`} className="py-3 underline">Forgot password?</Link>}
+          <div className="mb-4 mt-2 flex flex-wrap items-center justify-between gap-x-4 text-sm">
+            <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} className="h-4 w-4" />Remember me</label>
+            {mode === "login" && <Link to={`/forgot-password?email=${encodeURIComponent(identifier.includes("@") ? identifier : "")}`} className={`flex min-h-11 items-center ${authLinkClass}`}>Forgot password?</Link>}
           </div>
-          <button
-            type="submit"
-            disabled={submitting}
-            className={authSubmitClass}
-            style={{ backgroundColor: GOLD, color: INK }}
-          >
+          <button type="submit" disabled={submitting} className={authSubmitClass}>
             {submitting ? (mode === "login" ? "Logging in…" : "Creating account…") : mode === "login" ? "Log in" : "Create account"}
           </button>
-
-          {googleAvailable && (
-            <>
-              <div className="my-5 flex items-center gap-3 text-[10px] tracking-[0.2em] uppercase" style={{ color: PAPER_DIM }}>
-                <span className="h-px flex-1" style={{ backgroundColor: PAPER_FAINT }} />
-                or
-                <span className="h-px flex-1" style={{ backgroundColor: PAPER_FAINT }} />
-              </div>
-              {/* Solid, not transparent — Google's own branding guidelines
-                  never show the mark on a see-through surface. PAPER/INK
-                  (this page's "light" tokens) rather than plain white/
-                  black, so it still reads as this page's own paper-on-a-
-                  dark-cover material, not a foreign white rectangle
-                  dropped on top of it. Text stays "Sign in with Google"
-                  regardless of `mode` — signing in via Google IS the
-                  account action either way (a new account gets created on
-                  first use, same as it already does), there's no separate
-                  "sign up with Google" flow to word this differently for. */}
-              <a
-                href={`${API_URL}/auth/google`}
-                onClick={startGoogleSignIn}
-                className="flex w-full items-center justify-center gap-2.5 rounded-lg border py-2.5 text-sm font-medium transition-opacity hover:opacity-90"
-                style={{ borderColor: PAPER, backgroundColor: PAPER, color: INK }}
-              >
-                <GoogleLogo />
-                Sign in with Google
-              </a>
-            </>
-          )}
           </fieldset>
         </form>
+
+        {googleAvailable && (
+          <>
+            <div className="my-5 flex items-center gap-3 text-xs text-(--color-text-dim)">
+              <span className="h-px flex-1 bg-(--color-border)" />
+              or
+              <span className="h-px flex-1 bg-(--color-border)" />
+            </div>
+            <a href={`${API_URL}/auth/google`} onClick={startGoogleSignIn} className={authSecondaryClass}>
+              <GoogleLogo />
+              Continue with Google
+            </a>
+          </>
+        )}
+
+        <p className="mt-6 text-center text-sm text-(--color-text-dim)">
+          {mode === "login" ? "New to Atmyshelf?" : "Already have an account?"}{" "}
+          <button type="button" onClick={switchMode} disabled={submitting} className={`inline-flex min-h-11 items-center ${authLinkClass}`}>
+            {mode === "login" ? "Create an account" : "Log in"}
+          </button>
+        </p>
       </AuthCard>
     </AuthStage>
   );
