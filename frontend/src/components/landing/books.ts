@@ -20,3 +20,11 @@ export const BOOKS = {
 export type BookSlug = keyof typeof BOOKS;
 
 export const coverSrc = (slug: BookSlug) => `/covers/${slug}.jpg`;
+
+export function readerCardSrc(plate: { key: string; numeral: string }) {
+  const n = plate.numeral.toLowerCase();
+  return {
+    paper: `/reader-cards/${n}-${plate.key}-paper.svg`,
+    reversed: `/reader-cards/${n}-${plate.key}-reversed.svg`,
+  };
+}
