@@ -87,20 +87,22 @@ Web keyframes 130–200ms on `cubic-bezier(0.32, 0.72, 0, 1)` for dialogs/sheets
 
 One lockup wherever the product names itself: the app icon at 28px (`icon-192.png`, `radius-sm`) beside "Atmyshelf" in the system stack, 18px bold (`components/BrandLockup.tsx`). Used by the app sidebar and mobile drawer, the landing nav and footer, and every sign-in screen, where it links to `/`.
 
+The name stays live system-stack text, not Playfair: the lockup is interface chrome, and Playfair's single 400 weight reads thin at 18px beside the solid 28px tile. The stacked lockup (`logo.png`) sets the name in Playfair Display because an image can't carry the system stack; use it only where the product isn't drawing its own UI (store listings, press, a README).
+
 ## Public pages
 
 Landing (`/`), privacy (`/privacy`) and the sign-in journey follow the OS theme on the same tokens as the app. Extra rules: show the product through real screenshots (regenerated with `npm run screenshots:landing --workspace frontend`, never hand-mocked), one accent button per view, no store badges or links until they point somewhere real, unreleased features labelled with an `accent-soft` "Coming soon" chip. Content width 1152px with `px-4 sm:px-6` gutters.
 
 ## Logos
 
-Files in `frontend/public/` and `mobile/assets/images/`. The mark is a serif "S" ligature that doubles as a bookshelf (crossbars read as shelf brackets). It was drawn when the product was called Scripta and hasn't been redrawn for Atmyshelf; the icon still ships in the lockup above.
-- `frontend/public/logo.png` — old full lockup (monogram + "Scripta" wordmark). Retired with the rename; unused in the product until redrawn.
-- `frontend/public/scriptap.png` — monogram alone, dark ink (actually a JPEG with no transparency, despite the name).
-- `mobile/assets/images/amsicon-source.png` — the 1254px master source art (white glyph, transparent). Regenerate any new export from this, not from a resized existing export.
-- `frontend/public/icon-512.png` — shipped PWA icon: white glyph on near-black square.
-- `frontend/public/favicon-48.png` — same treatment at the smallest real size it's shown.
+The mark is a capital A made of two books leaning together on a shelf. The thin book on the left and the thick one on the right give it the thick–thin stress of a serif A (Playfair's included); a crossbar and the shelf rule finish the letter. Flat shapes only, so it holds at 16px; the notch where the tops meet and the lifted outer corners of the books only show from about 48px up.
 
-Never recolor the mark outside these two treatments (dark ink on transparent / white on dark square). `frontend/public/Gemini_Generated_Image_....jfif` is an unrelated AI-test image, not a brand asset.
+Masters are in `design/brand/`: `mark.svg` (a 76-unit square box) and `lockup.svg` (the mark over "Atmyshelf" in Playfair Display 400, outlined to paths so nothing depends on an installed font; it carries its own copy of the mark, so change both). `node design/brand/render.mjs` rasterises every file below with Chromium — edit the SVGs and rerun it, never retouch a PNG.
+- `frontend/public/favicon-48.png`, `icon-192.png`, `icon-512.png` — paper (`#f2f0ec`) mark on a full-bleed dark `bg` (`#141210`) square. `icon-512.png` is also the maskable icon, so the mark stays inside the central 80% circle.
+- `frontend/public/logo.png` — the stacked lockup, ink (`#201e1c`) on transparent, 992×1070.
+- `mobile/assets/images/icon.png` and `favicon.png` — the web icons' treatment. `adaptive-foreground.png` and `adaptive-monochrome.png` — paper mark on transparent, inside Android's 66dp safe circle, over `app.json`'s `#141210`. `splash-icon.png` / `splash-icon-dark.png` — ink / dark-theme `text` (`#ece8e3`) mark on transparent. `amsicon-source.png` — the mark at 1254px, ink on transparent.
+
+Two treatments only: ink on paper or transparent, paper on the dark `bg`. No accent in the mark: the lockup heads every view, and the accent is kept for that view's one primary action. `frontend/public/Gemini_Generated_Image_....jfif` is an unrelated AI-test image, not a brand asset.
 
 ## Components
 
