@@ -1,5 +1,9 @@
 import type { FinishRating } from "@scripta/shared";
-import { CoverImage } from "./BookCard";
+import { useQuery } from "@tanstack/react-query";
+import { useRef, useState } from "react";
+import { fetchIsAdmin, rejectSharedCover, uploadSharedCover } from "../api/books";
+import { forgetResolvedCover, rememberResolvedCover } from "../api/covers";
+import { coverParamsFor, CoverImage } from "./BookCard";
 import { BookSummary } from "./BookSummary";
 import { useConfirm } from "./ConfirmDialog";
 import { FeelingChips } from "./FeelingChips";
@@ -28,10 +32,38 @@ export function BookDetailSheet({
   useScrollLock();
   useDismissible(onClose);
   const confirm = useConfirm();
+  const { data: isAdmin = false } = useQuery({ queryKey: ["books-admin"], queryFn: fetchIsAdmin, staleTime: Infinity });
+  const [coverVersion, setCoverVersion] = useState(0);
+  const [coverError, setCoverError] = useState<string | null>(null);
+  const coverFile = useRef<HTMLInputElement>(null);
 
   async function handleDeleteNote(bookmarkId: string) {
     if (await confirm({ title: "Delete this note?", body: "This can't be undone.", confirmLabel: "Delete" })) {
       onDeleteNote(book, bookmarkId);
+    }
+  }
+
+  async function rejectCover() {
+    if (!(await confirm({ title: "Reject this cover?", body: "Every account stops seeing it, and the next best cover is looked up.", confirmLabel: "Reject" }))) return;
+    const params = coverParamsFor(book);
+    try {
+      await rejectSharedCover(params);
+      forgetResolvedCover(params);
+      setCoverError(null);
+      setCoverVersion((v) => v + 1);
+    } catch (error) {
+      setCoverError(error instanceof Error ? error.message : "Couldn't reject the cover.");
+    }
+  }
+
+  async function replaceCover(file: File) {
+    const params = coverParamsFor(book);
+    try {
+      rememberResolvedCover(params, await uploadSharedCover(params, file));
+      setCoverError(null);
+      setCoverVersion((v) => v + 1);
+    } catch (error) {
+      setCoverError(error instanceof Error ? error.message : "Couldn't upload the cover.");
     }
   }
 
@@ -62,7 +94,7 @@ export function BookDetailSheet({
 
         <div className="grid gap-5 p-5 sm:grid-cols-[180px_1fr]">
           <div className="relative mx-auto aspect-[2/3] w-32 overflow-hidden rounded-lg bg-(--color-border) sm:w-full">
-            <CoverImage book={book} size="full" />
+            <CoverImage key={coverVersion} book={book} size="full" />
           </div>
 
           <div className="min-w-0">
@@ -80,7 +112,34 @@ export function BookDetailSheet({
               <button onClick={() => onOpenCoverPicker(book)} className={actionClass}>
                 Cover
               </button>
+              {isAdmin && (
+                <>
+                  <button onClick={() => void rejectCover()} className={actionClass}>
+                    Wrong cover
+                  </button>
+                  <button onClick={() => coverFile.current?.click()} className={actionClass}>
+                    Replace cover
+                  </button>
+                  <input
+                    ref={coverFile}
+                    type="file"
+                    accept="image/*"
+                    hidden
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      event.target.value = "";
+                      if (file) void replaceCover(file);
+                    }}
+                  />
+                </>
+              )}
             </div>
+
+            {coverError && (
+              <p role="alert" className="mt-2 text-sm text-(--color-danger)">
+                {coverError}
+              </p>
+            )}
 
             <div
               role="group"
