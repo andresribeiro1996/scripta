@@ -1,5 +1,7 @@
 import { bookKey } from "../library/merge.js";
+import type { Group } from "../library/groups.js";
 import { DEFAULT_BLOCK_STYLE, type BlockStyle } from "../library/libraryStyle.js";
+import { readerIdentity } from "../library/readerIdentity.js";
 import { eligiblePassages } from "./home.js";
 import { ensureBookBlockHeights, newId, type BlockLayout, type MuralBlock } from "./murals.js";
 
@@ -64,7 +66,7 @@ export function shelfPresetSummary(books: Book[], published: boolean) {
   return `Made from your ${library.length} ${library.length === 1 ? "book" : "books"}: ${reading} you're reading and ${finished} you've finished. ${visibility}`;
 }
 
-export function buildMuralPreset(id: MuralPresetId, books: Book[]) {
+export function buildMuralPreset(id: MuralPresetId, books: Book[], groups: Group[] = []) {
   const preset = MURAL_PRESETS.find((item) => item.id === id)!;
   const library = titledBooks(books);
   const selected = presetBooks(id, library).slice(0, SHELF_SIZE);
@@ -80,9 +82,15 @@ export function buildMuralPreset(id: MuralPresetId, books: Book[]) {
     const finished = finishedNewestFirst(library).slice(0, SHELF_SIZE);
     const loved = favourites(library).slice(0, SHELF_SIZE);
     const hasPassage = eligiblePassages(library).length > 0;
-    blocks.push({ ...at(0, 0, 12, 5), type: "profile", bio: "", favoriteGenres: [] });
-    blocks.push({ ...at(0, 5, 12, 4), type: "stats", metrics: ["totalBooks", "booksFinished", "booksInProgress"] });
-    let y = 9;
+    const profileBottom = 5;
+    blocks.push({ ...at(0, 0, 12, profileBottom), type: "profile", bio: "", favoriteGenres: [] });
+    let statsY = profileBottom;
+    if (readerIdentity(library, groups).state === "settled") {
+      blocks.push({ ...at(0, profileBottom, 6, 8), type: "readerCard" });
+      statsY += 8;
+    }
+    blocks.push({ ...at(0, statsY, 12, 4), type: "stats", metrics: ["totalBooks", "booksFinished", "booksInProgress"] });
+    let y = statsY + 4;
     if (reading.length) { blocks.push({ ...at(0, y, 12, 4), type: "currentlyReading" }); y += 4; }
     if (finished.length) { blocks.push({ ...at(0, y, 12, 5), type: "shelf", title: "Finished", role: "finished", bookKeys: keys(finished) }); y += 5; }
     const width = hasPassage && loved.length ? 6 : 12;

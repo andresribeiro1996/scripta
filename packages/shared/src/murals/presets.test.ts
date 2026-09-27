@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { bookKey } from "../library/merge.js";
 import { buildMuralPreset, MURAL_PRESETS, presetAvailability, shelfPresetSummary } from "./presets.js";
 import { updateBlock, type Mural, type MuralBlock } from "./murals.js";
 
@@ -108,4 +109,15 @@ test("editing a shelf block through updateBlock keeps its role", () => {
   const edited = shelf.type === "shelf" ? { ...shelf, title: "Read in 2026" } : shelf;
   const [saved] = updateBlock([mural], "m1", edited)[0].blocks;
   assert.equal(saved.type === "shelf" ? saved.role : undefined, "finished");
+});
+
+test("the My shelf preset adds a settled reader card below the profile", () => {
+  const books = Array.from({ length: 10 }, (_, i) => ({ Title: `Book ${i}`, Attribution: `Author ${i}`, ReadStatus: 2 }));
+  const groups = [{ id: "g", type: "series" as const, name: "S", bookKeys: books.slice(0, 3).map(bookKey), createdAt: "", updatedAt: "" }];
+  const blocks = buildMuralPreset("shelf", books, groups).blocks;
+  const card = blocks.find((block) => block.type === "readerCard");
+  const profile = blocks.find((block) => block.type === "profile")!;
+  assert.ok(card, "settled card is placed");
+  assert.equal(card!.layout.y, profile.layout.y + profile.layout.h);
+  assert.equal(buildMuralPreset("shelf", books.slice(0, 4), []).blocks.some((block) => block.type === "readerCard"), false);
 });
