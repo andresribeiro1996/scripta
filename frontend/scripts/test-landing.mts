@@ -8,7 +8,7 @@ test("a session routes to the dashboard; a stranger gets the landing page", () =
   assert.equal(landingDestination(null), null);
 });
 
-test("the landing CTAs land on signup; everything else lands on login", () => {
+test("modeFromSearch reads mode=signup as signup; everything else as login", () => {
   assert.equal(modeFromSearch(new URLSearchParams("mode=signup")), "signup");
   assert.equal(modeFromSearch(new URLSearchParams("mode=login")), "login");
   assert.equal(modeFromSearch(new URLSearchParams("mode=bogus")), "login");

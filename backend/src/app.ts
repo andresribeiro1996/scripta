@@ -33,6 +33,7 @@ import { deleteLibraryUserData, registerLibraryModule, resolvePublicLibrary, rea
 import { deleteMuralsUserData, getMuralsPublicApi, registerMuralsModule } from "./modules/murals/index.js";
 import { deleteSocialsUserData, registerSocialsModule } from "./modules/socials/index.js";
 import { deleteTierlistsUserData, registerTierlistsModule, getTierlistsPublicApi } from "./modules/tierlists/index.js";
+import { registerWaitlistModule } from "./modules/waitlist/index.js";
 
 export function buildApp() {
   // Moves any still-embedded library.murals[] into the new murals table
@@ -125,6 +126,7 @@ export function buildApp() {
   app.register(registerGalleryModule);
   app.register(registerCoversModule);
   app.register(registerSocialsModule);
+  app.register(registerWaitlistModule);
   app.register(registerMuralsModule, {
     // Cross-module wiring, same shape as covers' peekCachedCoverUrl
     // consumers: the murals module never imports tierlists' internals —
