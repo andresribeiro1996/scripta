@@ -11,6 +11,7 @@ import { contentDetail, contentTarget } from "@scripta/shared/community";
 import type { Quiz } from "../api/quizzes";
 import type { Tierlist } from "../api/tierlists";
 import { TournamentStatusBadge } from "../components/arena/TournamentStatusBadge";
+import { QuizStatusBadge, quizStatus } from "../components/quizzes/QuizStatusBadge";
 import { useConfirm } from "../components/ConfirmDialog";
 import { EmptyState } from "../components/EmptyState";
 import { ArenaIcon } from "../components/NavIcons";
@@ -318,8 +319,9 @@ export function ArenaListPage() {
               >
                 <div className="p-4 pr-12">
                   <h3 className="font-semibold">{quiz.name}</h3>
-                  <p className="text-sm text-(--color-text-dim)">
-                    {quiz.data.books.length} books · {quiz.voteCode === null ? "Draft" : quiz.playOpen ? "Open" : "Closed"}
+                  <p className="flex flex-wrap items-center gap-1.5 text-sm text-(--color-text-dim)">
+                    {quiz.data.books.length} books
+                    <QuizStatusBadge status={quizStatus(quiz)} />
                   </p>
                 </div>
                 <OptionsMenu

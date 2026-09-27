@@ -9,6 +9,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import type { PublicQuizQuestion } from "@scripta/shared";
+import { CoverImage } from "../components/BookCard";
 import { fetchPublicResultsApi, submitPlayApi, type PlayResponse } from "../api/quizzes";
 import { storePlayId, useQuizPlay } from "../hooks/useQuizPlay";
 
@@ -22,7 +23,15 @@ function InfoScreen({ message }: { message: string }) {
 
 function Prompt({ question }: { question: PublicQuizQuestion }) {
   if (question.type === "cover_title") {
-    return <img src={question.prompt} alt="Which book is this?" className="mx-auto h-56 w-40 rounded-lg object-cover blur-md" />;
+    // Same cover chain as every other game (CoverImage: confirmed URL,
+    // backend resolve, fallback tile) — the blur is the whole question, so
+    // it wraps the fallback too. The fallback Title is deliberately NOT
+    // the answer: a dead cover must not give the question away.
+    return (
+      <div className="relative mx-auto h-56 w-40 overflow-hidden rounded-lg bg-(--color-border) blur-md">
+        <CoverImage book={{ Title: "Cover unavailable", _coverUrl: question.prompt }} alt="Which book is this?" />
+      </div>
+    );
   }
   if (question.type === "title_cover") {
     return <p className="text-center text-2xl font-bold">{question.prompt}</p>;
@@ -40,9 +49,9 @@ function Options({ question, onPick, picked }: { question: PublicQuizQuestion; o
             type="button"
             disabled={picked !== null}
             onClick={() => onPick(index)}
-            className={`overflow-hidden rounded-xl border-2 transition-colors ${picked === index ? "border-(--color-accent)" : "border-(--color-border) hover:border-(--color-text-dim)"}`}
+            className={`relative h-44 overflow-hidden rounded-xl border-2 bg-(--color-border) transition-colors ${picked === index ? "border-(--color-accent)" : "border-(--color-border) hover:border-(--color-text-dim)"}`}
           >
-            <img src={option} alt={`Option ${index + 1}`} className="h-44 w-full object-cover" />
+            <CoverImage book={{ Title: `Option ${index + 1}`, _coverUrl: option }} alt={`Option ${index + 1}`} />
           </button>
         ))}
       </div>
@@ -137,7 +146,7 @@ export function PlayQuizPage() {
           {index + 1}/{questions.length} · {Math.floor(elapsed / 1000)}s
         </span>
       </div>
-      <div className="h-1 rounded bg-(--color-surface-hover)">
+      <div className="h-1 rounded bg-(--color-border)">
         <div className="h-1 rounded bg-(--color-accent) transition-all" style={{ width: `${Math.round((answeredCount / questions.length) * 100)}%` }} />
       </div>
 
@@ -203,7 +212,9 @@ function ResultsView({
         {questions.map((question, i) => (
           <li key={question.id} className="flex items-center justify-between rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2">
             <span className="text-(--color-text-dim)">{i + 1}</span>
-            <span aria-hidden="true">{result.correct[question.id] ? "✓" : "✗"}</span>
+            <span aria-hidden="true" className={result.correct[question.id] ? "text-(--color-success)" : "text-(--color-danger)"}>
+              {result.correct[question.id] ? "✓" : "✗"}
+            </span>
           </li>
         ))}
       </ol>

@@ -5,7 +5,7 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { QUIZ_QUESTION_TYPES, eligibleTypes, type QuizData, type QuizQuestionType } from "@scripta/shared";
 import { PageContainer } from "../components/PageContainer";
 import { useConfirm } from "../components/ConfirmDialog";
@@ -21,6 +21,7 @@ const TYPE_LABELS: Record<QuizQuestionType, string> = {
 
 export function QuizEditorPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const { data: quizzes, isLoading } = useQuizzes();
@@ -83,7 +84,7 @@ export function QuizEditorPage() {
           {quiz.voteCode === null && (
             <button
               type="button"
-              onClick={() => { void confirm({ title: `Delete "${quiz.name}"?`, body: "This can't be undone." }).then(async (yes) => { if (yes) { await deleteQuizApi(quiz.id); await queryClient.invalidateQueries({ queryKey: ["quizzes"] }); window.location.href = "/dashboard/arena?tab=quizzes"; } }); }}
+              onClick={() => { void confirm({ title: `Delete "${quiz.name}"?`, body: "This can't be undone." }).then(async (yes) => { if (yes) { await deleteQuizApi(quiz.id); await queryClient.invalidateQueries({ queryKey: ["quizzes"] }); navigate("/dashboard/arena?tab=quizzes"); } }); }}
               className="min-h-10 rounded-lg border border-(--color-border) px-3 text-sm text-(--color-danger)"
             >
               Delete
@@ -273,7 +274,10 @@ function PublishedSection({ quiz, shareLink, copied, setCopied }: { quiz: Quiz; 
                 {stat.picks.map((pick) => (
                   <div key={pick.choiceIndex} className="flex items-center gap-2 text-xs text-(--color-text-dim)">
                     <span className="w-6">#{pick.choiceIndex + 1}</span>
-                    <span className="h-2 rounded bg-(--color-accent-soft)" style={{ width: `${Math.round((pick.count / stat.answerCount) * 100)}%` }} />
+                    {/* Same tally-bar treatment as DuelCard: accent fill on a border track. */}
+                    <span className="h-2 flex-1 rounded bg-(--color-border)">
+                      <span className="block h-2 rounded bg-(--color-accent)" style={{ width: `${Math.round((pick.count / stat.answerCount) * 100)}%` }} />
+                    </span>
                     <span>{pick.count}</span>
                   </div>
                 ))}
