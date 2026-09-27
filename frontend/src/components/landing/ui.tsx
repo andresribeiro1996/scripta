@@ -5,6 +5,9 @@ export const container = "mx-auto max-w-6xl px-4 sm:px-6";
 export const primaryButton =
   "flex min-h-12 items-center justify-center rounded-lg bg-(--color-accent) px-6 text-base font-semibold text-(--color-on-accent) transition-opacity hover:opacity-90";
 
+export const secondaryButton =
+  "flex min-h-11 items-center justify-center rounded-lg border border-(--color-border) bg-(--color-surface) px-4 text-sm font-semibold transition-colors hover:bg-(--color-surface-hover)";
+
 export const textLink =
   "flex min-h-11 items-center justify-center font-semibold text-(--color-text) underline decoration-(--color-accent) decoration-2 underline-offset-4 transition-[text-decoration-thickness] hover:decoration-4";
 
