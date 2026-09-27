@@ -16,12 +16,14 @@ import { env } from "./config/env.js";
 import { devHttps } from "./config/devCerts.js";
 import { runStartupMigrations } from "./migrations/runStartupMigrations.js";
 import {
+  emailEnabled,
   findUserIdByUsername,
   getDashboardSeenAt,
   registerAuthModule,
   resolvePublicReaderProfile,
   resolvePublicReaderProfiles,
   searchUsernameOwners,
+  sendAccountEmail,
   setDashboardSeenAt,
   userHasUsername
 } from "./modules/auth/index.js";
@@ -126,7 +128,7 @@ export function buildApp() {
   app.register(registerGalleryModule);
   app.register(registerCoversModule);
   app.register(registerSocialsModule);
-  app.register(registerWaitlistModule);
+  app.register(registerWaitlistModule, { sendEmail: emailEnabled ? sendAccountEmail : undefined });
   app.register(registerMuralsModule, {
     // Cross-module wiring, same shape as covers' peekCachedCoverUrl
     // consumers: the murals module never imports tierlists' internals —

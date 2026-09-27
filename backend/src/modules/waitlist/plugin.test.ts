@@ -117,3 +117,60 @@ test("the repository lists every stored address oldest first, normalised as the 
     db.close();
   }
 });
+
+function recordingSender(fail = false) {
+  const sent: { to: string; subject: string; text: string }[] = [];
+  const sendEmail = async (to: string, subject: string, text: string) => {
+    sent.push({ to, subject, text });
+    if (fail) throw new Error("provider down");
+  };
+  return { sent, sendEmail };
+}
+
+test("a new address gets one confirmation email, and joining again sends none", async () => {
+  const { sent, sendEmail } = recordingSender();
+  const app = Fastify();
+  await app.register(waitlistPlugin, { sendEmail });
+  await app.ready();
+  try {
+    const first = await app.inject({ method: "POST", url: "/waitlist", payload: { email: "  Confirm@Example.com" } });
+    const again = await app.inject({ method: "POST", url: "/waitlist", payload: { email: "confirm@example.com" } });
+    assert.equal(first.statusCode, 204);
+    assert.equal(again.statusCode, 204);
+    const [mail, ...rest] = sent;
+    assert.equal(rest.length, 0);
+    assert.equal(mail?.to, "confirm@example.com");
+    assert.match(mail?.subject ?? "", /launch list/);
+    assert.match(mail?.text ?? "", /confirm@example\.com/);
+  } finally {
+    await app.close();
+  }
+});
+
+test("an invalid address sends no email", async () => {
+  const { sent, sendEmail } = recordingSender();
+  const app = Fastify();
+  await app.register(waitlistPlugin, { sendEmail });
+  await app.ready();
+  try {
+    await app.inject({ method: "POST", url: "/waitlist", payload: { email: "not-an-email" } });
+    assert.equal(sent.length, 0);
+  } finally {
+    await app.close();
+  }
+});
+
+test("a failed confirmation email still keeps the signup", async () => {
+  const { sent, sendEmail } = recordingSender(true);
+  const app = Fastify();
+  await app.register(waitlistPlugin, { sendEmail });
+  await app.ready();
+  try {
+    const res = await app.inject({ method: "POST", url: "/waitlist", payload: { email: "unlucky@example.com" } });
+    assert.equal(res.statusCode, 204);
+    assert.equal(sent.length, 1);
+    assert.equal(countMatching("unlucky@example.com"), 1);
+  } finally {
+    await app.close();
+  }
+});

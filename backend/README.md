@@ -211,7 +211,8 @@ Rate-limited (30 requests/minute, scoped to this module's routes only) and given
 ### `waitlist`
 
 - **Exactly one thing**: an email address and when it was submitted, for the landing page's "Notify me when Atmyshelf launches" form. No accounts, no relation to any other module.
-- **No enumeration and no read route over HTTP** — `POST /waitlist` always answers `204` for any address that passes validation, whether it's brand new or already on the list (insert-or-ignore on the unique `email` column), so the response never reveals whether an address was already signed up. There's no `GET`/list endpoint either, and no email is ever sent from this module.
+- **No enumeration and no read route over HTTP** — `POST /waitlist` always answers `204` for any address that passes validation, whether it's brand new or already on the list (insert-or-ignore on the unique `email` column), so the response never reveals whether an address was already signed up. There's no `GET`/list endpoint either.
+- **One confirmation email per address** — the first time an address is stored (the insert actually added a row), the module sends a short "you're on the launch list" email through the same Resend sender `auth` uses, handed in from `app.ts`. The route doesn't wait for the send, so a new and an already-listed address get the same `204` at the same speed; re-submitting never sends a second email. A send failure is logged (`[waitlist] confirmation email failed`) and the signup still stands. With email unconfigured (no `RESEND_API_KEY`/`AUTH_EMAIL_FROM`, or a non-HTTPS `FRONTEND_URL`) the module warns at boot and stores signups without confirming them.
 - **Exporting is a command, not a route** — the list is only readable from a shell on the machine that holds the database, so nothing new is reachable from the internet. On Railway, from a shell in the backend service (`railway ssh`):
 
   ```bash

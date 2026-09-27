@@ -5,11 +5,11 @@ export interface WaitlistService {
   list(): WaitlistEntry[];
 }
 
-export function createWaitlistService(repo: WaitlistRepository): WaitlistService {
+export function createWaitlistService(repo: WaitlistRepository, onJoined?: (email: string) => void): WaitlistService {
   return {
     join(email) {
       const normalizedEmail = email.trim().toLowerCase();
-      repo.insert(normalizedEmail, new Date().toISOString());
+      if (repo.insert(normalizedEmail, new Date().toISOString())) onJoined?.(normalizedEmail);
     },
     list() {
       return repo.list();

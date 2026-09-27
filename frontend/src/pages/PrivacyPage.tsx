@@ -70,7 +70,7 @@ export function PrivacyPage() {
               </li>
               <li>
                 <b>Launch list, if you join it:</b> the email address you enter to hear when Atmyshelf launches; we use
-                it only to tell you about the launch, and delete it if you ask.
+                it only to confirm you joined and to tell you about the launch, and delete it if you ask.
               </li>
               <li>
                 <b>Server logs:</b> like most websites, our servers record technical details of each request, including
@@ -107,7 +107,7 @@ export function PrivacyPage() {
                 <b>Cloudflare</b> serves the website and carries traffic to our servers.
               </li>
               <li>
-                <b>Resend</b> delivers account emails, so it receives your email address and the message.
+                <b>Resend</b> delivers account emails and launch-list confirmations, so it receives your email address and the message.
               </li>
               <li>
                 <b>Google</b>, only if you choose to sign in with Google.
