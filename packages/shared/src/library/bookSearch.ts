@@ -8,13 +8,15 @@
 // author or any mix of them" lookup that returns CANDIDATES to pick
 // from. Same public Open Library search API, different slice of it —
 // Google Books and Hardcover stay out of this (they're cover sources in
-// the backend's covers module, not general search, and one catalog is
+// the backend's books module, not general search, and one catalog is
 // enough for the pick-a-result list; a miss just falls through to
 // filling the form by hand).
 //
-// The actual Open Library fetch (searchBooks) is network-bound and stays
-// per-client (frontend/src/lib/bookSearch.ts); this module holds only the
-// pure query-shape and result-mapping logic.
+// The actual Open Library fetch now runs server-side
+// (backend/src/modules/books/adapters/openlibrary/openLibraryCatalog.ts);
+// frontend/src/lib/bookSearch.ts's searchBooks just calls GET
+// /books/search. This module holds only the pure query-shape and
+// result-mapping logic.
 
 import { normalizeBookGenres, type BookGenre } from "./bookGenres.js";
 

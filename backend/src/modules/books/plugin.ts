@@ -19,12 +19,16 @@ import { createCoverWorker } from "./worker.js";
 const ISBNDB_GAP_MS = 1100;
 const APPLE_GAP_MS = 3200;
 const OPEN_LIBRARY_GAP_MS = 1000;
+const OPEN_LIBRARY_COVER_GAP_MS = 3100;
 
 export async function booksPlugin(app: FastifyInstance) {
   const repo = createSqliteBooksRepository(openBooksDb());
   const openLibraryThrottle = createThrottle(OPEN_LIBRARY_GAP_MS);
+  const openLibraryCoverThrottle = createThrottle(OPEN_LIBRARY_COVER_GAP_MS);
   const fetchImage: FetchCoverImage = async (candidate) => {
-    const bytes = await fetchBytes(candidate.source, candidate.url);
+    const bytes = candidate.source === "openlibrary"
+      ? await openLibraryCoverThrottle(() => fetchBytes(candidate.source, candidate.url))
+      : await fetchBytes(candidate.source, candidate.url);
     return bytes ? encodeCover(bytes) : null;
   };
   const service = createBooksService({

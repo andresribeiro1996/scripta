@@ -67,7 +67,7 @@ export function CoverImage({
           if (!cancelled) { setAutoUrl(cached); setResolving(false); }
           return;
         }
-        const url = await resolveCover(params, { size });
+        const url = await resolveCover(params, { size, poll: !onLoadEnd });
         if (!cancelled) { setAutoUrl(url); setResolving(false); }
       } catch {
         if (!cancelled) { setAutoUrl(null); setResolving(false); }
