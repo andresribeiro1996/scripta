@@ -57,6 +57,14 @@ test("readerName is escaped after uppercasing", () => {
   assert.match(svg, />A&lt;B</);
 });
 
+test("a long reader name is truncated before it can overprint the plate foot", () => {
+  const svg = renderPlate({ identity: "carto", state: "settled", readerName: "a".repeat(30), print: "paper", label: "x" });
+  const [, printed] = svg.match(/>(A+…?)<\/text>\s*<\/svg>/) ?? [];
+  assert.ok(printed, "reader name text not found");
+  assert.ok(printed!.length <= 17, `printed name is ${printed!.length} chars`);
+  assert.match(svg, />PLATE /);
+});
+
 test("a label containing a quote doesn't break the aria-label attribute", () => {
   const svg = renderPlate({ identity: "carto", state: "settled", readerName: "a", print: "paper", label: 'Reader "quill" card' });
   assert.match(svg, /aria-label="Reader &quot;quill&quot; card"/);

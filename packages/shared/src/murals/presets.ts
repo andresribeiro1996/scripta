@@ -84,13 +84,17 @@ export function buildMuralPreset(id: MuralPresetId, books: Book[], groups: Group
     const hasPassage = eligiblePassages(library).length > 0;
     const profileBottom = 5;
     blocks.push({ ...at(0, 0, 12, profileBottom), type: "profile", bio: "", favoriteGenres: [] });
-    let statsY = profileBottom;
-    if (readerIdentity(library, groups).state === "settled") {
+    const hasCard = readerIdentity(library, groups).state === "settled";
+    let statsY: number;
+    if (hasCard) {
       blocks.push({ ...at(0, profileBottom, 6, 8), type: "readerCard" });
-      statsY += 8;
+      blocks.push({ ...at(6, profileBottom, 6, 8), type: "stats", metrics: ["totalBooks", "booksFinished", "booksInProgress"] });
+      statsY = profileBottom + 8;
+    } else {
+      blocks.push({ ...at(0, profileBottom, 12, 4), type: "stats", metrics: ["totalBooks", "booksFinished", "booksInProgress"] });
+      statsY = profileBottom + 4;
     }
-    blocks.push({ ...at(0, statsY, 12, 4), type: "stats", metrics: ["totalBooks", "booksFinished", "booksInProgress"] });
-    let y = statsY + 4;
+    let y = statsY;
     if (reading.length) { blocks.push({ ...at(0, y, 12, 4), type: "currentlyReading" }); y += 4; }
     if (finished.length) { blocks.push({ ...at(0, y, 12, 5), type: "shelf", title: "Finished", role: "finished", bookKeys: keys(finished) }); y += 5; }
     const width = hasPassage && loved.length ? 6 : 12;

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { bookKey } from "../library/merge.js";
+import { readerIdentity } from "../library/readerIdentity.js";
 import { buildMuralPreset, MURAL_PRESETS, presetAvailability, shelfPresetSummary } from "./presets.js";
 import { updateBlock, type Mural, type MuralBlock } from "./murals.js";
 
@@ -111,13 +112,25 @@ test("editing a shelf block through updateBlock keeps its role", () => {
   assert.equal(saved.type === "shelf" ? saved.role : undefined, "finished");
 });
 
-test("the My shelf preset adds a settled reader card below the profile", () => {
+test("the My shelf preset places a settled reader card beside stats, below the profile", () => {
   const books = Array.from({ length: 10 }, (_, i) => ({ Title: `Book ${i}`, Attribution: `Author ${i}`, ReadStatus: 2 }));
   const groups = [{ id: "g", type: "series" as const, name: "S", bookKeys: books.slice(0, 3).map(bookKey), createdAt: "", updatedAt: "" }];
   const blocks = buildMuralPreset("shelf", books, groups).blocks;
   const card = blocks.find((block) => block.type === "readerCard");
+  const stats = blocks.find((block) => block.type === "stats")!;
   const profile = blocks.find((block) => block.type === "profile")!;
   assert.ok(card, "settled card is placed");
-  assert.equal(card!.layout.y, profile.layout.y + profile.layout.h);
+  const cardBottom = profile.layout.y + profile.layout.h;
+  assert.deepEqual(card!.layout, { x: 0, y: cardBottom, w: 6, h: 8 });
+  assert.deepEqual(stats.layout, { x: 6, y: cardBottom, w: 6, h: 8 });
   assert.equal(buildMuralPreset("shelf", books.slice(0, 4), []).blocks.some((block) => block.type === "readerCard"), false);
+});
+
+test("the My shelf preset omits a reader card while leaning", () => {
+  const seriesBooks = Array.from({ length: 3 }, (_, i) => ({ Title: `Series ${i}`, Attribution: `Author ${i}`, ReadStatus: 2 }));
+  const otherBooks = Array.from({ length: 9 }, (_, i) => ({ Title: `Standalone ${i}`, Attribution: `Author ${i + 3}`, ReadStatus: 2 }));
+  const books = [...seriesBooks, ...otherBooks];
+  const groups = [{ id: "g", type: "series" as const, name: "S", bookKeys: seriesBooks.map(bookKey), createdAt: "", updatedAt: "" }];
+  assert.equal(readerIdentity(books, groups).state, "leaning");
+  assert.equal(buildMuralPreset("shelf", books, groups).blocks.some((block) => block.type === "readerCard"), false);
 });

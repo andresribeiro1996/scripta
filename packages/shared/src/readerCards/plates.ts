@@ -1,6 +1,8 @@
 const SERIF = "'Playfair Display', Georgia, 'Times New Roman', serif";
 const SANS = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 
+export const PLATE_FONTS = { serif: SERIF, sans: SANS };
+
 export const PAPER = "#f1eadb";
 export const REVERSED_LINE = "#efe5d1";
 
