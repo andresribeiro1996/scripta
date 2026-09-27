@@ -40,6 +40,7 @@
 }
 
 @theme {
+  --font-display: "Playfair Display", ui-serif, Georgia, serif;
   --color-bg: #f2f0ec;
   --color-surface: #ffffff;
   --color-surface-hover: #f7f5f1;

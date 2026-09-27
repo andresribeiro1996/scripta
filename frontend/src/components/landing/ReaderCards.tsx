@@ -1,54 +1,34 @@
-const identities = [
-  { numeral: "I", name: "The Cartographer", slug: "i-carto" },
-  { numeral: "III", name: "The Lamplighter", slug: "iii-lamp" },
-  { numeral: "V", name: "The Archivist", slug: "v-arch" },
+const plates = [
+  { name: "The Cartographer", slug: "i-carto" },
+  { name: "The Lamplighter", slug: "iii-lamp" },
+  { name: "The Archivist", slug: "v-arch" },
 ];
 
 export function ReaderCards() {
   return (
-    <section className="scroll-mt-14 bg-(--color-text) text-(--color-bg)">
-      <div className="mx-auto max-w-6xl px-4 py-16 lg:py-24">
-        <div className="max-w-2xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-(--color-accent-soft)">Ex libris — reader cards</p>
-          <h2 className="mt-3 text-3xl font-bold sm:text-4xl" style={{ fontFamily: '"Playfair Display", serif' }}>
-            Eight reader identities, engraved
-          </h2>
-          <p className="mt-3 text-pretty text-lg text-(--color-bg)/70">
-            Scripta marks a reading life the way books used to be signed — with
-            a plate. Yours reflects how you read: the notes you keep, the maps
-            you draw, the tournaments you take.
-          </p>
-        </div>
-        <div className="mt-12 grid grid-cols-2 gap-x-4 gap-y-10 sm:grid-cols-3 lg:grid-cols-4">
-          {identities.map((identity) => (
-            <figure key={identity.slug} className="transition-transform duration-150 hover:-translate-y-1">
-              <img
-                src={`/reader-cards/${identity.slug}-paper.svg`}
-                alt=""
-                loading="lazy"
-                className="w-full shadow-[0_14px_40px_rgba(0,0,0,0.45)]"
-              />
-              <figcaption className="mt-3 text-center">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-(--color-bg)/60">{identity.numeral}</span>
-                <span className="mt-0.5 block text-sm font-semibold" style={{ fontFamily: '"Playfair Display", serif' }}>
-                  {identity.name}
-                </span>
-              </figcaption>
-            </figure>
-          ))}
-          <figure className="flex flex-col">
-            <div className="flex aspect-[250/350] items-center justify-center rounded-sm border border-dashed border-(--color-bg)/30">
-              <span className="text-sm font-semibold text-(--color-bg)/60">+5 more</span>
-            </div>
-            <figcaption className="mt-3 text-center">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-(--color-bg)/60">VI—VIII</span>
-              <span className="mt-0.5 block text-sm font-semibold text-(--color-bg)/60" style={{ fontFamily: '"Playfair Display", serif' }}>
-                earned by how you read
-              </span>
-            </figcaption>
-          </figure>
-        </div>
+    <div className="mt-20 grid items-center gap-10 border-t border-(--color-border) pt-14 sm:mt-24 lg:grid-cols-[1fr_1.3fr] lg:gap-16">
+      <div className="max-w-md">
+        <span className="inline-flex rounded-full bg-(--color-accent-soft) px-3 py-1 text-xs font-semibold">Coming soon</span>
+        <h3 className="mt-4 font-display text-2xl leading-tight sm:text-3xl">Reader cards</h3>
+        <p className="mt-3 text-pretty text-[15px] leading-relaxed text-(--color-text-dim)">
+          A bookplate matched to how you read, from a set of eight drawn for Atmyshelf, listing the books that earned it.
+        </p>
       </div>
-    </section>
+      <div className="grid grid-cols-3 gap-3 sm:gap-6">
+        {plates.map((plate) => (
+          <picture key={plate.slug}>
+            <source media="(prefers-color-scheme: dark)" srcSet={`/reader-cards/${plate.slug}-reversed.svg`} />
+            <img
+              src={`/reader-cards/${plate.slug}-paper.svg`}
+              width={250}
+              height={350}
+              loading="lazy"
+              alt={`${plate.name} reader card`}
+              className="h-auto w-full shadow-lg"
+            />
+          </picture>
+        ))}
+      </div>
+    </div>
   );
 }

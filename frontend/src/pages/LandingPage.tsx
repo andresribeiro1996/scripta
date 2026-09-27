@@ -3,12 +3,10 @@ import { useAuth } from "../auth/AuthContext";
 import { landingDestination } from "../lib/landing";
 import { LandingNav } from "../components/landing/LandingNav";
 import { LandingHero } from "../components/landing/LandingHero";
-import { FeatureGrid } from "../components/landing/FeatureGrid";
-import { ReaderCards } from "../components/landing/ReaderCards";
+import { HowItWorks } from "../components/landing/HowItWorks";
 import { MuralShowcase } from "../components/landing/MuralShowcase";
 import { ArenaShowcase } from "../components/landing/ArenaShowcase";
-import { TierSort } from "../components/landing/TierSort";
-import { GetApp } from "../components/landing/GetApp";
+import { GetStarted } from "../components/landing/GetStarted";
 import { LandingFooter } from "../components/landing/LandingFooter";
 
 export function LandingPage() {
@@ -20,12 +18,10 @@ export function LandingPage() {
       <LandingNav />
       <main>
         <LandingHero />
-        <FeatureGrid />
-        <ReaderCards />
+        <HowItWorks />
         <MuralShowcase />
         <ArenaShowcase />
-        <TierSort />
-        <GetApp />
+        <GetStarted />
       </main>
       <LandingFooter />
     </div>

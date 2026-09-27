@@ -1,32 +1,38 @@
 import { Link } from "react-router-dom";
+import { BrandLockup } from "../BrandLockup";
+import { container } from "./ui";
 
 const anchors = [
-  ["Features", "#features"],
-  ["Murals", "#murals"],
-  ["Arena", "#arena"],
-  ["Get the app", "#app"],
+  ["How it works", "#how"],
+  ["Sharing", "#sharing"],
+  ["Games", "#games"],
 ] as const;
 
 export function LandingNav() {
   return (
     <header className="sticky top-0 z-40 border-b border-(--color-border) bg-(--color-bg)">
-      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
-        <Link to="/" aria-label="Scripta home">
-          <img src="/icon-512.png" alt="" className="h-8 w-8 rounded-lg" />
+      <div className={`${container} flex h-16 items-center justify-between gap-4`}>
+        <Link to="/" aria-label="Atmyshelf home" className="flex min-h-11 items-center">
+          <BrandLockup />
         </Link>
-        <nav className="hidden items-center gap-6 text-sm font-semibold text-(--color-text-dim) sm:flex">
+        <nav aria-label="Sections" className="hidden items-center gap-8 text-sm text-(--color-text-dim) lg:flex">
           {anchors.map(([label, href]) => (
             <a key={href} href={href} className="transition-colors hover:text-(--color-text)">
               {label}
             </a>
           ))}
         </nav>
-        <Link
-          to="/login"
-          className="flex min-h-11 items-center rounded-lg bg-(--color-accent) px-4 text-sm font-semibold text-(--color-on-accent) transition-opacity hover:opacity-90"
-        >
-          Sign in
-        </Link>
+        <div className="flex items-center gap-1 sm:gap-2">
+          <Link to="/login" className="flex min-h-11 items-center px-3 text-sm font-semibold transition-colors hover:text-(--color-text-dim)">
+            Sign in
+          </Link>
+          <Link
+            to="/login?mode=signup"
+            className="flex min-h-11 items-center rounded-lg border border-(--color-border) bg-(--color-surface) px-4 text-sm font-semibold transition-colors hover:bg-(--color-surface-hover)"
+          >
+            Create account
+          </Link>
+        </div>
       </div>
     </header>
   );

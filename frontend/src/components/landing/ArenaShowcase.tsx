@@ -1,26 +1,44 @@
+import { useState } from "react";
+import { TierSortDemo } from "./TierSort";
 import { TournamentDemo } from "./TournamentDemo";
+import { SectionIntro, container } from "./ui";
+
+const demos = [
+  ["tournament", "Tournament"],
+  ["tiers", "Tier list"],
+] as const;
 
 export function ArenaShowcase() {
+  const [demo, setDemo] = useState<(typeof demos)[number][0]>("tournament");
+
   return (
-    <section id="arena" className="scroll-mt-14">
-      <div className="mx-auto max-w-6xl px-4 py-16 lg:py-24">
-        <div className="mx-auto max-w-2xl text-center">
-          <p className="flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-(--color-text-dim)">
-            <span aria-hidden className="h-px w-4 bg-(--color-accent)" />
-            The arena
-          </p>
-          <h2 className="mt-3 text-3xl font-bold sm:text-4xl" style={{ fontFamily: '"Playfair Display", serif' }}>
-            Settle it with tournaments
-          </h2>
-          <p className="mt-3 text-pretty text-lg text-(--color-text-dim)">
-            Seed a bracket with your books, then vote through the duels —
-            winners advance until a champion takes the final. This one is
-            live: run the whole tournament yourself.
-          </p>
+    <section id="games" className="scroll-mt-16 border-t border-(--color-border)">
+      <div className={`${container} py-20 sm:py-28`}>
+        <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
+          <SectionIntro title="Settle it with a tournament">
+            Put your books head to head and vote your way to a champion, or sort a shelf into tiers. Share the link and
+            friends can vote too.
+          </SectionIntro>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-(--color-text-dim)">Try it</span>
+            <div role="group" aria-label="Choose a demo" className="flex rounded-lg border border-(--color-border) bg-(--color-surface) p-1">
+              {demos.map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={demo === value}
+                  onClick={() => setDemo(value)}
+                  className={`min-h-11 rounded-md px-4 text-sm font-semibold transition-colors ${
+                    demo === value ? "bg-(--color-bg) text-(--color-text)" : "text-(--color-text-dim) hover:text-(--color-text)"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
-        <div className="mt-12">
-          <TournamentDemo />
-        </div>
+        <div className="mt-10">{demo === "tournament" ? <TournamentDemo /> : <TierSortDemo />}</div>
       </div>
     </section>
   );

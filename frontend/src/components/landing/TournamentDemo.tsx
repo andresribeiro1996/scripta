@@ -12,22 +12,28 @@ const VELOCITY_PX_S = 850;
 const TRAVEL_PX = 30;
 const PILL_PX = 75;
 
-function MiniCover({ src, winner }: { src: string; winner: boolean }) {
+type SlotState = "pending" | "won" | "lost";
+
+function MiniCover({ src, state }: { src: string; state: SlotState }) {
   return (
     <img
       src={`/covers/${src}.jpg`}
       alt=""
       loading="lazy"
       draggable={false}
-      className={`h-9 w-6 rounded object-cover ${winner ? "ring-2 ring-(--color-accent)" : "opacity-45"}`}
+      className={`h-12 w-8 rounded object-cover ${state === "won" ? "ring-2 ring-(--color-accent)" : state === "lost" ? "opacity-45" : ""}`}
     />
   );
+}
+
+function EmptySlot() {
+  return <span className="h-12 w-8 rounded border border-dashed border-(--color-border)" />;
 }
 
 function BracketSlot({ children, label }: { children: React.ReactNode; label: string }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-(--color-text-dim)">{label}</span>
+      <span className="text-xs text-(--color-text-dim)">{label}</span>
       {children}
     </div>
   );
@@ -49,6 +55,8 @@ export function TournamentDemo() {
   const b = isFinal ? winners[1]! : activeIndex === 1 ? books[3] : books[1];
   const roundLabel = champion ? "Champion" : isFinal ? "Final" : `Semifinal ${activeIndex + 1} of 2`;
   const tally = votes[activeIndex === 2 ? 2 : activeIndex === 1 ? 1 : 0] ?? null;
+  const stateIn = (round: number, book: (typeof books)[number]): SlotState =>
+    winners[round] ? (winners[round] === book ? "won" : "lost") : "pending";
 
   function decide(winnerSide: "a" | "b") {
     if (exit || activeIndex === -1) return;
@@ -121,22 +129,19 @@ export function TournamentDemo() {
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <div className="rounded-xl border border-(--color-border) bg-(--color-surface) p-5">
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-(--color-text-dim)">The bracket — fills in as you vote</p>
-        <div className="mt-5 flex items-stretch">
+      <div className="flex flex-col rounded-xl border border-(--color-border) bg-(--color-surface) p-5">
+        <p className="text-sm font-semibold">Bracket</p>
+        <div className="mt-5 flex flex-1 items-stretch">
           <div className="flex flex-1 flex-col justify-around gap-8">
-            <BracketSlot label="Semifinal 1">
-              <div className="flex items-center gap-1.5 rounded-lg border border-(--color-border) bg-(--color-bg) px-2 py-1.5">
-                {winners[0] ? <MiniCover src={winners[0].src} winner /> : <MiniCover src={books[0].src} winner={false} />}
-                {winners[0] ? <MiniCover src={books[1].src} winner={false} /> : <MiniCover src={books[1].src} winner={false} />}
-              </div>
-            </BracketSlot>
-            <BracketSlot label="Semifinal 2">
-              <div className="flex items-center gap-1.5 rounded-lg border border-(--color-border) bg-(--color-bg) px-2 py-1.5">
-                {winners[1] ? <MiniCover src={winners[1].src} winner /> : <MiniCover src={books[2].src} winner={false} />}
-                <MiniCover src={books[3].src} winner={false} />
-              </div>
-            </BracketSlot>
+            {[0, 1].map((round) => (
+              <BracketSlot key={round} label={`Semifinal ${round + 1}`}>
+                <div className="flex items-center gap-2 rounded-lg border border-(--color-border) bg-(--color-bg) px-2 py-1.5">
+                  {books.slice(round * 2, round * 2 + 2).map((book) => (
+                    <MiniCover key={book.src} src={book.src} state={stateIn(round, book)} />
+                  ))}
+                </div>
+              </BracketSlot>
+            ))}
           </div>
           <div className="relative mx-2 w-5 shrink-0">
             <span className="absolute left-0 top-1/4 h-px w-full bg-(--color-border)" />
@@ -146,41 +151,40 @@ export function TournamentDemo() {
           </div>
           <div className="flex flex-1 flex-col justify-around gap-8">
             <BracketSlot label="Final">
-              <div className="flex items-center gap-1.5 rounded-lg border border-(--color-border) bg-(--color-bg) px-2 py-1.5">
-                {winners[2] ? <MiniCover src={winners[2].src} winner /> : winners[0] ? <MiniCover src={winners[0].src} winner={false} /> : <span className="h-9 w-6 rounded border border-dashed border-(--color-border)" />}
-                {winners[2] ? <MiniCover src={winners[1]!.src} winner={false} /> : winners[1] ? <MiniCover src={winners[1].src} winner={false} /> : <span className="h-9 w-6 rounded border border-dashed border-(--color-border)" />}
+              <div className="flex items-center gap-2 rounded-lg border border-(--color-border) bg-(--color-bg) px-2 py-1.5">
+                {[winners[0], winners[1]].map((book, side) =>
+                  book ? <MiniCover key={book.src} src={book.src} state={stateIn(2, book)} /> : <EmptySlot key={side} />
+                )}
               </div>
             </BracketSlot>
             <BracketSlot label="Champion">
-              <div className="flex items-center gap-1.5 rounded-lg border border-(--color-border) bg-(--color-bg) px-2 py-1.5">
+              <div className="flex items-center gap-2 rounded-lg border border-(--color-border) bg-(--color-bg) px-2 py-1.5">
                 {champion ? (
                   <>
-                    <MiniCover src={champion.src} winner />
-                    <span className="text-[10px] font-semibold text-(--color-text-dim)">{champion.name}</span>
+                    <MiniCover src={champion.src} state="won" />
+                    <span className="text-xs font-semibold">{champion.name}</span>
                   </>
                 ) : (
-                  <span className="h-9 w-6 rounded border border-dashed border-(--color-border)" />
+                  <EmptySlot />
                 )}
               </div>
             </BracketSlot>
           </div>
         </div>
         {champion && (
-          <button type="button" onClick={reset} className="mt-5 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2.5 text-sm font-semibold transition-colors hover:bg-(--color-surface-hover)">
-            Tournament complete — run it again
+          <button type="button" onClick={reset} className="mt-5 min-h-11 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm font-semibold transition-colors hover:bg-(--color-surface-hover)">
+            Run it again
           </button>
         )}
       </div>
 
       <div className="flex flex-col rounded-xl border border-(--color-border) bg-(--color-surface) p-4">
-        <p className="text-center text-xs font-semibold uppercase tracking-[0.14em] text-(--color-text-dim)">
-          {champion ? "Champion" : `The duel — ${roundLabel}`}
-        </p>
+        <p className="text-center text-sm font-semibold">{roundLabel}</p>
         <div className="relative mt-4 flex flex-1 items-center justify-center py-2">
           {champion ? (
             <div className="flex flex-col items-center gap-3 py-6">
               <img src={`/covers/${champion.src}.jpg`} alt="" className="h-40 w-28 rounded-md object-cover ring-2 ring-(--color-accent)" />
-              <span className="rounded-full bg-(--color-success-soft) px-3 py-1 text-xs font-bold uppercase tracking-wider text-(--color-success)">{champion.name} takes it</span>
+              <span className="rounded-full bg-(--color-success-soft) px-3 py-1 text-sm font-semibold text-(--color-success)">{champion.name} takes it</span>
             </div>
           ) : (
             <div className="relative w-full">
@@ -203,7 +207,7 @@ export function TournamentDemo() {
                   {([a, b] as const).map((book, side) => (
                     <div key={side} className="flex flex-1 flex-col items-center gap-1.5 rounded-lg border-2 border-(--color-border) p-2.5">
                       <img src={`/covers/${book.src}.jpg`} alt="" draggable={false} className="h-24 w-16 rounded-md object-cover" />
-                      <span className="text-center text-[10px] font-semibold leading-tight text-(--color-text-dim)">{book.name}</span>
+                      <span className="text-center text-xs font-semibold leading-tight text-(--color-text-dim)">{book.name}</span>
                     </div>
                   ))}
                 </div>

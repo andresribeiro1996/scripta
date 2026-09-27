@@ -1,44 +1,59 @@
-const shelfCovers = ["piranesi", "circe", "hail-mary", "sapiens", "achilles"];
+import { ReaderCards } from "./ReaderCards";
+import { SectionIntro, container } from "./ui";
+
+const shelfCovers = ["piranesi", "gilead", "circe", "achilles", "normal-people"];
+
+const points = [
+  "Quotes come straight from your highlights",
+  "Stats keep count as you read",
+  "Share a mural or your whole library, or keep both to yourself",
+];
 
 export function MuralShowcase() {
   return (
-    <section id="murals" className="scroll-mt-14 border-y border-(--color-border)">
-      <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-16 lg:grid-cols-2 lg:py-24">
-        <div>
-          <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-(--color-text-dim)">
-            <span aria-hidden className="h-px w-4 bg-(--color-accent)" />
-            Murals
-          </p>
-          <h2 className="mt-3 text-3xl font-bold sm:text-4xl" style={{ fontFamily: '"Playfair Display", serif' }}>
-            Your library, composed
-          </h2>
-          <p className="text-pretty mt-3 text-lg text-(--color-text-dim)">
-            Drag shelves, quotes, stats and photos onto a freeform canvas.
-            Publish it at a link that shows your reading life the way you want
-            it told.
-          </p>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="rounded-xl border border-(--color-border) bg-(--color-surface) p-4 sm:col-span-2">
-            <div className="flex gap-2 overflow-hidden">
-              {shelfCovers.map((cover) => (
-                <img key={cover} src={`/covers/${cover}.jpg`} alt="" loading="lazy" className="aspect-[2/3] w-14 shrink-0 rounded-md object-cover" />
+    <section id="sharing" className="scroll-mt-16">
+      <div className={`${container} py-20 sm:py-28`}>
+        <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
+          <div>
+            <SectionIntro title="A page for your reading life">
+              Compose a mural from shelves, quotes, stats and photos, then share it at a link. Visitors see your reading
+              life the way you arranged it, without needing an account.
+            </SectionIntro>
+            <ul className="mt-8 max-w-md divide-y divide-(--color-border) border-y border-(--color-border) text-[15px]">
+              {points.map((point) => (
+                <li key={point} className="py-3">
+                  {point}
+                </li>
               ))}
+            </ul>
+          </div>
+          <figure>
+            <div className="grid grid-cols-2 gap-3 rounded-2xl border border-(--color-border) p-3 sm:gap-4 sm:p-4">
+              <div className="col-span-2 rounded-xl border border-(--color-border) bg-(--color-surface) p-4">
+                <p className="text-sm font-semibold">Favourites</p>
+                <div className="mt-3 grid grid-cols-5 gap-2 sm:gap-3">
+                  {shelfCovers.map((cover) => (
+                    <img key={cover} src={`/covers/${cover}.jpg`} alt="" loading="lazy" className="aspect-[2/3] w-full rounded-md object-cover" />
+                  ))}
+                </div>
+              </div>
+              <div className="flex flex-col justify-center rounded-xl border border-(--color-border) bg-(--color-surface) p-4 sm:p-5">
+                <p className="font-display text-base leading-snug sm:text-lg">
+                  “The Beauty of the House is immeasurable; its Kindness infinite.”
+                </p>
+                <p className="mt-3 text-xs text-(--color-text-dim)">Susanna Clarke, Piranesi</p>
+              </div>
+              <div className="rounded-xl border border-(--color-border) bg-(--color-surface) p-4 sm:p-5">
+                <p className="text-3xl font-bold text-(--color-accent)">19</p>
+                <p className="text-xs text-(--color-text-dim)">books in the library</p>
+                <p className="mt-4 text-3xl font-bold text-(--color-accent)">6</p>
+                <p className="text-xs text-(--color-text-dim)">finished this year</p>
+              </div>
             </div>
-          </div>
-          <div className="rounded-xl border border-(--color-border) bg-(--color-surface) p-5">
-            <p className="text-lg leading-snug" style={{ fontFamily: '"Playfair Display", serif' }}>
-              “A reader lives a thousand lives before he dies.”
-            </p>
-            <p className="mt-2 text-xs text-(--color-text-dim)">George R. R. Martin</p>
-          </div>
-          <div className="rounded-xl border border-(--color-border) bg-(--color-surface) p-5">
-            <p className="text-3xl font-bold text-(--color-accent)">312</p>
-            <p className="text-xs text-(--color-text-dim)">books imported</p>
-            <p className="mt-3 text-3xl font-bold text-(--color-accent)">48</p>
-            <p className="text-xs text-(--color-text-dim)">finished this year</p>
-          </div>
+            <figcaption className="mt-3 text-sm text-(--color-text-dim)">An example mural</figcaption>
+          </figure>
         </div>
+        <ReaderCards />
       </div>
     </section>
   );

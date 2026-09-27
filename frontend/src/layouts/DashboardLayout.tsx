@@ -2,6 +2,7 @@ import { Fragment, useState, type ComponentType } from "react";
 import { Link, NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { Avatar } from "../components/Avatar";
+import { BrandLockup } from "../components/BrandLockup";
 import {
   ArenaIcon,
   CollectionsIcon,
@@ -85,10 +86,7 @@ export function DashboardLayout() {
   return (
     <div className="flex min-h-screen">
       <aside className="hidden w-56 shrink-0 flex-col border-r border-(--color-border) bg-(--color-surface) px-3 py-5 lg:flex">
-        <div className="mb-6 flex items-center gap-2 px-2">
-          <img src="/icon-192.png" alt="" className="h-7 w-7 rounded-md" />
-          <span className="text-lg font-bold">Atmyshelf</span>
-        </div>
+        <BrandLockup className="mb-6 px-2" />
         <nav className="flex flex-1 flex-col gap-1">
           {NAV_GROUPS.map((group, groupIndex) => (
             <Fragment key={groupIndex}>
@@ -175,10 +173,7 @@ export function DashboardLayout() {
             className="flex h-full w-72 max-w-[85%] flex-col overflow-y-auto overscroll-contain border-r border-(--color-border) bg-(--color-surface) px-3 py-5 pb-[env(safe-area-inset-bottom,0px)]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mb-6 flex items-center gap-2 px-2">
-              <img src="/icon-192.png" alt="" className="h-7 w-7 rounded-md" />
-              <span className="text-lg font-bold">Atmyshelf</span>
-            </div>
+            <BrandLockup className="mb-6 px-2" />
             <nav className="flex flex-1 flex-col gap-1">
               {NAV_GROUPS.map((group, groupIndex) => (
                 <Fragment key={groupIndex}>

@@ -1,79 +1,52 @@
 import { Link } from "react-router-dom";
-
-const shelf = ["piranesi", "hail-mary", "circe", "normal-people"];
+import { container, primaryButton, textLink } from "./ui";
 
 export function LandingHero() {
   return (
     <section>
-      <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-16 sm:py-20 lg:grid-cols-[1.05fr_1fr] lg:py-24">
-        <div>
-          <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-(--color-text-dim)">
-            <span aria-hidden className="h-px w-4 bg-(--color-accent)" />
-            Ex libris
-          </p>
-          <h1
-            className="mt-4 max-w-xl text-balance text-4xl font-bold leading-[1.05] sm:text-5xl lg:text-6xl"
-            style={{ fontFamily: '"Playfair Display", serif' }}
-          >
-            Your reading life, <em className="text-(--color-accent)">beautifully</em> kept.
-          </h1>
-          <p className="mt-5 max-w-lg text-pretty text-lg leading-relaxed text-(--color-text-dim)">
-            Scripta imports your Kobo, Goodreads and StoryGraph history into a
-            library that's actually yours — styled book cards, murals worth
-            publishing, and tournaments that settle what's best.
-          </p>
-          <div className="mt-8 flex flex-wrap items-center gap-3">
-            <Link
-              to="/login?mode=signup"
-              className="rounded-lg bg-(--color-accent) px-6 py-3 text-base font-semibold text-(--color-on-accent) transition-opacity hover:opacity-90"
-            >
-              Create your library
-            </Link>
-            <a
-              href="#features"
-              className="rounded-lg border border-(--color-border) bg-(--color-surface) px-6 py-3 text-base font-semibold transition-colors hover:bg-(--color-surface-hover)"
-            >
-              See how it works
-            </a>
-          </div>
-          <p className="mt-10 border-t border-(--color-border) pt-5 text-[11px] font-semibold uppercase tracking-[0.18em] text-(--color-text-dim)">
-            Imports from <span className="text-(--color-text)">Kobo</span> · <span className="text-(--color-text)">Goodreads</span> · <span className="text-(--color-text)">StoryGraph</span>
-          </p>
+      <div className={`${container} pb-16 pt-14 sm:pb-24 sm:pt-20 lg:pb-32 lg:pt-24`}>
+        <h1 className="max-w-3xl font-display text-[2.5rem] leading-[1.05] tracking-[-0.01em] text-balance sm:text-6xl lg:text-7xl">
+          Your reading life, properly kept.
+        </h1>
+        <p className="mt-5 max-w-xl text-pretty text-[17px] leading-relaxed text-(--color-text-dim) sm:mt-6 sm:text-lg">
+          Bring your books from Kobo, Goodreads and StoryGraph into one personal library. Organise your shelves, revisit
+          your highlights and share what you love.
+        </p>
+        <div className="mt-8 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-7">
+          <Link to="/login?mode=signup" className={primaryButton}>
+            Create your library
+          </Link>
+          <a href="#how" className={`${textLink} text-sm`}>
+            See how it works
+          </a>
         </div>
-        <div className="relative px-2 pb-10 pt-8 sm:px-8">
-          <div className="absolute -top-1 right-0 z-10 flex items-center gap-2 rounded-full border border-(--color-border) bg-(--color-surface) px-3 py-1.5 shadow-[0_8px_20px_rgba(32,30,28,0.10)] sm:-right-2">
-            <span className="text-xs font-bold text-(--color-accent)">62%</span>
-            <span className="text-xs font-semibold text-(--color-text-dim)">The Duel — semis</span>
-          </div>
-          <div className="absolute bottom-14 left-0 z-10 rounded-full border border-(--color-border) bg-(--color-surface) px-3 py-1.5 shadow-[0_8px_20px_rgba(32,30,28,0.10)] sm:-left-2">
-            <span className="text-xs font-bold text-(--color-accent)">+312</span>
-            <span className="text-xs font-semibold text-(--color-text-dim)"> books imported</span>
-          </div>
-          <div className="flex items-end justify-center">
-            {shelf.map((cover) => (
-              <img
-                key={cover}
-                src={`/covers/${cover}.jpg`}
-                alt=""
-                className="mr-1 w-[19%] rounded-md shadow-[0_10px_24px_rgba(32,30,28,0.18)] transition-transform duration-150 hover:-translate-y-2"
-              />
-            ))}
+        <div className="relative mt-12 sm:mt-16">
+          <picture>
+            <source media="(min-width: 640px) and (prefers-color-scheme: dark)" srcSet="/landing/library-desktop-dark.webp" width={1920} height={1170} />
+            <source media="(min-width: 640px)" srcSet="/landing/library-desktop-light.webp" width={1920} height={1170} />
+            <source media="(prefers-color-scheme: dark)" srcSet="/landing/home-phone-dark.webp" />
             <img
-              src="/covers/gilead.jpg"
-              alt=""
-              className="relative z-10 -ml-2 w-[15%] origin-bottom-left rounded-md shadow-[0_10px_24px_rgba(32,30,28,0.22)] transition-transform duration-150 hover:-translate-y-2"
-              style={{ transform: "rotate(-9deg)", marginBottom: "2px" }}
+              src="/landing/home-phone-light.webp"
+              width={585}
+              height={1140}
+              fetchPriority="high"
+              alt="A reader's library in Atmyshelf: book covers with titles, authors and reading status"
+              className="mx-auto h-auto w-[80%] max-w-[320px] rounded-[1.75rem] border border-(--color-border) shadow-xl sm:w-full sm:max-w-none sm:rounded-xl"
             />
-            <div className="ml-3 hidden flex-col gap-[3px] sm:flex">
-              <img src="/covers/sapiens.jpg" alt="" className="h-5 w-[92px] rounded-[3px] object-cover shadow-[0_4px_10px_rgba(32,30,28,0.18)]" />
-              <img src="/covers/achilles.jpg" alt="" className="h-5 w-[84px] rounded-[3px] object-cover shadow-[0_4px_10px_rgba(32,30,28,0.18)]" />
-            </div>
-          </div>
-          <div className="mt-1 h-1.5 rounded-full bg-(--color-text) opacity-80" />
-          <div className="mt-1 h-2 rounded-full bg-(--color-border) opacity-60" />
+          </picture>
+          <picture className="absolute -bottom-12 -right-2 hidden w-[21%] lg:block">
+            <source media="(prefers-color-scheme: dark)" srcSet="/landing/home-phone-dark.webp" />
+            <img
+              src="/landing/home-phone-light.webp"
+              width={585}
+              height={1140}
+              loading="lazy"
+              alt="Atmyshelf on a phone, showing what's being read and what's up next"
+              className="h-auto w-full rounded-[1.75rem] border border-(--color-border) shadow-2xl ring-[6px] ring-(--color-bg)"
+            />
+          </picture>
         </div>
       </div>
     </section>
   );
 }
-
