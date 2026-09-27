@@ -6,7 +6,7 @@
 // cache on top of the URL memoization already in api/covers.ts.
 
 import { useEffect, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
 import { normalizeImageId, normalizeIsbn } from "@scripta/shared";
 import { useTheme } from "../../../ui/theme";
@@ -29,41 +29,46 @@ function coverParamsFor(book: Record<string, unknown>): ResolveCoverParams {
 export function CoverImage({
   book,
   onHasCoverChange,
+  onLoadEnd,
   contentFit = "cover",
 }: {
   book: Record<string, unknown>;
   onHasCoverChange?: (hasCover: boolean) => void;
+  onLoadEnd?: () => void;
   contentFit?: "cover" | "contain";
 }) {
   const { colors } = useTheme();
   const confirmedUrl = typeof book._coverUrl === "string" ? book._coverUrl : null;
   const [confirmedFailed, setConfirmedFailed] = useState(false);
   const [autoUrl, setAutoUrl] = useState<string | null>(() => peekResolvedCover(coverParamsFor(book)) ?? null);
+  const [resolving, setResolving] = useState(() => peekResolvedCover(coverParamsFor(book)) === undefined);
   const useAuto = !confirmedUrl || confirmedFailed;
 
   useEffect(() => {
     setConfirmedFailed(false);
-    setAutoUrl(peekResolvedCover(coverParamsFor(book)) ?? null);
+    const cached = peekResolvedCover(coverParamsFor(book));
+    setAutoUrl(cached ?? null);
+    setResolving(cached === undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [book, confirmedUrl]);
 
   useEffect(() => {
     if (!useAuto) return;
     const params = coverParamsFor(book);
-    if (!params.isbn && !params.imageId && !params.title) return;
+    if (!params.isbn && !params.imageId && !params.title) { setResolving(false); return; }
     let cancelled = false;
     void (async () => {
-      await ensureCoversHydrated();
-      const cached = peekResolvedCover(params);
-      if (cached !== undefined) {
-        if (!cancelled) setAutoUrl(cached);
-        return;
-      }
       try {
+        await ensureCoversHydrated();
+        const cached = peekResolvedCover(params);
+        if (cached !== undefined) {
+          if (!cancelled) { setAutoUrl(cached); setResolving(false); }
+          return;
+        }
         const url = await resolveCover(params);
-        if (!cancelled) setAutoUrl(url);
+        if (!cancelled) { setAutoUrl(url); setResolving(false); }
       } catch {
-        if (!cancelled) setAutoUrl(null);
+        if (!cancelled) { setAutoUrl(null); setResolving(false); }
       }
     })();
     return () => {
@@ -79,8 +84,12 @@ export function CoverImage({
     onHasCoverChange?.(hasCover);
   }, [hasCover, onHasCoverChange]);
 
+  useEffect(() => {
+    if (useAuto && !currentSrc && !resolving) onLoadEnd?.();
+  }, [useAuto, currentSrc, resolving, onLoadEnd]);
+
   if (!currentSrc) {
-    return <View style={[StyleSheet.absoluteFill, styles.placeholder, { backgroundColor: colors.border }]} />;
+    return <View style={[StyleSheet.absoluteFill, styles.placeholder, { backgroundColor: colors.border }]}>{onLoadEnd && !resolving ? <Text style={{ color: colors.textDim, fontSize: 11, textAlign: "center" }}>Cover unavailable</Text> : null}</View>;
   }
 
   return (
@@ -88,7 +97,8 @@ export function CoverImage({
       source={{ uri: coverUrlForApi(currentSrc, API_URL) }}
       style={StyleSheet.absoluteFill}
       contentFit={contentFit}
-      transition={150}
+      transition={onLoadEnd ? 0 : 150}
+      onDisplay={onLoadEnd}
       onError={() => {
         if (!useAuto) setConfirmedFailed(true);
         else {

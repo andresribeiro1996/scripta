@@ -209,3 +209,19 @@ test("the boot migration dedupes pre-existing multi-votes before creating idx_vo
   const index = db.prepare(`SELECT name FROM sqlite_master WHERE type='index' AND name='idx_votes_duel_user'`).get() as unknown as { name: string } | undefined;
   assert.ok(index, "the unique index is recreated");
 });
+
+
+test("deleteUserData removes the user's tournaments and unlinks their votes on anyone else's", () => {
+  const db = freshDb();
+  const repo = createSqliteArenaRepository(db);
+  const duel = (id: string, tournament: string) =>
+    db.prepare(`INSERT INTO duels (id, tournament_id, round_number, duel_index, book_a_key, book_a_title, book_a_author, book_b_key, book_b_title, book_b_author, opens_at, closes_at)
+      VALUES (?, ?, 1, 0, 'a', 'A', 'x', 'b', 'B', 'y', '2026-01-01', '2026-01-02')`).run(id, tournament);
+  db.prepare(`INSERT INTO tournaments (id, owner_user_id, name, bracket_size, round_duration_minutes) VALUES ('mine', 'leaver', 'Mine', 4, 60), ('theirs', 'stayer', 'Theirs', 4, 60)`).run();
+  duel("d-mine", "mine");
+  duel("d-theirs", "theirs");
+  db.prepare(`INSERT INTO votes (id, duel_id, voter_token, voter_user_id, book_key) VALUES ('v1', 'd-mine', 't1', 'stayer', 'a'), ('v2', 'd-theirs', 't2', 'leaver', 'b')`).run();
+  repo.deleteUserData("leaver");
+  assert.deepEqual(db.prepare(`SELECT id FROM tournaments`).all().map((r) => r.id), ["theirs"]);
+  assert.deepEqual(db.prepare(`SELECT id, voter_user_id FROM votes`).all().map((r) => ({ ...r })), [{ id: "v2", voter_user_id: null }]);
+});

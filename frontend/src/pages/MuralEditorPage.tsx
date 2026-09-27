@@ -71,7 +71,7 @@ export function MuralEditorPage() {
   // it unchanged.
   const isDraft = muralId === "new";
   const mural = isDraft ? undefined : murals.find((m) => m.id === muralId);
-  const genreEnrichment = useGenreEnrichment(books, mural?.blocks.some((block) => block.type === "profile") ?? false, updateLibrary);
+  const genreEnrichment = useGenreEnrichment(books, mural?.blocks.some((block) => block.type === "profile" || block.type === "readerCard") ?? false, updateLibrary);
   // Which folder the draft belongs to, carried from the list page so a
   // mural created from inside a folder lands in it.
   const draftFolderId = searchParams.get("folder");
@@ -221,11 +221,11 @@ export function MuralEditorPage() {
     const { murals: updated, blockId } = addBlock([target], target.id, type);
     await saveBlocks(target.id, updated[0].blocks);
     editVersionRef.current++;
-    // "currentlyReading" and "empty" have nothing to configure at all —
-    // skip straight to them just sitting on the canvas. Every other type
-    // opens its config panel right away, same "add then configure" flow
-    // as the rest of the app.
-    if (type !== "currentlyReading" && type !== "empty") setConfiguringBlockId(blockId);
+    // "currentlyReading", "readerCard" and "empty" have nothing to
+    // configure at all — skip straight to them just sitting on the
+    // canvas. Every other type opens its config panel right away, same
+    // "add then configure" flow as the rest of the app.
+    if (type !== "currentlyReading" && type !== "readerCard" && type !== "empty") setConfiguringBlockId(blockId);
   }
 
   async function handleSaveBlockConfig(block: MuralBlock) {
@@ -342,7 +342,7 @@ export function MuralEditorPage() {
         editVersionRef.current++;
         setMobileDraft(null);
         setSelectedBlockId(finishedDraft.block.id);
-        if (alreadyInserted && finishedDraft.kind === "add" && finishedDraft.block.type !== "currentlyReading" && finishedDraft.block.type !== "empty") {
+        if (alreadyInserted && finishedDraft.kind === "add" && finishedDraft.block.type !== "currentlyReading" && finishedDraft.block.type !== "readerCard" && finishedDraft.block.type !== "empty") {
           setConfiguringBlockId(finishedDraft.block.id);
         }
         return;
@@ -390,7 +390,7 @@ export function MuralEditorPage() {
           }
         });
       }
-      if (finishedDraft.kind === "add" && finishedDraft.block.type !== "currentlyReading" && finishedDraft.block.type !== "empty") {
+      if (finishedDraft.kind === "add" && finishedDraft.block.type !== "currentlyReading" && finishedDraft.block.type !== "readerCard" && finishedDraft.block.type !== "empty") {
         const inserted = saved.blocks.find((block) => block.id === finishedDraft.block.id);
         if (inserted) setConfiguringBlockId(inserted.id);
       }

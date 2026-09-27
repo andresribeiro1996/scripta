@@ -14,6 +14,7 @@ export interface UpsertConnectionInput {
 }
 
 export interface SocialsRepository {
+  deleteUserData(userId: string): void;
   listConnections(userId: string): SocialConnectionRow[];
   getConnection(userId: string, provider: SocialProvider): SocialConnectionRow | undefined;
   /** Insert-or-replace: one row per (user, provider). */

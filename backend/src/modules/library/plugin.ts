@@ -41,3 +41,9 @@ export async function libraryPlugin(app: FastifyInstance, opts: LibraryPluginOpt
     await scoped.register(buildPublicLibraryRoutes(libraryService));
   });
 }
+
+let erasingLibrary: ReturnType<typeof createSqliteLibraryRepository> | undefined;
+
+export function deleteLibraryUserData(userId: string) {
+  (erasingLibrary ??= createSqliteLibraryRepository(openLibraryDb())).deleteUserData(userId);
+}

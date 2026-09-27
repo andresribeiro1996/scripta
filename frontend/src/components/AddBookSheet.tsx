@@ -6,6 +6,7 @@ import { CoverImage } from "./BookCard";
 import { Sheet } from "./Sheet";
 import { useToast } from "./Toaster";
 import { statusLabel } from "../lib/covers";
+import { localDay } from "../lib/libraryView";
 
 /** Add-one-book sheet for the public pages (shared library, arena,
  *  tier-list voting): a link recipient sees a book they like, picks a
@@ -61,7 +62,8 @@ export function AddBookSheet({
         author: book.author,
         isbn: book.isbn ?? null,
         coverUrl: book.coverUrl ?? null,
-        readStatus
+        readStatus,
+        day: localDay()
       });
       toast({ message: updated ? "Updated in your library." : "Added to your library." });
       onClose();

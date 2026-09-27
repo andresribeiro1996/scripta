@@ -1,13 +1,12 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
 import { PASSWORD_HINT, type AccountSecurity } from "@scripta/shared";
 import { apiFetch } from "../api/client";
+import { setAuthNotice } from "./returnTo";
 import { setSession } from "./tokenStore";
 import { PasswordInput } from "./PasswordInput";
 
 export function AccountSecuritySection() {
-  const navigate = useNavigate();
   const account = useQuery({ queryKey: ["account-security"], queryFn: () => apiFetch("/auth/account") as Promise<AccountSecurity> });
   const [mode, setMode] = useState<"password" | "email" | null>(null);
   const [email, setEmail] = useState("");
@@ -36,7 +35,7 @@ export function AccountSecuritySection() {
     setBusy(true);
     try {
       await apiFetch(mode === "password" ? "/auth/change-password" : "/auth/verification-email", { method: "POST", body: JSON.stringify({ currentPassword: current, password, email: mode === "email" ? email : undefined }) });
-      if (mode === "password") { navigate("/login", { replace: true, state: { message: "Password updated. Log in with your new password." } }); setSession(null); }
+      if (mode === "password") { setAuthNotice("Password updated. Log in with your new password."); setSession(null); }
       else { setMessage("Check the new address to confirm it. Your current email stays active until then."); setMode(null); }
       setCurrent(""); setPassword(""); setConfirm("");
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Please try again."); }

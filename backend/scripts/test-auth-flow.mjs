@@ -34,6 +34,12 @@ async function main() {
   const health = await fetch(`${base}/health`);
   check("GET /health returns ok", health.status === 200);
 
+  console.log("\n1.1 Public app configuration");
+  const configRes = await fetch(`${base}/public-config`);
+  const config = await configRes.json();
+  check("GET /public-config returns only the frontend URL", configRes.status === 200 && Object.keys(config).length === 1 && typeof config.frontendUrl === "string");
+  check("frontend URL is absolute HTTP(S)", typeof config.frontendUrl === "string" && /^https?:\/\/\S+$/i.test(config.frontendUrl));
+
   console.log("\n2. Signup");
   const signupRes = await fetch(`${base}/auth/signup`, {
     method: "POST",

@@ -1,5 +1,6 @@
 import GridLayout from "react-grid-layout";
 import { useRef, useState } from "react";
+import type { Group, PublicReaderCard } from "@scripta/shared";
 import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
 import { blockFontFamilyCss, resolveBlockStyle, resolveBorderColor } from "../../lib/libraryStyle";
@@ -55,7 +56,9 @@ function BlockFrame({
   books,
   images,
   profile,
+  groups,
   shelfThemeOverride,
+  readerCardOverride,
   statsOverride,
   tierlistData,
   onActivate,
@@ -70,7 +73,9 @@ function BlockFrame({
   books: Array<Record<string, unknown>>;
   images: GalleryImage[];
   profile?: ReaderProfile;
+  groups?: Group[];
   shelfThemeOverride?: ShelfTheme;
+  readerCardOverride?: PublicReaderCard;
   statsOverride?: Record<string, number>;
   tierlistData?: (tierlistId: string) => ResolvedTierlist | undefined;
   onActivate: () => void;
@@ -117,7 +122,7 @@ function BlockFrame({
       }}
     >
       <div className="pointer-events-none h-full origin-top-left" style={{ width: `${scale * 100}%`, height: `${scale * 100}%`, transform: `scale(${1 / scale})`, fontSize: 14 }}>
-        <MobileBlockPreview block={block} books={books} images={images} profile={profile} shelfThemeOverride={shelfThemeOverride} statsOverride={statsOverride} tierlistData={tierlistData} width={((CANVAS_WIDTH - PADDING * 2 + MARGIN) / GRID_COLUMNS * block.layout.w - MARGIN) * scale} height={(block.layout.h * (ROW_HEIGHT + MARGIN) - MARGIN) * scale} />
+        <MobileBlockPreview block={block} books={books} images={images} profile={profile} groups={groups} shelfThemeOverride={shelfThemeOverride} readerCardOverride={readerCardOverride} statsOverride={statsOverride} tierlistData={tierlistData} width={((CANVAS_WIDTH - PADDING * 2 + MARGIN) / GRID_COLUMNS * block.layout.w - MARGIN) * scale} height={(block.layout.h * (ROW_HEIGHT + MARGIN) - MARGIN) * scale} />
       </div>
     </div>
   );
@@ -129,7 +134,9 @@ export function MobileMuralCanvas({
   books,
   images,
   profile,
+  groups,
   shelfThemeOverride,
+  readerCardOverride,
   selectedBlockId,
   draft,
   busy,
@@ -153,7 +160,9 @@ export function MobileMuralCanvas({
   books: Array<Record<string, unknown>>;
   images: GalleryImage[];
   profile?: ReaderProfile;
+  groups?: Group[];
   shelfThemeOverride?: ShelfTheme;
+  readerCardOverride?: PublicReaderCard;
   selectedBlockId?: string | null;
   draft?: MobileMuralDraft | null;
   busy?: boolean;
@@ -282,7 +291,9 @@ export function MobileMuralCanvas({
                     books={books}
                     images={images}
                     profile={profile}
+                    groups={groups}
                     shelfThemeOverride={shelfThemeOverride}
+                    readerCardOverride={readerCardOverride}
                     statsOverride={statsOverride}
                     tierlistData={tierlistData}
                     onActivate={() => activate(block)}
@@ -376,7 +387,9 @@ export function MobileMuralCanvas({
           books={books}
           images={images}
           profile={profile}
+          groups={groups}
           shelfThemeOverride={shelfThemeOverride}
+          readerCardOverride={readerCardOverride}
           statsOverride={statsOverride}
           tierlistData={tierlistData}
           onClose={() => {

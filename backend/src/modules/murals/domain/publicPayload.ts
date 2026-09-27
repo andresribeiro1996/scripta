@@ -49,7 +49,8 @@ export function resolveMuralPublicPayload(
     highlightRefs: refs.highlightRefs,
     needsCurrentlyReading: refs.needsCurrentlyReading,
     statsMetrics: [...refs.statsMetrics],
-    needsShelfTheme: refs.needsShelfTheme
+    needsShelfTheme: refs.needsShelfTheme,
+    needsReaderCard: refs.needsReaderCard
   });
 
   const imageIds = [...refs.imageIds, ...(row.cover_image_id ? [row.cover_image_id] : [])];
@@ -71,7 +72,7 @@ export function resolveMuralPublicPayload(
       coverImageUrl: row.cover_image_id ? imageUrls[row.cover_image_id]! : row.cover_image_url
     },
     library: libraryData,
-    profile: refs.needsShelfTheme ? resolvePublicReaderProfile(row.user_id) : undefined,
+    profile: refs.needsShelfTheme || refs.needsReaderCard ? resolvePublicReaderProfile(row.user_id) : undefined,
     imageUrls,
     tierlists
   };

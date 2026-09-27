@@ -61,6 +61,7 @@ curl -X PUT http://localhost:3000/library \
 | POST | `/auth/refresh` | — | `{refreshToken}` → new `{accessToken, refreshToken}` |
 | POST | `/auth/logout` | — | `{refreshToken}` → revokes that one session |
 | POST | `/auth/logout-everywhere` | ✓ | revokes every session for the caller |
+| POST | `/auth/delete-account` | ✓ | `{password}`, or `{confirmation}` (the username, else the email) for an account without a password → `204`. Signs out every session, then erases the account's data in every module through the `deleteUserData` erasers `app.ts` hands the auth plugin (votes and ballots on other people's games are unlinked, not deleted, so their results stand), then removes the user row and avatar files. A failure part-way leaves the account in place, so deleting again finishes the job. Rate-limited to 5/min |
 | GET | `/auth/me` | ✓ | `{user}` |
 | POST | `/auth/username` | ✓ | `{username}` → claims a username for the caller's account; `409` if taken. What a Google sign-in without one yet calls before it's treated as set up |
 | POST | `/auth/avatar` | ✓ | multipart `image` field → `{user}` with the new `avatarId`. Same validation pipeline as gallery uploads (magic-byte sniff, EXIF strip), then square-cropped to 256×256 WebP; replaces any previous avatar |

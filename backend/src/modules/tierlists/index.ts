@@ -2,7 +2,7 @@
 // modules/tierlists/ is private implementation — same convention as
 // modules/murals/index.ts and modules/arena/index.ts.
 
-export { tierlistsPlugin as registerTierlistsModule } from "./plugin.js";
+export { tierlistsPlugin as registerTierlistsModule, deleteTierlistsUserData } from "./plugin.js";
 // Cross-module getter for murals' shared-mural route — see plugin.ts's
 // getTierlistsPublicApi for why this opens its own connection instead of
 // riding on the plugin's own composition.

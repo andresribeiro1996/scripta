@@ -304,6 +304,7 @@ export function buildPublicMuralRoutes(service: MuralsService, getTierlistData?:
         currentlyReading: payload.library.currentlyReading,
         stats: payload.library.stats,
         shelfTheme: payload.library.shelfTheme,
+        readerCard: payload.library.readerCard,
         profile: payload.profile,
         imageUrls: payload.imageUrls,
         tierlists: payload.tierlists

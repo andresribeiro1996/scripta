@@ -13,11 +13,11 @@ export function keyOf(book: TierBook) {
   return bookKey({ Title: book.title, Attribution: book.author, ISBN: book.isbn, ImageId: book.imageId });
 }
 
-export function TierCover({ book, style }: { book: TierBook; style?: StyleProp<ViewStyle> }) {
+export function TierCover({ book, style, onLoadEnd }: { book: TierBook; style?: StyleProp<ViewStyle>; onLoadEnd?: () => void }) {
   const { colors } = useTheme();
   const [hasCover, setHasCover] = useState(false);
   return <View style={[styles.cover, style]}>
-    <CoverImage book={book} onHasCoverChange={setHasCover} />
+    <CoverImage book={book} onHasCoverChange={setHasCover} onLoadEnd={onLoadEnd} />
     {!hasCover ? <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.fallback, { backgroundColor: colors.accentSoft }]}><Text numberOfLines={3} {...dynamicType} style={[styles.fallbackTitle, { color: colors.accent }]}>{titleOf(book)}</Text><Text numberOfLines={1} {...dynamicType} style={[styles.fallbackAuthor, { color: colors.textDim }]}>{authorOf(book)}</Text></View> : null}
   </View>;
 }

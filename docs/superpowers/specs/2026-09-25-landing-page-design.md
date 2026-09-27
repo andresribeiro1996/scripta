@@ -127,3 +127,30 @@ trivial and the branches are unit-testable.
 Embedded signup form on the landing page; dark-mode variant; analytics;
 multi-page marketing site; automating the badge-URL swap when the app ships
 to stores.
+
+## Revision, 2026-09-27
+
+Reworked after two design reviews, towards a quieter, more serious page.
+Where this section and the ones above disagree, this one describes the code.
+
+- **Name**: Atmyshelf everywhere, with the app sidebar's icon-and-name
+  lockup (`components/BrandLockup.tsx`) in the landing nav and footer and
+  on every auth screen.
+- **One story**: hero → How it works (bring your books, make it yours,
+  share your reading life) → Sharing (murals, plus reader cards labelled
+  "Coming soon", since neither client ships them yet) → Games (the
+  tournament and tier-list demos in one section, behind a switch) →
+  Start your library → footer.
+- **Hero**: real screenshots of the app (a demo library on the three-user
+  fixture backend) in `public/landing/`, light and dark variants picked by
+  `prefers-color-scheme`; the desktop library view with the phone home
+  screen beside it, the phone view alone below `sm`.
+- **Honest availability**: no store badges until there are store links;
+  the closing section says the iPhone and Android apps are in beta.
+- **Type**: Playfair Display at its real 400 weight (`font-display`) for
+  the hero and section headings only; everything else in the system sans.
+  No uppercase eyebrow labels.
+- **Auth screens** (`auth/AuthStage.tsx`): the same theme tokens as the
+  app, following the OS light/dark preference, instead of the fixed dark
+  cover stage; log in / sign up switch by a link under the form instead of
+  tabs; Google as a secondary "Continue with Google" button.

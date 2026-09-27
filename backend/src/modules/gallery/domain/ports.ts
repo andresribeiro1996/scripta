@@ -10,6 +10,7 @@
 import type { GalleryImageRow } from "./types.js";
 
 export interface GalleryRepository {
+  deleteUserData(userId: string): void;
   listImages(userId: string): GalleryImageRow[];
   insertImage(row: GalleryImageRow): void;
   /** No ownership filter — needed by the public, unauthenticated
@@ -29,6 +30,7 @@ export interface GalleryRepository {
 }
 
 export interface ImageBlobStore {
+  deleteAll(userId: string): void;
   save(userId: string, id: string, extension: string, bytes: Buffer): void;
   read(userId: string, id: string, extension: string): Buffer | null;
   delete(userId: string, id: string, extension: string): void;

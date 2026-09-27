@@ -2,6 +2,7 @@ import { Fragment, useState, type ComponentType } from "react";
 import { Link, NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { Avatar } from "../components/Avatar";
+import { BrandLockup } from "../components/BrandLockup";
 import {
   ArenaIcon,
   CollectionsIcon,
@@ -85,10 +86,7 @@ export function DashboardLayout() {
   return (
     <div className="flex min-h-screen">
       <aside className="hidden w-56 shrink-0 flex-col border-r border-(--color-border) bg-(--color-surface) px-3 py-5 lg:flex">
-        <div className="mb-6 flex items-center gap-2 px-2">
-          <img src="/icon-192.png" alt="" className="h-7 w-7 rounded-md" />
-          <span className="text-lg font-bold">Atmyshelf</span>
-        </div>
+        <BrandLockup className="mb-6 px-2" />
         <nav className="flex flex-1 flex-col gap-1">
           {NAV_GROUPS.map((group, groupIndex) => (
             <Fragment key={groupIndex}>
@@ -111,7 +109,7 @@ export function DashboardLayout() {
         <div className="mt-auto border-t border-(--color-border) pt-3">
           <div className="mb-2 flex items-center gap-2 px-2">
             {session && (
-              <Link to={`/community/u/${session.user.username}`} aria-label="Your profile" className="shrink-0 rounded-full transition-opacity hover:opacity-80">
+              <Link to={`/community/u/${session.user.username}`} aria-label="My shelf" title="My shelf" className="shrink-0 rounded-full transition-opacity hover:opacity-80">
                 <Avatar user={session.user} size={24} />
               </Link>
             )}
@@ -175,10 +173,7 @@ export function DashboardLayout() {
             className="flex h-full w-72 max-w-[85%] flex-col overflow-y-auto overscroll-contain border-r border-(--color-border) bg-(--color-surface) px-3 py-5 pb-[env(safe-area-inset-bottom,0px)]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mb-6 flex items-center gap-2 px-2">
-              <img src="/icon-192.png" alt="" className="h-7 w-7 rounded-md" />
-              <span className="text-lg font-bold">Atmyshelf</span>
-            </div>
+            <BrandLockup className="mb-6 px-2" />
             <nav className="flex flex-1 flex-col gap-1">
               {NAV_GROUPS.map((group, groupIndex) => (
                 <Fragment key={groupIndex}>
@@ -210,7 +205,8 @@ export function DashboardLayout() {
                 {session && (
                   <Link
                     to={`/community/u/${session.user.username}`}
-                    aria-label="Your profile"
+                    aria-label="My shelf"
+                    title="My shelf"
                     onClick={() => setDrawerOpen(false)}
                     className="shrink-0 rounded-full transition-opacity hover:opacity-80"
                   >

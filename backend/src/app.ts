@@ -12,6 +12,7 @@ import fastifyCors from "@fastify/cors";
 import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
 import { STATUS_CODES } from "node:http";
 import { isAllowedOrigin } from "./config/corsOrigin.js";
+import { env } from "./config/env.js";
 import { devHttps } from "./config/devCerts.js";
 import { runStartupMigrations } from "./migrations/runStartupMigrations.js";
 import {
@@ -24,14 +25,14 @@ import {
   setDashboardSeenAt,
   userHasUsername
 } from "./modules/auth/index.js";
-import { getArenaPublicApi, registerArenaModule } from "./modules/arena/index.js";
-import { getCommunityPublicApi, registerCommunityModule } from "./modules/community/index.js";
+import { deleteArenaUserData, getArenaPublicApi, registerArenaModule } from "./modules/arena/index.js";
+import { deleteCommunityUserData, getCommunityPublicApi, registerCommunityModule } from "./modules/community/index.js";
 import { registerCoversModule } from "./modules/covers/index.js";
-import { registerGalleryModule } from "./modules/gallery/index.js";
-import { registerLibraryModule, resolvePublicLibrary, type BookEvent } from "./modules/library/index.js";
-import { getMuralsPublicApi, registerMuralsModule } from "./modules/murals/index.js";
-import { registerSocialsModule } from "./modules/socials/index.js";
-import { registerTierlistsModule, getTierlistsPublicApi } from "./modules/tierlists/index.js";
+import { deleteGalleryUserData, registerGalleryModule } from "./modules/gallery/index.js";
+import { deleteLibraryUserData, registerLibraryModule, resolvePublicLibrary, type BookEvent } from "./modules/library/index.js";
+import { deleteMuralsUserData, getMuralsPublicApi, registerMuralsModule } from "./modules/murals/index.js";
+import { deleteSocialsUserData, registerSocialsModule } from "./modules/socials/index.js";
+import { deleteTierlistsUserData, registerTierlistsModule, getTierlistsPublicApi } from "./modules/tierlists/index.js";
 
 export function buildApp() {
   // Moves any still-embedded library.murals[] into the new murals table
@@ -76,6 +77,7 @@ export function buildApp() {
   });
 
   app.get("/health", async () => ({ status: "ok" }));
+  app.get("/public-config", async () => ({ frontendUrl: env.FRONTEND_URL }));
 
   // Fastify's default 500 serializer forwards the raw error message to
   // the client — SQLite constraint text, file paths, JSON.parse details —
@@ -93,7 +95,12 @@ export function buildApp() {
     return reply.code(statusCode).send({ statusCode, error: STATUS_CODES[statusCode] ?? "Error", message: error.message });
   });
 
-  app.register(registerAuthModule, { authRoot: app });
+  app.register(registerAuthModule, {
+    authRoot: app,
+    deleteUserData: (userId: string) => {
+      for (const erase of [deleteLibraryUserData, deleteGalleryUserData, deleteSocialsUserData, deleteMuralsUserData, deleteArenaUserData, deleteTierlistsUserData, deleteCommunityUserData]) erase(userId);
+    }
+  });
   app.register(registerArenaModule, {
     emitPublished: (tournamentId: string, ownerUserId: string) => getCommunityPublicApi().emitEvent(ownerUserId, "tournament_published", "tournament", tournamentId),
     emitVotedOn: (voterUserId: string, tournamentId: string, name: string | null) => {

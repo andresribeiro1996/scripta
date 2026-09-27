@@ -27,3 +27,9 @@ export function getCommunityPublicApi(): CommunityPublicApi {
   }
   return cachedPublicApi;
 }
+
+let erasingCommunity: ReturnType<typeof createSqliteCommunityRepository> | undefined;
+
+export function deleteCommunityUserData(userId: string) {
+  (erasingCommunity ??= createSqliteCommunityRepository(openCommunityDb())).deleteUserData(userId);
+}

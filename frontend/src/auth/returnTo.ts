@@ -23,3 +23,15 @@ export function startAuthNavigation(value: unknown, signup: boolean): void {
 export function afterSignIn(username: string | null): string {
   return !username ? "/choose-username" : sessionStorage.getItem("scripta_auth_avatar") === "true" ? "/welcome-avatar" : getAuthReturnTo();
 }
+
+export function setAuthNotice(message: string): void {
+  sessionStorage.setItem("scripta_auth_notice", message);
+}
+
+export function readAuthNotice(): string | null {
+  return sessionStorage.getItem("scripta_auth_notice");
+}
+
+export function clearAuthNotice(): void {
+  sessionStorage.removeItem("scripta_auth_notice");
+}
