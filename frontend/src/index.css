@@ -48,6 +48,7 @@
   --color-border: #ddd8d0;
   --color-accent: #a85c32;
   --color-accent-soft: #f1e2d8;
+  --color-on-accent: #ffffff;
   --color-danger: #b3432f;
   --color-danger-soft: #f6dfda;
   /* "Finished, and it went fine" — the only genuinely positive state in
@@ -73,6 +74,7 @@
     --color-border: #45403a;
     --color-accent: #e08a52;
     --color-accent-soft: #3a2c22;
+    --color-on-accent: #1a1815;
     --color-danger: #e08072;
     --color-danger-soft: #3a2420;
     --color-success: #8fbf7f;

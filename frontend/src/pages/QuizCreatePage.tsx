@@ -2,19 +2,24 @@
 // books, then set length and question types. Quotes are pasted later in
 // the editor; the pool ships with famous first lines already attached.
 
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { QUIZ_POOL, QUIZ_QUESTION_TYPES, bookKey, booksInGroup, eligibleTypes, type QuizBook, type QuizData, type QuizQuestionType } from "@scripta/shared";
 import { PageContainer } from "../components/PageContainer";
 import { createQuizApi } from "../api/quizzes";
+import { resolveCover } from "../api/covers";
+import { normalizeImageId, normalizeIsbn } from "../lib/covers";
 import { useLibrary } from "../hooks/useLibrary";
 
-function toQuizBook(book: Record<string, unknown>): QuizBook {
+function toQuizBook(book: Record<string, unknown>, resolvedCover: string | null | undefined): QuizBook {
   return {
     key: bookKey(book),
     title: String(book.Title ?? "Untitled"),
     author: String(book.Attribution ?? ""),
-    coverUrl: typeof book._coverUrl === "string" && book._coverUrl ? book._coverUrl : null,
+    // _coverUrl only exists for manually-set covers; automatically
+    // resolved ones come from the backend cover cache, fetched per book
+    // below so availability (and the type checkboxes) is honest.
+    coverUrl: typeof book._coverUrl === "string" && book._coverUrl ? book._coverUrl : resolvedCover ?? null,
     quote: null,
     blurb: null
   };
@@ -46,19 +51,58 @@ export function QuizCreatePage() {
   const collections = (library?.data.groups ?? []).filter((group) => group.type === "collection");
   const collection = collections.find((group) => group.id === collectionId);
 
+  const shelfRawBooks = useMemo(
+    () => (source === "collection" ? (collection ? booksInGroup(collection, libraryBooks) : []) : source === "shelf" ? libraryBooks : []),
+    [source, collection, libraryBooks]
+  );
+
+  // Resolve covers the same way CoverImage does (backend cache-aware
+  // lookup) for every shelf/collection book without a manual cover, so
+  // cover-based question types are offered on ordinary libraries and the
+  // snapshot ships real URLs. Sequential and progressive: each result
+  // lands in state as it arrives.
+  const resolvedRef = useRef<Record<string, string | null>>({});
+  const [resolvedCovers, setResolvedCovers] = useState<Record<string, string | null>>({});
+  useEffect(() => {
+    if (source === "pool") return;
+    let cancelled = false;
+    void (async () => {
+      for (const raw of shelfRawBooks) {
+        const key = bookKey(raw);
+        if (resolvedRef.current[key] !== undefined) continue;
+        if (typeof raw._coverUrl === "string" && raw._coverUrl) {
+          resolvedRef.current[key] = raw._coverUrl;
+          continue;
+        }
+        const url = await resolveCover({
+          isbn: normalizeIsbn(raw.ISBN) || undefined,
+          imageId: normalizeImageId(raw.ImageId) || undefined,
+          title: String(raw.Title ?? "").trim() || undefined,
+          author: raw.Attribution ? String(raw.Attribution) : undefined
+        });
+        if (cancelled) return;
+        resolvedRef.current[key] = url ?? null;
+        setResolvedCovers({ ...resolvedRef.current });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [shelfRawBooks, source]);
+
   const books: QuizBook[] =
     source === "pool"
       ? QUIZ_POOL.filter((book) => poolKeys.includes(book.key))
-      : source === "collection"
-        ? collection
-          ? booksInGroup(collection, libraryBooks).map(toQuizBook)
-          : []
-        : libraryBooks.map(toQuizBook);
+      : shelfRawBooks.map((raw) => toQuizBook(raw, resolvedCovers[bookKey(raw)]));
 
   // A type is offerable only if at least one chosen book has the data it
   // needs — same eligibility rule the backend's publish enforces.
   const availableTypes = QUIZ_QUESTION_TYPES.filter((type) => books.some((book) => eligibleTypes(book).includes(type)));
   const effectiveTypes = allowedTypes.filter((type) => availableTypes.includes(type));
+
+  // Question count can never exceed the pool the draw picks from.
+  const lengthOptions = [4, 5, 10, 15, 20].filter((count) => count <= books.length);
+  const effectiveQuestionCount = lengthOptions.includes(questionCount) ? questionCount : (lengthOptions[lengthOptions.length - 1] ?? 0);
 
   async function submit() {
     setBusy(true);
@@ -66,7 +110,7 @@ export function QuizCreatePage() {
     try {
       const data: QuizData = {
         sourceLabel: source === "pool" ? "Famous books" : source === "collection" ? collection?.name ?? "Collection" : "My shelf",
-        questionCount,
+        questionCount: effectiveQuestionCount,
         allowedTypes: effectiveTypes.length > 0 ? effectiveTypes : availableTypes,
         books,
         questions: null
@@ -146,8 +190,10 @@ export function QuizCreatePage() {
         {step === 1 && (
           <>
             <label className="flex flex-col gap-1 text-sm font-semibold">Questions
-              <select value={questionCount} onChange={(event) => setQuestionCount(Number(event.target.value))} className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2">
-                {[5, 10, 15, 20].map((count) => (
+              {/* Only lengths the selected pool can actually fill — with 4–9
+                  books the old fixed 5/10/15/20 list left nothing selectable. */}
+              <select value={effectiveQuestionCount} onChange={(event) => setQuestionCount(Number(event.target.value))} className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2">
+                {lengthOptions.map((count) => (
                   <option key={count} value={count}>{count} questions</option>
                 ))}
               </select>
@@ -180,7 +226,7 @@ export function QuizCreatePage() {
               type="button"
               disabled={books.length < BOOK_COUNT || (source === "collection" && !collection)}
               onClick={() => setStep(1)}
-              className="min-h-11 rounded-lg bg-(--color-accent) px-4 font-semibold text-white disabled:opacity-50"
+              className="min-h-11 rounded-lg bg-(--color-accent) px-4 font-semibold text-(--color-on-accent) disabled:opacity-50"
             >
               Next
             </button>
@@ -189,7 +235,7 @@ export function QuizCreatePage() {
               type="button"
               disabled={busy || effectiveTypes.length === 0 || questionCount > books.length}
               onClick={() => void submit()}
-              className="min-h-11 rounded-lg bg-(--color-accent) px-4 font-semibold text-white disabled:opacity-50"
+              className="min-h-11 rounded-lg bg-(--color-accent) px-4 font-semibold text-(--color-on-accent) disabled:opacity-50"
             >
               {busy ? "Creating…" : "Create quiz"}
             </button>

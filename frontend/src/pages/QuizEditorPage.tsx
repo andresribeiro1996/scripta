@@ -4,7 +4,7 @@
 // Published mode is read-only plus the share/open controls and results.
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { QUIZ_QUESTION_TYPES, eligibleTypes, type QuizData, type QuizQuestionType } from "@scripta/shared";
 import { PageContainer } from "../components/PageContainer";
@@ -30,27 +30,56 @@ export function QuizEditorPage() {
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  async function save(id: string, data: QuizData) {
-    try {
-      await updateQuizApi(id, { data });
-      await queryClient.invalidateQueries({ queryKey: ["quizzes"] });
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Couldn't save.");
+  // Local draft of the document: every edit updates it immediately and
+  // enqueues a whole-document PUT. Sends are serialized over one promise
+  // chain and each carries the draft current AT ITS ENQUEUE TIME — later
+  // sends always hold newer state, so rapid edits can't overwrite each
+  // other with a stale snapshot the way per-edit fetch-then-PUT did.
+  const [draft, setDraft] = useState<QuizData | null>(null);
+  const draftRef = useRef<QuizData | null>(null);
+  const [draftQuizId, setDraftQuizId] = useState<string | null>(null);
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
+
+  useEffect(() => {
+    // Initialize once per quiz — a refetch must not clobber local edits.
+    if (quiz && draftQuizId !== quiz.id) {
+      setDraft(quiz.data);
+      draftRef.current = quiz.data;
+      setDraftQuizId(quiz.id);
     }
+  }, [quiz, draftQuizId]);
+
+  function updateDraft(mutate: (current: QuizData) => QuizData): void {
+    if (!quiz) return;
+    const current = draftRef.current;
+    if (!current) return;
+    const next = mutate(current);
+    draftRef.current = next;
+    setDraft(next);
+    saveQueueRef.current = saveQueueRef.current.then(async () => {
+      try {
+        await updateQuizApi(quiz.id, { data: next });
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : "Couldn't save.");
+      }
+    });
   }
 
-  function patchBook(quiz: Quiz, bookKey: string, patch: { quote?: string | null; blurb?: string | null }) {
-    const next: QuizData = {
-      ...quiz.data,
-      books: quiz.data.books.map((book) => (book.key === bookKey ? { ...book, ...patch } : book))
-    };
-    return save(quiz.id, next);
+  function patchBook(bookKey: string, patch: { quote?: string | null; blurb?: string | null }): void {
+    updateDraft((current) => ({
+      ...current,
+      books: current.books.map((book) => (book.key === bookKey ? { ...book, ...patch } : book))
+    }));
   }
 
   async function publish(quiz: Quiz) {
     setBusy(true);
     setError(null);
     try {
+      // Pending saves must land before the code is minted: publishing
+      // freezes the server-side document, so racing it would seed from a
+      // document missing the last edits.
+      await saveQueueRef.current;
       await publishQuizApi(quiz.id);
       await queryClient.invalidateQueries({ queryKey: ["quizzes"] });
     } catch (reason) {
@@ -72,8 +101,15 @@ export function QuizEditorPage() {
     );
   }
 
-  const data = quiz.data;
+  const data = draft;
   const shareLink = quiz.voteCode ? `${window.location.origin}/play/${quiz.voteCode}` : null;
+  if (!data) {
+    return (
+      <PageContainer>
+        <p className="px-5 py-8 text-(--color-text-dim)">Loading…</p>
+      </PageContainer>
+    );
+  }
 
   return (
     <PageContainer>
@@ -100,10 +136,10 @@ export function QuizEditorPage() {
                 Questions
                 <select
                   value={data.questionCount}
-                  onChange={(event) => void save(quiz.id, { ...data, questionCount: Number(event.target.value) })}
+                  onChange={(event) => updateDraft((current) => ({ ...current, questionCount: Number(event.target.value) }))}
                   className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2"
                 >
-                  {[5, 10, 15, 20].map((count) => (
+                  {[4, 5, 10, 15, 20].map((count) => (
                     <option key={count} value={count}>{count}</option>
                   ))}
                 </select>
@@ -119,10 +155,10 @@ export function QuizEditorPage() {
                         disabled={!offered}
                         checked={checked}
                         onChange={() =>
-                          void save(quiz.id, {
-                            ...data,
-                            allowedTypes: checked ? data.allowedTypes.filter((entry) => entry !== type) : [...data.allowedTypes, type]
-                          })
+                          updateDraft((current) => ({
+                            ...current,
+                            allowedTypes: checked ? current.allowedTypes.filter((entry) => entry !== type) : [...current.allowedTypes, type]
+                          }))
                         }
                       />
                       {TYPE_LABELS[type]}
@@ -141,7 +177,7 @@ export function QuizEditorPage() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => void save(quiz.id, { ...data, books: data.books.filter((entry) => entry.key !== book.key) })}
+                    onClick={() => updateDraft((current) => ({ ...current, books: current.books.filter((entry) => entry.key !== book.key) }))}
                     className="min-h-9 rounded-lg border border-(--color-border) px-3 text-sm"
                   >
                     Remove
@@ -155,7 +191,7 @@ export function QuizEditorPage() {
                     placeholder="Paste a line from this book…"
                     onBlur={(event) => {
                       const value = event.target.value.trim();
-                      if (value !== (book.quote ?? "")) void patchBook(quiz, book.key, { quote: value || null });
+                      if (value !== (book.quote ?? "")) patchBook(book.key, { quote: value || null });
                     }}
                     className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2"
                   />
@@ -167,7 +203,7 @@ export function QuizEditorPage() {
                     defaultValue={book.blurb ?? ""}
                     onBlur={(event) => {
                       const value = event.target.value.trim();
-                      if (value !== (book.blurb ?? "")) void patchBook(quiz, book.key, { blurb: value || null });
+                      if (value !== (book.blurb ?? "")) patchBook(book.key, { blurb: value || null });
                     }}
                     className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2"
                   />
@@ -179,7 +215,7 @@ export function QuizEditorPage() {
               type="button"
               disabled={busy || data.books.length < 4}
               onClick={() => void publish(quiz)}
-              className="min-h-11 self-start rounded-lg bg-(--color-accent) px-4 font-semibold text-white disabled:opacity-50"
+              className="min-h-11 self-start rounded-lg bg-(--color-accent) px-4 font-semibold text-(--color-on-accent) disabled:opacity-50"
             >
               {busy ? "Publishing…" : "Publish quiz"}
             </button>
@@ -214,7 +250,7 @@ function PublishedSection({ quiz, shareLink, copied, setCopied }: { quiz: Quiz; 
             setCopied(true);
             window.setTimeout(() => setCopied(false), 1500);
           }}
-          className="min-h-10 rounded-lg bg-(--color-accent) px-3 text-sm font-semibold text-white"
+          className="min-h-10 rounded-lg bg-(--color-accent) px-3 text-sm font-semibold text-(--color-on-accent)"
         >
           {copied ? "Copied!" : "Copy challenge link"}
         </button>

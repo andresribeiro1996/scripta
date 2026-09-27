@@ -49,9 +49,12 @@ function Options({ question, onPick, picked }: { question: PublicQuizQuestion; o
             type="button"
             disabled={picked !== null}
             onClick={() => onPick(index)}
-            className={`relative h-44 overflow-hidden rounded-xl border-2 bg-(--color-border) transition-colors ${picked === index ? "border-(--color-accent)" : "border-(--color-border) hover:border-(--color-text-dim)"}`}
+            className={`relative aspect-[2/3] overflow-hidden rounded-xl border-2 bg-(--color-border) transition-colors ${picked === index ? "border-(--color-accent)" : "border-(--color-border) hover:border-(--color-text-dim)"}`}
           >
-            <CoverImage book={{ Title: `Option ${index + 1}`, _coverUrl: option }} alt={`Option ${index + 1}`} />
+            {/* contain, not cover: cropping is what hides the artwork a
+                player needs to recognize; the border-colored tile backs
+                the letterbox, per DESIGN.md's BookCard note. */}
+            <CoverImage book={{ Title: `Option ${index + 1}`, _coverUrl: option }} fit="contain" alt={`Option ${index + 1}`} />
           </button>
         ))}
       </div>
@@ -170,7 +173,7 @@ export function PlayQuizPage() {
             type="button"
             disabled={busy}
             onClick={() => void submit()}
-            className="min-h-11 rounded-lg bg-(--color-accent) px-4 font-semibold text-white disabled:opacity-50"
+            className="min-h-11 rounded-lg bg-(--color-accent) px-4 font-semibold text-(--color-on-accent) disabled:opacity-50"
           >
             {busy ? "Scoring…" : "See my score"}
           </button>
@@ -228,7 +231,7 @@ function ResultsView({
             setCopied(true);
             window.setTimeout(() => setCopied(false), 1500);
           }}
-          className="min-h-10 shrink-0 rounded-lg bg-(--color-accent) px-3 text-sm font-semibold text-white"
+          className="min-h-10 shrink-0 rounded-lg bg-(--color-accent) px-3 text-sm font-semibold text-(--color-on-accent)"
         >
           {copied ? "Copied!" : "Challenge someone"}
         </button>
