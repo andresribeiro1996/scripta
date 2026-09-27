@@ -5,7 +5,7 @@
 // mapOpenLibraryDoc. Run with:
 //   npx tsx scripts/test-book-search.mts
 
-import { buildManualBook, looksLikeIsbnQuery, mapOpenLibraryDoc } from "../src/lib/bookSearch";
+import { buildManualBook, looksLikeIsbnQuery, mapOpenLibraryDoc } from "@scripta/shared";
 
 let passed = 0;
 let failed = 0;

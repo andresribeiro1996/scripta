@@ -1,34 +1,19 @@
-// The `BookMetadata` shape and `validBookRating` moved to
-// packages/shared/src/library/bookMetadata.ts (Task 3A) — re-exported
-// here so every existing `from "./lib/bookMetadata"` import keeps
-// working unchanged. `fetchBookMetadata` (an Open Library network call)
-// and `bookMetadataOptions` (a TanStack Query `queryOptions` wrapper)
-// stay here — see the shared module's own top comment for why.
-
 import { queryOptions } from "@tanstack/react-query";
 import { normalizeIsbn } from "./covers";
-import { buildBookMetadata, findOpenLibraryMatch, validBookRating, type BookMetadata } from "@scripta/shared";
+import { validBookRating, type BookMetadata } from "@scripta/shared";
+import { apiFetch } from "../api/client";
 
 export type { BookMetadata };
 export { validBookRating };
 
 export async function fetchBookMetadata(isbn: string, title: string, author: string, signal?: AbortSignal): Promise<BookMetadata | null> {
-  const query = new URLSearchParams({ fields: "key,title,author_name,ratings_average,ratings_count,subject", limit: "5" });
+  if (!isbn && (!title || !author)) return null;
+  const query = new URLSearchParams();
   if (isbn) query.set("isbn", isbn);
-  else {
-    if (!title || !author) return null;
-    query.set("title", title);
-    query.set("author", author);
-  }
-  const requestSignal = signal ? AbortSignal.any([signal, AbortSignal.timeout(12000)]) : AbortSignal.timeout(12000);
-  const response = await fetch(`https://openlibrary.org/search.json?${query}`, { signal: requestSignal });
-  if (!response.ok) throw new Error("Book information is unavailable.");
-  const match = findOpenLibraryMatch(await response.json(), isbn, title, author);
-  if (!match) return null;
-  const sourceUrl = `https://openlibrary.org${String(match.key)}`;
-  const workResponse = await fetch(`${sourceUrl}.json`, { signal: requestSignal });
-  if (!workResponse.ok) throw new Error("Book summary is unavailable.");
-  return buildBookMetadata(match, await workResponse.json());
+  if (title) query.set("title", title);
+  if (author) query.set("author", author);
+  const body = (await apiFetch(`/books/details?${query}`, { signal })) as { metadata: BookMetadata | null };
+  return body.metadata;
 }
 
 export function bookMetadataOptions(book: Record<string, unknown>) {

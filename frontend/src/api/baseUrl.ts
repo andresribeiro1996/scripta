@@ -24,6 +24,6 @@
 import { resolveApiUrl } from "./resolveApiUrl";
 
 export const API_URL = resolveApiUrl(
-  { apiUrl: import.meta.env.VITE_API_URL, apiPort: import.meta.env.VITE_API_PORT },
-  window.location,
+  { apiUrl: import.meta.env?.VITE_API_URL, apiPort: import.meta.env?.VITE_API_PORT },
+  typeof window !== "undefined" ? window.location : { protocol: "http:", hostname: "localhost" },
 );

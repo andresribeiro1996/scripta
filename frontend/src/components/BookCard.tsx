@@ -54,7 +54,7 @@ const BookIcon = () => (
  *  than cropped, at the cost of not filling every pixel of a
  *  mismatched-ratio box — the right trade for a small preview tile where
  *  seeing the whole cover matters more than a flush edge-to-edge fill. */
-function coverParamsFor(book: Record<string, unknown>): ResolveCoverParams {
+export function coverParamsFor(book: Record<string, unknown>): ResolveCoverParams {
   const isbn = normalizeIsbn(book.ISBN);
   const imageId = normalizeImageId(book.ImageId);
   const title = String(book.Title ?? "").trim();
@@ -70,16 +70,18 @@ export function CoverImage({
   book,
   onHasCoverChange,
   fit = "cover",
-  alt = ""
+  alt = "",
+  size = "thumb"
 }: {
   book: Record<string, unknown>;
   onHasCoverChange?: (hasCover: boolean) => void;
   fit?: "cover" | "contain";
   alt?: string;
+  size?: "thumb" | "full";
 }) {
   const confirmedUrl = typeof book._coverUrl === "string" ? book._coverUrl : null;
   const [confirmedFailed, setConfirmedFailed] = useState(false);
-  const [autoUrl, setAutoUrl] = useState<string | null>(() => peekResolvedCover(coverParamsFor(book)) ?? null);
+  const [autoUrl, setAutoUrl] = useState<string | null>(() => peekResolvedCover(coverParamsFor(book), size) ?? null);
   const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
   const useAuto = !confirmedUrl || confirmedFailed;
 
@@ -88,20 +90,20 @@ export function CoverImage({
   // for this one while the fresh lookup below is still in flight.
   useEffect(() => {
     setConfirmedFailed(false);
-    setAutoUrl(peekResolvedCover(coverParamsFor(book)) ?? null);
-  }, [book, confirmedUrl]);
+    setAutoUrl(peekResolvedCover(coverParamsFor(book), size) ?? null);
+  }, [book, confirmedUrl, size]);
 
   useEffect(() => {
     if (!useAuto) return;
     const params = coverParamsFor(book);
     if (!params.isbn && !params.imageId && !params.title) return; // nothing to even ask the backend about
-    const cached = peekResolvedCover(params);
+    const cached = peekResolvedCover(params, size);
     if (cached !== undefined) {
       setAutoUrl(cached);
       return;
     }
     let cancelled = false;
-    resolveCover(params)
+    resolveCover(params, { size })
       .then((url) => {
         if (!cancelled) setAutoUrl(url);
       })
@@ -114,7 +116,7 @@ export function CoverImage({
     return () => {
       cancelled = true;
     };
-  }, [useAuto, book]);
+  }, [useAuto, book, size]);
 
   const currentSrc = useAuto ? (autoUrl ?? undefined) : confirmedUrl!;
   const hasCover = Boolean(currentSrc);

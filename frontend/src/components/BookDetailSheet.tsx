@@ -62,7 +62,7 @@ export function BookDetailSheet({
 
         <div className="grid gap-5 p-5 sm:grid-cols-[180px_1fr]">
           <div className="relative mx-auto aspect-[2/3] w-32 overflow-hidden rounded-lg bg-(--color-border) sm:w-full">
-            <CoverImage book={book} />
+            <CoverImage book={book} size="full" />
           </div>
 
           <div className="min-w-0">
