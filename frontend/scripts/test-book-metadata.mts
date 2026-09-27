@@ -26,3 +26,24 @@ test("mural preloads select only referenced books and include resolved tiers", a
     name: "Tiers", tiers: [{ id: "tier", label: "A", color: "red", bookKeys: [bookKey(books[3])] }], pool: [bookKey(books[4])]
   })).map((book) => book.Title), ["Spotlight", "Shelf", "Reading", "Ranked", "Pool"]);
 });
+
+test("opening details reuses completed and in-flight preloads", async (t) => {
+  const { QueryClient } = await import("@tanstack/react-query");
+  const { bookMetadataOptions } = await import("../src/lib/bookMetadata.ts");
+  const client = new QueryClient();
+  const originalFetch = globalThis.fetch;
+  let requests = 0;
+  globalThis.fetch = async () => {
+    requests++;
+    return Response.json({ metadata: { summary: "Ready before tapping.", rating: null, ratingCount: 0, sourceUrl: "https://openlibrary.org/works/OL1W", genres: [] } });
+  };
+  t.after(() => { globalThis.fetch = originalFetch; client.clear(); });
+  const book = { ISBN: "9780553348477", Title: "Ecotopia", Attribution: "Ernest Callenbach" };
+  const preload = client.prefetchQuery(bookMetadataOptions(book));
+  const details = client.fetchQuery(bookMetadataOptions(book));
+  await preload;
+  assert.equal((await details)?.summary, "Ready before tapping.");
+  assert.equal(requests, 1);
+  await client.fetchQuery(bookMetadataOptions(book));
+  assert.equal(requests, 1);
+});
