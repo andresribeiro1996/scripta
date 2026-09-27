@@ -9,6 +9,7 @@ import { ArenaListPage } from "./pages/ArenaListPage";
 import { TierListCreatePage } from "./pages/TierListCreatePage";
 import { ArenaSeedPage } from "./pages/ArenaSeedPage";
 import { ArenaViewPage } from "./pages/ArenaViewPage";
+import { QuizCreatePage } from "./pages/QuizCreatePage";
 import { ChooseUsernamePage } from "./pages/ChooseUsernamePage";
 import { CollectionsPage } from "./pages/CollectionsPage";
 import { CommunityProfilePage } from "./pages/CommunityProfilePage";
@@ -77,6 +78,7 @@ export function App() {
               <Route path="/dashboard/arena" element={<ArenaListPage />} />
               <Route path="/dashboard/arena/tierlist/new" element={<TierListCreatePage />} />
               <Route path="/dashboard/arena/tierlist/:id" element={<TierListEditorPage />} />
+              <Route path="/dashboard/arena/quiz/new" element={<QuizCreatePage />} />
               <Route path="/dashboard/arena/:id/seed" element={<ArenaSeedPage />} />
               <Route path="/dashboard/style" element={<LibraryStylePage />} />
               <Route path="/dashboard/settings" element={<SettingsPage />} />
