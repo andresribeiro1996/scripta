@@ -39,7 +39,8 @@ export async function booksPlugin(app: FastifyInstance) {
     fetchImage,
     enqueue: (bookId, front) => worker.enqueue(bookId, front),
     publicUrlFor: (id, size) => `${env.PUBLIC_API_URL}/covers/cached/${id}/${size}`,
-    adminUserId: env.ADMIN_USER_ID
+    adminUserId: env.ADMIN_USER_ID,
+    warn: (details, message) => app.log.warn(details, message)
   });
   const worker = createCoverWorker(
     (bookId) => service.processBook(bookId),

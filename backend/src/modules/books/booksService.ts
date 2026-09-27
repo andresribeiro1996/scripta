@@ -34,6 +34,7 @@ export interface BooksServiceDeps {
   enqueue: (bookId: string, front?: boolean) => void;
   publicUrlFor: (imageId: string, size: CoverFileSize) => string;
   adminUserId: string;
+  warn: (details: Record<string, unknown>, message: string) => void;
   now?: () => Date;
 }
 
@@ -128,6 +129,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
         now().toISOString()
       );
       if (!book.title) deps.repo.fillIdentity(book.id, result.title, author);
+      deps.repo.makeSearchable(book.id);
       return book.cover_image_id ? { ...result, coverUrl: deps.publicUrlFor(book.cover_image_id, "thumb") } : result;
     });
   }
@@ -149,6 +151,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       if (!book || book.cover_status === "manual") return;
       try {
         const outcome = await findBestCover({ isbn: book.isbn, title: book.title, author: book.author }, deps.repo.listRejectedUrls(bookId), deps.sources, deps.fetchImage);
+        for (const failure of outcome.failures) deps.warn({ bookId, source: failure.source, error: failure.message }, "cover source unavailable");
 
         const latest = deps.repo.getBook(bookId);
         if (!latest || latest.cover_image_id !== book.cover_image_id || latest.cover_status !== book.cover_status) return;
@@ -199,9 +202,9 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       if (!trimmed) return [];
       if (looksLikeIsbnQuery(trimmed)) {
         const isbn = normalizeIsbn(trimmed);
-        const saved = isbn ? deps.repo.findBookByKey(`isbn:${isbn}`) : undefined;
+        const saved = deps.repo.findBookByKey(`isbn:${isbn}`);
         if (saved) return [toSearchResult(saved)];
-        return saveHits(await deps.catalog.search({ isbn: isbn || trimmed.replace(/[\s-]/g, "") }));
+        return saveHits(await deps.catalog.search({ isbn }));
       }
       const tokens = searchTokens(trimmed);
       if (tokens.length === 0) return [];

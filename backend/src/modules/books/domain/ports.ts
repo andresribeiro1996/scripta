@@ -11,6 +11,7 @@ export interface BooksRepository {
   getBook(id: string): BookRow | undefined;
   createBook(input: NewBook, key: string, createdAt: string): BookRow;
   fillIdentity(id: string, title: string, author: string): void;
+  makeSearchable(id: string): void;
   getImage(id: string): CoverImageRow | undefined;
   insertImage(row: CoverImageRow): void;
   setCover(bookId: string, cover: { imageId: string | null; status: CoverStatus | null; checkedAt: string | null }): void;

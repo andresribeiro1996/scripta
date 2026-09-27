@@ -79,21 +79,24 @@ test("title candidates must match title and any listed author", async () => {
   assert.equal(outcome.found?.candidate.url, "https://a/right");
 });
 
-test("an unavailable source marks the outcome incomplete and the chain continues", async () => {
+test("an unavailable source marks the outcome incomplete, records the failure and the chain continues", async () => {
+  const isbndbFailure = new SourceUnavailableError("isbndb", "HTTP 429");
   const outcome = await findBestCover(orlando, new Set(), sources({
-    isbndb: source({ isbn: new SourceUnavailableError("isbndb", "HTTP 429") }),
+    isbndb: source({ isbn: isbndbFailure }),
     openlibrary: source({ isbn: [{ source: "openlibrary", url: "https://o/1" }] })
   }), images({ "https://o/1": [320, 480] }));
   assert.equal(outcome.found?.candidate.url, "https://o/1");
   assert.equal(outcome.complete, false);
+  assert.deepEqual(outcome.failures, [isbndbFailure]);
 });
 
-test("an image download that is unavailable also marks the outcome incomplete", async () => {
+test("an image download that is unavailable also marks the outcome incomplete and is recorded", async () => {
+  const downloadFailure = new SourceUnavailableError("apple", "HTTP 503");
   const fetchImage: FetchCoverImage = async () => {
-    throw new SourceUnavailableError("apple", "HTTP 503");
+    throw downloadFailure;
   };
   const outcome = await findBestCover(orlando, new Set(), sources({ apple: source({ isbn: [{ source: "apple", url: "https://a/1" }] }) }), fetchImage);
-  assert.deepEqual(outcome, { found: null, complete: false });
+  assert.deepEqual(outcome, { found: null, complete: false, failures: [downloadFailure] });
 });
 
 test("unexpected errors propagate", async () => {
@@ -105,6 +108,6 @@ test("without an ISBN only title steps run; an empty title runs nothing", async 
   await findBestCover({ isbn: null, title: "Solaris", author: "Stanisław Lem" }, new Set(), sources({ apple }), images({}));
   assert.deepEqual(apple.calls, ["title:Solaris"]);
   const idle = source();
-  assert.deepEqual(await findBestCover({ isbn: null, title: "?!", author: "" }, new Set(), sources({ apple: idle }), images({})), { found: null, complete: true });
+  assert.deepEqual(await findBestCover({ isbn: null, title: "?!", author: "" }, new Set(), sources({ apple: idle }), images({})), { found: null, complete: true, failures: [] });
   assert.deepEqual(idle.calls, []);
 });

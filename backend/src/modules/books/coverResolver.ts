@@ -22,6 +22,7 @@ export interface FoundCover {
 export interface CoverOutcome {
   found: FoundCover | null;
   complete: boolean;
+  failures: SourceUnavailableError[];
 }
 
 async function attempt<T>(step: () => Promise<T>): Promise<T | SourceUnavailableError> {
@@ -49,22 +50,25 @@ export async function findBestCover(
 
   let best: FoundCover | null = null;
   let complete = true;
+  const failures: SourceUnavailableError[] = [];
   for (const step of steps) {
     const candidates = await attempt(step);
     if (candidates instanceof SourceUnavailableError) {
       complete = false;
+      failures.push(candidates);
       continue;
     }
     for (const candidate of candidates.filter((c) => !rejected.has(c.url)).slice(0, CANDIDATES_PER_STEP)) {
       const image = await attempt(() => fetchImage(candidate));
       if (image instanceof SourceUnavailableError) {
         complete = false;
+        failures.push(image);
         continue;
       }
       if (!image || !isAcceptableCover(candidate.source, image.width, image.height)) continue;
-      if (image.width >= MIN_GOOD_WIDTH) return { found: { candidate, image }, complete: true };
+      if (image.width >= MIN_GOOD_WIDTH) return { found: { candidate, image }, complete: true, failures };
       if (!best || image.width > best.image.width) best = { candidate, image };
     }
   }
-  return { found: best, complete };
+  return { found: best, complete, failures };
 }

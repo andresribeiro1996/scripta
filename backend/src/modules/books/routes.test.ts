@@ -40,6 +40,7 @@ function makeService(overrides: Partial<Deps> = {}) {
     enqueue: () => {},
     publicUrlFor: (id, size) => `https://api.test/covers/cached/${id}/${size}`,
     adminUserId: "admin",
+    warn: () => {},
     ...overrides
   });
   return { service, files };

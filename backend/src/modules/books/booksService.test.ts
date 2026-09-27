@@ -47,6 +47,7 @@ function harness(overrides: Partial<Deps> = {}) {
     read: (id: string, extension: string) => files.get(`${id}.${extension}`) ?? null
   };
   const enqueued: Array<{ bookId: string; front: boolean }> = [];
+  const warnings: Array<{ details: Record<string, unknown>; message: string }> = [];
   let clock = Date.parse("2026-10-01T00:00:00.000Z");
   const sizes = new Map<string, [number, number]>();
   const service = createBooksService({
@@ -64,11 +65,12 @@ function harness(overrides: Partial<Deps> = {}) {
     enqueue: (bookId, front = false) => { enqueued.push({ bookId, front }); },
     publicUrlFor: (id, size) => `https://api.test/covers/cached/${id}/${size}`,
     adminUserId: "",
+    warn: (details, message) => { warnings.push({ details, message }); },
     now: () => new Date(clock),
     ...overrides
   });
   const bookId = (key: string) => repo.findBookByKey(key)!.id;
-  return { db, repo, files, sizes, enqueued, service, bookId, advance: (ms: number) => { clock += ms; } };
+  return { db, repo, files, sizes, enqueued, warnings, service, bookId, advance: (ms: number) => { clock += ms; } };
 }
 
 test("a new book answers pending and repeat requests reuse the same row", () => {
@@ -146,6 +148,9 @@ test("an unavailable source records no miss and backs off for 10 minutes", async
   const book = h.repo.findBookByKey("isbn:9780141184272")!;
   assert.equal(book.cover_status, null);
   assert.equal(book.cover_checked_at, null);
+  assert.equal(h.warnings.length, 1);
+  assert.equal(h.warnings[0]!.details.source, "apple");
+  assert.equal(h.warnings[0]!.message, "cover source unavailable");
   h.enqueued.length = 0;
   assert.equal(h.service.resolveCover(orlando).pending, false);
   assert.equal(h.enqueued.length, 0);
@@ -332,6 +337,18 @@ test("search strips FTS syntax and ignores punctuation-only queries", async () =
   assert.deepEqual(await h.service.search("***"), []);
   assert.deepEqual(await h.service.search("   "), []);
   assert.equal(calls.length, 1);
+});
+
+test("search never returns a book that only came from an account's library", async () => {
+  const { calls, catalog } = recordingCatalog({ search: async (query) => {
+    calls.push("isbn" in query ? `search-isbn:${query.isbn}` : `search:${query.text}`);
+    return [];
+  } });
+  const h = harness({ catalog });
+  h.service.resolveCover({ title: "My Private Manuscript", author: "" });
+  const results = await h.service.search("manuscript");
+  assert.deepEqual(calls, ["search:manuscript"]);
+  assert.deepEqual(results, []);
 });
 
 const { default: sharp } = await import("sharp");

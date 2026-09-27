@@ -11,8 +11,11 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     VALUES ($id, $title, $author, $year, $publisher, $isbn, $ol_cover_id, $genres, $created_at)
   `);
   const insertKeyStmt = db.prepare(`INSERT INTO book_keys (key, book_id) VALUES (?, ?)`);
-  const insertFtsStmt = db.prepare(`INSERT INTO books_fts (book_id, title, author) VALUES (?, ?, ?)`);
   const fillIdentityStmt = db.prepare(`UPDATE books SET title = ?, author = ? WHERE id = ? AND title = ''`);
+  const makeSearchableStmt = db.prepare(`
+    INSERT INTO books_fts (book_id, title, author)
+    SELECT id, title, author FROM books WHERE id = ? AND title != '' AND NOT EXISTS (SELECT 1 FROM books_fts WHERE book_id = ?)
+  `);
   const imageStmt = db.prepare(`SELECT * FROM cover_images WHERE id = ?`);
   const insertImageStmt = db.prepare(`
     INSERT INTO cover_images (id, book_id, source, source_url, width, height, byte_size, created_at)
@@ -55,7 +58,6 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
           $created_at: createdAt
         });
         insertKeyStmt.run(key, id);
-        if (input.title) insertFtsStmt.run(id, input.title, input.author);
         db.exec("COMMIT");
       } catch (error) {
         db.exec("ROLLBACK");
@@ -65,7 +67,11 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     },
 
     fillIdentity(id, title, author) {
-      if (fillIdentityStmt.run(title, author, id).changes > 0) insertFtsStmt.run(id, title, author);
+      fillIdentityStmt.run(title, author, id);
+    },
+
+    makeSearchable(id) {
+      makeSearchableStmt.run(id, id);
     },
 
     getImage: (id) => imageStmt.get(id) as CoverImageRow | undefined,
