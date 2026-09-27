@@ -27,7 +27,7 @@ import {
 } from "./modules/auth/index.js";
 import { deleteArenaUserData, getArenaPublicApi, registerArenaModule } from "./modules/arena/index.js";
 import { deleteCommunityUserData, getCommunityPublicApi, registerCommunityModule } from "./modules/community/index.js";
-import { registerCoversModule } from "./modules/covers/index.js";
+import { registerBooksModule } from "./modules/books/index.js";
 import { deleteGalleryUserData, registerGalleryModule } from "./modules/gallery/index.js";
 import { deleteLibraryUserData, registerLibraryModule, resolvePublicLibrary, type BookEvent } from "./modules/library/index.js";
 import { deleteMuralsUserData, getMuralsPublicApi, registerMuralsModule } from "./modules/murals/index.js";
@@ -123,7 +123,7 @@ export function buildApp() {
     }
   });
   app.register(registerGalleryModule);
-  app.register(registerCoversModule);
+  app.register(registerBooksModule);
   app.register(registerSocialsModule);
   app.register(registerMuralsModule, {
     // Cross-module wiring, same shape as covers' peekCachedCoverUrl

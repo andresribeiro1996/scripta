@@ -36,7 +36,7 @@ import { calculateShelfTheme, publicReaderCard, readerIdentity, type Group, type
 // use this but not the authGuard'd, network-calling GET /covers/resolve
 // path. The module registration order in backend/src/app.ts (library
 // before covers) doesn't matter here — see that file's own note.
-import { peekCachedCoverUrl } from "../covers/index.js";
+import { peekCachedCoverUrl } from "../books/index.js";
 import { openLibraryDb } from "./adapters/sqlite/connection.js";
 
 export interface PublicBookData {
