@@ -3,12 +3,13 @@ import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { Image } from "expo-image";
 import { Animated, Dimensions, FlatList, Keyboard, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from "react-native";
-import { DEFAULT_TIER_PRESET } from "@scripta/shared";
+import { DEFAULT_TIER_PRESET, readerGlyphLabel } from "@scripta/shared";
 import { EmptyState, ErrorState, Icon, Input, Skeleton, dynamicType, minimumTouchTarget, radii, spacing, typography, useReducedMotion, useTheme, type IconName } from "../../ui";
 import type { ContentTone, DiscoverItem, PublishedContent } from "@scripta/shared/community";
 import { fetchDiscover } from "./api";
 import { DISCOVER_FILTERS, contentKindLabel, contentStats, contentStatus, contentTarget, type DiscoverFilter } from "./communityHome";
 import { openProfile } from "./AuthorAvatar";
+import { ReaderGlyph } from "./ReaderGlyph";
 
 const FILTER_ICONS: Record<DiscoverFilter, IconName> = { all: "filter", tierlist: "tierlist", tournament: "bracket" };
 
@@ -124,6 +125,7 @@ function DiscoverRow({ item }: { item: DiscoverItem }) {
   const { colors } = useTheme();
   const { content, author } = item;
   const status = contentStatus(content);
+  const glyphLabel = readerGlyphLabel(author.readerGlyph);
   return (
     <Pressable accessibilityRole="link" accessibilityLabel={`Open ${content.name}`} onPress={() => router.push(contentTarget(content) as never)}>
       {({ pressed }) => (
@@ -138,20 +140,24 @@ function DiscoverRow({ item }: { item: DiscoverItem }) {
                 {contentKindLabel(content)} ·{" "}
               </Text>
               {author.unavailable ? (
-                <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.shrink, { color: colors.textDim }]}>
-                  {author.username}
-                </Text>
+                <View style={[styles.nameRow, styles.shrink]}>
+                  <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.metaName, { color: colors.textDim }]}>
+                    {author.username}
+                  </Text>
+                  <ReaderGlyph identity={author.readerGlyph} />
+                </View>
               ) : (
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={`Open ${author.username}'s profile`}
+                  accessibilityLabel={glyphLabel ? `Open ${author.username}'s profile, ${glyphLabel}` : `Open ${author.username}'s profile`}
                   hitSlop={spacing.sm}
                   onPress={() => openProfile(author.username)}
-                  style={styles.shrink}
+                  style={[styles.nameRow, styles.shrink]}
                 >
-                  <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
+                  <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.metaName, { color: colors.textDim }]}>
                     {author.username}
                   </Text>
+                  <ReaderGlyph identity={author.readerGlyph} />
                 </Pressable>
               )}
             </View>
@@ -270,6 +276,8 @@ const styles = StyleSheet.create({
   cycle: { alignItems: "center", justifyContent: "center", width: minimumTouchTarget, height: minimumTouchTarget, borderWidth: 1, borderRadius: radii.full },
   row: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1 },
   metaRow: { flexDirection: "row", alignItems: "center" },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
+  metaName: { flexShrink: 1 },
   statusRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.xs },
   badge: { borderWidth: 1, borderRadius: radii.full, paddingHorizontal: spacing.sm },
   thumb: { width: THUMB_WIDTH, height: THUMB_HEIGHT },

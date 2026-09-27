@@ -5,6 +5,7 @@ import type { PersonResult } from "@scripta/shared/community";
 import { AuthorAvatar } from "../components/CommunityAuthorAvatar";
 import { EmptyState } from "../components/EmptyState";
 import { CommunityIcon } from "../components/NavIcons";
+import { ReaderGlyph } from "../components/ReaderGlyph";
 import { SkeletonCardGrid } from "../components/Skeleton";
 import { followUser, unfollowUser } from "../api/community";
 import { useCommunityPeople } from "../hooks/useCommunity";
@@ -58,10 +59,13 @@ function PeoplePane() {
         <div className="grid grid-cols-1 gap-3">
           {people.map((person) => (
             <div key={person.user.userId} className="flex items-center justify-between gap-3 rounded-xl border border-(--color-border) bg-(--color-surface) p-4">
-              <Link to={`/community/u/${person.user.username}`} className="flex items-center gap-2">
+              <Link to={`/community/u/${person.user.username}`} className="flex min-w-0 items-center gap-2">
                 <AuthorAvatar author={person.user} size={32} />
-                <span>
-                  <span className="block text-sm font-semibold">{person.user.username}</span>
+                <span className="min-w-0">
+                  <span className="flex items-center gap-1 text-sm font-semibold">
+                    <span className="truncate">{person.user.username}</span>
+                    <ReaderGlyph identity={person.user.readerGlyph} />
+                  </span>
                   <span className="block text-xs text-(--color-text-dim)">
                     {person.followerCount} {person.followerCount === 1 ? "follower" : "followers"}
                   </span>

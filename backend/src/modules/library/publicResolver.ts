@@ -27,7 +27,7 @@
 // plugin can be reworked without this file needing to change at all.
 
 import type { DatabaseSync } from "node:sqlite";
-import { calculateShelfTheme, publicReaderCard, readerIdentity, type Group, type PublicReaderCard, type ShelfTheme } from "@scripta/shared";
+import { calculateShelfTheme, publicReaderCard, readerIdentity, type Group, type IdentityKey, type PublicReaderCard, type ShelfTheme } from "@scripta/shared";
 // Cross-module dependency, same discipline as murals/routes.ts importing
 // this very file only from library/index.ts: peekCachedCoverUrl is
 // covers' own public surface for a synchronous, cache-only cover lookup —
@@ -289,22 +289,49 @@ function emptyResult(req: PublicDataRequest): ResolvedPublicData {
   return req.needsReaderCard ? { ...EMPTY_RESULT, readerCard: publicReaderCard(readerIdentity([], [])) } : EMPTY_RESULT;
 }
 
-export function resolvePublicLibraryData(userId: string, req: PublicDataRequest): ResolvedPublicData {
-  const row = getStatements().getDocumentStmt.get(userId) as { data: string } | undefined;
-  if (!row) return emptyResult(req);
+interface ParsedLibraryDocument {
+  allBooks: Record<string, unknown>[];
+  groupRecords: Record<string, unknown>[];
+}
 
+function parseLibraryDocument(userId: string): ParsedLibraryDocument | null {
+  const row = getStatements().getDocumentStmt.get(userId) as { data: string } | undefined;
+  if (!row) return null;
   let parsed: unknown;
   try {
     parsed = JSON.parse(row.data);
   } catch {
-    return emptyResult(req);
+    return null;
   }
-  if (!isRecord(parsed) || !Array.isArray(parsed.books)) return emptyResult(req);
+  if (!isRecord(parsed) || !Array.isArray(parsed.books)) return null;
+  return {
+    allBooks: parsed.books.filter(isRecord),
+    groupRecords: Array.isArray(parsed.groups) ? parsed.groups.filter(isRecord) : []
+  };
+}
+
+// Tolerant filtering, same convention as this file's byKey/collection
+// lookups: a malformed group (missing bookKeys, non-string name) is
+// dropped rather than crashing readerIdentity's own iteration over it.
+function toReaderGroups(groupRecords: Record<string, unknown>[]): Group[] {
+  return groupRecords.filter((group) => Array.isArray(group.bookKeys) && typeof group.name === "string") as unknown as Group[];
+}
+
+export function readerGlyphFor(userId: string): IdentityKey | null {
+  const parsedDoc = parseLibraryDocument(userId);
+  if (!parsedDoc) return null;
+  const identity = readerIdentity(parsedDoc.allBooks, toReaderGroups(parsedDoc.groupRecords));
+  return identity.state === "settled" ? identity.identity : null;
+}
+
+export function resolvePublicLibraryData(userId: string, req: PublicDataRequest): ResolvedPublicData {
+  const parsedDoc = parseLibraryDocument(userId);
+  if (!parsedDoc) return emptyResult(req);
 
   // The full, private book list — read in full so currentlyReading/stats
   // below can be computed correctly (see this file's own top comment),
   // but this array itself is never part of the returned ResolvedPublicData.
-  const allBooks = parsed.books.filter(isRecord);
+  const { allBooks, groupRecords } = parsedDoc;
 
   const byKey = new Map<string, Record<string, unknown>>();
   for (const book of allBooks) {
@@ -316,7 +343,6 @@ export function resolvePublicLibraryData(userId: string, req: PublicDataRequest)
   // silently skipped, same tolerant convention frontend/src/lib/murals.ts's
   // own resolveShelfBooks/resolveQuote already use.
   const collectionBooks: Record<string, string[]> = Object.create(null);
-  const groupRecords = Array.isArray(parsed.groups) ? parsed.groups.filter(isRecord) : [];
   for (const id of req.collectionIds ?? []) {
     const collection = groupRecords.find((group) => group.id === id && group.type === "collection");
     collectionBooks[id] = Array.isArray(collection?.bookKeys) ? collection.bookKeys.filter((key): key is string => typeof key === "string" && byKey.has(key)) : [];
@@ -365,12 +391,7 @@ export function resolvePublicLibraryData(userId: string, req: PublicDataRequest)
     }
   }
 
-  // Tolerant filtering, same convention as this file's byKey/collection
-  // lookups: a malformed group (missing bookKeys, non-string name) is
-  // dropped rather than crashing readerIdentity's own iteration over it.
-  const readerGroups = groupRecords.filter((group) => Array.isArray(group.bookKeys) && typeof group.name === "string") as unknown as Group[];
-
-  return { books, highlights, currentlyReading, stats, ...(req.needsShelfTheme ? { shelfTheme: calculateShelfTheme(allBooks) } : {}), ...(req.needsReaderCard ? { readerCard: publicReaderCard(readerIdentity(allBooks, readerGroups)) } : {}), ...(req.collectionIds ? { collectionBooks } : {}) };
+  return { books, highlights, currentlyReading, stats, ...(req.needsShelfTheme ? { shelfTheme: calculateShelfTheme(allBooks) } : {}), ...(req.needsReaderCard ? { readerCard: publicReaderCard(readerIdentity(allBooks, toReaderGroups(groupRecords))) } : {}), ...(req.collectionIds ? { collectionBooks } : {}) };
 }
 
 export function resolvePublicLibrary(userId: string): Record<string, unknown> | null {

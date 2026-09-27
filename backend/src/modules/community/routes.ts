@@ -20,7 +20,7 @@ const discoverQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20),
   offset: z.coerce.number().int().min(0).default(0)
 });
-const feedSettingsSchema = z.object({ publications: z.boolean(), reading: z.boolean(), votes: z.boolean(), follows: z.boolean() });
+const feedSettingsSchema = z.object({ publications: z.boolean(), reading: z.boolean(), votes: z.boolean(), follows: z.boolean(), readerGlyph: z.boolean().optional() });
 const activityQuerySchema = z.object({
   cursor: z.string().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(50).default(20)

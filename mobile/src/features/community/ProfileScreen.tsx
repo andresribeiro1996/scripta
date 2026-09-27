@@ -1,8 +1,8 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Stack, router } from "expo-router";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
-import { ensureBookBlockHeights, profileOnlyMural, type Mural } from "@scripta/shared";
+import { FlatList, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { ensureBookBlockHeights, profileOnlyMural, readerGlyphLabel, type IdentityKey, type Mural } from "@scripta/shared";
 import { Button, Dialog, EmptyState, ErrorState, Icon, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { MuralCanvas } from "../murals";
 import { useMurals } from "../murals/useMurals";
@@ -12,6 +12,7 @@ import type { GalleryImage } from "../gallery/api";
 import { ActivityList } from "./ActivityList";
 import { fetchProfile, fetchProfileLibrary, followUser, unfollowUser, type CommunityProfileView } from "./api";
 import { contentDetail, contentKindLabel, contentTarget } from "./communityHome";
+import { ReaderGlyph } from "./ReaderGlyph";
 
 export function ProfileScreen({ username }: { username: string }) {
   const { colors } = useTheme();
@@ -90,7 +91,14 @@ export function ProfileScreen({ username }: { username: string }) {
 
   return (
     <Screen bottom top={false}>
-      <Stack.Screen options={{ headerShown: true, title: profileUser.username }} />
+      <Stack.Screen
+        options={{
+          headerShown: true,
+          title: profileUser.username,
+          headerLargeTitleEnabled: false,
+          headerTitle: () => <ProfileHeaderTitle username={profileUser.username} identity={profileUser.readerGlyph} />,
+        }}
+      />
       {error ? <Toast visible message={error} tone="error" /> : null}
       <SwipeableTabs
         accessibilityLabel="Profile sections"
@@ -189,6 +197,25 @@ function publishedRows(view: CommunityProfileView): PublishedRow[] {
   return rows;
 }
 
+function ProfileHeaderTitle({ username, identity }: { username: string; identity?: IdentityKey }) {
+  const { colors } = useTheme();
+  const { width } = useWindowDimensions();
+  const label = readerGlyphLabel(identity);
+  return (
+    <View
+      accessible
+      accessibilityRole="header"
+      accessibilityLabel={label ? `${username}, ${label}` : username}
+      style={[styles.headerTitleRow, { maxWidth: width * 0.6 }]}
+    >
+      <Text numberOfLines={1} {...dynamicType} style={[typography.title, styles.strong, styles.metaName, { color: colors.text }]}>
+        {username}
+      </Text>
+      <ReaderGlyph identity={identity} />
+    </View>
+  );
+}
+
 function Centered({ children }: { children: ReactNode }) {
   const { colors } = useTheme();
   return <View style={[styles.centered, { backgroundColor: colors.background }]}>{children}</View>;
@@ -260,6 +287,8 @@ const styles = StyleSheet.create({
   grow: { flex: 1 },
   strong: { fontWeight: "700" },
   centered: { flex: 1, justifyContent: "center", padding: spacing.lg, gap: spacing.md },
+  headerTitleRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
+  metaName: { flexShrink: 1 },
   page: { flex: 1, padding: spacing.lg },
   list: { padding: spacing.lg, gap: spacing.sm, paddingBottom: spacing.huge },
   eyebrow: { textTransform: "uppercase", letterSpacing: 0.8, fontWeight: "600" },
