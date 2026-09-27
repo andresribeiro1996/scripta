@@ -57,30 +57,44 @@ export function QuizCreateScreen() {
 
   // Same resolve-as-you-go pass the web create page does: ordinary library
   // books carry no _coverUrl, so cover-question availability is only honest
-  // once each book's cached cover resolved.
+  // once each book's cached cover resolved. A failed request is skipped,
+  // not fatal — the pass keeps going and a retry re-runs only the gaps.
   const resolvedRef = useRef<Record<string, string | null>>({});
   const [resolvedCovers, setResolvedCovers] = useState<Record<string, string | null>>({});
+  const [resolveFailed, setResolveFailed] = useState(false);
+  const [resolveAttempt, setResolveAttempt] = useState(0);
   useEffect(() => {
     if (source === "pool") return;
     let cancelled = false;
     void (async () => {
+      let failed = false;
       for (const raw of shelfRawBooks) {
         const key = bookKey(raw);
         if (resolvedRef.current[key] !== undefined) continue;
         if (typeof raw._coverUrl === "string" && raw._coverUrl) { resolvedRef.current[key] = raw._coverUrl; continue; }
-        const url = await resolveCover({
-          isbn: normalizeIsbn(raw.ISBN) || undefined,
-          imageId: normalizeImageId(raw.ImageId) || undefined,
-          title: String(raw.Title ?? "").trim() || undefined,
-          author: raw.Attribution ? String(raw.Attribution) : undefined,
-        });
+        let url: string | null;
+        try {
+          url = await resolveCover({
+            isbn: normalizeIsbn(raw.ISBN) || undefined,
+            imageId: normalizeImageId(raw.ImageId) || undefined,
+            title: String(raw.Title ?? "").trim() || undefined,
+            author: raw.Attribution ? String(raw.Attribution) : undefined,
+          });
+        } catch {
+          // Leave the book unresolved so a retry re-attempts it, and let
+          // the pass finish for the rest of the shelf.
+          failed = true;
+          if (cancelled) return;
+          continue;
+        }
         if (cancelled) return;
         resolvedRef.current[key] = url ?? null;
         setResolvedCovers({ ...resolvedRef.current });
       }
+      if (!cancelled) setResolveFailed(failed);
     })();
     return () => { cancelled = true; };
-  }, [shelfRawBooks, source]);
+  }, [shelfRawBooks, source, resolveAttempt]);
 
   const books: QuizBook[] = source === "pool"
     ? QUIZ_POOL.filter((book) => poolKeys.includes(book.key))
@@ -144,6 +158,10 @@ export function QuizCreateScreen() {
       {source === "shelf" ? <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>
         {library.isPending ? "Loading books…" : library.isError ? "Your library couldn't be loaded." : `${libraryBooks.length} books on your shelf.`}
       </Text> : null}
+      {resolveFailed && source !== "pool" ? <View style={styles.resolveRetry}>
+        <Text {...dynamicType} style={[typography.caption, styles.grow, { color: colors.textDim }]}>Some covers couldn't be checked, so cover questions may be unavailable.</Text>
+        <Button label="Retry" variant="secondary" onPress={() => { setResolveFailed(false); setResolveAttempt((value) => value + 1); }} />
+      </View> : null}
       <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{books.length} {books.length === 1 ? "book" : "books"} selected</Text>
     </> : <ScrollView contentContainerStyle={styles.stepScroll} keyboardShouldPersistTaps="handled">
       <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>Questions</Text>
@@ -181,6 +199,7 @@ const styles = StyleSheet.create({
   lengths: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   length: { minWidth: 56, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderWidth: 1, borderRadius: radii.md, alignItems: "center" },
   stepScroll: { gap: spacing.md, paddingBottom: spacing.lg },
+  resolveRetry: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   actions: { flexDirection: "row", justifyContent: "flex-end", gap: spacing.sm },
   strong: { fontWeight: "700" },
 });

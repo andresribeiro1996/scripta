@@ -1,11 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Stack } from "expo-router";
-import * as Linking from "expo-linking";
 import { Image } from "expo-image";
 import { QUIZ_QUESTION_TYPES, eligibleTypes, type QuizData, type QuizQuestionType } from "@scripta/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Pressable, Share, StyleSheet, Text, View } from "react-native";
-import { Button, Dialog, ErrorState, IconButton, Input, Menu, type MenuItem, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { Pressable, ScrollView, Share, StyleSheet, Text, View } from "react-native";
+import { API_URL } from "../../core/config";
+import { Button, Dialog, ErrorState, FormScroll, IconButton, Input, Menu, type MenuItem, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { coverUrlForApi } from "../library/lib/coverUrl";
 import { fetchQuizResults, publishQuiz, setPlayState, updateQuiz, type Quiz } from "./api";
 
 type EditorView = "setup" | "results";
@@ -19,13 +20,24 @@ const TYPE_LABELS: Record<QuizQuestionType, string> = {
   blurb_title: "Blurb → title",
 };
 
+// The public web origin — the same host the universal links claim.
+// Linking.createURL would strand recipients without the app on a
+// scripta:/// or exp:// URL; the HTTPS link plays in any browser and
+// opens the installed app for those who have it.
+const WEB_ORIGIN = "https://atmyshelf.com";
+
+const uriFor = (url: string): string => coverUrlForApi(url, API_URL);
+
 export function QuizEditorScreen({ quiz, onUpdated }: { quiz: Quiz; onUpdated: (quiz: Quiz) => void }) {
   const { colors } = useTheme();
   const queryClient = useQueryClient();
   const [current, setCurrent] = useState(quiz);
   const [data, setData] = useState<QuizData>(quiz.data);
+  const dataRef = useRef(data);
+  dataRef.current = data;
   const [view, setView] = useState<EditorView>("setup");
   const [busy, setBusy] = useState(false);
+  const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmingPublish, setConfirmingPublish] = useState(false);
   const results = useQuery({ queryKey: ["quizzes", "results", current.id], queryFn: () => fetchQuizResults(current.id), enabled: current.voteCode !== null, retry: false });
@@ -36,12 +48,15 @@ export function QuizEditorScreen({ quiz, onUpdated }: { quiz: Quiz; onUpdated: (
   useEffect(() => { setCurrent(quiz); setData(quiz.data); }, [quiz.id, quiz.updatedAt]);
 
   async function run(action: () => Promise<Quiz>) {
+    // The draft at send time. If the user kept typing while the request
+    // was in flight, the server response must not throw those edits away.
+    const submitted = dataRef.current;
     setBusy(true);
     setError(null);
     try {
       const updated = await action();
       setCurrent(updated);
-      setData(updated.data);
+      if (dataRef.current === submitted) setData(updated.data);
       onUpdated(updated);
       await queryClient.invalidateQueries({ queryKey: ["quizzes"] });
       return true;
@@ -54,10 +69,12 @@ export function QuizEditorScreen({ quiz, onUpdated }: { quiz: Quiz; onUpdated: (
   }
 
   async function publish() {
-    setBusy(true);
+    // Publishing freezes the document, so in-flight typing would be
+    // stranded: the form is locked for the duration instead.
+    setPublishing(true);
     setError(null);
     try {
-      if (JSON.stringify(data) !== JSON.stringify(current.data)) await updateQuiz(current.id, { data });
+      if (JSON.stringify(dataRef.current) !== JSON.stringify(current.data)) await updateQuiz(current.id, { data: dataRef.current });
       const { quiz: published } = await publishQuiz(current.id);
       setCurrent(published);
       setData(published.data);
@@ -67,20 +84,21 @@ export function QuizEditorScreen({ quiz, onUpdated }: { quiz: Quiz; onUpdated: (
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Couldn't publish.");
     } finally {
-      setBusy(false);
+      setPublishing(false);
     }
   }
 
   const frozen = current.voteCode !== null;
   const dirty = !frozen && JSON.stringify(data) !== JSON.stringify(current.data);
+  const lockEdits = publishing;
   const actionItems: MenuItem[] = frozen
     ? [
-      { label: "Share challenge link", onPress: () => void Share.share({ message: Linking.createURL(`/play/${current.voteCode}`) }) },
+      { label: "Share challenge link", onPress: () => void Share.share({ message: `${WEB_ORIGIN}/play/${current.voteCode}` }) },
       { label: current.playOpen ? "Close for play" : "Open for play", onPress: () => void run(() => setPlayState(current.id, !current.playOpen)) },
     ]
     : [{ label: "Publish…", onPress: () => setConfirmingPublish(true) }];
 
-  return <Screen top={false} style={styles.screen}>
+  return <Screen top={false}>
     <Stack.Screen options={{
       headerShown: true,
       title: current.name,
@@ -89,13 +107,13 @@ export function QuizEditorScreen({ quiz, onUpdated }: { quiz: Quiz; onUpdated: (
       </View>,
     }} />
     {error ? <Toast visible message={error} tone="error" /> : null}
-    {!frozen ? <>
-      <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{data.books.length} books · {busy ? "Saving…" : dirty ? "Unsaved changes" : "Saved"}</Text>
-      <Button label="Save changes" disabled={!dirty} loading={busy} onPress={() => void run(() => updateQuiz(current.id, { data }))} />
+    {!frozen ? <FormScroll contentContainerStyle={styles.screen}>
+      <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{data.books.length} books · {publishing ? "Publishing…" : busy ? "Saving…" : dirty ? "Unsaved changes" : "Saved"}</Text>
+      <Button label="Save changes" disabled={!dirty || publishing} loading={busy} onPress={() => void run(() => updateQuiz(current.id, { data: dataRef.current }))} />
       <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>Questions</Text>
       <View style={styles.lengths}>
         {[4, 5, 10, 15, 20].filter((count) => count <= data.books.length).map((count) => (
-          <Pressable key={count} accessibilityRole="radio" accessibilityState={{ selected: data.questionCount === count }} onPress={() => setData((value) => ({ ...value, questionCount: count }))} style={[styles.length, { borderColor: data.questionCount === count ? colors.accent : colors.border, backgroundColor: data.questionCount === count ? colors.accentSoft : colors.surface }]}>
+          <Pressable key={count} accessibilityRole="radio" accessibilityState={{ selected: data.questionCount === count, disabled: lockEdits }} disabled={lockEdits} onPress={() => setData((value) => ({ ...value, questionCount: count }))} style={[styles.length, { borderColor: data.questionCount === count ? colors.accent : colors.border, backgroundColor: data.questionCount === count ? colors.accentSoft : colors.surface }]}>
             <Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{count}</Text>
           </Pressable>
         ))}
@@ -103,19 +121,19 @@ export function QuizEditorScreen({ quiz, onUpdated }: { quiz: Quiz; onUpdated: (
       {QUIZ_QUESTION_TYPES.map((type) => {
         const offered = data.books.some((book) => eligibleTypes(book).includes(type));
         const checked = offered && data.allowedTypes.includes(type);
-        return <Pressable key={type} accessibilityRole="checkbox" accessibilityState={{ checked, disabled: !offered }} disabled={!offered} onPress={() => setData((value) => ({ ...value, allowedTypes: checked ? value.allowedTypes.filter((entry) => entry !== type) : [...value.allowedTypes, type] }))} style={[styles.row, offered ? null : styles.offered, { borderColor: colors.border }]}>
+        return <Pressable key={type} accessibilityRole="checkbox" accessibilityState={{ checked, disabled: !offered || lockEdits }} disabled={!offered || lockEdits} onPress={() => setData((value) => ({ ...value, allowedTypes: checked ? value.allowedTypes.filter((entry) => entry !== type) : [...value.allowedTypes, type] }))} style={[styles.row, offered ? null : styles.offered, { borderColor: colors.border }]}>
           <Text {...dynamicType} style={[typography.body, styles.grow, { color: colors.text }]}>{TYPE_LABELS[type]}</Text>
           {!offered ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>no book has this data</Text> : <Text {...dynamicType} style={[typography.body, { color: colors.accent }]}>{checked ? "✓" : ""}</Text>}
         </Pressable>;
       })}
       {data.books.map((book) => <View key={book.key} style={[styles.book, { borderColor: colors.border, backgroundColor: colors.surface }]}>
         <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{book.title}</Text>
-        <Input label="Quote (optional)" value={book.quote ?? ""} onChangeText={(quote) => setData((value) => ({ ...value, books: value.books.map((entry) => entry.key === book.key ? { ...entry, quote } : entry) }))} placeholder="Paste a line from this book…" multiline />
-        <Input label="Blurb (optional)" value={book.blurb ?? ""} onChangeText={(blurb) => setData((value) => ({ ...value, books: value.books.map((entry) => entry.key === book.key ? { ...entry, blurb } : entry) }))} multiline />
+        <Input label="Quote (optional)" value={book.quote ?? ""} editable={!lockEdits} onChangeText={(quote) => setData((value) => ({ ...value, books: value.books.map((entry) => entry.key === book.key ? { ...entry, quote } : entry) }))} placeholder="Paste a line from this book…" multiline />
+        <Input label="Blurb (optional)" value={book.blurb ?? ""} editable={!lockEdits} onChangeText={(blurb) => setData((value) => ({ ...value, books: value.books.map((entry) => entry.key === book.key ? { ...entry, blurb } : entry) }))} multiline />
       </View>)}
-      <Button label="Publish quiz" loading={busy} disabled={data.books.length < 4} onPress={() => setConfirmingPublish(true)} />
+      <Button label="Publish quiz" loading={publishing} disabled={data.books.length < 4 || busy} onPress={() => setConfirmingPublish(true)} />
       {data.books.length < 4 ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>A quiz needs at least 4 books.</Text> : null}
-    </> : frozen ? results.isPending ? <Skeleton height={180} /> : <SwipeableTabs accessibilityLabel="Quiz editor view" options={PUBLISHED_VIEWS} value={view} onChange={setView} renderPage={(page) => page === "results" ? results.isError ? <ErrorState body="Couldn't load results." actionLabel="Retry" onAction={() => void results.refetch()} /> : <View style={styles.section}>
+    </FormScroll> : frozen ? results.isPending ? <Skeleton height={180} /> : <SwipeableTabs accessibilityLabel="Quiz editor view" options={PUBLISHED_VIEWS} value={view} onChange={setView} renderPage={(page) => page === "results" ? results.isError ? <ErrorState body="Couldn't load results." actionLabel="Retry" onAction={() => void results.refetch()} /> : <ScrollView contentContainerStyle={styles.screen}>
       {(results.data?.plays ?? []).map((play, i) => <View key={`${play.playerName ?? "Guest"}-${i}`} style={[styles.leaderRow, { borderColor: colors.border }]}>
         <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{i + 1}</Text>
         <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, styles.grow, { color: colors.text }]}>{play.playerName ?? "Guest"}</Text>
@@ -129,25 +147,25 @@ export function QuizEditorScreen({ quiz, onUpdated }: { quiz: Quiz; onUpdated: (
           <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{pick.count}</Text>
         </View>)}
       </View>)}
-    </View> : <View style={styles.section}>
+    </ScrollView> : <ScrollView contentContainerStyle={styles.screen}>
       {(current.data.questions ?? []).map((question, index) => <View key={question.id} style={[styles.row, { borderColor: colors.border }]}>
         <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{index + 1}. {TYPE_LABELS[question.type]}</Text>
         {question.type === "title_cover"
-          ? <Image source={{ uri: String(question.options[question.answerIndex]) }} contentFit="contain" style={styles.answerThumb} alt="Answer cover" />
+          ? <Image source={{ uri: uriFor(String(question.options[question.answerIndex])) }} contentFit="contain" style={styles.answerThumb} alt="Answer cover" />
           : <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, styles.grow, { color: colors.text }]}>{String(question.options[question.answerIndex])}</Text>}
       </View>)}
-    </View>} /> : null}
+    </ScrollView>} /> : null}
     <Dialog visible={confirmingPublish} title="Publish quiz" onClose={() => setConfirmingPublish(false)}>
       <View style={styles.dialog}>
         <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>Publishing mints the challenge link and locks the books, quotes, and questions. This can't be undone.</Text>
-        <Button label="Publish" loading={busy} onPress={() => void publish()} />
+        <Button label="Publish" loading={publishing} onPress={() => void publish()} />
       </View>
     </Dialog>
   </Screen>;
 }
 
 const styles = StyleSheet.create({
-  screen: { padding: spacing.lg, gap: spacing.md },
+  screen: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xl },
   headerActions: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   lengths: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   length: { minWidth: 56, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderWidth: 1, borderRadius: radii.md, alignItems: "center" },
