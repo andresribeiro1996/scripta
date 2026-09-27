@@ -211,7 +211,14 @@ Rate-limited (30 requests/minute, scoped to this module's routes only) and given
 ### `waitlist`
 
 - **Exactly one thing**: an email address and when it was submitted, for the landing page's "Notify me when Atmyshelf launches" form. No accounts, no relation to any other module.
-- **No enumeration and no read/export route** — `POST /waitlist` always answers `204` for any address that passes validation, whether it's brand new or already on the list (insert-or-ignore on the unique `email` column), so the response never reveals whether an address was already signed up. There's no `GET`/list endpoint either; the owner reads `WAITLIST_DB_PATH`'s SQLite file directly, and no email is ever sent from this module.
+- **No enumeration and no read route over HTTP** — `POST /waitlist` always answers `204` for any address that passes validation, whether it's brand new or already on the list (insert-or-ignore on the unique `email` column), so the response never reveals whether an address was already signed up. There's no `GET`/list endpoint either, and no email is ever sent from this module.
+- **Exporting is a command, not a route** — the list is only readable from a shell on the machine that holds the database, so nothing new is reachable from the internet. On Railway, from a shell in the backend service (`railway ssh`):
+
+  ```bash
+  npm run -s waitlist:export --workspace backend > waitlist.csv
+  ```
+
+  It runs the built backend (`dist/`), resolves `WAITLIST_DB_PATH` exactly as the server does, prints `email,created_at` CSV oldest first to stdout, and reports the count and the database path it read on stderr. Keep `-s`: without it npm prints its own banner into the CSV.
 - **Stored beside the accounts database** — `WAITLIST_DB_PATH` defaults to `waitlist.sqlite` in the same directory as `AUTH_DB_PATH`, not to `./data`. Accounts already have to live on the deployment's persistent disk, so the launch list inherits that location without a separate volume or env var and survives redeploys. Set `WAITLIST_DB_PATH` to put it somewhere else.
 - **Open route, its own rate limit** — no `authGuard` (anyone visiting the landing page can join), so it gets a tight per-IP limit (5 requests/minute, this module's own `@fastify/rate-limit` scope) against script abuse, the same shape every other unauthenticated write route in this app uses (e.g. `arena`'s vote route).
 
