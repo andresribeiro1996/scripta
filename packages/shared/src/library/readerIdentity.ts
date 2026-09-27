@@ -1,5 +1,5 @@
 import { READER_PLATES, type CardState, type IdentityKey } from "../readerCards/index.js";
-import { genresForBook, type BookGenre } from "./bookGenres.js";
+import { genresForBook, isFinishedBook, type BookGenre } from "./bookGenres.js";
 import type { Group } from "./groups.js";
 import { bookKey } from "./merge.js";
 
@@ -55,7 +55,7 @@ function markCount(book: Book) {
 
 export function readerIdentity(books: Book[], groups: Group[]): ReaderIdentity {
   const seenKeys = new Set<string>();
-  const finished = books.filter((book) => book.ReadStatus === 2).filter((book) => {
+  const finished = books.filter(isFinishedBook).filter((book) => {
     const key = bookKey(book);
     if (seenKeys.has(key)) return false;
     seenKeys.add(key);

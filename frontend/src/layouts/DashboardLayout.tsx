@@ -15,6 +15,8 @@ import {
 } from "../components/NavIcons";
 import { OfflineBanner } from "../components/OfflineBanner";
 import { useDismissible } from "../hooks/useDismissible";
+import { useGenreEnrichment } from "../hooks/useGenreEnrichment";
+import { useLibrary } from "../hooks/useLibrary";
 import { useScrollLock } from "../hooks/useScrollLock";
 
 interface NavItem {
@@ -64,6 +66,8 @@ const TAB_ITEMS = NAV_GROUPS[0].items;
  *  this existed (see git history on DashboardPage.tsx). */
 export function DashboardLayout() {
   const { session, logout } = useAuth();
+  const { data: library, updateLibrary } = useLibrary();
+  useGenreEnrichment(library?.data.books ?? [], updateLibrary);
   const [drawerOpen, setDrawerOpen] = useState(false);
   // Set by the mural editor while it's in edit mode: the canvas is the
   // whole activity then, and the fixed bottom nav both covers it and
