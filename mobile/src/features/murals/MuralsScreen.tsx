@@ -74,8 +74,8 @@ export function MuralsScreen() {
       pendingPreset.current = null;
       setPresets(false);
       router.push(`/murals/${updated.id}` as never);
-    } catch {
-      setPresetError("Couldn't create the mural. Try again.");
+    } catch (reason) {
+      setPresetError(reason instanceof Error ? reason.message : "Couldn't create the mural. Try again.");
     } finally {
       working.current = false;
     }
