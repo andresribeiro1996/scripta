@@ -312,3 +312,10 @@ frontend and mobile test suites.
 - Extracting covers of sideloaded Kobo books from the device.
 - Merging editions or refreshing stored details.
 - Admin actions on mobile.
+- **R2 + Cloudflare CDN — a follow-up spec.** Cover files move to an R2
+  bucket served on a subdomain of the app's domain (already on Cloudflare),
+  so Cloudflare's cache delivers them and egress is free. It needs a new
+  `CoverBlobStore` adapter (S3-compatible client, R2 keys in env), a
+  one-time copy of existing files, and `/covers/cached/:id/{file,thumb}`
+  redirecting to the new URLs. Local development keeps the filesystem
+  adapter. Not needed at today's ~45 MB.
