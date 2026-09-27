@@ -9,6 +9,7 @@ import type { ContentTone, DiscoverItem, PublishedContent } from "@scripta/share
 import { fetchDiscover } from "./api";
 import { DISCOVER_FILTERS, contentKindLabel, contentStats, contentStatus, contentTarget, type DiscoverFilter } from "./communityHome";
 import { openProfile } from "./AuthorAvatar";
+import { ReaderGlyph } from "./ReaderGlyph";
 
 const FILTER_ICONS: Record<DiscoverFilter, IconName> = { all: "filter", tierlist: "tierlist", tournament: "bracket" };
 
@@ -138,20 +139,24 @@ function DiscoverRow({ item }: { item: DiscoverItem }) {
                 {contentKindLabel(content)} ·{" "}
               </Text>
               {author.unavailable ? (
-                <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.shrink, { color: colors.textDim }]}>
-                  {author.username}
-                </Text>
+                <View style={[styles.nameRow, styles.shrink]}>
+                  <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.metaName, { color: colors.textDim }]}>
+                    {author.username}
+                  </Text>
+                  <ReaderGlyph identity={author.readerGlyph} />
+                </View>
               ) : (
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={`Open ${author.username}'s profile`}
                   hitSlop={spacing.sm}
                   onPress={() => openProfile(author.username)}
-                  style={styles.shrink}
+                  style={[styles.nameRow, styles.shrink]}
                 >
-                  <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
+                  <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.metaName, { color: colors.textDim }]}>
                     {author.username}
                   </Text>
+                  <ReaderGlyph identity={author.readerGlyph} />
                 </Pressable>
               )}
             </View>
@@ -270,6 +275,8 @@ const styles = StyleSheet.create({
   cycle: { alignItems: "center", justifyContent: "center", width: minimumTouchTarget, height: minimumTouchTarget, borderWidth: 1, borderRadius: radii.full },
   row: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1 },
   metaRow: { flexDirection: "row", alignItems: "center" },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
+  metaName: { flexShrink: 1 },
   statusRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.xs },
   badge: { borderWidth: 1, borderRadius: radii.full, paddingHorizontal: spacing.sm },
   thumb: { width: THUMB_WIDTH, height: THUMB_HEIGHT },

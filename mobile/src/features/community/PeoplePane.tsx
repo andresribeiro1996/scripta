@@ -5,6 +5,7 @@ import { Button, EmptyState, Input, Toast, dynamicType, radii, spacing, typograp
 import type { PersonResult } from "@scripta/shared/community";
 import { followUser, searchPeople, unfollowUser } from "./api";
 import { AuthorAvatar, openProfile } from "./AuthorAvatar";
+import { ReaderGlyph } from "./ReaderGlyph";
 
 export function PeoplePane() {
   const { colors } = useTheme();
@@ -76,9 +77,12 @@ export function PeoplePane() {
               >
                 <AuthorAvatar username={item.user.username} avatarUrl={item.user.avatarUrl} />
                 <View style={styles.grow}>
-                  <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>
-                    {item.user.username}
-                  </Text>
+                  <View style={styles.nameRow}>
+                    <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, styles.metaName, { color: colors.text }]}>
+                      {item.user.username}
+                    </Text>
+                    <ReaderGlyph identity={item.user.readerGlyph} />
+                  </View>
                   <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
                     {item.followerCount} {item.followerCount === 1 ? "follower" : "followers"}
                   </Text>
@@ -105,4 +109,6 @@ const styles = StyleSheet.create({
   list: { padding: spacing.lg, gap: spacing.sm, paddingBottom: spacing.huge, flexGrow: 1 },
   card: { borderWidth: 1, borderRadius: radii.lg, padding: spacing.md, gap: spacing.sm },
   actorRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
+  metaName: { flexShrink: 1 },
 });

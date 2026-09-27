@@ -6,6 +6,7 @@ import { ApiError } from "../../core/api";
 import { Icon, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { AuthorAvatar } from "../community/AuthorAvatar";
 import { CoverFan, SLOT_HEIGHT, SLOT_WIDTH } from "../community/CoverFan";
+import { ReaderGlyph } from "../community/ReaderGlyph";
 import { fetchDashboard, followUser } from "../community/api";
 import { feedRowModel, relativeTime } from "./feedRowModel";
 
@@ -53,6 +54,7 @@ export function FeedRow({ item, onOpen, onFollowBack, following }: { item: Diges
   const { colors } = useTheme();
   const row = feedRowModel(item);
   const labelColor = row.tone === "accent" ? colors.accent : row.tone === "success" ? colors.success : colors.textDim;
+  const metaDetail = row.meta.startsWith(item.actor.username) ? row.meta.slice(item.actor.username.length).replace(/^ · /, "") : row.meta;
 
   return (
     <Pressable accessibilityRole="link" accessibilityLabel={digestHeading(item)} onPress={onOpen}>
@@ -87,9 +89,17 @@ export function FeedRow({ item, onOpen, onFollowBack, following }: { item: Diges
                 {row.title}
               </Text>
             ) : null}
-            <Text numberOfLines={2} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
-              {row.meta}
-            </Text>
+            <View style={styles.nameRow}>
+              <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.metaName, { color: colors.textDim }]}>
+                {item.actor.username}
+              </Text>
+              <ReaderGlyph identity={item.actor.readerGlyph} />
+            </View>
+            {metaDetail ? (
+              <Text numberOfLines={2} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
+                {metaDetail}
+              </Text>
+            ) : null}
             {row.action === "followBack" ? (
               <Pressable
                 accessibilityRole="button"
@@ -127,6 +137,8 @@ const styles = StyleSheet.create({
   // Centred, not baseline-aligned: a native symbol view has no text
   // baseline, and aligning to one collapses it to nothing.
   labelRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
+  metaName: { flexShrink: 1 },
   timestamp: { flexShrink: 0, marginLeft: "auto" },
   // Padded to clear the 44px floor: the label alone is a 16px-tall target.
   rowAction: { minHeight: minimumTouchTarget - spacing.lg, justifyContent: "center", paddingVertical: spacing.xs },
