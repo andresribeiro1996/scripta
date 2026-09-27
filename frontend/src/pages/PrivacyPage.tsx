@@ -69,6 +69,10 @@ export function PrivacyPage() {
                 platform, stored encrypted and used only for what you ask Atmyshelf to do there.
               </li>
               <li>
+                <b>Launch list, if you join it:</b> the email address you enter to hear when Atmyshelf launches; we use
+                it only to tell you about the launch, and delete it if you ask.
+              </li>
+              <li>
                 <b>Server logs:</b> like most websites, our servers record technical details of each request, including
                 your IP address. We use them only to run and protect the service.
               </li>
@@ -134,7 +138,8 @@ export function PrivacyPage() {
               We keep your data while your account exists. When you delete your account, in Settings, we delete it along
               with your library, images and everything else linked to it straight away. Votes you cast on other people's
               tier lists and tournaments stay counted but are no longer linked to you. Server logs are kept for a limited
-              period by our hosting provider.
+              period by our hosting provider. The launch list has no account attached, so we keep an address on it until
+              you ask us to remove it.
             </p>
           </Section>
 
