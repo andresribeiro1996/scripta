@@ -17,6 +17,7 @@ const { createSqliteMuralsRepository } = await import("./adapters/sqlite/sqliteM
 const { createMuralsService } = await import("./service.js");
 const { buildMuralRoutes, buildPublicMuralRoutes } = await import("./routes.js");
 const { openLibraryDb } = await import("../library/adapters/sqlite/connection.js");
+const { openAuthDb } = await import("../auth/adapters/sqlite/connection.js");
 const { getAuthenticatedUserFromAccessToken } = await import("../auth/tokens.js");
 const { bookKey } = await import("@scripta/shared");
 const authorization = (sub: string) => ({ authorization: `Bearer ${jwt.sign({ sub, email: `${sub}@example.test`, username: sub }, process.env.JWT_ACCESS_SECRET!, { expiresIn: "5m" })}` });
@@ -79,12 +80,16 @@ test("public mural payload carries the reader card without leaking titles or ser
   db.exec(readFileSync(new URL("./adapters/sqlite/schema.sql", import.meta.url), "utf8"));
   const service = createMuralsService(createSqliteMuralsRepository(db), (token) => `https://example.test/shared/${token}`);
   const app = Fastify();
-  app.decorate("authenticateAccessToken", (token: string) => getAuthenticatedUserFromAccessToken(token, (id) => id === "cardOwner" ? {
+  app.decorate("authenticateAccessToken", (token: string) => getAuthenticatedUserFromAccessToken(token, (id) => ["cardOwner", "annoOwner", "noLibraryOwner"].includes(id) ? {
     id, email: `${id}@example.test`, username: id, avatar_id: null, google_id: null, password_hash: null, created_at: ""
   } : undefined));
   await app.register(buildMuralRoutes(service));
   await app.register(buildPublicMuralRoutes(service));
   const library = openLibraryDb();
+  const auth = openAuthDb();
+  const insertUser = auth.prepare(`INSERT INTO users (id, email, username, auth_version, created_at) VALUES (?, ?, ?, 0, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`);
+  insertUser.run("cardOwner", "cardOwner@example.test", "cardOwner");
+  insertUser.run("annoOwner", "annoOwner@example.test", "annoOwner");
   try {
     const create = () => app.inject({ method: "POST", url: "/murals", headers: authorization("cardOwner"), payload: { name: "My reading space" } });
     const [withCard, withoutCard] = await Promise.all([create(), create()]);
@@ -97,7 +102,10 @@ test("public mural payload carries the reader card without leaking titles or ser
     const books = [...seriesBooks, ...otherBooks];
     library.prepare("INSERT INTO library_documents (user_id, data) VALUES (?, ?)").run("cardOwner", JSON.stringify({
       books,
-      groups: [{ id: "series-id", type: "series", name: "Secret Series", bookKeys: seriesBooks.map(bookKey) }]
+      groups: [
+        { id: "series-id", type: "series", name: "Secret Series", bookKeys: seriesBooks.map(bookKey) },
+        { id: "malformed-group", type: "series", name: 123, bookKeys: "not-an-array" }
+      ]
     }));
     const cardHome = withCard.json();
     const noCardHome = withoutCard.json();
@@ -106,6 +114,7 @@ test("public mural payload carries the reader card without leaking titles or ser
     const sharedWithoutCard = service.share("cardOwner", noCardHome.id)!;
     const withCardResponse = await app.inject({ method: "GET", url: `/murals/shared/${sharedWithCard.shareToken}` });
     const withoutCardResponse = await app.inject({ method: "GET", url: `/murals/shared/${sharedWithoutCard.shareToken}` });
+    assert.equal(withCardResponse.statusCode, 200, "a malformed group must not 500 the public payload");
     const withCardBody = withCardResponse.json();
     assert.deepEqual(withCardBody.readerCard, {
       state: "settled",
@@ -114,13 +123,35 @@ test("public mural payload carries the reader card without leaking titles or ser
       signal: { counted: 3, of: 10, label: "3 of 10 finished books are in a series" },
       coverage: ["genres known for 0 of 10 finished books"]
     });
-    const readerCardJson = JSON.stringify(withCardBody.readerCard);
-    assert.equal(readerCardJson.includes("Secret Series"), false);
-    assert.equal(readerCardJson.includes("Klara"), false);
+    assert.equal(withCardBody.profile?.username, "cardOwner");
+    for (const secretValue of ["Secret Series", "Klara"]) assert.equal(withCardResponse.body.includes(secretValue), false);
     assert.equal("readerCard" in withoutCardResponse.json(), false);
+
+    const markedTitles = ["Secret Diary One", "Secret Diary Two", "Secret Diary Three"];
+    const marks = Array.from({ length: 7 }, (_, i) => ({ BookmarkID: `m${i}`, Type: "highlight", Text: "a private note" }));
+    const annoBooks = [
+      ...markedTitles.map((title, i) => ({ Title: title, Attribution: `Marked Author ${i}`, ReadStatus: 2, highlights: marks })),
+      ...Array.from({ length: 7 }, (_, i) => ({ Title: `Unmarked ${i}`, Attribution: `Plain Author ${i}`, ReadStatus: 2 }))
+    ];
+    library.prepare("INSERT INTO library_documents (user_id, data) VALUES (?, ?)").run("annoOwner", JSON.stringify({ books: annoBooks }));
+    const annoHome = (await app.inject({ method: "POST", url: "/murals", headers: authorization("annoOwner"), payload: { name: "Anno reading space" } })).json();
+    service.updateMural("annoOwner", annoHome.id, { blocks: [{ id: "c", type: "readerCard", layout: { x: 0, y: 0, w: 4, h: 6 } }], updatedAt: annoHome.updatedAt });
+    const sharedAnno = service.share("annoOwner", annoHome.id)!;
+    const annoResponse = await app.inject({ method: "GET", url: `/murals/shared/${sharedAnno.shareToken}` });
+    const annoBody = annoResponse.json();
+    assert.equal(annoBody.readerCard?.identity, "anno");
+    assert.equal(annoBody.readerCard?.state, "settled");
+    for (const secretTitle of markedTitles) assert.equal(annoResponse.body.includes(secretTitle), false);
+
+    const noLibraryHome = (await app.inject({ method: "POST", url: "/murals", headers: authorization("noLibraryOwner"), payload: { name: "No library" } })).json();
+    service.updateMural("noLibraryOwner", noLibraryHome.id, { blocks: [{ id: "c", type: "readerCard", layout: { x: 0, y: 0, w: 4, h: 6 } }], updatedAt: noLibraryHome.updatedAt });
+    const sharedNoLibrary = service.share("noLibraryOwner", noLibraryHome.id)!;
+    const noLibraryBody = (await app.inject({ method: "GET", url: `/murals/shared/${sharedNoLibrary.shareToken}` })).json();
+    assert.deepEqual(noLibraryBody.readerCard, { state: "unwritten", identity: null, runnerUp: null, signal: null, coverage: ["genres known for 0 of 0 finished books"] });
   } finally {
     await app.close();
     library.close();
+    auth.close();
     db.close();
   }
 });

@@ -285,17 +285,21 @@ function getStatements() {
 
 const EMPTY_RESULT: ResolvedPublicData = { books: [], highlights: [], currentlyReading: [], stats: {} };
 
+function emptyResult(req: PublicDataRequest): ResolvedPublicData {
+  return req.needsReaderCard ? { ...EMPTY_RESULT, readerCard: publicReaderCard(readerIdentity([], [])) } : EMPTY_RESULT;
+}
+
 export function resolvePublicLibraryData(userId: string, req: PublicDataRequest): ResolvedPublicData {
   const row = getStatements().getDocumentStmt.get(userId) as { data: string } | undefined;
-  if (!row) return EMPTY_RESULT;
+  if (!row) return emptyResult(req);
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(row.data);
   } catch {
-    return EMPTY_RESULT;
+    return emptyResult(req);
   }
-  if (!isRecord(parsed) || !Array.isArray(parsed.books)) return EMPTY_RESULT;
+  if (!isRecord(parsed) || !Array.isArray(parsed.books)) return emptyResult(req);
 
   // The full, private book list — read in full so currentlyReading/stats
   // below can be computed correctly (see this file's own top comment),
@@ -361,7 +365,12 @@ export function resolvePublicLibraryData(userId: string, req: PublicDataRequest)
     }
   }
 
-  return { books, highlights, currentlyReading, stats, ...(req.needsShelfTheme ? { shelfTheme: calculateShelfTheme(allBooks) } : {}), ...(req.needsReaderCard ? { readerCard: publicReaderCard(readerIdentity(allBooks, groupRecords as unknown as Group[])) } : {}), ...(req.collectionIds ? { collectionBooks } : {}) };
+  // Tolerant filtering, same convention as this file's byKey/collection
+  // lookups: a malformed group (missing bookKeys, non-string name) is
+  // dropped rather than crashing readerIdentity's own iteration over it.
+  const readerGroups = groupRecords.filter((group) => Array.isArray(group.bookKeys) && typeof group.name === "string") as unknown as Group[];
+
+  return { books, highlights, currentlyReading, stats, ...(req.needsShelfTheme ? { shelfTheme: calculateShelfTheme(allBooks) } : {}), ...(req.needsReaderCard ? { readerCard: publicReaderCard(readerIdentity(allBooks, readerGroups)) } : {}), ...(req.collectionIds ? { collectionBooks } : {}) };
 }
 
 export function resolvePublicLibrary(userId: string): Record<string, unknown> | null {
