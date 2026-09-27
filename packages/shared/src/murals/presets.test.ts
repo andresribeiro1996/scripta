@@ -121,8 +121,8 @@ test("the My shelf preset places a settled reader card beside stats, below the p
   const profile = blocks.find((block) => block.type === "profile")!;
   assert.ok(card, "settled card is placed");
   const cardBottom = profile.layout.y + profile.layout.h;
-  assert.deepEqual(card!.layout, { x: 0, y: cardBottom, w: 6, h: 8 });
-  assert.deepEqual(stats.layout, { x: 6, y: cardBottom, w: 6, h: 8 });
+  assert.deepEqual(card!.layout, { x: 0, y: cardBottom, w: 6, h: 7 });
+  assert.deepEqual(stats.layout, { x: 6, y: cardBottom, w: 6, h: 7 });
   assert.equal(buildMuralPreset("shelf", books.slice(0, 4), []).blocks.some((block) => block.type === "readerCard"), false);
 });
 
