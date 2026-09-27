@@ -91,7 +91,14 @@ export function ProfileScreen({ username }: { username: string }) {
 
   return (
     <Screen bottom top={false}>
-      <Stack.Screen options={{ headerShown: true, title: profileUser.username, headerTitle: () => <ProfileHeaderTitle username={profileUser.username} identity={profileUser.readerGlyph} /> }} />
+      <Stack.Screen
+        options={{
+          headerShown: true,
+          title: profileUser.username,
+          headerLargeTitleEnabled: false,
+          headerTitle: () => <ProfileHeaderTitle username={profileUser.username} identity={profileUser.readerGlyph} />,
+        }}
+      />
       {error ? <Toast visible message={error} tone="error" /> : null}
       <SwipeableTabs
         accessibilityLabel="Profile sections"
@@ -194,7 +201,7 @@ function ProfileHeaderTitle({ username, identity }: { username: string; identity
   const { colors } = useTheme();
   return (
     <View style={styles.headerTitleRow}>
-      <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, styles.metaName, { color: colors.text }]}>
+      <Text numberOfLines={1} {...dynamicType} style={[typography.title, styles.strong, styles.metaName, { color: colors.text }]}>
         {username}
       </Text>
       <ReaderGlyph identity={identity} />

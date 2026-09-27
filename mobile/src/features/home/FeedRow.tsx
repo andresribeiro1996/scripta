@@ -54,7 +54,6 @@ export function FeedRow({ item, onOpen, onFollowBack, following }: { item: Diges
   const { colors } = useTheme();
   const row = feedRowModel(item);
   const labelColor = row.tone === "accent" ? colors.accent : row.tone === "success" ? colors.success : colors.textDim;
-  const metaDetail = row.meta.startsWith(item.actor.username) ? row.meta.slice(item.actor.username.length).replace(/^ · /, "") : row.meta;
 
   return (
     <Pressable accessibilityRole="link" accessibilityLabel={digestHeading(item)} onPress={onOpen}>
@@ -94,12 +93,12 @@ export function FeedRow({ item, onOpen, onFollowBack, following }: { item: Diges
                 {item.actor.username}
               </Text>
               <ReaderGlyph identity={item.actor.readerGlyph} />
+              {row.detail ? (
+                <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.metaDetail, { color: colors.textDim }]}>
+                  {` · ${row.detail}`}
+                </Text>
+              ) : null}
             </View>
-            {metaDetail ? (
-              <Text numberOfLines={2} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
-                {metaDetail}
-              </Text>
-            ) : null}
             {row.action === "followBack" ? (
               <Pressable
                 accessibilityRole="button"
@@ -139,6 +138,7 @@ const styles = StyleSheet.create({
   labelRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   nameRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   metaName: { flexShrink: 1 },
+  metaDetail: { flexShrink: 1 },
   timestamp: { flexShrink: 0, marginLeft: "auto" },
   // Padded to clear the 44px floor: the label alone is a 16px-tall target.
   rowAction: { minHeight: minimumTouchTarget - spacing.lg, justifyContent: "center", paddingVertical: spacing.xs },

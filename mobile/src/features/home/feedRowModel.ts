@@ -16,7 +16,7 @@ export interface FeedRowModel {
   /** The line a reader scans for. Empty when the event is its own headline —
    *  a follow or a vote says everything in one sentence. */
   title: string;
-  meta: string;
+  detail?: string;
   /** The one thing worth doing from the row itself. Null for every row whose
    *  only useful action is the tap that opens it. */
   action: "followBack" | null;
@@ -33,7 +33,7 @@ export function feedRowModel(item: DigestItem): FeedRowModel {
         label: contentKindLabel(item.content),
         tone: "accent",
         title: item.content.name,
-        meta: `${item.actor.username} · ${contentDetail(item.content)}`,
+        detail: contentDetail(item.content),
         action: null
       };
     case "vote":
@@ -43,7 +43,7 @@ export function feedRowModel(item: DigestItem): FeedRowModel {
         label: item.content.kind === "tierlist" ? "Ranked" : "Voted",
         tone: "accent",
         title: "",
-        meta: `${item.actor.username} · ${item.content.name}`,
+        detail: item.content.name,
         action: null
       };
     case "reading":
@@ -53,12 +53,12 @@ export function feedRowModel(item: DigestItem): FeedRowModel {
         label: item.finished ? "Finished" : "Added",
         tone: item.finished ? "success" : "dim",
         title: item.book.title,
-        meta: item.book.author ? `${item.actor.username} · ${item.book.author}` : item.actor.username,
+        detail: item.book.author || undefined,
         action: null
       };
     case "follow":
       // Offered only one way round: following back is the reply to being
       // followed, and there is nothing to offer once it is mutual.
-      return { covers: [], icon: "follow", label: "New follower", tone: "dim", title: "", meta: item.actor.username, action: item.viewerFollows ? null : "followBack" };
+      return { covers: [], icon: "follow", label: "New follower", tone: "dim", title: "", action: item.viewerFollows ? null : "followBack" };
   }
 }

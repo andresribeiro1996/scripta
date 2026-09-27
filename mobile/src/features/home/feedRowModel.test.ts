@@ -22,7 +22,7 @@ test("a publication leads with the thing published, not the sentence", () => {
   assert.equal(row.title, "Fantasy doorstoppers");
   assert.equal(row.label, "Tier list");
   assert.equal(row.icon, "tierlist");
-  assert.equal(row.meta, "alice · 24 books · 7 ballots");
+  assert.equal(row.detail, "24 books · 7 ballots");
   assert.deepEqual(row.covers, ["a.png", "b.png"]);
 });
 
@@ -34,7 +34,7 @@ test("a vote is its own headline, so it carries no title and no covers", () => {
   assert.deepEqual(row.covers, []);
   // The ranked list still has covers of its own — a vote just doesn't earn
   // the same visual weight as publishing one.
-  assert.equal(row.meta, "alice · Fantasy doorstoppers");
+  assert.equal(row.detail, "Fantasy doorstoppers");
 });
 
 test("a finished book shows its one cover and reads as done", () => {
@@ -50,7 +50,7 @@ test("a finished book shows its one cover and reads as done", () => {
 test("a book with no cover falls back to the avatar slot", () => {
   const row = feedRowModel({ kind: "reading", id: "e4", actor, book: { title: "Untitled", author: "", coverUrl: null }, finished: false, createdAt: "2026-09-17T00:00:00.000Z" });
   assert.deepEqual(row.covers, []);
-  assert.equal(row.meta, "alice");
+  assert.equal(row.detail, undefined);
 });
 
 test("relative time stays relative only while that is easier to read", () => {
