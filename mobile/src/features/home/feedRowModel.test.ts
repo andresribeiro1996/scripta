@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { DigestItem } from "@scripta/shared";
-import { feedRowModel, relativeTime } from "./feedRowModel.js";
+import { feedRowAccessibilityLabel, feedRowModel, relativeTime } from "./feedRowModel.js";
 
 const actor = { userId: "u1", username: "alice", avatarUrl: null };
 
@@ -22,7 +22,7 @@ test("a publication leads with the thing published, not the sentence", () => {
   assert.equal(row.title, "Fantasy doorstoppers");
   assert.equal(row.label, "Tier list");
   assert.equal(row.icon, "tierlist");
-  assert.equal(row.meta, "alice · 24 books · 7 ballots");
+  assert.equal(row.detail, "24 books · 7 ballots");
   assert.deepEqual(row.covers, ["a.png", "b.png"]);
 });
 
@@ -34,7 +34,7 @@ test("a vote is its own headline, so it carries no title and no covers", () => {
   assert.deepEqual(row.covers, []);
   // The ranked list still has covers of its own — a vote just doesn't earn
   // the same visual weight as publishing one.
-  assert.equal(row.meta, "alice · Fantasy doorstoppers");
+  assert.equal(row.detail, "Fantasy doorstoppers");
 });
 
 test("a finished book shows its one cover and reads as done", () => {
@@ -50,7 +50,7 @@ test("a finished book shows its one cover and reads as done", () => {
 test("a book with no cover falls back to the avatar slot", () => {
   const row = feedRowModel({ kind: "reading", id: "e4", actor, book: { title: "Untitled", author: "", coverUrl: null }, finished: false, createdAt: "2026-09-17T00:00:00.000Z" });
   assert.deepEqual(row.covers, []);
-  assert.equal(row.meta, "alice");
+  assert.equal(row.detail, undefined);
 });
 
 test("relative time stays relative only while that is easier to read", () => {
@@ -75,6 +75,13 @@ test("a new follower who isn't followed back offers the one action a row has", (
   // Already mutual: there is nothing left to offer, so the row is a link again.
   const mutual = feedRowModel({ kind: "follow", id: "f2", actor, createdAt: "2026-09-17T00:00:00.000Z", viewerFollows: true });
   assert.equal(mutual.action, null);
+});
+
+test("the row's accessibility label names the glyph when the actor has one, and is silent otherwise", () => {
+  const withGlyph: DigestItem = { kind: "follow", id: "f1", actor: { ...actor, readerGlyph: "star" }, createdAt: "2026-09-17T00:00:00.000Z", viewerFollows: false };
+  assert.equal(feedRowAccessibilityLabel(withGlyph), "alice started following you, the Stargazer");
+  const withoutGlyph: DigestItem = { kind: "follow", id: "f2", actor, createdAt: "2026-09-17T00:00:00.000Z", viewerFollows: false };
+  assert.equal(feedRowAccessibilityLabel(withoutGlyph), "alice started following you");
 });
 
 test("no other row kind carries an action", () => {

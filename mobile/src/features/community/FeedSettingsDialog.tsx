@@ -47,6 +47,11 @@ export function FeedSettingsDialog({ visible, settings, onClose }: { visible: bo
             onPress={() => setLocal((current) => ({ ...current, [key]: !current[key] }))}
           />
         ))}
+        <Button
+          label={`Show my reader glyph next to my name: ${local.readerGlyph ?? false ? "On" : "Off"}`}
+          variant="secondary"
+          onPress={() => setLocal((current) => ({ ...current, readerGlyph: !(current.readerGlyph ?? false) }))}
+        />
         {error ? <Toast visible message="Could not save settings." tone="error" /> : null}
         <Button label="Save" loading={busy} onPress={() => void save()} />
       </View>

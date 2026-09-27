@@ -11,6 +11,7 @@ import { MuralCanvas } from "../components/murals/MuralCanvas";
 import { OwnShelfView } from "../components/OwnShelfView";
 import { ProfileActivity } from "../components/ProfileActivity";
 import { PublicLibraryGrid } from "../components/PublicLibraryGrid";
+import { ReaderGlyph } from "../components/ReaderGlyph";
 import { SkeletonCardGrid } from "../components/Skeleton";
 import { SwipeTabs } from "../components/SwipeTabs";
 import { useCommunityActivity, useCommunityLibrary, useCommunityProfile } from "../hooks/useCommunity";
@@ -101,7 +102,10 @@ export function CommunityProfilePage() {
   return (
     <div className="mx-auto max-w-4xl px-4 pt-3 pb-10 sm:px-6 sm:pt-6">
       <header className="flex items-center justify-between gap-4 pb-3">
-        <h1 className="min-w-0 truncate text-xl font-bold tracking-tight sm:text-2xl">{user.username}</h1>
+        <h1 className="flex min-w-0 items-center gap-1.5 text-xl font-bold tracking-tight sm:text-2xl">
+          <span className="truncate">{user.username}</span>
+          <ReaderGlyph identity={user.readerGlyph} />
+        </h1>
         <FollowControls
           busy={busy}
           following={view.profile.viewerFollows === true}

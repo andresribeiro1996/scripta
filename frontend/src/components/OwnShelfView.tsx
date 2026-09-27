@@ -327,6 +327,20 @@ function OwnerControls({
               )}
             </button>
           ))}
+          <button
+            onClick={() => setNext((settings) => ({ ...settings, readerGlyph: !(settings.readerGlyph ?? false) }))}
+            aria-pressed={next.readerGlyph ?? false}
+            className={`flex min-h-12 w-full items-center justify-between rounded-lg px-3 text-left text-[15px] hover:bg-(--color-surface-hover) ${
+              (next.readerGlyph ?? false) ? "" : "text-(--color-text-dim)"
+            }`}
+          >
+            Show my reader glyph next to my name
+            {(next.readerGlyph ?? false) && (
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+            )}
+          </button>
           <div className="px-3 pt-2">
             <button
               onClick={() => onSaveSettings(next)}
