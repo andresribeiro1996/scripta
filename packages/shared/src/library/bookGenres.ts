@@ -81,6 +81,17 @@ export function needsGenreMetadata(book: Record<string, unknown>): boolean {
   return !Object.prototype.hasOwnProperty.call(book, "_genres");
 }
 
+export function isFinishedBook(book: Record<string, unknown>): boolean {
+  return book.ReadStatus === 2;
+}
+
+export const GENRE_LOOKUP_BATCH = 20;
+
+export function genreLookupOrder(books: Array<Record<string, unknown>>): Array<Record<string, unknown>> {
+  const candidates = books.filter(needsGenreMetadata);
+  return [...candidates.filter(isFinishedBook), ...candidates.filter((book) => !isFinishedBook(book))];
+}
+
 export interface ShelfTheme {
   genres: BookGenre[];
   matchedBooks: number;
