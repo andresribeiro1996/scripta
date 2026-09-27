@@ -312,9 +312,9 @@ export function resolvePublicLibraryData(userId: string, req: PublicDataRequest)
   // silently skipped, same tolerant convention frontend/src/lib/murals.ts's
   // own resolveShelfBooks/resolveQuote already use.
   const collectionBooks: Record<string, string[]> = Object.create(null);
-  const collections = Array.isArray(parsed.groups) ? parsed.groups.filter(isRecord) : [];
+  const groupRecords = Array.isArray(parsed.groups) ? parsed.groups.filter(isRecord) : [];
   for (const id of req.collectionIds ?? []) {
-    const collection = collections.find((group) => group.id === id && group.type === "collection");
+    const collection = groupRecords.find((group) => group.id === id && group.type === "collection");
     collectionBooks[id] = Array.isArray(collection?.bookKeys) ? collection.bookKeys.filter((key): key is string => typeof key === "string" && byKey.has(key)) : [];
   }
   const books: PublicBookData[] = [];
@@ -361,9 +361,7 @@ export function resolvePublicLibraryData(userId: string, req: PublicDataRequest)
     }
   }
 
-  const groups = collections as unknown as Group[];
-
-  return { books, highlights, currentlyReading, stats, ...(req.needsShelfTheme ? { shelfTheme: calculateShelfTheme(allBooks) } : {}), ...(req.needsReaderCard ? { readerCard: publicReaderCard(readerIdentity(allBooks, groups)) } : {}), ...(req.collectionIds ? { collectionBooks } : {}) };
+  return { books, highlights, currentlyReading, stats, ...(req.needsShelfTheme ? { shelfTheme: calculateShelfTheme(allBooks) } : {}), ...(req.needsReaderCard ? { readerCard: publicReaderCard(readerIdentity(allBooks, groupRecords as unknown as Group[])) } : {}), ...(req.collectionIds ? { collectionBooks } : {}) };
 }
 
 export function resolvePublicLibrary(userId: string): Record<string, unknown> | null {
