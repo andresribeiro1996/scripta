@@ -23,19 +23,23 @@ const quizBookSchema = z.object({
   blurb: z.string().trim().max(4000).nullable().optional()
 });
 
-const createQuizSchema = z.object({
-  name: z.string().trim().min(1, "name is required and must be non-empty.").max(200),
-  data: z.object({
-    sourceLabel: z.string().trim().max(200).default(""),
-    questionCount: z.number().int().min(1).max(20).default(10),
-    allowedTypes: z.array(z.enum(["cover_title", "title_cover", "quote_title", "blurb_title"])).min(1).default(["cover_title", "title_cover", "quote_title", "blurb_title"]),
-    books: z.array(quizBookSchema).max(500).default([])
-  })
+const quizDataSchema = z.object({
+  sourceLabel: z.string().trim().max(200).default(""),
+  questionCount: z.number().int().min(1).max(20).default(10),
+  allowedTypes: z.array(z.enum(["cover_title", "title_cover", "quote_title", "blurb_title"])).min(1).default(["cover_title", "title_cover", "quote_title", "blurb_title"]),
+  books: z.array(quizBookSchema).max(500).default([])
 });
 
-// Light-touch on PUT, same as tierlists: only checks data is an object.
+const createQuizSchema = z.object({
+  name: z.string().trim().min(1, "name is required and must be non-empty.").max(200),
+  data: quizDataSchema
+});
+
+// Same document validation as POST, not a pass-through record: the quiz
+// document drives publish-time question generation, so an unvalidated
+// update can poison a later publish (null books made publish 500).
 const updateQuizSchema = z
-  .object({ name: z.string().min(1).optional(), data: z.record(z.unknown()).optional() })
+  .object({ name: z.string().min(1).optional(), data: quizDataSchema.optional() })
   .refine((body) => body.name !== undefined || body.data !== undefined, { message: "At least one of name or data must be provided." });
 
 const playStateSchema = z.object({ open: z.boolean() });
@@ -77,6 +81,10 @@ export function buildQuizRoutes(service: QuizzesService) {
       if (!params.success) return reply.code(400).send({ error: "Invalid quiz id." });
       const body = updateQuizSchema.safeParse(request.body);
       if (!body.success) return reply.code(400).send({ error: body.error.issues[0]?.message ?? "Invalid request." });
+      if (body.data.data) {
+        const keys = body.data.data.books.map((b) => b.key);
+        if (new Set(keys).size !== keys.length) return reply.code(400).send({ error: "Duplicate book." });
+      }
       // undefined = not found, not owned, OR already published — a
       // published quiz's seeded set must not drift, and 404 covers all
       // three without leaking which (same convention as tierlists).
