@@ -24,7 +24,7 @@ export const QUIZ_POOL: QuizBook[] = [
   entry("pool-the-hobbit", "The Hobbit", "J. R. R. Tolkien", "9780547928227", "In a hole in the ground there lived a hobbit."),
   entry("pool-fahrenheit-451", "Fahrenheit 451", "Ray Bradbury", "9781451673319", "It was a pleasure to burn."),
   entry("pool-the-metamorphosis", "The Metamorphosis", "Franz Kafka", "9780553213690", "As Gregor Samsa awoke one morning from uneasy dreams, he found himself transformed in his bed into a gigantic insect."),
-  entry("pool-peter-pan", "Peter Pan", "J. M. Barrie", "9780147501883", "All children, except one, grow up."),
+  entry("pool-peter-pan", "Peter Pan", "J. M. Barrie", "9780142437933", "All children, except one, grow up."),
   entry("pool-old-man-and-the-sea", "The Old Man and the Sea", "Ernest Hemingway", "9780684801223", "He was an old man who fished alone in a skiff in the Gulf Stream and he had gone eighty-four days now without taking a fish."),
   entry("pool-the-great-gatsby", "The Great Gatsby", "F. Scott Fitzgerald", "9780743273565", "In my younger and more vulnerable years my father gave me some advice."),
   entry("pool-the-catcher-in-the-rye", "The Catcher in the Rye", "J. D. Salinger", "9780316769488", "If you really want to hear about it, the first thing you'll probably want to know is where I was born."),

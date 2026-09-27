@@ -18,6 +18,7 @@ Skim layer over the detailed sections below — each module's own section has th
 | `arena` | Anonymous-vote book bracket tournaments; duels settled by a 30s background sweep | create/seed/start/settle/tiebreak/delete/mine ✓; view/public-list/vote open |
 | `murals` | Per-account freeform dashboard documents (block semantics live in the frontend) plus public share links | all `/murals*` ✓ except `GET /murals/shared/:token` |
 | `tierlists` | Tier list ranking polls: owner-created private tier lists can open to community voting (anonymous or members-only), with live vote aggregation in three modes | create/list/get/update/delete/results ✓; open-voting/set-voting-state ✓; public-list/voting-board/ballot (submit/edit/get) open |
+| `quizzes` | Game module storing quiz documents + seeded question sets + locked plays/answers in its own SQLite file, anonymous link challenges via vote codes | create/list/get/update/delete/publish/set-voting-state/results ✓; voting-board/play (submit/get)/results open |
 
 ## Running it
 
