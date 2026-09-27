@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Stack, router } from "expo-router";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { ensureBookBlockHeights, profileOnlyMural, type IdentityKey, type Mural } from "@scripta/shared";
 import { Button, Dialog, EmptyState, ErrorState, Icon, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { MuralCanvas } from "../murals";
@@ -199,9 +199,10 @@ function publishedRows(view: CommunityProfileView): PublishedRow[] {
 
 function ProfileHeaderTitle({ username, identity }: { username: string; identity?: IdentityKey }) {
   const { colors } = useTheme();
+  const { width } = useWindowDimensions();
   return (
-    <View style={styles.headerTitleRow}>
-      <Text numberOfLines={1} {...dynamicType} style={[typography.title, styles.strong, styles.metaName, { color: colors.text }]}>
+    <View style={[styles.headerTitleRow, { maxWidth: width * 0.6 }]}>
+      <Text accessibilityRole="header" numberOfLines={1} {...dynamicType} style={[typography.title, styles.strong, styles.metaName, { color: colors.text }]}>
         {username}
       </Text>
       <ReaderGlyph identity={identity} />

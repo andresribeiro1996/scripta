@@ -1,14 +1,14 @@
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { digestHeading, digestTarget, type DigestItem } from "@scripta/shared";
+import { digestTarget, type DigestItem } from "@scripta/shared";
 import { ApiError } from "../../core/api";
 import { Icon, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { AuthorAvatar } from "../community/AuthorAvatar";
 import { CoverFan, SLOT_HEIGHT, SLOT_WIDTH } from "../community/CoverFan";
 import { ReaderGlyph } from "../community/ReaderGlyph";
 import { fetchDashboard, followUser } from "../community/api";
-import { feedRowModel, relativeTime } from "./feedRowModel";
+import { feedRowAccessibilityLabel, feedRowModel, relativeTime } from "./feedRowModel";
 
 // Mobile's profile route is /u/<name>; the shared target is the web app's
 // /community/u/<name>, so the two kinds that point at a person are remapped.
@@ -56,7 +56,7 @@ export function FeedRow({ item, onOpen, onFollowBack, following }: { item: Diges
   const labelColor = row.tone === "accent" ? colors.accent : row.tone === "success" ? colors.success : colors.textDim;
 
   return (
-    <Pressable accessibilityRole="link" accessibilityLabel={digestHeading(item)} onPress={onOpen}>
+    <Pressable accessibilityRole="link" accessibilityLabel={feedRowAccessibilityLabel(item)} onPress={onOpen}>
       {({ pressed }) => (
         <View style={[styles.feedRow, { backgroundColor: pressed ? colors.surfacePressed : "transparent", borderBottomColor: colors.border }]}>
           <View style={styles.slot}>
@@ -138,7 +138,7 @@ const styles = StyleSheet.create({
   labelRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   nameRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   metaName: { flexShrink: 1 },
-  metaDetail: { flexShrink: 1 },
+  metaDetail: { flex: 1 },
   timestamp: { flexShrink: 0, marginLeft: "auto" },
   // Padded to clear the 44px floor: the label alone is a 16px-tall target.
   rowAction: { minHeight: minimumTouchTarget - spacing.lg, justifyContent: "center", paddingVertical: spacing.xs },

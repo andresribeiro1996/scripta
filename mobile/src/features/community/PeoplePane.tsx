@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { readerGlyphLabel } from "@scripta/shared";
 import { Button, EmptyState, Input, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import type { PersonResult } from "@scripta/shared/community";
 import { followUser, searchPeople, unfollowUser } from "./api";
@@ -67,35 +68,38 @@ export function PeoplePane() {
               <EmptyState title="Find people" body="Search a username to follow them." />
             )
           }
-          renderItem={({ item }) => (
-            <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Open ${item.user.username}'s profile`}
-                onPress={() => openProfile(item.user.username)}
-                style={[styles.actorRow, styles.grow]}
-              >
-                <AuthorAvatar username={item.user.username} avatarUrl={item.user.avatarUrl} />
-                <View style={styles.grow}>
-                  <View style={styles.nameRow}>
-                    <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, styles.metaName, { color: colors.text }]}>
-                      {item.user.username}
+          renderItem={({ item }) => {
+            const glyphLabel = readerGlyphLabel(item.user.readerGlyph);
+            return (
+              <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={glyphLabel ? `Open ${item.user.username}'s profile, ${glyphLabel}` : `Open ${item.user.username}'s profile`}
+                  onPress={() => openProfile(item.user.username)}
+                  style={[styles.actorRow, styles.grow]}
+                >
+                  <AuthorAvatar username={item.user.username} avatarUrl={item.user.avatarUrl} />
+                  <View style={styles.grow}>
+                    <View style={styles.nameRow}>
+                      <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, styles.metaName, { color: colors.text }]}>
+                        {item.user.username}
+                      </Text>
+                      <ReaderGlyph identity={item.user.readerGlyph} />
+                    </View>
+                    <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
+                      {item.followerCount} {item.followerCount === 1 ? "follower" : "followers"}
                     </Text>
-                    <ReaderGlyph identity={item.user.readerGlyph} />
                   </View>
-                  <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
-                    {item.followerCount} {item.followerCount === 1 ? "follower" : "followers"}
-                  </Text>
-                </View>
-              </Pressable>
-              <Button
-                label={item.viewerFollows ? "Following" : "Follow"}
-                variant={item.viewerFollows ? "secondary" : "primary"}
-                loading={busyId === item.user.userId}
-                onPress={() => void toggle(item)}
-              />
-            </View>
-          )}
+                </Pressable>
+                <Button
+                  label={item.viewerFollows ? "Following" : "Follow"}
+                  variant={item.viewerFollows ? "secondary" : "primary"}
+                  loading={busyId === item.user.userId}
+                  onPress={() => void toggle(item)}
+                />
+              </View>
+            );
+          }}
         />
       </View>
     </>

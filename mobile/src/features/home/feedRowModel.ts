@@ -1,5 +1,5 @@
 import { contentDetail, contentKindLabel, relativeTime } from "@scripta/shared/community";
-import type { DigestItem } from "@scripta/shared";
+import { digestHeading, readerGlyphLabel, type DigestItem } from "@scripta/shared";
 import type { IconName } from "../../ui";
 
 export interface FeedRowModel {
@@ -23,6 +23,12 @@ export interface FeedRowModel {
 }
 
 export { relativeTime };
+
+export function feedRowAccessibilityLabel(item: DigestItem): string {
+  const heading = digestHeading(item);
+  const label = readerGlyphLabel(item.actor.readerGlyph);
+  return label ? `${heading}, ${label}` : heading;
+}
 
 export function feedRowModel(item: DigestItem): FeedRowModel {
   switch (item.kind) {

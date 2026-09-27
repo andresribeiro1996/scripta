@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { Image } from "expo-image";
 import { Animated, Dimensions, FlatList, Keyboard, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from "react-native";
-import { DEFAULT_TIER_PRESET } from "@scripta/shared";
+import { DEFAULT_TIER_PRESET, readerGlyphLabel } from "@scripta/shared";
 import { EmptyState, ErrorState, Icon, Input, Skeleton, dynamicType, minimumTouchTarget, radii, spacing, typography, useReducedMotion, useTheme, type IconName } from "../../ui";
 import type { ContentTone, DiscoverItem, PublishedContent } from "@scripta/shared/community";
 import { fetchDiscover } from "./api";
@@ -125,8 +125,13 @@ function DiscoverRow({ item }: { item: DiscoverItem }) {
   const { colors } = useTheme();
   const { content, author } = item;
   const status = contentStatus(content);
+  const glyphLabel = readerGlyphLabel(author.readerGlyph);
   return (
-    <Pressable accessibilityRole="link" accessibilityLabel={`Open ${content.name}`} onPress={() => router.push(contentTarget(content) as never)}>
+    <Pressable
+      accessibilityRole="link"
+      accessibilityLabel={glyphLabel ? `Open ${content.name}, ${glyphLabel}` : `Open ${content.name}`}
+      onPress={() => router.push(contentTarget(content) as never)}
+    >
       {({ pressed }) => (
         <View style={[styles.row, { backgroundColor: pressed ? colors.surfacePressed : "transparent", borderBottomColor: colors.border }]}>
           {content.kind === "tierlist" ? <TierlistThumb covers={content.covers} /> : <TournamentThumb covers={content.covers} />}
@@ -148,7 +153,7 @@ function DiscoverRow({ item }: { item: DiscoverItem }) {
               ) : (
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={`Open ${author.username}'s profile`}
+                  accessibilityLabel={glyphLabel ? `Open ${author.username}'s profile, ${glyphLabel}` : `Open ${author.username}'s profile`}
                   hitSlop={spacing.sm}
                   onPress={() => openProfile(author.username)}
                   style={[styles.nameRow, styles.shrink]}
