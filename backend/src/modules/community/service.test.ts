@@ -404,6 +404,26 @@ test("dashboard actors carry a reader glyph only when published and switched on,
   assert.deepEqual(Object.keys(actorFor("a")).sort(), ["avatarUrl", "readerGlyph", "userId", "username"]);
 });
 
+test("dashboard never looks up glyphs for authors whose rows are dropped by the page limit", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, readerGlyphs, readerGlyphCalls, tierlistRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  const ids = ["a", "b", "c", "d"];
+  ids.forEach((id, i) => {
+    readerProfiles.set(id, reader(id));
+    repo.upsertProfile(profileRow(id));
+    repo.updateFeedSettings(id, { ...DEFAULT_FEED_SETTINGS, readerGlyph: true });
+    readerGlyphs.set(id, "star");
+    repo.insertFollow({ follower_id: "viewer", followee_id: id, created_at: "2026-09-01T00:00:00.000Z" });
+    tierlistRefs.set(`t-${id}`, tierRef(`t-${id}`, id));
+    repo.insertEvent({ id: `e-${id}`, user_id: id, type: "tierlist_published", ref_type: "tierlist", ref_id: `t-${id}`, payload: null, created_at: `2026-09-0${4 - i}T00:00:00.000Z` });
+  });
+
+  const page = service.getDashboard("viewer", undefined, 2);
+  assert.equal(page.items.length, 2);
+  assert.deepEqual(readerGlyphCalls.sort(), ["a", "b"]);
+});
+
 test("follow rows surface only to the followee and retract on unfollow", () => {
   const { repo } = createRepoFake();
   const { deps, readerProfiles } = createDeps(repo);
@@ -582,6 +602,24 @@ test("discover carries no glyph for an unpublished author with the switch on", (
   const items = service.getDiscover("all", "", 10, 0).items;
   assert.equal(items.find((i) => i.content.id === "t1")?.author.readerGlyph, undefined);
   assert.equal(readerGlyphCalls.includes("carol"), false);
+});
+
+test("discover only looks up glyphs for authors on the returned page, not the whole scan window", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs, readerGlyphs, readerGlyphCalls } = createDeps(repo);
+  const service = createCommunityService(deps);
+  const ids = ["a", "b", "c", "d", "e"];
+  ids.forEach((id, i) => {
+    readerProfiles.set(id, reader(id));
+    repo.upsertProfile(profileRow(id));
+    repo.updateFeedSettings(id, { ...DEFAULT_FEED_SETTINGS, readerGlyph: true });
+    readerGlyphs.set(id, "star");
+    tierlistRefs.set(`t-${id}`, tierRef(`t-${id}`, id, { createdAt: `2026-09-0${i + 1}T00:00:00.000Z` }));
+  });
+
+  const page = service.getDiscover("all", "", 2, 0);
+  assert.equal(page.items.length, 2);
+  assert.deepEqual(readerGlyphCalls.sort(), ["d", "e"]);
 });
 
 test("people search excludes self and unpublished profiles", () => {
