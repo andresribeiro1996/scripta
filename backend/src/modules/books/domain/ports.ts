@@ -1,5 +1,5 @@
-import type { BookMetadata } from "@scripta/shared";
-import type { BookRow, CachedCoverRow, CoverImageRow, CoverStatus, NewBook } from "./types.js";
+import type { BookMetadata, BookSearchResult } from "@scripta/shared";
+import type { BookRow, CachedCoverRow, CoverImageRow, CoverSourceName, CoverStatus, NewBook } from "./types.js";
 
 // The one seam Hardcover specifically needs — something that can look up
 // a cover image URL for a book, given its ISBN. Written in terms the
@@ -51,4 +51,29 @@ export interface BooksRepository {
   saveDetails(bookId: string, details: BookMetadata, checkedAt: string): void;
   markDetailsMissing(bookId: string, checkedAt: string): void;
   searchBooks(tokens: string[], limit: number): BookRow[];
+}
+
+export interface CoverCandidate {
+  source: Exclude<CoverSourceName, "upload">;
+  url: string;
+}
+
+export interface TitledCandidate extends CoverCandidate {
+  title: string;
+  authors: string[];
+}
+
+export interface CoverSource {
+  byIsbn(isbn: string): Promise<CoverCandidate[]>;
+  byTitle(title: string, author: string, accept: (candidate: TitledCandidate) => boolean): Promise<CoverCandidate[]>;
+}
+
+export interface CatalogSearchHit {
+  result: BookSearchResult;
+  olCoverId: number | null;
+}
+
+export interface BookCatalog {
+  fetchDetails(lookup: { isbn: string | null; title: string; author: string }): Promise<BookMetadata | null>;
+  search(query: { isbn: string } | { text: string }): Promise<CatalogSearchHit[]>;
 }
