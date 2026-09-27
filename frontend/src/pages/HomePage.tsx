@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { bookKey, buildDashboardCards, digestHeading, digestTarget, resolveQuote } from "@scripta/shared";
+import { bookKey, buildDashboardCards, digestAction, digestTarget, resolveQuote } from "@scripta/shared";
 import { useDashboard } from "../hooks/useDashboard";
 import { useLibrary } from "../hooks/useLibrary";
 import { useAuth } from "../auth/AuthContext";
@@ -70,31 +70,23 @@ export function HomePage() {
           {dashboard.newCount > 0 ? <p className="text-sm font-semibold text-(--color-accent)">You have {dashboard.newCount} new</p> : null}
           {dashboard.items.length === 0 ? <p className="text-sm text-(--color-text-dim)">Nothing here yet. Follow people to see what they publish.</p> : (
             <div className="space-y-3">
-              {dashboard.items.map((item) => {
-                const heading = digestHeading(item);
-                const rest = heading.startsWith(item.actor.username) ? heading.slice(item.actor.username.length) : null;
-                return (
-                  <div key={`${item.kind}:${item.id}`} className="rounded-xl border border-(--color-border) bg-(--color-surface) p-4">
-                    <Link to={digestTarget(item)} className="flex items-center gap-2">
-                      <AuthorAvatar author={item.actor} />
-                      <span>
-                        <span className="block text-sm font-semibold">
-                          {rest !== null ? (
-                            <>
-                              {item.actor.username}
-                              <ReaderGlyph identity={item.actor.readerGlyph} />
-                              {rest}
-                            </>
-                          ) : (
-                            heading
-                          )}
-                        </span>
-                        {item.kind === "publication" ? <span className="block text-sm text-(--color-text-dim)">{item.content.name}</span> : null}
+              {dashboard.items.map((item) => (
+                <div key={`${item.kind}:${item.id}`} className="rounded-xl border border-(--color-border) bg-(--color-surface) p-4">
+                  <Link to={digestTarget(item)} className="flex items-center gap-2">
+                    <AuthorAvatar author={item.actor} />
+                    <span>
+                      <span className="block text-sm font-semibold">
+                        <span className="inline-flex items-center gap-1">
+                          {item.actor.username}
+                          <ReaderGlyph identity={item.actor.readerGlyph} />
+                        </span>{" "}
+                        {digestAction(item)}
                       </span>
-                    </Link>
-                  </div>
-                );
-              })}
+                      {item.kind === "publication" ? <span className="block text-sm text-(--color-text-dim)">{item.content.name}</span> : null}
+                    </span>
+                  </Link>
+                </div>
+              ))}
             </div>
           )}
           {dashboard.hasNextPage && (
