@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ownGlyphPreview, readerIdentity } from "@scripta/shared";
 import type { FeedCategory, FeedSettings } from "@scripta/shared/community";
 import { DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
 import { fetchOwnProfile, publishProfile, setShelfMural, unpublishProfile, updateFeedSettings } from "../api/community";
@@ -9,6 +10,7 @@ import { avatarUrlFor } from "./Avatar";
 import { useConfirm } from "./ConfirmDialog";
 import { EmptyState } from "./EmptyState";
 import { MuralsIcon } from "./NavIcons";
+import { ReaderGlyph } from "./ReaderGlyph";
 import { MuralCanvas } from "./murals/MuralCanvas";
 import { ProfileActivity } from "./ProfileActivity";
 import { Sheet } from "./Sheet";
@@ -268,11 +270,16 @@ function OwnerControls({
   onSaveSettings: (settings: FeedSettings) => void;
 }) {
   const { data: murals } = useMurals();
+  const { data: library } = useLibrary();
   const [open, setOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [muralId, setMuralId] = useState<string>(currentMuralId ?? "");
   const [next, setNext] = useState<FeedSettings>(feedSettings ?? DEFAULT_FEED_SETTINGS);
   const sectionLabel = "px-3 pt-4 pb-2 text-[11px] font-semibold tracking-wider text-(--color-text-dim) uppercase";
+  const glyphPreview = useMemo(
+    () => ownGlyphPreview(readerIdentity(library?.data.books ?? [], library?.data.groups ?? [])),
+    [library]
+  );
   return (
     <>
       <button
@@ -341,6 +348,12 @@ function OwnerControls({
               </svg>
             )}
           </button>
+          <p className="flex items-center gap-1.5 px-3 text-sm text-(--color-text-dim)">
+            <span aria-hidden="true">
+              <ReaderGlyph identity={glyphPreview.glyph ?? undefined} />
+            </span>
+            {glyphPreview.line}
+          </p>
           <div className="px-3 pt-2">
             <button
               onClick={() => onSaveSettings(next)}
