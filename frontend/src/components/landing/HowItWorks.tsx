@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { cardFontFamilyCss } from "../../lib/libraryStyle";
 import { BOOKS, coverSrc, type BookSlug } from "./books";
 import { SectionIntro, container } from "./ui";
@@ -148,6 +148,12 @@ export function HowItWorks() {
   const fontCss = cardFontFamilyCss(font);
   const radius = cornerOpts.find((c) => c.value === corner)!.radius;
 
+  useEffect(() => {
+    if (!copied) return;
+    const t = setTimeout(() => setCopied(false), 2000);
+    return () => clearTimeout(t);
+  }, [copied]);
+
   async function handleCopy() {
     try {
       await navigator.clipboard.writeText(shareLink);
@@ -216,19 +222,25 @@ export function HowItWorks() {
       </div>
       {shared ? (
         <div className="flex gap-2">
-          <div className="flex h-10 grow items-center truncate rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-[12.5px] text-(--color-text-dim)">
+          <div className="flex h-11 min-w-0 grow items-center truncate rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-[12.5px] text-(--color-text-dim)">
             {shareLink}
           </div>
           <button
             type="button"
             onClick={handleCopy}
-            className="min-h-11 shrink-0 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-xs font-semibold whitespace-nowrap transition-colors hover:bg-(--color-surface-hover)"
+            aria-label={copied ? "Copied" : "Copy link"}
+            className="grid h-11 shrink-0 place-items-center rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-xs font-semibold whitespace-nowrap transition-colors hover:bg-(--color-surface-hover)"
           >
-            {copied ? "Copied" : "Copy link"}
+            <span className={`col-start-1 row-start-1 ${copied ? "invisible" : ""}`}>Copy link</span>
+            {copied && (
+              <span className="col-start-1 row-start-1">
+                <CheckIcon className="text-(--color-accent)" />
+              </span>
+            )}
           </button>
         </div>
       ) : (
-        <div className="flex h-10 items-center gap-2 text-[13px] text-(--color-text-dim)">
+        <div className="flex h-11 items-center gap-2 text-[13px] text-(--color-text-dim)">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <rect x="5" y="11" width="14" height="10" rx="2" />
             <path d="M8 11V7.5a4 4 0 0 1 8 0V11" />
