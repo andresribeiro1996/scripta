@@ -4,7 +4,7 @@ import type { PublicQuizQuestion } from "@scripta/shared";
 import { useQuery } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import { Image } from "expo-image";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useAuth } from "../../core/auth";
 import { ApiError } from "../../core/api";
 import { Button, ErrorState, Input, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
