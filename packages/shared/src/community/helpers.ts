@@ -48,9 +48,13 @@ export function feedTarget(item: FeedItem): string {
   return contentTarget(item.content);
 }
 
-export function feedHeading(item: FeedItem): string {
+export function feedAction(item: FeedItem): string {
   const noun = item.content.kind === "tierlist" ? "tier list" : "tournament";
-  return `${item.actor.username} published a ${noun}`;
+  return `published a ${noun}`;
+}
+
+export function feedHeading(item: FeedItem): string {
+  return `${item.actor.username} ${feedAction(item)}`;
 }
 
 export const DEFAULT_FEED_SETTINGS: FeedSettings = {
