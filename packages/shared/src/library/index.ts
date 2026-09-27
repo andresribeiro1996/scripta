@@ -21,3 +21,4 @@ export * from "./bookMetadata.js";
 export * from "./bookSearch.js";
 export * from "./bookGenres.js";
 export * from "./finish.js";
+export * from "./readerIdentity.js";
