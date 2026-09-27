@@ -57,7 +57,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
   const books = library?.data.books ?? [];
   const needle = search.trim().toLowerCase();
   const filteredBooks = needle ? books.filter((book) => `${book.Title ?? ""} ${book.Attribution ?? ""}`.toLowerCase().includes(needle)) : books;
-  const genreEnrichment = useGenreEnrichment(books, currentBlocks.some((block) => block.type === "profile"), updateLibrary);
+  const genreEnrichment = useGenreEnrichment(books, currentBlocks.some((block) => block.type === "profile" || block.type === "readerCard"), updateLibrary);
 
   useFocusEffect(useCallback(() => {
     void muralQuery.refetch().then(({ data }) => {
