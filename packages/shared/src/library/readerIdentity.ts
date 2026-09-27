@@ -30,9 +30,11 @@ const GENRE_SIGNALS: Array<{ key: IdentityKey; genres: BookGenre[]; threshold: n
   { key: "corr", genres: ["Classics", "Literary Fiction", "Poetry"], threshold: 0.4, words: "classics, literary fiction or poetry" },
 ];
 
-const pct = (value: number) => `${Math.round(value * 100)}%`;
+const pct = (value: number) => `${Math.floor(value * 100)}%`;
+const pctUp = (value: number) => `${Math.ceil(value * 100)}%`;
 const plural = (n: number, word: string) => `${n} ${n === 1 ? word : `${word}s`}`;
 const nameOf = (key: IdentityKey) => READER_PLATES.find((plate) => plate.key === key)!.name;
+const normalizeAuthor = (value: unknown) => String(value ?? "").trim().toLowerCase().replace(/\s+/g, " ");
 
 function bump(counts: Map<string, number>, key: string, by = 1) {
   counts.set(key, (counts.get(key) ?? 0) + by);
@@ -46,14 +48,22 @@ function markCount(book: Book) {
   return (Array.isArray(book.highlights) ? book.highlights : []).filter((h) => {
     if (!h || typeof h !== "object") return false;
     const mark = h as Book;
-    return (mark.Type === "highlight" || mark.Type === "review") && String(mark.Text ?? "").trim() !== "";
+    if (mark.Type !== "highlight" && mark.Type !== "review" && mark.Type !== "note") return false;
+    return String(mark.Text ?? "").trim() !== "" || String(mark.Annotation ?? "").trim() !== "";
   }).length;
 }
 
 export function readerIdentity(books: Book[], groups: Group[]): ReaderIdentity {
-  const finished = books.filter((book) => book.ReadStatus === 2);
+  const seenKeys = new Set<string>();
+  const finished = books.filter((book) => book.ReadStatus === 2).filter((book) => {
+    const key = bookKey(book);
+    if (seenKeys.has(key)) return false;
+    seenKeys.add(key);
+    return true;
+  });
   const n = finished.length;
-  const known = finished.filter((book) => genresForBook(book).length > 0);
+  const genresOf = new Map(finished.map((book) => [book, genresForBook(book)] as const));
+  const known = finished.filter((book) => genresOf.get(book)!.length > 0);
   const coverage = [`genres known for ${known.length} of ${n} finished books`];
   if (finished.some((book) => /^(goodreads|storygraph):/.test(String(book.ContentID ?? "")))) coverage.push("series unknown for Goodreads and StoryGraph imports");
   const unwritten = (missing: string): ReaderIdentity => ({ state: "unwritten", identity: null, runnerUp: null, signal: null, leaders: [], coverage, missing });
@@ -86,29 +96,35 @@ export function readerIdentity(books: Book[], groups: Group[]): ReaderIdentity {
     gap: `${pct(marked.length / n)} of finished books have highlights or notes, with ${plural(marks, "mark")}; 30% and 20 marks settle it`,
   });
 
-  const authors = new Map<string, number>();
+  const authorCounts = new Map<string, number>();
+  const authorDisplay = new Map<string, string>();
   for (const book of finished) {
-    const author = String(book.Attribution ?? "").trim();
-    if (author) bump(authors, author);
+    const raw = String(book.Attribution ?? "").trim();
+    if (!raw) continue;
+    const norm = normalizeAuthor(raw);
+    if (!authorDisplay.has(norm)) authorDisplay.set(norm, raw);
+    bump(authorCounts, norm);
   }
-  const loyalAuthors = top(authors).filter((author) => author.count >= 2);
+  const loyalAuthors = top(authorCounts)
+    .filter((author) => author.count >= 2)
+    .map((author) => ({ label: authorDisplay.get(author.label)!, count: author.count }));
   const byLoyal = loyalAuthors.reduce((sum, author) => sum + author.count, 0);
   candidates.push({
     key: "loyal",
-    strength: byLoyal / n / 0.4,
-    signal: { counted: byLoyal, of: n, label: `${byLoyal} of ${n} finished books are by your three most-read authors` },
+    strength: Math.min(byLoyal / n / 0.4, byLoyal / 3),
+    signal: { counted: byLoyal, of: n, label: `${byLoyal} of ${n} finished books are by authors you keep returning to` },
     leaders: loyalAuthors,
-    gap: `${pct(byLoyal / n)} of finished books are by your three most-read authors; 40% settles it`,
+    gap: `${pct(byLoyal / n)} of finished books are by authors you keep returning to; 40% settles it`,
   });
 
   if (known.length * 2 >= n) {
     const m = known.length;
     const groupShares: number[] = [];
     for (const signal of GENRE_SIGNALS) {
-      const matching = known.filter((book) => genresForBook(book).some((genre) => signal.genres.includes(genre)));
+      const matching = known.filter((book) => genresOf.get(book)!.some((genre) => signal.genres.includes(genre)));
       groupShares.push(matching.length / m);
       const genreCounts = new Map<string, number>();
-      for (const book of matching) for (const genre of genresForBook(book)) if (signal.genres.includes(genre)) bump(genreCounts, genre);
+      for (const book of matching) for (const genre of genresOf.get(book)!) if (signal.genres.includes(genre)) bump(genreCounts, genre);
       candidates.push({
         key: signal.key,
         strength: matching.length / m / signal.threshold,
@@ -118,22 +134,23 @@ export function readerIdentity(books: Book[], groups: Group[]): ReaderIdentity {
       });
     }
     const all = new Map<string, number>();
-    for (const book of known) for (const genre of genresForBook(book)) bump(all, genre);
-    const shares = [...all.values()].map((count) => count / m);
-    const wide = shares.filter((share) => share > 0.05).length;
-    const largest = Math.max(...shares, ...groupShares);
+    for (const book of known) for (const genre of genresOf.get(book)!) bump(all, genre);
+    const genreShares = [...all].map(([genre, count]) => ({ label: genre, share: count / m }));
+    const groupSharesNamed = GENRE_SIGNALS.map((signal, i) => ({ label: signal.words, share: groupShares[i]! }));
+    const wide = genreShares.filter((entry) => entry.share > 0.05).length;
+    const largest = [...genreShares, ...groupSharesNamed].reduce((a, b) => (b.share > a.share ? b : a));
     candidates.push({
       key: "way",
-      strength: Math.min(wide / 6, 0.25 / largest),
-      signal: { counted: wide, of: all.size, label: `${wide} genres above 5% of finished books; the largest is ${pct(largest)}` },
+      strength: Math.min(wide / 6, 0.25 / largest.share),
+      signal: { counted: wide, of: all.size, label: `${wide} genres above 5% of books with known genres; the largest, ${largest.label}, is ${pctUp(largest.share)}` },
       leaders: top(all),
-      gap: `${plural(wide, "genre")} above 5%, the largest at ${pct(largest)}; 6 genres with none over 25% settle it`,
+      gap: `${plural(wide, "genre")} above 5% of books with known genres; the largest, ${largest.label}, at ${pctUp(largest.share)}; 6 genres with none over 25% settle it`,
     });
   }
 
   const [best, second] = [...candidates].sort((a, b) => b.strength - a.strength);
   if (!best || best.strength < 0.75 - EPSILON) {
-    return unwritten(known.length * 2 < n ? `Genres are known for ${known.length} of ${n} finished books` : "No reading pattern stands out yet");
+    return unwritten(known.length * 2 < n ? `Genres known for ${known.length} of ${n} books` : "No reading pattern stands out yet");
   }
   const clears = (candidate: Candidate | undefined) => Boolean(candidate && candidate.strength >= 1 - EPSILON);
   const tie = clears(best) && clears(second) && second!.strength >= best.strength * 0.95 - EPSILON;

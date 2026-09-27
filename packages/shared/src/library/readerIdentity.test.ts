@@ -1,8 +1,13 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 import { bookKey } from "./merge.js";
 import type { Group } from "./groups.js";
 import { publicReaderCard, readerIdentity } from "./readerIdentity.js";
+
+const fixturePath = join(dirname(fileURLToPath(import.meta.url)), "../../../../scripts/fixtures/library.json");
 
 type Book = Record<string, unknown>;
 const book = (i: number, fields: Book = {}): Book => ({ Title: `Book ${i}`, Attribution: `Author ${i}`, ReadStatus: 2, ...fields });
@@ -62,7 +67,7 @@ test("genre signals wait until genres are known for half the finished books", ()
   const books = shelf(10, (i) => (i < 4 ? { _genres: ["Fantasy"] } : {}));
   const result = readerIdentity(books, []);
   assert.equal(result.state, "unwritten");
-  assert.equal(result.missing, "Genres are known for 4 of 10 finished books");
+  assert.equal(result.missing, "Genres known for 4 of 10 books");
   assert.deepEqual(result.coverage, ["genres known for 4 of 10 finished books"]);
 });
 
@@ -88,7 +93,7 @@ test("the Loyalist counts only authors with at least two finished books", () => 
   const result = readerIdentity(loyal, []);
   assert.equal(result.identity, "loyal");
   assert.equal(result.state, "settled");
-  assert.equal(result.signal?.label, "4 of 10 finished books are by your three most-read authors");
+  assert.equal(result.signal?.label, "4 of 10 finished books are by authors you keep returning to");
   assert.deepEqual(result.leaders, [{ label: "Kazuo Ishiguro", count: 4 }]);
   assert.equal(readerIdentity(shelf(5), []).state, "unwritten");
 });
@@ -119,4 +124,107 @@ test("the public card carries no titles, authors, series or missing line", () =>
   assert.deepEqual(Object.keys(card).sort(), ["coverage", "identity", "runnerUp", "signal", "state"]);
   const text = JSON.stringify(card);
   for (const leak of ["Ishiguro", "Klara", "Secret Series", "Book 5"]) assert.ok(!text.includes(leak), leak);
+});
+
+test("Wayfarer's largest share names its source: a grouped signal when that's largest", () => {
+  const groupGenres = ["Romance", "Historical Fiction", "Philosophy", "Psychology", "Science", "Technology", "Business"];
+  const books = shelf(20, (i) => {
+    if (i < 3) return { _genres: ["Fantasy"] };
+    if (i < 6) return { _genres: ["Science Fiction"] };
+    return { _genres: [groupGenres[Math.floor((i - 6) / 2)]!] };
+  });
+  const result = readerIdentity(books, []);
+  assert.equal(result.identity, "way");
+  assert.equal(result.state, "leaning");
+  assert.equal(result.signal?.label, "9 genres above 5% of books with known genres; the largest, fantasy or science fiction, is 30%");
+});
+
+test("gap percentages round down so a near-miss doesn't read as settled", () => {
+  const books = shelf(27);
+  const result = readerIdentity(books, [series(books.slice(0, 8))]);
+  assert.equal(result.state, "leaning");
+  assert.equal(result.missing, "29% of finished books are in a series; 30% settles it");
+});
+
+test("each genre signal settles exactly at threshold and not one book below", () => {
+  const cases = [
+    { key: "lamp", genre: "Mystery", threshold: 0.35 },
+    { key: "star", genre: "Fantasy", threshold: 0.4 },
+    { key: "arch", genre: "History", threshold: 0.35 },
+    { key: "corr", genre: "Classics", threshold: 0.4 },
+  ];
+  const m = 20;
+  for (const { key, genre, threshold } of cases) {
+    const atThreshold = Math.round(threshold * m);
+    const atBooks = shelf(m, (i) => ({ _genres: [i < atThreshold ? genre : "Romance"] }));
+    const atResult = readerIdentity(atBooks, []);
+    assert.equal(atResult.identity, key, `${key} at threshold identity`);
+    assert.equal(atResult.state, "settled", `${key} at threshold state`);
+
+    const belowBooks = shelf(m, (i) => ({ _genres: [i < atThreshold - 1 ? genre : "Romance"] }));
+    const belowResult = readerIdentity(belowBooks, []);
+    assert.notEqual(belowResult.state, "settled", `${key} one book below`);
+  }
+});
+
+test("Wayfarer needs six genres above 5%, with none of them over 25%", () => {
+  const fiveGenres = ["Romance", "Philosophy", "Psychology", "Science", "Technology"];
+  const onlyFive = shelf(21, (i) => ({ _genres: [i < 20 ? fiveGenres[Math.floor(i / 4)]! : "Religion"] }));
+  assert.notEqual(readerIdentity(onlyFive, []).state, "settled");
+
+  const sixButSkewed = ["Philosophy", "Psychology", "Science", "Technology", "Business"];
+  const skewed = shelf(20, (i) => ({ _genres: [i < 10 ? "Romance" : sixButSkewed[(i - 10) % 5]!] }));
+  assert.notEqual(readerIdentity(skewed, []).state, "settled");
+});
+
+test("the Loyalist needs 40% share, not just three books", () => {
+  const books = shelf(10, (i) => (i < 3 ? { Attribution: "Author A" } : {}));
+  const result = readerIdentity(books, []);
+  assert.ok(!(result.state === "settled" && result.identity === "loyal"));
+});
+
+test("the Loyalist needs the repeat authors to cover at least three books", () => {
+  const books = shelf(5, (i) => (i < 2 ? { Attribution: "Author A" } : {}));
+  const result = readerIdentity(books, []);
+  assert.ok(!(result.state === "settled" && result.identity === "loyal"));
+});
+
+test("the Annotator needs 30% of finished books marked, not just enough marks", () => {
+  const books = shelf(10, (i) => (i < 2 ? { highlights: mark(15) } : {}));
+  const result = readerIdentity(books, []);
+  assert.ok(!(result.state === "settled" && result.identity === "anno"));
+});
+
+test("Annotator marks count Kobo notes with Text or Annotation, but not dogears", () => {
+  const notes = (n: number) => Array.from({ length: n }, (_, j) => ({ Type: "note", Text: `passage ${j}`, Annotation: `note ${j}`, BookmarkID: `n${j}` }));
+  const books = shelf(10, (i) => {
+    if (i < 3) return { highlights: notes(7) };
+    if (i === 3) return { highlights: [{ Type: "dogear", BookmarkID: "d1" }] };
+    return {};
+  });
+  const result = readerIdentity(books, []);
+  assert.equal(result.identity, "anno");
+  assert.equal(result.state, "settled");
+  assert.equal(result.signal?.counted, 3);
+});
+
+test("duplicate finished books (same key) count once", () => {
+  const base = shelf(10);
+  const dup = [...base, { ...base[0]! }];
+  assert.deepEqual(readerIdentity(dup, []), readerIdentity(base, []));
+});
+
+test("author names normalize before counting; the first spelling seen is displayed", () => {
+  const books = shelf(10, (i) => (i < 4 ? { Attribution: i === 2 ? "terry  pratchett" : "Terry Pratchett" } : {}));
+  const result = readerIdentity(books, []);
+  assert.equal(result.identity, "loyal");
+  assert.deepEqual(result.leaders[0], { label: "Terry Pratchett", count: 4 });
+});
+
+test("the sample library fixture leans Cartographer with 3 of 11 finished books in a series", () => {
+  const data = JSON.parse(readFileSync(fixturePath, "utf8")) as { books: Book[]; groups: Group[] };
+  const result = readerIdentity(data.books, data.groups);
+  assert.equal(result.identity, "carto");
+  assert.equal(result.state, "leaning");
+  assert.deepEqual(result.signal, { counted: 3, of: 11, label: "3 of 11 finished books are in a series" });
 });
