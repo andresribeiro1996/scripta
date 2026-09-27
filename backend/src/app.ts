@@ -32,6 +32,7 @@ import { registerLibraryModule, resolvePublicLibrary, type BookEvent } from "./m
 import { getMuralsPublicApi, registerMuralsModule } from "./modules/murals/index.js";
 import { registerSocialsModule } from "./modules/socials/index.js";
 import { registerTierlistsModule, getTierlistsPublicApi } from "./modules/tierlists/index.js";
+import { registerQuizzesModule } from "./modules/quizzes/index.js";
 
 export function buildApp() {
   // Moves any still-embedded library.murals[] into the new murals table
@@ -158,6 +159,7 @@ export function buildApp() {
       }
     }
   });
+  app.register(registerQuizzesModule);
 
   return app;
 }

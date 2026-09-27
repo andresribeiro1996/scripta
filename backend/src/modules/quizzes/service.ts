@@ -109,7 +109,7 @@ export interface QuizzesService {
   submitPlay(code: string, answers: SubmittedAnswer[], durationMs: number, playerName: string | null, player: Player): PlayOutcome;
   getPlay(code: string, player: Player): PlayOutcome;
   getResults(userId: string, id: string): QuizResults | undefined;
-  getPublicResults(code: string): { plays: ResultPlay[]; questionCount: number } | undefined;
+  getPublicResults(code: string): { plays: Array<Omit<ResultPlay, "playId">>; questionCount: number } | undefined;
 }
 
 export function createQuizzesService(repo: QuizzesRepository): QuizzesService {
@@ -272,7 +272,15 @@ export function createQuizzesService(repo: QuizzesRepository): QuizzesService {
     getPublicResults(code) {
       const row = repo.getByVoteCode(code);
       if (!row) return undefined;
-      return { plays: repo.listPlays(row.id).map(toResultPlay), questionCount: readDocument(toQuiz(row)).questionCount };
+      // playId stays owner-side: it's an anonymous player's only play
+      // handle, and the public leaderboard must not hand out everyone's.
+      return {
+        plays: repo.listPlays(row.id).map((playRow) => {
+          const { playId: _playId, ...rest } = toResultPlay(playRow);
+          return rest;
+        }),
+        questionCount: readDocument(toQuiz(row)).questionCount
+      };
     }
   };
 }
