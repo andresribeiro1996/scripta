@@ -4,6 +4,6 @@ export interface WaitlistEntry {
 }
 
 export interface WaitlistRepository {
-  insert(email: string, createdAt: string): void;
+  insert(email: string, createdAt: string): boolean;
   list(): WaitlistEntry[];
 }

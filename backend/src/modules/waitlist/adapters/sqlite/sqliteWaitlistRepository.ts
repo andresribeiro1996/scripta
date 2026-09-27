@@ -7,7 +7,7 @@ export function createSqliteWaitlistRepository(db: DatabaseSync): WaitlistReposi
 
   return {
     insert(email, createdAt) {
-      insertStmt.run({ $email: email, $created_at: createdAt });
+      return Number(insertStmt.run({ $email: email, $created_at: createdAt }).changes) === 1;
     },
     list() {
       return (listStmt.all() as { email: string; created_at: string }[]).map((row) => ({ email: row.email, createdAt: row.created_at }));
