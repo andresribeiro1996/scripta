@@ -10,3 +10,9 @@ export function readerCardLabel({ state, identity }: { state: CardState; identit
 export function readerCardPlateLine(missing: string | null): string | undefined {
   return missing ? missing.charAt(0).toLowerCase() + missing.slice(1) : undefined;
 }
+
+export function readerGlyphLabel(identity?: IdentityKey): string | undefined {
+  if (!identity) return undefined;
+  const plate = PLATES.find((p) => p.key === identity);
+  return plate ? `the ${plate.name}` : undefined;
+}

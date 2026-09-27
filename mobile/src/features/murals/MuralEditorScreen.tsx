@@ -18,7 +18,6 @@ import { Button, EmptyState, ErrorState, IconButton, Input, Screen, Sheet, Toast
 import { spacing, typography, useTheme } from "../../ui/theme";
 import { fetchGalleryImages } from "../gallery/api";
 import { useLibrary } from "../library/hooks/useLibrary";
-import { useGenreEnrichment } from "../library/hooks/useGenreEnrichment";
 import { fetchTierlists } from "../tierlists/api";
 import { changeBlockLayout } from "./layout";
 import { MuralCanvas } from "./MuralCanvas";
@@ -37,7 +36,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
   const client = useQueryClient();
   const muralQuery = useQuery({ queryKey: ["murals", id], queryFn: () => fetchMural(id), retry: false });
   const libraryQuery = useLibrary();
-  const { data: library, updateLibrary } = libraryQuery;
+  const { data: library } = libraryQuery;
   const gallery = useQuery({ queryKey: ["gallery"], queryFn: fetchGalleryImages });
   const tierlists = useQuery({ queryKey: ["tierlists"], queryFn: fetchTierlists });
   const [name, setName] = useState<string | null>(null);
@@ -57,7 +56,6 @@ export function MuralEditorScreen({ id }: { id: string }) {
   const books = library?.data.books ?? [];
   const needle = search.trim().toLowerCase();
   const filteredBooks = needle ? books.filter((book) => `${book.Title ?? ""} ${book.Attribution ?? ""}`.toLowerCase().includes(needle)) : books;
-  const genreEnrichment = useGenreEnrichment(books, currentBlocks.some((block) => block.type === "profile" || block.type === "readerCard"), updateLibrary);
 
   useFocusEffect(useCallback(() => {
     void muralQuery.refetch().then(({ data }) => {
@@ -120,7 +118,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
         }}
       />
       <View style={styles.nameRow}><Input label="Mural name" value={currentName} onChangeText={setName} /></View>
-      {error || genreEnrichment.error ? <Toast visible message={error ?? genreEnrichment.error ?? ""} tone="error" /> : null}
+      {error ? <Toast visible message={error} tone="error" /> : null}
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.canvasScroll}>
         <MuralCanvas mural={draftMural} books={books} groups={library?.data.groups ?? []} images={gallery.data ?? []} tierlists={tierlists.data ?? []} profile={user?.username ? { username: user.username, avatarUrl: user.avatarId ? `${API_URL}/auth/avatar/${user.avatarId}/file` : null } : undefined} editable selectedBlockId={selectedId} onSelectBlock={setSelectedId} onLayoutChange={(blockId, layout) => setBlocks(changeBlockLayout(currentBlocks, blockId, layout))} />
       </ScrollView>

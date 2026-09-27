@@ -187,6 +187,41 @@ test("feed-settings PUT validates the body and records the update", async () => 
   await app.close();
 });
 
+test("feed-settings PUT accepts an optional readerGlyph flag", async () => {
+  const calls: Array<Record<string, unknown>> = [];
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", () => ({ id: "viewer", email: "v@example.test", username: "v", avatarId: null }));
+  await app.register(
+    buildCommunityRoutes(
+      fakeService({
+        updateFeedSettings: (userId, settings) => {
+          calls.push({ userId, settings });
+        }
+      })
+    )
+  );
+  const auth = { authorization: "Bearer x" };
+  const withGlyph = await app.inject({
+    method: "PUT",
+    url: "/community/profile/feed-settings",
+    headers: auth,
+    payload: { publications: true, reading: false, votes: true, follows: true, readerGlyph: true }
+  });
+  assert.equal(withGlyph.statusCode, 204);
+  const withoutGlyph = await app.inject({
+    method: "PUT",
+    url: "/community/profile/feed-settings",
+    headers: auth,
+    payload: { publications: true, reading: false, votes: true, follows: true }
+  });
+  assert.equal(withoutGlyph.statusCode, 204);
+  assert.deepEqual(calls, [
+    { userId: "viewer", settings: { publications: true, reading: false, votes: true, follows: true, readerGlyph: true } },
+    { userId: "viewer", settings: { publications: true, reading: false, votes: true, follows: true } }
+  ]);
+  await app.close();
+});
+
 test("own profile GET and shelf mural PUT are authed and validate the body", async () => {
   const calls: Array<Record<string, unknown>> = [];
   const app = Fastify();

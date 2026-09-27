@@ -3,9 +3,17 @@ import { usePathname, useGlobalSearchParams } from "expo-router";
 import { ActivityIndicator, View } from "react-native";
 import { Redirect, Tabs } from "expo-router";
 import { useAuth } from "../../core/auth";
+import { useGenreEnrichment } from "../../features/library/hooks/useGenreEnrichment";
+import { useLibrary } from "../../features/library/hooks/useLibrary";
 import { ErrorState } from "../../ui/components";
 import { Icon } from "../../ui/icon";
 import { useTheme } from "../../ui/theme";
+
+function GenreEnrichment() {
+  const { data: library, updateLibrary } = useLibrary();
+  useGenreEnrichment(library?.data.books ?? [], updateLibrary);
+  return null;
+}
 
 export default function AppLayout() {
   const pathname = usePathname();
@@ -46,19 +54,22 @@ export default function AppLayout() {
   // another tab screen hidden with href: null. The group segments don't appear
   // in the URL, so every path is unchanged.
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: colors.accent,
-        tabBarInactiveTintColor: colors.textDim,
-        tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
-      }}
-    >
-      <Tabs.Screen name="(home)" options={{ title: "Home", tabBarIcon: ({ color, focused, size }) => <Icon name="home" filled={focused} color={color} size={size} /> }} />
-      <Tabs.Screen name="(library)" options={{ title: "My shelf", tabBarIcon: ({ color, focused, size }) => <Icon name="library" filled={focused} color={color} size={size} /> }} />
-      <Tabs.Screen name="(arena)" options={{ title: "Games", tabBarIcon: ({ color, focused, size }) => <Icon name="arena" filled={focused} color={color} size={size} /> }} />
-      <Tabs.Screen name="(murals)" options={{ title: "Murals", tabBarIcon: ({ color, focused, size }) => <Icon name="murals" filled={focused} color={color} size={size} /> }} />
-      <Tabs.Screen name="(settings)" options={{ title: "Settings", tabBarIcon: ({ color, focused, size }) => <Icon name="settings" filled={focused} color={color} size={size} /> }} />
-    </Tabs>
+    <>
+      <GenreEnrichment />
+      <Tabs
+        screenOptions={{
+          headerShown: false,
+          tabBarActiveTintColor: colors.accent,
+          tabBarInactiveTintColor: colors.textDim,
+          tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
+        }}
+      >
+        <Tabs.Screen name="(home)" options={{ title: "Home", tabBarIcon: ({ color, focused, size }) => <Icon name="home" filled={focused} color={color} size={size} /> }} />
+        <Tabs.Screen name="(library)" options={{ title: "My shelf", tabBarIcon: ({ color, focused, size }) => <Icon name="library" filled={focused} color={color} size={size} /> }} />
+        <Tabs.Screen name="(arena)" options={{ title: "Games", tabBarIcon: ({ color, focused, size }) => <Icon name="arena" filled={focused} color={color} size={size} /> }} />
+        <Tabs.Screen name="(murals)" options={{ title: "Murals", tabBarIcon: ({ color, focused, size }) => <Icon name="murals" filled={focused} color={color} size={size} /> }} />
+        <Tabs.Screen name="(settings)" options={{ title: "Settings", tabBarIcon: ({ color, focused, size }) => <Icon name="settings" filled={focused} color={color} size={size} /> }} />
+      </Tabs>
+    </>
   );
 }

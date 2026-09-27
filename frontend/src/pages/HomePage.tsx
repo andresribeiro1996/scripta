@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { bookKey, buildDashboardCards, digestHeading, digestTarget, resolveQuote } from "@scripta/shared";
+import { bookKey, buildDashboardCards, digestAction, digestTarget, resolveQuote } from "@scripta/shared";
 import { useDashboard } from "../hooks/useDashboard";
 import { useLibrary } from "../hooks/useLibrary";
 import { useAuth } from "../auth/AuthContext";
@@ -9,6 +9,7 @@ import { BookGrid } from "../components/BookGrid";
 import { BookCard } from "../components/BookCard";
 import { AuthorAvatar } from "../components/CommunityAuthorAvatar";
 import { PickNextSheet } from "../components/PickNextSheet";
+import { ReaderGlyph } from "../components/ReaderGlyph";
 import { resolveLibraryStyle } from "../lib/libraryStyle";
 
 const button = "inline-flex min-h-11 items-center justify-center rounded-lg border border-(--color-border) px-4 py-2 text-sm hover:bg-(--color-surface-hover) disabled:opacity-50";
@@ -74,7 +75,13 @@ export function HomePage() {
                   <Link to={digestTarget(item)} className="flex items-center gap-2">
                     <AuthorAvatar author={item.actor} />
                     <span>
-                      <span className="block text-sm font-semibold">{digestHeading(item)}</span>
+                      <span className="block text-sm font-semibold">
+                        <span className="inline-flex items-center gap-1">
+                          {item.actor.username}
+                          <ReaderGlyph identity={item.actor.readerGlyph} />
+                        </span>{" "}
+                        {digestAction(item)}
+                      </span>
                       {item.kind === "publication" ? <span className="block text-sm text-(--color-text-dim)">{item.content.name}</span> : null}
                     </span>
                   </Link>

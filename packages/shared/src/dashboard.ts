@@ -1,5 +1,5 @@
 import type { CommunityAuthor, FeedItem, PublishedContent } from "./community/types.js";
-import { contentTarget, feedHeading, feedTarget } from "./community/helpers.js";
+import { contentTarget, feedAction, feedTarget } from "./community/helpers.js";
 import { bookKey } from "./library/merge.js";
 import { rediscoverPassage } from "./murals/home.js";
 
@@ -47,19 +47,21 @@ export function upNextPair(keys: string[], offset: number): string[] {
   return first === second ? [first] : [first, second];
 }
 
-export function digestHeading(item: DigestItem): string {
+export function digestAction(item: DigestItem): string {
   switch (item.kind) {
     case "publication":
-      return feedHeading(item);
+      return feedAction(item);
     case "vote":
-      return item.content.kind === "tierlist"
-        ? `${item.actor.username} ranked books on ${item.content.name}`
-        : `${item.actor.username} voted in ${item.content.name}`;
+      return item.content.kind === "tierlist" ? `ranked books on ${item.content.name}` : `voted in ${item.content.name}`;
     case "reading":
-      return `${item.actor.username} ${item.finished ? "finished" : "added"} ${item.book.title}`;
+      return `${item.finished ? "finished" : "added"} ${item.book.title}`;
     case "follow":
-      return `${item.actor.username} started following you`;
+      return "started following you";
   }
+}
+
+export function digestHeading(item: DigestItem): string {
+  return `${item.actor.username} ${digestAction(item)}`;
 }
 
 // A book someone else read is not a page this reader can open — their

@@ -1,6 +1,7 @@
+import type { IdentityKey } from "../readerCards/index.js";
 import type { ReaderProfile } from "../murals/murals.js";
 
-export type CommunityAuthor = ReaderProfile & { userId: string; unavailable?: boolean };
+export type CommunityAuthor = ReaderProfile & { userId: string; unavailable?: boolean; readerGlyph?: IdentityKey };
 
 export interface FollowState {
   following: boolean;
@@ -92,6 +93,7 @@ export interface FeedSettings {
   reading: boolean;
   votes: boolean;
   follows: boolean;
+  readerGlyph?: boolean;
 }
 
 export interface OwnProfile {

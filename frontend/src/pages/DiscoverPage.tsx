@@ -5,6 +5,7 @@ import type { ContentTone, DiscoverItem, DiscoverType } from "@scripta/shared/co
 import { contentKindLabel, contentStats, contentStatus, contentTarget } from "@scripta/shared/community";
 import { EmptyState } from "../components/EmptyState";
 import { CommunityIcon } from "../components/NavIcons";
+import { ReaderGlyph } from "../components/ReaderGlyph";
 import { SkeletonCardGrid } from "../components/Skeleton";
 import { useCommunityDiscover } from "../hooks/useCommunity";
 
@@ -102,15 +103,18 @@ function DiscoverRow({ item }: { item: DiscoverItem }) {
             {content.name}
           </Link>
         </h3>
-        <p className="truncate text-xs text-(--color-text-dim)">
-          {contentKindLabel(content)} ·{" "}
-          {author.unavailable ? (
-            author.username
-          ) : (
-            <Link to={`/community/u/${author.username}`} className="relative z-10 hover:text-(--color-accent)">
-              {author.username}
-            </Link>
-          )}
+        <p className="flex min-w-0 items-center gap-1 text-xs text-(--color-text-dim)">
+          <span className="min-w-0 truncate">
+            {contentKindLabel(content)} ·{" "}
+            {author.unavailable ? (
+              author.username
+            ) : (
+              <Link to={`/community/u/${author.username}`} className="relative z-10 hover:text-(--color-accent)">
+                {author.username}
+              </Link>
+            )}
+          </span>
+          <ReaderGlyph identity={author.readerGlyph} />
         </p>
         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-(--color-text-dim)">
           <span className={`rounded-full border px-2 font-semibold ${STATUS_TONES[status.tone]}`}>{status.label}</span>

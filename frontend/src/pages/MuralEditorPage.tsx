@@ -13,7 +13,6 @@ import { useToast } from "../components/Toaster";
 import { ChevronLeftIcon, FullscreenIcon, PencilIcon, ShareIcon, toolbarIconClass } from "../components/Toolbar";
 import { useGalleryImages } from "../hooks/useGalleryImages";
 import { useLibrary } from "../hooks/useLibrary";
-import { useGenreEnrichment } from "../hooks/useGenreEnrichment";
 import { useMuralFullscreen } from "../hooks/useMuralFullscreen";
 import { useMurals } from "../hooks/useMurals";
 import { useTierlists } from "../hooks/useTierlists";
@@ -45,7 +44,7 @@ export function MuralEditorPage() {
   const { muralId } = useParams<{ muralId: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { data: library, updateLibrary } = useLibrary();
+  const { data: library } = useLibrary();
   const { data: muralsData, isLoading, refetch, create, rename, saveBlocks, currentMural, share, unshare } = useMurals();
   const toast = useToast();
   const { images } = useGalleryImages();
@@ -71,7 +70,6 @@ export function MuralEditorPage() {
   // it unchanged.
   const isDraft = muralId === "new";
   const mural = isDraft ? undefined : murals.find((m) => m.id === muralId);
-  const genreEnrichment = useGenreEnrichment(books, mural?.blocks.some((block) => block.type === "profile" || block.type === "readerCard") ?? false, updateLibrary);
   // Which folder the draft belongs to, carried from the list page so a
   // mural created from inside a folder lands in it.
   const draftFolderId = searchParams.get("folder");
@@ -523,8 +521,6 @@ export function MuralEditorPage() {
           </button>
         </div>
       </header>
-
-      {genreEnrichment.error && <p role="alert" className="mb-4 text-sm text-(--color-danger)">{genreEnrichment.error}</p>}
 
       {view.blocks.length === 0 && !mobileDraft && (
         // Editing is already on in the second case, so telling you to turn
