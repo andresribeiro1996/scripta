@@ -194,7 +194,7 @@ function toPublicBookData(book: Record<string, unknown>): PublicBookData {
     author: typeof book.Attribution === "string" && book.Attribution ? book.Attribution : "Unknown author",
     isbn,
     imageId,
-    coverUrl: manualCoverUrl ?? peekCachedCoverUrl({ isbn, imageId }),
+    coverUrl: manualCoverUrl ?? peekCachedCoverUrl({ isbn, title: typeof book.Title === "string" ? book.Title : null, author: typeof book.Attribution === "string" ? book.Attribution : null }),
     readStatus: typeof book.ReadStatus === "number" ? book.ReadStatus : null
   };
 }
@@ -238,7 +238,7 @@ function toPublicLibraryBook(book: Record<string, unknown>): Record<string, unkn
     ReadStatus: typeof book.ReadStatus === "number" ? book.ReadStatus : undefined,
     SeriesNumber: typeof book.SeriesNumber === "number" ? book.SeriesNumber : undefined,
     _order: typeof book._order === "number" ? book._order : undefined,
-    _coverUrl: manualCoverUrl ?? peekCachedCoverUrl({ isbn, imageId })
+    _coverUrl: manualCoverUrl ?? peekCachedCoverUrl({ isbn, title: typeof book.Title === "string" ? book.Title : null, author: typeof book.Attribution === "string" ? book.Attribution : null })
   };
 }
 

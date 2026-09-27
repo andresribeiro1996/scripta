@@ -11,18 +11,6 @@ import { MIN_GOOD_WIDTH } from "../../domain/constants.js";
 
 const adapterDir = dirname(fileURLToPath(import.meta.url));
 
-export function openCoversDb(): DatabaseSync {
-  mkdirSync(dirname(env.COVERS_DB_PATH), { recursive: true });
-
-  const db = new DatabaseSync(env.COVERS_DB_PATH);
-  db.exec("PRAGMA journal_mode = WAL");
-
-  const schema = readFileSync(`${adapterDir}/schema.sql`, "utf8");
-  db.exec(schema);
-
-  return db;
-}
-
 const LEGACY_CHECKED_AT = "1970-01-01T00:00:00.000Z";
 
 interface LegacyCoverRow {

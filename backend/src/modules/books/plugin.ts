@@ -1,58 +1,64 @@
-// Composition root — mirrors modules/gallery/plugin.ts's shape.
-//
-// Registers UNCONDITIONALLY now, unlike the module's very first version —
-// caching Kobo CDN/Open Library/Google Books hits needs no key at all,
-// so there's no reason to gate the whole module behind Hardcover being
-// configured. Only the Hardcover STEP within the resolution chain is
-// conditional (see below) — service.ts's own resolveCover already treats
-// a missing hardcoverLookup as "skip that one candidate," the exact same
-// "an unavailable source just means try the next thing" contract every
-// other candidate already follows.
-
+import fastifyMultipart from "@fastify/multipart";
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
-import { env, hardcoverConfigured } from "../../config/env.js";
+import { env, isbndbConfigured } from "../../config/env.js";
 import { createFsCoverBlobStore } from "./adapters/fs/fsCoverBlobStore.js";
-import { createHardcoverCoverLookup } from "./adapters/hardcover/hardcoverCoverLookup.js";
-import { openCoversDb } from "./adapters/sqlite/connection.js";
-import { createSqliteCoverCacheRepository } from "./adapters/sqlite/sqliteCoverCacheRepository.js";
-import { buildCachedFileRoute, buildResolveRoute } from "./routes.js";
-import { createCoversService } from "./service.js";
+import { createThrottle, fetchBytes } from "./adapters/http/http.js";
+import { createOpenLibraryCatalog } from "./adapters/openlibrary/openLibraryCatalog.js";
+import { createAppleSource } from "./adapters/sources/apple.js";
+import { createIsbndbSource } from "./adapters/sources/isbndb.js";
+import { createOpenLibraryCoverSource } from "./adapters/sources/openLibrary.js";
+import { openBooksDb } from "./adapters/sqlite/connection.js";
+import { createSqliteBooksRepository } from "./adapters/sqlite/sqliteBooksRepository.js";
+import { createBooksService, MAX_UPLOAD_BYTES } from "./booksService.js";
+import type { FetchCoverImage } from "./coverResolver.js";
+import { encodeCover } from "./domain/images.js";
+import { buildAdminRoutes, buildCatalogRoutes, buildCoverFileRoutes, buildResolveRoutes } from "./routes.js";
+import { createCoverWorker } from "./worker.js";
 
-export async function coversPlugin(app: FastifyInstance) {
-  // --- composition: swap any of these to change storage/lookup technology ---
-  const db = openCoversDb();
-  const cacheRepo = createSqliteCoverCacheRepository(db);
-  const blobStore = createFsCoverBlobStore(env.COVERS_STORAGE_PATH);
-  const hardcoverLookup = hardcoverConfigured ? createHardcoverCoverLookup(env.HARDCOVER_API_KEY) : null;
-  const publicUrlFor = (id: string) => `${env.PUBLIC_API_URL}/covers/cached/${id}/file`;
-  const coversService = createCoversService(cacheRepo, blobStore, hardcoverLookup, publicUrlFor);
-  // ---------------------------------------------------------------------------
+const ISBNDB_GAP_MS = 1100;
+const APPLE_GAP_MS = 3200;
+const OPEN_LIBRARY_GAP_MS = 1000;
 
-  // Two SEPARATE registrations, each its own Fastify encapsulation scope
-  // (an inline async plugin function, same trick modules/auth/plugin.ts's
-  // own rate-limit scoping already uses) — @fastify/rate-limit applies
-  // per-scope, so each of these gets its own independent limit rather
-  // than sharing one. That split matters here specifically: a resolve on
-  // a cache MISS can mean 4-5 sequential external requests plus a sharp
-  // re-encode, genuinely worth protecting; a cached-file read is a
-  // single local disk read, the same cost profile gallery's own
-  // (unlimited) GET /gallery/:id/file already has. A real library's full
-  // page load fires roughly one of EACH per book, nearly simultaneously —
-  // discovered live, loading a 26-book test library: a single SHARED
-  // 60/min limit covering both routes let the file-serving route get
-  // starved by the resolve route's own traffic, 429ing plain cached-image
-  // requests that had nothing to do with the expensive path at all (and
-  // browsers treat a JSON error body served in place of an expected image
-  // as a hard failure — ERR_BLOCKED_BY_ORB — not a retryable one).
+export async function booksPlugin(app: FastifyInstance) {
+  const repo = createSqliteBooksRepository(openBooksDb());
+  const openLibraryThrottle = createThrottle(OPEN_LIBRARY_GAP_MS);
+  const fetchImage: FetchCoverImage = async (candidate) => {
+    const bytes = await fetchBytes(candidate.source, candidate.url);
+    return bytes ? encodeCover(bytes) : null;
+  };
+  const service = createBooksService({
+    repo,
+    blobs: createFsCoverBlobStore(env.COVERS_STORAGE_PATH),
+    sources: {
+      isbndb: isbndbConfigured ? createIsbndbSource(env.ISBNDB_API_KEY, createThrottle(ISBNDB_GAP_MS)) : null,
+      apple: createAppleSource(createThrottle(APPLE_GAP_MS)),
+      openlibrary: createOpenLibraryCoverSource(openLibraryThrottle)
+    },
+    catalog: createOpenLibraryCatalog(openLibraryThrottle),
+    fetchImage,
+    enqueue: (bookId, front) => worker.enqueue(bookId, front),
+    publicUrlFor: (id, size) => `${env.PUBLIC_API_URL}/covers/cached/${id}/${size}`,
+    adminUserId: env.ADMIN_USER_ID
+  });
+  const worker = createCoverWorker(
+    (bookId) => service.processBook(bookId),
+    (error, bookId) => app.log.error({ err: error, bookId }, "cover lookup failed")
+  );
+  app.addHook("onClose", async () => worker.stop());
+
+  await app.register(async (scoped) => {
+    await scoped.register(fastifyRateLimit, { max: 1200, timeWindow: "1 minute" });
+    await scoped.register(buildResolveRoutes(service));
+  });
   await app.register(async (scoped) => {
     await scoped.register(fastifyRateLimit, { max: 300, timeWindow: "1 minute" });
-    await scoped.register(buildResolveRoute(coversService));
+    await scoped.register(buildCatalogRoutes(service));
   });
-
-  // No rate limit at all — same as gallery's own file-serving route.
-  // Nothing here does external network calls or re-encoding; it's a
-  // lookup by an unguessable UUID and a local file read, the exact same
-  // trust/cost model as a plain static asset.
-  await app.register(buildCachedFileRoute(coversService));
+  await app.register(async (scoped) => {
+    await scoped.register(fastifyRateLimit, { max: 30, timeWindow: "1 minute" });
+    await scoped.register(fastifyMultipart, { limits: { fileSize: MAX_UPLOAD_BYTES, files: 1 } });
+    await scoped.register(buildAdminRoutes(service));
+  });
+  await app.register(buildCoverFileRoutes(service));
 }
