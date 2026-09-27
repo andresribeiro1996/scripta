@@ -49,7 +49,8 @@ export function resolveMuralPublicPayload(
     highlightRefs: refs.highlightRefs,
     needsCurrentlyReading: refs.needsCurrentlyReading,
     statsMetrics: [...refs.statsMetrics],
-    needsShelfTheme: refs.needsShelfTheme
+    needsShelfTheme: refs.needsShelfTheme,
+    needsReaderCard: refs.needsReaderCard
   });
 
   const imageIds = [...refs.imageIds, ...(row.cover_image_id ? [row.cover_image_id] : [])];

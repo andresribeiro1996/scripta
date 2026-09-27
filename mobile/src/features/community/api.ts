@@ -1,4 +1,4 @@
-import type { LibraryData, MuralBlock, ResolvedTierlist, ShelfTheme } from "@scripta/shared";
+import type { LibraryData, MuralBlock, PublicReaderCard, ResolvedTierlist, ShelfTheme } from "@scripta/shared";
 import type { DashboardFeedPage } from "@scripta/shared/dashboard";
 import type {
   ActivityItem,
@@ -25,6 +25,7 @@ export interface CommunityProfileView {
       currentlyReading: PublicBookData[];
       stats: Record<string, number>;
       shelfTheme?: ShelfTheme;
+      readerCard?: PublicReaderCard;
     };
     imageUrls: Record<string, string | null>;
     tierlists: Record<string, ResolvedTierlist>;

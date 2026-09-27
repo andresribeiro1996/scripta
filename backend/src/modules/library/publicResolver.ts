@@ -27,7 +27,7 @@
 // plugin can be reworked without this file needing to change at all.
 
 import type { DatabaseSync } from "node:sqlite";
-import { calculateShelfTheme, type ShelfTheme } from "@scripta/shared";
+import { calculateShelfTheme, publicReaderCard, readerIdentity, type Group, type PublicReaderCard, type ShelfTheme } from "@scripta/shared";
 // Cross-module dependency, same discipline as murals/routes.ts importing
 // this very file only from library/index.ts: peekCachedCoverUrl is
 // covers' own public surface for a synchronous, cache-only cover lookup —
@@ -62,6 +62,7 @@ export interface ResolvedPublicData {
   currentlyReading: PublicBookData[];
   stats: Record<string, number>;
   shelfTheme?: ShelfTheme;
+  readerCard?: PublicReaderCard;
 }
 
 export interface PublicDataRequest {
@@ -71,6 +72,7 @@ export interface PublicDataRequest {
   needsCurrentlyReading: boolean;
   statsMetrics: string[];
   needsShelfTheme?: boolean;
+  needsReaderCard?: boolean;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -359,7 +361,9 @@ export function resolvePublicLibraryData(userId: string, req: PublicDataRequest)
     }
   }
 
-  return { books, highlights, currentlyReading, stats, ...(req.needsShelfTheme ? { shelfTheme: calculateShelfTheme(allBooks) } : {}), ...(req.collectionIds ? { collectionBooks } : {}) };
+  const groups = collections as unknown as Group[];
+
+  return { books, highlights, currentlyReading, stats, ...(req.needsShelfTheme ? { shelfTheme: calculateShelfTheme(allBooks) } : {}), ...(req.needsReaderCard ? { readerCard: publicReaderCard(readerIdentity(allBooks, groups)) } : {}), ...(req.collectionIds ? { collectionBooks } : {}) };
 }
 
 export function resolvePublicLibrary(userId: string): Record<string, unknown> | null {

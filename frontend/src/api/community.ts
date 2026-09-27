@@ -11,6 +11,7 @@ import type {
   TournamentSummary
 } from "@scripta/shared/community";
 import type { DashboardFeedPage } from "@scripta/shared/dashboard";
+import type { PublicReaderCard } from "@scripta/shared";
 import type { MuralBlock, ShelfTheme } from "../lib/murals";
 import type { LibraryData } from "./library";
 import { apiFetch, publicFetch } from "./client";
@@ -27,6 +28,7 @@ export interface CommunityProfileView {
       currentlyReading: PublicBookData[];
       stats: Record<string, number>;
       shelfTheme?: ShelfTheme;
+      readerCard?: PublicReaderCard;
     };
     imageUrls: Record<string, string | null>;
     tierlists: Record<string, ResolvedTierlist>;

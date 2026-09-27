@@ -73,3 +73,54 @@ test("murals routes preserve ownership, edits and public content boundaries", as
     db.close();
   }
 });
+
+test("public mural payload carries the reader card without leaking titles or series names", async () => {
+  const db = new DatabaseSync(":memory:");
+  db.exec(readFileSync(new URL("./adapters/sqlite/schema.sql", import.meta.url), "utf8"));
+  const service = createMuralsService(createSqliteMuralsRepository(db), (token) => `https://example.test/shared/${token}`);
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", (token: string) => getAuthenticatedUserFromAccessToken(token, (id) => id === "cardOwner" ? {
+    id, email: `${id}@example.test`, username: id, avatar_id: null, google_id: null, password_hash: null, created_at: ""
+  } : undefined));
+  await app.register(buildMuralRoutes(service));
+  await app.register(buildPublicMuralRoutes(service));
+  const library = openLibraryDb();
+  try {
+    const create = () => app.inject({ method: "POST", url: "/murals", headers: authorization("cardOwner"), payload: { name: "My reading space" } });
+    const [withCard, withoutCard] = await Promise.all([create(), create()]);
+    const seriesBooks = [
+      { Title: "Klara 1", Attribution: "Author A", ReadStatus: 2 },
+      { Title: "Klara 2", Attribution: "Author B", ReadStatus: 2 },
+      { Title: "Klara 3", Attribution: "Author C", ReadStatus: 2 }
+    ];
+    const otherBooks = Array.from({ length: 7 }, (_, i) => ({ Title: `Standalone ${i}`, Attribution: `Author ${i + 4}`, ReadStatus: 2 }));
+    const books = [...seriesBooks, ...otherBooks];
+    library.prepare("INSERT INTO library_documents (user_id, data) VALUES (?, ?)").run("cardOwner", JSON.stringify({
+      books,
+      groups: [{ id: "series-id", type: "series", name: "Secret Series", bookKeys: seriesBooks.map(bookKey) }]
+    }));
+    const cardHome = withCard.json();
+    const noCardHome = withoutCard.json();
+    service.updateMural("cardOwner", cardHome.id, { blocks: [{ id: "c", type: "readerCard", layout: { x: 0, y: 0, w: 4, h: 6 } }], updatedAt: cardHome.updatedAt });
+    const sharedWithCard = service.share("cardOwner", cardHome.id)!;
+    const sharedWithoutCard = service.share("cardOwner", noCardHome.id)!;
+    const withCardResponse = await app.inject({ method: "GET", url: `/murals/shared/${sharedWithCard.shareToken}` });
+    const withoutCardResponse = await app.inject({ method: "GET", url: `/murals/shared/${sharedWithoutCard.shareToken}` });
+    const withCardBody = withCardResponse.json();
+    assert.deepEqual(withCardBody.readerCard, {
+      state: "settled",
+      identity: "carto",
+      runnerUp: null,
+      signal: { counted: 3, of: 10, label: "3 of 10 finished books are in a series" },
+      coverage: ["genres known for 0 of 10 finished books"]
+    });
+    const readerCardJson = JSON.stringify(withCardBody.readerCard);
+    assert.equal(readerCardJson.includes("Secret Series"), false);
+    assert.equal(readerCardJson.includes("Klara"), false);
+    assert.equal("readerCard" in withoutCardResponse.json(), false);
+  } finally {
+    await app.close();
+    library.close();
+    db.close();
+  }
+});
