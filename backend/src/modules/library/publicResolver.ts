@@ -289,10 +289,6 @@ function emptyResult(req: PublicDataRequest): ResolvedPublicData {
   return req.needsReaderCard ? { ...EMPTY_RESULT, readerCard: publicReaderCard(readerIdentity([], [])) } : EMPTY_RESULT;
 }
 
-// The document-level parsing (and its tolerant convention: unparseable or
-// missing means null, never a thrown error) shared by resolvePublicLibraryData
-// below and library/index.ts's readerGlyphFor — one copy of the "does this
-// user even have a readable library document" question.
 interface ParsedLibraryDocument {
   allBooks: Record<string, unknown>[];
   groupRecords: Record<string, unknown>[];

@@ -401,6 +401,7 @@ test("dashboard actors carry a reader glyph only when published and switched on,
   assert.equal(actorFor("c").readerGlyph, undefined);
   assert.equal(readerGlyphCalls.filter((id) => id === "a").length, 1);
   assert.equal(readerGlyphCalls.includes("b"), false);
+  assert.deepEqual(Object.keys(actorFor("a")).sort(), ["avatarUrl", "readerGlyph", "userId", "username"]);
 });
 
 test("follow rows surface only to the followee and retract on unfollow", () => {
@@ -566,6 +567,21 @@ test("discover authors carry a reader glyph only when published and switched on"
   assert.equal(items.find((i) => i.content.id === "t1")?.author.readerGlyph, "star");
   assert.equal(items.find((i) => i.content.id === "t2")?.author.readerGlyph, undefined);
   assert.equal(readerGlyphCalls.includes("bob"), false);
+});
+
+test("discover carries no glyph for an unpublished author with the switch on", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs, readerGlyphs, readerGlyphCalls } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("carol", reader("carol"));
+  repo.upsertProfile(profileRow("carol", { published: 0 }));
+  repo.updateFeedSettings("carol", { ...DEFAULT_FEED_SETTINGS, readerGlyph: true });
+  readerGlyphs.set("carol", "star");
+  tierlistRefs.set("t1", tierRef("t1", "carol"));
+
+  const items = service.getDiscover("all", "", 10, 0).items;
+  assert.equal(items.find((i) => i.content.id === "t1")?.author.readerGlyph, undefined);
+  assert.equal(readerGlyphCalls.includes("carol"), false);
 });
 
 test("people search excludes self and unpublished profiles", () => {

@@ -276,6 +276,12 @@ test("readerGlyphFor returns null for a library that only leans toward an identi
   assert.equal(readerGlyphFor("leaning-user"), null);
 });
 
+test("readerGlyphFor returns null for an Unwritten library, distinct from a missing document", () => {
+  const books = shelf(3);
+  seedLibraryDocument("unwritten-user", { books, groups: [] });
+  assert.equal(readerGlyphFor("unwritten-user"), null);
+});
+
 test("readerGlyphFor returns null when the user has no library document", () => {
   assert.equal(readerGlyphFor("ghost-user"), null);
 });
