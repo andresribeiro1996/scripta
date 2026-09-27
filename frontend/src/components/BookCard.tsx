@@ -18,12 +18,12 @@ const BookIcon = () => (
  *  backend's own cover cache existed, or a manually-supplied preview URL
  *  (LibraryStylePage.tsx's sample books). No network involved at all in
  *  that case; it's used exactly as given. Otherwise, one call to the
- *  backend's cache-aware GET /covers/resolve (api/covers.ts) — the ENTIRE
- *  cover-resolution chain (Kobo CDN, Open Library, Google Books,
- *  Hardcover, and a global cache checked before any of those) now lives
- *  server-side; see lib/covers.ts's own top comment for why it moved
- *  there and backend/src/modules/covers for where it lives now. Renders
- *  the fallback icon until — and unless — something resolves.
+ *  backend's cache-aware GET /covers/resolve (api/covers.ts, wrapping
+ *  @scripta/shared's createCoverResolver) — the ENTIRE cover-resolution
+ *  chain (ISBNdb, Apple Books, Open Library, and the shared book/cover
+ *  database checked before any of those) lives server-side, in
+ *  backend/src/modules/books. Renders the fallback icon until — and
+ *  unless — something resolves.
  *
  *  If the confirmed URL itself fails to load (a stale external URL from
  *  before the cache existed, most likely — a real custom cover practically

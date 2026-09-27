@@ -228,7 +228,6 @@ function toPublicBookData(book: Record<string, unknown>): PublicBookData {
  *  Kobo/Goodreads field — nothing outside the list above, ever. */
 function toPublicLibraryBook(book: Record<string, unknown>): Record<string, unknown> {
   const isbn = normalizeIsbn(book.ISBN) || null;
-  const imageId = normalizeImageId(book.ImageId) || null;
   const manualCoverUrl = typeof book._coverUrl === "string" ? book._coverUrl : null;
   return {
     Title: typeof book.Title === "string" ? book.Title : undefined,

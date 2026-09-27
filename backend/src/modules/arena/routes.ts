@@ -204,7 +204,7 @@ export function buildArenaRoutes(service: ArenaService) {
 
 // Registered in its OWN Fastify encapsulation scope (plugin.ts) so it can
 // carry its own rate limit, independent of every other /arenas route —
-// same reasoning as modules/covers/plugin.ts's two-scopes split: this is
+// same reasoning as modules/books/plugin.ts's multi-scope split: this is
 // the app's first anonymous (unauthenticated) WRITE endpoint, worth
 // protecting on its own rather than sharing a limit with authed routes.
 export function buildVoteRoute(service: ArenaService) {

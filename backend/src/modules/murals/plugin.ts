@@ -1,5 +1,5 @@
 // The murals module's Fastify plugin and composition root — mirrors
-// modules/library/plugin.ts's shape, plus modules/covers/plugin.ts's
+// modules/library/plugin.ts's shape, plus modules/books/plugin.ts's
 // pattern of registering EACH route builder in its own Fastify
 // encapsulation scope so each can carry its own independent rate limit.
 
@@ -32,7 +32,7 @@ export async function muralsPlugin(app: FastifyInstance, opts: MuralsPluginOptio
   // -----------------------------------------------------------------------
 
   // Two SEPARATE registrations, each its own Fastify encapsulation scope,
-  // same trick modules/covers/plugin.ts uses (see that file's own
+  // same trick modules/books/plugin.ts uses (see that file's own
   // comment for the full reasoning): a single rate limit shared across
   // the WHOLE plugin used to also cover ordinary authenticated editing
   // (one PUT per drag-end/resize-end/block-add/rename), which trivially
