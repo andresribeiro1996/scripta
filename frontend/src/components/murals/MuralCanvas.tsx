@@ -1,5 +1,5 @@
 import { MuralBlockDetail } from "./MuralBlockDetail";
-import { resolveHomeBlock, type Group } from "@scripta/shared";
+import { resolveHomeBlock, type Group, type PublicReaderCard } from "@scripta/shared";
 import GridLayout from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
@@ -25,6 +25,7 @@ export function MuralCanvas({
   images,
   profile,
   shelfThemeOverride,
+  readerCardOverride,
   onLayoutChange,
   onConfigureBlock,
   onStyleBlock,
@@ -50,6 +51,7 @@ export function MuralCanvas({
   images: GalleryImage[];
   profile?: ReaderProfile;
   shelfThemeOverride?: ShelfTheme;
+  readerCardOverride?: PublicReaderCard;
   onLayoutChange?: (blockId: string, layout: BlockLayout) => void;
   onConfigureBlock?: (block: MuralBlock) => void;
   onStyleBlock?: (block: MuralBlock) => void;
@@ -95,7 +97,9 @@ export function MuralCanvas({
         books={books}
         images={images}
         profile={profile}
+        groups={groups}
         shelfThemeOverride={shelfThemeOverride}
+        readerCardOverride={readerCardOverride}
         selectedBlockId={selectedBlockId}
         draft={mobileDraft}
         busy={busy}
@@ -161,7 +165,7 @@ export function MuralCanvas({
             }}
           >
             {!editMode ? <button className="absolute inset-0 z-10 rounded-[inherit] focus-visible:outline-2 focus-visible:outline-(--color-accent)" aria-label={`Open ${block.type} block`} onClick={() => onOpenBlock ? onOpenBlock(block) : setFocusedId(block.id)} /> : null}
-            <BlockRenderer block={block} books={books} images={images} profile={profile} shelfThemeOverride={shelfThemeOverride} statsOverride={statsOverride} tierlistData={tierlistData} />
+            <BlockRenderer block={block} books={books} images={images} profile={profile} groups={groups} shelfThemeOverride={shelfThemeOverride} readerCardOverride={readerCardOverride} statsOverride={statsOverride} tierlistData={tierlistData} />
             {editMode && (
               <div className="mural-block-controls absolute top-1.5 right-1.5 opacity-0 transition-opacity group-hover:opacity-100">
                 <OptionsMenu
@@ -179,7 +183,7 @@ export function MuralCanvas({
         );
       })}
     </ResponsiveGridLayout>
-    {focusedId && mural.blocks.some((block) => block.id === focusedId) ? <MuralBlockDetail block={mural.blocks.find((block) => block.id === focusedId)!} books={books} images={images} profile={profile} shelfThemeOverride={shelfThemeOverride} statsOverride={statsOverride} tierlistData={tierlistData} onClose={() => setFocusedId(null)} /> : null}
+    {focusedId && mural.blocks.some((block) => block.id === focusedId) ? <MuralBlockDetail block={mural.blocks.find((block) => block.id === focusedId)!} books={books} images={images} profile={profile} groups={groups} shelfThemeOverride={shelfThemeOverride} readerCardOverride={readerCardOverride} statsOverride={statsOverride} tierlistData={tierlistData} onClose={() => setFocusedId(null)} /> : null}
     </>
   );
 }

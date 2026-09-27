@@ -1,9 +1,12 @@
+import type { Group, PublicReaderCard } from "@scripta/shared";
 import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
 import { bookKey } from "../../lib/merge";
 import { computeStat } from "../../lib/muralStats";
 import { calculateShelfTheme, muralBlockTitle, resolveQuote, resolveQuoteCollection, resolveShelfBooks, type MuralBlock, type ReaderProfile, type ShelfTheme } from "../../lib/murals";
 import { CoverImage } from "../BookCard";
+import { ReaderCardPlate } from "./blocks/ReaderCardBlock";
+import { useReaderCard } from "../../hooks/useReaderCard";
 
 const PREVIEW_STAT_LABELS = {
   totalBooks: "Library",
@@ -18,7 +21,9 @@ export function MobileBlockPreview({
   books,
   images,
   profile,
+  groups,
   shelfThemeOverride,
+  readerCardOverride,
   width,
   height,
   statsOverride,
@@ -28,13 +33,16 @@ export function MobileBlockPreview({
   books: Array<Record<string, unknown>>;
   images: GalleryImage[];
   profile?: ReaderProfile;
+  groups?: Group[];
   shelfThemeOverride?: ShelfTheme;
+  readerCardOverride?: PublicReaderCard;
   width: number;
   height: number;
   statsOverride?: Record<string, number>;
   tierlistData?: (id: string) => ResolvedTierlist | undefined;
 }) {
   const title = muralBlockTitle(block, books, block.type === "tierlist" ? tierlistData?.(block.tierlistId)?.name : undefined);
+  const { card: readerCard, own: readerOwn } = useReaderCard(books, groups ?? [], readerCardOverride);
   const compact = height < 64 || width < 80;
   const heading = <p className="shrink-0 truncate text-[14px] leading-5 font-semibold">{title}</p>;
   const placeholder = (
@@ -47,6 +55,13 @@ export function MobileBlockPreview({
   if (block.type === "profile") {
     const theme = shelfThemeOverride ?? calculateShelfTheme(books);
     return <div className="flex h-full flex-col gap-2 overflow-hidden p-2"><div className="flex items-center gap-2">{profile?.avatarUrl ? <img src={profile.avatarUrl} alt="" className="h-10 w-10 rounded-full object-cover" /> : <div className="flex h-10 w-10 items-center justify-center rounded-full bg-(--color-accent-soft) font-bold text-(--color-accent)">{(profile?.username || "Reader")[0]?.toUpperCase()}</div>}<div className="min-w-0"><p className="truncate font-semibold">@{profile?.username || "reader"}</p>{block.bio && height >= 80 ? <p className="line-clamp-2 text-[12px] text-(--color-text-dim)">{block.bio}</p> : null}</div></div>{height >= 100 && theme.genres.length > 0 ? <p className="truncate text-[12px] text-(--color-text-dim)">{theme.genres.join(" · ")}</p> : null}</div>;
+  }
+  if (block.type === "readerCard") {
+    return (
+      <div className="flex h-full items-center justify-center overflow-hidden p-1">
+        <ReaderCardPlate card={readerCard} own={readerOwn} readerName={profile?.username || "reader"} />
+      </div>
+    );
   }
   if ((height < 32 || width < 48) && block.type !== "image" && block.type !== "spotlight") {
     const symbol =

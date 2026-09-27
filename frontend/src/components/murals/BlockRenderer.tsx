@@ -1,9 +1,12 @@
+import type { Group, PublicReaderCard } from "@scripta/shared";
 import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
 import type { MuralBlock, ReaderProfile, ShelfTheme } from "../../lib/murals";
 import { CurrentlyReadingBlockView, ShelfBlockView, SpotlightBlockView, TierListBlockView } from "./blocks/BookBlocks";
 import { ImageBlockView, ProfileBlockView, StatsBlockView, TextBlockView } from "./blocks/MiscBlocks";
 import { QuoteBlockView, QuoteCollectionBlockView } from "./blocks/QuoteBlocks";
+import { ReaderCardPlate } from "./blocks/ReaderCardBlock";
+import { useReaderCard } from "../../hooks/useReaderCard";
 
 /** Dispatches a block to its view-mode renderer by `type` — the one place
  *  that knows every block type exists, so adding a new type later means
@@ -23,7 +26,9 @@ export function BlockRenderer({
   books,
   images,
   profile,
+  groups,
   shelfThemeOverride,
+  readerCardOverride,
   statsOverride,
   tierlistData
 }: {
@@ -31,7 +36,9 @@ export function BlockRenderer({
   books: Array<Record<string, unknown>>;
   images: GalleryImage[];
   profile?: ReaderProfile;
+  groups?: Group[];
   shelfThemeOverride?: ShelfTheme;
+  readerCardOverride?: PublicReaderCard;
   /** See MuralCanvas.tsx's own comment — threaded straight through to
    *  StatsBlockView, ignored by every other case. */
   statsOverride?: Record<string, number>;
@@ -40,6 +47,7 @@ export function BlockRenderer({
    *  "unavailable" state. See this file's own top comment. */
   tierlistData?: (tierlistId: string) => ResolvedTierlist | undefined;
 }) {
+  const { card, own } = useReaderCard(books, groups ?? [], readerCardOverride);
   switch (block.type) {
     case "spotlight":
       return <SpotlightBlockView block={block} books={books} />;
@@ -61,6 +69,8 @@ export function BlockRenderer({
       return <StatsBlockView block={block} books={books} statsOverride={statsOverride} />;
     case "tierlist":
       return <TierListBlockView tierlist={tierlistData?.(block.tierlistId)} books={books} />;
+    case "readerCard":
+      return <ReaderCardPlate card={card} own={own} readerName={profile?.username || "reader"} />;
     case "empty":
       // Genuinely nothing to render — the block wrapper itself
       // (MuralCanvas.tsx) already carries the whole BlockStyle

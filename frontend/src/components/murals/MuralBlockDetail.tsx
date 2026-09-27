@@ -1,4 +1,5 @@
 import { useRef, useState, type ReactNode } from "react";
+import { READER_PLATES, type Group, type PublicReaderCard } from "@scripta/shared";
 import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
 import {
@@ -17,13 +18,17 @@ import { CoverImage } from "../BookCard";
 import { BookSummary } from "../BookSummary";
 import { Sheet } from "../Sheet";
 import { ProfileBlockView } from "./blocks/MiscBlocks";
+import { ReaderCardDetail, ReaderCardPlate } from "./blocks/ReaderCardBlock";
+import { useReaderCard } from "../../hooks/useReaderCard";
 
 export function MuralBlockDetail({
   block,
   books,
   images,
   profile,
+  groups: libraryGroups,
   shelfThemeOverride,
+  readerCardOverride,
   statsOverride,
   tierlistData,
   onClose,
@@ -33,7 +38,9 @@ export function MuralBlockDetail({
   books: Array<Record<string, unknown>>;
   images: GalleryImage[];
   profile?: ReaderProfile;
+  groups?: Group[];
   shelfThemeOverride?: ShelfTheme;
+  readerCardOverride?: PublicReaderCard;
   statsOverride?: Record<string, number>;
   tierlistData?: (tierlistId: string) => ResolvedTierlist | undefined;
   onClose: () => void;
@@ -45,6 +52,7 @@ export function MuralBlockDetail({
   const spotlight = block.type === "spotlight" ? books.find((book) => bookKey(book) === block.bookKey) : undefined;
   const book = selectedBook ?? spotlight;
   const tierlist = block.type === "tierlist" ? tierlistData?.(block.tierlistId) : undefined;
+  const { card: readerCard, own: readerOwn } = useReaderCard(books, libraryGroups ?? [], readerCardOverride);
   const groups =
     block.type === "shelf"
       ? [{ title: "", books: resolveShelfBooks(block, books) }]
@@ -67,9 +75,16 @@ export function MuralBlockDetail({
       : block.type === "quote"
         ? [resolveQuote(block, books)].filter((quote) => quote !== null)
         : [];
+  const title = book
+    ? "Book details"
+    : block.type === "readerCard"
+      ? readerCard.identity
+        ? `The ${READER_PLATES.find((item) => item.key === readerCard.identity)?.name}`
+        : "Unwritten"
+      : muralBlockTitle(block, books, tierlist?.name);
   return (
     <Sheet
-      title={book ? "Book details" : muralBlockTitle(block, books, tierlist?.name)}
+      title={title}
       onBack={
         selectedBook
           ? () => {
@@ -133,6 +148,13 @@ export function MuralBlockDetail({
           </div>
         ) : block.type === "profile" ? (
           <ProfileBlockView block={block} books={books} profile={profile} shelfThemeOverride={shelfThemeOverride} />
+        ) : block.type === "readerCard" ? (
+          <div className="space-y-5">
+            <div className="mx-auto h-56 max-w-full">
+              <ReaderCardPlate card={readerCard} own={readerOwn} readerName={profile?.username || "reader"} />
+            </div>
+            <ReaderCardDetail card={readerCard} own={readerOwn} />
+          </div>
         ) : block.type === "stats" ? (
           <div className="grid grid-cols-2 gap-x-6 gap-y-5 py-1">
             {block.metrics.map((metric) => (
