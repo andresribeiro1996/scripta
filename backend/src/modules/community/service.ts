@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
-import type { ReaderProfile } from "@scripta/shared";
+import type { IdentityKey, ReaderProfile } from "@scripta/shared";
 import { categoryFor, contentDetail, decodeCursor, encodeCursor, DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
-import type { ActivityEventType, ActivityItem, CommunityEventType, DiscoverItem, DiscoverType, FeedCategory, FeedSettings, FollowState, OwnProfile, Page, PersonResult, PublishedContent, PublishedProfile, TierlistSummary, TournamentSummary } from "@scripta/shared/community";
+import type { ActivityEventType, ActivityItem, CommunityAuthor, CommunityEventType, DiscoverItem, DiscoverType, FeedCategory, FeedSettings, FollowState, OwnProfile, Page, PersonResult, PublishedContent, PublishedProfile, TierlistSummary, TournamentSummary } from "@scripta/shared/community";
 import type { DashboardFeedPage, DigestItem } from "@scripta/shared/dashboard";
 import type { PublishedTournamentRef } from "../arena/service.js";
 import type { MuralsPublicApi } from "../murals/publicApi.js";
@@ -51,6 +51,7 @@ export interface CommunityDeps {
   resolveProfile(userId: string): ReaderProfile | undefined;
   resolveProfiles(userIds: string[]): Map<string, ReaderProfile>;
   resolveLibrary(userId: string): Record<string, unknown> | null;
+  readerGlyphFor(userId: string): IdentityKey | null;
   userHasUsername(userId: string): boolean;
   findUserIdByUsername(username: string): string | undefined;
   searchUsernameOwners(query: string, limit: number): string[];
@@ -95,6 +96,19 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
     repo.insertEvent({ id: randomUUID(), user_id: userId, type, ref_type: refType, ref_id: refId, payload: payload ? JSON.stringify(payload) : null, created_at: new Date().toISOString() });
   };
   const settingsFor = (userId: string): FeedSettings => repo.getFeedSettings(userId) ?? DEFAULT_FEED_SETTINGS;
+  const glyphsFor = (userIds: string[]): Map<string, IdentityKey | null> => {
+    const glyphs = new Map<string, IdentityKey | null>();
+    for (const id of userIds) {
+      if (repo.getProfileRow(id)?.published !== 1) continue;
+      if (!settingsFor(id).readerGlyph) continue;
+      glyphs.set(id, deps.readerGlyphFor(id));
+    }
+    return glyphs;
+  };
+  const withGlyph = (author: ReaderProfile, userId: string, glyphs: Map<string, IdentityKey | null>): CommunityAuthor => {
+    const glyph = glyphs.get(userId);
+    return glyph ? { ...author, userId, readerGlyph: glyph } : { ...author, userId };
+  };
   const visibleUserId = (username: string, viewerId: string | undefined): string => {
     const userId = deps.findUserIdByUsername(username);
     if (!userId) throw new ProfileNotFoundError();
@@ -172,9 +186,10 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
       const author = deps.resolveProfiles([userId]).get(userId);
       if (!author) throw new ProfileNotFoundError();
       const mural = row.mural_id ? deps.murals.getMuralPublicPayload(userId, row.mural_id) : null;
+      const glyphs = glyphsFor([userId]);
       const view: PublicProfileView = {
         profile: {
-          user: { ...author, userId },
+          user: withGlyph(author, userId, glyphs),
           publishedAt: row.published_at ?? row.updated_at,
           followerCount: repo.countFollowers(userId),
           followingCount: repo.countFollowing(userId),
@@ -206,6 +221,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
         if (row.follow) actorIds.add(row.follow.follower_id);
       }
       const profiles = deps.resolveProfiles([...actorIds]);
+      const glyphs = glyphsFor([...actorIds]);
       // The publisher's own switches, the same ones their profile's activity
       // list obeys — a category they broadcast there, they broadcast here.
       const settingsCache = new Map<string, FeedSettings>();
@@ -237,13 +253,13 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
               // a placeholder author rather than dropping out of the feed.
               const author = ref && ref.ownerUserId === event.user_id ? actor ?? (ref.promotedAt ? { username: "Original creator unavailable", avatarUrl: null, unavailable: true } : undefined) : undefined;
               if (ref && author) {
-                items.push({ kind: "publication", id: event.id, actor: { ...author, userId: event.user_id }, type: event.type as CommunityEventType, content: toTierlistSummary(ref), createdAt: event.created_at });
+                items.push({ kind: "publication", id: event.id, actor: withGlyph(author, event.user_id, glyphs), type: event.type as CommunityEventType, content: toTierlistSummary(ref), createdAt: event.created_at });
                 lastIncluded = row;
               }
             } else {
               const ref = deps.tournaments.get(event.ref_id);
               if (ref && ref.ownerUserId === event.user_id && actor) {
-                items.push({ kind: "publication", id: event.id, actor: { ...actor, userId: event.user_id }, type: event.type as CommunityEventType, content: toTournamentSummary(ref), createdAt: event.created_at });
+                items.push({ kind: "publication", id: event.id, actor: withGlyph(actor, event.user_id, glyphs), type: event.type as CommunityEventType, content: toTournamentSummary(ref), createdAt: event.created_at });
                 lastIncluded = row;
               }
             }
@@ -254,7 +270,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
               ? (() => { const ref = deps.tierlists.get(event.ref_id); return ref ? toTierlistSummary(ref) : undefined; })()
               : (() => { const ref = deps.tournaments.get(event.ref_id); return ref ? toTournamentSummary(ref) : undefined; })();
             if (content && actor) {
-              items.push({ kind: "vote", id: event.id, actor: { ...actor, userId: event.user_id }, content, createdAt: event.created_at });
+              items.push({ kind: "vote", id: event.id, actor: withGlyph(actor, event.user_id, glyphs), content, createdAt: event.created_at });
               lastIncluded = row;
             }
           } else if (event.type === "book_added" || event.type === "book_finished") {
@@ -264,7 +280,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
               items.push({
                 kind: "reading",
                 id: event.id,
-                actor: { ...actor, userId: event.user_id },
+                actor: withGlyph(actor, event.user_id, glyphs),
                 book: { title: String(payload.title ?? ""), author: String(payload.author ?? ""), coverUrl },
                 finished: event.type === "book_finished",
                 createdAt: event.created_at
@@ -277,7 +293,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
           if (author) {
             // followees is already loaded for the event half of this feed, so
             // knowing whether this is mutual costs nothing extra.
-            items.push({ kind: "follow", id: row.follow.follower_id, actor: { ...author, userId: row.follow.follower_id }, createdAt: row.follow.created_at, viewerFollows: followees.includes(row.follow.follower_id) });
+            items.push({ kind: "follow", id: row.follow.follower_id, actor: withGlyph(author, row.follow.follower_id, glyphs), createdAt: row.follow.created_at, viewerFollows: followees.includes(row.follow.follower_id) });
             lastIncluded = row;
           }
         }
@@ -308,6 +324,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
         }
       }
       const authors = deps.resolveProfiles([...new Set(entries.map((e) => e.userId))]);
+      const glyphs = glyphsFor([...authors.keys()]);
       const visible = entries
         .flatMap((entry) => {
           const author = authors.get(entry.userId) ?? (entry.content.kind === "tierlist" && entry.content.promotedAt ? { username: "Original creator unavailable", avatarUrl: null, unavailable: true } : undefined);
@@ -317,7 +334,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
         })
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
       return {
-        items: visible.slice(offset, offset + limit).map(({ userId, author, content }) => ({ author: { ...author, userId }, content })),
+        items: visible.slice(offset, offset + limit).map(({ userId, author, content }) => ({ author: withGlyph(author, userId, glyphs), content })),
         nextOffset: offset + limit < visible.length ? offset + limit : null
       };
     },
@@ -327,10 +344,11 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
       const candidates = deps.searchUsernameOwners(needle, limit * 2).filter((id) => id !== viewerId);
       const visible = candidates.filter((id) => repo.getProfileRow(id)?.published === 1).slice(0, limit);
       const authors = deps.resolveProfiles(visible);
+      const glyphs = glyphsFor(visible);
       return visible.flatMap((id) => {
         const user = authors.get(id);
         if (!user) return [];
-        return [{ user: { ...user, userId: id }, followerCount: repo.countFollowers(id), viewerFollows: repo.getFollow(viewerId, id) !== undefined }];
+        return [{ user: withGlyph(user, id, glyphs), followerCount: repo.countFollowers(id), viewerFollows: repo.getFollow(viewerId, id) !== undefined }];
       });
     },
     getLibrary(username) {

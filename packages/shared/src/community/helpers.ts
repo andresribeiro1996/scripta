@@ -57,7 +57,8 @@ export const DEFAULT_FEED_SETTINGS: FeedSettings = {
   publications: true,
   reading: false,
   votes: true,
-  follows: true
+  follows: true,
+  readerGlyph: false
 };
 
 export function normalizeFeedSettings(value: unknown): FeedSettings | null {
@@ -69,6 +70,7 @@ export function normalizeFeedSettings(value: unknown): FeedSettings | null {
     if (typeof v[k] !== "boolean") return null;
     out[k] = v[k] as boolean;
   }
+  if (typeof v.readerGlyph === "boolean") out.readerGlyph = v.readerGlyph;
   return out as FeedSettings;
 }
 
