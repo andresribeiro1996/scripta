@@ -33,7 +33,7 @@ export function LandingHero() {
           </a>
         </div>
 
-        <div aria-hidden="true" className="relative mt-2 h-[400px] w-full max-w-[358px] lg:mt-0 lg:h-[560px] lg:w-[480px] lg:max-w-none lg:shrink-0">
+        <div aria-hidden="true" className="relative mx-auto mt-2 h-[400px] w-full max-w-[358px] lg:mx-0 lg:mt-0 lg:h-[560px] lg:w-[480px] lg:max-w-none lg:shrink-0">
           <img
             src={coverSrc("piranesi")}
             alt=""
