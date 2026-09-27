@@ -42,7 +42,7 @@ export function LandingHero() {
               height={1140}
               loading="lazy"
               alt="Atmyshelf on a phone, showing what's being read and what's up next"
-              className="h-auto w-full rounded-[1.75rem] border border-(--color-border) shadow-2xl ring-[6px] ring-(--color-bg)"
+              className="h-auto w-full rounded-[1.75rem] border border-(--color-border) shadow-xl ring-[6px] ring-(--color-bg)"
             />
           </picture>
         </div>

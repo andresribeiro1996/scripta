@@ -24,7 +24,7 @@ export function ReaderCards() {
               height={350}
               loading="lazy"
               alt={`${plate.name} reader card`}
-              className="h-auto w-full shadow-lg"
+              className="h-auto w-full shadow-xl"
             />
           </picture>
         ))}

@@ -1,25 +1,26 @@
-# Scripta Design System
+# Atmyshelf Design System
 
-Local mirror of the live [Scripta Design System](https://claude.ai/artifact/3X65LF3q7Tc4pqEHmReyp6) artifact, for agents (Codex, opencode/GLM) that can't reach a Claude artifact. Claude Code should prefer reading the artifact directly when available, since it has live component previews; this file exists so every agent has the same values.
+Local mirror of the live [Atmyshelf Design System](https://claude.ai/artifact/3X65LF3q7Tc4pqEHmReyp6) artifact, for agents (Codex, opencode/GLM) that can't reach a Claude artifact. Claude Code should prefer reading the artifact directly when available, since it has live component previews; this file exists so every agent has the same values.
 
 **Keeping this in sync**: the artifact is the source of truth. When tokens or components change there, ask Claude Code to regenerate this file from it. This file will drift if edited independently of the artifact.
 
-Extracted from real app source (`frontend/src/index.css`, `mobile/src/ui/theme.tsx`, and the component files cited per section) — not invented. One palette, byte-identical between web's Tailwind v4 `@theme` block and mobile's `palettes` object.
+Extracted from real app source (`frontend/src/index.css`, `mobile/src/ui/theme.tsx`, and the component files cited per section) — not invented. One palette, byte-identical between web's Tailwind v4 `@theme` block (plus its dark-mode `:root` override) and mobile's `palettes` object. The product is Atmyshelf; "Scripta" survives only in package names and the design system's bundle global.
 
 ## Color
 
 | Token | Light | Dark | Usage |
 |---|---|---|---|
-| `bg` | `#f5f4f2` | `#1a1815` | Page background |
-| `surface` | `#ffffff` | `#242220` | Cards, sheets, dialogs, inputs |
-| `surface-hover` | `#fbfaf8` | `#2b2926` | Hover/press state |
-| `text` | `#201e1c` | `#ece8e3` | Primary text (15.1:1 / 14.5:1 on bg) |
-| `text-dim` | `#6b6560` | `#a39c93` | Secondary/caption text (5.2:1+ on bg) |
-| `border` | `#e4e0da` | `#38342f` | Hairlines only — deliberately low-contrast (~1.2–1.4:1), never the sole signal for an interactive edge |
-| `accent` | `#a85c32` | `#e08a52` | Primary action fill, links, focus ring, active tab |
-| `accent-soft` | `#f1e2d8` | `#3a2c22` | Accent chip/badge bg — pair with `text`, not `accent` |
-| `danger` | `#b3432f` | `#e08072` | Destructive actions, error text/border |
-| `danger-soft` | `#f6dfda` | `#3a2420` | Error banner bg — `danger` text on it is 4.38:1 light (just under AA; short labels only) |
+| `bg` | `#f2f0ec` | `#141210` | Page background |
+| `surface` | `#ffffff` | `#2a2724` | Cards, sheets, dialogs, inputs; the whole page on phone-width sign-in screens |
+| `surface-hover` | `#f7f5f1` | `#333029` | Hover/press state (mobile: `surfacePressed`) |
+| `text` | `#201e1c` | `#ece8e3` | Primary text (14.6:1 / 15.3:1 on bg) |
+| `text-dim` | `#6b6560` | `#a8a199` | Secondary/caption text (5.05:1+ on bg) |
+| `border` | `#ddd8d0` | `#45403a` | Hairlines only — deliberately low-contrast (~1.25–1.8:1), never the sole signal for an interactive edge |
+| `accent` | `#a85c32` | `#e08a52` | Primary action fill, focus ring, active tab, link underlines. Accent *text* is 4.35:1 on light bg — under AA for small text, so small links are `text` with an accent underline. One accent button per view |
+| `accent-soft` | `#f1e2d8` | `#3a2c22` | Accent chip/badge bg (e.g. "Coming soon") — pair with `text`, not `accent` |
+| `accent-fill` | `#e0ccbf` | `#593b26` | Mobile only: selected fill that must outrank a border (`text` on it 10.7:1 / 8.3:1) |
+| `danger` | `#b3432f` | `#e08072` | Destructive actions, field error text/border |
+| `danger-soft` | `#f6dfda` | `#3a2420` | Error banner bg — `danger` text on it is 4.38:1 light (short labels only); sentences use `text` |
 | `success` | `#47713c` | `#8fbf7f` | The one "done"/positive state (e.g. finished tournament) — use sparingly |
 | `success-soft` | `#e4efdf` | `#262f21` | Success chip bg, paired with `success` text |
 | `info` | `#285f7a` | `#7fb8d4` | Running with nothing asked of you (tournament in progress) — never an action colour |
@@ -27,8 +28,8 @@ Extracted from real app source (`frontend/src/index.css`, `mobile/src/ui/theme.t
 | `reference` | `#6b4f8f` | `#b9a3d6` | Kept permanently as the canonical result (promoted tier list) — distinct from merely finished |
 | `reference-soft` | `#ebe4f3` | `#2c2536` | Reference chip bg, paired with `reference` text |
 | `scrim` | `rgba(32,30,28,.48)` | `rgba(0,0,0,.64)` | Modal/sheet backdrop |
-| `on-accent` | `#ffffff` | `#1a1815` | Text on filled `accent` |
-| `on-danger` | `#ffffff` | `#1a1815` | Text on filled `danger` |
+| `on-accent` | `#ffffff` | `#141210` | Text on filled `accent` (4.95:1 / 7.05:1) |
+| `on-danger` | `#ffffff` | `#141210` | Text on filled `danger` |
 | `image-caption-scrim` | `rgba(10,8,6,.6)` | *(same)* | Caption bar over a mural photo — deliberately identical in both themes; pairs with hardcoded white text |
 
 ### Tier-rank colors (not theme tokens — per-tierlist mutable data, default presets)
@@ -37,9 +38,11 @@ Extracted from real app source (`frontend/src/index.css`, `mobile/src/ui/theme.t
 
 ## Type
 
-No brand font for UI chrome — both platforms use the OS system stack (`-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`) for all labels/buttons/body/headings.
+No brand font for UI chrome — both platforms use the OS system stack (`-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`) for all labels/buttons/body/headings inside the app.
 
-Three self-hosted, Latin-subset, **regular-weight-only** fonts exist for exactly one purpose — book-cover title/author overlay text, one of 6 user-selectable options (`CardFontFamily`): `Playfair Display`, `Inter`, `JetBrains Mono` (files under `frontend/public/fonts/`), plus 3 unstyled system stacks. Bold uses `font-synthesis`, never a second downloaded weight.
+Three self-hosted, Latin-subset, **regular-weight-only** fonts exist for book-cover title/author overlay text, one of 6 user-selectable options (`CardFontFamily`): `Playfair Display`, `Inter`, `JetBrains Mono` (files under `frontend/public/fonts/`), plus 3 unstyled system stacks. Cover overlays may use synthesized bold (`font-synthesis`), never a second downloaded weight.
+
+Playfair Display also sets the **display headings of the public pages** — web class `font-display` (`--font-display` in `index.css`), always weight 400, never bolded: landing hero (40px phone / 60px `sm` / 72px `lg`, line-height 1.05, tracking -0.01em), landing section headings (30px / 40px `sm`), the heading in each sign-in card (30px) and the privacy page title (48px). Everything else on those pages — step and feature titles, labels, body, links, buttons — stays in the system stack. Sentence case throughout; no uppercase eyebrow labels.
 
 App text scale (mobile named, web uses the equivalent Tailwind size):
 
@@ -80,11 +83,19 @@ Content max-width is a per-library user preference (`contentMaxWidth`, 800–180
 
 Web keyframes 130–200ms on `cubic-bezier(0.32, 0.72, 0, 1)` for dialogs/sheets/menus/toasts. Mobile toasts fade 180ms; skeletons pulse 700ms. Both fully respect `prefers-reduced-motion` / `AccessibilityInfo.isReduceMotionEnabled()` — snap instantly instead of animating.
 
+## Brand lockup
+
+One lockup wherever the product names itself: the app icon at 28px (`icon-192.png`, `radius-sm`) beside "Atmyshelf" in the system stack, 18px bold (`components/BrandLockup.tsx`). Used by the app sidebar and mobile drawer, the landing nav and footer, and every sign-in screen, where it links to `/`.
+
+## Public pages
+
+Landing (`/`), privacy (`/privacy`) and the sign-in journey follow the OS theme on the same tokens as the app. Extra rules: show the product through real screenshots (regenerated with `npm run screenshots:landing --workspace frontend`, never hand-mocked), one accent button per view, no store badges or links until they point somewhere real, unreleased features labelled with an `accent-soft` "Coming soon" chip. Content width 1152px with `px-4 sm:px-6` gutters.
+
 ## Logos
 
-Files in `frontend/public/` and `mobile/assets/images/`. The mark is a serif "S" ligature that doubles as a bookshelf (crossbars read as shelf brackets).
-- `frontend/public/logo.png` — full lockup (monogram + "Scripta" wordmark), dark ink on transparent. Primary mark for light contexts.
-- `frontend/public/scriptap.png` — monogram alone, dark ink on transparent. Use below ~64px where the wordmark stops being legible.
+Files in `frontend/public/` and `mobile/assets/images/`. The mark is a serif "S" ligature that doubles as a bookshelf (crossbars read as shelf brackets). It was drawn when the product was called Scripta and hasn't been redrawn for Atmyshelf; the icon still ships in the lockup above.
+- `frontend/public/logo.png` — old full lockup (monogram + "Scripta" wordmark). Retired with the rename; unused in the product until redrawn.
+- `frontend/public/scriptap.png` — monogram alone, dark ink (actually a JPEG with no transparency, despite the name).
 - `mobile/assets/images/amsicon-source.png` — the 1254px master source art (white glyph, transparent). Regenerate any new export from this, not from a resized existing export.
 - `frontend/public/icon-512.png` — shipped PWA icon: white glyph on near-black square.
 - `frontend/public/favicon-48.png` — same treatment at the smallest real size it's shown.
@@ -112,6 +123,10 @@ Full guidelines, states and prop shapes live in the artifact's per-component REA
 - **MuralBlock** (`components/murals/blocks/*.tsx`) — 8 variants: `shelf`/`currentlyReading` (horizontal scroll, hand-curated order), `spotlight` (full-bleed single cover), `quote` (vertically centered pull-quote), `quoteCollection` (left-ruled citations, `accent` as a structural rule), `text` (no color muting — user's own words), `profile` (avatar + eyebrow-label sections, reuses `accent-soft`/`accent` as chip), `image` (zero inner padding, `image-caption-scrim`), `stats` (numbers hardcoded to `accent`, a badge not body text). All blocks size text in `em` not `rem` so per-block `fontSize` cascades. Block chrome (`radius-lg`/`border`/`surface`) applied uniformly by `MuralCanvas.tsx`.
 - **DuelCard** (`components/arena/DuelCard.tsx`) — two book sides with **2px** border (the one 2px control in the system — the border carries the primary signal here), live tally bar (`accent` fill on `border` track). Winner side border → `accent`; no separate loser-red treatment.
 - **BracketMap** (`components/arena/BracketMap.tsx`) — tournament bracket, pure-CSS connectors: equal `flex-1` cells per round so a parent match centers exactly on its two child matches, connected by small absolutely-positioned 1px-`border` stub elements (no SVG, no JS measuring). Winner: 2px `accent` ring on cover. Loser: 0.45 opacity. Empty slot: dashed `border`.
+
+### Forms (web)
+
+- **AuthCard** (`frontend/src/auth/AuthStage.tsx`) — the frame of every sign-in screen: lockup linking to `/`, then a 400px card (`surface`, `border`, `radius-lg`, 32px padding, no shadow) with a `font-display` 30px heading and an optional `text-dim` line, sentence-case `body-strong` labels, fields on `bg` with 16px text and 44px min height (error replaces hint), one accent submit, "Continue with Google" as a secondary button after an "or" divider, a text link to switch log in/sign up, and a 12px Privacy link under the card. Below `sm` the card chrome drops and the page takes `surface`. `color-scheme: light dark` on the stage so native controls follow the theme.
 
 ### Other controls
 
