@@ -67,7 +67,7 @@ export function SettingsScreen() {
         {error ? <Text accessibilityRole="alert" style={[typography.caption, { color: colors.danger }]}>{error}</Text> : null}
       </View>
       <Button label="Open gallery" variant="secondary" onPress={() => router.push("/gallery")} />
-      <Button label="Password and email" variant="secondary" onPress={() => router.push("/account-security")} />
+      <Button label="Account" variant="secondary" onPress={() => router.push("/account-security")} />
       <SocialsSection />
       <Button label="Sign out" variant="destructive" onPress={confirmSignOut} />
     </ScrollView>
