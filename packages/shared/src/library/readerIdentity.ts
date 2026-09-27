@@ -103,8 +103,10 @@ export function readerIdentity(books: Book[], groups: Group[]): ReaderIdentity {
 
   if (known.length * 2 >= n) {
     const m = known.length;
+    const groupShares: number[] = [];
     for (const signal of GENRE_SIGNALS) {
       const matching = known.filter((book) => genresForBook(book).some((genre) => signal.genres.includes(genre)));
+      groupShares.push(matching.length / m);
       const genreCounts = new Map<string, number>();
       for (const book of matching) for (const genre of genresForBook(book)) if (signal.genres.includes(genre)) bump(genreCounts, genre);
       candidates.push({
@@ -119,7 +121,7 @@ export function readerIdentity(books: Book[], groups: Group[]): ReaderIdentity {
     for (const book of known) for (const genre of genresForBook(book)) bump(all, genre);
     const shares = [...all.values()].map((count) => count / m);
     const wide = shares.filter((share) => share > 0.05).length;
-    const largest = Math.max(...shares);
+    const largest = Math.max(...shares, ...groupShares);
     candidates.push({
       key: "way",
       strength: Math.min(wide / 6, 0.25 / largest),

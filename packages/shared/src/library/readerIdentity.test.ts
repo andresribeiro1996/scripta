@@ -67,7 +67,7 @@ test("genre signals wait until genres are known for half the finished books", ()
 });
 
 test("40% fantasy or science fiction settles the Stargazer", () => {
-  const others = ["Romance", "Romance", "Philosophy", "Philosophy", "Science", "Science"];
+  const others = ["Romance", "Philosophy", "Science", "Travel", "Cooking", "Psychology"];
   const books = shelf(10, (i) => ({ _genres: [i < 4 ? (i % 2 ? "Fantasy" : "Science Fiction") : others[i - 4]!] }));
   const result = readerIdentity(books, []);
   assert.equal(result.identity, "star");
@@ -91,6 +91,14 @@ test("the Loyalist counts only authors with at least two finished books", () => 
   assert.equal(result.signal?.label, "4 of 10 finished books are by your three most-read authors");
   assert.deepEqual(result.leaders, [{ label: "Kazuo Ishiguro", count: 4 }]);
   assert.equal(readerIdentity(shelf(5), []).state, "unwritten");
+});
+
+test("two signals clear with the winner more than 5% ahead: settled, no runner-up", () => {
+  const books = shelf(10, (i) => (i < 5 ? { Attribution: "Author A" } : {}));
+  const result = readerIdentity(books, [series(books.slice(5, 8))]);
+  assert.equal(result.state, "settled");
+  assert.equal(result.identity, "loyal");
+  assert.equal(result.runnerUp, null);
 });
 
 test("two signals clearing within 5% lean, naming both", () => {
