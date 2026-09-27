@@ -1,25 +1,37 @@
 import { useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from "react-native";
 import { SvgXml } from "react-native-svg";
 import { READER_PLATES, readerCardLabel, readerCardPlateLine, readerIdentity, renderPlate, type Group, type PublicReaderCard } from "@scripta/shared";
-import { Sheet, spacing, typography, useTheme } from "../../ui";
+import { Sheet, sansFamily, serifFamily, spacing, typography, useTheme } from "../../ui";
+
+const PLATE_SERIF = "'Playfair Display', Georgia, 'Times New Roman', serif";
+const PLATE_SANS = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+const PLATE_RATIO = 350 / 250;
 
 export function ReaderCardBlock({ books, groups, readerName, publicCard, editable }: { books: Array<Record<string, unknown>>; groups: Group[]; readerName: string; publicCard?: PublicReaderCard; editable?: boolean }) {
   const { colors, mode } = useTheme();
   const [open, setOpen] = useState(false);
+  const [box, setBox] = useState({ width: 0, height: 0 });
   const own = useMemo(() => (publicCard ? null : readerIdentity(books, groups)), [books, groups, publicCard]);
   const card = publicCard ?? own!;
   const label = readerCardLabel(card);
-  const xml = useMemo(() => renderPlate({ identity: card.identity, state: card.state, readerName, print: mode === "dark" ? "reversed" : "paper", label, unwrittenLine: readerCardPlateLine(own?.missing ?? null) }), [card, readerName, mode, label, own]);
+  const xml = useMemo(() => {
+    const svg = renderPlate({ identity: card.identity, state: card.state, readerName, print: mode === "dark" ? "reversed" : "paper", label, unwrittenLine: readerCardPlateLine(own?.missing ?? null) });
+    return svg.replaceAll(PLATE_SERIF, serifFamily).replaceAll(PLATE_SANS, sansFamily);
+  }, [card, readerName, mode, label, own]);
   const plateOf = (key: string | null) => READER_PLATES.find((plate) => plate.key === key);
   const name = (key: string | null) => plateOf(key)?.name;
   const epithet = plateOf(card.identity)?.epithet;
-  const plate = <SvgXml xml={xml} width="100%" height="100%" />;
+  const onLayout = (event: LayoutChangeEvent) => setBox(event.nativeEvent.layout);
+  const width = Math.max(0, Math.min(box.width, box.height / PLATE_RATIO));
+  const plate = width > 0 ? <SvgXml xml={xml} width={width} height={width * PLATE_RATIO} /> : null;
   return (
     <>
-      {editable
-        ? <View accessibilityLabel={label} style={styles.plate}>{plate}</View>
-        : <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={() => setOpen(true)} style={styles.plate}>{plate}</Pressable>}
+      <View onLayout={onLayout} style={styles.plateBox}>
+        {editable
+          ? <View accessibilityLabel={label} style={{ width, height: width * PLATE_RATIO }}>{plate}</View>
+          : <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={() => setOpen(true)} style={{ width, height: width * PLATE_RATIO }}>{plate}</Pressable>}
+      </View>
       <Sheet visible={open} title={card.identity ? `The ${name(card.identity)}` : "Unwritten"} onClose={() => setOpen(false)}>
         <View style={styles.sheet}>
           {epithet ? <Text style={[typography.caption, styles.epithet, { color: colors.textDim }]}>{epithet}</Text> : null}
@@ -35,7 +47,7 @@ export function ReaderCardBlock({ books, groups, readerName, publicCard, editabl
 }
 
 const styles = StyleSheet.create({
-  plate: { flex: 1, aspectRatio: 5 / 7, alignSelf: "center" },
+  plateBox: { flex: 1, alignItems: "center", justifyContent: "center" },
   sheet: { gap: spacing.sm },
   epithet: { fontStyle: "italic" },
 });

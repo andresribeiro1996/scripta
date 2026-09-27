@@ -11,6 +11,9 @@ const sans = Platform.select({ ios: "System", android: "sans-serif", default: "s
 const serif = Platform.select({ ios: "Georgia", android: "serif", default: "serif" });
 const mono = Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" });
 
+export const sansFamily = sans;
+export const serifFamily = serif;
+
 const fontFamilies: Record<CardFontFamily | BlockFontFamily, string> = {
   sans,
   serif,
