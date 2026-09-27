@@ -22,6 +22,7 @@ import { LoginPage } from "./pages/LoginPage";
 import { MuralEditorPage } from "./pages/MuralEditorPage";
 import { MuralsListPage } from "./pages/MuralsListPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
+import { PlayQuizPage } from "./pages/PlayQuizPage";
 import { OAuthSuccessPage } from "./pages/OAuthSuccessPage";
 import { PeoplePage } from "./pages/PeoplePage";
 import { SeriesPage } from "./pages/SeriesPage";
@@ -53,6 +54,7 @@ export function App() {
         <Route path="/shared/murals/:token" element={<SharedMuralPage />} />
         <Route path="/shared/library/:token" element={<SharedLibraryPage />} />
         <Route path="/vote/:code" element={<VoteTierlistPage />} />
+        <Route path="/play/:code" element={<PlayQuizPage />} />
 
         {/* RequireAuth: must be signed in at all. RequireUsername, nested
             inside it: must also have finished setup (a username) — a
