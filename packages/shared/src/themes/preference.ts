@@ -13,15 +13,6 @@ export function resolveTheme(preference: ThemePreference, osScheme: ThemeScheme)
   return preference === "system" ? osScheme : preference;
 }
 
-export function reconcileThemePreference(
-  account: ThemePreference | null,
-  device: ThemePreference,
-): { apply: ThemePreference | null; upload: ThemePreference | null } {
-  if (account === null) return { apply: null, upload: device };
-  if (account === device) return { apply: null, upload: null };
-  return { apply: account, upload: null };
-}
-
 export type FontPreference = FontId | "theme";
 
 export const DISPLAY_FONT_PREFERENCES = ["theme", ...DISPLAY_FONT_IDS] as const;

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { THEME_IDS, themes, type ThemeColors, type ThemePreference } from "@scripta/shared/themes";
 import { dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui/theme";
-import { isThemeSyncFailure, saveAccountTheme } from "./themeSync";
+import { isAppearanceSyncFailure, saveAccountAppearance } from "./appearanceSync";
 
 const OPTIONS: ThemePreference[] = ["system", ...THEME_IDS];
 
@@ -25,8 +25,8 @@ export function ThemePicker() {
   function choose(next: ThemePreference) {
     setPreference(next);
     setError(null);
-    saveAccountTheme(next).catch((err: unknown) => {
-      if (!isThemeSyncFailure(err)) throw err;
+    saveAccountAppearance({ theme: next }).catch((err: unknown) => {
+      if (!isAppearanceSyncFailure(err)) throw err;
       setError("Couldn't save to your account. Try again.");
     });
   }

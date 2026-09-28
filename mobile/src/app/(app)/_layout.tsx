@@ -3,7 +3,7 @@ import { usePathname, useGlobalSearchParams } from "expo-router";
 import { ActivityIndicator, View } from "react-native";
 import { Redirect, Tabs } from "expo-router";
 import { useAuth } from "../../core/auth";
-import { useAccountThemeSync } from "../../features/settings/themeSync";
+import { useAccountAppearanceSync } from "../../features/settings/appearanceSync";
 import { useGenreEnrichment } from "../../features/library/hooks/useGenreEnrichment";
 import { useLibrary } from "../../features/library/hooks/useLibrary";
 import { ErrorState } from "../../ui/components";
@@ -16,8 +16,8 @@ function GenreEnrichment() {
   return null;
 }
 
-function ThemeSync() {
-  useAccountThemeSync();
+function AppearanceSync() {
+  useAccountAppearanceSync();
   return null;
 }
 
@@ -62,7 +62,7 @@ export default function AppLayout() {
   return (
     <>
       <GenreEnrichment />
-      <ThemeSync />
+      <AppearanceSync />
       <Tabs
         screenOptions={{
           headerShown: false,
