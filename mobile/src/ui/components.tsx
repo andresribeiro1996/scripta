@@ -1,5 +1,6 @@
-import { createContext, type ReactNode, type Ref, type RefObject, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { createContext, memo, type ReactNode, type Ref, type RefObject, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Animated, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, type TextInputProps, View, type ViewStyle } from "react-native";
+import { SvgXml } from "react-native-svg";
 import { Text } from "./Text";
 import MenuView, { type MenuAction } from "@expo/ui/community/menu";
 import PagerView from "react-native-pager-view";
@@ -10,8 +11,28 @@ import { errorHaptic, successHaptic } from "./haptics";
 import { fontStyleFor } from "./fontStyle";
 import { revealOffset } from "./keyboardScroll";
 import { dynamicType, minimumTouchTarget, radii, spacing, typography, useReducedMotion, useTheme } from "./theme";
+import { THEME_DECOR, withOpacity, type ThemeId } from "@scripta/shared/themes";
+import { decorLayerStyle, pieceStyle } from "./decorLayout";
 
 const AnimatedPagerView = Animated.createAnimatedComponent(PagerView);
+
+const DecorLayer = memo(function DecorLayer({ id, top, bottom, insetTop, insetBottom }: { id: ThemeId; top: boolean; bottom: boolean; insetTop: number; insetBottom: number }) {
+  const decor = THEME_DECOR[id];
+  if (!decor) return null;
+  return (
+    <View pointerEvents="none" style={decorLayerStyle(top, bottom, { top: insetTop, bottom: insetBottom })}>
+      {decor.frame?.lines.map((line) => (
+        <View
+          key={line.inset}
+          style={{ position: "absolute", top: line.inset, left: line.inset, right: line.inset, bottom: line.inset, borderWidth: line.width, borderRadius: line.radius, borderColor: withOpacity(decor.frame!.color, line.opacity) }}
+        />
+      ))}
+      {decor.pieces.map((piece, index) => (
+        <SvgXml key={index} xml={piece.svg} width={piece.width === "full" ? "100%" : piece.width} height={piece.height} style={pieceStyle(piece)} />
+      ))}
+    </View>
+  );
+});
 
 // Every screen root: paints the themed background and pays whichever safe-area
 // insets nothing else is covering.
@@ -31,7 +52,7 @@ export function Screen({
   bottom?: boolean;
   style?: ViewStyle;
 }) {
-  const { colors } = useTheme();
+  const { colors, id } = useTheme();
   const insets = useSafeAreaInsets();
   return (
     <View
@@ -42,6 +63,7 @@ export function Screen({
         style,
       ]}
     >
+      <DecorLayer id={id} top={top} bottom={bottom} insetTop={insets.top} insetBottom={insets.bottom} />
       {children}
     </View>
   );
