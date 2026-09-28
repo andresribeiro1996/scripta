@@ -36,6 +36,10 @@ Extracted from real app source (`packages/shared/src/themes/palettes.ts` and the
 
 The table above is the default Light/Dark pair. The registry defines eleven themes with the same tokens: Light, Sepia, Rosé and Newsprint use the light scheme; Dark, Midnight, Forest, Matrix, Synthwave, Seventies and Oxblood use the dark scheme. Settings → Appearance picks one, or System (Light or Dark from the OS). The choice is cached per device under `theme` and synced through `GET`/`PUT /auth/theme` while signed in; the account wins. Every theme passes the AA pairs in `packages/shared/src/themes/themes.test.ts`. Dark-scheme themes get the reversed reader-card print and Tailwind's `dark:` variant. Text on an `accent` or `danger` fill is always `on-accent` / `on-danger`, never white.
 
+### Typography
+
+Two slots, both set per theme and overridable in Settings → Appearance: **display** (web `h1`–`h3` and the `font-display` utility; mobile text of 18pt and up or with `display`) and **text** (everything else, including inputs and buttons). The catalog lives in `packages/shared/src/themes/fonts.ts`; files are bundled (`frontend/public/fonts`, `mobile/assets/fonts`, licences alongside (SIL OFL; Apache-2.0 for Special Elite)). Defaults: Light, Dark and Midnight Playfair / System; Sepia Literata / Literata; Rosé and Forest Fraunces / System; Matrix VT323 / JetBrains Mono; Synthwave Orbitron / System; Seventies Righteous / System; Newsprint Special Elite / Literata; Oxblood Cormorant Garamond / Literata. Press Start 2P and Monoton are override-only. Text with its own font (book-card and mural styles) keeps it. The choice syncs with the theme through `/auth/appearance`.
+
 ### Tier-rank colors (not theme tokens — per-tierlist mutable data, default presets)
 
 `tier-s #c9482f` · `tier-a #d98a3d` · `tier-b #c9a53d` · `tier-c #5c9e5c` · `tier-d #4a7fc9` (the one blue in the palette) · `tier-grey #8a8580` (neutral/catch-all preset). Never alias these to `accent`/`danger`/`success` even where a hue is close — rank and state are different meanings.

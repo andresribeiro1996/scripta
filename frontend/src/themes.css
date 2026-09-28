@@ -2,6 +2,131 @@
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *, [data-theme="midnight"], [data-theme="midnight"] *, [data-theme="forest"], [data-theme="forest"] *, [data-theme="matrix"], [data-theme="matrix"] *, [data-theme="synthwave"], [data-theme="synthwave"] *, [data-theme="seventies"], [data-theme="seventies"] *, [data-theme="oxblood"], [data-theme="oxblood"] *));
 
+@font-face {
+  font-family: "Playfair Display";
+  src: url("/fonts/playfair-700.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Literata";
+  src: url("/fonts/literata-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Literata";
+  src: url("/fonts/literata-700.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Fraunces";
+  src: url("/fonts/fraunces-700.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Cormorant Garamond";
+  src: url("/fonts/cormorant-600.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  size-adjust: 112%;
+}
+
+@font-face {
+  font-family: "Special Elite";
+  src: url("/fonts/specialElite-400.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "VT323";
+  src: url("/fonts/vt323-400.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  size-adjust: 130%;
+}
+
+@font-face {
+  font-family: "Orbitron";
+  src: url("/fonts/orbitron-700.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  size-adjust: 88%;
+}
+
+@font-face {
+  font-family: "Righteous";
+  src: url("/fonts/righteous-400.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Press Start 2P";
+  src: url("/fonts/pressStart-400.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  size-adjust: 72%;
+}
+
+@font-face {
+  font-family: "Monoton";
+  src: url("/fonts/monoton-400.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  size-adjust: 85%;
+}
+
+@font-face {
+  font-family: "Atkinson Hyperlegible";
+  src: url("/fonts/atkinson-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Atkinson Hyperlegible";
+  src: url("/fonts/atkinson-700.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/fonts/jetbrainsMono-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/fonts/jetbrainsMono-700.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme {
   --color-bg: #f2f0ec;
   --color-surface: #ffffff;
@@ -21,6 +146,8 @@
   --color-reference: #6b4f8f;
   --color-reference-soft: #ebe4f3;
   --color-on-danger: #ffffff;
+  --font-display: "Playfair Display", ui-serif, Georgia, serif;
+  --font-text: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 :root {
@@ -47,6 +174,8 @@
   --color-reference: #6b4f8f;
   --color-reference-soft: #ebe4f3;
   --color-on-danger: #ffffff;
+  --font-display: "Playfair Display", ui-serif, Georgia, serif;
+  --font-text: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 :root[data-theme="dark"] {
@@ -69,6 +198,8 @@
   --color-reference: #b9a3d6;
   --color-reference-soft: #2c2536;
   --color-on-danger: #141210;
+  --font-display: "Playfair Display", ui-serif, Georgia, serif;
+  --font-text: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 :root[data-theme="sepia"] {
@@ -91,6 +222,8 @@
   --color-reference: #6a4c84;
   --color-reference-soft: #e3d9d6;
   --color-on-danger: #ffffff;
+  --font-display: "Literata", ui-serif, Georgia, serif;
+  --font-text: "Literata", ui-serif, Georgia, serif;
 }
 
 :root[data-theme="rose"] {
@@ -113,6 +246,8 @@
   --color-reference: #5a4b94;
   --color-reference-soft: #e5deea;
   --color-on-danger: #ffffff;
+  --font-display: "Fraunces", ui-serif, Georgia, serif;
+  --font-text: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 :root[data-theme="midnight"] {
@@ -135,6 +270,8 @@
   --color-reference: #bba8ea;
   --color-reference-soft: #303045;
   --color-on-danger: #0d121c;
+  --font-display: "Playfair Display", ui-serif, Georgia, serif;
+  --font-text: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 :root[data-theme="forest"] {
@@ -157,6 +294,8 @@
   --color-reference: #c7a6de;
   --color-reference-soft: #33333b;
   --color-on-danger: #0e1612;
+  --font-display: "Fraunces", ui-serif, Georgia, serif;
+  --font-text: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 :root[data-theme="matrix"] {
@@ -179,6 +318,8 @@
   --color-reference: #d38cff;
   --color-reference-soft: #2c2237;
   --color-on-danger: #020805;
+  --font-display: "VT323", ui-monospace, monospace;
+  --font-text: "JetBrains Mono", ui-monospace, monospace;
 }
 
 :root[data-theme="synthwave"] {
@@ -201,6 +342,8 @@
   --color-reference: #b9a0ff;
   --color-reference-soft: #362a53;
   --color-on-danger: #150d28;
+  --font-display: "Orbitron", sans-serif;
+  --font-text: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 :root[data-theme="seventies"] {
@@ -223,6 +366,8 @@
   --color-reference: #d3a3c9;
   --color-reference-soft: #463233;
   --color-on-danger: #23160d;
+  --font-display: "Righteous", sans-serif;
+  --font-text: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 :root[data-theme="newsprint"] {
@@ -245,6 +390,8 @@
   --color-reference: #664b8a;
   --color-reference-soft: #e0dadf;
   --color-on-danger: #ffffff;
+  --font-display: "Special Elite", ui-monospace, monospace;
+  --font-text: "Literata", ui-serif, Georgia, serif;
 }
 
 :root[data-theme="oxblood"] {
@@ -267,4 +414,66 @@
   --color-reference: #c9a8e0;
   --color-reference-soft: #3f2b38;
   --color-on-danger: #1c0c0e;
+  --font-display: "Cormorant Garamond", ui-serif, Georgia, serif;
+  --font-text: "Literata", ui-serif, Georgia, serif;
+}
+
+:root[data-font-display="system"] {
+  --font-display: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+:root[data-font-display="playfair"] {
+  --font-display: "Playfair Display", ui-serif, Georgia, serif;
+}
+
+:root[data-font-display="literata"] {
+  --font-display: "Literata", ui-serif, Georgia, serif;
+}
+
+:root[data-font-display="fraunces"] {
+  --font-display: "Fraunces", ui-serif, Georgia, serif;
+}
+
+:root[data-font-display="cormorant"] {
+  --font-display: "Cormorant Garamond", ui-serif, Georgia, serif;
+}
+
+:root[data-font-display="specialElite"] {
+  --font-display: "Special Elite", ui-monospace, monospace;
+}
+
+:root[data-font-display="vt323"] {
+  --font-display: "VT323", ui-monospace, monospace;
+}
+
+:root[data-font-display="orbitron"] {
+  --font-display: "Orbitron", sans-serif;
+}
+
+:root[data-font-display="righteous"] {
+  --font-display: "Righteous", sans-serif;
+}
+
+:root[data-font-display="pressStart"] {
+  --font-display: "Press Start 2P", ui-monospace, monospace;
+}
+
+:root[data-font-display="monoton"] {
+  --font-display: "Monoton", sans-serif;
+}
+
+:root[data-font-text="system"] {
+  --font-text: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+:root[data-font-text="literata"] {
+  --font-text: "Literata", ui-serif, Georgia, serif;
+}
+
+:root[data-font-text="atkinson"] {
+  --font-text: "Atkinson Hyperlegible", sans-serif;
+}
+
+:root[data-font-text="jetbrainsMono"] {
+  --font-text: "JetBrains Mono", ui-monospace, monospace;
 }

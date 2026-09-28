@@ -19,6 +19,14 @@
             : matchMedia("(prefers-color-scheme: dark)").matches
               ? "dark"
               : "light";
+        var displayFont = null;
+        var textFont = null;
+        try {
+          displayFont = localStorage.getItem("fontDisplay");
+          textFont = localStorage.getItem("fontText");
+        } catch (err) {}
+        if (displayFont && displayFont !== "theme") document.documentElement.dataset.fontDisplay = displayFont;
+        if (textFont && textFont !== "theme") document.documentElement.dataset.fontText = textFont;
       })();
     </script>
   </head>
