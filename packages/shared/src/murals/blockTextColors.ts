@@ -38,8 +38,16 @@ export function contrastRatio(a: string, b: string): number | null {
   return ratio(rgbA, rgbB);
 }
 
+function roundChannel(value: number): number {
+  return Math.round(Math.min(255, Math.max(0, value)));
+}
+
+function roundRgb({ r, g, b }: Rgb): Rgb {
+  return { r: roundChannel(r), g: roundChannel(g), b: roundChannel(b) };
+}
+
 function toHex({ r, g, b }: Rgb): string {
-  const channel = (value: number) => Math.round(Math.min(255, Math.max(0, value))).toString(16).padStart(2, "0");
+  const channel = (value: number) => value.toString(16).padStart(2, "0");
   return `#${channel(r)}${channel(g)}${channel(b)}`;
 }
 
@@ -51,14 +59,14 @@ export function mutedTextColor(text: string, background: string): string | null 
   const white: Rgb = { r: 255, g: 255, b: 255 };
   const base = ratio(textRgb, backgroundRgb) >= 4.5 ? textRgb : ratio(black, backgroundRgb) >= ratio(white, backgroundRgb) ? black : white;
   for (const share of MIX_SHARES) {
-    const mixed: Rgb = {
+    const mixed = roundRgb({
       r: base.r * share + backgroundRgb.r * (1 - share),
       g: base.g * share + backgroundRgb.g * (1 - share),
       b: base.b * share + backgroundRgb.b * (1 - share)
-    };
+    });
     if (ratio(mixed, backgroundRgb) >= 4.5) return toHex(mixed);
   }
-  return toHex(base);
+  return toHex(roundRgb(base));
 }
 
 export function blockTextColors(

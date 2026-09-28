@@ -75,3 +75,27 @@ test("blockTextColors falls back to theme.textDim when the override colours don'
   const { dim } = blockTextColors({ backgroundColor: "not-a-color", textColor: null }, theme);
   assert.equal(dim, theme.textDim);
 });
+
+const SPREAD_COLORS = [
+  "#000000", "#111111", "#222222", "#2b2622", "#233d35", "#25364f", "#44252e",
+  "#333333", "#444444", "#555555", "#666666", "#777777", "#808080", "#999999",
+  "#aaaaaa", "#bbbbbb", "#cccccc", "#dddddd", "#e6c79c", "#edcd96", "#c2dbc9",
+  "#c5d7f1", "#eeeeee", "#f5f1e9", "#ffffff"
+];
+
+test("mutedTextColor's boundary case: the rounded mix, not the unrounded one, must clear 4.5:1", () => {
+  const dim = mutedTextColor("#000038", "#999999");
+  assert.ok(dim);
+  assert.ok(contrastRatio(dim!, "#999999")! >= 4.5, `muted to ${dim} (${contrastRatio(dim!, "#999999")}:1)`);
+});
+
+test("mutedTextColor's returned hex, not just the unrounded mix, meets 4.5:1 against the background", () => {
+  for (const text of SPREAD_COLORS) {
+    for (const background of SPREAD_COLORS) {
+      const dim = mutedTextColor(text, background);
+      assert.ok(dim, `${text} on ${background} produced no colour`);
+      const actual = contrastRatio(dim!, background)!;
+      assert.ok(actual >= 4.5, `${text} on ${background} muted to ${dim} (${actual.toFixed(4)}:1)`);
+    }
+  }
+});
