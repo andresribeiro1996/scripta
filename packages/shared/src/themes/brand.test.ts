@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { ENTRANCE, MARK_BOOKPLATE, MARK_EXTRA_COLORS, MARK_RECTS, layerEntrance, markTreatment } from "./brand.js";
+import { ENTRANCE, MARK_BOOKPLATE, MARK_EXTRA_COLORS, MARK_RECTS, entranceTotalMs, layerEntrance, markTreatment } from "./brand.js";
 import { THEME_IDS } from "./palettes.js";
 
 const ENTRANCES: Record<string, string> = { matrix: "scan", synthwave: "rise", seventies: "fan", newsprint: "register", oxblood: "gild" };
@@ -61,6 +61,14 @@ test("entrance timings match the spec", () => {
     register: { ms: 620 },
     gild: { ms: 700, markDelayMs: 450, markMs: 350 },
   });
+});
+
+test("entranceTotalMs is the full entrance length including delays", () => {
+  assert.equal(entranceTotalMs("scan"), 560);
+  assert.equal(entranceTotalMs("rise"), 600);
+  assert.equal(entranceTotalMs("fan"), 680);
+  assert.equal(entranceTotalMs("register"), 720);
+  assert.equal(entranceTotalMs("gild"), 800);
 });
 
 test("the bookplate perimeters are the rounded-rect lengths the dash animation draws", () => {

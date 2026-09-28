@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import Animated, { Easing, ReduceMotion, useAnimatedProps, useAnimatedStyle, useSharedValue, withDelay, withTiming } from "react-native-reanimated";
 import Svg, { Defs, G, Mask, Rect } from "react-native-svg";
-import { ENTRANCE, FAN_EASE, MARK_BOOKPLATE, MARK_EXTRA_COLORS, MARK_RECTS, MARK_VIEWBOX, MOTION, layerEntrance, markTreatment, type MarkEntrance, type MarkFill, type MarkTreatment } from "@scripta/shared/themes";
+import { ENTRANCE, FAN_EASE, MARK_BOOKPLATE, MARK_EXTRA_COLORS, MARK_RECTS, MARK_VIEWBOX, MOTION, entranceTotalMs, layerEntrance, markTreatment, type MarkEntrance, type MarkFill, type MarkTreatment } from "@scripta/shared/themes";
 import { entranceAvailable, markEntrancePlayed } from "./markEntrance";
+import { layerStyle } from "./markLayerStyle";
 import { useReducedMotion, useTheme, type ThemeColors } from "./theme";
 
 const AnimatedRect = Animated.createAnimatedComponent(Rect);
@@ -28,7 +29,7 @@ function MarkRects({ fill }: { fill: string }) {
 
 function Layer({ treatment, index, size, colors, entrance }: { treatment: MarkTreatment; index: number; size: number; colors: ThemeColors; entrance: MarkEntrance | null }) {
   const layer = treatment.layers[index]!;
-  const enter = entrance ? layerEntrance(treatment, index) : null;
+  const enter = useMemo(() => (entrance ? layerEntrance(treatment, index) : null), [entrance, treatment, index]);
   const gild = entrance === "gild";
   const progress = useSharedValue(enter || gild ? 0 : 1);
   useEffect(() => {
@@ -40,12 +41,7 @@ function Layer({ treatment, index, size, colors, entrance }: { treatment: MarkTr
     }
   }, []);
   const unit = size / UNITS;
-  const style = useAnimatedStyle(() => {
-    const p = progress.get();
-    if (gild) return { opacity: p };
-    if (!enter) return {};
-    return { opacity: enter.fade ? p : 1, transform: [{ translateX: (1 - p) * enter.from[0] * unit }, { translateY: (1 - p) * enter.from[1] * unit }] };
-  });
+  const style = useAnimatedStyle(() => layerStyle(progress.get(), enter, gild, unit));
   return (
     <Animated.View style={[StyleSheet.absoluteFill, style]}>
       <Svg width={size} height={size} viewBox={MARK_VIEWBOX}>
@@ -100,21 +96,11 @@ function Bookplate({ size, colors, draw }: { size: number; colors: ThemeColors; 
   );
 }
 
-export function BrandMark({ size }: { size: number }) {
-  const { id, colors } = useTheme();
-  const reduced = useReducedMotion();
-  const treatment = markTreatment(id);
-  const [initialId] = useState(() => (entranceAvailable() ? id : null));
-  const [themeChanged, setThemeChanged] = useState(false);
-  if (initialId !== null && !themeChanged && id !== initialId) setThemeChanged(true);
-  useEffect(() => {
-    markEntrancePlayed();
-  }, []);
-  const entrance = id === initialId && !themeChanged && !reduced ? treatment.entrance : null;
+function MarkBody({ size, treatment, colors, entrance }: { size: number; treatment: MarkTreatment; colors: ThemeColors; entrance: MarkEntrance | null }) {
   const reveal = useSharedValue(entrance === "scan" ? 0 : 1);
   const rise = useSharedValue(entrance === "rise" ? 0 : 1);
   useEffect(() => {
-    if (entrance === "scan") reveal.set(withTiming(1, { duration: ENTRANCE.scan.ms, easing: Easing.steps(ENTRANCE.scan.steps, true), reduceMotion: ReduceMotion.System }));
+    if (entrance === "scan") reveal.set(withTiming(1, { duration: ENTRANCE.scan.ms, easing: Easing.steps(ENTRANCE.scan.steps, false), reduceMotion: ReduceMotion.System }));
     if (entrance === "rise") rise.set(withTiming(1, { duration: ENTRANCE.rise.ms, easing: EASE, reduceMotion: ReduceMotion.System }));
   }, []);
   const riseStyle = useAnimatedStyle(() => ({ opacity: rise.get(), transform: [{ translateY: (1 - rise.get()) * ENTRANCE.rise.from * (size / UNITS) }] }));
@@ -130,5 +116,30 @@ export function BrandMark({ size }: { size: number }) {
         </View>
       </Animated.View>
     </Animated.View>
+  );
+}
+
+export function BrandMark({ size }: { size: number }) {
+  const { id, colors } = useTheme();
+  const reduced = useReducedMotion();
+  const treatment = markTreatment(id);
+  const [initialId] = useState(() => (entranceAvailable() ? id : null));
+  const [themeChanged, setThemeChanged] = useState(false);
+  if (initialId !== null && !themeChanged && id !== initialId) setThemeChanged(true);
+  useEffect(() => {
+    markEntrancePlayed();
+  }, []);
+  const entrance = id === initialId && !themeChanged && !reduced ? treatment.entrance : null;
+  const [settled, setSettled] = useState(false);
+  useEffect(() => {
+    if (!entrance) return;
+    const timer = setTimeout(() => setSettled(true), entranceTotalMs(entrance) + 100);
+    return () => clearTimeout(timer);
+  }, []);
+  const active = settled ? null : entrance;
+  return (
+    <View style={{ width: size, height: size }}>
+      <MarkBody key={active ? "enter" : "rest"} size={size} treatment={treatment} colors={colors} entrance={active} />
+    </View>
   );
 }

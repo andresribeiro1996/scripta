@@ -36,6 +36,14 @@ export interface MarkTreatment {
   entrance: MarkEntrance | null;
 }
 
+export function entranceTotalMs(entrance: MarkEntrance): number {
+  if (entrance === "scan") return ENTRANCE.scan.ms;
+  if (entrance === "rise") return ENTRANCE.rise.ms;
+  if (entrance === "fan") return ENTRANCE.fan.ms + 80;
+  if (entrance === "register") return ENTRANCE.register.ms + 100;
+  return Math.max(ENTRANCE.gild.ms, ENTRANCE.gild.markDelayMs + ENTRANCE.gild.markMs);
+}
+
 function roundedRect(x: number, y: number, size: number, radius: number, stroke: number) {
   return { x, y, size, radius, stroke, perimeter: Math.round((4 * size - (8 - 2 * Math.PI) * radius) * 100) / 100 };
 }
