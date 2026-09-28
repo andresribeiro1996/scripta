@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { test } from "node:test";
-import { DISPLAY_FONT_IDS, FONT_IDS, TEXT_FONT_IDS, THEME_IDS, fontFileName, fontStack, fonts, themes } from "@scripta/shared/themes";
+import { DISPLAY_FONT_IDS, FONT_IDS, TEXT_FONT_IDS, THEME_DECOR, THEME_IDS, fontFileName, fontStack, fonts, themes } from "@scripta/shared/themes";
 import { renderThemesCss } from "./themesCss.mts";
 
 test("src/themes.css matches the shared theme registry", () => {
@@ -67,4 +67,47 @@ test("font override blocks exist for every pickable font and come after every th
     assert.ok(at > lastTheme, `text ${id}`);
   }
   assert.ok(!css.includes(`[data-font-text="vt323"]`));
+});
+
+test("decor rules exist for exactly the decor themes, after every theme block, on a layer that takes no clicks", () => {
+  const css = renderThemesCss();
+  const lastTheme = Math.max(...THEME_IDS.map((id) => css.indexOf(`:root[data-theme="${id}"] {`)));
+  for (const id of THEME_IDS) {
+    const at = css.indexOf(`:root[data-theme="${id}"] body::before {`);
+    assert.equal(at !== -1, THEME_DECOR[id] !== undefined, id);
+    if (at === -1) continue;
+    assert.ok(at > lastTheme, id);
+    const rule = css.slice(at, css.indexOf("\n}\n", at));
+    assert.match(rule, /position: fixed;/, id);
+    assert.match(rule, /pointer-events: none;/, id);
+    assert.match(rule, /z-index: -1;/, id);
+    assert.equal((rule.match(/url\("data:image\/svg\+xml,/g) ?? []).length, THEME_DECOR[id]!.pieces.length, id);
+  }
+});
+
+test("decor data URIs are fully percent-encoded, so a hex colour's # can't end the URL", () => {
+  const css = renderThemesCss();
+  const urls = [...css.matchAll(/url\("data:image\/svg\+xml,([^"]*)"\)/g)].map(([, data]) => data!);
+  assert.ok(urls.length > 0);
+  for (const data of urls) {
+    assert.ok(!/[#<>"{}\s]/.test(data), data.slice(0, 80));
+  }
+});
+
+test("full-width pieces span the viewport and corner pieces keep their pixel size", () => {
+  const css = renderThemesCss();
+  const synthwave = css.slice(css.indexOf(`:root[data-theme="synthwave"] body::before {`));
+  assert.match(synthwave, /center bottom \/ 100% 48px no-repeat/);
+  assert.match(synthwave, /right bottom \/ 120px 104px no-repeat/);
+});
+
+test("the oxblood frame is a click-through fixed border with an inset outline", () => {
+  const css = renderThemesCss();
+  const frame = css.split(`:root[data-theme="oxblood"] body::after {`)[1]?.split("}")[0] ?? "";
+  assert.match(frame, /inset: 10px;/);
+  assert.match(frame, /pointer-events: none;/);
+  assert.match(frame, /border: 1\.5px solid rgba\(217, 179, 107, 0\.2\);/);
+  assert.match(frame, /outline: 0\.75px solid rgba\(217, 179, 107, 0\.14\);/);
+  assert.match(frame, /outline-offset: -7px;/);
+  assert.ok(!css.includes(`[data-theme="matrix"] body::after`));
 });
