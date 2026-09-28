@@ -1,3 +1,5 @@
+import type { FontId } from "./fonts.js";
+
 export type ThemeScheme = "light" | "dark";
 
 export interface ThemeColors {
@@ -26,6 +28,7 @@ export interface ThemeColors {
 export interface ThemeDefinition {
   label: string;
   scheme: ThemeScheme;
+  fonts: { display: FontId; text: FontId };
   colors: ThemeColors;
 }
 
@@ -37,6 +40,7 @@ export const themes: Record<ThemeId, ThemeDefinition> = {
   light: {
     label: "Light",
     scheme: "light",
+    fonts: { display: "playfair", text: "system" },
     colors: {
       background: "#f2f0ec",
       surface: "#ffffff",
@@ -63,6 +67,7 @@ export const themes: Record<ThemeId, ThemeDefinition> = {
   dark: {
     label: "Dark",
     scheme: "dark",
+    fonts: { display: "playfair", text: "system" },
     colors: {
       background: "#141210",
       surface: "#2a2724",
@@ -89,6 +94,7 @@ export const themes: Record<ThemeId, ThemeDefinition> = {
   sepia: {
     label: "Sepia",
     scheme: "light",
+    fonts: { display: "literata", text: "literata" },
     colors: {
       background: "#f1e7d0",
       surface: "#faf4e6",
@@ -115,6 +121,7 @@ export const themes: Record<ThemeId, ThemeDefinition> = {
   rose: {
     label: "Rosé",
     scheme: "light",
+    fonts: { display: "fraunces", text: "system" },
     colors: {
       background: "#f6ecec",
       surface: "#fffafa",
@@ -141,6 +148,7 @@ export const themes: Record<ThemeId, ThemeDefinition> = {
   midnight: {
     label: "Midnight",
     scheme: "dark",
+    fonts: { display: "playfair", text: "system" },
     colors: {
       background: "#0d121c",
       surface: "#1a2130",
@@ -167,6 +175,7 @@ export const themes: Record<ThemeId, ThemeDefinition> = {
   forest: {
     label: "Forest",
     scheme: "dark",
+    fonts: { display: "fraunces", text: "system" },
     colors: {
       background: "#0e1612",
       surface: "#19241e",
@@ -193,6 +202,7 @@ export const themes: Record<ThemeId, ThemeDefinition> = {
   matrix: {
     label: "Matrix",
     scheme: "dark",
+    fonts: { display: "vt323", text: "jetbrainsMono" },
     colors: {
       background: "#020805",
       surface: "#08170e",
@@ -219,6 +229,7 @@ export const themes: Record<ThemeId, ThemeDefinition> = {
   synthwave: {
     label: "Synthwave",
     scheme: "dark",
+    fonts: { display: "orbitron", text: "system" },
     colors: {
       background: "#150d28",
       surface: "#22163b",
@@ -245,6 +256,7 @@ export const themes: Record<ThemeId, ThemeDefinition> = {
   seventies: {
     label: "Seventies",
     scheme: "dark",
+    fonts: { display: "righteous", text: "system" },
     colors: {
       background: "#23160d",
       surface: "#342214",
@@ -271,6 +283,7 @@ export const themes: Record<ThemeId, ThemeDefinition> = {
   newsprint: {
     label: "Newsprint",
     scheme: "light",
+    fonts: { display: "specialElite", text: "literata" },
     colors: {
       background: "#ece9e1",
       surface: "#f7f5ef",
@@ -297,6 +310,7 @@ export const themes: Record<ThemeId, ThemeDefinition> = {
   oxblood: {
     label: "Oxblood",
     scheme: "dark",
+    fonts: { display: "cormorant", text: "literata" },
     colors: {
       background: "#1c0c0e",
       surface: "#2c1518",
