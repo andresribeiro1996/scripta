@@ -213,7 +213,7 @@ function TournamentBody({ tournament }: { tournament: TournamentSummary }) {
         <Icon filled name="arena" size={24} color={colors.success} />
       </View>
     ) : tournament.covers.length === 0 ? <View style={[styles.tile, { backgroundColor: colors.accentSoft }]}>
-      <Text {...dynamicType} style={[styles.tileCount, { color: colors.accent }]}>{tournament.bracketSize}</Text>
+      <Text {...dynamicType} display={false} style={[styles.tileCount, { color: colors.accent }]}>{tournament.bracketSize}</Text>
       <Text {...dynamicType} style={[styles.tileLabel, { color: colors.accent }]}>BOOKS</Text>
     </View> : null}
     <View style={styles.grow}>

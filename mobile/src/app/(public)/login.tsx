@@ -102,7 +102,7 @@ export default function LoginPage() {
   return (
     <Screen bottom>
       <FormScroll contentContainerStyle={styles.center}>
-        <Text accessibilityRole="header" style={[styles.logo, { color: colors.text }]}>Atmyshelf</Text>
+        <Text accessibilityRole="header" display={false} style={[styles.logo, { color: colors.text }]}>Atmyshelf</Text>
         {/* Only worth the user's attention when the server is actually
             unreachable — "server ok" is a developer's line, not a reader's. */}
         {health.isError ? (

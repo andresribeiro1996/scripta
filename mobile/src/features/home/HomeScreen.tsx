@@ -92,7 +92,7 @@ export function HomeScreen() {
                   <View style={styles.sectionPad}>
                     <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                       <Text {...dynamicType} style={[typography.title, styles.heading, { color: colors.text }]}>Rediscover</Text>
-                      <Text {...dynamicType} style={[typography.title, { color: colors.text }]}>{String(quote.highlight.Text)}</Text>
+                      <Text {...dynamicType} display={false} style={[typography.title, { color: colors.text }]}>{String(quote.highlight.Text)}</Text>
                       <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
                         {String(quote.book.Title)} · {String(quote.book.Attribution ?? "")}
                       </Text>

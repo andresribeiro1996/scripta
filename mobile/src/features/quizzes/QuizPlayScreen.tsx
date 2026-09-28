@@ -144,7 +144,7 @@ function Prompt({ question }: { question: PublicQuizQuestion }) {
   if (question.type === "title_cover") {
     return <Text {...dynamicType} style={[typography.heading, styles.promptText, { color: colors.text }]}>{question.prompt}</Text>;
   }
-  return <Text {...dynamicType} style={[typography.title, styles.promptQuote, { color: colors.text }]}>“{question.prompt}”</Text>;
+  return <Text {...dynamicType} display={false} style={[typography.title, styles.promptQuote, { color: colors.text }]}>“{question.prompt}”</Text>;
 }
 
 function EndScreen({ code, board, result, returning, tab, setTab }: {
@@ -171,7 +171,7 @@ function EndScreen({ code, board, result, returning, tab, setTab }: {
   ) : (
     <ScrollView contentContainerStyle={styles.section}>
       <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{returning ? "You already played this quiz." : "Your score"}</Text>
-      <Text {...dynamicType} style={[typography.heading, styles.score, { color: colors.accent }]}>{result.score}/{board.questionCount}</Text>
+      <Text {...dynamicType} display={false} style={[typography.heading, styles.score, { color: colors.accent }]}>{result.score}/{board.questionCount}</Text>
       {board.questions.map((question, i) => (
         <View key={question.id} style={[styles.verdict, { borderColor: colors.border }]}>
           <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{i + 1}</Text>
