@@ -87,7 +87,7 @@ export function GalleryPage() {
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
-            className="min-h-11 w-full rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-white disabled:opacity-60 sm:w-auto"
+            className="min-h-11 w-full rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-(--color-on-accent) disabled:opacity-60 sm:w-auto"
           >
             {uploading ? "Uploading…" : "Upload image…"}
           </button>

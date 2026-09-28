@@ -41,6 +41,10 @@ function createInMemoryRepo(): AuthRepository & { rows: Map<string, UserRow>; re
     changePassword() { throw new Error("Unused in this test"); },
     verifyEmail() { throw new Error("Unused in this test"); },
     markEmailVerified() { throw new Error("Unused in this test"); },
+    setTheme(userId, theme) {
+      const row = rows.get(userId);
+      if (row) rows.set(userId, { ...row, theme });
+    },
     rows,
     refreshTokens,
     createUser(input) {
@@ -414,4 +418,26 @@ test("concurrent refreshes of the same token both succeed without revoking unrel
 
   const secondRow = findRowByToken(repo, second.tokens.refreshToken);
   assert.equal(secondRow?.revoked_at, null, "a race between two refreshes of the SAME token must not look like theft to an unrelated session");
+});
+
+test("getTheme is null until a theme is saved, then returns it", () => {
+  const { service, repo } = makeService();
+  const row = repo.createUser({ email: "t@example.test", username: "themer", passwordHash: null, googleId: null });
+  assert.equal(service.getTheme(row.id), null);
+  service.setTheme(row.id, "oxblood");
+  assert.equal(service.getTheme(row.id), "oxblood");
+  service.setTheme(row.id, "system");
+  assert.equal(service.getTheme(row.id), "system");
+});
+
+test("getTheme reads a stored value this server no longer knows as system", () => {
+  const { service, repo } = makeService();
+  const row = repo.createUser({ email: "old@example.test", username: "oldtheme", passwordHash: null, googleId: null });
+  repo.rows.set(row.id, { ...row, theme: "vaporwave" });
+  assert.equal(service.getTheme(row.id), "system");
+});
+
+test("getTheme is null for an unknown user", () => {
+  const { service } = makeService();
+  assert.equal(service.getTheme("nobody"), null);
 });

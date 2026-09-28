@@ -76,7 +76,7 @@ export function SeedSlotGrid({
           onClick={onRandomFill}
           disabled={books.length < bracketSize}
           title={books.length < bracketSize ? `Your library needs at least ${bracketSize} books to random-fill.` : undefined}
-          className="rounded-lg bg-(--color-accent) px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+          className="rounded-lg bg-(--color-accent) px-3 py-1.5 text-sm font-medium text-(--color-on-accent) disabled:opacity-50"
         >
           Random fill
         </button>

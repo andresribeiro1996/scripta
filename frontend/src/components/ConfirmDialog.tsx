@@ -92,8 +92,8 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                 onClick={() => settle(true)}
                 className={
                   pending.danger === false
-                    ? "rounded-lg bg-(--color-accent) px-3 py-2.5 text-sm font-semibold text-white hover:opacity-90"
-                    : "rounded-lg bg-(--color-danger) px-3 py-2.5 text-sm font-semibold text-white hover:opacity-90"
+                    ? "rounded-lg bg-(--color-accent) px-3 py-2.5 text-sm font-semibold text-(--color-on-accent) hover:opacity-90"
+                    : "rounded-lg bg-(--color-danger) px-3 py-2.5 text-sm font-semibold text-(--color-on-danger) hover:opacity-90"
                 }
               >
                 {pending.confirmLabel ?? "Delete"}

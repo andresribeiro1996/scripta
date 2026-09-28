@@ -316,7 +316,7 @@ export function BookCard({
             className={`pointer-events-none absolute top-2.5 left-2.5 flex h-6 w-6 items-center justify-center rounded-full border-2 backdrop-blur-xs ${selected ? "border-(--color-accent) bg-(--color-accent)" : "border-white/70 bg-[rgba(10,8,6,0.4)]"}`}
           >
             {selected && (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-on-accent)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
             )}
@@ -341,7 +341,7 @@ export function BookCard({
                 onOpenStyle(book);
               }}
               title={book._style ? "Edit this book's custom style" : "Give this book its own style"}
-              className={`rounded-full px-2.5 py-1 text-[10.5px] font-semibold text-white backdrop-blur-xs ${book._style ? "bg-(--color-accent)" : "bg-[rgba(10,8,6,0.72)]"}`}
+              className={`rounded-full px-2.5 py-1 text-[10.5px] font-semibold backdrop-blur-xs ${book._style ? "bg-(--color-accent) text-(--color-on-accent)" : "bg-[rgba(10,8,6,0.72)] text-white"}`}
             >
               Style
             </button>
@@ -353,7 +353,7 @@ export function BookCard({
                 onOpenCoverPicker(book);
               }}
               title={book._coverImageId ? "Change this book's custom cover" : "Set a custom cover from your gallery"}
-              className={`rounded-full px-2.5 py-1 text-[10.5px] font-semibold text-white backdrop-blur-xs ${book._coverImageId ? "bg-(--color-accent)" : "bg-[rgba(10,8,6,0.72)]"}`}
+              className={`rounded-full px-2.5 py-1 text-[10.5px] font-semibold backdrop-blur-xs ${book._coverImageId ? "bg-(--color-accent) text-(--color-on-accent)" : "bg-[rgba(10,8,6,0.72)] text-white"}`}
             >
               Cover
             </button>

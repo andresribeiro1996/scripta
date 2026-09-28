@@ -38,7 +38,7 @@ export default defineConfig(({ mode }) => {
           name: 'Atmyshelf',
           short_name: 'Atmyshelf',
           description: 'Your book library, wherever you left off.',
-          theme_color: '#a85c32',
+          theme_color: '#97532d',
           background_color: '#f2f0ec',
           display: 'standalone',
           start_url: '/',

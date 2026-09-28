@@ -171,7 +171,7 @@ export function OwnShelfView({ username }: { username: string }) {
             <button
               onClick={() => void handlePublish()}
               disabled={busy || !ownData.muralId}
-              className="rounded-full bg-(--color-accent) px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
+              className="rounded-full bg-(--color-accent) px-4 py-1.5 text-sm font-semibold text-(--color-on-accent) disabled:opacity-50"
             >
               Publish…
             </button>
@@ -214,7 +214,7 @@ export function OwnShelfView({ username }: { username: string }) {
                   body="Import your existing collection, or add your first book manually."
                   action={
                     <div className="flex flex-wrap justify-center gap-2">
-                      <Link to="/dashboard/library?action=import" className="rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-white">
+                      <Link to="/dashboard/library?action=import" className="rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-(--color-on-accent)">
                         Import library
                       </Link>
                       <Link to="/dashboard/library?action=add" className="rounded-lg border border-(--color-border) px-3 py-2 text-sm">
@@ -227,7 +227,7 @@ export function OwnShelfView({ username }: { username: string }) {
                 <div className="space-y-4">
                   <p className="text-sm text-(--color-text-dim)">{shelfPresetSummary(books, ownData.published)}</p>
                   <div className="flex flex-wrap gap-2">
-                    <button onClick={() => void keepShelf()} disabled={busy} className="rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                    <button onClick={() => void keepShelf()} disabled={busy} className="rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-(--color-on-accent) disabled:opacity-50">
                       Keep this shelf
                     </button>
                     <button onClick={() => void startBlank()} disabled={busy} className="rounded-lg border border-(--color-border) px-3 py-2 text-sm disabled:opacity-50">
@@ -358,7 +358,7 @@ function OwnerControls({
             <button
               onClick={() => onSaveSettings(next)}
               disabled={busy}
-              className="w-full rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              className="w-full rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-(--color-on-accent) disabled:opacity-50"
             >
               {busy ? "Saving…" : "Save feed settings"}
             </button>
@@ -372,7 +372,7 @@ function OwnerControls({
                     <button onClick={() => setConfirming(false)} className="px-2 py-1.5 text-sm text-(--color-text-dim) hover:text-(--color-text)">
                       Cancel
                     </button>
-                    <button onClick={onUnpublish} disabled={busy} className="rounded-lg bg-(--color-danger) px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50">
+                    <button onClick={onUnpublish} disabled={busy} className="rounded-lg bg-(--color-danger) px-3 py-1.5 text-sm font-semibold text-(--color-on-danger) disabled:opacity-50">
                       Unpublish
                     </button>
                   </span>

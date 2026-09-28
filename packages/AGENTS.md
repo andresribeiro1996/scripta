@@ -5,6 +5,7 @@
 ## Commands
 
 - Verify: `npm run build --workspace @scripta/shared`
+- Verify: `npm test --workspace @scripta/shared`
 - Consumers read `dist/`, so rebuild before running any consumer's typecheck or tests.
 
 ## Rules

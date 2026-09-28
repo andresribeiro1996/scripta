@@ -60,7 +60,7 @@ export function AddBlockMenu({ onAdd }: { onAdd: (type: BlockType) => void }) {
       <div className="relative hidden sm:block">
         <button
           onClick={() => setOpen((o) => !o)}
-          className="rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-white"
+          className="rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-(--color-on-accent)"
         >
           + Add block
         </button>

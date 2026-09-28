@@ -11,6 +11,7 @@ export interface UserRow {
   avatar_id: string | null;
   auth_version?: number;
   email_verified_at?: string | null;
+  theme?: string | null;
   created_at: string;
 }
 

@@ -337,7 +337,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
               <button
                 onClick={() => void handleDeleteSelected()}
                 disabled={selectedKeys.size === 0}
-                className="rounded-lg bg-(--color-danger) px-3.5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+                className="rounded-lg bg-(--color-danger) px-3.5 py-2.5 text-sm font-semibold text-(--color-on-danger) hover:opacity-90 disabled:opacity-50"
               >
                 Delete selected
               </button>

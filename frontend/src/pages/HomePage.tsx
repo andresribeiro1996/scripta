@@ -37,7 +37,7 @@ export function HomePage() {
         </div>
       </header>
       {dashboard.isLoading || library.isPending ? <p role="status">Loading home…</p> : dashboard.error || library.isError ? <div role="alert"><p>Couldn't load your home.</p><button className={button} onClick={() => { void dashboard.refetch(); void library.refetch(); }}>Retry</button></div> : <>
-        {!books.length ? <div className="space-y-3 rounded-xl border border-(--color-border) p-6"><h2 className="text-xl">Start your library</h2><p>Import your existing collection, or add your first book manually.</p><div className="flex flex-wrap gap-2"><Link className={`${button} bg-(--color-accent) text-white`} to="/dashboard/library?action=import">Import library</Link><Link className={button} to="/dashboard/library?action=add">Add a book manually</Link></div></div>
+        {!books.length ? <div className="space-y-3 rounded-xl border border-(--color-border) p-6"><h2 className="text-xl">Start your library</h2><p>Import your existing collection, or add your first book manually.</p><div className="flex flex-wrap gap-2"><Link className={`${button} bg-(--color-accent) text-(--color-on-accent)`} to="/dashboard/library?action=import">Import library</Link><Link className={button} to="/dashboard/library?action=add">Add a book manually</Link></div></div>
           : cards.map((card) => {
             if (card.kind === "currentlyReading" || card.kind === "upNext") {
               const section = card.kind === "currentlyReading" ? card.bookKeys : card.bookKeys.slice(0, 6);

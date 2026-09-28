@@ -425,7 +425,7 @@ export function BlockConfigPanel({
           <button onClick={onClose} className="rounded-lg border border-(--color-border) px-3 py-2 text-sm hover:bg-(--color-surface-hover)">
             Cancel
           </button>
-          <button onClick={handleSave} className="rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-white">
+          <button onClick={handleSave} className="rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-(--color-on-accent)">
             Save
           </button>
         </div>

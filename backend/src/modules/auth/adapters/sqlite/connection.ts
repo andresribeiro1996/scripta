@@ -35,6 +35,7 @@ export function applyAuthMigrations(db: DatabaseSync): void {
     if (!columns.some((column) => column.name === "auth_version")) db.exec("ALTER TABLE users ADD COLUMN auth_version INTEGER NOT NULL DEFAULT 0");
     if (!columns.some((column) => column.name === "email_verified_at")) db.exec("ALTER TABLE users ADD COLUMN email_verified_at TEXT");
     if (!columns.some((column) => column.name === "dashboard_seen_at")) db.exec("ALTER TABLE users ADD COLUMN dashboard_seen_at TEXT");
+    if (!columns.some((column) => column.name === "theme")) db.exec("ALTER TABLE users ADD COLUMN theme TEXT");
   }
 
   const refreshTokenColumns = db.prepare("PRAGMA table_info(refresh_tokens)").all() as Array<{ name: string }>;

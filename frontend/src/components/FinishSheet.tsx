@@ -165,7 +165,7 @@ export function FinishSheet({
             <button
               type="button"
               onClick={close}
-              className="min-h-9 rounded-lg bg-(--color-accent) px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90"
+              className="min-h-9 rounded-lg bg-(--color-accent) px-3 py-1.5 text-sm font-semibold text-(--color-on-accent) hover:opacity-90"
             >
               Done
             </button>

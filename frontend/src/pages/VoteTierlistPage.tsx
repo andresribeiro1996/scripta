@@ -201,7 +201,7 @@ export function VoteTierlistPage() {
             <Link
               to="/login"
               state={{ from: location }}
-              className="min-h-9 shrink-0 rounded-lg bg-(--color-accent) px-3 text-sm font-semibold text-white flex items-center"
+              className="min-h-9 shrink-0 rounded-lg bg-(--color-accent) px-3 text-sm font-semibold text-(--color-on-accent) flex items-center"
             >
               Sign in to vote
             </Link>
@@ -221,7 +221,7 @@ export function VoteTierlistPage() {
               <button
                 onClick={() => void handleSubmit()}
                 disabled={submitting || toPlacements(data).length === 0}
-                className="min-h-9 rounded-lg bg-(--color-accent) px-3 text-sm font-semibold text-white disabled:opacity-60"
+                className="min-h-9 rounded-lg bg-(--color-accent) px-3 text-sm font-semibold text-(--color-on-accent) disabled:opacity-60"
               >
                 {submitting ? "Submitting…" : editing ? "Update ballot" : "Submit ballot"}
               </button>

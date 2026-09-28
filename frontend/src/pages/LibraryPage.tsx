@@ -487,7 +487,7 @@ export function LibraryPage() {
 
   return (
     <PageContainer maxWidth={style.contentMaxWidth}>
-      {searchParams.get("action") === "import" ? <div className="mb-4 rounded-lg border border-(--color-border) p-4"><h2 className="font-semibold">Import your library</h2><button className="mt-2 min-h-11 rounded-lg bg-(--color-accent) px-4 py-2 text-white" onClick={() => fileInputRef.current?.click()}>Choose import file</button></div> : null}
+      {searchParams.get("action") === "import" ? <div className="mb-4 rounded-lg border border-(--color-border) p-4"><h2 className="font-semibold">Import your library</h2><button className="mt-2 min-h-11 rounded-lg bg-(--color-accent) px-4 py-2 text-(--color-on-accent)" onClick={() => fileInputRef.current?.click()}>Choose import file</button></div> : null}
       {/* Desktop-only, with one exception: renaming. On a phone the whole
           header is gone — its actions moved into the toolbar row and the
           library name into that row's menu — but "Rename library…" in
@@ -535,7 +535,7 @@ export function LibraryPage() {
               <button
                 onClick={() => void handleDeleteSelected()}
                 disabled={selectedKeys.size === 0}
-                className="min-h-11 rounded-lg bg-(--color-danger) px-3.5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+                className="min-h-11 rounded-lg bg-(--color-danger) px-3.5 py-2.5 text-sm font-semibold text-(--color-on-danger) hover:opacity-90 disabled:opacity-50"
               >
                 Delete selected
               </button>
@@ -551,7 +551,7 @@ export function LibraryPage() {
           <div className={`hidden items-center gap-2 sm:flex ${selectionMode ? "sm:hidden" : ""}`}>
             <button
               onClick={() => setAddingBook(true)}
-              className="min-h-11 rounded-lg bg-(--color-accent) px-3.5 py-2.5 text-sm font-semibold text-white hover:opacity-90"
+              className="min-h-11 rounded-lg bg-(--color-accent) px-3.5 py-2.5 text-sm font-semibold text-(--color-on-accent) hover:opacity-90"
             >
               Add book
             </button>
@@ -655,7 +655,7 @@ export function LibraryPage() {
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={importing}
-                className="rounded-lg bg-(--color-accent) px-4 py-2.5 font-semibold text-white disabled:opacity-60"
+                className="rounded-lg bg-(--color-accent) px-4 py-2.5 font-semibold text-(--color-on-accent) disabled:opacity-60"
               >
                 {importing ? "Importing…" : "Choose a file"}
               </button>

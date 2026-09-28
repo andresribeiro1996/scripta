@@ -8,6 +8,7 @@ import { radii, spacing, typography, useTheme } from "../../ui/theme";
 import { useAuth } from "../../core/auth";
 import { API_URL } from "../../core/config";
 import { SocialsSection } from "../socials";
+import { ThemePicker } from "./ThemePicker";
 
 export function SettingsScreen() {
   const { colors } = useTheme();
@@ -49,6 +50,10 @@ export function SettingsScreen() {
     <Screen top={false}>
       <Stack.Screen options={{ headerShown: true, title: "Settings" }} />
       <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
+      <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Text style={[styles.heading, { color: colors.text }]}>Appearance</Text>
+        <ThemePicker />
+      </View>
       <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <Text style={[styles.heading, { color: colors.text }]}>Account</Text>
         <View style={styles.profile}>
