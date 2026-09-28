@@ -227,9 +227,9 @@ export function buildAuthRoutes(service: AuthService, security?: AccountSecurity
       }
     });
 
-    app.get("/auth/theme", { preHandler: authGuard }, async (request) => ({ theme: service.getTheme(request.user.id) }));
+    app.get("/auth/theme", { preHandler: authGuard, config: { rateLimit: { max: 120, timeWindow: "1 minute" } } }, async (request) => ({ theme: service.getTheme(request.user.id) }));
 
-    app.put("/auth/theme", { preHandler: authGuard }, async (request, reply) => {
+    app.put("/auth/theme", { preHandler: authGuard, config: { rateLimit: { max: 120, timeWindow: "1 minute" } } }, async (request, reply) => {
       const parsed = setThemeSchema.safeParse(request.body);
       if (!parsed.success) return reply.code(400).send({ error: "Unknown theme." });
       service.setTheme(request.user.id, parsed.data.theme);

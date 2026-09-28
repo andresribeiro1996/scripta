@@ -18,6 +18,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import Fastify, { type InjectOptions } from "fastify";
+import fastifyRateLimit from "@fastify/rate-limit";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -194,4 +195,35 @@ test("PUT /auth/theme rejects anything that is not a known preference", async ()
     assert.deepEqual(body, { error: "Unknown theme." });
   }
   assert.equal(stored.size, 0);
+});
+
+test("theme routes carry their own rate limit, separate from the shared auth limit", async () => {
+  const stored = new Map<string, ThemePreference>();
+  const service = {
+    getTheme: (userId: string) => stored.get(userId) ?? null,
+    setTheme: (userId: string, theme: ThemePreference) => { stored.set(userId, theme); },
+    getUserById: (userId: string) => (userId === user.id ? user : null)
+  } as unknown as AuthService;
+
+  const app = Fastify();
+  await app.register(fastifyRateLimit, { max: 2, timeWindow: "1 minute" });
+  app.decorate("authenticateAccessToken", (candidate: string) => (candidate === "valid-token" ? user : null));
+  await app.register(buildAuthRoutes(service));
+
+  const headers = { authorization: "Bearer valid-token" };
+  for (let i = 0; i < 5; i++) {
+    const get = await app.inject({ method: "GET", url: "/auth/theme", headers });
+    assert.equal(get.statusCode, 200, `GET #${i}`);
+    const put = await app.inject({ method: "PUT", url: "/auth/theme", payload: { theme: "dark" }, headers });
+    assert.equal(put.statusCode, 204, `PUT #${i}`);
+  }
+
+  const first = await app.inject({ method: "GET", url: "/auth/me", headers });
+  assert.equal(first.statusCode, 200);
+  const second = await app.inject({ method: "GET", url: "/auth/me", headers });
+  assert.equal(second.statusCode, 200);
+  const third = await app.inject({ method: "GET", url: "/auth/me", headers });
+  assert.equal(third.statusCode, 429);
+
+  await app.close();
 });
