@@ -9,7 +9,7 @@ export const palettes = {
     text: "#201e1c",
     textDim: "#6b6560",
     border: "#ddd8d0",
-    accent: "#a85c32",
+    accent: "#97532d",
     accentSoft: "#f1e2d8",
     // A fill that has to outrank a border. accentSoft is a wash for things
     // that sit behind accent-coloured text (avatars, cover fallbacks,
@@ -20,7 +20,7 @@ export const palettes = {
     // dark, both landing just above their borders with body text still over
     // 8:1 on top.
     accentFill: "#e0ccbf",
-    danger: "#b3432f",
+    danger: "#ae412e",
     dangerSoft: "#f6dfda",
     success: "#47713c",
     successSoft: "#e4efdf",

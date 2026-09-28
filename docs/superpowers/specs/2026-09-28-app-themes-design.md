@@ -33,7 +33,6 @@ workable for 2 themes, not for 11.
   (today's behaviour — resolved at load and on pick — is kept; mobile's
   `useColorScheme` already updates live).
 - Changing the PWA manifest colours or the installed app icon.
-- Fixing Light's two existing sub-AA chip pairs (see Testing) — separate task.
 
 ## Theme registry (`packages/shared/src/themes/`)
 
@@ -209,10 +208,8 @@ Follows the `dashboard_seen_at` precedent: a column on `users`, routes in
     `danger|success|info|reference` on `surface`, each of
     `accent|danger|success|info|reference` on its own `*Soft`, and `text` on
     `accentFill`; and `accentFill` separates from `background` more than
-    `border` does (the rule documented in `theme.tsx`). Named exceptions,
-    asserted at their current values so they can't silently regress
-    further: Light `accent`/`accentSoft` (3.92) and Light
-    `danger`/`dangerSoft` (4.38).
+    `border` does (the rule documented in `theme.tsx`). No exceptions —
+    Light's accent and danger were darkened to pass before this spec landed.
   - `parseThemePreference`: every valid value round-trips; unknown string,
     `""`, `null`, a number → `"system"`.
   - `resolveTheme`: System under both OS schemes; an explicit id ignores the

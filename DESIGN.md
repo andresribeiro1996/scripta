@@ -16,11 +16,11 @@ Extracted from real app source (`frontend/src/index.css`, `mobile/src/ui/theme.t
 | `text` | `#201e1c` | `#ece8e3` | Primary text (14.6:1 / 15.3:1 on bg) |
 | `text-dim` | `#6b6560` | `#a8a199` | Secondary/caption text (5.05:1+ on bg) |
 | `border` | `#ddd8d0` | `#45403a` | Hairlines only — deliberately low-contrast (~1.25–1.8:1), never the sole signal for an interactive edge |
-| `accent` | `#a85c32` | `#e08a52` | Primary action fill, focus ring, active tab, link underlines. Accent *text* is 4.35:1 on light bg — under AA for small text, so small links are `text` with an accent underline. One accent button per view |
-| `accent-soft` | `#f1e2d8` | `#3a2c22` | Accent chip/badge bg (e.g. "Coming soon") — pair with `text`, not `accent` |
+| `accent` | `#97532d` | `#e08a52` | Primary action fill, focus ring, active tab, link underlines. Accent *text* is 5.14:1 / 7.05:1 on bg; small links are still `text` with an accent underline. One accent button per view |
+| `accent-soft` | `#f1e2d8` | `#3a2c22` | Accent chip/badge bg (e.g. "Coming soon", avatar initials) — `accent` text on it 4.63:1 / 5.07:1 |
 | `accent-fill` | `#e0ccbf` | `#593b26` | Mobile only: selected fill that must outrank a border (`text` on it 10.7:1 / 8.3:1) |
-| `danger` | `#b3432f` | `#e08072` | Destructive actions, field error text/border |
-| `danger-soft` | `#f6dfda` | `#3a2420` | Error banner bg — `danger` text on it is 4.38:1 light (short labels only); sentences use `text` |
+| `danger` | `#ae412e` | `#e08072` | Destructive actions, field error text/border |
+| `danger-soft` | `#f6dfda` | `#3a2420` | Error banner bg — `danger` text on it 4.59:1 / 5.16:1 |
 | `success` | `#47713c` | `#8fbf7f` | The one "done"/positive state (e.g. finished tournament) — use sparingly |
 | `success-soft` | `#e4efdf` | `#262f21` | Success chip bg, paired with `success` text |
 | `info` | `#285f7a` | `#7fb8d4` | Running with nothing asked of you (tournament in progress) — never an action colour |
@@ -28,7 +28,7 @@ Extracted from real app source (`frontend/src/index.css`, `mobile/src/ui/theme.t
 | `reference` | `#6b4f8f` | `#b9a3d6` | Kept permanently as the canonical result (promoted tier list) — distinct from merely finished |
 | `reference-soft` | `#ebe4f3` | `#2c2536` | Reference chip bg, paired with `reference` text |
 | `scrim` | `rgba(32,30,28,.48)` | `rgba(0,0,0,.64)` | Modal/sheet backdrop |
-| `on-accent` | `#ffffff` | `#141210` | Text on filled `accent` (4.95:1 / 7.05:1) |
+| `on-accent` | `#ffffff` | `#141210` | Text on filled `accent` (5.85:1 / 7.05:1) |
 | `on-danger` | `#ffffff` | `#141210` | Text on filled `danger` |
 | `image-caption-scrim` | `rgba(10,8,6,.6)` | *(same)* | Caption bar over a mural photo — deliberately identical in both themes; pairs with hardcoded white text |
 
