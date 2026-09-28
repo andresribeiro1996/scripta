@@ -34,19 +34,24 @@ function RootStack() {
   return <Stack screenOptions={{ ...useScreenOptions(), headerShown: false }} />;
 }
 
+function HideSplash() {
+  useEffect(() => {
+    void SplashScreen.hideAsync();
+  }, []);
+  return null;
+}
+
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts(FONT_ASSETS);
   useEffect(() => {
     if (fontError) console.warn("Couldn't load the bundled fonts; using system fonts.", fontError);
   }, [fontError]);
-  useEffect(() => {
-    if (fontsLoaded || fontError) void SplashScreen.hideAsync();
-  }, [fontsLoaded, fontError]);
   if (!fontsLoaded && !fontError) return null;
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
           <ThemeProvider bundledFonts={fontsLoaded}>
+            <HideSplash />
             <AuthProvider>
               <AccountRoutes />
             </AuthProvider>
