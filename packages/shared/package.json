@@ -37,6 +37,10 @@
     "./readerCards": {
       "types": "./dist/readerCards/index.d.ts",
       "default": "./dist/readerCards/index.js"
+    },
+    "./themes": {
+      "types": "./dist/themes/index.d.ts",
+      "default": "./dist/themes/index.js"
     }
   },
   "files": [
