@@ -240,7 +240,7 @@ needs this change and the themes one — flagged to the user, not edited here.
 
 ## Sourcing
 
-Files come from Google Fonts (all SIL OFL 1.1): web WOFF2 latin subsets from
+Files come from Google Fonts (SIL OFL 1.1; Apache-2.0 for Special Elite): web WOFF2 latin subsets from
 the CSS2 API with a modern user agent, mobile static TTFs from the same API
 with a plain user agent (static instances per weight, including variable
 families — if the API returns only a variable file for some family, the

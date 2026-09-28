@@ -34,7 +34,7 @@ Extracted from real app source (`packages/shared/src/themes/palettes.ts` and the
 
 ### Themes
 
-The table above is the default Light/Dark pair. The registry defines eleven themes with the same tokens: Light, Sepia, Rosé and Newsprint use the light scheme; Dark, Midnight, Forest, Matrix, Synthwave, Seventies and Oxblood use the dark scheme. Settings → Appearance picks one, or System (Light or Dark from the OS). The choice is cached per device under `theme` and synced through `GET`/`PUT /auth/theme` while signed in; the account wins. Every theme passes the AA pairs in `packages/shared/src/themes/themes.test.ts`. Dark-scheme themes get the reversed reader-card print and Tailwind's `dark:` variant. Text on an `accent` or `danger` fill is always `on-accent` / `on-danger`, never white.
+The table above is the default Light/Dark pair. The registry defines eleven themes with the same tokens: Light, Sepia, Rosé and Newsprint use the light scheme; Dark, Midnight, Forest, Matrix, Synthwave, Seventies and Oxblood use the dark scheme. Settings → Appearance picks one, or System (Light or Dark from the OS). The choice is cached per device under `theme` and synced through `GET`/`PUT /auth/appearance` while signed in (it syncs theme and both fonts); the account wins. Every theme passes the AA pairs in `packages/shared/src/themes/themes.test.ts`. Dark-scheme themes get the reversed reader-card print and Tailwind's `dark:` variant. Text on an `accent` or `danger` fill is always `on-accent` / `on-danger`, never white.
 
 ### Typography
 
@@ -46,11 +46,11 @@ Two slots, both set per theme and overridable in Settings → Appearance: **disp
 
 ## Type
 
-No brand font for UI chrome — both platforms use the OS system stack (`-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`) for all labels/buttons/body/headings inside the app.
+In-app `h1`–`h3` (web) and mobile text 18pt and up (or with `display`) render in the theme's **display** font; body copy, buttons and inputs render in the theme's **text** font — see the Typography section above for the catalog, defaults, and how the choice is picked and synced.
 
-Three self-hosted, Latin-subset, **regular-weight-only** fonts exist for book-cover title/author overlay text, one of 6 user-selectable options (`CardFontFamily`): `Playfair Display`, `Inter`, `JetBrains Mono` (files under `frontend/public/fonts/`), plus 3 unstyled system stacks. Cover overlays may use synthesized bold (`font-synthesis`), never a second downloaded weight.
+Three self-hosted, Latin-subset fonts also exist separately for book-cover title/author overlay text and mural blocks, one of 6 user-selectable options (`CardFontFamily`/`BlockFontFamily`): `Playfair Display`, `Inter`, `JetBrains Mono` (files under `frontend/public/fonts/`), plus 3 unstyled system stacks — card and mural styles keep whichever of these they set for themselves, regardless of the theme's display/text choice. `Playfair Display` and `JetBrains Mono` share their font-family name with the theme catalog above: Playfair ships a 700 face for headings while the 400 face stays for card styles, and JetBrains Mono ships both 400 and 700, so a bold card/block title in either now renders the real bundled face rather than synthesized bold; `Inter` stays single-weight and still relies on `font-synthesis` for bold.
 
-Playfair Display also sets the **display headings of the public pages** — web class `font-display` (`--font-display` in `index.css`), always weight 400, never bolded: landing hero (40px phone / 60px `sm` / 72px `lg`, line-height 1.05, tracking -0.01em), landing section headings (30px / 40px `sm`), the heading in each sign-in card (30px) and the privacy page title (48px). Everything else on those pages — step and feature titles, labels, body, links, buttons — stays in the system stack. Sentence case throughout; no uppercase eyebrow labels.
+Sentence case throughout; no uppercase eyebrow labels.
 
 App text scale (mobile named, web uses the equivalent Tailwind size):
 
