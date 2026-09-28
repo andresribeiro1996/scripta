@@ -79,7 +79,7 @@ export function QuizCreateScreen() {
             imageId: normalizeImageId(raw.ImageId) || undefined,
             title: String(raw.Title ?? "").trim() || undefined,
             author: raw.Attribution ? String(raw.Attribution) : undefined,
-          });
+          }, { poll: false });
         } catch {
           // Leave the book unresolved so a retry re-attempts it, and let
           // the pass finish for the rest of the shelf.

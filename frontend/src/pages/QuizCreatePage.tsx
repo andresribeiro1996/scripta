@@ -86,7 +86,7 @@ export function QuizCreatePage() {
           imageId: normalizeImageId(raw.ImageId) || undefined,
           title: String(raw.Title ?? "").trim() || undefined,
           author: raw.Attribution ? String(raw.Attribution) : undefined
-        });
+        }, { poll: false });
         if (cancelled) return;
         resolvedRef.current[key] = url ?? null;
         setResolvedCovers({ ...resolvedRef.current });
