@@ -4,7 +4,7 @@ Local mirror of the live [Atmyshelf Design System](https://claude.ai/artifact/3X
 
 **Keeping this in sync**: the artifact is the source of truth. When tokens or components change there, ask Claude Code to regenerate this file from it. This file will drift if edited independently of the artifact.
 
-Extracted from real app source (`frontend/src/index.css`, `mobile/src/ui/theme.tsx`, and the component files cited per section) — not invented. One palette, byte-identical between web's Tailwind v4 `@theme` block (plus its `:root[data-theme="dark"]` override) and mobile's `palettes` object. The product is Atmyshelf; "Scripta" survives only in package names and the design system's bundle global.
+Extracted from real app source (`packages/shared/src/themes/palettes.ts` and the component files cited per section) — not invented. One theme registry, `packages/shared/src/themes/palettes.ts`, read directly by mobile and by web through `frontend/src/themes.css`, which `npm run themes --workspace frontend` generates from it (a web test fails if it goes stale). The product is Atmyshelf; "Scripta" survives only in package names and the design system's bundle global.
 
 ## Color
 
@@ -31,6 +31,10 @@ Extracted from real app source (`frontend/src/index.css`, `mobile/src/ui/theme.t
 | `on-accent` | `#ffffff` | `#141210` | Text on filled `accent` (5.85:1 / 7.05:1) |
 | `on-danger` | `#ffffff` | `#141210` | Text on filled `danger` |
 | `image-caption-scrim` | `rgba(10,8,6,.6)` | *(same)* | Caption bar over a mural photo — deliberately identical in both themes; pairs with hardcoded white text |
+
+### Themes
+
+The table above is the default Light/Dark pair. The registry defines eleven themes with the same tokens: Light, Sepia, Rosé and Newsprint use the light scheme; Dark, Midnight, Forest, Matrix, Synthwave, Seventies and Oxblood use the dark scheme. Settings → Appearance picks one, or System (Light or Dark from the OS). The choice is cached per device under `theme` and synced through `GET`/`PUT /auth/theme` while signed in; the account wins. Every theme passes the AA pairs in `packages/shared/src/themes/themes.test.ts`. Dark-scheme themes get the reversed reader-card print and Tailwind's `dark:` variant. Text on an `accent` or `danger` fill is always `on-accent` / `on-danger`, never white.
 
 ### Tier-rank colors (not theme tokens — per-tierlist mutable data, default presets)
 
@@ -91,7 +95,7 @@ The name stays live system-stack text, not Playfair: the lockup is interface chr
 
 ## Public pages
 
-Landing (`/`), privacy (`/privacy`) and the sign-in journey use the same tokens as the app. The theme follows the OS until the landing header's toggle picks one; `index.html` applies the choice (`localStorage` `theme`) as `data-theme` on `<html>` before first paint, so it carries into the app. Extra rules: show the product through real screenshots (regenerated with `npm run screenshots:landing --workspace frontend`, never hand-mocked), one accent button per view, no store badges or links until they point somewhere real, unreleased features labelled with an `accent-soft` "Coming soon" chip. Content width 1152px with `px-4 sm:px-6` gutters.
+Landing (`/`), privacy (`/privacy`) and the sign-in journey use the same tokens as the app. The theme follows the OS until the landing header's toggle (light/dark) or Settings → Appearance (any theme) picks one; `index.html` applies the choice (`localStorage` `theme`) as `data-theme` on `<html>` before first paint, so it carries into the app. Extra rules: show the product through real screenshots (regenerated with `npm run screenshots:landing --workspace frontend`, never hand-mocked), one accent button per view, no store badges or links until they point somewhere real, unreleased features labelled with an `accent-soft` "Coming soon" chip. Content width 1152px with `px-4 sm:px-6` gutters.
 
 ## Logos
 

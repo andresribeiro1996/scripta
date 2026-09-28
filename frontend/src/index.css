@@ -1,6 +1,5 @@
 @import "tailwindcss";
-
-@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+@import "./themes.css";
 
 /* Self-hosted (not linked live from fonts.googleapis.com) — same
    offline-friendly, self-hosted-app reasoning as everywhere else in this
@@ -43,56 +42,6 @@
 
 @theme {
   --font-display: "Playfair Display", ui-serif, Georgia, serif;
-  --color-bg: #f2f0ec;
-  --color-surface: #ffffff;
-  --color-surface-hover: #f7f5f1;
-  --color-text: #201e1c;
-  --color-text-dim: #6b6560;
-  --color-border: #ddd8d0;
-  --color-accent: #97532d;
-  --color-accent-soft: #f1e2d8;
-  --color-on-accent: #ffffff;
-  --color-danger: #ae412e;
-  --color-danger-soft: #f6dfda;
-  /* "Finished, and it went fine" — the only genuinely positive state in
-     the app, added for tournament status where seeding/active/completed
-     otherwise had to share one colour. Desaturated and warm-leaning so
-     it sits with the ink-and-paper palette rather than reading as a
-     system-green alert. */
-  --color-success: #47713c;
-  --color-success-soft: #e4efdf;
-  --color-info: #285f7a;
-  --color-info-soft: #dcebf2;
-  --color-reference: #6b4f8f;
-  --color-reference-soft: #ebe4f3;
-  --color-on-accent: #ffffff;
-  --color-on-danger: #ffffff;
-}
-
-:root {
-  color-scheme: light;
-}
-
-:root[data-theme="dark"] {
-  color-scheme: dark;
-  --color-bg: #141210;
-  --color-surface: #2a2724;
-  --color-surface-hover: #333029;
-  --color-text: #ece8e3;
-  --color-text-dim: #a8a199;
-  --color-border: #45403a;
-  --color-accent: #e08a52;
-  --color-accent-soft: #3a2c22;
-  --color-danger: #e08072;
-  --color-danger-soft: #3a2420;
-  --color-success: #8fbf7f;
-  --color-success-soft: #262f21;
-  --color-info: #7fb8d4;
-  --color-info-soft: #1f2d33;
-  --color-reference: #b9a3d6;
-  --color-reference-soft: #2c2536;
-  --color-on-accent: #141210;
-  --color-on-danger: #141210;
 }
 
 body {
