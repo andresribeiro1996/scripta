@@ -28,11 +28,3 @@ export function fontStyleFor(font: FontId, slot: FontSlot, style: FontStyleInput
   }
   return result;
 }
-
-export function textBreakStrategyFor(
-  hasCustomFont: boolean,
-  requested?: "simple" | "highQuality" | "balanced",
-): "simple" | "highQuality" | "balanced" | undefined {
-  if (requested) return requested;
-  return hasCustomFont ? "simple" : undefined;
-}
