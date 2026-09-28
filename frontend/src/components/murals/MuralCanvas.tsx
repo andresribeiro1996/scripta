@@ -1,14 +1,16 @@
 import { MuralBlockDetail } from "./MuralBlockDetail";
-import { resolveHomeBlock, type Group, type PublicReaderCard } from "@scripta/shared";
+import { blockTextColors, resolveHomeBlock, type Group, type PublicReaderCard } from "@scripta/shared";
+import { resolveTheme, themes } from "@scripta/shared/themes";
 import GridLayout from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
 import { blockFontFamilyCss, resolveBlockStyle, resolveBorderColor } from "../../lib/libraryStyle";
 import { GRID_COLUMNS, type BlockLayout, type Mural, type MuralBlock, type ReaderProfile, type ShelfTheme } from "../../lib/murals";
 import { useMuralBookMetadata } from "../../hooks/useMuralBookMetadata";
+import { osScheme, useThemePreference } from "../../lib/theme";
 import { OptionsMenu } from "../OptionsMenu";
 import { BlockRenderer } from "./BlockRenderer";
 import { MobileMuralCanvas, type MobileMuralDraft } from "./MobileMuralCanvas";
@@ -72,6 +74,7 @@ export function MuralCanvas({
 }) {
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [day] = useState(() => new Date().toISOString().slice(0, 10));
+  const themeColors = themes[resolveTheme(useThemePreference(), osScheme())].colors;
   const mural = { ...originalMural, blocks: originalMural.blocks.map((block) => resolveHomeBlock(block, books, groups, day)) };
   const originalBlock = (block: MuralBlock) => originalMural.blocks.find((item) => item.id === block.id) ?? block;
   useMuralBookMetadata(mural.blocks, books, tierlistData);
@@ -144,6 +147,7 @@ export function MuralCanvas({
     >
       {mural.blocks.map((block) => {
         const style = resolveBlockStyle(block.style);
+        const overridesColor = Boolean(style.backgroundColor || style.textColor);
         return (
           <div
             key={block.id}
@@ -162,8 +166,9 @@ export function MuralCanvas({
               fontSize: `${style.fontSize}px`,
               fontWeight: style.bold ? 700 : undefined,
               fontStyle: style.italic ? "italic" : undefined,
-              color: style.textColor ?? undefined
-            }}
+              color: style.textColor ?? undefined,
+              ...(overridesColor ? { "--color-text-dim": blockTextColors(style, themeColors).dim } : {})
+            } as CSSProperties}
           >
             {!editMode ? <button className="absolute inset-0 z-10 rounded-[inherit] focus-visible:outline-2 focus-visible:outline-(--color-accent)" aria-label={`Open ${block.type} block`} onClick={() => onOpenBlock ? onOpenBlock(block) : setFocusedId(block.id)} /> : null}
             <BlockRenderer block={block} books={books} images={images} profile={profile} groups={groups} shelfThemeOverride={shelfThemeOverride} readerCardOverride={readerCardOverride} statsOverride={statsOverride} tierlistData={tierlistData} />

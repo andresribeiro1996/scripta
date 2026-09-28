@@ -1,10 +1,12 @@
+import { blockTextColors, type Group, type PublicReaderCard } from "@scripta/shared";
+import { resolveTheme, themes } from "@scripta/shared/themes";
 import GridLayout from "react-grid-layout";
-import { useRef, useState } from "react";
-import type { Group, PublicReaderCard } from "@scripta/shared";
+import { useRef, useState, type CSSProperties } from "react";
 import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
 import { blockFontFamilyCss, resolveBlockStyle, resolveBorderColor } from "../../lib/libraryStyle";
 import { muralBlockTitle, GRID_COLUMNS, screenPointToGrid, type BlockLayout, type Mural, type MuralBlock, type ReaderProfile, type ShelfTheme } from "../../lib/murals";
+import { osScheme, useThemePreference } from "../../lib/theme";
 import { ActionSheet } from "../Sheet";
 import { MobileBlockPreview } from "./MobileBlockPreview";
 import { MuralBlockDetail } from "./MuralBlockDetail";
@@ -84,6 +86,8 @@ function BlockFrame({
 }) {
   const style = resolveBlockStyle(block.style);
   const pointerStart = useRef<{ x: number; y: number } | null>(null);
+  const themeColors = themes[resolveTheme(useThemePreference(), osScheme())].colors;
+  const overridesColor = Boolean(style.backgroundColor || style.textColor);
   return (
     <div
       ref={buttonRef}
@@ -118,8 +122,9 @@ function BlockFrame({
         fontSize: `${style.fontSize}px`,
         fontWeight: style.bold ? 700 : undefined,
         fontStyle: style.italic ? "italic" : undefined,
-        color: style.textColor ?? undefined
-      }}
+        color: style.textColor ?? undefined,
+        ...(overridesColor ? { "--color-text-dim": blockTextColors(style, themeColors).dim } : {})
+      } as CSSProperties}
     >
       <div className="pointer-events-none h-full origin-top-left" style={{ width: `${scale * 100}%`, height: `${scale * 100}%`, transform: `scale(${1 / scale})`, fontSize: 14 }}>
         <MobileBlockPreview block={block} books={books} images={images} profile={profile} groups={groups} shelfThemeOverride={shelfThemeOverride} readerCardOverride={readerCardOverride} statsOverride={statsOverride} tierlistData={tierlistData} width={((CANVAS_WIDTH - PADDING * 2 + MARGIN) / GRID_COLUMNS * block.layout.w - MARGIN) * scale} height={(block.layout.h * (ROW_HEIGHT + MARGIN) - MARGIN) * scale} />

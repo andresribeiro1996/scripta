@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   BLOCK_TYPE_LABELS,
+  blockTextColors,
   calculateShelfTheme,
   resolveHomeBlock,
   type Group,
@@ -86,9 +87,10 @@ export function BlockContent({ block, books, images, tierlists, profile, groups,
   const { colors: themeColors } = useTheme();
   const [failedSource, setFailedSource] = useState<string | null>(null);
   const style = resolveBlockStyle(block.style);
-  const colors = { ...themeColors, text: style.textColor ?? themeColors.text };
+  const blockColors = blockTextColors(style, themeColors);
+  const colors = { ...themeColors, text: blockColors.text };
   const text = blockTextStyles(style, colors.text);
-  const dim = { color: colors.textDim };
+  const dim = { color: blockColors.dim };
   const title = (book: Record<string, unknown> | undefined) => String(book?.Title ?? "Book unavailable");
   if (block.type === "text") return <><Text style={text.title}>{block.heading || "Note"}</Text><Text style={text.body}>{block.body}</Text></>;
   if (block.type === "profile") {
