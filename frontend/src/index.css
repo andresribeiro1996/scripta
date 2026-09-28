@@ -47,6 +47,10 @@ body {
   h3 {
     font-family: var(--font-display);
   }
+
+  [data-own-font] :is(h1, h2, h3) {
+    font-family: inherit;
+  }
 }
 
 /* Themed scrollbars — every scrollable area in the app (the page itself,

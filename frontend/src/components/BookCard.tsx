@@ -256,6 +256,7 @@ export function BookCard({
   return (
     <div
       ref={setRefs}
+      data-own-font=""
       {...(dragEnabled ? { ...attributes, ...listeners } : {})}
       role="button"
       tabIndex={0}
