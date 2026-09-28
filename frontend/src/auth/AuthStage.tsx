@@ -1,128 +1,60 @@
-// Shared backdrop for every screen in the sign-up/sign-in journey
-// (LoginPage, ChooseUsernamePage, WelcomeAvatarPage): the app's fixed dark
-// "cover" stage — near-black ground, faint inverted watermark, paper ink —
-// with the working form sitting in an elevated card on top. The cover
-// identity stays fixed regardless of the OS light/dark preference (same
-// reasoning LoginPage has always carried); the card is what makes these
-// working screens read as conventional forms rather than title pages.
-
-import { useEffect, useState, type ReactNode } from "react";
-
-export const INK = "#0d0c0b";
-export const PAPER = "#f2ede6";
-export const PAPER_DIM = "rgba(242, 237, 230, 0.65)";
-export const PAPER_FAINT = "rgba(242, 237, 230, 0.18)";
-export const CARD = "#171310";
-export const CARD_BORDER = "rgba(242, 237, 230, 0.12)";
-export const GOLD = "#e08a52";
-
-// logo.png's actual pixel dimensions — needed to compute a *capped* cover
-// size (a plain CSS `background-size: cover` has no ceiling: on a window
-// shape very different from the image's own aspect ratio, it scales the
-// artwork up past the point of being recognizable as anything but abstract
-// texture).
-const LOGO_NATURAL_WIDTH = 992;
-const LOGO_NATURAL_HEIGHT = 1070;
-const LOGO_MAX_SCALE = 1.7;
-
-function useCappedCoverSize() {
-  function compute() {
-    if (typeof window === "undefined") return { width: LOGO_NATURAL_WIDTH, height: LOGO_NATURAL_HEIGHT };
-    const coverScale = Math.max(window.innerWidth / LOGO_NATURAL_WIDTH, window.innerHeight / LOGO_NATURAL_HEIGHT);
-    const scale = Math.min(coverScale, LOGO_MAX_SCALE);
-    return { width: LOGO_NATURAL_WIDTH * scale, height: LOGO_NATURAL_HEIGHT * scale };
-  }
-
-  const [size, setSize] = useState(compute);
-
-  useEffect(() => {
-    function handleResize() {
-      setSize(compute());
-    }
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  return size;
-}
+import type { ReactNode } from "react";
+import { Link } from "react-router-dom";
+import { BrandLockup } from "../components/BrandLockup";
 
 export function AuthStage({ children }: { children: ReactNode }) {
-  const bgSize = useCappedCoverSize();
-
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-5 py-12" style={{ backgroundColor: INK, color: PAPER }}>
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 select-none"
-        style={{
-          backgroundImage: "url(/logo.png)",
-          backgroundSize: `${bgSize.width}px ${bgSize.height}px`,
-          backgroundPosition: "center",
-          backgroundRepeat: "no-repeat",
-          filter: "invert(1) brightness(1.1)",
-          opacity: 0.07
-        }}
-      />
-      <div className="relative z-10 w-full max-w-[400px]">{children}</div>
+    <div className="flex min-h-screen flex-col items-center bg-(--color-surface) px-4 py-8 text-(--color-text) sm:justify-center sm:bg-(--color-bg) sm:py-16">
+      <Link to="/" aria-label="Atmyshelf home" className="mb-8 flex min-h-11 items-center sm:mb-10">
+        <BrandLockup />
+      </Link>
+      <main className="w-full max-w-[400px]">{children}</main>
+      <Link to="/privacy" className="mt-6 flex min-h-11 items-center text-xs text-(--color-text-dim) transition-colors hover:text-(--color-text)">
+        Privacy
+      </Link>
     </div>
   );
 }
 
 export function AuthCard({ children }: { children: ReactNode }) {
+  return <div className="sm:rounded-xl sm:border sm:border-(--color-border) sm:bg-(--color-surface) sm:p-8">{children}</div>;
+}
+
+export function AuthHeading({ title, subtitle }: { title: string; subtitle?: ReactNode }) {
   return (
-    <div
-      className="rounded-2xl p-6 sm:p-8"
-      style={{ backgroundColor: CARD, border: `1px solid ${CARD_BORDER}`, boxShadow: "0 12px 40px rgba(0, 0, 0, 0.5)" }}
-    >
-      {children}
+    <div className="mb-7">
+      <h1 className="font-display text-3xl leading-tight">{title}</h1>
+      {subtitle && <p className="mt-2 text-sm leading-relaxed text-(--color-text-dim)">{subtitle}</p>}
     </div>
   );
 }
 
-export function AuthBrandHeading({ subtitle }: { subtitle: string }) {
-  return (
-    <div className="mb-6 text-center">
-      <h1
-        className="text-2xl tracking-[0.12em]"
-        style={{ color: PAPER, fontFamily: "ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif" }}
-      >
-        Atmyshelf
-      </h1>
-      <p className="mt-2 text-[12px]" style={{ color: PAPER_DIM }}>
-        {subtitle}
-      </p>
-    </div>
-  );
-}
-
-// Standard box input for auth forms: quiet 1px border, faint fill, and the
-// hairline focus treatment — 1px gold border swap plus a tight 2px ring at
-// low opacity (no blur, no glow). Pure CSS :focus styling; none of the old
-// manual onFocus/onBlur border juggling.
-const fieldBase =
-  "w-full rounded-lg bg-[rgba(242,237,230,0.05)] px-3 py-2.5 text-[14px] text-[#f2ede6] outline-none transition-shadow border focus:border-[#e08a52] focus:ring-2 focus:ring-[#e08a52]/15";
-export const authFieldClass = `${fieldBase} border-[rgba(242,237,230,0.15)]`;
-export const authFieldErrorClass = `${fieldBase} border-[#c96a52]`;
+const fieldBase = "min-h-11 w-full rounded-lg border bg-(--color-bg) px-3 py-2.5 text-base text-(--color-text)";
+export const authFieldClass = `${fieldBase} border-(--color-border)`;
+export const authFieldErrorClass = `${fieldBase} border-(--color-danger)`;
+export const authLabelClass = "mb-1.5 block text-sm font-semibold";
+export const authHintClass = "mt-1.5 text-xs text-(--color-text-dim)";
+export const authLinkClass =
+  "font-semibold text-(--color-text) underline decoration-(--color-accent) underline-offset-4 hover:decoration-2";
+export const authSubmitClass =
+  "flex min-h-11 w-full items-center justify-center rounded-lg bg-(--color-accent) px-4 text-sm font-semibold text-(--color-on-accent) transition-opacity hover:opacity-90 disabled:opacity-55";
+export const authSecondaryClass =
+  "flex min-h-11 w-full items-center justify-center gap-2.5 rounded-lg border border-(--color-border) bg-(--color-surface) px-4 text-sm font-semibold text-(--color-text) transition-colors hover:bg-(--color-surface-hover) disabled:opacity-55";
 
 export function AuthFieldError({ id, message }: { id: string; message: string | null | undefined }) {
   if (!message) return null;
   return (
-    <p id={id} className="mt-1.5 text-[11px]" style={{ color: "#e3a292" }}>
+    <p id={id} className="mt-1.5 text-xs text-(--color-danger)">
       {message}
     </p>
   );
 }
 
-export const authLabelClass = "mb-1.5 block text-[10px] font-semibold tracking-[0.14em] uppercase";
-
 export function AuthServerError({ message }: { message: string | null }) {
   if (!message) return null;
   return (
-    <div className="mb-5 rounded-lg px-3 py-2 text-xs" style={{ backgroundColor: "rgba(201, 106, 82, 0.14)", color: "#e3a292" }} role="alert">
+    <div className="mb-5 rounded-lg bg-(--color-danger-soft) px-3 py-2.5 text-sm" role="alert">
       {message}
     </div>
   );
 }
-
-export const authSubmitClass =
-  "w-full rounded-lg py-2.5 text-sm font-semibold transition-colors disabled:opacity-50";

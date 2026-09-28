@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import { bookKey, buildDashboardCards, digestHeading, digestTarget, resolveQuote } from "@scripta/shared";
+import { Link, useNavigate } from "react-router-dom";
+import { bookKey, buildDashboardCards, digestAction, digestTarget, resolveQuote } from "@scripta/shared";
 import { useDashboard } from "../hooks/useDashboard";
 import { useLibrary } from "../hooks/useLibrary";
 import { useAuth } from "../auth/AuthContext";
@@ -8,19 +8,24 @@ import { PageContainer } from "../components/PageContainer";
 import { BookGrid } from "../components/BookGrid";
 import { BookCard } from "../components/BookCard";
 import { AuthorAvatar } from "../components/CommunityAuthorAvatar";
+import { PickNextSheet } from "../components/PickNextSheet";
+import { ReaderGlyph } from "../components/ReaderGlyph";
 import { resolveLibraryStyle } from "../lib/libraryStyle";
 
 const button = "inline-flex min-h-11 items-center justify-center rounded-lg border border-(--color-border) px-4 py-2 text-sm hover:bg-(--color-surface-hover) disabled:opacity-50";
 
 export function HomePage() {
+  const navigate = useNavigate();
   const { session } = useAuth();
   const dashboard = useDashboard();
   const library = useLibrary();
   const [day] = useState(() => new Date().toISOString().slice(0, 10));
+  const [picking, setPicking] = useState(false);
   const books = library.data?.data.books ?? [];
   const style = resolveLibraryStyle(library.data?.data.style);
   const byKey = new Map(books.map((book) => [bookKey(book), book] as const));
   const cards = session ? buildDashboardCards(books, day, session.user.id) : [];
+  const upNextKeys = cards.find((c) => c.kind === "upNext")?.bookKeys ?? [];
 
   return <PageContainer>
     <div className="space-y-5">
@@ -39,9 +44,14 @@ export function HomePage() {
               const sectionBooks = section.flatMap((key) => { const book = byKey.get(key); return book ? [book] : []; });
               if (!sectionBooks.length) return null;
               return <section key={card.kind} aria-label={card.kind === "currentlyReading" ? "Currently reading" : "Up next"} className="space-y-3">
-                <h2 className="text-xl">{card.kind === "currentlyReading" ? "Currently reading" : "Up next"}</h2>
+                <div className="flex items-baseline justify-between">
+                  <h2 className="text-xl">{card.kind === "currentlyReading" ? "Currently reading" : "Up next"}</h2>
+                  {card.kind === "upNext" && card.bookKeys.length >= 2 ? (
+                    <button type="button" className="inline-flex min-h-11 items-center text-sm text-(--color-text-dim) hover:text-(--color-accent)" onClick={() => setPicking(true)}>Can't choose?</button>
+                  ) : null}
+                </div>
                 <BookGrid style={style}>
-                  {sectionBooks.map((book) => <BookCard key={bookKey(book)} book={book} onClick={() => {}} style={style} />)}
+                  {sectionBooks.map((book) => <BookCard key={bookKey(book)} book={book} onClick={() => navigate(`/dashboard/library?book=${encodeURIComponent(bookKey(book))}`)} style={style} />)}
                 </BookGrid>
               </section>;
             }
@@ -65,7 +75,13 @@ export function HomePage() {
                   <Link to={digestTarget(item)} className="flex items-center gap-2">
                     <AuthorAvatar author={item.actor} />
                     <span>
-                      <span className="block text-sm font-semibold">{digestHeading(item)}</span>
+                      <span className="block text-sm font-semibold">
+                        <span className="inline-flex items-center gap-1">
+                          {item.actor.username}
+                          <ReaderGlyph identity={item.actor.readerGlyph} />
+                        </span>{" "}
+                        {digestAction(item)}
+                      </span>
                       {item.kind === "publication" ? <span className="block text-sm text-(--color-text-dim)">{item.content.name}</span> : null}
                     </span>
                   </Link>
@@ -84,6 +100,7 @@ export function HomePage() {
           )}
         </section>
       </>}
+      {picking && upNextKeys.length >= 2 ? <PickNextSheet keys={upNextKeys} books={books} onClose={() => setPicking(false)} /> : null}
     </div>
   </PageContainer>;
 }

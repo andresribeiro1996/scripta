@@ -81,6 +81,35 @@ export function needsGenreMetadata(book: Record<string, unknown>): boolean {
   return !Object.prototype.hasOwnProperty.call(book, "_genres");
 }
 
+export function isFinishedBook(book: Record<string, unknown>): boolean {
+  return book.ReadStatus === 2;
+}
+
+export const GENRE_LOOKUP_BATCH = 20;
+export const GENRE_LOOKUP_CONCURRENCY = 4;
+
+export function genreLookupOrder(books: Array<Record<string, unknown>>): Array<Record<string, unknown>> {
+  const candidates = books.filter(needsGenreMetadata);
+  return [...candidates.filter(isFinishedBook), ...candidates.filter((book) => !isFinishedBook(book))];
+}
+
+export async function settleWithConcurrency<T, R>(items: T[], limit: number, run: (item: T) => Promise<R>): Promise<PromiseSettledResult<R>[]> {
+  const results: PromiseSettledResult<R>[] = new Array(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const index = next++;
+      try {
+        results[index] = { status: "fulfilled", value: await run(items[index]!) };
+      } catch (reason) {
+        results[index] = { status: "rejected", reason };
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
 export interface ShelfTheme {
   genres: BookGenre[];
   matchedBooks: number;

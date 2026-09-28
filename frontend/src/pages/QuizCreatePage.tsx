@@ -47,8 +47,15 @@ export function QuizCreatePage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const libraryBooks = library?.data.books ?? [];
-  const collections = (library?.data.groups ?? []).filter((group) => group.type === "collection");
+  // Derived from the cached document, not from `library` itself: the `?? []`
+  // fallback would otherwise be a fresh array each render and churn the
+  // memo below (and through it, the cover-resolution effect).
+  const libraryData = library?.data;
+  const libraryBooks = useMemo(() => libraryData?.books ?? [], [libraryData]);
+  const collections = useMemo(
+    () => (libraryData?.groups ?? []).filter((group) => group.type === "collection"),
+    [libraryData]
+  );
   const collection = collections.find((group) => group.id === collectionId);
 
   const shelfRawBooks = useMemo(

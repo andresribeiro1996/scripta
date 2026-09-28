@@ -16,6 +16,7 @@ import { CollectionsPage } from "./pages/CollectionsPage";
 import { CommunityProfilePage } from "./pages/CommunityProfilePage";
 import { DiscoverPage } from "./pages/DiscoverPage";
 import { GalleryPage } from "./pages/GalleryPage";
+import { LandingPage } from "./pages/LandingPage";
 import { LibraryPage } from "./pages/LibraryPage";
 import { LibraryStylePage } from "./pages/LibraryStylePage";
 import { LoginPage } from "./pages/LoginPage";
@@ -23,6 +24,7 @@ import { MuralEditorPage } from "./pages/MuralEditorPage";
 import { MuralsListPage } from "./pages/MuralsListPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { PlayQuizPage } from "./pages/PlayQuizPage";
+import { PrivacyPage } from "./pages/PrivacyPage";
 import { OAuthSuccessPage } from "./pages/OAuthSuccessPage";
 import { PeoplePage } from "./pages/PeoplePage";
 import { SeriesPage } from "./pages/SeriesPage";
@@ -38,11 +40,12 @@ export function App() {
     <>
       <EdgeSwipeBack />
       <Routes>
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/" element={<LandingPage />} />
         <Route path="/forgot-password" element={<AccountActionPage key="forgot" action="forgot" />} />
         <Route path="/reset-password" element={<AccountActionPage key="reset" action="reset" />} />
         <Route path="/verify-email" element={<AccountActionPage key="verify" action="verify" />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/oauth-success" element={<OAuthSuccessPage />} />
         <Route path="/arena" element={<Navigate to="/community/discover" replace />} />
         <Route path="/arena/:id" element={<ArenaViewPage />} />

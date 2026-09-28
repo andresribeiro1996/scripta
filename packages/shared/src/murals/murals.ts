@@ -65,7 +65,7 @@ interface MuralBlockBase {
  *  content of its own to configure. */
 export type MuralBlock =
   | (MuralBlockBase & { type: "spotlight"; bookKey: string; caption?: string })
-  | (MuralBlockBase & { type: "shelf"; title: string; bookKeys: string[]; collectionId?: string })
+  | (MuralBlockBase & { type: "shelf"; title: string; bookKeys: string[]; collectionId?: string; role?: "finished" | "favourites" })
   | (MuralBlockBase & { type: "quote"; bookKey: string; highlightId: string; mode?: "rediscover" })
   | (MuralBlockBase & { type: "quoteCollection"; title: string; quotes: QuoteRef[] })
   | (MuralBlockBase & { type: "image"; imageId: string; caption?: string })
@@ -74,7 +74,8 @@ export type MuralBlock =
   | (MuralBlockBase & { type: "currentlyReading" })
   | (MuralBlockBase & { type: "stats"; metrics: StatMetric[] })
   | (MuralBlockBase & { type: "empty" })
-  | (MuralBlockBase & { type: "tierlist"; tierlistId: string });
+  | (MuralBlockBase & { type: "tierlist"; tierlistId: string })
+  | (MuralBlockBase & { type: "readerCard" });
 
 export type BlockType = MuralBlock["type"];
 
@@ -97,7 +98,8 @@ export const BLOCK_TYPE_LABELS: Record<BlockType, string> = {
   currentlyReading: "Currently reading",
   stats: "Stats",
   empty: "Empty block",
-  tierlist: "Tier list"
+  tierlist: "Tier list",
+  readerCard: "Reader card"
 };
 
 export function muralBlockTitle(block: MuralBlock, books: Array<Record<string, unknown>>, tierlistName?: string) {
@@ -173,7 +175,8 @@ const DEFAULT_SIZE_BY_TYPE: Record<BlockType, { w: number; h: number }> = {
   empty: { w: 3, h: 2 },
   // Five stacked tier rows each need enough height to read as a row, not
   // a sliver — noticeably taller than every other type's default.
-  tierlist: { w: 10, h: 8 }
+  tierlist: { w: 10, h: 8 },
+  readerCard: { w: 4, h: 6 }
 };
 
 export function ensureBookBlockHeights(blocks: MuralBlock[]): MuralBlock[] {
@@ -307,6 +310,8 @@ function defaultBlockForType(id: string, type: BlockType, layout: BlockLayout): 
       return { id, type, layout };
     case "tierlist":
       return { id, type, layout, tierlistId: "" };
+    case "readerCard":
+      return { id, type, layout };
   }
 }
 

@@ -95,6 +95,19 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
   }
 
   return {
+    deleteUserData(userId) {
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        db.prepare("DELETE FROM tierlist_ballot_placements WHERE tierlist_id IN (SELECT id FROM tierlists WHERE owner_user_id = ?)").run(userId);
+        db.prepare("DELETE FROM tierlist_ballots WHERE tierlist_id IN (SELECT id FROM tierlists WHERE owner_user_id = ?)").run(userId);
+        db.prepare("DELETE FROM tierlists WHERE owner_user_id = ?").run(userId);
+        db.prepare("UPDATE tierlist_ballots SET voter_user_id = NULL WHERE voter_user_id = ?").run(userId);
+        db.exec("COMMIT");
+      } catch (error) {
+        db.exec("ROLLBACK");
+        throw error;
+      }
+    },
     listByUser(userId) {
       return listStmt.all(userId) as unknown as TierlistRow[];
     },

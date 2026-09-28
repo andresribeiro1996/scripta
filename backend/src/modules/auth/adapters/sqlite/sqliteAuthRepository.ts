@@ -53,6 +53,15 @@ export function createSqliteAuthRepository(db: DatabaseSync): AuthRepository {
   }
 
   return {
+    revokeSessions(userId) {
+      transaction(() => {
+        revokeSessions(userId);
+        return true;
+      });
+    },
+    deleteUser(userId) {
+      db.prepare("DELETE FROM users WHERE id = ?").run(userId);
+    },
     saveAccountToken(token) {
       const now = new Date().toISOString();
       db.prepare("DELETE FROM account_tokens WHERE expires_at <= ?").run(now);

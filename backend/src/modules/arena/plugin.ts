@@ -58,3 +58,9 @@ export function getArenaPublicApi(): ArenaPublicApi {
   }
   return cachedApi;
 }
+
+let erasingArena: ReturnType<typeof createSqliteArenaRepository> | undefined;
+
+export function deleteArenaUserData(userId: string) {
+  (erasingArena ??= createSqliteArenaRepository(openArenaDb())).deleteUserData(userId);
+}

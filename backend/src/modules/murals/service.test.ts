@@ -19,6 +19,7 @@ function createInMemoryRepo(): MuralsRepository {
   const folders = new Map<string, MuralFolderRow>();
 
   return {
+    deleteUserData() {},
     listByUser(userId) {
       return [...murals.values()].filter((m) => m.user_id === userId);
     },
@@ -218,6 +219,14 @@ test("createMural carries folderId and defaults to root", () => {
   assert.equal(service.createMural("u1", "M", f.id).folderId, f.id);
   assert.equal(service.createMural("u1", "RootM").folderId, null);
   assert.throws(() => service.createMural("u1", "Bad", UNKNOWN_UUID), InvalidFolderReferenceError);
+});
+
+test("updateMural stores a shelf block's role as sent", () => {
+  const service = makeService();
+  const mural = service.createMural("u1", "M");
+  service.updateMural("u1", mural.id, { blocks: [{ id: "b1", type: "shelf", layout: { x: 0, y: 0, w: 12, h: 5 }, title: "Finished", bookKeys: [], role: "finished" }] });
+  const blocks = service.getMural("u1", mural.id)?.blocks as Array<{ role?: string }>;
+  assert.equal(blocks[0]!.role, "finished");
 });
 
 test("openMuralsDb migration is idempotent and preserves data", async () => {

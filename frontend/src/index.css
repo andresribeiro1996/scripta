@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 /* Self-hosted (not linked live from fonts.googleapis.com) — same
    offline-friendly, self-hosted-app reasoning as everywhere else in this
    codebase that touches fonts (see lib/libraryStyle.ts's
@@ -40,6 +42,7 @@
 }
 
 @theme {
+  --font-display: "Playfair Display", ui-serif, Georgia, serif;
   --color-bg: #f2f0ec;
   --color-surface: #ffffff;
   --color-surface-hover: #f7f5f1;
@@ -62,28 +65,34 @@
   --color-info-soft: #dcebf2;
   --color-reference: #6b4f8f;
   --color-reference-soft: #ebe4f3;
+  --color-on-accent: #ffffff;
+  --color-on-danger: #ffffff;
 }
 
-@media (prefers-color-scheme: dark) {
-  @theme {
-    --color-bg: #141210;
-    --color-surface: #2a2724;
-    --color-surface-hover: #333029;
-    --color-text: #ece8e3;
-    --color-text-dim: #a8a199;
-    --color-border: #45403a;
-    --color-accent: #e08a52;
-    --color-accent-soft: #3a2c22;
-    --color-on-accent: #1a1815;
-    --color-danger: #e08072;
-    --color-danger-soft: #3a2420;
-    --color-success: #8fbf7f;
-    --color-success-soft: #262f21;
-    --color-info: #7fb8d4;
-    --color-info-soft: #1f2d33;
-    --color-reference: #b9a3d6;
-    --color-reference-soft: #2c2536;
-  }
+:root {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-bg: #141210;
+  --color-surface: #2a2724;
+  --color-surface-hover: #333029;
+  --color-text: #ece8e3;
+  --color-text-dim: #a8a199;
+  --color-border: #45403a;
+  --color-accent: #e08a52;
+  --color-accent-soft: #3a2c22;
+  --color-danger: #e08072;
+  --color-danger-soft: #3a2420;
+  --color-success: #8fbf7f;
+  --color-success-soft: #262f21;
+  --color-info: #7fb8d4;
+  --color-info-soft: #1f2d33;
+  --color-reference: #b9a3d6;
+  --color-reference-soft: #2c2536;
+  --color-on-accent: #141210;
+  --color-on-danger: #141210;
 }
 
 body {
@@ -403,6 +412,9 @@ input[type="range"]:focus-visible::-moz-range-thumb {
    forever. Measured, not guessed — it left every dialog in the app at
    opacity 0. */
 @media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
   /* One class on the backdrop covers both halves: the scrim fades and
      its panel child rises. Saves adding a second class to ten separate
      dialogs, all of which are a full-screen backdrop wrapping exactly
@@ -426,6 +438,9 @@ input[type="range"]:focus-visible::-moz-range-thumb {
   }
   .menu-in {
     animation: scripta-menu 130ms ease-out both;
+  }
+  .tier-drop {
+    animation: scripta-pop 220ms cubic-bezier(0.32, 0.72, 0, 1) both;
   }
 }
 
@@ -474,10 +489,43 @@ input[type="range"]:focus-visible::-moz-range-thumb {
   }
 }
 
+@keyframes scripta-pop {
+  from {
+    opacity: 0.4;
+    transform: scale(0.5);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 @keyframes scripta-slide-left {
   from {
     opacity: 0;
     transform: translateX(-14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes scripta-arena-pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes scripta-arena-drop {
+  from {
+    opacity: 0;
+    transform: scale(0.6) translateY(-10px);
   }
   to {
     opacity: 1;

@@ -13,7 +13,6 @@ import { useToast } from "../components/Toaster";
 import { ChevronLeftIcon, FullscreenIcon, PencilIcon, ShareIcon, toolbarIconClass } from "../components/Toolbar";
 import { useGalleryImages } from "../hooks/useGalleryImages";
 import { useLibrary } from "../hooks/useLibrary";
-import { useGenreEnrichment } from "../hooks/useGenreEnrichment";
 import { useMuralFullscreen } from "../hooks/useMuralFullscreen";
 import { useMurals } from "../hooks/useMurals";
 import { useTierlists } from "../hooks/useTierlists";
@@ -45,7 +44,7 @@ export function MuralEditorPage() {
   const { muralId } = useParams<{ muralId: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { data: library, updateLibrary } = useLibrary();
+  const { data: library } = useLibrary();
   const { data: muralsData, isLoading, refetch, create, rename, saveBlocks, currentMural, share, unshare } = useMurals();
   const toast = useToast();
   const { images } = useGalleryImages();
@@ -71,7 +70,6 @@ export function MuralEditorPage() {
   // it unchanged.
   const isDraft = muralId === "new";
   const mural = isDraft ? undefined : murals.find((m) => m.id === muralId);
-  const genreEnrichment = useGenreEnrichment(books, mural?.blocks.some((block) => block.type === "profile") ?? false, updateLibrary);
   // Which folder the draft belongs to, carried from the list page so a
   // mural created from inside a folder lands in it.
   const draftFolderId = searchParams.get("folder");
@@ -221,11 +219,11 @@ export function MuralEditorPage() {
     const { murals: updated, blockId } = addBlock([target], target.id, type);
     await saveBlocks(target.id, updated[0].blocks);
     editVersionRef.current++;
-    // "currentlyReading" and "empty" have nothing to configure at all —
-    // skip straight to them just sitting on the canvas. Every other type
-    // opens its config panel right away, same "add then configure" flow
-    // as the rest of the app.
-    if (type !== "currentlyReading" && type !== "empty") setConfiguringBlockId(blockId);
+    // "currentlyReading", "readerCard" and "empty" have nothing to
+    // configure at all — skip straight to them just sitting on the
+    // canvas. Every other type opens its config panel right away, same
+    // "add then configure" flow as the rest of the app.
+    if (type !== "currentlyReading" && type !== "readerCard" && type !== "empty") setConfiguringBlockId(blockId);
   }
 
   async function handleSaveBlockConfig(block: MuralBlock) {
@@ -342,7 +340,7 @@ export function MuralEditorPage() {
         editVersionRef.current++;
         setMobileDraft(null);
         setSelectedBlockId(finishedDraft.block.id);
-        if (alreadyInserted && finishedDraft.kind === "add" && finishedDraft.block.type !== "currentlyReading" && finishedDraft.block.type !== "empty") {
+        if (alreadyInserted && finishedDraft.kind === "add" && finishedDraft.block.type !== "currentlyReading" && finishedDraft.block.type !== "readerCard" && finishedDraft.block.type !== "empty") {
           setConfiguringBlockId(finishedDraft.block.id);
         }
         return;
@@ -390,7 +388,7 @@ export function MuralEditorPage() {
           }
         });
       }
-      if (finishedDraft.kind === "add" && finishedDraft.block.type !== "currentlyReading" && finishedDraft.block.type !== "empty") {
+      if (finishedDraft.kind === "add" && finishedDraft.block.type !== "currentlyReading" && finishedDraft.block.type !== "readerCard" && finishedDraft.block.type !== "empty") {
         const inserted = saved.blocks.find((block) => block.id === finishedDraft.block.id);
         if (inserted) setConfiguringBlockId(inserted.id);
       }
@@ -523,8 +521,6 @@ export function MuralEditorPage() {
           </button>
         </div>
       </header>
-
-      {genreEnrichment.error && <p role="alert" className="mb-4 text-sm text-(--color-danger)">{genreEnrichment.error}</p>}
 
       {view.blocks.length === 0 && !mobileDraft && (
         // Editing is already on in the second case, so telling you to turn

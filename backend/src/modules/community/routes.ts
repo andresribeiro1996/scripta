@@ -20,7 +20,7 @@ const discoverQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20),
   offset: z.coerce.number().int().min(0).default(0)
 });
-const feedSettingsSchema = z.object({ publications: z.boolean(), reading: z.boolean(), votes: z.boolean(), follows: z.boolean() });
+const feedSettingsSchema = z.object({ publications: z.boolean(), reading: z.boolean(), votes: z.boolean(), follows: z.boolean(), readerGlyph: z.boolean().optional() });
 const activityQuerySchema = z.object({
   cursor: z.string().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(50).default(20)
@@ -72,6 +72,23 @@ export function buildCommunityRoutes(service: CommunityService) {
     app.delete("/community/profile/publish", { preHandler: authGuard }, async (request, reply) => {
       service.unpublishProfile(request.user.id);
       return reply.code(204).send();
+    });
+
+    app.get("/community/profile", { preHandler: authGuard }, async (request, reply) => {
+      reply.header("Cache-Control", "no-store");
+      return reply.send(service.getOwnProfile(request.user.id));
+    });
+
+    app.put("/community/profile/mural", { preHandler: authGuard }, async (request, reply) => {
+      const parsed = publishSchema.safeParse(request.body);
+      if (!parsed.success) return reply.code(400).send({ error: "Expected {muralId}." });
+      try {
+        service.setShelfMural(request.user.id, parsed.data.muralId);
+        return reply.code(204).send();
+      } catch (err) {
+        if (err instanceof CommunityError) return reply.code(statusForCommunityError(err)).send({ error: err.message });
+        throw err;
+      }
     });
 
     app.put("/community/profile/feed-settings", { preHandler: authGuard }, async (request, reply) => {

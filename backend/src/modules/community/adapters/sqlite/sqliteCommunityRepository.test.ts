@@ -70,3 +70,23 @@ test("followers order newest first per (created_at, follower_id), paginate by ke
   r.deleteFollow("dave", "alice");
   assert.deepEqual(r.listFollowersByFollowee("alice", undefined, 10).map((f) => f.follower_id), ["carol", "bob", "adam"]);
 });
+
+
+test("deleteUserData removes follows both ways, the profile, and events by or about the user", () => {
+  const r = repo();
+  const at = "2026-09-10T00:00:00.000Z";
+  r.insertFollow({ follower_id: "leaver", followee_id: "carol", created_at: at });
+  r.insertFollow({ follower_id: "carol", followee_id: "leaver", created_at: at });
+  r.insertFollow({ follower_id: "carol", followee_id: "dave", created_at: at });
+  r.upsertProfile({ user_id: "leaver", published: 1, mural_id: null, published_at: at, updated_at: at, feed_settings: null });
+  r.insertEvent({ id: "erase-e1", user_id: "leaver", type: "book_finished", ref_type: "book", ref_id: "k", payload: null, created_at: at });
+  r.insertEvent({ id: "erase-e2", user_id: "carol", type: "following", ref_type: "user", ref_id: "leaver", payload: null, created_at: at });
+  r.insertEvent({ id: "erase-e3", user_id: "carol", type: "following", ref_type: "user", ref_id: "dave", payload: null, created_at: at });
+  r.deleteUserData("leaver");
+  assert.equal(r.getFollow("leaver", "carol"), undefined);
+  assert.equal(r.getFollow("carol", "leaver"), undefined);
+  assert.ok(r.getFollow("carol", "dave"));
+  assert.equal(r.getProfileRow("leaver"), undefined);
+  const left = openCommunityDb().prepare(`SELECT id FROM events WHERE id IN ('erase-e1', 'erase-e2', 'erase-e3')`).all().map((e) => e.id);
+  assert.deepEqual(left, ["erase-e3"]);
+});

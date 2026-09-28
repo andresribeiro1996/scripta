@@ -6,6 +6,7 @@
 import type { LibraryDocumentRow } from "./types.js";
 
 export interface LibraryRepository {
+  deleteUserData(userId: string): void;
   getDocument(userId: string): LibraryDocumentRow | undefined;
   /** Insert-or-replace: one document per user. Returns the stored row
    *  (with its server-assigned updatedAt) so the service doesn't need to

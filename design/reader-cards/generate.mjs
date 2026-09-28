@@ -1,7 +1,7 @@
 import { writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { INKS, PAPER, PLATES, REVERSED_LINE, glyph, plate, printStyle } from "./plates.mjs";
+import { INKS, PAPER, PLATES, REVERSED_LINE, glyph, plate, printStyle } from "../../packages/shared/dist/readerCards/plates.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const standalone = (svg, ground, line) => svg.replace(">", `>${printStyle(ground, line)}`);

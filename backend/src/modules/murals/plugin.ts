@@ -58,3 +58,9 @@ export function getMuralsPublicApi(getTierlistData?: (ownerUserId: string, tierl
   }
   return cachedPublicApi;
 }
+
+let erasingMurals: ReturnType<typeof createSqliteMuralsRepository> | undefined;
+
+export function deleteMuralsUserData(userId: string) {
+  (erasingMurals ??= createSqliteMuralsRepository(openMuralsDb())).deleteUserData(userId);
+}

@@ -2,17 +2,7 @@ import { takeAuthReturnTo } from "../auth/returnTo";
 import { useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
-import {
-  GOLD,
-  INK,
-  PAPER,
-  PAPER_DIM,
-  PAPER_FAINT,
-  AuthBrandHeading,
-  AuthCard,
-  AuthServerError,
-  AuthStage
-} from "../auth/AuthStage";
+import { AuthCard, AuthHeading, AuthServerError, AuthStage, authSecondaryClass, authSubmitClass } from "../auth/AuthStage";
 import { Avatar } from "../components/Avatar";
 
 /** The skippable last step of the signup journey (password signups land
@@ -51,14 +41,10 @@ export function WelcomeAvatarPage() {
   return (
     <AuthStage>
       <AuthCard>
-        <AuthBrandHeading subtitle="Make it yours" />
-
-        <h2 className="mb-1 text-center text-lg font-semibold" style={{ color: PAPER }}>
-          Add a profile picture
-        </h2>
-        <p className="mb-6 text-center text-[12px]" style={{ color: PAPER_DIM }}>
-          Shown next to your name around the app. You can change it anytime in Settings — or skip this for now.
-        </p>
+        <AuthHeading
+          title="Add a profile picture"
+          subtitle="Shown next to your name around the app. You can change it anytime in Settings, or skip this for now."
+        />
 
         <div className="mb-6 flex justify-center">
           <Avatar user={session.user} size={96} className={uploading ? "animate-pulse" : ""} />
@@ -77,8 +63,7 @@ export function WelcomeAvatarPage() {
           type="button"
           disabled={uploading}
           onClick={() => fileInputRef.current?.click()}
-          className="w-full rounded-lg border py-2.5 text-sm font-medium transition-colors disabled:opacity-50"
-          style={{ borderColor: PAPER_FAINT, backgroundColor: "rgba(242, 237, 230, 0.05)", color: PAPER }}
+          className={authSecondaryClass}
         >
           {uploading ? "Uploading…" : hasAvatar ? "Choose a different photo" : "Choose a photo"}
         </button>
@@ -89,8 +74,7 @@ export function WelcomeAvatarPage() {
           type="button"
           disabled={uploading}
           onClick={() => navigate(takeAuthReturnTo(), { replace: true })}
-          className="mt-3 w-full rounded-lg py-2.5 text-sm font-semibold transition-colors disabled:opacity-50"
-          style={{ backgroundColor: GOLD, color: INK }}
+          className={`${authSubmitClass} mt-3`}
         >
           {hasAvatar ? "Continue" : "Skip for now"}
         </button>

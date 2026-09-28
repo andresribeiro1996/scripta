@@ -3,13 +3,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { test } from "node:test";
+import { bookKey, localDay } from "@scripta/shared";
 
 // service.js reaches config/env.ts through covers/index.js (peekCachedCoverUrl),
 // and that module process.exit(1)s on an unsatisfied schema at import time. Set
 // the required vars before the deferred imports below, exactly as
 // import/parseImport.test.ts and the other env-reaching tests do — a static
-// import would hoist above these assignments. Nothing here is ever opened: the
-// test runs against :memory:.
+// import would hoist above these assignments. The LibraryService tests below
+// run against :memory:; the readerGlyphFor tests further down are the
+// exception — they open the real file at LIBRARY_DB_PATH, since that's the
+// connection publicResolver.js's own module-scoped cache uses.
 const scratch = join(tmpdir(), "library-service-test");
 process.env.AUTH_DB_PATH = join(scratch, "auth.sqlite");
 process.env.LIBRARY_DB_PATH = join(scratch, "library.sqlite");
@@ -19,8 +22,10 @@ process.env.JWT_ACCESS_SECRET = "a".repeat(64);
 process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
 const { createSqliteLibraryRepository } = await import("./adapters/sqlite/sqliteLibraryRepository.js");
+const { openLibraryDb } = await import("./adapters/sqlite/connection.js");
 const { LibraryConflictError } = await import("./domain/errors.js");
 const { createLibraryService } = await import("./service.js");
+const { readerGlyphFor } = await import("./publicResolver.js");
 
 type RecordedEvent = { userId: string; type: "book_added" | "book_finished"; refId: string; payload: Record<string, unknown> };
 
@@ -137,7 +142,18 @@ test("addBook with no match appends a manual book and emits book_added", () => {
   db.close();
 });
 
-test("addBook matches by trimmed ISBN and updates status in place", () => {
+test("addBook with no match, finished with a given day, records that day", () => {
+  const { db, service } = setup();
+
+  const result = service.addBook("user-1", { title: "Stoner", author: "John Williams", readStatus: 2, day: "2026-01-01" });
+
+  const books = booksOf(service, "user-1");
+  assert.equal(books[0]?.ContentID, result.key);
+  assert.equal(books[0]?.DateLastRead, "2026-01-01");
+  db.close();
+});
+
+test("addBook matches by trimmed ISBN, finishing records the given day and 100%", () => {
   const { db, service, events } = setup();
   service.saveLibrary("user-1", {
     books: [{ ContentID: "k1", Title: "Stoner", Attribution: "John Williams", ISBN: " 9780394729685 ", ReadStatus: 1, ___PercentRead: 40, DateLastRead: null }],
@@ -145,16 +161,47 @@ test("addBook matches by trimmed ISBN and updates status in place", () => {
   });
   events.length = 0;
 
-  const result = service.addBook("user-1", { title: "Stoner", author: "John Williams", isbn: "9780394729685", readStatus: 2 });
+  const result = service.addBook("user-1", { title: "Stoner", author: "John Williams", isbn: "9780394729685", readStatus: 2, day: "2024-03-02" });
 
   assert.deepEqual(result, { key: "k1", updated: true });
   const books = booksOf(service, "user-1");
   assert.equal(books.length, 1);
   assert.equal(books[0]?.ReadStatus, 2);
   assert.equal(books[0]?.___PercentRead, 100);
-  assert.equal(books[0]?.DateLastRead, new Date().toISOString().slice(0, 10));
+  assert.equal(books[0]?.DateLastRead, "2024-03-02");
   assert.deepEqual((service.getLibrary("user-1")?.data as { groups?: unknown }).groups, [{ name: "g" }]);
   assert.deepEqual(events.map(({ type, refId }) => ({ type, refId })), [{ type: "book_finished", refId: "k1" }]);
+  db.close();
+});
+
+test("addBook finishing without a day falls back to the server's local day", () => {
+  const { db, service } = setup();
+  service.saveLibrary("user-1", {
+    books: [{ ContentID: "k1", Title: "Stoner", Attribution: "John Williams", ReadStatus: 0 }]
+  });
+
+  const result = service.addBook("user-1", { title: "Stoner", author: "John Williams", readStatus: 2 });
+
+  assert.deepEqual(result, { key: "k1", updated: true });
+  assert.equal(booksOf(service, "user-1")[0]?.DateLastRead, localDay());
+  db.close();
+});
+
+test("addBook moving out of Finished keeps DateLastRead and ___PercentRead", () => {
+  const { db, service, events } = setup();
+  service.saveLibrary("user-1", {
+    books: [{ ContentID: "k1", Title: "Stoner", Attribution: "John Williams", ReadStatus: 2, ___PercentRead: 100, DateLastRead: "2020-06-01" }]
+  });
+  events.length = 0;
+
+  const result = service.addBook("user-1", { title: "Stoner", author: "John Williams", readStatus: 0 });
+
+  assert.deepEqual(result, { key: "k1", updated: true });
+  const book = booksOf(service, "user-1")[0];
+  assert.equal(book?.ReadStatus, 0);
+  assert.equal(book?.___PercentRead, 100);
+  assert.equal(book?.DateLastRead, "2020-06-01");
+  assert.deepEqual(events, []);
   db.close();
 });
 
@@ -202,4 +249,44 @@ test("addBook with the same status on a match writes nothing and emits nothing",
   assert.deepEqual(events, []);
   assert.equal(service.getLibrary("user-1")?.updatedAt, before);
   db.close();
+});
+
+type Book = Record<string, unknown>;
+const shelf = (count: number): Book[] => Array.from({ length: count }, (_, i) => ({ Title: `Book ${i}`, Attribution: `Author ${i}`, ReadStatus: 2 }));
+const seriesGroup = (books: Book[]) => ({ id: "g1", type: "series", name: "Discworld", bookKeys: books.map(bookKey) });
+
+function seedLibraryDocument(userId: string, data: unknown) {
+  const db = openLibraryDb();
+  db.prepare(`INSERT OR REPLACE INTO library_documents (user_id, data, updated_at) VALUES (?, ?, ?)`).run(
+    userId,
+    typeof data === "string" ? data : JSON.stringify(data),
+    new Date().toISOString()
+  );
+}
+
+test("readerGlyphFor returns the settled identity for a library that clears the threshold", () => {
+  const books = shelf(10);
+  seedLibraryDocument("settled-user", { books, groups: [seriesGroup(books.slice(0, 3))] });
+  assert.equal(readerGlyphFor("settled-user"), "carto");
+});
+
+test("readerGlyphFor returns null for a library that only leans toward an identity", () => {
+  const books = shelf(11);
+  seedLibraryDocument("leaning-user", { books, groups: [seriesGroup(books.slice(0, 3))] });
+  assert.equal(readerGlyphFor("leaning-user"), null);
+});
+
+test("readerGlyphFor returns null for an Unwritten library, distinct from a missing document", () => {
+  const books = shelf(3);
+  seedLibraryDocument("unwritten-user", { books, groups: [] });
+  assert.equal(readerGlyphFor("unwritten-user"), null);
+});
+
+test("readerGlyphFor returns null when the user has no library document", () => {
+  assert.equal(readerGlyphFor("ghost-user"), null);
+});
+
+test("readerGlyphFor returns null for an unparseable library document", () => {
+  seedLibraryDocument("corrupt-user", "not json");
+  assert.equal(readerGlyphFor("corrupt-user"), null);
 });
