@@ -1,60 +1,17 @@
-import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
-import { AccessibilityInfo, useColorScheme } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { AccessibilityInfo, Appearance, useColorScheme } from "react-native";
+import {
+  parseThemePreference,
+  resolveTheme,
+  themes,
+  type ThemeColors,
+  type ThemeId,
+  type ThemePreference,
+  type ThemeScheme,
+} from "@scripta/shared/themes";
 
-export const palettes = {
-  light: {
-    background: "#f2f0ec",
-    surface: "#ffffff",
-    surfacePressed: "#f7f5f1",
-    text: "#201e1c",
-    textDim: "#6b6560",
-    border: "#ddd8d0",
-    accent: "#97532d",
-    accentSoft: "#f1e2d8",
-    // A fill that has to outrank a border. accentSoft is a wash for things
-    // that sit behind accent-coloured text (avatars, cover fallbacks,
-    // badges), so it is deliberately weak — at 1.11:1 in light and 1.39:1
-    // in dark it separates from the page LESS than a hairline does (1.25
-    // and 1.82), which puts structure above meaning wherever it marks a
-    // selection. This one carries more of the accent: 24% in light, 34% in
-    // dark, both landing just above their borders with body text still over
-    // 8:1 on top.
-    accentFill: "#e0ccbf",
-    danger: "#ae412e",
-    dangerSoft: "#f6dfda",
-    success: "#47713c",
-    successSoft: "#e4efdf",
-    info: "#285f7a",
-    infoSoft: "#dcebf2",
-    reference: "#6b4f8f",
-    referenceSoft: "#ebe4f3",
-    scrim: "rgba(32, 30, 28, 0.48)",
-    onAccent: "#ffffff",
-    onDanger: "#ffffff",
-  },
-  dark: {
-    background: "#141210",
-    surface: "#2a2724",
-    surfacePressed: "#333029",
-    text: "#ece8e3",
-    textDim: "#a8a199",
-    border: "#45403a",
-    accent: "#e08a52",
-    accentSoft: "#3a2c22",
-    accentFill: "#593b26",
-    danger: "#e08072",
-    dangerSoft: "#3a2420",
-    success: "#8fbf7f",
-    successSoft: "#262f21",
-    info: "#7fb8d4",
-    infoSoft: "#1f2d33",
-    reference: "#b9a3d6",
-    referenceSoft: "#2c2536",
-    scrim: "rgba(0, 0, 0, 0.64)",
-    onAccent: "#141210",
-    onDanger: "#141210",
-  },
-} as const;
+export type { ThemeColors };
 
 export const spacing = { none: 0, xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 24, xxxl: 32, huge: 48 } as const;
 export const radii = { sm: 6, md: 8, lg: 12, xl: 16, full: 999 } as const;
@@ -68,27 +25,76 @@ export const typography = {
 export const minimumTouchTarget = 44;
 export const dynamicType = { allowFontScaling: true } as const;
 
-export type ThemeMode = keyof typeof palettes;
-export type ThemeColors = (typeof palettes)[ThemeMode];
-export type Theme = { mode: ThemeMode; colors: ThemeColors };
+export type ThemeMode = ThemeScheme;
+export type Theme = {
+  id: ThemeId;
+  mode: ThemeMode;
+  colors: ThemeColors;
+  preference: ThemePreference;
+  setPreference: (preference: ThemePreference) => void;
+};
 
+const STORAGE_KEY = "theme";
 const ThemeContext = createContext<Theme | undefined>(undefined);
 
-function systemTheme(scheme: ReturnType<typeof useColorScheme>): Theme {
-  const mode: ThemeMode = scheme === "dark" ? "dark" : "light";
-  return { mode, colors: palettes[mode] };
+function osScheme(scheme: ReturnType<typeof useColorScheme>): ThemeScheme {
+  return scheme === "dark" ? "dark" : "light";
 }
 
-export function ThemeProvider({ children, mode }: { children: ReactNode; mode?: ThemeMode }) {
+function applyNativeScheme(preference: ThemePreference): void {
+  Appearance.setColorScheme(preference === "system" ? "unspecified" : themes[preference].scheme);
+}
+
+export function ThemeProvider({ children }: { children: ReactNode }) {
   const scheme = useColorScheme();
-  const resolvedMode = mode ?? (scheme === "dark" ? "dark" : "light");
-  return <ThemeContext.Provider value={{ mode: resolvedMode, colors: palettes[resolvedMode] }}>{children}</ThemeContext.Provider>;
+  const [preference, setPreferenceState] = useState<ThemePreference | null>(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem(STORAGE_KEY).then(
+      (stored) => {
+        const parsed = parseThemePreference(stored);
+        applyNativeScheme(parsed);
+        setPreferenceState(parsed);
+      },
+      (err: unknown) => {
+        console.warn("Couldn't read the saved theme; following the system.", err);
+        setPreferenceState("system");
+      },
+    );
+  }, []);
+
+  const setPreference = useCallback((next: ThemePreference) => {
+    applyNativeScheme(next);
+    setPreferenceState(next);
+    AsyncStorage.setItem(STORAGE_KEY, next).catch((err: unknown) => {
+      console.warn("Couldn't save the theme on this device.", err);
+    });
+  }, []);
+
+  const value = useMemo<Theme | null>(() => {
+    if (!preference) return null;
+    const id = resolveTheme(preference, osScheme(scheme));
+    return { id, mode: themes[id].scheme, colors: themes[id].colors, preference, setPreference };
+  }, [preference, scheme, setPreference]);
+
+  if (!value) return null;
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
 export function useTheme(): Theme {
   const context = useContext(ThemeContext);
   const scheme = useColorScheme();
-  return context ?? systemTheme(scheme);
+  if (context) return context;
+  const id = osScheme(scheme);
+  return {
+    id,
+    mode: id,
+    colors: themes[id].colors,
+    preference: "system",
+    setPreference: () => {
+      throw new Error("setPreference needs a ThemeProvider above it.");
+    },
+  };
 }
 
 export function useReducedMotion(): boolean {

@@ -3,6 +3,7 @@ import { usePathname, useGlobalSearchParams } from "expo-router";
 import { ActivityIndicator, View } from "react-native";
 import { Redirect, Tabs } from "expo-router";
 import { useAuth } from "../../core/auth";
+import { useAccountThemeSync } from "../../features/settings/themeSync";
 import { useGenreEnrichment } from "../../features/library/hooks/useGenreEnrichment";
 import { useLibrary } from "../../features/library/hooks/useLibrary";
 import { ErrorState } from "../../ui/components";
@@ -12,6 +13,11 @@ import { useTheme } from "../../ui/theme";
 function GenreEnrichment() {
   const { data: library, updateLibrary } = useLibrary();
   useGenreEnrichment(library?.data.books ?? [], updateLibrary);
+  return null;
+}
+
+function ThemeSync() {
+  useAccountThemeSync();
   return null;
 }
 
@@ -56,6 +62,7 @@ export default function AppLayout() {
   return (
     <>
       <GenreEnrichment />
+      <ThemeSync />
       <Tabs
         screenOptions={{
           headerShown: false,
