@@ -43,7 +43,7 @@ function coverBookFor(side: DuelSide) {
 function CheckBadge() {
   return (
     <span
-      className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-(--color-accent) text-white sm:h-4 sm:w-4"
+      className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-(--color-accent) text-(--color-on-accent) sm:h-4 sm:w-4"
       aria-hidden
     >
       <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
@@ -233,7 +233,7 @@ function MatchSheet({
                 key={s.key}
                 onClick={() => onVote(s.key)}
                 disabled={voting}
-                className="min-h-11 min-w-0 flex-1 truncate rounded-lg bg-(--color-accent) px-3 text-sm font-semibold text-white disabled:opacity-60"
+                className="min-h-11 min-w-0 flex-1 truncate rounded-lg bg-(--color-accent) px-3 text-sm font-semibold text-(--color-on-accent) disabled:opacity-60"
               >
                 {s.title}
               </button>

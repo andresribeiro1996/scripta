@@ -514,7 +514,7 @@ export function MuralEditorPage() {
           <button
             onClick={toggleEditMode}
             className={`rounded-lg px-3 py-2 text-sm font-semibold ${
-              editMode ? "bg-(--color-accent) text-white" : "border border-(--color-border) bg-(--color-surface) hover:bg-(--color-surface-hover)"
+              editMode ? "bg-(--color-accent) text-(--color-on-accent)" : "border border-(--color-border) bg-(--color-surface) hover:bg-(--color-surface-hover)"
             }`}
           >
             {editMode ? "Done editing" : "Edit"}
@@ -532,7 +532,7 @@ export function MuralEditorPage() {
           body={editMode ? "Add your first block with the + button above." : "Turn on editing and add your first block."}
           action={
             !editMode && (
-              <button onClick={() => setEditMode(true)} className="rounded-lg bg-(--color-accent) px-4 py-2 font-semibold text-white">
+              <button onClick={() => setEditMode(true)} className="rounded-lg bg-(--color-accent) px-4 py-2 font-semibold text-(--color-on-accent)">
                 Start building
               </button>
             )

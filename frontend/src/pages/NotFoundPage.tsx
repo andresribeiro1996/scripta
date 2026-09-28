@@ -7,7 +7,7 @@ export function NotFoundPage() {
       <p className="text-sm text-(--color-text-dim)">The link may be old or mistyped.</p>
       <Link
         to="/dashboard"
-        className="rounded-lg bg-(--color-accent) px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90"
+        className="rounded-lg bg-(--color-accent) px-4 py-2.5 text-sm font-semibold text-(--color-on-accent) hover:opacity-90"
       >
         Go to your library
       </Link>

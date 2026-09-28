@@ -361,7 +361,7 @@ export function MobileMuralCanvas({
             <button onClick={onCancelDraft} disabled={busy} className="min-h-11 rounded-xl px-3 text-sm font-semibold text-(--color-text-dim) hover:bg-(--color-surface-hover) disabled:opacity-40">
               {draft.kind === "add" || draft.kind === "duplicate" ? "Discard" : "Cancel"}
             </button>
-            <button onClick={onApplyDraft} disabled={busy || !draft.valid} className="min-h-11 rounded-xl bg-(--color-accent) px-3 text-sm font-semibold text-white disabled:opacity-40">
+            <button onClick={onApplyDraft} disabled={busy || !draft.valid} className="min-h-11 rounded-xl bg-(--color-accent) px-3 text-sm font-semibold text-(--color-on-accent) disabled:opacity-40">
               {busy ? "Saving…" : draft.kind === "add" || draft.kind === "duplicate" ? "Place" : "Save size"}
             </button>
           </div>

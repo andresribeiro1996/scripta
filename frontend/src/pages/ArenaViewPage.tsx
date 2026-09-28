@@ -175,7 +175,7 @@ export function ArenaViewPage() {
                 Shown on both tabs because the count is a property of the
                 tournament, not of how you're looking at it. */}
             {pendingVotes > 0 && (
-              <span className="rounded-full bg-(--color-accent) px-1.5 text-[10px] font-bold text-white tabular-nums">{pendingVotes}</span>
+              <span className="rounded-full bg-(--color-accent) px-1.5 text-[10px] font-bold text-(--color-on-accent) tabular-nums">{pendingVotes}</span>
             )}
           </button>
         ))}
@@ -225,14 +225,14 @@ export function ArenaViewPage() {
                   <button
                     onClick={() => void handleTiebreak(duel.id, duel.bookA.key)}
                     disabled={busyDuelId === duel.id}
-                    className="flex-1 rounded-lg bg-(--color-accent) py-2 text-xs font-medium text-white"
+                    className="flex-1 rounded-lg bg-(--color-accent) py-2 text-xs font-medium text-(--color-on-accent)"
                   >
                     {duel.bookA.title} wins
                   </button>
                   <button
                     onClick={() => void handleTiebreak(duel.id, duel.bookB.key)}
                     disabled={busyDuelId === duel.id}
-                    className="flex-1 rounded-lg bg-(--color-accent) py-2 text-xs font-medium text-white"
+                    className="flex-1 rounded-lg bg-(--color-accent) py-2 text-xs font-medium text-(--color-on-accent)"
                   >
                     {duel.bookB.title} wins
                   </button>

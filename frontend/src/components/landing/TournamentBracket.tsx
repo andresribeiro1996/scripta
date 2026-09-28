@@ -126,7 +126,7 @@ function SideView({ view, geo }: { view: Side; geo: Geo }) {
   const check = view.winner && (
     <span
       aria-hidden="true"
-      className="absolute flex items-center justify-center rounded-full bg-(--color-accent) font-bold text-white"
+      className="absolute flex items-center justify-center rounded-full bg-(--color-accent) font-bold text-(--color-on-accent)"
       style={{ top: -4, right: -4, width: geo.checkSize, height: geo.checkSize, fontSize: geo.checkFontSize }}
     >
       ✓

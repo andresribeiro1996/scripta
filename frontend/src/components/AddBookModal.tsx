@@ -202,7 +202,7 @@ export function AddBookModal({
           <button
             type="submit"
             disabled={searching || query.trim() === ""}
-            className="shrink-0 rounded-lg bg-(--color-accent) px-3.5 py-2 text-sm font-semibold text-white disabled:opacity-60"
+            className="shrink-0 rounded-lg bg-(--color-accent) px-3.5 py-2 text-sm font-semibold text-(--color-on-accent) disabled:opacity-60"
           >
             {searching ? "Searching…" : "Search"}
           </button>
@@ -337,7 +337,7 @@ export function AddBookModal({
           <button
             onClick={() => void handleSave()}
             disabled={saving || title.trim() === "" || author.trim() === ""}
-            className="w-full rounded-lg bg-(--color-accent) px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+            className="w-full rounded-lg bg-(--color-accent) px-4 py-2.5 text-sm font-semibold text-(--color-on-accent) disabled:opacity-60"
           >
             {saving ? "Adding…" : "Add book"}
           </button>

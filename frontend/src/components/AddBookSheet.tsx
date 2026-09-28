@@ -45,7 +45,7 @@ export function AddBookSheet({
           <Link
             to="/login"
             state={{ from: location }}
-            className="min-h-9 rounded-lg bg-(--color-accent) px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+            className="min-h-9 rounded-lg bg-(--color-accent) px-4 py-2 text-sm font-semibold text-(--color-on-accent) hover:opacity-90"
           >
             Sign in
           </Link>

@@ -339,7 +339,7 @@ export function BookCard({
                 onOpenStyle(book);
               }}
               title={book._style ? "Edit this book's custom style" : "Give this book its own style"}
-              className={`rounded-full px-2.5 py-1 text-[10.5px] font-semibold text-white backdrop-blur-xs ${book._style ? "bg-(--color-accent)" : "bg-[rgba(10,8,6,0.72)]"}`}
+              className={`rounded-full px-2.5 py-1 text-[10.5px] font-semibold backdrop-blur-xs ${book._style ? "bg-(--color-accent) text-(--color-on-accent)" : "bg-[rgba(10,8,6,0.72)] text-white"}`}
             >
               Style
             </button>
@@ -351,7 +351,7 @@ export function BookCard({
                 onOpenCoverPicker(book);
               }}
               title={book._coverImageId ? "Change this book's custom cover" : "Set a custom cover from your gallery"}
-              className={`rounded-full px-2.5 py-1 text-[10.5px] font-semibold text-white backdrop-blur-xs ${book._coverImageId ? "bg-(--color-accent)" : "bg-[rgba(10,8,6,0.72)]"}`}
+              className={`rounded-full px-2.5 py-1 text-[10.5px] font-semibold backdrop-blur-xs ${book._coverImageId ? "bg-(--color-accent) text-(--color-on-accent)" : "bg-[rgba(10,8,6,0.72)] text-white"}`}
             >
               Cover
             </button>
