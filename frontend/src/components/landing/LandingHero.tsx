@@ -4,10 +4,22 @@ import { WaitlistForm } from "./WaitlistForm";
 
 function CartographerPlate({ className, width, height }: { className: string; width: number; height: number }) {
   return (
-    <picture className={className}>
-      <source media="(prefers-color-scheme: dark)" srcSet="/reader-cards/i-carto-reversed.svg" />
-      <img src="/reader-cards/i-carto-paper.svg" width={width} height={height} alt="" className="block h-full w-full rounded-[3px]" />
-    </picture>
+    <span className={className}>
+      <img
+        src="/reader-cards/i-carto-paper.svg"
+        width={width}
+        height={height}
+        alt=""
+        className="block h-full w-full rounded-[3px] dark:hidden"
+      />
+      <img
+        src="/reader-cards/i-carto-reversed.svg"
+        width={width}
+        height={height}
+        alt=""
+        className="hidden h-full w-full rounded-[3px] dark:block"
+      />
+    </span>
   );
 }
 

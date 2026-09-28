@@ -7,6 +7,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content="Atmyshelf brings your Kobo, Goodreads and StoryGraph history into one personal library: styled covers, series and collections, murals you can share, and book tournaments." />
     <title>Atmyshelf — your reading life, properly kept</title>
+    <script>
+      (function () {
+        var stored = null;
+        try {
+          stored = localStorage.getItem("theme");
+        } catch (err) {}
+        var query = matchMedia("(prefers-color-scheme: dark)");
+        if (stored === "light" || stored === "dark") {
+          document.documentElement.dataset.theme = stored;
+        } else {
+          document.documentElement.dataset.theme = query.matches ? "dark" : "light";
+          query.addEventListener("change", function (e) {
+            document.documentElement.dataset.theme = e.matches ? "dark" : "light";
+          });
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

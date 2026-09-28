@@ -73,7 +73,7 @@ const cornerOpts = [
 type CornerOpt = (typeof cornerOpts)[number]["value"];
 
 const previewSlugs: BookSlug[] = ["piranesi", "gilead", "klara", "hail-mary", "circe", "stoner"];
-const shareLink = "atmyshelf.com/shared/library/k3v9q2";
+const shareLink = "atmyshelf.com/eleanor";
 
 function SegmentedGroup<T extends string>({
   label,

@@ -51,15 +51,18 @@ export function ReaderCards() {
                 zIndex: on ? 20 : index + 1,
               }}
             >
-              <picture>
-                <source media="(prefers-color-scheme: dark)" srcSet={src.reversed} />
-                <img
-                  src={src.paper}
-                  alt=""
-                  loading="lazy"
-                  className={`block h-full w-full rounded-[3px] ${on ? "shadow-[0_28px_40px_-14px_rgb(0_0_0/0.5)]" : "shadow-[0_12px_22px_-10px_rgb(0_0_0/0.4)]"}`}
-                />
-              </picture>
+              <img
+                src={src.paper}
+                alt=""
+                loading="lazy"
+                className={`block h-full w-full rounded-[3px] dark:hidden ${on ? "shadow-[0_28px_40px_-14px_rgb(0_0_0/0.5)]" : "shadow-[0_12px_22px_-10px_rgb(0_0_0/0.4)]"}`}
+              />
+              <img
+                src={src.reversed}
+                alt=""
+                loading="lazy"
+                className={`hidden h-full w-full rounded-[3px] dark:block ${on ? "shadow-[0_28px_40px_-14px_rgb(0_0_0/0.5)]" : "shadow-[0_12px_22px_-10px_rgb(0_0_0/0.4)]"}`}
+              />
             </button>
           );
         })}
