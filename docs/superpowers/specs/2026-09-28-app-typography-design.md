@@ -36,13 +36,17 @@ the landing/sign-in/privacy pages use a display face (Playfair); the 82 in-app
 export type FontSlot = "display" | "text";
 export type FontWeight = 400 | 600 | 700;
 export interface FontDefinition {
-  label: string;
-  slots: FontSlot[];
-  stack: string;        // CSS font-family value, primary family first, then fallbacks
-  scale: number;        // size correction vs the system font
-  weights: FontWeight[]; // bundled static files; [] for system
+  label: string;           // shown in pickers
+  family: string | null;   // CSS/Google family name; null for system
+  slots: readonly FontSlot[];
+  weights: readonly FontWeight[]; // bundled static files; [] for system
+  scale: number;           // size correction vs the system font
+  fallback: string;        // CSS fallbacks after the family
 }
 ```
+
+`fontStack(id)` builds the CSS value (`"<family>", <fallback>`, or just the
+fallback for system); `fontFileName(id, weight)` is `<id>-<weight>`.
 
 | id | label | slots | weights | scale | fallback in `stack` |
 |---|---|---|---|---|---|
@@ -191,14 +195,20 @@ export interface FontDefinition {
   nothing; display → `"<id>-<its weight>"`; text → `"<id>-700"` when
   weight ≥ 600 else `"<id>-400"`; a custom family drops `fontWeight`; sizes
   multiply by `scale` (rounded).
-- **`mobile/src/ui/Text.tsx`**: `Text` (and `TextInput`) wrapping React
-  Native's, applying `fontStyleFor` for the text slot, or the display slot
-  with a `display` prop. An explicit `fontFamily` in the passed style always
-  wins (card/mural styling keeps working).
-- **Migration**: every `Text`/`TextInput` import from `"react-native"` in
-  `mobile/src` moves to `ui`; every `Text` styled with `typography.heading` or
-  `typography.title` gets `display`; `navigation.tsx` header titles use the
-  display font and the tab bar labels the text font.
+- **`mobile/src/ui/Text.tsx`**: `Text` wrapping React Native's, applying
+  `fontStyleFor` — the display slot when the resolved font size is ≥ 18
+  (`typography.title` and up), the text slot otherwise, with a `display`
+  prop to force either way. An explicit `fontFamily` in the passed style
+  always wins (card/mural styling keeps working). `TextInput` is not
+  wrapped: its single render site (`ui/components.tsx` `Input`) applies the
+  text font directly (it is also used as a ref type, which a wrapper would
+  break).
+- **Migration**: every `Text` import from `"react-native"` in `mobile/src`
+  moves to `ui/Text`; `navigation.tsx` header titles use the display font and
+  the tab bar labels the text font.
+- **Load failure**: `ThemeProvider` takes `bundledFonts`; when the fonts
+  failed to load, both slots resolve to System rather than naming faces that
+  were never registered. The splash screen is held until fonts are ready.
 
 ## Testing
 
@@ -217,7 +227,7 @@ export interface FontDefinition {
 - **Mobile**: `fontStyleFor` unit tests (system passthrough, weight mapping,
   explicit family untouched by the wrapper's contract, scale rounding);
   typecheck/test; a guard test that no file under `mobile/src` imports `Text`
-  or `TextInput` from `"react-native"` except `ui/Text.tsx`.
+  from `"react-native"` except `ui/Text.tsx`.
 - **Manual**: browser pass (Matrix, Oxblood, Press Start 2P override,
   cross-tab), emulator pass (same three plus a cold start), both only after
   checking the lease per AGENTS.md.
