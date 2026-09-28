@@ -74,3 +74,10 @@ test("the oxblood frame is two lines, outer then inner", () => {
 test("withOpacity turns a hex colour into rgba", () => {
   assert.equal(withOpacity("#d9b36b", 0.2), "rgba(217, 179, 107, 0.2)");
 });
+
+test("matrix glyphs fade from 0.21 down to 0.02", () => {
+  const svg = THEME_DECOR.matrix!.pieces[0]!.svg;
+  const opacities = [...svg.matchAll(/opacity="([\d.]+)"/g)].map(([, value]) => Number(value));
+  assert.equal(Math.max(...opacities), 0.21);
+  assert.equal(Math.min(...opacities), 0.02);
+});

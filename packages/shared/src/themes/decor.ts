@@ -51,7 +51,7 @@ function matrix(c: ThemeColors): Decor {
   const glyphs = columns.flatMap(([x, rows]) =>
     Array.from({ length: rows }, (_, row) => {
       const glyph = MATRIX_GLYPHS[(k++ * 7) % MATRIX_GLYPHS.length];
-      return `<text x="${x}" y="${16 + row * 20}" font-family="monospace" font-size="16" fill="${c.accent}" opacity="${round(0.02 + 0.19 * (1 - row / rows))}">${glyph}</text>`;
+      return `<text x="${x}" y="${16 + row * 20}" font-family="monospace" font-size="16" fill="${c.accent}" opacity="${round(0.02 + 0.19 * (1 - row / (rows - 1)))}">${glyph}</text>`;
     }),
   );
   return { pieces: [{ anchor: "top-right", width: 128, height: 248, svg: svg(128, 248, glyphs.join("")) }] };
