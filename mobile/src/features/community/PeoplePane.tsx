@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, View } from "react-native";
+import { Text } from "../../ui/Text";
 import { readerGlyphLabel } from "@scripta/shared";
 import { Button, EmptyState, Input, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import type { PersonResult } from "@scripta/shared/community";

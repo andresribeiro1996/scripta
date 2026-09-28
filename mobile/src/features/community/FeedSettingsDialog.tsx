@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text } from "../../ui/Text";
 import { ownGlyphPreview, readerIdentity } from "@scripta/shared";
 import { DEFAULT_FEED_SETTINGS, type FeedCategory, type FeedSettings } from "@scripta/shared/community";
 import { Button, Dialog, Toast, spacing, typography, useTheme } from "../../ui";

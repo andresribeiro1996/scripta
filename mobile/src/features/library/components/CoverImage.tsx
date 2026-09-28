@@ -6,7 +6,8 @@
 // cache on top of the URL memoization already in api/covers.ts.
 
 import { useEffect, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text } from "../../../ui/Text";
 import { Image } from "expo-image";
 import { normalizeImageId, normalizeIsbn, type CoverSize } from "@scripta/shared";
 import { useTheme } from "../../../ui/theme";

@@ -1,7 +1,8 @@
 import { RankingMethodSelector } from "./RankingMethodSelector";
 import { useEffect, useRef, useState } from "react";
 import { aggregate, AGGREGATION_MODES, type AggregationMode, type HistogramCell } from "@scripta/shared";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Text } from "../../ui/Text";
 import { Sheet, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { authorOf, keyOf, TierCover, titleOf, type TierBook } from "./TierBoard";
 

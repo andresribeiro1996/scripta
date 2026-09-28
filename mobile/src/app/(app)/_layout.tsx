@@ -3,10 +3,11 @@ import { usePathname, useGlobalSearchParams } from "expo-router";
 import { ActivityIndicator, View } from "react-native";
 import { Redirect, Tabs } from "expo-router";
 import { useAuth } from "../../core/auth";
-import { useAccountThemeSync } from "../../features/settings/themeSync";
+import { useAccountAppearanceSync } from "../../features/settings/appearanceSync";
 import { useGenreEnrichment } from "../../features/library/hooks/useGenreEnrichment";
 import { useLibrary } from "../../features/library/hooks/useLibrary";
 import { ErrorState } from "../../ui/components";
+import { fontStyleFor } from "../../ui/fontStyle";
 import { Icon } from "../../ui/icon";
 import { useTheme } from "../../ui/theme";
 
@@ -16,8 +17,8 @@ function GenreEnrichment() {
   return null;
 }
 
-function ThemeSync() {
-  useAccountThemeSync();
+function AppearanceSync() {
+  useAccountAppearanceSync();
   return null;
 }
 
@@ -26,7 +27,7 @@ export default function AppLayout() {
   const params = useGlobalSearchParams();
   const returnTo = pathWithQuery(pathname, params);
   const { ready, user, unreachable, retry } = useAuth();
-  const { colors } = useTheme();
+  const { colors, fonts } = useTheme();
   if (!ready) {
     return (
       <View style={{ flex: 1, alignItems: "center", backgroundColor: colors.background, justifyContent: "center" }}>
@@ -62,13 +63,14 @@ export default function AppLayout() {
   return (
     <>
       <GenreEnrichment />
-      <ThemeSync />
+      <AppearanceSync />
       <Tabs
         screenOptions={{
           headerShown: false,
           tabBarActiveTintColor: colors.accent,
           tabBarInactiveTintColor: colors.textDim,
           tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
+          tabBarLabelStyle: fontStyleFor(fonts.text, "text", { fontSize: 10 }) ?? undefined,
         }}
       >
         <Tabs.Screen name="(home)" options={{ title: "Home", tabBarIcon: ({ color, focused, size }) => <Icon name="home" filled={focused} color={color} size={size} /> }} />

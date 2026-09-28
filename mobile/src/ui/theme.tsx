@@ -2,9 +2,14 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { AccessibilityInfo, Appearance, useColorScheme } from "react-native";
 import {
+  parseFontPreference,
   parseThemePreference,
+  resolveFonts,
   resolveTheme,
   themes,
+  type FontId,
+  type FontPreference,
+  type FontSlot,
   type ThemeColors,
   type ThemeId,
   type ThemePreference,
@@ -32,9 +37,15 @@ export type Theme = {
   colors: ThemeColors;
   preference: ThemePreference;
   setPreference: (preference: ThemePreference) => void;
+  fonts: { display: FontId; text: FontId };
+  displayFont: FontPreference;
+  textFont: FontPreference;
+  setFontPreference: (slot: FontSlot, preference: FontPreference) => void;
 };
 
 const STORAGE_KEY = "theme";
+const FONT_KEYS: Record<FontSlot, string> = { display: "fontDisplay", text: "fontText" };
+const SYSTEM_FONTS = { display: "system", text: "system" } as const;
 const ThemeContext = createContext<Theme | undefined>(undefined);
 
 function osScheme(scheme: ReturnType<typeof useColorScheme>): ThemeScheme {
@@ -45,19 +56,24 @@ function applyNativeScheme(preference: ThemePreference): void {
   Appearance.setColorScheme(preference === "system" ? "unspecified" : themes[preference].scheme);
 }
 
-export function ThemeProvider({ children }: { children: ReactNode }) {
+export function ThemeProvider({ children, bundledFonts }: { children: ReactNode; bundledFonts: boolean }) {
   const scheme = useColorScheme();
   const [preference, setPreferenceState] = useState<ThemePreference | null>(null);
+  const [displayFont, setDisplayFont] = useState<FontPreference>("theme");
+  const [textFont, setTextFont] = useState<FontPreference>("theme");
 
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY).then(
-      (stored) => {
-        const parsed = parseThemePreference(stored);
+    AsyncStorage.multiGet([STORAGE_KEY, FONT_KEYS.display, FONT_KEYS.text]).then(
+      (entries) => {
+        const stored = new Map(entries);
+        const parsed = parseThemePreference(stored.get(STORAGE_KEY));
         applyNativeScheme(parsed);
+        setDisplayFont(parseFontPreference("display", stored.get(FONT_KEYS.display)));
+        setTextFont(parseFontPreference("text", stored.get(FONT_KEYS.text)));
         setPreferenceState(parsed);
       },
       (err: unknown) => {
-        console.warn("Couldn't read the saved theme; following the system.", err);
+        console.warn("Couldn't read the saved appearance; following the system.", err);
         setPreferenceState("system");
       },
     );
@@ -71,11 +87,20 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const setFontPreference = useCallback((slot: FontSlot, next: FontPreference) => {
+    if (slot === "display") setDisplayFont(next);
+    else setTextFont(next);
+    AsyncStorage.setItem(FONT_KEYS[slot], next).catch((err: unknown) => {
+      console.warn("Couldn't save the font on this device.", err);
+    });
+  }, []);
+
   const value = useMemo<Theme | null>(() => {
     if (!preference) return null;
     const id = resolveTheme(preference, osScheme(scheme));
-    return { id, mode: themes[id].scheme, colors: themes[id].colors, preference, setPreference };
-  }, [preference, scheme, setPreference]);
+    const fonts = bundledFonts ? resolveFonts(id, displayFont, textFont) : SYSTEM_FONTS;
+    return { id, mode: themes[id].scheme, colors: themes[id].colors, preference, setPreference, fonts, displayFont, textFont, setFontPreference };
+  }, [preference, scheme, setPreference, bundledFonts, displayFont, textFont, setFontPreference]);
 
   if (!value) return null;
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
@@ -93,6 +118,12 @@ export function useTheme(): Theme {
     preference: "system",
     setPreference: () => {
       throw new Error("setPreference needs a ThemeProvider above it.");
+    },
+    fonts: SYSTEM_FONTS,
+    displayFont: "theme",
+    textFont: "theme",
+    setFontPreference: () => {
+      throw new Error("setFontPreference needs a ThemeProvider above it.");
     },
   };
 }

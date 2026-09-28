@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Group, Mural, ReaderProfile } from "@scripta/shared";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "../../ui/Text";
 import { Button } from "../../ui";
 import { spacing, typography, useTheme } from "../../ui/theme";
 import { ContentShareSheet } from "../sharing/ContentShareSheet";

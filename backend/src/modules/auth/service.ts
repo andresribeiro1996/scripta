@@ -22,7 +22,7 @@ import {
 import type { AuthRepository, AvatarBlobStore } from "./domain/ports.js";
 import type { AuthenticatedUser, RefreshTokenRow, TokenPair, UserRow } from "./domain/types.js";
 import { generateRefreshToken, hashRefreshToken, refreshTokenExpiry, signAccessToken } from "./tokens.js";
-import { parseThemePreference, type ThemePreference } from "@scripta/shared/themes";
+import { parseAccountAppearance, type AccountAppearance, type Appearance } from "@scripta/shared/themes";
 
 export interface AuthService {
   signup(email: string, username: string, password: string): Promise<{ user: AuthenticatedUser; tokens: TokenPair }>;
@@ -39,8 +39,8 @@ export interface AuthService {
    *  one to change theirs (it's set once, at signup). */
   setUsername(userId: string, username: string): Promise<AuthenticatedUser>;
   getUserById(userId: string): AuthenticatedUser | null;
-  getTheme(userId: string): ThemePreference | null;
-  setTheme(userId: string, theme: ThemePreference): void;
+  getAppearance(userId: string): AccountAppearance;
+  setAppearance(userId: string, patch: Partial<Appearance>): void;
   /** Validates, square-crops, and re-encodes an uploaded profile picture
    *  (same pipeline reasoning as gallery's uploadImage — magic-byte sniff,
    *  EXIF strip via re-encode, server-generated id), replaces any previous
@@ -268,13 +268,13 @@ export function createAuthService(repo: AuthRepository, avatarStore: AvatarBlobS
       return user ? toAuthenticatedUser(user) : null;
     },
 
-    getTheme(userId) {
-      const theme = repo.findUserById(userId)?.theme;
-      return theme == null ? null : parseThemePreference(theme);
+    getAppearance(userId) {
+      const row = repo.findUserById(userId);
+      return parseAccountAppearance({ theme: row?.theme ?? null, displayFont: row?.display_font ?? null, textFont: row?.text_font ?? null });
     },
 
-    setTheme(userId, theme) {
-      repo.setTheme(userId, theme);
+    setAppearance(userId, patch) {
+      repo.setAppearance(userId, { theme: patch.theme, display_font: patch.displayFont, text_font: patch.textFont });
     },
 
     async setAvatar(userId, buffer) {

@@ -151,11 +151,12 @@ test("revokeAllRefreshTokensForUser only touches that user's still-active tokens
   assert.equal(repo.findRefreshTokenById(bTokenId)?.revoked_at, null);
 });
 
-test("a fresh database has the theme column", () => {
-  assert.ok(columnNames(freshDb(), "users").includes("theme"));
+test("a fresh database has the appearance columns", () => {
+  const cols = columnNames(freshDb(), "users");
+  for (const column of ["theme", "display_font", "text_font"]) assert.ok(cols.includes(column), column);
 });
 
-test("migrating a database without the theme column adds it, NULL for existing users, and setTheme persists", () => {
+test("migrating a database without the appearance columns adds them, NULL for existing users, and setAppearance updates only the given ones", () => {
   const db = new DatabaseSync(":memory:");
   db.exec(`
     CREATE TABLE users (
@@ -168,9 +169,15 @@ test("migrating a database without the theme column adds it, NULL for existing u
 
   applyAuthMigrations(db);
 
-  assert.ok(columnNames(db, "users").includes("theme"));
+  const cols = columnNames(db, "users");
+  for (const column of ["theme", "display_font", "text_font"]) assert.ok(cols.includes(column), column);
   const repo = createSqliteAuthRepository(db);
-  assert.equal(repo.findUserById("u1")?.theme, null);
-  repo.setTheme("u1", "midnight");
-  assert.equal(repo.findUserById("u1")?.theme, "midnight");
+  const row = () => repo.findUserById("u1");
+  assert.deepEqual([row()?.theme, row()?.display_font, row()?.text_font], [null, null, null]);
+  repo.setAppearance("u1", { theme: "midnight" });
+  assert.deepEqual([row()?.theme, row()?.display_font, row()?.text_font], ["midnight", null, null]);
+  repo.setAppearance("u1", { display_font: "vt323", text_font: "atkinson" });
+  assert.deepEqual([row()?.theme, row()?.display_font, row()?.text_font], ["midnight", "vt323", "atkinson"]);
+  repo.setAppearance("u1", {});
+  assert.deepEqual([row()?.theme, row()?.display_font, row()?.text_font], ["midnight", "vt323", "atkinson"]);
 });

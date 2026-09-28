@@ -6,7 +6,8 @@
 // collection" button).
 
 import { useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Text } from "../../../ui/Text";
 import { router, Stack } from "expo-router";
 import {
   addBookToGroup,

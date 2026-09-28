@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { THEME_IDS, themes, type ThemeColors, type ThemePreference } from "@scripta/shared/themes";
-import { isThemeSyncFailure, saveAccountTheme } from "../api/theme";
+import { isAppearanceSyncFailure, saveAccountAppearance } from "../api/appearance";
 import { applyThemePreference, useThemePreference } from "../lib/theme";
 
 const OPTIONS: ThemePreference[] = ["system", ...THEME_IDS];
@@ -25,9 +25,9 @@ export function ThemePicker() {
     applyThemePreference(preference);
     setError(null);
     try {
-      await saveAccountTheme(preference);
+      await saveAccountAppearance({ theme: preference });
     } catch (err) {
-      if (!isThemeSyncFailure(err)) throw err;
+      if (!isAppearanceSyncFailure(err)) throw err;
       setError("Couldn't save to your account. Try again.");
     }
   }

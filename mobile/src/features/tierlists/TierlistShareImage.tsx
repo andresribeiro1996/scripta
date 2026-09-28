@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AGGREGATION_MODES, type AggregationMode, type HistogramCell, type TierlistData } from "@scripta/shared";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "../../ui/Text";
 import { radii, spacing, typography, useTheme } from "../../ui";
 import { keyOf, TierCover, type TierBook } from "./TierBoard";
 import { tierlistShareRows } from "./tierlistShareData";
@@ -33,11 +34,11 @@ export function TierlistShareImage({ title, data, books, community, histogram, b
         </View>
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm }}>
           <View style={{ flexGrow: 1, padding: spacing.md, borderRadius: radii.lg, backgroundColor: colors.accentSoft, gap: spacing.xs }}>
-            <Text style={[typography.heading, { color: colors.text, fontWeight: "700", fontVariant: ["tabular-nums"] }]}>{ballotCount ?? 0}</Text>
+            <Text display={false} style={[typography.heading, { color: colors.text, fontWeight: "700", fontVariant: ["tabular-nums"] }]}>{ballotCount ?? 0}</Text>
             <Text style={[typography.caption, { color: colors.textDim }]}>{ballotCount === 1 ? "vote cast" : "votes cast"}</Text>
           </View>
           <View style={{ flexGrow: 1, padding: spacing.md, borderRadius: radii.lg, backgroundColor: colors.surface, gap: spacing.xs, justifyContent: "center", borderLeftWidth: 3, borderLeftColor: colors.accent }}>
-            <Text style={[typography.title, { color: colors.text, fontWeight: "600" }]}>{AGGREGATION_MODES.find((item) => item.mode === mode)?.label ?? "Average"}</Text>
+            <Text display={false} style={[typography.title, { color: colors.text, fontWeight: "600" }]}>{AGGREGATION_MODES.find((item) => item.mode === mode)?.label ?? "Average"}</Text>
             <Text style={[typography.caption, { color: colors.textDim }]}>Ranking method</Text>
           </View>
         </View>

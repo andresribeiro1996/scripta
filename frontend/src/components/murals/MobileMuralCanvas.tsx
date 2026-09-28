@@ -91,6 +91,7 @@ function BlockFrame({
   return (
     <div
       ref={buttonRef}
+      data-own-font=""
       role="button"
       tabIndex={0}
       aria-label={`${selected ? "Selected: " : "Open "}${muralBlockTitle(block, books, block.type === "tierlist" ? tierlistData?.(block.tierlistId)?.name : undefined)}`}

@@ -3,6 +3,7 @@ import { DeleteAccountSection } from "../auth/DeleteAccountSection";
 import { useRef, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
 import { Avatar } from "../components/Avatar";
+import { FontPicker } from "../components/FontPicker";
 import { SocialsSection } from "../components/SocialsSection";
 import { ThemePicker } from "../components/ThemePicker";
 
@@ -68,6 +69,10 @@ export function SettingsPage() {
       <section className="rounded-xl border border-(--color-border) bg-(--color-surface) p-5">
         <h3 className="mb-4 text-sm font-semibold">Appearance</h3>
         <ThemePicker />
+        <div className="mt-5 space-y-4">
+          <FontPicker slot="display" />
+          <FontPicker slot="text" />
+        </div>
       </section>
 
       <section className="mt-5 rounded-xl border border-(--color-border) bg-(--color-surface) p-5">

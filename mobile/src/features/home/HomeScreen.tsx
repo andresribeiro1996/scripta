@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Text } from "../../ui/Text";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
 import { bookKey, buildDashboardCards, resolveQuote } from "@scripta/shared";
 import { Button, EmptyState, ErrorState, Screen, Skeleton, Toast, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
@@ -91,7 +92,7 @@ export function HomeScreen() {
                   <View style={styles.sectionPad}>
                     <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                       <Text {...dynamicType} style={[typography.title, styles.heading, { color: colors.text }]}>Rediscover</Text>
-                      <Text {...dynamicType} style={[typography.title, { color: colors.text }]}>{String(quote.highlight.Text)}</Text>
+                      <Text {...dynamicType} display={false} style={[typography.title, { color: colors.text }]}>{String(quote.highlight.Text)}</Text>
                       <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
                         {String(quote.book.Title)} · {String(quote.book.Attribution ?? "")}
                       </Text>

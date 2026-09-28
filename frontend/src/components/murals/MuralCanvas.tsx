@@ -151,6 +151,7 @@ export function MuralCanvas({
         return (
           <div
             key={block.id}
+            data-own-font=""
             className={`group relative overflow-hidden ${style.cardShadow ? "shadow-sm" : ""} ${style.cardHoverEffect ? "transition-transform hover:-translate-y-0.5 hover:scale-[1.01] hover:shadow-lg" : ""}`}
             style={{
               borderRadius: `${style.cardRadius}px`,

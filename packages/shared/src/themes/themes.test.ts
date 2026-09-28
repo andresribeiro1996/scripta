@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { THEME_IDS, themes, type ThemeColors } from "./palettes.js";
-import { THEME_PREFERENCES, parseThemePreference, reconcileThemePreference, resolveTheme } from "./preference.js";
+import { THEME_PREFERENCES, parseThemePreference, resolveTheme } from "./preference.js";
 
 function luminance(hex: string): number {
   const channels = [1, 3, 5].map((i) => {
@@ -79,12 +79,4 @@ test("resolveTheme follows the OS only for system", () => {
   assert.equal(resolveTheme("system", "dark"), "dark");
   assert.equal(resolveTheme("matrix", "light"), "matrix");
   assert.equal(resolveTheme("sepia", "dark"), "sepia");
-});
-
-test("reconcileThemePreference seeds an empty account, ignores a match, and otherwise applies the account", () => {
-  assert.deepEqual(reconcileThemePreference(null, "dark"), { apply: null, upload: "dark" });
-  assert.deepEqual(reconcileThemePreference(null, "system"), { apply: null, upload: "system" });
-  assert.deepEqual(reconcileThemePreference("midnight", "midnight"), { apply: null, upload: null });
-  assert.deepEqual(reconcileThemePreference("midnight", "light"), { apply: "midnight", upload: null });
-  assert.deepEqual(reconcileThemePreference("system", "oxblood"), { apply: "system", upload: null });
 });

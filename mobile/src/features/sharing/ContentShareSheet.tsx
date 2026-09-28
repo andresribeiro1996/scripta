@@ -1,6 +1,7 @@
 import { BottomSheet, RNHostView } from "@expo/ui";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ActivityIndicator, Pressable, ScrollView, Share, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, Share, StyleSheet, View, useWindowDimensions } from "react-native";
+import { Text } from "../../ui/Text";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { captureRef, releaseCapture } from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
@@ -145,7 +146,7 @@ function ShareChoice({ icon, label, detail, primary = false, disabled, onPress }
       {primary ? <View style={{ flex: 1, alignItems: "flex-end" }}><Icon name="chevronRight" size={20} color={foreground} /></View> : null}
     </View>
     <View style={{ gap: spacing.xs }}>
-      <Text {...dynamicType} style={[primary ? typography.title : typography.body, { color: foreground, fontWeight: "600" }]}>{label}</Text>
+      <Text {...dynamicType} display={false} style={[primary ? typography.title : typography.body, { color: foreground, fontWeight: "600" }]}>{label}</Text>
       <Text {...dynamicType} style={[typography.caption, { color: primary ? foreground : colors.textDim }]}>{detail}</Text>
     </View>
   </Pressable>;

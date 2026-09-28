@@ -1,5 +1,6 @@
 import { AGGREGATION_MODES, type AggregationMode } from "@scripta/shared";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { Text } from "../../ui/Text";
 import { dynamicType, radii, typography, useTheme } from "../../ui";
 
 export function RankingMethodSelector({ mode, onChange }: { mode: AggregationMode; onChange: (mode: AggregationMode) => void }) {

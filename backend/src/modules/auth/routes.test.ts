@@ -37,7 +37,7 @@ const { createAuthorizationCode } = await import("./authorizationCode.js");
 
 import type { AuthenticatedUser, TokenPair } from "./domain/types.js";
 import type { AuthService } from "./service.js";
-import type { ThemePreference } from "@scripta/shared/themes";
+import type { AccountAppearance, Appearance } from "@scripta/shared/themes";
 
 const user: AuthenticatedUser = { id: "u1", email: "a@b.c", username: "andre", avatarId: null };
 const tokens: TokenPair = { accessToken: "access-1", refreshToken: "refresh-1" };
@@ -143,16 +143,18 @@ test("a PKCE-bound code with the wrong verifier is a 400", async () => {
   assert.equal(status, 400);
 });
 
-function themeService(stored: Map<string, ThemePreference>): AuthService {
+function appearanceService(stored: Map<string, AccountAppearance>): AuthService {
+  const empty: AccountAppearance = { theme: null, displayFont: null, textFont: null };
   return {
-    getTheme: (userId: string) => stored.get(userId) ?? null,
-    setTheme: (userId: string, theme: ThemePreference) => {
-      stored.set(userId, theme);
+    getAppearance: (userId: string) => stored.get(userId) ?? empty,
+    setAppearance: (userId: string, patch: Partial<Appearance>) => {
+      stored.set(userId, { ...(stored.get(userId) ?? empty), ...patch });
     },
+    getUserById: (userId: string) => (userId === user.id ? user : null),
   } as unknown as AuthService;
 }
 
-async function callThemeRoute(service: AuthService, options: InjectOptions, token?: string) {
+async function callAppearanceRoute(service: AuthService, options: InjectOptions, token?: string) {
   const app = Fastify();
   app.decorate("authenticateAccessToken", (candidate: string) => (candidate === "valid-token" ? user : null));
   await app.register(buildAuthRoutes(service));
@@ -161,50 +163,46 @@ async function callThemeRoute(service: AuthService, options: InjectOptions, toke
   return { status: res.statusCode, body: res.body ? (res.json() as Record<string, unknown>) : null };
 }
 
-test("theme routes reject a request without a valid access token", async () => {
-  const service = themeService(new Map());
-  assert.equal((await callThemeRoute(service, { method: "GET", url: "/auth/theme" })).status, 401);
-  assert.equal((await callThemeRoute(service, { method: "PUT", url: "/auth/theme", payload: { theme: "dark" } })).status, 401);
-  assert.equal((await callThemeRoute(service, { method: "GET", url: "/auth/theme" }, "forged")).status, 401);
+test("appearance routes reject a request without a valid access token", async () => {
+  const service = appearanceService(new Map());
+  assert.equal((await callAppearanceRoute(service, { method: "GET", url: "/auth/appearance" })).status, 401);
+  assert.equal((await callAppearanceRoute(service, { method: "PUT", url: "/auth/appearance", payload: { theme: "dark" } })).status, 401);
+  assert.equal((await callAppearanceRoute(service, { method: "GET", url: "/auth/appearance" }, "forged")).status, 401);
 });
 
-test("GET /auth/theme is null for an account that never chose one", async () => {
-  const { status, body } = await callThemeRoute(themeService(new Map()), { method: "GET", url: "/auth/theme" }, "valid-token");
+test("GET /auth/appearance is all null for an account that never chose anything", async () => {
+  const { status, body } = await callAppearanceRoute(appearanceService(new Map()), { method: "GET", url: "/auth/appearance" }, "valid-token");
   assert.equal(status, 200);
-  assert.deepEqual(body, { theme: null });
+  assert.deepEqual(body, { theme: null, displayFont: null, textFont: null });
 });
 
-test("PUT then GET /auth/theme round-trips the preference for the signed-in user", async () => {
-  const stored = new Map<string, ThemePreference>();
-  const service = themeService(stored);
-  const put = await callThemeRoute(service, { method: "PUT", url: "/auth/theme", payload: { theme: "midnight" } }, "valid-token");
-  assert.equal(put.status, 204);
-  assert.equal(stored.get(user.id), "midnight");
-  const get = await callThemeRoute(service, { method: "GET", url: "/auth/theme" }, "valid-token");
-  assert.deepEqual(get.body, { theme: "midnight" });
-  assert.equal((await callThemeRoute(service, { method: "PUT", url: "/auth/theme", payload: { theme: "system" } }, "valid-token")).status, 204);
-  assert.equal(stored.get(user.id), "system");
+test("a partial PUT round-trips one field without touching the others", async () => {
+  const stored = new Map<string, AccountAppearance>();
+  const service = appearanceService(stored);
+  assert.equal((await callAppearanceRoute(service, { method: "PUT", url: "/auth/appearance", payload: { theme: "matrix" } }, "valid-token")).status, 204);
+  assert.equal((await callAppearanceRoute(service, { method: "PUT", url: "/auth/appearance", payload: { displayFont: "righteous" } }, "valid-token")).status, 204);
+  const { body } = await callAppearanceRoute(service, { method: "GET", url: "/auth/appearance" }, "valid-token");
+  assert.deepEqual(body, { theme: "matrix", displayFont: "righteous", textFont: null });
 });
 
-test("PUT /auth/theme rejects anything that is not a known preference", async () => {
-  const stored = new Map<string, ThemePreference>();
-  const service = themeService(stored);
-  for (const payload of [{ theme: "vaporwave" }, { theme: "Light" }, { theme: null }, {}, { theme: 3 }]) {
-    const { status, body } = await callThemeRoute(service, { method: "PUT", url: "/auth/theme", payload }, "valid-token");
+test("PUT /auth/appearance rejects empty, unknown and slot-ineligible values", async () => {
+  const stored = new Map<string, AccountAppearance>();
+  const service = appearanceService(stored);
+  for (const payload of [{}, { theme: "vaporwave" }, { displayFont: "atkinson" }, { textFont: "vt323" }, { textFont: null }, { theme: "dark", extra: 1 }, { font: "system" }]) {
+    const { status, body } = await callAppearanceRoute(service, { method: "PUT", url: "/auth/appearance", payload }, "valid-token");
     assert.equal(status, 400, JSON.stringify(payload));
-    assert.deepEqual(body, { error: "Unknown theme." });
+    assert.deepEqual(body, { error: "Unknown appearance." });
   }
   assert.equal(stored.size, 0);
 });
 
-test("theme routes carry their own rate limit, separate from the shared auth limit", async () => {
-  const stored = new Map<string, ThemePreference>();
-  const service = {
-    getTheme: (userId: string) => stored.get(userId) ?? null,
-    setTheme: (userId: string, theme: ThemePreference) => { stored.set(userId, theme); },
-    getUserById: (userId: string) => (userId === user.id ? user : null)
-  } as unknown as AuthService;
+test("the old /auth/theme routes are gone", async () => {
+  const service = appearanceService(new Map());
+  assert.equal((await callAppearanceRoute(service, { method: "GET", url: "/auth/theme" }, "valid-token")).status, 404);
+});
 
+test("appearance routes carry their own rate limit, separate from the shared auth limit", async () => {
+  const service = appearanceService(new Map());
   const app = Fastify();
   await app.register(fastifyRateLimit, { max: 2, timeWindow: "1 minute" });
   app.decorate("authenticateAccessToken", (candidate: string) => (candidate === "valid-token" ? user : null));
@@ -212,18 +210,11 @@ test("theme routes carry their own rate limit, separate from the shared auth lim
 
   const headers = { authorization: "Bearer valid-token" };
   for (let i = 0; i < 5; i++) {
-    const get = await app.inject({ method: "GET", url: "/auth/theme", headers });
-    assert.equal(get.statusCode, 200, `GET #${i}`);
-    const put = await app.inject({ method: "PUT", url: "/auth/theme", payload: { theme: "dark" }, headers });
-    assert.equal(put.statusCode, 204, `PUT #${i}`);
+    assert.equal((await app.inject({ method: "GET", url: "/auth/appearance", headers })).statusCode, 200, `GET #${i}`);
+    assert.equal((await app.inject({ method: "PUT", url: "/auth/appearance", payload: { textFont: "atkinson" }, headers })).statusCode, 204, `PUT #${i}`);
   }
-
-  const first = await app.inject({ method: "GET", url: "/auth/me", headers });
-  assert.equal(first.statusCode, 200);
-  const second = await app.inject({ method: "GET", url: "/auth/me", headers });
-  assert.equal(second.statusCode, 200);
-  const third = await app.inject({ method: "GET", url: "/auth/me", headers });
-  assert.equal(third.statusCode, 429);
-
+  assert.equal((await app.inject({ method: "GET", url: "/auth/me", headers })).statusCode, 200);
+  assert.equal((await app.inject({ method: "GET", url: "/auth/me", headers })).statusCode, 200);
+  assert.equal((await app.inject({ method: "GET", url: "/auth/me", headers })).statusCode, 429);
   await app.close();
 });

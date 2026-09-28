@@ -22,7 +22,8 @@
 // coalescing treatment as a slider drag did on the web.
 
 import type { ReactNode } from "react";
-import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import { Pressable, StyleSheet, Switch, View } from "react-native";
+import { Text } from "../../../ui/Text";
 import { minimumTouchTarget, radii, spacing, typography, useTheme } from "../../../ui/theme";
 
 export function Section({ title, children }: { title?: string; children: ReactNode }) {
