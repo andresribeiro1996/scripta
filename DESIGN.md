@@ -4,7 +4,7 @@ Local mirror of the live [Atmyshelf Design System](https://claude.ai/artifact/3X
 
 **Keeping this in sync**: the artifact is the source of truth. When tokens or components change there, ask Claude Code to regenerate this file from it. This file will drift if edited independently of the artifact.
 
-Extracted from real app source (`frontend/src/index.css`, `mobile/src/ui/theme.tsx`, and the component files cited per section) — not invented. One palette, byte-identical between web's Tailwind v4 `@theme` block (plus its dark-mode `:root` override) and mobile's `palettes` object. The product is Atmyshelf; "Scripta" survives only in package names and the design system's bundle global.
+Extracted from real app source (`frontend/src/index.css`, `mobile/src/ui/theme.tsx`, and the component files cited per section) — not invented. One palette, byte-identical between web's Tailwind v4 `@theme` block (plus its `:root[data-theme="dark"]` override) and mobile's `palettes` object. The product is Atmyshelf; "Scripta" survives only in package names and the design system's bundle global.
 
 ## Color
 
@@ -91,7 +91,7 @@ The name stays live system-stack text, not Playfair: the lockup is interface chr
 
 ## Public pages
 
-Landing (`/`), privacy (`/privacy`) and the sign-in journey follow the OS theme on the same tokens as the app. Extra rules: show the product through real screenshots (regenerated with `npm run screenshots:landing --workspace frontend`, never hand-mocked), one accent button per view, no store badges or links until they point somewhere real, unreleased features labelled with an `accent-soft` "Coming soon" chip. Content width 1152px with `px-4 sm:px-6` gutters.
+Landing (`/`), privacy (`/privacy`) and the sign-in journey use the same tokens as the app. The theme follows the OS until the landing header's toggle picks one; `index.html` applies the choice (`localStorage` `theme`) as `data-theme` on `<html>` before first paint, so it carries into the app. Extra rules: show the product through real screenshots (regenerated with `npm run screenshots:landing --workspace frontend`, never hand-mocked), one accent button per view, no store badges or links until they point somewhere real, unreleased features labelled with an `accent-soft` "Coming soon" chip. Content width 1152px with `px-4 sm:px-6` gutters.
 
 ## Logos
 

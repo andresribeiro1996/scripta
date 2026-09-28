@@ -89,15 +89,18 @@ export function MuralShowcase() {
             </div>
 
             <div className="col-span-1 flex items-center justify-center rounded-xl border border-(--color-border) bg-(--color-surface) lg:col-span-3">
-              <picture>
-                <source media="(prefers-color-scheme: dark)" srcSet={correspondentSrc.reversed} />
-                <img
-                  src={correspondentSrc.paper}
-                  alt={`The ${correspondent.name} reader card`}
-                  loading="lazy"
-                  className="aspect-5/7 w-[100px] rounded-[3px] shadow-[0_12px_22px_-10px_rgb(0_0_0/0.4)] sm:w-[125px] lg:w-[150px]"
-                />
-              </picture>
+              <img
+                src={correspondentSrc.paper}
+                alt={`The ${correspondent.name} reader card`}
+                loading="lazy"
+                className="aspect-5/7 w-[100px] rounded-[3px] shadow-[0_12px_22px_-10px_rgb(0_0_0/0.4)] sm:w-[125px] lg:w-[150px] dark:hidden"
+              />
+              <img
+                src={correspondentSrc.reversed}
+                alt={`The ${correspondent.name} reader card`}
+                loading="lazy"
+                className="hidden aspect-5/7 w-[100px] rounded-[3px] shadow-[0_12px_22px_-10px_rgb(0_0_0/0.4)] sm:w-[125px] lg:w-[150px] dark:block"
+              />
             </div>
           </div>
           <figcaption className="mt-3 flex flex-wrap justify-between gap-x-4 gap-y-1 text-sm text-(--color-text-dim)">
