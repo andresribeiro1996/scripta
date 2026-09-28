@@ -1,10 +1,5 @@
-import { useState } from "react";
-
-type Theme = "light" | "dark";
-
-function readTheme(): Theme {
-  return document.documentElement.dataset.theme === "dark" ? "dark" : "light";
-}
+import { resolveTheme, themes } from "@scripta/shared/themes";
+import { applyThemePreference, osScheme, useThemePreference } from "../../lib/theme";
 
 function SunIcon() {
   return (
@@ -44,27 +39,16 @@ function MoonIcon() {
 }
 
 export function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme>(readTheme);
-
-  function handleClick() {
-    const next: Theme = theme === "dark" ? "light" : "dark";
-    document.documentElement.dataset.theme = next;
-    try {
-      localStorage.setItem("theme", next);
-    } catch (err) {
-      if (!(err instanceof DOMException)) throw err;
-    }
-    setTheme(next);
-  }
+  const scheme = themes[resolveTheme(useThemePreference(), osScheme())].scheme;
 
   return (
     <button
       type="button"
-      onClick={handleClick}
-      aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+      onClick={() => applyThemePreference(scheme === "dark" ? "light" : "dark")}
+      aria-label={scheme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
       className="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-(--color-border) text-(--color-text-dim) transition-colors hover:bg-(--color-surface-hover) hover:text-(--color-text)"
     >
-      {theme === "dark" ? <SunIcon /> : <MoonIcon />}
+      {scheme === "dark" ? <SunIcon /> : <MoonIcon />}
     </button>
   );
 }
