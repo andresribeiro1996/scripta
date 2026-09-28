@@ -171,6 +171,13 @@ Follows the `dashboard_seen_at` precedent: a column on `users`, routes in
   split Light/Dark. Tiles are visually-hidden native radio inputs inside
   labels (one `name`), so keyboard and screen readers work natively; the
   checked tile gets a 2px ring in the current theme's accent.
+- **Text on accent and danger fills**: 44 elements put hardcoded
+  `text-white` on `bg-(--color-accent)` and 4 on `bg-(--color-danger)`.
+  White on Dark's accent is already ~2.6:1 and on the light accents of
+  Midnight, Forest, Matrix, Synthwave, Seventies and Oxblood it is
+  unreadable, so these become `text-(--color-on-accent)` /
+  `text-(--color-on-danger)` (mobile already uses `onAccent`), guarded by a
+  web test that fails if the pairing comes back.
 - **Landing `ThemeToggle`**: reads the active theme's `scheme` from the
   registry (Midnight shows the sun) and flips to `"light"`/`"dark"` through
   `applyThemePreference`.
@@ -191,7 +198,7 @@ Follows the `dashboard_seen_at` precedent: a column on `users`, routes in
     `Appearance.setColorScheme(scheme)` for an explicit theme or
     `"unspecified"` for System, so native alerts, keyboard and pickers match
     (confirmed on RN 0.86: `ColorSchemeName = 'light' | 'dark' | 'unspecified'`).
-  - The `mode` prop override on `ThemeProvider` stays for tests.
+  - The unused `mode` prop on `ThemeProvider` is removed — nothing passes it.
 - **`useAccountThemeSync()`** (mobile) mounted in `(app)/_layout.tsx` once
   `user` is set; uses the existing `apiClient`.
 - **`SettingsScreen`**: "Appearance" section at the top — same tile previews,
