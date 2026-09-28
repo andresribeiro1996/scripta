@@ -95,9 +95,6 @@ export function OwnLibraryPane() {
             book={book}
             onPress={() => router.push(`/book/${encodeURIComponent(bookKey(book))}` as never)}
             style={cardStyle}
-            showActions
-            onOpenStyle={() => router.push(`/book/${encodeURIComponent(bookKey(book))}/style` as never)}
-            onOpenCoverPicker={() => router.push(`/book/${encodeURIComponent(bookKey(book))}/cover` as never)}
           />
         );
       }}

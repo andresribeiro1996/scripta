@@ -302,9 +302,6 @@ export function LibraryScreen() {
                         book={book}
                         onPress={() => router.push(`/book/${encodeURIComponent(bookKey(book))}` as never)}
                         style={cardStyle}
-                        showActions
-                        onOpenStyle={selectionMode ? undefined : () => router.push(`/book/${encodeURIComponent(bookKey(book))}/style` as never)}
-                        onOpenCoverPicker={selectionMode ? undefined : () => router.push(`/book/${encodeURIComponent(bookKey(book))}/cover` as never)}
                         selectable={selectionMode}
                         selected={selectedKeys.has(bookKey(book))}
                         onToggleSelect={handleToggleSelect}

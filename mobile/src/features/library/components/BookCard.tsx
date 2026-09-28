@@ -1,30 +1,27 @@
 // Mirrors frontend's components/BookCard.tsx — cover art, a title/author/
-// status overlay, the Style/Cover buttons, selection-mode checkbox, and
-// highlight-count badge. Two deliberate touch-platform adaptations, both
-// called out in this task's handoff:
+// status overlay, selection-mode checkbox, and highlight-count badge. Two
+// deliberate touch-platform adaptations:
 //
-//  1. No CSS gradient scrim (no `expo-linear-gradient` in this app, and
-//     adding one is a mobile/package.json change this task doesn't own)
-//     — a single flat semi-transparent panel behind the text stands in,
-//     sized by the same `overlayIntensity` setting.
+//  1. The web card's CSS gradient scrim is drawn as a react-native-svg
+//     linear gradient (no `expo-linear-gradient` in this app), its peak
+//     opacity set by the same `overlayIntensity` setting.
 //  2. `cardHoverEffect` has no touch equivalent for "hover" itself; it's
 //     repurposed as a press-in scale/opacity response, which is the
 //     nearest analogous "this is interactive" feedback on a touchscreen.
 //
-// Long-press (not hover) reveals the Style/Cover buttons, since a
-// touchscreen has no hover state to reveal them on mount the way the web
-// version's `group-hover` does — they'd otherwise have to be always-on
-// clutter over every cover. Selection mode still shows its checkbox
-// unconditionally, same as the web version.
+// Selection mode shows its checkbox unconditionally, same as the web
+// version.
 
 import { useState } from "react";
 import { Platform, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../../ui/Text";
-import type { LibraryStyleSettings, PerCardStyle } from "@scripta/shared";
+import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
+import type { LibraryStyleSettings } from "@scripta/shared";
 import { statusLabel } from "@scripta/shared";
 import { cardFontFamily, resolveBorderColor, resolveBorderStyle } from "../../../ui/libraryStyle";
 import { dynamicType, minimumTouchTarget, useTheme } from "../../../ui/theme";
 import { CoverImage } from "./CoverImage";
+import { scrimStops } from "./scrim";
 
 function aspectRatioNumber(value: LibraryStyleSettings["cardAspectRatio"]): number {
   const [w, h] = value.split("/").map(Number);
@@ -36,9 +33,6 @@ export function BookCard({
   onPress,
   onLongPress,
   style,
-  showActions = false,
-  onOpenStyle,
-  onOpenCoverPicker,
   selectable = false,
   selected = false,
   onToggleSelect,
@@ -47,13 +41,6 @@ export function BookCard({
   onPress: () => void;
   onLongPress?: () => void;
   style: LibraryStyleSettings;
-  /** Whether the Style/Cover buttons are currently revealed — driven by
-   *  this card's own long-press when neither callback consumer holds
-   *  open state, but the parent grid controls it so only one card's
-   *  actions show at a time. */
-  showActions?: boolean;
-  onOpenStyle?: (book: Record<string, unknown>) => void;
-  onOpenCoverPicker?: (book: Record<string, unknown>) => void;
   selectable?: boolean;
   selected?: boolean;
   onToggleSelect?: (book: Record<string, unknown>) => void;
@@ -64,8 +51,6 @@ export function BookCard({
   const highlights = Array.isArray(book.highlights) ? book.highlights.length : 0;
   const showOverlayText = style.showTitleAuthor || !hasCover;
   const overlayTextColor = style.cardTextColor ?? "#ffffff";
-  const bookStyle = book._style as PerCardStyle | undefined;
-  const coverImageId = book._coverImageId as string | undefined;
 
   const borderWidthFor = (side: keyof LibraryStyleSettings["cardBorderSides"]) =>
     style.cardBorderSides[side] ? style.cardBorderWidth : 0;
@@ -111,31 +96,6 @@ export function BookCard({
         </View>
       )}
 
-      {!selectable && showActions && (onOpenStyle || onOpenCoverPicker) && (
-        <View style={styles.actions}>
-          {onOpenStyle && (
-            <Pressable
-              accessibilityLabel={bookStyle ? "Edit this book's custom style" : "Give this book its own style"}
-              accessibilityRole="button"
-              onPress={() => onOpenStyle(book)}
-              style={[styles.actionButton, { backgroundColor: bookStyle ? colors.accent : "rgba(10,8,6,0.72)" }]}
-            >
-              <Text style={[styles.actionText, bookStyle ? { color: colors.onAccent } : null]}>Style</Text>
-            </Pressable>
-          )}
-          {onOpenCoverPicker && (
-            <Pressable
-              accessibilityLabel={coverImageId ? "Change this book's custom cover" : "Set a custom cover from your gallery"}
-              accessibilityRole="button"
-              onPress={() => onOpenCoverPicker(book)}
-              style={[styles.actionButton, { backgroundColor: coverImageId ? colors.accent : "rgba(10,8,6,0.72)" }]}
-            >
-              <Text style={[styles.actionText, coverImageId ? { color: colors.onAccent } : null]}>Cover</Text>
-            </Pressable>
-          )}
-        </View>
-      )}
-
       {highlights > 0 && (
         <View style={styles.highlightBadge} pointerEvents="none">
           <Text style={styles.actionText}>
@@ -145,14 +105,16 @@ export function BookCard({
       )}
 
       {showOverlayText && (
-        <View style={styles.overlayScrim} pointerEvents="none">
-          <View
-            style={[
-              StyleSheet.absoluteFill,
-              { backgroundColor: "#0a0806", opacity: style.overlayIntensity / 100 },
-            ]}
-          />
-        </View>
+        <Svg pointerEvents="none" style={StyleSheet.absoluteFill} width="100%" height="100%" preserveAspectRatio="none" viewBox="0 0 1 1">
+          <Defs>
+            <LinearGradient id="scrim" x1="0" y1="1" x2="0" y2="0">
+              {scrimStops(style.overlayIntensity).map((stop) => (
+                <Stop key={stop.offset} offset={stop.offset} stopColor="#0a0806" stopOpacity={stop.opacity} />
+              ))}
+            </LinearGradient>
+          </Defs>
+          <Rect width="1" height="1" fill="url(#scrim)" />
+        </Svg>
       )}
 
       {showOverlayText && (
@@ -162,6 +124,7 @@ export function BookCard({
             numberOfLines={2}
             style={[
               styles.title,
+              styles.shadow,
               {
                 color: overlayTextColor,
                 fontFamily: cardFontFamily(style.cardFontFamily),
@@ -178,6 +141,7 @@ export function BookCard({
             numberOfLines={1}
             style={[
               styles.author,
+              styles.shadow,
               {
                 color: overlayTextColor,
                 opacity: 0.82,
@@ -194,6 +158,7 @@ export function BookCard({
             {...dynamicType}
             style={[
               styles.status,
+              styles.shadow,
               {
                 color: overlayTextColor,
                 opacity: 0.6,
@@ -232,12 +197,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   checkmark: { fontWeight: "700", fontSize: 13 },
-  actions: { position: "absolute", top: 8, left: 8, gap: 6 },
-  actionButton: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
   actionText: { color: "white", fontSize: 10.5, fontWeight: "600" },
   highlightBadge: { position: "absolute", top: 8, right: 8, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: "rgba(10,8,6,0.72)" },
-  overlayScrim: { position: "absolute", left: 0, right: 0, bottom: 0, height: "60%" },
   textOverlay: { position: "absolute", left: 0, right: 0, bottom: 0, padding: 12 },
+  shadow: { textShadowColor: "rgba(0,0,0,0.55)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   title: {},
   author: { marginTop: 2 },
   status: { marginTop: 3, fontWeight: "500" },
