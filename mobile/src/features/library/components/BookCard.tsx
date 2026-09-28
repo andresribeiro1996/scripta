@@ -106,7 +106,7 @@ export function BookCard({
             { borderColor: selected ? colors.accent : "rgba(255,255,255,0.7)", backgroundColor: selected ? colors.accent : "rgba(10,8,6,0.4)" },
           ]}
         >
-          {selected && <Text style={styles.checkmark}>✓</Text>}
+          {selected && <Text style={[styles.checkmark, { color: colors.onAccent }]}>✓</Text>}
         </View>
       )}
 
@@ -119,7 +119,7 @@ export function BookCard({
               onPress={() => onOpenStyle(book)}
               style={[styles.actionButton, { backgroundColor: bookStyle ? colors.accent : "rgba(10,8,6,0.72)" }]}
             >
-              <Text style={styles.actionText}>Style</Text>
+              <Text style={[styles.actionText, bookStyle ? { color: colors.onAccent } : null]}>Style</Text>
             </Pressable>
           )}
           {onOpenCoverPicker && (
@@ -129,7 +129,7 @@ export function BookCard({
               onPress={() => onOpenCoverPicker(book)}
               style={[styles.actionButton, { backgroundColor: coverImageId ? colors.accent : "rgba(10,8,6,0.72)" }]}
             >
-              <Text style={styles.actionText}>Cover</Text>
+              <Text style={[styles.actionText, coverImageId ? { color: colors.onAccent } : null]}>Cover</Text>
             </Pressable>
           )}
         </View>
@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  checkmark: { color: "white", fontWeight: "700", fontSize: 13 },
+  checkmark: { fontWeight: "700", fontSize: 13 },
   actions: { position: "absolute", top: 8, left: 8, gap: 6 },
   actionButton: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
   actionText: { color: "white", fontSize: 10.5, fontWeight: "600" },
