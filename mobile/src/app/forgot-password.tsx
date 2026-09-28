@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from "react-native";
+import { KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
+import { Text } from "../ui/Text";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { RECOVERY_MESSAGE } from "@scripta/shared";
 import { apiClient } from "../core/api";

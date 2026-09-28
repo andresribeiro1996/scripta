@@ -37,7 +37,8 @@
 // as nested Pressables, so tapping one doesn't also open the sheet.
 
 import { Fragment, useRef, useState } from "react";
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Text } from "../../ui/Text";
 import { bracketShape, countdownLabel, needsVote, sharePercent, type BracketSlot, type Duel, type DuelSide } from "@scripta/shared";
 import { Icon, Sheet, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "./BookCover";

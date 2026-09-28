@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, FlatList, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, FlatList, StyleSheet, View } from "react-native";
+import { Text } from "../../ui/Text";
 import { Stack, useRouter } from "expo-router";
 import { ErrorState, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, spacing, typography, useTheme } from "../../ui";
 import { DiscoverPane } from "../community/DiscoverPane";

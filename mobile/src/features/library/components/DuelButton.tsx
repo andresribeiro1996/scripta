@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text } from "react-native";
+import { Pressable, StyleSheet } from "react-native";
+import { Text } from "../../../ui/Text";
 import { dynamicType, radii, spacing, typography, useTheme } from "../../../ui/theme";
 
 // Not the shared Button — that one sizes to its text, so "This one" (one

@@ -2,7 +2,8 @@
 // to vote on, so it hands the space to the book that won — at a size the
 // bracket's 32pt row thumbnails can't give it.
 
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text } from "../../ui/Text";
 import type { DuelSide } from "@scripta/shared";
 import { Icon, dynamicType, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "./BookCover";

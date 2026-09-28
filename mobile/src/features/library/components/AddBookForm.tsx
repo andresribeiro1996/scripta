@@ -7,7 +7,8 @@
 // merge/order/save pipeline, same as the web version.
 
 import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Text } from "../../../ui/Text";
 import { Image } from "expo-image";
 import { buildManualBook, normalizeIsbn } from "@scripta/shared";
 import { Button, Input } from "../../../ui/components";

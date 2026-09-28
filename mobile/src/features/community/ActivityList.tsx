@@ -1,6 +1,7 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, View } from "react-native";
+import { Text } from "../../ui/Text";
 import { activityDay, activityRow, relativeTime, type ActivityItem } from "@scripta/shared/community";
 import { EmptyState, ErrorState, Icon, Skeleton, dynamicType, radii, spacing, typography, useTheme, type IconName } from "../../ui";
 import { fetchActivity } from "./api";

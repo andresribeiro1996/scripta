@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { router, useGlobalSearchParams, usePathname } from "expo-router";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text } from "../../ui/Text";
 import { localDay } from "@scripta/shared";
 import { useAuth } from "../../core/auth";
 import { Button, Sheet, Toast, dynamicType, spacing, typography, useTheme } from "../../ui";

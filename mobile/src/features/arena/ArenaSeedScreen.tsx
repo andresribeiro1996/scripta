@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Stack } from "expo-router";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, View } from "react-native";
+import { Text } from "../../ui/Text";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { filterBooks, seedCoverLookup, toSeedBook, type SeedBook } from "@scripta/shared";
 import { Button, EmptyState, ErrorState, Input, Screen, Sheet, Skeleton, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";

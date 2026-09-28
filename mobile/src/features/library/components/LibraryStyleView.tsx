@@ -6,7 +6,8 @@
 // which this task doesn't own).
 
 import { useEffect, useRef, useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
+import { Text } from "../../../ui/Text";
 import {
   CARD_GAP_RANGE,
   CARD_MIN_WIDTH_RANGE,

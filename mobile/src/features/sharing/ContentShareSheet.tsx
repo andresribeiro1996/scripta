@@ -1,6 +1,7 @@
 import { BottomSheet, RNHostView } from "@expo/ui";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ActivityIndicator, Pressable, ScrollView, Share, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, Share, StyleSheet, View, useWindowDimensions } from "react-native";
+import { Text } from "../../ui/Text";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { captureRef, releaseCapture } from "react-native-view-shot";
 import * as Sharing from "expo-sharing";

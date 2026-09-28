@@ -2,7 +2,8 @@
 // author/status, the Style/Cover actions, the status control, and the
 // highlight list.
 
-import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, View } from "react-native";
+import { Text } from "../../../ui/Text";
 import { statusLabel, type FinishRating, type ReadStatus } from "@scripta/shared";
 import { Button, Segmented } from "../../../ui/components";
 import { spacing, typography, useTheme } from "../../../ui/theme";

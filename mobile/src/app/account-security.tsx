@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, Text, View } from "react-native";
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
+import { Text } from "../ui/Text";
 import { Redirect, router, Stack } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { PASSWORD_HINT, type AccountSecurity } from "@scripta/shared";

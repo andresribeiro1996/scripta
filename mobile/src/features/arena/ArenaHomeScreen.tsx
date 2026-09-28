@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import { Stack, router } from "expo-router";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, View } from "react-native";
+import { Text } from "../../ui/Text";
 import { Image } from "expo-image";
 import { Button, Dialog, EmptyState, ErrorState, Fab, Icon, IconButton, Input, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { deleteQuiz, fetchQuizzes, type Quiz } from "../quizzes/api";

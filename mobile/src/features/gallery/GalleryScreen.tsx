@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Stack } from "expo-router";
-import { Alert, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { Alert, FlatList, Pressable, RefreshControl, StyleSheet, View } from "react-native";
+import { Text } from "../../ui/Text";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { scrubImageFromBooks } from "@scripta/shared";

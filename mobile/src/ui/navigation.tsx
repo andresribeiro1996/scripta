@@ -2,19 +2,20 @@
 // the four tab stacks can't drift from each other. Every screen used to draw
 // its own header View instead, which is why none of them had a back gesture.
 import type { NativeStackNavigationOptions } from "expo-router";
+import { fontStyleFor } from "./fontStyle";
 import { radii, spacing, useTheme } from "./theme";
 
 export function useScreenOptions(): NativeStackNavigationOptions {
-  const { colors } = useTheme();
+  const { colors, fonts } = useTheme();
   return {
     headerStyle: { backgroundColor: colors.background },
     headerTintColor: colors.accent,
-    headerTitleStyle: { color: colors.text, fontWeight: "700" },
+    headerTitleStyle: { color: colors.text, fontWeight: "700", ...fontStyleFor(fonts.display, "display", { fontSize: 17 }) },
     headerShadowVisible: false,
     // iOS only, and ignored elsewhere: the title starts large and collapses
     // into the bar as the screen scrolls.
     headerLargeTitleEnabled: true,
-    headerLargeTitleStyle: { color: colors.text },
+    headerLargeTitleStyle: { color: colors.text, ...fontStyleFor(fonts.display, "display", { fontSize: 34 }) },
     headerLargeTitleShadowVisible: false,
     headerLargeStyle: { backgroundColor: colors.background },
     // "Back" spelled out crowds a phone header; the chevron alone is the

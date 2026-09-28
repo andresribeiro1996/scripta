@@ -1,26 +1,13 @@
 import { createContext, type ReactNode, type Ref, type RefObject, useCallback, useContext, useEffect, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  Animated,
-  Keyboard,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  type TextInputProps,
-  View,
-  type ViewStyle,
-} from "react-native";
+import { ActivityIndicator, Animated, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, type TextInputProps, View, type ViewStyle } from "react-native";
+import { Text } from "./Text";
 import MenuView, { type MenuAction } from "@expo/ui/community/menu";
 import PagerView from "react-native-pager-view";
 import { Icon, type IconName } from "./icon";
 import SegmentedControl from "@expo/ui/community/segmented-control";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { errorHaptic, successHaptic } from "./haptics";
+import { fontStyleFor } from "./fontStyle";
 import { revealOffset } from "./keyboardScroll";
 import { dynamicType, minimumTouchTarget, radii, spacing, typography, useReducedMotion, useTheme } from "./theme";
 
@@ -258,7 +245,7 @@ export function Input({
   ref,
   ...props
 }: TextInputProps & { label?: string; error?: string; hint?: string; icon?: IconName; ref?: Ref<TextInput> }) {
-  const { colors } = useTheme();
+  const { colors, fonts } = useTheme();
   const [visible, setVisible] = useState(false);
   const inputRef = useRef<TextInput>(null);
   const fieldRef = useRef<View>(null);
@@ -288,6 +275,7 @@ export function Input({
           icon ? { paddingLeft: minimumTouchTarget } : null,
           secureTextEntry ? { paddingRight: minimumTouchTarget + spacing.sm } : null,
           style,
+          fontStyleFor(fonts.text, "text", { fontSize: typography.input.fontSize }) ?? null,
         ]}
       />
       {secureTextEntry && <Pressable accessibilityRole="button" accessibilityLabel={visible ? "Hide password" : "Show password"} accessibilityState={{ disabled: !editable }}

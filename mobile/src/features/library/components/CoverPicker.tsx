@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Text } from "../../../ui/Text";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { Button, ErrorState, Sheet } from "../../../ui/components";

@@ -1,13 +1,8 @@
 import { authFieldErrors, PASSWORD_HINT, USERNAME_HINT } from "@scripta/shared";
 import { afterSignIn, startAuthNavigation } from "../../features/auth/navigation";
 import { useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  StyleSheet,
-  Text,
-  type TextInput,
-  View,
-} from "react-native";
+import { ActivityIndicator, StyleSheet, type TextInput, View } from "react-native";
+import { Text } from "../../ui/Text";
 import { Redirect, router, useLocalSearchParams } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { GoogleSignInCancelledError, useAuth } from "../../core/auth";

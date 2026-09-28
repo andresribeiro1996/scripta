@@ -18,7 +18,8 @@
 // unconditionally, same as the web version.
 
 import { useState } from "react";
-import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, StyleSheet, View } from "react-native";
+import { Text } from "../../../ui/Text";
 import type { LibraryStyleSettings, PerCardStyle } from "@scripta/shared";
 import { statusLabel } from "@scripta/shared";
 import { cardFontFamily, resolveBorderColor, resolveBorderStyle } from "../../../ui/libraryStyle";

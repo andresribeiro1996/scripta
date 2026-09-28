@@ -13,7 +13,8 @@ import {
 } from "@scripta/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Text } from "../../ui/Text";
 import { Button, EmptyState, ErrorState, IconButton, Input, Screen, Sheet, Toast } from "../../ui";
 import { spacing, typography, useTheme } from "../../ui/theme";
 import { fetchGalleryImages } from "../gallery/api";

@@ -16,7 +16,8 @@
 // at groups instead of books while this tab is active.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, RefreshControl, StyleSheet, View } from "react-native";
+import { Text } from "../../ui/Text";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import {
   bookKey,

@@ -17,7 +17,8 @@
 // without it needing its own header.
 
 import { forwardRef, useImperativeHandle, useMemo, useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Text } from "../../../ui/Text";
 import { router } from "expo-router";
 import { makeGroup, orderedGroupBooks, type GroupType } from "@scripta/shared";
 import { EmptyState, Input, Segmented } from "../../../ui/components";

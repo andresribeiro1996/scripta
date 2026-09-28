@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text } from "../../ui/Text";
 import { bookKey, upNextPair } from "@scripta/shared";
 import { Button, Sheet, spacing, typography, useTheme } from "../../ui";
 import { CoverImage } from "../library/components/CoverImage";

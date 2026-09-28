@@ -8,7 +8,8 @@
 // keeps the whole screen.
 
 import { useMemo, useRef, useState } from "react";
-import { Alert, FlatList, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, FlatList, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Text } from "../../ui/Text";
 import { Image } from "expo-image";
 import { useQuery } from "@tanstack/react-query";
 import { Stack, useRouter } from "expo-router";

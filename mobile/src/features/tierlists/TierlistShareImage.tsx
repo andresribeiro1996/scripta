@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AGGREGATION_MODES, type AggregationMode, type HistogramCell, type TierlistData } from "@scripta/shared";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "../../ui/Text";
 import { radii, spacing, typography, useTheme } from "../../ui";
 import { keyOf, TierCover, type TierBook } from "./TierBoard";
 import { tierlistShareRows } from "./tierlistShareData";

@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text } from "../../ui/Text";
 import { Button, ErrorState, Skeleton } from "../../ui/components";
 import { spacing, typography, useTheme } from "../../ui/theme";
 import { uploadImportPreview } from "./api";

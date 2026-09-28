@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Text } from "../../ui/Text";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
 import { bookKey, buildDashboardCards, resolveQuote } from "@scripta/shared";
 import { Button, EmptyState, ErrorState, Screen, Skeleton, Toast, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";

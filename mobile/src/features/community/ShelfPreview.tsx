@@ -1,4 +1,5 @@
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
+import { Text } from "../../ui/Text";
 import type { Group, Mural, ReaderProfile } from "@scripta/shared";
 import { Button, dynamicType, spacing, typography, useTheme } from "../../ui";
 import type { GalleryImage } from "../gallery/api";

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { router } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { Text } from "../../ui/Text";
 import {
   bookKey,
   effectiveCardStyle,

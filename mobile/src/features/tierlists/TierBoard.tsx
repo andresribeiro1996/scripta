@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { bookKey, type TierDefinition, type TierlistData } from "@scripta/shared";
-import { Pressable, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
+import { Text } from "../../ui/Text";
 import { Button, Dialog, IconButton, Input, Menu, type MenuItem, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { CoverImage } from "../library/components/CoverImage";
 
