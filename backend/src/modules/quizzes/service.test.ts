@@ -33,6 +33,7 @@ function createInMemoryRepo(): QuizzesRepository {
       quizzes.delete(id);
       return true;
     },
+    deleteUserData: () => {},
     getByVoteCode: (code) => [...quizzes.values()].find((q) => q.vote_code === code),
     publish: (id, userId, data, code) => {
       const row = quizzes.get(id);

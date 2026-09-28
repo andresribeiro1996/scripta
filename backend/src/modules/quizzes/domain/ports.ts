@@ -16,6 +16,10 @@ export interface QuizzesRepository {
   insert(row: QuizRow): void;
   update(id: string, userId: string, patch: { name?: string; data?: string }): QuizRow | undefined;
   delete(id: string, userId: string): boolean;
+  /** Account-deletion eraser — the caller's own quizzes, plays, and answers
+   *  go away; the caller's plays on OTHER people's quizzes are unlinked,
+   *  not deleted, so leaderboards keep their rows (tierlists' precedent). */
+  deleteUserData(userId: string): void;
 
   /** Lookup by public code — NOT ownership-checked: this backs the public
    *  play routes, where the caller may have no session at all. */
