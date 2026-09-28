@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { DISPLAY_MIN_FONT_SIZE, fontStyleFor, slotFor } from "./fontStyle";
+import { DISPLAY_MIN_FONT_SIZE, fontStyleFor, slotFor, textBreakStrategyFor } from "./fontStyle";
 
 test("slotFor picks display from 18pt up unless display says otherwise", () => {
   assert.equal(DISPLAY_MIN_FONT_SIZE, 18);
@@ -32,4 +32,11 @@ test("display fonts use their heading weight and scale size and line height", ()
   assert.deepEqual(fontStyleFor("vt323", "display", { fontSize: 24, lineHeight: 30 }), { fontFamily: "vt323-400", fontWeight: "normal", fontSize: 31, lineHeight: 39 });
   assert.deepEqual(fontStyleFor("pressStart", "display", {}), { fontFamily: "pressStart-400", fontWeight: "normal", fontSize: 10 });
   assert.deepEqual(fontStyleFor("cormorant", "display", { fontSize: 24 }), { fontFamily: "cormorant-600", fontWeight: "normal", fontSize: 27 });
+});
+
+test("textBreakStrategyFor picks simple for custom fonts unless the caller requested otherwise", () => {
+  assert.equal(textBreakStrategyFor(true, undefined), "simple");
+  assert.equal(textBreakStrategyFor(true, "highQuality"), "highQuality");
+  assert.equal(textBreakStrategyFor(false, undefined), undefined);
+  assert.equal(textBreakStrategyFor(false, "balanced"), "balanced");
 });
