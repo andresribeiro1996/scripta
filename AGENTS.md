@@ -24,7 +24,7 @@ The table below is generated from those files — edit each package's own `AGENT
 | `backend/` | Fastify/TypeScript API, modular monolith | `npm run dev` / `typecheck` / `test` |
 | `frontend/` | React/Vite/TypeScript + Tailwind, installable as a PWA | `npm run dev` / `typecheck` / `lint` / `test` |
 | `mobile/` | Expo/React Native app | `npm run mobile` / `typecheck` / `test` / `expo-doctor` |
-| `packages/` | `@scripta/shared` — the model and logic the web, mobile, and backend clients all reuse | `npm run build` |
+| `packages/` | `@scripta/shared` — the model and logic the web, mobile, and backend clients all reuse | `npm run build` / `test` |
 | `exporter/` | Python stdlib script → `library.json` | `python3 export.py` |
 | `viewer/` | Static single-file HTML | none |
 <!-- END agent-table -->
