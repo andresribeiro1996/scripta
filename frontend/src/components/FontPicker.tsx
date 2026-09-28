@@ -31,7 +31,7 @@ export function FontPicker({ slot }: { slot: FontSlot }) {
               <input type="radio" name={`font-${slot}`} value={option} checked={selected === option} onClick={() => void choose(option)} readOnly className="peer sr-only" />
               <span
                 className="block rounded-lg border border-(--color-border) px-3 py-1.5 text-sm peer-checked:border-(--color-accent) peer-checked:ring-1 peer-checked:ring-(--color-accent) peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-(--color-accent)"
-                style={{ fontFamily: fontStack(shown) }}
+                style={{ fontFamily: fontStack(shown), fontWeight: slot === "display" ? 700 : undefined }}
               >
                 {option === "theme" ? `Theme default · ${fonts[themeDefault].label}` : fonts[option].label}
               </span>
