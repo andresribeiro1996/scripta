@@ -4,7 +4,7 @@ import { BrandLockup } from "../components/BrandLockup";
 
 export function AuthStage({ children }: { children: ReactNode }) {
   return (
-    <div className="flex min-h-screen flex-col items-center bg-(--color-surface) px-4 py-8 text-(--color-text) [color-scheme:light_dark] sm:justify-center sm:bg-(--color-bg) sm:py-16">
+    <div className="flex min-h-screen flex-col items-center bg-(--color-surface) px-4 py-8 text-(--color-text) sm:justify-center sm:bg-(--color-bg) sm:py-16">
       <Link to="/" aria-label="Atmyshelf home" className="mb-8 flex min-h-11 items-center sm:mb-10">
         <BrandLockup />
       </Link>

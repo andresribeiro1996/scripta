@@ -16,12 +16,14 @@ import { env } from "./config/env.js";
 import { devHttps } from "./config/devCerts.js";
 import { runStartupMigrations } from "./migrations/runStartupMigrations.js";
 import {
+  emailEnabled,
   findUserIdByUsername,
   getDashboardSeenAt,
   registerAuthModule,
   resolvePublicReaderProfile,
   resolvePublicReaderProfiles,
   searchUsernameOwners,
+  sendAccountEmail,
   setDashboardSeenAt,
   userHasUsername
 } from "./modules/auth/index.js";
@@ -31,8 +33,10 @@ import { registerBooksModule } from "./modules/books/index.js";
 import { deleteGalleryUserData, registerGalleryModule } from "./modules/gallery/index.js";
 import { deleteLibraryUserData, registerLibraryModule, resolvePublicLibrary, readerGlyphFor, type BookEvent } from "./modules/library/index.js";
 import { deleteMuralsUserData, getMuralsPublicApi, registerMuralsModule } from "./modules/murals/index.js";
+import { registerQuizzesModule } from "./modules/quizzes/index.js";
 import { deleteSocialsUserData, registerSocialsModule } from "./modules/socials/index.js";
 import { deleteTierlistsUserData, registerTierlistsModule, getTierlistsPublicApi } from "./modules/tierlists/index.js";
+import { registerWaitlistModule } from "./modules/waitlist/index.js";
 
 export function buildApp() {
   // Moves any still-embedded library.murals[] into the new murals table
@@ -127,6 +131,7 @@ export function buildApp() {
   app.register(registerGalleryModule);
   app.register(registerBooksModule);
   app.register(registerSocialsModule);
+  app.register(registerWaitlistModule, { sendEmail: emailEnabled ? sendAccountEmail : undefined });
   app.register(registerMuralsModule, {
     // Cross-module wiring, same shape as covers' peekCachedCoverUrl
     // consumers: the murals module never imports tierlists' internals —
@@ -168,6 +173,7 @@ export function buildApp() {
       }
     }
   });
+  app.register(registerQuizzesModule);
 
   return app;
 }

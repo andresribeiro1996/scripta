@@ -4,6 +4,7 @@
 // deep inside a request handler.
 
 import "dotenv/config";
+import { dirname, join } from "node:path";
 import { z } from "zod";
 
 // "15m", "1h", "30d" — a single integer + unit. Kept intentionally
@@ -87,7 +88,9 @@ const envSchema = z.object({
   // modules/tierlists' own SQLite file — same one-file-per-module
   // isolation as every other module's *_DB_PATH above.
   TIERLISTS_DB_PATH: z.string().min(1).default("./data/tierlists.sqlite"),
+  QUIZZES_DB_PATH: z.string().min(1).default("./data/quizzes.sqlite"),
   COMMUNITY_DB_PATH: z.string().min(1).default("./data/community.sqlite"),
+  WAITLIST_DB_PATH: z.string().min(1).optional(),
   // This API's own externally-reachable base URL — needed to build
   // absolute image URLs (GET /gallery/:id/file) that resolve correctly
   // from the frontend's own origin, which a relative path wouldn't (see
@@ -178,7 +181,9 @@ const envSchema = z.object({
     )
 });
 
-const parsed = envSchema.safeParse(process.env);
+const parsed = envSchema
+  .transform((e) => ({ ...e, WAITLIST_DB_PATH: e.WAITLIST_DB_PATH ?? join(dirname(e.AUTH_DB_PATH), "waitlist.sqlite") }))
+  .safeParse(process.env);
 
 if (!parsed.success) {
   console.error("Invalid environment configuration:");

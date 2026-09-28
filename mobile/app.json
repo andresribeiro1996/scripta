@@ -49,6 +49,11 @@
               "scheme": "https",
               "host": "atmyshelf.com",
               "pathPrefix": "/vote/"
+            },
+            {
+              "scheme": "https",
+              "host": "atmyshelf.com",
+              "pathPrefix": "/play/"
             }
           ]
         }

@@ -1,6 +1,6 @@
 # Kobo Library Backend
 
-A Node.js/Fastify/TypeScript backend, structured as a **modular monolith**: one deployable service, internally split into self-contained modules that only talk to each other through explicit public interfaces. Eight modules so far — `auth`, `library`, `gallery`, `books`, `socials`, `arena`, `murals`, and `tierlists` — with more expected as the project grows. Consumed by the [frontend](../frontend/README.md), which replaces the old static, drag-your-own-file [viewer](../viewer/README.md).
+A Node.js/Fastify/TypeScript backend, structured as a **modular monolith**: one deployable service, internally split into self-contained modules that only talk to each other through explicit public interfaces. Nine modules so far — `auth`, `library`, `gallery`, `books`, `socials`, `arena`, `murals`, `tierlists`, and `waitlist` — with more expected as the project grows. Consumed by the [frontend](../frontend/README.md), which replaces the old static, drag-your-own-file [viewer](../viewer/README.md).
 
 Every module with a persistence dependency follows **hexagonal architecture** (ports & adapters): the module's business logic depends only on a repository *interface* it defines, never on a concrete database. See "Hexagonal architecture" below — this is a standing convention for this backend, not just how `auth` happened to be built.
 
@@ -18,6 +18,8 @@ Skim layer over the detailed sections below — each module's own section has th
 | `arena` | Anonymous-vote book bracket tournaments; duels settled by a 30s background sweep | create/seed/start/settle/tiebreak/delete/mine ✓; view/public-list/vote open |
 | `murals` | Per-account freeform dashboard documents (block semantics live in the frontend) plus public share links | all `/murals*` ✓ except `GET /murals/shared/:token` |
 | `tierlists` | Tier list ranking polls: owner-created private tier lists can open to community voting (anonymous or members-only), with live vote aggregation in three modes | create/list/get/update/delete/results ✓; open-voting/set-voting-state ✓; public-list/voting-board/ballot (submit/edit/get) open |
+| `quizzes` | Game module storing quiz documents + seeded question sets + locked plays/answers in its own SQLite file, anonymous link challenges via vote codes | create/list/get/update/delete/publish/set-voting-state/results ✓; voting-board/play (submit/get)/results open |
+| `waitlist` | Pre-launch email signups for the landing page — an address and when it signed up, nothing else | `POST /waitlist` open |
 
 ## Running it
 
@@ -210,6 +212,25 @@ Rate-limited (30 requests/minute, scoped to this module's routes only) and given
 | POST | `/tierlists/voting/:code/ballot` | — | `{placements: [{bookKey, tierId}, ...]}` → creates or replaces a ballot (by user id if the request carries a token, else by the browser-held ballot id). Success is `{ballotId, placements, results: {histogram, ballotCount}}` — the service's internal `BallotOutcome` union is never serialized. Rejections are `{error}` at `404` (unknown code) / `409` (voting closed) / `401` (members-only, no token) / `400` (placements outside the frozen structure) |
 | PUT | `/tierlists/voting/:code/ballot/:ballotId` | — | Same validation, same success/failure shapes as POST; for UI simplicity `PUT` is also allowed (the backend resolves both to an edit of the existing ballot, never creating duplicates) |
 | GET | `/tierlists/voting/:code/ballot/:ballotId` | — | `{ballotId, placements, results}` for the voter to see their current ballot; same voter-identification as POST/PUT (token if present, else the browser-held id). `404 {error}` if that voter has no ballot |
+
+### `waitlist`
+
+- **Exactly one thing**: an email address and when it was submitted, for the landing page's "Notify me when Atmyshelf launches" form. No accounts, no relation to any other module.
+- **No enumeration and no read route over HTTP** — `POST /waitlist` always answers `204` for any address that passes validation, whether it's brand new or already on the list (insert-or-ignore on the unique `email` column), so the response never reveals whether an address was already signed up. There's no `GET`/list endpoint either.
+- **One confirmation email per address** — the first time an address is stored (the insert actually added a row), the module sends a short "you're on the launch list" email through the same Resend sender `auth` uses, handed in from `app.ts`. The route doesn't wait for the send, so a new and an already-listed address get the same `204` at the same speed; re-submitting never sends a second email. A send failure is logged (`[waitlist] confirmation email failed`) and the signup still stands. With email unconfigured (no `RESEND_API_KEY`/`AUTH_EMAIL_FROM`, or a non-HTTPS `FRONTEND_URL`) the module warns at boot and stores signups without confirming them.
+- **Exporting is a command, not a route** — the list is only readable from a shell on the machine that holds the database, so nothing new is reachable from the internet. On Railway, from a shell in the backend service (`railway ssh`):
+
+  ```bash
+  npm run -s waitlist:export --workspace backend > waitlist.csv
+  ```
+
+  It runs the built backend (`dist/`), resolves `WAITLIST_DB_PATH` exactly as the server does, prints `email,created_at` CSV oldest first to stdout, and reports the count and the database path it read on stderr. Keep `-s`: without it npm prints its own banner into the CSV.
+- **Stored beside the accounts database** — `WAITLIST_DB_PATH` defaults to `waitlist.sqlite` in the same directory as `AUTH_DB_PATH`, not to `./data`. Accounts already have to live on the deployment's persistent disk, so the launch list inherits that location without a separate volume or env var and survives redeploys. Set `WAITLIST_DB_PATH` to put it somewhere else.
+- **Open route, its own rate limit** — no `authGuard` (anyone visiting the landing page can join), so it gets a tight per-IP limit (5 requests/minute, this module's own `@fastify/rate-limit` scope) against script abuse, the same shape every other unauthenticated write route in this app uses (e.g. `arena`'s vote route).
+
+| Method | Path | Auth required | Notes |
+|---|---|---|---|
+| POST | `/waitlist` | — | `{email}` → `204` for any syntactically valid address (trimmed, lowercased, max 254 chars), new or already listed. `400 {error, field: "email"}` if invalid or missing. `429` past the rate limit |
 
 ## Hexagonal architecture — the standing convention for dependencies like a database
 

@@ -9,4 +9,5 @@ export * from "./library/index.js";
 export * from "./arena/index.js";
 export * from "./murals/index.js";
 export * from "./tierlists/index.js";
+export * from "./quizzes/index.js";
 export * from "./readerCards/index.js";
