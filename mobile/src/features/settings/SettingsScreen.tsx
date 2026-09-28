@@ -9,6 +9,7 @@ import { radii, spacing, typography, useTheme } from "../../ui/theme";
 import { useAuth } from "../../core/auth";
 import { API_URL } from "../../core/config";
 import { SocialsSection } from "../socials";
+import { FontPicker } from "./FontPicker";
 import { ThemePicker } from "./ThemePicker";
 
 export function SettingsScreen() {
@@ -54,6 +55,8 @@ export function SettingsScreen() {
       <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <Text style={[styles.heading, { color: colors.text }]}>Appearance</Text>
         <ThemePicker />
+        <FontPicker slot="display" />
+        <FontPicker slot="text" />
       </View>
       <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <Text style={[styles.heading, { color: colors.text }]}>Account</Text>
