@@ -67,5 +67,5 @@ const styles = StyleSheet.create({
   wrap: { gap: spacing.sm },
   heading: { fontWeight: "600" },
   row: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  chip: { minHeight: minimumTouchTarget, justifyContent: "center", paddingHorizontal: spacing.md, borderRadius: radii.md, borderWidth: 1 },
+  chip: { width: "48%", flexGrow: 1, minHeight: minimumTouchTarget, justifyContent: "center", paddingHorizontal: spacing.md, borderRadius: radii.md, borderWidth: 1 },
 });
