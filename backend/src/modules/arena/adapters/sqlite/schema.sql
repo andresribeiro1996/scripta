@@ -67,8 +67,9 @@ CREATE INDEX IF NOT EXISTS idx_duels_status_closes_at ON duels(status, closes_at
 -- voter_token is a random UUID the frontend generates once per browser
 -- and stores in localStorage — this is what makes "anyone can vote, no
 -- account needed" possible at all. The UNIQUE constraint is what makes a
--- vote lock in once cast (INSERT OR IGNORE in the adapter, same
--- race-safe idiom modules/covers already uses for first-write-wins).
+-- vote lock in once cast (INSERT OR IGNORE in the adapter turns a
+-- concurrent double-vote into "second one loses quietly" instead of a
+-- thrown constraint error).
 --
 -- voter_user_id is the signed-in counterpart: NULL for a truly anonymous
 -- vote, the account id once someone votes with a session. Voting signed

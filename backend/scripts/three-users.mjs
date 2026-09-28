@@ -65,7 +65,7 @@ if (!shared) {
   if (!existsSync(secretsPath)) writeFileSync(secretsPath, JSON.stringify({ JWT_ACCESS_SECRET: randomBytes(32).toString("hex"), JWT_REFRESH_SECRET: randomBytes(32).toString("hex") }), { mode: 0o600 });
   Object.assign(process.env, JSON.parse(readFileSync(secretsPath, "utf8")), {
     DOTENV_CONFIG_PATH: join(directory, "unused.env"),
-    GOOGLE_CLIENT_ID: "", GOOGLE_CLIENT_SECRET: "", GOOGLE_CALLBACK_URL: "", HARDCOVER_API_KEY: "",
+    GOOGLE_CLIENT_ID: "", GOOGLE_CLIENT_SECRET: "", GOOGLE_CALLBACK_URL: "", ISBNDB_API_KEY: "",
     SOCIALS_ENCRYPTION_KEY: "", X_CLIENT_ID: "", INSTAGRAM_CLIENT_ID: "", THREADS_CLIENT_ID: "", TIKTOK_CLIENT_KEY: "",
     ALLOW_LAN_ORIGINS: "true"
   });

@@ -1,6 +1,7 @@
 // The cross-client half of frontend's lib/bookMetadata.ts: the
 // BookMetadata shape and the rating validator both the detail sheet and
-// (eventually) mobile need. The actual Open Library fetch and the
+// (eventually) mobile need. The actual fetch (now just GET
+// /books/details — the backend does the Open Library lookup) and the
 // TanStack Query `queryOptions` wrapper are framework/network-bound —
 // they stay in frontend/src/lib/bookMetadata.ts (and their own future
 // mobile equivalent), not here.

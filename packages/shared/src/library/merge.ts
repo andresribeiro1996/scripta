@@ -62,7 +62,7 @@ function unionHighlights(existing: unknown, incoming: unknown): Array<Record<str
  *  than replace. `_coverUrl` is set by bookCovers.ts's setBookCover
  *  (a genuine custom gallery cover) — auto-resolved covers no longer
  *  write back here at all, now that resolution is a persistent, global
- *  cache server-side (backend/src/modules/covers) rather than something
+ *  cache server-side (backend/src/modules/books) rather than something
  *  that needed preserving per-book across a re-import; a book with no
  *  custom cover just re-resolves the exact same answer from that shared
  *  cache regardless of which side of a merge it came from. An importer

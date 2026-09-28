@@ -36,8 +36,8 @@ export interface GalleryImage {
    *  unauthenticated URL keyed by this image's random `id` (see
    *  routes.ts's GET /gallery/:id/file). It has to be usable directly as
    *  an `<img src>` with no Authorization header attached, the same trust
-   *  model this app already uses for the Kobo CDN / Open Library cover
-   *  URLs BookCard's CoverImage loads today — an unguessable UUID is the
+   *  model this app already uses for the books module's own
+   *  GET /covers/cached/:id/:size URLs — an unguessable UUID is the
    *  access control, not a session check. */
   url: string;
 }

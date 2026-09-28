@@ -29,7 +29,7 @@ import {
 } from "./modules/auth/index.js";
 import { deleteArenaUserData, getArenaPublicApi, registerArenaModule } from "./modules/arena/index.js";
 import { deleteCommunityUserData, getCommunityPublicApi, registerCommunityModule } from "./modules/community/index.js";
-import { registerCoversModule } from "./modules/covers/index.js";
+import { registerBooksModule } from "./modules/books/index.js";
 import { deleteGalleryUserData, registerGalleryModule } from "./modules/gallery/index.js";
 import { deleteLibraryUserData, registerLibraryModule, resolvePublicLibrary, readerGlyphFor, type BookEvent } from "./modules/library/index.js";
 import { deleteMuralsUserData, getMuralsPublicApi, registerMuralsModule } from "./modules/murals/index.js";
@@ -57,7 +57,9 @@ export function buildApp() {
   // plain-http one — this app never touches request.raw/reply.raw (the
   // only APIs that would actually differ between an http.Server and an
   // https.Server), so nothing downstream needs the more specific type.
-  const app: FastifyInstance = devHttps ? (Fastify({ logger: true, https: devHttps }) as FastifyInstance) : Fastify({ logger: true });
+  const app: FastifyInstance = devHttps
+    ? (Fastify({ logger: true, https: devHttps, trustProxy: true }) as FastifyInstance)
+    : Fastify({ logger: true, trustProxy: true });
 
   // Genuinely app-wide (unlike each module's own rate limiter) — the
   // frontend is a separate origin from this API in dev (Vite on 5173,
@@ -127,7 +129,7 @@ export function buildApp() {
     }
   });
   app.register(registerGalleryModule);
-  app.register(registerCoversModule);
+  app.register(registerBooksModule);
   app.register(registerSocialsModule);
   app.register(registerWaitlistModule, { sendEmail: emailEnabled ? sendAccountEmail : undefined });
   app.register(registerMuralsModule, {

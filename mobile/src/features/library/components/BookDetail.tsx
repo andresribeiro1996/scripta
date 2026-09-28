@@ -53,7 +53,7 @@ export function BookDetail({
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: spacing.lg, paddingBottom: spacing.xl }}>
         <View style={styles.header}>
           <View style={[styles.cover, { backgroundColor: colors.border }]}>
-            <CoverImage book={book} />
+            <CoverImage book={book} size="full" />
           </View>
           <View style={styles.headerText}>
             <Text style={[typography.heading, { color: colors.text }]} numberOfLines={2}>

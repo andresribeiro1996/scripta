@@ -52,7 +52,9 @@ export interface ArenaRepository {
    *  this duel was already voted — by this exact (duel_id, voter_token)
    *  pair OR, when voter_user_id is set, by that account on any token
    *  (idx_votes_duel_user in the SQLite adapter makes the second case a
-   *  constraint, same INSERT OR IGNORE race-safety as modules/covers). */
+   *  constraint) — `INSERT OR IGNORE` in the SQLite adapter converts a
+   *  race between two concurrent votes into "second one loses quietly"
+   *  instead of throwing on the constraint. */
   insertVote(row: VoteRow): boolean;
   /** Claims a voter_token's votes for an account: stamps voter_user_id
    *  onto every vote cast under that token that doesn't have one yet and

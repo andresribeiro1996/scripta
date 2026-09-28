@@ -22,8 +22,8 @@ import { CloseIcon } from "./Toolbar";
  *  modal) meant the "what am I a cover FOR" question had to stop being
  *  book-specific. Each caller supplies its own `removeCoverLabel` too,
  *  since what "removing it" actually means differs: a book falls back to
- *  auto-resolution (Kobo CDN/Open Library), a mural just goes back to a
- *  plain card — there's no auto-detected mural cover to fall back to. */
+ *  auto-resolution (the backend's books module), a mural just goes back
+ *  to a plain card — there's no auto-detected mural cover to fall back to. */
 export function CoverPickerModal({
   title,
   currentImageId,

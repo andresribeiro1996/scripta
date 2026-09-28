@@ -8,7 +8,7 @@
 //
 //   PUBLIC_API_URL     Cover and gallery images are served as ABSOLUTE
 //                      urls built from this (modules/gallery/plugin.ts,
-//                      modules/covers/plugin.ts). Left at its localhost
+//                      modules/books/plugin.ts). Left at its localhost
 //                      default, every image on the phone resolves to the
 //                      PHONE's own localhost and the whole grid renders
 //                      broken — the single most confusing way this setup

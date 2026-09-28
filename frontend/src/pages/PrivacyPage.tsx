@@ -116,9 +116,10 @@ export function PrivacyPage() {
                 <b>X, Instagram, Threads, TikTok or Bluesky</b>, only if you connect that account.
               </li>
               <li>
-                <b>Book services:</b> to find covers, our servers send a book's ISBN, title or author to Open Library,
-                Google Books, Kobo and Hardcover, with nothing about you attached. When you search for a book to add,
-                your browser asks Open Library directly, so Open Library sees that search and your IP address.
+                <b>Book services:</b> to find covers and book details, our servers send a book's ISBN, title or author
+                to ISBNdb, Apple Books and Open Library, with nothing about you attached. When you search for a book
+                to add, our servers run that search with Open Library. Thumbnails in the search results can load
+                straight from Open Library's image server, which then sees your IP address.
               </li>
             </ul>
             <p>These providers may process data outside your country, including in the United States.</p>

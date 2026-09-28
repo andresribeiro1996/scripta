@@ -1,5 +1,5 @@
 // Opens (and migrates) this module's own SQLite database — mirrors
-// modules/covers/adapters/sqlite/connection.ts exactly.
+// modules/books/adapters/sqlite/connection.ts exactly.
 
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync, readFileSync } from "node:fs";

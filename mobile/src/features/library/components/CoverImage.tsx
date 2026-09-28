@@ -8,7 +8,7 @@
 import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
-import { normalizeImageId, normalizeIsbn } from "@scripta/shared";
+import { normalizeImageId, normalizeIsbn, type CoverSize } from "@scripta/shared";
 import { useTheme } from "../../../ui/theme";
 import { API_URL } from "../../../core/config";
 import { coverUrlForApi } from "../lib/coverUrl";
@@ -31,26 +31,28 @@ export function CoverImage({
   onHasCoverChange,
   onLoadEnd,
   contentFit = "cover",
+  size = "thumb",
 }: {
   book: Record<string, unknown>;
   onHasCoverChange?: (hasCover: boolean) => void;
   onLoadEnd?: () => void;
   contentFit?: "cover" | "contain";
+  size?: CoverSize;
 }) {
   const { colors } = useTheme();
   const confirmedUrl = typeof book._coverUrl === "string" ? book._coverUrl : null;
   const [confirmedFailed, setConfirmedFailed] = useState(false);
-  const [autoUrl, setAutoUrl] = useState<string | null>(() => peekResolvedCover(coverParamsFor(book)) ?? null);
-  const [resolving, setResolving] = useState(() => peekResolvedCover(coverParamsFor(book)) === undefined);
+  const [autoUrl, setAutoUrl] = useState<string | null>(() => peekResolvedCover(coverParamsFor(book), size) ?? null);
+  const [resolving, setResolving] = useState(() => peekResolvedCover(coverParamsFor(book), size) === undefined);
   const useAuto = !confirmedUrl || confirmedFailed;
 
   useEffect(() => {
     setConfirmedFailed(false);
-    const cached = peekResolvedCover(coverParamsFor(book));
+    const cached = peekResolvedCover(coverParamsFor(book), size);
     setAutoUrl(cached ?? null);
     setResolving(cached === undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [book, confirmedUrl]);
+  }, [book, confirmedUrl, size]);
 
   useEffect(() => {
     if (!useAuto) return;
@@ -60,12 +62,12 @@ export function CoverImage({
     void (async () => {
       try {
         await ensureCoversHydrated();
-        const cached = peekResolvedCover(params);
+        const cached = peekResolvedCover(params, size);
         if (cached !== undefined) {
           if (!cancelled) { setAutoUrl(cached); setResolving(false); }
           return;
         }
-        const url = await resolveCover(params);
+        const url = await resolveCover(params, { size, poll: !onLoadEnd });
         if (!cancelled) { setAutoUrl(url); setResolving(false); }
       } catch {
         if (!cancelled) { setAutoUrl(null); setResolving(false); }
@@ -75,7 +77,7 @@ export function CoverImage({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [useAuto, book]);
+  }, [useAuto, book, size]);
 
   const currentSrc = useAuto ? autoUrl : confirmedUrl;
   const hasCover = Boolean(currentSrc);

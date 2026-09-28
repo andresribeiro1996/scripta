@@ -36,7 +36,7 @@ import { calculateShelfTheme, publicReaderCard, readerIdentity, type Group, type
 // use this but not the authGuard'd, network-calling GET /covers/resolve
 // path. The module registration order in backend/src/app.ts (library
 // before covers) doesn't matter here — see that file's own note.
-import { peekCachedCoverUrl } from "../covers/index.js";
+import { peekCachedCoverUrl } from "../books/index.js";
 import { openLibraryDb } from "./adapters/sqlite/connection.js";
 
 export interface PublicBookData {
@@ -194,7 +194,7 @@ function toPublicBookData(book: Record<string, unknown>): PublicBookData {
     author: typeof book.Attribution === "string" && book.Attribution ? book.Attribution : "Unknown author",
     isbn,
     imageId,
-    coverUrl: manualCoverUrl ?? peekCachedCoverUrl({ isbn, imageId }),
+    coverUrl: manualCoverUrl ?? peekCachedCoverUrl({ isbn, title: typeof book.Title === "string" ? book.Title : null, author: typeof book.Attribution === "string" ? book.Attribution : null }),
     readStatus: typeof book.ReadStatus === "number" ? book.ReadStatus : null
   };
 }
@@ -228,7 +228,6 @@ function toPublicBookData(book: Record<string, unknown>): PublicBookData {
  *  Kobo/Goodreads field — nothing outside the list above, ever. */
 function toPublicLibraryBook(book: Record<string, unknown>): Record<string, unknown> {
   const isbn = normalizeIsbn(book.ISBN) || null;
-  const imageId = normalizeImageId(book.ImageId) || null;
   const manualCoverUrl = typeof book._coverUrl === "string" ? book._coverUrl : null;
   return {
     Title: typeof book.Title === "string" ? book.Title : undefined,
@@ -238,7 +237,7 @@ function toPublicLibraryBook(book: Record<string, unknown>): Record<string, unkn
     ReadStatus: typeof book.ReadStatus === "number" ? book.ReadStatus : undefined,
     SeriesNumber: typeof book.SeriesNumber === "number" ? book.SeriesNumber : undefined,
     _order: typeof book._order === "number" ? book._order : undefined,
-    _coverUrl: manualCoverUrl ?? peekCachedCoverUrl({ isbn, imageId })
+    _coverUrl: manualCoverUrl ?? peekCachedCoverUrl({ isbn, title: typeof book.Title === "string" ? book.Title : null, author: typeof book.Attribution === "string" ? book.Attribution : null })
   };
 }
 

@@ -16,7 +16,7 @@ export function useGenreEnrichment(
   useEffect(() => {
     if (!signature || stopped.current) return;
     const controller = new AbortController();
-    void settleWithConcurrency(candidates, GENRE_LOOKUP_CONCURRENCY, async (book) => ({ key: bookKey(book), metadata: await fetchBookMetadata(book, controller.signal) })).then(async (results) => {
+    void settleWithConcurrency(candidates, GENRE_LOOKUP_CONCURRENCY, async (book) => ({ key: bookKey(book), metadata: await fetchBookMetadata(book) })).then(async (results) => {
       if (controller.signal.aborted) return;
       const updates = new Map(results.flatMap((result) => result.status === "fulfilled" ? [[result.value.key, result.value.metadata?.genres ?? []] as const] : []));
       if (!updates.size) return;

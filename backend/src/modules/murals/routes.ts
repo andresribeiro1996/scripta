@@ -13,7 +13,7 @@
 // Two separate builder functions, not one — plugin.ts registers each in
 // its OWN Fastify encapsulation scope specifically so they can carry
 // DIFFERENT rate limits, same reasoning and same split as
-// modules/covers/routes.ts's buildResolveRoute/buildCachedFileRoute: the
+// modules/books/routes.ts's buildResolveRoutes/buildCoverFileRoutes: the
 // authenticated CRUD routes below back ordinary mural editing (one PUT
 // per drag-end/resize-end/block-add/rename), which can easily fire well
 // over 30 requests/minute during a normal editing session; the public

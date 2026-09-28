@@ -18,12 +18,12 @@ const BookIcon = () => (
  *  backend's own cover cache existed, or a manually-supplied preview URL
  *  (LibraryStylePage.tsx's sample books). No network involved at all in
  *  that case; it's used exactly as given. Otherwise, one call to the
- *  backend's cache-aware GET /covers/resolve (api/covers.ts) — the ENTIRE
- *  cover-resolution chain (Kobo CDN, Open Library, Google Books,
- *  Hardcover, and a global cache checked before any of those) now lives
- *  server-side; see lib/covers.ts's own top comment for why it moved
- *  there and backend/src/modules/covers for where it lives now. Renders
- *  the fallback icon until — and unless — something resolves.
+ *  backend's cache-aware GET /covers/resolve (api/covers.ts, wrapping
+ *  @scripta/shared's createCoverResolver) — the ENTIRE cover-resolution
+ *  chain (ISBNdb, Apple Books, Open Library, and the shared book/cover
+ *  database checked before any of those) lives server-side, in
+ *  backend/src/modules/books. Renders the fallback icon until — and
+ *  unless — something resolves.
  *
  *  If the confirmed URL itself fails to load (a stale external URL from
  *  before the cache existed, most likely — a real custom cover practically
@@ -54,7 +54,7 @@ const BookIcon = () => (
  *  than cropped, at the cost of not filling every pixel of a
  *  mismatched-ratio box — the right trade for a small preview tile where
  *  seeing the whole cover matters more than a flush edge-to-edge fill. */
-function coverParamsFor(book: Record<string, unknown>): ResolveCoverParams {
+export function coverParamsFor(book: Record<string, unknown>): ResolveCoverParams {
   const isbn = normalizeIsbn(book.ISBN);
   const imageId = normalizeImageId(book.ImageId);
   const title = String(book.Title ?? "").trim();
@@ -70,16 +70,18 @@ export function CoverImage({
   book,
   onHasCoverChange,
   fit = "cover",
-  alt = ""
+  alt = "",
+  size = "thumb"
 }: {
   book: Record<string, unknown>;
   onHasCoverChange?: (hasCover: boolean) => void;
   fit?: "cover" | "contain";
   alt?: string;
+  size?: "thumb" | "full";
 }) {
   const confirmedUrl = typeof book._coverUrl === "string" ? book._coverUrl : null;
   const [confirmedFailed, setConfirmedFailed] = useState(false);
-  const [autoUrl, setAutoUrl] = useState<string | null>(() => peekResolvedCover(coverParamsFor(book)) ?? null);
+  const [autoUrl, setAutoUrl] = useState<string | null>(() => peekResolvedCover(coverParamsFor(book), size) ?? null);
   const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
   const useAuto = !confirmedUrl || confirmedFailed;
 
@@ -88,20 +90,20 @@ export function CoverImage({
   // for this one while the fresh lookup below is still in flight.
   useEffect(() => {
     setConfirmedFailed(false);
-    setAutoUrl(peekResolvedCover(coverParamsFor(book)) ?? null);
-  }, [book, confirmedUrl]);
+    setAutoUrl(peekResolvedCover(coverParamsFor(book), size) ?? null);
+  }, [book, confirmedUrl, size]);
 
   useEffect(() => {
     if (!useAuto) return;
     const params = coverParamsFor(book);
     if (!params.isbn && !params.imageId && !params.title) return; // nothing to even ask the backend about
-    const cached = peekResolvedCover(params);
+    const cached = peekResolvedCover(params, size);
     if (cached !== undefined) {
       setAutoUrl(cached);
       return;
     }
     let cancelled = false;
-    resolveCover(params)
+    resolveCover(params, { size })
       .then((url) => {
         if (!cancelled) setAutoUrl(url);
       })
@@ -114,7 +116,7 @@ export function CoverImage({
     return () => {
       cancelled = true;
     };
-  }, [useAuto, book]);
+  }, [useAuto, book, size]);
 
   const currentSrc = useAuto ? (autoUrl ?? undefined) : confirmedUrl!;
   const hasCover = Boolean(currentSrc);

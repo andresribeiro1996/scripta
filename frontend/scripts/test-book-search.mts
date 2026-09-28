@@ -1,11 +1,12 @@
-// Exercises lib/bookSearch.ts's pure functions directly against
-// synthetic inputs — same one-off verification script style as
-// scripts/test-merge.mts. No network: searchBooks itself (the only
-// impure function there) stays out, its parsing half is covered via
-// mapOpenLibraryDoc. Run with:
+// Exercises @scripta/shared's book-search functions (as imported by
+// lib/bookSearch.ts) directly against synthetic inputs — same one-off
+// verification script style as scripts/test-merge.mts. No network:
+// lib/bookSearch.ts's own searchBooks (the only impure function there)
+// stays out, its parsing half is covered via mapOpenLibraryDoc. Run
+// with:
 //   npx tsx scripts/test-book-search.mts
 
-import { buildManualBook, looksLikeIsbnQuery, mapOpenLibraryDoc } from "../src/lib/bookSearch";
+import { buildManualBook, looksLikeIsbnQuery, mapOpenLibraryDoc } from "@scripta/shared";
 
 let passed = 0;
 let failed = 0;
