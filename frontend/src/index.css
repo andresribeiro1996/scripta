@@ -386,6 +386,28 @@ input[type="range"]:focus-visible::-moz-range-thumb {
   .tier-drop {
     animation: scripta-pop 220ms cubic-bezier(0.32, 0.72, 0, 1) both;
   }
+  .mark-scan {
+    animation: scripta-mark-scan var(--mark-ms) steps(var(--mark-steps), end) both;
+  }
+  .mark-rise {
+    animation: scripta-mark-rise var(--mark-ms) cubic-bezier(0.32, 0.72, 0, 1) both;
+  }
+  .mark-fan .mark-layer {
+    animation: scripta-mark-layer var(--mark-ms) cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+  .mark-register .mark-layer {
+    animation: scripta-mark-layer var(--mark-ms) cubic-bezier(0.32, 0.72, 0, 1) both;
+  }
+  .mark-gild .mark-gild-frame {
+    animation: scripta-mark-draw var(--mark-ms) cubic-bezier(0.32, 0.72, 0, 1) both;
+  }
+  .mark-gild .mark-gild-mark {
+    animation: scripta-fade var(--mark-gild-ms) ease-out var(--mark-gild-delay) both;
+  }
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 250ms;
+  }
 }
 
 @keyframes scripta-fade {
@@ -474,5 +496,45 @@ input[type="range"]:focus-visible::-moz-range-thumb {
   to {
     opacity: 1;
     transform: none;
+  }
+}
+
+@keyframes scripta-mark-scan {
+  from {
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes scripta-mark-rise {
+  from {
+    opacity: 0;
+    transform: translateY(var(--mark-rise));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes scripta-mark-layer {
+  from {
+    opacity: var(--mark-from-opacity);
+    transform: translate(var(--mark-from-x), var(--mark-from-y));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes scripta-mark-draw {
+  from {
+    stroke-dashoffset: var(--mark-dash);
+  }
+  to {
+    stroke-dashoffset: 0;
   }
 }
