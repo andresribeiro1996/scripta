@@ -33,7 +33,7 @@ import { registerCoversModule } from "./modules/covers/index.js";
 import { deleteGalleryUserData, registerGalleryModule } from "./modules/gallery/index.js";
 import { deleteLibraryUserData, registerLibraryModule, resolvePublicLibrary, readerGlyphFor, type BookEvent } from "./modules/library/index.js";
 import { deleteMuralsUserData, getMuralsPublicApi, registerMuralsModule } from "./modules/murals/index.js";
-import { registerQuizzesModule } from "./modules/quizzes/index.js";
+import { deleteQuizzesUserData, registerQuizzesModule } from "./modules/quizzes/index.js";
 import { deleteSocialsUserData, registerSocialsModule } from "./modules/socials/index.js";
 import { deleteTierlistsUserData, registerTierlistsModule, getTierlistsPublicApi } from "./modules/tierlists/index.js";
 import { registerWaitlistModule } from "./modules/waitlist/index.js";
@@ -102,7 +102,7 @@ export function buildApp() {
   app.register(registerAuthModule, {
     authRoot: app,
     deleteUserData: (userId: string) => {
-      for (const erase of [deleteLibraryUserData, deleteGalleryUserData, deleteSocialsUserData, deleteMuralsUserData, deleteArenaUserData, deleteTierlistsUserData, deleteCommunityUserData]) erase(userId);
+      for (const erase of [deleteLibraryUserData, deleteGalleryUserData, deleteSocialsUserData, deleteMuralsUserData, deleteArenaUserData, deleteTierlistsUserData, deleteQuizzesUserData, deleteCommunityUserData]) erase(userId);
     }
   });
   app.register(registerArenaModule, {

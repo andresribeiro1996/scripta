@@ -116,3 +116,24 @@ test("delete removes the quiz, its plays and their answers", () => {
   assert.equal(repo.getAnswers("p1").length, 0);
   assert.equal(repo.delete("quiz-1", "u1"), false);
 });
+
+test("deleteUserData erases the account's quizzes and unlinks their plays elsewhere", () => {
+  const repo = makeRepo();
+  repo.insert(quizRow({ id: "mine", owner_user_id: "u1" }));
+  repo.insert(quizRow({ id: "theirs", owner_user_id: "u2" }));
+  const answer = (playId: string, quizId: string, q: string) => ({ play_id: playId, quiz_id: quizId, question_id: q, choice_index: 0, correct: 1 });
+  repo.savePlay(playRow("own", "mine", "u1"), [answer("own", "mine", "q0")]);
+  repo.savePlay(playRow("guest", "theirs", "u1"), [answer("guest", "theirs", "q0")]);
+  repo.savePlay(playRow("other", "theirs", "u9"), [answer("other", "theirs", "q0")]);
+
+  repo.deleteUserData("u1");
+
+  assert.equal(repo.getById("mine"), undefined);
+  assert.equal(repo.getById("theirs")?.owner_user_id, "u2");
+  assert.equal(repo.getAnswers("own").length, 0);
+  // The play on someone else's quiz stays (the leaderboard keeps its row),
+  // unlinked from the deleted account.
+  assert.deepEqual(repo.getPlayByVoter("theirs", "u1"), undefined);
+  assert.equal(repo.getPlayById("theirs", "guest")?.player_name, null);
+  assert.equal(repo.getPlayByVoter("theirs", "u9")?.id, "other");
+});

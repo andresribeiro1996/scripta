@@ -24,3 +24,9 @@ export async function quizzesPlugin(app: FastifyInstance) {
     await scoped.register(buildPublicQuizRoutes(quizzesService));
   });
 }
+
+let erasingQuizzes: ReturnType<typeof createSqliteQuizzesRepository> | undefined;
+
+export function deleteQuizzesUserData(userId: string) {
+  (erasingQuizzes ??= createSqliteQuizzesRepository(openQuizzesDb())).deleteUserData(userId);
+}

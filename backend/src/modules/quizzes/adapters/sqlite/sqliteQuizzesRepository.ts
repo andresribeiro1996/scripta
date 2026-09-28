@@ -91,6 +91,24 @@ export function createSqliteQuizzesRepository(db: DatabaseSync): QuizzesReposito
       }
     },
 
+    deleteUserData(userId) {
+      // Own quizzes (with their plays and answers) go; the account's plays
+      // on other people's quizzes are unlinked, not deleted — the
+      // leaderboard keeps its rows, now attributed to nobody (tierlists'
+      // same unlink-not-delete rule).
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        db.prepare("DELETE FROM quiz_play_answers WHERE quiz_id IN (SELECT id FROM quizzes WHERE owner_user_id = ?)").run(userId);
+        db.prepare("DELETE FROM quiz_plays WHERE quiz_id IN (SELECT id FROM quizzes WHERE owner_user_id = ?)").run(userId);
+        db.prepare("DELETE FROM quizzes WHERE owner_user_id = ?").run(userId);
+        db.prepare("UPDATE quiz_plays SET voter_user_id = NULL WHERE voter_user_id = ?").run(userId);
+        db.exec("COMMIT");
+      } catch (error) {
+        db.exec("ROLLBACK");
+        throw error;
+      }
+    },
+
     getByVoteCode(code) {
       return getByVoteCodeStmt.get(code) as QuizRow | undefined;
     },
