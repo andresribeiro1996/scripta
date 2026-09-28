@@ -32,6 +32,8 @@ export const typography = {
 export const minimumTouchTarget = 44;
 export const dynamicType = { allowFontScaling: true } as const;
 
+type ActiveVeil = Veil & { opacity: Animated.Value };
+
 export type ThemeMode = ThemeScheme;
 export type Theme = {
   id: ThemeId;
@@ -82,31 +84,29 @@ export function ThemeProvider({ children, bundledFonts }: { children: ReactNode;
   }, []);
 
   const reduced = useReducedMotion();
-  const [veil, setVeil] = useState<Veil | null>(null);
-  const veilOpacity = useRef(new Animated.Value(0)).current;
+  const [veil, setVeil] = useState<ActiveVeil | null>(null);
   const current = useRef<{ id: ThemeId | null; scheme: typeof scheme; reduced: boolean }>({ id: null, scheme, reduced });
 
   const setPreference = useCallback((next: ThemePreference, options?: { fade?: boolean }) => {
     const { id: from, scheme: os, reduced: less } = current.current;
     if (from && shouldFadeTheme({ fade: options?.fade ?? false, reduced: less, from, to: resolveTheme(next, osScheme(os)) })) {
-      veilOpacity.setValue(1);
-      setVeil((previous) => nextVeil(previous, themes[from].colors.background));
+      setVeil((previous) => ({ ...nextVeil(previous, themes[from].colors.background), opacity: new Animated.Value(1) }));
     }
     applyNativeScheme(next);
     setPreferenceState(next);
     AsyncStorage.setItem(STORAGE_KEY, next).catch((err: unknown) => {
       console.warn("Couldn't save the theme on this device.", err);
     });
-  }, [veilOpacity]);
+  }, []);
 
   useEffect(() => {
     if (!veil) return;
-    const animation = Animated.timing(veilOpacity, { toValue: 0, duration: MOTION.themeFadeMs, easing: Easing.bezier(MOTION.ease[0], MOTION.ease[1], MOTION.ease[2], MOTION.ease[3]), useNativeDriver: true });
+    const animation = Animated.timing(veil.opacity, { toValue: 0, duration: MOTION.themeFadeMs, easing: Easing.bezier(MOTION.ease[0], MOTION.ease[1], MOTION.ease[2], MOTION.ease[3]), useNativeDriver: true });
     animation.start(({ finished }) => {
       if (finished) setVeil((now) => (now?.key === veil.key ? null : now));
     });
     return () => animation.stop();
-  }, [veil, veilOpacity]);
+  }, [veil]);
 
   const setFontPreference = useCallback((slot: FontSlot, next: FontPreference) => {
     if (slot === "display") setDisplayFont(next);
@@ -131,7 +131,7 @@ export function ThemeProvider({ children, bundledFonts }: { children: ReactNode;
   return (
     <ThemeContext.Provider value={value}>
       {children}
-      {veil ? <Animated.View key={veil.key} pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: veil.color, opacity: veilOpacity }]} /> : null}
+      {veil ? <Animated.View key={veil.key} pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: veil.color, opacity: veil.opacity }]} /> : null}
     </ThemeContext.Provider>
   );
 }
