@@ -35,6 +35,7 @@ export interface AuthRepository {
   linkGoogleId(userId: string, googleId: string): void;
   setUsername(userId: string, username: string): void;
   setAvatarId(userId: string, avatarId: string | null): void;
+  setTheme(userId: string, theme: string): void;
   /** No ownership filter — needed by the public, unauthenticated
    *  GET /auth/avatar/:id/file route to find which account's blob to
    *  read, keyed only by the unguessable avatar id (same trust model as

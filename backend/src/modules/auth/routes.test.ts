@@ -36,6 +36,7 @@ const { createAuthorizationCode } = await import("./authorizationCode.js");
 
 import type { AuthenticatedUser, TokenPair } from "./domain/types.js";
 import type { AuthService } from "./service.js";
+import type { ThemePreference } from "@scripta/shared/themes";
 
 const user: AuthenticatedUser = { id: "u1", email: "a@b.c", username: "andre", avatarId: null };
 const tokens: TokenPair = { accessToken: "access-1", refreshToken: "refresh-1" };
@@ -139,4 +140,58 @@ test("a PKCE-bound code with the wrong verifier is a 400", async () => {
   });
 
   assert.equal(status, 400);
+});
+
+function themeService(stored: Map<string, ThemePreference>): AuthService {
+  return {
+    getTheme: (userId: string) => stored.get(userId) ?? null,
+    setTheme: (userId: string, theme: ThemePreference) => {
+      stored.set(userId, theme);
+    },
+  } as unknown as AuthService;
+}
+
+async function callThemeRoute(service: AuthService, options: InjectOptions, token?: string) {
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", (candidate: string) => (candidate === "valid-token" ? user : null));
+  await app.register(buildAuthRoutes(service));
+  const res = await app.inject(token ? { ...options, headers: { ...options.headers, authorization: `Bearer ${token}` } } : options);
+  await app.close();
+  return { status: res.statusCode, body: res.body ? (res.json() as Record<string, unknown>) : null };
+}
+
+test("theme routes reject a request without a valid access token", async () => {
+  const service = themeService(new Map());
+  assert.equal((await callThemeRoute(service, { method: "GET", url: "/auth/theme" })).status, 401);
+  assert.equal((await callThemeRoute(service, { method: "PUT", url: "/auth/theme", payload: { theme: "dark" } })).status, 401);
+  assert.equal((await callThemeRoute(service, { method: "GET", url: "/auth/theme" }, "forged")).status, 401);
+});
+
+test("GET /auth/theme is null for an account that never chose one", async () => {
+  const { status, body } = await callThemeRoute(themeService(new Map()), { method: "GET", url: "/auth/theme" }, "valid-token");
+  assert.equal(status, 200);
+  assert.deepEqual(body, { theme: null });
+});
+
+test("PUT then GET /auth/theme round-trips the preference for the signed-in user", async () => {
+  const stored = new Map<string, ThemePreference>();
+  const service = themeService(stored);
+  const put = await callThemeRoute(service, { method: "PUT", url: "/auth/theme", payload: { theme: "midnight" } }, "valid-token");
+  assert.equal(put.status, 204);
+  assert.equal(stored.get(user.id), "midnight");
+  const get = await callThemeRoute(service, { method: "GET", url: "/auth/theme" }, "valid-token");
+  assert.deepEqual(get.body, { theme: "midnight" });
+  assert.equal((await callThemeRoute(service, { method: "PUT", url: "/auth/theme", payload: { theme: "system" } }, "valid-token")).status, 204);
+  assert.equal(stored.get(user.id), "system");
+});
+
+test("PUT /auth/theme rejects anything that is not a known preference", async () => {
+  const stored = new Map<string, ThemePreference>();
+  const service = themeService(stored);
+  for (const payload of [{ theme: "vaporwave" }, { theme: "Light" }, { theme: null }, {}, { theme: 3 }]) {
+    const { status, body } = await callThemeRoute(service, { method: "PUT", url: "/auth/theme", payload }, "valid-token");
+    assert.equal(status, 400, JSON.stringify(payload));
+    assert.deepEqual(body, { error: "Unknown theme." });
+  }
+  assert.equal(stored.size, 0);
 });

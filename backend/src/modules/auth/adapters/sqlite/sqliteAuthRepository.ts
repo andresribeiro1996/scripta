@@ -19,6 +19,7 @@ export function createSqliteAuthRepository(db: DatabaseSync): AuthRepository {
   const linkGoogleIdStmt = db.prepare(`UPDATE users SET google_id = ? WHERE id = ?`);
   const setUsernameStmt = db.prepare(`UPDATE users SET username = ? WHERE id = ?`);
   const setAvatarIdStmt = db.prepare(`UPDATE users SET avatar_id = ? WHERE id = ?`);
+  const setThemeStmt = db.prepare(`UPDATE users SET theme = ? WHERE id = ?`);
   const findUserIdByAvatarIdStmt = db.prepare(`SELECT id FROM users WHERE avatar_id = ?`);
 
   const insertRefreshTokenStmt = db.prepare(
@@ -162,6 +163,10 @@ export function createSqliteAuthRepository(db: DatabaseSync): AuthRepository {
 
     setAvatarId(userId, avatarId) {
       setAvatarIdStmt.run(avatarId, userId);
+    },
+
+    setTheme(userId, theme) {
+      setThemeStmt.run(theme, userId);
     },
 
     findUserIdByAvatarId(avatarId) {

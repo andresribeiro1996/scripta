@@ -20,6 +20,7 @@ import {
   UsernameInUseError
 } from "./domain/errors.js";
 import { RECOVERY_MESSAGE } from "@scripta/shared";
+import { THEME_PREFERENCES } from "@scripta/shared/themes";
 import { AccountActionError, type AccountSecurityService } from "./accountSecurity.js";
 import type { AuthService } from "./service.js";
 import { MAX_AVATAR_UPLOAD_BYTES } from "./service.js";
@@ -59,6 +60,8 @@ const setUsernameSchema = z.object({
 });
 
 const avatarIdParamSchema = z.object({ id: z.string().uuid() });
+
+const setThemeSchema = z.object({ theme: z.enum(THEME_PREFERENCES) });
 
 function statusForAvatarError(err: AvatarError): number {
   if (err instanceof AvatarTooLargeError) return 413;
@@ -222,6 +225,15 @@ export function buildAuthRoutes(service: AuthService, security?: AccountSecurity
         if (err instanceof UsernameInUseError) return reply.code(409).send({ error: err.message, field: "username" });
         throw err;
       }
+    });
+
+    app.get("/auth/theme", { preHandler: authGuard }, async (request) => ({ theme: service.getTheme(request.user.id) }));
+
+    app.put("/auth/theme", { preHandler: authGuard }, async (request, reply) => {
+      const parsed = setThemeSchema.safeParse(request.body);
+      if (!parsed.success) return reply.code(400).send({ error: "Unknown theme." });
+      service.setTheme(request.user.id, parsed.data.theme);
+      return reply.code(204).send();
     });
 
     app.post(

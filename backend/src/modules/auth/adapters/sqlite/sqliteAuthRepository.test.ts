@@ -150,3 +150,27 @@ test("revokeAllRefreshTokensForUser only touches that user's still-active tokens
   assert.ok(repo.findRefreshTokenById(aTokenId)?.revoked_at);
   assert.equal(repo.findRefreshTokenById(bTokenId)?.revoked_at, null);
 });
+
+test("a fresh database has the theme column", () => {
+  assert.ok(columnNames(freshDb(), "users").includes("theme"));
+});
+
+test("migrating a database without the theme column adds it, NULL for existing users, and setTheme persists", () => {
+  const db = new DatabaseSync(":memory:");
+  db.exec(`
+    CREATE TABLE users (
+      id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, username TEXT UNIQUE,
+      password_hash TEXT, google_id TEXT UNIQUE, avatar_id TEXT UNIQUE,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+    );
+  `);
+  db.prepare(`INSERT INTO users (id, email, username, password_hash) VALUES ('u1','a@b.c','andre','x')`).run();
+
+  applyAuthMigrations(db);
+
+  assert.ok(columnNames(db, "users").includes("theme"));
+  const repo = createSqliteAuthRepository(db);
+  assert.equal(repo.findUserById("u1")?.theme, null);
+  repo.setTheme("u1", "midnight");
+  assert.equal(repo.findUserById("u1")?.theme, "midnight");
+});

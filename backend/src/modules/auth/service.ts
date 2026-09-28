@@ -22,6 +22,7 @@ import {
 import type { AuthRepository, AvatarBlobStore } from "./domain/ports.js";
 import type { AuthenticatedUser, RefreshTokenRow, TokenPair, UserRow } from "./domain/types.js";
 import { generateRefreshToken, hashRefreshToken, refreshTokenExpiry, signAccessToken } from "./tokens.js";
+import { parseThemePreference, type ThemePreference } from "@scripta/shared/themes";
 
 export interface AuthService {
   signup(email: string, username: string, password: string): Promise<{ user: AuthenticatedUser; tokens: TokenPair }>;
@@ -38,6 +39,8 @@ export interface AuthService {
    *  one to change theirs (it's set once, at signup). */
   setUsername(userId: string, username: string): Promise<AuthenticatedUser>;
   getUserById(userId: string): AuthenticatedUser | null;
+  getTheme(userId: string): ThemePreference | null;
+  setTheme(userId: string, theme: ThemePreference): void;
   /** Validates, square-crops, and re-encodes an uploaded profile picture
    *  (same pipeline reasoning as gallery's uploadImage — magic-byte sniff,
    *  EXIF strip via re-encode, server-generated id), replaces any previous
@@ -263,6 +266,15 @@ export function createAuthService(repo: AuthRepository, avatarStore: AvatarBlobS
     getUserById(userId) {
       const user = repo.findUserById(userId);
       return user ? toAuthenticatedUser(user) : null;
+    },
+
+    getTheme(userId) {
+      const theme = repo.findUserById(userId)?.theme;
+      return theme == null ? null : parseThemePreference(theme);
+    },
+
+    setTheme(userId, theme) {
+      repo.setTheme(userId, theme);
     },
 
     async setAvatar(userId, buffer) {
