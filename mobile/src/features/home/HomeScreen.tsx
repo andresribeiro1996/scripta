@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, V
 import { Text } from "../../ui/Text";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
 import { bookKey, buildDashboardCards, resolveQuote } from "@scripta/shared";
-import { Button, EmptyState, ErrorState, Screen, Skeleton, Toast, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
+import { BrandMark, Button, EmptyState, ErrorState, Screen, Skeleton, Toast, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { useAuth } from "../../core/auth";
 import { useLibrary } from "../library/hooks/useLibrary";
 import { CoverImage } from "../library/components/CoverImage";
@@ -59,6 +59,7 @@ export function HomeScreen() {
         options={{
           title: "Home",
           headerShown: true,
+          headerLeft: () => <View style={styles.mark}><BrandMark size={24} /></View>,
         }}
       />
       {library.isPending ? (
@@ -194,6 +195,7 @@ function BookRow({ keys, books, onOpen }: { keys: string[]; books: Array<Record<
 
 const styles = StyleSheet.create({
   page: { padding: spacing.lg, gap: spacing.md },
+  mark: { marginRight: spacing.sm },
   sectionPad: { paddingHorizontal: spacing.lg },
   heading: { fontWeight: "700" },
   headerTitle: { flexShrink: 1 },

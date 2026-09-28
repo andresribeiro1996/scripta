@@ -7,7 +7,7 @@ import { Redirect, router, useLocalSearchParams } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { GoogleSignInCancelledError, useAuth } from "../../core/auth";
 import { ApiError, apiClient } from "../../core/api";
-import { Button, FormScroll, Input, Screen, Segmented } from "../../ui";
+import { BrandMark, Button, FormScroll, Input, Screen, Segmented } from "../../ui";
 import { spacing, typography, useTheme } from "../../ui/theme";
 
 const AUTH_MODES = [
@@ -102,6 +102,7 @@ export default function LoginPage() {
   return (
     <Screen bottom>
       <FormScroll contentContainerStyle={styles.center}>
+        <View style={styles.mark}><BrandMark size={56} /></View>
         <Text accessibilityRole="header" display={false} style={[styles.logo, { color: colors.text }]}>Atmyshelf</Text>
         {/* Only worth the user's attention when the server is actually
             unreachable — "server ok" is a developer's line, not a reader's. */}
@@ -198,6 +199,7 @@ export default function LoginPage() {
 
 const styles = StyleSheet.create({
   center: { flexGrow: 1, justifyContent: "center", alignItems: "center", padding: spacing.xxl },
+  mark: { marginBottom: spacing.md },
   logo: { fontSize: 40, lineHeight: 48, fontWeight: "700" },
   server: { ...typography.body, marginTop: spacing.xs, marginBottom: spacing.xxxl, textAlign: "center" },
   modeRow: { width: "100%", marginBottom: spacing.lg },
