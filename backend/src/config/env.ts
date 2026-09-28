@@ -95,6 +95,7 @@ const envSchema = z.object({
   // modules/tierlists' own SQLite file — same one-file-per-module
   // isolation as every other module's *_DB_PATH above.
   TIERLISTS_DB_PATH: z.string().min(1).default("./data/tierlists.sqlite"),
+  QUIZZES_DB_PATH: z.string().min(1).default("./data/quizzes.sqlite"),
   COMMUNITY_DB_PATH: z.string().min(1).default("./data/community.sqlite"),
   WAITLIST_DB_PATH: z.string().min(1).optional(),
   // This API's own externally-reachable base URL — needed to build
