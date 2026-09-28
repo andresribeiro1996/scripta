@@ -41,9 +41,15 @@ function createInMemoryRepo(): AuthRepository & { rows: Map<string, UserRow>; re
     changePassword() { throw new Error("Unused in this test"); },
     verifyEmail() { throw new Error("Unused in this test"); },
     markEmailVerified() { throw new Error("Unused in this test"); },
-    setTheme(userId, theme) {
+    setAppearance(userId, fields) {
       const row = rows.get(userId);
-      if (row) rows.set(userId, { ...row, theme });
+      if (!row) return;
+      rows.set(userId, {
+        ...row,
+        theme: fields.theme ?? row.theme,
+        display_font: fields.display_font ?? row.display_font,
+        text_font: fields.text_font ?? row.text_font,
+      });
     },
     rows,
     refreshTokens,
@@ -420,24 +426,24 @@ test("concurrent refreshes of the same token both succeed without revoking unrel
   assert.equal(secondRow?.revoked_at, null, "a race between two refreshes of the SAME token must not look like theft to an unrelated session");
 });
 
-test("getTheme is null until a theme is saved, then returns it", () => {
+test("getAppearance is all null until something is saved, and setAppearance updates only the given fields", () => {
   const { service, repo } = makeService();
   const row = repo.createUser({ email: "t@example.test", username: "themer", passwordHash: null, googleId: null });
-  assert.equal(service.getTheme(row.id), null);
-  service.setTheme(row.id, "oxblood");
-  assert.equal(service.getTheme(row.id), "oxblood");
-  service.setTheme(row.id, "system");
-  assert.equal(service.getTheme(row.id), "system");
+  assert.deepEqual(service.getAppearance(row.id), { theme: null, displayFont: null, textFont: null });
+  service.setAppearance(row.id, { theme: "oxblood" });
+  assert.deepEqual(service.getAppearance(row.id), { theme: "oxblood", displayFont: null, textFont: null });
+  service.setAppearance(row.id, { displayFont: "monoton", textFont: "theme" });
+  assert.deepEqual(service.getAppearance(row.id), { theme: "oxblood", displayFont: "monoton", textFont: "theme" });
 });
 
-test("getTheme reads a stored value this server no longer knows as system", () => {
+test("getAppearance reads stored values this server no longer knows as the defaults", () => {
   const { service, repo } = makeService();
   const row = repo.createUser({ email: "old@example.test", username: "oldtheme", passwordHash: null, googleId: null });
-  repo.rows.set(row.id, { ...row, theme: "vaporwave" });
-  assert.equal(service.getTheme(row.id), "system");
+  repo.rows.set(row.id, { ...row, theme: "vaporwave", display_font: "comic", text_font: "vt323" });
+  assert.deepEqual(service.getAppearance(row.id), { theme: "system", displayFont: "theme", textFont: "theme" });
 });
 
-test("getTheme is null for an unknown user", () => {
+test("getAppearance is all null for an unknown user", () => {
   const { service } = makeService();
-  assert.equal(service.getTheme("nobody"), null);
+  assert.deepEqual(service.getAppearance("nobody"), { theme: null, displayFont: null, textFont: null });
 });
