@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { parseThemePreference, resolveTheme, type ThemePreference, type ThemeScheme } from "@scripta/shared/themes";
+import { parseFontPreference, parseThemePreference, resolveTheme, type Appearance, type FontPreference, type FontSlot, type ThemePreference, type ThemeScheme } from "@scripta/shared/themes";
 
 const STORAGE_KEY = "theme";
 const CHANGE_EVENT = "themechange";
@@ -36,9 +36,48 @@ export function useThemePreference(): ThemePreference {
   return useSyncExternalStore(subscribe, readThemePreference);
 }
 
-export function followThemePreferenceFromOtherTabs(): () => void {
+const FONT_KEYS: Record<FontSlot, "fontDisplay" | "fontText"> = { display: "fontDisplay", text: "fontText" };
+
+export function readFontPreference(slot: FontSlot): FontPreference {
+  try {
+    return parseFontPreference(slot, localStorage.getItem(FONT_KEYS[slot]));
+  } catch (err) {
+    if (err instanceof DOMException) return "theme";
+    throw err;
+  }
+}
+
+export function applyFontPreference(slot: FontSlot, preference: FontPreference): void {
+  const key = FONT_KEYS[slot];
+  if (preference === "theme") delete document.documentElement.dataset[key];
+  else document.documentElement.dataset[key] = preference;
+  try {
+    localStorage.setItem(key, preference);
+  } catch (err) {
+    if (!(err instanceof DOMException)) throw err;
+  }
+  window.dispatchEvent(new Event(CHANGE_EVENT));
+}
+
+export function useFontPreference(slot: FontSlot): FontPreference {
+  return useSyncExternalStore(subscribe, () => readFontPreference(slot));
+}
+
+export function readAppearance(): Appearance {
+  return { theme: readThemePreference(), displayFont: readFontPreference("display"), textFont: readFontPreference("text") };
+}
+
+export function applyAppearance(patch: Partial<Appearance>): void {
+  if (patch.theme) applyThemePreference(patch.theme);
+  if (patch.displayFont) applyFontPreference("display", patch.displayFont);
+  if (patch.textFont) applyFontPreference("text", patch.textFont);
+}
+
+export function followAppearanceFromOtherTabs(): () => void {
   function onStorage(event: StorageEvent) {
     if (event.key === STORAGE_KEY) applyThemePreference(readThemePreference());
+    if (event.key === FONT_KEYS.display) applyFontPreference("display", readFontPreference("display"));
+    if (event.key === FONT_KEYS.text) applyFontPreference("text", readFontPreference("text"));
   }
   window.addEventListener("storage", onStorage);
   return () => window.removeEventListener("storage", onStorage);
