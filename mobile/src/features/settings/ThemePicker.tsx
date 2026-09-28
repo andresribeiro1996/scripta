@@ -56,7 +56,7 @@ export function ThemePicker() {
                   <Swatch colors={themes[option].colors} />
                 )}
               </View>
-              <Text {...dynamicType} numberOfLines={1} style={[typography.caption, styles.label, { color: checked ? colors.text : colors.textDim }]}>
+              <Text {...dynamicType} numberOfLines={2} style={[typography.caption, styles.label, { color: checked ? colors.text : colors.textDim }]}>
                 {label}
               </Text>
             </Pressable>
