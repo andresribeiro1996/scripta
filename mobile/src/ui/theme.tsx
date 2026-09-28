@@ -1,7 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { AccessibilityInfo, Appearance, useColorScheme } from "react-native";
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { AccessibilityInfo, Animated, Appearance, Easing, StyleSheet, useColorScheme } from "react-native";
 import {
+  MOTION,
   parseFontPreference,
   parseThemePreference,
   resolveFonts,
@@ -15,6 +16,7 @@ import {
   type ThemePreference,
   type ThemeScheme,
 } from "@scripta/shared/themes";
+import { nextVeil, shouldFadeTheme, type Veil } from "./themeFade";
 
 export type { ThemeColors };
 
@@ -36,7 +38,7 @@ export type Theme = {
   mode: ThemeMode;
   colors: ThemeColors;
   preference: ThemePreference;
-  setPreference: (preference: ThemePreference) => void;
+  setPreference: (preference: ThemePreference, options?: { fade?: boolean }) => void;
   fonts: { display: FontId; text: FontId };
   displayFont: FontPreference;
   textFont: FontPreference;
@@ -79,13 +81,32 @@ export function ThemeProvider({ children, bundledFonts }: { children: ReactNode;
     );
   }, []);
 
-  const setPreference = useCallback((next: ThemePreference) => {
+  const reduced = useReducedMotion();
+  const [veil, setVeil] = useState<Veil | null>(null);
+  const veilOpacity = useRef(new Animated.Value(0)).current;
+  const current = useRef<{ id: ThemeId | null; scheme: typeof scheme; reduced: boolean }>({ id: null, scheme, reduced });
+
+  const setPreference = useCallback((next: ThemePreference, options?: { fade?: boolean }) => {
+    const { id: from, scheme: os, reduced: less } = current.current;
+    if (from && shouldFadeTheme({ fade: options?.fade ?? false, reduced: less, from, to: resolveTheme(next, osScheme(os)) })) {
+      veilOpacity.setValue(1);
+      setVeil((previous) => nextVeil(previous, themes[from].colors.background));
+    }
     applyNativeScheme(next);
     setPreferenceState(next);
     AsyncStorage.setItem(STORAGE_KEY, next).catch((err: unknown) => {
       console.warn("Couldn't save the theme on this device.", err);
     });
-  }, []);
+  }, [veilOpacity]);
+
+  useEffect(() => {
+    if (!veil) return;
+    const animation = Animated.timing(veilOpacity, { toValue: 0, duration: MOTION.themeFadeMs, easing: Easing.bezier(MOTION.ease[0], MOTION.ease[1], MOTION.ease[2], MOTION.ease[3]), useNativeDriver: true });
+    animation.start(({ finished }) => {
+      if (finished) setVeil((now) => (now?.key === veil.key ? null : now));
+    });
+    return () => animation.stop();
+  }, [veil, veilOpacity]);
 
   const setFontPreference = useCallback((slot: FontSlot, next: FontPreference) => {
     if (slot === "display") setDisplayFont(next);
@@ -102,8 +123,17 @@ export function ThemeProvider({ children, bundledFonts }: { children: ReactNode;
     return { id, mode: themes[id].scheme, colors: themes[id].colors, preference, setPreference, fonts, displayFont, textFont, setFontPreference };
   }, [preference, scheme, setPreference, bundledFonts, displayFont, textFont, setFontPreference]);
 
+  useEffect(() => {
+    current.current = { id: value ? value.id : null, scheme, reduced };
+  }, [value, scheme, reduced]);
+
   if (!value) return null;
-  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+  return (
+    <ThemeContext.Provider value={value}>
+      {children}
+      {veil ? <Animated.View key={veil.key} pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: veil.color, opacity: veilOpacity }]} /> : null}
+    </ThemeContext.Provider>
+  );
 }
 
 export function useTheme(): Theme {
