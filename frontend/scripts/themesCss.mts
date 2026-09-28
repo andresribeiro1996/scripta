@@ -1,4 +1,4 @@
-import { DISPLAY_FONT_IDS, FONT_IDS, TEXT_FONT_IDS, THEME_IDS, fontFileName, fontStack, fonts, themes, type FontId, type ThemeColors } from "@scripta/shared/themes";
+import { DISPLAY_FONT_IDS, FONT_IDS, TEXT_FONT_IDS, THEME_DECOR, THEME_IDS, fontFileName, fontStack, fonts, themes, withOpacity, type DecorAnchor, type FontId, type ThemeColors } from "@scripta/shared/themes";
 
 const WEB_TOKENS: Array<[keyof ThemeColors, string]> = [
   ["background", "--color-bg"],
@@ -49,6 +49,36 @@ function fontVariables(display: FontId, text: FontId): string {
   return `  --font-display: ${fontStack(display)};\n  --font-text: ${fontStack(text)};`;
 }
 
+const POSITIONS: Record<DecorAnchor, string> = {
+  "top-left": "left top",
+  "top-right": "right top",
+  "bottom-left": "left bottom",
+  "bottom-right": "right bottom",
+  top: "center top",
+  bottom: "center bottom",
+};
+
+function decorRules(): string[] {
+  return THEME_IDS.flatMap((id) => {
+    const decor = THEME_DECOR[id];
+    if (!decor) return [];
+    const layers = decor.pieces.map((piece) => {
+      const width = piece.width === "full" ? "100%" : `${piece.width}px`;
+      return `url("data:image/svg+xml,${encodeURIComponent(piece.svg)}") ${POSITIONS[piece.anchor]} / ${width} ${piece.height}px no-repeat`;
+    });
+    const rules = [
+      `:root[data-theme="${id}"] body::before {\n  content: "";\n  position: fixed;\n  inset: 0;\n  z-index: -1;\n  pointer-events: none;\n  background:\n    ${layers.join(",\n    ")};\n}\n`,
+    ];
+    if (decor.frame) {
+      const [outer, inner] = decor.frame.lines;
+      rules.push(
+        `:root[data-theme="${id}"] body::after {\n  content: "";\n  position: fixed;\n  inset: ${outer!.inset}px;\n  z-index: -1;\n  pointer-events: none;\n  border: ${outer!.width}px solid ${withOpacity(decor.frame.color, outer!.opacity)};\n  border-radius: ${outer!.radius}px;\n  outline: ${inner!.width}px solid ${withOpacity(decor.frame.color, inner!.opacity)};\n  outline-offset: -${inner!.inset - outer!.inset}px;\n}\n`,
+      );
+    }
+    return rules;
+  });
+}
+
 export function renderThemesCss(): string {
   const darkSelectors = THEME_IDS.filter((id) => themes[id].scheme === "dark")
     .map((id) => `[data-theme="${id}"], [data-theme="${id}"] *`)
@@ -67,5 +97,6 @@ export function renderThemesCss(): string {
     ...blocks,
     ...displayOverrides,
     ...textOverrides,
+    ...decorRules(),
   ].join("\n");
 }

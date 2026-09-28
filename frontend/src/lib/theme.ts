@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { flushSync } from "react-dom";
 import { parseFontPreference, parseThemePreference, resolveTheme, type Appearance, type FontPreference, type FontSlot, type ThemePreference, type ThemeScheme } from "@scripta/shared/themes";
 
 const STORAGE_KEY = "theme";
@@ -25,6 +26,20 @@ export function applyThemePreference(preference: ThemePreference): void {
     if (!(err instanceof DOMException)) throw err;
   }
   window.dispatchEvent(new Event(CHANGE_EVENT));
+}
+
+export function fadeToThemePreference(preference: ThemePreference): void {
+  const doc = document as Document & { startViewTransition?: (update: () => void) => { ready: Promise<void>; finished: Promise<void> } };
+  if (typeof doc.startViewTransition !== "function" || matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    applyThemePreference(preference);
+    return;
+  }
+  const transition = doc.startViewTransition(() => flushSync(() => applyThemePreference(preference)));
+  const skipped = (err: unknown) => {
+    if (!(err instanceof DOMException)) throw err;
+  };
+  transition.ready.catch(skipped);
+  transition.finished.catch(skipped);
 }
 
 function subscribe(onChange: () => void): () => void {

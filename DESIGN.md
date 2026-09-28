@@ -34,7 +34,7 @@ Extracted from real app source (`packages/shared/src/themes/palettes.ts` and the
 
 ### Themes
 
-The table above is the default Light/Dark pair. The registry defines eleven themes with the same tokens: Light, Sepia, Rosé and Newsprint use the light scheme; Dark, Midnight, Forest, Matrix, Synthwave, Seventies and Oxblood use the dark scheme. Settings → Appearance picks one, or System (Light or Dark from the OS). The choice is cached per device under `theme` and synced through `GET`/`PUT /auth/appearance` while signed in (it syncs theme and both fonts); the account wins. Every theme passes the AA pairs in `packages/shared/src/themes/themes.test.ts`. Dark-scheme themes get the reversed reader-card print and Tailwind's `dark:` variant. Text on an `accent` or `danger` fill is always `on-accent` / `on-danger`, never white.
+The table above is the default Light/Dark pair. The registry defines eleven themes with the same tokens: Light, Sepia, Rosé and Newsprint use the light scheme; Dark, Midnight, Forest, Matrix, Synthwave, Seventies and Oxblood use the dark scheme. Settings → Appearance picks one, or System (Light or Dark from the OS). The choice is cached per device under `theme` and synced through `GET`/`PUT /auth/appearance` while signed in (it syncs theme and both fonts); the account wins. Every theme passes the AA pairs in `packages/shared/src/themes/themes.test.ts`. Dark-scheme themes get the reversed reader-card print and Tailwind's `dark:` variant. Text on an `accent` or `danger` fill is always `on-accent` / `on-danger`, never white. Matrix, Synthwave, Seventies, Newsprint and Oxblood also carry decor (`packages/shared/src/themes/decor.ts`): flat motifs pinned to a corner or edge, behind the content, never above 0.25 opacity. Matrix has a glyph fall at the top right, Synthwave a sliced sun and horizon grid at the bottom, Seventies a triple-stripe arc at the top right, Newsprint a double rule along the top edge and a halftone corner, and Oxblood a gilt double frame with corner diamonds. Decor has no preference of its own; a plain theme is how you get none.
 
 ### Typography
 
@@ -89,13 +89,15 @@ Content max-width is a per-library user preference (`contentMaxWidth`, 800–180
 
 ## Motion
 
-Web keyframes 130–200ms on `cubic-bezier(0.32, 0.72, 0, 1)` for dialogs/sheets/menus/toasts. Mobile toasts fade 180ms; skeletons pulse 700ms. Both fully respect `prefers-reduced-motion` / `AccessibilityInfo.isReduceMotionEnabled()` — snap instantly instead of animating.
+Web keyframes 130–200ms on `cubic-bezier(0.32, 0.72, 0, 1)` for dialogs/sheets/menus/toasts. Mobile toasts fade 180ms; skeletons pulse 700ms. The brand mark plays its theme's entrance (scan, rise, fan, register or gild; 560–700ms, `ENTRANCE` in `packages/shared/src/themes/brand.ts`) once per page load or app launch, and picking a theme fades for 250ms (a View Transition on web, a veil in the old background colour on mobile). Both fully respect `prefers-reduced-motion` / `AccessibilityInfo.isReduceMotionEnabled()`, snapping instantly instead of animating.
 
 ## Brand lockup
 
-One lockup wherever the product names itself: the app icon at 28px (`icon-192.png`, `radius-sm`) beside "Atmyshelf" in the system stack, 18px bold (`components/BrandLockup.tsx`). Used by the app sidebar and mobile drawer, the landing nav and footer, and every sign-in screen, where it links to `/`.
+One lockup wherever the product names itself: the brand mark at 28px (`components/BrandMark.tsx`, drawn in the active theme's treatment) beside "Atmyshelf" in the system stack, 18px bold (`components/BrandLockup.tsx`). Used by the app sidebar and mobile drawer, the landing nav and footer, and every sign-in screen, where it links to `/`.
 
-The name stays live system-stack text, not Playfair: the lockup is interface chrome, and Playfair's single 400 weight reads thin at 18px beside the solid 28px tile. The stacked lockup (`logo.png`) sets the name in Playfair Display because an image can't carry the system stack; use it only where the product isn't drawing its own UI (store listings, press, a README).
+The name stays live system-stack text, not Playfair: the lockup is interface chrome, and Playfair's single 400 weight reads thin at 18px beside the 28px mark. The stacked lockup (`logo.png`) sets the name in Playfair Display because an image can't carry the system stack; use it only where the product isn't drawing its own UI (store listings, press, a README).
+
+Mobile draws the same mark (`ui/BrandMark.tsx`) above the name on the login screen and beside the Home title.
 
 ## Public pages
 
@@ -110,7 +112,7 @@ Masters are in `design/brand/`: `mark.svg` (a 76-unit square box) and `lockup.sv
 - `frontend/public/logo.png` — the stacked lockup, ink (`#201e1c`) on transparent, 992×1070.
 - `mobile/assets/images/icon.png` and `favicon.png` — the web icons' treatment. `adaptive-foreground.png` and `adaptive-monochrome.png` — paper mark on transparent, inside Android's 66dp safe circle, over `app.json`'s `#141210`. `splash-icon.png` / `splash-icon-dark.png` — ink / dark-theme `text` (`#ece8e3`) mark on transparent. `amsicon-source.png` — the mark at 1254px, ink on transparent.
 
-Two treatments only: ink on paper or transparent, paper on the dark `bg`. No accent in the mark: the lockup heads every view, and the accent is kept for that view's one primary action. `frontend/public/Gemini_Generated_Image_....jfif` is an unrelated AI-test image, not a brand asset.
+In the app the mark follows the theme (`markTreatment` in `packages/shared/src/themes/brand.ts`). Matrix, Synthwave, Seventies, Newsprint and Oxblood draw their themed finish, accent included: banded, sliced, a triple-stripe echo, an off-register red plate, and a gilt bookplate. Every other theme draws the plain mark in its text colour. Files outside the app (the icons, splash and `logo.png` above) keep two treatments only: ink on paper or transparent, paper on the dark `bg`. `frontend/public/Gemini_Generated_Image_....jfif` is an unrelated AI-test image, not a brand asset.
 
 ## Components
 

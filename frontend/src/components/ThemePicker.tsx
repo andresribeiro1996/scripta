@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { THEME_IDS, themes, type ThemeColors, type ThemePreference } from "@scripta/shared/themes";
 import { isAppearanceSyncFailure, saveAccountAppearance } from "../api/appearance";
-import { applyThemePreference, useThemePreference } from "../lib/theme";
+import { fadeToThemePreference, useThemePreference } from "../lib/theme";
 
 const OPTIONS: ThemePreference[] = ["system", ...THEME_IDS];
 
@@ -22,7 +22,7 @@ export function ThemePicker() {
   const [error, setError] = useState<string | null>(null);
 
   async function choose(preference: ThemePreference) {
-    applyThemePreference(preference);
+    fadeToThemePreference(preference);
     setError(null);
     try {
       await saveAccountAppearance({ theme: preference });

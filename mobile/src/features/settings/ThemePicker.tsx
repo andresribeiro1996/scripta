@@ -24,7 +24,7 @@ export function ThemePicker() {
   const [error, setError] = useState<string | null>(null);
 
   function choose(next: ThemePreference) {
-    setPreference(next);
+    setPreference(next, { fade: true });
     setError(null);
     saveAccountAppearance({ theme: next }).catch((err: unknown) => {
       if (!isAppearanceSyncFailure(err)) throw err;
