@@ -44,7 +44,7 @@ export function OwnLibraryPane() {
               style={styles.grow}
               icon="search"
               accessibilityLabel="Search your books"
-              placeholder="Search your books"
+              placeholder="Search books"
               autoCapitalize="none"
               autoCorrect={false}
               clearButtonMode="while-editing"

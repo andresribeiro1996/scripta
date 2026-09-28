@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { errorHaptic, successHaptic } from "./haptics";
 import { fontStyleFor } from "./fontStyle";
 import { revealOffset } from "./keyboardScroll";
+import { SYSTEM_FAMILY } from "./systemFont";
 import { dynamicType, minimumTouchTarget, radii, spacing, typography, useReducedMotion, useTheme } from "./theme";
 import { THEME_DECOR, withOpacity, type ThemeId } from "@scripta/shared/themes";
 import { decorLayerStyle, pieceStyle } from "./decorLayout";
@@ -297,7 +298,7 @@ export function Input({
           icon ? { paddingLeft: minimumTouchTarget } : null,
           secureTextEntry ? { paddingRight: minimumTouchTarget + spacing.sm } : null,
           style,
-          fontStyleFor(fonts.text, "text", { fontSize: typography.input.fontSize }) ?? null,
+          fontStyleFor(fonts.text, "text", { fontSize: typography.input.fontSize }) ?? { fontFamily: SYSTEM_FAMILY },
         ]}
       />
       {secureTextEntry && <Pressable accessibilityRole="button" accessibilityLabel={visible ? "Hide password" : "Show password"} accessibilityState={{ disabled: !editable }}
