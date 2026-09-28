@@ -13,15 +13,12 @@
         try {
           stored = localStorage.getItem("theme");
         } catch (err) {}
-        var query = matchMedia("(prefers-color-scheme: dark)");
-        if (stored === "light" || stored === "dark") {
-          document.documentElement.dataset.theme = stored;
-        } else {
-          document.documentElement.dataset.theme = query.matches ? "dark" : "light";
-          query.addEventListener("change", function (e) {
-            document.documentElement.dataset.theme = e.matches ? "dark" : "light";
-          });
-        }
+        document.documentElement.dataset.theme =
+          stored === "light" || stored === "dark"
+            ? stored
+            : matchMedia("(prefers-color-scheme: dark)").matches
+              ? "dark"
+              : "light";
       })();
     </script>
   </head>
