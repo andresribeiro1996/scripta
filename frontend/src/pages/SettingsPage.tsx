@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
 import { Avatar } from "../components/Avatar";
 import { SocialsSection } from "../components/SocialsSection";
+import { ThemePicker } from "../components/ThemePicker";
 
 export function SettingsPage() {
   const { session, setUsername, uploadAvatar, removeAvatar } = useAuth();
@@ -65,6 +66,11 @@ export function SettingsPage() {
       <h2 className="mb-6 text-lg font-bold">Settings</h2>
 
       <section className="rounded-xl border border-(--color-border) bg-(--color-surface) p-5">
+        <h3 className="mb-4 text-sm font-semibold">Appearance</h3>
+        <ThemePicker />
+      </section>
+
+      <section className="mt-5 rounded-xl border border-(--color-border) bg-(--color-surface) p-5">
         <h3 className="mb-4 text-sm font-semibold">Account</h3>
 
         {session && (
