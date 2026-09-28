@@ -43,7 +43,8 @@ export function ThemePicker() {
               name="theme"
               value={option}
               checked={selected === option}
-              onChange={() => void choose(option)}
+              onClick={() => void choose(option)}
+              readOnly
               className="peer sr-only"
             />
             <div className="flex h-16 overflow-hidden rounded-lg border border-(--color-border) peer-checked:ring-2 peer-checked:ring-(--color-accent) peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-(--color-accent)">
