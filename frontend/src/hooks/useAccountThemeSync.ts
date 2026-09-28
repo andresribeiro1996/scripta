@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { reconcileThemePreference } from "@scripta/shared/themes";
 import { fetchAccountTheme, isThemeSyncFailure, saveAccountTheme } from "../api/theme";
-import { applyThemePreference, readThemePreference } from "../lib/theme";
+import { applyThemePreference, followThemePreferenceFromOtherTabs, readThemePreference } from "../lib/theme";
 
 async function syncOnce(): Promise<void> {
   const { apply, upload } = reconcileThemePreference(await fetchAccountTheme(), readThemePreference());
@@ -21,6 +21,10 @@ export function useAccountThemeSync(): void {
     }
     run();
     document.addEventListener("visibilitychange", onVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+    const stopFollowing = followThemePreferenceFromOtherTabs();
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      stopFollowing();
+    };
   }, []);
 }

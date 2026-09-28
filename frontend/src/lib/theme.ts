@@ -35,3 +35,11 @@ function subscribe(onChange: () => void): () => void {
 export function useThemePreference(): ThemePreference {
   return useSyncExternalStore(subscribe, readThemePreference);
 }
+
+export function followThemePreferenceFromOtherTabs(): () => void {
+  function onStorage(event: StorageEvent) {
+    if (event.key === STORAGE_KEY) applyThemePreference(readThemePreference());
+  }
+  window.addEventListener("storage", onStorage);
+  return () => window.removeEventListener("storage", onStorage);
+}
