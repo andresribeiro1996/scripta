@@ -30,6 +30,6 @@ test("display fonts use their heading weight and scale size and line height", ()
   assert.deepEqual(fontStyleFor("playfair", "display", { fontSize: 24, lineHeight: 30, fontWeight: "700" }), { fontFamily: "playfair-700", fontWeight: "normal" });
   assert.deepEqual(fontStyleFor("literata", "display", { fontSize: 18 }), { fontFamily: "literata-700", fontWeight: "normal" });
   assert.deepEqual(fontStyleFor("vt323", "display", { fontSize: 24, lineHeight: 30 }), { fontFamily: "vt323-400", fontWeight: "normal", fontSize: 31, lineHeight: 39 });
-  assert.deepEqual(fontStyleFor("pressStart", "display", {}), { fontFamily: "pressStart-400", fontWeight: "normal", fontSize: 10 });
+  assert.deepEqual(fontStyleFor("orbitron", "display", {}), { fontFamily: "orbitron-700", fontWeight: "normal", fontSize: 12 });
   assert.deepEqual(fontStyleFor("cormorant", "display", { fontSize: 24 }), { fontFamily: "cormorant-600", fontWeight: "normal", fontSize: 27 });
 });

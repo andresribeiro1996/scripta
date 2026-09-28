@@ -78,24 +78,6 @@
 }
 
 @font-face {
-  font-family: "Press Start 2P";
-  src: url("/fonts/pressStart-400.woff2") format("woff2");
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-  size-adjust: 72%;
-}
-
-@font-face {
-  font-family: "Monoton";
-  src: url("/fonts/monoton-400.woff2") format("woff2");
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-  size-adjust: 85%;
-}
-
-@font-face {
   font-family: "Atkinson Hyperlegible";
   src: url("/fonts/atkinson-400.woff2") format("woff2");
   font-weight: 400;
@@ -452,14 +434,6 @@
 
 :root[data-font-display="righteous"] {
   --font-display: "Righteous", sans-serif;
-}
-
-:root[data-font-display="pressStart"] {
-  --font-display: "Press Start 2P", ui-monospace, monospace;
-}
-
-:root[data-font-display="monoton"] {
-  --font-display: "Monoton", sans-serif;
 }
 
 :root[data-font-text="system"] {

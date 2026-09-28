@@ -8,8 +8,6 @@ export const FONT_ASSETS: Record<string, number> = {
   "vt323-400": require("../../assets/fonts/vt323-400.ttf"),
   "orbitron-700": require("../../assets/fonts/orbitron-700.ttf"),
   "righteous-400": require("../../assets/fonts/righteous-400.ttf"),
-  "pressStart-400": require("../../assets/fonts/pressStart-400.ttf"),
-  "monoton-400": require("../../assets/fonts/monoton-400.ttf"),
   "atkinson-400": require("../../assets/fonts/atkinson-400.ttf"),
   "atkinson-700": require("../../assets/fonts/atkinson-700.ttf"),
   "jetbrainsMono-400": require("../../assets/fonts/jetbrainsMono-400.ttf"),

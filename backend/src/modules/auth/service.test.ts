@@ -432,8 +432,8 @@ test("getAppearance is all null until something is saved, and setAppearance upda
   assert.deepEqual(service.getAppearance(row.id), { theme: null, displayFont: null, textFont: null });
   service.setAppearance(row.id, { theme: "oxblood" });
   assert.deepEqual(service.getAppearance(row.id), { theme: "oxblood", displayFont: null, textFont: null });
-  service.setAppearance(row.id, { displayFont: "monoton", textFont: "theme" });
-  assert.deepEqual(service.getAppearance(row.id), { theme: "oxblood", displayFont: "monoton", textFont: "theme" });
+  service.setAppearance(row.id, { displayFont: "righteous", textFont: "theme" });
+  assert.deepEqual(service.getAppearance(row.id), { theme: "oxblood", displayFont: "righteous", textFont: "theme" });
 });
 
 test("getAppearance reads stored values this server no longer knows as the defaults", () => {

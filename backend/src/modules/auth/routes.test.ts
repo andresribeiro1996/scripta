@@ -180,9 +180,9 @@ test("a partial PUT round-trips one field without touching the others", async ()
   const stored = new Map<string, AccountAppearance>();
   const service = appearanceService(stored);
   assert.equal((await callAppearanceRoute(service, { method: "PUT", url: "/auth/appearance", payload: { theme: "matrix" } }, "valid-token")).status, 204);
-  assert.equal((await callAppearanceRoute(service, { method: "PUT", url: "/auth/appearance", payload: { displayFont: "pressStart" } }, "valid-token")).status, 204);
+  assert.equal((await callAppearanceRoute(service, { method: "PUT", url: "/auth/appearance", payload: { displayFont: "righteous" } }, "valid-token")).status, 204);
   const { body } = await callAppearanceRoute(service, { method: "GET", url: "/auth/appearance" }, "valid-token");
-  assert.deepEqual(body, { theme: "matrix", displayFont: "pressStart", textFont: null });
+  assert.deepEqual(body, { theme: "matrix", displayFont: "righteous", textFont: null });
 });
 
 test("PUT /auth/appearance rejects empty, unknown and slot-ineligible values", async () => {

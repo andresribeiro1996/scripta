@@ -18,7 +18,7 @@ test("the catalog lists every font once and FONT_IDS matches its keys", () => {
 });
 
 test("picker lists are in the designed order and only hold fonts allowed in that slot", () => {
-  assert.deepEqual(DISPLAY_FONT_IDS, ["system", "playfair", "literata", "fraunces", "cormorant", "specialElite", "vt323", "orbitron", "righteous", "pressStart", "monoton"]);
+  assert.deepEqual(DISPLAY_FONT_IDS, ["system", "playfair", "literata", "fraunces", "cormorant", "specialElite", "vt323", "orbitron", "righteous"]);
   assert.deepEqual(TEXT_FONT_IDS, ["system", "literata", "atkinson", "jetbrainsMono"]);
   for (const id of DISPLAY_FONT_IDS) assert.ok(fonts[id].slots.includes("display"), id);
   for (const id of TEXT_FONT_IDS) assert.ok(fonts[id].slots.includes("text"), id);
@@ -48,11 +48,11 @@ test("every theme's default fonts exist and are allowed in their slot", () => {
   }
 });
 
-test("Press Start 2P and Monoton are override-only", () => {
-  for (const id of THEME_IDS) {
-    assert.notEqual(themes[id].fonts.display, "pressStart");
-    assert.notEqual(themes[id].fonts.display, "monoton");
-  }
+test("Press Start 2P and Monoton were removed and fall back to theme", () => {
+  assert.ok(!FONT_IDS.includes("pressStart" as FontId));
+  assert.ok(!FONT_IDS.includes("monoton" as FontId));
+  assert.equal(parseFontPreference("display", "pressStart"), "theme");
+  assert.equal(parseFontPreference("display", "monoton"), "theme");
 });
 
 test("fontStack puts the quoted family first; fontFileName joins id and weight", () => {
@@ -74,12 +74,12 @@ test("parseAccountAppearance keeps null as never-chosen and normalises unknown v
   assert.deepEqual(parseAccountAppearance({}), { theme: null, displayFont: null, textFont: null });
   assert.deepEqual(parseAccountAppearance(null), { theme: null, displayFont: null, textFont: null });
   assert.deepEqual(parseAccountAppearance({ theme: "vaporwave", displayFont: "comic", textFont: "vt323" }), { theme: "system", displayFont: "theme", textFont: "theme" });
-  assert.deepEqual(parseAccountAppearance({ theme: "matrix", displayFont: "monoton", textFont: "atkinson" }), { theme: "matrix", displayFont: "monoton", textFont: "atkinson" });
+  assert.deepEqual(parseAccountAppearance({ theme: "matrix", displayFont: "righteous", textFont: "atkinson" }), { theme: "matrix", displayFont: "righteous", textFont: "atkinson" });
 });
 
 test("resolveFonts uses the theme default for theme, keeps an allowed override, and ignores an ineligible one", () => {
   assert.deepEqual(resolveFonts("matrix", "theme", "theme"), { display: "vt323", text: "jetbrainsMono" });
-  assert.deepEqual(resolveFonts("sepia", "pressStart", "atkinson"), { display: "pressStart", text: "atkinson" });
+  assert.deepEqual(resolveFonts("sepia", "righteous", "atkinson"), { display: "righteous", text: "atkinson" });
   assert.deepEqual(resolveFonts("light", "theme", "vt323" as FontPreference), { display: "playfair", text: "system" });
   assert.deepEqual(resolveFonts("oxblood", "atkinson" as FontPreference, "theme"), { display: "cormorant", text: "literata" });
 });

@@ -59,12 +59,10 @@ fallback for system); `fontFileName(id, weight)` is `<id>-<weight>`.
 | `vt323` | VT323 | display | 400 | 1.3 | `ui-monospace, monospace` |
 | `orbitron` | Orbitron | display | 700 | 0.88 | `sans-serif` |
 | `righteous` | Righteous | display | 400 | 1 | `sans-serif` |
-| `pressStart` | Press Start 2P | display | 400 | 0.72 | `ui-monospace, monospace` |
-| `monoton` | Monoton | display | 400 | 0.85 | `sans-serif` |
 | `atkinson` | Atkinson Hyperlegible | text | 400, 700 | 1 | `sans-serif` |
 | `jetbrainsMono` | JetBrains Mono | text | 400, 700 | 1 | `ui-monospace, monospace` |
 
-- `DISPLAY_FONT_IDS` (picker order): `system, playfair, literata, fraunces, cormorant, specialElite, vt323, orbitron, righteous, pressStart, monoton`.
+- `DISPLAY_FONT_IDS` (picker order): `system, playfair, literata, fraunces, cormorant, specialElite, vt323, orbitron, righteous`.
 - `TEXT_FONT_IDS` (picker order): `system, literata, atkinson, jetbrainsMono`.
 - Scales are starting values; the verification pass may tune them (a scale
   change is a one-line registry edit). `playfair` and `jetbrainsMono` stay at
@@ -89,7 +87,7 @@ fallback for system); `fontFileName(id, weight)` is `<id>-<weight>`.
 | newsprint | specialElite | literata |
 | oxblood | cormorant | literata |
 
-`pressStart` and `monoton` are override-only.
+`pressStart` (Press Start 2P) and `monoton` (Monoton) were removed after the device pass: too heavy at heading sizes for a clean UI.
 
 ### Preferences
 
@@ -228,7 +226,7 @@ fallback for system); `fontFileName(id, weight)` is `<id>-<weight>`.
   explicit family untouched by the wrapper's contract, scale rounding);
   typecheck/test; a guard test that no file under `mobile/src` imports `Text`
   from `"react-native"` except `ui/Text.tsx`.
-- **Manual**: browser pass (Matrix, Oxblood, Press Start 2P override,
+- **Manual**: browser pass (Matrix, Oxblood, Righteous override,
   cross-tab), emulator pass (same three plus a cold start), both only after
   checking the lease per AGENTS.md.
 
@@ -246,4 +244,4 @@ with a plain user agent (static instances per weight, including variable
 families — if the API returns only a variable file for some family, the
 static instance is cut with fontTools' `instancer` instead), licences from
 `github.com/google/fonts/ofl/<family>/OFL.txt`.
-About 30 files, ~2 MB total. Downloading needs the user's explicit go-ahead.
+13 font files per platform, ~2 MB total. Downloading needs the user's explicit go-ahead.

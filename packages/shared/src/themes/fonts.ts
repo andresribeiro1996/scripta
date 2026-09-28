@@ -15,7 +15,7 @@ const SERIF = "ui-serif, Georgia, serif";
 const MONO = "ui-monospace, monospace";
 const SANS = "sans-serif";
 
-export const FONT_IDS = ["system", "playfair", "literata", "fraunces", "cormorant", "specialElite", "vt323", "orbitron", "righteous", "pressStart", "monoton", "atkinson", "jetbrainsMono"] as const;
+export const FONT_IDS = ["system", "playfair", "literata", "fraunces", "cormorant", "specialElite", "vt323", "orbitron", "righteous", "atkinson", "jetbrainsMono"] as const;
 
 export type FontId = (typeof FONT_IDS)[number];
 
@@ -29,13 +29,11 @@ export const fonts: Record<FontId, FontDefinition> = {
   vt323: { label: "VT323", family: "VT323", slots: ["display"], weights: [400], scale: 1.3, fallback: MONO },
   orbitron: { label: "Orbitron", family: "Orbitron", slots: ["display"], weights: [700], scale: 0.88, fallback: SANS },
   righteous: { label: "Righteous", family: "Righteous", slots: ["display"], weights: [400], scale: 1, fallback: SANS },
-  pressStart: { label: "Press Start 2P", family: "Press Start 2P", slots: ["display"], weights: [400], scale: 0.72, fallback: MONO },
-  monoton: { label: "Monoton", family: "Monoton", slots: ["display"], weights: [400], scale: 0.85, fallback: SANS },
   atkinson: { label: "Atkinson Hyperlegible", family: "Atkinson Hyperlegible", slots: ["text"], weights: [400, 700], scale: 1, fallback: SANS },
   jetbrainsMono: { label: "JetBrains Mono", family: "JetBrains Mono", slots: ["text"], weights: [400, 700], scale: 1, fallback: MONO },
 };
 
-export const DISPLAY_FONT_IDS = ["system", "playfair", "literata", "fraunces", "cormorant", "specialElite", "vt323", "orbitron", "righteous", "pressStart", "monoton"] as const satisfies readonly FontId[];
+export const DISPLAY_FONT_IDS = ["system", "playfair", "literata", "fraunces", "cormorant", "specialElite", "vt323", "orbitron", "righteous"] as const satisfies readonly FontId[];
 
 export const TEXT_FONT_IDS = ["system", "literata", "atkinson", "jetbrainsMono"] as const satisfies readonly FontId[];
 
