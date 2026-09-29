@@ -86,9 +86,9 @@ export function buildMuralPreset(id: MuralPresetId, books: Book[], groups: Group
     const hasCard = readerIdentity(library, groups).state === "settled";
     let statsY: number;
     if (hasCard) {
-      blocks.push({ ...at(0, profileBottom, 6, 7), type: "readerCard" });
-      blocks.push({ ...at(6, profileBottom, 6, 7), type: "stats", metrics: ["totalBooks", "booksFinished", "booksInProgress"] });
-      statsY = profileBottom + 7;
+      blocks.push({ ...at(0, profileBottom, 6, 6), type: "readerCard" });
+      blocks.push({ ...at(6, profileBottom, 6, 6), type: "stats", metrics: ["totalBooks", "booksFinished", "booksInProgress"] });
+      statsY = profileBottom + 6;
     } else {
       blocks.push({ ...at(0, profileBottom, 12, 4), type: "stats", metrics: ["totalBooks", "booksFinished", "booksInProgress"] });
       statsY = profileBottom + 4;

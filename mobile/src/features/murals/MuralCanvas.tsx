@@ -302,7 +302,7 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThe
 
 const styles = StyleSheet.create({
   canvas: { position: "relative", width: "100%" },
-  block: { position: "absolute", overflow: "hidden", padding: spacing.lg },
+  block: { position: "absolute", overflow: "hidden", padding: spacing.md },
   blockPress: { flex: 1, minHeight: minimumTouchTarget },
   blockBody: { flex: 1, gap: spacing.sm },
   emptyBlock: { flex: 1, minHeight: 0, alignItems: "center", justifyContent: "center" },
