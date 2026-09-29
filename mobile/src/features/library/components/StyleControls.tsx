@@ -102,7 +102,7 @@ export function SelectRow<V extends string>({
   onChange,
 }: {
   label: string;
-  value: V;
+  value: V | null;
   options: Array<{ value: V; label: string }>;
   onChange: (value: V) => void;
 }) {
@@ -134,7 +134,7 @@ export function SelectRow<V extends string>({
   );
 }
 
-const SWATCHES = ["#ffffff", "#141210", "#a85c32", "#47713c", "#3b5b8c", "#8c3b5b", "#b3432f", "#e0c060"];
+export const SWATCHES = ["#ffffff", "#141210", "#a85c32", "#47713c", "#3b5b8c", "#8c3b5b", "#b3432f", "#e0c060"];
 
 export function ColorSwatchRow({
   label,

@@ -4,6 +4,8 @@ import {
   bookKey,
   createBlockCandidate,
   createDuplicateCandidate,
+  resolveBlockStyle,
+  type BlockStyle,
   type BlockType,
   type Mural,
   type MuralBlock,
@@ -24,6 +26,7 @@ import { ContentTab, hasContentFields, type PickerKind } from "./ContentTab";
 import { LayoutTab } from "./LayoutTab";
 import { BlockPreview, MuralCanvas } from "./MuralCanvas";
 import { MuralShareSheet } from "./MuralShareSheet";
+import { StyleTab } from "./StyleTab";
 import { fetchMural, shareMural, unshareMural, updateMural } from "./api";
 import { MURALS_QUERY_KEY } from "./useMurals";
 import { useAuth } from "../../core/auth";
@@ -45,6 +48,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
   const [blocks, setBlocks] = useState<MuralBlock[] | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sheetTab, setSheetTab] = useState<SheetTab | null>(null);
+  const [copiedStyle, setCopiedStyle] = useState<BlockStyle | null>(null);
   const [adding, setAdding] = useState(false);
   const [picking, setPicking] = useState<PickerKind | null>(null);
   const [search, setSearch] = useState("");
@@ -118,6 +122,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
   const blockActions: BlockAction[] = selected ? [
     { key: "done", label: "Done", icon: "confirm", onPress: () => setSelectedId(null) },
     ...(hasContentFields(selected.type) ? [{ key: "edit", label: "Edit", icon: "edit" as const, onPress: () => setSheetTab("content") }] : []),
+    { key: "style", label: "Style", icon: "style", onPress: () => setSheetTab("style") },
     { key: "size", label: "Size", icon: "resize", onPress: () => setSheetTab("layout") },
     { key: "copy", label: "Copy", icon: "duplicate", onPress: () => { const copy = createDuplicateCandidate(selected, currentBlocks); setBlocks([...currentBlocks, copy]); setSelectedId(copy.id); } },
     { key: "delete", label: "Delete", icon: "delete", tone: "danger", onPress: () => { setBlocks(currentBlocks.filter((block) => block.id !== selected.id)); setSelectedId(null); } },
@@ -168,7 +173,14 @@ export function MuralEditorScreen({ id }: { id: string }) {
         onClose={() => setSheetTab(null)}
         preview={selected ? <BlockPreview block={selected} canvasWidth={windowWidth - spacing.sm * 2} maxHeight={200} books={books} images={gallery.data ?? []} tierlists={tierlists.data ?? []} profile={profile} groups={groups} /> : null}
         content={selected && hasContentFields(selected.type) ? <ContentTab block={selected} books={books} groups={groups} images={gallery.data ?? []} tierlists={tierlists.data ?? []} update={updateSelected} onPick={setPicking} /> : null}
-        style={null}
+        style={selected ? <StyleTab
+          style={resolveBlockStyle(selected.style)}
+          onChange={(style) => updateSelected((block) => ({ ...block, style }))}
+          onReset={() => updateSelected((block) => { const next = { ...block }; delete next.style; return next; })}
+          onCopy={() => setCopiedStyle(resolveBlockStyle(selected.style))}
+          onPaste={() => { if (copiedStyle) updateSelected((block) => ({ ...block, style: copiedStyle })); }}
+          canPaste={copiedStyle !== null}
+        /> : null}
         layout={selected ? <LayoutTab block={selected} blocks={currentBlocks} onChange={(patch) => setBlocks(changeBlockLayout(currentBlocks, selected.id, patch))} /> : null}
       />
       <Sheet visible={picking !== null} title={quoteBook ? "Choose a passage" : `Choose ${picking ?? "content"}`} onClose={() => { setPicking(null); setQuoteBook(null); }}>
