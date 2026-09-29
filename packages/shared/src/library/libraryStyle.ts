@@ -375,6 +375,21 @@ export const BLOCK_FONT_FAMILY_OPTIONS: Array<{ value: BlockFontFamily; label: s
 
 export const BLOCK_FONT_SIZE_RANGE = { min: 10, max: 24, step: 1 };
 
+export type BlockTextAlign = "left" | "center" | "right";
+export type BlockInnerSpacing = "tight" | "normal" | "roomy";
+
+export const BLOCK_TEXT_ALIGN_OPTIONS: Array<{ value: BlockTextAlign; label: string }> = [
+  { value: "left", label: "Left" },
+  { value: "center", label: "Center" },
+  { value: "right", label: "Right" }
+];
+
+export const BLOCK_INNER_SPACING_OPTIONS: Array<{ value: BlockInnerSpacing; label: string }> = [
+  { value: "tight", label: "Tight" },
+  { value: "normal", label: "Normal" },
+  { value: "roomy", label: "Roomy" }
+];
+
 /** A FULLY INDEPENDENT type — deliberately NOT `Omit<PerCardStyle, ...> &
  *  {...}` (an earlier version of this file did derive it that way, and it
  *  was a real bug waiting to happen: the moment PerCardStyle grew its own
@@ -438,6 +453,8 @@ export type BlockStyle = {
   cardOpacity: number;
   cardShadow: boolean;
   cardHoverEffect: boolean;
+  textAlign: BlockTextAlign;
+  innerSpacing: BlockInnerSpacing;
 };
 
 export const DEFAULT_BLOCK_STYLE: BlockStyle = {
@@ -456,7 +473,9 @@ export const DEFAULT_BLOCK_STYLE: BlockStyle = {
   cardBorderSides: DEFAULT_BORDER_SIDES,
   cardOpacity: 100,
   cardShadow: true, // matches the old hardcoded `shadow-sm`
-  cardHoverEffect: false // a mural block isn't a clickable navigational element the way a BookCard is — off by default, unlike PerCardStyle's
+  cardHoverEffect: false, // a mural block isn't a clickable navigational element the way a BookCard is — off by default, unlike PerCardStyle's
+  textAlign: "left",
+  innerSpacing: "normal"
 };
 
 /** Same "fill in whatever's missing" reasoning as resolvePerCardStyle(). */

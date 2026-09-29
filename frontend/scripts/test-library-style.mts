@@ -187,6 +187,8 @@ console.log("\n8. BlockStyle — resolveBlockStyle fills in defaults, doesn't ca
   const partial = resolveBlockStyle({ cardRadius: 4 });
   check("a partial override fills in everything else from the default", partial.cardRadius === 4 && partial.cardShadow === DEFAULT_BLOCK_STYLE.cardShadow);
   check("backgroundColor defaults to null (theme surface)", resolveBlockStyle(undefined).backgroundColor === null);
+  check("textAlign defaults to left and innerSpacing to normal (today's rendering)", DEFAULT_BLOCK_STYLE.textAlign === "left" && DEFAULT_BLOCK_STYLE.innerSpacing === "normal");
+  check("a style saved before textAlign/innerSpacing existed resolves to today's rendering", resolveBlockStyle({ cardRadius: 4 }).textAlign === "left" && resolveBlockStyle({ cardRadius: 4 }).innerSpacing === "normal");
   check(
     "PerCardStyle's cover-only fields (cardAspectRatio/overlayIntensity/showTitleAuthor) aren't part of BlockStyle at all",
     !("cardAspectRatio" in resolved) && !("overlayIntensity" in resolved) && !("showTitleAuthor" in resolved)
