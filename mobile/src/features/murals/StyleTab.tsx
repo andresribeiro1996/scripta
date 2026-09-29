@@ -118,9 +118,9 @@ export function StyleTab({ style, onChange, onReset, onCopy, onPaste, canPaste }
       <ColorRow label="Background" value={style.backgroundColor} defaults={[{ label: "None", value: "transparent" }, { label: "Theme", value: null }]} themeKeys={BACKGROUND_THEME_SWATCHES} fixed={BACKGROUND_FIXED_SWATCHES} onChange={(backgroundColor) => set(backgroundColor === "transparent" ? { backgroundColor, cardShadow: false } : { backgroundColor })} />
       <Group title="Corners">
         <View style={styles.wrap}>
-          {CORNER_PRESETS.map((preset) => (
-            <Tile key={preset.key} label={preset.label} selected={style.cardRadius === preset.value} onPress={() => set({ cardRadius: preset.value })}>
-              <View style={[styles.corner, { borderColor: colors.text, borderTopLeftRadius: preset.value }]} />
+          {CORNER_PRESETS.map(({ key, label, value: radius }) => (
+            <Tile key={key} label={label} selected={style.cardRadius === radius} onPress={() => set({ cardRadius: radius })}>
+              <View style={[styles.corner, { borderColor: colors.text, borderTopLeftRadius: radius }]} />
             </Tile>
           ))}
         </View>
@@ -146,11 +146,11 @@ export function StyleTab({ style, onChange, onReset, onCopy, onPaste, canPaste }
           <PresetRow label="Strength" presets={BORDER_STRENGTH_PRESETS} value={style.cardBorderOpacity} onChange={(cardBorderOpacity) => set({ cardBorderOpacity })} />
           <Text style={[typography.body, styles.rowLabel, { color: colors.text }]}>Sides</Text>
           <View style={styles.wrap}>
-            {BORDER_SIDE_PRESETS.map((preset) => {
+            {BORDER_SIDE_PRESETS.map(({ key, label, value: sides }) => {
               const edge = (on: boolean) => (on ? colors.text : colors.border);
               return (
-                <Tile key={preset.key} label={preset.label} selected={matchSides(style.cardBorderSides) === preset.key} onPress={() => set({ cardBorderSides: preset.value })}>
-                  <View style={[styles.sides, { borderTopColor: edge(preset.value.top), borderRightColor: edge(preset.value.right), borderBottomColor: edge(preset.value.bottom), borderLeftColor: edge(preset.value.left) }]} />
+                <Tile key={key} label={label} selected={matchSides(style.cardBorderSides) === key} onPress={() => set({ cardBorderSides: sides })}>
+                  <View style={[styles.sides, { borderTopColor: edge(sides.top), borderRightColor: edge(sides.right), borderBottomColor: edge(sides.bottom), borderLeftColor: edge(sides.left) }]} />
                 </Tile>
               );
             })}
