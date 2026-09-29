@@ -91,6 +91,7 @@ function EmptyBlock({ message, style }: { message: string; style: StyleProp<Text
 export function BlockContent({ block, books, images, tierlists, profile, groups, shelfThemeOverride, readerCardOverride, statsOverride, editable, onAssetReady }: { block: MuralBlock; books: Array<Record<string, unknown>>; images: GalleryImage[]; tierlists: Tierlist[]; profile?: ReaderProfile; groups?: Group[]; shelfThemeOverride?: ShelfTheme; readerCardOverride?: PublicReaderCard; statsOverride?: Record<string, number>; editable?: boolean; onAssetReady?: (key: string) => void }) {
   const { colors: themeColors } = useTheme();
   const [failedSource, setFailedSource] = useState<string | null>(null);
+  const [readingHeight, setReadingHeight] = useState(0);
   const style = resolveBlockStyle(block.style);
   const blockColors = blockTextColors(style, themeColors);
   const colors = { ...themeColors, text: blockColors.text };
@@ -114,9 +115,9 @@ export function BlockContent({ block, books, images, tierlists, profile, groups,
   if (block.type === "currentlyReading") {
     const reading = books.filter((book) => book.ReadStatus === 1);
     return <>{eyebrow("Currently reading", reading.length)}
-      {reading.length ? <ScrollView horizontal scrollEnabled={!editable} showsHorizontalScrollIndicator={false} style={styles.readingScroll} contentContainerStyle={styles.readingRow}>{reading.map((book) => {
+      {reading.length ? <ScrollView horizontal scrollEnabled={!editable} showsHorizontalScrollIndicator={false} onLayout={(event) => setReadingHeight(event.nativeEvent.layout.height)} style={styles.readingScroll} contentContainerStyle={styles.readingRow}>{reading.map((book) => {
         const percent = readingPercent(book);
-        return <View key={bookKey(book)} style={styles.readingTile}>
+        return <View key={bookKey(book)} style={[styles.readingTile, readingHeight > 0 && { height: readingHeight }]}>
           <View accessible accessibilityRole="image" accessibilityLabel={title(book)} style={[styles.bookCover, styles.readingCover]}><CoverImage book={book} contentFit="contain" onLoadEnd={onAssetReady ? () => onAssetReady(`cover:${block.id}:${bookKey(book)}:${String(book._coverUrl ?? "")}`) : undefined} /></View>
           <View style={styles.readingFooter}>
             <View style={[styles.readingTrack, percent !== null && { backgroundColor: colors.border }]}>{percent ? <View style={[styles.readingFill, { width: `${percent}%`, backgroundColor: colors.accent }]} /> : null}</View>
@@ -252,7 +253,7 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThe
   });
   const imageReady = width > 0 && assetKeys.every((key) => readyAssets.has(key));
   useEffect(() => { onImageReadyChange?.(imageReady); }, [imageReady, onImageReadyChange]);
-  const columnWidth = width / GRID_COLUMNS;
+  const columnWidth = (width + GAP) / GRID_COLUMNS;
   const height = muralCanvasHeight(mural.blocks, ROW_HEIGHT, onImageReadyChange && mural.blocks.length ? 0 : undefined);
   return (
     <View onLayout={(event) => setWidth(event.nativeEvent.layout.width)} style={[styles.canvas, { height, backgroundColor: colors.background }]}>
