@@ -103,7 +103,7 @@ export function MyShelfScreen() {
 
   if (own.isPending) {
     return (
-      <Screen bottom top={false}>
+      <Screen top={false}>
         <Stack.Screen options={{ headerShown: true, title: "My shelf" }} />
         <View style={styles.tabPad}><Skeleton height={180} /></View>
       </Screen>
@@ -112,7 +112,7 @@ export function MyShelfScreen() {
 
   if (own.isError) {
     return (
-      <Screen bottom top={false}>
+      <Screen top={false}>
         <Stack.Screen options={{ headerShown: true, title: "My shelf" }} />
         <ErrorState title="Shelf unavailable" body="Couldn't load your shelf." actionLabel="Retry" onAction={() => void own.refetch()} />
       </Screen>
@@ -185,7 +185,7 @@ export function MyShelfScreen() {
   );
 
   return (
-    <Screen bottom top={false}>
+    <Screen top={false}>
       <Stack.Screen options={{ headerShown: true, title: "My shelf", headerRight }} />
       {error ? <Toast visible message={error} tone="error" /> : null}
       <SwipeableTabs
