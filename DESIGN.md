@@ -121,7 +121,7 @@ Full guidelines, states and prop shapes live in the artifact's per-component REA
 ### Core controls (`mobile/src/ui/components.tsx`; web composes the same tokens ad hoc per call site, no shared primitives)
 
 - **Button** — variants `primary` (filled `accent`/`on-accent`) / `secondary` (`surface` + `border`, hover → `surface-hover`) / `destructive` (filled `danger`/`on-danger`). 44px min-height, `radius-md`, `body-strong` label. `disabled` → 0.55 opacity; `loading` → spinner replaces label. One primary button per screen.
-- **IconButton** — glyph-only (44×44, `radius-full`) or glyph+label (pill). `tone: default | danger`. Always set `accessibilityLabel`.
+- **IconButton** — glyph-only (44×44, `radius-full`) or glyph+label (pill). `tone: default | danger | accent` (accent = filled `accent`/`on-accent`, pressed `accent-soft`). Always set `accessibilityLabel`.
 - **Input** — label (`body-strong`) + field (`surface`, `radius-md`, `input` text) + hint/error (`caption`). Border: `border` default → `accent` focused → `danger` on error (error wins). Optional leading icon and password show/hide toggle, each reserving 44px.
 - **Toast** — `default` (`surface`/`border`) / `success` (mobile only) / `error` (`danger-soft`/`danger`). `radius-md`, `shadow-overlay` on web. One at a time, replaces not stacks.
 - **EmptyState** — shared shape for "nothing here" (neutral) and "error" (`danger-soft` card, `radius-lg`). Centered column, optional primary-button action.
@@ -150,6 +150,7 @@ Full guidelines, states and prop shapes live in the artifact's per-component REA
 - A header carries the back chevron, the title, at most **two** labelled actions and the `⋯` overflow menu — everything else belongs in the menu or in screen content.
 - Every header action is an **`IconButton` with `label` + `framed`** (icon + word in a drawn 44pt target), so the visible target matches the touch target — a bare glyph reads smaller than its hit area and people aim at the ink. The `⋯` menu trigger stays glyph-only (platform convention).
 - Creation stays on **FABs** (thumb zone), not the header; header buttons navigate (`Browse`, `Library`) or open modals (`Add`, `Upload`, `Save`).
+- The mural editor shows its name as the page title (tap to rename) and Save as a glyph-only state button — accent while there are unsaved changes, plain when saved — because an editor's title can't share a narrow header with its actions.
 - A screen's primary social action (Follow) is a full-width `Button` in the profile content, never a header pill.
 
 ### Gesture components (mobile only — Reanimated + haptics, not reproducible in a static doc)

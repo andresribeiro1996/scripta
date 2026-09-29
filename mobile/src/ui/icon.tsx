@@ -28,6 +28,7 @@ const GLYPHS = {
   settings: { ios: "gearshape", android: "settings" },
   add: { ios: "plus", android: "add" },
   confirm: { ios: "checkmark", android: "check" },
+  edit: { ios: "pencil", android: "edit" },
   // Vertical on Android: a toolbar or row overflow is drawn that way there,
   // so it's where the thumb already goes. iOS spells the same thing sideways.
   more: { ios: "ellipsis", android: "more_vert" },

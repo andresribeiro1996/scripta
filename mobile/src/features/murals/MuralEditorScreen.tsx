@@ -15,7 +15,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
-import { Button, Dialog, EmptyState, ErrorState, Fab, HeaderActions, IconButton, Input, Menu, Screen, Sheet, Toast } from "../../ui";
+import { Button, Dialog, EmptyState, ErrorState, Fab, HeaderActions, Icon, IconButton, Input, Screen, Sheet, Toast } from "../../ui";
 import { spacing, typography, useTheme } from "../../ui/theme";
 import { fetchGalleryImages } from "../gallery/api";
 import { useLibrary } from "../library/hooks/useLibrary";
@@ -116,16 +116,20 @@ export function MuralEditorScreen({ id }: { id: string }) {
       <Stack.Screen
         options={{
           headerShown: true,
-          title: currentName || "Mural",
+          title: "",
+          headerLargeTitleEnabled: false,
           headerRight: () => <HeaderActions>
-            {unsaved ? <IconButton framed accessibilityLabel="Save mural" label="Save" name="confirm" onPress={() => { if (!busy) void save(); }} /> : null}
+            <IconButton framed tone={unsaved ? "accent" : "default"} accessibilityLabel={unsaved ? "Save changes" : "All changes saved"} name="confirm" onPress={() => { if (unsaved && !busy) void save(); }} />
             <IconButton framed accessibilityLabel="Share mural" name="share" onPress={() => setShareFor(draftMural)} />
-            <Menu title={currentName} items={[{ label: "Rename…", onPress: () => setRenaming(true) }]}><IconButton framed accessibilityLabel="Mural actions" name="more" /></Menu>
           </HeaderActions>,
         }}
       />
       {error ? <Toast visible message={error} tone="error" /> : null}
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.canvasScroll}>
+        <Pressable accessibilityLabel={`Rename mural, ${currentName}`} accessibilityRole="button" hitSlop={spacing.sm} onPress={() => setRenaming(true)} style={styles.heading}>
+          <Text display numberOfLines={2} style={[typography.heading, styles.headingText, { color: colors.text }]}>{currentName}</Text>
+          <Icon color={colors.textDim} name="edit" size={18} />
+        </Pressable>
         <MuralCanvas mural={draftMural} books={books} groups={library?.data.groups ?? []} images={gallery.data ?? []} tierlists={tierlists.data ?? []} profile={user?.username ? { username: user.username, avatarUrl: user.avatarId ? `${API_URL}/auth/avatar/${user.avatarId}/file` : null } : undefined} editable selectedBlockId={selectedId} onSelectBlock={setSelectedId} onLayoutChange={(blockId, layout) => setBlocks(changeBlockLayout(currentBlocks, blockId, layout))} />
       </ScrollView>
       <Fab label="Add" accessibilityLabel="Add block" onPress={() => setAdding(true)} />
@@ -196,6 +200,8 @@ const styles = StyleSheet.create({
   screen: {},
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   canvasScroll: { paddingHorizontal: spacing.sm, paddingTop: spacing.md, paddingBottom: 56 + spacing.lg + spacing.md },
+  heading: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingHorizontal: spacing.sm, marginBottom: spacing.sm },
+  headingText: { flex: 1, fontWeight: "700" },
   dialog: { gap: spacing.md },
   sheet: { gap: spacing.sm, paddingBottom: spacing.xl },
   row: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
