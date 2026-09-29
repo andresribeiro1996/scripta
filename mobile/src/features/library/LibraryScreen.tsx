@@ -329,7 +329,7 @@ const styles = StyleSheet.create({
   loadingRow: { flexDirection: "row", gap: spacing.md },
   headerActions: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   shelfPage: { flex: 1 },
-  shelfToolbar: { flexDirection: "row", paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
+  shelfToolbar: { flexDirection: "row", paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
   sortPill: { flexDirection: "row", alignItems: "center", gap: spacing.xs, alignSelf: "flex-start", minHeight: 32, paddingHorizontal: spacing.md, borderRadius: radii.full, borderWidth: 1 },
   strong: { fontWeight: "700" },
 });

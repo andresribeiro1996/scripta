@@ -300,7 +300,7 @@ export function MyShelfScreen() {
 const styles = StyleSheet.create({
   strong: { fontWeight: "700" },
   tabPad: { flex: 1, padding: spacing.lg },
-  canvasScroll: { paddingHorizontal: spacing.sm, paddingBottom: spacing.xxl },
+  canvasScroll: { paddingHorizontal: spacing.sm, paddingTop: spacing.lg, paddingBottom: spacing.xxl },
   headerRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   chip: { height: 32, paddingHorizontal: spacing.md, borderRadius: radii.full, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   dialogGap: { gap: spacing.md },

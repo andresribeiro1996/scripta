@@ -96,7 +96,7 @@ export function TierlistResults({ histogram, tiers, pool, books, ballotCount, el
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, gap: spacing.sm, paddingTop: spacing.md },
+  root: { flex: 1, gap: spacing.sm, paddingTop: spacing.lg },
   summary: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", gap: spacing.sm },
   metaActions: { flexDirection: "row", justifyContent: "space-between", gap: spacing.sm },
   metaButton: { minHeight: 44, justifyContent: "center" },

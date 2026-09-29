@@ -39,6 +39,7 @@ export function LibraryGrid<T>({
   ListHeaderComponent,
   ListFooterComponent,
   refreshControl,
+  topInset = 0,
 }: {
   data: T[];
   keyExtractor: (item: T, index: number) => string;
@@ -48,6 +49,7 @@ export function LibraryGrid<T>({
   ListHeaderComponent?: FlatListProps<T>["ListHeaderComponent"];
   ListFooterComponent?: FlatListProps<T>["ListFooterComponent"];
   refreshControl?: FlatListProps<T>["refreshControl"];
+  topInset?: number;
 }) {
   const { colors } = useTheme();
   const { columns, contentWidth } = useLibraryGridColumns(style);
@@ -73,7 +75,7 @@ export function LibraryGrid<T>({
         {
           backgroundColor: style.backgroundColor ?? undefined,
           paddingHorizontal: SCREEN_PADDING + style.contentPaddingX,
-          paddingTop: style.contentPaddingY,
+          paddingTop: style.contentPaddingY + topInset,
           paddingBottom: style.contentPaddingY + spacing.xxxl,
           gap: style.rowGap,
         },

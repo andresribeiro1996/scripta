@@ -158,7 +158,7 @@ function EndScreen({ code, board, result, returning, tab, setTab }: {
   const { colors } = useTheme();
   const leaderboard = useQuery({ queryKey: ["quizzes", "results", code], queryFn: () => fetchPublicResults(code), retry: false });
   return <SwipeableTabs accessibilityLabel="Quiz results" options={[{ value: "you", label: "You" }, { value: "board", label: "Leaderboard" }]} value={tab} onChange={setTab} renderPage={(page) => page === "board" ? (
-    leaderboard.isPending ? <Skeleton height={180} /> : leaderboard.isError ? <ErrorState body="Couldn't load the leaderboard." actionLabel="Retry" onAction={() => void leaderboard.refetch()} /> : <ScrollView contentContainerStyle={styles.section}>
+    leaderboard.isPending ? <View style={styles.section}><Skeleton height={180} /></View> : leaderboard.isError ? <ErrorState body="Couldn't load the leaderboard." actionLabel="Retry" onAction={() => void leaderboard.refetch()} /> : <ScrollView contentContainerStyle={styles.section}>
       {leaderboard.data.plays.map((play, i) => (
         <View key={`${play.playerName ?? "Guest"}-${i}`} style={[styles.leaderRow, { borderColor: colors.border }]}>
           <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{i + 1}</Text>
@@ -196,7 +196,7 @@ const styles = StyleSheet.create({
   options: { gap: spacing.sm },
   option: { minHeight: 52, borderWidth: 1, borderRadius: radii.md, paddingHorizontal: spacing.md, justifyContent: "center" },
   complete: { gap: spacing.sm, paddingBottom: spacing.xl },
-  section: { gap: spacing.sm },
+  section: { gap: spacing.sm, paddingTop: spacing.lg },
   leaderRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.xs, borderBottomWidth: StyleSheet.hairlineWidth },
   verdict: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderWidth: 1, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   score: { textAlign: "center", fontWeight: "700" },

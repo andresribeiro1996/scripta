@@ -111,7 +111,7 @@ export function ProfileScreen({ username }: { username: string }) {
           if (value === "library") {
             if (library.isPending) return <View style={styles.page}><Skeleton height={180} /></View>;
             if (library.isError) return <View style={styles.page}><ErrorState body="Couldn't load this library." actionLabel="Retry" onAction={() => void library.refetch()} /></View>;
-            return <PublicLibraryGrid library={library.data.data} />;
+            return <PublicLibraryGrid library={library.data.data} topInset={spacing.lg} />;
           }
           return (
             <FlatList

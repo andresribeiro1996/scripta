@@ -213,9 +213,9 @@ const styles = StyleSheet.create({
   // Each pane carries its own gutter instead.
   centered: { padding: spacing.lg, gap: spacing.md },
   grow: { flex: 1 },
-  pane: { gap: spacing.md, paddingHorizontal: spacing.lg, paddingBottom: spacing.huge, flexGrow: 1, justifyContent: "center" },
+  pane: { gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.huge, flexGrow: 1, justifyContent: "center" },
   matchWrap: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, justifyContent: "center" },
-  list: { gap: spacing.md, paddingHorizontal: spacing.lg, paddingBottom: spacing.huge, flexGrow: 1 },
+  list: { gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.huge, flexGrow: 1 },
   // The same bottom strip the round rail sits in, so the toggle keeps its
   // place between the two views.
   classicBar: { position: "absolute", left: 0, right: 0, bottom: 0, minHeight: 64, flexDirection: "row", alignItems: "center", justifyContent: "flex-end", paddingHorizontal: spacing.lg, borderTopWidth: 1 },
