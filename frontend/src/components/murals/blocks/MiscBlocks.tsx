@@ -97,9 +97,9 @@ export function StatsBlockView({
           {/* Deliberately accent-colored, not `textColor` — same
               "this is a badge, not body content" reasoning as
               BookCard.tsx's highlight-count badge. The block wrapper
-              swaps in the text colour when the accent can't be read on
-              the block's own background. */}
-          <div className="text-[1.6em] font-bold text-(--color-accent)">
+              sets --block-accent to the text colour when the accent
+              can't be read on the block's own background. */}
+          <div className="text-[1.6em] font-bold text-[var(--block-accent,var(--color-accent))]">
             {statsOverride && metric in statsOverride ? statsOverride[metric] : computeStat(metric, books)}
           </div>
           <div className="text-[0.75em] text-(--color-text-dim)">{STAT_METRIC_LABELS[metric]}</div>

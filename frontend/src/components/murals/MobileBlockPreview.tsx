@@ -143,7 +143,7 @@ export function MobileBlockPreview({
       <div className="flex h-full items-center gap-2 overflow-hidden block-p-2">
         {visible.map((metric) => (
           <div key={metric} className="min-w-0 flex-1">
-            <p className="truncate text-[20px] leading-6 font-bold text-(--color-accent)">
+            <p className="truncate text-[20px] leading-6 font-bold text-[var(--block-accent,var(--color-accent))]">
               {statsOverride && metric in statsOverride ? statsOverride[metric] : computeStat(metric, books)}
             </p>
             {height >= 48 && <p className="truncate text-[12px] leading-4 text-(--color-text-dim)">{PREVIEW_STAT_LABELS[metric]}</p>}

@@ -126,10 +126,10 @@ function BlockFrame({
         color: resolveBlockColor(style.textColor, themeColors) ?? undefined,
         textAlign: style.textAlign,
         "--block-pad": BLOCK_PAD_SCALE[style.innerSpacing],
-        ...(overridden ? { "--color-text-dim": overridden.dim } : {})
+        ...(overridden ? { "--color-text-dim": overridden.dim, "--block-accent": overridden.accent } : {})
       } as CSSProperties}
     >
-      <div className="pointer-events-none h-full origin-top-left" style={{ width: `${scale * 100}%`, height: `${scale * 100}%`, transform: `scale(${1 / scale})`, fontSize: 14, ...(overridden ? { "--color-accent": overridden.accent } : {}) } as CSSProperties}>
+      <div className="pointer-events-none h-full origin-top-left" style={{ width: `${scale * 100}%`, height: `${scale * 100}%`, transform: `scale(${1 / scale})`, fontSize: 14 } as CSSProperties}>
         <MobileBlockPreview block={block} books={books} images={images} profile={profile} groups={groups} shelfThemeOverride={shelfThemeOverride} readerCardOverride={readerCardOverride} statsOverride={statsOverride} tierlistData={tierlistData} width={((CANVAS_WIDTH - PADDING * 2 + MARGIN) / GRID_COLUMNS * block.layout.w - MARGIN) * scale} height={(block.layout.h * (ROW_HEIGHT + MARGIN) - MARGIN) * scale} />
       </div>
     </div>

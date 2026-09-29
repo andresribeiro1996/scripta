@@ -170,10 +170,10 @@ export function MuralCanvas({
               color: resolveBlockColor(style.textColor, themeColors) ?? undefined,
               textAlign: style.textAlign,
               "--block-pad": BLOCK_PAD_SCALE[style.innerSpacing],
-              ...(overridden ? { "--color-text-dim": overridden.dim, "--color-accent": overridden.accent } : {})
+              ...(overridden ? { "--color-text-dim": overridden.dim, "--block-accent": overridden.accent } : {})
             } as CSSProperties}
           >
-            {!editMode ? <button className="absolute inset-0 z-10 rounded-[inherit] focus-visible:outline-2 focus-visible:outline-(--color-accent)" aria-label={`Open ${block.type} block`} onClick={() => onOpenBlock ? onOpenBlock(block) : setFocusedId(block.id)} /> : null}
+            {!editMode ? <button className="absolute inset-0 z-10 rounded-[inherit] focus-visible:outline-2 focus-visible:outline-[var(--block-accent,var(--color-accent))]" aria-label={`Open ${block.type} block`} onClick={() => onOpenBlock ? onOpenBlock(block) : setFocusedId(block.id)} /> : null}
             <BlockRenderer block={block} books={books} images={images} profile={profile} groups={groups} shelfThemeOverride={shelfThemeOverride} readerCardOverride={readerCardOverride} statsOverride={statsOverride} tierlistData={tierlistData} />
             {editMode && (
               <div className="mural-block-controls absolute top-1.5 right-1.5 opacity-0 transition-opacity group-hover:opacity-100">
