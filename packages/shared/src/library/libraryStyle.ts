@@ -404,10 +404,12 @@ export const BLOCK_INNER_SPACING_OPTIONS: Array<{ value: BlockInnerSpacing; labe
  *  references PerCardStyle, so a future change to one can never silently
  *  reach the other again. */
 export type BlockStyle = {
-  /** CSS color for the block's own background — `null` means "use the
-   *  theme default" (--color-surface). A BookCard has no equivalent
-   *  setting since its background IS the cover art; a mural block has no
-   *  cover art of its own, so this is a genuinely new field here. */
+  /** CSS color, `"transparent"`, or a `theme:<key>` reference (resolved per
+   *  viewer via `resolveBlockColor`) for the block's own background —
+   *  `null` means "use the theme default" (--color-surface). A BookCard
+   *  has no equivalent setting since its background IS the cover art; a
+   *  mural block has no cover art of its own, so this is a genuinely new
+   *  field here. */
   backgroundColor: string | null;
   /** The block's typeface — see BlockFontFamily above. */
   fontFamily: BlockFontFamily;
@@ -419,8 +421,9 @@ export type BlockStyle = {
    *  heading might be `1.1em`, a caption `0.8em`, but they all move
    *  together as this changes. */
   fontSize: number;
-  /** CSS color for the block's PRIMARY text — `null` means "use the
-   *  theme default" (--color-text). Secondary/meta text (captions,
+  /** CSS color, or a `theme:<key>` reference (resolved per viewer via
+   *  `resolveBlockColor`), for the block's PRIMARY text — `null` means
+   *  "use the theme default" (--color-text). Secondary/meta text (captions,
    *  attributions, dimmed labels) intentionally keeps its own muted color
    *  regardless of this setting, same reasoning a BookCard's highlight
    *  badge stays accent-colored regardless of anything else — some text
