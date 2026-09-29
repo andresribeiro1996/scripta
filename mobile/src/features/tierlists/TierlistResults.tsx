@@ -4,7 +4,9 @@ import { aggregate, AGGREGATION_MODES, type AggregationMode, type HistogramCell 
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { Sheet, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
-import { authorOf, keyOf, TierCover, titleOf, type TierBook } from "./TierBoard";
+import { authorOf, keyOf, TierCover, TierHead, titleOf, type TierBook } from "./TierBoard";
+
+const hitSlop = { top: 14, bottom: 14, left: 8, right: 8 };
 
 const descriptions: Record<AggregationMode, string> = {
   average: "Balances every vote into a tier.",
@@ -60,11 +62,13 @@ export function TierlistResults({ histogram, tiers, pool, books, ballotCount, el
   }
 
   return <View style={styles.root}>
-    <View style={styles.summary}><Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{ballotCount} {ballotCount === 1 ? "vote" : "votes"}</Text><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{votedBooks}/{pool.length} books · {promoted ? "Reference" : votingOpen === undefined ? "Community" : votingOpen ? "Voting open" : "Voting closed"}</Text></View>
+    <TierHead>
+    <View style={styles.summary}><Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.text }]}>{ballotCount} {ballotCount === 1 ? "vote" : "votes"}</Text><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{votedBooks}/{pool.length} books · {promoted ? "Reference" : votingOpen === undefined ? "Community" : votingOpen ? "Voting open" : "Voting closed"}</Text></View>
     {(eligibleVoteCount !== undefined && !promoted || ownPlacements.length > 0) ? <View style={styles.metaActions}>
-      {eligibleVoteCount !== undefined && !promoted ? <Pressable accessibilityRole="button" accessibilityLabel={`${eligibleVoteCount} of 100 eligible voters toward reference status. Learn more`} onPress={() => setExplainProgress(true)} style={styles.metaButton}><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{eligibleVoteCount}/100 eligible ⓘ</Text></Pressable> : null}
-      {ownPlacements.length ? <Pressable accessibilityRole="switch" accessibilityState={{ checked: showMine }} onPress={() => setShowMine(!showMine)} style={styles.metaButton}><Text {...dynamicType} style={[typography.caption, { color: colors.text }]}>My ranks: <Text style={{ color: colors.accent }}>{showMine ? "On" : "Off"}</Text></Text></Pressable> : null}
+      {eligibleVoteCount !== undefined && !promoted ? <Pressable accessibilityRole="button" accessibilityLabel={`${eligibleVoteCount} of 100 eligible voters toward reference status. Learn more`} hitSlop={hitSlop} onPress={() => setExplainProgress(true)}><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{eligibleVoteCount}/100 eligible ⓘ</Text></Pressable> : null}
+      {ownPlacements.length ? <Pressable accessibilityRole="switch" accessibilityState={{ checked: showMine }} hitSlop={hitSlop} onPress={() => setShowMine(!showMine)} style={styles.toggle}><Text {...dynamicType} style={[typography.caption, { color: colors.text }]}>My ranks:</Text><Text {...dynamicType} style={[typography.caption, { color: colors.accent }]}>{showMine ? "On" : "Off"}</Text></Pressable> : null}
     </View> : null}
+    </TierHead>
     <ScrollView ref={boardScroll} style={styles.board} contentContainerStyle={styles.rows}>
       {ballotCount === 0 ? <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>No votes yet. Results will appear when someone submits votes.</Text> : null}
       {tiers.map((tier, index) => {
@@ -99,8 +103,8 @@ const styles = StyleSheet.create({
   root: { flex: 1, gap: spacing.sm, paddingTop: spacing.lg },
   summary: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", gap: spacing.sm },
   metaActions: { flexDirection: "row", justifyContent: "space-between", gap: spacing.sm },
-  metaButton: { minHeight: 44, justifyContent: "center" },
-  board: { flex: 1 },
+  toggle: { flexDirection: "row", gap: spacing.xs },
+  board: { flex: 1, marginTop: spacing.md },
   rows: { paddingBottom: spacing.sm },
   row: { height: 84, flexDirection: "row", overflow: "hidden" },
   topCorners: { borderTopLeftRadius: radii.md, borderTopRightRadius: radii.md },
