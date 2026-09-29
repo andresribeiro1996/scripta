@@ -74,7 +74,7 @@ export function SpotlightBlockView({ block, books }: { block: Extract<MuralBlock
       <div className="relative min-h-0 flex-1 overflow-hidden bg-(--color-border)">
         <CoverImage book={book} />
       </div>
-      <div className="shrink-0 px-2.5 py-2">
+      <div className="shrink-0 block-px-2.5 block-py-2">
         <div className="truncate text-[1.1em] font-semibold">{String(book.Title ?? "Untitled")}</div>
         <div className="truncate text-[0.85em] text-(--color-text-dim)">{String(book.Attribution ?? "Unknown author")}</div>
         {block.caption && <p className="mt-1 text-[0.85em]">{block.caption}</p>}
@@ -89,7 +89,7 @@ export function SpotlightBlockView({ block, books }: { block: Extract<MuralBlock
 export function ShelfBlockView({ block, books }: { block: Extract<MuralBlock, { type: "shelf" }>; books: Array<Record<string, unknown>> }) {
   const resolved = resolveShelfBooks(block, books);
   return (
-    <div className="flex h-full flex-col overflow-hidden p-2.5">
+    <div className="flex h-full flex-col overflow-hidden block-p-2.5">
       <div className="mb-1.5 shrink-0 truncate text-[1.1em] font-semibold">{block.title || "Untitled shelf"}</div>
       {resolved.length === 0 ? (
         <EmptyBlockState message="No books picked yet." />
@@ -110,7 +110,7 @@ export function ShelfBlockView({ block, books }: { block: Extract<MuralBlock, { 
 export function CurrentlyReadingBlockView({ books }: { books: Array<Record<string, unknown>> }) {
   const reading = books.filter((b) => b.ReadStatus === 1);
   return (
-    <div className="flex h-full flex-col overflow-hidden p-2.5">
+    <div className="flex h-full flex-col overflow-hidden block-p-2.5">
       <div className="mb-1.5 shrink-0 text-[1.1em] font-semibold">Currently reading</div>
       {reading.length === 0 ? (
         <EmptyBlockState message="Nothing marked as reading right now." />
@@ -333,7 +333,7 @@ export function DraggableTierTile({
 export function TierListBlockView({ tierlist, books }: { tierlist: ResolvedTierlist | undefined; books: Array<Record<string, unknown>> }) {
   if (!tierlist) return <EmptyBlockState message="Tier list unavailable." />;
   return (
-    <div className="flex h-full flex-col overflow-hidden p-2.5">
+    <div className="flex h-full flex-col overflow-hidden block-p-2.5">
       {/* Always rendered, with a fallback — same "always show SOME title
           line" convention ShelfBlockView's own `block.title || "Untitled
           shelf"` already follows. */}

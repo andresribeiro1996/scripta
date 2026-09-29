@@ -1,5 +1,5 @@
 import { MuralBlockDetail } from "./MuralBlockDetail";
-import { blockTextColors, resolveHomeBlock, type Group, type PublicReaderCard } from "@scripta/shared";
+import { blockTextColors, resolveBlockColor, resolveHomeBlock, type Group, type PublicReaderCard } from "@scripta/shared";
 import { resolveTheme, themes } from "@scripta/shared/themes";
 import GridLayout from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
@@ -7,7 +7,7 @@ import "react-resizable/css/styles.css";
 import { useEffect, useState, type CSSProperties } from "react";
 import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
-import { blockFontFamilyCss, resolveBlockStyle, resolveBorderColor } from "../../lib/libraryStyle";
+import { BLOCK_PAD_SCALE, blockFontFamilyCss, resolveBlockStyle, resolveBorderColor } from "../../lib/libraryStyle";
 import { GRID_COLUMNS, type BlockLayout, type Mural, type MuralBlock, type ReaderProfile, type ShelfTheme } from "../../lib/murals";
 import { useMuralBookMetadata } from "../../hooks/useMuralBookMetadata";
 import { osScheme, useThemePreference } from "../../lib/theme";
@@ -156,18 +156,20 @@ export function MuralCanvas({
             style={{
               borderRadius: `${style.cardRadius}px`,
               opacity: style.cardOpacity / 100,
-              backgroundColor: style.backgroundColor ?? "var(--color-surface)",
+              backgroundColor: resolveBlockColor(style.backgroundColor, themeColors) ?? "var(--color-surface)",
               borderTopWidth: `${style.cardBorderSides.top ? style.cardBorderWidth : 0}px`,
               borderRightWidth: `${style.cardBorderSides.right ? style.cardBorderWidth : 0}px`,
               borderBottomWidth: `${style.cardBorderSides.bottom ? style.cardBorderWidth : 0}px`,
               borderLeftWidth: `${style.cardBorderSides.left ? style.cardBorderWidth : 0}px`,
               borderStyle: style.cardBorderWidth > 0 ? style.cardBorderStyle : "none",
-              borderColor: resolveBorderColor(style.cardBorderColor, style.cardBorderOpacity),
+              borderColor: resolveBorderColor(resolveBlockColor(style.cardBorderColor, themeColors), style.cardBorderOpacity),
               fontFamily: style.codeStyle ? blockFontFamilyCss("jetbrainsMono") : blockFontFamilyCss(style.fontFamily),
               fontSize: `${style.fontSize}px`,
               fontWeight: style.bold ? 700 : undefined,
               fontStyle: style.italic ? "italic" : undefined,
-              color: style.textColor ?? undefined,
+              color: resolveBlockColor(style.textColor, themeColors) ?? undefined,
+              textAlign: style.textAlign,
+              "--block-pad": BLOCK_PAD_SCALE[style.innerSpacing],
               ...(overridesColor ? { "--color-text-dim": blockTextColors(style, themeColors).dim } : {})
             } as CSSProperties}
           >

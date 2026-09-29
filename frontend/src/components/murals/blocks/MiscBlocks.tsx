@@ -17,7 +17,7 @@ export function TextBlockView({ block }: { block: Extract<MuralBlock, { type: "t
     return <EmptyBlockState message="Add a heading or some text." />;
   }
   return (
-    <div className="flex h-full flex-col gap-1.5 overflow-y-auto p-3.5">
+    <div className="flex h-full flex-col gap-1.5 overflow-y-auto block-p-3.5">
       {block.heading && <h3 className="text-[1.3em] font-bold">{block.heading}</h3>}
       {block.body && <p className="text-[1em] whitespace-pre-wrap">{block.body}</p>}
     </div>
@@ -27,7 +27,7 @@ export function TextBlockView({ block }: { block: Extract<MuralBlock, { type: "t
 export function ProfileBlockView({ block, books, profile, shelfThemeOverride }: { block: Extract<MuralBlock, { type: "profile" }>; books: Array<Record<string, unknown>>; profile?: ReaderProfile; shelfThemeOverride?: ShelfTheme }) {
   const theme = shelfThemeOverride ?? calculateShelfTheme(books);
   const initial = (profile?.username || "Reader")[0]?.toUpperCase();
-  return <div className="flex h-full flex-col gap-3 overflow-y-auto p-3.5">
+  return <div className="flex h-full flex-col gap-3 overflow-y-auto block-p-3.5">
     <div className="flex items-center gap-3">
       {profile?.avatarUrl ? <img src={profile.avatarUrl} alt="" className="h-14 w-14 shrink-0 rounded-full object-cover" /> : <div aria-hidden="true" className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-(--color-accent-soft) text-xl font-bold text-(--color-accent)">{initial}</div>}
       <div className="min-w-0"><h3 className="truncate text-[1.25em] font-bold">@{profile?.username || "reader"}</h3>{block.bio && <p className="line-clamp-3 text-[0.9em] text-(--color-text-dim)">{block.bio}</p>}</div>
@@ -91,7 +91,7 @@ export function StatsBlockView({
     return <EmptyBlockState message="Pick which numbers to show." />;
   }
   return (
-    <div className="flex h-full items-center justify-around gap-2 overflow-x-auto p-2.5">
+    <div className="flex h-full items-center justify-around gap-2 overflow-x-auto block-p-2.5">
       {block.metrics.map((metric) => (
         <div key={metric} className="shrink-0 text-center">
           {/* Deliberately always accent-colored, not `textColor` — same

@@ -18,7 +18,7 @@ export function QuoteBlockView({ block, books }: { block: Extract<MuralBlock, { 
   }
   const { book, highlight } = resolved;
   return (
-    <div className="flex h-full flex-col justify-center gap-3 overflow-y-auto p-4">
+    <div className="flex h-full flex-col justify-center gap-3 overflow-y-auto block-p-4">
       <p className="text-[1.1em] leading-snug italic">"{String(highlight.Text ?? "")}"</p>
       {highlight.Annotation ? <p className="text-[0.85em] text-(--color-text-dim)">{String(highlight.Annotation)}</p> : null}
       <p className="text-[0.85em] font-medium text-(--color-text-dim)">
@@ -39,7 +39,7 @@ export function QuoteCollectionBlockView({
 }) {
   const resolved = resolveQuoteCollection(block, books);
   return (
-    <div className="flex h-full flex-col overflow-hidden p-2.5">
+    <div className="flex h-full flex-col overflow-hidden block-p-2.5">
       <div className="mb-1.5 shrink-0 truncate text-[1.1em] font-semibold">{block.title || "Untitled quotes"}</div>
       {resolved.length === 0 ? (
         <EmptyBlockState message="No quotes picked yet." />
