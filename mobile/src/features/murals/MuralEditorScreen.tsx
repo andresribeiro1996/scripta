@@ -7,7 +7,6 @@ import {
   resolveHomeBlock,
   createBlockCandidate,
   createDuplicateCandidate,
-  DEFAULT_BLOCK_STYLE,
   type BlockType,
   type Mural,
   type MuralBlock,
@@ -22,7 +21,7 @@ import { fetchGalleryImages } from "../gallery/api";
 import { useLibrary } from "../library/hooks/useLibrary";
 import { fetchTierlists } from "../tierlists/api";
 import { changeBlockLayout } from "./layout";
-import { blockShadow, GAP, MuralCanvas } from "./MuralCanvas";
+import { MuralCanvas } from "./MuralCanvas";
 import { MuralShareSheet } from "./MuralShareSheet";
 import { fetchMural, shareMural, unshareMural, updateMural } from "./api";
 import { MURALS_QUERY_KEY, withGrownBlocks } from "./useMurals";
@@ -127,8 +126,8 @@ export function MuralEditorScreen({ id }: { id: string }) {
       />
       {error ? <Toast visible message={error} tone="error" /> : null}
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.canvasScroll}>
-        <Pressable accessibilityLabel={`Rename mural, ${currentName}`} accessibilityRole="button" onPress={() => setRenaming(true)} style={({ pressed }) => [styles.heading, DEFAULT_BLOCK_STYLE.cardShadow ? blockShadow : null, { backgroundColor: pressed ? colors.surfacePressed : colors.surface, borderColor: colors.border }]}>
-          <Text display numberOfLines={2} style={[typography.heading, styles.headingText, { color: colors.text }]}>{currentName}</Text>
+        <Pressable accessibilityLabel={`Rename mural, ${currentName}`} accessibilityRole="button" hitSlop={spacing.sm} onPress={() => setRenaming(true)} style={styles.heading}>
+          <Text display numberOfLines={2} style={[typography.title, styles.headingText, { color: colors.text }]}>{currentName}</Text>
           <Icon color={colors.textDim} name="edit" size={18} />
         </Pressable>
         <MuralCanvas mural={draftMural} books={books} groups={library?.data.groups ?? []} images={gallery.data ?? []} tierlists={tierlists.data ?? []} profile={user?.username ? { username: user.username, avatarUrl: user.avatarId ? `${API_URL}/auth/avatar/${user.avatarId}/file` : null } : undefined} editable selectedBlockId={selectedId} onSelectBlock={setSelectedId} onLayoutChange={(blockId, layout) => setBlocks(changeBlockLayout(currentBlocks, blockId, layout))} />
@@ -201,7 +200,7 @@ const styles = StyleSheet.create({
   screen: {},
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   canvasScroll: { paddingHorizontal: spacing.sm, paddingTop: spacing.md, paddingBottom: 56 + spacing.lg + spacing.md },
-  heading: { flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.md, marginBottom: GAP, borderWidth: DEFAULT_BLOCK_STYLE.cardBorderWidth, borderRadius: DEFAULT_BLOCK_STYLE.cardRadius },
+  heading: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingHorizontal: spacing.sm, marginBottom: spacing.sm },
   headingText: { flex: 1, fontWeight: "700" },
   dialog: { gap: spacing.md },
   sheet: { gap: spacing.sm, paddingBottom: spacing.xl },

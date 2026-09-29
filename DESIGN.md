@@ -150,7 +150,7 @@ Full guidelines, states and prop shapes live in the artifact's per-component REA
 - A header carries the back chevron, the title, at most **two** labelled actions and the `⋯` overflow menu — everything else belongs in the menu or in screen content.
 - Every header action is an **`IconButton` with `label` + `framed`** (icon + word in a drawn 44pt target), so the visible target matches the touch target — a bare glyph reads smaller than its hit area and people aim at the ink. The `⋯` menu trigger stays glyph-only (platform convention).
 - Creation stays on **FABs** (thumb zone), not the header; header buttons navigate (`Browse`, `Library`) or open modals (`Add`, `Upload`, `Save`).
-- The mural editor shows its name in a title card styled like a block (tap to rename) and Save as a save-glyph state button — accent while there are unsaved changes, plain when saved — because an editor's title can't share a narrow header with its actions.
+- The mural editor shows its name as the page title above the canvas (tap to rename) and Save as a save-glyph state button — accent while there are unsaved changes, plain when saved — because an editor's title can't share a narrow header with its actions.
 - A screen's primary social action (Follow) is a full-width `Button` in the profile content, never a header pill.
 
 ### Gesture components (mobile only — Reanimated + haptics, not reproducible in a static doc)
