@@ -37,6 +37,7 @@ export function LibraryGrid<T>({
   style,
   ListEmptyComponent,
   ListHeaderComponent,
+  ListFooterComponent,
   refreshControl,
 }: {
   data: T[];
@@ -45,6 +46,7 @@ export function LibraryGrid<T>({
   style: LibraryStyleSettings;
   ListEmptyComponent?: FlatListProps<T>["ListEmptyComponent"];
   ListHeaderComponent?: FlatListProps<T>["ListHeaderComponent"];
+  ListFooterComponent?: FlatListProps<T>["ListFooterComponent"];
   refreshControl?: FlatListProps<T>["refreshControl"];
 }) {
   const { colors } = useTheme();
@@ -60,6 +62,7 @@ export function LibraryGrid<T>({
       refreshControl={refreshControl}
       ListEmptyComponent={ListEmptyComponent}
       ListHeaderComponent={ListHeaderComponent}
+      ListFooterComponent={ListFooterComponent}
       columnWrapperStyle={{ gap: style.cardGap }}
       // The toolbar's search field sits directly above this grid: without
       // this the first tap on a card only dismisses the keyboard.
