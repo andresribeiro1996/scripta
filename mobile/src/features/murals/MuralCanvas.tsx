@@ -41,10 +41,10 @@ import { muralCanvasHeight } from "./layout";
 
 const LIFT_SPRING = { duration: 300, dampingRatio: 0.8 } as const;
 const ROW_HEIGHT = 36;
-const GAP = 8;
+export const GAP = 8;
 const PROGRESS_TRACK = 4;
 
-const blockShadow = Platform.select({
+export const blockShadow = Platform.select({
   ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 4 },
   android: { elevation: 2 },
   default: {},
