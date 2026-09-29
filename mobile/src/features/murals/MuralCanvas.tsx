@@ -59,9 +59,12 @@ function sideWidths(width: number, sides: BlockStyle["cardBorderSides"]) {
   };
 }
 
+function blockPadding(style: BlockStyle) {
+  return { padding: BLOCK_PADDING[style.innerSpacing] ?? BLOCK_PADDING.normal };
+}
+
 function blockFrameStyle(style: BlockStyle, colors: ThemeColors) {
   return {
-    padding: BLOCK_PADDING[style.innerSpacing] ?? BLOCK_PADDING.normal,
     backgroundColor: resolveBlockColor(style.backgroundColor, colors) ?? colors.surface,
     borderColor: resolveBorderColor(resolveBlockColor(style.cardBorderColor, colors), style.cardBorderOpacity, colors.border),
     ...sideWidths(style.cardBorderWidth, style.cardBorderSides),
@@ -195,11 +198,12 @@ function CanvasBlock({ block, columnWidth, editable, selected, books, images, ti
       if (dx !== 0 || dy !== 0) scheduleOnRN(commitHaptic);
     })
     .onFinalize(() => { x.value = withSpring(0); y.value = withSpring(0); lifted.value = withSpring(0, LIFT_SPRING); });
+  const style = resolveBlockStyle(block.style);
+  const restOpacity = style.cardOpacity / 100;
   const animated = useAnimatedStyle(() => ({
-    opacity: 1 - lifted.value * 0.15,
+    opacity: restOpacity * (1 - lifted.value * 0.15),
     transform: [{ translateX: x.value }, { translateY: y.value }, { scale: 1 + lifted.value * 0.03 }],
   }));
-  const style = resolveBlockStyle(block.style);
   const body = <View style={styles.blockBody}><BlockContent block={block} books={books} images={images} tierlists={tierlists} profile={profile} groups={groups} shelfThemeOverride={shelfThemeOverride} readerCardOverride={readerCardOverride} statsOverride={statsOverride} editable={editable} onAssetReady={onAssetReady} /></View>;
   const content = <Animated.View style={[
         styles.block,
@@ -214,7 +218,7 @@ function CanvasBlock({ block, columnWidth, editable, selected, books, images, ti
         },
         animated,
       ]}>
-        {editable ? <Pressable accessibilityRole="button" accessibilityLabel={`${BLOCK_TYPE_LABELS[block.type]} block. Long press and drag to move`} accessibilityActions={MOVE_ACTIONS} onAccessibilityAction={(event) => { const move = MOVES[event.nativeEvent.actionName]; if (move) onMove(move[0], move[1]); }} onPress={onSelect} style={styles.blockPress}>{body}</Pressable> : <View style={styles.blockPress}>{body}</View>}
+        {editable ? <Pressable accessibilityRole="button" accessibilityLabel={`${BLOCK_TYPE_LABELS[block.type]} block. Long press and drag to move`} accessibilityActions={MOVE_ACTIONS} onAccessibilityAction={(event) => { const move = MOVES[event.nativeEvent.actionName]; if (move) onMove(move[0], move[1]); }} onPress={onSelect} style={[styles.blockPress, blockPadding(style)]}>{body}</Pressable> : <View style={[styles.blockPress, blockPadding(style)]}>{body}</View>}
       </Animated.View>;
   return editable ? <GestureDetector gesture={gesture}>{content}</GestureDetector> : content;
 }
@@ -237,7 +241,7 @@ export function BlockPreview({ block, canvasWidth, maxHeight, books, images, tie
   const width = block.layout.w * (canvasWidth / GRID_COLUMNS) - GAP;
   const height = block.layout.h * ROW_HEIGHT - GAP;
   const room = boxWidth - spacing.md * 2;
-  const scale = room > 0 ? Math.min(1, room / width, maxHeight / height) : 0;
+  const scale = room > 0 && canvasWidth > 0 ? Math.min(1, room / width, maxHeight / height) : 0;
   return (
     <View
       accessibilityLabel={`Preview of this ${BLOCK_TYPE_LABELS[block.type]} block`}
@@ -246,8 +250,10 @@ export function BlockPreview({ block, canvasWidth, maxHeight, books, images, tie
     >
       {scale ? (
         <View style={[styles.previewBlock, frameShadow(style), blockFrameStyle(style, colors), { width, height, transform: [{ scale }] }]}>
-          <View style={styles.blockBody}>
-            <BlockContent block={resolved} books={books} images={images} tierlists={tierlists} profile={profile} groups={groups} />
+          <View style={[styles.blockPress, blockPadding(style)]}>
+            <View style={styles.blockBody}>
+              <BlockContent block={resolved} books={books} images={images} tierlists={tierlists} profile={profile} groups={groups} editable />
+            </View>
           </View>
         </View>
       ) : null}
