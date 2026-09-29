@@ -90,7 +90,7 @@ export function ToggleRow({ label, hint, checked, onChange }: { label: string; h
         <Text style={[typography.body, { color: colors.text, fontWeight: "600" }]}>{label}</Text>
         {hint && <Text style={[typography.caption, { color: colors.textDim, marginTop: 2 }]}>{hint}</Text>}
       </View>
-      <Switch onValueChange={onChange} trackColor={{ true: colors.accent }} value={checked} />
+      <Switch accessibilityLabel={label} onValueChange={onChange} trackColor={{ true: colors.accent }} value={checked} />
     </View>
   );
 }
@@ -102,7 +102,7 @@ export function SelectRow<V extends string>({
   onChange,
 }: {
   label: string;
-  value: V;
+  value: V | null;
   options: Array<{ value: V; label: string }>;
   onChange: (value: V) => void;
 }) {
@@ -134,7 +134,7 @@ export function SelectRow<V extends string>({
   );
 }
 
-const SWATCHES = ["#ffffff", "#141210", "#a85c32", "#47713c", "#3b5b8c", "#8c3b5b", "#b3432f", "#e0c060"];
+export const SWATCHES = ["#ffffff", "#141210", "#a85c32", "#47713c", "#3b5b8c", "#8c3b5b", "#b3432f", "#e0c060"];
 
 export function ColorSwatchRow({
   label,

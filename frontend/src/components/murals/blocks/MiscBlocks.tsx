@@ -17,7 +17,7 @@ export function TextBlockView({ block }: { block: Extract<MuralBlock, { type: "t
     return <EmptyBlockState message="Add a heading or some text." />;
   }
   return (
-    <div className="flex h-full flex-col gap-1.5 overflow-y-auto p-3.5">
+    <div className="flex h-full flex-col gap-1.5 overflow-y-auto block-p-3.5">
       {block.heading && <h3 className="text-[1.3em] font-bold">{block.heading}</h3>}
       {block.body && <p className="text-[1em] whitespace-pre-wrap">{block.body}</p>}
     </div>
@@ -27,7 +27,7 @@ export function TextBlockView({ block }: { block: Extract<MuralBlock, { type: "t
 export function ProfileBlockView({ block, books, profile, shelfThemeOverride }: { block: Extract<MuralBlock, { type: "profile" }>; books: Array<Record<string, unknown>>; profile?: ReaderProfile; shelfThemeOverride?: ShelfTheme }) {
   const theme = shelfThemeOverride ?? calculateShelfTheme(books);
   const initial = (profile?.username || "Reader")[0]?.toUpperCase();
-  return <div className="flex h-full flex-col gap-3 overflow-y-auto p-3.5">
+  return <div className="flex h-full flex-col gap-3 overflow-y-auto block-p-3.5">
     <div className="flex items-center gap-3">
       {profile?.avatarUrl ? <img src={profile.avatarUrl} alt="" className="h-14 w-14 shrink-0 rounded-full object-cover" /> : <div aria-hidden="true" className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-(--color-accent-soft) text-xl font-bold text-(--color-accent)">{initial}</div>}
       <div className="min-w-0"><h3 className="truncate text-[1.25em] font-bold">@{profile?.username || "reader"}</h3>{block.bio && <p className="line-clamp-3 text-[0.9em] text-(--color-text-dim)">{block.bio}</p>}</div>
@@ -94,13 +94,15 @@ export function StatsBlockView({
   const breakdown = libraryBreakdown(block.metrics, value);
   if (!breakdown) {
     return (
-      <div className="flex h-full items-center justify-around gap-2 overflow-x-auto p-2.5">
+      <div className="flex h-full items-center justify-around gap-2 overflow-x-auto block-p-2.5">
         {block.metrics.map((metric) => (
           <div key={metric} className="shrink-0 text-center">
-            {/* Deliberately always accent-colored, not `textColor` — same
+            {/* Deliberately accent-colored, not `textColor` — same
                 "this is a badge, not body content" reasoning as
-                BookCard.tsx's highlight-count badge. */}
-            <div className="text-[1.6em] font-bold text-(--color-accent)">{value(metric)}</div>
+                BookCard.tsx's highlight-count badge. The block wrapper
+                sets --block-accent to the text colour when the accent
+                can't be read on the block's own background. */}
+            <div className="text-[1.6em] font-bold text-[var(--block-accent,var(--color-accent))]">{value(metric)}</div>
             <div className="text-[0.75em] text-(--color-text-dim)">{STAT_METRIC_LABELS[metric]}</div>
           </div>
         ))}
@@ -108,15 +110,15 @@ export function StatsBlockView({
     );
   }
   const segments = [
-    { count: breakdown.finished, color: "bg-(--color-accent)", label: "finished" },
+    { count: breakdown.finished, color: "bg-[var(--block-accent,var(--color-accent))]", label: "finished" },
     { count: breakdown.reading, color: "bg-(--color-accent-fill)", label: "reading" },
     { count: breakdown.toRead, color: "bg-(--color-border)", label: "to read" }
   ];
   return (
-    <div className="h-full overflow-y-auto p-2.5">
+    <div className="h-full overflow-y-auto block-p-2.5">
       <BlockEyebrow>Your library</BlockEyebrow>
       <p>
-        <span className="text-[2.8em] leading-none font-bold text-(--color-accent)">{breakdown.finished}</span>{" "}
+        <span className="text-[2.8em] leading-none font-bold text-[var(--block-accent,var(--color-accent))]">{breakdown.finished}</span>{" "}
         <span className="text-[0.85em] text-(--color-text-dim)">of {breakdown.total} finished</span>
       </p>
       <div className={`mt-2 flex h-2.5 gap-0.5 overflow-hidden rounded-full ${breakdown.total === 0 ? "bg-(--color-border)" : ""}`}>
@@ -136,7 +138,7 @@ export function StatsBlockView({
         <div className="mt-2 flex flex-col gap-0.5">
           {breakdown.others.map((metric) => (
             <div key={metric} className="flex items-baseline gap-1.5">
-              <span className="font-bold text-(--color-accent)">{value(metric)}</span>
+              <span className="font-bold text-[var(--block-accent,var(--color-accent))]">{value(metric)}</span>
               <span className="text-[0.85em] text-(--color-text-dim)">{STAT_METRIC_LABELS[metric]}</span>
             </div>
           ))}

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   BLOCK_TYPE_LABELS,
+  DEFAULT_BORDER_SIDES,
   blockTextColors,
   calculateShelfTheme,
   resolveHomeBlock,
@@ -10,6 +11,7 @@ import {
   computeStat,
   libraryBreakdown,
   readingPercent,
+  resolveBlockColor,
   resolveBlockStyle,
   resolveQuote,
   resolveQuoteCollection,
@@ -34,14 +36,16 @@ import { commitHaptic, liftHaptic } from "../../ui/haptics";
 import { PixelRatio, Platform, Pressable, ScrollView, StyleSheet, View, type StyleProp, type TextStyle } from "react-native";
 import { Text } from "../../ui/Text";
 import { blockFontFamily, resolveBorderColor, resolveBorderStyle } from "../../ui/libraryStyle";
-import { minimumTouchTarget, spacing, useTheme } from "../../ui/theme";
+import { minimumTouchTarget, radii, spacing, useTheme, type ThemeColors } from "../../ui/theme";
 import type { GalleryImage } from "../gallery/api";
 import type { Tierlist } from "../tierlists/api";
+import { selectionBorderColor } from "./blockStyleOptions";
 import { muralCanvasHeight } from "./layout";
 
 const LIFT_SPRING = { duration: 300, dampingRatio: 0.8 } as const;
 const ROW_HEIGHT = 36;
 const GAP = 8;
+const gridColumnWidth = (width: number) => (width + GAP) / GRID_COLUMNS;
 const PROGRESS_TRACK = 4;
 
 const blockShadow = Platform.select({
@@ -49,6 +53,36 @@ const blockShadow = Platform.select({
   android: { elevation: 2 },
   default: {},
 });
+
+const BLOCK_PADDING = { tight: spacing.sm, normal: spacing.md, roomy: spacing.xl } as const;
+
+function sideWidths(width: number, sides: BlockStyle["cardBorderSides"]) {
+  return {
+    borderTopWidth: sides.top ? width : 0,
+    borderRightWidth: sides.right ? width : 0,
+    borderBottomWidth: sides.bottom ? width : 0,
+    borderLeftWidth: sides.left ? width : 0,
+  };
+}
+
+function blockPadding(style: BlockStyle) {
+  return { padding: BLOCK_PADDING[style.innerSpacing] ?? BLOCK_PADDING.normal };
+}
+
+function blockFrameStyle(style: BlockStyle, colors: ThemeColors) {
+  return {
+    backgroundColor: resolveBlockColor(style.backgroundColor, colors) ?? colors.surface,
+    borderColor: resolveBorderColor(resolveBlockColor(style.cardBorderColor, colors), style.cardBorderOpacity, colors.border),
+    ...sideWidths(style.cardBorderWidth, style.cardBorderSides),
+    borderStyle: resolveBorderStyle(style.cardBorderStyle),
+    borderRadius: style.cardRadius,
+    opacity: style.cardOpacity / 100,
+  };
+}
+
+function frameShadow(style: BlockStyle) {
+  return style.cardShadow && style.backgroundColor !== "transparent" ? blockShadow : null;
+}
 
 /** Every size inside a block is an `em` of the block's own font size on the
  *  web canvas (1.25em name, 1.1em heading, 0.7em label), and nothing here
@@ -59,6 +93,7 @@ function blockTextStyles(style: BlockStyle, color: string) {
   const face = {
     fontFamily: blockFontFamily(style.codeStyle ? "jetbrainsMono" : style.fontFamily),
     fontStyle: style.italic ? ("italic" as const) : ("normal" as const),
+    textAlign: style.textAlign,
     color,
   };
   // Nothing shrinks below 11pt, the floor a phone at arm's length can still
@@ -91,7 +126,7 @@ function EmptyBlock({ message, style }: { message: string; style: StyleProp<Text
 
 const title = (book: Record<string, unknown> | undefined) => String(book?.Title ?? "Book unavailable");
 
-function CoverRow({ blockId, books, mode, caption, dim, editable, onAssetReady }: { blockId: string; books: Array<Record<string, unknown>>; mode: "reading" | "shelf"; caption: ReturnType<typeof blockTextStyles>["caption"]; dim: { color: string }; editable?: boolean; onAssetReady?: (key: string) => void }) {
+function CoverRow({ blockId, books, mode, caption, dim, accent, editable, onAssetReady }: { blockId: string; books: Array<Record<string, unknown>>; mode: "reading" | "shelf"; caption: ReturnType<typeof blockTextStyles>["caption"]; dim: { color: string }; accent: string; editable?: boolean; onAssetReady?: (key: string) => void }) {
   const { colors } = useTheme();
   const [rowHeight, setRowHeight] = useState(0);
   const line = Math.ceil(caption.lineHeight * PixelRatio.getFontScale());
@@ -106,7 +141,7 @@ function CoverRow({ blockId, books, mode, caption, dim, editable, onAssetReady }
       <View accessible accessibilityRole="image" accessibilityLabel={title(book)} style={{ width: tileWidth, height: coverHeight }}><CoverImage book={book} contentFit="contain" onLoadEnd={onAssetReady ? () => onAssetReady(`cover:${blockId}:${bookKey(book)}:${String(book._coverUrl ?? "")}`) : undefined} /></View>
       {bodyHeight ? <View style={[styles.coverFooter, { height: bodyHeight }]}>
         {mode === "shelf" ? <Text numberOfLines={1} style={caption}>{title(book)}</Text> : percent === null ? null : <>
-          <View style={[styles.readingTrack, { backgroundColor: colors.border }]}>{percent ? <View style={[styles.readingFill, { width: `${percent}%`, backgroundColor: colors.accent }]} /> : null}</View>
+          <View style={[styles.readingTrack, { backgroundColor: colors.border }]}>{percent ? <View style={[styles.readingFill, { width: `${percent}%`, backgroundColor: accent }]} /> : null}</View>
           <Text style={[caption, dim]}>{percent}%</Text>
         </>}
       </View> : null}
@@ -139,13 +174,13 @@ export function BlockContent({ block, books, images, tierlists, profile, groups,
   if (block.type === "currentlyReading") {
     const reading = books.filter((book) => book.ReadStatus === 1);
     return <>{eyebrow("Currently reading", reading.length)}
-      {reading.length ? <CoverRow blockId={block.id} books={reading} mode="reading" caption={text.caption} dim={dim} editable={editable} onAssetReady={onAssetReady} /> : <EmptyBlock message="Choose books or connect a collection in Edit." style={[text.caption, dim]} />}
+      {reading.length ? <CoverRow blockId={block.id} books={reading} mode="reading" caption={text.caption} dim={dim} accent={blockColors.accent} editable={editable} onAssetReady={onAssetReady} /> : <EmptyBlock message="Choose books or connect a collection in Edit." style={[text.caption, dim]} />}
     </>;
   }
   if (block.type === "shelf") {
     const selected = resolveShelfBooks(block, books);
     return <>{eyebrow(block.title || "Shelf", selected.length)}
-      {selected.length ? <CoverRow blockId={block.id} books={selected} mode="shelf" caption={text.caption} dim={dim} editable={editable} onAssetReady={onAssetReady} /> : <EmptyBlock message="Choose books or connect a collection in Edit." style={[text.caption, dim]} />}
+      {selected.length ? <CoverRow blockId={block.id} books={selected} mode="shelf" caption={text.caption} dim={dim} accent={blockColors.accent} editable={editable} onAssetReady={onAssetReady} /> : <EmptyBlock message="Choose books or connect a collection in Edit." style={[text.caption, dim]} />}
     </>;
   }
   if (block.type === "spotlight") {
@@ -163,22 +198,30 @@ export function BlockContent({ block, books, images, tierlists, profile, groups,
     const breakdown = libraryBreakdown(block.metrics, value);
     if (!breakdown) return <View style={styles.stats}>{block.metrics.map((metric) => <View key={metric}><Text numberOfLines={1} style={text.stat}>{value(metric)}</Text><Text numberOfLines={1} style={[text.caption, dim]}>{STAT_METRIC_LABELS[metric]}</Text></View>)}</View>;
     const segments = [
-      { label: "finished", count: breakdown.finished, color: colors.accent },
+      { label: "finished", count: breakdown.finished, color: blockColors.accent },
       { label: "reading", count: breakdown.reading, color: colors.accentFill },
       { label: "to read", count: breakdown.toRead, color: colors.border },
     ];
     return <View style={styles.statsBreakdown}>
       {eyebrow("Your library")}
-      <View style={styles.statsHero}><Text style={[text.hero, { color: colors.accent }]}>{breakdown.finished}</Text><Text style={[text.caption, dim, styles.statsOf]}>of {breakdown.total} finished</Text></View>
+      <View style={styles.statsHero}><Text style={[text.hero, { color: blockColors.accent }]}>{breakdown.finished}</Text><Text style={[text.caption, dim, styles.statsOf]}>of {breakdown.total} finished</Text></View>
       <View style={styles.statsBar}>{breakdown.total ? segments.filter((segment) => segment.count).map((segment) => <View key={segment.label} style={{ flex: segment.count, backgroundColor: segment.color }} />) : <View style={{ flex: 1, backgroundColor: colors.border }} />}</View>
       <View style={styles.statsLegend}>{segments.map((segment) => <View key={segment.label} style={styles.statsLegendRow}><View style={[styles.statsDot, { backgroundColor: segment.color }]} /><Text numberOfLines={1} style={[text.caption, dim]}>{segment.count} {segment.label}</Text></View>)}</View>
-      {breakdown.others.map((metric) => <View key={metric} style={styles.statsRow}><Text numberOfLines={1} style={[text.stat, { color: colors.accent }]}>{value(metric)}</Text><Text numberOfLines={1} style={[text.caption, dim, styles.statsOf]}>{STAT_METRIC_LABELS[metric]}</Text></View>)}
+      {breakdown.others.map((metric) => <View key={metric} style={styles.statsRow}><Text numberOfLines={1} style={[text.stat, { color: blockColors.accent }]}>{value(metric)}</Text><Text numberOfLines={1} style={[text.caption, dim, styles.statsOf]}>{STAT_METRIC_LABELS[metric]}</Text></View>)}
     </View>;
   }
   if (block.type === "tierlist") { const tierlist = tierlists.find((item) => item.id === block.tierlistId); return <>{eyebrow(tierlist?.name ?? "Tier list unavailable")}{tierlist?.data.tiers.map((tier) => <Text key={tier.id} style={text.body}>{tier.label}: {tier.bookKeys.length}</Text>)}</>; }
   if (block.type === "readerCard") return <ReaderCardBlock books={books} groups={groups ?? []} readerName={profile?.username || "reader"} publicCard={readerCardOverride} editable={editable} />;
   return <Text style={text.body}>{BLOCK_TYPE_LABELS[block.type]}</Text>;
 }
+
+const MOVES: Record<string, [number, number]> = { moveLeft: [-1, 0], moveRight: [1, 0], moveUp: [0, -1], moveDown: [0, 1] };
+const MOVE_ACTIONS = [
+  { name: "moveLeft", label: "Move left" },
+  { name: "moveRight", label: "Move right" },
+  { name: "moveUp", label: "Move up" },
+  { name: "moveDown", label: "Move down" },
+];
 
 function CanvasBlock({ block, columnWidth, editable, selected, books, images, tierlists, profile, groups, shelfThemeOverride, readerCardOverride, statsOverride, onSelect, onMove, onAssetReady }: {
   block: MuralBlock;
@@ -215,32 +258,67 @@ function CanvasBlock({ block, columnWidth, editable, selected, books, images, ti
       if (dx !== 0 || dy !== 0) scheduleOnRN(commitHaptic);
     })
     .onFinalize(() => { x.value = withSpring(0); y.value = withSpring(0); lifted.value = withSpring(0, LIFT_SPRING); });
+  const style = resolveBlockStyle(block.style);
+  const restOpacity = style.cardOpacity / 100;
   const animated = useAnimatedStyle(() => ({
-    opacity: 1 - lifted.value * 0.15,
+    opacity: restOpacity * (1 - lifted.value * 0.15),
     transform: [{ translateX: x.value }, { translateY: y.value }, { scale: 1 + lifted.value * 0.03 }],
   }));
-  const style = resolveBlockStyle(block.style);
   const body = <View style={styles.blockBody}><BlockContent block={block} books={books} images={images} tierlists={tierlists} profile={profile} groups={groups} shelfThemeOverride={shelfThemeOverride} readerCardOverride={readerCardOverride} statsOverride={statsOverride} editable={editable} onAssetReady={onAssetReady} /></View>;
   const content = <Animated.View style={[
         styles.block,
-        style.cardShadow ? blockShadow : null,
+        frameShadow(style),
+        blockFrameStyle(style, colors),
+        selected ? { borderColor: selectionBorderColor(style, colors), ...sideWidths(Math.max(2, style.cardBorderWidth), DEFAULT_BORDER_SIDES) } : null,
         {
           left: block.layout.x * columnWidth,
           top: block.layout.y * ROW_HEIGHT,
           width: block.layout.w * columnWidth - GAP,
           height: block.layout.h * ROW_HEIGHT - GAP,
-          backgroundColor: style.backgroundColor ?? colors.surface,
-          borderColor: selected ? colors.accent : resolveBorderColor(style.cardBorderColor, style.cardBorderOpacity, colors.border),
-          borderWidth: selected ? Math.max(2, style.cardBorderWidth) : style.cardBorderWidth,
-          borderStyle: resolveBorderStyle(style.cardBorderStyle),
-          borderRadius: style.cardRadius,
-          opacity: style.cardOpacity / 100,
         },
         animated,
       ]}>
-        {editable ? <Pressable accessibilityRole="button" accessibilityLabel={`${BLOCK_TYPE_LABELS[block.type]} block. Long press and drag to move`} onPress={onSelect} style={styles.blockPress}>{body}</Pressable> : <View style={styles.blockPress}>{body}</View>}
+        {editable ? <Pressable accessibilityRole="button" accessibilityLabel={`${BLOCK_TYPE_LABELS[block.type]} block. Long press and drag to move`} accessibilityActions={MOVE_ACTIONS} onAccessibilityAction={(event) => { const move = MOVES[event.nativeEvent.actionName]; if (move) onMove(move[0], move[1]); }} onPress={onSelect} style={[styles.blockPress, blockPadding(style)]}>{body}</Pressable> : <View style={[styles.blockPress, blockPadding(style)]}>{body}</View>}
       </Animated.View>;
   return editable ? <GestureDetector gesture={gesture}>{content}</GestureDetector> : content;
+}
+
+export function BlockPreview({ block, canvasWidth, maxHeight, books, images, tierlists, profile, groups = [] }: {
+  block: MuralBlock;
+  canvasWidth: number;
+  maxHeight: number;
+  books: Array<Record<string, unknown>>;
+  images: GalleryImage[];
+  tierlists: Tierlist[];
+  profile?: ReaderProfile;
+  groups?: Group[];
+}) {
+  const { colors } = useTheme();
+  const [boxWidth, setBoxWidth] = useState(0);
+  const [day] = useState(() => new Date().toISOString().slice(0, 10));
+  const resolved = useMemo(() => resolveHomeBlock(block, books, groups, day), [block, books, groups, day]);
+  const style = resolveBlockStyle(resolved.style);
+  const width = block.layout.w * gridColumnWidth(canvasWidth) - GAP;
+  const height = block.layout.h * ROW_HEIGHT - GAP;
+  const room = boxWidth - spacing.md * 2;
+  const scale = room > 0 && canvasWidth > 0 ? Math.min(1, room / width, maxHeight / height) : 0;
+  return (
+    <View
+      accessibilityLabel={`Preview of this ${BLOCK_TYPE_LABELS[block.type]} block`}
+      onLayout={(event) => setBoxWidth(event.nativeEvent.layout.width)}
+      style={[styles.previewBox, { height: (scale ? height * scale : maxHeight) + spacing.md * 2, backgroundColor: colors.background }]}
+    >
+      {scale ? (
+        <View style={[styles.previewBlock, frameShadow(style), blockFrameStyle(style, colors), { width, height, transform: [{ scale }] }]}>
+          <View style={[styles.blockPress, blockPadding(style)]}>
+            <View style={styles.blockBody}>
+              <BlockContent block={resolved} books={books} images={images} tierlists={tierlists} profile={profile} groups={groups} editable />
+            </View>
+          </View>
+        </View>
+      ) : null}
+    </View>
+  );
 }
 
 export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThemeOverride, readerCardOverride, statsOverride, editable = false, selectedBlockId, onSelectBlock, onLayoutChange, onImageReadyChange, groups = [] }: {
@@ -255,7 +333,7 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThe
   statsOverride?: Record<string, number>;
   editable?: boolean;
   selectedBlockId?: string | null;
-  onSelectBlock?: (id: string) => void;
+  onSelectBlock?: (id: string | null) => void;
   onLayoutChange?: (id: string, layout: BlockLayout) => void;
   onImageReadyChange?: (ready: boolean) => void;
 }) {
@@ -274,9 +352,9 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThe
   });
   const imageReady = width > 0 && assetKeys.every((key) => readyAssets.has(key));
   useEffect(() => { onImageReadyChange?.(imageReady); }, [imageReady, onImageReadyChange]);
-  const columnWidth = (width + GAP) / GRID_COLUMNS;
+  const columnWidth = gridColumnWidth(width);
   const height = muralCanvasHeight(mural.blocks, ROW_HEIGHT, onImageReadyChange && mural.blocks.length ? 0 : undefined);
-  return (
+  const canvas = (
     <View onLayout={(event) => setWidth(event.nativeEvent.layout.width)} style={[styles.canvas, { height, backgroundColor: colors.background }]}>
       {width > 0 ? resolvedBlocks.map((block) => <CanvasBlock
         key={block.id}
@@ -298,13 +376,16 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThe
       />) : null}
     </View>
   );
+  return editable ? <Pressable accessible={false} onPress={() => onSelectBlock?.(null)}>{canvas}</Pressable> : canvas;
 }
 
 const styles = StyleSheet.create({
   canvas: { position: "relative", width: "100%" },
-  block: { position: "absolute", overflow: "hidden", padding: spacing.md },
+  block: { position: "absolute", overflow: "hidden" },
   blockPress: { flex: 1, minHeight: minimumTouchTarget },
   blockBody: { flex: 1, gap: spacing.sm },
+  previewBox: { borderRadius: radii.lg, alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  previewBlock: { overflow: "hidden" },
   emptyBlock: { flex: 1, minHeight: 0, alignItems: "center", justifyContent: "center" },
   bookRow: { flex: 1, flexDirection: "row", gap: spacing.sm },
   bookColumn: { flex: 1, minWidth: 0, gap: spacing.xs },

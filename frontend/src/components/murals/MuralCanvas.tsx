@@ -1,5 +1,5 @@
 import { MuralBlockDetail } from "./MuralBlockDetail";
-import { blockTextColors, resolveHomeBlock, type Group, type PublicReaderCard } from "@scripta/shared";
+import { blockTextColors, resolveBlockColor, resolveHomeBlock, type Group, type PublicReaderCard } from "@scripta/shared";
 import { resolveTheme, themes } from "@scripta/shared/themes";
 import GridLayout from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
@@ -7,7 +7,7 @@ import "react-resizable/css/styles.css";
 import { useEffect, useState, type CSSProperties } from "react";
 import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
-import { blockFontFamilyCss, resolveBlockStyle, resolveBorderColor } from "../../lib/libraryStyle";
+import { BLOCK_PAD_SCALE, blockFontFamilyCss, resolveBlockStyle, resolveBorderColor } from "../../lib/libraryStyle";
 import { GRID_COLUMNS, type BlockLayout, type Mural, type MuralBlock, type ReaderProfile, type ShelfTheme } from "../../lib/murals";
 import { useMuralBookMetadata } from "../../hooks/useMuralBookMetadata";
 import { osScheme, useThemePreference } from "../../lib/theme";
@@ -147,7 +147,7 @@ export function MuralCanvas({
     >
       {mural.blocks.map((block) => {
         const style = resolveBlockStyle(block.style);
-        const overridesColor = Boolean(style.backgroundColor || style.textColor);
+        const overridden = style.backgroundColor || style.textColor ? blockTextColors(style, themeColors) : null;
         return (
           <div
             key={block.id}
@@ -156,22 +156,24 @@ export function MuralCanvas({
             style={{
               borderRadius: `${style.cardRadius}px`,
               opacity: style.cardOpacity / 100,
-              backgroundColor: style.backgroundColor ?? "var(--color-surface)",
+              backgroundColor: resolveBlockColor(style.backgroundColor, themeColors) ?? "var(--color-surface)",
               borderTopWidth: `${style.cardBorderSides.top ? style.cardBorderWidth : 0}px`,
               borderRightWidth: `${style.cardBorderSides.right ? style.cardBorderWidth : 0}px`,
               borderBottomWidth: `${style.cardBorderSides.bottom ? style.cardBorderWidth : 0}px`,
               borderLeftWidth: `${style.cardBorderSides.left ? style.cardBorderWidth : 0}px`,
               borderStyle: style.cardBorderWidth > 0 ? style.cardBorderStyle : "none",
-              borderColor: resolveBorderColor(style.cardBorderColor, style.cardBorderOpacity),
+              borderColor: resolveBorderColor(resolveBlockColor(style.cardBorderColor, themeColors), style.cardBorderOpacity),
               fontFamily: style.codeStyle ? blockFontFamilyCss("jetbrainsMono") : blockFontFamilyCss(style.fontFamily),
               fontSize: `${style.fontSize}px`,
               fontWeight: style.bold ? 700 : undefined,
               fontStyle: style.italic ? "italic" : undefined,
-              color: style.textColor ?? undefined,
-              ...(overridesColor ? { "--color-text-dim": blockTextColors(style, themeColors).dim } : {})
+              color: resolveBlockColor(style.textColor, themeColors) ?? undefined,
+              textAlign: style.textAlign,
+              "--block-pad": BLOCK_PAD_SCALE[style.innerSpacing],
+              ...(overridden ? { "--color-text-dim": overridden.dim, "--block-accent": overridden.accent } : {})
             } as CSSProperties}
           >
-            {!editMode ? <button className="absolute inset-0 z-10 rounded-[inherit] focus-visible:outline-2 focus-visible:outline-(--color-accent)" aria-label={`Open ${block.type} block`} onClick={() => onOpenBlock ? onOpenBlock(block) : setFocusedId(block.id)} /> : null}
+            {!editMode ? <button className="absolute inset-0 z-10 rounded-[inherit] focus-visible:outline-2 focus-visible:outline-[var(--block-accent,var(--color-accent))]" aria-label={`Open ${block.type} block`} onClick={() => onOpenBlock ? onOpenBlock(block) : setFocusedId(block.id)} /> : null}
             <BlockRenderer block={block} books={books} images={images} profile={profile} groups={groups} shelfThemeOverride={shelfThemeOverride} readerCardOverride={readerCardOverride} statsOverride={statsOverride} tierlistData={tierlistData} />
             {editMode && (
               <div className="mural-block-controls absolute top-1.5 right-1.5 opacity-0 transition-opacity group-hover:opacity-100">

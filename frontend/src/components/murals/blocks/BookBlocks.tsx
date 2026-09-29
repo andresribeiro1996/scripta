@@ -85,7 +85,7 @@ export function SpotlightBlockView({ block, books }: { block: Extract<MuralBlock
       <div className="relative min-h-0 flex-1 overflow-hidden bg-(--color-border)">
         <CoverImage book={book} />
       </div>
-      <div className="shrink-0 px-2.5 py-2">
+      <div className="shrink-0 block-px-2.5 block-py-2">
         <div className="truncate text-[1.1em] font-semibold">{String(book.Title ?? "Untitled")}</div>
         <div className="truncate text-[0.85em] text-(--color-text-dim)">{String(book.Attribution ?? "Unknown author")}</div>
         {block.caption && <p className="mt-1 text-[0.85em]">{block.caption}</p>}
@@ -100,7 +100,7 @@ export function SpotlightBlockView({ block, books }: { block: Extract<MuralBlock
 export function ShelfBlockView({ block, books }: { block: Extract<MuralBlock, { type: "shelf" }>; books: Array<Record<string, unknown>> }) {
   const resolved = resolveShelfBooks(block, books);
   return (
-    <div className="flex h-full flex-col overflow-hidden p-2.5">
+    <div className="flex h-full flex-col overflow-hidden block-p-2.5">
       <BlockEyebrow count={resolved.length}>{block.title || "Untitled shelf"}</BlockEyebrow>
       {resolved.length === 0 ? (
         <EmptyBlockState message="No books picked yet." />
@@ -122,7 +122,7 @@ export function CurrentlyReadingBlockView({ books }: { books: Array<Record<strin
   const reading = books.filter((b) => b.ReadStatus === 1);
   const showProgress = reading.some((b) => readingPercent(b) !== null);
   return (
-    <div className="flex h-full flex-col overflow-hidden p-2.5">
+    <div className="flex h-full flex-col overflow-hidden block-p-2.5">
       <BlockEyebrow count={reading.length}>Currently reading</BlockEyebrow>
       {reading.length === 0 ? (
         <EmptyBlockState message="Nothing marked as reading right now." />
@@ -140,7 +140,7 @@ export function CurrentlyReadingBlockView({ books }: { books: Array<Record<strin
                     {percent !== null && (
                       <>
                         <div className="h-1 overflow-hidden rounded-full bg-(--color-border)">
-                          <div className="h-full rounded-full bg-(--color-accent)" style={{ width: `${percent}%` }} />
+                          <div className="h-full rounded-full bg-[var(--block-accent,var(--color-accent))]" style={{ width: `${percent}%` }} />
                         </div>
                         <div className="mt-0.5 text-[0.75em] leading-none text-(--color-text-dim)">{percent}%</div>
                       </>
@@ -362,7 +362,7 @@ export function DraggableTierTile({
 export function TierListBlockView({ tierlist, books }: { tierlist: ResolvedTierlist | undefined; books: Array<Record<string, unknown>> }) {
   if (!tierlist) return <EmptyBlockState message="Tier list unavailable." />;
   return (
-    <div className="flex h-full flex-col overflow-hidden p-2.5">
+    <div className="flex h-full flex-col overflow-hidden block-p-2.5">
       {/* Always rendered, with a fallback — same "always show SOME title
           line" convention ShelfBlockView's own `block.title || "Untitled
           shelf"` already follows. */}
