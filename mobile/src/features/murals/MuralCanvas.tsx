@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   BLOCK_TYPE_LABELS,
+  DEFAULT_BORDER_SIDES,
   blockTextColors,
   calculateShelfTheme,
   resolveHomeBlock,
@@ -8,6 +9,7 @@ import {
   GRID_COLUMNS,
   bookKey,
   computeStat,
+  resolveBlockColor,
   resolveBlockStyle,
   resolveQuote,
   resolveQuoteCollection,
@@ -31,7 +33,7 @@ import { commitHaptic, liftHaptic } from "../../ui/haptics";
 import { Platform, Pressable, StyleSheet, View, type StyleProp, type TextStyle } from "react-native";
 import { Text } from "../../ui/Text";
 import { blockFontFamily, resolveBorderColor, resolveBorderStyle } from "../../ui/libraryStyle";
-import { minimumTouchTarget, spacing, useTheme } from "../../ui/theme";
+import { minimumTouchTarget, radii, spacing, useTheme, type ThemeColors } from "../../ui/theme";
 import type { GalleryImage } from "../gallery/api";
 import type { Tierlist } from "../tierlists/api";
 import { muralCanvasHeight } from "./layout";
@@ -46,6 +48,33 @@ const blockShadow = Platform.select({
   default: {},
 });
 
+const BLOCK_PADDING = { tight: spacing.sm, normal: spacing.lg, roomy: spacing.xxl } as const;
+
+function sideWidths(width: number, sides: BlockStyle["cardBorderSides"]) {
+  return {
+    borderTopWidth: sides.top ? width : 0,
+    borderRightWidth: sides.right ? width : 0,
+    borderBottomWidth: sides.bottom ? width : 0,
+    borderLeftWidth: sides.left ? width : 0,
+  };
+}
+
+function blockFrameStyle(style: BlockStyle, colors: ThemeColors) {
+  return {
+    padding: BLOCK_PADDING[style.innerSpacing] ?? BLOCK_PADDING.normal,
+    backgroundColor: resolveBlockColor(style.backgroundColor, colors) ?? colors.surface,
+    borderColor: resolveBorderColor(resolveBlockColor(style.cardBorderColor, colors), style.cardBorderOpacity, colors.border),
+    ...sideWidths(style.cardBorderWidth, style.cardBorderSides),
+    borderStyle: resolveBorderStyle(style.cardBorderStyle),
+    borderRadius: style.cardRadius,
+    opacity: style.cardOpacity / 100,
+  };
+}
+
+function frameShadow(style: BlockStyle) {
+  return style.cardShadow && style.backgroundColor !== "transparent" ? blockShadow : null;
+}
+
 /** Every size inside a block is an `em` of the block's own font size on the
  *  web canvas (1.25em name, 1.1em heading, 0.7em label), and nothing here
  *  read the block's font settings at all — a style panel change moved the
@@ -55,6 +84,7 @@ function blockTextStyles(style: BlockStyle, color: string) {
   const face = {
     fontFamily: blockFontFamily(style.codeStyle ? "jetbrainsMono" : style.fontFamily),
     fontStyle: style.italic ? ("italic" as const) : ("normal" as const),
+    textAlign: style.textAlign,
     color,
   };
   // Nothing shrinks below 11pt, the floor a phone at arm's length can still
@@ -122,6 +152,14 @@ export function BlockContent({ block, books, images, tierlists, profile, groups,
   return <Text style={text.body}>{BLOCK_TYPE_LABELS[block.type]}</Text>;
 }
 
+const MOVES: Record<string, [number, number]> = { moveLeft: [-1, 0], moveRight: [1, 0], moveUp: [0, -1], moveDown: [0, 1] };
+const MOVE_ACTIONS = [
+  { name: "moveLeft", label: "Move left" },
+  { name: "moveRight", label: "Move right" },
+  { name: "moveUp", label: "Move up" },
+  { name: "moveDown", label: "Move down" },
+];
+
 function CanvasBlock({ block, columnWidth, editable, selected, books, images, tierlists, profile, groups, shelfThemeOverride, readerCardOverride, statsOverride, onSelect, onMove, onAssetReady }: {
   block: MuralBlock;
   columnWidth: number;
@@ -165,24 +203,56 @@ function CanvasBlock({ block, columnWidth, editable, selected, books, images, ti
   const body = <View style={styles.blockBody}><BlockContent block={block} books={books} images={images} tierlists={tierlists} profile={profile} groups={groups} shelfThemeOverride={shelfThemeOverride} readerCardOverride={readerCardOverride} statsOverride={statsOverride} editable={editable} onAssetReady={onAssetReady} /></View>;
   const content = <Animated.View style={[
         styles.block,
-        style.cardShadow ? blockShadow : null,
+        frameShadow(style),
+        blockFrameStyle(style, colors),
+        selected ? { borderColor: colors.accent, ...sideWidths(Math.max(2, style.cardBorderWidth), DEFAULT_BORDER_SIDES) } : null,
         {
           left: block.layout.x * columnWidth,
           top: block.layout.y * ROW_HEIGHT,
           width: block.layout.w * columnWidth - GAP,
           height: block.layout.h * ROW_HEIGHT - GAP,
-          backgroundColor: style.backgroundColor ?? colors.surface,
-          borderColor: selected ? colors.accent : resolveBorderColor(style.cardBorderColor, style.cardBorderOpacity, colors.border),
-          borderWidth: selected ? Math.max(2, style.cardBorderWidth) : style.cardBorderWidth,
-          borderStyle: resolveBorderStyle(style.cardBorderStyle),
-          borderRadius: style.cardRadius,
-          opacity: style.cardOpacity / 100,
         },
         animated,
       ]}>
-        {editable ? <Pressable accessibilityRole="button" accessibilityLabel={`${BLOCK_TYPE_LABELS[block.type]} block. Long press and drag to move`} onPress={onSelect} style={styles.blockPress}>{body}</Pressable> : <View style={styles.blockPress}>{body}</View>}
+        {editable ? <Pressable accessibilityRole="button" accessibilityLabel={`${BLOCK_TYPE_LABELS[block.type]} block. Long press and drag to move`} accessibilityActions={MOVE_ACTIONS} onAccessibilityAction={(event) => { const move = MOVES[event.nativeEvent.actionName]; if (move) onMove(move[0], move[1]); }} onPress={onSelect} style={styles.blockPress}>{body}</Pressable> : <View style={styles.blockPress}>{body}</View>}
       </Animated.View>;
   return editable ? <GestureDetector gesture={gesture}>{content}</GestureDetector> : content;
+}
+
+export function BlockPreview({ block, canvasWidth, maxHeight, books, images, tierlists, profile, groups = [] }: {
+  block: MuralBlock;
+  canvasWidth: number;
+  maxHeight: number;
+  books: Array<Record<string, unknown>>;
+  images: GalleryImage[];
+  tierlists: Tierlist[];
+  profile?: ReaderProfile;
+  groups?: Group[];
+}) {
+  const { colors } = useTheme();
+  const [boxWidth, setBoxWidth] = useState(0);
+  const [day] = useState(() => new Date().toISOString().slice(0, 10));
+  const resolved = useMemo(() => resolveHomeBlock(block, books, groups, day), [block, books, groups, day]);
+  const style = resolveBlockStyle(resolved.style);
+  const width = block.layout.w * (canvasWidth / GRID_COLUMNS) - GAP;
+  const height = block.layout.h * ROW_HEIGHT - GAP;
+  const room = boxWidth - spacing.md * 2;
+  const scale = room > 0 ? Math.min(1, room / width, maxHeight / height) : 0;
+  return (
+    <View
+      accessibilityLabel={`Preview of this ${BLOCK_TYPE_LABELS[block.type]} block`}
+      onLayout={(event) => setBoxWidth(event.nativeEvent.layout.width)}
+      style={[styles.previewBox, { height: (scale ? height * scale : maxHeight) + spacing.md * 2, backgroundColor: colors.background }]}
+    >
+      {scale ? (
+        <View style={[styles.previewBlock, frameShadow(style), blockFrameStyle(style, colors), { width, height, transform: [{ scale }] }]}>
+          <View style={styles.blockBody}>
+            <BlockContent block={resolved} books={books} images={images} tierlists={tierlists} profile={profile} groups={groups} />
+          </View>
+        </View>
+      ) : null}
+    </View>
+  );
 }
 
 export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThemeOverride, readerCardOverride, statsOverride, editable = false, selectedBlockId, onSelectBlock, onLayoutChange, onImageReadyChange, groups = [] }: {
@@ -197,7 +267,7 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThe
   statsOverride?: Record<string, number>;
   editable?: boolean;
   selectedBlockId?: string | null;
-  onSelectBlock?: (id: string) => void;
+  onSelectBlock?: (id: string | null) => void;
   onLayoutChange?: (id: string, layout: BlockLayout) => void;
   onImageReadyChange?: (ready: boolean) => void;
 }) {
@@ -218,7 +288,7 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThe
   useEffect(() => { onImageReadyChange?.(imageReady); }, [imageReady, onImageReadyChange]);
   const columnWidth = width / GRID_COLUMNS;
   const height = muralCanvasHeight(mural.blocks, ROW_HEIGHT, onImageReadyChange && mural.blocks.length ? 0 : undefined);
-  return (
+  const canvas = (
     <View onLayout={(event) => setWidth(event.nativeEvent.layout.width)} style={[styles.canvas, { height, backgroundColor: colors.background }]}>
       {width > 0 ? resolvedBlocks.map((block) => <CanvasBlock
         key={block.id}
@@ -240,13 +310,16 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThe
       />) : null}
     </View>
   );
+  return editable ? <Pressable accessible={false} onPress={() => onSelectBlock?.(null)}>{canvas}</Pressable> : canvas;
 }
 
 const styles = StyleSheet.create({
   canvas: { position: "relative", width: "100%" },
-  block: { position: "absolute", overflow: "hidden", padding: spacing.lg },
+  block: { position: "absolute", overflow: "hidden" },
   blockPress: { flex: 1, minHeight: minimumTouchTarget },
   blockBody: { flex: 1, gap: spacing.sm },
+  previewBox: { borderRadius: radii.lg, alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  previewBlock: { overflow: "hidden" },
   emptyBlock: { flex: 1, minHeight: 0, alignItems: "center", justifyContent: "center" },
   bookRow: { flex: 1, flexDirection: "row", gap: spacing.sm },
   bookColumn: { flex: 1, minWidth: 0, gap: spacing.xs },
