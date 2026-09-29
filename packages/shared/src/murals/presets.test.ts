@@ -4,7 +4,7 @@ import { bookKey } from "../library/merge.js";
 import { readerIdentity } from "../library/readerIdentity.js";
 import { buildMuralPreset, MURAL_PRESETS, presetAvailability, shelfPresetSummary } from "./presets.js";
 import { DEFAULT_BLOCK_STYLE } from "../library/libraryStyle.js";
-import { updateBlock, type Mural, type MuralBlock } from "./murals.js";
+import { ensureBookBlockHeights, updateBlock, type Mural, type MuralBlock } from "./murals.js";
 
 const book = (title: string, fields: Record<string, unknown> = {}) => ({ Title: title, Attribution: "Author", ...fields });
 const key = (title: string) => `ta:${title.toLowerCase()}|author`;
@@ -75,6 +75,10 @@ test("the My shelf preset stacks profile, stats, reading, finished, then passage
   assert.equal(stats.layout.h, 4);
   const profile = blocks.find((block) => block.type === "profile")!;
   assert.equal(profile.layout.h, 5);
+  const reading = blocks.find((block) => block.type === "currentlyReading")!;
+  assert.equal(reading.layout.h, 6);
+  assert.equal(finished.layout.y, reading.layout.y + 6);
+  assert.equal(ensureBookBlockHeights(blocks), blocks);
 });
 
 test("the My shelf preset leaves out blocks with no data and widens a lone bottom block", () => {

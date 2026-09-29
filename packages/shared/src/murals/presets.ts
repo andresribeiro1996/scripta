@@ -94,7 +94,7 @@ export function buildMuralPreset(id: MuralPresetId, books: Book[], groups: Group
       statsY = profileBottom + 4;
     }
     let y = statsY;
-    if (reading.length) { blocks.push({ ...at(0, y, 12, 4), type: "currentlyReading" }); y += 4; }
+    if (reading.length) { blocks.push({ ...at(0, y, 12, 6), type: "currentlyReading" }); y += 6; }
     if (finished.length) { blocks.push({ ...at(0, y, 12, 5), type: "shelf", title: "Finished", role: "finished", bookKeys: keys(finished) }); y += 5; }
     const width = hasPassage && loved.length ? 6 : 12;
     if (hasPassage) blocks.push({ ...at(0, y, width, 5), type: "quote", bookKey: "", highlightId: "", mode: "rediscover" });

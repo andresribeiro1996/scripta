@@ -24,7 +24,7 @@ import { changeBlockLayout } from "./layout";
 import { MuralCanvas } from "./MuralCanvas";
 import { MuralShareSheet } from "./MuralShareSheet";
 import { fetchMural, shareMural, unshareMural, updateMural } from "./api";
-import { MURALS_QUERY_KEY } from "./useMurals";
+import { MURALS_QUERY_KEY, withGrownBlocks } from "./useMurals";
 import { useAuth } from "../../core/auth";
 import { API_URL } from "../../core/config";
 
@@ -35,7 +35,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
   const { user } = useAuth();
   const router = useRouter();
   const client = useQueryClient();
-  const muralQuery = useQuery({ queryKey: ["murals", id], queryFn: () => fetchMural(id), retry: false });
+  const muralQuery = useQuery({ queryKey: ["murals", id], queryFn: () => fetchMural(id), select: withGrownBlocks, retry: false });
   const libraryQuery = useLibrary();
   const { data: library } = libraryQuery;
   const gallery = useQuery({ queryKey: ["gallery"], queryFn: fetchGalleryImages });

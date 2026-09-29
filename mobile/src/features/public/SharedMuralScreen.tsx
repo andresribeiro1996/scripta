@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Stack } from "expo-router";
-import type { Mural } from "@scripta/shared";
+import { ensureBookBlockHeights, type Mural } from "@scripta/shared";
 import { useQuery } from "@tanstack/react-query";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
@@ -21,7 +21,7 @@ export function SharedMuralScreen({ token }: { token: string }) {
 
   if (query.isPending) return <View style={[styles.center, { backgroundColor: colors.background }]}><Skeleton height={180} /></View>;
   if (query.isError || !query.data) return <View style={[styles.center, { backgroundColor: colors.background }]}><ErrorState title="Mural unavailable" body="This link is invalid or no longer active." /></View>;
-  const mural: Mural = { ...query.data.mural, coverImageId: undefined, coverImageUrl: query.data.mural.coverImageUrl ?? undefined, shareToken: null, shareUrl: null, folderId: null, createdAt: "", updatedAt: "" };
+  const mural: Mural = { ...query.data.mural, blocks: ensureBookBlockHeights(query.data.mural.blocks), coverImageId: undefined, coverImageUrl: query.data.mural.coverImageUrl ?? undefined, shareToken: null, shareUrl: null, folderId: null, createdAt: "", updatedAt: "" };
   return <Screen bottom top={false}>
     <Stack.Screen options={{ headerShown: true, title: mural.name }} />
     <ScrollView contentContainerStyle={styles.screen}>

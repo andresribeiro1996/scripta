@@ -100,8 +100,8 @@ console.log("\n2b. Multi-book blocks have enough height for full covers");
     { id: "below", type: "text", layout: { x: 0, y: 3, w: 4, h: 2 }, heading: "Below" }
   ];
   const upgraded = ensureBookBlockHeights(blocks);
-  check("short multi-book blocks gain one row", upgraded[0].layout.h === 4 && upgraded[1].layout.h === 4);
-  check("blocks below move once without overlap", upgraded[2].layout.y === 4);
+  check("short shelves reach 4 rows and short currently-reading blocks reach 6", upgraded[0].layout.h === 4 && upgraded[1].layout.h === 6);
+  check("blocks below move once without overlap", upgraded[2].layout.y === 6);
   check("height upgrade is idempotent", ensureBookBlockHeights(upgraded) === upgraded);
 }
 
