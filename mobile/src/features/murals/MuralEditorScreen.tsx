@@ -68,6 +68,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
   }, [muralQuery.refetch]));
 
   const draftMural = useMemo(() => mural ? { ...mural, name: currentName, blocks: currentBlocks } : null, [mural, currentName, currentBlocks]);
+  const unsaved = useMemo(() => !!mural && ((currentName.trim() || mural.name) !== mural.name || JSON.stringify(currentBlocks) !== JSON.stringify(mural.blocks)), [mural, currentName, currentBlocks]);
 
   function updateSelected(transform: (block: MuralBlock) => MuralBlock) {
     if (!selected) return;
@@ -117,7 +118,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
           headerShown: true,
           title: currentName || "Mural",
           headerRight: () => <HeaderActions>
-            <IconButton framed accessibilityLabel="Save mural" label="Save" name="confirm" onPress={() => { if (!busy) void save(); }} />
+            {unsaved ? <IconButton framed accessibilityLabel="Save mural" label="Save" name="confirm" onPress={() => { if (!busy) void save(); }} /> : null}
             <IconButton framed accessibilityLabel="Share mural" name="share" onPress={() => setShareFor(draftMural)} />
             <Menu title={currentName} items={[{ label: "Rename…", onPress: () => setRenaming(true) }]}><IconButton framed accessibilityLabel="Mural actions" name="more" /></Menu>
           </HeaderActions>,
@@ -127,7 +128,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.canvasScroll}>
         <MuralCanvas mural={draftMural} books={books} groups={library?.data.groups ?? []} images={gallery.data ?? []} tierlists={tierlists.data ?? []} profile={user?.username ? { username: user.username, avatarUrl: user.avatarId ? `${API_URL}/auth/avatar/${user.avatarId}/file` : null } : undefined} editable selectedBlockId={selectedId} onSelectBlock={setSelectedId} onLayoutChange={(blockId, layout) => setBlocks(changeBlockLayout(currentBlocks, blockId, layout))} />
       </ScrollView>
-      <Fab label="Add block" onPress={() => setAdding(true)} />
+      <Fab label="Add" accessibilityLabel="Add block" onPress={() => setAdding(true)} />
       <Dialog visible={renaming} title="Rename mural" onClose={() => setRenaming(false)}>
         <View style={styles.dialog}><Input label="Mural name" value={currentName} onChangeText={setName} /><Button label="Done" onPress={() => setRenaming(false)} /></View>
       </Dialog>
