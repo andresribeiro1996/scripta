@@ -51,12 +51,13 @@ export function ContentTab({ block, books, groups, images, tierlists, update, on
   const hint = (text: string) => <Text style={[typography.caption, { color: colors.textDim }]}>{text}</Text>;
 
   if (block.type === "shelf") {
+    const following = collections.some((group) => group.id === block.collectionId);
     return (
       <View style={styles.tab}>
-        <Input label="Title" value={block.title} onChangeText={(title) => update((item) => item.type === "shelf" ? { ...item, title } : item)} />
-        {collections.length ? <Segmented options={SHELF_SOURCES} value={block.collectionId ? "follow" : "pick"} accessibilityLabel="Shelf source" onChange={(source) => update((item) => item.type !== "shelf" ? item : source === "follow" ? { ...item, collectionId: collections[0]!.id, bookKeys: [] } : { ...item, collectionId: undefined, bookKeys: (resolveHomeBlock(item, books, groups, "") as typeof item).bookKeys })} /> : null}
-        {block.collectionId
-          ? <><SelectRow label="Collection" value={block.collectionId} options={collections.map((group) => ({ value: group.id, label: group.name }))} onChange={(collectionId) => update((item) => item.type === "shelf" ? { ...item, collectionId, bookKeys: [] } : item)} />{hint("Leave the title blank to use the collection's name.")}</>
+        <Input label="Title" value={block.title} hint={following ? "Leave blank to use the collection's name." : undefined} onChangeText={(title) => update((item) => item.type === "shelf" ? { ...item, title } : item)} />
+        {collections.length ? <Segmented options={SHELF_SOURCES} value={following ? "follow" : "pick"} accessibilityLabel="Shelf source" onChange={(source) => update((item) => item.type !== "shelf" ? item : source === "follow" ? { ...item, collectionId: collections[0]!.id, bookKeys: [] } : { ...item, collectionId: undefined, bookKeys: (resolveHomeBlock(item, books, groups, "") as typeof item).bookKeys })} /> : null}
+        {following
+          ? <SelectRow label="Collection" value={block.collectionId!} options={collections.map((group) => ({ value: group.id, label: group.name }))} onChange={(collectionId) => update((item) => item.type === "shelf" ? { ...item, collectionId, bookKeys: [] } : item)} />
           : <PickerRow label="Books" value={`${block.bookKeys.length} chosen`} onPress={() => onPick("book")} />}
       </View>
     );
@@ -72,12 +73,13 @@ export function ContentTab({ block, books, groups, images, tierlists, update, on
   }
 
   if (block.type === "quote") {
+    const quote = resolveQuote(block, books);
     return (
       <View style={styles.tab}>
         <Segmented options={QUOTE_SOURCES} value={block.mode === "rediscover" ? "rediscover" : "pinned"} accessibilityLabel="Passage source" onChange={(source) => update((item) => item.type !== "quote" ? item : source === "rediscover" ? { ...item, mode: "rediscover", bookKey: "", highlightId: "" } : { ...item, mode: undefined })} />
         {block.mode === "rediscover"
           ? hint("A different passage from your books each day. Only passages from known books are used.")
-          : <PickerRow label="Passage" value={String(resolveQuote(block, books)?.highlight.Text ?? "None")} onPress={() => onPick("book")} />}
+          : <PickerRow label="Passage" value={quote ? String(quote.highlight.Text || quote.highlight.Annotation || "Untitled passage") : "None"} onPress={() => onPick("book")} />}
       </View>
     );
   }
