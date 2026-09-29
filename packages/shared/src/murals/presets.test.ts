@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { bookKey } from "../library/merge.js";
 import { readerIdentity } from "../library/readerIdentity.js";
 import { buildMuralPreset, MURAL_PRESETS, presetAvailability, shelfPresetSummary } from "./presets.js";
+import { DEFAULT_BLOCK_STYLE } from "../library/libraryStyle.js";
 import { updateBlock, type Mural, type MuralBlock } from "./murals.js";
 
 const book = (title: string, fields: Record<string, unknown> = {}) => ({ Title: title, Attribution: "Author", ...fields });
@@ -91,6 +92,15 @@ test("preset blocks never overlap", () => {
       if (a === b) continue;
       const overlap = a.layout.x < b.layout.x + b.layout.w && b.layout.x < a.layout.x + a.layout.w && a.layout.y < b.layout.y + b.layout.h && b.layout.y < a.layout.y + a.layout.h;
       assert.ok(!overlap, `${id}: ${a.type} overlaps ${b.type}`);
+    }
+  }
+});
+
+test("preset blocks follow the theme: no colour or chrome overrides, only the heading's display font", () => {
+  for (const { id } of MURAL_PRESETS) {
+    for (const block of buildMuralPreset(id, library).blocks) {
+      if (block.type === "text") assert.deepEqual(block.style, { ...DEFAULT_BLOCK_STYLE, fontFamily: "playfairDisplay" }, `${id}: heading style`);
+      else assert.equal(block.style, undefined, `${id}: ${block.type} has a style override`);
     }
   }
 });

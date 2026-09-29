@@ -6,10 +6,10 @@ import { eligiblePassages } from "./home.js";
 import { ensureBookBlockHeights, newId, type BlockLayout, type MuralBlock } from "./murals.js";
 
 export const MURAL_PRESETS = [
-  { id: "best", name: "All-time favourites", description: "The books that stayed with you.", color: "#44252e", accent: "#edcd96" },
-  { id: "recent", name: "Recently finished", description: "Your last pages, newest first.", color: "#233d35", accent: "#c2dbc9" },
-  { id: "next", name: "Want to read", description: "Stories waiting their turn.", color: "#25364f", accent: "#c5d7f1" },
-  { id: "shelf", name: "My shelf", description: "What you're reading, what you've finished, and a passage to revisit.", color: "#2b2622", accent: "#e6c79c" }
+  { id: "best", name: "All-time favourites", description: "The books that stayed with you." },
+  { id: "recent", name: "Recently finished", description: "Your last pages, newest first." },
+  { id: "next", name: "Want to read", description: "Stories waiting their turn." },
+  { id: "shelf", name: "My shelf", description: "What you're reading, what you've finished, and a passage to revisit." }
 ] as const;
 
 export type MuralPresetId = typeof MURAL_PRESETS[number]["id"];
@@ -71,10 +71,9 @@ export function buildMuralPreset(id: MuralPresetId, books: Book[], groups: Group
   const library = titledBooks(books);
   const selected = presetBooks(id, library).slice(0, SHELF_SIZE);
   const keys = (list: Book[]) => list.map(bookKey);
-  const style: BlockStyle = { ...DEFAULT_BLOCK_STYLE, backgroundColor: preset.color, textColor: "#f5f1e9", cardBorderWidth: 0, cardShadow: false, cardRadius: 16, fontFamily: "sans" };
-  const accentStyle: BlockStyle = { ...style, backgroundColor: preset.accent, textColor: preset.color, fontFamily: "playfairDisplay" };
-  const at = (x: number, y: number, w: number, h: number, accent = false): { id: string; layout: BlockLayout; style: BlockStyle } =>
-    ({ id: newId(), layout: { x, y, w, h }, style: accent ? accentStyle : style });
+  const accentStyle: BlockStyle = { ...DEFAULT_BLOCK_STYLE, fontFamily: "playfairDisplay" };
+  const at = (x: number, y: number, w: number, h: number, accent = false): { id: string; layout: BlockLayout; style?: BlockStyle } =>
+    ({ id: newId(), layout: { x, y, w, h }, ...(accent ? { style: accentStyle } : {}) });
   const blocks: MuralBlock[] = [];
 
   if (id === "shelf") {
