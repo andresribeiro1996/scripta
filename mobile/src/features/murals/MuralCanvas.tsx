@@ -31,7 +31,7 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { commitHaptic, liftHaptic } from "../../ui/haptics";
-import { Platform, Pressable, ScrollView, StyleSheet, View, type StyleProp, type TextStyle } from "react-native";
+import { PixelRatio, Platform, Pressable, ScrollView, StyleSheet, View, type StyleProp, type TextStyle } from "react-native";
 import { Text } from "../../ui/Text";
 import { blockFontFamily, resolveBorderColor, resolveBorderStyle } from "../../ui/libraryStyle";
 import { minimumTouchTarget, spacing, useTheme } from "../../ui/theme";
@@ -42,6 +42,7 @@ import { muralCanvasHeight } from "./layout";
 const LIFT_SPRING = { duration: 300, dampingRatio: 0.8 } as const;
 const ROW_HEIGHT = 36;
 const GAP = 8;
+const PROGRESS_TRACK = 4;
 
 const blockShadow = Platform.select({
   ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 4 },
@@ -65,7 +66,7 @@ function blockTextStyles(style: BlockStyle, color: string) {
   // desktop and not here. A block deliberately set smaller than the floor
   // keeps its own size as the ceiling instead of having steps grow past it.
   const floor = Math.min(11, style.fontSize);
-  const step = (em: number, weight?: TextStyle["fontWeight"]): TextStyle => {
+  const step = (em: number, weight?: TextStyle["fontWeight"]): TextStyle & { lineHeight: number } => {
     const size = Math.max(floor, Math.round(style.fontSize * em));
     return { ...face, fontSize: size, lineHeight: Math.round(size * 1.4), fontWeight: weight ?? (style.bold ? "700" : "400") };
   };
@@ -88,16 +89,39 @@ function EmptyBlock({ message, style }: { message: string; style: StyleProp<Text
   return <View style={styles.emptyBlock}><Text style={style}>{message}</Text></View>;
 }
 
+const title = (book: Record<string, unknown> | undefined) => String(book?.Title ?? "Book unavailable");
+
+function CoverRow({ blockId, books, mode, caption, dim, editable, onAssetReady }: { blockId: string; books: Array<Record<string, unknown>>; mode: "reading" | "shelf"; caption: ReturnType<typeof blockTextStyles>["caption"]; dim: { color: string }; editable?: boolean; onAssetReady?: (key: string) => void }) {
+  const { colors } = useTheme();
+  const [rowHeight, setRowHeight] = useState(0);
+  const line = Math.ceil(caption.lineHeight * PixelRatio.getFontScale());
+  const showProgress = mode === "reading" && books.some((book) => readingPercent(book) !== null);
+  const bodyHeight = mode === "shelf" ? line : showProgress ? PROGRESS_TRACK + spacing.xs + line : 0;
+  const footerHeight = bodyHeight ? spacing.xs + bodyHeight : 0;
+  const coverHeight = Math.max(0, rowHeight - footerHeight);
+  const tileWidth = (coverHeight * 2) / 3;
+  return <ScrollView horizontal scrollEnabled={!editable} showsHorizontalScrollIndicator={false} onLayout={(event) => setRowHeight(event.nativeEvent.layout.height)} style={styles.coverScroll} contentContainerStyle={styles.coverRow}>{rowHeight > 0 ? books.map((book) => {
+    const percent = mode === "reading" ? readingPercent(book) : null;
+    return <View key={bookKey(book)} style={[styles.coverTile, { width: tileWidth, height: rowHeight }]}>
+      <View accessible accessibilityRole="image" accessibilityLabel={title(book)} style={{ width: tileWidth, height: coverHeight }}><CoverImage book={book} contentFit="contain" onLoadEnd={onAssetReady ? () => onAssetReady(`cover:${blockId}:${bookKey(book)}:${String(book._coverUrl ?? "")}`) : undefined} /></View>
+      {bodyHeight ? <View style={[styles.coverFooter, { height: bodyHeight }]}>
+        {mode === "shelf" ? <Text numberOfLines={1} style={caption}>{title(book)}</Text> : percent === null ? null : <>
+          <View style={[styles.readingTrack, { backgroundColor: colors.border }]}>{percent ? <View style={[styles.readingFill, { width: `${percent}%`, backgroundColor: colors.accent }]} /> : null}</View>
+          <Text style={[caption, dim]}>{percent}%</Text>
+        </>}
+      </View> : null}
+    </View>;
+  }) : null}</ScrollView>;
+}
+
 export function BlockContent({ block, books, images, tierlists, profile, groups, shelfThemeOverride, readerCardOverride, statsOverride, editable, onAssetReady }: { block: MuralBlock; books: Array<Record<string, unknown>>; images: GalleryImage[]; tierlists: Tierlist[]; profile?: ReaderProfile; groups?: Group[]; shelfThemeOverride?: ShelfTheme; readerCardOverride?: PublicReaderCard; statsOverride?: Record<string, number>; editable?: boolean; onAssetReady?: (key: string) => void }) {
   const { colors: themeColors } = useTheme();
   const [failedSource, setFailedSource] = useState<string | null>(null);
-  const [readingHeight, setReadingHeight] = useState(0);
   const style = resolveBlockStyle(block.style);
   const blockColors = blockTextColors(style, themeColors);
   const colors = { ...themeColors, text: blockColors.text };
   const text = blockTextStyles(style, colors.text);
   const dim = { color: blockColors.dim };
-  const title = (book: Record<string, unknown> | undefined) => String(book?.Title ?? "Book unavailable");
   const eyebrow = (label: string, count?: number) => <View style={styles.eyebrowRow}><Text numberOfLines={1} style={[text.label, styles.genreLabel, dim, styles.eyebrowLabel]}>{label}</Text>{count === undefined ? null : <Text style={[text.caption, dim, styles.eyebrowCount]}>{count} {count === 1 ? "book" : "books"}</Text>}</View>;
   if (block.type === "text") return <><Text style={text.title}>{block.heading || "Note"}</Text><Text style={text.body}>{block.body}</Text></>;
   if (block.type === "profile") {
@@ -115,21 +139,18 @@ export function BlockContent({ block, books, images, tierlists, profile, groups,
   if (block.type === "currentlyReading") {
     const reading = books.filter((book) => book.ReadStatus === 1);
     return <>{eyebrow("Currently reading", reading.length)}
-      {reading.length ? <ScrollView horizontal scrollEnabled={!editable} showsHorizontalScrollIndicator={false} onLayout={(event) => setReadingHeight(event.nativeEvent.layout.height)} style={styles.readingScroll} contentContainerStyle={styles.readingRow}>{reading.map((book) => {
-        const percent = readingPercent(book);
-        return <View key={bookKey(book)} style={[styles.readingTile, readingHeight > 0 && { height: readingHeight }]}>
-          <View accessible accessibilityRole="image" accessibilityLabel={title(book)} style={[styles.bookCover, styles.readingCover]}><CoverImage book={book} contentFit="contain" onLoadEnd={onAssetReady ? () => onAssetReady(`cover:${block.id}:${bookKey(book)}:${String(book._coverUrl ?? "")}`) : undefined} /></View>
-          <View style={styles.readingFooter}>
-            <View style={[styles.readingTrack, percent !== null && { backgroundColor: colors.border }]}>{percent ? <View style={[styles.readingFill, { width: `${percent}%`, backgroundColor: colors.accent }]} /> : null}</View>
-            <Text style={[text.caption, dim]}>{percent === null ? "\u00A0" : `${percent}%`}</Text>
-          </View>
-        </View>;
-      })}</ScrollView> : <EmptyBlock message="Choose books or connect a collection in Edit." style={[text.caption, dim]} />}
+      {reading.length ? <CoverRow blockId={block.id} books={reading} mode="reading" caption={text.caption} dim={dim} editable={editable} onAssetReady={onAssetReady} /> : <EmptyBlock message="Choose books or connect a collection in Edit." style={[text.caption, dim]} />}
     </>;
   }
-  if (block.type === "spotlight" || block.type === "shelf") {
-    const selected = block.type === "spotlight" ? books.filter((book) => bookKey(book) === block.bookKey) : resolveShelfBooks(block, books);
-    return <>{block.type === "shelf" ? eyebrow(block.title || "Shelf", selected.length) : <Text numberOfLines={1} style={text.title}>{title(selected[0])}</Text>}
+  if (block.type === "shelf") {
+    const selected = resolveShelfBooks(block, books);
+    return <>{eyebrow(block.title || "Shelf", selected.length)}
+      {selected.length ? <CoverRow blockId={block.id} books={selected} mode="shelf" caption={text.caption} dim={dim} editable={editable} onAssetReady={onAssetReady} /> : <EmptyBlock message="Choose books or connect a collection in Edit." style={[text.caption, dim]} />}
+    </>;
+  }
+  if (block.type === "spotlight") {
+    const selected = books.filter((book) => bookKey(book) === block.bookKey);
+    return <><Text numberOfLines={1} style={text.title}>{title(selected[0])}</Text>
       {selected.length ? <View style={styles.bookRow}>{selected.slice(0, 3).map((book) => <View key={bookKey(book)} style={styles.bookColumn}><View style={styles.bookCover}><CoverImage book={book} contentFit="contain" onLoadEnd={onAssetReady ? () => onAssetReady(`cover:${block.id}:${bookKey(book)}:${String(book._coverUrl ?? "")}`) : undefined} /></View><Text numberOfLines={2} style={text.caption}>{title(book)}</Text></View>)}</View> : <EmptyBlock message="Choose books or connect a collection in Edit." style={[text.caption, dim]} />}
     </>;
   }
@@ -249,7 +270,7 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThe
     if (block.type === "image") { const image = images.find((item) => item.id === block.imageId); return image ? [`image:${block.id}:${image.url}`] : []; }
     if (block.type !== "spotlight" && block.type !== "shelf" && block.type !== "currentlyReading") return [];
     const selected = block.type === "spotlight" ? books.filter((book) => bookKey(book) === block.bookKey) : block.type === "shelf" ? resolveShelfBooks(block, books) : books.filter((book) => book.ReadStatus === 1);
-    return (block.type === "currentlyReading" ? selected : selected.slice(0, 3)).map((book) => `cover:${block.id}:${bookKey(book)}:${String(book._coverUrl ?? "")}`);
+    return (block.type === "spotlight" ? selected.slice(0, 3) : selected).map((book) => `cover:${block.id}:${bookKey(book)}:${String(book._coverUrl ?? "")}`);
   });
   const imageReady = width > 0 && assetKeys.every((key) => readyAssets.has(key));
   useEffect(() => { onImageReadyChange?.(imageReady); }, [imageReady, onImageReadyChange]);
@@ -291,13 +312,12 @@ const styles = StyleSheet.create({
   eyebrowRow: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", gap: spacing.sm },
   eyebrowLabel: { flexShrink: 1 },
   eyebrowCount: { fontWeight: "400" },
-  readingScroll: { flex: 1 },
-  readingRow: { gap: spacing.sm },
-  readingTile: { gap: spacing.xs },
-  readingCover: { aspectRatio: 2 / 3 },
-  readingFooter: { gap: spacing.xs },
-  readingTrack: { height: 4, borderRadius: 999, overflow: "hidden" },
-  readingFill: { height: 4 },
+  coverScroll: { flex: 1 },
+  coverRow: { gap: spacing.sm },
+  coverTile: { gap: spacing.xs },
+  coverFooter: { gap: spacing.xs, overflow: "hidden" },
+  readingTrack: { height: PROGRESS_TRACK, borderRadius: 999, overflow: "hidden" },
+  readingFill: { height: PROGRESS_TRACK },
   pill: { borderWidth: 1, borderRadius: 8, padding: spacing.xs, marginRight: spacing.xs },
   fill: { flex: 1, width: "100%" },
   stats: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },

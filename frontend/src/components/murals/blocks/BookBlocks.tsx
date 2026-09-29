@@ -120,6 +120,7 @@ export function ShelfBlockView({ block, books }: { block: Extract<MuralBlock, { 
 /** Auto-computed, no picker at all — every book with ReadStatus === 1. */
 export function CurrentlyReadingBlockView({ books }: { books: Array<Record<string, unknown>> }) {
   const reading = books.filter((b) => b.ReadStatus === 1);
+  const showProgress = reading.some((b) => readingPercent(b) !== null);
   return (
     <div className="flex h-full flex-col overflow-hidden p-2.5">
       <BlockEyebrow count={reading.length}>Currently reading</BlockEyebrow>
@@ -131,19 +132,21 @@ export function CurrentlyReadingBlockView({ books }: { books: Array<Record<strin
             const percent = readingPercent(book);
             return (
               <div key={String(book.ContentID ?? i)} className="flex h-full shrink-0 flex-col">
-                <div className="aspect-[2/3] h-[calc(100%-2em)] overflow-hidden">
+                <div className={`aspect-[2/3] overflow-hidden ${showProgress ? "h-[calc(100%-2em)]" : "h-full"}`}>
                   <MiniBookTile book={book} showTitle={false} showAuthor={false} />
                 </div>
-                <div className="h-[2em] pt-1">
-                  {percent !== null && (
-                    <>
-                      <div className="h-1 overflow-hidden rounded-full bg-(--color-border)">
-                        <div className="h-full rounded-full bg-(--color-accent)" style={{ width: `${percent}%` }} />
-                      </div>
-                      <div className="mt-0.5 text-[0.75em] leading-none text-(--color-text-dim)">{percent}%</div>
-                    </>
-                  )}
-                </div>
+                {showProgress && (
+                  <div className="h-[2em] pt-1">
+                    {percent !== null && (
+                      <>
+                        <div className="h-1 overflow-hidden rounded-full bg-(--color-border)">
+                          <div className="h-full rounded-full bg-(--color-accent)" style={{ width: `${percent}%` }} />
+                        </div>
+                        <div className="mt-0.5 text-[0.75em] leading-none text-(--color-text-dim)">{percent}%</div>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
