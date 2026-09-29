@@ -8,6 +8,8 @@ import {
   GRID_COLUMNS,
   bookKey,
   computeStat,
+  libraryBreakdown,
+  readingPercent,
   resolveBlockStyle,
   resolveQuote,
   resolveQuoteCollection,
@@ -20,6 +22,7 @@ import {
   type PublicReaderCard,
   type ReaderProfile,
   type ShelfTheme,
+  type StatMetric,
 } from "@scripta/shared";
 import { CoverImage } from "../library/components/CoverImage";
 import { ReaderCardBlock } from "./ReaderCardBlock";
@@ -28,7 +31,7 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { commitHaptic, liftHaptic } from "../../ui/haptics";
-import { Platform, Pressable, StyleSheet, View, type StyleProp, type TextStyle } from "react-native";
+import { Platform, Pressable, ScrollView, StyleSheet, View, type StyleProp, type TextStyle } from "react-native";
 import { Text } from "../../ui/Text";
 import { blockFontFamily, resolveBorderColor, resolveBorderStyle } from "../../ui/libraryStyle";
 import { minimumTouchTarget, spacing, useTheme } from "../../ui/theme";
@@ -68,6 +71,7 @@ function blockTextStyles(style: BlockStyle, color: string) {
   };
   return {
     name: step(1.25, "700"),
+    hero: step(2.8, "700"),
     stat: step(1.45, "700"),
     title: step(1.1, "700"),
     body: step(1),
@@ -93,6 +97,7 @@ export function BlockContent({ block, books, images, tierlists, profile, groups,
   const text = blockTextStyles(style, colors.text);
   const dim = { color: blockColors.dim };
   const title = (book: Record<string, unknown> | undefined) => String(book?.Title ?? "Book unavailable");
+  const eyebrow = (label: string, count?: number) => <View style={styles.eyebrowRow}><Text numberOfLines={1} style={[text.label, styles.genreLabel, dim, styles.eyebrowLabel]}>{label}</Text>{count === undefined ? null : <Text style={[text.caption, dim, styles.eyebrowCount]}>{count} {count === 1 ? "book" : "books"}</Text>}</View>;
   if (block.type === "text") return <><Text style={text.title}>{block.heading || "Note"}</Text><Text style={text.body}>{block.body}</Text></>;
   if (block.type === "profile") {
     const theme = shelfThemeOverride ?? calculateShelfTheme(books);
@@ -106,18 +111,49 @@ export function BlockContent({ block, books, images, tierlists, profile, groups,
       {theme.genres.length ? <View style={styles.genreSection}><Text style={[text.label, styles.genreLabel, dim]}>My shelf theme</Text><Text style={text.body}>{theme.genres.join(" · ")}</Text><Text style={[text.caption, dim]}>Based on {theme.matchedBooks} of {theme.totalBooks} books</Text></View> : null}
     </View>;
   }
-  if (block.type === "spotlight" || block.type === "shelf" || block.type === "currentlyReading") {
-    const selected = block.type === "spotlight" ? books.filter((book) => bookKey(book) === block.bookKey) : block.type === "shelf" ? resolveShelfBooks(block, books) : books.filter((book) => book.ReadStatus === 1);
-    return <><Text numberOfLines={1} style={text.title}>{block.type === "shelf" ? block.title || "Shelf" : block.type === "currentlyReading" ? "Currently reading" : title(selected[0])}</Text>
+  if (block.type === "currentlyReading") {
+    const reading = books.filter((book) => book.ReadStatus === 1);
+    return <>{eyebrow("Currently reading", reading.length)}
+      {reading.length ? <ScrollView horizontal scrollEnabled={!editable} showsHorizontalScrollIndicator={false} style={styles.readingScroll} contentContainerStyle={styles.readingRow}>{reading.map((book) => {
+        const percent = readingPercent(book);
+        return <View key={bookKey(book)} style={styles.readingTile}>
+          <View accessible accessibilityRole="image" accessibilityLabel={title(book)} style={[styles.bookCover, styles.readingCover]}><CoverImage book={book} contentFit="contain" onLoadEnd={onAssetReady ? () => onAssetReady(`cover:${block.id}:${bookKey(book)}:${String(book._coverUrl ?? "")}`) : undefined} /></View>
+          <View style={styles.readingFooter}>
+            <View style={[styles.readingTrack, percent !== null && { backgroundColor: colors.border }]}>{percent ? <View style={[styles.readingFill, { width: `${percent}%`, backgroundColor: colors.accent }]} /> : null}</View>
+            <Text style={[text.caption, dim]}>{percent === null ? "\u00A0" : `${percent}%`}</Text>
+          </View>
+        </View>;
+      })}</ScrollView> : <EmptyBlock message="Choose books or connect a collection in Edit." style={[text.caption, dim]} />}
+    </>;
+  }
+  if (block.type === "spotlight" || block.type === "shelf") {
+    const selected = block.type === "spotlight" ? books.filter((book) => bookKey(book) === block.bookKey) : resolveShelfBooks(block, books);
+    return <>{block.type === "shelf" ? eyebrow(block.title || "Shelf", selected.length) : <Text numberOfLines={1} style={text.title}>{title(selected[0])}</Text>}
       {selected.length ? <View style={styles.bookRow}>{selected.slice(0, 3).map((book) => <View key={bookKey(book)} style={styles.bookColumn}><View style={styles.bookCover}><CoverImage book={book} contentFit="contain" onLoadEnd={onAssetReady ? () => onAssetReady(`cover:${block.id}:${bookKey(book)}:${String(book._coverUrl ?? "")}`) : undefined} /></View><Text numberOfLines={2} style={text.caption}>{title(book)}</Text></View>)}</View> : <EmptyBlock message="Choose books or connect a collection in Edit." style={[text.caption, dim]} />}
     </>;
   }
   if (block.type === "quote") { const value = resolveQuote(block, books); return <><Text numberOfLines={6} style={text.body}>“{String(value?.highlight.Text ?? "No eligible passage available")}”</Text>{value ? <Text style={[text.caption, dim]}>{String(value.book.Title)} · {String(value.book.Attribution ?? "")}</Text> : null}</>; }
-  if (block.type === "quoteCollection") return <><Text style={text.title}>{block.title || "Quotes"}</Text>{resolveQuoteCollection(block, books).map(({ highlight }, index) => <Text key={index} style={text.body}>“{String(highlight.Text ?? highlight.Annotation ?? "")}”</Text>)}</>;
+  if (block.type === "quoteCollection") return <>{eyebrow(block.title || "Quotes")}{resolveQuoteCollection(block, books).map(({ highlight }, index) => <Text key={index} style={text.body}>“{String(highlight.Text ?? highlight.Annotation ?? "")}”</Text>)}</>;
   if (block.type === "image") { const image = images.find((item) => item.id === block.imageId); return image && failedSource !== image.url ? <><Image source={{ uri: image.url }} style={styles.fill} contentFit="cover" onDisplay={() => onAssetReady?.(`image:${block.id}:${image.url}`)} onError={() => { setFailedSource(image.url); onAssetReady?.(`image:${block.id}:${image.url}`); }} />{block.caption ? <Text style={[text.caption, dim]}>{block.caption}</Text> : null}</> : <EmptyBlock message="Image unavailable" style={[text.caption, dim]} />; }
 
-  if (block.type === "stats") return <View style={styles.stats}>{block.metrics.map((metric) => <View key={metric}><Text numberOfLines={1} style={text.stat}>{statsOverride?.[metric] ?? computeStat(metric, books)}</Text><Text numberOfLines={1} style={[text.caption, dim]}>{STAT_METRIC_LABELS[metric]}</Text></View>)}</View>;
-  if (block.type === "tierlist") { const tierlist = tierlists.find((item) => item.id === block.tierlistId); return <><Text numberOfLines={1} style={text.title}>{tierlist?.name ?? "Tier list unavailable"}</Text>{tierlist?.data.tiers.map((tier) => <Text key={tier.id} style={text.body}>{tier.label}: {tier.bookKeys.length}</Text>)}</>; }
+  if (block.type === "stats") {
+    const value = (metric: StatMetric) => statsOverride?.[metric] ?? computeStat(metric, books);
+    const breakdown = libraryBreakdown(block.metrics, value);
+    if (!breakdown) return <View style={styles.stats}>{block.metrics.map((metric) => <View key={metric}><Text numberOfLines={1} style={text.stat}>{value(metric)}</Text><Text numberOfLines={1} style={[text.caption, dim]}>{STAT_METRIC_LABELS[metric]}</Text></View>)}</View>;
+    const segments = [
+      { label: "finished", count: breakdown.finished, color: colors.accent },
+      { label: "reading", count: breakdown.reading, color: colors.accentFill },
+      { label: "to read", count: breakdown.toRead, color: colors.border },
+    ];
+    return <View style={styles.statsBreakdown}>
+      {eyebrow("Your library")}
+      <View style={styles.statsHero}><Text style={[text.hero, { color: colors.accent }]}>{breakdown.finished}</Text><Text style={[text.caption, dim, styles.statsOf]}>of {breakdown.total} finished</Text></View>
+      <View style={styles.statsBar}>{breakdown.total ? segments.filter((segment) => segment.count).map((segment) => <View key={segment.label} style={{ flex: segment.count, backgroundColor: segment.color }} />) : <View style={{ flex: 1, backgroundColor: colors.border }} />}</View>
+      <View style={styles.statsLegend}>{segments.map((segment) => <View key={segment.label} style={styles.statsLegendRow}><View style={[styles.statsDot, { backgroundColor: segment.color }]} /><Text numberOfLines={1} style={[text.caption, dim]}>{segment.count} {segment.label}</Text></View>)}</View>
+      {breakdown.others.map((metric) => <View key={metric} style={styles.statsRow}><Text numberOfLines={1} style={[text.stat, { color: colors.accent }]}>{value(metric)}</Text><Text numberOfLines={1} style={[text.caption, dim, styles.statsOf]}>{STAT_METRIC_LABELS[metric]}</Text></View>)}
+    </View>;
+  }
+  if (block.type === "tierlist") { const tierlist = tierlists.find((item) => item.id === block.tierlistId); return <>{eyebrow(tierlist?.name ?? "Tier list unavailable")}{tierlist?.data.tiers.map((tier) => <Text key={tier.id} style={text.body}>{tier.label}: {tier.bookKeys.length}</Text>)}</>; }
   if (block.type === "readerCard") return <ReaderCardBlock books={books} groups={groups ?? []} readerName={profile?.username || "reader"} publicCard={readerCardOverride} editable={editable} />;
   return <Text style={text.body}>{BLOCK_TYPE_LABELS[block.type]}</Text>;
 }
@@ -212,7 +248,7 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThe
     if (block.type === "image") { const image = images.find((item) => item.id === block.imageId); return image ? [`image:${block.id}:${image.url}`] : []; }
     if (block.type !== "spotlight" && block.type !== "shelf" && block.type !== "currentlyReading") return [];
     const selected = block.type === "spotlight" ? books.filter((book) => bookKey(book) === block.bookKey) : block.type === "shelf" ? resolveShelfBooks(block, books) : books.filter((book) => book.ReadStatus === 1);
-    return selected.slice(0, 3).map((book) => `cover:${block.id}:${bookKey(book)}:${String(book._coverUrl ?? "")}`);
+    return (block.type === "currentlyReading" ? selected : selected.slice(0, 3)).map((book) => `cover:${block.id}:${bookKey(book)}:${String(book._coverUrl ?? "")}`);
   });
   const imageReady = width > 0 && assetKeys.every((key) => readyAssets.has(key));
   useEffect(() => { onImageReadyChange?.(imageReady); }, [imageReady, onImageReadyChange]);
@@ -251,9 +287,27 @@ const styles = StyleSheet.create({
   bookRow: { flex: 1, flexDirection: "row", gap: spacing.sm },
   bookColumn: { flex: 1, minWidth: 0, gap: spacing.xs },
   bookCover: { flex: 1, minHeight: 48 },
+  eyebrowRow: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", gap: spacing.sm },
+  eyebrowLabel: { flexShrink: 1 },
+  eyebrowCount: { fontWeight: "400" },
+  readingScroll: { flex: 1 },
+  readingRow: { gap: spacing.sm },
+  readingTile: { gap: spacing.xs },
+  readingCover: { aspectRatio: 2 / 3 },
+  readingFooter: { gap: spacing.xs },
+  readingTrack: { height: 4, borderRadius: 999, overflow: "hidden" },
+  readingFill: { height: 4 },
   pill: { borderWidth: 1, borderRadius: 8, padding: spacing.xs, marginRight: spacing.xs },
   fill: { flex: 1, width: "100%" },
   stats: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
+  statsBreakdown: { flex: 1, gap: spacing.sm },
+  statsHero: { flexDirection: "row", alignItems: "baseline", gap: spacing.sm },
+  statsOf: { flexShrink: 1 },
+  statsBar: { flexDirection: "row", height: 10, gap: 2, borderRadius: 999, overflow: "hidden" },
+  statsLegend: { gap: spacing.xs },
+  statsLegendRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  statsDot: { width: 8, height: 8, borderRadius: 4 },
+  statsRow: { flexDirection: "row", alignItems: "baseline", gap: spacing.sm },
   profileBlock: { flex: 1, gap: spacing.md },
   profileHeader: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   profileAvatar: { width: 56, height: 56, borderRadius: 28 },
