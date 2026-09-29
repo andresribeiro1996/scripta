@@ -2,9 +2,8 @@
 // panel it used to present as a modal (book detail, add, import, reorder,
 // share, per-book style and cover) is now a sibling route presented as a form
 // sheet, so each one is a real UISheetPresentationController the user can drag
-// away. Search lives in the native header bar, status in the swipeable tabs,
-// and sort in a pill above the grid it acts on, so what is left here is the
-// grid and selection mode.
+// away. Status lives in the swipeable tabs, and search and sort in the head of
+// the grid they act on, so what is left here is the grid and selection mode.
 //
 // "Collections" is one more page in the same swipeable strip as the shelf
 // tabs, not a separate destination behind the overflow menu — Series and
@@ -12,8 +11,8 @@
 // both (they're the same underlying resource) as tappable rows into
 // GroupDetail; the standalone /collections route still exists for deep
 // links (e.g. Home's "Open collection", which goes straight to a group's
-// detail screen). The header search bar and its "New" button are re-pointed
-// at groups instead of books while this tab is active.
+// detail screen). The header's "New" button is re-pointed at groups instead of
+// books while this tab is active.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Pressable, RefreshControl, StyleSheet, View } from "react-native";
@@ -33,9 +32,8 @@ import {
   type PerCardStyle,
   type SortKey,
 } from "@scripta/shared";
-import { Button, EmptyState, ErrorState, IconButton, Input, Menu, Screen, Sheet, Skeleton, SwipeableTabs, type MenuItem } from "../../ui/components";
+import { Button, EmptyState, ErrorState, HeaderActions, IconButton, Input, Menu, Screen, Sheet, Skeleton, SwipeableTabs, type MenuItem } from "../../ui/components";
 import { Icon, dynamicType, useTheme } from "../../ui";
-import type { SearchBarCommands } from "react-native-screens";
 import { radii, spacing, typography } from "../../ui/theme";
 import { useMurals } from "../murals/useMurals";
 import { useLibrary } from "./hooks/useLibrary";
@@ -54,31 +52,16 @@ export function LibraryScreen() {
   const actions = useLibraryActions();
   const murals = useMurals();
 
-  // Home hands its search over as ?q=. The native search bar owns its own
-  // text, so both have to be driven: `setText`/`clearText` are the only way to
-  // move the visible field, and without them the grid would filter against a
-  // query the header never shows. Both platforms implement them (Android via
-  // SearchBarManager).
   const { q } = useLocalSearchParams<{ q?: string }>();
-  const searchBar = useRef<SearchBarCommands>(null);
   const [query, setQuery] = useState(q ?? "");
   useEffect(() => {
     setQuery(q ?? "");
-    if (q) searchBar.current?.setText(q);
-    else searchBar.current?.clearText();
   }, [q]);
   const [statusFilter, setStatusFilter] = useState<LibraryTab>(LIBRARY_STATUS_TABS[0].value);
   const [sortKey, setSortKey] = useState<SortKey>("manual");
   const [groupQuery, setGroupQuery] = useState("");
   const groupsView = useRef<GroupsViewHandle>(null);
   const onCollectionsTab = statusFilter === "collections";
-  // The header search bar is one physical field shared by every tab; switch
-  // its displayed text to match whichever domain (books vs. groups) is now
-  // showing, same as the `q` sync above.
-  useEffect(() => {
-    searchBar.current?.setText(onCollectionsTab ? groupQuery : query);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onCollectionsTab]);
 
   // Renaming stays a modal: it is one field, and a form sheet for it would be
   // more ceremony than the edit.
@@ -96,7 +79,6 @@ export function LibraryScreen() {
   const toolbarActive = query.trim() !== "" || sortKey !== "manual";
 
   function clearSearchAndFilters() {
-    searchBar.current?.clearText();
     setQuery("");
     setSortKey("manual");
   }
@@ -188,40 +170,15 @@ export function LibraryScreen() {
           : {
               headerShown: true,
               title: library?.data.name || "Library",
-              // Only worth a search field once there is something to search;
-              // an empty library gets the plain header instead. It's the
-              // same physical field on every tab, just re-pointed at book
-              // search or group search (see the sync effect above).
-              headerSearchBarOptions: books.length > 0
-                ? onCollectionsTab
-                  ? {
-                      ref: searchBar,
-                      autoCapitalize: "none",
-                      placeholder: "Search collections",
-                      hideWhenScrolling: true,
-                      onChangeText: (event) => setGroupQuery(event.nativeEvent.text),
-                      onCancelButtonPress: () => setGroupQuery(""),
-                    }
-                  : {
-                      ref: searchBar,
-                      autoCapitalize: "none",
-                      placeholder: "Search title or author",
-                      // iOS only: the bar tucks under the large title until the
-                      // grid is pulled back down.
-                      hideWhenScrolling: true,
-                      onChangeText: (event) => setQuery(event.nativeEvent.text),
-                      onCancelButtonPress: () => setQuery(""),
-                    }
-                : undefined,
               headerRight: () => (
-                <View style={styles.headerActions}>
+                <HeaderActions>
                   {onCollectionsTab
                     ? <IconButton framed accessibilityLabel="New collection" label="New" name="add" onPress={() => groupsView.current?.startCreating()} />
                     : <IconButton framed accessibilityLabel="Add book" label="Add" name="add" onPress={() => router.push("/add-book" as never)} />}
                   <Menu title={library?.data.name || "Library"} items={actionItems}>
                     <IconButton framed accessibilityLabel="Library actions" name="more" />
                   </Menu>
-                </View>
+                </HeaderActions>
               ),
             }}
       />
@@ -261,56 +218,59 @@ export function LibraryScreen() {
           value={statusFilter}
           onChange={setStatusFilter}
         renderPage={(status) => {
-          if (status === "collections") return <GroupsView ref={groupsView} search={groupQuery} />;
+          if (status === "collections") return <GroupsView ref={groupsView} search={groupQuery} onSearchChange={setGroupQuery} />;
           const pageBooks = sortBooks(filterBooks(ordered, query, status), sortKey);
           return (
-            <View style={styles.shelfPage}>
-              {/* Sort sits above the grid, not in the overflow menu: it acts on
-                  the shelf you're looking at, so it belongs next to it. */}
-              <View style={styles.shelfToolbar}>
-                <Menu title="Sort books" items={sortItems}>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`Sort books, currently ${sortLabel}`}
-                    style={({ pressed }) => [styles.sortPill, { borderColor: colors.border }, pressed ? { backgroundColor: colors.surfacePressed } : null]}
-                  >
-                    <Icon name="filter" size={14} color={colors.textDim} />
-                    <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.strong, { color: colors.text }]}>
-                      Sort · {sortLabel}
-                    </Text>
-                  </Pressable>
-                </Menu>
-              </View>
-              {pageBooks.length === 0 ? (
+            <LibraryGrid
+              data={pageBooks}
+              keyExtractor={(book, i) => String(book.ContentID ?? i)}
+              style={style}
+              topInset={spacing.lg}
+              refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} />}
+              ListHeaderComponent={
+                <View style={styles.shelfHead}>
+                  <Input icon="search" accessibilityLabel="Search title or author" placeholder="Search title or author" value={query} onChangeText={setQuery} autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" returnKeyType="search" />
+                  {/* Sort sits above the grid, not in the overflow menu: it acts on
+                      the shelf you're looking at, so it belongs next to it. */}
+                  <View style={styles.shelfToolbar}>
+                    <Menu title="Sort books" items={sortItems}>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`Sort books, currently ${sortLabel}`}
+                        style={({ pressed }) => [styles.sortPill, { borderColor: colors.border }, pressed ? { backgroundColor: colors.surfacePressed } : null]}
+                      >
+                        <Icon name="filter" size={14} color={colors.textDim} />
+                        <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.strong, { color: colors.text }]}>
+                          Sort · {sortLabel}
+                        </Text>
+                      </Pressable>
+                    </Menu>
+                  </View>
+                </View>
+              }
+              ListEmptyComponent={
                 <EmptyState
                   title="No books match."
                   body="Every book is still here — the search above just doesn't match any of them."
                   actionLabel={toolbarActive ? "Clear search and sort" : undefined}
                   onAction={toolbarActive ? clearSearchAndFilters : undefined}
                 />
-              ) : (
-                <LibraryGrid
-                  data={pageBooks}
-                  keyExtractor={(book, i) => String(book.ContentID ?? i)}
-                  style={style}
-                  refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} />}
-                  renderItem={(book) => {
-                    const seriesGroup = bookSeriesGroup.get(bookKey(book));
-                    const cardStyle = effectiveCardStyle(style, seriesGroup?.style, book._style as PerCardStyle | undefined);
-                    return (
-                      <BookCard
-                        book={book}
-                        onPress={() => router.push(`/book/${encodeURIComponent(bookKey(book))}` as never)}
-                        style={cardStyle}
-                        selectable={selectionMode}
-                        selected={selectedKeys.has(bookKey(book))}
-                        onToggleSelect={handleToggleSelect}
-                      />
-                    );
-                  }}
-                />
-              )}
-            </View>
+              }
+              renderItem={(book) => {
+                const seriesGroup = bookSeriesGroup.get(bookKey(book));
+                const cardStyle = effectiveCardStyle(style, seriesGroup?.style, book._style as PerCardStyle | undefined);
+                return (
+                  <BookCard
+                    book={book}
+                    onPress={() => router.push(`/book/${encodeURIComponent(bookKey(book))}` as never)}
+                    style={cardStyle}
+                    selectable={selectionMode}
+                    selected={selectedKeys.has(bookKey(book))}
+                    onToggleSelect={handleToggleSelect}
+                  />
+                );
+              }}
+            />
           );
         }}
         />
@@ -327,9 +287,8 @@ export function LibraryScreen() {
 const styles = StyleSheet.create({
   loading: { padding: spacing.lg, gap: spacing.md },
   loadingRow: { flexDirection: "row", gap: spacing.md },
-  headerActions: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  shelfPage: { flex: 1 },
-  shelfToolbar: { flexDirection: "row", paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
+  shelfHead: { gap: spacing.md },
+  shelfToolbar: { flexDirection: "row" },
   sortPill: { flexDirection: "row", alignItems: "center", gap: spacing.xs, alignSelf: "flex-start", minHeight: 32, paddingHorizontal: spacing.md, borderRadius: radii.full, borderWidth: 1 },
   strong: { fontWeight: "700" },
 });

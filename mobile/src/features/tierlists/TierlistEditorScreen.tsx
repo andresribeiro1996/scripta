@@ -6,7 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { FlatList, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { apiClient, ApiError } from "../../core/api";
-import { Button, Dialog, EmptyState, ErrorState, Fab, IconButton, Input, Menu, type MenuItem, Screen, Sheet, Skeleton, SwipeableTabs, Toast, dynamicType, spacing, typography, useTheme } from "../../ui";
+import { Button, Dialog, EmptyState, ErrorState, Fab, HeaderActions, IconButton, Input, Menu, type MenuItem, Screen, Sheet, Skeleton, SwipeableTabs, Toast, dynamicType, spacing, typography, useTheme } from "../../ui";
 import { fetchMyBallot, fetchTierlistResults, fetchVotingBoard, openVoting, setVotingState, updateTierlist, type Tierlist } from "./api";
 import { moveBookTo } from "./tierBoardData";
 import { TierBoard } from "./TierBoard";
@@ -137,11 +137,11 @@ export function TierlistEditorScreen({ tierlist, onUpdated, startInRank = false 
     <Stack.Screen options={{
       headerShown: true,
       title: current.name,
-      headerRight: () => <View style={styles.headerActions}>
+      headerRight: () => <HeaderActions>
         {!frozen ? <IconButton framed accessibilityLabel="Save changes" label="Save" name="confirm" onPress={() => void save()} /> : null}
-        <IconButton framed accessibilityLabel="Share tier list" label="Share" name="share" onPress={showShare} />
+        <IconButton framed accessibilityLabel="Share tier list" name="share" onPress={showShare} />
         <Menu title={current.name} items={actionItems}><IconButton framed accessibilityLabel="Tier list actions" name="more" /></Menu>
-      </View>,
+      </HeaderActions>,
     }} />
     {error ? <Toast visible message={error} tone="error" /> : null}
     {!frozen ? view === "sort" ? <Pressable accessibilityRole="button" accessibilityLabel="Back to board" onPress={() => { setSelectedBookKey(null); setView("board"); }}><Text {...dynamicType} style={[typography.body, { color: colors.accent }]}>‹ Board</Text></Pressable> : <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{placed} of {placed + data.pool.length} ranked · {busy ? "Saving…" : dirty ? "Unsaved changes" : "Saved"}</Text> : null}
@@ -171,7 +171,6 @@ export function TierlistEditorScreen({ tierlist, onUpdated, startInRank = false 
 const styles = StyleSheet.create({
   screen: { padding: spacing.lg, gap: spacing.md },
   strong: { fontWeight: "700" },
-  headerActions: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   complete: { gap: spacing.sm },
   tabPage: { paddingTop: spacing.lg },
   boardPage: { flex: 1, paddingTop: spacing.lg - spacing.md },

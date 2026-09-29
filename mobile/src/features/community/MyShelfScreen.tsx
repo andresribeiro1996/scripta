@@ -1,12 +1,12 @@
 import { useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Stack, router } from "expo-router";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { buildMuralPreset, ensureBookBlockHeights, orderLibraryBooks, shelfPresetSummary, type Mural } from "@scripta/shared";
 import { useAuth } from "../../core/auth";
 import { API_URL } from "../../core/config";
-import { Button, Dialog, dynamicType, EmptyState, ErrorState, IconButton, Menu, radii, Screen, Skeleton, spacing, SwipeableTabs, Toast, typography, useTheme, type MenuItem } from "../../ui";
+import { Button, Dialog, dynamicType, EmptyState, ErrorState, HeaderActions, IconButton, Menu, Screen, Skeleton, spacing, SwipeableTabs, Toast, typography, useTheme, type MenuItem } from "../../ui";
 import { fetchGalleryImages } from "../gallery/api";
 import { useLibrary } from "../library/hooks/useLibrary";
 import { MuralCanvas } from "../murals";
@@ -167,21 +167,18 @@ export function MyShelfScreen() {
   ];
 
   const headerRight = () => (
-    <View style={styles.headerRow}>
-      <Pressable
-        accessibilityRole="button"
+    <HeaderActions>
+      <IconButton
+        framed
+        label={ownData.published ? "Published" : "Private"}
+        name={ownData.published ? "public" : "lock"}
         accessibilityLabel={ownData.published ? "Published. Tap to unpublish" : "Private. Tap to publish"}
         onPress={handleChipPress}
-        style={({ pressed }) => [styles.chip, { borderColor: colors.border, backgroundColor: pressed ? colors.surfacePressed : colors.surface }]}
-      >
-        <Text {...dynamicType} style={[typography.caption, styles.strong, { color: ownData.published ? colors.accent : colors.textDim }]}>
-          {ownData.published ? "Published" : "Private"}
-        </Text>
-      </Pressable>
+      />
       <Menu title="My shelf" items={menuItems}>
         <IconButton framed accessibilityLabel="Shelf options" name="more" />
       </Menu>
-    </View>
+    </HeaderActions>
   );
 
   return (
@@ -298,10 +295,7 @@ export function MyShelfScreen() {
 }
 
 const styles = StyleSheet.create({
-  strong: { fontWeight: "700" },
   tabPad: { flex: 1, padding: spacing.lg },
   canvasScroll: { paddingHorizontal: spacing.sm, paddingTop: spacing.lg, paddingBottom: spacing.xxl },
-  headerRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  chip: { height: 32, paddingHorizontal: spacing.md, borderRadius: radii.full, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   dialogGap: { gap: spacing.md },
 });

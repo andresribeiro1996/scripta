@@ -252,6 +252,10 @@ export function IconButton({
   );
 }
 
+export function HeaderActions({ children }: { children: ReactNode }) {
+  return <View style={styles.headerActions}>{children}</View>;
+}
+
 export function Input({
   label,
   error,
@@ -746,6 +750,7 @@ const styles = StyleSheet.create({
   tabIndicator: { position: "absolute", left: 0, bottom: 0, height: 3, borderTopLeftRadius: radii.sm, borderTopRightRadius: radii.sm },
   fab: { position: "absolute", right: spacing.lg, bottom: spacing.lg, minHeight: 56, flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingHorizontal: spacing.lg, borderRadius: radii.full, elevation: 6, shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
   fabLabel: { fontWeight: "700" },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   iconButton: { minHeight: minimumTouchTarget, minWidth: minimumTouchTarget, alignItems: "center", justifyContent: "center", borderRadius: radii.full },
   field: { gap: spacing.xs },
   label: { ...typography.body, fontWeight: "600" },
