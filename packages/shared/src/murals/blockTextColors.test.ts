@@ -125,7 +125,7 @@ test("an unknown theme key resolves to the theme default, not a colour", () => {
 test("blockTextColors measures a transparent block against the page background", () => {
   const colors = blockTextColors({ backgroundColor: "transparent", textColor: null }, light);
   assert.equal(colors.text, light.text);
-  assert.ok(contrastRatio(colors.dim, light.background)! >= 4.5);
+  assert.equal(colors.dim, mutedTextColor(light.text, light.background));
 });
 
 test("blockTextColors resolves theme references before measuring", () => {
