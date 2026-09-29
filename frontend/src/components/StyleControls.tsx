@@ -1,7 +1,10 @@
 import type { ReactNode } from "react";
+import { BLOCK_THEME_COLOR_LABELS, parseThemeColorRef } from "@scripta/shared";
 import {
   BLOCK_FONT_FAMILY_OPTIONS,
   BLOCK_FONT_SIZE_RANGE,
+  BLOCK_INNER_SPACING_OPTIONS,
+  BLOCK_TEXT_ALIGN_OPTIONS,
   CARD_ASPECT_RATIO_OPTIONS,
   CARD_BORDER_OPACITY_RANGE,
   CARD_BORDER_STYLE_OPTIONS,
@@ -12,7 +15,9 @@ import {
   CARD_RADIUS_RANGE,
   OVERLAY_INTENSITY_RANGE,
   type BlockFontFamily,
+  type BlockInnerSpacing,
   type BlockStyle,
+  type BlockTextAlign,
   type CardAspectRatio,
   type CardBorderStyle,
   type CardFontFamily,
@@ -75,6 +80,21 @@ export function SliderRow({
       />
     </div>
   );
+}
+
+function ColorValueInput({ value, fallback, onChange }: { value: string; fallback: string; onChange: (color: string) => void }) {
+  const themeKey = parseThemeColorRef(value);
+  if (themeKey) {
+    return (
+      <span className="flex items-center gap-2 text-sm text-(--color-text-dim)">
+        Theme color: {BLOCK_THEME_COLOR_LABELS[themeKey]}
+        <button type="button" onClick={() => onChange(fallback)} className="font-semibold text-(--color-text) underline decoration-(--color-accent)">
+          Use a custom color
+        </button>
+      </span>
+    );
+  }
+  return <input type="color" value={value} onChange={(e) => onChange(e.target.value)} className="h-8 w-16 rounded border border-(--color-border) bg-transparent" />;
 }
 
 export function ToggleRow({
@@ -262,12 +282,7 @@ export function CardBorderSection({ idPrefix, draft, onApply, onSaveNow }: CardB
           Custom border color
         </label>
         {usingCustomBorderColor && (
-          <input
-            type="color"
-            value={draft.cardBorderColor ?? "#45403a"}
-            onChange={(e) => onApply({ cardBorderColor: e.target.value })}
-            className="h-8 w-16 rounded border border-(--color-border) bg-transparent"
-          />
+          <ColorValueInput value={draft.cardBorderColor ?? "#45403a"} fallback="#45403a" onChange={(color) => onApply({ cardBorderColor: color })} />
         )}
       </div>
       {draft.cardBorderWidth === 0 && <p className="mt-1 text-xs text-(--color-text-dim)">Set a border width above to enable a border.</p>}
@@ -360,7 +375,7 @@ export function CardTextSection({ idPrefix, draft, onApply, onSaveNow }: { idPre
   );
 }
 
-type BlockAppearanceFields = "backgroundColor" | "cardRadius" | "cardOpacity" | "cardShadow" | "cardHoverEffect";
+type BlockAppearanceFields = "backgroundColor" | "cardRadius" | "cardOpacity" | "cardShadow" | "cardHoverEffect" | "innerSpacing";
 
 /** BlockStyle's counterpart to CardAppearanceSection — same radius/
  *  opacity/shadow/hover controls, minus the two cover-specific ones
@@ -379,16 +394,27 @@ export function BlockAppearanceSection({
   onApply: (patch: Partial<Pick<BlockStyle, BlockAppearanceFields>>) => void;
   onSaveNow: (patch: Partial<Pick<BlockStyle, BlockAppearanceFields>>) => void;
 }) {
-  const usingCustomBackground = draft.backgroundColor !== null;
+  const transparent = draft.backgroundColor === "transparent";
+  const usingCustomBackground = draft.backgroundColor !== null && !transparent;
 
   return (
     <Section title="Block appearance">
+      <label className="mb-3 flex items-center gap-2 text-sm font-semibold" htmlFor={`${idPrefix}-no-bg-toggle`}>
+        <input
+          id={`${idPrefix}-no-bg-toggle`}
+          type="checkbox"
+          checked={transparent}
+          onChange={(e) => onSaveNow(e.target.checked ? { backgroundColor: "transparent", cardShadow: false } : { backgroundColor: null })}
+        />
+        No background
+      </label>
       <div className="mb-4 flex items-center justify-between">
         <label className="flex items-center gap-2 text-sm font-semibold" htmlFor={`${idPrefix}-custom-bg-toggle`}>
           <input
             id={`${idPrefix}-custom-bg-toggle`}
             type="checkbox"
             checked={usingCustomBackground}
+            disabled={transparent}
             onChange={(e) => {
               if (e.target.checked) {
                 const computed = getComputedStyle(document.documentElement).getPropertyValue("--color-surface").trim();
@@ -401,12 +427,7 @@ export function BlockAppearanceSection({
           Custom background color
         </label>
         {usingCustomBackground && (
-          <input
-            type="color"
-            value={draft.backgroundColor ?? "#ffffff"}
-            onChange={(e) => onApply({ backgroundColor: e.target.value })}
-            className="h-8 w-16 rounded border border-(--color-border) bg-transparent"
-          />
+          <ColorValueInput value={draft.backgroundColor ?? "#ffffff"} fallback="#ffffff" onChange={(color) => onApply({ backgroundColor: color })} />
         )}
       </div>
 
@@ -427,6 +448,24 @@ export function BlockAppearanceSection({
         onChange={(v) => onApply({ cardOpacity: v })}
       />
 
+      <div className="mb-4">
+        <label className="mb-1 block text-sm font-semibold" htmlFor={`${idPrefix}-inner-spacing`}>
+          Inner spacing
+        </label>
+        <select
+          id={`${idPrefix}-inner-spacing`}
+          value={draft.innerSpacing}
+          onChange={(e) => onSaveNow({ innerSpacing: e.target.value as BlockInnerSpacing })}
+          className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
+        >
+          {BLOCK_INNER_SPACING_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <ToggleRow id={`${idPrefix}-block-shadow`} label="Drop shadow" checked={draft.cardShadow} onChange={(v) => onSaveNow({ cardShadow: v })} />
       <ToggleRow
         id={`${idPrefix}-block-hover`}
@@ -439,7 +478,7 @@ export function BlockAppearanceSection({
   );
 }
 
-type BlockTextFields = "fontFamily" | "fontSize" | "textColor" | "bold" | "italic" | "codeStyle";
+type BlockTextFields = "fontFamily" | "fontSize" | "textColor" | "bold" | "italic" | "codeStyle" | "textAlign";
 
 /** A block's typeface, base text size, and primary text color. Used only
  *  by components/murals/BlockStylePanel.tsx — no BookCard equivalent,
@@ -486,6 +525,24 @@ export function BlockTextSection({
         onChange={(v) => onApply({ fontSize: v })}
       />
 
+      <div className="mb-4">
+        <label className="mb-1 block text-sm font-semibold" htmlFor={`${idPrefix}-text-align`}>
+          Alignment
+        </label>
+        <select
+          id={`${idPrefix}-text-align`}
+          value={draft.textAlign}
+          onChange={(e) => onSaveNow({ textAlign: e.target.value as BlockTextAlign })}
+          className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
+        >
+          {BLOCK_TEXT_ALIGN_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <div className="mb-4 flex gap-4">
         <ToggleRow id={`${idPrefix}-bold`} label="Bold" checked={draft.bold} onChange={(v) => onSaveNow({ bold: v })} />
         <ToggleRow id={`${idPrefix}-italic`} label="Italic" checked={draft.italic} onChange={(v) => onSaveNow({ italic: v })} />
@@ -516,12 +573,7 @@ export function BlockTextSection({
           Custom text color
         </label>
         {usingCustomTextColor && (
-          <input
-            type="color"
-            value={draft.textColor ?? "#1a1a1a"}
-            onChange={(e) => onApply({ textColor: e.target.value })}
-            className="h-8 w-16 rounded border border-(--color-border) bg-transparent"
-          />
+          <ColorValueInput value={draft.textColor ?? "#1a1a1a"} fallback="#1a1a1a" onChange={(color) => onApply({ textColor: color })} />
         )}
       </div>
       <p className="mt-1 text-xs text-(--color-text-dim)">Applies to the block's main text — captions, labels, and quote attributions stay their own muted color.</p>

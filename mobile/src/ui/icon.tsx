@@ -50,6 +50,10 @@ const GLYPHS = {
   vote: { ios: "checkmark.circle", android: "how_to_vote" },
   book: { ios: "book.closed", android: "book" },
   follow: { ios: "person.badge.plus", android: "person_add" },
+  edit: { ios: "pencil", android: "edit" },
+  style: { ios: "paintbrush", android: "brush" },
+  resize: { ios: "arrow.up.left.and.arrow.down.right", android: "open_in_full" },
+  duplicate: { ios: "plus.square.on.square", android: "content_copy" },
 } as const satisfies Record<string, Glyph>;
 
 /** Only these five have a solid counterpart worth using; the rest read the

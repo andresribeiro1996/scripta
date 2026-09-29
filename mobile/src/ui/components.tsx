@@ -6,6 +6,7 @@ import MenuView, { type MenuAction } from "@expo/ui/community/menu";
 import PagerView from "react-native-pager-view";
 import { Icon, type IconName } from "./icon";
 import SegmentedControl from "@expo/ui/community/segmented-control";
+import { Host, SegmentedButton, SingleChoiceSegmentedButtonRow, Text as ComposeText } from "@expo/ui/jetpack-compose";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { errorHaptic, successHaptic } from "./haptics";
 import { fontStyleFor } from "./fontStyle";
@@ -391,6 +392,32 @@ export function Segmented<T extends string>({
 }) {
   const { colors, mode } = useTheme();
   const index = Math.max(0, options.findIndex((option) => option.value === value));
+
+  if (Platform.OS === "android") {
+    const segmentColors = {
+      activeContainerColor: colors.accentFill,
+      activeContentColor: colors.text,
+      inactiveContainerColor: colors.surface,
+      inactiveContentColor: colors.text,
+      activeBorderColor: colors.border,
+      inactiveBorderColor: colors.border,
+    };
+    return (
+      <View accessibilityLabel={accessibilityLabel} accessibilityRole="tablist">
+        <Host matchContents={{ vertical: true }} colorScheme={mode}>
+          <SingleChoiceSegmentedButtonRow>
+            {options.map((option, position) => (
+              <SegmentedButton key={option.value} selected={position === index} onClick={() => onChange(option.value)} colors={segmentColors}>
+                <SegmentedButton.Label>
+                  <ComposeText>{option.label}</ComposeText>
+                </SegmentedButton.Label>
+              </SegmentedButton>
+            ))}
+          </SingleChoiceSegmentedButtonRow>
+        </Host>
+      </View>
+    );
+  }
 
   return (
     <View accessibilityLabel={accessibilityLabel} accessibilityRole="tablist">
