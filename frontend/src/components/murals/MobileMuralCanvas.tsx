@@ -87,7 +87,7 @@ function BlockFrame({
   const style = resolveBlockStyle(block.style);
   const pointerStart = useRef<{ x: number; y: number } | null>(null);
   const themeColors = themes[resolveTheme(useThemePreference(), osScheme())].colors;
-  const overridesColor = Boolean(style.backgroundColor || style.textColor);
+  const overridden = style.backgroundColor || style.textColor ? blockTextColors(style, themeColors) : null;
   return (
     <div
       ref={buttonRef}
@@ -126,10 +126,10 @@ function BlockFrame({
         color: resolveBlockColor(style.textColor, themeColors) ?? undefined,
         textAlign: style.textAlign,
         "--block-pad": BLOCK_PAD_SCALE[style.innerSpacing],
-        ...(overridesColor ? { "--color-text-dim": blockTextColors(style, themeColors).dim } : {})
+        ...(overridden ? { "--color-text-dim": overridden.dim } : {})
       } as CSSProperties}
     >
-      <div className="pointer-events-none h-full origin-top-left" style={{ width: `${scale * 100}%`, height: `${scale * 100}%`, transform: `scale(${1 / scale})`, fontSize: 14 }}>
+      <div className="pointer-events-none h-full origin-top-left" style={{ width: `${scale * 100}%`, height: `${scale * 100}%`, transform: `scale(${1 / scale})`, fontSize: 14, ...(overridden ? { "--color-accent": overridden.accent } : {}) } as CSSProperties}>
         <MobileBlockPreview block={block} books={books} images={images} profile={profile} groups={groups} shelfThemeOverride={shelfThemeOverride} readerCardOverride={readerCardOverride} statsOverride={statsOverride} tierlistData={tierlistData} width={((CANVAS_WIDTH - PADDING * 2 + MARGIN) / GRID_COLUMNS * block.layout.w - MARGIN) * scale} height={(block.layout.h * (ROW_HEIGHT + MARGIN) - MARGIN) * scale} />
       </div>
     </div>

@@ -94,9 +94,11 @@ export function StatsBlockView({
     <div className="flex h-full items-center justify-around gap-2 overflow-x-auto block-p-2.5">
       {block.metrics.map((metric) => (
         <div key={metric} className="shrink-0 text-center">
-          {/* Deliberately always accent-colored, not `textColor` — same
+          {/* Deliberately accent-colored, not `textColor` — same
               "this is a badge, not body content" reasoning as
-              BookCard.tsx's highlight-count badge. */}
+              BookCard.tsx's highlight-count badge. The block wrapper
+              swaps in the text colour when the accent can't be read on
+              the block's own background. */}
           <div className="text-[1.6em] font-bold text-(--color-accent)">
             {statsOverride && metric in statsOverride ? statsOverride[metric] : computeStat(metric, books)}
           </div>

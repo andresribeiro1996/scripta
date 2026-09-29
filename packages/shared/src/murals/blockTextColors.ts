@@ -113,8 +113,13 @@ export function mutedTextColor(text: string, background: string): string | null 
 export function blockTextColors(
   style: Pick<BlockStyle, "backgroundColor" | "textColor">,
   theme: Pick<ThemeColors, BlockThemeColorKey | "textDim">
-): { text: string; dim: string } {
-  if (!style.backgroundColor && !style.textColor) return { text: theme.text, dim: theme.textDim };
+): { text: string; dim: string; accent: string } {
+  if (!style.backgroundColor && !style.textColor) return { text: theme.text, dim: theme.textDim, accent: theme.accent };
   const { text, background } = effectiveBlockColors(style, theme);
-  return { text, dim: mutedTextColor(text, background) ?? theme.textDim };
+  const accentContrast = contrastRatio(theme.accent, background);
+  return {
+    text,
+    dim: mutedTextColor(text, background) ?? theme.textDim,
+    accent: accentContrast !== null && accentContrast < 3 ? text : theme.accent
+  };
 }

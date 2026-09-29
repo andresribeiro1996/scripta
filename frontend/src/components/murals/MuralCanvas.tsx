@@ -147,7 +147,7 @@ export function MuralCanvas({
     >
       {mural.blocks.map((block) => {
         const style = resolveBlockStyle(block.style);
-        const overridesColor = Boolean(style.backgroundColor || style.textColor);
+        const overridden = style.backgroundColor || style.textColor ? blockTextColors(style, themeColors) : null;
         return (
           <div
             key={block.id}
@@ -170,7 +170,7 @@ export function MuralCanvas({
               color: resolveBlockColor(style.textColor, themeColors) ?? undefined,
               textAlign: style.textAlign,
               "--block-pad": BLOCK_PAD_SCALE[style.innerSpacing],
-              ...(overridesColor ? { "--color-text-dim": blockTextColors(style, themeColors).dim } : {})
+              ...(overridden ? { "--color-text-dim": overridden.dim, "--color-accent": overridden.accent } : {})
             } as CSSProperties}
           >
             {!editMode ? <button className="absolute inset-0 z-10 rounded-[inherit] focus-visible:outline-2 focus-visible:outline-(--color-accent)" aria-label={`Open ${block.type} block`} onClick={() => onOpenBlock ? onOpenBlock(block) : setFocusedId(block.id)} /> : null}

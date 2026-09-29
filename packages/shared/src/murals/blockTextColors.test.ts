@@ -50,7 +50,7 @@ test("mutedTextColor returns null for unparseable colours", () => {
 
 test("blockTextColors keeps the theme's colours when the block has no overrides", () => {
   const theme = { ...light, text: "#111111", textDim: "#666666", surface: "#eeeeee" };
-  assert.deepEqual(blockTextColors({ backgroundColor: null, textColor: null }, theme), { text: theme.text, dim: theme.textDim });
+  assert.deepEqual(blockTextColors({ backgroundColor: null, textColor: null }, theme), { text: theme.text, dim: theme.textDim, accent: theme.accent });
 });
 
 test("blockTextColors mutes against the theme surface when only textColor is overridden", () => {
@@ -132,4 +132,24 @@ test("blockTextColors resolves theme references before measuring", () => {
   const colors = blockTextColors({ backgroundColor: themeColorRef("accent"), textColor: themeColorRef("onAccent") }, dark);
   assert.equal(colors.text, dark.onAccent);
   assert.ok(contrastRatio(colors.dim, dark.accent)! >= 4.5);
+});
+
+test("blockTextColors keeps the theme accent when the block has no overrides", () => {
+  assert.equal(blockTextColors({ backgroundColor: null, textColor: null }, light).accent, light.accent);
+});
+
+test("blockTextColors swaps the accent for the text colour when the block is painted with the accent", () => {
+  for (const theme of [light, dark]) {
+    const colors = blockTextColors({ backgroundColor: themeColorRef("accent"), textColor: themeColorRef("onAccent") }, theme);
+    assert.equal(colors.accent, theme.onAccent);
+  }
+});
+
+test("blockTextColors swaps the accent for the text colour on a fixed background equal to the accent", () => {
+  const colors = blockTextColors({ backgroundColor: light.accent, textColor: "#ffffff" }, light);
+  assert.equal(colors.accent, "#ffffff");
+});
+
+test("blockTextColors keeps the theme accent where it reads against the block background", () => {
+  assert.equal(blockTextColors({ backgroundColor: "#ffffff", textColor: null }, light).accent, light.accent);
 });
