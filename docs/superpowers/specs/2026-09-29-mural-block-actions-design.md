@@ -24,6 +24,8 @@ Native has no way to edit a block's style.
   screen.
 - Two new style capabilities, rendered the same on web and native: text
   alignment and inner spacing. Plus an invisible background.
+- Theme colours: block colours can follow the viewer's theme (as a `null`
+  background already does), alongside fixed colours that never change.
 
 ## Non-goals
 
@@ -102,25 +104,48 @@ Every control is a choice you can see. Values set on web that don't match any
 preset are kept, and no chip is highlighted for them until the user picks one.
 Order, top to bottom:
 
-1. **Quick looks:** a horizontal row of small swatch cards. A look sets
-   background, text colour, font, bold/italic/code, corners, border and shadow.
-   It leaves text size, alignment, inner spacing and fade alone.
+1. **Quick looks:** two rows of small swatch cards, each drawn as it will look.
+   A look sets background, text colour, font, bold/italic/code, corners,
+   border (width, colour, style, strength, sides) and shadow. It leaves text
+   size, alignment, inner spacing and fade alone. A look is an action, not a
+   state: no look is shown as selected afterwards. The tab's other controls
+   show what the look set.
+
+   **Theme looks** re-colour for every theme and every viewer (section 3):
 
    | Look | Background | Text | Font | Corners | Border | Shadow |
    |---|---|---|---|---|---|---|
-   | Plain | theme (`null`) | auto | sans | Rounded | Thin | Soft |
+   | Plain | `null` (surface) | auto | sans | Rounded | Thin, auto | Soft |
    | Bare | `transparent` | auto | sans | Rounded | None | None |
-   | Paper | `#f6efe3` | `#201e1c` | serif | Slight | Thin | Soft |
+   | Tinted | `theme:accentSoft` | auto | sans | Rounded | None | Soft |
+   | Accent | `theme:accent` | `theme:onAccent` | sans, bold | Rounded | None | Soft |
+   | Outline | `transparent` | auto | sans | Rounded | Thick, `theme:accent` | None |
+
+   **Fixed looks** use the same colours in every theme:
+
+   | Look | Background | Text | Font | Corners | Border | Shadow |
+   |---|---|---|---|---|---|---|
+   | Paper | `#f6efe3` | `#201e1c` | serif | Slight | Thin, auto | Soft |
    | Note | `#fff3b0` | `#201e1c` | mono | Square | None | Soft |
    | Ink | `#201e1c` | `#f2f0ec` | serif | Rounded | None | Soft |
    | Clay | `#97532d` | `#ffffff` | sans, bold | Rounded | None | Soft |
 
-   Looks that set a background also set the text colour, so they stay readable
-   in every theme. A look is an action, not a state: no look is shown as
-   selected afterwards. The tab's other controls show what the look set.
-2. **Background:** swatches for None (checkerboard, stored as `"transparent"`),
-   Theme (`null`), and a tint set: `#ffffff #f1e2d8 #e4efdf #dcebf2 #ebe4f3
-   #fff3b0 #201e1c`. Picking None also sets `cardShadow: false`.
+   Every look resets the border style to Solid, the strength to Solid and the
+   sides to All. A fixed look that sets a background also sets the text colour,
+   so it stays readable on every theme.
+2. **Colour rows** (Background, Text colour, Border colour) share one layout:
+   the row's default first, then a **Theme** group of swatches drawn in the
+   current theme's colours and labelled "Changes with the theme", then a
+   **Fixed** group.
+
+   | Row | Default | Theme swatches | Fixed swatches |
+   |---|---|---|---|
+   | Background | None (checkerboard, `"transparent"`); Theme (`null`) | Page `background`, Tint `accentSoft`, Fill `accentFill`, Accent `accent` | `#ffffff #f1e2d8 #e4efdf #dcebf2 #ebe4f3 #fff3b0 #201e1c` |
+   | Text colour | Auto (`null`) | Accent `accent`, On accent `onAccent` | `SWATCHES` from `StyleControls.tsx` |
+   | Border colour | Auto (`null`) | Accent `accent`, Text `text` | `SWATCHES` |
+
+   Picking None for the background also sets `cardShadow: false`, because a
+   shadow under an invisible card looks like a ghost box.
 3. **Corners:** four picture tiles. Square 0, Slight 4, Rounded 12 (default),
    Round 24 (all on `CARD_RADIUS_RANGE`'s grid).
 4. **Text:**
@@ -129,27 +154,34 @@ Order, top to bottom:
    - Size chips S 12 / M 14 / L 17 / XL 20.
    - Emphasis toggles for bold / italic / code.
    - Alignment toggles for left / centre / right.
-5. **Text colour:** Auto (`null`), plus the `SWATCHES` from `StyleControls.tsx`.
-6. **Hard-to-read warning:** shown under the text colour when
-   `contrastRatio(effective text, effective background) < 4.5`. The effective
-   text is `textColor ?? theme.text`. The effective background is `theme.bg`
+   - The Text colour row.
+5. **Hard-to-read warning:** shown under the text colour when
+   `contrastRatio(effective text, effective background) < 4.5`. Both colours are
+   first resolved against the current theme (section 3). The effective text is
+   `textColor ?? theme.text`. The effective background is `theme.background`
    when transparent and `theme.surface` when `null`. There's no warning when
    `contrastRatio` returns `null`.
-7. **Border:**
-   - Width: None 0 / Thin 1 / Thick 3.
-   - When the width isn't None: style chips Solid / Dashed / Dotted (the native
-     app can't draw double/groove/ridge), and colour Auto plus `SWATCHES`.
-   - Border opacity isn't shown, and its value is kept.
-8. **Shadow:** None / Soft.
-9. **Fade** (`cardOpacity`): None 100 / Light 72 / Strong 40.
-10. **Inner spacing:** Tight / Normal / Roomy.
-11. **Footer:** Reset (removes `block.style`, so it resolves to the defaults),
+6. **Border:**
+   - Width: None 0 / Thin 1 / Thick 3. The rest of this group shows only when
+     the width isn't None.
+   - Style: Solid / Dashed / Dotted. The native app can't draw
+     double/groove/ridge.
+   - Strength (`cardBorderOpacity`): Faint 40 / Medium 72 / Solid 100.
+   - Sides (`cardBorderSides`): All / Top & bottom / Left & right / Bottom
+     only, each drawn as a small square with those edges.
+   - The Border colour row.
+7. **Shadow:** None / Soft.
+8. **Fade** (`cardOpacity`): None 100 / Light 72 / Strong 40.
+9. **Inner spacing:** Tight / Normal / Roomy.
+10. **Footer:** Reset (removes `block.style`, so it resolves to the defaults),
     Copy style, and Paste style. Copied style is held in editor state for the
     session, and Paste is disabled until something has been copied. Paste
     replaces the whole style.
 
-Border sides and hover effect aren't shown on native (the native canvas draws
-neither), and their values are kept.
+The hover effect (`cardHoverEffect`) isn't shown on native, and its value is
+kept. On web it lifts the block when you hover while viewing. On native a mural
+being viewed can't be tapped, so there's nothing for it to react to. Editing on
+the phone must not switch it off for web viewers.
 
 ### Layout tab
 
@@ -171,9 +203,19 @@ In `packages/shared/src/library/libraryStyle.ts`:
 - `DEFAULT_BLOCK_STYLE` gets `textAlign: "left"` and `innerSpacing: "normal"`,
   so `resolveBlockStyle` fills them in for existing murals.
 - `backgroundColor` may be `"transparent"`.
-- `blockTextColors` (`murals/blockTextColors.ts`) takes `bg` in its theme
-  argument and measures against it when the background is `"transparent"`.
-  Every caller passes it.
+- **Theme colour references.**
+  - `backgroundColor`, `textColor` and `cardBorderColor` may hold
+    `theme:<key>`, where `<key>` is one of `background`, `surface`, `text`,
+    `accent`, `accentSoft`, `accentFill` or `onAccent` (the palette keys in
+    `themes/palettes.ts`).
+  - A new shared `resolveBlockColor(value, palette)` returns the palette's hex
+    for a reference and passes any other value through unchanged. An unknown
+    key resolves to `null`, which means the theme default.
+  - Every renderer and helper that reads these fields resolves them first,
+    against the viewer's theme.
+- `blockTextColors` (`murals/blockTextColors.ts`) resolves references, takes
+  `background` in its theme argument, and measures against it when the
+  background is `"transparent"`. Every caller passes it.
 
 The backend passes `block.style` through without validation, so it needs no
 change.
@@ -194,6 +236,15 @@ change.
     (0.5 / 1 / 1.6). Normal renders exactly as today.
 - **Transparent background:** already renders on both clients. Only the dim
   text colour changes (section 3).
+- **Theme colour references:** the native block frame and the web wrappers
+  (`MuralCanvas.tsx`, `MobileMuralCanvas.tsx`) pass `backgroundColor`,
+  `textColor` and `cardBorderColor` through `resolveBlockColor` with the
+  viewer's palette. On web that palette is the `themeColors` both canvases
+  already compute. The resolved border colour then goes through each client's
+  existing `resolveBorderColor`.
+- **Border sides on native:** the mural block frame draws per-side widths from
+  `cardBorderSides`, the same way `BookCard.tsx:55` does. Web already draws
+  them.
 
 ## 5. Web
 
@@ -204,16 +255,26 @@ edited everywhere. They go in `BlockStylePanel` via `frontend/src/components/Sty
 - An inner-spacing select.
 - A "No background" option next to the custom-background toggle. Today,
   `<input type="color">` would show `"transparent"` as black.
+- When the background, text or border colour holds a theme reference, its row
+  shows "Theme colour: <name>" with a "Use a custom colour" button in place of
+  the colour input. Otherwise the input would show black and overwrite the
+  reference on first touch. Web doesn't offer picking theme colours itself;
+  those come from native.
 
 ## Testing
 
 - **Shared:**
-  - `blockTextColors` with a `"transparent"` background measures against `bg`.
+  - `blockTextColors` with a `"transparent"` background measures against
+    `background`, and resolves theme references.
+  - `resolveBlockColor`: reference → palette hex, hex passes through,
+    `transparent` passes through, unknown key → `null`.
   - `resolveBlockStyle` fills `textAlign`/`innerSpacing` for old styles.
 - **Mobile unit** (`npm test --workspace mobile`):
   - The layout-reason helper (edge, overlap, minimum, allowed).
   - Quick looks leave size/alignment/spacing/fade untouched and produce a
-    complete `BlockStyle`.
+    complete `BlockStyle`. Every theme look passes the hard-to-read check in
+    all 11 themes. A theme look that fails there is a bad look definition, not
+    a test to loosen.
   - Preset matching (a value off-preset highlights nothing).
   - The hard-to-read predicate.
 - **Web:** `typecheck`, `lint` and `test` for the frontend workspace. A
@@ -221,5 +282,6 @@ edited everywhere. They go in `BlockStylePanel` via `frontend/src/components/Sty
   today's padding.
 - **Device pass:** check `node scripts/dev-status.mjs --json` first, and skip
   if another worktree holds the emulator. Select → bar → each tab → pickers
-  and back → Copy/Delete. Style looks in light and dark. Keyboard with the Text
-  block's Body field.
+  and back → Copy/Delete. Theme and fixed looks in light, dark and one
+  high-contrast theme (Matrix), then switch the app theme and confirm the theme
+  looks re-colour. Border sides. Keyboard with the Text block's Body field.
