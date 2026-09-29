@@ -104,6 +104,6 @@ export function ActivityScreen({ initialTab }: { initialTab?: HomeTab }) {
 const styles = StyleSheet.create({
   page: { padding: spacing.lg, gap: spacing.md },
   grow: { flex: 1 },
-  list: { paddingBottom: spacing.huge, flexGrow: 1 },
+  list: { paddingTop: spacing.lg - spacing.md, paddingBottom: spacing.huge, flexGrow: 1 },
   emptyFeed: { padding: spacing.lg },
 });

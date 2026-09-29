@@ -103,9 +103,7 @@ export function QuizEditorScreen({ quiz, onUpdated }: { quiz: Quiz; onUpdated: (
     <Stack.Screen options={{
       headerShown: true,
       title: current.name,
-      headerRight: () => <View style={styles.headerActions}>
-        <Menu title={current.name} items={actionItems}><IconButton framed accessibilityLabel="Quiz actions" name="more" /></Menu>
-      </View>,
+      headerRight: () => <Menu title={current.name} items={actionItems}><IconButton framed accessibilityLabel="Quiz actions" name="more" /></Menu>,
     }} />
     {error ? <Toast visible message={error} tone="error" /> : null}
     {!frozen ? <FormScroll contentContainerStyle={styles.screen}>
@@ -167,7 +165,6 @@ export function QuizEditorScreen({ quiz, onUpdated }: { quiz: Quiz; onUpdated: (
 
 const styles = StyleSheet.create({
   screen: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xl },
-  headerActions: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   lengths: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   length: { minWidth: 56, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderWidth: 1, borderRadius: radii.md, alignItems: "center" },
   row: { minHeight: 52, borderWidth: 1, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, flexDirection: "row", alignItems: "center", gap: spacing.sm },

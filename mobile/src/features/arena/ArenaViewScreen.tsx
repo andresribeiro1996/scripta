@@ -6,7 +6,7 @@ import { RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { createVoterToken } from "@scripta/shared";
 import { useAuth } from "../../core/auth";
-import { Button, Dialog, EmptyState, ErrorState, IconButton, Input, Menu, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, spacing, typography, useTheme } from "../../ui";
+import { Button, Dialog, EmptyState, ErrorState, HeaderActions, IconButton, Input, Menu, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, spacing, typography, useTheme } from "../../ui";
 import { AddBookSheet } from "../community/AddBookSheet";
 import { fetchTournament, renameTournament, resolveTiebreak, settleDuelEarly, voteOnDuel } from "./api";
 import { arenaViewTabs, matchEmptyCopy, tournamentChampion, votableDuels, type ArenaViewTab } from "./arenaView";
@@ -176,7 +176,7 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
           headerShown: true,
           title: data.name,
           headerRight: () => (
-            <View style={{ flexDirection: "row", gap: spacing.sm }}>
+            <HeaderActions>
             <IconButton framed name="share" accessibilityLabel="Share tournament" onPress={() => void action("share", async () => setShareUrl(await publicContentUrl(`/arena/${encodeURIComponent(id)}`)))} />
             <Menu
               title={data.name}
@@ -187,7 +187,7 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
             >
               <IconButton accessibilityLabel={`Actions for ${data.name}`} framed name="more" />
             </Menu>
-            </View>
+            </HeaderActions>
           ),
         }}
       />
@@ -213,9 +213,9 @@ const styles = StyleSheet.create({
   // Each pane carries its own gutter instead.
   centered: { padding: spacing.lg, gap: spacing.md },
   grow: { flex: 1 },
-  pane: { gap: spacing.md, paddingHorizontal: spacing.lg, paddingBottom: spacing.huge, flexGrow: 1, justifyContent: "center" },
+  pane: { gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.huge, flexGrow: 1, justifyContent: "center" },
   matchWrap: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, justifyContent: "center" },
-  list: { gap: spacing.md, paddingHorizontal: spacing.lg, paddingBottom: spacing.huge, flexGrow: 1 },
+  list: { gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.huge, flexGrow: 1 },
   // The same bottom strip the round rail sits in, so the toggle keeps its
   // place between the two views.
   classicBar: { position: "absolute", left: 0, right: 0, bottom: 0, minHeight: 64, flexDirection: "row", alignItems: "center", justifyContent: "flex-end", paddingHorizontal: spacing.lg, borderTopWidth: 1 },

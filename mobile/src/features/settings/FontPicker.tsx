@@ -1,12 +1,11 @@
 import { useState } from "react";
-import { Platform, Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import { DISPLAY_FONT_IDS, TEXT_FONT_IDS, fonts, resolveFonts, type FontId, type FontPreference, type FontSlot } from "@scripta/shared/themes";
 import { fontStyleFor } from "../../ui/fontStyle";
+import { SYSTEM_FAMILY } from "../../ui/systemFont";
 import { Text } from "../../ui/Text";
 import { dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui/theme";
 import { isAppearanceSyncFailure, saveAccountAppearance } from "./appearanceSync";
-
-const SYSTEM_FAMILY = Platform.select({ ios: "System", default: "sans-serif" });
 
 function sampleStyle(font: FontId, slot: FontSlot) {
   return fontStyleFor(font, slot, typography.body) ?? { fontFamily: SYSTEM_FAMILY };

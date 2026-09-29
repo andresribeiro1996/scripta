@@ -271,7 +271,7 @@ const styles = StyleSheet.create({
   shrink: { flexShrink: 1 },
   strong: { fontWeight: "600" },
   page: { flex: 1, padding: spacing.lg },
-  list: { paddingBottom: minimumTouchTarget + spacing.lg * 2, flexGrow: 1 },
+  list: { paddingTop: spacing.lg - spacing.md, paddingBottom: minimumTouchTarget + spacing.lg * 2, flexGrow: 1 },
   dock: { position: "absolute", left: 0, right: 0, flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.md },
   searchField: { borderRadius: radii.full },
   cycle: { alignItems: "center", justifyContent: "center", width: minimumTouchTarget, height: minimumTouchTarget, borderWidth: 1, borderRadius: radii.full },

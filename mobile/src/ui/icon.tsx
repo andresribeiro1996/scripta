@@ -34,6 +34,7 @@ const GLYPHS = {
   search: { ios: "magnifyingglass", android: "search" },
   filter: { ios: "line.3.horizontal.decrease", android: "filter_list" },
   public: { ios: "globe", android: "public" },
+  lock: { ios: "lock", android: "lock" },
   image: { ios: "photo", android: "image" },
   link: { ios: "link", android: "link" },
   qr: { ios: "qrcode", android: "qr_code_2" },

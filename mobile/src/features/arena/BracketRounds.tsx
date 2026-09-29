@@ -403,7 +403,7 @@ const styles = StyleSheet.create({
   block: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1 },
   labelRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs, paddingBottom: spacing.xs, paddingHorizontal: spacing.xs },
   meta: { fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6 },
-  roundHead: { paddingTop: spacing.md, paddingBottom: spacing.sm, paddingHorizontal: spacing.lg, gap: 2 },
+  roundHead: { paddingTop: spacing.lg, paddingBottom: spacing.sm, paddingHorizontal: spacing.lg, gap: 2 },
   pair: { flexDirection: "row", alignItems: "stretch", gap: spacing.sm },
   brace: { width: 3, borderRadius: 2 },
   braceFill: { position: "absolute", left: 0, width: 3, height: "50%", borderRadius: 2 },

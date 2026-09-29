@@ -2,7 +2,7 @@
 // page carries its folder tree in a sidebar; on a phone that strip of pills
 // (All, Unfiled, every folder, New folder, and the selected folder's Edit and
 // Delete) cost about a third of the screen and pushed its own actions off the
-// right edge. Search is the header's own search bar and the folder choice and
+// right edge. Search is a field at the top of the list and the folder choice and
 // its management live on the overflow menu, the same treatment the Library
 // screen got — the header title carries which folder is in view, so the list
 // keeps the whole screen.
@@ -13,9 +13,8 @@ import { Text } from "../../ui/Text";
 import { Image } from "expo-image";
 import { useQuery } from "@tanstack/react-query";
 import { Stack, useRouter } from "expo-router";
-import type { SearchBarCommands } from "react-native-screens";
 import { buildMuralPreset, buildTree, MURAL_PRESETS, presetAvailability, type Mural, type MuralFolder, type MuralPresetId } from "@scripta/shared";
-import { Button, dynamicType, EmptyState, ErrorState, IconButton, Input, Menu, ModalBody, Screen, Sheet, Toast, type MenuItem } from "../../ui";
+import { Button, dynamicType, EmptyState, ErrorState, HeaderActions, IconButton, Input, Menu, ModalBody, Screen, Sheet, Toast, type MenuItem } from "../../ui";
 import { radii, spacing, typography, useTheme } from "../../ui/theme";
 import { fetchGalleryImages } from "../gallery/api";
 import { fetchTierlists } from "../tierlists/api";
@@ -38,7 +37,6 @@ export function MuralsScreen() {
   const gallery = useQuery({ queryKey: ["gallery"], queryFn: fetchGalleryImages });
   const tierlists = useQuery({ queryKey: ["tierlists"], queryFn: fetchTierlists });
   const [folderId, setFolderId] = useState<string | null | undefined>(undefined);
-  const searchBar = useRef<SearchBarCommands>(null);
   const [search, setSearch] = useState("");
   const [presets, setPresets] = useState(false);
   const pendingPreset = useRef<{ id: string; preset: MuralPresetId } | null>(null);
@@ -83,7 +81,6 @@ export function MuralsScreen() {
   }
 
   function clearSearch() {
-    searchBar.current?.clearText();
     setSearch("");
   }
 
@@ -143,21 +140,8 @@ export function MuralsScreen() {
         options={{
           headerShown: true,
           title,
-          headerSearchBarOptions: (murals.data ?? []).length > 0
-            ? {
-                ref: searchBar,
-                autoCapitalize: "none",
-                placeholder: "Search murals",
-                hideWhenScrolling: true,
-                onChangeText: (event) => setSearch(event.nativeEvent.text),
-                onCancelButtonPress: () => setSearch(""),
-              }
-            : undefined,
           headerRight: () => (
-            <View style={styles.headerActions}>
-              <Menu title={title} items={actionItems}>
-                <IconButton framed accessibilityLabel="Folders" name="more" />
-              </Menu>
+            <HeaderActions>
               <Menu
                 title="New mural"
                 items={[
@@ -167,7 +151,10 @@ export function MuralsScreen() {
               >
                 <IconButton framed accessibilityLabel="New mural" label="New" name="add" />
               </Menu>
-            </View>
+              <Menu title={title} items={actionItems}>
+                <IconButton framed accessibilityLabel="Folders" name="more" />
+              </Menu>
+            </HeaderActions>
           ),
         }}
       />
@@ -175,6 +162,8 @@ export function MuralsScreen() {
         data={visible}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
+        keyboardShouldPersistTaps="handled"
+        ListHeaderComponent={(murals.data ?? []).length > 0 ? <Input icon="search" accessibilityLabel="Search murals" value={search} onChangeText={setSearch} placeholder="Search murals" autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" returnKeyType="search" /> : null}
         refreshing={murals.isRefetching}
         onRefresh={() => void murals.refetch()}
         ListEmptyComponent={!murals.isPending ? <EmptyState title={search ? "Nothing matches" : "No murals here"} body={search ? "Search covers every folder — nothing in your murals matches this." : "Create a freeform mural or start from a preset."} actionLabel={search ? "Clear search" : "Start from a preset"} onAction={search ? clearSearch : openPresets} /> : null}
@@ -227,7 +216,6 @@ export function MuralsScreen() {
 
 const styles = StyleSheet.create({
   screen: { padding: spacing.lg, gap: spacing.md },
-  headerActions: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   list: { gap: spacing.md, paddingBottom: spacing.huge, flexGrow: 1 },
   card: { borderWidth: 1, borderRadius: radii.lg, padding: spacing.md, gap: spacing.sm, flexDirection: "row", alignItems: "center" },
   open: { flex: 1, flexDirection: "row", alignItems: "center", gap: spacing.md },

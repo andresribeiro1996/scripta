@@ -122,7 +122,7 @@ export function VoteTierlistScreen({ code, startInRank = false }: { code: string
   }
 
   return <Screen bottom top={false} style={styles.screen}>
-    <Stack.Screen options={{ headerShown: true, title: board.name, headerRight: () => <IconButton framed accessibilityLabel="Share tier list" label="Share" name="share" onPress={showShare} /> }} />
+    <Stack.Screen options={{ headerShown: true, title: board.name, headerRight: () => <IconButton framed accessibilityLabel="Share tier list" name="share" onPress={showShare} /> }} />
     {error ? <Toast visible message={error} tone="error" /> : null}
     <SwipeableTabs accessibilityLabel="Tier list view" options={[{ value: "board", label: "My board" }, { value: "community", label: "Community" }]} value={view === "community" ? "community" : "board"} onChange={setView} renderPage={(page, active) => {
       if (page !== "community") return <View style={styles.page}>
@@ -157,7 +157,7 @@ export function VoteTierlistScreen({ code, startInRank = false }: { code: string
 
 const styles = StyleSheet.create({
   screen: { padding: spacing.lg, gap: spacing.md },
-  page: { flex: 1, gap: spacing.sm, paddingTop: spacing.md },
+  page: { flex: 1, gap: spacing.sm, paddingTop: spacing.lg },
   complete: { gap: spacing.sm },
   fabClearance: { paddingBottom: 72 },
   strong: { fontWeight: "700" },
