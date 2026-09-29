@@ -9,6 +9,7 @@ const WEB_TOKENS: Array<[keyof ThemeColors, string]> = [
   ["border", "--color-border"],
   ["accent", "--color-accent"],
   ["accentSoft", "--color-accent-soft"],
+  ["accentFill", "--color-accent-fill"],
   ["onAccent", "--color-on-accent"],
   ["danger", "--color-danger"],
   ["dangerSoft", "--color-danger-soft"],
