@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
   fill: { flex: 1 },
   fabClearance: { height: 96 },
   strong: { fontWeight: "700" },
-  header: { gap: spacing.md, paddingBottom: spacing.sm },
+  header: { gap: spacing.md, paddingTop: spacing.lg, paddingBottom: spacing.sm },
   chipsRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   chip: { height: 32, paddingHorizontal: spacing.md, borderRadius: radii.full, borderWidth: 1, alignItems: "center", justifyContent: "center" },
 });
