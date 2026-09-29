@@ -1,10 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import {
-  ALL_STAT_METRICS,
-  BOOK_GENRES,
   BLOCK_TYPE_LABELS,
   bookKey,
-  resolveHomeBlock,
   createBlockCandidate,
   createDuplicateCandidate,
   type BlockType,
@@ -13,7 +10,7 @@ import {
 } from "@scripta/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { AccessibilityInfo, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { Button, EmptyState, ErrorState, IconButton, Input, Screen, Sheet, Toast } from "../../ui";
 import { spacing, typography, useTheme } from "../../ui/theme";
@@ -21,7 +18,11 @@ import { fetchGalleryImages } from "../gallery/api";
 import { useLibrary } from "../library/hooks/useLibrary";
 import { fetchTierlists } from "../tierlists/api";
 import { changeBlockLayout } from "./layout";
-import { MuralCanvas } from "./MuralCanvas";
+import { BlockActionBar, type BlockAction } from "./BlockActionBar";
+import { BlockSheet, type SheetTab } from "./BlockSheet";
+import { ContentTab, hasContentFields, type PickerKind } from "./ContentTab";
+import { LayoutTab } from "./LayoutTab";
+import { BlockPreview, MuralCanvas } from "./MuralCanvas";
 import { MuralShareSheet } from "./MuralShareSheet";
 import { fetchMural, shareMural, unshareMural, updateMural } from "./api";
 import { MURALS_QUERY_KEY } from "./useMurals";
@@ -43,8 +44,9 @@ export function MuralEditorScreen({ id }: { id: string }) {
   const [name, setName] = useState<string | null>(null);
   const [blocks, setBlocks] = useState<MuralBlock[] | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [sheetTab, setSheetTab] = useState<SheetTab | null>(null);
   const [adding, setAdding] = useState(false);
-  const [picking, setPicking] = useState<"book" | "image" | "tierlist" | null>(null);
+  const [picking, setPicking] = useState<PickerKind | null>(null);
   const [search, setSearch] = useState("");
   const [quoteBook, setQuoteBook] = useState<Record<string, unknown> | null>(null);
   const [busy, setBusy] = useState(false);
@@ -55,6 +57,9 @@ export function MuralEditorScreen({ id }: { id: string }) {
   const currentName = name ?? mural?.name ?? "Mural";
   const selected = currentBlocks.find((block) => block.id === selectedId) ?? null;
   const books = library?.data.books ?? [];
+  const groups = library?.data.groups ?? [];
+  const { width: windowWidth } = useWindowDimensions();
+  const profile = user?.username ? { username: user.username, avatarUrl: user.avatarId ? `${API_URL}/auth/avatar/${user.avatarId}/file` : null } : undefined;
   const needle = search.trim().toLowerCase();
   const filteredBooks = needle ? books.filter((book) => `${book.Title ?? ""} ${book.Attribution ?? ""}`.toLowerCase().includes(needle)) : books;
 
@@ -77,6 +82,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
     const block = createBlockCandidate(type, currentBlocks);
     setBlocks([...currentBlocks, block]);
     setSelectedId(block.id);
+    setSheetTab(hasContentFields(type) ? "content" : null);
     setAdding(false);
   }
 
@@ -109,6 +115,14 @@ export function MuralEditorScreen({ id }: { id: string }) {
   if (muralQuery.isPending) return <View style={styles.center}><Text>Loading mural…</Text></View>;
   if (muralQuery.isError || !mural || !draftMural) return <ErrorState title="Mural unavailable" body="It may have been deleted." actionLabel="Back" onAction={() => router.back()} />;
 
+  const blockActions: BlockAction[] = selected ? [
+    { key: "done", label: "Done", icon: "confirm", onPress: () => setSelectedId(null) },
+    ...(hasContentFields(selected.type) ? [{ key: "edit", label: "Edit", icon: "edit" as const, onPress: () => setSheetTab("content") }] : []),
+    { key: "size", label: "Size", icon: "resize", onPress: () => setSheetTab("layout") },
+    { key: "copy", label: "Copy", icon: "duplicate", onPress: () => { const copy = createDuplicateCandidate(selected, currentBlocks); setBlocks([...currentBlocks, copy]); setSelectedId(copy.id); } },
+    { key: "delete", label: "Delete", icon: "delete", tone: "danger", onPress: () => { setBlocks(currentBlocks.filter((block) => block.id !== selected.id)); setSelectedId(null); } },
+  ] : [];
+
   return (
     <Screen top={false} style={styles.screen}>
       <Stack.Screen
@@ -121,13 +135,19 @@ export function MuralEditorScreen({ id }: { id: string }) {
       <View style={styles.nameRow}><Input label="Mural name" value={currentName} onChangeText={setName} /></View>
       {error ? <Toast visible message={error} tone="error" /> : null}
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.canvasScroll}>
-        <MuralCanvas mural={draftMural} books={books} groups={library?.data.groups ?? []} images={gallery.data ?? []} tierlists={tierlists.data ?? []} profile={user?.username ? { username: user.username, avatarUrl: user.avatarId ? `${API_URL}/auth/avatar/${user.avatarId}/file` : null } : undefined} editable selectedBlockId={selectedId} onSelectBlock={setSelectedId} onLayoutChange={(blockId, layout) => setBlocks(changeBlockLayout(currentBlocks, blockId, layout))} />
+        <MuralCanvas mural={draftMural} books={books} groups={groups} images={gallery.data ?? []} tierlists={tierlists.data ?? []} profile={profile} editable selectedBlockId={selectedId} onSelectBlock={(blockId) => { setSelectedId(blockId); if (blockId === null) setSheetTab(null); }} onLayoutChange={(blockId, layout) => {
+          const next = changeBlockLayout(currentBlocks, blockId, layout);
+          if (next === currentBlocks) AccessibilityInfo.announceForAccessibility("Can't move there");
+          else setBlocks(next);
+        }} />
       </ScrollView>
       <View style={[styles.dock, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <Button label="Add block" onPress={() => setAdding(true)} />
-        <Button label="Share" variant="secondary" onPress={() => setShareFor(draftMural)} />
+        {selected ? <BlockActionBar actions={blockActions} /> : <>
+          <Button label="Add block" onPress={() => setAdding(true)} />
+          <Button label="Share" variant="secondary" onPress={() => setShareFor(draftMural)} />
+        </>}
       </View>
-      <MuralShareSheet mural={shareFor} books={books} groups={library?.data.groups ?? []} images={gallery.data ?? []} tierlists={tierlists.data ?? []} profile={user?.username ? { username: user.username, avatarUrl: user.avatarId ? `${API_URL}/auth/avatar/${user.avatarId}/file` : null } : undefined} draft={shareFor !== null && (shareFor.name !== mural.name || shareFor.blocks !== mural.blocks)} contentReady={!libraryQuery.isPending && !gallery.isPending && !tierlists.isPending} contentError={libraryQuery.error?.message ?? gallery.error?.message ?? tierlists.error?.message ?? undefined} onRetryContent={() => { void libraryQuery.refetch(); void gallery.refetch(); void tierlists.refetch(); }} onClose={() => setShareFor(null)} onEnableLink={async () => {
+      <MuralShareSheet mural={shareFor} books={books} groups={groups} images={gallery.data ?? []} tierlists={tierlists.data ?? []} profile={profile} draft={shareFor !== null && (shareFor.name !== mural.name || shareFor.blocks !== mural.blocks)} contentReady={!libraryQuery.isPending && !gallery.isPending && !tierlists.isPending} contentError={libraryQuery.error?.message ?? gallery.error?.message ?? tierlists.error?.message ?? undefined} onRetryContent={() => { void libraryQuery.refetch(); void gallery.refetch(); void tierlists.refetch(); }} onClose={() => setShareFor(null)} onEnableLink={async () => {
         if (shareFor === null) return;
         if (shareFor.name !== mural.name || shareFor.blocks !== mural.blocks) setShareFor(await persist());
         const updated = await shareMural(id);
@@ -140,31 +160,17 @@ export function MuralEditorScreen({ id }: { id: string }) {
         setShareFor({ ...updated, name: currentName, blocks: currentBlocks });
       }} />
       <Sheet visible={adding} title="Add block" onClose={() => setAdding(false)}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheet}>{BLOCK_TYPES.map((type) => <Button key={type} label={BLOCK_TYPE_LABELS[type]} variant="secondary" onPress={() => add(type)} />)}</ScrollView></Sheet>
-      <Sheet visible={selected !== null && picking === null} title="Block settings" onClose={() => setSelectedId(null)}>
-        {selected ? <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheet}>
-          {selected.type === "shelf" ? <>
-            <Text style={{ color: colors.text }}>Shelf source</Text>
-            <Button label="Pick books (keep the current selection)" variant="secondary" onPress={() => updateSelected((block) => block.type === "shelf" ? { ...block, collectionId: undefined, bookKeys: (resolveHomeBlock(block, books, library?.data.groups ?? [], "") as typeof block).bookKeys } : block)} />
-            {(library?.data.groups ?? []).filter((group) => group.type === "collection").map((group) => <Button key={group.id} label={`Follow ${group.name}`} variant="secondary" onPress={() => updateSelected((block) => block.type === "shelf" ? { ...block, collectionId: group.id, bookKeys: [] } : block)} />)
-            }
-            {selected.collectionId ? <Text style={{ color: colors.textDim }}>Following a collection. Leave the title blank to use its name.</Text> : null}
-          </> : null}
-          {selected.type === "quote" ? <><Button label="Rediscover a passage" variant="secondary" onPress={() => updateSelected((block) => block.type === "quote" ? { ...block, mode: "rediscover", bookKey: "", highlightId: "" } : block)} /><Text style={{ color: colors.textDim }}>Only known book passages are rediscovered. Choose books below to pin a specific highlight instead.</Text></> : null}
-          {selected.type === "text" ? <><Input label="Heading" value={selected.heading} onChangeText={(heading) => updateSelected((block) => ({ ...block, heading } as MuralBlock))} /><Input label="Body" value={selected.body} multiline onChangeText={(body) => updateSelected((block) => ({ ...block, body } as MuralBlock))} /></> : null}
-          {selected.type === "profile" ? <><Input label="Biography" value={selected.bio} multiline onChangeText={(bio) => updateSelected((block) => block.type === "profile" ? { ...block, bio } : block)} /><Text style={{ color: colors.text }}>What I like</Text><View style={styles.genreChoices}>{BOOK_GENRES.map((genre) => { const checked = selected.favoriteGenres.includes(genre); return <Pressable key={genre} accessibilityRole="checkbox" accessibilityState={{ checked }} onPress={() => updateSelected((block) => block.type === "profile" ? { ...block, favoriteGenres: checked ? block.favoriteGenres.filter((item) => item !== genre) : [...block.favoriteGenres, genre] } : block)} style={[styles.genreChoice, { backgroundColor: checked ? colors.accentSoft : colors.surface, borderColor: checked ? colors.accent : colors.border }]}><Text style={{ color: checked ? colors.accent : colors.text }}>{genre}</Text></Pressable>; })}</View></> : null}
-          {selected.type === "shelf" || selected.type === "quoteCollection" ? <Input label="Title" value={selected.title} onChangeText={(title) => updateSelected((block) => ({ ...block, title } as MuralBlock))} /> : null}
-          {selected.type === "spotlight" || selected.type === "image" ? <Input label="Caption" value={selected.caption ?? ""} onChangeText={(caption) => updateSelected((block) => ({ ...block, caption } as MuralBlock))} /> : null}
-          {selected.type === "stats" ? <View style={styles.sheet}>{ALL_STAT_METRICS.map((metric) => <Pressable accessibilityLabel={metric} accessibilityRole="checkbox" accessibilityState={{ checked: selected.metrics.includes(metric) }} key={metric} onPress={() => updateSelected((block) => block.type === "stats" ? { ...block, metrics: block.metrics.includes(metric) ? block.metrics.filter((item) => item !== metric) : [...block.metrics, metric] } : block)}><Text style={[typography.body, { color: selected.metrics.includes(metric) ? colors.accent : colors.text }]}>✓ {metric}</Text></Pressable>)}</View> : null}
-          <Text style={[typography.caption, { color: colors.textDim }]}>Position x{selected.layout.x}, y{selected.layout.y}; size {selected.layout.w}×{selected.layout.h}</Text>
-          <View style={styles.row}><Button label="←" accessibilityLabel="Move block left" variant="secondary" onPress={() => setBlocks(changeBlockLayout(currentBlocks, selected.id, { x: selected.layout.x - 1 }))} /><Button label="→" accessibilityLabel="Move block right" variant="secondary" onPress={() => setBlocks(changeBlockLayout(currentBlocks, selected.id, { x: selected.layout.x + 1 }))} /><Button label="↑" accessibilityLabel="Move block up" variant="secondary" onPress={() => setBlocks(changeBlockLayout(currentBlocks, selected.id, { y: selected.layout.y - 1 }))} /><Button label="↓" accessibilityLabel="Move block down" variant="secondary" onPress={() => setBlocks(changeBlockLayout(currentBlocks, selected.id, { y: selected.layout.y + 1 }))} /></View>
-          <View style={styles.row}><Button label="Narrower" variant="secondary" onPress={() => setBlocks(changeBlockLayout(currentBlocks, selected.id, { w: selected.layout.w - 1 }))} /><Button label="Wider" variant="secondary" onPress={() => setBlocks(changeBlockLayout(currentBlocks, selected.id, { w: selected.layout.w + 1 }))} /><Button label="Shorter" variant="secondary" onPress={() => setBlocks(changeBlockLayout(currentBlocks, selected.id, { h: selected.layout.h - 1 }))} /><Button label="Taller" variant="secondary" onPress={() => setBlocks(changeBlockLayout(currentBlocks, selected.id, { h: selected.layout.h + 1 }))} /></View>
-          {selected.type === "spotlight" || (selected.type === "shelf" && !selected.collectionId) || selected.type === "quote" || selected.type === "quoteCollection" ? <Button label="Choose books" onPress={() => setPicking("book")} /> : null}
-          {selected.type === "image" ? <Button label="Choose image" onPress={() => setPicking("image")} /> : null}
-          {selected.type === "tierlist" ? <Button label="Choose tier list" onPress={() => setPicking("tierlist")} /> : null}
-          <Button label="Duplicate" variant="secondary" onPress={() => setBlocks([...currentBlocks, createDuplicateCandidate(selected, currentBlocks)])} />
-          <Button label="Delete" variant="destructive" onPress={() => { setBlocks(currentBlocks.filter((block) => block.id !== selected.id)); setSelectedId(null); }} />
-        </ScrollView> : null}
-      </Sheet>
+      <BlockSheet
+        block={selected}
+        visible={selected !== null && sheetTab !== null && picking === null}
+        tab={sheetTab}
+        onTabChange={setSheetTab}
+        onClose={() => setSheetTab(null)}
+        preview={selected ? <BlockPreview block={selected} canvasWidth={windowWidth - spacing.sm * 2} maxHeight={200} books={books} images={gallery.data ?? []} tierlists={tierlists.data ?? []} profile={profile} groups={groups} /> : null}
+        content={selected && hasContentFields(selected.type) ? <ContentTab block={selected} books={books} groups={groups} images={gallery.data ?? []} tierlists={tierlists.data ?? []} update={updateSelected} onPick={setPicking} /> : null}
+        style={null}
+        layout={selected ? <LayoutTab block={selected} blocks={currentBlocks} onChange={(patch) => setBlocks(changeBlockLayout(currentBlocks, selected.id, patch))} /> : null}
+      />
       <Sheet visible={picking !== null} title={quoteBook ? "Choose a passage" : `Choose ${picking ?? "content"}`} onClose={() => { setPicking(null); setQuoteBook(null); }}>
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheet}>
           {quoteBook ? <><Button label="Back to books" variant="secondary" onPress={() => setQuoteBook(null)} />{(Array.isArray(quoteBook.highlights) ? quoteBook.highlights : []).filter((highlight) => highlight && typeof highlight === "object" && typeof highlight.BookmarkID === "string").map((highlight) => <Button key={String(highlight.BookmarkID)} label={String(highlight.Text ?? highlight.Annotation ?? "Untitled passage")} variant="secondary" onPress={() => {
@@ -194,7 +200,4 @@ const styles = StyleSheet.create({
   canvasScroll: { paddingHorizontal: spacing.sm, paddingBottom: 120 },
   dock: { position: "absolute", left: 0, right: 0, bottom: 0, borderTopWidth: 1, padding: spacing.sm, flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   sheet: { gap: spacing.sm, paddingBottom: spacing.xl },
-  row: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  genreChoices: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  genreChoice: { borderWidth: 1, borderRadius: 999, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
 });
