@@ -1,4 +1,4 @@
-import { DEFAULT_BORDER_SIDES, contrastRatio, effectiveBlockColors, themeColorRef, type BlockStyle, type BlockThemeColorKey, type BorderSides, type CardBorderStyle } from "@scripta/shared";
+import { DEFAULT_BORDER_SIDES, contrastRatio, effectiveBlockColors, resolveBlockColor, themeColorRef, type BlockStyle, type BlockThemeColorKey, type BorderSides, type CardBorderStyle } from "@scripta/shared";
 import type { ThemeColors } from "@scripta/shared/themes";
 
 export type Preset<T> = { key: string; label: string; value: T };
@@ -101,4 +101,9 @@ export function isHardToRead(style: Pick<BlockStyle, "backgroundColor" | "textCo
   const { text, background } = effectiveBlockColors(style, colors);
   const ratio = contrastRatio(text, background);
   return ratio !== null && ratio < 4.5;
+}
+
+export function selectionBorderColor(style: Pick<BlockStyle, "backgroundColor" | "cardBorderColor">, colors: Pick<ThemeColors, BlockThemeColorKey>): string {
+  const isAccent = (value: string | null) => resolveBlockColor(value, colors)?.toLowerCase() === colors.accent.toLowerCase();
+  return isAccent(style.backgroundColor) || isAccent(style.cardBorderColor) ? colors.text : colors.accent;
 }

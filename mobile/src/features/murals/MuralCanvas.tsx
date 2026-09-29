@@ -36,6 +36,7 @@ import { blockFontFamily, resolveBorderColor, resolveBorderStyle } from "../../u
 import { minimumTouchTarget, radii, spacing, useTheme, type ThemeColors } from "../../ui/theme";
 import type { GalleryImage } from "../gallery/api";
 import type { Tierlist } from "../tierlists/api";
+import { selectionBorderColor } from "./blockStyleOptions";
 import { muralCanvasHeight } from "./layout";
 
 const LIFT_SPRING = { duration: 300, dampingRatio: 0.8 } as const;
@@ -209,7 +210,7 @@ function CanvasBlock({ block, columnWidth, editable, selected, books, images, ti
         styles.block,
         frameShadow(style),
         blockFrameStyle(style, colors),
-        selected ? { borderColor: colors.accent, ...sideWidths(Math.max(2, style.cardBorderWidth), DEFAULT_BORDER_SIDES) } : null,
+        selected ? { borderColor: selectionBorderColor(style, colors), ...sideWidths(Math.max(2, style.cardBorderWidth), DEFAULT_BORDER_SIDES) } : null,
         {
           left: block.layout.x * columnWidth,
           top: block.layout.y * ROW_HEIGHT,

@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { BLOCK_FONT_SIZE_RANGE, CARD_BORDER_OPACITY_RANGE, CARD_OPACITY_RANGE, CARD_RADIUS_RANGE, DEFAULT_BLOCK_STYLE, type BlockStyle } from "@scripta/shared";
 import { THEME_IDS, themes } from "@scripta/shared/themes";
-import { BORDER_STRENGTH_PRESETS, CORNER_PRESETS, FADE_PRESETS, QUICK_LOOKS, SIZE_PRESETS, applyLook, isHardToRead, matchPreset, matchSides } from "./blockStyleOptions.js";
+import { BORDER_STRENGTH_PRESETS, CORNER_PRESETS, FADE_PRESETS, QUICK_LOOKS, SIZE_PRESETS, applyLook, isHardToRead, matchPreset, matchSides, selectionBorderColor } from "./blockStyleOptions.js";
 
 const onGrid = (value: number, range: { min: number; max: number; step: number }) => value >= range.min && value <= range.max && (value - range.min) % range.step === 0;
 
@@ -59,4 +59,14 @@ test("isHardToRead flags low contrast and measures a transparent block against t
   assert.equal(isHardToRead({ backgroundColor: "#ffffff", textColor: "#eeeeee" }, themes.light.colors), true);
   assert.equal(isHardToRead({ backgroundColor: "transparent", textColor: themes.dark.colors.background }, themes.dark.colors), true);
   assert.equal(isHardToRead({ backgroundColor: null, textColor: null }, themes.light.colors), false);
+});
+
+test("the selection border stays visible when the block itself is painted with the accent", () => {
+  const light = themes.light.colors;
+  const dark = themes.dark.colors;
+  assert.equal(selectionBorderColor({ backgroundColor: null, cardBorderColor: null }, light), light.accent);
+  assert.equal(selectionBorderColor({ backgroundColor: "#ffffff", cardBorderColor: "#123456" }, light), light.accent);
+  assert.equal(selectionBorderColor({ backgroundColor: "theme:accent", cardBorderColor: null }, dark), dark.text);
+  assert.equal(selectionBorderColor({ backgroundColor: light.accent.toUpperCase(), cardBorderColor: null }, light), light.text);
+  assert.equal(selectionBorderColor({ backgroundColor: null, cardBorderColor: "theme:accent" }, dark), dark.text);
 });
