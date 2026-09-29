@@ -30,13 +30,11 @@ function SizeStepper({ label, value, unit, decrease, increase, onStep }: {
   const reason = increase ? REASONS[increase] : undefined;
   return (
     <View style={styles.row}>
-      <View style={styles.line}>
-        <Text style={[typography.body, { color: colors.text, fontWeight: "600" }]}>{label}</Text>
-        <View style={styles.stepper}>
-          {button(-1, decrease, "−", "Decrease")}
-          <Text style={[typography.body, styles.value, { color: colors.text }]}>{value} {unit}</Text>
-          {button(1, increase, "+", "Increase")}
-        </View>
+      <Text style={[typography.body, { color: colors.text, fontWeight: "600" }]}>{label}</Text>
+      <View style={styles.stepper}>
+        {button(-1, decrease, "−", "Decrease")}
+        <Text style={[typography.body, styles.value, { color: colors.text }]}>{value} {unit}</Text>
+        {button(1, increase, "+", "Increase")}
       </View>
       {reason ? <Text style={[typography.caption, { color: colors.textDim }]}>{reason}</Text> : null}
     </View>
@@ -57,9 +55,8 @@ export function LayoutTab({ block, blocks, onChange }: { block: MuralBlock; bloc
 
 const styles = StyleSheet.create({
   tab: { gap: spacing.lg },
-  row: { gap: spacing.xs },
-  line: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md },
+  row: { gap: spacing.sm },
   stepper: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  step: { minWidth: minimumTouchTarget, minHeight: minimumTouchTarget, borderWidth: 1, borderRadius: radii.md, alignItems: "center", justifyContent: "center" },
-  value: { minWidth: 96, textAlign: "center" },
+  step: { minWidth: minimumTouchTarget, minHeight: minimumTouchTarget, borderWidth: 1, borderRadius: radii.md, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  value: { minWidth: 96, flexShrink: 1, textAlign: "center" },
 });
