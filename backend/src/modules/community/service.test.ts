@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { IdentityKey, ReaderProfile } from "@scripta/shared";
 import type { DiscoverItem, GameParticipation } from "@scripta/shared/community";
-import { DEFAULT_FEED_SETTINGS, normalizeFeedSettings } from "@scripta/shared/community";
+import { DEFAULT_FEED_SETTINGS, encodeCursor, normalizeFeedSettings } from "@scripta/shared/community";
 import type { ParticipationItem } from "@scripta/shared/dashboard";
 import type { PublishedTierlistRef } from "../tierlists/service.js";
 import type { PublishedTournamentRef } from "../arena/service.js";
@@ -10,7 +10,7 @@ import type { MuralPublicPayload } from "../murals/index.js";
 import type { CommunityRepository, CursorKeyset } from "./domain/ports.js";
 import type { EventRow, FollowRow, ProfileRow } from "./domain/types.js";
 import { InvalidCursorError, MuralNotOwnedError, NotFollowingError, ProfileNotFoundError, SelfFollowError, UsernameRequiredError } from "./domain/errors.js";
-import { createCommunityService, type CommunityDeps } from "./service.js";
+import { createCommunityService, type CommunityDeps, type CommunityService } from "./service.js";
 
 function createRepoFake() {
   const follows = new Map<string, FollowRow>();
@@ -183,6 +183,18 @@ function reader(userId: string): ReaderProfile {
 }
 
 const at = (day: number) => `2026-09-${String(day).padStart(2, "0")}T00:00:00.000Z`;
+
+const pageThrough = (service: CommunityService, limit: number): string[] => {
+  const ids: string[] = [];
+  let cursor: string | null | undefined;
+  for (let pages = 0; cursor !== null && pages < 50; pages++) {
+    const page = service.getDashboard("viewer", cursor ?? undefined, limit);
+    assert.ok(page.items.length <= limit);
+    ids.push(...page.items.map((item) => item.id));
+    cursor = page.nextCursor;
+  }
+  return ids;
+};
 
 export function tierRef(id: string, owner: string, overrides: Partial<PublishedTierlistRef> = {}): PublishedTierlistRef {
   return {
@@ -702,14 +714,7 @@ test("participation rows page with the cursor, without repeats or gaps", () => {
     readerProfiles.set(id, reader(id));
     repo.insertFollow({ follower_id: id, followee_id: "viewer", created_at: at(day) });
   }
-  const collected: string[] = [];
-  let cursor: string | undefined;
-  do {
-    const page = service.getDashboard("viewer", cursor, 2);
-    collected.push(...page.items.map((item) => item.id));
-    cursor = page.nextCursor ?? undefined;
-  } while (cursor && collected.length < 10);
-  assert.deepEqual(collected, ["f3", "tierlist:g3", "f2", "tierlist:g2", "f1", "tierlist:g1"]);
+  assert.deepEqual(pageThrough(service, 2), ["f3", "tierlist:g3", "f2", "tierlist:g2", "f1", "tierlist:g1"]);
 });
 
 test("a cursor page carries no counts", () => {
@@ -729,6 +734,141 @@ test("a cursor page carries no counts", () => {
   assert.equal(next.seenAt, null);
   assert.equal(next.personalNewCount, 0);
   assert.equal(next.followingNewCount, 0);
+});
+
+test("one unrenderable row in a fetch window can't end the feed early", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  repo.upsertProfile(profileRow("alice"));
+  repo.insertFollow({ follower_id: "viewer", followee_id: "alice", created_at: at(1) });
+  for (let i = 0; i < 22; i++) {
+    const n = String(i).padStart(2, "0");
+    repo.insertEvent({ id: `v${n}`, user_id: "alice", type: "voted_on", ref_type: "tierlist", ref_id: `t${n}`, payload: null, created_at: `2026-09-02T00:00:${n}.000Z` });
+    if (i !== 21) tierlistRefs.set(`t${n}`, tierRef(`t${n}`, "carol"));
+  }
+  assert.deepEqual(pageThrough(service, 20), Array.from({ length: 21 }, (_, i) => `v${String(20 - i).padStart(2, "0")}`));
+});
+
+test("a window of unrenderable rows can't make the page skip a visible row behind it", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs, tierlistParticipation } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  repo.upsertProfile(profileRow("alice"));
+  repo.insertFollow({ follower_id: "viewer", followee_id: "alice", created_at: at(1) });
+  for (const [id, day] of [["a1", 20], ["a2", 19], ["a3", 18], ["a4", 17]] as const) {
+    repo.insertEvent({ id, user_id: "alice", type: "voted_on", ref_type: "tierlist", ref_id: `t-${id}`, payload: null, created_at: at(day) });
+  }
+  tierlistRefs.set("t-a4", tierRef("t-a4", "carol"));
+  for (const [id, day] of [["g1", 16], ["g2", 15], ["g3", 14]] as const) tierlistParticipation.push({ id, name: id, covers: [], participantCount: 1, latestAt: at(day), recent: [] });
+  assert.deepEqual(pageThrough(service, 2), ["a4", "tierlist:g1", "tierlist:g2", "tierlist:g3"]);
+});
+
+test("rows from a quieter source don't jump ahead of the unfetched rows of a busier one", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  for (const id of ["alice", "bob"]) {
+    readerProfiles.set(id, reader(id));
+    repo.upsertProfile(profileRow(id));
+    repo.insertFollow({ follower_id: "viewer", followee_id: id, created_at: at(1) });
+  }
+  for (const [id, user, day] of [["b1", "bob", 20], ["b2", "bob", 19], ["b3", "bob", 18], ["b4", "bob", 17], ["a1", "alice", 16], ["a2", "alice", 15], ["a3", "alice", 14]] as const) {
+    repo.insertEvent({ id, user_id: user, type: "voted_on", ref_type: "tierlist", ref_id: `t-${id}`, payload: null, created_at: at(day) });
+    if (id !== "b1" && id !== "b2" && id !== "b3") tierlistRefs.set(`t-${id}`, tierRef(`t-${id}`, "carol"));
+  }
+  assert.deepEqual(pageThrough(service, 2), ["b4", "a1", "a2", "a3"]);
+});
+
+test("a run of unrenderable rows longer than a page's refills doesn't strand what comes after it", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  repo.upsertProfile(profileRow("alice"));
+  repo.insertFollow({ follower_id: "viewer", followee_id: "alice", created_at: at(1) });
+  const second = (n: number) => `2026-09-10T00:00:${String(n).padStart(2, "0")}.000Z`;
+  repo.insertEvent({ id: "x1", user_id: "alice", type: "voted_on", ref_type: "tierlist", ref_id: "t-x1", payload: null, created_at: second(40) });
+  for (let i = 1; i <= 20; i++) repo.insertEvent({ id: `d${String(i).padStart(2, "0")}`, user_id: "alice", type: "voted_on", ref_type: "tierlist", ref_id: `t-d${i}`, payload: null, created_at: second(40 - i) });
+  repo.insertEvent({ id: "x2", user_id: "alice", type: "voted_on", ref_type: "tierlist", ref_id: "t-x2", payload: null, created_at: second(5) });
+  tierlistRefs.set("t-x1", tierRef("t-x1", "carol"));
+  tierlistRefs.set("t-x2", tierRef("t-x2", "carol"));
+  assert.deepEqual(pageThrough(service, 2), ["x1", "x2"]);
+});
+
+test("a page gives up refilling after five fetches and hands back a cursor", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  repo.upsertProfile(profileRow("alice"));
+  repo.insertFollow({ follower_id: "viewer", followee_id: "alice", created_at: at(1) });
+  for (let i = 0; i < 40; i++) {
+    const n = String(i).padStart(2, "0");
+    repo.insertEvent({ id: `d${n}`, user_id: "alice", type: "voted_on", ref_type: "tierlist", ref_id: `t-d${n}`, payload: null, created_at: `2026-09-10T00:00:${n}.000Z` });
+  }
+  const listEventsByUser = repo.listEventsByUser;
+  let fetches = 0;
+  repo.listEventsByUser = (...args) => {
+    fetches++;
+    return listEventsByUser(...args);
+  };
+  const page = service.getDashboard("viewer", encodeCursor({ createdAt: at(11), id: "z" }), 2);
+  assert.deepEqual(page.items, []);
+  assert.ok(page.nextCursor);
+  assert.equal(fetches, 5);
+});
+
+test("a page that finds too few rows in its first fetch tops up from the next", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  repo.upsertProfile(profileRow("alice"));
+  repo.insertFollow({ follower_id: "viewer", followee_id: "alice", created_at: at(1) });
+  for (const [id, day] of [["x1", 20], ["d1", 19], ["d2", 18], ["x2", 17], ["x3", 16], ["x4", 15]] as const) {
+    repo.insertEvent({ id, user_id: "alice", type: "voted_on", ref_type: "tierlist", ref_id: `t-${id}`, payload: null, created_at: at(day) });
+    if (id.startsWith("x")) tierlistRefs.set(`t-${id}`, tierRef(`t-${id}`, "carol"));
+  }
+  const first = service.getDashboard("viewer", undefined, 2);
+  assert.deepEqual(first.items.map((item) => item.id), ["x1", "x2"]);
+  const second = service.getDashboard("viewer", first.nextCursor!, 2);
+  assert.deepEqual(second.items.map((item) => item.id), ["x3", "x4"]);
+  assert.equal(second.nextCursor, null);
+});
+
+test("an event, a follow and a participation row sharing a time each appear once, largest id first", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs, tierlistParticipation } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  readerProfiles.set("fan", reader("fan"));
+  repo.upsertProfile(profileRow("alice"));
+  repo.insertFollow({ follower_id: "viewer", followee_id: "alice", created_at: at(1) });
+  tierlistRefs.set("t1", tierRef("t1", "alice"));
+  repo.insertEvent({ id: "e-tie", user_id: "alice", type: "tierlist_published", ref_type: "tierlist", ref_id: "t1", payload: null, created_at: at(5) });
+  repo.insertFollow({ follower_id: "fan", followee_id: "viewer", created_at: at(5) });
+  tierlistParticipation.push({ id: "g-tie", name: "Tie", covers: [], participantCount: 1, latestAt: at(5), recent: [] });
+  assert.deepEqual(pageThrough(service, 1), ["tierlist:g-tie", "fan", "e-tie"]);
+});
+
+test("only the participants that get named have a glyph looked up", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, readerGlyphs, readerGlyphCalls, tierlistParticipation } = createDeps(repo);
+  const service = createCommunityService(deps);
+  const ids = ["p1", "p2", "p3", "p4", "p5"];
+  for (const id of ids) {
+    if (id !== "p1") readerProfiles.set(id, reader(id));
+    repo.upsertProfile(profileRow(id));
+    repo.updateFeedSettings(id, { ...DEFAULT_FEED_SETTINGS, readerGlyph: true });
+    readerGlyphs.set(id, "star");
+  }
+  tierlistParticipation.push({ id: "t1", name: "Sci-fi", covers: [], participantCount: 5, latestAt: at(5), recent: ids.map((userId, i) => ({ userId, at: at(5 - i) })) });
+  const row = service.getDashboard("viewer", undefined, 20).items[0] as ParticipationItem;
+  assert.deepEqual(row.actors.map((actor) => actor.username), ["user-p2", "user-p3", "user-p4"]);
+  assert.deepEqual(readerGlyphCalls, ["p2", "p3", "p4"]);
 });
 
 test("discover merges both content kinds newest first", () => {
@@ -1120,7 +1260,7 @@ test("dashboard shows a followee's reading and votes only while their switches a
     }
   }
   repo.updateFeedSettings("alice", { ...DEFAULT_FEED_SETTINGS, reading: true, votes: false });
-  const { items } = service.getDashboard("viewer", undefined, 20);
+  const { items } = service.getDashboard("viewer", undefined, 3);
   assert.deepEqual(items.map((item) => [item.kind, item.id]), [["vote", "bob-vote"], ["reading", "alice-finished"], ["reading", "alice-added"]]);
   assert.deepEqual(items.flatMap((item) => (item.kind === "reading" ? [[item.finished, item.book]] : [])), [
     [true, { title: "Emma", author: "Austen", coverUrl: null }],

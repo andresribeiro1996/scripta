@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { IdentityKey, ReaderProfile } from "@scripta/shared";
 import { categoryFor, contentDetail, decodeCursor, encodeCursor, DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
-import type { ActivityEventType, ActivityItem, CommunityAuthor, CommunityEventType, DiscoverItem, DiscoverType, FeedCategory, FeedSettings, FollowState, GameParticipation, OwnProfile, Page, ParticipationGameKind, PersonResult, PublishedContent, PublishedProfile, TierlistSummary, TournamentSummary } from "@scripta/shared/community";
+import type { ActivityEventType, ActivityItem, CommunityAuthor, CommunityEventType, DiscoverItem, DiscoverType, FeedSettings, FollowState, GameParticipation, OwnProfile, Page, ParticipationGameKind, PersonResult, PublishedContent, PublishedProfile, TierlistSummary, TournamentSummary } from "@scripta/shared/community";
 import type { DashboardFeedPage, DigestItem, ParticipationItem } from "@scripta/shared/dashboard";
 import type { PublishedTournamentRef } from "../arena/service.js";
 import type { MuralsPublicApi } from "../murals/publicApi.js";
@@ -13,13 +13,9 @@ import type { EventRow, FollowRow } from "./domain/types.js";
 
 const DISCOVER_SCAN_CAP = 500;
 const DASHBOARD_COUNT_CAP = 100;
+const DASHBOARD_REFILL_ROUNDS = 5;
 const NAMED_PARTICIPANTS = 3;
-const DIGEST_TYPES: Record<FeedCategory, ActivityEventType[]> = {
-  publications: ["tierlist_published", "tournament_published"],
-  votes: ["voted_on"],
-  reading: ["book_added", "book_finished"],
-  follows: []
-};
+const DIGEST_EVENT_TYPES: ActivityEventType[] = ["tierlist_published", "tournament_published", "voted_on", "book_added", "book_finished"];
 
 export type CommunityRefType = "tierlist" | "tournament" | "book" | "user" | "mural";
 
@@ -137,11 +133,9 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
   type DigestRow = { id: string; createdAt: string; event?: EventRow; follow?: FollowRow; participation?: ParticipationItem };
   type Bound = { keyset?: CursorKeyset; since?: string };
 
-  // The publisher's own switches, the same ones their profile's activity
-  // list obeys — a category they broadcast there, they broadcast here.
   const digestTypesFor = (userId: string): ActivityEventType[] => {
     const settings = settingsFor(userId);
-    return (Object.keys(DIGEST_TYPES) as FeedCategory[]).flatMap((category) => (settings[category] ? DIGEST_TYPES[category] : []));
+    return DIGEST_EVENT_TYPES.filter((type) => settings[categoryFor(type)]);
   };
   const withinBound = (bound: Bound, createdAt: string, id: string): boolean =>
     bound.since !== undefined ? createdAt > bound.since : !bound.keyset || createdAt < bound.keyset.createdAt || (createdAt === bound.keyset.createdAt && id < bound.keyset.id);
@@ -158,27 +152,28 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
       list.map((game) => {
         const nameable = game.recent.map((entry) => entry.userId).filter((userId) => repo.getProfileRow(userId)?.published === 1 && settingsFor(userId).votes);
         const profiles = deps.resolveProfiles(nameable);
-        const actors = nameable.flatMap((userId) => {
-          const profile = profiles.get(userId);
-          return profile ? [withGlyph(profile, userId, glyphOf)] : [];
-        }).slice(0, NAMED_PARTICIPANTS);
+        const actors = nameable
+          .filter((userId) => profiles.has(userId))
+          .slice(0, NAMED_PARTICIPANTS)
+          .map((userId) => withGlyph(profiles.get(userId)!, userId, glyphOf));
         return { kind: "participation" as const, id: `${kind}:${game.id}`, game: { kind, id: game.id, name: game.name, covers: game.covers.slice(0, FEED_COVER_LIMIT) }, actors, count: game.participantCount, createdAt: game.latestAt };
       })
     );
   };
 
-  const followingRows = (followees: string[], bound: Bound, limit: number): DigestRow[] =>
-    followees.flatMap((followeeId) => {
+  const followingWindows = (followees: string[], bound: Bound, limit: number): DigestRow[][] =>
+    followees.map((followeeId) => {
       const types = digestTypesFor(followeeId);
       if (types.length === 0) return [];
       const events = bound.since !== undefined ? repo.listEventsByUserSince(followeeId, bound.since, limit, types) : repo.listEventsByUser(followeeId, bound.keyset, limit, types);
       return events.map((event) => ({ id: event.id, createdAt: event.created_at, event }));
     });
 
-  const personalRows = (viewerId: string, participation: ParticipationItem[], bound: Bound, limit: number): DigestRow[] => [
-    ...(bound.since !== undefined ? repo.listFollowersSince(viewerId, bound.since, limit) : repo.listFollowersByFollowee(viewerId, bound.keyset, limit)).map((follow) => ({ id: follow.follower_id, createdAt: follow.created_at, follow })),
-    ...participation.filter((item) => withinBound(bound, item.createdAt, item.id)).map((item) => ({ id: item.id, createdAt: item.createdAt, participation: item }))
-  ];
+  const followerRows = (viewerId: string, bound: Bound, limit: number): DigestRow[] =>
+    (bound.since !== undefined ? repo.listFollowersSince(viewerId, bound.since, limit) : repo.listFollowersByFollowee(viewerId, bound.keyset, limit)).map((follow) => ({ id: follow.follower_id, createdAt: follow.created_at, follow }));
+
+  const participationRows = (participation: ParticipationItem[], bound: Bound): DigestRow[] =>
+    participation.filter((item) => withinBound(bound, item.createdAt, item.id)).map((item) => ({ id: item.id, createdAt: item.createdAt, participation: item }));
 
   const toDigestItem = (row: DigestRow, profiles: Map<string, ReaderProfile>, glyphOf: (userId: string) => IdentityKey | null, followees: string[]): DigestItem | undefined => {
     if (row.event) {
@@ -227,7 +222,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
     return undefined;
   };
 
-  const buildItems = (rows: DigestRow[], followees: string[], limit: number, glyphOf = glyphLookup()): { items: DigestItem[]; last?: DigestRow; more: boolean } => {
+  const buildItems = (rows: DigestRow[], followees: string[], limit: number, glyphOf = glyphLookup(), horizon?: CursorKeyset): { items: DigestItem[]; last?: DigestRow; more: boolean } => {
     rows.sort(newestFirst);
     const actorIds = new Set<string>();
     for (const row of rows) {
@@ -238,12 +233,10 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
     const items: DigestItem[] = [];
     let last: DigestRow | undefined;
     for (const row of rows) {
-      if (items.length === limit) return { items, last, more: true };
+      if (items.length === limit || (horizon && withinBound({ keyset: horizon }, row.createdAt, row.id))) return { items, last, more: true };
       const item = row.participation ?? toDigestItem(row, profiles, glyphOf, followees);
-      if (item) {
-        items.push(item);
-        last = row;
-      }
+      if (item) items.push(item);
+      last = row;
     }
     return { items, last, more: false };
   };
@@ -342,14 +335,27 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
       if (cursor && !keyset) throw new InvalidCursorError();
       const followees = repo.listFollowees(viewerId);
       const participation = participationItems(viewerId);
-      const page = buildItems([...followingRows(followees, { keyset }, limit + 1), ...personalRows(viewerId, participation, { keyset }, limit + 1)], followees, limit);
-      const nextCursor = page.more && page.last ? encodeCursor({ createdAt: page.last.createdAt, id: page.last.id }) : null;
-      if (keyset) return { items: page.items, nextCursor, seenAt: null, personalNewCount: 0, followingNewCount: 0 };
+      const glyphOf = glyphLookup();
+      const items: DigestItem[] = [];
+      let pageBound: Bound = { keyset };
+      let last: DigestRow | undefined;
+      let more = true;
+      for (let round = 0; more && items.length < limit && round < DASHBOARD_REFILL_ROUNDS; round++) {
+        const windows = [...followingWindows(followees, pageBound, limit + 1), followerRows(viewerId, pageBound, limit + 1)];
+        const horizon = windows.filter((rows) => rows.length === limit + 1).map((rows) => rows[rows.length - 1]!).sort(newestFirst)[0];
+        const page = buildItems([...windows.flat(), ...participationRows(participation, pageBound)], followees, limit - items.length, glyphOf, horizon);
+        items.push(...page.items);
+        last = page.last ?? last;
+        more = page.more || horizon !== undefined;
+        if (last) pageBound = { keyset: last };
+      }
+      const nextCursor = more && last ? encodeCursor({ createdAt: last.createdAt, id: last.id }) : null;
+      if (keyset) return { items, nextCursor, seenAt: null, personalNewCount: 0, followingNewCount: 0 };
       const seenAt = deps.getDashboardSeenAt(viewerId);
-      const bound: Bound = seenAt ? { since: seenAt } : {};
-      const personalNewCount = countItems(personalRows(viewerId, participation, bound, DASHBOARD_COUNT_CAP), followees);
-      const followingNewCount = countItems(followingRows(followees, bound, DASHBOARD_COUNT_CAP), followees);
-      return { items: page.items, nextCursor, seenAt, personalNewCount, followingNewCount };
+      const countBound: Bound = seenAt ? { since: seenAt } : {};
+      const personalNewCount = countItems([...followerRows(viewerId, countBound, DASHBOARD_COUNT_CAP), ...participationRows(participation, countBound)], followees);
+      const followingNewCount = countItems(followingWindows(followees, countBound, DASHBOARD_COUNT_CAP).flat(), followees);
+      return { items, nextCursor, seenAt, personalNewCount, followingNewCount };
     },
     markDashboardSeen(viewerId) {
       deps.setDashboardSeenAt(viewerId, new Date().toISOString());
