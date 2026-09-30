@@ -71,7 +71,7 @@ export function DiscoverPane() {
             <View style={styles.page}>
               <Skeleton height={160} />
             </View>
-          ) : discover.isError ? (
+          ) : discover.isError && !discover.data ? (
             <View style={styles.page}>
               <ErrorState body="Couldn't load tier lists and tournaments." actionLabel="Retry" onAction={() => void discover.refetch()} />
             </View>
@@ -94,10 +94,16 @@ export function DiscoverPane() {
                 </View>
               }
               onEndReached={() => {
-                if (discover.hasNextPage && !discover.isFetchingNextPage) void discover.fetchNextPage();
+                if (discover.hasNextPage && !discover.isFetchingNextPage && !discover.isFetchNextPageError) void discover.fetchNextPage();
               }}
               onEndReachedThreshold={0.4}
-              ListFooterComponent={discover.isFetchingNextPage ? <View style={styles.page}><Skeleton height={80} /></View> : null}
+              ListFooterComponent={
+                discover.isFetchingNextPage ? (
+                  <View style={styles.page}><Skeleton height={80} /></View>
+                ) : discover.isFetchNextPageError ? (
+                  <View style={styles.page}><ErrorState body="Couldn't load more." actionLabel="Retry" onAction={() => void discover.fetchNextPage()} /></View>
+                ) : null
+              }
               renderItem={({ item }) => <DiscoverRow item={item} onPreviewBooks={setPreview} />}
             />
           )}
