@@ -92,10 +92,9 @@ The fix:
 - `mobile/src/app/arena/index.tsx` renders a new `DiscoverScreen` (header
   title "Discover") wrapping the existing `DiscoverPane`, and
   `ArenaPublicListScreen` is deleted.
-- The route stays in the root stack, outside the tabs. So:
-  - guests can open it, and so can the `/arena` Android App Link;
-  - Games → Browse still pushes it, and Back returns to Games with its list
-    position intact.
+- The route stays in the root stack, outside the tabs, so guests and the
+  `/arena` Android App Link can open it. Games → Browse opens the in-tab
+  Discover instead (see the correction below).
 - `fetchPublicTournaments` and `fetchPublicTierlists` lose their only caller
   and are deleted. The backend endpoints stay (compatibility).
 - **Correction found in the device pass.** From the root-stack `/arena`, an
@@ -115,8 +114,8 @@ The fix:
   up to 70.
 - **Guest access.** Send `auth` only when signed in. Today `fetchDiscover`
   always sends `auth: true`, which throws "Not signed in" for guests before
-  any request (`apiClient.ts:129`). Guests get no "voted" state. Author taps
-  go through the normal login redirect.
+  any request (`apiClient.ts:129`). Guests get no "voted" state. On `/arena`,
+  author names are plain text (see the correction above).
 - **"See all N books" on tournament rows.** This opens `ArenaBooksSheet`, and
   from there `AddBookSheet`, both moved from the old list. `AddBookSheet`
   already shows a Sign in prompt to guests.
@@ -132,7 +131,10 @@ The fix:
   `/community`. Home's "All activity" and "Find readers" links point there
   (the Activity and People tabs).
 - **Seen marker:** `markDashboardSeen` runs only once the Activity tab is
-  showing with data loaded, not on Discover or People. This fix moves up from
+  showing with data loaded, and not after a failed load. It doesn't run on
+  Discover or People. An empty Activity still counts as seen once shown.
+  The opening tab is chosen before the first render with data, so an empty
+  feed opens straight on Discover without marking or sliding. This fix moves up from
   step 2 because this step rewires every way into the screen.
 
 ### Web
