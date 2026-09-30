@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { combineBooks, findDuplicates, markDistinct, mergeDuplicateBooks, rekeyKeys, rekeyTierBoard } from "./dedupe.js";
+import { combineBooks, findDuplicates, markDistinct, mergeCertainDuplicates, mergeDuplicateBooks, rekeyKeys, rekeyTierBoard } from "./dedupe.js";
 import { bookKey } from "./merge.js";
 import type { LibraryData } from "./types.js";
 
@@ -83,4 +83,66 @@ test("rekeyKeys and rekeyTierBoard rewrite and de-duplicate, tiers winning over 
   assert.deepEqual(rekeyKeys(["old", "x", "new"], from, "new"), ["new", "x"]);
   const board = { name: "n", tiers: [{ id: "s", bookKeys: ["old"] }, { id: "a", bookKeys: ["new"] }], pool: ["new", "y"] };
   assert.deepEqual(rekeyTierBoard(board, from, "new"), { name: "n", tiers: [{ id: "s", bookKeys: ["new"] }, { id: "a", bookKeys: [] }], pool: ["y"] });
+});
+
+const doc = (books: unknown[], updatedAt = "v1") => ({ data: { books } as LibraryData, updatedAt });
+
+test("mergeCertainDuplicates merges each certain group once and returns the last document", async () => {
+  const calls: Array<[string, string[], string]> = [];
+  const start = doc([kobo, goodreads, series]);
+  const result = await mergeCertainDuplicates(
+    start,
+    async (keep, merge, updatedAt) => {
+      calls.push([keep, merge, updatedAt]);
+      return doc([kobo, series], "v2");
+    },
+    async () => null,
+    () => false
+  );
+  assert.deepEqual(calls, [[bookKey(kobo), [bookKey(goodreads)], "v1"]]);
+  assert.equal(result.updatedAt, "v2");
+});
+
+test("mergeCertainDuplicates returns the same document when nothing is certain", async () => {
+  const start = doc([kobo, series]);
+  assert.equal(await mergeCertainDuplicates(start, async () => { throw new Error("unexpected"); }, async () => null, () => false), start);
+});
+
+test("on a conflict it refetches and retries once; a second failure rejects", async () => {
+  let attempts = 0;
+  const conflict = new Error("409");
+  const result = await mergeCertainDuplicates(
+    doc([kobo, goodreads]),
+    async () => {
+      attempts++;
+      if (attempts === 1) throw conflict;
+      return doc([kobo], "v3");
+    },
+    async () => doc([kobo, goodreads], "v2"),
+    (error) => error === conflict
+  );
+  assert.equal(result.updatedAt, "v3");
+  await assert.rejects(
+    mergeCertainDuplicates(doc([kobo, goodreads]), async () => { throw conflict; }, async () => doc([kobo, goodreads], "v2"), (error) => error === conflict)
+  );
+});
+
+test("a non-conflict failure mid-run rejects instead of looping", async () => {
+  const other = { ContentID: "x", Title: "Emma", Attribution: "Jane Austen" };
+  const otherCopy = { ContentID: "y", Title: "Emma", Attribution: "Jane Austen", ISBN: "9780141439587" };
+  let calls = 0;
+  await assert.rejects(
+    mergeCertainDuplicates(
+      doc([kobo, goodreads, other, otherCopy]),
+      async () => {
+        calls++;
+        if (calls === 2) throw new Error("offline");
+        return doc([kobo, other, otherCopy], "v2");
+      },
+      async () => null,
+      () => false
+    ),
+    /offline/
+  );
+  assert.equal(calls, 2);
 });
