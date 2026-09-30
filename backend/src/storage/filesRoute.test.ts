@@ -14,7 +14,6 @@ Object.assign(process.env, {
   GALLERY_STORAGE_PATH: join(dir, "gallery-files"),
   AVATAR_STORAGE_PATH: join(dir, "avatar-files"),
   COVERS_DB_PATH: join(dir, "covers.sqlite"),
-  COVERS_STORAGE_PATH: join(dir, "covers-files"),
   MURALS_DB_PATH: join(dir, "murals.sqlite"),
   SOCIALS_DB_PATH: join(dir, "socials.sqlite"),
   ARENA_DB_PATH: join(dir, "arena.sqlite"),

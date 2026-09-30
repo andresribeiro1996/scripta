@@ -30,7 +30,6 @@ process.env.LIBRARY_DB_PATH = join(scratchDir, "library.sqlite");
 process.env.GALLERY_DB_PATH = join(scratchDir, "gallery.sqlite");
 process.env.GALLERY_STORAGE_PATH = join(scratchDir, "gallery-files");
 process.env.COVERS_DB_PATH = join(scratchDir, "covers.sqlite");
-process.env.COVERS_STORAGE_PATH = join(scratchDir, "covers-files");
 process.env.TIERLISTS_DB_PATH = join(scratchDir, "tierlists.sqlite");
 process.env.JWT_ACCESS_SECRET = "a".repeat(64);
 process.env.JWT_REFRESH_SECRET = "b".repeat(64);

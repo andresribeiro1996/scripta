@@ -80,7 +80,6 @@ const envSchema = z.object({
   MURALS_DB_PATH: z.string().min(1).default("./data/murals.sqlite"),
 
   COVERS_DB_PATH: z.string().min(1).default("./data/covers.sqlite"),
-  COVERS_STORAGE_PATH: z.string().min(1).default("./data/covers-files"),
   R2_ENDPOINT: urlOrBlank,
   R2_ACCESS_KEY_ID: z.string().default(""),
   R2_SECRET_ACCESS_KEY: z.string().default(""),

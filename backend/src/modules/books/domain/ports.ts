@@ -2,8 +2,7 @@ import type { BookMetadata, BookSearchResult } from "@scripta/shared";
 import type { BookRow, CoverImageRow, CoverSourceName, CoverStatus, DataSource, NewBook } from "./types.js";
 
 export interface CoverBlobStore {
-  save(id: string, extension: string, bytes: Buffer): void;
-  read(id: string, extension: string): Buffer | null;
+  save(id: string, extension: string, bytes: Buffer): Promise<void>;
 }
 
 export interface BooksRepository {
