@@ -39,6 +39,7 @@ function fakeService(overrides: Partial<CommunityService> = {}): CommunityServic
     markDashboardSeen: () => {},
     getDiscover: () => ({ items: [], nextOffset: null }),
     searchPeople: () => [],
+    suggestPeople: () => [],
     emitEvent: () => {},
     getActivity: () => ({ items: [], nextCursor: null }),
     getLibrary: () => {
@@ -219,6 +220,87 @@ test("feed-settings PUT accepts an optional readerGlyph flag", async () => {
     { userId: "viewer", settings: { publications: true, reading: false, votes: true, follows: true, readerGlyph: true } },
     { userId: "viewer", settings: { publications: true, reading: false, votes: true, follows: true } }
   ]);
+  await app.close();
+});
+
+test("publish PUT takes a muralId, a shareReading flag, both or neither, and rejects anything else", async () => {
+  const calls: Array<Record<string, unknown>> = [];
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", () => ({ id: "viewer", email: "v@example.test", username: "v", avatarId: null }));
+  await app.register(
+    buildCommunityRoutes(
+      fakeService({
+        publishProfile: (userId, input) => {
+          calls.push({ userId, input });
+        }
+      })
+    )
+  );
+  const noAuth = await app.inject({ method: "PUT", url: "/community/profile/publish", payload: {} });
+  assert.equal(noAuth.statusCode, 401);
+  const auth = { authorization: "Bearer x" };
+  const send = (payload: object) => app.inject({ method: "PUT", url: "/community/profile/publish", headers: auth, payload });
+  assert.equal((await send({})).statusCode, 200);
+  assert.equal((await send({ muralId: "m1" })).statusCode, 200);
+  assert.equal((await send({ shareReading: false })).statusCode, 200);
+  assert.equal((await send({ muralId: "m1", shareReading: true })).statusCode, 200);
+  assert.deepEqual(calls, [
+    { userId: "viewer", input: {} },
+    { userId: "viewer", input: { muralId: "m1" } },
+    { userId: "viewer", input: { shareReading: false } },
+    { userId: "viewer", input: { muralId: "m1", shareReading: true } }
+  ]);
+  const badFlag = await send({ shareReading: "yes" });
+  assert.equal(badFlag.statusCode, 400);
+  assert.equal(badFlag.json().error, "Expected {muralId?, shareReading?}.");
+  assert.equal((await send({ muralId: "" })).statusCode, 400);
+  assert.equal((await send({ muralId: 7 })).statusCode, 400);
+  assert.equal(calls.length, 4);
+  await app.close();
+});
+
+test("publish PUT reports a mural the user doesn't own as a 400", async () => {
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", () => ({ id: "viewer", email: "v@example.test", username: "v", avatarId: null }));
+  await app.register(
+    buildCommunityRoutes(
+      fakeService({
+        publishProfile: () => {
+          throw new MuralNotOwnedError();
+        }
+      })
+    )
+  );
+  const res = await app.inject({ method: "PUT", url: "/community/profile/publish", headers: { authorization: "Bearer x" }, payload: { muralId: "theirs" } });
+  assert.equal(res.statusCode, 400);
+  await app.close();
+});
+
+test("suggested people GET is authed, defaults the limit to 20, and validates it", async () => {
+  const seen: Array<Record<string, unknown>> = [];
+  const suggestion = { user: { username: "reader", avatarUrl: null, userId: "u1" }, followerCount: 0, viewerFollows: false, private: false, sharedCount: 1, sharedBooks: [{ title: "Dune", author: "Frank Herbert", coverUrl: null }] };
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", () => ({ id: "viewer", email: "v@example.test", username: "v", avatarId: null }));
+  await app.register(
+    buildCommunityRoutes(
+      fakeService({
+        suggestPeople: (viewerId, limit) => {
+          seen.push({ viewerId, limit });
+          return [suggestion];
+        }
+      })
+    )
+  );
+  const noAuth = await app.inject({ method: "GET", url: "/community/people/suggested" });
+  assert.equal(noAuth.statusCode, 401);
+  const auth = { authorization: "Bearer x" };
+  const res = await app.inject({ method: "GET", url: "/community/people/suggested", headers: auth });
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.json(), { people: [suggestion] });
+  assert.equal((await app.inject({ method: "GET", url: "/community/people/suggested?limit=5", headers: auth })).statusCode, 200);
+  assert.equal((await app.inject({ method: "GET", url: "/community/people/suggested?limit=0", headers: auth })).statusCode, 400);
+  assert.equal((await app.inject({ method: "GET", url: "/community/people/suggested?limit=51", headers: auth })).statusCode, 400);
+  assert.deepEqual(seen, [{ viewerId: "viewer", limit: 20 }, { viewerId: "viewer", limit: 5 }]);
   await app.close();
 });
 

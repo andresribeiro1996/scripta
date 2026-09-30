@@ -128,3 +128,15 @@ test("deleteUserData removes follows both ways, the profile, and events by or ab
   const left = openCommunityDb().prepare(`SELECT id FROM events WHERE id IN ('erase-e1', 'erase-e2', 'erase-e3')`).all().map((e) => e.id);
   assert.deepEqual(left, ["erase-e3"]);
 });
+
+test("listPublishedProfiles returns published rows newest update first and skips unpublished ones", () => {
+  const r = repo();
+  const at = (day: number) => `2026-11-0${day}T00:00:00.000Z`;
+  r.upsertProfile({ user_id: "listed-a", published: 1, mural_id: null, published_at: at(1), updated_at: at(1), feed_settings: null });
+  r.upsertProfile({ user_id: "listed-b", published: 1, mural_id: "m1", published_at: at(1), updated_at: at(3), feed_settings: null });
+  r.upsertProfile({ user_id: "listed-hidden", published: 0, mural_id: null, published_at: null, updated_at: at(4), feed_settings: null });
+  r.upsertProfile({ user_id: "listed-c", published: 1, mural_id: null, published_at: at(1), updated_at: at(2), feed_settings: null });
+  assert.deepEqual(r.listPublishedProfiles(2).map((row) => row.user_id), ["listed-b", "listed-c"]);
+  assert.deepEqual(r.listPublishedProfiles(3).map((row) => row.user_id), ["listed-b", "listed-c", "listed-a"]);
+  assert.equal(r.listPublishedProfiles(2)[0]?.mural_id, "m1");
+});

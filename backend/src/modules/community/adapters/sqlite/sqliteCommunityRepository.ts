@@ -35,6 +35,8 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
       updated_at = excluded.updated_at
   `);
 
+  const listPublishedProfilesStmt = db.prepare(`SELECT * FROM profiles WHERE published = 1 ORDER BY updated_at DESC LIMIT ?`);
+
   const insertEventStmt = db.prepare(`
     INSERT OR IGNORE INTO events (id, user_id, type, ref_type, ref_id, payload, created_at)
     VALUES ($id, $user_id, $type, $ref_type, $ref_id, $payload, $created_at)
@@ -116,6 +118,9 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
         $published_at: row.published_at,
         $updated_at: row.updated_at
       });
+    },
+    listPublishedProfiles(limit) {
+      return listPublishedProfilesStmt.all(limit) as unknown as ProfileRow[];
     },
     getFeedSettings(userId) {
       const row = getFeedSettingsStmt.get(userId) as { feed_settings: string | null } | undefined;

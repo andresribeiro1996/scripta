@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
+import { bookMatchKeys } from "@scripta/shared";
 import type { IdentityKey, ReaderProfile } from "@scripta/shared";
 import { categoryFor, contentDetail, decodeCursor, encodeCursor, DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
-import type { ActivityEventType, ActivityItem, CommunityAuthor, CommunityEventType, DiscoverItem, DiscoverType, FeedSettings, FollowState, GameParticipation, OwnProfile, Page, ParticipationGameKind, PersonResult, PublishedContent, PublishedProfile, TierlistSummary, TournamentSummary } from "@scripta/shared/community";
+import type { ActivityEventType, ActivityItem, CommunityAuthor, CommunityEventType, DiscoverItem, DiscoverType, FeedSettings, FollowState, GameParticipation, OwnProfile, Page, ParticipationGameKind, PersonResult, PublishProfileInput, PublishedContent, PublishedProfile, SuggestedReader, TierlistSummary, TournamentSummary } from "@scripta/shared/community";
 import type { DashboardFeedPage, DigestItem, ParticipationItem } from "@scripta/shared/dashboard";
 import type { PublishedTournamentRef } from "../arena/service.js";
 import type { MuralsPublicApi } from "../murals/publicApi.js";
@@ -12,6 +13,9 @@ import type { CommunityRepository, CursorKeyset } from "./domain/ports.js";
 import type { EventRow, FollowRow } from "./domain/types.js";
 
 const DISCOVER_SCAN_CAP = 500;
+const SUGGESTION_SCAN_CAP = 500;
+const SUGGESTION_OVERLAP_FLOOR = 5;
+const SHARED_BOOKS_SHOWN = 3;
 const DASHBOARD_COUNT_CAP = 100;
 const DASHBOARD_REFILL_ROUNDS = 5;
 const NAMED_PARTICIPANTS = 3;
@@ -27,6 +31,10 @@ function parseEventPayload(raw: string | null): Record<string, unknown> | undefi
   } catch {
     return undefined;
   }
+}
+
+function libraryBooks(doc: Record<string, unknown> | null): Record<string, unknown>[] {
+  return doc && Array.isArray(doc.books) ? doc.books.filter((book): book is Record<string, unknown> => typeof book === "object" && book !== null) : [];
 }
 
 export interface PublicProfileView {
@@ -85,7 +93,7 @@ export interface CommunityService {
   unfollow(followerId: string, followeeId: string): void;
   getFollowState(viewerId: string, userId: string): FollowState;
   emitEvent(userId: string, type: ActivityEventType, refType: CommunityRefType, refId: string, payload?: Record<string, unknown>): void;
-  publishProfile(userId: string, muralId: string): void;
+  publishProfile(userId: string, input: PublishProfileInput): void;
   unpublishProfile(userId: string): void;
   getOwnProfile(userId: string): OwnProfile;
   setShelfMural(userId: string, muralId: string): void;
@@ -94,6 +102,7 @@ export interface CommunityService {
   markDashboardSeen(viewerId: string): void;
   getDiscover(type: DiscoverType, q: string, limit: number, offset: number, viewerId?: string): { items: DiscoverItem[]; nextOffset: number | null };
   searchPeople(viewerId: string, q: string, limit: number): PersonResult[];
+  suggestPeople(viewerId: string, limit: number): SuggestedReader[];
   getActivity(username: string, viewerId: string | undefined, cursor: string | undefined, limit: number): Page<ActivityItem>;
   getLibrary(username: string): { data: Record<string, unknown> | null };
   getFeedSettings(userId: string): FeedSettings;
@@ -263,11 +272,12 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
       };
     },
     emitEvent: emit,
-    publishProfile(userId, muralId) {
+    publishProfile(userId, input) {
       if (!deps.userHasUsername(userId)) throw new UsernameRequiredError();
-      if (!deps.murals.ownsMural(userId, muralId)) throw new MuralNotOwnedError();
+      if (input.muralId !== undefined && !deps.murals.ownsMural(userId, input.muralId)) throw new MuralNotOwnedError();
       const existing = repo.getProfileRow(userId);
-      const previousMuralId = existing?.mural_id ?? null;
+      const keptMural = existing?.mural_id && deps.murals.ownsMural(userId, existing.mural_id) ? existing.mural_id : null;
+      const muralId = input.muralId ?? keptMural;
       const now = new Date().toISOString();
       repo.upsertProfile({
         user_id: userId,
@@ -277,7 +287,8 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
         updated_at: now,
         feed_settings: existing?.feed_settings ?? null
       });
-      if (!existing?.published_at || previousMuralId !== muralId) emit(userId, "mural_published", "mural", muralId);
+      if (input.shareReading !== undefined) repo.updateFeedSettings(userId, { ...settingsFor(userId), reading: input.shareReading });
+      if (muralId && (!existing?.published_at || existing.mural_id !== muralId)) emit(userId, "mural_published", "mural", muralId);
     },
     unpublishProfile(userId) {
       const existing = repo.getProfileRow(userId);
@@ -404,6 +415,32 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
         if (!user) return [];
         return [{ user: withGlyph(user, id, glyphOf), followerCount: repo.countFollowers(id), viewerFollows: repo.getFollow(viewerId, id) !== undefined, private: repo.getProfileRow(id)?.published !== 1 }];
       });
+    },
+    suggestPeople(viewerId, limit) {
+      const own = new Set<string>();
+      for (const book of libraryBooks(deps.resolveLibrary(viewerId))) for (const key of bookMatchKeys(book)) own.add(key);
+      const candidates = repo
+        .listPublishedProfiles(SUGGESTION_SCAN_CAP)
+        .map((row) => row.user_id)
+        .filter((id) => id !== viewerId && !repo.getFollow(viewerId, id));
+      const profiles = deps.resolveProfiles(candidates);
+      const scored = candidates.flatMap((id, recency) => {
+        const user = profiles.get(id);
+        if (!user) return [];
+        const shared = libraryBooks(deps.resolveLibrary(id)).filter((book) => bookMatchKeys(book).some((key) => own.has(key)));
+        return [{ id, user, recency, shared }];
+      });
+      const overlapping = scored.filter((entry) => entry.shared.length > 0).sort((a, b) => b.shared.length - a.shared.length || a.recency - b.recency);
+      const fill = overlapping.length < SUGGESTION_OVERLAP_FLOOR ? scored.filter((entry) => entry.shared.length === 0) : [];
+      const glyphOf = glyphLookup();
+      return [...overlapping, ...fill].slice(0, limit).map((entry) => ({
+        user: withGlyph(entry.user, entry.id, glyphOf),
+        followerCount: repo.countFollowers(entry.id),
+        viewerFollows: false,
+        private: false,
+        sharedCount: entry.shared.length,
+        sharedBooks: entry.shared.slice(0, SHARED_BOOKS_SHOWN).map((book) => ({ title: String(book.Title ?? ""), author: String(book.Attribution ?? ""), coverUrl: typeof book._coverUrl === "string" ? book._coverUrl : null }))
+      }));
     },
     getLibrary(username) {
       return { data: deps.resolveLibrary(publishedUserId(username)) };

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { IdentityKey, ReaderProfile } from "@scripta/shared";
-import type { DiscoverItem, GameParticipation } from "@scripta/shared/community";
+import type { DiscoverItem, GameParticipation, SuggestedReader } from "@scripta/shared/community";
 import { DEFAULT_FEED_SETTINGS, encodeCursor, normalizeFeedSettings } from "@scripta/shared/community";
 import type { ParticipationItem } from "@scripta/shared/dashboard";
 import type { PublishedTierlistRef } from "../tierlists/service.js";
@@ -47,6 +47,12 @@ function createRepoFake() {
     },
     upsertProfile(row) {
       profiles.set(row.user_id, { ...row });
+    },
+    listPublishedProfiles(limit) {
+      return [...profiles.values()]
+        .filter((row) => row.published === 1)
+        .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
+        .slice(0, limit);
     },
     getFeedSettings(userId) {
       const row = profiles.get(userId);
@@ -275,11 +281,11 @@ test("publish requires a username, then an owned mural", () => {
   const { deps, usernames, ownedMurals } = createDeps(repo);
   const service = createCommunityService(deps);
   profiles.set("alice", profileRow("alice", { published: 0 }));
-  assert.throws(() => service.publishProfile("alice", "m1"), UsernameRequiredError);
+  assert.throws(() => service.publishProfile("alice", { muralId: "m1" }), UsernameRequiredError);
   usernames.set("alice", "alice");
-  assert.throws(() => service.publishProfile("alice", "m1"), MuralNotOwnedError);
+  assert.throws(() => service.publishProfile("alice", { muralId: "m1" }), MuralNotOwnedError);
   ownedMurals.add("alice:m1");
-  service.publishProfile("alice", "m1");
+  service.publishProfile("alice", { muralId: "m1" });
   const row = repo.getProfileRow("alice")!;
   assert.equal(row.published, 1);
   assert.equal(row.mural_id, "m1");
@@ -292,12 +298,94 @@ test("republish swaps the mural and keeps the original published_at", () => {
   usernames.set("alice", "alice");
   ownedMurals.add("alice:m1");
   ownedMurals.add("alice:m2");
-  service.publishProfile("alice", "m1");
+  service.publishProfile("alice", { muralId: "m1" });
   const first = repo.getProfileRow("alice")!;
-  service.publishProfile("alice", "m2");
+  service.publishProfile("alice", { muralId: "m2" });
   const second = repo.getProfileRow("alice")!;
   assert.equal(second.mural_id, "m2");
   assert.equal(second.published_at, first.published_at);
+});
+
+test("publishing without a mural needs a username, then publishes with none and announces nothing", () => {
+  const { repo, events } = createRepoFake();
+  const { deps, usernames } = createDeps(repo);
+  const service = createCommunityService(deps);
+  assert.throws(() => service.publishProfile("alice", {}), UsernameRequiredError);
+  assert.equal(repo.getProfileRow("alice"), undefined);
+  usernames.set("alice", "alice");
+  service.publishProfile("alice", {});
+  const row = repo.getProfileRow("alice")!;
+  assert.equal(row.published, 1);
+  assert.equal(row.mural_id, null);
+  assert.equal(events.filter((event) => event.type === "mural_published").length, 0);
+});
+
+test("publishing without a mural keeps the shelf mural already chosen and announces it the first time", () => {
+  const { repo, events } = createRepoFake();
+  const { deps, usernames, ownedMurals } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  ownedMurals.add("alice:m1");
+  service.setShelfMural("alice", "m1");
+  service.publishProfile("alice", {});
+  const row = repo.getProfileRow("alice")!;
+  assert.equal(row.published, 1);
+  assert.equal(row.mural_id, "m1");
+  assert.deepEqual(events.filter((event) => event.type === "mural_published").map((event) => event.ref_id), ["m1"]);
+});
+
+test("publishing without a mural drops a shelf mural that has since been deleted", () => {
+  const { repo, events } = createRepoFake();
+  const { deps, usernames, ownedMurals } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  ownedMurals.add("alice:m1");
+  service.setShelfMural("alice", "m1");
+  ownedMurals.delete("alice:m1");
+  service.publishProfile("alice", {});
+  const row = repo.getProfileRow("alice")!;
+  assert.equal(row.published, 1);
+  assert.equal(row.mural_id, null);
+  assert.equal(events.filter((event) => event.type === "mural_published").length, 0);
+});
+
+test("publishing a mural the user doesn't own fails and changes nothing, even with a shelf mural already chosen", () => {
+  const { repo } = createRepoFake();
+  const { deps, usernames, ownedMurals } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  ownedMurals.add("alice:m1");
+  service.setShelfMural("alice", "m1");
+  assert.throws(() => service.publishProfile("alice", { muralId: "theirs", shareReading: true }), MuralNotOwnedError);
+  const row = repo.getProfileRow("alice")!;
+  assert.equal(row.published, 0);
+  assert.equal(row.mural_id, "m1");
+  assert.equal(service.getFeedSettings("alice").reading, false);
+});
+
+test("a first publish can choose to share reading, and can later choose not to", () => {
+  const { repo } = createRepoFake();
+  const { deps, usernames } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  service.publishProfile("alice", { shareReading: true });
+  assert.equal(repo.getProfileRow("alice")!.published, 1);
+  assert.deepEqual(service.getFeedSettings("alice"), { ...DEFAULT_FEED_SETTINGS, reading: true });
+  service.publishProfile("alice", { shareReading: false });
+  assert.deepEqual(service.getFeedSettings("alice"), { ...DEFAULT_FEED_SETTINGS, reading: false });
+});
+
+test("publishing changes only the reading switch, and only when asked to", () => {
+  const { repo } = createRepoFake();
+  const { deps, usernames } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  repo.upsertProfile(profileRow("alice", { published: 0 }));
+  repo.updateFeedSettings("alice", { ...DEFAULT_FEED_SETTINGS, votes: false, follows: false });
+  service.publishProfile("alice", { shareReading: true });
+  assert.deepEqual(service.getFeedSettings("alice"), { ...DEFAULT_FEED_SETTINGS, votes: false, follows: false, reading: true });
+  service.publishProfile("alice", {});
+  assert.deepEqual(service.getFeedSettings("alice"), { ...DEFAULT_FEED_SETTINGS, votes: false, follows: false, reading: true });
 });
 
 test("unpublish clears published, keeps the row, and is a no-op when never published", () => {
@@ -308,7 +396,7 @@ test("unpublish clears published, keeps the row, and is a no-op when never publi
   profiles.set("alice", profileRow("alice"));
   usernames.set("alice", "alice");
   ownedMurals.add("alice:m1");
-  service.publishProfile("alice", "m1");
+  service.publishProfile("alice", { muralId: "m1" });
   service.unpublishProfile("alice");
   const row = repo.getProfileRow("alice")!;
   assert.equal(row.published, 0);
@@ -1104,9 +1192,9 @@ test("publishProfile emits mural_published only when the mural changes", () => {
   ownedMurals.add("alice:m1");
   ownedMurals.add("alice:m2");
   repo.upsertProfile(profileRow("alice", { mural_id: "m1" }));
-  service.publishProfile("alice", "m1");
+  service.publishProfile("alice", { muralId: "m1" });
   assert.equal(events.filter((e) => e.type === "mural_published").length, 0);
-  service.publishProfile("alice", "m2");
+  service.publishProfile("alice", { muralId: "m2" });
   const murals = events.filter((e) => e.type === "mural_published");
   assert.equal(murals.length, 1);
   assert.equal(murals[0]?.ref_type, "mural");
@@ -1120,7 +1208,7 @@ test("publishing a privately chosen shelf for the first time announces it", () =
   usernames.set("alice", "alice");
   ownedMurals.add("alice:m1");
   service.setShelfMural("alice", "m1");
-  service.publishProfile("alice", "m1");
+  service.publishProfile("alice", { muralId: "m1" });
   const announcements = events.filter((event) => event.type === "mural_published");
   assert.equal(announcements.length, 1);
   assert.equal(announcements[0]?.ref_id, "m1");
@@ -1132,10 +1220,10 @@ test("republishing the same mural after unpublish stays silent", () => {
   const service = createCommunityService(deps);
   usernames.set("alice", "alice");
   ownedMurals.add("alice:m1");
-  service.publishProfile("alice", "m1");
+  service.publishProfile("alice", { muralId: "m1" });
   service.unpublishProfile("alice");
   const before = events.filter((event) => event.type === "mural_published").length;
-  service.publishProfile("alice", "m1");
+  service.publishProfile("alice", { muralId: "m1" });
   assert.equal(events.filter((event) => event.type === "mural_published").length, before);
 });
 
@@ -1360,7 +1448,7 @@ test("switching a published shelf announces the new mural once", () => {
   usernames.set("alice", "alice");
   ownedMurals.add("alice:m1");
   ownedMurals.add("alice:m2");
-  service.publishProfile("alice", "m1");
+  service.publishProfile("alice", { muralId: "m1" });
   const announcements = () => events.filter((event) => event.type === "mural_published").length;
   const before = announcements();
   service.setShelfMural("alice", "m2");
@@ -1396,4 +1484,141 @@ test("getActivity links votes to what was voted on, and leaves vanished ones pla
   assert.deepEqual(payloads.t1, { game: "tierlist", id: "t1", name: "List t1", covers: ["a", "b", "c"], href: "/vote/code-t1" });
   assert.deepEqual(payloads.g1, { game: "tournament", id: "g1", name: "Cup g1", covers: ["x"], href: "/arena/g1" });
   assert.deepEqual(payloads.gone, { game: "tournament", id: "gone", name: "Old cup" });
+});
+
+function suggestionFixture() {
+  const { repo } = createRepoFake();
+  const { deps, libraries, readerProfiles, readerGlyphs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  const addReader = (id: string, books: Array<Record<string, unknown>>, updatedAt = at(1)) => {
+    readerProfiles.set(id, reader(id));
+    libraries.set(id, { books });
+    repo.upsertProfile(profileRow(id, { updated_at: updatedAt }));
+  };
+  const suggested = (limit = 20) => service.suggestPeople("viewer", limit);
+  return { repo, service, libraries, readerProfiles, readerGlyphs, addReader, suggested };
+}
+
+const shelfBook = (title: string, extra: Record<string, unknown> = {}) => ({ Title: title, Attribution: "A. Writer", ...extra });
+const suggestedIds = (people: SuggestedReader[]) => people.map((person) => person.user.userId);
+const suggestedCounts = (people: SuggestedReader[]) => people.map((person) => [person.user.userId, person.sharedCount]);
+
+test("suggested readers are ranked by shared books, then by how recently they were active", () => {
+  const { libraries, addReader, suggested } = suggestionFixture();
+  const shelf = [shelfBook("A"), shelfBook("B"), shelfBook("C")];
+  libraries.set("viewer", { books: shelf });
+  addReader("one-old", [shelfBook("A")], at(1));
+  addReader("one-new", [shelfBook("A")], at(6));
+  addReader("three", shelf, at(2));
+  addReader("two", [shelfBook("A"), shelfBook("B")], at(3));
+  assert.deepEqual(suggestedCounts(suggested()), [["three", 3], ["two", 2], ["one-new", 1], ["one-old", 1]]);
+});
+
+test("a book matches on ISBN even when the titles differ, and on title and author when one side has no ISBN", () => {
+  const { libraries, addReader, suggested } = suggestionFixture();
+  libraries.set("viewer", { books: [{ Title: "Dune", Attribution: "Frank Herbert", ISBN: "9780441172719" }, { Title: "Emma", Attribution: "Jane Austen" }] });
+  addReader("by-isbn", [{ Title: "Dune (Deluxe Edition)", Attribution: "F. Herbert", ISBN: "978-0-441-17271-9" }], at(3));
+  addReader("by-title", [{ Title: " EMMA ", Attribution: "Jane  Austen", ISBN: "9780141439587" }], at(2));
+  addReader("neither", [{ Title: "Emma", Attribution: "Someone Else", ISBN: "9780000000002" }], at(1));
+  assert.deepEqual(suggestedCounts(suggested()), [["by-isbn", 1], ["by-title", 1], ["neither", 0]]);
+});
+
+test("suggested readers leave out the viewer, people they follow, unpublished readers and readers with no profile", () => {
+  const { repo, libraries, addReader, suggested } = suggestionFixture();
+  const shelf = [shelfBook("A")];
+  addReader("viewer", shelf, at(6));
+  addReader("followed", shelf, at(5));
+  addReader("unpublished", shelf, at(4));
+  addReader("stranger", shelf, at(3));
+  addReader("follower", shelf, at(2));
+  repo.upsertProfile(profileRow("unpublished", { published: 0, updated_at: at(4) }));
+  repo.insertFollow({ follower_id: "viewer", followee_id: "followed", created_at: at(7) });
+  repo.insertFollow({ follower_id: "follower", followee_id: "viewer", created_at: at(7) });
+  libraries.set("nameless", { books: shelf });
+  repo.upsertProfile(profileRow("nameless", { updated_at: at(8) }));
+  assert.deepEqual(suggestedIds(suggested()), ["stranger", "follower"]);
+});
+
+test("fewer than five overlapping readers are topped up with recently active ones, newest first", () => {
+  const { libraries, addReader, suggested } = suggestionFixture();
+  libraries.set("viewer", { books: [shelfBook("A")] });
+  addReader("match", [shelfBook("A")], at(1));
+  addReader("quiet", [], at(2));
+  addReader("busy", [shelfBook("Z")], at(9));
+  addReader("fresh", [], at(5));
+  assert.deepEqual(suggestedCounts(suggested()), [["match", 1], ["busy", 0], ["fresh", 0], ["quiet", 0]]);
+});
+
+test("the top-up stops once five readers overlap", () => {
+  const { libraries, addReader, suggested } = suggestionFixture();
+  libraries.set("viewer", { books: [shelfBook("A")] });
+  for (let n = 1; n <= 4; n++) addReader(`match-${n}`, [shelfBook("A")], at(n));
+  addReader("other", [], at(9));
+  assert.deepEqual(suggestedIds(suggested()), ["match-4", "match-3", "match-2", "match-1", "other"]);
+  addReader("match-5", [shelfBook("A")], at(5));
+  assert.deepEqual(suggestedIds(suggested()), ["match-5", "match-4", "match-3", "match-2", "match-1"]);
+});
+
+test("a missing, malformed or junk-padded library never breaks suggestions", () => {
+  const { repo, libraries, readerProfiles, addReader, suggested } = suggestionFixture();
+  libraries.set("viewer", { books: [null, 7, shelfBook("A")] });
+  addReader("padded", [], at(4));
+  libraries.set("padded", { books: [null, 7, shelfBook("A")] });
+  addReader("malformed", [], at(3));
+  libraries.set("malformed", { books: "none" });
+  readerProfiles.set("absent", reader("absent"));
+  repo.upsertProfile(profileRow("absent", { updated_at: at(2) }));
+  assert.deepEqual(suggestedCounts(suggested()), [["padded", 1], ["malformed", 0], ["absent", 0]]);
+});
+
+test("a viewer with no library is shown recently active readers", () => {
+  const { addReader, suggested } = suggestionFixture();
+  addReader("older", [shelfBook("A")], at(1));
+  addReader("newer", [shelfBook("B")], at(2));
+  assert.deepEqual(suggestedCounts(suggested()), [["newer", 0], ["older", 0]]);
+});
+
+test("a suggestion lists up to three shared books, with covers from the reader's own library", () => {
+  const { libraries, addReader, suggested } = suggestionFixture();
+  libraries.set("viewer", { books: ["A", "B", "C", "D"].map((title) => shelfBook(title, { _coverUrl: "https://covers.test/viewer.jpg" })) });
+  addReader("reader", [shelfBook("A", { _coverUrl: "https://covers.test/a.jpg" }), shelfBook("B"), shelfBook("C", { _coverUrl: null }), shelfBook("D", { _coverUrl: "https://covers.test/d.jpg" })]);
+  const [suggestion] = suggested();
+  assert.equal(suggestion?.sharedCount, 4);
+  assert.deepEqual(suggestion?.sharedBooks, [
+    { title: "A", author: "A. Writer", coverUrl: "https://covers.test/a.jpg" },
+    { title: "B", author: "A. Writer", coverUrl: null },
+    { title: "C", author: "A. Writer", coverUrl: null }
+  ]);
+});
+
+test("suggested readers stop at the limit, overlapping ones first", () => {
+  const { libraries, addReader, suggested } = suggestionFixture();
+  libraries.set("viewer", { books: [shelfBook("A"), shelfBook("B")] });
+  addReader("one", [shelfBook("A")], at(1));
+  addReader("two", [shelfBook("A"), shelfBook("B")], at(2));
+  addReader("none", [], at(3));
+  assert.deepEqual(suggestedIds(suggested(1)), ["two"]);
+  assert.deepEqual(suggestedIds(suggested(2)), ["two", "one"]);
+  assert.deepEqual(suggestedIds(suggested(3)), ["two", "one", "none"]);
+});
+
+test("a suggestion carries the card fields and the follower count, and a reader glyph only when switched on", () => {
+  const { repo, libraries, readerGlyphs, addReader, suggested } = suggestionFixture();
+  libraries.set("viewer", { books: [shelfBook("A")] });
+  addReader("glyphed", [shelfBook("A")], at(2));
+  addReader("plain", [shelfBook("A")], at(1));
+  repo.updateFeedSettings("glyphed", { ...DEFAULT_FEED_SETTINGS, readerGlyph: true });
+  readerGlyphs.set("glyphed", "star");
+  readerGlyphs.set("plain", "star");
+  repo.insertFollow({ follower_id: "fan", followee_id: "glyphed", created_at: at(3) });
+  const [glyphed, plain] = suggested();
+  assert.deepEqual(glyphed, {
+    user: { username: "user-glyphed", avatarUrl: null, userId: "glyphed", readerGlyph: "star" },
+    followerCount: 1,
+    viewerFollows: false,
+    private: false,
+    sharedCount: 1,
+    sharedBooks: [{ title: "A", author: "A. Writer", coverUrl: null }]
+  });
+  assert.equal(plain?.user.readerGlyph, undefined);
 });
