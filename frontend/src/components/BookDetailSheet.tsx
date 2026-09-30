@@ -1,4 +1,4 @@
-import type { FinishRating } from "@scripta/shared";
+import { readingPercent, type FinishRating } from "@scripta/shared";
 import { useQuery } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { fetchIsAdmin, rejectSharedCover, uploadSharedCover } from "../api/books";
@@ -70,7 +70,7 @@ export function BookDetailSheet({
   const highlights = Array.isArray(book.highlights)
     ? (book.highlights as Array<Record<string, unknown>>).filter((h) => String(h.Text ?? "").trim() !== "")
     : [];
-  const percent = typeof book.___PercentRead === "number" ? Math.round(book.___PercentRead) : null;
+  const percent = readingPercent(book);
   const actionClass =
     "rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2.5 text-sm font-medium hover:bg-(--color-surface-hover)";
 

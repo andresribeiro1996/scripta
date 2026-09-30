@@ -50,15 +50,15 @@ export function MuralPresetPicker({ folderId, onClose }: { folderId: string | nu
           const reason = presetAvailability(preset.id, books);
           return (
             <button key={preset.id} disabled={busy || isLoading || isError || Boolean(reason) || Boolean(pending && pending.preset !== preset.id)} onClick={() => void choose(preset.id)} className="block w-full overflow-hidden rounded-2xl border border-(--color-border) text-left transition-colors hover:border-(--color-accent) disabled:opacity-50">
-              <div aria-hidden="true" className="relative h-44 overflow-hidden bg-[#151719]">
+              <div aria-hidden="true" className="relative h-44 overflow-hidden bg-(--color-bg)">
                 {built.blocks.map((block) => (
-                  <div key={block.id} className="absolute overflow-hidden rounded p-1.5" style={{ left: `${block.layout.x / 12 * 100}%`, top: `${block.layout.y / bottom * 100}%`, width: `calc(${block.layout.w / 12 * 100}% - 4px)`, height: `calc(${block.layout.h / bottom * 100}% - 4px)`, backgroundColor: block.style?.backgroundColor ?? preset.color, color: block.style?.textColor ?? preset.accent }}>
+                  <div key={block.id} className="absolute overflow-hidden rounded border border-(--color-border) bg-(--color-surface) p-1.5 text-(--color-text) shadow-sm" style={{ left: `${block.layout.x / 12 * 100}%`, top: `${block.layout.y / bottom * 100}%`, width: `calc(${block.layout.w / 12 * 100}% - 4px)`, height: `calc(${block.layout.h / bottom * 100}% - 4px)` }}>
                     {block.type === "text" ? <span className="line-clamp-2 text-[11px] leading-tight font-semibold">{block.heading}</span> : (
                       <div className="flex h-full gap-1.5">
                         {(block.type === "spotlight" ? [block.bookKey] : block.type === "shelf" ? block.bookKeys.slice(0, 3) : []).map((key) => {
                           const book = books.find((item) => bookKey(item) === key);
-                          return <div key={key} className="h-full min-w-0 flex-1 overflow-hidden rounded-sm" style={{ backgroundColor: preset.accent }}>
-                            {typeof book?._coverUrl === "string" ? <img src={book._coverUrl} alt="" className="h-full w-full object-contain" /> : <span className="block p-1 text-[10px] leading-tight" style={{ color: preset.color }}>{String(book?.Title ?? "")}</span>}
+                          return <div key={key} className="h-full min-w-0 flex-1 overflow-hidden rounded-sm bg-(--color-border)">
+                            {typeof book?._coverUrl === "string" ? <img src={book._coverUrl} alt="" className="h-full w-full object-contain" /> : <span className="block p-1 text-[10px] leading-tight text-(--color-text-dim)">{String(book?.Title ?? "")}</span>}
                           </div>;
                         })}
                       </div>

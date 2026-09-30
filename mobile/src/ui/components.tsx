@@ -226,7 +226,7 @@ export function IconButton({
    *  — a globe could be public, or language, or region. */
   label?: string;
   onPress?: () => void;
-  tone?: "default" | "danger";
+  tone?: "default" | "danger" | "accent";
   /** Draws the 44pt target instead of leaving it implied. A bare glyph in a
    *  header reads as smaller than it is and people aim at the ink, not the
    *  box; a row's own overflow button doesn't want the chrome, so this is
@@ -234,18 +234,21 @@ export function IconButton({
   framed?: boolean;
 }) {
   const { colors } = useTheme();
-  const color = tone === "danger" ? colors.danger : colors.textDim;
+  const color = tone === "danger" ? colors.danger : tone === "accent" ? colors.onAccent : colors.textDim;
   return (
     <Pressable
       accessibilityLabel={accessibilityLabel}
       accessibilityRole="button"
       hitSlop={8}
       onPress={onPress}
-      style={({ pressed }) => [
-        label ? styles.labelledIconButton : styles.iconButton,
-        framed ? { borderWidth: 1, borderColor: colors.border } : null,
-        { backgroundColor: pressed ? colors.surfacePressed : framed ? colors.surface : "transparent" },
-      ]}
+      style={({ pressed }) => {
+        const background = tone === "accent" ? (pressed ? colors.accentSoft : colors.accent) : pressed ? colors.surfacePressed : framed ? colors.surface : "transparent";
+        return [
+          label ? styles.labelledIconButton : styles.iconButton,
+          framed ? { borderWidth: 1, borderColor: tone === "accent" ? background : colors.border } : null,
+          { backgroundColor: background },
+        ];
+      }}
     >
       <Icon color={color} name={name} size={22} />
       {label ? <Text {...dynamicType} numberOfLines={1} style={[typography.body, { color }]}>{label}</Text> : null}

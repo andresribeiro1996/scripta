@@ -1,13 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { blockTextColors, contrastRatio, mutedTextColor, parseThemeColorRef, resolveBlockColor, themeColorRef } from "./blockTextColors.js";
-import { MURAL_PRESETS } from "./presets.js";
 import { themes } from "../themes/palettes.js";
 
 const light = themes.light.colors;
 const dark = themes.dark.colors;
 
-const starterBackground = MURAL_PRESETS.find((preset) => preset.id === "shelf")!.color;
+const starterBackground = "#2b2622";
 const starterText = "#f5f1e9";
 
 test("mutedTextColor mutes light text on a dark card while staying readable", () => {

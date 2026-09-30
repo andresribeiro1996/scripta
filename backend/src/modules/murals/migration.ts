@@ -12,6 +12,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { ThemeId } from "@scripta/shared/themes";
 import type { DatabaseSync } from "node:sqlite";
+import { DEFAULT_BLOCK_STYLE } from "@scripta/shared";
 import { openMuralsDb } from "./adapters/sqlite/connection.js";
 
 /** Mirrors modules/library/index.ts's own EmbeddedMuralRow shape — kept
@@ -129,6 +130,49 @@ export function listHomeDesignations(db: DatabaseSync = openMuralsDb()): Array<{
 export function dropMuralHomes(db: DatabaseSync = openMuralsDb()): void {
   db.exec("DROP TRIGGER IF EXISTS clear_mural_home");
   db.exec("DROP TABLE IF EXISTS mural_homes");
+}
+
+const PRESET_COLOR_PAIRS = new Set([
+  "#44252e|#f5f1e9", "#edcd96|#44252e",
+  "#233d35|#f5f1e9", "#c2dbc9|#233d35",
+  "#25364f|#f5f1e9", "#c5d7f1|#25364f",
+  "#2b2622|#f5f1e9", "#e6c79c|#2b2622"
+]);
+const PRESET_CHROME = { cardBorderWidth: 0, cardShadow: false, cardRadius: 16 } as const;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function resetPresetBlock(block: unknown): unknown {
+  if (!isRecord(block) || !isRecord(block.style)) return block;
+  const { backgroundColor, textColor } = block.style;
+  if (typeof backgroundColor !== "string" || typeof textColor !== "string") return block;
+  if (!PRESET_COLOR_PAIRS.has(`${backgroundColor}|${textColor}`.toLowerCase())) return block;
+  const style: Record<string, unknown> = { ...block.style, backgroundColor: null, textColor: null };
+  for (const key of Object.keys(PRESET_CHROME) as Array<keyof typeof PRESET_CHROME>) {
+    if (style[key] === PRESET_CHROME[key]) style[key] = DEFAULT_BLOCK_STYLE[key];
+  }
+  return { ...block, style };
+}
+
+export function resetPresetBlockStyles(db: DatabaseSync = openMuralsDb()): void {
+  const update = db.prepare("UPDATE murals SET blocks = $blocks WHERE id = $id");
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const rows = db.prepare("SELECT id, blocks FROM murals").all() as Array<{ id: string; blocks: string }>;
+    for (const row of rows) {
+      const blocks: unknown = JSON.parse(row.blocks);
+      if (!Array.isArray(blocks)) continue;
+      const reset = blocks.map(resetPresetBlock);
+      if (reset.every((block, i) => block === blocks[i])) continue;
+      update.run({ $id: row.id, $blocks: JSON.stringify(reset) });
+    }
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
 }
 
 export function backfillMuralThemes(resolveOwnerTheme: (userId: string) => ThemeId, db: DatabaseSync = openMuralsDb()): void {
