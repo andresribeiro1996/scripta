@@ -1,7 +1,9 @@
 const SLOTS = 3;
 
+export type CoverPriority = "front" | "normal" | "background";
+
 export interface CoverWorker {
-  enqueue(bookId: string, front?: boolean): void;
+  enqueue(bookId: string, priority?: CoverPriority): void;
   idle(): Promise<void>;
   stop(): void;
 }
@@ -11,6 +13,7 @@ export function createCoverWorker(
   onError: (error: unknown, bookId: string) => void
 ): CoverWorker {
   const queue: string[] = [];
+  const background: string[] = [];
   const queued = new Set<string>();
   const requeue = new Set<string>();
   const active = new Set<string>();
@@ -20,8 +23,8 @@ export function createCoverWorker(
 
   async function drain() {
     try {
-      while (queue.length > 0 && !stopped) {
-        const bookId = queue.shift()!;
+      while ((queue.length > 0 || background.length > 0) && !stopped) {
+        const bookId = (queue.length > 0 ? queue : background).shift()!;
         queued.delete(bookId);
         active.add(bookId);
         try {
@@ -43,20 +46,25 @@ export function createCoverWorker(
   }
 
   return {
-    enqueue(bookId, front = false) {
+    enqueue(bookId, priority = "normal") {
       if (stopped) return;
+      const front = priority === "front";
       if (active.has(bookId)) {
         if (front) requeue.add(bookId);
         return;
       }
       if (queued.has(bookId)) {
-        if (!front) return;
-        queue.splice(queue.indexOf(bookId), 1);
+        if (priority === "background") return;
+        const inBackground = background.indexOf(bookId);
+        if (inBackground >= 0) background.splice(inBackground, 1);
+        else if (!front) return;
+        else queue.splice(queue.indexOf(bookId), 1);
       } else {
         queued.add(bookId);
       }
       if (front) queue.unshift(bookId);
-      else queue.push(bookId);
+      else if (priority === "normal") queue.push(bookId);
+      else background.push(bookId);
       if (running < SLOTS) {
         running++;
         void drain();
@@ -70,6 +78,7 @@ export function createCoverWorker(
     stop() {
       stopped = true;
       queue.length = 0;
+      background.length = 0;
       queued.clear();
       requeue.clear();
     }

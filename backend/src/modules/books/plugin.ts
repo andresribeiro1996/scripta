@@ -56,7 +56,7 @@ export async function booksPlugin(app: FastifyInstance) {
       isbndbConfigured ? createIsbndbCatalog(env.ISBNDB_API_KEY, isbndbThrottle) : null
     ),
     fetchImage,
-    enqueue: (bookId, front) => worker.enqueue(bookId, front),
+    enqueue: (bookId, priority) => worker.enqueue(bookId, priority),
     publicUrlFor: coverUrlFor,
     adminUserId: env.ADMIN_USER_ID,
     warn: (details, message) => app.log.warn(details, message)
