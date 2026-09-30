@@ -301,13 +301,13 @@ function recordingCatalog(overrides: Partial<Catalog> = {}) {
   const catalog: Catalog = {
     fetchDetails: async (lookup) => {
       calls.push(`details:${lookup.isbn ?? lookup.title}`);
-      return { summary: "Spice.", rating: 4.2, ratingCount: 10, sourceUrl: "https://openlibrary.org/works/OL1W", genres: ["Science Fiction"] };
+      return { metadata: { summary: "Spice.", rating: 4.2, ratingCount: 10, sourceUrl: "https://openlibrary.org/works/OL1W", genres: ["Science Fiction"] }, sources: ["openlibrary"] };
     },
     search: async (query) => {
       calls.push("isbn" in query ? `search-isbn:${query.isbn}` : `search:${query.text}`);
       return [
-        { result: { title: "Dune", authors: ["Frank Herbert"], year: 1965, isbn: "9780441013593", publisher: "Ace", coverUrl: "https://covers.openlibrary.org/b/id/7-M.jpg", genres: [] }, olCoverId: 7 },
-        { result: { title: "Dune Encyclopedia", authors: ["Willis E. McNelly"], year: 1984, isbn: null, publisher: null, coverUrl: null, genres: [] }, olCoverId: null }
+        { result: { title: "Dune", authors: ["Frank Herbert"], year: 1965, isbn: "9780441013593", publisher: "Ace", coverUrl: "https://covers.openlibrary.org/b/id/7-M.jpg", genres: [] }, olCoverId: 7, source: "openlibrary" },
+        { result: { title: "Dune Encyclopedia", authors: ["Willis E. McNelly"], year: 1984, isbn: null, publisher: null, coverUrl: null, genres: [] }, olCoverId: null, source: "openlibrary" }
       ];
     },
     ...overrides
@@ -323,6 +323,18 @@ test("details are fetched once and then served from the database", async () => {
   assert.equal((await h.service.getDetails(dune))?.summary, "Spice.");
   assert.deepEqual(await h.service.getDetails(dune), { summary: "Spice.", rating: 4.2, ratingCount: 10, sourceUrl: "https://openlibrary.org/works/OL1W", genres: ["Science Fiction"] });
   assert.deepEqual(calls, ["details:9780441013593"]);
+  assert.equal(h.repo.findBookByKey("isbn:9780441013593")!.data_sources, '["openlibrary"]');
+});
+
+test("details fetched from ISBNdb are tagged with it", async () => {
+  const { catalog } = recordingCatalog({
+    fetchDetails: async () => ({ metadata: { summary: "Spice.", rating: null, ratingCount: 0, sourceUrl: "https://isbndb.com/book/9780441013593", genres: [] }, sources: ["isbndb"] })
+  });
+  const h = harness({ catalog });
+  await h.service.getDetails(dune);
+  const row = h.repo.findBookByKey("isbn:9780441013593")!;
+  assert.equal(row.data_sources, '["isbndb"]');
+  assert.equal(row.source_url, "https://isbndb.com/book/9780441013593");
 });
 
 test("a details miss is remembered for 30 days", async () => {
@@ -393,8 +405,8 @@ test("an outside text search saves every result so the inside search finds them 
 });
 
 test("a partial saved match no longer hides the outside search", async () => {
-  const messiah = { result: { title: "Dune Messiah", authors: ["Frank Herbert"], year: 1969, isbn: null, publisher: null, coverUrl: null, genres: [] }, olCoverId: null };
-  const dune = { result: { title: "Dune", authors: ["Frank Herbert"], year: 1965, isbn: "9780441013593", publisher: null, coverUrl: null, genres: [] }, olCoverId: null };
+  const messiah = { result: { title: "Dune Messiah", authors: ["Frank Herbert"], year: 1969, isbn: null, publisher: null, coverUrl: null, genres: [] }, olCoverId: null, source: "openlibrary" as const };
+  const dune = { result: { title: "Dune", authors: ["Frank Herbert"], year: 1965, isbn: "9780441013593", publisher: null, coverUrl: null, genres: [] }, olCoverId: null, source: "openlibrary" as const };
   const { calls, catalog } = recordingCatalog({ search: async (query) => {
     calls.push("isbn" in query ? `search-isbn:${query.isbn}` : `search:${query.text}`);
     return "text" in query && query.text === "messiah" ? [messiah] : [messiah, dune];
@@ -405,6 +417,18 @@ test("a partial saved match no longer hides the outside search", async () => {
   const outside = await h.service.searchExternal("dune");
   assert.deepEqual(outside.map((result) => result.title), ["Dune Messiah", "Dune"]);
   assert.deepEqual(calls, ["search:messiah", "search:dune"]);
+});
+
+test("a saved search hit is tagged with its source, and an existing row is left alone", async () => {
+  const bookHit = (source: "openlibrary" | "isbndb") => ({ result: { title: "Dune", authors: ["Frank Herbert"], year: 1965, isbn: "9780441013593", publisher: null, coverUrl: null, genres: [] }, olCoverId: null, source });
+  const fromIsbndb = harness({ catalog: recordingCatalog({ search: async () => [bookHit("isbndb")] }).catalog });
+  await fromIsbndb.service.searchExternal("dune");
+  assert.equal(fromIsbndb.repo.findBookByKey("isbn:9780441013593")!.data_sources, '["isbndb"]');
+
+  const existing = harness({ catalog: recordingCatalog({ search: async () => [bookHit("isbndb")] }).catalog });
+  existing.service.resolveCover(dune);
+  await existing.service.searchExternal("dune");
+  assert.equal(existing.repo.findBookByKey("isbn:9780441013593")!.data_sources, "[]");
 });
 
 test("a saved book's own cover is used in search results", async () => {
