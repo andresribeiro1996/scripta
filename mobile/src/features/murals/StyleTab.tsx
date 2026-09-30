@@ -4,7 +4,7 @@ import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Button } from "../../ui";
 import { Text } from "../../ui/Text";
 import { blockFontFamily } from "../../ui/libraryStyle";
-import { minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui/theme";
+import { minimumTouchTarget, radii, spacing, typography, useTheme, type ThemeColors } from "../../ui/theme";
 import { SelectRow, SWATCHES } from "../library/components/StyleControls";
 import {
   BACKGROUND_FIXED_SWATCHES, BACKGROUND_THEME_SWATCHES, BORDER_SIDE_PRESETS, BORDER_STRENGTH_PRESETS, BORDER_STYLE_CHOICES, BORDER_THEME_SWATCHES,
@@ -50,8 +50,9 @@ function PresetRow({ label, presets, value, onChange }: { label: string; presets
   return <SelectRow label={label} value={matchPreset(presets, value)} options={presets.map((preset) => ({ value: preset.key, label: preset.label }))} onChange={(key) => onChange(presets.find((preset) => preset.key === key)!.value)} />;
 }
 
-function ColorRow({ label, value, defaults, themeKeys, fixed, onChange }: {
+function ColorRow({ label, palette, value, defaults, themeKeys, fixed, onChange }: {
   label: string;
+  palette: ThemeColors;
   value: string | null;
   defaults: Array<{ label: string; value: string | null }>;
   themeKeys: readonly BlockThemeColorKey[];
@@ -68,23 +69,23 @@ function ColorRow({ label, value, defaults, themeKeys, fixed, onChange }: {
     <View style={styles.colorRow}>
       <Text style={[typography.body, styles.rowLabel, { color: colors.text }]}>{label}</Text>
       <View style={styles.wrap}>{defaults.map((option) => <Chip key={option.label} label={option.label} selected={value === option.value} onPress={() => onChange(option.value)} />)}</View>
-      <Caption>Theme · changes with the theme</Caption>
-      <View style={styles.wrap}>{themeKeys.map((key) => swatch(key, `${BLOCK_THEME_COLOR_LABELS[key]}, theme color`, colors[key], themeColorRef(key)))}</View>
+      <Caption>Theme · follows the mural theme</Caption>
+      <View style={styles.wrap}>{themeKeys.map((key) => swatch(key, `${BLOCK_THEME_COLOR_LABELS[key]}, theme color`, palette[key], themeColorRef(key)))}</View>
       <Caption>Fixed</Caption>
       <View style={styles.wrap}>{fixed.map((hex) => swatch(hex, `Use ${hex}`, hex, hex))}</View>
     </View>
   );
 }
 
-function LookCard({ look, onPress }: { look: QuickLook; onPress: () => void }) {
+function LookCard({ look, palette, onPress }: { look: QuickLook; palette: ThemeColors; onPress: () => void }) {
   const { colors } = useTheme();
   const { style } = look;
-  const background = resolveBlockColor(style.backgroundColor, colors) ?? colors.surface;
-  const text = resolveBlockColor(style.textColor, colors) ?? colors.text;
-  const border = resolveBlockColor(style.cardBorderColor, colors) ?? colors.border;
+  const background = resolveBlockColor(style.backgroundColor, palette) ?? palette.surface;
+  const text = resolveBlockColor(style.textColor, palette) ?? palette.text;
+  const border = resolveBlockColor(style.cardBorderColor, palette) ?? palette.border;
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={`Apply the ${look.label} look`} onPress={onPress} style={styles.lookWrap}>
-      <View style={[styles.look, { backgroundColor: background, borderColor: style.cardBorderWidth ? border : colors.border, borderWidth: Math.max(1, style.cardBorderWidth), borderStyle: style.cardBorderWidth ? "solid" : "dashed", borderRadius: Math.min(style.cardRadius, radii.lg) }]}>
+      <View style={[styles.look, { backgroundColor: background, borderColor: style.cardBorderWidth ? border : palette.border, borderWidth: Math.max(1, style.cardBorderWidth), borderStyle: style.cardBorderWidth ? "solid" : "dashed", borderRadius: Math.min(style.cardRadius, radii.lg) }]}>
         <Text style={{ color: text, fontFamily: blockFontFamily(style.fontFamily), fontWeight: style.bold ? "700" : "400", fontSize: 16 }}>Aa</Text>
       </View>
       <Text style={[typography.caption, { color: colors.textDim }]}>{look.label}</Text>
@@ -92,8 +93,9 @@ function LookCard({ look, onPress }: { look: QuickLook; onPress: () => void }) {
   );
 }
 
-export function StyleTab({ style, onChange, onReset, onCopy, onPaste, canPaste }: {
+export function StyleTab({ style, palette, onChange, onReset, onCopy, onPaste, canPaste }: {
   style: BlockStyle;
+  palette: ThemeColors;
   onChange: (style: BlockStyle) => void;
   onReset: () => void;
   onCopy: () => void;
@@ -104,18 +106,18 @@ export function StyleTab({ style, onChange, onReset, onCopy, onPaste, canPaste }
   const set = (patch: Partial<BlockStyle>) => onChange({ ...style, ...patch });
   const looks = (group: QuickLook["group"]) => (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.looks}>
-      {QUICK_LOOKS.filter((look) => look.group === group).map((look) => <LookCard key={look.key} look={look} onPress={() => onChange(applyLook(style, look))} />)}
+      {QUICK_LOOKS.filter((look) => look.group === group).map((look) => <LookCard key={look.key} look={look} palette={palette} onPress={() => onChange(applyLook(style, look))} />)}
     </ScrollView>
   );
   return (
     <View style={styles.tab}>
       <Group title="Quick looks">
-        <Caption>Theme looks change with the theme</Caption>
+        <Caption>Theme looks follow the mural theme</Caption>
         {looks("theme")}
         <Caption>Fixed looks</Caption>
         {looks("fixed")}
       </Group>
-      <ColorRow label="Background" value={style.backgroundColor} defaults={[{ label: "None", value: "transparent" }, { label: "Theme", value: null }]} themeKeys={BACKGROUND_THEME_SWATCHES} fixed={BACKGROUND_FIXED_SWATCHES} onChange={(backgroundColor) => set(backgroundColor === "transparent" ? { backgroundColor, cardShadow: false } : { backgroundColor })} />
+      <ColorRow palette={palette} label="Background" value={style.backgroundColor} defaults={[{ label: "None", value: "transparent" }, { label: "Theme", value: null }]} themeKeys={BACKGROUND_THEME_SWATCHES} fixed={BACKGROUND_FIXED_SWATCHES} onChange={(backgroundColor) => set(backgroundColor === "transparent" ? { backgroundColor, cardShadow: false } : { backgroundColor })} />
       <Group title="Corners">
         <View style={styles.wrap}>
           {CORNER_PRESETS.map(({ key, label, value: radius }) => (
@@ -136,8 +138,8 @@ export function StyleTab({ style, onChange, onReset, onCopy, onPaste, canPaste }
           <Chip label="Code" selected={style.codeStyle} onPress={() => set({ codeStyle: !style.codeStyle })} />
         </View>
         <SelectRow label="Alignment" value={style.textAlign} options={BLOCK_TEXT_ALIGN_OPTIONS} onChange={(textAlign) => set({ textAlign })} />
-        <ColorRow label="Text color" value={style.textColor} defaults={[{ label: "Auto", value: null }]} themeKeys={TEXT_THEME_SWATCHES} fixed={SWATCHES} onChange={(textColor) => set({ textColor })} />
-        {isHardToRead(style, colors) ? <Text accessibilityLiveRegion="polite" style={[typography.caption, { color: colors.danger }]}>Hard to read on this background</Text> : null}
+        <ColorRow palette={palette} label="Text color" value={style.textColor} defaults={[{ label: "Auto", value: null }]} themeKeys={TEXT_THEME_SWATCHES} fixed={SWATCHES} onChange={(textColor) => set({ textColor })} />
+        {isHardToRead(style, palette) ? <Text accessibilityLiveRegion="polite" style={[typography.caption, { color: colors.danger }]}>Hard to read on this background</Text> : null}
       </Group>
       <Group title="Border">
         <PresetRow label="Width" presets={BORDER_WIDTH_PRESETS} value={style.cardBorderWidth} onChange={(cardBorderWidth) => set({ cardBorderWidth })} />
@@ -155,7 +157,7 @@ export function StyleTab({ style, onChange, onReset, onCopy, onPaste, canPaste }
               );
             })}
           </View>
-          <ColorRow label="Border color" value={style.cardBorderColor} defaults={[{ label: "Auto", value: null }]} themeKeys={BORDER_THEME_SWATCHES} fixed={SWATCHES} onChange={(cardBorderColor) => set({ cardBorderColor })} />
+          <ColorRow palette={palette} label="Border color" value={style.cardBorderColor} defaults={[{ label: "Auto", value: null }]} themeKeys={BORDER_THEME_SWATCHES} fixed={SWATCHES} onChange={(cardBorderColor) => set({ cardBorderColor })} />
         </> : null}
       </Group>
       <SelectRow label="Shadow" value={style.cardShadow ? "soft" : "none"} options={[{ value: "none", label: "None" }, { value: "soft", label: "Soft" }]} onChange={(value) => set({ cardShadow: value === "soft" })} />

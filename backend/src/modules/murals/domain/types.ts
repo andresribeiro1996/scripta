@@ -1,5 +1,7 @@
 // Domain types for the murals module.
 
+import type { ThemeId } from "@scripta/shared/themes";
+
 /** Row shape as stored — `blocks` is the mural's block list as raw JSON
  *  text, kept opaque all the way down (same treatment as `data` in
  *  modules/library/domain/types.ts's LibraryDocumentRow): parsed only at
@@ -9,6 +11,7 @@ export interface MuralRow {
   id: string;
   user_id: string;
   name: string;
+  theme: string | null;
   blocks: string;
   cover_image_id: string | null;
   cover_image_url: string | null;
@@ -28,6 +31,7 @@ export interface MuralRow {
 export interface Mural {
   id: string;
   name: string;
+  theme: ThemeId;
   blocks: unknown[];
   coverImageId: string | null;
   coverImageUrl: string | null;

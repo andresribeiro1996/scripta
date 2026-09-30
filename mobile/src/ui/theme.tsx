@@ -158,6 +158,12 @@ export function useTheme(): Theme {
   };
 }
 
+export function MuralThemeScope({ theme, children }: { theme: ThemeId; children: ReactNode }) {
+  const parent = useTheme();
+  const value = useMemo<Theme>(() => ({ ...parent, id: theme, mode: themes[theme].scheme, colors: themes[theme].colors }), [parent, theme]);
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+}
+
 export function useReducedMotion(): boolean {
   const [reduced, setReduced] = useState(false);
 

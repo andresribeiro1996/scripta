@@ -1,26 +1,5 @@
 import { DISPLAY_FONT_IDS, FONT_IDS, TEXT_FONT_IDS, THEME_DECOR, THEME_IDS, fontFileName, fontStack, fonts, themes, withOpacity, type DecorAnchor, type FontId, type ThemeColors } from "@scripta/shared/themes";
-
-const WEB_TOKENS: Array<[keyof ThemeColors, string]> = [
-  ["background", "--color-bg"],
-  ["surface", "--color-surface"],
-  ["surfacePressed", "--color-surface-hover"],
-  ["text", "--color-text"],
-  ["textDim", "--color-text-dim"],
-  ["border", "--color-border"],
-  ["accent", "--color-accent"],
-  ["accentSoft", "--color-accent-soft"],
-  ["accentFill", "--color-accent-fill"],
-  ["onAccent", "--color-on-accent"],
-  ["danger", "--color-danger"],
-  ["dangerSoft", "--color-danger-soft"],
-  ["success", "--color-success"],
-  ["successSoft", "--color-success-soft"],
-  ["info", "--color-info"],
-  ["infoSoft", "--color-info-soft"],
-  ["reference", "--color-reference"],
-  ["referenceSoft", "--color-reference-soft"],
-  ["onDanger", "--color-on-danger"],
-];
+import { WEB_TOKENS } from "../src/lib/theme";
 
 function declarations(colors: ThemeColors): string {
   return WEB_TOKENS.map(([token, name]) => `  ${name}: ${colors[token]};`).join("\n");

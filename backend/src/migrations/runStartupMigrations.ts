@@ -21,7 +21,8 @@
 // either module's adapters/domain/service.ts directly.
 
 import { readEmbeddedMurals, clearEmbeddedMuralsField } from "../modules/library/index.js";
-import { insertMigratedMurals, listHomeDesignations, dropMuralHomes, resetPresetBlockStyles } from "../modules/murals/index.js";
+import { getUserTheme } from "../modules/auth/index.js";
+import { insertMigratedMurals, listHomeDesignations, dropMuralHomes, resetPresetBlockStyles, backfillMuralThemes } from "../modules/murals/index.js";
 import { applyHomeMuralMigration } from "../modules/community/index.js";
 
 export function runStartupMigrations(): void {
@@ -31,8 +32,10 @@ export function runStartupMigrations(): void {
   resetPresetBlockStyles();
 
   const extracted = readEmbeddedMurals();
-  if (extracted.length === 0) return;
+  if (extracted.length > 0) {
+    insertMigratedMurals(extracted);
+    clearEmbeddedMuralsField([...new Set(extracted.map((r) => r.userId))]);
+  }
 
-  insertMigratedMurals(extracted);
-  clearEmbeddedMuralsField([...new Set(extracted.map((r) => r.userId))]);
+  backfillMuralThemes(getUserTheme);
 }

@@ -3,7 +3,9 @@
 // module's service.ts.
 
 import { randomUUID } from "node:crypto";
+import { muralThemeId } from "@scripta/shared";
 import { FolderCycleError, InvalidFolderReferenceError, MuralConflictError } from "./domain/errors.js";
+import type { ThemeId } from "@scripta/shared/themes";
 import type { MuralsRepository } from "./domain/ports.js";
 import type { Mural, MuralFolder, MuralFolderRow, MuralRow } from "./domain/types.js";
 
@@ -11,6 +13,7 @@ function toMural(row: MuralRow, publicUrlFor: (token: string) => string): Mural 
   return {
     id: row.id,
     name: row.name,
+    theme: muralThemeId(row.theme),
     blocks: JSON.parse(row.blocks),
     coverImageId: row.cover_image_id,
     coverImageUrl: row.cover_image_url,
@@ -34,14 +37,15 @@ function toFolder(row: MuralFolderRow): MuralFolder {
 
 export interface MuralsService {
   listMurals(userId: string): Mural[];
-  createMural(userId: string, name: string, folderId?: string | null): Mural;
+  /** `theme` omitted (older clients) falls back to the owner's account theme. */
+  createMural(userId: string, name: string, folderId?: string | null, theme?: ThemeId): Mural;
   /** undefined if no mural with that id is owned by userId — a
    *  caller-facing 404, not a server error. Same convention as
    *  modules/gallery/service.ts's getImageFile. */
   getMural(userId: string, id: string): Mural | undefined;
   /** Partial merge onto the existing row — only the keys present in
    *  `patch` change. undefined if not owned. */
-  updateMural(userId: string, id: string, patch: { name?: string; blocks?: unknown[]; folderId?: string | null; updatedAt?: string }): Mural | undefined;
+  updateMural(userId: string, id: string, patch: { name?: string; theme?: ThemeId; blocks?: unknown[]; folderId?: string | null; updatedAt?: string }): Mural | undefined;
   /** Returns false if no mural with that id was owned by userId — same
    *  convention as modules/gallery/service.ts's deleteImage. */
   deleteMural(userId: string, id: string): boolean;
@@ -70,19 +74,24 @@ export interface MuralsService {
   getRowByShareToken(token: string): MuralRow | undefined;
 }
 
-export function createMuralsService(repo: MuralsRepository, publicUrlFor: (token: string) => string): MuralsService {
+export function createMuralsService(
+  repo: MuralsRepository,
+  publicUrlFor: (token: string) => string,
+  resolveOwnerTheme: (userId: string) => ThemeId
+): MuralsService {
   return {
     listMurals(userId) {
       return repo.listByUser(userId).map((row) => toMural(row, publicUrlFor));
     },
 
-    createMural(userId, name, folderId = null) {
+    createMural(userId, name, folderId = null, theme) {
       if (folderId !== null && !repo.getOwnedFolder(folderId, userId)) throw new InvalidFolderReferenceError();
       const now = new Date().toISOString();
       const row: MuralRow = {
         id: randomUUID(),
         user_id: userId,
         name,
+        theme: theme ?? resolveOwnerTheme(userId),
         blocks: "[]",
         cover_image_id: null,
         cover_image_url: null,
@@ -106,6 +115,7 @@ export function createMuralsService(repo: MuralsRepository, publicUrlFor: (token
       }
       const row = repo.update(id, userId, {
         ...(patch.name !== undefined ? { name: patch.name } : {}),
+        ...(patch.theme !== undefined ? { theme: patch.theme } : {}),
         ...(patch.blocks !== undefined ? { blocks: JSON.stringify(patch.blocks) } : {}),
         ...(patch.folderId !== undefined ? { folder_id: patch.folderId } : {})
       }, patch.updatedAt);

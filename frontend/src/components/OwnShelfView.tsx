@@ -23,6 +23,7 @@ import { useMurals } from "../hooks/useMurals";
 import { orderLibraryBooks } from "../lib/libraryOrder";
 import { buildMuralPreset, shelfPresetSummary } from "../lib/muralPresets";
 import type { Mural } from "../lib/murals";
+import { useResolvedTheme } from "../lib/theme";
 
 const OWN_SHELF_TABS = [
   { value: "mural", label: "Mural" },
@@ -38,6 +39,7 @@ export function OwnShelfView({ username }: { username: string }) {
   const navigate = useNavigate();
   const own = useQuery({ queryKey: ["community", "own-profile"], queryFn: fetchOwnProfile });
   const murals = useMurals();
+  const viewerTheme = useResolvedTheme();
   const libraryQuery = useLibrary();
   const library = libraryQuery.data;
   const { images } = useGalleryImages();
@@ -49,7 +51,7 @@ export function OwnShelfView({ username }: { username: string }) {
   const groups = useMemo(() => library?.data.groups ?? [], [library]);
   const ordered = useMemo(() => orderLibraryBooks(books, groups), [books, groups]);
   const preview = useMemo(() => buildMuralPreset("shelf", ordered, groups), [ordered, groups]);
-  const previewMural: Mural = { id: "shelf-preview", name: preview.name, blocks: preview.blocks, createdAt: "", updatedAt: "", shareToken: null, shareUrl: null, folderId: null };
+  const previewMural: Mural = { id: "shelf-preview", name: preview.name, theme: viewerTheme, blocks: preview.blocks, createdAt: "", updatedAt: "", shareToken: null, shareUrl: null, folderId: null };
   const pendingShelf = useRef<string | null>(null);
   const working = useRef(false);
 
@@ -84,7 +86,7 @@ export function OwnShelfView({ username }: { username: string }) {
   }
 
   async function shelfTargetId() {
-    const id = own.data?.muralId ?? pendingShelf.current ?? (await murals.create("My shelf")).id;
+    const id = own.data?.muralId ?? pendingShelf.current ?? (await murals.create("My shelf", viewerTheme)).id;
     pendingShelf.current = id;
     return id;
   }

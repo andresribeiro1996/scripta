@@ -31,7 +31,7 @@ type MyShelfTab = (typeof MY_SHELF_TABS)[number]["value"];
 let lastTab: MyShelfTab = "shelf";
 
 export function MyShelfScreen() {
-  const { colors } = useTheme();
+  const { colors, id: theme } = useTheme();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const username = user?.username ?? "";
@@ -66,7 +66,7 @@ export function MyShelfScreen() {
 
   const ordered = useMemo(() => orderLibraryBooks(books, groups), [books, groups]);
   const preview = useMemo(() => buildMuralPreset("shelf", ordered, groups), [ordered, groups]);
-  const previewMural: Mural = { id: "shelf-preview", name: preview.name, blocks: preview.blocks, createdAt: "", updatedAt: "", shareToken: null, shareUrl: null, folderId: null };
+  const previewMural: Mural = { id: "shelf-preview", name: preview.name, theme, blocks: preview.blocks, createdAt: "", updatedAt: "", shareToken: null, shareUrl: null, folderId: null };
   const pendingShelf = useRef<string | null>(null);
   const working = useRef(false);
 
@@ -124,7 +124,7 @@ export function MyShelfScreen() {
   const muralHasBlocks = Boolean(mural.data && mural.data.blocks.length > 0);
 
   async function shelfTargetId() {
-    const id = ownData.muralId ?? pendingShelf.current ?? (await murals.create("My shelf")).id;
+    const id = ownData.muralId ?? pendingShelf.current ?? (await murals.create("My shelf", theme)).id;
     pendingShelf.current = id;
     return id;
   }
