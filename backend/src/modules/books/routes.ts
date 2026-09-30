@@ -71,8 +71,14 @@ export function buildCatalogRoutes(service: BooksService) {
     app.get("/books/search", { preHandler: authGuard }, async (request, reply) => {
       const parsed = searchSchema.safeParse(request.query);
       if (!parsed.success) return reply.code(400).send({ error: "Send a search query as q." });
+      return reply.send({ results: service.search(parsed.data.q) });
+    });
+
+    app.get("/books/search/external", { preHandler: authGuard }, async (request, reply) => {
+      const parsed = searchSchema.safeParse(request.query);
+      if (!parsed.success) return reply.code(400).send({ error: "Send a search query as q." });
       try {
-        return reply.send({ results: await service.search(parsed.data.q) });
+        return reply.send({ results: await service.searchExternal(parsed.data.q) });
       } catch (error) {
         if (error instanceof SourceUnavailableError) return reply.code(502).send({ error: "Search is unavailable right now — try again." });
         throw error;

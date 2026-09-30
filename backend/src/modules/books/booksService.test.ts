@@ -342,35 +342,48 @@ test("a details failure propagates and records nothing", async () => {
   assert.equal(h.repo.findBookByKey("isbn:9780441013593")!.details_status, null);
 });
 
-test("an ISBN search is answered from a saved book without calling Open Library", async () => {
+test("an ISBN search is answered from a saved book without calling Open Library", () => {
   const { calls, catalog } = recordingCatalog();
   const h = harness({ catalog });
   h.service.resolveCover(dune);
-  const results = await h.service.search("978-0-441-01359-3");
+  const results = h.service.search("978-0-441-01359-3");
   assert.equal(results[0]!.title, "Dune");
   assert.deepEqual(calls, []);
 });
 
-test("an unknown ISBN goes to Open Library and the results are saved", async () => {
+test("an unknown ISBN searched inside finds nothing and never calls Open Library", () => {
   const { calls, catalog } = recordingCatalog();
   const h = harness({ catalog });
-  await h.service.search("9780441013593");
-  assert.deepEqual(calls, ["search-isbn:9780441013593"]);
-  assert.ok(h.repo.findBookByKey("isbn:9780441013593"));
-  await h.service.search("9780441013593");
-  assert.equal(calls.length, 1);
+  assert.deepEqual(h.service.search("9780441013593"), []);
+  assert.deepEqual(calls, []);
 });
 
-test("free text returns saved matches first and falls back to Open Library, saving every result", async () => {
+test("an outside ISBN search goes to Open Library and saves the results", async () => {
   const { calls, catalog } = recordingCatalog();
   const h = harness({ catalog });
-  const fromOpenLibrary = await h.service.search("dune");
+  await h.service.searchExternal("978-0-441-01359-3");
+  assert.deepEqual(calls, ["search-isbn:9780441013593"]);
+  assert.ok(h.repo.findBookByKey("isbn:9780441013593"));
+  assert.equal(h.service.search("9780441013593")[0]!.title, "Dune");
+});
+
+test("an inside text search only returns saved matches and never calls Open Library", () => {
+  const { calls, catalog } = recordingCatalog();
+  const h = harness({ catalog });
+  assert.deepEqual(h.service.search("dune"), []);
+  assert.deepEqual(calls, []);
+});
+
+test("an outside text search saves every result so the inside search finds them next time", async () => {
+  const { calls, catalog } = recordingCatalog();
+  const h = harness({ catalog });
+  const fromOpenLibrary = await h.service.searchExternal("dune");
   assert.deepEqual(calls, ["search:dune"]);
   assert.equal(fromOpenLibrary.length, 2);
   assert.equal(fromOpenLibrary[0]!.coverUrl, "https://covers.openlibrary.org/b/id/7-M.jpg");
   assert.ok(h.repo.findBookByKey("ta:dune encyclopedia|willis e mcnelly"));
 
-  const saved = await h.service.search("Dune");
+  const saved = h.service.search("Dune");
   assert.equal(calls.length, 1);
   assert.deepEqual(saved.map((result) => result.title).sort(), ["Dune", "Dune Encyclopedia"]);
   const book = saved.find((result) => result.title === "Dune")!;
@@ -379,23 +392,41 @@ test("free text returns saved matches first and falls back to Open Library, savi
   assert.equal(book.coverUrl, "https://covers.openlibrary.org/b/id/7-M.jpg");
 });
 
+test("a partial saved match no longer hides the outside search", async () => {
+  const messiah = { result: { title: "Dune Messiah", authors: ["Frank Herbert"], year: 1969, isbn: null, publisher: null, coverUrl: null, genres: [] }, olCoverId: null };
+  const dune = { result: { title: "Dune", authors: ["Frank Herbert"], year: 1965, isbn: "9780441013593", publisher: null, coverUrl: null, genres: [] }, olCoverId: null };
+  const { calls, catalog } = recordingCatalog({ search: async (query) => {
+    calls.push("isbn" in query ? `search-isbn:${query.isbn}` : `search:${query.text}`);
+    return "text" in query && query.text === "messiah" ? [messiah] : [messiah, dune];
+  } });
+  const h = harness({ catalog });
+  await h.service.searchExternal("messiah");
+  assert.deepEqual(h.service.search("dune").map((result) => result.title), ["Dune Messiah"]);
+  const outside = await h.service.searchExternal("dune");
+  assert.deepEqual(outside.map((result) => result.title), ["Dune Messiah", "Dune"]);
+  assert.deepEqual(calls, ["search:messiah", "search:dune"]);
+});
+
 test("a saved book's own cover is used in search results", async () => {
   const { catalog } = recordingCatalog();
   const h = harness({ catalog, sources: { isbndb: null, apple: isbnSource("https://a/1"), openlibrary: emptySource } });
   h.sizes.set("https://a/1", [900, 1400]);
   h.service.resolveCover(dune);
   await h.service.processBook(h.bookId("isbn:9780441013593"));
-  const [result] = await h.service.search("dune herbert");
+  await h.service.searchExternal("dune herbert");
+  const [result] = h.service.search("dune herbert");
   assert.match(result!.coverUrl!, /\/covers\/cached\/.+\/thumb$/);
 });
 
 test("search strips FTS syntax and ignores punctuation-only queries", async () => {
   const { calls, catalog } = recordingCatalog();
   const h = harness({ catalog });
-  await h.service.search("dune");
-  assert.equal((await h.service.search('"Dune" -herbert* (')).length, 1);
-  assert.deepEqual(await h.service.search("***"), []);
-  assert.deepEqual(await h.service.search("   "), []);
+  await h.service.searchExternal("dune");
+  assert.equal(h.service.search('"Dune" -herbert* (').length, 1);
+  assert.deepEqual(h.service.search("***"), []);
+  assert.deepEqual(h.service.search("   "), []);
+  assert.deepEqual(await h.service.searchExternal("***"), []);
+  assert.deepEqual(await h.service.searchExternal("   "), []);
   assert.equal(calls.length, 1);
 });
 
@@ -406,9 +437,10 @@ test("search never returns a book that only came from an account's library", asy
   } });
   const h = harness({ catalog });
   h.service.resolveCover({ title: "My Private Manuscript", author: "" });
-  const results = await h.service.search("manuscript");
+  assert.deepEqual(h.service.search("manuscript"), []);
+  assert.deepEqual(await h.service.searchExternal("manuscript"), []);
+  assert.deepEqual(h.service.search("manuscript"), []);
   assert.deepEqual(calls, ["search:manuscript"]);
-  assert.deepEqual(results, []);
 });
 
 const { default: sharp } = await import("sharp");
