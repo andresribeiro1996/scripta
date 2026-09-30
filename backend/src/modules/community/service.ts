@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import type { IdentityKey, ReaderProfile } from "@scripta/shared";
 import { categoryFor, contentDetail, decodeCursor, encodeCursor, DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
-import type { ActivityEventType, ActivityItem, CommunityAuthor, CommunityEventType, DiscoverItem, DiscoverType, FeedCategory, FeedSettings, FollowState, OwnProfile, Page, PersonResult, PublishedContent, PublishedProfile, TierlistSummary, TournamentSummary } from "@scripta/shared/community";
-import type { DashboardFeedPage, DigestItem } from "@scripta/shared/dashboard";
+import type { ActivityEventType, ActivityItem, CommunityAuthor, CommunityEventType, DiscoverItem, DiscoverType, FeedCategory, FeedSettings, FollowState, GameParticipation, OwnProfile, Page, ParticipationGameKind, PersonResult, PublishedContent, PublishedProfile, TierlistSummary, TournamentSummary } from "@scripta/shared/community";
+import type { DashboardFeedPage, DigestItem, ParticipationItem } from "@scripta/shared/dashboard";
 import type { PublishedTournamentRef } from "../arena/service.js";
 import type { MuralsPublicApi } from "../murals/publicApi.js";
 import type { MuralPublicPayload } from "../murals/index.js";
@@ -12,6 +12,14 @@ import type { CommunityRepository, CursorKeyset } from "./domain/ports.js";
 import type { EventRow, FollowRow } from "./domain/types.js";
 
 const DISCOVER_SCAN_CAP = 500;
+const DASHBOARD_COUNT_CAP = 100;
+const NAMED_PARTICIPANTS = 3;
+const DIGEST_TYPES: Record<FeedCategory, ActivityEventType[]> = {
+  publications: ["tierlist_published", "tournament_published"],
+  votes: ["voted_on"],
+  reading: ["book_added", "book_finished"],
+  follows: []
+};
 
 export type CommunityRefType = "tierlist" | "tournament" | "book" | "user" | "mural";
 
@@ -69,6 +77,11 @@ export interface CommunityDeps {
     listByOwner(ownerUserId: string): PublishedTournamentRef[];
     listVotedByUser(voterUserId: string): PublishedTournamentRef[];
   };
+  participation: {
+    tierlists(userId: string): GameParticipation[];
+    tournaments(userId: string): GameParticipation[];
+    quizzes(userId: string): GameParticipation[];
+  };
 }
 
 export interface CommunityService {
@@ -120,6 +133,122 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
     return userId;
   };
   const publishedUserId = (username: string): string => visibleUserId(username, undefined);
+
+  type DigestRow = { id: string; createdAt: string; event?: EventRow; follow?: FollowRow; participation?: ParticipationItem };
+  type Bound = { keyset?: CursorKeyset; since?: string };
+
+  // The publisher's own switches, the same ones their profile's activity
+  // list obeys — a category they broadcast there, they broadcast here.
+  const digestTypesFor = (userId: string): ActivityEventType[] => {
+    const settings = settingsFor(userId);
+    return (Object.keys(DIGEST_TYPES) as FeedCategory[]).flatMap((category) => (settings[category] ? DIGEST_TYPES[category] : []));
+  };
+  const withinBound = (bound: Bound, createdAt: string, id: string): boolean =>
+    bound.since !== undefined ? createdAt > bound.since : !bound.keyset || createdAt < bound.keyset.createdAt || (createdAt === bound.keyset.createdAt && id < bound.keyset.id);
+  const newestFirst = (a: DigestRow, b: DigestRow): number => (a.createdAt !== b.createdAt ? b.createdAt.localeCompare(a.createdAt) : a.id < b.id ? 1 : -1);
+
+  const participationItems = (viewerId: string): ParticipationItem[] => {
+    const glyphOf = glyphLookup();
+    const games: Array<[ParticipationGameKind, GameParticipation[]]> = [
+      ["tierlist", deps.participation.tierlists(viewerId)],
+      ["tournament", deps.participation.tournaments(viewerId)],
+      ["quiz", deps.participation.quizzes(viewerId)]
+    ];
+    return games.flatMap(([kind, list]) =>
+      list.map((game) => {
+        const nameable = game.recent.map((entry) => entry.userId).filter((userId) => repo.getProfileRow(userId)?.published === 1 && settingsFor(userId).votes);
+        const profiles = deps.resolveProfiles(nameable);
+        const actors = nameable.flatMap((userId) => {
+          const profile = profiles.get(userId);
+          return profile ? [withGlyph(profile, userId, glyphOf)] : [];
+        }).slice(0, NAMED_PARTICIPANTS);
+        return { kind: "participation" as const, id: `${kind}:${game.id}`, game: { kind, id: game.id, name: game.name, covers: game.covers.slice(0, FEED_COVER_LIMIT) }, actors, count: game.participantCount, createdAt: game.latestAt };
+      })
+    );
+  };
+
+  const followingRows = (followees: string[], bound: Bound, limit: number): DigestRow[] =>
+    followees.flatMap((followeeId) => {
+      const types = digestTypesFor(followeeId);
+      if (types.length === 0) return [];
+      const events = bound.since !== undefined ? repo.listEventsByUserSince(followeeId, bound.since, limit, types) : repo.listEventsByUser(followeeId, bound.keyset, limit, types);
+      return events.map((event) => ({ id: event.id, createdAt: event.created_at, event }));
+    });
+
+  const personalRows = (viewerId: string, participation: ParticipationItem[], bound: Bound, limit: number): DigestRow[] => [
+    ...(bound.since !== undefined ? repo.listFollowersSince(viewerId, bound.since, limit) : repo.listFollowersByFollowee(viewerId, bound.keyset, limit)).map((follow) => ({ id: follow.follower_id, createdAt: follow.created_at, follow })),
+    ...participation.filter((item) => withinBound(bound, item.createdAt, item.id)).map((item) => ({ id: item.id, createdAt: item.createdAt, participation: item }))
+  ];
+
+  const toDigestItem = (row: DigestRow, profiles: Map<string, ReaderProfile>, glyphOf: (userId: string) => IdentityKey | null, followees: string[]): DigestItem | undefined => {
+    if (row.event) {
+      const event = row.event;
+      const actor = profiles.get(event.user_id);
+      if (event.type === "tierlist_published" || event.type === "tournament_published") {
+        if (event.ref_type === "tierlist") {
+          const ref = deps.tierlists.get(event.ref_id);
+          // A promoted tier list outlives its creator's profile, so it keeps
+          // a placeholder author rather than dropping out of the feed.
+          const author = ref && ref.ownerUserId === event.user_id ? actor ?? (ref.promotedAt ? { username: "Original creator unavailable", avatarUrl: null, unavailable: true } : undefined) : undefined;
+          if (ref && author) return { kind: "publication", id: event.id, actor: withGlyph(author, event.user_id, glyphOf), type: event.type as CommunityEventType, content: toTierlistSummary(ref), createdAt: event.created_at };
+        } else {
+          const ref = deps.tournaments.get(event.ref_id);
+          if (ref && ref.ownerUserId === event.user_id && actor) return { kind: "publication", id: event.id, actor: withGlyph(actor, event.user_id, glyphOf), type: event.type as CommunityEventType, content: toTournamentSummary(ref), createdAt: event.created_at };
+        }
+      } else if (event.type === "voted_on") {
+        // The voter is not the owner here, so there is no ownership check to
+        // make — only that the thing voted on is still published.
+        const content = event.ref_type === "tierlist"
+          ? (() => { const ref = deps.tierlists.get(event.ref_id); return ref ? toTierlistSummary(ref) : undefined; })()
+          : (() => { const ref = deps.tournaments.get(event.ref_id); return ref ? toTournamentSummary(ref) : undefined; })();
+        if (content && actor) return { kind: "vote", id: event.id, actor: withGlyph(actor, event.user_id, glyphOf), content, createdAt: event.created_at };
+      } else if (event.type === "book_added" || event.type === "book_finished") {
+        const payload = parseEventPayload(event.payload);
+        if (payload && actor) {
+          const coverUrl = typeof payload.coverUrl === "string" ? payload.coverUrl : null;
+          return {
+            kind: "reading",
+            id: event.id,
+            actor: withGlyph(actor, event.user_id, glyphOf),
+            book: { title: String(payload.title ?? ""), author: String(payload.author ?? ""), coverUrl },
+            finished: event.type === "book_finished",
+            createdAt: event.created_at
+          };
+        }
+      }
+    } else if (row.follow) {
+      const author = profiles.get(row.follow.follower_id);
+      if (author) {
+        // followees is already loaded for the event half of this feed, so
+        // knowing whether this is mutual costs nothing extra.
+        return { kind: "follow", id: row.follow.follower_id, actor: withGlyph(author, row.follow.follower_id, glyphOf), createdAt: row.follow.created_at, viewerFollows: followees.includes(row.follow.follower_id) };
+      }
+    }
+    return undefined;
+  };
+
+  const buildItems = (rows: DigestRow[], followees: string[], limit: number, glyphOf = glyphLookup()): { items: DigestItem[]; last?: DigestRow; more: boolean } => {
+    rows.sort(newestFirst);
+    const actorIds = new Set<string>();
+    for (const row of rows) {
+      if (row.event) actorIds.add(row.event.user_id);
+      if (row.follow) actorIds.add(row.follow.follower_id);
+    }
+    const profiles = deps.resolveProfiles([...actorIds]);
+    const items: DigestItem[] = [];
+    let last: DigestRow | undefined;
+    for (const row of rows) {
+      if (items.length === limit) return { items, last, more: true };
+      const item = row.participation ?? toDigestItem(row, profiles, glyphOf, followees);
+      if (item) {
+        items.push(item);
+        last = row;
+      }
+    }
+    return { items, last, more: false };
+  };
+  const countItems = (rows: DigestRow[], followees: string[]): number => buildItems(rows, followees, DASHBOARD_COUNT_CAP, () => null).items.length;
+
   return {
     follow(followerId, followeeId) {
       if (followerId === followeeId) throw new SelfFollowError();
@@ -211,100 +340,16 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
     getDashboard(viewerId, cursor, limit) {
       const keyset = cursor ? decodeCursor(cursor) : undefined;
       if (cursor && !keyset) throw new InvalidCursorError();
-      type Row = { id: string; createdAt: string; event?: EventRow; follow?: FollowRow };
-      const rows: Row[] = [];
       const followees = repo.listFollowees(viewerId);
-      for (const followeeId of followees) {
-        rows.push(...repo.listEventsByUser(followeeId, keyset, limit + 1).map((event) => ({ id: event.id, createdAt: event.created_at, event })));
-      }
-      rows.push(...repo.listFollowersByFollowee(viewerId, keyset, limit + 1).map((follow) => ({ id: follow.follower_id, createdAt: follow.created_at, follow })));
-      rows.sort((a, b) => (a.createdAt !== b.createdAt ? b.createdAt.localeCompare(a.createdAt) : a.id < b.id ? 1 : -1));
-      const actorIds = new Set<string>();
-      for (const row of rows) {
-        if (row.event) actorIds.add(row.event.user_id);
-        if (row.follow) actorIds.add(row.follow.follower_id);
-      }
-      const profiles = deps.resolveProfiles([...actorIds]);
-      const glyphOf = glyphLookup();
-      // The publisher's own switches, the same ones their profile's activity
-      // list obeys — a category they broadcast there, they broadcast here.
-      const settingsCache = new Map<string, FeedSettings>();
-      const broadcasts = (actorId: string, category: FeedCategory): boolean => {
-        let settings = settingsCache.get(actorId);
-        if (!settings) {
-          settings = settingsFor(actorId);
-          settingsCache.set(actorId, settings);
-        }
-        return settings[category];
-      };
-      const items: DigestItem[] = [];
-      let nextCursor: string | null = null;
-      let lastIncluded: Row | undefined;
-      for (const row of rows) {
-        if (items.length === limit) {
-          if (lastIncluded) nextCursor = encodeCursor({ createdAt: lastIncluded.createdAt, id: lastIncluded.id });
-          break;
-        }
-        if (row.event) {
-          const event = row.event;
-          const category = categoryFor(event.type as ActivityEventType);
-          if (!broadcasts(event.user_id, category)) continue;
-          const actor = profiles.get(event.user_id);
-          if (event.type === "tierlist_published" || event.type === "tournament_published") {
-            if (event.ref_type === "tierlist") {
-              const ref = deps.tierlists.get(event.ref_id);
-              // A promoted tier list outlives its creator's profile, so it keeps
-              // a placeholder author rather than dropping out of the feed.
-              const author = ref && ref.ownerUserId === event.user_id ? actor ?? (ref.promotedAt ? { username: "Original creator unavailable", avatarUrl: null, unavailable: true } : undefined) : undefined;
-              if (ref && author) {
-                items.push({ kind: "publication", id: event.id, actor: withGlyph(author, event.user_id, glyphOf), type: event.type as CommunityEventType, content: toTierlistSummary(ref), createdAt: event.created_at });
-                lastIncluded = row;
-              }
-            } else {
-              const ref = deps.tournaments.get(event.ref_id);
-              if (ref && ref.ownerUserId === event.user_id && actor) {
-                items.push({ kind: "publication", id: event.id, actor: withGlyph(actor, event.user_id, glyphOf), type: event.type as CommunityEventType, content: toTournamentSummary(ref), createdAt: event.created_at });
-                lastIncluded = row;
-              }
-            }
-          } else if (event.type === "voted_on") {
-            // The voter is not the owner here, so there is no ownership check to
-            // make — only that the thing voted on is still published.
-            const content = event.ref_type === "tierlist"
-              ? (() => { const ref = deps.tierlists.get(event.ref_id); return ref ? toTierlistSummary(ref) : undefined; })()
-              : (() => { const ref = deps.tournaments.get(event.ref_id); return ref ? toTournamentSummary(ref) : undefined; })();
-            if (content && actor) {
-              items.push({ kind: "vote", id: event.id, actor: withGlyph(actor, event.user_id, glyphOf), content, createdAt: event.created_at });
-              lastIncluded = row;
-            }
-          } else if (event.type === "book_added" || event.type === "book_finished") {
-            const payload = parseEventPayload(event.payload);
-            if (payload && actor) {
-              const coverUrl = typeof payload.coverUrl === "string" ? payload.coverUrl : null;
-              items.push({
-                kind: "reading",
-                id: event.id,
-                actor: withGlyph(actor, event.user_id, glyphOf),
-                book: { title: String(payload.title ?? ""), author: String(payload.author ?? ""), coverUrl },
-                finished: event.type === "book_finished",
-                createdAt: event.created_at
-              });
-              lastIncluded = row;
-            }
-          }
-        } else if (row.follow) {
-          const author = profiles.get(row.follow.follower_id);
-          if (author) {
-            // followees is already loaded for the event half of this feed, so
-            // knowing whether this is mutual costs nothing extra.
-            items.push({ kind: "follow", id: row.follow.follower_id, actor: withGlyph(author, row.follow.follower_id, glyphOf), createdAt: row.follow.created_at, viewerFollows: followees.includes(row.follow.follower_id) });
-            lastIncluded = row;
-          }
-        }
-      }
-      const seen = keyset ? null : deps.getDashboardSeenAt(viewerId);
-      const newCount = !keyset && seen ? repo.countEventsByUsersSince(followees, seen) + repo.countFollowersSince(viewerId, seen) : 0;
-      return { items, nextCursor, newCount };
+      const participation = participationItems(viewerId);
+      const page = buildItems([...followingRows(followees, { keyset }, limit + 1), ...personalRows(viewerId, participation, { keyset }, limit + 1)], followees, limit);
+      const nextCursor = page.more && page.last ? encodeCursor({ createdAt: page.last.createdAt, id: page.last.id }) : null;
+      if (keyset) return { items: page.items, nextCursor, seenAt: null, personalNewCount: 0, followingNewCount: 0 };
+      const seenAt = deps.getDashboardSeenAt(viewerId);
+      const bound: Bound = seenAt ? { since: seenAt } : {};
+      const personalNewCount = countItems(personalRows(viewerId, participation, bound, DASHBOARD_COUNT_CAP), followees);
+      const followingNewCount = countItems(followingRows(followees, bound, DASHBOARD_COUNT_CAP), followees);
+      return { items: page.items, nextCursor, seenAt, personalNewCount, followingNewCount };
     },
     markDashboardSeen(viewerId) {
       deps.setDashboardSeenAt(viewerId, new Date().toISOString());

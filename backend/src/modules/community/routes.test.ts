@@ -35,7 +35,7 @@ function fakeService(overrides: Partial<CommunityService> = {}): CommunityServic
     getProfileByUsername: () => {
       throw new ProfileNotFoundError();
     },
-    getDashboard: () => ({ items: [], nextCursor: null, newCount: 0 }),
+    getDashboard: () => ({ items: [], nextCursor: null, seenAt: null, personalNewCount: 0, followingNewCount: 0 }),
     markDashboardSeen: () => {},
     getDiscover: () => ({ items: [], nextOffset: null }),
     searchPeople: () => [],
@@ -263,7 +263,7 @@ test("dashboard routes pass cursor/limit through and mark seen", async () => {
       fakeService({
         getDashboard: (_viewerId, cursor, limit) => {
           seen.push({ cursor, limit });
-          return { items: [], nextCursor: null, newCount: 0 };
+          return { items: [], nextCursor: null, seenAt: null, personalNewCount: 0, followingNewCount: 0 };
         },
         markDashboardSeen: () => {
           marked += 1;

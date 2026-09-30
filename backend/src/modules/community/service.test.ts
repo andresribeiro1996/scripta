@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { IdentityKey, ReaderProfile } from "@scripta/shared";
-import type { DiscoverItem } from "@scripta/shared/community";
+import type { DiscoverItem, GameParticipation } from "@scripta/shared/community";
 import { DEFAULT_FEED_SETTINGS, normalizeFeedSettings } from "@scripta/shared/community";
+import type { ParticipationItem } from "@scripta/shared/dashboard";
 import type { PublishedTierlistRef } from "../tierlists/service.js";
 import type { PublishedTournamentRef } from "../arena/service.js";
 import type { MuralPublicPayload } from "../murals/index.js";
@@ -16,6 +17,8 @@ function createRepoFake() {
   const profiles = new Map<string, ProfileRow>();
   const events: EventRow[] = [];
   const key = (a: string, b: string) => `${a}:${b}`;
+  const newestEvent = (a: EventRow, b: EventRow) => (a.created_at === b.created_at ? (a.id > b.id ? -1 : 1) : b.created_at.localeCompare(a.created_at));
+  const newestFollow = (a: FollowRow, b: FollowRow) => (a.created_at === b.created_at ? (a.follower_id > b.follower_id ? -1 : 1) : b.created_at.localeCompare(a.created_at));
   const repo: CommunityRepository = {
     deleteUserData() {},
     insertFollow(row) {
@@ -63,25 +66,32 @@ function createRepoFake() {
       if (events.some((e) => e.ref_type === row.ref_type && e.ref_id === row.ref_id)) return;
       events.push({ ...row });
     },
-    listEventsByUser(userId, keyset: CursorKeyset | undefined, limit) {
+    listEventsByUser(userId, keyset: CursorKeyset | undefined, limit, types) {
       return events
         .filter((e) => e.user_id === userId)
+        .filter((e) => !types || types.includes(e.type))
         .filter((e) => !keyset || e.created_at < keyset.createdAt || (e.created_at === keyset.createdAt && e.id < keyset.id))
-        .sort((a, b) => (a.created_at === b.created_at ? (a.id > b.id ? -1 : 1) : b.created_at.localeCompare(a.created_at)))
+        .sort(newestEvent)
+        .slice(0, limit);
+    },
+    listEventsByUserSince(userId, since, limit, types) {
+      return events
+        .filter((e) => e.user_id === userId && types.includes(e.type) && e.created_at > since)
+        .sort(newestEvent)
         .slice(0, limit);
     },
     listFollowersByFollowee(followeeId, keyset, limit) {
       return [...follows.values()]
         .filter((row) => row.followee_id === followeeId)
         .filter((row) => !keyset || row.created_at < keyset.createdAt || (row.created_at === keyset.createdAt && row.follower_id < keyset.id))
-        .sort((a, b) => (a.created_at === b.created_at ? (a.follower_id > b.follower_id ? -1 : 1) : b.created_at.localeCompare(a.created_at)))
+        .sort(newestFollow)
         .slice(0, limit);
     },
-    countEventsByUsersSince(userIds, since) {
-      return events.filter((e) => userIds.includes(e.user_id) && e.created_at > since).length;
-    },
-    countFollowersSince(followeeId, since) {
-      return [...follows.values()].filter((row) => row.followee_id === followeeId && row.created_at > since).length;
+    listFollowersSince(followeeId, since, limit) {
+      return [...follows.values()]
+        .filter((row) => row.followee_id === followeeId && row.created_at > since)
+        .sort(newestFollow)
+        .slice(0, limit);
     }
   };
   return { repo, follows, profiles, events };
@@ -101,6 +111,9 @@ function createDeps(repo: CommunityRepository) {
   const tournamentVotes = new Set<string>();
   const readerGlyphs = new Map<string, IdentityKey | null>();
   const readerGlyphCalls: string[] = [];
+  const tierlistParticipation: GameParticipation[] = [];
+  const tournamentParticipation: GameParticipation[] = [];
+  const quizParticipation: GameParticipation[] = [];
   const deps: CommunityDeps = {
     repo,
     getDashboardSeenAt: () => seenAt.value,
@@ -143,9 +156,14 @@ function createDeps(repo: CommunityRepository) {
       get: (id) => tournamentRefs.get(id),
       listByOwner: (owner) => [...tournamentRefs.values()].filter((r) => r.ownerUserId === owner).sort(byNewest),
       listVotedByUser: (voter) => [...tournamentRefs.values()].filter((r) => tournamentVotes.has(`${voter}:${r.id}`)).sort(byNewest)
+    },
+    participation: {
+      tierlists: () => tierlistParticipation,
+      tournaments: () => tournamentParticipation,
+      quizzes: () => quizParticipation
     }
   };
-  return { deps, readerProfiles, usernames, ownedMurals, muralPayloads, libraries, tierlistRefs, tournamentRefs, seenAt, votes, tournamentVotes, readerGlyphs, readerGlyphCalls };
+  return { deps, readerProfiles, usernames, ownedMurals, muralPayloads, libraries, tierlistRefs, tournamentRefs, seenAt, votes, tournamentVotes, readerGlyphs, readerGlyphCalls, tierlistParticipation, tournamentParticipation, quizParticipation };
 }
 
 function profileRow(userId: string, overrides: Partial<ProfileRow> = {}): ProfileRow {
@@ -163,6 +181,8 @@ function profileRow(userId: string, overrides: Partial<ProfileRow> = {}): Profil
 function reader(userId: string): ReaderProfile {
   return { username: `user-${userId}`, avatarUrl: null };
 }
+
+const at = (day: number) => `2026-09-${String(day).padStart(2, "0")}T00:00:00.000Z`;
 
 export function tierRef(id: string, owner: string, overrides: Partial<PublishedTierlistRef> = {}): PublishedTierlistRef {
   return {
@@ -483,7 +503,7 @@ test("follow rows surface only to the followee and retract on unfollow", () => {
   assert.equal(service.getDashboard("viewer", undefined, 20).items.length, 0);
 });
 
-test("newCount counts unseen rows and the seen marker resets it", () => {
+test("personalNewCount counts unseen rows and the seen marker resets it", () => {
   const { repo } = createRepoFake();
   const { deps, seenAt, readerProfiles } = createDeps(repo);
   const service = createCommunityService(deps);
@@ -492,11 +512,11 @@ test("newCount counts unseen rows and the seen marker resets it", () => {
   repo.upsertProfile(profileRow("viewer"));
   repo.insertFollow({ follower_id: "alice", followee_id: "viewer", created_at: "2026-09-05T00:00:00.000Z" });
   repo.insertFollow({ follower_id: "bob", followee_id: "viewer", created_at: "2026-09-06T00:00:00.000Z" });
-  assert.equal(service.getDashboard("viewer", undefined, 20).newCount, 0);
+  assert.equal(service.getDashboard("viewer", undefined, 20).personalNewCount, 2);
   seenAt.value = "2026-09-05T12:00:00.000Z";
-  assert.equal(service.getDashboard("viewer", undefined, 20).newCount, 1);
+  assert.equal(service.getDashboard("viewer", undefined, 20).personalNewCount, 1);
   service.markDashboardSeen("viewer");
-  assert.equal(service.getDashboard("viewer", undefined, 20).newCount, 0);
+  assert.equal(service.getDashboard("viewer", undefined, 20).personalNewCount, 0);
 });
 
 test("dashboard pagination by keyset spans both sources", () => {
@@ -537,6 +557,178 @@ test("an unparseable dashboard cursor is a 400-worthy error", () => {
   const { deps } = createDeps(repo);
   const service = createCommunityService(deps);
   assert.throws(() => service.getDashboard("viewer", "###", 20), InvalidCursorError);
+});
+
+test("your games' participation shows as one row per game", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistParticipation } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("ana", reader("ana"));
+  repo.upsertProfile(profileRow("ana"));
+  tierlistParticipation.push({ id: "t1", name: "Sci-fi", covers: ["a", "b", "c", "d"], participantCount: 4, latestAt: at(2), recent: [{ userId: "ana", at: at(2) }, { userId: "ghost", at: at(1) }] });
+  const { items } = service.getDashboard("viewer", undefined, 20);
+  assert.equal(items.length, 1);
+  const row = items[0] as ParticipationItem;
+  assert.equal(row.kind, "participation");
+  assert.equal(row.id, "tierlist:t1");
+  assert.equal(row.game.covers.length, 3);
+  assert.equal(row.count, 4);
+  assert.equal(row.createdAt, at(2));
+  assert.deepEqual(row.actors.map((actor) => actor.username), ["user-ana"]);
+});
+
+test("each kind of game keeps its own kind and id", () => {
+  const { repo } = createRepoFake();
+  const { deps, tierlistParticipation, tournamentParticipation, quizParticipation } = createDeps(repo);
+  const service = createCommunityService(deps);
+  const game = (id: string, day: number) => ({ id, name: `Game ${id}`, covers: [], participantCount: 1, latestAt: at(day), recent: [] });
+  tierlistParticipation.push(game("a", 1));
+  tournamentParticipation.push(game("a", 2));
+  quizParticipation.push(game("a", 3));
+  const rows = service.getDashboard("viewer", undefined, 20).items as ParticipationItem[];
+  assert.deepEqual(rows.map((row) => [row.id, row.game.kind, row.game.id]), [["quiz:a", "quiz", "a"], ["tournament:a", "tournament", "a"], ["tierlist:a", "tierlist", "a"]]);
+});
+
+test("participants who are private or hide their votes are counted, never named", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistParticipation } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("bo", reader("bo"));
+  readerProfiles.set("cy", reader("cy"));
+  repo.upsertProfile(profileRow("bo", { published: 0 }));
+  repo.upsertProfile(profileRow("cy"));
+  repo.updateFeedSettings("cy", { ...DEFAULT_FEED_SETTINGS, votes: false });
+  tierlistParticipation.push({ id: "t1", name: "Sci-fi", covers: [], participantCount: 2, latestAt: at(2), recent: [{ userId: "bo", at: at(2) }, { userId: "cy", at: at(1) }] });
+  const row = service.getDashboard("viewer", undefined, 20).items[0] as ParticipationItem;
+  assert.deepEqual(row.actors, []);
+  assert.equal(row.count, 2);
+});
+
+test("no more than three participants are named", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistParticipation } = createDeps(repo);
+  const service = createCommunityService(deps);
+  const ids = ["p1", "p2", "p3", "p4"];
+  for (const id of ids) {
+    readerProfiles.set(id, reader(id));
+    repo.upsertProfile(profileRow(id));
+  }
+  tierlistParticipation.push({ id: "t1", name: "Sci-fi", covers: [], participantCount: 4, latestAt: at(4), recent: ids.map((userId, i) => ({ userId, at: at(4 - i) })) });
+  const row = service.getDashboard("viewer", undefined, 20).items[0] as ParticipationItem;
+  assert.deepEqual(row.actors.map((actor) => actor.username), ["user-p1", "user-p2", "user-p3"]);
+  assert.equal(row.count, 4);
+});
+
+test("hidden events can't push a visible one off the first page", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  repo.upsertProfile(profileRow("alice"));
+  repo.insertFollow({ follower_id: "viewer", followee_id: "alice", created_at: at(1) });
+  tierlistRefs.set("t1", tierRef("t1", "alice"));
+  repo.insertEvent({ id: "e-pub", user_id: "alice", type: "tierlist_published", ref_type: "tierlist", ref_id: "t1", payload: null, created_at: at(2) });
+  for (let i = 0; i < 30; i++) {
+    repo.insertEvent({ id: `e-book-${i}`, user_id: "alice", type: "book_added", ref_type: "book", ref_id: `b${i}`, payload: JSON.stringify({ title: "T", author: "A" }), created_at: `2026-09-03T00:00:${String(i).padStart(2, "0")}.000Z` });
+  }
+  assert.deepEqual(service.getDashboard("viewer", undefined, 20).items.map((item) => item.id), ["e-pub"]);
+});
+
+test("counts come from the rows the list shows", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs, tierlistParticipation, seenAt } = createDeps(repo);
+  const service = createCommunityService(deps);
+  seenAt.value = at(10);
+  for (const id of ["alice", "bob", "old-fan"]) readerProfiles.set(id, reader(id));
+  repo.upsertProfile(profileRow("alice"));
+  repo.insertFollow({ follower_id: "viewer", followee_id: "alice", created_at: at(1) });
+  tierlistRefs.set("t-old", tierRef("t-old", "alice"));
+  tierlistRefs.set("t-new", tierRef("t-new", "alice"));
+  repo.insertEvent({ id: "e-old", user_id: "alice", type: "tierlist_published", ref_type: "tierlist", ref_id: "t-old", payload: null, created_at: at(9) });
+  repo.insertEvent({ id: "e-new", user_id: "alice", type: "tierlist_published", ref_type: "tierlist", ref_id: "t-new", payload: null, created_at: at(11) });
+  for (let i = 0; i < 5; i++) {
+    repo.insertEvent({ id: `e-book-${i}`, user_id: "alice", type: "book_added", ref_type: "book", ref_id: `b${i}`, payload: JSON.stringify({ title: "T", author: "A" }), created_at: at(12) });
+  }
+  repo.insertEvent({ id: "e-following", user_id: "alice", type: "following", ref_type: "user", ref_id: "bob", payload: JSON.stringify({ username: "user-bob" }), created_at: at(12) });
+  repo.insertEvent({ id: "e-mural", user_id: "alice", type: "mural_published", ref_type: "mural", ref_id: "m1", payload: null, created_at: at(12) });
+  repo.insertFollow({ follower_id: "old-fan", followee_id: "viewer", created_at: at(9) });
+  repo.insertFollow({ follower_id: "bob", followee_id: "viewer", created_at: at(11) });
+  tierlistParticipation.push({ id: "g-old", name: "Old", covers: [], participantCount: 1, latestAt: at(9), recent: [] });
+  tierlistParticipation.push({ id: "g-seen", name: "Seen", covers: [], participantCount: 1, latestAt: at(10), recent: [] });
+  tierlistParticipation.push({ id: "g-new", name: "New", covers: [], participantCount: 1, latestAt: at(12), recent: [] });
+  const page = service.getDashboard("viewer", undefined, 20);
+  assert.equal(page.followingNewCount, 1);
+  assert.equal(page.personalNewCount, 2);
+  assert.equal(page.seenAt, at(10));
+});
+
+test("each count stops at 100", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  repo.upsertProfile(profileRow("alice"));
+  repo.insertFollow({ follower_id: "viewer", followee_id: "alice", created_at: at(1) });
+  for (let i = 0; i < 105; i++) {
+    readerProfiles.set(`fan${i}`, reader(`fan${i}`));
+    repo.insertFollow({ follower_id: `fan${i}`, followee_id: "viewer", created_at: at(2) });
+    tierlistRefs.set(`t${i}`, tierRef(`t${i}`, "alice"));
+    repo.insertEvent({ id: `e${i}`, user_id: "alice", type: "tierlist_published", ref_type: "tierlist", ref_id: `t${i}`, payload: null, created_at: at(3) });
+  }
+  const page = service.getDashboard("viewer", undefined, 20);
+  assert.equal(page.personalNewCount, 100);
+  assert.equal(page.followingNewCount, 100);
+});
+
+test("with no seen marker every row counts", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistParticipation } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("bob", reader("bob"));
+  repo.insertFollow({ follower_id: "bob", followee_id: "viewer", created_at: at(2) });
+  tierlistParticipation.push({ id: "t1", name: "Sci-fi", covers: [], participantCount: 1, latestAt: at(3), recent: [] });
+  const page = service.getDashboard("viewer", undefined, 20);
+  assert.equal(page.seenAt, null);
+  assert.equal(page.personalNewCount, 2);
+  assert.equal(page.followingNewCount, 0);
+});
+
+test("participation rows page with the cursor, without repeats or gaps", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistParticipation } = createDeps(repo);
+  const service = createCommunityService(deps);
+  for (const [id, day] of [["g1", 1], ["g2", 3], ["g3", 5]] as const) tierlistParticipation.push({ id, name: id, covers: [], participantCount: 1, latestAt: at(day), recent: [] });
+  for (const [id, day] of [["f1", 2], ["f2", 4], ["f3", 6]] as const) {
+    readerProfiles.set(id, reader(id));
+    repo.insertFollow({ follower_id: id, followee_id: "viewer", created_at: at(day) });
+  }
+  const collected: string[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = service.getDashboard("viewer", cursor, 2);
+    collected.push(...page.items.map((item) => item.id));
+    cursor = page.nextCursor ?? undefined;
+  } while (cursor && collected.length < 10);
+  assert.deepEqual(collected, ["f3", "tierlist:g3", "f2", "tierlist:g2", "f1", "tierlist:g1"]);
+});
+
+test("a cursor page carries no counts", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, seenAt } = createDeps(repo);
+  const service = createCommunityService(deps);
+  seenAt.value = at(1);
+  for (const [id, day] of [["f1", 2], ["f2", 3], ["f3", 4]] as const) {
+    readerProfiles.set(id, reader(id));
+    repo.insertFollow({ follower_id: id, followee_id: "viewer", created_at: at(day) });
+  }
+  const first = service.getDashboard("viewer", undefined, 2);
+  assert.equal(first.seenAt, at(1));
+  assert.equal(first.personalNewCount, 3);
+  const next = service.getDashboard("viewer", first.nextCursor!, 2);
+  assert.deepEqual(next.items.map((item) => item.id), ["f1"]);
+  assert.equal(next.seenAt, null);
+  assert.equal(next.personalNewCount, 0);
+  assert.equal(next.followingNewCount, 0);
 });
 
 test("discover merges both content kinds newest first", () => {
@@ -907,6 +1099,33 @@ test("dashboard omits publications from actors who disabled them but keeps follo
     page.items.map((i) => (i.kind === "publication" ? i.content.id : i.id)),
     ["t2", "carol"]
   );
+});
+
+test("dashboard shows a followee's reading and votes only while their switches are on, and their follows and murals never crowd them out", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  for (const id of ["alice", "bob"]) {
+    readerProfiles.set(id, reader(id));
+    repo.upsertProfile(profileRow(id));
+    repo.insertFollow({ follower_id: "viewer", followee_id: id, created_at: at(1) });
+    tierlistRefs.set(`t-${id}`, tierRef(`t-${id}`, "carol"));
+    repo.insertEvent({ id: `${id}-added`, user_id: id, type: "book_added", ref_type: "book", ref_id: `${id}-b1`, payload: JSON.stringify({ title: "Dune", author: "Herbert", coverUrl: "https://covers.test/dune.jpg" }), created_at: at(2) });
+    repo.insertEvent({ id: `${id}-finished`, user_id: id, type: "book_finished", ref_type: "book", ref_id: `${id}-b2`, payload: JSON.stringify({ title: "Emma", author: "Austen" }), created_at: at(3) });
+    repo.insertEvent({ id: `${id}-vote`, user_id: id, type: "voted_on", ref_type: "tierlist", ref_id: `t-${id}`, payload: JSON.stringify({ game: "tierlist" }), created_at: at(4) });
+    for (let i = 0; i < 25; i++) {
+      const createdAt = `2026-09-05T00:00:${String(i).padStart(2, "0")}.000Z`;
+      repo.insertEvent({ id: `${id}-following-${i}`, user_id: id, type: "following", ref_type: "user", ref_id: `${id}-x${i}`, payload: null, created_at: createdAt });
+      repo.insertEvent({ id: `${id}-mural-${i}`, user_id: id, type: "mural_published", ref_type: "mural", ref_id: `${id}-m${i}`, payload: null, created_at: createdAt });
+    }
+  }
+  repo.updateFeedSettings("alice", { ...DEFAULT_FEED_SETTINGS, reading: true, votes: false });
+  const { items } = service.getDashboard("viewer", undefined, 20);
+  assert.deepEqual(items.map((item) => [item.kind, item.id]), [["vote", "bob-vote"], ["reading", "alice-finished"], ["reading", "alice-added"]]);
+  assert.deepEqual(items.flatMap((item) => (item.kind === "reading" ? [[item.finished, item.book]] : [])), [
+    [true, { title: "Emma", author: "Austen", coverUrl: null }],
+    [false, { title: "Dune", author: "Herbert", coverUrl: "https://covers.test/dune.jpg" }]
+  ]);
 });
 
 test("feed settings round-trip and reach only the owner's profile view", () => {
