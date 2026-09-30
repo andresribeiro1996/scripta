@@ -12,30 +12,26 @@ import { FeedRow, digestRoute, useDashboardFeed, useFollowBack } from "./FeedRow
 export function CommunityScreen({ initialTab }: { initialTab?: CommunityTab }) {
   const { colors } = useTheme();
   const router = useRouter();
-  const [tab, setTab] = useState<CommunityTab>(initialTab ?? "activity");
-  const tabInitedRef = useRef(Boolean(initialTab));
   const markedRef = useRef(false);
   const dashboard = useDashboardFeed();
 
   const items = dashboard.data?.pages.flatMap((page) => page.items) ?? [];
   const newCount = dashboard.data?.pages[0]?.newCount ?? 0;
-
-  useEffect(() => {
-    if (!markedRef.current && shouldMarkSeen(tab, items.length, dashboard.isError)) {
-      markedRef.current = true;
-      void markDashboardSeen().catch(() => {});
-    }
-  }, [tab, items.length, dashboard.isError]);
+  const loaded = dashboard.data !== undefined;
 
   // Picks the opening tab once real data has arrived, then leaves the user's
   // own tab choice alone — otherwise a later refetch could yank them back to
   // Discover mid-swipe just because Activity happened to be empty on load.
+  const [chosenTab, setChosenTab] = useState<CommunityTab | undefined>(initialTab);
+  if (chosenTab === undefined && dashboard.data) setChosenTab(defaultCommunityTab(items.length));
+  const tab = chosenTab ?? "activity";
+
   useEffect(() => {
-    if (!tabInitedRef.current && dashboard.data) {
-      tabInitedRef.current = true;
-      setTab(defaultCommunityTab(items.length));
+    if (!markedRef.current && shouldMarkSeen(tab, loaded, dashboard.isError)) {
+      markedRef.current = true;
+      void markDashboardSeen().catch(() => {});
     }
-  }, [dashboard.data, items.length]);
+  }, [tab, loaded, dashboard.isError]);
 
   const { followingId, followError, followBack } = useFollowBack(dashboard.refetch);
 
@@ -62,7 +58,7 @@ export function CommunityScreen({ initialTab }: { initialTab?: CommunityTab }) {
             accessibilityLabel="Community sections"
             options={communityTabOptions(newCount)}
             value={tab}
-            onChange={setTab}
+            onChange={setChosenTab}
             renderPage={(value) => {
               if (value === "discover") return <DiscoverPane />;
               if (value === "people") return <PeoplePane />;

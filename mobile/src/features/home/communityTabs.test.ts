@@ -25,10 +25,10 @@ test("a tab param opens that tab, and anything else falls back to the default", 
   assert.equal(parseCommunityTab(undefined), undefined);
 });
 
-test("activity counts as seen only while its rows are on screen", () => {
-  assert.equal(shouldMarkSeen("activity", 2, false), true);
-  assert.equal(shouldMarkSeen("activity", 0, false), false);
-  assert.equal(shouldMarkSeen("activity", 2, true), false);
-  assert.equal(shouldMarkSeen("discover", 2, false), false);
-  assert.equal(shouldMarkSeen("people", 2, false), false);
+test("activity counts as seen only once it shows loaded data", () => {
+  assert.equal(shouldMarkSeen("activity", true, false), true);
+  assert.equal(shouldMarkSeen("activity", false, false), false);
+  assert.equal(shouldMarkSeen("activity", true, true), false);
+  assert.equal(shouldMarkSeen("discover", true, false), false);
+  assert.equal(shouldMarkSeen("people", true, false), false);
 });
