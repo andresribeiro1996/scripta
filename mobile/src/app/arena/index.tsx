@@ -1,5 +1,5 @@
 import { DiscoverScreen } from "../../features/community/DiscoverScreen";
 
 export default function ArenaPublicRoute() {
-  return <DiscoverScreen />;
+  return <DiscoverScreen inTabs={false} />;
 }

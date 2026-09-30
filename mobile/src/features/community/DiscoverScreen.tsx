@@ -2,11 +2,11 @@ import { Stack } from "expo-router";
 import { Screen } from "../../ui";
 import { DiscoverPane } from "./DiscoverPane";
 
-export function DiscoverScreen() {
+export function DiscoverScreen({ inTabs }: { inTabs: boolean }) {
   return (
-    <Screen bottom top={false}>
+    <Screen bottom={!inTabs} top={false}>
       <Stack.Screen options={{ headerShown: true, title: "Discover" }} />
-      <DiscoverPane />
+      <DiscoverPane linkAuthors={inTabs} />
     </Screen>
   );
 }

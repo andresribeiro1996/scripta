@@ -17,7 +17,7 @@ import { ReaderGlyph } from "./ReaderGlyph";
 
 const FILTER_ICONS: Record<DiscoverFilter, IconName> = { all: "filter", tierlist: "tierlist", tournament: "bracket" };
 
-export function DiscoverPane() {
+export function DiscoverPane({ linkAuthors = true }: { linkAuthors?: boolean }) {
   const { colors } = useTheme();
   const [filter, setFilter] = useState<DiscoverFilter>("all");
   const [search, setSearch] = useState("");
@@ -105,7 +105,7 @@ export function DiscoverPane() {
                   <View style={styles.page}><ErrorState body="Couldn't load more." actionLabel="Retry" onAction={() => void discover.fetchNextPage()} /></View>
                 ) : null
               }
-              renderItem={({ item }) => <DiscoverRow item={item} onPreviewBooks={setPreview} />}
+              renderItem={({ item }) => <DiscoverRow item={item} onPreviewBooks={setPreview} linkAuthor={linkAuthors} />}
             />
           )}
         </View>
@@ -152,7 +152,7 @@ export function DiscoverPane() {
   );
 }
 
-function DiscoverRow({ item, onPreviewBooks }: { item: DiscoverItem; onPreviewBooks: (tournament: { id: string; name: string }) => void }) {
+function DiscoverRow({ item, onPreviewBooks, linkAuthor }: { item: DiscoverItem; onPreviewBooks: (tournament: { id: string; name: string }) => void; linkAuthor: boolean }) {
   const { colors } = useTheme();
   const { content, author } = item;
   const status = contentStatus(content);
@@ -170,7 +170,7 @@ function DiscoverRow({ item, onPreviewBooks }: { item: DiscoverItem; onPreviewBo
               <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
                 {contentKindLabel(content)} ·{" "}
               </Text>
-              {author.unavailable ? (
+              {author.unavailable || !linkAuthor ? (
                 <View style={[styles.nameRow, styles.shrink]}>
                   <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.metaName, { color: colors.textDim }]}>
                     {author.username}
