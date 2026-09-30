@@ -87,7 +87,8 @@ function roundRgb({ r, g, b }: Rgb): Rgb {
   return { r: roundChannel(r), g: roundChannel(g), b: roundChannel(b) };
 }
 
-export function toHex({ r, g, b }: Rgb): string {
+export function toHex(rgb: Rgb): string {
+  const { r, g, b } = roundRgb(rgb);
   const channel = (value: number) => value.toString(16).padStart(2, "0");
   return `#${channel(r)}${channel(g)}${channel(b)}`;
 }

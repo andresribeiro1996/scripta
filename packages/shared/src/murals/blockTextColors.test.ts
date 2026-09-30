@@ -167,3 +167,8 @@ test("parseHexColor and toHex round-trip", () => {
   for (const hex of ["#000000", "#ffffff", "#1a2b3c", "#97532d"]) assert.equal(toHex(parseHexColor(hex)!), hex);
   assert.deepEqual(parseHexColor("#0080ff"), { r: 0, g: 128, b: 255 });
 });
+
+test("toHex rounds and clamps each channel", () => {
+  assert.equal(toHex({ r: 127.6, g: -3, b: 300 }), "#8000ff");
+  assert.equal(toHex({ r: 127.99998, g: 0.4, b: 254.5 }), "#8000ff");
+});
