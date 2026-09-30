@@ -47,7 +47,7 @@ export function createIsbndbCatalog(apiKey: string, throttle: Throttle): BookCat
       const summary = plainText(record.synopsis) ?? plainText(record.overview);
       const genres = normalizeBookGenres(record.subjects);
       if (!summary && genres.length === 0) return null;
-      return { summary, rating: null, ratingCount: 0, sourceUrl: `https://isbndb.com/book/${isbnOf(record) ?? isbn}`, genres };
+      return { metadata: { summary, rating: null, ratingCount: 0, sourceUrl: `https://isbndb.com/book/${isbnOf(record) ?? isbn}`, genres }, sources: ["isbndb"] };
     },
 
     async search(query) {
@@ -56,7 +56,7 @@ export function createIsbndbCatalog(apiKey: string, throttle: Throttle): BookCat
         : `${API}/books/${encodeURIComponent(query.text)}?page=1&pageSize=20`;
       return isbndbRecords(await get(url)).flatMap((record) => {
         const result = toResult(record);
-        return result ? [{ result, olCoverId: null }] : [];
+        return result ? [{ result, olCoverId: null, source: "isbndb" as const }] : [];
       });
     }
   };

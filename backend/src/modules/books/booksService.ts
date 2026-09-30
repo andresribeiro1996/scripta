@@ -121,12 +121,12 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
   }
 
   function saveHits(hits: CatalogSearchHit[]): BookSearchResult[] {
-    return hits.map(({ result, olCoverId }) => {
+    return hits.map(({ result, olCoverId, source }) => {
       const author = result.authors.join(", ");
       const identity = lookupIdentity({ isbn: result.isbn, title: result.title, author });
       if (!identity) return result;
       const book = deps.repo.findBookByKey(identity.key) ?? deps.repo.createBook(
-        { title: result.title, author, isbn: identity.isbn, year: result.year, publisher: result.publisher, olCoverId, genres: result.genres },
+        { title: result.title, author, isbn: identity.isbn, year: result.year, publisher: result.publisher, olCoverId, genres: result.genres, sources: [source] },
         identity.key,
         now().toISOString()
       );
@@ -201,11 +201,11 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       if (!book) return null;
       if (book.details_status === "found") return detailsOf(book);
       if (book.details_status === "missing" && !olderThan(book.details_checked_at, RETRY_AFTER_MS)) return null;
-      const metadata = await deps.catalog.fetchDetails({ isbn: book.isbn, title: book.title, author: book.author });
+      const details = await deps.catalog.fetchDetails({ isbn: book.isbn, title: book.title, author: book.author });
       const at = now().toISOString();
-      if (metadata) deps.repo.saveDetails(book.id, metadata, at);
+      if (details) deps.repo.saveDetails(book.id, details.metadata, details.sources, at);
       else deps.repo.markDetailsMissing(book.id, at);
-      return metadata;
+      return details?.metadata ?? null;
     },
 
     search(query) {

@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS books (
   rating              REAL,
   rating_count        INTEGER NOT NULL DEFAULT 0,
   genres              TEXT NOT NULL DEFAULT '[]',
+  data_sources        TEXT NOT NULL DEFAULT '[]',
   source_url          TEXT,
   details_status      TEXT,
   details_checked_at  TEXT,

@@ -38,11 +38,14 @@ const dune = {
 test("details come from the synopsis and subjects of the ISBN lookup", async () => {
   const requests = respond(200, { book: dune });
   assert.deepEqual(await createIsbndbCatalog("secret", direct).fetchDetails({ isbn: "9780441013593", title: "Dune", author: "Frank Herbert" }), {
-    summary: 'Set on the desert planet Arrakis.\nPaul & Jessica "flee".\nThe spice must flow.',
-    rating: null,
-    ratingCount: 0,
-    sourceUrl: "https://isbndb.com/book/9780441013593",
-    genres: ["Fantasy", "Science Fiction"]
+    metadata: {
+      summary: 'Set on the desert planet Arrakis.\nPaul & Jessica "flee".\nThe spice must flow.',
+      rating: null,
+      ratingCount: 0,
+      sourceUrl: "https://isbndb.com/book/9780441013593",
+      genres: ["Fantasy", "Science Fiction"]
+    },
+    sources: ["isbndb"]
   });
   assert.deepEqual(requests, [{ url: "https://api2.isbndb.com/book/9780441013593", authorization: "secret" }]);
 });
@@ -51,9 +54,9 @@ test("details fall back to the overview, and need an ISBN and something to show"
   const requests = respond(200, { book: { isbn: "0441013597", overview: "Short overview.", subjects: ["Unmapped"] } });
   const catalog = createIsbndbCatalog("k", direct);
   const details = await catalog.fetchDetails({ isbn: "0441013597", title: "Dune", author: "Frank Herbert" });
-  assert.equal(details?.summary, "Short overview.");
-  assert.equal(details?.sourceUrl, "https://isbndb.com/book/0441013597");
-  assert.deepEqual(details?.genres, []);
+  assert.equal(details?.metadata.summary, "Short overview.");
+  assert.equal(details?.metadata.sourceUrl, "https://isbndb.com/book/0441013597");
+  assert.deepEqual(details?.metadata.genres, []);
 
   requests.length = 0;
   assert.equal(await catalog.fetchDetails({ isbn: null, title: "Dune", author: "Frank Herbert" }), null);
@@ -83,7 +86,8 @@ test("an ISBN search returns the one book", async () => {
       coverUrl: null,
       genres: ["Fantasy", "Science Fiction"]
     },
-    olCoverId: null
+    olCoverId: null,
+    source: "isbndb"
   }]);
   assert.equal(requests[0]!.url, "https://api2.isbndb.com/book/9780441013593");
 });

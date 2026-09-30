@@ -122,11 +122,12 @@ test("covers, rejections and details round-trip", () => {
   repo.addRejection(book.id, "https://img.test/1", NOW);
   assert.deepEqual([...repo.listRejectedUrls(book.id)], ["https://img.test/1"]);
 
-  repo.saveDetails(book.id, { summary: "Spice.", rating: 4.2, ratingCount: 10, sourceUrl: "https://openlibrary.org/works/OL1W", genres: ["Science Fiction"] }, NOW);
+  repo.saveDetails(book.id, { summary: "Spice.", rating: 4.2, ratingCount: 10, sourceUrl: "https://openlibrary.org/works/OL1W", genres: ["Science Fiction"] }, ["openlibrary", "isbndb"], NOW);
   const saved = repo.getBook(book.id)!;
   assert.equal(saved.details_status, "found");
   assert.equal(saved.summary, "Spice.");
   assert.equal(saved.genres, '["Science Fiction"]');
+  assert.equal(saved.data_sources, '["openlibrary","isbndb"]');
 
   repo.markDetailsMissing(book.id, NOW);
   assert.equal(repo.getBook(book.id)!.details_status, "missing");
@@ -142,4 +143,43 @@ test("listUncheckedCoverIds returns only never-checked books, oldest first", () 
   repo.setCover(good.id, { imageId: "img-1", status: "good", checkedAt: NOW });
   repo.setCover(missing.id, { imageId: null, status: "missing", checkedAt: NOW });
   assert.deepEqual(repo.listUncheckedCoverIds(), [older.id, newer.id]);
+});
+
+test("createBook stores the sources of a new row and defaults to none", () => {
+  const { repo } = freshRepo();
+  const tagged = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: null, sources: ["isbndb"] }, "ta:dune|frank herbert", NOW);
+  assert.equal(tagged.data_sources, '["isbndb"]');
+  assert.equal(repo.createBook({ title: "Emma", author: "Jane Austen", isbn: null }, "ta:emma|jane austen", NOW).data_sources, "[]");
+});
+
+test("the migration adds data_sources to a books table that predates it", () => {
+  const db = new DatabaseSync(":memory:");
+  db.exec(`CREATE TABLE books (
+    id TEXT PRIMARY KEY, title TEXT NOT NULL, author TEXT NOT NULL, year INTEGER, publisher TEXT, isbn TEXT, ol_cover_id INTEGER,
+    summary TEXT, rating REAL, rating_count INTEGER NOT NULL DEFAULT 0, genres TEXT NOT NULL DEFAULT '[]', source_url TEXT,
+    details_status TEXT, details_checked_at TEXT, cover_image_id TEXT, cover_status TEXT, cover_checked_at TEXT, created_at TEXT NOT NULL
+  )`);
+  db.prepare(`INSERT INTO books (id, title, author, created_at) VALUES ('old', 'Dune', 'Frank Herbert', ?)`).run(NOW);
+  applyBooksMigrations(db);
+  applyBooksMigrations(db);
+  const repo = createSqliteBooksRepository(db);
+  assert.equal(repo.getBook("old")!.data_sources, "[]");
+  repo.saveDetails("old", { summary: "Spice.", rating: null, ratingCount: 0, sourceUrl: "https://isbndb.com/book/1", genres: [] }, ["isbndb"], NOW);
+  assert.equal(repo.getBook("old")!.data_sources, '["isbndb"]');
+});
+
+test("the ISBNdb lapse cleanup clears only rows tagged with it", () => {
+  const { db, repo } = freshRepo();
+  const details = { summary: "Spice.", rating: 4, ratingCount: 1, sourceUrl: "https://example.test/", genres: ["Fantasy" as const] };
+  const both = repo.createBook({ title: "A", author: "A", isbn: null }, "ta:a|a", NOW);
+  const only = repo.createBook({ title: "B", author: "B", isbn: null, sources: ["isbndb"], genres: ["Fantasy"] }, "ta:b|b", NOW);
+  const open = repo.createBook({ title: "C", author: "C", isbn: null }, "ta:c|c", NOW);
+  repo.saveDetails(both.id, details, ["openlibrary", "isbndb"], NOW);
+  repo.saveDetails(open.id, details, ["openlibrary"], NOW);
+  db.exec(`UPDATE books SET summary = NULL, genres = '[]', details_status = NULL, details_checked_at = NULL, source_url = NULL, data_sources = '[]' WHERE EXISTS (SELECT 1 FROM json_each(books.data_sources) WHERE value = 'isbndb')`);
+  for (const id of [both.id, only.id]) {
+    const row = repo.getBook(id)!;
+    assert.deepEqual([row.summary, row.genres, row.details_status, row.source_url, row.data_sources], [null, "[]", null, null, "[]"]);
+  }
+  assert.deepEqual([repo.getBook(open.id)!.summary, repo.getBook(open.id)!.data_sources], ["Spice.", '["openlibrary"]']);
 });

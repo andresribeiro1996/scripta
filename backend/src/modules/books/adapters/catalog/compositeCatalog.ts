@@ -38,7 +38,7 @@ export function createCompositeCatalog(primary: BookCatalog, secondary: BookCata
     async fetchDetails(lookup) {
       const first = await attempt(primary.fetchDetails(lookup));
       const found = first.ok ? first.value : null;
-      if ((found?.summary && found.genres.length > 0) || !lookup.isbn) {
+      if ((found?.metadata.summary && found.metadata.genres.length > 0) || !lookup.isbn) {
         if (!first.ok) throw first.error;
         return found;
       }
@@ -52,13 +52,16 @@ export function createCompositeCatalog(primary: BookCatalog, secondary: BookCata
         return second.value;
       }
       if (!second.value) return found;
-      const fillSummary = !found.summary && Boolean(second.value.summary);
-      const fillGenres = found.genres.length === 0 && second.value.genres.length > 0;
+      const fillSummary = !found.metadata.summary && Boolean(second.value.metadata.summary);
+      const fillGenres = found.metadata.genres.length === 0 && second.value.metadata.genres.length > 0;
+      if (!fillSummary && !fillGenres) return found;
       return {
-        ...found,
-        summary: fillSummary ? second.value.summary : found.summary,
-        genres: fillGenres ? second.value.genres : found.genres,
-        sourceUrl: fillSummary || fillGenres ? second.value.sourceUrl : found.sourceUrl
+        metadata: {
+          ...found.metadata,
+          summary: fillSummary ? second.value.metadata.summary : found.metadata.summary,
+          genres: fillGenres ? second.value.metadata.genres : found.metadata.genres
+        },
+        sources: [...found.sources, ...second.value.sources]
       };
     },
 
