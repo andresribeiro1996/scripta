@@ -26,6 +26,7 @@ function parseEventPayload(raw: string | null): Record<string, unknown> | undefi
 }
 
 export interface PublicProfileView {
+  private: boolean;
   profile: PublishedProfile;
   mural: MuralPublicPayload | null;
   published: { tierlists: TierlistSummary[]; tournaments: TournamentSummary[] };
@@ -183,23 +184,25 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
       const userId = deps.findUserIdByUsername(username);
       if (!userId) throw new ProfileNotFoundError();
       const row = repo.getProfileRow(userId);
-      if (!row || row.published !== 1) throw new ProfileNotFoundError();
+      const published = row?.published === 1;
+      if (!published && viewerId === userId) throw new ProfileNotFoundError();
       const author = deps.resolveProfiles([userId]).get(userId);
       if (!author) throw new ProfileNotFoundError();
-      const mural = row.mural_id ? deps.murals.getMuralPublicPayload(userId, row.mural_id) : null;
+      const mural = published && row.mural_id ? deps.murals.getMuralPublicPayload(userId, row.mural_id) : null;
       const glyphOf = glyphLookup();
       const view: PublicProfileView = {
+        private: !published,
         profile: {
           user: withGlyph(author, userId, glyphOf),
-          publishedAt: row.published_at ?? row.updated_at,
+          publishedAt: published ? row.published_at ?? row.updated_at : null,
           followerCount: repo.countFollowers(userId),
           followingCount: repo.countFollowing(userId),
           viewerFollows: viewerId ? repo.getFollow(viewerId, userId) !== undefined : undefined
         },
         mural,
         published: {
-          tierlists: deps.tierlists.listByOwner(userId).map(toTierlistSummary),
-          tournaments: deps.tournaments.listByOwner(userId).map(toTournamentSummary)
+          tierlists: published ? deps.tierlists.listByOwner(userId).map(toTierlistSummary) : [],
+          tournaments: published ? deps.tournaments.listByOwner(userId).map(toTournamentSummary) : []
         }
       };
       if (viewerId === userId) view.feedSettings = settingsFor(userId);
@@ -342,14 +345,13 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
     searchPeople(viewerId, q, limit) {
       const needle = q.trim();
       if (!needle) return [];
-      const candidates = deps.searchUsernameOwners(needle, limit * 2).filter((id) => id !== viewerId);
-      const visible = candidates.filter((id) => repo.getProfileRow(id)?.published === 1).slice(0, limit);
-      const authors = deps.resolveProfiles(visible);
+      const found = deps.searchUsernameOwners(needle, limit).filter((id) => id !== viewerId);
+      const authors = deps.resolveProfiles(found);
       const glyphOf = glyphLookup();
-      return visible.flatMap((id) => {
+      return found.flatMap((id) => {
         const user = authors.get(id);
         if (!user) return [];
-        return [{ user: withGlyph(user, id, glyphOf), followerCount: repo.countFollowers(id), viewerFollows: repo.getFollow(viewerId, id) !== undefined }];
+        return [{ user: withGlyph(user, id, glyphOf), followerCount: repo.countFollowers(id), viewerFollows: repo.getFollow(viewerId, id) !== undefined, private: repo.getProfileRow(id)?.published !== 1 }];
       });
     },
     getLibrary(username) {
