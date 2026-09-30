@@ -23,6 +23,7 @@ export const COVER_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const COVER_POLL_INTERVAL_MS = 3_000;
 export const COVER_POLL_GIVE_UP_MS = 30 * 60 * 1000;
 export const COVER_BATCH_SIZE = 100;
+export const COVER_POLL_MAX_FAILED_TICKS = 3;
 
 export function coverQueryKey(params: CoverLookupParams): string {
   const query = new URLSearchParams();
@@ -62,6 +63,7 @@ export function createCoverResolver(deps: CoverResolverDeps): CoverResolver {
   const inFlight = new Map<string, Promise<CoverCacheEntry | null>>();
   const pending = new Map<string, PendingCover>();
   let polling = false;
+  let failedTicks = 0;
 
   const fresh = (entry: CoverCacheEntry | undefined) => (entry && now() - entry.at < COVER_CACHE_TTL_MS ? entry : undefined);
   const pick = (entry: CoverCacheEntry, size: CoverSize) => (size === "full" ? entry.fullUrl ?? entry.url : entry.url);
@@ -84,10 +86,13 @@ export function createCoverResolver(deps: CoverResolverDeps): CoverResolver {
 
   async function pollOnce() {
     const keys = [...pending.keys()];
+    let succeeded = false;
+    let failure: { error: unknown } | null = null;
     for (let start = 0; start < keys.length; start += COVER_BATCH_SIZE) {
       const chunk = keys.slice(start, start + COVER_BATCH_SIZE);
       try {
         const bodies = await deps.fetchResolveBatch(chunk.map((key) => pending.get(key)!.lookup));
+        succeeded = true;
         let settled = false;
         chunk.forEach((key, index) => {
           const body = bodies[index];
@@ -99,12 +104,13 @@ export function createCoverResolver(deps: CoverResolverDeps): CoverResolver {
         });
         if (settled) persist();
       } catch (error) {
-        for (const key of chunk) {
-          const waiter = pending.get(key)!;
-          pending.delete(key);
-          waiter.reject(error);
-        }
+        failure = { error };
       }
+    }
+    if (succeeded || !failure) failedTicks = 0;
+    else if (++failedTicks >= COVER_POLL_MAX_FAILED_TICKS) {
+      for (const waiter of pending.values()) waiter.reject(failure.error);
+      pending.clear();
     }
     for (const [key, waiter] of pending) {
       if (now() - waiter.since < COVER_POLL_GIVE_UP_MS) continue;
@@ -121,6 +127,7 @@ export function createCoverResolver(deps: CoverResolverDeps): CoverResolver {
       }
     } finally {
       polling = false;
+      failedTicks = 0;
     }
   }
 

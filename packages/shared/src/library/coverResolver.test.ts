@@ -4,6 +4,7 @@ import {
   COVER_CACHE_TTL_MS,
   COVER_BATCH_SIZE,
   COVER_POLL_GIVE_UP_MS,
+  COVER_POLL_MAX_FAILED_TICKS,
   COVER_POLL_INTERVAL_MS,
   coverQueryKey,
   createCoverResolver,
@@ -121,16 +122,42 @@ test("the poll loop stops when nothing is pending and restarts for the next book
   assert.deepEqual(sleeps, [COVER_POLL_INTERVAL_MS, COVER_POLL_INTERVAL_MS]);
 });
 
-test("a failed batch rejects its waiters, caches nothing and leaves the loop restartable", async () => {
-  let fail = true;
-  const { resolver } = setup([pending, pending], (lookups) => {
-    if (fail) throw new Error("offline");
+test("a failed tick leaves the key pending and the next success resolves it", async () => {
+  let calls = 0;
+  const { resolver, batches } = setup([pending], (lookups) => {
+    if (++calls === 1) throw new Error("offline");
     return lookups.map(() => found);
   });
-  await assert.rejects(resolver.resolve(params), /offline/);
-  assert.equal(resolver.peek(params), undefined);
-  fail = false;
   assert.equal(await resolver.resolve(params), found.url);
+  assert.equal(batches.length, 2);
+  assert.equal(resolver.peek(params), found.url);
+});
+
+test("consecutive failed ticks reject every waiter with the last error and cache nothing", async () => {
+  let calls = 0;
+  const { resolver, batches } = setup([pending, pending, pending, found], (lookups) => {
+    if (calls >= COVER_POLL_MAX_FAILED_TICKS) return lookups.map(() => found);
+    throw new Error(`offline ${++calls}`);
+  });
+  const results = await Promise.allSettled([resolver.resolve({ title: "A" }), resolver.resolve({ title: "B" })]);
+  for (const result of results) {
+    assert.equal(result.status, "rejected");
+    assert.match(String((result as PromiseRejectedResult).reason), /offline 3/);
+  }
+  assert.equal(batches.length, COVER_POLL_MAX_FAILED_TICKS);
+  assert.equal(resolver.peek({ title: "A" }), undefined);
+  assert.equal(await resolver.resolve({ title: "C" }), found.url);
+});
+
+test("a successful tick resets the failure count", async () => {
+  const script = ["fail", "fail", "pending", "fail", "fail", "ready"];
+  const { resolver, batches } = setup([pending], (lookups) => {
+    const step = script.shift();
+    if (step === "fail") throw new Error("offline");
+    return lookups.map(() => (step === "ready" ? found : pending));
+  });
+  assert.equal(await resolver.resolve(params), found.url);
+  assert.equal(batches.length, 6);
 });
 
 test("concurrent resolves for the same book share one request", async () => {
