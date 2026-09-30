@@ -1,5 +1,5 @@
 import type { HistogramCell, TierlistData } from "@scripta/shared";
-import { File } from "expo-file-system";
+import { File, Paths } from "expo-file-system";
 import { apiClient } from "../../core/api";
 
 export interface Tierlist {
@@ -130,8 +130,12 @@ export function fetchTierlistResults(id: string) {
   return apiClient.request<{ histogram: HistogramCell[]; ballotCount: number }>(`/tierlists/${id}/results`, { auth: true });
 }
 
-export function renderTierlistShareVideo(id: string, imageUri: string) {
+export async function renderTierlistShareVideo(id: string, imageUri: string) {
   const form = new FormData();
   form.append("image", new File(imageUri));
-  return apiClient.request<{ base64: string }>(`/tierlists/${id}/share-video`, { method: "POST", body: form, auth: true });
+  const { base64 } = await apiClient.request<{ base64: string }>(`/tierlists/${id}/share-video`, { method: "POST", body: form, auth: true });
+  const file = new File(Paths.cache, `tierlist-${id}-${Date.now()}.mp4`);
+  file.create();
+  file.write(base64, { encoding: "base64" });
+  return file.uri;
 }

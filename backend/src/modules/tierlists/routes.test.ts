@@ -104,9 +104,11 @@ test("share video renders an MP4 only for the published tier list's owner", asyn
   }
 
   try {
-    const png = await sharp({ create: { width: 540, height: 960, channels: 3, background: "#f2f0ec" } }).png().toBuffer();
+    const png = await sharp({ create: { width: 600, height: 1500, channels: 3, background: "#f2f0ec" } }).png().toBuffer();
     assert.equal((await upload(png, "u2")).statusCode, 404);
-    assert.equal((await upload(Buffer.from("not a PNG"), "u1")).statusCode, 422);
+    assert.equal((await upload(Buffer.from("not a PNG"), "u1")).statusCode, 400);
+    const jpeg = await sharp({ create: { width: 600, height: 1500, channels: 3, background: "#f2f0ec" } }).jpeg().toBuffer();
+    assert.equal((await upload(jpeg, "u1")).statusCode, 400);
     const response = await upload(png, "u1");
     assert.equal(response.statusCode, 200);
     const video = Buffer.from((response.json() as { base64: string }).base64, "base64");

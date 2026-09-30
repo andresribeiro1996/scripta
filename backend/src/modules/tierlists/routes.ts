@@ -14,7 +14,7 @@ import { z } from "zod";
 import { authGuard, getOptionalAuthenticatedUser } from "../auth/index.js";
 import { resolvePublicLibraryData } from "../library/index.js";
 import type { BallotOutcome, TierlistsService, Voter } from "./service.js";
-import { InvalidShareImageError, MAX_SHARE_IMAGE_BYTES, renderShareVideo } from "./shareVideo.js";
+import { InvalidShareImageError, MAX_SHARE_IMAGE_BYTES, renderShareVideo, ShareVideoRenderError } from "./shareVideo.js";
 
 const idParamSchema = z.object({ id: z.string().uuid() });
 
@@ -199,7 +199,11 @@ export function buildTierlistShareVideoRoutes(service: TierlistsService) {
         reply.header("Cache-Control", "no-store");
         return reply.send({ base64: video.toString("base64") });
       } catch (error) {
-        if (error instanceof InvalidShareImageError) return reply.code(422).send({ error: error.message });
+        if (error instanceof InvalidShareImageError) return reply.code(400).send({ error: error.message });
+        if (error instanceof ShareVideoRenderError) {
+          request.log.error(error);
+          return reply.code(500).send({ error: error.message });
+        }
         throw error;
       }
     });
