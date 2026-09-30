@@ -23,6 +23,7 @@ function createInMemoryRepo(): MuralsRepository {
 
   return {
     deleteUserData() {},
+    rekeyBooks() {},
     listByUser(userId) {
       return [...murals.values()].filter((m) => m.user_id === userId);
     },

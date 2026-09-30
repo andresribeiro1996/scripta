@@ -238,3 +238,19 @@ test("deleteUserData removes the user's tier lists with their ballots and unlink
   assert.deepEqual(db.prepare(`SELECT id, voter_user_id FROM tierlist_ballots`).all().map((r) => ({ ...r })), [{ id: "b2", voter_user_id: null }]);
   assert.deepEqual(db.prepare(`SELECT ballot_id FROM tierlist_ballot_placements`).all().map((r) => r.ballot_id), ["b2"]);
 });
+
+test("rekeyBooks rewrites the owner's unpublished tier lists only", async () => {
+  const { createSqliteTierlistsRepository } = await import("./sqliteTierlistsRepository.js");
+  const db = freshDb();
+  const insert = db.prepare("INSERT INTO tierlists (id, owner_user_id, origin_user_id, name, data, vote_code, created_at, updated_at) VALUES (?, ?, ?, 'n', ?, ?, 't0', 't0')");
+  const data = JSON.stringify({ tiers: [{ id: "s", label: "S", color: "#000000", bookKeys: ["old"] }], pool: ["new", "y"] });
+  insert.run("draft", "u1", "u1", data, null);
+  insert.run("published", "u1", "u1", data, "CODE1");
+  insert.run("other", "u2", "u2", data, null);
+  createSqliteTierlistsRepository(db).rekeyBooks("u1", ["old"], "new");
+  const read = (id: string) => db.prepare("SELECT data, updated_at FROM tierlists WHERE id = ?").get(id) as { data: string; updated_at: string };
+  assert.deepEqual(JSON.parse(read("draft").data), { tiers: [{ id: "s", label: "S", color: "#000000", bookKeys: ["new"] }], pool: ["y"] });
+  assert.notEqual(read("draft").updated_at, "t0");
+  assert.equal(read("published").data, data);
+  assert.equal(read("other").data, data);
+});
