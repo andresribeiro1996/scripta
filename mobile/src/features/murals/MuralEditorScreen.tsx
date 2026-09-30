@@ -155,9 +155,9 @@ export function MuralEditorScreen({ id }: { id: string }) {
       </ScrollView>
       <View style={[styles.dock, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         {selected ? <BlockActionBar actions={blockActions} /> : <>
-          <Button label="Add block" onPress={() => setAdding(true)} />
-          <Button label="Theme" variant="secondary" onPress={() => setThemeOpen(true)} />
-          <Button label="Share" variant="secondary" onPress={() => setShareFor(draftMural)} />
+          <View style={styles.dockItem}><Button label="Add" accessibilityLabel="Add block" onPress={() => setAdding(true)} /></View>
+          <View style={styles.dockItem}><Button label="Theme" variant="secondary" onPress={() => setThemeOpen(true)} /></View>
+          <View style={styles.dockItem}><Button label="Share" variant="secondary" onPress={() => setShareFor(draftMural)} /></View>
         </>}
       </View>
       <MuralShareSheet mural={shareFor} books={books} groups={groups} images={gallery.data ?? []} tierlists={tierlists.data ?? []} profile={profile} draft={shareFor !== null && (shareFor.name !== mural.name || shareFor.theme !== mural.theme || shareFor.blocks !== mural.blocks)} contentReady={!libraryQuery.isPending && !gallery.isPending && !tierlists.isPending} contentError={libraryQuery.error?.message ?? gallery.error?.message ?? tierlists.error?.message ?? undefined} onRetryContent={() => { void libraryQuery.refetch(); void gallery.refetch(); void tierlists.refetch(); }} onClose={() => setShareFor(null)} onEnableLink={async () => {
@@ -220,6 +220,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   nameRow: { paddingHorizontal: spacing.md, paddingTop: spacing.sm },
   canvasScroll: { paddingHorizontal: spacing.sm, paddingBottom: 120 },
+  dockItem: { flex: 1 },
   dock: { position: "absolute", left: 0, right: 0, bottom: 0, borderTopWidth: 1, padding: spacing.sm, flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   sheet: { gap: spacing.sm, paddingBottom: spacing.xl },
 });

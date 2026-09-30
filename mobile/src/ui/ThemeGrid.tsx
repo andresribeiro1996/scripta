@@ -44,6 +44,9 @@ export function ThemeGrid<T extends ThemePreference>({ options, value, onChange 
           </Pressable>
         );
       })}
+      {Array.from({ length: (3 - options.length % 3) % 3 }, (_, index) => (
+        <View key={`filler-${index}`} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" pointerEvents="none" style={styles.tile} />
+      ))}
     </View>
   );
 }
