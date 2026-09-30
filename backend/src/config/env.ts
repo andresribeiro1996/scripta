@@ -193,9 +193,11 @@ const parsed = envSchema
   .transform((e) => ({ ...e, WAITLIST_DB_PATH: e.WAITLIST_DB_PATH ?? join(dirname(e.AUTH_DB_PATH), "waitlist.sqlite") }))
   .superRefine((e, ctx) => {
     const volume = process.env.RAILWAY_VOLUME_MOUNT_PATH;
+    if (volume || e.R2_IMAGES_BUCKET) {
+      const missing = ["R2_ENDPOINT", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_IMAGES_BUCKET", "R2_IMAGES_PUBLIC_URL"].filter((name) => !e[name as keyof typeof e]);
+      if (missing.length > 0) ctx.addIssue({ code: "custom", path: ["R2_IMAGES_BUCKET"], message: `images live in R2 on Railway or whenever R2_IMAGES_BUCKET is set — missing ${missing.join(", ")}` });
+    }
     if (!volume) return;
-    const missing = ["R2_ENDPOINT", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_IMAGES_BUCKET", "R2_IMAGES_PUBLIC_URL"].filter((name) => !e[name as keyof typeof e]);
-    if (missing.length > 0) ctx.addIssue({ code: "custom", path: ["R2_IMAGES_BUCKET"], message: `required on Railway, images no longer live on the volume — missing ${missing.join(", ")}` });
     for (const [key, value] of Object.entries(e)) {
       if (key.endsWith("_DB_PATH") && !resolve(String(value)).startsWith(resolve(volume) + sep)) {
         ctx.addIssue({ code: "custom", path: [key], message: `must be under the volume at ${volume}, or every deploy wipes it` });

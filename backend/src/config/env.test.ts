@@ -71,3 +71,13 @@ test("on Railway, all five R2 image variables boot", () => {
   const result = bootWithVolume({ ...volumeDatabases, ...r2Env });
   assert.equal(result.status, 0, result.stderr);
 });
+
+test("off Railway, a bucket without the other R2 variables fails the boot and names them", () => {
+  const result = spawnSync(process.execPath, ["--import", "tsx", "-e", `await import(${JSON.stringify(import.meta.resolve("./env.js"))})`], {
+    env: { PATH: process.env.PATH, ...requiredEnv, ...r2Env, R2_IMAGES_PUBLIC_URL: "" },
+    encoding: "utf8"
+  });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /missing R2_IMAGES_PUBLIC_URL/);
+  assert.doesNotMatch(result.stderr, /R2_ENDPOINT/);
+});
