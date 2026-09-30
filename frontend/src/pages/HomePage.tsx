@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { bookKey, buildDashboardCards, clearDashboardCounts, digestAction, digestHeading, digestTarget, isNewDigestItem, newCountLabel, resolveQuote, type DashboardFeedPage } from "@scripta/shared";
 import { markDashboardSeen } from "../api/community";
-import { useDashboard } from "../hooks/useDashboard";
+import { DASHBOARD_QUERY_KEY, useDashboard } from "../hooks/useDashboard";
 import { useLibrary } from "../hooks/useLibrary";
 import { useAuth } from "../auth/AuthContext";
 import { PageContainer } from "../components/PageContainer";
@@ -43,7 +43,7 @@ export function HomePage() {
         if (markedRef.current || !entries.some((entry) => entry.isIntersecting)) return;
         markedRef.current = true;
         void markDashboardSeen().then(
-          () => queryClient.setQueryData<InfiniteData<DashboardFeedPage>>(["community", "dashboard"], (data) => data && clearDashboardCounts(data)),
+          () => queryClient.setQueryData<InfiniteData<DashboardFeedPage>>(DASHBOARD_QUERY_KEY, (data) => data && clearDashboardCounts(data)),
           () => { markedRef.current = false; }
         );
       },
@@ -114,7 +114,7 @@ export function HomePage() {
                           {item.actors.length > 0 && (
                             <span className="flex shrink-0 -space-x-1">
                               {item.actors.map((actor) => (
-                                <span key={actor.userId} className="rounded-full ring-2 ring-(--color-bg)">
+                                <span key={actor.userId} className="rounded-full ring-2 ring-(--color-surface)">
                                   <AuthorAvatar author={actor} />
                                 </span>
                               ))}

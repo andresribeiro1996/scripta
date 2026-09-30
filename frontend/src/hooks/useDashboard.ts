@@ -1,9 +1,11 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { fetchDashboard } from "../api/community";
 
+export const DASHBOARD_QUERY_KEY = ["community", "dashboard"] as const;
+
 export function useDashboard() {
   const query = useInfiniteQuery({
-    queryKey: ["community", "dashboard"],
+    queryKey: DASHBOARD_QUERY_KEY,
     queryFn: ({ pageParam }) => fetchDashboard(pageParam),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
