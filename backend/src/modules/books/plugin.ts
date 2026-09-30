@@ -12,6 +12,7 @@ import { createIsbndbSource } from "./adapters/sources/isbndb.js";
 import { createOpenLibraryCoverSource } from "./adapters/sources/openLibrary.js";
 import { openBooksDb } from "./adapters/sqlite/connection.js";
 import { createSqliteBooksRepository } from "./adapters/sqlite/sqliteBooksRepository.js";
+import { startBackfill } from "./backfill.js";
 import { createBooksService, MAX_UPLOAD_BYTES, type BooksService } from "./booksService.js";
 import type { FetchCoverImage } from "./coverResolver.js";
 import { encodeCover } from "./domain/images.js";
@@ -66,9 +67,11 @@ export async function booksPlugin(app: FastifyInstance) {
     (error, bookId) => app.log.error({ err: error, bookId }, "cover lookup failed")
   );
   service.enqueueUnchecked();
+  const stopBackfill = startBackfill(() => service.enqueueUnchecked());
   activeService = service;
   app.addHook("onClose", async () => {
     activeService = null;
+    stopBackfill();
     worker.stop();
   });
 
