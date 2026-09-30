@@ -25,6 +25,8 @@ function hexSecret(name: string) {
     );
 }
 
+const urlOrBlank = z.union([z.literal(""), z.string().url()]).default("");
+
 const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
 
@@ -79,6 +81,12 @@ const envSchema = z.object({
 
   COVERS_DB_PATH: z.string().min(1).default("./data/covers.sqlite"),
   COVERS_STORAGE_PATH: z.string().min(1).default("./data/covers-files"),
+  R2_ENDPOINT: urlOrBlank,
+  R2_ACCESS_KEY_ID: z.string().default(""),
+  R2_SECRET_ACCESS_KEY: z.string().default(""),
+  R2_IMAGES_BUCKET: z.string().default(""),
+  R2_IMAGES_PUBLIC_URL: urlOrBlank,
+  FILES_STORAGE_PATH: z.string().min(1).default("./data/files"),
   // modules/socials' own SQLite file — same one-file-per-module isolation
   // as every other module's *_DB_PATH above.
   SOCIALS_DB_PATH: z.string().min(1).default("./data/socials.sqlite"),
@@ -186,6 +194,8 @@ const parsed = envSchema
   .superRefine((e, ctx) => {
     const volume = process.env.RAILWAY_VOLUME_MOUNT_PATH;
     if (!volume) return;
+    const missing = ["R2_ENDPOINT", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_IMAGES_BUCKET", "R2_IMAGES_PUBLIC_URL"].filter((name) => !e[name as keyof typeof e]);
+    if (missing.length > 0) ctx.addIssue({ code: "custom", path: ["R2_IMAGES_BUCKET"], message: `required on Railway, images no longer live on the volume — missing ${missing.join(", ")}` });
     for (const [key, value] of Object.entries(e)) {
       if (key.endsWith("_DB_PATH") && !resolve(String(value)).startsWith(resolve(volume) + sep)) {
         ctx.addIssue({ code: "custom", path: [key], message: `must be under the volume at ${volume}, or every deploy wipes it` });
