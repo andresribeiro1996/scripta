@@ -21,11 +21,11 @@ export function CommunityScreen({ initialTab }: { initialTab?: CommunityTab }) {
   const newCount = dashboard.data?.pages[0]?.newCount ?? 0;
 
   useEffect(() => {
-    if (!markedRef.current && shouldMarkSeen(tab, items.length)) {
+    if (!markedRef.current && shouldMarkSeen(tab, items.length, dashboard.isError)) {
       markedRef.current = true;
       void markDashboardSeen().catch(() => {});
     }
-  }, [tab, items.length]);
+  }, [tab, items.length, dashboard.isError]);
 
   // Picks the opening tab once real data has arrived, then leaves the user's
   // own tab choice alone — otherwise a later refetch could yank them back to

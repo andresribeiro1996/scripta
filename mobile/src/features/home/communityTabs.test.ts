@@ -26,8 +26,9 @@ test("a tab param opens that tab, and anything else falls back to the default", 
 });
 
 test("activity counts as seen only while its rows are on screen", () => {
-  assert.equal(shouldMarkSeen("activity", 2), true);
-  assert.equal(shouldMarkSeen("activity", 0), false);
-  assert.equal(shouldMarkSeen("discover", 2), false);
-  assert.equal(shouldMarkSeen("people", 2), false);
+  assert.equal(shouldMarkSeen("activity", 2, false), true);
+  assert.equal(shouldMarkSeen("activity", 0, false), false);
+  assert.equal(shouldMarkSeen("activity", 2, true), false);
+  assert.equal(shouldMarkSeen("discover", 2, false), false);
+  assert.equal(shouldMarkSeen("people", 2, false), false);
 });
