@@ -788,6 +788,10 @@ Only if the emulator is free. This pass renders; it doesn't change code.
      library". Close it without adding.
   4. Home's "All activity" or "Find readers" link opens Community on the
      matching tab.
+  5. Signed in: Games → **Browse** → tap an author's name in a Discover row.
+     Report exactly what appears. In particular, does a second tab bar or a
+     Home screen appear under the profile? Then report what each Back press
+     returns to, until you're back on Games.
 - [ ] **Step 4:** Change app state only through the app's UI. Never write to
   `backend/data/*` or sqlite. Undo any test change through the UI, and report
   anything you couldn't undo.
