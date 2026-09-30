@@ -2,7 +2,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { BLOCK_FONT_SIZE_RANGE, CARD_BORDER_OPACITY_RANGE, CARD_OPACITY_RANGE, CARD_RADIUS_RANGE, DEFAULT_BLOCK_STYLE, type BlockStyle } from "@scripta/shared";
+import { BLOCK_FONT_SIZE_RANGE, CARD_BORDER_OPACITY_RANGE, CARD_OPACITY_RANGE, CARD_RADIUS_RANGE, DEFAULT_BLOCK_STYLE, blockTextColors, contrastRatio, type BlockStyle } from "@scripta/shared";
 import { THEME_IDS, themes } from "@scripta/shared/themes";
 import { BORDER_STRENGTH_PRESETS, COLOR_LOOKS, COLOR_LOOK_FIELDS, CORNER_PRESETS, FADE_PRESETS, FRAME_LOOKS, FRAME_LOOK_FIELDS, SIZE_PRESETS, applyLook, customColorStart, isHardToRead, matchPreset, matchSides, selectionBorderColor } from "./blockStyleOptions.js";
 
@@ -88,6 +88,22 @@ test("every colour look is readable in every theme", () => {
   for (const look of COLOR_LOOKS) {
     for (const id of THEME_IDS) assert.equal(isHardToRead(applyLook(DEFAULT_BLOCK_STYLE, look), themes[id].colors), false, `${look.key} in ${id}`);
   }
+});
+
+test("the palette looks keep text and muted text at 4.5:1 in every theme", () => {
+  for (const key of ["sage", "seaGlass", "lilac", "rose", "ochre"]) {
+    const style = applyLook(DEFAULT_BLOCK_STYLE, COLOR_LOOKS.find((look) => look.key === key)!);
+    for (const id of THEME_IDS) {
+      const { text, dim } = blockTextColors(style, themes[id].colors);
+      assert.ok((contrastRatio(text, style.backgroundColor!) ?? 0) >= 4.5, `${key} text in ${id}`);
+      assert.ok((contrastRatio(dim, style.backgroundColor!) ?? 0) >= 4.5, `${key} dim in ${id}`);
+    }
+  }
+});
+
+test("Margin note draws the left edge only and Bookplate's corners match a preset", () => {
+  assert.equal(matchSides(FRAME_LOOKS.find((look) => look.key === "marginNote")!.style.cardBorderSides), "left");
+  assert.equal(matchPreset(CORNER_PRESETS, 4), "slight");
 });
 
 test("isHardToRead flags low contrast and measures a transparent block against the page", () => {
