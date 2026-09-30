@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { Image } from "expo-image";
 import { Animated, Dimensions, FlatList, Keyboard, KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from "react-native";
@@ -7,8 +7,11 @@ import { Text } from "../../ui/Text";
 import { DEFAULT_TIER_PRESET, readerGlyphLabel } from "@scripta/shared";
 import { EmptyState, ErrorState, Icon, Input, Skeleton, dynamicType, minimumTouchTarget, radii, spacing, typography, useReducedMotion, useTheme, type IconName } from "../../ui";
 import type { ContentTone, DiscoverItem, PublishedContent } from "@scripta/shared/community";
+import { useAuth } from "../../core/auth";
+import { ArenaBooksSheet } from "../arena/ArenaBooksSheet";
 import { fetchDiscover } from "./api";
 import { DISCOVER_FILTERS, contentKindLabel, contentStats, contentStatus, contentTarget, type DiscoverFilter } from "./communityHome";
+import { AddBookSheet } from "./AddBookSheet";
 import { openProfile } from "./AuthorAvatar";
 import { ReaderGlyph } from "./ReaderGlyph";
 
@@ -19,12 +22,17 @@ export function DiscoverPane() {
   const [filter, setFilter] = useState<DiscoverFilter>("all");
   const [search, setSearch] = useState("");
   const needle = search.trim();
-  const discover = useQuery({
+  const { user } = useAuth();
+  const discover = useInfiniteQuery({
     queryKey: ["community", "discover", filter, needle],
-    queryFn: () => fetchDiscover(filter, needle),
+    queryFn: ({ pageParam }) => fetchDiscover(filter, needle, pageParam, Boolean(user)),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) => lastPage.nextOffset ?? undefined,
     retry: false,
   });
-  const items = discover.data?.items ?? [];
+  const items = discover.data?.pages.flatMap((page) => page.items) ?? [];
+  const [preview, setPreview] = useState<{ id: string; name: string } | null>(null);
+  const [addBook, setAddBook] = useState<{ title: string; author: string; coverUrl?: string | null } | null>(null);
   const index = DISCOVER_FILTERS.findIndex((option) => option.value === filter);
   const current = DISCOVER_FILTERS[index];
   const next = DISCOVER_FILTERS[(index + 1) % DISCOVER_FILTERS.length];
@@ -85,7 +93,12 @@ export function DiscoverPane() {
                   <EmptyState title="Nothing published yet" body="Check back later for new tier lists and tournaments." />
                 </View>
               }
-              renderItem={({ item }) => <DiscoverRow item={item} />}
+              onEndReached={() => {
+                if (discover.hasNextPage && !discover.isFetchingNextPage) void discover.fetchNextPage();
+              }}
+              onEndReachedThreshold={0.4}
+              ListFooterComponent={discover.isFetchingNextPage ? <View style={styles.page}><Skeleton height={80} /></View> : null}
+              renderItem={({ item }) => <DiscoverRow item={item} onPreviewBooks={setPreview} />}
             />
           )}
         </View>
@@ -118,11 +131,21 @@ export function DiscoverPane() {
           </Pressable>
         </Animated.View>
       </View>
+      <ArenaBooksSheet
+        id={preview?.id ?? null}
+        name={preview?.name ?? "Tournament"}
+        onAddBook={(book) => {
+          setPreview(null);
+          setAddBook(book);
+        }}
+        onClose={() => setPreview(null)}
+      />
+      {addBook ? <AddBookSheet book={addBook} onClose={() => setAddBook(null)} /> : null}
     </KeyboardAvoidingView>
   );
 }
 
-function DiscoverRow({ item }: { item: DiscoverItem }) {
+function DiscoverRow({ item, onPreviewBooks }: { item: DiscoverItem; onPreviewBooks: (tournament: { id: string; name: string }) => void }) {
   const { colors } = useTheme();
   const { content, author } = item;
   const status = contentStatus(content);
@@ -170,6 +193,16 @@ function DiscoverRow({ item }: { item: DiscoverItem }) {
                   <Text style={[styles.strong, { color: colors.text }]}>{stat.value}</Text> {stat.label}
                 </Text>
               ))}
+              {content.kind === "tournament" ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`See all ${content.bookCount} books in ${content.name}`}
+                  hitSlop={spacing.sm}
+                  onPress={() => onPreviewBooks({ id: content.id, name: content.name })}
+                >
+                  <Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.accent }]}>See books</Text>
+                </Pressable>
+              ) : null}
             </View>
           </View>
         </View>
