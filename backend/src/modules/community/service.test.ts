@@ -322,13 +322,59 @@ test("getProfileByUsername's user carries a reader glyph only when published, sw
   assert.deepEqual(readerGlyphCalls, ["alice"]);
 });
 
-test("getProfileByUsername 404s for unknown and unpublished profiles", () => {
+test("getProfileByUsername 404s for an unknown username and for the viewer's own unpublished profile", () => {
   const { repo, profiles } = createRepoFake();
-  const { deps } = createDeps(repo);
+  const { deps, usernames, readerProfiles } = createDeps(repo);
   const service = createCommunityService(deps);
   assert.throws(() => service.getProfileByUsername("ghost"), ProfileNotFoundError);
+  usernames.set("alice", "alice");
+  readerProfiles.set("alice", reader("alice"));
   profiles.set("alice", profileRow("alice", { published: 0 }));
-  assert.throws(() => service.getProfileByUsername("alice"), ProfileNotFoundError);
+  assert.throws(() => service.getProfileByUsername("alice", "alice"), ProfileNotFoundError);
+});
+
+test("getProfileByUsername shows an unpublished user as private, with nothing published", () => {
+  const { repo, profiles } = createRepoFake();
+  const { deps, usernames, readerProfiles, ownedMurals, muralPayloads, tierlistRefs, tournamentRefs, readerGlyphs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  usernames.set("bob", "bob");
+  readerProfiles.set("alice", reader("alice"));
+  readerProfiles.set("bob", reader("bob"));
+  ownedMurals.add("alice:m1");
+  muralPayloads.set("alice:m1", fakePayload);
+  tierlistRefs.set("t1", tierRef("t1", "alice"));
+  tournamentRefs.set("g1", tournRef("g1", "alice"));
+  readerGlyphs.set("alice", "star");
+  profiles.set("alice", profileRow("alice", { published: 0, mural_id: "m1" }));
+  service.follow("me", "alice");
+  service.follow("bob", "alice");
+  service.follow("alice", "bob");
+
+  const view = service.getProfileByUsername("alice", "me");
+  assert.equal(view.private, true);
+  assert.equal(view.profile.user.username, "user-alice");
+  assert.equal(view.profile.user.readerGlyph, undefined);
+  assert.equal(view.profile.publishedAt, null);
+  assert.equal(view.profile.followerCount, 2);
+  assert.equal(view.profile.followingCount, 1);
+  assert.equal(view.profile.viewerFollows, true);
+  assert.equal(view.mural, null);
+  assert.deepEqual(view.published, { tierlists: [], tournaments: [] });
+
+  assert.equal(service.getProfileByUsername("bob").private, true);
+});
+
+test("getProfileByUsername marks a published profile as not private", () => {
+  const { repo, profiles } = createRepoFake();
+  const { deps, usernames, readerProfiles } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  readerProfiles.set("alice", reader("alice"));
+  profiles.set("alice", profileRow("alice"));
+  const view = service.getProfileByUsername("alice");
+  assert.equal(view.private, false);
+  assert.equal(view.profile.publishedAt, "2026-09-01T00:00:00.000Z");
 });
 
 test("a profile mural deleted later resolves to null without breaking the view", () => {
@@ -622,25 +668,32 @@ test("discover only looks up glyphs for authors on the returned page, not the wh
   assert.deepEqual(readerGlyphCalls.sort(), ["d", "e"]);
 });
 
-test("people search excludes self and unpublished profiles", () => {
+test("people search finds unpublished users as private and excludes self", () => {
   const { repo, profiles } = createRepoFake();
   const { deps, readerProfiles, usernames } = createDeps(repo);
   const service = createCommunityService(deps);
   usernames.set("alice", "alice");
   usernames.set("alina", "alina");
+  usernames.set("alix", "alix");
   usernames.set("bob", "bobby");
+  usernames.set("me", "alison");
   readerProfiles.set("alice", reader("alice"));
   readerProfiles.set("alina", reader("alina"));
+  readerProfiles.set("alix", reader("alix"));
+  readerProfiles.set("me", reader("me"));
   profiles.set("alice", profileRow("alice"));
   profiles.set("alina", profileRow("alina", { published: 0 }));
 
   const results = service.searchPeople("me", "ali", 10);
-  assert.deepEqual(results.map((r) => r.user.username), ["user-alice"]);
-  assert.deepEqual(results.map((r) => r.viewerFollows), [false]);
+  assert.deepEqual(results.map((r) => r.user.username), ["user-alice", "user-alina", "user-alix"]);
+  assert.deepEqual(results.map((r) => r.private), [false, true, true]);
+  assert.deepEqual(results.map((r) => r.viewerFollows), [false, false, false]);
 
   service.follow("me", "alice");
   const after = service.searchPeople("me", "ali", 10);
-  assert.deepEqual(after.map((r) => r.viewerFollows), [true]);
+  assert.deepEqual(after.map((r) => r.viewerFollows), [true, false, false]);
+
+  assert.equal(service.searchPeople("me", "ali", 2).length, 2);
 });
 
 test("people search results carry a reader glyph only when published and switched on", () => {
@@ -746,6 +799,7 @@ test("getActivity 404s on unknown username and unpublished profile", () => {
   usernames.set("alice", "alice");
   profiles.set("alice", profileRow("alice", { published: 0 }));
   assert.throws(() => service.getActivity("alice", undefined, undefined, 20), ProfileNotFoundError);
+  assert.throws(() => service.getActivity("alice", "me", undefined, 20), ProfileNotFoundError);
 });
 
 test("an unparseable activity cursor is a 400-worthy error", () => {
