@@ -34,9 +34,14 @@ test("skips works without an ISBN in that language", () => {
 });
 
 test("falls back to ISBN-10 and the work title when the edition has only those", () => {
-  const entries = parseRankedWorks({ docs: [{ key: "/works/OL3W", title: "Work Title", author_name: ["C"], readinglog_count: 1, editions: { docs: [{ isbn: ["0306406152"] }] } }] }, "eng");
+  const entries = parseRankedWorks({ docs: [{ key: "/works/OL3W", title: "Work Title", author_name: ["C"], readinglog_count: 1, editions: { docs: [{ language: ["eng"], isbn: ["0306406152"] }] } }] }, "eng");
   assert.equal(entries[0]?.isbn, "0306406152");
   assert.equal(entries[0]?.title, "Work Title");
+});
+
+test("skips an edition in another language", () => {
+  const entries = parseRankedWorks({ docs: [{ key: "/works/OL4W", title: "Dune", author_name: ["F"], readinglog_count: 1, editions: { docs: [{ language: ["eng"], isbn: ["9780306406157"] }] } }] }, "por");
+  assert.deepEqual(entries, []);
 });
 
 test("ignores malformed pages", () => {

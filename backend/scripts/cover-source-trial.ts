@@ -1,4 +1,4 @@
-import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import type { CoverSources, FetchCoverImage } from "../src/modules/books/coverResolver.js";
 import { createThrottle, fetchBytes } from "../src/modules/books/adapters/http/http.js";
@@ -21,6 +21,8 @@ const apiKey = process.env.ISBNDB_API_KEY;
 if (!apiKey) throw new Error("Set ISBNDB_API_KEY (e.g. npx tsx --env-file=<path to backend/.env> scripts/cover-source-trial.ts).");
 
 const readJsonl = <T>(path: string): T[] => (existsSync(path) ? readFileSync(path, "utf8").split("\n").filter(Boolean).map((line) => JSON.parse(line) as T) : []);
+const SUMMARY_PATH = "data/seed/trial-summary.json";
+rmSync(SUMMARY_PATH, { force: true });
 const list = readJsonl<SeedEntry>(values.list);
 const sample = [...list.filter((e) => e.lang === "por").slice(0, Number(values.por)), ...list.filter((e) => e.lang === "eng").slice(0, Number(values.eng))];
 const recorded = new Set(readJsonl<TrialRow>(values.out).map((row) => row.isbn));
@@ -47,23 +49,27 @@ let stopped = false;
 async function worker() {
   while (!stopped && next < todo.length) {
     const entry = todo[next++]!;
-    const row = await trialBook(entry, freeSources, isbndbOnly, fetchImage);
-    if (!row) {
+    const result = await trialBook(entry, freeSources, isbndbOnly, fetchImage);
+    if ("failures" in result) {
       incomplete++;
-      console.error(`incomplete: ${entry.isbn} (${incomplete} in a row)`);
+      console.error(`incomplete: ${entry.isbn} — ${result.failures.join("; ")} (${incomplete} in a row)`);
       if (incomplete >= MAX_CONSECUTIVE_INCOMPLETE) stopped = true;
       continue;
     }
     incomplete = 0;
-    appendFileSync(values.out, JSON.stringify(row) + "\n");
+    appendFileSync(values.out, JSON.stringify(result.row) + "\n");
     if (++done % 50 === 0) console.error(`${done}/${todo.length}`);
   }
 }
 
 await Promise.all(Array.from({ length: IN_FLIGHT }, worker));
-const summary = JSON.stringify(summarizeTrial(readJsonl<TrialRow>(values.out), { eng: 35000, por: 5000 }), null, 1);
-writeFileSync("data/seed/trial-summary.json", summary + "\n");
+const rows = readJsonl<TrialRow>(values.out);
+const summary = JSON.stringify(summarizeTrial(rows, { eng: 35000, por: 5000 }), null, 1);
+writeFileSync(SUMMARY_PATH, summary + "\n");
 console.log(summary);
+const sampled = new Set(sample.map((e) => e.isbn));
+const coverage = (["eng", "por"] as const).map((lang) => `${lang}: ${rows.filter((r) => r.lang === lang && sampled.has(r.isbn)).length}/${sample.filter((e) => e.lang === lang).length} recorded`);
+console.error(coverage.join(", "));
 if (stopped) {
   console.error("Stopped early: a source keeps failing (quota or outage). Rerun to resume.");
   process.exit(1);

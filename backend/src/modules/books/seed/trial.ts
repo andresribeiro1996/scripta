@@ -23,18 +23,20 @@ export interface TrialSummary {
   projectedGapFills: number;
 }
 
-export async function trialBook(entry: SeedEntry, freeSources: CoverSources, isbndbOnly: CoverSources, fetchImage: FetchCoverImage): Promise<TrialRow | null> {
+export async function trialBook(entry: SeedEntry, freeSources: CoverSources, isbndbOnly: CoverSources, fetchImage: FetchCoverImage): Promise<{ row: TrialRow } | { failures: string[] }> {
   const book = { isbn: entry.isbn, title: entry.title, author: entry.author };
   const [free, isbndb] = await Promise.all([
     findBestCover(book, new Set(), freeSources, fetchImage),
     findBestCover(book, new Set(), isbndbOnly, fetchImage)
   ]);
-  if (!free.complete || !isbndb.complete) return null;
+  if (!free.complete || !isbndb.complete) return { failures: [...free.failures, ...isbndb.failures].map((failure) => failure.message) };
   return {
-    isbn: entry.isbn,
-    lang: entry.lang,
-    free: free.found ? { source: free.found.candidate.source, width: free.found.image.width } : null,
-    isbndb: isbndb.found ? { width: isbndb.found.image.width } : null
+    row: {
+      isbn: entry.isbn,
+      lang: entry.lang,
+      free: free.found ? { source: free.found.candidate.source, width: free.found.image.width } : null,
+      isbndb: isbndb.found ? { width: isbndb.found.image.width } : null
+    }
   };
 }
 

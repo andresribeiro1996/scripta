@@ -18,21 +18,23 @@ const sized = (sizes: Record<string, [number, number]>): FetchCoverImage => asyn
 test("records the free chain's cover and ISBNdb's width separately", async () => {
   const free: CoverSources = { isbndb: null, apple: giving("apple", "a"), openlibrary: none };
   const isbndbOnly: CoverSources = { isbndb: giving("isbndb", "i"), apple: none, openlibrary: none };
-  const row = await trialBook(entry, free, isbndbOnly, sized({ a: [300, 450], i: [500, 750] }));
-  assert.deepEqual(row, { isbn: entry.isbn, lang: "eng", free: { source: "apple", width: 300 }, isbndb: { width: 500 } });
+  const result = await trialBook(entry, free, isbndbOnly, sized({ a: [300, 450], i: [500, 750] }));
+  assert.deepEqual("row" in result && result.row, { isbn: entry.isbn, lang: "eng", free: { source: "apple", width: 300 }, isbndb: { width: 500 } });
 });
 
 test("the ISBNdb placeholder is not a find", async () => {
   const free: CoverSources = { isbndb: null, apple: none, openlibrary: none };
   const isbndbOnly: CoverSources = { isbndb: giving("isbndb", "p"), apple: none, openlibrary: none };
-  const row = await trialBook(entry, free, isbndbOnly, sized({ p: [200, 248] }));
-  assert.equal(row?.isbndb, null);
+  const result = await trialBook(entry, free, isbndbOnly, sized({ p: [200, 248] }));
+  assert.equal("row" in result && result.row.isbndb, null);
 });
 
-test("an incomplete ISBNdb pass is not recorded", async () => {
+test("an incomplete ISBNdb pass is not recorded and says why", async () => {
   const free: CoverSources = { isbndb: null, apple: giving("apple", "a"), openlibrary: none };
   const isbndbOnly: CoverSources = { isbndb: failing, apple: none, openlibrary: none };
-  assert.equal(await trialBook(entry, free, isbndbOnly, sized({ a: [600, 900] })), null);
+  const result = await trialBook(entry, free, isbndbOnly, sized({ a: [600, 900] }));
+  assert.ok("failures" in result);
+  assert.ok(result.failures.some((message) => message.includes("HTTP 429")));
 });
 
 test("resume skips isbns already recorded", () => {

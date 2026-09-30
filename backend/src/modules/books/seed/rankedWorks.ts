@@ -35,6 +35,7 @@ export function parseRankedWorks(json: unknown, lang: SeedLanguage): SeedEntry[]
     const work = item as Record<string, unknown>;
     const editions = work.editions && typeof work.editions === "object" ? (work.editions as { docs?: unknown }).docs : undefined;
     const edition = Array.isArray(editions) && editions[0] && typeof editions[0] === "object" ? (editions[0] as Record<string, unknown>) : null;
+    if (edition && !strings(edition.language).includes(lang)) return [];
     const isbn = edition ? pickIsbn(strings(edition.isbn)) : "";
     const title = (typeof edition?.title === "string" && edition.title) || (typeof work.title === "string" ? work.title : "");
     const author = strings(work.author_name)[0] ?? "";

@@ -35,6 +35,7 @@ jobs:
         run: npx tsx scripts/build-seed-list.ts
         working-directory: backend
       - run: npx tsx scripts/cover-source-trial.ts --eng "${{ inputs.eng }}" --por "${{ inputs.por }}"
+        timeout-minutes: 320
         working-directory: backend
         env:
           ISBNDB_API_KEY: ${{ secrets.ISBNDB_API_KEY }}
