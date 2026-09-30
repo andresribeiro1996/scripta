@@ -46,10 +46,10 @@ Open any route directly:
 adb -s <serial> shell am start -a android.intent.action.VIEW -d "exp://127.0.0.1:<metro-port>/--/<route>" host.exp.exponent
 ```
 
-Screenshot and structure:
+Screenshot and structure. `<shots-dir>` is the directory the caller named, or `mktemp -d` if none; name each file for the screen and state it shows:
 
 ```bash
-adb -s <serial> exec-out screencap -p > "$TMPDIR/screen.png"
+adb -s <serial> exec-out screencap -p > "<shots-dir>/<route>-<what>.png"
 adb -s <serial> shell uiautomator dump /sdcard/ui.xml && adb -s <serial> shell cat /sdcard/ui.xml
 ```
 
