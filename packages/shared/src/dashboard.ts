@@ -42,6 +42,12 @@ export interface DashboardFeedPage {
   followingNewCount: number;
 }
 
+const DIGEST_KINDS: Record<DigestItem["kind"], true> = { publication: true, vote: true, reading: true, follow: true, participation: true };
+
+export function withKnownDigestItems(page: DashboardFeedPage): DashboardFeedPage {
+  return { ...page, items: page.items.filter((item) => DIGEST_KINDS[item.kind as DigestItem["kind"]] === true) };
+}
+
 export type DashboardCard =
   | { kind: "currentlyReading"; bookKeys: string[] }
   | { kind: "upNext"; bookKeys: string[] }

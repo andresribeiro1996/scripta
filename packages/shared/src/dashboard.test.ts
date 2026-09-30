@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { DigestItem, ParticipationItem } from "./dashboard.js";
-import { clearDashboardCounts, digestAction, digestHeading, digestTarget, isNewDigestItem, newCountLabel, participationLead, upNextPair } from "./dashboard.js";
+import { clearDashboardCounts, digestAction, digestHeading, digestTarget, isNewDigestItem, newCountLabel, participationLead, upNextPair, withKnownDigestItems } from "./dashboard.js";
 
 const actor = { userId: "u1", username: "alice", avatarUrl: null };
 const tierlist = { kind: "tierlist" as const, id: "t1", voteCode: "abc", name: "Fantasy doorstoppers", poolSize: 5, ballotCount: 1, votingOpen: true, promotedAt: null, covers: [] };
@@ -78,6 +78,13 @@ test("clearing the counts keeps the rows and the seen marker", () => {
   assert.equal(cleared.pages[0]!.seenAt, page.seenAt);
   assert.equal(cleared.pages[0]!.items.length, 1);
   assert.deepEqual(cleared.pageParams, [undefined, "c"]);
+});
+
+test("a row of a kind this build doesn't know is dropped, and everything else on the page is kept", () => {
+  const follow: DigestItem = { kind: "follow", id: "e4", actor, createdAt: "2026-09-17T00:00:00.000Z", viewerFollows: false };
+  const reply = { kind: "reply", id: "r1", actor, createdAt: "2026-09-18T00:00:00.000Z" } as unknown as DigestItem;
+  const page = { items: [reply, follow, participation()], nextCursor: "c1", seenAt: "2026-09-16T00:00:00.000Z", personalNewCount: 2, followingNewCount: 1 };
+  assert.deepEqual(withKnownDigestItems(page), { ...page, items: [follow, participation()] });
 });
 
 test("two keys pairs both, at any offset", () => {
