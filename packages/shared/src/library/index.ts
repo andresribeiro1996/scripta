@@ -8,6 +8,7 @@
 
 export * from "./types.js";
 export * from "./merge.js";
+export * from "./bookMatch.js";
 export * from "./libraryView.js";
 export * from "./groups.js";
 export * from "./libraryOrder.js";
