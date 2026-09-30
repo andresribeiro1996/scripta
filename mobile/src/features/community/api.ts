@@ -10,6 +10,8 @@ import type {
   Page,
   PersonResult,
   PublishedProfile,
+  PublishProfileInput,
+  SuggestedReader,
   TierlistSummary,
   TournamentSummary,
 } from "@scripta/shared/community";
@@ -56,6 +58,10 @@ export async function searchPeople(q: string) {
   return apiClient.request<{ people: PersonResult[] }>(`/community/people?q=${encodeURIComponent(q)}`, { auth: true });
 }
 
+export async function fetchSuggestedPeople() {
+  return apiClient.request<{ people: SuggestedReader[] }>("/community/people/suggested", { auth: true });
+}
+
 export async function fetchProfile(username: string) {
   return apiClient.request<CommunityProfileView>(`/community/profiles/${encodeURIComponent(username)}`, { auth: true });
 }
@@ -81,8 +87,8 @@ export function unfollowUser(userId: string) {
   return apiClient.request(`/community/follows/${userId}`, { method: "DELETE", auth: true });
 }
 
-export function publishProfile(muralId: string) {
-  return apiClient.request("/community/profile/publish", { method: "PUT", body: { muralId }, auth: true });
+export function publishProfile(input: PublishProfileInput) {
+  return apiClient.request("/community/profile/publish", { method: "PUT", body: input, auth: true });
 }
 
 export function unpublishProfile() {

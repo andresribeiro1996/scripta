@@ -49,8 +49,9 @@ export function MyShelfScreen() {
   const murals = useMurals();
 
   const [tab, setTab] = useState<MyShelfTab>(lastTab);
-  const [pickerMode, setPickerMode] = useState<"publish" | "switch" | null>(null);
+  const [switchingMural, setSwitchingMural] = useState(false);
   const [confirmingPublish, setConfirmingPublish] = useState(false);
+  const [answer, setAnswer] = useState<boolean | null>(null);
   const [confirmingUnpublish, setConfirmingUnpublish] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -97,8 +98,7 @@ export function MyShelfScreen() {
   function handleChipPress() {
     if (!own.data) return;
     if (own.data.published) setConfirmingUnpublish(true);
-    else if (own.data.muralId) setConfirmingPublish(true);
-    else setPickerMode("publish");
+    else setConfirmingPublish(true);
   }
 
   if (own.isPending) {
@@ -159,10 +159,19 @@ export function MyShelfScreen() {
     }
   }
 
+  async function publish(shareReading: boolean) {
+    setAnswer(shareReading);
+    await run(async () => {
+      await publishProfile({ ...(ownData.muralId ? { muralId: ownData.muralId } : {}), shareReading });
+      setConfirmingPublish(false);
+    });
+    setAnswer(null);
+  }
+
   const menuItems: MenuItem[] = [
     ...(hasMural ? [{ label: "Edit shelf", onPress: () => router.push(`/murals/${ownData.muralId}` as never) }] : []),
     { label: "Manage library…", onPress: () => router.push("/library" as never) },
-    { label: "Switch shelf mural…", onPress: () => setPickerMode("switch") },
+    { label: "Switch shelf mural…", onPress: () => setSwitchingMural(true) },
     { label: "Feed settings…", onPress: () => setSettingsOpen(true) },
   ];
 
@@ -227,41 +236,29 @@ export function MyShelfScreen() {
         }}
       />
       <MuralPicker
-        visible={pickerMode !== null}
+        visible={switchingMural}
         busy={busy}
-        title={pickerMode === "switch" ? "Choose your shelf" : "Publish profile"}
-        description={pickerMode === "switch" ? "Pick the mural that becomes your shelf." : "Pick the mural that becomes your public page."}
-        actionLabel={pickerMode === "switch" ? "Use this mural" : "Publish"}
+        title="Choose your shelf"
+        description="Pick the mural that becomes your shelf."
+        actionLabel="Use this mural"
         error={error}
-        onClose={() => setPickerMode(null)}
-        onPick={(muralId) => {
-          if (pickerMode === "switch") {
-            void run(async () => {
-              await setShelfMural(muralId);
-              setPickerMode(null);
-            });
-          } else {
-            void run(async () => {
-              await publishProfile(muralId);
-              setPickerMode(null);
-            });
-          }
-        }}
+        onClose={() => setSwitchingMural(false)}
+        onPick={(muralId) => void run(async () => {
+          await setShelfMural(muralId);
+          setSwitchingMural(false);
+        })}
       />
       <Dialog visible={confirmingPublish} title="Publish your shelf?" onClose={() => setConfirmingPublish(false)}>
         <View style={styles.dialogGap}>
           <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>
             {`It becomes a public page at /u/${username}, and people can follow you.`}
           </Text>
+          <Text {...dynamicType} style={[typography.body, { color: colors.text }]}>
+            Share what you read and finish with followers?
+          </Text>
           {error ? <Toast visible message={error} tone="error" /> : null}
-          <Button
-            label="Publish"
-            loading={busy}
-            onPress={() => void run(async () => {
-              await publishProfile(ownData.muralId!);
-              setConfirmingPublish(false);
-            })}
-          />
+          <Button label="Share my reading" loading={answer === true} disabled={busy} onPress={() => void publish(true)} />
+          <Button label="Keep my reading private" variant="secondary" loading={answer === false} disabled={busy} onPress={() => void publish(false)} />
         </View>
       </Dialog>
       <Dialog visible={confirmingUnpublish} title="Unpublish your profile?" onClose={() => setConfirmingUnpublish(false)}>
