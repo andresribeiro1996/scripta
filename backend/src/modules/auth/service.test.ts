@@ -255,7 +255,7 @@ test("removeAvatar whose delete rejects propagates the error", async () => {
   await assert.rejects(service.removeAvatar(user.id), /r2 down/);
 });
 
-test("erasing an account deletes its avatar blob after the other modules' data", async () => {
+test("erasing an account deletes its avatar blob before the other modules' data", async () => {
   const repo = createInMemoryRepo();
   const store = createInMemoryBlobStore();
   const user = repo.createUser({ email: "a@b.c", username: "andre", passwordHash: "x", googleId: null });
@@ -264,7 +264,7 @@ test("erasing an account deletes its avatar blob after the other modules' data",
 
   await createUserDataEraser(repo, { ...store, delete: async (id) => { events.push(`delete ${id}`); } }, async (id) => { await Promise.resolve(); events.push(`erase ${id}`); })(user.id);
 
-  assert.deepEqual(events, [`erase ${user.id}`, `delete ${avatarId}`]);
+  assert.deepEqual(events, [`delete ${avatarId}`, `erase ${user.id}`]);
 });
 
 test("erasing an account with no avatar deletes no blob", async () => {
@@ -282,6 +282,18 @@ test("erasing an account whose avatar delete rejects propagates the error", asyn
   await createAuthService(repo, store).setAvatar(user.id, await pngBuffer(100, 100));
 
   await assert.rejects(createUserDataEraser(repo, { ...store, delete: async () => { throw new Error("r2 down"); } }, async () => {})(user.id), /r2 down/);
+});
+
+test("erasing an account whose avatar delete rejects leaves the other modules' data alone", async () => {
+  const repo = createInMemoryRepo();
+  const store = createInMemoryBlobStore();
+  const user = repo.createUser({ email: "a@b.c", username: "andre", passwordHash: "x", googleId: null });
+  await createAuthService(repo, store).setAvatar(user.id, await pngBuffer(100, 100));
+  let erased = false;
+
+  await assert.rejects(createUserDataEraser(repo, { ...store, delete: async () => { throw new Error("r2 down"); } }, async () => { erased = true; })(user.id), /r2 down/);
+
+  assert.equal(erased, false);
 });
 
 // --- Task 4A: refresh-rotation grace window --------------------------------

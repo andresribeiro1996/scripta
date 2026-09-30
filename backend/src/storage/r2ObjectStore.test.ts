@@ -61,6 +61,16 @@ test("delete accepts 204, 200 and 404 and rejects otherwise", async () => {
   await assert.rejects(store.delete(key), /HTTP 403/);
 });
 
+test("every request carries a 15s abort signal", async (t) => {
+  const timeout = t.mock.method(AbortSignal, "timeout");
+  const calls = stub(200);
+  await store.put(key, Buffer.from("img"), "image/webp");
+  await store.get(key);
+  await store.delete(key);
+  assert.equal(calls.length, 3);
+  assert.deepEqual(timeout.mock.calls.map((call) => call.arguments[0]), [15_000, 15_000, 15_000]);
+});
+
 test("methods validate the key before any request", async () => {
   const calls = stub(200);
   await assert.rejects(store.get("covers/../x.webp"), /Invalid object key/);
