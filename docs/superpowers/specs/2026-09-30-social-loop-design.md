@@ -379,6 +379,22 @@ Clients display at most "99+".
 - **Existing published users** keep their current setting and are not asked
   again.
 
+### Decided while planning step 3
+
+- **The publish body** is `{ muralId?: string, shareReading?: boolean }`.
+  - Both fields are optional, so old clients keep working.
+  - `shareReading` sets `feedSettings.reading` in the same request.
+  - Publishing without a mural emits no `mural_published` event.
+- **Suggestion rows reuse `PersonResult`**, plus `sharedCount` and up to three
+  `sharedBooks: { title, author, coverUrl }`.
+  - `coverUrl` comes from the public library's `_coverUrl`.
+  - The reason text comes from a shared `suggestionReason`: "You share 6
+    books", "You share 1 book", or "Recently active" for fill rows.
+- **Ranking** is by books in common, then by profile recency (`updated_at`).
+  The scan covers up to 500 published profiles, and the default limit is 20.
+- **Both clients' People tabs** show the suggestions whenever the search box
+  is empty.
+
 ### Testing
 
 - **Suggestions:**
