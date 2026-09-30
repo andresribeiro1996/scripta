@@ -15,16 +15,6 @@ export interface Tierlist {
   originCreatorId: string;
 }
 
-export interface PublicTierlistSummary {
-  voteCode: string;
-  name: string;
-  poolSize: number;
-  ballotCount: number;
-  eligibleVoteCount: number;
-  promotedAt: string | null;
-  votingOpen: boolean;
-}
-
 export interface VotingBoard {
   name: string;
   tiers: Array<{ id: string; label: string; color: string }>;
@@ -66,10 +56,6 @@ export function updateTierlist(id: string, patch: { name?: string; data?: Tierli
 
 export function deleteTierlist(id: string) {
   return apiClient.request(`/tierlists/${id}`, { method: "DELETE", auth: true });
-}
-
-export async function fetchPublicTierlists() {
-  return (await apiClient.request<{ tierlists: PublicTierlistSummary[] }>("/tierlists/public")).tierlists;
 }
 
 /** A published tier list the signed-in account holds a ballot on — the
