@@ -312,6 +312,40 @@ Adding a third module means repeating both shapes: its own `domain/ports.ts` + `
 
 `better-sqlite3` needs a native C++ toolchain (node-gyp) to compile on install, which isn't available on every machine this might run on — it failed outright on the machine this was built on. Node 22.5+ ships a built-in `node:sqlite` module with a very similar synchronous API and no native build step at all — though this backend requires Node 24+, since the books module's FTS5 table needs a `node:sqlite` build with FTS5 compiled in, which only later releases have. It's still flagged experimental by Node itself (a runtime warning, not an error) — worth knowing, and easy to swap later: thanks to the hexagonal split above, that would mean a new `adapters/sqlite/` implementation (or, given the name would no longer fit, a rename) rather than touching `service.ts` or `routes.ts` in either module.
 
+## Backups
+
+Litestream 0.5.17 streams every SQLite file on the Railway volume to the private R2 bucket `R2_BACKUPS_BUCKET`, one prefix per file: `/data/auth.sqlite` goes to `s3://atmyshelf-backups/auth.sqlite/`. `litestream.yml` lists the databases (auth, waitlist, library, gallery, murals, covers, socials, arena, tierlists, quizzes, community), the binary is downloaded and checksum-verified into `bin/` by `scripts/install-litestream.sh` during the build, and `scripts/start-with-litestream.sh` is Railway's start command. Uploaded files (covers, gallery, avatars) are not covered: they are not SQLite.
+
+- **Boot:** the script refuses to start unless `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` and `R2_BACKUPS_BUCKET` are set, and unless every `*_DB_PATH` in the environment is in `litestream.yml`. It then restores each database that is missing locally (`-if-db-not-exists -if-replica-exists`) and runs `litestream replicate -exec "node dist/server.js"`, so replication starts and stops with the server. A failed check fails the healthcheck and Railway keeps the previous deployment.
+- **Fresh or empty volume:** every database comes back from R2 on boot, no manual step. If the bucket has nothing for a database (the very first deploy), it starts empty and is replicated from then on.
+- **Volume check:** on Railway (`RAILWAY_VOLUME_MOUNT_PATH` set), `config/env.ts` exits at boot if any `*_DB_PATH` is outside the volume.
+- **Snapshots:** Litestream's defaults, a full snapshot every 24h kept for 24h, changes replicated about every second.
+- **Local dev** never touches Litestream: `npm run dev` starts the server directly.
+
+Verify objects are appearing (any machine with the four `R2_*` values exported, and Litestream 0.5.17 installed):
+
+```sh
+litestream ltx -config backend/litestream.yml /data/auth.sqlite
+```
+
+Each database should list level 0 files with a recent `created`. The bucket's Objects tab in the Cloudflare dashboard shows the same prefixes.
+
+Restore into a scratch directory, without touching the volume:
+
+```sh
+mkdir -p /tmp/restore
+for db in auth waitlist library gallery murals covers socials arena tierlists quizzes community; do
+  litestream restore -config backend/litestream.yml -o /tmp/restore/$db.sqlite /data/$db.sqlite
+done
+sqlite3 -readonly /tmp/restore/auth.sqlite 'select count(*) from users'
+```
+
+Add `-timestamp <RFC3339>` or `-txid <hex>` to restore to an earlier point. To put a restored file back on the volume, stop the service, delete that database and its `-wal`/`-shm` files, and redeploy: the boot restore recreates it.
+
+Adding a database: add its `*_DB_PATH` (under `/data`) to `litestream.yml`. The start script reads the restore list from that file, and refuses to boot if a `*_DB_PATH` in the environment is missing from it.
+
+Checkpointing: nothing here sets `wal_checkpoint` or `wal_autocheckpoint`. Litestream's tips page recommends `busy_timeout = 5000` on the app's connections, so every module's `connection.ts` sets it, and disabling autocheckpoint only for high write load servers, which this is not.
+
 ## Security notes
 
 - Passwords hashed with argon2 (its default parameters — no manual tuning done here).

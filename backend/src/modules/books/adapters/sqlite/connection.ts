@@ -63,6 +63,7 @@ export function openBooksDb(): DatabaseSync {
   mkdirSync(dirname(env.COVERS_DB_PATH), { recursive: true });
   const db = new DatabaseSync(env.COVERS_DB_PATH);
   db.exec("PRAGMA journal_mode = WAL");
+  db.exec("PRAGMA busy_timeout = 5000");
   applyBooksMigrations(db);
   return db;
 }

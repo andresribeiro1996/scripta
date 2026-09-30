@@ -14,6 +14,7 @@ export function openArenaDb(): DatabaseSync {
 
   const db = new DatabaseSync(env.ARENA_DB_PATH);
   db.exec("PRAGMA journal_mode = WAL");
+  db.exec("PRAGMA busy_timeout = 5000");
 
   applyArenaMigrations(db);
 
