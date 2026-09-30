@@ -9,21 +9,27 @@ const goodreads = { ContentID: "g1", Title: "Dune", Attribution: "Frank Herbert"
 const series = { ContentID: "k2", Title: "Dune (Dune Chronicles #1)", Attribution: "Frank Herbert", _order: 2 };
 const deluxe = { ContentID: "g2", Title: "Dune", Attribution: "Frank Herbert", ISBN: "9780593099322", _order: 3 };
 
-test("findDuplicates separates certain groups from likely ones, in library order", () => {
+test("findDuplicates separates certain groups from likely ones, ISBN-bearing books first then library order", () => {
   const groups = findDuplicates({ books: [kobo, goodreads, series] });
-  assert.deepEqual(groups.certain, [[bookKey(kobo), bookKey(goodreads)]]);
-  assert.deepEqual(groups.likely, [[bookKey(kobo), bookKey(goodreads), bookKey(series)]]);
+  assert.deepEqual(groups.certain, [[bookKey(goodreads), bookKey(kobo)]]);
+  assert.deepEqual(groups.likely, [[bookKey(goodreads), bookKey(kobo), bookKey(series)]]);
 });
 
 test("a certain group bridging two different ISBNs is demoted to likely", () => {
   const groups = findDuplicates({ books: [kobo, goodreads, deluxe] });
   assert.deepEqual(groups.certain, []);
-  assert.deepEqual(groups.likely, [[bookKey(kobo), bookKey(goodreads), bookKey(deluxe)]]);
+  assert.deepEqual(groups.likely, [[bookKey(goodreads), bookKey(deluxe), bookKey(kobo)]]);
 });
 
 test("pairs in distinctBooks are never grouped", () => {
   const groups = findDuplicates({ books: [goodreads, deluxe], distinctBooks: [[bookKey(deluxe), bookKey(goodreads)]] });
   assert.deepEqual(groups, { certain: [], likely: [] });
+});
+
+test("corrupt distinctBooks entries are skipped instead of throwing", () => {
+  const library = { books: [goodreads, deluxe], distinctBooks: [null, "x", [bookKey(goodreads)]] } as unknown as LibraryData;
+  assert.doesNotThrow(() => findDuplicates(library));
+  assert.doesNotThrow(() => mergeDuplicateBooks({ books: [kobo, goodreads], distinctBooks: library.distinctBooks }, bookKey(kobo), [bookKey(goodreads)]));
 });
 
 test("untitled books and non-object entries never group and never throw", () => {
@@ -67,6 +73,14 @@ test("mergeDuplicateBooks keeps the survivor in place and rewrites groups and di
   assert.deepEqual(merged.distinctBooks, [[bookKey(series), bookKey(kobo)]]);
 });
 
+test("the merged survivor keeps the original's identity, so its bookKey is unchanged", () => {
+  const merged = mergeDuplicateBooks({ books: [kobo, goodreads] }, bookKey(kobo), [bookKey(goodreads)]);
+  const survivor = merged.books[0] as Record<string, unknown>;
+  assert.equal(bookKey(survivor), bookKey(kobo));
+  assert.equal("ISBN" in survivor, false);
+  assert.equal(survivor.Rating, 5);
+});
+
 test("mergeDuplicateBooks is a no-op when the keys are gone", () => {
   const library: LibraryData = { books: [kobo] };
   assert.equal(mergeDuplicateBooks(library, bookKey(kobo), [bookKey(goodreads)]), library);
@@ -99,7 +113,7 @@ test("mergeCertainDuplicates merges each certain group once and returns the last
     async () => null,
     () => false
   );
-  assert.deepEqual(calls, [[bookKey(kobo), [bookKey(goodreads)], "v1"]]);
+  assert.deepEqual(calls, [[bookKey(goodreads), [bookKey(kobo)], "v1"]]);
   assert.equal(result.updatedAt, "v2");
 });
 

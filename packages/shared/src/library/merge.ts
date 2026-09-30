@@ -90,7 +90,7 @@ function mergeBookPair(
 
 const IDENTITY_FIELDS = ["Title", "Attribution", "ISBN"] as const;
 
-function withIdentityOf(book: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> {
+export function withIdentityOf(book: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> {
   const next = { ...book };
   for (const field of IDENTITY_FIELDS) {
     if (field in source) next[field] = source[field];

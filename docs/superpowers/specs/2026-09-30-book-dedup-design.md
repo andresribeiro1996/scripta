@@ -70,7 +70,8 @@ titled `Poems` by the same poet look identical, so that case always asks.
 
 `findDuplicates(books)` groups books transitively (union-find over the two
 relations) and returns `{ certain: string[][]; likely: string[][] }` of
-`bookKey` groups, each group ordered by library position. A certain group
+`bookKey` groups, each group ordered with ISBN-bearing books first, then by
+library position. A certain group
 that ends up holding two or more distinct canonical ISBNs is demoted to
 likely. Pairs recorded in `distinctBooks` (section 4) are never paired.
 Books with an empty normalized title never match anything, even when their
@@ -122,6 +123,7 @@ merged book:
 | `DateLastRead` | latest |
 | `highlights` | union by `BookmarkID` (existing `unionHighlights`) |
 | `_genres` | union, normalized |
+| `Title`, `Attribution`, `ISBN` | always `keep`'s, so its `bookKey` is unchanged |
 | anything else | `keep`'s value, filled from the merged book where `keep`'s is missing or empty |
 
 The merged books are removed. Group `bookKeys` and `distinctBooks` pairs are
@@ -176,9 +178,9 @@ no confirm step.
 
 - `createBook` registers the ISBN key and the title key when both exist.
 - `findOrCreate` and `saveHits` look up the ISBN key first, then the title
-  key. When the title key finds a book, the lookup's ISBN key is added as an
-  alias to it. An edition therefore shares its catalog book's cover and
-  genres.
+  key. When the title key finds a book that has no ISBN of its own, the
+  lookup's ISBN key is added as an alias to it. Editions with different ISBNs
+  keep separate catalog books.
 - A startup backfill inserts the new-format title key for every existing
   `books` row (`INSERT OR IGNORE`). Old keys stay and are harmless.
 

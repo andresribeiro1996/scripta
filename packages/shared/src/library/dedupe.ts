@@ -1,6 +1,6 @@
 import { normalizeBookGenres } from "./bookGenres.js";
 import { certainFacts, likelyFacts, matchFacts, type MatchFacts } from "./bookMatch.js";
-import { bookKey, unionHighlights } from "./merge.js";
+import { bookKey, unionHighlights, withIdentityOf } from "./merge.js";
 import type { LibraryData } from "./types.js";
 
 type Book = Record<string, unknown>;
@@ -37,7 +37,9 @@ export function findDuplicates(library: LibraryData): DuplicateGroups {
   const books = library.books.filter(isBook);
   const facts: MatchFacts[] = books.map(matchFacts);
   const keys = books.map(bookKey);
-  const distinct = new Set((library.distinctBooks ?? []).map(([a, b]) => pairId(String(a), String(b))));
+  const distinct = new Set(
+    (library.distinctBooks ?? []).filter((pair): pair is string[] => Array.isArray(pair)).map(([a, b]) => pairId(String(a), String(b)))
+  );
   const buckets = new Map<string, number[]>();
   facts.forEach((fact, i) => {
     for (const bucket of [fact.isbn && `i:${fact.isbn}`, fact.exact && `e:${fact.exact}`, fact.loose && `l:${fact.loose}`]) {
@@ -61,7 +63,8 @@ export function findDuplicates(library: LibraryData): DuplicateGroups {
     }
   }
   const position = (i: number) => (typeof books[i]!._order === "number" ? (books[i]!._order as number) : Number.MAX_SAFE_INTEGER);
-  const ordered = (group: number[]) => [...group].sort((a, b) => position(a) - position(b) || a - b);
+  const ordered = (group: number[]) =>
+    [...group].sort((a, b) => Number(facts[b]!.isbn !== "") - Number(facts[a]!.isbn !== "") || position(a) - position(b) || a - b);
   const toKeys = (group: number[]) => [...new Set(ordered(group).map((i) => keys[i]!))];
   const signature = (group: number[]) => [...group].sort((a, b) => a - b).join(",");
   const certainGroups = components(books.length, certainEdges).filter((group) => new Set(group.map((i) => facts[i]!.isbn).filter(Boolean)).size <= 1);
@@ -108,10 +111,12 @@ export function rekeyTierBoard<T extends Record<string, unknown>>(board: T, from
   return { ...board, tiers, pool };
 }
 
-function rekeyPairs(pairs: readonly unknown[][], from: ReadonlySet<string>, to: string): string[][] {
+function rekeyPairs(pairs: readonly unknown[], from: ReadonlySet<string>, to: string): string[][] {
   const seen = new Set<string>();
   const result: string[][] = [];
-  for (const [a, b] of pairs) {
+  for (const pair of pairs) {
+    if (!Array.isArray(pair)) continue;
+    const [a, b] = pair;
     if (typeof a !== "string" || typeof b !== "string") continue;
     const left = from.has(a) ? to : a;
     const right = from.has(b) ? to : b;
@@ -123,7 +128,7 @@ function rekeyPairs(pairs: readonly unknown[][], from: ReadonlySet<string>, to: 
 }
 
 export function markDistinct(library: LibraryData, keys: string[]): LibraryData {
-  const pairs: unknown[][] = [...(library.distinctBooks ?? [])];
+  const pairs: unknown[] = [...(library.distinctBooks ?? [])];
   for (let i = 0; i < keys.length; i++) for (let j = i + 1; j < keys.length; j++) pairs.push([keys[i], keys[j]]);
   return { ...library, distinctBooks: rekeyPairs(pairs, new Set(), "") };
 }
@@ -133,7 +138,7 @@ export function mergeDuplicateBooks(library: LibraryData, keep: string, merge: s
   const original = library.books.find((book) => isBook(book) && bookKey(book) === keep);
   const members = library.books.filter((book): book is Book => isBook(book) && keys.has(bookKey(book)));
   if (!original || members.length < 2) return library;
-  const survivor = members.reduce((acc, book) => (book === original ? acc : combineBooks(acc, book)), original);
+  const survivor = withIdentityOf(members.reduce((acc, book) => (book === original ? acc : combineBooks(acc, book)), original), original);
   const books = library.books.flatMap((book) => (book === original ? [survivor] : isBook(book) && keys.has(bookKey(book)) ? [] : [book]));
   const from = new Set(merge.filter((key) => key !== keep));
   const now = new Date().toISOString();
