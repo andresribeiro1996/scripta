@@ -107,15 +107,18 @@ async function main() {
 
   const { openAuthDb } = await import("../backend/src/modules/auth/adapters/sqlite/connection.js");
   const { createSqliteAuthRepository } = await import("../backend/src/modules/auth/adapters/sqlite/sqliteAuthRepository.js");
-  const { createFsAvatarBlobStore } = await import("../backend/src/modules/auth/adapters/fs/avatarBlobStore.js");
+  const { createObjectStore } = await import("../backend/src/storage/createObjectStore.js");
   const { createAuthService } = await import("../backend/src/modules/auth/service.js");
   const { EmailInUseError, UsernameInUseError } = await import("../backend/src/modules/auth/domain/errors.js");
   const { openLibraryDb } = await import("../backend/src/modules/library/adapters/sqlite/connection.js");
-  const { env } = await import("../backend/src/config/env.js");
 
   const authDb = openAuthDb();
   const authRepository = createSqliteAuthRepository(authDb);
-  const avatarStore = createFsAvatarBlobStore(env.AVATAR_STORAGE_PATH);
+  const objectStore = createObjectStore();
+  const avatarStore = {
+    save: (id, bytes) => objectStore.put(`avatars/${id}.webp`, bytes, "image/webp"),
+    delete: (id) => objectStore.delete(`avatars/${id}.webp`),
+  };
   const authService = createAuthService(authRepository, avatarStore);
 
   let user;

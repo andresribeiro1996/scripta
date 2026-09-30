@@ -17,19 +17,21 @@ import { readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { env, googleOAuthConfigured } from "../../config/env.js";
-import { createFsAvatarBlobStore } from "./adapters/fs/avatarBlobStore.js";
+import { createObjectStore } from "../../storage/createObjectStore.js";
 import { createSqliteAuthRepository } from "./adapters/sqlite/sqliteAuthRepository.js";
 import { openAuthDb } from "./adapters/sqlite/connection.js";
 import { createAuthorizationCode } from "./authorizationCode.js";
 import { consumeGoogleOAuthFlow, createGoogleOAuthFlow } from "./googleOAuthFlow.js";
 import { isValidGoogleOAuthState } from "./googleOAuthState.js";
+import type { AvatarBlobStore } from "./domain/ports.js";
+import { setAvatarUrlFor } from "./publicProfile.js";
 import { validateGoogleStartRequest } from "./googleStartRequest.js";
 import { parseMobileRedirectAllowlist } from "./mobileRedirectAllowlist.js";
 import { getAuthenticatedUserFromAccessToken } from "./tokens.js";
 import { createAccountSecurity } from "./accountSecurity.js";
 import { sendAccountEmail, emailEnabled } from "./email.js";
 import { buildAuthRoutes } from "./routes.js";
-import { createAuthService, MAX_AVATAR_UPLOAD_BYTES } from "./service.js";
+import { createAuthService, createUserDataEraser, MAX_AVATAR_UPLOAD_BYTES } from "./service.js";
 
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 const consoleHtml = readFileSync(`${moduleDir}/public/console.html`, "utf8");
@@ -65,20 +67,29 @@ function queryParam(request: FastifyRequest, key: string): string {
   return typeof value === "string" ? value : "";
 }
 
+const avatarKey = (id: string) => `avatars/${id}.webp`;
+const avatarUrlFor = (id: string) => createObjectStore().urlFor(avatarKey(id));
+
+function avatarBlobStore(): AvatarBlobStore {
+  return {
+    save: (id, bytes) => createObjectStore().put(avatarKey(id), bytes, "image/webp"),
+    delete: (id) => createObjectStore().delete(avatarKey(id))
+  };
+}
+
 export async function authPlugin(app: FastifyInstance, options: { authRoot?: FastifyInstance; deleteUserData?: (userId: string) => void } = {}) {
   // --- composition: swap this one block to change storage technology ---
   const db = openAuthDb();
   const authRepository = createSqliteAuthRepository(db);
-  const avatarStore = createFsAvatarBlobStore(env.AVATAR_STORAGE_PATH);
+  setAvatarUrlFor(avatarUrlFor);
   const security = createAccountSecurity(authRepository, async (to, subject, text) => {
     try { await sendAccountEmail(to, subject, text); }
     catch (error) { app.log.error("Account email delivery failed; check email configuration and provider status."); throw error; }
-  }, env.FRONTEND_URL, emailEnabled, (userId) => {
+  }, env.FRONTEND_URL, emailEnabled, createUserDataEraser(authRepository, avatarBlobStore(), (userId) => {
     if (!options.deleteUserData) throw new Error("Account deletion needs the other modules' data erasers, and none were configured.");
     options.deleteUserData(userId);
-    avatarStore.deleteAll(userId);
-  });
-  const authService = createAuthService(authRepository, avatarStore);
+  }));
+  const authService = createAuthService(authRepository, avatarBlobStore());
   (options.authRoot ?? app).decorate("authenticateAccessToken", (token: string) => getAuthenticatedUserFromAccessToken(token, authRepository.findUserById));
   app.addHook("onClose", async () => { db.close(); });
   // -----------------------------------------------------------------------
@@ -100,7 +111,7 @@ export async function authPlugin(app: FastifyInstance, options: { authRoot?: Fas
     }
   });
 
-  await app.register(buildAuthRoutes(authService, security));
+  await app.register(buildAuthRoutes(authService, avatarUrlFor, security));
 
   // A minimal, self-contained HTML test console for this module — not a
   // real app screen. Lets you exercise signup/login/refresh/logout/Google

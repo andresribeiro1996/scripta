@@ -30,7 +30,7 @@ function setup(enabled = true) {
     if (eraseFails) throw new Error("erase failed");
     erased.push(userId);
   });
-  const auth = createAuthService(repo, { save() {}, read() { return null; }, delete() {}, deleteAll() {} });
+  const auth = createAuthService(repo, { save: async () => {}, delete: async () => {} });
   const token = () => new URLSearchParams(new URL(emails.at(-1)!.text.match(/https:\/\/\S+/)![0]).hash.slice(1)).get("token")!;
   return { db, repo, emails, erased, security, auth, token, failErase: () => { eraseFails = true; } };
 }
@@ -132,7 +132,7 @@ test("recovery responses hide account existence, validate input and enforce IP t
   try {
     await auth.signup("reader@example.com", "reader", "old password");
     await app.register(rateLimit);
-    await app.register(buildAuthRoutes(auth, security));
+    await app.register(buildAuthRoutes(auth, () => "", security));
     const known = await app.inject({ method: "POST", url: "/auth/forgot-password", payload: { email: "reader@example.com" } });
     const unknown = await app.inject({ method: "POST", url: "/auth/forgot-password", payload: { email: "missing@example.com" } });
     assert.equal(known.statusCode, 202);

@@ -19,7 +19,6 @@ export function createSqliteAuthRepository(db: DatabaseSync): AuthRepository {
   const linkGoogleIdStmt = db.prepare(`UPDATE users SET google_id = ? WHERE id = ?`);
   const setUsernameStmt = db.prepare(`UPDATE users SET username = ? WHERE id = ?`);
   const setAvatarIdStmt = db.prepare(`UPDATE users SET avatar_id = ? WHERE id = ?`);
-  const findUserIdByAvatarIdStmt = db.prepare(`SELECT id FROM users WHERE avatar_id = ?`);
 
   const insertRefreshTokenStmt = db.prepare(
     `INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at, granted_via_grace) VALUES ($id, $user_id, $token_hash, $expires_at, $granted_via_grace)`
@@ -168,11 +167,6 @@ export function createSqliteAuthRepository(db: DatabaseSync): AuthRepository {
       const columns = (["theme", "display_font", "text_font"] as const).filter((column) => fields[column] !== undefined);
       if (columns.length === 0) return;
       db.prepare(`UPDATE users SET ${columns.map((column) => `${column} = ?`).join(", ")} WHERE id = ?`).run(...columns.map((column) => fields[column] as string), userId);
-    },
-
-    findUserIdByAvatarId(avatarId) {
-      const row = findUserIdByAvatarIdStmt.get(avatarId) as { id: string } | undefined;
-      return row?.id;
     },
 
     insertRefreshToken(input) {

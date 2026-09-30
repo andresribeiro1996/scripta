@@ -72,7 +72,7 @@ if (!shared) {
   for (const module of ["auth", "library", "gallery", "covers", "socials", "arena", "murals", "tierlists", "community"]) {
     process.env[`${module.toUpperCase()}_DB_PATH`] = join(directory, `${module}.sqlite`);
   }
-  for (const storage of ["gallery", "avatar"]) process.env[`${storage.toUpperCase()}_STORAGE_PATH`] = join(directory, `${storage}-files`);
+  for (const storage of ["gallery"]) process.env[`${storage.toUpperCase()}_STORAGE_PATH`] = join(directory, `${storage}-files`);
   process.env.FILES_STORAGE_PATH = join(directory, "files");
 }
 const { buildApp } = await import("../src/app.ts");

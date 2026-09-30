@@ -23,7 +23,7 @@ export const devDataDir = join(repoRoot, "backend", "data", "dev");
 // sqlite, so follows and events resolved against ids from a different
 // auth database than the one the dev account lives in.
 const DB_MODULES = ["auth", "library", "gallery", "covers", "socials", "arena", "murals", "tierlists", "community"];
-const STORAGE_MODULES = ["gallery", "avatar", "covers"];
+const STORAGE_MODULES = ["gallery", "covers"];
 
 /** Env var overrides that point a backend process (spawned or dynamically
  *  imported) at devDataDir instead of whatever backend/.env says. Callers

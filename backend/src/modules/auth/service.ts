@@ -47,9 +47,6 @@ export interface AuthService {
    *  avatar, and returns the fresh user. */
   setAvatar(userId: string, buffer: Buffer): Promise<AuthenticatedUser>;
   removeAvatar(userId: string): Promise<AuthenticatedUser>;
-  /** No ownership check — backs the public GET /auth/avatar/:id/file
-   *  route (UUID-addressed, gallery's trust model). */
-  getAvatarFile(avatarId: string): { buffer: Buffer; mimeType: string } | null;
 }
 
 // Task 4A — how long a rotation-revoked refresh token is still allowed to
@@ -69,7 +66,6 @@ export const MAX_AVATAR_UPLOAD_BYTES = 5 * 1024 * 1024;
 export const MAX_AVATAR_INPUT_DIMENSION = 8000;
 const AVATAR_SIZE = 256;
 const AVATAR_QUALITY = 85;
-const AVATAR_MIME_TYPE = "image/webp";
 
 // The login miss path verifies against this instead of a real hash, so
 // "no such user" costs the same argon2 work as "wrong password" — see
@@ -306,9 +302,9 @@ export function createAuthService(repo: AuthRepository, avatarStore: AvatarBlobS
       if (!user) throw new Error(`setAvatar: user ${userId} vanished mid-request.`);
 
       const avatarId = randomUUID();
-      avatarStore.save(userId, avatarId, encoded);
+      await avatarStore.save(avatarId, encoded);
       repo.setAvatarId(userId, avatarId);
-      if (user.avatar_id) avatarStore.delete(userId, user.avatar_id);
+      if (user.avatar_id) await avatarStore.delete(user.avatar_id);
       return toAuthenticatedUser({ ...user, avatar_id: avatarId });
     },
 
@@ -317,19 +313,19 @@ export function createAuthService(repo: AuthRepository, avatarStore: AvatarBlobS
       if (!user) throw new Error(`removeAvatar: user ${userId} vanished mid-request.`);
       if (user.avatar_id) {
         repo.setAvatarId(userId, null);
-        avatarStore.delete(userId, user.avatar_id);
+        await avatarStore.delete(user.avatar_id);
       }
       // `user` was fetched before the column was cleared — project the
       // cleared state onto it rather than re-fetching.
       return toAuthenticatedUser({ ...user, avatar_id: null });
-    },
-
-    getAvatarFile(avatarId) {
-      const userId = repo.findUserIdByAvatarId(avatarId);
-      if (!userId) return null;
-      const buffer = avatarStore.read(userId, avatarId);
-      if (!buffer) return null;
-      return { buffer, mimeType: AVATAR_MIME_TYPE };
     }
+  };
+}
+
+export function createUserDataEraser(repo: AuthRepository, avatarStore: AvatarBlobStore, deleteOtherData: (userId: string) => void) {
+  return async (userId: string): Promise<void> => {
+    const avatarId = repo.findUserById(userId)?.avatar_id;
+    deleteOtherData(userId);
+    if (avatarId) await avatarStore.delete(avatarId);
   };
 }
