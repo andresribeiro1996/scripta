@@ -580,6 +580,38 @@ test("discover filters by type and by name substring, and paginates by offset", 
   assert.equal(page3.nextOffset, null);
 });
 
+test("a single-type discover filter reports its next page", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  tierlistRefs.set("t1", tierRef("t1", "alice", { createdAt: "2026-09-01T00:00:00.000Z" }));
+  tierlistRefs.set("t2", tierRef("t2", "alice", { createdAt: "2026-09-02T00:00:00.000Z" }));
+  tierlistRefs.set("t3", tierRef("t3", "alice", { createdAt: "2026-09-03T00:00:00.000Z" }));
+
+  const page1 = service.getDiscover("tierlist", "", 2, 0);
+  assert.deepEqual(page1.items.map((i) => i.content.id), ["t3", "t2"]);
+  assert.equal(page1.nextOffset, 2);
+  const page2 = service.getDiscover("tierlist", "", 2, 2);
+  assert.deepEqual(page2.items.map((i) => i.content.id), ["t1"]);
+  assert.equal(page2.nextOffset, null);
+});
+
+test("discover search finds a match older than the first page", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  tierlistRefs.set("old", tierRef("old", "alice", { name: "Fantasy classics", createdAt: "2026-09-01T00:00:00.000Z" }));
+  for (let day = 2; day <= 9; day++) {
+    tierlistRefs.set(`t${day}`, tierRef(`t${day}`, "alice", { name: `List ${day}`, createdAt: `2026-09-0${day}T00:00:00.000Z` }));
+  }
+
+  const page = service.getDiscover("all", "fantasy", 2, 0);
+  assert.deepEqual(page.items.map((i) => i.content.id), ["old"]);
+  assert.equal(page.nextOffset, null);
+});
+
 test("discover drops rows whose author has no reader profile", () => {
   const { repo } = createRepoFake();
   const { deps, tierlistRefs } = createDeps(repo);
