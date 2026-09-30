@@ -19,7 +19,9 @@ export function DuplicatesSheet({ groups, library, onClose }: { groups: string[]
     setBusy(true);
     try {
       await action();
-    } catch {
+    } catch (error) {
+      console.error(error);
+      void queryClient.invalidateQueries({ queryKey: ["library"] });
       toast({ message: failure, kind: "error" });
     } finally {
       setBusy(false);

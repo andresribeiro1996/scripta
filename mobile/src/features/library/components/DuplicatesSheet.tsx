@@ -22,7 +22,9 @@ export function DuplicatesSheetBody({ groups, library }: { groups: string[][]; l
     setBusy(true);
     try {
       await action();
-    } catch {
+    } catch (error) {
+      console.error(error);
+      void queryClient.invalidateQueries({ queryKey: LIBRARY_QUERY_KEY });
       Alert.alert(failure);
     } finally {
       setBusy(false);
