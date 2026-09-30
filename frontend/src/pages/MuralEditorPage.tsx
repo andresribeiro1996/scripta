@@ -19,7 +19,7 @@ import { useLibrary } from "../hooks/useLibrary";
 import { useMuralFullscreen } from "../hooks/useMuralFullscreen";
 import { useMurals } from "../hooks/useMurals";
 import { useTierlists } from "../hooks/useTierlists";
-import { useResolvedTheme } from "../lib/theme";
+import { muralThemeStyle, useResolvedTheme } from "../lib/theme";
 import { type BlockStyle } from "../lib/libraryStyle";
 import { useAuth } from "../auth/AuthContext";
 import { avatarUrlFor } from "../components/Avatar";
@@ -565,6 +565,7 @@ export function MuralEditorPage() {
       {(view.blocks.length > 0 || mobileDraft) && (
         <div
           ref={fullscreenRef}
+          style={fullscreen ? muralThemeStyle(view.theme) : undefined}
           className={fullscreen ? "fixed inset-0 z-50 overflow-y-auto bg-(--color-bg) px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]" : ""}
         >
           {fullscreen && (
