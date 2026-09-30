@@ -16,7 +16,7 @@ Before writing code, read the root `AGENTS.md` and the `AGENTS.md` and `README.m
 - Mobile: install Expo packages with `npx expo install`; never run `eas`, `expo prebuild --clean`, or build APK/AAB.
 - UI changes: use existing tokens and components from `DESIGN.md` before adding colors, spacing or radii.
 
-Git in a worktree: `cd` to the worktree root in its own Bash call, then run `/usr/bin/git …` as a single plain command. Plain `git`, `git -C` and `cd … && git` are refused there. Stage and commit in one call.
+Run git from the worktree root; `git -C` and `cd … && git` can trigger approval prompts. Stage and commit in one call.
 
 Before trusting any test run, `ls node_modules` at the worktree root. Missing → `npm run dev:link-deps`; afterwards `readlink node_modules/@scripta/shared` must print `../../packages/shared`. Otherwise tests resolve the main checkout's stale copy and a failure looks "pre-existing".
 
