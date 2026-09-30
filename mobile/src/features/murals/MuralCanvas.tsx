@@ -13,6 +13,7 @@ import {
   bookKey,
   computeStat,
   libraryBreakdown,
+  muralThemeId,
   readingPercent,
   resolveBlockColor,
   resolveBlockStyle,
@@ -354,7 +355,8 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThe
   onLayoutChange?: (id: string, layout: BlockLayout) => void;
   onImageReadyChange?: (ready: boolean) => void;
 }) {
-  const colors = themes[mural.theme].colors;
+  const theme = muralThemeId(mural.theme);
+  const colors = themes[theme].colors;
   const [width, setWidth] = useState(0);
   const [day] = useState(() => new Date().toISOString().slice(0, 10));
   const [readyAssets, setReadyAssets] = useState<Set<string>>(() => new Set());
@@ -393,7 +395,7 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThe
       />) : null}
     </View>
   );
-  return <MuralThemeScope theme={mural.theme}>{editable ? <Pressable accessible={false} onPress={() => onSelectBlock?.(null)}>{canvas}</Pressable> : canvas}</MuralThemeScope>;
+  return <MuralThemeScope theme={theme}>{editable ? <Pressable accessible={false} onPress={() => onSelectBlock?.(null)}>{canvas}</Pressable> : canvas}</MuralThemeScope>;
 }
 
 const styles = StyleSheet.create({

@@ -29,6 +29,7 @@ import {
   createDuplicateCandidate,
   duplicateBlock,
   isValidBlockLayout,
+  muralThemeId,
   removeBlock,
   updateBlock,
   type BlockLayout,
@@ -431,7 +432,7 @@ export function MuralEditorPage() {
     );
   }
 
-  const view: Mural = mural ?? {
+  const view: Mural = mural ? { ...mural, theme: muralThemeId(mural.theme) } : {
     id: "",
     name: draftName,
     theme: draftTheme,

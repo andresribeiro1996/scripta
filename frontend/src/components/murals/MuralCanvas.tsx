@@ -8,7 +8,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
 import { BLOCK_PAD_SCALE, blockFinishImage, blockFontFamilyCss, resolveBlockStyle, resolveBorderColor } from "../../lib/libraryStyle";
-import { GRID_COLUMNS, type BlockLayout, type Mural, type MuralBlock, type ReaderProfile, type ShelfTheme } from "../../lib/murals";
+import { GRID_COLUMNS, muralThemeId, type BlockLayout, type Mural, type MuralBlock, type ReaderProfile, type ShelfTheme } from "../../lib/murals";
 import { useMuralBookMetadata } from "../../hooks/useMuralBookMetadata";
 import { muralThemeStyle } from "../../lib/theme";
 import { OptionsMenu } from "../OptionsMenu";
@@ -74,9 +74,9 @@ export function MuralCanvas({
 }) {
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [day] = useState(() => new Date().toISOString().slice(0, 10));
-  const themeColors = themes[originalMural.theme].colors;
-  const mural = { ...originalMural, blocks: originalMural.blocks.map((block) => resolveHomeBlock(block, books, groups, day)) };
+  const mural = { ...originalMural, theme: muralThemeId(originalMural.theme), blocks: originalMural.blocks.map((block) => resolveHomeBlock(block, books, groups, day)) };
   const originalBlock = (block: MuralBlock) => originalMural.blocks.find((item) => item.id === block.id) ?? block;
+  const themeColors = themes[mural.theme].colors;
   useMuralBookMetadata(mural.blocks, books, tierlistData);
   const [compactMode, setCompactMode] = useState(
     () => typeof window !== "undefined" && (window.innerWidth < 768 || Boolean(window.matchMedia?.("(pointer: coarse)").matches))

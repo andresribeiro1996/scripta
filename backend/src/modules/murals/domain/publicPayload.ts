@@ -1,11 +1,10 @@
-import type { ReaderProfile } from "@scripta/shared";
+import { muralThemeId, type ReaderProfile } from "@scripta/shared";
 import type { ThemeId } from "@scripta/shared/themes";
 import { env } from "../../../config/env.js";
 import { resolvePublicReaderProfile } from "../../auth/index.js";
 import { resolvePublicLibraryData } from "../../library/index.js";
 import type { TierlistData } from "../../tierlists/index.js";
 import { extractReferences } from "./blockRefs.js";
-import { muralRowTheme } from "./theme.js";
 import type { MuralRow } from "./types.js";
 
 type PublicLibraryData = ReturnType<typeof resolvePublicLibraryData>;
@@ -62,7 +61,7 @@ export function resolveMuralPublicPayload(
     mural: {
       id: row.id,
       name: row.name,
-      theme: muralRowTheme(row),
+      theme: muralThemeId(row.theme),
       blocks: (Array.isArray(blocks) ? blocks : []).map((block) => {
         if (!block || typeof block !== "object") return block;
         if (block.type === "quote" && block.mode === "rediscover") return { id: block.id, type: "text", layout: block.layout, style: block.style, heading: "Private passage", body: "Rediscovered passages are only visible to the owner." };
