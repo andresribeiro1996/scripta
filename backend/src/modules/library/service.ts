@@ -192,12 +192,12 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
     mergeBooks(userId, keep, merge, expectedUpdatedAt) {
       const row = repo.getDocument(userId);
       if (!row) throw new NoLibraryDocumentError();
-      if (row.updated_at !== expectedUpdatedAt) throw new LibraryConflictError();
       const parsed: unknown = JSON.parse(row.data);
       if (!isRecord(parsed) || !Array.isArray(parsed.books)) throw new Error("Stored library document is unreadable; refusing to rewrite it.");
       const library = parsed as LibraryData;
       const next = mergeDuplicateBooks(library, keep, merge);
       if (next === library) return toLibraryDocument(row, publicUrlFor);
+      if (row.updated_at !== expectedUpdatedAt) throw new LibraryConflictError();
       const present = new Set(library.books.filter(isRecord).map(bookKey));
       const fromKeys = merge.filter((key) => key !== keep && present.has(key));
       if (fromKeys.length > 0 && rekeyBooks) rekeyBooks(userId, fromKeys, keep);

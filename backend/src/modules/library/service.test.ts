@@ -349,6 +349,7 @@ test("mergeBooks rewrites references, then saves the merged library", () => {
   assert.equal(data.books.length, 1);
   assert.equal(data.books[0]!.ReadStatus, 2);
   assert.deepEqual(data.groups[0]!.bookKeys, [bookKey(koboDune)]);
+  assert.equal(bookKey(data.books[0]!), bookKey(koboDune));
 });
 
 test("mergeBooks with a stale updatedAt throws a conflict before touching any reference", () => {
@@ -362,6 +363,14 @@ test("mergeBooks is a no-op when the keys are already gone", () => {
   const { service, rekeys } = setupMerge();
   const saved = service.saveLibrary("u1", { books: [koboDune] });
   const again = service.mergeBooks("u1", bookKey(koboDune), [bookKey(goodreadsDune)], saved.updatedAt);
+  assert.equal(again.updatedAt, saved.updatedAt);
+  assert.deepEqual(rekeys, []);
+});
+
+test("mergeBooks with a stale updatedAt still succeeds when the keys are already gone", () => {
+  const { service, rekeys } = setupMerge();
+  const saved = service.saveLibrary("u1", { books: [koboDune] });
+  const again = service.mergeBooks("u1", bookKey(koboDune), [bookKey(goodreadsDune)], "2000-01-01T00:00:00.000Z");
   assert.equal(again.updatedAt, saved.updatedAt);
   assert.deepEqual(rekeys, []);
 });
