@@ -46,7 +46,7 @@ export function DuplicatesSheet({ groups, library, onClose }: { groups: string[]
               if (!book) return null;
               return (
                 <div key={key} className="flex items-center gap-3">
-                  <div className="aspect-[2/3] w-12 shrink-0 overflow-hidden rounded bg-(--color-border)">
+                  <div className="relative aspect-[2/3] w-12 shrink-0 overflow-hidden rounded bg-(--color-border)">
                     <CoverImage book={book} />
                   </div>
                   <div className="min-w-0 text-sm">
