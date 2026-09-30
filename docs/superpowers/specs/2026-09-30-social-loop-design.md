@@ -131,7 +131,8 @@ The fix:
   `/community`. Home's "All activity" and "Find readers" links point there
   (the Activity and People tabs).
 - **Seen marker:** `markDashboardSeen` runs only once the Activity tab is
-  showing with data loaded, and not after a failed load. It doesn't run on
+  showing with data loaded, not after a failed load, and not while a refetch
+  is still in flight (a late response would restore the cleared counts). It doesn't run on
   Discover or People. An empty Activity still counts as seen once shown.
   The opening tab is chosen before the first render with data, so an empty
   feed opens straight on Discover without marking or sliding. This fix moves up from
