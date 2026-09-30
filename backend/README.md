@@ -340,7 +340,64 @@ done
 sqlite3 -readonly /tmp/restore/auth.sqlite 'select count(*) from users'
 ```
 
-Add `-timestamp <RFC3339>` or `-txid <hex>` to restore to an earlier point. To put a restored file back on the volume, stop the service, delete that database and its `-wal`/`-shm` files, and redeploy: the boot restore recreates it.
+Add `-timestamp <RFC3339>` or `-txid <hex>` to restore to an earlier point. To make a restored file the live database, see the next section.
+
+### Rolling back production to a point in time
+
+Modules reference each other by id (murals to books, community to users, and so on), and each database is rolled back on its own. Rolling back one database can leave references dangling in the others. Roll back every database to the same time unless you know the one you are touching is self-contained.
+
+The restore is staged on the volume while the server keeps running, and `scripts/start-with-litestream.sh` swaps it in on the next start. For each file in `/data/restore/` named like a database in `litestream.yml` it deletes the live file, its `-wal`/`-shm` and its `.<name>-litestream` metadata directory, moves the staged file into place and removes `/data/restore/`. Litestream then finds the database behind the replica, fetches the replica's last position and writes a full snapshot on top of it, so the replica's history stays linear: rolled-back and newer writes replicate normally, and the pre-rollback history stays in R2 and is still restorable by timestamp until the retention window passes. A file in `/data/restore/` that is not a database in `litestream.yml` makes the script exit before touching anything.
+
+All commands below use the explicit project, environment and service flags. Keep the `-- sh -c '...'` form: a bare quoted command string fails with "error decoding response body". Times are UTC (RFC3339 with `Z`), for the `created` column and for `-timestamp`.
+
+1. Find the time. Snapshots (level 9) show how far back you can go, and level 0 files show each replicated change:
+
+   ```sh
+   railway ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && bin/litestream ltx -level 9 -config litestream.yml /data/auth.sqlite'
+   ```
+
+   Pick a time after the oldest snapshot's `created` and before the damage. Use `date -u +%Y-%m-%dT%H:%M:%SZ` for now.
+
+2. Stage one database (here `auth`, at `2026-10-01T09:30:00Z`). This only reads from R2 and leaves the live database alone:
+
+   ```sh
+   railway ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'set -e; cd /app/backend && export PATH=$PWD/bin:$PATH && mkdir -p /data/restore && litestream restore -config litestream.yml -timestamp 2026-10-01T09:30:00Z -integrity-check quick -o /data/restore/auth.sqlite /data/auth.sqlite'
+   ```
+
+   Or stage all of them, the usual case:
+
+   ```sh
+   railway ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'set -e; cd /app/backend && export PATH=$PWD/bin:$PATH && mkdir -p /data/restore && for db in $(litestream databases -config litestream.yml | awk "NR > 1 { print \$1 }"); do litestream restore -config litestream.yml -timestamp 2026-10-01T09:30:00Z -integrity-check quick -o /data/restore/$(basename $db) $db; done'
+   ```
+
+   `litestream restore -o` refuses an existing output file, so to re-stage, delete `/data/restore` first (see abort below). Check what is staged, one file per database:
+
+   ```sh
+   railway ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- ls -l /data/restore
+   ```
+
+3. Restart. Nothing changes until this step:
+
+   ```sh
+   railway redeploy --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta --yes
+   ```
+
+   The deployment log shows `start-with-litestream: rolled back /data/<name>.sqlite to the staged restore` per database. If the script exits instead, the log says why and nothing was swapped; fix or delete `/data/restore` and redeploy again.
+
+4. Verify:
+   - `curl -fsS https://<backend host>/health`.
+   - The content is at the chosen time: look at the app, or on the service `sqlite3 /data/<name>.sqlite ...` if installed.
+   - Writes replicate: make a change in the app, then on a laptop with the four `R2_*` values exported restore the database fresh and check that it has the rolled-back state plus the new change, not the pre-rollback state:
+
+     ```sh
+     litestream restore -config backend/litestream.yml -o /tmp/verify/auth.sqlite /data/auth.sqlite
+     ```
+
+To abort before step 3, delete the staged files; the next start then does nothing extra:
+
+```sh
+railway ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'rm -rf /data/restore'
+```
 
 Adding a database: add its `*_DB_PATH` (under `/data`) to `litestream.yml`. The start script reads the restore list from that file, and refuses to boot if a `*_DB_PATH` in the environment is missing from it.
 
