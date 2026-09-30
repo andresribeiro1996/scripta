@@ -9,9 +9,7 @@ const scratch = mkdtempSync(join(tmpdir(), "books-service-test-"));
 process.env.AUTH_DB_PATH = join(scratch, "auth.sqlite");
 process.env.LIBRARY_DB_PATH = join(scratch, "library.sqlite");
 process.env.GALLERY_DB_PATH = join(scratch, "gallery.sqlite");
-process.env.GALLERY_STORAGE_PATH = join(scratch, "gallery-files");
 process.env.COVERS_DB_PATH = join(scratch, "covers.sqlite");
-process.env.COVERS_STORAGE_PATH = join(scratch, "covers-files");
 process.env.JWT_ACCESS_SECRET = "a".repeat(64);
 process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
@@ -43,8 +41,7 @@ function harness(overrides: Partial<Deps> = {}) {
   const repo = createSqliteBooksRepository(db);
   const files = new Map<string, Buffer>();
   const blobs = {
-    save: (id: string, extension: string, bytes: Buffer) => { files.set(`${id}.${extension}`, bytes); },
-    read: (id: string, extension: string) => files.get(`${id}.${extension}`) ?? null
+    save: async (id: string, extension: string, bytes: Buffer) => { files.set(`${id}.${extension}`, bytes); }
   };
   const enqueued: Array<{ bookId: string; front: boolean }> = [];
   const warnings: Array<{ details: Record<string, unknown>; message: string }> = [];
@@ -286,12 +283,19 @@ test("a migrated book with no title gets its title from the first lookup that ha
   assert.equal(h.repo.findBookByKey("isbn:9780141184272")!.title, "Orlando");
 });
 
-test("getCoverFile serves the thumbnail and falls back to the full file", () => {
-  const h = harness();
-  h.files.set("legacy.webp", Buffer.from("legacy"));
-  assert.equal(h.service.getCoverFile("legacy", "thumb")!.buffer.toString(), "legacy");
-  assert.equal(h.service.getCoverFile("legacy", "file")!.mimeType, "image/webp");
-  assert.equal(h.service.getCoverFile("unknown", "file"), null);
+test("a cover whose blob save rejects stores no image row and no cover pointer", async () => {
+  const h = harness({
+    sources: { isbndb: null, apple: isbnSource("https://a/1"), openlibrary: emptySource },
+    blobs: { save: async () => { throw new Error("R2 PUT failed: HTTP 403"); } }
+  });
+  h.sizes.set("https://a/1", [600, 900]);
+  h.service.resolveCover(orlando);
+  const id = h.bookId("isbn:9780141184272");
+  await assert.rejects(h.service.processBook(id), /HTTP 403/);
+  assert.equal((h.db.prepare(`SELECT COUNT(*) AS n FROM cover_images`).get() as { n: number }).n, 0);
+  assert.equal(h.repo.getBook(id)!.cover_image_id, null);
+  await assert.rejects(h.service.uploadCover(orlando, await sharp({ create: { width: 600, height: 900, channels: 3, background: "#224466" } }).jpeg().toBuffer()), /HTTP 403/);
+  assert.equal((h.db.prepare(`SELECT COUNT(*) AS n FROM cover_images`).get() as { n: number }).n, 0);
 });
 
 type Catalog = Deps["catalog"];

@@ -2,8 +2,8 @@ import fastifyMultipart from "@fastify/multipart";
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
 import { env, isbndbConfigured } from "../../config/env.js";
+import { createObjectStore } from "../../storage/createObjectStore.js";
 import { createCompositeCatalog } from "./adapters/catalog/compositeCatalog.js";
-import { createFsCoverBlobStore } from "./adapters/fs/fsCoverBlobStore.js";
 import { createThrottle, fetchBytes } from "./adapters/http/http.js";
 import { createIsbndbCatalog } from "./adapters/isbndb/isbndbCatalog.js";
 import { createOpenLibraryCatalog } from "./adapters/openlibrary/openLibraryCatalog.js";
@@ -16,6 +16,7 @@ import { createBooksService, MAX_UPLOAD_BYTES, type BooksService } from "./books
 import type { FetchCoverImage } from "./coverResolver.js";
 import { encodeCover } from "./domain/images.js";
 import type { BookLookup } from "./domain/normalize.js";
+import { coverUrlFor } from "./publicCoverLookup.js";
 import { buildAdminRoutes, buildCatalogRoutes, buildCoverFileRoutes, buildResolveRoutes } from "./routes.js";
 import { createCoverWorker } from "./worker.js";
 
@@ -44,7 +45,7 @@ export async function booksPlugin(app: FastifyInstance) {
   };
   const service = createBooksService({
     repo,
-    blobs: createFsCoverBlobStore(env.COVERS_STORAGE_PATH),
+    blobs: { save: (id, extension, bytes) => createObjectStore().put(`covers/${id}.${extension}`, bytes, "image/webp") },
     sources: {
       isbndb: isbndbConfigured ? createIsbndbSource(env.ISBNDB_API_KEY, isbndbThrottle) : null,
       apple: createAppleSource(createThrottle(APPLE_GAP_MS)),
@@ -56,7 +57,7 @@ export async function booksPlugin(app: FastifyInstance) {
     ),
     fetchImage,
     enqueue: (bookId, front) => worker.enqueue(bookId, front),
-    publicUrlFor: (id, size) => `${env.PUBLIC_API_URL}/covers/cached/${id}/${size}`,
+    publicUrlFor: coverUrlFor,
     adminUserId: env.ADMIN_USER_ID,
     warn: (details, message) => app.log.warn(details, message)
   });
@@ -84,5 +85,5 @@ export async function booksPlugin(app: FastifyInstance) {
     await scoped.register(fastifyMultipart, { limits: { fileSize: MAX_UPLOAD_BYTES, files: 1 } });
     await scoped.register(buildAdminRoutes(service));
   });
-  await app.register(buildCoverFileRoutes(service));
+  await app.register(buildCoverFileRoutes(coverUrlFor));
 }

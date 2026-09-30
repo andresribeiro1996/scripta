@@ -20,6 +20,6 @@ export interface LibraryRepository {
   /** Looks up a document by its live share token — backs the public
    *  GET /library/shared/:token route. No ownership/userId involved: the
    *  token itself is the credential, same trust model as
-   *  modules/gallery's getImageById. */
+   *  modules/gallery's unguessable image ids. */
   getByShareToken(token: string): LibraryDocumentRow | undefined;
 }

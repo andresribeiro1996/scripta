@@ -23,9 +23,8 @@ process.env.JWT_REFRESH_SECRET ??= "b".repeat(64);
 process.env.AUTH_DB_PATH ??= join(scratchDir, "auth.sqlite");
 process.env.LIBRARY_DB_PATH ??= join(scratchDir, "library.sqlite");
 process.env.GALLERY_DB_PATH ??= join(scratchDir, "gallery.sqlite");
-process.env.GALLERY_STORAGE_PATH ??= join(scratchDir, "gallery-files");
 
-const { createAuthService, REFRESH_ROTATION_GRACE_MS } = await import("./service.js");
+const { createAuthService, createUserDataEraser, REFRESH_ROTATION_GRACE_MS } = await import("./service.js");
 
 function createInMemoryRepo(): AuthRepository & { rows: Map<string, UserRow>; refreshTokens: Map<string, RefreshTokenRow> } {
   const rows = new Map<string, UserRow>();
@@ -90,9 +89,6 @@ function createInMemoryRepo(): AuthRepository & { rows: Map<string, UserRow>; re
       const row = rows.get(userId);
       if (row) rows.set(userId, { ...row, avatar_id: avatarId });
     },
-    findUserIdByAvatarId(avatarId) {
-      return [...rows.values()].find((row) => row.avatar_id === avatarId)?.id;
-    },
     insertRefreshToken(input) {
       const id = `refresh-${nextRefreshTokenId++}`;
       refreshTokens.set(id, {
@@ -143,18 +139,13 @@ function createInMemoryRepo(): AuthRepository & { rows: Map<string, UserRow>; re
 
 function createInMemoryBlobStore(): AvatarBlobStore & { saved: Map<string, Buffer> } {
   const saved = new Map<string, Buffer>();
-  const key = (userId: string, avatarId: string) => `${userId}/${avatarId}`;
   return {
     saved,
-    save(userId, avatarId, bytes) {
-      saved.set(key(userId, avatarId), bytes);
+    save: async (avatarId, bytes) => {
+      saved.set(avatarId, bytes);
     },
-    deleteAll() { throw new Error("Unused in this test"); },
-    read(userId, avatarId) {
-      return saved.get(key(userId, avatarId)) ?? null;
-    },
-    delete(userId, avatarId) {
-      saved.delete(key(userId, avatarId));
+    delete: async (avatarId) => {
+      saved.delete(avatarId);
     }
   };
 }
@@ -181,17 +172,12 @@ test("setAvatar stores a re-encoded square webp and returns the fresh user", asy
 
   assert.ok(updated.avatarId);
   assert.equal(repo.rows.get(user.id)?.avatar_id, updated.avatarId);
-  const stored = blobStore.saved.get(`${user.id}/${updated.avatarId}`);
+  const stored = blobStore.saved.get(updated.avatarId!);
   assert.ok(stored);
   const metadata = await sharp(stored).metadata();
   assert.equal(metadata.format, "webp");
   assert.equal(metadata.width, 256);
   assert.equal(metadata.height, 256);
-
-  const file = service.getAvatarFile(updated.avatarId);
-  assert.ok(file);
-  assert.equal(file.mimeType, "image/webp");
-  assert.equal(file.buffer, stored);
 });
 
 test("setAvatar replaces a previous avatar and deletes the old blob", async () => {
@@ -203,8 +189,7 @@ test("setAvatar replaces a previous avatar and deletes the old blob", async () =
 
   assert.notEqual(first.avatarId, second.avatarId);
   assert.equal(repo.rows.get(user.id)?.avatar_id, second.avatarId);
-  assert.equal(blobStore.saved.has(`${user.id}/${first.avatarId}`), false);
-  assert.equal(service.getAvatarFile(first.avatarId!), null);
+  assert.equal(blobStore.saved.has(first.avatarId!), false);
 });
 
 test("removeAvatar clears the column and deletes the blob", async () => {
@@ -216,7 +201,7 @@ test("removeAvatar clears the column and deletes the blob", async () => {
 
   assert.equal(removed.avatarId, null);
   assert.equal(repo.rows.get(user.id)?.avatar_id, null);
-  assert.equal(blobStore.saved.has(`${user.id}/${avatarId}`), false);
+  assert.equal(blobStore.saved.has(avatarId!), false);
 });
 
 test("removeAvatar on an account with no avatar is a no-op success", async () => {
@@ -249,19 +234,66 @@ test("setAvatar rejects decompression-bomb-sized dimensions", async () => {
   await assert.rejects(service.setAvatar(user.id, await pngBuffer(9000, 1)), AvatarDimensionsTooLargeError);
 });
 
-test("getAvatarFile with an unknown id returns null", () => {
-  const { service } = makeService();
-  assert.equal(service.getAvatarFile("00000000-0000-4000-8000-000000000000"), null);
+test("setAvatar whose save rejects leaves avatar_id unchanged", async () => {
+  const repo = createInMemoryRepo();
+  const failing = { ...createInMemoryBlobStore(), save: async () => { throw new Error("r2 down"); } };
+  const service = createAuthService(repo, failing);
+  const user = repo.createUser({ email: "a@b.c", username: "andre", passwordHash: "x", googleId: null });
+
+  await assert.rejects(service.setAvatar(user.id, await pngBuffer(100, 100)), /r2 down/);
+
+  assert.equal(repo.rows.get(user.id)?.avatar_id, null);
 });
 
-test("avatars are per-account: one user's avatar id never resolves another's", async () => {
-  const { service, repo } = makeService();
-  const a = repo.createUser({ email: "a@b.c", username: "a", passwordHash: "x", googleId: null });
-  repo.createUser({ email: "d@e.f", username: "d", passwordHash: "x", googleId: null });
+test("removeAvatar whose delete rejects propagates the error", async () => {
+  const repo = createInMemoryRepo();
+  const store = createInMemoryBlobStore();
+  const user = repo.createUser({ email: "a@b.c", username: "andre", passwordHash: "x", googleId: null });
+  await createAuthService(repo, store).setAvatar(user.id, await pngBuffer(100, 100));
+  const service = createAuthService(repo, { ...store, delete: async () => { throw new Error("r2 down"); } });
 
-  const { avatarId } = await service.setAvatar(a.id, await pngBuffer(100, 100));
+  await assert.rejects(service.removeAvatar(user.id), /r2 down/);
+});
 
-  assert.ok(service.getAvatarFile(avatarId!));
+test("erasing an account deletes its avatar blob before the other modules' data", async () => {
+  const repo = createInMemoryRepo();
+  const store = createInMemoryBlobStore();
+  const user = repo.createUser({ email: "a@b.c", username: "andre", passwordHash: "x", googleId: null });
+  const { avatarId } = await createAuthService(repo, store).setAvatar(user.id, await pngBuffer(100, 100));
+  const events: string[] = [];
+
+  await createUserDataEraser(repo, { ...store, delete: async (id) => { events.push(`delete ${id}`); } }, async (id) => { await Promise.resolve(); events.push(`erase ${id}`); })(user.id);
+
+  assert.deepEqual(events, [`delete ${avatarId}`, `erase ${user.id}`]);
+});
+
+test("erasing an account with no avatar deletes no blob", async () => {
+  const repo = createInMemoryRepo();
+  const user = repo.createUser({ email: "a@b.c", username: "andre", passwordHash: "x", googleId: null });
+  const failing = { ...createInMemoryBlobStore(), delete: async () => { throw new Error("unexpected"); } };
+
+  await createUserDataEraser(repo, failing, async () => {})(user.id);
+});
+
+test("erasing an account whose avatar delete rejects propagates the error", async () => {
+  const repo = createInMemoryRepo();
+  const store = createInMemoryBlobStore();
+  const user = repo.createUser({ email: "a@b.c", username: "andre", passwordHash: "x", googleId: null });
+  await createAuthService(repo, store).setAvatar(user.id, await pngBuffer(100, 100));
+
+  await assert.rejects(createUserDataEraser(repo, { ...store, delete: async () => { throw new Error("r2 down"); } }, async () => {})(user.id), /r2 down/);
+});
+
+test("erasing an account whose avatar delete rejects leaves the other modules' data alone", async () => {
+  const repo = createInMemoryRepo();
+  const store = createInMemoryBlobStore();
+  const user = repo.createUser({ email: "a@b.c", username: "andre", passwordHash: "x", googleId: null });
+  await createAuthService(repo, store).setAvatar(user.id, await pngBuffer(100, 100));
+  let erased = false;
+
+  await assert.rejects(createUserDataEraser(repo, { ...store, delete: async () => { throw new Error("r2 down"); } }, async () => { erased = true; })(user.id), /r2 down/);
+
+  assert.equal(erased, false);
 });
 
 // --- Task 4A: refresh-rotation grace window --------------------------------

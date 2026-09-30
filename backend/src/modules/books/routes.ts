@@ -42,15 +42,12 @@ export function buildResolveRoutes(service: BooksService) {
   };
 }
 
-export function buildCoverFileRoutes(service: BooksService) {
+export function buildCoverFileRoutes(publicUrlFor: (id: string, size: CoverFileSize) => string) {
   return async function coverFileRoutes(app: FastifyInstance) {
     app.get("/covers/cached/:id/:size", async (request, reply) => {
       const parsed = fileParamsSchema.safeParse(request.params);
       if (!parsed.success) return reply.code(400).send({ error: "Invalid cover id." });
-      const file = service.getCoverFile(parsed.data.id, parsed.data.size as CoverFileSize);
-      if (!file) return reply.code(404).send({ error: "No such cached cover." });
-      reply.header("Cache-Control", "public, max-age=31536000, immutable");
-      return reply.type(file.mimeType).send(file.buffer);
+      return reply.redirect(publicUrlFor(parsed.data.id, parsed.data.size), 301);
     });
   };
 }
