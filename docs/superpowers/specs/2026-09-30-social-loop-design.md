@@ -163,6 +163,27 @@ The fix:
 
 ## Step 2: your creations talk back
 
+### Carried over from step 1
+
+- **Keep what's already loaded.** Community keeps its cached rows, and its
+  Discover and People tabs, when a dashboard refetch or next page fails.
+  Follow the pattern `DiscoverPane` uses: a footer retry for a failed page,
+  and a toast for a failed refresh. Today one failed refetch replaces the
+  whole screen with an error.
+- **Stop swallowing mark-seen failures.** Revisit
+  `markDashboardSeen().catch(() => {})`, which hides a failed mark, as part
+  of the seen-marker rework.
+- **Discover can repeat a row.** Offset paging repeats a row when something
+  publishes between two page loads, which gives duplicate list keys on both
+  clients. Consider keyset paging if Discover gets busy.
+- **Your own profile inside Games** renders My shelf. Its Library tab pushes
+  `/book/<key>`, which opens in the Home tab. Decide whether `/u/<me>` should
+  send you to the My shelf tab instead.
+- **Untested paths.** Discover paging and the signed-out request have no
+  automated test. Mobile's node tests can't import `core/api` (it needs
+  `EXPO_PUBLIC_API_URL` and expo-secure-store), and web has no component
+  harness.
+
 ### What the owner sees
 
 - **One row per game of yours that other people took part in**, whether a
