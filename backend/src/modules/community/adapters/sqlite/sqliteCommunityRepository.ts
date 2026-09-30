@@ -1,4 +1,4 @@
-import type { DatabaseSync } from "node:sqlite";
+import type { DatabaseSync, StatementSync } from "node:sqlite";
 import { normalizeFeedSettings, type FeedSettings } from "@scripta/shared/community";
 import type { CommunityRepository, CursorKeyset } from "../../domain/ports.js";
 import type { EventRow, FollowRow, ProfileRow } from "../../domain/types.js";
@@ -54,10 +54,16 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
     WHERE user_id = ? AND (created_at < ? OR (created_at = ? AND id < ?))
     ORDER BY created_at DESC, id DESC LIMIT ?
   `);
-  const listEventsOfTypes = (userId: string, types: readonly string[], bound: string, boundArgs: string[], limit: number): EventRow[] =>
-    db
-      .prepare(`SELECT * FROM events WHERE user_id = ? AND type IN (${types.map(() => "?").join(",")})${bound} ORDER BY created_at DESC, id DESC LIMIT ?`)
-      .all(userId, ...types, ...boundArgs, limit) as unknown as EventRow[];
+  const typedEventStmts = new Map<string, StatementSync>();
+  const listEventsOfTypes = (userId: string, types: readonly string[], bound: string, boundArgs: string[], limit: number): EventRow[] => {
+    const sql = `SELECT * FROM events WHERE user_id = ? AND type IN (${types.map(() => "?").join(",")})${bound} ORDER BY created_at DESC, id DESC LIMIT ?`;
+    let stmt = typedEventStmts.get(sql);
+    if (!stmt) {
+      stmt = db.prepare(sql);
+      typedEventStmts.set(sql, stmt);
+    }
+    return stmt.all(userId, ...types, ...boundArgs, limit) as unknown as EventRow[];
+  };
 
   return {
     deleteUserData(userId) {

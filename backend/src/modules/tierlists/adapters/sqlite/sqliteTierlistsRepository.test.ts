@@ -239,7 +239,7 @@ test("deleteUserData removes the user's tier lists with their ballots and unlink
   assert.deepEqual(db.prepare(`SELECT ballot_id FROM tierlist_ballot_placements`).all().map((r) => r.ballot_id), ["b2"]);
 });
 
-test("participation counts other people's ballots on the creator's published lists by creation time", () => {
+test("participation counts other people's ballots on the creator's published lists by creation time, and leaves promoted lists out", () => {
   const repo = createSqliteTierlistsRepository(freshDb());
   const publicBooks = JSON.stringify([{ coverUrl: "https://covers.test/a.jpg" }]);
   insertPublished(repo, row({ id: "c1", name: "Fantasy", vote_code: "code1", voting_open: 1, public_books: publicBooks }), ballot({ id: "own1", tierlist_id: "c1", voter_user_id: "u1" }), []);
@@ -258,8 +258,7 @@ test("participation counts other people's ballots on the creator's published lis
 
   const rows = repo.listParticipation("u1").map((r) => ({ ...r })).sort((a, b) => a.id.localeCompare(b.id));
   assert.deepEqual(rows, [
-    { id: "c1", name: "Fantasy", public_books: publicBooks, participants: 3, latest_at: "2026-01-04T00:00:00.000Z" },
-    { id: "c2", name: "Promoted", public_books: null, participants: 1, latest_at: "2026-02-01T00:00:00.000Z" }
+    { id: "c1", name: "Fantasy", public_books: publicBooks, participants: 3, latest_at: "2026-01-04T00:00:00.000Z" }
   ]);
   assert.deepEqual(repo.listRecentVoters("c1", "u1", 10).map((r) => ({ ...r })), [
     { user_id: "u3", at: "2026-01-04T00:00:00.000Z" },

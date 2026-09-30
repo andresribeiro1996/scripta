@@ -222,7 +222,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
     return undefined;
   };
 
-  const buildItems = (rows: DigestRow[], followees: string[], limit: number, glyphOf = glyphLookup(), horizon?: CursorKeyset): { items: DigestItem[]; last?: DigestRow; more: boolean } => {
+  const buildItems = (rows: DigestRow[], followees: string[], limit: number, glyphOf: (userId: string) => IdentityKey | null, horizon?: CursorKeyset): { items: DigestItem[]; last?: DigestRow; more: boolean } => {
     rows.sort(newestFirst);
     const actorIds = new Set<string>();
     for (const row of rows) {

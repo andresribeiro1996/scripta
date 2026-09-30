@@ -854,6 +854,21 @@ test("an event, a follow and a participation row sharing a time each appear once
   assert.deepEqual(pageThrough(service, 1), ["tierlist:g-tie", "fan", "e-tie"]);
 });
 
+test("rows tied with the fetch horizon's time are split by id, so none is skipped", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  for (const id of ["alice", "c"]) readerProfiles.set(id, reader(id));
+  repo.upsertProfile(profileRow("alice"));
+  repo.insertFollow({ follower_id: "viewer", followee_id: "alice", created_at: at(1) });
+  for (const [id, day] of [["a1", 12], ["a2", 11], ["m", 10], ["e", 10]] as const) {
+    repo.insertEvent({ id, user_id: "alice", type: "voted_on", ref_type: "tierlist", ref_id: `t-${id}`, payload: null, created_at: at(day) });
+    if (day === 10) tierlistRefs.set(`t-${id}`, tierRef(`t-${id}`, "carol"));
+  }
+  repo.insertFollow({ follower_id: "c", followee_id: "viewer", created_at: at(10) });
+  assert.deepEqual(pageThrough(service, 2), ["m", "e", "c"]);
+});
+
 test("only the participants that get named have a glyph looked up", () => {
   const { repo } = createRepoFake();
   const { deps, readerProfiles, readerGlyphs, readerGlyphCalls, tierlistParticipation } = createDeps(repo);

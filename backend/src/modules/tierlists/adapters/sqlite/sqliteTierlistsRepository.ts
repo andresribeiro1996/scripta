@@ -76,7 +76,7 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
     SELECT t.id, t.name, t.public_books, COUNT(b.id) AS participants, MAX(b.created_at) AS latest_at
     FROM tierlists t
     JOIN tierlist_ballots b ON b.tierlist_id = t.id
-    WHERE t.origin_user_id = ? AND t.vote_code IS NOT NULL
+    WHERE t.origin_user_id = ? AND t.vote_code IS NOT NULL AND t.promoted_at IS NULL
       AND (b.voter_user_id IS NULL OR b.voter_user_id != t.origin_user_id)
     GROUP BY t.id
   `);
