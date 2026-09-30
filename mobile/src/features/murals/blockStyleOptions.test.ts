@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { BLOCK_FONT_SIZE_RANGE, CARD_BORDER_OPACITY_RANGE, CARD_OPACITY_RANGE, CARD_RADIUS_RANGE, DEFAULT_BLOCK_STYLE, type BlockStyle } from "@scripta/shared";
 import { THEME_IDS, themes } from "@scripta/shared/themes";
-import { BORDER_STRENGTH_PRESETS, COLOR_LOOKS, COLOR_LOOK_FIELDS, CORNER_PRESETS, FADE_PRESETS, FRAME_LOOKS, FRAME_LOOK_FIELDS, SIZE_PRESETS, applyLook, isHardToRead, matchPreset, matchSides, selectionBorderColor } from "./blockStyleOptions.js";
+import { BORDER_STRENGTH_PRESETS, COLOR_LOOKS, COLOR_LOOK_FIELDS, CORNER_PRESETS, FADE_PRESETS, FRAME_LOOKS, FRAME_LOOK_FIELDS, SIZE_PRESETS, applyLook, customColorStart, isHardToRead, matchPreset, matchSides, selectionBorderColor } from "./blockStyleOptions.js";
 
 const onGrid = (value: number, range: { min: number; max: number; step: number }) => value >= range.min && value <= range.max && (value - range.min) % range.step === 0;
 
@@ -104,4 +104,39 @@ test("the selection border stays visible when the block itself is painted with t
   assert.equal(selectionBorderColor({ backgroundColor: "theme:accent", cardBorderColor: null }, dark), dark.text);
   assert.equal(selectionBorderColor({ backgroundColor: light.accent.toUpperCase(), cardBorderColor: null }, light), light.text);
   assert.equal(selectionBorderColor({ backgroundColor: null, cardBorderColor: "theme:accent" }, dark), dark.text);
+});
+
+const palette = themes.light.colors;
+const pick = (backgroundColor: string | null, textColor: string | null, cardBorderColor: string | null) => ({ backgroundColor, textColor, cardBorderColor });
+
+test("customColorStart resolves theme references against the mural palette", () => {
+  const style = pick("theme:accentSoft", "theme:onAccent", "theme:text");
+  assert.equal(customColorStart("backgroundColor", style, palette), palette.accentSoft.toLowerCase());
+  assert.equal(customColorStart("textColor", style, palette), palette.onAccent.toLowerCase());
+  assert.equal(customColorStart("cardBorderColor", style, palette), palette.text.toLowerCase());
+});
+
+test("customColorStart starts unset colours from what the canvas draws", () => {
+  const style = pick(null, null, null);
+  assert.equal(customColorStart("backgroundColor", style, palette), palette.surface.toLowerCase());
+  assert.equal(customColorStart("textColor", style, palette), palette.text.toLowerCase());
+  assert.equal(customColorStart("cardBorderColor", style, palette), palette.border.toLowerCase());
+});
+
+test("customColorStart starts a transparent background from the page colour, and text from the block background", () => {
+  assert.equal(customColorStart("backgroundColor", pick("transparent", null, null), palette), palette.background.toLowerCase());
+  assert.equal(customColorStart("textColor", pick("transparent", "theme:accent", null), palette), palette.accent.toLowerCase());
+});
+
+test("customColorStart normalises a stored HEX and never touches the style", () => {
+  const style = pick("#ABC", "#1A2B3C", "#97532d");
+  const before = structuredClone(style);
+  assert.equal(customColorStart("backgroundColor", style, palette), "#aabbcc");
+  assert.equal(customColorStart("textColor", style, palette), "#1a2b3c");
+  assert.equal(customColorStart("cardBorderColor", style, palette), "#97532d");
+  assert.deepEqual(style, before);
+});
+
+test("customColorStart falls back to a valid palette colour for an unparseable stored value", () => {
+  assert.equal(customColorStart("textColor", pick(null, "not-a-color", null), palette), palette.text.toLowerCase());
 });

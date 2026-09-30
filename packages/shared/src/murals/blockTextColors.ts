@@ -41,11 +41,11 @@ export function effectiveBlockColors(
   };
 }
 
-type Rgb = { r: number; g: number; b: number };
+export type Rgb = { r: number; g: number; b: number };
 
 const MIX_SHARES = [0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1];
 
-function parseHexColor(value: string): Rgb | null {
+export function parseHexColor(value: string): Rgb | null {
   const match = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(value.trim());
   if (!match) return null;
   const hex = match[1];
@@ -87,9 +87,14 @@ function roundRgb({ r, g, b }: Rgb): Rgb {
   return { r: roundChannel(r), g: roundChannel(g), b: roundChannel(b) };
 }
 
-function toHex({ r, g, b }: Rgb): string {
+export function toHex({ r, g, b }: Rgb): string {
   const channel = (value: number) => value.toString(16).padStart(2, "0");
   return `#${channel(r)}${channel(g)}${channel(b)}`;
+}
+
+export function normalizeHexColor(input: string): string | null {
+  const rgb = parseHexColor(input);
+  return rgb ? toHex(rgb) : null;
 }
 
 export function mutedTextColor(text: string, background: string): string | null {
