@@ -29,15 +29,15 @@ import {
   setDashboardSeenAt,
   userHasUsername
 } from "./modules/auth/index.js";
-import { deleteArenaUserData, getArenaPublicApi, registerArenaModule } from "./modules/arena/index.js";
+import { deleteArenaUserData, getArenaPublicApi, registerArenaModule, rekeyArenaBooks } from "./modules/arena/index.js";
 import { deleteCommunityUserData, getCommunityPublicApi, registerCommunityModule } from "./modules/community/index.js";
 import { enqueueBookCovers, registerBooksModule } from "./modules/books/index.js";
 import { deleteGalleryUserData, registerGalleryModule } from "./modules/gallery/index.js";
 import { deleteLibraryUserData, registerLibraryModule, resolvePublicLibrary, readerGlyphFor, type BookEvent } from "./modules/library/index.js";
-import { deleteMuralsUserData, getMuralsPublicApi, registerMuralsModule } from "./modules/murals/index.js";
-import { deleteQuizzesUserData, registerQuizzesModule } from "./modules/quizzes/index.js";
+import { deleteMuralsUserData, getMuralsPublicApi, registerMuralsModule, rekeyMuralsBooks } from "./modules/murals/index.js";
+import { deleteQuizzesUserData, registerQuizzesModule, rekeyQuizzesBooks } from "./modules/quizzes/index.js";
 import { deleteSocialsUserData, registerSocialsModule } from "./modules/socials/index.js";
-import { deleteTierlistsUserData, registerTierlistsModule, getTierlistsPublicApi } from "./modules/tierlists/index.js";
+import { deleteTierlistsUserData, registerTierlistsModule, getTierlistsPublicApi, rekeyTierlistsBooks } from "./modules/tierlists/index.js";
 import { registerWaitlistModule } from "./modules/waitlist/index.js";
 
 export function buildApp() {
@@ -135,6 +135,9 @@ export function buildApp() {
       } catch (error) {
         app.log.error(error, "failed to queue covers for imported library");
       }
+    },
+    rekeyBooks: (userId: string, fromKeys: string[], toKey: string) => {
+      for (const rekey of [rekeyMuralsBooks, rekeyTierlistsBooks, rekeyArenaBooks, rekeyQuizzesBooks]) rekey(userId, fromKeys, toKey);
     }
   });
   app.register(registerGalleryModule);
