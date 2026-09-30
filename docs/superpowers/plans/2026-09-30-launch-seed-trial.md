@@ -18,6 +18,8 @@
 - **ISBNdb is on a trial plan.** Its terms require deleting stored ISBNdb data when the subscription ends, so this plan stores **nothing** from ISBNdb: no images and no URLs, only measured widths.
 - **Trial sample:** the 2,000 most popular books from the list, 10% Portuguese (1,800 English + 200 Portuguese).
 - **"Worth it" means** ISBNdb gives a ≥400px cover where Apple + Open Library give none or <400px. The report projects that to the 40k seed per language.
+- **Overlap the lookups.** Each book's free pass and ISBNdb pass run at the same time, and 4 books are in flight at once. Each source keeps its own throttle, so no rate limit changes. The run is bounded by Apple alone: ~2–3 h instead of ~3.5–5.5 h.
+- **Run in the cloud.** A manually triggered GitHub Actions workflow runs the trial, so the user's PC can be off. The ISBNdb key is a repository secret (`ISBNDB_API_KEY`) that the user sets. Progress is kept in the Actions cache so a rerun resumes. Results (widths only) are uploaded as an artifact.
 
 ## Where this plan fits (launch roadmap)
 
@@ -460,10 +462,11 @@ export interface TrialSummary {
 
 export async function trialBook(entry: SeedEntry, freeSources: CoverSources, isbndbOnly: CoverSources, fetchImage: FetchCoverImage): Promise<TrialRow | null> {
   const book = { isbn: entry.isbn, title: entry.title, author: entry.author };
-  const free = await findBestCover(book, new Set(), freeSources, fetchImage);
-  if (!free.complete) return null;
-  const isbndb = await findBestCover(book, new Set(), isbndbOnly, fetchImage);
-  if (!isbndb.complete) return null;
+  const [free, isbndb] = await Promise.all([
+    findBestCover(book, new Set(), freeSources, fetchImage),
+    findBestCover(book, new Set(), isbndbOnly, fetchImage)
+  ]);
+  if (!free.complete || !isbndb.complete) return null;
   return {
     isbn: entry.isbn,
     lang: entry.lang,
@@ -508,9 +511,11 @@ Expected: PASS (5 tests)
 - It appends one `TrialRow` JSON line per finished book to `data/seed/trial-rows.jsonl` (resumable), and prints the summary at the end.
 - It reads `ISBNDB_API_KEY` from the environment and does not import `config/env.ts`, which exits without the full server env.
 - It stops after 5 consecutive incomplete books, so an exhausted quota doesn't spin for hours.
+- It keeps 4 books in flight. The per-source throttles are shared across them, so every source stays at its own spacing and total time is bounded by Apple's.
+- It writes the summary to `data/seed/trial-summary.json`, as well as printing it, so the workflow in Task 4 can upload it.
 
 ```ts
-import { appendFileSync, existsSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import type { CoverSources, FetchCoverImage } from "../src/modules/books/coverResolver.js";
 import { createThrottle, fetchBytes } from "../src/modules/books/adapters/http/http.js";
@@ -550,25 +555,36 @@ const freeSources: CoverSources = { isbndb: null, apple: createAppleSource(creat
 const isbndbOnly: CoverSources = { isbndb: createIsbndbSource(apiKey, createThrottle(1100)), apple: none, openlibrary: none };
 
 console.error(`${sample.length} sampled, ${recorded.size} already recorded, ${todo.length} to go`);
+const IN_FLIGHT = 4;
+let next = 0;
+let done = 0;
 let incomplete = 0;
-for (const [index, entry] of todo.entries()) {
-  const row = await trialBook(entry, freeSources, isbndbOnly, fetchImage);
-  if (!row) {
-    incomplete++;
-    console.error(`incomplete: ${entry.isbn} (${incomplete} in a row)`);
-    if (incomplete >= MAX_CONSECUTIVE_INCOMPLETE) {
-      console.error("Stopping: a source keeps failing (quota or outage). Rerun later to resume.");
-      process.exit(1);
+let stopped = false;
+
+async function worker() {
+  while (!stopped && next < todo.length) {
+    const entry = todo[next++]!;
+    const row = await trialBook(entry, freeSources, isbndbOnly, fetchImage);
+    if (!row) {
+      incomplete++;
+      console.error(`incomplete: ${entry.isbn} (${incomplete} in a row)`);
+      if (incomplete >= MAX_CONSECUTIVE_INCOMPLETE) stopped = true;
+      continue;
     }
-    continue;
+    incomplete = 0;
+    appendFileSync(values.out, JSON.stringify(row) + "\n");
+    if (++done % 50 === 0) console.error(`${done}/${todo.length}`);
   }
-  incomplete = 0;
-  appendFileSync(values.out, JSON.stringify(row) + "\n");
-  if ((index + 1) % 50 === 0) console.error(`${index + 1}/${todo.length}`);
 }
 
-const rows = readJsonl<TrialRow>(values.out);
-console.log(JSON.stringify(summarizeTrial(rows, { eng: 35000, por: 5000 }), null, 1));
+await Promise.all(Array.from({ length: IN_FLIGHT }, worker));
+const summary = JSON.stringify(summarizeTrial(readJsonl<TrialRow>(values.out), { eng: 35000, por: 5000 }), null, 1);
+writeFileSync("data/seed/trial-summary.json", summary + "\n");
+console.log(summary);
+if (stopped) {
+  console.error("Stopped early: a source keeps failing (quota or outage). Rerun to resume.");
+  process.exit(1);
+}
 ```
 
 - [ ] **Step 6: Typecheck, run the whole backend suite, and commit**
@@ -582,25 +598,124 @@ git add backend/src/modules/books/seed/trial.ts backend/src/modules/books/seed/t
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
-- [ ] **Step 7: Hand the run to the user**
+- [ ] **Step 7: Smoke-run locally on a tiny sample (no ISBNdb spend worth noting)**
 
-The run takes roughly 2,000 books × ~6–10 s ≈ 3.5–5.5 hours, and needs the ISBNdb trial key from the main checkout's `backend/.env`. Give the user this command to run from the worktree's `backend/` directory (or run it yourself if the session allows):
-
-```bash
-npx tsx --env-file=/Users/andreribeiro/Documents/scripta/backend/.env scripts/cover-source-trial.ts
-```
-
-It prints progress every 50 books and the JSON summary at the end. It's safe to stop and rerun, since it resumes.
+Run: `cd backend && npx tsx --env-file=/Users/andreribeiro/Documents/scripta/backend/.env scripts/cover-source-trial.ts --eng 3 --por 2 --out data/seed/smoke-rows.jsonl`
+Expected: `5 sampled, 0 already recorded, 5 to go`, then a JSON summary with `books` 3 (eng) and 2 (por). Then `rm backend/data/seed/smoke-rows.jsonl backend/data/seed/trial-summary.json`. If `backend/.env` has no `ISBNDB_API_KEY`, skip this step and say so; the workflow run in Task 4 is the real run.
 
 ---
 
-### Task 4: Report the verdict
+### Task 4: Run the trial in the cloud (GitHub Actions)
+
+**Files:**
+- Create: `.github/workflows/cover-trial.yml`
+
+**Interfaces:**
+- Consumes: `backend/scripts/build-seed-list.ts` (Task 2), `backend/scripts/cover-source-trial.ts` (Task 3), and the repository secret `ISBNDB_API_KEY` (set by the user).
+- Produces: an artifact named `cover-trial` containing `trial-rows.jsonl`, `trial-summary.json` and `seed-list.jsonl`. The Actions cache entry `cover-trial-<run id>` holds `backend/data/seed/` so the next run resumes.
+
+- [ ] **Step 1: Write the workflow**
+
+```yaml
+name: Cover source trial
+
+on:
+  workflow_dispatch:
+    inputs:
+      eng:
+        description: English books to sample
+        default: "1800"
+      por:
+        description: Portuguese books to sample
+        default: "200"
+
+concurrency:
+  group: cover-trial
+  cancel-in-progress: false
+
+jobs:
+  trial:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+      - run: npm ci
+      - run: npm run build --workspace @scripta/shared
+      - uses: actions/cache/restore@v4
+        with:
+          path: backend/data/seed
+          key: cover-trial-${{ github.run_id }}
+          restore-keys: cover-trial-
+      - if: hashFiles('backend/data/seed/seed-list.jsonl') == ''
+        run: npx tsx scripts/build-seed-list.ts
+        working-directory: backend
+      - run: npx tsx scripts/cover-source-trial.ts --eng "${{ inputs.eng }}" --por "${{ inputs.por }}"
+        working-directory: backend
+        env:
+          ISBNDB_API_KEY: ${{ secrets.ISBNDB_API_KEY }}
+      - if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: backend/data/seed
+          key: cover-trial-${{ github.run_id }}
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cover-trial
+          path: |
+            backend/data/seed/trial-rows.jsonl
+            backend/data/seed/trial-summary.json
+            backend/data/seed/seed-list.jsonl
+          if-no-files-found: warn
+```
+
+`timeout-minutes: 340` stays under GitHub's 6-hour job cap, so the cache-save step still runs if the trial is slow. A rerun then continues where the cache left off.
+
+- [ ] **Step 2: Validate and commit**
+
+Run: `npx -y @action-validator/cli .github/workflows/cover-trial.yml`
+Expected: exit 0 with no errors. If that tool can't be fetched, run `node -e "require('node:fs').readFileSync('.github/workflows/cover-trial.yml','utf8')"` plus a careful read, and say the schema wasn't machine-checked.
+
+```bash
+git add .github/workflows/cover-trial.yml && git commit -m "Run the ISBNdb cover trial as a manual GitHub Actions workflow" -m "A 2–3 hour run shouldn't depend on a laptop staying awake. The ISBNdb key comes from a repository secret, progress lives in the Actions cache so a rerun resumes, and only widths plus the CC0 seed list are uploaded as the artifact.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
+- [ ] **Step 3: Get it onto `main` and start it (controller, not implementer)**
+
+`workflow_dispatch` only works once the workflow file is on the default branch. The controller does this:
+1. Push the branch and open a PR.
+2. Merge it after CI passes. The user has asked for merges in this effort.
+3. Once the user confirms the `ISBNDB_API_KEY` secret is set, start the run.
+
+The user sets the secret themselves, because the key value never passes through Claude:
+
+```bash
+gh secret set ISBNDB_API_KEY --repo andresribeiro1996/scripta
+```
+
+Start and watch:
+
+```bash
+gh workflow run cover-trial.yml --repo andresribeiro1996/scripta --ref main
+```
+
+---
+
+### Task 5: Report the verdict
 
 **Files:** none (a chat report). Then append the measured numbers to the "Known limitations" section of `backend/README.md`.
 
-- [ ] **Step 1: Read the summary**
+- [ ] **Step 1: Fetch the summary**
 
-Run: `cd backend && npx tsx -e "import { readFileSync } from 'node:fs'; import { summarizeTrial } from './src/modules/books/seed/trial.ts'; const rows = readFileSync('data/seed/trial-rows.jsonl','utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)); console.log(JSON.stringify(summarizeTrial(rows, { eng: 35000, por: 5000 }), null, 1))"`
+Run: `gh run download --repo andresribeiro1996/scripta -n cover-trial -D /tmp/cover-trial "$(gh run list --repo andresribeiro1996/scripta --workflow cover-trial.yml --limit 1 --json databaseId --jq '.[0].databaseId')" && cat /tmp/cover-trial/trial-summary.json && wc -l /tmp/cover-trial/trial-rows.jsonl`
+
+If the run stopped early (non-zero exit, fewer than 2,000 rows), rerun the workflow; it resumes from the cache. Report the partial numbers only if the user asks.
 
 - [ ] **Step 2: Report to the user, per language**
   - books measured
