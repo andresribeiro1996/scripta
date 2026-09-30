@@ -21,5 +21,5 @@ Expo/React Native app. Read `README.md` before changing it.
 - Rebuild the development client only when native dependencies or native configuration change and the user explicitly requests it.
 - Never run `expo prebuild --clean` unless explicitly requested.
 - Production builds and submissions require an explicit release request, a clean release ref, and passing checks.
-- Android store releases are automated by `.eas/workflows/android-release.yml`: every other night (02:00 GMT) it builds `main` if the app changed since the last production build and uploads it to Play internal testing. Run it by hand (`npx eas-cli workflow:run .eas/workflows/android-release.yml` from `mobile/`) only on an explicit release request.
+- An Android store release is one command from `mobile/`: `npx eas-cli workflow:run .eas/workflows/android-release.yml` builds `main` on EAS and uploads it to Play internal testing. Run it only on an explicit release request — the EAS account is on the Free plan (15 Android builds a month).
 - For UI/UX changes, check `../DESIGN.md` (or the live Atmyshelf Design System artifact it mirrors) for existing tokens/components before introducing new colors, spacing, or radii.

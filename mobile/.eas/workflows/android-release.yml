@@ -1,48 +1,11 @@
 name: Android release
 
 on:
-  schedule:
-    - cron: '0 2 */2 * *'
   workflow_dispatch: {}
 
 jobs:
-  last_build:
-    name: Find the last store build
-    type: get-build
-    params:
-      platform: android
-      profile: production
-
-  changes:
-    name: Check for app changes since then
-    needs: [last_build]
-    outputs:
-      changed: ${{ steps.compare.outputs.changed }}
-    steps:
-      - uses: eas/checkout
-      - id: compare
-        run: |
-          last="${{ needs.last_build.outputs.git_commit_hash }}"
-          head="$(git rev-parse HEAD)"
-          if [ -z "$last" ]; then
-            echo "No previous store build; building $head."
-            set-output changed true
-            exit 0
-          fi
-          changed="$(node -e '
-            const [last, head] = process.argv.slice(1);
-            const app = /^(mobile\/|packages\/shared\/|patches\/|package\.json$|package-lock\.json$)/;
-            fetch(`https://api.github.com/repos/andresribeiro1996/scripta/compare/${last}...${head}`)
-              .then((r) => { if (!r.ok) throw new Error(`GitHub compare ${r.status}`); return r.json(); })
-              .then(({ files = [] }) => console.log(files.length >= 300 || files.some((f) => app.test(f.filename))));
-          ' "$last" "$head")"
-          echo "Last build $last, main $head, app changed: $changed"
-          set-output changed "$changed"
-
   build:
     name: Build Android
-    needs: [changes]
-    if: ${{ needs.changes.outputs.changed == 'true' }}
     type: build
     params:
       platform: android
