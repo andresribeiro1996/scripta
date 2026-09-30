@@ -72,7 +72,19 @@ moments may now reach other people.
 
 ## Step 1: one Discover, and a Community screen
 
-Client-only apart from routing. No backend change.
+Mostly client work, plus one backend fix found while planning.
+
+### Backend
+
+`getDiscover` asks each content type for only `offset + limit` rows. That
+breaks two things:
+- a single-type filter ("Tier lists") never reports a next page;
+- search only looks at the newest `offset + limit` items of each type.
+
+The fix:
+- without a search, fetch `offset + limit + 1` rows per type, so a next page
+  can be detected;
+- with a search, scan up to the existing 500-row cap.
 
 ### Mobile
 
