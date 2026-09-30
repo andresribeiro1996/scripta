@@ -272,8 +272,8 @@ Clients display at most "99+".
 - **Where the shape lives.** `GameParticipation` lives in
   `@scripta/shared/community`, the neutral place the three game modules and
   community all import.
-- **Quizzes carry no covers** in v1, so their rows show the players'
-  avatars.
+- **Quizzes carry no covers** in v1, so their rows show a stack of up to
+  three players' avatars.
 
 ### Shared
 
@@ -286,9 +286,12 @@ Clients display at most "99+".
 
 ### Mobile
 
-- **`FeedRow`** renders participation rows: a cover fan, up to three
-  avatars, the label "Ranked", "Voted" or "Played", and "Ana, Rui and 10
-  others".
+- **`FeedRow`** renders participation rows with the label "Ranked",
+  "Voted" or "Played", and "Ana, Rui and 10 others". The leading slot shows:
+  - with covers, the cover fan with the first participant's avatar badge;
+  - without covers, an overlapping stack of up to three participants'
+    avatars;
+  - with no named participants, a group icon.
 - **The personal badge** (`personalNewCount`) appears in three places:
   - on the Home tab (`tabBarBadge`, reading the same dashboard query);
   - on the Community header button (`IconButton` gains an optional badge
@@ -301,7 +304,7 @@ Clients display at most "99+".
 ### Web
 
 - Home's "Following" section becomes "Activity" and renders participation
-  rows.
+  rows, led by an overlapping stack of up to three participants' avatars.
 - The Home nav item shows the personal badge.
 - Seen is marked when the Activity section scrolls into view
   (IntersectionObserver), not on page load.
