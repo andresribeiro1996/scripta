@@ -14,6 +14,7 @@ import { z } from "zod";
 import { authGuard, getOptionalAuthenticatedUser } from "../auth/index.js";
 import { resolvePublicLibraryData } from "../library/index.js";
 import type { BallotOutcome, TierlistsService, Voter } from "./service.js";
+import { InvalidShareImageError, MAX_SHARE_IMAGE_BYTES, renderShareVideo, ShareVideoRenderError } from "./shareVideo.js";
 
 const idParamSchema = z.object({ id: z.string().uuid() });
 
@@ -178,6 +179,33 @@ export function buildTierlistRoutes(service: TierlistsService) {
         return reply.code(404).send({ error: "No tier list with that id." });
       }
       return reply.send(service.getResults(params.data.id));
+    });
+  };
+}
+
+export function buildTierlistShareVideoRoutes(service: TierlistsService) {
+  return async function tierlistShareVideoRoutes(app: FastifyInstance) {
+    app.post("/tierlists/:id/share-video", { preHandler: authGuard, bodyLimit: MAX_SHARE_IMAGE_BYTES + 2048 }, async (request, reply) => {
+      const params = idParamSchema.safeParse(request.params);
+      if (!params.success) return reply.code(400).send({ error: "Invalid tier list id." });
+      const tierlist = service.getTierlist(request.user.id, params.data.id);
+      if (!tierlist?.voteCode) return reply.code(404).send({ error: "No public tier list with that id." });
+
+      const upload = await request.file();
+      if (!upload || upload.fieldname !== "image") return reply.code(400).send({ error: "Upload a PNG in the image field." });
+      const image = await upload.toBuffer();
+      try {
+        const video = await renderShareVideo(image);
+        reply.header("Cache-Control", "no-store");
+        return reply.send({ base64: video.toString("base64") });
+      } catch (error) {
+        if (error instanceof InvalidShareImageError) return reply.code(400).send({ error: error.message });
+        if (error instanceof ShareVideoRenderError) {
+          request.log.error(error);
+          return reply.code(500).send({ error: error.message });
+        }
+        throw error;
+      }
     });
   };
 }

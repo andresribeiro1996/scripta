@@ -1,0 +1,63 @@
+access-key-id: ${R2_ACCESS_KEY_ID}
+secret-access-key: ${R2_SECRET_ACCESS_KEY}
+
+snapshot:
+  interval: 24h
+  retention: 336h
+
+dbs:
+  - path: /data/auth.sqlite
+    replica:
+      url: s3://${R2_BACKUPS_BUCKET}/auth.sqlite
+      endpoint: ${R2_ENDPOINT}
+      region: auto
+  - path: /data/waitlist.sqlite
+    replica:
+      url: s3://${R2_BACKUPS_BUCKET}/waitlist.sqlite
+      endpoint: ${R2_ENDPOINT}
+      region: auto
+  - path: /data/library.sqlite
+    replica:
+      url: s3://${R2_BACKUPS_BUCKET}/library.sqlite
+      endpoint: ${R2_ENDPOINT}
+      region: auto
+  - path: /data/gallery.sqlite
+    replica:
+      url: s3://${R2_BACKUPS_BUCKET}/gallery.sqlite
+      endpoint: ${R2_ENDPOINT}
+      region: auto
+  - path: /data/murals.sqlite
+    replica:
+      url: s3://${R2_BACKUPS_BUCKET}/murals.sqlite
+      endpoint: ${R2_ENDPOINT}
+      region: auto
+  - path: /data/covers.sqlite
+    replica:
+      url: s3://${R2_BACKUPS_BUCKET}/covers.sqlite
+      endpoint: ${R2_ENDPOINT}
+      region: auto
+  - path: /data/socials.sqlite
+    replica:
+      url: s3://${R2_BACKUPS_BUCKET}/socials.sqlite
+      endpoint: ${R2_ENDPOINT}
+      region: auto
+  - path: /data/arena.sqlite
+    replica:
+      url: s3://${R2_BACKUPS_BUCKET}/arena.sqlite
+      endpoint: ${R2_ENDPOINT}
+      region: auto
+  - path: /data/tierlists.sqlite
+    replica:
+      url: s3://${R2_BACKUPS_BUCKET}/tierlists.sqlite
+      endpoint: ${R2_ENDPOINT}
+      region: auto
+  - path: /data/quizzes.sqlite
+    replica:
+      url: s3://${R2_BACKUPS_BUCKET}/quizzes.sqlite
+      endpoint: ${R2_ENDPOINT}
+      region: auto
+  - path: /data/community.sqlite
+    replica:
+      url: s3://${R2_BACKUPS_BUCKET}/community.sqlite
+      endpoint: ${R2_ENDPOINT}
+      region: auto

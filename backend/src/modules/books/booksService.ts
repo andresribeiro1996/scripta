@@ -4,15 +4,13 @@ import { findBestCover, type CoverSources, type FetchCoverImage } from "./coverR
 import { MIN_GOOD_WIDTH } from "./domain/constants.js";
 import { BookNotFoundError, FileTooLargeError, InvalidImageError } from "./domain/errors.js";
 import { encodeCover, type EncodedCover } from "./domain/images.js";
-import { findByIdentity, lookupIdentity, searchTokens, type BookIdentity, type BookLookup } from "./domain/normalize.js";
+import { findByIdentity, lookupIdentity, SEARCH_LIMIT, searchTokens, type BookIdentity, type BookLookup } from "./domain/normalize.js";
 import type { BookCatalog, BooksRepository, CatalogSearchHit, CoverBlobStore } from "./domain/ports.js";
 import type { BookRow, CoverSourceName, CoverStatus } from "./domain/types.js";
 
 const RETRY_AFTER_MS = 30 * 24 * 60 * 60 * 1000;
 const UNAVAILABLE_BACKOFF_MS = 10 * 60 * 1000;
-const SEARCH_LIMIT = 12;
 const COVER_EXTENSION = "webp";
-const COVER_MIME_TYPE = "image/webp";
 const NO_COVER: ResolvedCover = { url: null, fullUrl: null, pending: false };
 const PENDING: ResolvedCover = { url: null, fullUrl: null, pending: true };
 
@@ -42,10 +40,11 @@ export interface BooksServiceDeps {
 export interface BooksService {
   resolveCover(lookup: BookLookup, front?: boolean): ResolvedCover;
   enqueueCovers(lookups: BookLookup[]): void;
+  enqueueUnchecked(): void;
   processBook(bookId: string): Promise<void>;
-  getCoverFile(id: string, size: CoverFileSize): { buffer: Buffer; mimeType: string } | null;
   getDetails(lookup: BookLookup): Promise<BookMetadata | null>;
-  search(query: string): Promise<BookSearchResult[]>;
+  search(query: string): BookSearchResult[];
+  searchExternal(query: string): Promise<BookSearchResult[]>;
   isAdmin(userId: string): boolean;
   rejectCover(lookup: BookLookup): ResolvedCover;
   uploadCover(lookup: BookLookup, bytes: Buffer): Promise<ResolvedCover>;
@@ -100,10 +99,10 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
     deps.enqueue(bookId, front);
   }
 
-  function storeImage(bookId: string, source: CoverSourceName, sourceUrl: string | null, image: EncodedCover, at: string): string {
+  async function storeImage(bookId: string, source: CoverSourceName, sourceUrl: string | null, image: EncodedCover, at: string): Promise<string> {
     const id = randomUUID();
-    deps.blobs.save(id, COVER_EXTENSION, image.full);
-    deps.blobs.save(`${id}-thumb`, COVER_EXTENSION, image.thumb);
+    await deps.blobs.save(id, COVER_EXTENSION, image.full);
+    await deps.blobs.save(`${id}-thumb`, COVER_EXTENSION, image.thumb);
     deps.repo.insertImage({ id, book_id: bookId, source, source_url: sourceUrl, width: image.width, height: image.height, byte_size: image.full.byteLength, created_at: at });
     return id;
   }
@@ -135,12 +134,12 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
   }
 
   function saveHits(hits: CatalogSearchHit[]): BookSearchResult[] {
-    return hits.map(({ result, olCoverId }) => {
+    return hits.map(({ result, olCoverId, source }) => {
       const author = result.authors.join(", ");
       const identity = lookupIdentity({ isbn: result.isbn, title: result.title, author });
       if (!identity) return result;
       const book = findExisting(identity) ?? deps.repo.createBook(
-        { title: result.title, author, isbn: identity.isbn, year: result.year, publisher: result.publisher, olCoverId, genres: result.genres },
+        { title: result.title, author, isbn: identity.isbn, year: result.year, publisher: result.publisher, olCoverId, genres: result.genres, sources: [source] },
         keysOf(identity),
         now().toISOString()
       );
@@ -167,6 +166,10 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       for (const lookup of lookups) this.resolveCover(lookup);
     },
 
+    enqueueUnchecked() {
+      for (const id of deps.repo.listUncheckedCoverIds()) schedule(id);
+    },
+
     async processBook(bookId) {
       const book = deps.repo.getBook(bookId);
       if (!book || book.cover_status === "manual") return;
@@ -181,7 +184,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
         let imageId = latest.cover_image_id;
         let width = current?.width ?? 0;
         if (outcome.found && outcome.found.image.width > width) {
-          imageId = storeImage(bookId, outcome.found.candidate.source, outcome.found.candidate.url, outcome.found.image, at);
+          imageId = await storeImage(bookId, outcome.found.candidate.source, outcome.found.candidate.url, outcome.found.image, at);
           width = outcome.found.image.width;
         }
         const status: CoverStatus = imageId === null ? "missing" : width >= MIN_GOOD_WIDTH ? "good" : "low_res";
@@ -199,38 +202,34 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       }
     },
 
-    getCoverFile(id, size) {
-      const buffer = size === "thumb"
-        ? deps.blobs.read(`${id}-thumb`, COVER_EXTENSION) ?? deps.blobs.read(id, COVER_EXTENSION)
-        : deps.blobs.read(id, COVER_EXTENSION);
-      return buffer ? { buffer, mimeType: COVER_MIME_TYPE } : null;
-    },
-
     async getDetails(lookup) {
       const book = findOrCreate(lookup);
       if (!book) return null;
       if (book.details_status === "found") return detailsOf(book);
       if (book.details_status === "missing" && !olderThan(book.details_checked_at, RETRY_AFTER_MS)) return null;
-      const metadata = await deps.catalog.fetchDetails({ isbn: book.isbn, title: book.title, author: book.author });
+      const details = await deps.catalog.fetchDetails({ isbn: book.isbn, title: book.title, author: book.author });
       const at = now().toISOString();
-      if (metadata) deps.repo.saveDetails(book.id, metadata, at);
+      if (details) deps.repo.saveDetails(book.id, details.metadata, details.sources, at);
       else deps.repo.markDetailsMissing(book.id, at);
-      return metadata;
+      return details?.metadata ?? null;
     },
 
-    async search(query) {
+    search(query) {
       const trimmed = query.trim();
       if (!trimmed) return [];
       if (looksLikeIsbnQuery(trimmed)) {
-        const isbn = normalizeIsbn(trimmed);
-        const saved = deps.repo.findBookByKey(`isbn:${isbn}`);
-        if (saved) return [toSearchResult(saved)];
-        return saveHits(await deps.catalog.search({ isbn }));
+        const saved = deps.repo.findBookByKey(`isbn:${normalizeIsbn(trimmed)}`);
+        return saved ? [toSearchResult(saved)] : [];
       }
       const tokens = searchTokens(trimmed);
-      if (tokens.length === 0) return [];
-      const saved = deps.repo.searchBooks(tokens, SEARCH_LIMIT);
-      if (saved.length > 0) return saved.map(toSearchResult);
+      return tokens.length === 0 ? [] : deps.repo.searchBooks(tokens, SEARCH_LIMIT).map(toSearchResult);
+    },
+
+    async searchExternal(query) {
+      const trimmed = query.trim();
+      if (!trimmed) return [];
+      if (looksLikeIsbnQuery(trimmed)) return saveHits(await deps.catalog.search({ isbn: normalizeIsbn(trimmed) }));
+      if (searchTokens(trimmed).length === 0) return [];
       return saveHits(await deps.catalog.search({ text: trimmed }));
     },
 
@@ -258,7 +257,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       const book = findOrCreate(lookup);
       if (!book) throw new BookNotFoundError();
       const at = now().toISOString();
-      const imageId = storeImage(book.id, "upload", null, image, at);
+      const imageId = await storeImage(book.id, "upload", null, image, at);
       deps.repo.setCover(book.id, { imageId, status: "manual", checkedAt: at });
       backoffUntil.delete(book.id);
       return coverOf(deps.repo.getBook(book.id) ?? book);

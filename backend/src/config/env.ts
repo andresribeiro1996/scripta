@@ -4,7 +4,7 @@
 // deep inside a request handler.
 
 import "dotenv/config";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 import { z } from "zod";
 
 // "15m", "1h", "30d" — a single integer + unit. Kept intentionally
@@ -24,6 +24,8 @@ function hexSecret(name: string) {
       `${name} must be a hex string of at least 64 chars (32 bytes) — generate with node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
     );
 }
+
+const urlOrBlank = z.union([z.literal(""), z.string().url()]).default("");
 
 const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
@@ -66,19 +68,18 @@ const envSchema = z.object({
   AUTH_DB_PATH: z.string().min(1),
   LIBRARY_DB_PATH: z.string().min(1),
   GALLERY_DB_PATH: z.string().min(1),
-  // Where uploaded images are actually stored on disk, one subdirectory
-  // per account — see modules/gallery/adapters/fs/fsImageBlobStore.ts.
-  GALLERY_STORAGE_PATH: z.string().min(1),
-  // Profile pictures (modules/auth avatars) — one subdirectory per
-  // account, same shape as GALLERY_STORAGE_PATH.
-  AVATAR_STORAGE_PATH: z.string().min(1).default("./data/avatar-files"),
 
   // modules/murals' own SQLite file — same one-file-per-module isolation as
   // every other module's *_DB_PATH above.
   MURALS_DB_PATH: z.string().min(1).default("./data/murals.sqlite"),
 
   COVERS_DB_PATH: z.string().min(1).default("./data/covers.sqlite"),
-  COVERS_STORAGE_PATH: z.string().min(1).default("./data/covers-files"),
+  R2_ENDPOINT: urlOrBlank,
+  R2_ACCESS_KEY_ID: z.string().default(""),
+  R2_SECRET_ACCESS_KEY: z.string().default(""),
+  R2_IMAGES_BUCKET: z.string().default(""),
+  R2_IMAGES_PUBLIC_URL: urlOrBlank,
+  FILES_STORAGE_PATH: z.string().min(1).default("./data/files"),
   // modules/socials' own SQLite file — same one-file-per-module isolation
   // as every other module's *_DB_PATH above.
   SOCIALS_DB_PATH: z.string().min(1).default("./data/socials.sqlite"),
@@ -92,9 +93,9 @@ const envSchema = z.object({
   COMMUNITY_DB_PATH: z.string().min(1).default("./data/community.sqlite"),
   WAITLIST_DB_PATH: z.string().min(1).optional(),
   // This API's own externally-reachable base URL — needed to build
-  // absolute image URLs (GET /gallery/:id/file) that resolve correctly
-  // from the frontend's own origin, which a relative path wouldn't (see
-  // modules/gallery/plugin.ts's publicUrlFor). Defaults to the dev
+  // absolute URLs (the filesystem object store's GET /files/*, shared
+  // mural images) that resolve correctly from the frontend's own origin,
+  // which a relative path wouldn't. Defaults to the dev
   // backend's own address; set this to the real deployed origin in prod.
   PUBLIC_API_URL: z.string().url().default("http://localhost:3000"),
 
@@ -183,6 +184,19 @@ const envSchema = z.object({
 
 const parsed = envSchema
   .transform((e) => ({ ...e, WAITLIST_DB_PATH: e.WAITLIST_DB_PATH ?? join(dirname(e.AUTH_DB_PATH), "waitlist.sqlite") }))
+  .superRefine((e, ctx) => {
+    const volume = process.env.RAILWAY_VOLUME_MOUNT_PATH;
+    if (volume || e.R2_IMAGES_BUCKET) {
+      const missing = ["R2_ENDPOINT", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_IMAGES_BUCKET", "R2_IMAGES_PUBLIC_URL"].filter((name) => !e[name as keyof typeof e]);
+      if (missing.length > 0) ctx.addIssue({ code: "custom", path: ["R2_IMAGES_BUCKET"], message: `images live in R2 on Railway or whenever R2_IMAGES_BUCKET is set — missing ${missing.join(", ")}` });
+    }
+    if (!volume) return;
+    for (const [key, value] of Object.entries(e)) {
+      if (key.endsWith("_DB_PATH") && !resolve(String(value)).startsWith(resolve(volume) + sep)) {
+        ctx.addIssue({ code: "custom", path: [key], message: `must be under the volume at ${volume}, or every deploy wipes it` });
+      }
+    }
+  })
   .safeParse(process.env);
 
 if (!parsed.success) {

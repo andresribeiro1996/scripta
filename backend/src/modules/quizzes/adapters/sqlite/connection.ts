@@ -19,6 +19,7 @@ export function openQuizzesDb(): DatabaseSync {
 
   const db = new DatabaseSync(env.QUIZZES_DB_PATH);
   db.exec("PRAGMA journal_mode = WAL");
+  db.exec("PRAGMA busy_timeout = 5000");
   applyQuizzesMigrations(db);
 
   return db;

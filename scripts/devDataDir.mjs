@@ -1,7 +1,7 @@
 // Shared by dev-account.mjs and dev-emulator.mjs (and, in --shared mode,
 // backend/scripts/three-users.mjs): the single dedicated data directory
 // the "one real server, one seeded dev database" workflow uses —
-// backend/data/dev/ — plus the *_DB_PATH/*_STORAGE_PATH overrides that
+// backend/data/dev/ — plus the *_DB_PATH and FILES_STORAGE_PATH overrides that
 // point a spawned or imported backend at it instead of backend/.env's
 // own paths.
 //
@@ -23,7 +23,6 @@ export const devDataDir = join(repoRoot, "backend", "data", "dev");
 // sqlite, so follows and events resolved against ids from a different
 // auth database than the one the dev account lives in.
 const DB_MODULES = ["auth", "library", "gallery", "covers", "socials", "arena", "murals", "tierlists", "community"];
-const STORAGE_MODULES = ["gallery", "avatar", "covers"];
 
 /** Env var overrides that point a backend process (spawned or dynamically
  *  imported) at devDataDir instead of whatever backend/.env says. Callers
@@ -32,6 +31,6 @@ const STORAGE_MODULES = ["gallery", "avatar", "covers"];
 export function devDataDirEnv(directory = devDataDir) {
   const env = {};
   for (const module of DB_MODULES) env[`${module.toUpperCase()}_DB_PATH`] = join(directory, `${module}.sqlite`);
-  for (const storage of STORAGE_MODULES) env[`${storage.toUpperCase()}_STORAGE_PATH`] = join(directory, `${storage}-files`);
+  env.FILES_STORAGE_PATH = join(directory, "files");
   return env;
 }

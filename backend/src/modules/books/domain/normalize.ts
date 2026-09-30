@@ -6,6 +6,8 @@ export { normalizeTitle, normalizeWords } from "@scripta/shared";
 
 const MAX_SEARCH_TOKENS = 8;
 
+export const SEARCH_LIMIT = 12;
+
 export interface BookLookup {
   isbn?: string | null;
   title?: string | null;

@@ -7,7 +7,7 @@ export class AccountActionError extends Error {
   constructor(message: string, readonly status = 400) { super(message); }
 }
 
-export function createAccountSecurity(repo: AuthRepository, send: (to: string, subject: string, text: string) => Promise<void>, frontendUrl: string, enabled: boolean, eraseUserData: (userId: string) => void) {
+export function createAccountSecurity(repo: AuthRepository, send: (to: string, subject: string, text: string) => Promise<void>, frontendUrl: string, enabled: boolean, eraseUserData: (userId: string) => Promise<void>) {
   function requireEmail() {
     if (!enabled) throw new AccountActionError("Email delivery is unavailable. Please try again later.", 503);
   }
@@ -80,7 +80,7 @@ export function createAccountSecurity(repo: AuthRepository, send: (to: string, s
         throw new AccountActionError(user.username ? "Type your username to confirm." : "Type your email address to confirm.", 403);
       }
       repo.revokeSessions(userId);
-      eraseUserData(userId);
+      await eraseUserData(userId);
       repo.deleteUser(userId);
       if (enabled) await send(user.email, "Your Atmyshelf account was deleted", "Your Atmyshelf account and everything in it — your library, murals, images, lists and connections — have been deleted. This can't be undone.").catch(() => undefined);
     },

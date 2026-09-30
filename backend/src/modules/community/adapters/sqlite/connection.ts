@@ -11,6 +11,7 @@ export function openCommunityDb(): DatabaseSync {
 
   const db = new DatabaseSync(env.COMMUNITY_DB_PATH);
   db.exec("PRAGMA journal_mode = WAL");
+  db.exec("PRAGMA busy_timeout = 5000");
   db.exec("PRAGMA foreign_keys = ON");
 
   const schema = readFileSync(`${adapterDir}/schema.sql`, "utf8");

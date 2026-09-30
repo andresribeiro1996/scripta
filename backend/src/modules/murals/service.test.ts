@@ -15,7 +15,6 @@ process.env.JWT_REFRESH_SECRET ??= "b".repeat(64);
 process.env.AUTH_DB_PATH ??= join(tmpdir(), "murals-test-auth.sqlite");
 process.env.LIBRARY_DB_PATH ??= join(tmpdir(), "murals-test-library.sqlite");
 process.env.GALLERY_DB_PATH ??= join(tmpdir(), "murals-test-gallery.sqlite");
-process.env.GALLERY_STORAGE_PATH ??= join(tmpdir(), "murals-test-gallery-files");
 
 function createInMemoryRepo(): MuralsRepository {
   const murals = new Map<string, MuralRow>();

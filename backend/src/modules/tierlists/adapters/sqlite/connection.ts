@@ -49,6 +49,7 @@ export function openTierlistsDb(): DatabaseSync {
 
   const db = new DatabaseSync(env.TIERLISTS_DB_PATH);
   db.exec("PRAGMA journal_mode = WAL");
+  db.exec("PRAGMA busy_timeout = 5000");
   applyTierlistsMigrations(db);
 
   return db;

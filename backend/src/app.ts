@@ -15,6 +15,9 @@ import { STATUS_CODES } from "node:http";
 import { isAllowedOrigin } from "./config/corsOrigin.js";
 import { env } from "./config/env.js";
 import { devHttps } from "./config/devCerts.js";
+import { assertObjectKey } from "./storage/objectStore.js";
+import { createObjectStore } from "./storage/createObjectStore.js";
+import { IMMUTABLE_CACHE_CONTROL } from "./storage/r2ObjectStore.js";
 import { runStartupMigrations } from "./migrations/runStartupMigrations.js";
 import {
   emailEnabled,
@@ -85,6 +88,19 @@ export function buildApp() {
   });
 
   app.get("/health", async () => ({ status: "ok" }));
+  if ("root" in createObjectStore()) {
+    app.get<{ Params: { "*": string } }>("/files/*", async (request, reply) => {
+      const key = request.params["*"];
+      try {
+        assertObjectKey(key);
+      } catch {
+        return reply.code(400).send({ error: "Invalid object key" });
+      }
+      const bytes = await createObjectStore().get(key);
+      if (!bytes) return reply.code(404).send({ error: "Not found" });
+      return reply.header("Content-Type", "image/webp").header("Cache-Control", IMMUTABLE_CACHE_CONTROL).send(bytes);
+    });
+  }
   app.get("/public-config", async () => ({ frontendUrl: env.FRONTEND_URL }));
 
   // Fastify's default 500 serializer forwards the raw error message to
@@ -105,8 +121,8 @@ export function buildApp() {
 
   app.register(registerAuthModule, {
     authRoot: app,
-    deleteUserData: (userId: string) => {
-      for (const erase of [deleteLibraryUserData, deleteGalleryUserData, deleteSocialsUserData, deleteMuralsUserData, deleteArenaUserData, deleteTierlistsUserData, deleteQuizzesUserData, deleteCommunityUserData]) erase(userId);
+    deleteUserData: async (userId: string) => {
+      for (const erase of [deleteGalleryUserData, deleteLibraryUserData, deleteSocialsUserData, deleteMuralsUserData, deleteArenaUserData, deleteTierlistsUserData, deleteQuizzesUserData, deleteCommunityUserData]) await erase(userId);
     }
   });
   app.register(registerArenaModule, {

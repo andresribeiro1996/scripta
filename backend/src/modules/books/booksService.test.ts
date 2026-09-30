@@ -9,9 +9,7 @@ const scratch = mkdtempSync(join(tmpdir(), "books-service-test-"));
 process.env.AUTH_DB_PATH = join(scratch, "auth.sqlite");
 process.env.LIBRARY_DB_PATH = join(scratch, "library.sqlite");
 process.env.GALLERY_DB_PATH = join(scratch, "gallery.sqlite");
-process.env.GALLERY_STORAGE_PATH = join(scratch, "gallery-files");
 process.env.COVERS_DB_PATH = join(scratch, "covers.sqlite");
-process.env.COVERS_STORAGE_PATH = join(scratch, "covers-files");
 process.env.JWT_ACCESS_SECRET = "a".repeat(64);
 process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
@@ -43,8 +41,7 @@ function harness(overrides: Partial<Deps> = {}) {
   const repo = createSqliteBooksRepository(db);
   const files = new Map<string, Buffer>();
   const blobs = {
-    save: (id: string, extension: string, bytes: Buffer) => { files.set(`${id}.${extension}`, bytes); },
-    read: (id: string, extension: string) => files.get(`${id}.${extension}`) ?? null
+    save: async (id: string, extension: string, bytes: Buffer) => { files.set(`${id}.${extension}`, bytes); }
   };
   const enqueued: Array<{ bookId: string; front: boolean }> = [];
   const warnings: Array<{ details: Record<string, unknown>; message: string }> = [];
@@ -223,32 +220,34 @@ test("an unexpected error during processing sets a 10-minute backoff and rethrow
   assert.equal(h.enqueued.length, 1);
 });
 
-test("resolve queues at the back unless asked to jump the queue", () => {
-  const { service, enqueued } = harness();
-  service.resolveCover(orlando);
-  service.resolveCover(orlando, true);
-  assert.deepEqual(enqueued.map((entry) => entry.front), [false, true]);
-});
-
-test("enqueueCovers queues each unresolved book at the back and skips resolved ones", async () => {
-  const dune = { title: "Dune", author: "Frank Herbert" };
+test("enqueueUnchecked queues never-checked books at the back, oldest first, and skips checked ones", async () => {
   const h = harness({ sources: { isbndb: null, apple: isbnSource("https://a/1"), openlibrary: emptySource } });
   h.sizes.set("https://a/1", [900, 1400]);
   h.service.resolveCover(orlando);
   await h.service.processBook(h.bookId("isbn:9780141184272"));
+  h.advance(1000);
+  h.service.resolveCover({ title: "Dune", author: "Frank Herbert" });
+  h.advance(1000);
+  h.service.resolveCover({ title: "Emma", author: "Jane Austen" });
   h.enqueued.length = 0;
-  h.service.enqueueCovers([orlando, dune, { title: "" }]);
-  assert.deepEqual(h.enqueued, [{ bookId: h.bookId("ta:dune|frank herbert|"), front: false }]);
+  h.service.enqueueUnchecked();
+  assert.deepEqual(h.enqueued, [
+    { bookId: h.bookId("ta:dune|frank herbert|"), front: false },
+    { bookId: h.bookId("ta:emma|jane austen|"), front: false }
+  ]);
 });
 
-test("enqueueCovers skips a book in backoff", async () => {
+test("enqueueUnchecked skips a book in backoff", async () => {
   const failing: CoverSource = { byIsbn: async () => { throw new SourceUnavailableError("apple", "HTTP 429"); }, byTitle: async () => [] };
   const h = harness({ sources: { isbndb: null, apple: failing, openlibrary: emptySource } });
   h.service.resolveCover(orlando);
   await h.service.processBook(h.bookId("isbn:9780141184272"));
   h.enqueued.length = 0;
-  h.service.enqueueCovers([orlando]);
+  h.service.enqueueUnchecked();
   assert.equal(h.enqueued.length, 0);
+  h.advance(10 * 60 * 1000);
+  h.service.enqueueUnchecked();
+  assert.equal(h.enqueued.length, 1);
 });
 
 test("manual covers are never processed", async () => {
@@ -284,12 +283,19 @@ test("a migrated book with no title gets its title from the first lookup that ha
   assert.equal(h.repo.findBookByKey("isbn:9780141184272")!.title, "Orlando");
 });
 
-test("getCoverFile serves the thumbnail and falls back to the full file", () => {
-  const h = harness();
-  h.files.set("legacy.webp", Buffer.from("legacy"));
-  assert.equal(h.service.getCoverFile("legacy", "thumb")!.buffer.toString(), "legacy");
-  assert.equal(h.service.getCoverFile("legacy", "file")!.mimeType, "image/webp");
-  assert.equal(h.service.getCoverFile("unknown", "file"), null);
+test("a cover whose blob save rejects stores no image row and no cover pointer", async () => {
+  const h = harness({
+    sources: { isbndb: null, apple: isbnSource("https://a/1"), openlibrary: emptySource },
+    blobs: { save: async () => { throw new Error("R2 PUT failed: HTTP 403"); } }
+  });
+  h.sizes.set("https://a/1", [600, 900]);
+  h.service.resolveCover(orlando);
+  const id = h.bookId("isbn:9780141184272");
+  await assert.rejects(h.service.processBook(id), /HTTP 403/);
+  assert.equal((h.db.prepare(`SELECT COUNT(*) AS n FROM cover_images`).get() as { n: number }).n, 0);
+  assert.equal(h.repo.getBook(id)!.cover_image_id, null);
+  await assert.rejects(h.service.uploadCover(orlando, await sharp({ create: { width: 600, height: 900, channels: 3, background: "#224466" } }).jpeg().toBuffer()), /HTTP 403/);
+  assert.equal((h.db.prepare(`SELECT COUNT(*) AS n FROM cover_images`).get() as { n: number }).n, 0);
 });
 
 type Catalog = Deps["catalog"];
@@ -299,13 +305,13 @@ function recordingCatalog(overrides: Partial<Catalog> = {}) {
   const catalog: Catalog = {
     fetchDetails: async (lookup) => {
       calls.push(`details:${lookup.isbn ?? lookup.title}`);
-      return { summary: "Spice.", rating: 4.2, ratingCount: 10, sourceUrl: "https://openlibrary.org/works/OL1W", genres: ["Science Fiction"] };
+      return { metadata: { summary: "Spice.", rating: 4.2, ratingCount: 10, sourceUrl: "https://openlibrary.org/works/OL1W", genres: ["Science Fiction"] }, sources: ["openlibrary"] };
     },
     search: async (query) => {
       calls.push("isbn" in query ? `search-isbn:${query.isbn}` : `search:${query.text}`);
       return [
-        { result: { title: "Dune", authors: ["Frank Herbert"], year: 1965, isbn: "9780441013593", publisher: "Ace", coverUrl: "https://covers.openlibrary.org/b/id/7-M.jpg", genres: [] }, olCoverId: 7 },
-        { result: { title: "Dune Encyclopedia", authors: ["Willis E. McNelly"], year: 1984, isbn: null, publisher: null, coverUrl: null, genres: [] }, olCoverId: null }
+        { result: { title: "Dune", authors: ["Frank Herbert"], year: 1965, isbn: "9780441013593", publisher: "Ace", coverUrl: "https://covers.openlibrary.org/b/id/7-M.jpg", genres: [] }, olCoverId: 7, source: "openlibrary" },
+        { result: { title: "Dune Encyclopedia", authors: ["Willis E. McNelly"], year: 1984, isbn: null, publisher: null, coverUrl: null, genres: [] }, olCoverId: null, source: "openlibrary" }
       ];
     },
     ...overrides
@@ -321,6 +327,18 @@ test("details are fetched once and then served from the database", async () => {
   assert.equal((await h.service.getDetails(dune))?.summary, "Spice.");
   assert.deepEqual(await h.service.getDetails(dune), { summary: "Spice.", rating: 4.2, ratingCount: 10, sourceUrl: "https://openlibrary.org/works/OL1W", genres: ["Science Fiction"] });
   assert.deepEqual(calls, ["details:9780441013593"]);
+  assert.equal(h.repo.findBookByKey("isbn:9780441013593")!.data_sources, '["openlibrary"]');
+});
+
+test("details fetched from ISBNdb are tagged with it", async () => {
+  const { catalog } = recordingCatalog({
+    fetchDetails: async () => ({ metadata: { summary: "Spice.", rating: null, ratingCount: 0, sourceUrl: "https://isbndb.com/book/9780441013593", genres: [] }, sources: ["isbndb"] })
+  });
+  const h = harness({ catalog });
+  await h.service.getDetails(dune);
+  const row = h.repo.findBookByKey("isbn:9780441013593")!;
+  assert.equal(row.data_sources, '["isbndb"]');
+  assert.equal(row.source_url, "https://isbndb.com/book/9780441013593");
 });
 
 test("a details miss is remembered for 30 days", async () => {
@@ -340,35 +358,48 @@ test("a details failure propagates and records nothing", async () => {
   assert.equal(h.repo.findBookByKey("isbn:9780441013593")!.details_status, null);
 });
 
-test("an ISBN search is answered from a saved book without calling Open Library", async () => {
+test("an ISBN search is answered from a saved book without calling Open Library", () => {
   const { calls, catalog } = recordingCatalog();
   const h = harness({ catalog });
   h.service.resolveCover(dune);
-  const results = await h.service.search("978-0-441-01359-3");
+  const results = h.service.search("978-0-441-01359-3");
   assert.equal(results[0]!.title, "Dune");
   assert.deepEqual(calls, []);
 });
 
-test("an unknown ISBN goes to Open Library and the results are saved", async () => {
+test("an unknown ISBN searched inside finds nothing and never calls Open Library", () => {
   const { calls, catalog } = recordingCatalog();
   const h = harness({ catalog });
-  await h.service.search("9780441013593");
-  assert.deepEqual(calls, ["search-isbn:9780441013593"]);
-  assert.ok(h.repo.findBookByKey("isbn:9780441013593"));
-  await h.service.search("9780441013593");
-  assert.equal(calls.length, 1);
+  assert.deepEqual(h.service.search("9780441013593"), []);
+  assert.deepEqual(calls, []);
 });
 
-test("free text returns saved matches first and falls back to Open Library, saving every result", async () => {
+test("an outside ISBN search goes to Open Library and saves the results", async () => {
   const { calls, catalog } = recordingCatalog();
   const h = harness({ catalog });
-  const fromOpenLibrary = await h.service.search("dune");
+  await h.service.searchExternal("978-0-441-01359-3");
+  assert.deepEqual(calls, ["search-isbn:9780441013593"]);
+  assert.ok(h.repo.findBookByKey("isbn:9780441013593"));
+  assert.equal(h.service.search("9780441013593")[0]!.title, "Dune");
+});
+
+test("an inside text search only returns saved matches and never calls Open Library", () => {
+  const { calls, catalog } = recordingCatalog();
+  const h = harness({ catalog });
+  assert.deepEqual(h.service.search("dune"), []);
+  assert.deepEqual(calls, []);
+});
+
+test("an outside text search saves every result so the inside search finds them next time", async () => {
+  const { calls, catalog } = recordingCatalog();
+  const h = harness({ catalog });
+  const fromOpenLibrary = await h.service.searchExternal("dune");
   assert.deepEqual(calls, ["search:dune"]);
   assert.equal(fromOpenLibrary.length, 2);
   assert.equal(fromOpenLibrary[0]!.coverUrl, "https://covers.openlibrary.org/b/id/7-M.jpg");
   assert.ok(h.repo.findBookByKey("ta:dune encyclopedia|willis e mcnelly|"));
 
-  const saved = await h.service.search("Dune");
+  const saved = h.service.search("Dune");
   assert.equal(calls.length, 1);
   assert.deepEqual(saved.map((result) => result.title).sort(), ["Dune", "Dune Encyclopedia"]);
   const book = saved.find((result) => result.title === "Dune")!;
@@ -377,23 +408,53 @@ test("free text returns saved matches first and falls back to Open Library, savi
   assert.equal(book.coverUrl, "https://covers.openlibrary.org/b/id/7-M.jpg");
 });
 
+test("a partial saved match no longer hides the outside search", async () => {
+  const messiah = { result: { title: "Dune Messiah", authors: ["Frank Herbert"], year: 1969, isbn: null, publisher: null, coverUrl: null, genres: [] }, olCoverId: null, source: "openlibrary" as const };
+  const dune = { result: { title: "Dune", authors: ["Frank Herbert"], year: 1965, isbn: "9780441013593", publisher: null, coverUrl: null, genres: [] }, olCoverId: null, source: "openlibrary" as const };
+  const { calls, catalog } = recordingCatalog({ search: async (query) => {
+    calls.push("isbn" in query ? `search-isbn:${query.isbn}` : `search:${query.text}`);
+    return "text" in query && query.text === "messiah" ? [messiah] : [messiah, dune];
+  } });
+  const h = harness({ catalog });
+  await h.service.searchExternal("messiah");
+  assert.deepEqual(h.service.search("dune").map((result) => result.title), ["Dune Messiah"]);
+  const outside = await h.service.searchExternal("dune");
+  assert.deepEqual(outside.map((result) => result.title), ["Dune Messiah", "Dune"]);
+  assert.deepEqual(calls, ["search:messiah", "search:dune"]);
+});
+
+test("a saved search hit is tagged with its source, and an existing row is left alone", async () => {
+  const bookHit = (source: "openlibrary" | "isbndb") => ({ result: { title: "Dune", authors: ["Frank Herbert"], year: 1965, isbn: "9780441013593", publisher: null, coverUrl: null, genres: [] }, olCoverId: null, source });
+  const fromIsbndb = harness({ catalog: recordingCatalog({ search: async () => [bookHit("isbndb")] }).catalog });
+  await fromIsbndb.service.searchExternal("dune");
+  assert.equal(fromIsbndb.repo.findBookByKey("isbn:9780441013593")!.data_sources, '["isbndb"]');
+
+  const existing = harness({ catalog: recordingCatalog({ search: async () => [bookHit("isbndb")] }).catalog });
+  existing.service.resolveCover(dune);
+  await existing.service.searchExternal("dune");
+  assert.equal(existing.repo.findBookByKey("isbn:9780441013593")!.data_sources, "[]");
+});
+
 test("a saved book's own cover is used in search results", async () => {
   const { catalog } = recordingCatalog();
   const h = harness({ catalog, sources: { isbndb: null, apple: isbnSource("https://a/1"), openlibrary: emptySource } });
   h.sizes.set("https://a/1", [900, 1400]);
   h.service.resolveCover(dune);
   await h.service.processBook(h.bookId("isbn:9780441013593"));
-  const [result] = await h.service.search("dune herbert");
+  await h.service.searchExternal("dune herbert");
+  const [result] = h.service.search("dune herbert");
   assert.match(result!.coverUrl!, /\/covers\/cached\/.+\/thumb$/);
 });
 
 test("search strips FTS syntax and ignores punctuation-only queries", async () => {
   const { calls, catalog } = recordingCatalog();
   const h = harness({ catalog });
-  await h.service.search("dune");
-  assert.equal((await h.service.search('"Dune" -herbert* (')).length, 1);
-  assert.deepEqual(await h.service.search("***"), []);
-  assert.deepEqual(await h.service.search("   "), []);
+  await h.service.searchExternal("dune");
+  assert.equal(h.service.search('"Dune" -herbert* (').length, 1);
+  assert.deepEqual(h.service.search("***"), []);
+  assert.deepEqual(h.service.search("   "), []);
+  assert.deepEqual(await h.service.searchExternal("***"), []);
+  assert.deepEqual(await h.service.searchExternal("   "), []);
   assert.equal(calls.length, 1);
 });
 
@@ -404,9 +465,10 @@ test("search never returns a book that only came from an account's library", asy
   } });
   const h = harness({ catalog });
   h.service.resolveCover({ title: "My Private Manuscript", author: "" });
-  const results = await h.service.search("manuscript");
+  assert.deepEqual(h.service.search("manuscript"), []);
+  assert.deepEqual(await h.service.searchExternal("manuscript"), []);
+  assert.deepEqual(h.service.search("manuscript"), []);
   assert.deepEqual(calls, ["search:manuscript"]);
-  assert.deepEqual(results, []);
 });
 
 const { default: sharp } = await import("sharp");

@@ -27,16 +27,19 @@ test("details come from the matching work", async () => {
   const catalog = createOpenLibraryCatalog(direct);
   const requests = respond([{ docs: [doc] }, { description: { value: "A book summary." }, subjects: ["Science fiction", "Ecology"] }]);
   assert.deepEqual(await catalog.fetchDetails({ isbn: "9780553348477", title: "Ecotopia", author: "Ernest Callenbach" }), {
-    summary: "A book summary.",
-    rating: 3.8,
-    ratingCount: 42,
-    sourceUrl: "https://openlibrary.org/works/OL123W",
-    genres: ["Science Fiction"]
+    metadata: {
+      summary: "A book summary.",
+      rating: 3.8,
+      ratingCount: 42,
+      sourceUrl: "https://openlibrary.org/works/OL123W",
+      genres: ["Science Fiction"]
+    },
+    sources: ["openlibrary"]
   });
   assert.equal(new URL(requests[0]!).searchParams.get("isbn"), "9780553348477");
 
   respond([{ docs: [doc] }, { description: "**Plain summary.** Source: [Wikipedia](https://en.wikipedia.org/wiki/Ecotopia)" }]);
-  assert.equal((await catalog.fetchDetails({ isbn: null, title: "ECOTOPIA", author: "Ernest Callenbach" }))?.summary, "Plain summary. Source: Wikipedia");
+  assert.equal((await catalog.fetchDetails({ isbn: null, title: "ECOTOPIA", author: "Ernest Callenbach" }))?.metadata.summary, "Plain summary. Source: Wikipedia");
 });
 
 test("details reject mismatches and untrusted keys", async () => {
@@ -55,10 +58,10 @@ test("details reject mismatches and untrusted keys", async () => {
 test("details tolerate invalid ratings and an empty work", async () => {
   respond([{ docs: [{ ...doc, ratings_average: 8, ratings_count: -2 }] }, {}]);
   const missing = await createOpenLibraryCatalog(direct).fetchDetails({ isbn: "9780553348477", title: "", author: "" });
-  assert.equal(missing?.summary, null);
-  assert.equal(missing?.rating, null);
-  assert.equal(missing?.ratingCount, 0);
-  assert.deepEqual(missing?.genres, []);
+  assert.equal(missing?.metadata.summary, null);
+  assert.equal(missing?.metadata.rating, null);
+  assert.equal(missing?.metadata.ratingCount, 0);
+  assert.deepEqual(missing?.metadata.genres, []);
 });
 
 test("a network failure is reported as unavailable", async () => {
@@ -80,4 +83,17 @@ test("search maps docs and keeps the Open Library cover id", async () => {
   const isbnRequests = respond([{ docs: [] }]);
   assert.deepEqual(await createOpenLibraryCatalog(direct).search({ isbn: "9780441013593" }), []);
   assert.equal(new URL(isbnRequests[0]!).searchParams.get("isbn"), "9780441013593");
+});
+
+test("catalog calls use the urgent lane", async () => {
+  const lanes: Array<boolean | undefined> = [];
+  const recording: Throttle = (task, options) => {
+    lanes.push(options?.urgent);
+    return task();
+  };
+  respond([{ docs: [doc] }, {}, { docs: [] }]);
+  const catalog = createOpenLibraryCatalog(recording);
+  await catalog.fetchDetails({ isbn: "9780553348477", title: "", author: "" });
+  await catalog.search({ text: "dune" });
+  assert.deepEqual(lanes, [true, true, true]);
 });
