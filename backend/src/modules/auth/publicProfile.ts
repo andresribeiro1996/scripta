@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { ReaderProfile } from "@scripta/shared";
-import { env } from "../../config/env.js";
+import { parseThemePreference, type ThemeId } from "@scripta/shared/themes";
 import { openAuthDb } from "./adapters/sqlite/connection.js";
 
 interface CachedStatements {
@@ -10,9 +10,15 @@ interface CachedStatements {
   search: ReturnType<DatabaseSync["prepare"]>;
   getSeen: ReturnType<DatabaseSync["prepare"]>;
   setSeen: ReturnType<DatabaseSync["prepare"]>;
+  getTheme: ReturnType<DatabaseSync["prepare"]>;
 }
 
 let cached: CachedStatements | null = null;
+let avatarUrlFor: ((avatarId: string) => string) | undefined;
+
+export function setAvatarUrlFor(fn: (avatarId: string) => string): void {
+  avatarUrlFor = fn;
+}
 
 function statements(): CachedStatements {
   if (!cached) {
@@ -23,7 +29,8 @@ function statements(): CachedStatements {
       findIdByUsername: db.prepare("SELECT id FROM users WHERE username = ?"),
       search: db.prepare("SELECT id FROM users WHERE username LIKE ? ESCAPE '\\' ORDER BY username LIMIT ?"),
       getSeen: db.prepare("SELECT dashboard_seen_at FROM users WHERE id = ?"),
-      setSeen: db.prepare("UPDATE users SET dashboard_seen_at = ? WHERE id = ?")
+      setSeen: db.prepare("UPDATE users SET dashboard_seen_at = ? WHERE id = ?"),
+      getTheme: db.prepare("SELECT theme FROM users WHERE id = ?")
     };
   }
   return cached;
@@ -31,7 +38,9 @@ function statements(): CachedStatements {
 
 function toReaderProfile(row: { username: string | null; avatar_id: string | null } | undefined): ReaderProfile | undefined {
   if (!row?.username) return undefined;
-  return { username: row.username, avatarUrl: row.avatar_id ? `${env.PUBLIC_API_URL}/auth/avatar/${row.avatar_id}/file` : null };
+  if (!row.avatar_id) return { username: row.username, avatarUrl: null };
+  if (!avatarUrlFor) throw new Error("toReaderProfile: no avatarUrlFor configured; the auth module must be registered first.");
+  return { username: row.username, avatarUrl: avatarUrlFor(row.avatar_id) };
 }
 
 export function resolvePublicReaderProfile(userId: string): ReaderProfile | undefined {
@@ -69,4 +78,10 @@ export function getDashboardSeenAt(userId: string): string | null {
 
 export function setDashboardSeenAt(userId: string, seenAt: string): void {
   statements().setSeen.run(seenAt, userId);
+}
+
+export function getUserTheme(userId: string): ThemeId {
+  const row = statements().getTheme.get(userId) as { theme: string | null } | undefined;
+  const preference = parseThemePreference(row?.theme);
+  return preference === "system" ? "light" : preference;
 }

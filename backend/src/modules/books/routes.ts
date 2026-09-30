@@ -15,27 +15,39 @@ const fileParamsSchema = z.object({ id: z.string().uuid(), size: z.enum(["file",
 const FORBIDDEN = { error: "Only the admin can change shared covers." };
 const NOT_FOUND = { error: "No such book." };
 
+const MAX_BATCH = 100;
+const batchSchema = z.array(lookupSchema).max(MAX_BATCH);
+
+function isLookable(lookup: z.infer<typeof lookupSchema>) {
+  return Boolean(lookup.isbn || lookup.title);
+}
+
 export function buildResolveRoutes(service: BooksService) {
   return async function resolveRoutes(app: FastifyInstance) {
     app.get("/covers/resolve", { preHandler: authGuard }, async (request, reply) => {
       const parsed = lookupSchema.safeParse(request.query);
-      if (!parsed.success || (!parsed.data.isbn && !parsed.data.title)) {
+      if (!parsed.success || !isLookable(parsed.data)) {
         return reply.code(400).send({ error: "Send an isbn or a title (author optional)." });
       }
-      return reply.send(service.resolveCover(parsed.data));
+      return reply.send(service.resolveCover(parsed.data, true));
+    });
+
+    app.post("/covers/resolve/batch", { preHandler: authGuard }, async (request, reply) => {
+      const parsed = batchSchema.safeParse(request.body);
+      if (!parsed.success || !parsed.data.every(isLookable)) {
+        return reply.code(400).send({ error: `Send up to ${MAX_BATCH} lookups, each with an isbn or a title (author optional).` });
+      }
+      return reply.send({ results: parsed.data.map((lookup) => service.resolveCover(lookup)) });
     });
   };
 }
 
-export function buildCoverFileRoutes(service: BooksService) {
+export function buildCoverFileRoutes(publicUrlFor: (id: string, size: CoverFileSize) => string) {
   return async function coverFileRoutes(app: FastifyInstance) {
     app.get("/covers/cached/:id/:size", async (request, reply) => {
       const parsed = fileParamsSchema.safeParse(request.params);
       if (!parsed.success) return reply.code(400).send({ error: "Invalid cover id." });
-      const file = service.getCoverFile(parsed.data.id, parsed.data.size as CoverFileSize);
-      if (!file) return reply.code(404).send({ error: "No such cached cover." });
-      reply.header("Cache-Control", "public, max-age=31536000, immutable");
-      return reply.type(file.mimeType).send(file.buffer);
+      return reply.redirect(publicUrlFor(parsed.data.id, parsed.data.size), 301);
     });
   };
 }
@@ -56,8 +68,14 @@ export function buildCatalogRoutes(service: BooksService) {
     app.get("/books/search", { preHandler: authGuard }, async (request, reply) => {
       const parsed = searchSchema.safeParse(request.query);
       if (!parsed.success) return reply.code(400).send({ error: "Send a search query as q." });
+      return reply.send({ results: service.search(parsed.data.q) });
+    });
+
+    app.get("/books/search/external", { preHandler: authGuard }, async (request, reply) => {
+      const parsed = searchSchema.safeParse(request.query);
+      if (!parsed.success) return reply.code(400).send({ error: "Send a search query as q." });
       try {
-        return reply.send({ results: await service.search(parsed.data.q) });
+        return reply.send({ results: await service.searchExternal(parsed.data.q) });
       } catch (error) {
         if (error instanceof SourceUnavailableError) return reply.code(502).send({ error: "Search is unavailable right now — try again." });
         throw error;

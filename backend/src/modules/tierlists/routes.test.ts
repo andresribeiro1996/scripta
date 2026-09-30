@@ -15,20 +15,20 @@
 // static import would be hoisted above these assignments.
 
 import assert from "node:assert/strict";
+import fastifyMultipart from "@fastify/multipart";
 import Fastify, { type InjectOptions } from "fastify";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { test } from "node:test";
+import sharp from "sharp";
 
 const scratchDir = mkdtempSync(join(tmpdir(), "tierlists-routes-test-"));
 process.env.AUTH_DB_PATH = join(scratchDir, "auth.sqlite");
 process.env.LIBRARY_DB_PATH = join(scratchDir, "library.sqlite");
 process.env.GALLERY_DB_PATH = join(scratchDir, "gallery.sqlite");
-process.env.GALLERY_STORAGE_PATH = join(scratchDir, "gallery-files");
 process.env.COVERS_DB_PATH = join(scratchDir, "covers.sqlite");
-process.env.COVERS_STORAGE_PATH = join(scratchDir, "covers-files");
 process.env.TIERLISTS_DB_PATH = join(scratchDir, "tierlists.sqlite");
 process.env.JWT_ACCESS_SECRET = "a".repeat(64);
 process.env.JWT_REFRESH_SECRET = "b".repeat(64);
@@ -36,7 +36,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 const { applyTierlistsMigrations } = await import("./adapters/sqlite/connection.js");
 const { createSqliteTierlistsRepository } = await import("./adapters/sqlite/sqliteTierlistsRepository.js");
 const { createTierlistsService } = await import("./service.js");
-const { buildPublicTierlistRoutes } = await import("./routes.js");
+const { buildPublicTierlistRoutes, buildTierlistShareVideoRoutes } = await import("./routes.js");
 
 type Service = ReturnType<typeof createTierlistsService>;
 
@@ -78,6 +78,43 @@ test("an OPEN poll's board withholds the histogram from anyone reading it", asyn
   assert.equal(board.ballotCount, 1);
   assert.equal(board.votingOpen, true);
   assert.equal("id" in board, false);
+});
+
+test("share video renders an MP4 only for the published tier list's owner", async () => {
+  const { service, copy } = openPoll();
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", (token: string) => token === "u1" || token === "u2" ? { id: token, email: `${token}@example.test`, username: token, avatarId: null } : null);
+  await app.register(fastifyMultipart, { limits: { fileSize: 4 * 1024 * 1024, files: 1 } });
+  await app.register(buildTierlistShareVideoRoutes(service));
+
+  function upload(image: Buffer, user: string) {
+    const boundary = "tierlist-card";
+    return app.inject({
+      method: "POST",
+      url: `/tierlists/${copy.id}/share-video`,
+      headers: { authorization: `Bearer ${user}`, "content-type": `multipart/form-data; boundary=${boundary}` },
+      payload: Buffer.concat([
+        Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="image"; filename="card.png"\r\nContent-Type: image/png\r\n\r\n`),
+        image,
+        Buffer.from(`\r\n--${boundary}--\r\n`)
+      ])
+    });
+  }
+
+  try {
+    const png = await sharp({ create: { width: 600, height: 1500, channels: 3, background: "#f2f0ec" } }).png().toBuffer();
+    assert.equal((await upload(png, "u2")).statusCode, 404);
+    assert.equal((await upload(Buffer.from("not a PNG"), "u1")).statusCode, 400);
+    const jpeg = await sharp({ create: { width: 600, height: 1500, channels: 3, background: "#f2f0ec" } }).jpeg().toBuffer();
+    assert.equal((await upload(jpeg, "u1")).statusCode, 400);
+    const response = await upload(png, "u1");
+    assert.equal(response.statusCode, 200);
+    const video = Buffer.from((response.json() as { base64: string }).base64, "base64");
+    assert.ok(video.length > 1000);
+    assert.equal(video.toString("ascii", 4, 8), "ftyp");
+  } finally {
+    await app.close();
+  }
 });
 
 test("a CLOSED poll's board carries the final histogram", async () => {

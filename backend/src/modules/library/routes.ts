@@ -76,6 +76,12 @@ const addBookSchema = z.object({
   day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()
 });
 
+const mergeBooksSchema = z.object({
+  keep: z.string().min(1),
+  merge: z.array(z.string().min(1)).max(50),
+  updatedAt: z.string().datetime()
+});
+
 /** The authenticated surface — get/save/share/unshare, all behind
  *  authGuard. Registered in plugin.ts with no rate limit, same as before. */
 export function buildLibraryRoutes(service: LibraryService) {
@@ -131,6 +137,22 @@ export function buildLibraryRoutes(service: LibraryService) {
       } catch (error) {
         if (error instanceof LibraryConflictError) {
           return reply.code(409).send({ error: error.message });
+        }
+        throw error;
+      }
+    });
+
+    app.post("/library/books/merge", { preHandler: authGuard }, async (request, reply) => {
+      const parsed = mergeBooksSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: "Expected { keep, merge: [...], updatedAt }." });
+      }
+      try {
+        return reply.send(service.mergeBooks(request.user.id, parsed.data.keep, parsed.data.merge, parsed.data.updatedAt));
+      } catch (error) {
+        if (error instanceof NoLibraryDocumentError) return reply.code(404).send({ error: "No library saved yet." });
+        if (error instanceof LibraryConflictError) {
+          return reply.code(409).send({ error: error.message, current: service.getLibrary(request.user.id) });
         }
         throw error;
       }

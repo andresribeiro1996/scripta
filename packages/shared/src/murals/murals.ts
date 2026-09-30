@@ -18,6 +18,7 @@
 import type { BlockStyle } from "../library/libraryStyle.js";
 import type { BookGenre } from "../library/bookGenres.js";
 import { bookKey } from "../library/merge.js";
+import { THEME_IDS, type ThemeId } from "../themes/palettes.js";
 
 export type BlockLayout = { x: number; y: number; w: number; h: number };
 
@@ -114,6 +115,7 @@ export function muralBlockTitle(block: MuralBlock, books: Array<Record<string, u
 export interface Mural {
   id: string;
   name: string;
+  theme: ThemeId;
   blocks: MuralBlock[];
   createdAt: string;
   updatedAt: string;
@@ -179,10 +181,14 @@ const DEFAULT_SIZE_BY_TYPE: Record<BlockType, { w: number; h: number }> = {
   readerCard: { w: 4, h: 6 }
 };
 
+function minimumHeight(block: MuralBlock) {
+  return block.type === "currentlyReading" ? 6 : block.type === "shelf" ? 4 : block.type === "tierlist" ? 8 : 0;
+}
+
 export function ensureBookBlockHeights(blocks: MuralBlock[]): MuralBlock[] {
   const boundaries = new Map<number, number>();
   for (const block of blocks) {
-    const minimum = block.type === "shelf" || block.type === "currentlyReading" ? 4 : block.type === "tierlist" ? 8 : 0;
+    const minimum = minimumHeight(block);
     const increase = Math.max(0, minimum - block.layout.h);
     if (increase > 0) {
       const boundary = block.layout.y + block.layout.h;
@@ -191,7 +197,7 @@ export function ensureBookBlockHeights(blocks: MuralBlock[]): MuralBlock[] {
   }
   if (boundaries.size === 0) return blocks;
   return blocks.map((block) => {
-    const minimum = block.type === "shelf" || block.type === "currentlyReading" ? 4 : block.type === "tierlist" ? 8 : 0;
+    const minimum = minimumHeight(block);
     const shift = [...boundaries].reduce((total, [boundary, amount]) => total + (block.layout.y >= boundary ? amount : 0), 0);
     return { ...block, layout: { ...block.layout, y: block.layout.y + shift, h: Math.max(block.layout.h, minimum) } };
   });
@@ -320,9 +326,13 @@ export function createBlockCandidate(type: BlockType, blocks: MuralBlock[]): Mur
   return defaultBlockForType(newId(), type, findAvailableLayout(blocks, w, h));
 }
 
-export function profileOnlyMural(): Mural {
+export function muralThemeId(theme: unknown): ThemeId {
+  return THEME_IDS.find((id) => id === theme) ?? "light";
+}
+
+export function profileOnlyMural(theme: ThemeId): Mural {
   const block = createBlockCandidate("profile", []);
-  return { id: "profile", name: "", blocks: [{ ...block, layout: { x: 0, y: 0, w: GRID_COLUMNS, h: 3 } }], createdAt: "", updatedAt: "", shareToken: null, shareUrl: null, folderId: null };
+  return { id: "profile", name: "", theme, blocks: [{ ...block, layout: { x: 0, y: 0, w: GRID_COLUMNS, h: 3 } }], createdAt: "", updatedAt: "", shareToken: null, shareUrl: null, folderId: null };
 }
 
 export function createDuplicateCandidate(block: MuralBlock, blocks: MuralBlock[]): MuralBlock {

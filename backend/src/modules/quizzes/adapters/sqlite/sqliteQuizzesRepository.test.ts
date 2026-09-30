@@ -11,7 +11,6 @@ process.env.JWT_REFRESH_SECRET ??= "b".repeat(64);
 process.env.AUTH_DB_PATH ??= join(scratchDir, "auth.sqlite");
 process.env.LIBRARY_DB_PATH ??= join(scratchDir, "library.sqlite");
 process.env.GALLERY_DB_PATH ??= join(scratchDir, "gallery.sqlite");
-process.env.GALLERY_STORAGE_PATH ??= join(scratchDir, "gallery-files");
 
 const { applyQuizzesMigrations } = await import("./connection.js");
 import { createSqliteQuizzesRepository } from "./sqliteQuizzesRepository.js";
@@ -136,4 +135,18 @@ test("deleteUserData erases the account's quizzes and unlinks their plays elsewh
   assert.deepEqual(repo.getPlayByVoter("theirs", "u1"), undefined);
   assert.equal(repo.getPlayById("theirs", "guest")?.player_name, null);
   assert.equal(repo.getPlayByVoter("theirs", "u9")?.id, "other");
+});
+
+test("rekeyBooks rewrites the owner's unpublished quiz books and de-duplicates by key", () => {
+  const db = new DatabaseSync(":memory:");
+  applyQuizzesMigrations(db);
+  const insert = db.prepare("INSERT INTO quizzes (id, owner_user_id, name, data, vote_code, updated_at) VALUES (?, ?, 'q', ?, ?, 't0')");
+  const data = JSON.stringify({ sourceLabel: "", questionCount: 5, allowedTypes: [], books: [{ key: "new", title: "Dune" }, { key: "old", title: "Dune" }, { key: "x", title: "X" }], questions: null });
+  insert.run("draft", "u1", data, null);
+  insert.run("published", "u1", data, "CODE1");
+  createSqliteQuizzesRepository(db).rekeyBooks("u1", ["old"], "new");
+  const read = (id: string) => db.prepare("SELECT data, updated_at FROM quizzes WHERE id = ?").get(id) as { data: string; updated_at: string };
+  assert.deepEqual(JSON.parse(read("draft").data).books, [{ key: "new", title: "Dune" }, { key: "x", title: "X" }]);
+  assert.notEqual(read("draft").updated_at, "t0");
+  assert.equal(read("published").data, data);
 });

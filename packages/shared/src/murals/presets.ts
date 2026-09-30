@@ -6,10 +6,10 @@ import { eligiblePassages } from "./home.js";
 import { ensureBookBlockHeights, newId, type BlockLayout, type MuralBlock } from "./murals.js";
 
 export const MURAL_PRESETS = [
-  { id: "best", name: "All-time favourites", description: "The books that stayed with you.", color: "#44252e", accent: "#edcd96" },
-  { id: "recent", name: "Recently finished", description: "Your last pages, newest first.", color: "#233d35", accent: "#c2dbc9" },
-  { id: "next", name: "Want to read", description: "Stories waiting their turn.", color: "#25364f", accent: "#c5d7f1" },
-  { id: "shelf", name: "My shelf", description: "What you're reading, what you've finished, and a passage to revisit.", color: "#2b2622", accent: "#e6c79c" }
+  { id: "best", name: "All-time favourites", description: "The books that stayed with you." },
+  { id: "recent", name: "Recently finished", description: "Your last pages, newest first." },
+  { id: "next", name: "Want to read", description: "Stories waiting their turn." },
+  { id: "shelf", name: "My shelf", description: "What you're reading, what you've finished, and a passage to revisit." }
 ] as const;
 
 export type MuralPresetId = typeof MURAL_PRESETS[number]["id"];
@@ -71,10 +71,9 @@ export function buildMuralPreset(id: MuralPresetId, books: Book[], groups: Group
   const library = titledBooks(books);
   const selected = presetBooks(id, library).slice(0, SHELF_SIZE);
   const keys = (list: Book[]) => list.map(bookKey);
-  const style: BlockStyle = { ...DEFAULT_BLOCK_STYLE, backgroundColor: preset.color, textColor: "#f5f1e9", cardBorderWidth: 0, cardShadow: false, cardRadius: 16, fontFamily: "sans" };
-  const accentStyle: BlockStyle = { ...style, backgroundColor: preset.accent, textColor: preset.color, fontFamily: "playfairDisplay" };
-  const at = (x: number, y: number, w: number, h: number, accent = false): { id: string; layout: BlockLayout; style: BlockStyle } =>
-    ({ id: newId(), layout: { x, y, w, h }, style: accent ? accentStyle : style });
+  const accentStyle: BlockStyle = { ...DEFAULT_BLOCK_STYLE, fontFamily: "playfairDisplay" };
+  const at = (x: number, y: number, w: number, h: number, accent = false): { id: string; layout: BlockLayout; style?: BlockStyle } =>
+    ({ id: newId(), layout: { x, y, w, h }, ...(accent ? { style: accentStyle } : {}) });
   const blocks: MuralBlock[] = [];
 
   if (id === "shelf") {
@@ -87,15 +86,15 @@ export function buildMuralPreset(id: MuralPresetId, books: Book[], groups: Group
     const hasCard = readerIdentity(library, groups).state === "settled";
     let statsY: number;
     if (hasCard) {
-      blocks.push({ ...at(0, profileBottom, 6, 7), type: "readerCard" });
-      blocks.push({ ...at(6, profileBottom, 6, 7), type: "stats", metrics: ["totalBooks", "booksFinished", "booksInProgress"] });
-      statsY = profileBottom + 7;
+      blocks.push({ ...at(0, profileBottom, 6, 6), type: "readerCard" });
+      blocks.push({ ...at(6, profileBottom, 6, 6), type: "stats", metrics: ["totalBooks", "booksFinished", "booksInProgress"] });
+      statsY = profileBottom + 6;
     } else {
       blocks.push({ ...at(0, profileBottom, 12, 4), type: "stats", metrics: ["totalBooks", "booksFinished", "booksInProgress"] });
       statsY = profileBottom + 4;
     }
     let y = statsY;
-    if (reading.length) { blocks.push({ ...at(0, y, 12, 4), type: "currentlyReading" }); y += 4; }
+    if (reading.length) { blocks.push({ ...at(0, y, 12, 6), type: "currentlyReading" }); y += 6; }
     if (finished.length) { blocks.push({ ...at(0, y, 12, 5), type: "shelf", title: "Finished", role: "finished", bookKeys: keys(finished) }); y += 5; }
     const width = hasPassage && loved.length ? 6 : 12;
     if (hasPassage) blocks.push({ ...at(0, y, width, 5), type: "quote", bookKey: "", highlightId: "", mode: "rediscover" });

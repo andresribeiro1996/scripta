@@ -91,6 +91,32 @@ export function createSqliteQuizzesRepository(db: DatabaseSync): QuizzesReposito
       }
     },
 
+    rekeyBooks(userId, fromKeys, toKey) {
+      const from = new Set(fromKeys);
+      const now = new Date().toISOString();
+      const update = db.prepare("UPDATE quizzes SET data = ?, updated_at = ? WHERE id = ?");
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        for (const row of db.prepare("SELECT id, data FROM quizzes WHERE owner_user_id = ? AND vote_code IS NULL").all(userId) as Array<{ id: string; data: string }>) {
+          const parsed = JSON.parse(row.data) as Record<string, unknown>;
+          if (!Array.isArray(parsed.books)) continue;
+          const seen = new Set<string>();
+          const books = parsed.books.flatMap((book: unknown) => {
+            if (typeof book !== "object" || book === null || typeof (book as { key?: unknown }).key !== "string") return [book];
+            const key = from.has((book as { key: string }).key) ? toKey : (book as { key: string }).key;
+            if (seen.has(key)) return [];
+            seen.add(key);
+            return [{ ...book, key }];
+          });
+          const after = JSON.stringify({ ...parsed, books });
+          if (after !== JSON.stringify(parsed)) update.run(after, now, row.id);
+        }
+        db.exec("COMMIT");
+      } catch (error) {
+        db.exec("ROLLBACK");
+        throw error;
+      }
+    },
     deleteUserData(userId) {
       // Own quizzes (with their plays and answers) go; the account's plays
       // on other people's quizzes are unlinked, not deleted — the

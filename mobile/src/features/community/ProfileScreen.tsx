@@ -11,12 +11,13 @@ import { reconstructBooks, reconstructTierlists } from "../public/adapters";
 import { PublicLibraryGrid } from "../public/PublicLibraryGrid";
 import type { GalleryImage } from "../gallery/api";
 import { ActivityList } from "./ActivityList";
+import { AuthorAvatar } from "./AuthorAvatar";
 import { fetchProfile, fetchProfileLibrary, followUser, unfollowUser, type CommunityProfileView } from "./api";
 import { contentDetail, contentKindLabel, contentTarget } from "./communityHome";
 import { ReaderGlyph } from "./ReaderGlyph";
 
 export function ProfileScreen({ username }: { username: string }) {
-  const { colors } = useTheme();
+  const { colors, id: viewerTheme } = useTheme();
   const queryClient = useQueryClient();
   const profile = useQuery({
     queryKey: ["community", "profile", username],
@@ -74,10 +75,23 @@ export function ProfileScreen({ username }: { username: string }) {
     );
   }
 
+  if (view!.private) {
+    return (
+      <Centered>
+        <Stack.Screen options={{ headerShown: true, title: view!.profile.user.username }} />
+        <View style={styles.privateAvatar}>
+          <AuthorAvatar username={view!.profile.user.username} avatarUrl={view!.profile.user.avatarUrl} size={72} />
+        </View>
+        <EmptyState title="This profile is private" />
+      </Centered>
+    );
+  }
+
   const mural: Mural | null = muralData
     ? {
         id: muralData.mural.id,
         name: muralData.mural.name,
+        theme: muralData.mural.theme,
         blocks: ensureBookBlockHeights(muralData.mural.blocks),
         createdAt: "",
         updatedAt: "",
@@ -134,7 +148,7 @@ export function ProfileScreen({ username }: { username: string }) {
                       statsOverride={muralData?.library.stats}
                     />
                   ) : (
-                    <MuralCanvas mural={profileOnlyMural()} books={[]} images={[]} tierlists={[]} profile={profileUser} />
+                    <MuralCanvas mural={profileOnlyMural(viewerTheme)} books={[]} images={[]} tierlists={[]} profile={profileUser} />
                   )}
                   <Button
                     label={view!.profile.viewerFollows === true ? "Following" : "Follow"}
@@ -287,6 +301,7 @@ export function MuralPicker({
 const styles = StyleSheet.create({
   grow: { flex: 1 },
   strong: { fontWeight: "700" },
+  privateAvatar: { alignItems: "center" },
   centered: { flex: 1, justifyContent: "center", padding: spacing.lg, gap: spacing.md },
   headerTitleRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   metaName: { flexShrink: 1 },

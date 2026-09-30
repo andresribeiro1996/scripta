@@ -3,13 +3,14 @@
 // MuralsRepository interface this fulfills.
 
 import type { DatabaseSync } from "node:sqlite";
+import { rekeyBlocks } from "../../domain/rekeyBlocks.js";
 import type { MuralsRepository } from "../../domain/ports.js";
 import type { MuralFolderRow, MuralRow } from "../../domain/types.js";
 
 export function createSqliteMuralsRepository(db: DatabaseSync): MuralsRepository {
   const insertStmt = db.prepare(`
-    INSERT INTO murals (id, user_id, name, blocks, cover_image_id, cover_image_url, share_token, folder_id, created_at, updated_at)
-    VALUES ($id, $user_id, $name, $blocks, $cover_image_id, $cover_image_url, $share_token, $folder_id, $created_at, $updated_at)
+    INSERT INTO murals (id, user_id, name, theme, blocks, cover_image_id, cover_image_url, share_token, folder_id, created_at, updated_at)
+    VALUES ($id, $user_id, $name, $theme, $blocks, $cover_image_id, $cover_image_url, $share_token, $folder_id, $created_at, $updated_at)
   `);
   const listStmt = db.prepare(`SELECT * FROM murals WHERE user_id = ? ORDER BY created_at DESC`);
   const getOwnedStmt = db.prepare(`SELECT * FROM murals WHERE id = ? AND user_id = ?`);
@@ -18,7 +19,7 @@ export function createSqliteMuralsRepository(db: DatabaseSync): MuralsRepository
   // column already has its final value by the time this runs.
   const updateStmt = db.prepare(`
     UPDATE murals
-    SET name = $name, blocks = $blocks, cover_image_id = $cover_image_id, cover_image_url = $cover_image_url, folder_id = $folder_id, updated_at = $updated_at
+    SET name = $name, theme = $theme, blocks = $blocks, cover_image_id = $cover_image_id, cover_image_url = $cover_image_url, folder_id = $folder_id, updated_at = $updated_at
     WHERE id = $id AND user_id = $user_id
       AND ($expected_updated_at IS NULL OR updated_at = $expected_updated_at)
   `);
@@ -58,6 +59,23 @@ export function createSqliteMuralsRepository(db: DatabaseSync): MuralsRepository
         throw error;
       }
     },
+    rekeyBooks(userId, fromKeys, toKey) {
+      const from = new Set(fromKeys);
+      const now = new Date().toISOString();
+      const update = db.prepare("UPDATE murals SET blocks = ?, updated_at = ? WHERE id = ?");
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        for (const row of db.prepare("SELECT id, blocks FROM murals WHERE user_id = ?").all(userId) as Array<{ id: string; blocks: string }>) {
+          const before = JSON.stringify(JSON.parse(row.blocks));
+          const after = JSON.stringify(rekeyBlocks(JSON.parse(row.blocks), from, toKey));
+          if (after !== before) update.run(after, now, row.id);
+        }
+        db.exec("COMMIT");
+      } catch (error) {
+        db.exec("ROLLBACK");
+        throw error;
+      }
+    },
     listByUser(userId) {
       return listStmt.all(userId) as unknown as MuralRow[];
     },
@@ -71,6 +89,7 @@ export function createSqliteMuralsRepository(db: DatabaseSync): MuralsRepository
         $id: row.id,
         $user_id: row.user_id,
         $name: row.name,
+        $theme: row.theme,
         $blocks: row.blocks,
         $cover_image_id: row.cover_image_id,
         $cover_image_url: row.cover_image_url,
@@ -91,6 +110,7 @@ export function createSqliteMuralsRepository(db: DatabaseSync): MuralsRepository
         $id: id,
         $user_id: userId,
         $name: merged.name,
+        $theme: merged.theme,
         $blocks: merged.blocks,
         $cover_image_id: merged.cover_image_id,
         $cover_image_url: merged.cover_image_url,

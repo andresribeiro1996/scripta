@@ -14,11 +14,13 @@
 //
 // The actual Open Library fetch now runs server-side
 // (backend/src/modules/books/adapters/openlibrary/openLibraryCatalog.ts);
-// frontend/src/lib/bookSearch.ts's searchBooks just calls GET
-// /books/search. This module holds only the pure query-shape and
-// result-mapping logic.
+// both clients' bookSearchApi calls GET /books/search (saved books) and
+// GET /books/search/external (Open Library). This module holds only the
+// pure query-shape, merge and result-mapping logic.
 
 import { normalizeBookGenres, type BookGenre } from "./bookGenres.js";
+import { normalizeIsbn } from "./covers.js";
+import { bookKey } from "./merge.js";
 
 export interface BookSearchResult {
   title: string;
@@ -36,6 +38,67 @@ export interface BookSearchResult {
 export function looksLikeIsbnQuery(text: string): boolean {
   const digits = text.replace(/[\s-]/g, "");
   return /^(?:97[89]\d{10}|\d{9}[\dXx])$/.test(digits);
+}
+
+function isSameBook(a: BookSearchResult, b: BookSearchResult): boolean {
+  const isbnA = normalizeIsbn(a.isbn);
+  const isbnB = normalizeIsbn(b.isbn);
+  if (isbnA && isbnB) return isbnA === isbnB;
+  const titleAndAuthor = (r: BookSearchResult) => bookKey({ Title: r.title, Attribution: r.authors[0] ?? "" });
+  return titleAndAuthor(a) === titleAndAuthor(b);
+}
+
+/** Inside (saved) results first, then the outside (Open Library) results
+ *  that aren't already listed: same ISBN, or same title + first author
+ *  when either side has no ISBN. */
+export function mergeSearchResults(inside: BookSearchResult[], outside: BookSearchResult[]): BookSearchResult[] {
+  const merged = [...inside];
+  for (const result of outside) {
+    if (!merged.some((existing) => isSameBook(existing, result))) merged.push(result);
+  }
+  return merged;
+}
+
+export interface BookSearchApi {
+  inside: (query: string) => Promise<BookSearchResult[]>;
+  outside: (query: string) => Promise<BookSearchResult[]>;
+}
+
+export interface BookSearchState {
+  results: BookSearchResult[];
+  outsidePending: boolean;
+  outsideFailed: boolean;
+}
+
+type Settled<T> = { ok: true; value: T } | { ok: false; error: unknown };
+
+function settle<T>(promise: Promise<T>): Promise<Settled<T>> {
+  return promise.then((value) => ({ ok: true, value }), (error: unknown) => ({ ok: false, error }));
+}
+
+/** Runs the inside (saved) and outside (Open Library) searches together
+ *  and reports each step through onState: inside results as soon as they
+ *  land, then the merged list. An ISBN that inside already answers skips
+ *  outside. Rejects when inside fails, or when outside fails with nothing
+ *  inside to show; outside failing behind inside results is reported as
+ *  outsideFailed instead. */
+export async function searchInsideOutside(query: string, api: BookSearchApi, onState: (state: BookSearchState) => void): Promise<void> {
+  const isbnQuery = looksLikeIsbnQuery(query);
+  const insidePromise = api.inside(query);
+  const early = isbnQuery ? null : settle(api.outside(query));
+  const inside = await insidePromise;
+  if (isbnQuery && inside.length > 0) {
+    onState({ results: inside, outsidePending: false, outsideFailed: false });
+    return;
+  }
+  onState({ results: inside, outsidePending: true, outsideFailed: false });
+  const outside = await (early ?? settle(api.outside(query)));
+  if (outside.ok) {
+    onState({ results: mergeSearchResults(inside, outside.value), outsidePending: false, outsideFailed: false });
+    return;
+  }
+  if (inside.length === 0) throw outside.error;
+  onState({ results: inside, outsidePending: false, outsideFailed: true });
 }
 
 /** One Open Library search "doc" -> the slim shape the result list

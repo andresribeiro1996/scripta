@@ -12,6 +12,7 @@ import type {
 } from "@scripta/shared/community";
 import type { DashboardFeedPage } from "@scripta/shared/dashboard";
 import type { PublicReaderCard } from "@scripta/shared";
+import type { ThemeId } from "@scripta/shared/themes";
 import type { MuralBlock, ShelfTheme } from "../lib/murals";
 import type { LibraryData } from "./library";
 import { apiFetch, publicFetch } from "./client";
@@ -19,9 +20,10 @@ import type { PublicBookData, PublicHighlight } from "./sharedMurals";
 import type { ResolvedTierlist } from "./tierlists";
 
 export interface CommunityProfileView {
+  private: boolean;
   profile: PublishedProfile;
   mural: {
-    mural: { id: string; name: string; blocks: MuralBlock[]; coverImageUrl: string | null };
+    mural: { id: string; name: string; theme: ThemeId; blocks: MuralBlock[]; coverImageUrl: string | null };
     library: {
       books: PublicBookData[];
       highlights: PublicHighlight[];

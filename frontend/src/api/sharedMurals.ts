@@ -11,6 +11,7 @@
 // app already has (see that file's own top comment, or blockRefs.ts's).
 
 import type { PublicReaderCard } from "@scripta/shared";
+import type { ThemeId } from "@scripta/shared/themes";
 import type { MuralBlock, ReaderProfile, ShelfTheme } from "../lib/murals";
 import { publicFetch } from "./client";
 import type { ResolvedTierlist } from "./tierlists";
@@ -32,7 +33,7 @@ export interface PublicHighlight {
 }
 
 export interface SharedMuralPayload {
-  mural: { id: string; name: string; blocks: MuralBlock[]; coverImageUrl: string | null };
+  mural: { id: string; name: string; theme: ThemeId; blocks: MuralBlock[]; coverImageUrl: string | null };
   books: PublicBookData[];
   highlights: PublicHighlight[];
   currentlyReading: PublicBookData[];

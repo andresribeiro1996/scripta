@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { blockTextColors, contrastRatio, mutedTextColor } from "./blockTextColors.js";
-import { MURAL_PRESETS } from "./presets.js";
+import { blockTextColors, contrastRatio, mutedTextColor, normalizeHexColor, parseHexColor, parseThemeColorRef, resolveBlockColor, themeColorRef, toHex } from "./blockTextColors.js";
+import { themes } from "../themes/palettes.js";
 
-const starterBackground = MURAL_PRESETS.find((preset) => preset.id === "shelf")!.color;
+const light = themes.light.colors;
+const dark = themes.dark.colors;
+
+const starterBackground = "#2b2622";
 const starterText = "#f5f1e9";
 
 test("mutedTextColor mutes light text on a dark card while staying readable", () => {
@@ -45,33 +48,33 @@ test("mutedTextColor returns null for unparseable colours", () => {
 });
 
 test("blockTextColors keeps the theme's colours when the block has no overrides", () => {
-  const theme = { text: "#111111", textDim: "#666666", surface: "#eeeeee" };
-  assert.deepEqual(blockTextColors({ backgroundColor: null, textColor: null }, theme), { text: theme.text, dim: theme.textDim });
+  const theme = { ...light, text: "#111111", textDim: "#666666", surface: "#eeeeee" };
+  assert.deepEqual(blockTextColors({ backgroundColor: null, textColor: null }, theme), { text: theme.text, dim: theme.textDim, accent: theme.accent });
 });
 
 test("blockTextColors mutes against the theme surface when only textColor is overridden", () => {
-  const theme = { text: "#111111", textDim: "#666666", surface: "#0a0a0a" };
+  const theme = { ...light, text: "#111111", textDim: "#666666", surface: "#0a0a0a" };
   const { text, dim } = blockTextColors({ backgroundColor: null, textColor: starterText }, theme);
   assert.equal(text, starterText);
   assert.ok(contrastRatio(dim, theme.surface)! >= 4.5);
 });
 
 test("blockTextColors mutes against the block background when only backgroundColor is overridden", () => {
-  const theme = { text: "#eeeeee", textDim: "#999999", surface: "#ffffff" };
+  const theme = { ...light, text: "#eeeeee", textDim: "#999999", surface: "#ffffff" };
   const { text, dim } = blockTextColors({ backgroundColor: starterBackground, textColor: null }, theme);
   assert.equal(text, theme.text);
   assert.ok(contrastRatio(dim, starterBackground)! >= 4.5);
 });
 
 test("blockTextColors mutes against the block's own colours when both are overridden", () => {
-  const theme = { text: "#000000", textDim: "#333333", surface: "#ffffff" };
+  const theme = { ...light, text: "#000000", textDim: "#333333", surface: "#ffffff" };
   const { text, dim } = blockTextColors({ backgroundColor: starterBackground, textColor: starterText }, theme);
   assert.equal(text, starterText);
   assert.ok(contrastRatio(dim, starterBackground)! >= 4.5);
 });
 
 test("blockTextColors falls back to theme.textDim when the override colours don't parse", () => {
-  const theme = { text: "#111111", textDim: "#666666", surface: "#0a0a0a" };
+  const theme = { ...light, text: "#111111", textDim: "#666666", surface: "#0a0a0a" };
   const { dim } = blockTextColors({ backgroundColor: "not-a-color", textColor: null }, theme);
   assert.equal(dim, theme.textDim);
 });
@@ -98,4 +101,74 @@ test("mutedTextColor's returned hex, not just the unrounded mix, meets 4.5:1 aga
       assert.ok(actual >= 4.5, `${text} on ${background} muted to ${dim} (${actual.toFixed(4)}:1)`);
     }
   }
+});
+
+test("resolveBlockColor turns a theme reference into the viewer's theme colour", () => {
+  assert.equal(resolveBlockColor(themeColorRef("accentSoft"), light), light.accentSoft);
+  assert.equal(resolveBlockColor(themeColorRef("accentSoft"), dark), dark.accentSoft);
+});
+
+test("resolveBlockColor passes hex, transparent and null through", () => {
+  assert.equal(resolveBlockColor("#123456", light), "#123456");
+  assert.equal(resolveBlockColor("transparent", light), "transparent");
+  assert.equal(resolveBlockColor(null, light), null);
+});
+
+test("an unknown theme key resolves to the theme default, not a colour", () => {
+  assert.equal(resolveBlockColor("theme:nope", light), null);
+  assert.equal(parseThemeColorRef("theme:nope"), null);
+  assert.equal(parseThemeColorRef("#ffffff"), null);
+  assert.equal(parseThemeColorRef(themeColorRef("onAccent")), "onAccent");
+});
+
+test("blockTextColors measures a transparent block against the page background", () => {
+  const colors = blockTextColors({ backgroundColor: "transparent", textColor: null }, light);
+  assert.equal(colors.text, light.text);
+  assert.equal(colors.dim, mutedTextColor(light.text, light.background));
+});
+
+test("blockTextColors resolves theme references before measuring", () => {
+  const colors = blockTextColors({ backgroundColor: themeColorRef("accent"), textColor: themeColorRef("onAccent") }, dark);
+  assert.equal(colors.text, dark.onAccent);
+  assert.ok(contrastRatio(colors.dim, dark.accent)! >= 4.5);
+});
+
+test("blockTextColors keeps the theme accent when the block has no overrides", () => {
+  assert.equal(blockTextColors({ backgroundColor: null, textColor: null }, light).accent, light.accent);
+});
+
+test("blockTextColors swaps the accent for the text colour when the block is painted with the accent", () => {
+  for (const theme of [light, dark]) {
+    const colors = blockTextColors({ backgroundColor: themeColorRef("accent"), textColor: themeColorRef("onAccent") }, theme);
+    assert.equal(colors.accent, theme.onAccent);
+  }
+});
+
+test("blockTextColors swaps the accent for the text colour on a fixed background equal to the accent", () => {
+  const colors = blockTextColors({ backgroundColor: light.accent, textColor: "#ffffff" }, light);
+  assert.equal(colors.accent, "#ffffff");
+});
+
+test("blockTextColors keeps the theme accent where it reads against the block background", () => {
+  assert.equal(blockTextColors({ backgroundColor: "#ffffff", textColor: null }, light).accent, light.accent);
+});
+
+test("normalizeHexColor expands shorthand, lowercases and trims", () => {
+  assert.equal(normalizeHexColor("#abc"), "#aabbcc");
+  assert.equal(normalizeHexColor("#AABBCC"), "#aabbcc");
+  assert.equal(normalizeHexColor("  #1A2b3C \n"), "#1a2b3c");
+});
+
+test("normalizeHexColor rejects anything that is not #rgb or #rrggbb", () => {
+  for (const input of ["abc", "#abcd", "#ggg", "#12345", "", "rgb(0,0,0)"]) assert.equal(normalizeHexColor(input), null, input);
+});
+
+test("parseHexColor and toHex round-trip", () => {
+  for (const hex of ["#000000", "#ffffff", "#1a2b3c", "#97532d"]) assert.equal(toHex(parseHexColor(hex)!), hex);
+  assert.deepEqual(parseHexColor("#0080ff"), { r: 0, g: 128, b: 255 });
+});
+
+test("toHex rounds and clamps each channel", () => {
+  assert.equal(toHex({ r: 127.6, g: -3, b: 300 }), "#8000ff");
+  assert.equal(toHex({ r: 127.99998, g: 0.4, b: 254.5 }), "#8000ff");
 });

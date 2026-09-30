@@ -11,7 +11,6 @@ const scratch = mkdtempSync(join(tmpdir(), "library-import-test-"));
 process.env.AUTH_DB_PATH = join(scratch, "auth.sqlite");
 process.env.LIBRARY_DB_PATH = join(scratch, "library.sqlite");
 process.env.GALLERY_DB_PATH = join(scratch, "gallery.sqlite");
-process.env.GALLERY_STORAGE_PATH = join(scratch, "gallery-files");
 process.env.JWT_ACCESS_SECRET = "a".repeat(64);
 process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 process.env.IMPORT_MAX_UPLOAD_BYTES = "32768";
@@ -72,6 +71,7 @@ async function testApp() {
     share: () => { throw new Error("not used"); },
     unshare: () => undefined,
     addBook: () => { throw new Error("not used"); },
+    mergeBooks: () => { throw new Error("not used"); },
     getPublicByToken: () => null
   };
   const app = Fastify();

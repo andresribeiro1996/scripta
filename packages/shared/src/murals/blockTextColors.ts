@@ -1,10 +1,51 @@
 import type { BlockStyle } from "../library/libraryStyle.js";
+import type { ThemeColors } from "../themes/palettes.js";
 
-type Rgb = { r: number; g: number; b: number };
+export const BLOCK_THEME_COLOR_KEYS = ["background", "surface", "text", "accent", "accentSoft", "accentFill", "onAccent"] as const;
+export type BlockThemeColorKey = (typeof BLOCK_THEME_COLOR_KEYS)[number];
+export const BLOCK_THEME_COLOR_LABELS: Record<BlockThemeColorKey, string> = {
+  background: "Page",
+  surface: "Surface",
+  text: "Text",
+  accent: "Accent",
+  accentSoft: "Tint",
+  accentFill: "Fill",
+  onAccent: "On accent"
+};
+
+const THEME_REF = "theme:";
+
+export function themeColorRef(key: BlockThemeColorKey): string {
+  return `${THEME_REF}${key}`;
+}
+
+export function parseThemeColorRef(value: string | null): BlockThemeColorKey | null {
+  if (!value?.startsWith(THEME_REF)) return null;
+  const key = value.slice(THEME_REF.length);
+  return (BLOCK_THEME_COLOR_KEYS as readonly string[]).includes(key) ? (key as BlockThemeColorKey) : null;
+}
+
+export function resolveBlockColor(value: string | null, palette: Pick<ThemeColors, BlockThemeColorKey>): string | null {
+  if (!value?.startsWith(THEME_REF)) return value;
+  const key = parseThemeColorRef(value);
+  return key ? palette[key] : null;
+}
+
+export function effectiveBlockColors(
+  style: Pick<BlockStyle, "backgroundColor" | "textColor">,
+  theme: Pick<ThemeColors, BlockThemeColorKey>
+): { text: string; background: string } {
+  return {
+    text: resolveBlockColor(style.textColor, theme) ?? theme.text,
+    background: style.backgroundColor === "transparent" ? theme.background : resolveBlockColor(style.backgroundColor, theme) ?? theme.surface
+  };
+}
+
+export type Rgb = { r: number; g: number; b: number };
 
 const MIX_SHARES = [0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1];
 
-function parseHexColor(value: string): Rgb | null {
+export function parseHexColor(value: string): Rgb | null {
   const match = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(value.trim());
   if (!match) return null;
   const hex = match[1];
@@ -46,9 +87,15 @@ function roundRgb({ r, g, b }: Rgb): Rgb {
   return { r: roundChannel(r), g: roundChannel(g), b: roundChannel(b) };
 }
 
-function toHex({ r, g, b }: Rgb): string {
+export function toHex(rgb: Rgb): string {
+  const { r, g, b } = roundRgb(rgb);
   const channel = (value: number) => value.toString(16).padStart(2, "0");
   return `#${channel(r)}${channel(g)}${channel(b)}`;
+}
+
+export function normalizeHexColor(input: string): string | null {
+  const rgb = parseHexColor(input);
+  return rgb ? toHex(rgb) : null;
 }
 
 export function mutedTextColor(text: string, background: string): string | null {
@@ -71,10 +118,14 @@ export function mutedTextColor(text: string, background: string): string | null 
 
 export function blockTextColors(
   style: Pick<BlockStyle, "backgroundColor" | "textColor">,
-  theme: { text: string; textDim: string; surface: string }
-): { text: string; dim: string } {
-  if (!style.backgroundColor && !style.textColor) return { text: theme.text, dim: theme.textDim };
-  const text = style.textColor ?? theme.text;
-  const background = style.backgroundColor ?? theme.surface;
-  return { text, dim: mutedTextColor(text, background) ?? theme.textDim };
+  theme: Pick<ThemeColors, BlockThemeColorKey | "textDim">
+): { text: string; dim: string; accent: string } {
+  if (!style.backgroundColor && !style.textColor) return { text: theme.text, dim: theme.textDim, accent: theme.accent };
+  const { text, background } = effectiveBlockColors(style, theme);
+  const accentContrast = contrastRatio(theme.accent, background);
+  return {
+    text,
+    dim: mutedTextColor(text, background) ?? theme.textDim,
+    accent: accentContrast !== null && accentContrast < 3 ? text : theme.accent
+  };
 }

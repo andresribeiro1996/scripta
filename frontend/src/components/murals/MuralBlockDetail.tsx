@@ -1,5 +1,6 @@
 import { useRef, useState, type ReactNode } from "react";
 import { READER_PLATES, type Group, type PublicReaderCard } from "@scripta/shared";
+import type { ThemeId } from "@scripta/shared/themes";
 import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
 import {
@@ -14,6 +15,7 @@ import {
 } from "../../lib/murals";
 import { bookKey } from "../../lib/merge";
 import { computeStat } from "../../lib/muralStats";
+import { muralThemeStyle } from "../../lib/theme";
 import { CoverImage } from "../BookCard";
 import { BookSummary } from "../BookSummary";
 import { Sheet } from "../Sheet";
@@ -21,7 +23,12 @@ import { ProfileBlockView } from "./blocks/MiscBlocks";
 import { ReaderCardDetail, ReaderCardPlate } from "./blocks/ReaderCardBlock";
 import { useReaderCard } from "../../hooks/useReaderCard";
 
+function detailSheetStyle(theme: ThemeId) {
+  return { ...muralThemeStyle(theme), backgroundColor: "var(--color-surface)" };
+}
+
 function ReaderCardDetailSheet({
+  theme,
   books,
   groups,
   readerCardOverride,
@@ -29,6 +36,7 @@ function ReaderCardDetailSheet({
   onClose,
   actions
 }: {
+  theme: ThemeId;
   books: Array<Record<string, unknown>>;
   groups: Group[];
   readerCardOverride?: PublicReaderCard;
@@ -39,7 +47,7 @@ function ReaderCardDetailSheet({
   const { card, own } = useReaderCard(books, groups, readerCardOverride);
   const title = card.identity ? `The ${READER_PLATES.find((item) => item.key === card.identity)?.name}` : "Unwritten";
   return (
-    <Sheet title={title} onClose={onClose}>
+    <Sheet title={title} onClose={onClose} style={detailSheetStyle(theme)}>
       {actions}
       <div className="max-h-[min(70dvh,40rem)] overflow-y-auto overscroll-contain px-3 pt-1 pb-5 text-base">
         <div className="space-y-5">
@@ -55,6 +63,7 @@ function ReaderCardDetailSheet({
 
 export function MuralBlockDetail({
   block,
+  theme,
   books,
   images,
   profile,
@@ -67,6 +76,7 @@ export function MuralBlockDetail({
   actions
 }: {
   block: MuralBlock;
+  theme: ThemeId;
   books: Array<Record<string, unknown>>;
   images: GalleryImage[];
   profile?: ReaderProfile;
@@ -82,7 +92,7 @@ export function MuralBlockDetail({
   const contentRef = useRef<HTMLDivElement>(null);
   const collectionScroll = useRef(0);
   if (block.type === "readerCard") {
-    return <ReaderCardDetailSheet books={books} groups={libraryGroups ?? []} readerCardOverride={readerCardOverride} readerName={profile?.username || "reader"} onClose={onClose} actions={actions} />;
+    return <ReaderCardDetailSheet theme={theme} books={books} groups={libraryGroups ?? []} readerCardOverride={readerCardOverride} readerName={profile?.username || "reader"} onClose={onClose} actions={actions} />;
   }
   const spotlight = block.type === "spotlight" ? books.find((book) => bookKey(book) === block.bookKey) : undefined;
   const book = selectedBook ?? spotlight;
@@ -122,6 +132,7 @@ export function MuralBlockDetail({
           : undefined
       }
       onClose={onClose}
+      style={detailSheetStyle(theme)}
     >
       {actions}
       <div ref={contentRef} className="max-h-[min(70dvh,40rem)] overflow-y-auto overscroll-contain px-3 pt-1 pb-5 text-base">

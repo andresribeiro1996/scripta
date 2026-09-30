@@ -3,7 +3,7 @@
 // modules/auth/service.ts.
 
 import { randomUUID } from "node:crypto";
-import { buildManualBook, localDay, setReadStatus } from "@scripta/shared";
+import { bookKey, buildManualBook, isCertainMatch, localDay, mergeDuplicateBooks, seedCoverLookup, setReadStatus, type CoverLookupParams, type LibraryData } from "@scripta/shared";
 import type { BookRecommendationInput } from "@scripta/shared/community";
 import { LibraryConflictError, NoLibraryDocumentError } from "./domain/errors.js";
 import type { LibraryRepository } from "./domain/ports.js";
@@ -13,6 +13,10 @@ import { toPublicLibraryData } from "./publicResolver.js";
 export type BookEvent = { type: "book_added" | "book_finished"; refId: string; payload: Record<string, unknown> };
 
 export type EmitBookEvents = (userId: string, events: BookEvent[]) => void;
+
+export type EnqueueCovers = (lookups: CoverLookupParams[]) => void;
+
+export type RekeyBooks = (userId: string, fromKeys: string[], toKey: string) => void;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -72,11 +76,12 @@ export interface LibraryService {
   getLibrary(userId: string): LibraryDocument | null;
   saveLibrary(userId: string, data: unknown, expectedUpdatedAt?: string, source?: "import"): LibraryDocument;
   /** Same-shelf book upsert behind POST /library/books: matches an
-   *  existing book by ISBN (trimmed), else by case-insensitive trimmed
-   *  title+author, and updates its reading status in place — or appends a
-   *  manual: book when nothing matches. `updated` distinguishes "matched
-   *  and re-shelved" from "appended". */
+   *  existing book with the shared certain-match rule and updates its
+   *  reading status in place — or appends a manual: book when nothing
+   *  matches. `updated` distinguishes "matched and re-shelved" from
+   *  "appended". */
   addBook(userId: string, input: BookRecommendationInput): { key: string; updated: boolean };
+  mergeBooks(userId: string, keep: string, merge: string[], expectedUpdatedAt: string): LibraryDocument;
   /** Idempotent: a document that's already shared keeps its existing
    *  token rather than minting a new one, so a re-opened share modal (or
    *  a retried request) never invalidates a link someone already has.
@@ -94,7 +99,12 @@ export interface LibraryService {
   getPublicByToken(token: string): { data: unknown } | null;
 }
 
-export function createLibraryService(repo: LibraryRepository, publicUrlFor: (token: string) => string, emitBookEvents?: EmitBookEvents): LibraryService {
+function coverLookupsOf(data: unknown): CoverLookupParams[] {
+  const books = isRecord(data) && Array.isArray(data.books) ? data.books : [];
+  return books.filter(isRecord).flatMap((book) => seedCoverLookup(book) ?? []);
+}
+
+export function createLibraryService(repo: LibraryRepository, publicUrlFor: (token: string) => string, emitBookEvents?: EmitBookEvents, enqueueCovers?: EnqueueCovers, rekeyBooks?: RekeyBooks): LibraryService {
   return {
     getLibrary(userId) {
       const row = repo.getDocument(userId);
@@ -115,6 +125,7 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
           // successful save (e.g. an unparsable previous document).
         }
       }
+      if (source === "import" && enqueueCovers) enqueueCovers(coverLookupsOf(data));
       return toLibraryDocument(row, publicUrlFor);
     },
 
@@ -133,15 +144,8 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
         doc = { books: [] };
       }
       const books = Array.isArray(doc.books) ? doc.books : [];
-      const norm = (s: string) => s.trim().toLowerCase();
-      const needle = input.isbn?.trim() ? norm(input.isbn) : null;
-      const match = books.find(
-        (b): b is Record<string, unknown> =>
-          isRecord(b) &&
-          (needle
-            ? norm(String(b.ISBN ?? "")) === needle
-            : norm(String(b.Title ?? "")) === norm(input.title) && norm(String(b.Attribution ?? "")) === norm(input.author))
-      );
+      const incoming = { Title: input.title, Attribution: input.author, ISBN: input.isbn ?? "" };
+      const match = books.find((b): b is Record<string, unknown> => isRecord(b) && isCertainMatch(b, incoming));
 
       if (match) {
         const key = contentId(match);
@@ -183,6 +187,23 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
         }
       }
       return { key: `manual:${id}`, updated: false };
+    },
+
+    mergeBooks(userId, keep, merge, expectedUpdatedAt) {
+      const row = repo.getDocument(userId);
+      if (!row) throw new NoLibraryDocumentError();
+      const parsed: unknown = JSON.parse(row.data);
+      if (!isRecord(parsed) || !Array.isArray(parsed.books)) throw new Error("Stored library document is unreadable; refusing to rewrite it.");
+      const library = parsed as LibraryData;
+      const next = mergeDuplicateBooks(library, keep, merge);
+      if (next === library) return toLibraryDocument(row, publicUrlFor);
+      if (row.updated_at !== expectedUpdatedAt) throw new LibraryConflictError();
+      const present = new Set(library.books.filter(isRecord).map(bookKey));
+      const fromKeys = merge.filter((key) => key !== keep && present.has(key));
+      if (fromKeys.length > 0 && rekeyBooks) rekeyBooks(userId, fromKeys, keep);
+      const saved = repo.upsertDocument(userId, JSON.stringify(next), row.updated_at);
+      if (!saved) throw new LibraryConflictError();
+      return toLibraryDocument(saved, publicUrlFor);
     },
 
     share(userId) {

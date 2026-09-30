@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
-import { GENRE_LOOKUP_BATCH, genreLookupOrder, settleWithConcurrency } from "./bookGenres.js";
+import { GENRE_LOOKUP_BATCH, genreLookupOrder, normalizeBookGenres, settleWithConcurrency } from "./bookGenres.js";
 
 test("genreLookupOrder puts finished books first, unread/reading after, both in stable order", () => {
   const unread = { Title: "A", ReadStatus: 0 };
@@ -49,4 +49,21 @@ test("settleWithConcurrency never runs more than limit at once", async () => {
     active--;
   });
   assert.equal(peak, 2);
+});
+
+test("normalizeBookGenres maps BISAC-style subject paths", () => {
+  const cases: Array<[string, string]> = [
+    ["Fiction / Science Fiction / General", "Science Fiction"],
+    ["Fiction / Fantasy / Epic", "Fantasy"],
+    ["Fiction / Mystery & Detective / General", "Mystery"],
+    ["Fiction / Thrillers / Suspense", "Thriller"],
+    ["Fiction / Historical / General", "Historical Fiction"],
+    ["Fiction / Literary", "Literary Fiction"],
+    ["Juvenile Fiction / Fantasy & Magic", "Children's"],
+    ["Biography & Autobiography / Historical", "Biography & Memoir"],
+    ["Political Science / General", "Politics"],
+    ["Business & Economics / General", "Business"]
+  ];
+  for (const [subject, genre] of cases) assert.deepEqual(normalizeBookGenres([subject]), [genre], subject);
+  assert.deepEqual(normalizeBookGenres(["Fiction / General"]), []);
 });

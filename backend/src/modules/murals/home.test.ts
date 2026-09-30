@@ -9,8 +9,6 @@ import jwt from "jsonwebtoken";
 
 const scratch = mkdtempSync(join(tmpdir(), "scripta-home-test-"));
 for (const key of ["AUTH", "LIBRARY", "MURALS", "COVERS", "GALLERY", "TIERLISTS", "ARENA"]) process.env[`${key}_DB_PATH`] = join(scratch, `${key}.sqlite`);
-process.env.GALLERY_STORAGE_PATH = join(scratch, "gallery");
-process.env.COVERS_STORAGE_PATH = join(scratch, "covers");
 process.env.JWT_ACCESS_SECRET = "a".repeat(64);
 process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 const { createSqliteMuralsRepository } = await import("./adapters/sqlite/sqliteMuralsRepository.js");
@@ -25,7 +23,7 @@ const authorization = (sub: string) => ({ authorization: `Bearer ${jwt.sign({ su
 test("murals routes preserve ownership, edits and public content boundaries", async () => {
   const db = new DatabaseSync(":memory:");
   db.exec(readFileSync(new URL("./adapters/sqlite/schema.sql", import.meta.url), "utf8"));
-  const service = createMuralsService(createSqliteMuralsRepository(db), (token) => `https://example.test/shared/${token}`);
+  const service = createMuralsService(createSqliteMuralsRepository(db), (token) => `https://example.test/shared/${token}`, () => "light");
   const app = Fastify();
   app.decorate("authenticateAccessToken", (token: string) => getAuthenticatedUserFromAccessToken(token, (id) => ["owner", "stranger"].includes(id) ? {
     id, email: `${id}@example.test`, username: id, avatar_id: null, google_id: null, password_hash: null, created_at: ""
@@ -78,7 +76,7 @@ test("murals routes preserve ownership, edits and public content boundaries", as
 test("public mural payload carries the reader card without leaking titles or series names", async () => {
   const db = new DatabaseSync(":memory:");
   db.exec(readFileSync(new URL("./adapters/sqlite/schema.sql", import.meta.url), "utf8"));
-  const service = createMuralsService(createSqliteMuralsRepository(db), (token) => `https://example.test/shared/${token}`);
+  const service = createMuralsService(createSqliteMuralsRepository(db), (token) => `https://example.test/shared/${token}`, () => "light");
   const app = Fastify();
   app.decorate("authenticateAccessToken", (token: string) => getAuthenticatedUserFromAccessToken(token, (id) => ["cardOwner", "annoOwner", "noLibraryOwner"].includes(id) ? {
     id, email: `${id}@example.test`, username: id, avatar_id: null, google_id: null, password_hash: null, created_at: ""

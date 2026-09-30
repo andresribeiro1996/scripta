@@ -73,7 +73,7 @@ function statusForAvatarError(err: AvatarError): number {
   return 400;
 }
 
-export function buildAuthRoutes(service: AuthService, security?: AccountSecurityService) {
+export function buildAuthRoutes(service: AuthService, avatarUrlFor: (id: string) => string, security?: AccountSecurityService) {
   return async function authRoutes(app: FastifyInstance) {
     const deliveries = new Set<Promise<unknown>>();
     function deliver(action: () => Promise<unknown>) {
@@ -274,19 +274,14 @@ export function buildAuthRoutes(service: AuthService, security?: AccountSecurity
 
     // Deliberately NOT behind authGuard — a plain <img src> target, same
     // as gallery's file route. Access control is "the id is an
-    // unguessable UUID"; the id regenerates on every replacement, so the
-    // immutable caching below can't serve a stale avatar after a change.
+    // unguessable UUID"; the id regenerates on every replacement, so a
+    // cached redirect can't serve a stale avatar after a change.
     app.get("/auth/avatar/:id/file", async (request, reply) => {
       const parsed = avatarIdParamSchema.safeParse(request.params);
       if (!parsed.success) {
         return reply.code(400).send({ error: "Invalid avatar id." });
       }
-      const file = service.getAvatarFile(parsed.data.id);
-      if (!file) {
-        return reply.code(404).send({ error: "No such avatar." });
-      }
-      reply.header("Cache-Control", "public, max-age=31536000, immutable");
-      return reply.type(file.mimeType).send(file.buffer);
+      return reply.redirect(avatarUrlFor(parsed.data.id), 301);
     });
 
     app.setErrorHandler((error, _request, reply) => {

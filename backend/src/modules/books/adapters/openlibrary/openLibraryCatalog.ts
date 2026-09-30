@@ -3,7 +3,7 @@ import type { BookCatalog } from "../../domain/ports.js";
 import { fetchJson, type Throttle } from "../http/http.js";
 
 export function createOpenLibraryCatalog(throttle: Throttle): BookCatalog {
-  const get = (url: string) => throttle(() => fetchJson("openlibrary", url));
+  const get = (url: string) => throttle(() => fetchJson("openlibrary", url), { urgent: true });
   return {
     async fetchDetails({ isbn, title, author }) {
       if (!isbn && (!title || !author)) return null;
@@ -15,7 +15,7 @@ export function createOpenLibraryCatalog(throttle: Throttle): BookCatalog {
       }
       const match = findOpenLibraryMatch(await get(`https://openlibrary.org/search.json?${query}`), isbn ?? "", title, author);
       if (!match) return null;
-      return buildBookMetadata(match, await get(`https://openlibrary.org${String(match.key)}.json`));
+      return { metadata: buildBookMetadata(match, await get(`https://openlibrary.org${String(match.key)}.json`)), sources: ["openlibrary"] };
     },
 
     async search(query) {
@@ -29,7 +29,7 @@ export function createOpenLibraryCatalog(throttle: Throttle): BookCatalog {
         if (!item || typeof item !== "object") return [];
         const doc = item as Record<string, unknown>;
         const result = mapOpenLibraryDoc(doc);
-        return result ? [{ result, olCoverId: typeof doc.cover_i === "number" ? doc.cover_i : null }] : [];
+        return result ? [{ result, olCoverId: typeof doc.cover_i === "number" ? doc.cover_i : null, source: "openlibrary" as const }] : [];
       });
     }
   };

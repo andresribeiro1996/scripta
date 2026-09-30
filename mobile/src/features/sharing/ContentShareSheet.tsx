@@ -24,9 +24,10 @@ type Props = {
   onDisableLink?: () => Promise<void>;
   linkError?: string | null;
   onRetryLink?: () => void;
+  onExportVideo?: (pngUri: string) => Promise<string>;
 };
 
-export function ContentShareSheet({ visible, onClose, title, description, url, children, previewControls, imageReady = true, onEnableLink, enableLinkLabel = "Create share link", onDisableLink, linkError, onRetryLink }: Props) {
+export function ContentShareSheet({ visible, onClose, title, description, url, children, previewControls, imageReady = true, onEnableLink, enableLinkLabel = "Create share link", onDisableLink, linkError, onRetryLink, onExportVideo }: Props) {
   const { colors } = useTheme();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -57,19 +58,21 @@ export function ContentShareSheet({ visible, onClose, title, description, url, c
     finally { setBusy(false); }
   }
 
-  async function exportImage(save: boolean) {
+  async function exportImage(mode: "save" | "send" | "video") {
     if (!imageReady || !capture.current) throw new Error("Wait for the image preview to finish loading.");
-    if (save) {
+    if (mode === "save") {
       const permission = await requestPermissionsAsync(true, ["photo"]);
       if (!permission.granted) throw new Error("Allow saving photos in your device settings, or use Send image.");
     } else if (!await Sharing.isAvailableAsync()) {
-      throw new Error("Image sharing is unavailable on this device. You can save the image instead.");
+      throw new Error("Sharing is unavailable on this device. You can save the image instead.");
     }
     const uri = await captureRef(capture, { format: "png", result: "tmpfile", ...snapshotSize(size.current.width, size.current.height) });
     try {
-      if (save) {
+      if (mode === "save") {
         await saveToLibraryAsync(uri);
         setNotice("Image saved to Photos.");
+      } else if (mode === "video") {
+        await Sharing.shareAsync(await onExportVideo!(uri), { mimeType: "video/mp4", UTI: "public.mpeg-4", dialogTitle: title });
       } else {
         await Sharing.shareAsync(uri, { mimeType: "image/png", UTI: "public.png", dialogTitle: title });
       }
@@ -95,11 +98,12 @@ export function ContentShareSheet({ visible, onClose, title, description, url, c
           <View style={{ gap: spacing.md }}>
             <View style={styles.header}>
               {!imageReady || busy ? <ActivityIndicator size="small" color={colors.accent} /> : <Icon name="confirm" size={16} color={colors.textDim} />}
-              <Text accessibilityLiveRegion="polite" style={[typography.caption, { color: colors.textDim, flex: 1 }]}>{busy ? "Preparing your image…" : imageReady ? "Full image · Ready to share" : "Loading your image…"}</Text>
+              <Text accessibilityLiveRegion="polite" style={[typography.caption, { color: colors.textDim, flex: 1 }]}>{busy ? "Preparing your share…" : imageReady ? "Full image · Ready to share" : "Loading your image…"}</Text>
             </View>
             <View style={styles.actions}>
-              <View style={styles.imageAction}><Button label="Save image" variant="secondary" disabled={busy || !imageReady} onPress={() => void run(() => exportImage(true))} /></View>
-              <View style={styles.imageAction}><Button label="Send image" disabled={busy || !imageReady} onPress={() => void run(() => exportImage(false))} /></View>
+              <View style={styles.imageAction}><Button label="Save image" variant="secondary" disabled={busy || !imageReady} onPress={() => void run(() => exportImage("save"))} /></View>
+              <View style={styles.imageAction}><Button label="Send image" disabled={busy || !imageReady} onPress={() => void run(() => exportImage("send"))} /></View>
+              {onExportVideo ? <View style={styles.imageAction}><Button label="Send video" variant="secondary" disabled={busy || !imageReady} onPress={() => void run(() => exportImage("video"))} /></View> : null}
             </View>
           </View>
         </> : <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: spacing.lg, paddingBottom: spacing.sm }}>

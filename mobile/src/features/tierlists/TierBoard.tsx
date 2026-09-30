@@ -23,6 +23,12 @@ export function TierCover({ book, style, onLoadEnd }: { book: TierBook; style?: 
   </View>;
 }
 
+export function TierRowScroll({ style, contentContainerStyle, children }: { style?: StyleProp<ViewStyle>; contentContainerStyle?: StyleProp<ViewStyle>; children: ReactNode }) {
+  const [viewport, setViewport] = useState(0);
+  const [content, setContent] = useState(0);
+  return <ScrollView horizontal showsHorizontalScrollIndicator={false} scrollEnabled={content > viewport + 1} onLayout={(event) => setViewport(event.nativeEvent.layout.width)} onContentSizeChange={(width) => setContent(width)} style={style} contentContainerStyle={contentContainerStyle}>{children}</ScrollView>;
+}
+
 function BookChip({ book, onReassign }: { book: TierBook; onReassign?: () => void }) {
   return (
     <Pressable disabled={!onReassign} accessibilityRole={onReassign ? "button" : undefined} accessibilityLabel={`${titleOf(book)} by ${authorOf(book)}`} accessibilityHint={onReassign ? "Opens the tier ring to reassign this book" : undefined} onPress={onReassign} onLongPress={onReassign} style={styles.chipWrap}>
@@ -51,7 +57,7 @@ export function TierBoard({ data, books, onChange, structureEditable, poolLabel 
   function renderBooks(section: string) {
     const keys = keysFor(section).filter((key) => byKey.has(key));
     if (!keys.length) return <Text {...dynamicType} style={[typography.caption, styles.empty, { color: colors.textDim }]}>{section === "pool" ? "Books unavailable" : "–"}</Text>;
-    return <ScrollView horizontal showsHorizontalScrollIndicator={false} style={section === "pool" ? styles.poolBooks : styles.booksScroll} contentContainerStyle={styles.books}>{keys.map((key) => <BookChip key={key} book={byKey.get(key)!} onReassign={onReassign ? () => onReassign(key) : undefined} />)}</ScrollView>;
+    return <TierRowScroll style={section === "pool" ? styles.poolBooks : styles.booksScroll} contentContainerStyle={styles.books}>{keys.map((key) => <BookChip key={key} book={byKey.get(key)!} onReassign={onReassign ? () => onReassign(key) : undefined} />)}</TierRowScroll>;
   }
 
   return (

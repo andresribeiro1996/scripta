@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { statusLabel } from "./covers.js";
-import { STATUS_FILTER_OPTIONS, localDay, setReadStatus } from "./libraryView.js";
+import { STATUS_FILTER_OPTIONS, localDay, readingPercent, setReadStatus } from "./libraryView.js";
 
 test("finishing a book records the day and full progress", () => {
   const book = { Title: "A", ReadStatus: 1, ___PercentRead: 40, DateLastRead: "2024-01-01" };
@@ -30,4 +30,23 @@ test("status 0 reads as To read", () => {
   assert.equal(statusLabel(0), "To read");
   assert.equal(statusLabel(undefined), "To read");
   assert.equal(STATUS_FILTER_OPTIONS.find((option) => option.value === "unread")?.label, "To read");
+});
+
+test("readingPercent rounds a numeric percent", () => {
+  assert.equal(readingPercent({ ___PercentRead: 40 }), 40);
+  assert.equal(readingPercent({ ___PercentRead: 40.6 }), 41);
+  assert.equal(readingPercent({ ___PercentRead: 0 }), 0);
+});
+
+test("readingPercent clamps to 0..100", () => {
+  assert.equal(readingPercent({ ___PercentRead: 140 }), 100);
+  assert.equal(readingPercent({ ___PercentRead: -5 }), 0);
+});
+
+test("readingPercent is null when progress is unknown", () => {
+  assert.equal(readingPercent({}), null);
+  assert.equal(readingPercent({ ___PercentRead: "40" }), null);
+  assert.equal(readingPercent({ ___PercentRead: null }), null);
+  assert.equal(readingPercent({ ___PercentRead: Number.NaN }), null);
+  assert.equal(readingPercent({ ___PercentRead: Number.POSITIVE_INFINITY }), null);
 });

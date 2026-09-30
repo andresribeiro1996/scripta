@@ -16,6 +16,7 @@ export function openMuralsDb(): DatabaseSync {
 
   const db = new DatabaseSync(env.MURALS_DB_PATH);
   db.exec("PRAGMA journal_mode = WAL");
+  db.exec("PRAGMA busy_timeout = 5000");
 
   const schema = readFileSync(`${adapterDir}/schema.sql`, "utf8");
   db.exec(schema);
@@ -23,6 +24,9 @@ export function openMuralsDb(): DatabaseSync {
   const columns = db.prepare(`PRAGMA table_info(murals)`).all() as { name: string }[];
   if (!columns.some((c) => c.name === "folder_id")) {
     db.exec(`ALTER TABLE murals ADD COLUMN folder_id TEXT`);
+  }
+  if (!columns.some((c) => c.name === "theme")) {
+    db.exec(`ALTER TABLE murals ADD COLUMN theme TEXT`);
   }
 
   return db;

@@ -16,6 +16,8 @@ function loadPersisted(): Record<string, CoverCacheEntry> {
 
 const resolver = createCoverResolver({
   fetchResolve: async (query) => (await apiFetch(`/covers/resolve?${query}`)) as ResolvedCoverResponse,
+  fetchResolveBatch: async (lookups) =>
+    ((await apiFetch("/covers/resolve/batch", { method: "POST", body: JSON.stringify(lookups) })) as { results: ResolvedCoverResponse[] }).results,
   persist(entries) {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));

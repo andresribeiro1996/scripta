@@ -44,6 +44,7 @@ function makeMural(name = "M"): Mural[] {
     {
       id: `m${++muralSeq}`,
       name,
+      theme: "light",
       blocks: [],
       createdAt: now,
       updatedAt: now,
@@ -67,7 +68,7 @@ function check(label: string, condition: boolean, detail?: string) {
 }
 
 function muralWithBlocks(blocks: MuralBlock[]): Mural[] {
-  return [{ id: "m1", name: "Mural", blocks, createdAt: "t", updatedAt: "t", shareToken: null, shareUrl: null, folderId: null }];
+  return [{ id: "m1", name: "Mural", theme: "light", blocks, createdAt: "t", updatedAt: "t", shareToken: null, shareUrl: null, folderId: null }];
 }
 
 console.log("\n1. Layout validation and placement");
@@ -100,8 +101,8 @@ console.log("\n2b. Multi-book blocks have enough height for full covers");
     { id: "below", type: "text", layout: { x: 0, y: 3, w: 4, h: 2 }, heading: "Below" }
   ];
   const upgraded = ensureBookBlockHeights(blocks);
-  check("short multi-book blocks gain one row", upgraded[0].layout.h === 4 && upgraded[1].layout.h === 4);
-  check("blocks below move once without overlap", upgraded[2].layout.y === 4);
+  check("short shelves reach 4 rows and short currently-reading blocks reach 6", upgraded[0].layout.h === 4 && upgraded[1].layout.h === 6);
+  check("blocks below move once without overlap", upgraded[2].layout.y === 6);
   check("height upgrade is idempotent", ensureBookBlockHeights(upgraded) === upgraded);
 }
 
@@ -376,6 +377,7 @@ console.log("\n17. scrubImageFromMurals — also clears a mural's OWN cover, not
     {
       id: "m1",
       name: "Cover Test",
+      theme: "light",
       blocks: [{ id: "img1", type: "image", layout: { x: 0, y: 0, w: 1, h: 1 }, imageId: "gallery-2" }],
       createdAt: "t",
       updatedAt: "t",
@@ -425,8 +427,9 @@ console.log("\n18. scrubBooksFromMurals — a tierlist block is never touched by
 }
 
 {
-  const mural = profileOnlyMural();
+  const mural = profileOnlyMural("dark");
   check("profileOnlyMural holds one profile block", mural.blocks.length === 1 && mural.blocks[0]?.type === "profile");
+  check("profileOnlyMural takes the theme it is given", mural.theme === "dark");
   check("spanning the full grid, three rows tall", JSON.stringify(mural.blocks[0]?.layout) === JSON.stringify({ x: 0, y: 0, w: 12, h: 3 }));
 }
 

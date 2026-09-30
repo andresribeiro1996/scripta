@@ -9,9 +9,7 @@ const scratch = mkdtempSync(join(tmpdir(), "books-repo-test-"));
 process.env.AUTH_DB_PATH = join(scratch, "auth.sqlite");
 process.env.LIBRARY_DB_PATH = join(scratch, "library.sqlite");
 process.env.GALLERY_DB_PATH = join(scratch, "gallery.sqlite");
-process.env.GALLERY_STORAGE_PATH = join(scratch, "gallery-files");
 process.env.COVERS_DB_PATH = join(scratch, "covers.sqlite");
-process.env.COVERS_STORAGE_PATH = join(scratch, "covers-files");
 process.env.JWT_ACCESS_SECRET = "a".repeat(64);
 process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
@@ -62,8 +60,8 @@ test("migration turns legacy ISBN cache rows into books and drops cover_cache", 
 
 test("createBook returns the existing row for a key that is already taken", () => {
   const { repo } = freshRepo();
-  const first = repo.createBook({ title: "Orlando", author: "Virginia Woolf", isbn: "9780141184272" }, "isbn:9780141184272", NOW);
-  const second = repo.createBook({ title: "Other", author: "Other", isbn: "9780141184272" }, "isbn:9780141184272", NOW);
+  const first = repo.createBook({ title: "Orlando", author: "Virginia Woolf", isbn: "9780141184272" }, ["isbn:9780141184272"], NOW);
+  const second = repo.createBook({ title: "Other", author: "Other", isbn: "9780141184272" }, ["isbn:9780141184272"], NOW);
   assert.equal(second.id, first.id);
   assert.equal(second.title, "Orlando");
   assert.equal(repo.getBook(first.id)!.genres, "[]");
@@ -71,7 +69,7 @@ test("createBook returns the existing row for a key that is already taken", () =
 
 test("fillIdentity only fills an empty title and does not make the book searchable", () => {
   const { repo } = freshRepo();
-  const book = repo.createBook({ title: "", author: "", isbn: "9780141184272" }, "isbn:9780141184272", NOW);
+  const book = repo.createBook({ title: "", author: "", isbn: "9780141184272" }, ["isbn:9780141184272"], NOW);
   assert.deepEqual(repo.searchBooks(["orlando"], 12), []);
   repo.fillIdentity(book.id, "Orlando", "Virginia Woolf");
   repo.fillIdentity(book.id, "Changed", "Nobody");
@@ -81,14 +79,14 @@ test("fillIdentity only fills an empty title and does not make the book searchab
 
 test("createBook alone does not make a book searchable", () => {
   const { repo } = freshRepo();
-  repo.createBook({ title: "Orlando", author: "Virginia Woolf", isbn: "9780141184272" }, "isbn:9780141184272", NOW);
+  repo.createBook({ title: "Orlando", author: "Virginia Woolf", isbn: "9780141184272" }, ["isbn:9780141184272"], NOW);
   assert.deepEqual(repo.searchBooks(["orlando"], 12), []);
 });
 
 test("makeSearchable indexes a titled book, skips an untitled one, and is idempotent", () => {
   const { repo } = freshRepo();
-  const book = repo.createBook({ title: "Orlando", author: "Virginia Woolf", isbn: "9780141184272" }, "isbn:9780141184272", NOW);
-  const untitled = repo.createBook({ title: "", author: "", isbn: "9780374520731" }, "isbn:9780374520731", NOW);
+  const book = repo.createBook({ title: "Orlando", author: "Virginia Woolf", isbn: "9780141184272" }, ["isbn:9780141184272"], NOW);
+  const untitled = repo.createBook({ title: "", author: "", isbn: "9780374520731" }, ["isbn:9780374520731"], NOW);
 
   repo.makeSearchable(untitled.id);
   assert.deepEqual(repo.searchBooks(["orlando"], 12), []);
@@ -100,8 +98,8 @@ test("makeSearchable indexes a titled book, skips an untitled one, and is idempo
 
 test("search is diacritic-insensitive, requires every token and ignores an empty token list", () => {
   const { repo } = freshRepo();
-  const antidoto = repo.createBook({ title: "Antídoto", author: "José Luís Peixoto", isbn: null }, "ta:antidoto|jose luis peixoto", NOW);
-  const dune = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593" }, "isbn:9780441013593", NOW);
+  const antidoto = repo.createBook({ title: "Antídoto", author: "José Luís Peixoto", isbn: null }, ["ta:antidoto|jose luis peixoto|"], NOW);
+  const dune = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593" }, ["isbn:9780441013593"], NOW);
   repo.makeSearchable(antidoto.id);
   repo.makeSearchable(dune.id);
   assert.equal(repo.searchBooks(["antidoto"], 12)[0]!.title, "Antídoto");
@@ -112,7 +110,7 @@ test("search is diacritic-insensitive, requires every token and ignores an empty
 
 test("covers, rejections and details round-trip", () => {
   const { repo } = freshRepo();
-  const book = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: null }, "ta:dune|frank herbert", NOW);
+  const book = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: null }, ["ta:dune|frank herbert|"], NOW);
   repo.insertImage({ id: "img-1", book_id: book.id, source: "apple", source_url: "https://img.test/1", width: 900, height: 1400, byte_size: 10, created_at: NOW });
   repo.setCover(book.id, { imageId: "img-1", status: "good", checkedAt: NOW });
   assert.equal(repo.getBook(book.id)!.cover_image_id, "img-1");
@@ -122,12 +120,82 @@ test("covers, rejections and details round-trip", () => {
   repo.addRejection(book.id, "https://img.test/1", NOW);
   assert.deepEqual([...repo.listRejectedUrls(book.id)], ["https://img.test/1"]);
 
-  repo.saveDetails(book.id, { summary: "Spice.", rating: 4.2, ratingCount: 10, sourceUrl: "https://openlibrary.org/works/OL1W", genres: ["Science Fiction"] }, NOW);
+  repo.saveDetails(book.id, { summary: "Spice.", rating: 4.2, ratingCount: 10, sourceUrl: "https://openlibrary.org/works/OL1W", genres: ["Science Fiction"] }, ["openlibrary", "isbndb"], NOW);
   const saved = repo.getBook(book.id)!;
   assert.equal(saved.details_status, "found");
   assert.equal(saved.summary, "Spice.");
   assert.equal(saved.genres, '["Science Fiction"]');
+  assert.equal(saved.data_sources, '["openlibrary","isbndb"]');
 
   repo.markDetailsMissing(book.id, NOW);
   assert.equal(repo.getBook(book.id)!.details_status, "missing");
+});
+
+test("createBook registers every key and addKey aliases an existing book", () => {
+  const { repo } = freshRepo();
+  const book = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593" }, ["isbn:9780441013593", "ta:dune|frank herbert|"], "2026-09-30T00:00:00.000Z");
+  assert.equal(repo.findBookByKey("ta:dune|frank herbert|")?.id, book.id);
+  repo.addKey("isbn:9780593099322", book.id);
+  repo.addKey("isbn:9780593099322", "someone-else");
+  assert.equal(repo.findBookByKey("isbn:9780593099322")?.id, book.id);
+});
+
+test("backfill adds a title key to existing rows once", () => {
+  const db = new DatabaseSync(":memory:");
+  applyBooksMigrations(db);
+  db.prepare("INSERT INTO books (id, title, author, genres, created_at) VALUES ('b1', 'Orlando', 'Virginia Woolf', '[]', 't')").run();
+  db.exec("PRAGMA user_version = 0");
+  applyBooksMigrations(db);
+  assert.equal((db.prepare("SELECT book_id FROM book_keys WHERE key = 'ta:orlando|virginia woolf|'").get() as { book_id: string }).book_id, "b1");
+});
+
+test("listUncheckedCoverIds returns only never-checked books, oldest first", () => {
+  const { repo } = freshRepo();
+  const newer = repo.createBook({ title: "Emma", author: "Jane Austen", isbn: null }, ["ta:emma|jane austen|"], "2026-10-02T00:00:00.000Z");
+  const older = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: null }, ["ta:dune|frank herbert|"], "2026-10-01T00:00:00.000Z");
+  const good = repo.createBook({ title: "Orlando", author: "Virginia Woolf", isbn: null }, ["ta:orlando|virginia woolf|"], NOW);
+  const missing = repo.createBook({ title: "Ulysses", author: "James Joyce", isbn: null }, ["ta:ulysses|james joyce|"], NOW);
+  repo.insertImage({ id: "img-1", book_id: good.id, source: "apple", source_url: null, width: 900, height: 1400, byte_size: 10, created_at: NOW });
+  repo.setCover(good.id, { imageId: "img-1", status: "good", checkedAt: NOW });
+  repo.setCover(missing.id, { imageId: null, status: "missing", checkedAt: NOW });
+  assert.deepEqual(repo.listUncheckedCoverIds(), [older.id, newer.id]);
+});
+
+test("createBook stores the sources of a new row and defaults to none", () => {
+  const { repo } = freshRepo();
+  const tagged = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: null, sources: ["isbndb"] }, ["ta:dune|frank herbert|"], NOW);
+  assert.equal(tagged.data_sources, '["isbndb"]');
+  assert.equal(repo.createBook({ title: "Emma", author: "Jane Austen", isbn: null }, ["ta:emma|jane austen|"], NOW).data_sources, "[]");
+});
+
+test("the migration adds data_sources to a books table that predates it", () => {
+  const db = new DatabaseSync(":memory:");
+  db.exec(`CREATE TABLE books (
+    id TEXT PRIMARY KEY, title TEXT NOT NULL, author TEXT NOT NULL, year INTEGER, publisher TEXT, isbn TEXT, ol_cover_id INTEGER,
+    summary TEXT, rating REAL, rating_count INTEGER NOT NULL DEFAULT 0, genres TEXT NOT NULL DEFAULT '[]', source_url TEXT,
+    details_status TEXT, details_checked_at TEXT, cover_image_id TEXT, cover_status TEXT, cover_checked_at TEXT, created_at TEXT NOT NULL
+  )`);
+  db.prepare(`INSERT INTO books (id, title, author, created_at) VALUES ('old', 'Dune', 'Frank Herbert', ?)`).run(NOW);
+  applyBooksMigrations(db);
+  applyBooksMigrations(db);
+  const repo = createSqliteBooksRepository(db);
+  assert.equal(repo.getBook("old")!.data_sources, "[]");
+  repo.saveDetails("old", { summary: "Spice.", rating: null, ratingCount: 0, sourceUrl: "https://isbndb.com/book/1", genres: [] }, ["isbndb"], NOW);
+  assert.equal(repo.getBook("old")!.data_sources, '["isbndb"]');
+});
+
+test("the ISBNdb lapse cleanup clears only rows tagged with it", () => {
+  const { db, repo } = freshRepo();
+  const details = { summary: "Spice.", rating: 4, ratingCount: 1, sourceUrl: "https://example.test/", genres: ["Fantasy" as const] };
+  const both = repo.createBook({ title: "A", author: "A", isbn: null }, ["ta:a|a|"], NOW);
+  const only = repo.createBook({ title: "B", author: "B", isbn: null, sources: ["isbndb"], genres: ["Fantasy"] }, ["ta:b|b|"], NOW);
+  const open = repo.createBook({ title: "C", author: "C", isbn: null }, ["ta:c|c|"], NOW);
+  repo.saveDetails(both.id, details, ["openlibrary", "isbndb"], NOW);
+  repo.saveDetails(open.id, details, ["openlibrary"], NOW);
+  db.exec(`UPDATE books SET summary = NULL, genres = '[]', details_status = NULL, details_checked_at = NULL, source_url = NULL, data_sources = '[]' WHERE EXISTS (SELECT 1 FROM json_each(books.data_sources) WHERE value = 'isbndb')`);
+  for (const id of [both.id, only.id]) {
+    const row = repo.getBook(id)!;
+    assert.deepEqual([row.summary, row.genres, row.details_status, row.source_url, row.data_sources], [null, "[]", null, null, "[]"]);
+  }
+  assert.deepEqual([repo.getBook(open.id)!.summary, repo.getBook(open.id)!.data_sources], ["Spice.", '["openlibrary"]']);
 });

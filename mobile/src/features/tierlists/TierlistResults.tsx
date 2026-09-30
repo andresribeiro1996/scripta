@@ -4,7 +4,7 @@ import { aggregate, AGGREGATION_MODES, type AggregationMode, type HistogramCell 
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { Sheet, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
-import { authorOf, keyOf, TierCover, TierHead, titleOf, type TierBook } from "./TierBoard";
+import { authorOf, keyOf, TierCover, TierHead, TierRowScroll, titleOf, type TierBook } from "./TierBoard";
 
 const hitSlop = { top: 14, bottom: 14, left: 8, right: 8 };
 
@@ -49,7 +49,7 @@ export function TierlistResults({ histogram, tiers, pool, books, ballotCount, el
   useEffect(() => { if (active) boardScroll.current?.scrollTo({ y: 0, animated: false }); }, [active]);
 
   function renderBooks(rows: typeof results) {
-    return <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.books}>
+    return <TierRowScroll contentContainerStyle={styles.books}>
       {rows.length ? rows.map((result) => {
         const book = byKey.get(result.bookKey);
         const personal = tiers.find((item) => item.id === mine.get(result.bookKey));
@@ -58,7 +58,7 @@ export function TierlistResults({ histogram, tiers, pool, books, ballotCount, el
           {showMine && personal ? <View style={[styles.badge, { backgroundColor: colors.surface }]}><Text style={[typography.caption, { color: colors.text }]}>You: {personal.label}</Text></View> : null}
         </Pressable>;
       }) : <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>–</Text>}
-    </ScrollView>;
+    </TierRowScroll>;
   }
 
   return <View style={styles.root}>

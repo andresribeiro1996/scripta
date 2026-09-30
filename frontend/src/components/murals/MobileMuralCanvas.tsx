@@ -1,12 +1,12 @@
-import { blockTextColors, type Group, type PublicReaderCard } from "@scripta/shared";
-import { resolveTheme, themes } from "@scripta/shared/themes";
+import { blockTextColors, resolveBlockColor, type Group, type PublicReaderCard } from "@scripta/shared";
+import { themes, type ThemeColors } from "@scripta/shared/themes";
 import GridLayout from "react-grid-layout";
 import { useRef, useState, type CSSProperties } from "react";
 import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
-import { blockFontFamilyCss, resolveBlockStyle, resolveBorderColor } from "../../lib/libraryStyle";
+import { BLOCK_PAD_SCALE, blockFinishImage, blockFontFamilyCss, resolveBlockStyle, resolveBorderColor } from "../../lib/libraryStyle";
 import { muralBlockTitle, GRID_COLUMNS, screenPointToGrid, type BlockLayout, type Mural, type MuralBlock, type ReaderProfile, type ShelfTheme } from "../../lib/murals";
-import { osScheme, useThemePreference } from "../../lib/theme";
+import { muralThemeStyle } from "../../lib/theme";
 import { ActionSheet } from "../Sheet";
 import { MobileBlockPreview } from "./MobileBlockPreview";
 import { MuralBlockDetail } from "./MuralBlockDetail";
@@ -65,7 +65,8 @@ function BlockFrame({
   tierlistData,
   onActivate,
   buttonRef,
-  scale
+  scale,
+  themeColors
 }: {
   block: MuralBlock;
   selected: boolean;
@@ -83,11 +84,11 @@ function BlockFrame({
   onActivate: () => void;
   buttonRef?: (element: HTMLDivElement | null) => void;
   scale: number;
+  themeColors: ThemeColors;
 }) {
   const style = resolveBlockStyle(block.style);
   const pointerStart = useRef<{ x: number; y: number } | null>(null);
-  const themeColors = themes[resolveTheme(useThemePreference(), osScheme())].colors;
-  const overridesColor = Boolean(style.backgroundColor || style.textColor);
+  const overridden = style.backgroundColor || style.textColor ? blockTextColors(style, themeColors) : null;
   return (
     <div
       ref={buttonRef}
@@ -112,22 +113,25 @@ function BlockFrame({
       style={{
         borderRadius: `${style.cardRadius}px`,
         opacity: (style.cardOpacity / 100) * (draft ? 0.8 : 1),
-        backgroundColor: style.backgroundColor ?? "var(--color-surface)",
+        backgroundColor: resolveBlockColor(style.backgroundColor, themeColors) ?? "var(--color-surface)",
+        backgroundImage: blockFinishImage(style, themeColors),
         borderTopWidth: `${style.cardBorderSides.top ? style.cardBorderWidth : 0}px`,
         borderRightWidth: `${style.cardBorderSides.right ? style.cardBorderWidth : 0}px`,
         borderBottomWidth: `${style.cardBorderSides.bottom ? style.cardBorderWidth : 0}px`,
         borderLeftWidth: `${style.cardBorderSides.left ? style.cardBorderWidth : 0}px`,
         borderStyle: style.cardBorderWidth > 0 ? style.cardBorderStyle : "none",
-        borderColor: resolveBorderColor(style.cardBorderColor, style.cardBorderOpacity),
+        borderColor: resolveBorderColor(resolveBlockColor(style.cardBorderColor, themeColors), style.cardBorderOpacity),
         fontFamily: style.codeStyle ? blockFontFamilyCss("jetbrainsMono") : blockFontFamilyCss(style.fontFamily),
         fontSize: `${style.fontSize}px`,
         fontWeight: style.bold ? 700 : undefined,
         fontStyle: style.italic ? "italic" : undefined,
-        color: style.textColor ?? undefined,
-        ...(overridesColor ? { "--color-text-dim": blockTextColors(style, themeColors).dim } : {})
+        color: resolveBlockColor(style.textColor, themeColors) ?? undefined,
+        textAlign: style.textAlign,
+        "--block-pad": BLOCK_PAD_SCALE[style.innerSpacing],
+        ...(overridden ? { "--color-text-dim": overridden.dim, "--block-accent": overridden.accent } : {})
       } as CSSProperties}
     >
-      <div className="pointer-events-none h-full origin-top-left" style={{ width: `${scale * 100}%`, height: `${scale * 100}%`, transform: `scale(${1 / scale})`, fontSize: 14 }}>
+      <div className="pointer-events-none h-full origin-top-left" style={{ width: `${scale * 100}%`, height: `${scale * 100}%`, transform: `scale(${1 / scale})`, fontSize: 14 } as CSSProperties}>
         <MobileBlockPreview block={block} books={books} images={images} profile={profile} groups={groups} shelfThemeOverride={shelfThemeOverride} readerCardOverride={readerCardOverride} statsOverride={statsOverride} tierlistData={tierlistData} width={((CANVAS_WIDTH - PADDING * 2 + MARGIN) / GRID_COLUMNS * block.layout.w - MARGIN) * scale} height={(block.layout.h * (ROW_HEIGHT + MARGIN) - MARGIN) * scale} />
       </div>
     </div>
@@ -242,8 +246,8 @@ export function MobileMuralCanvas({
     <div className={`relative bg-(--color-bg) ${controlsPadding}`}>
       <div
         ref={setViewport}
-        className="mural-overview-stage relative w-full overflow-hidden bg-(--color-bg)"
-        style={{ height: logicalHeight * scale, minHeight: editMode ? "52dvh" : undefined }}
+        className="mural-overview-stage relative w-full overflow-hidden"
+        style={{ ...muralThemeStyle(mural.theme), height: logicalHeight * scale, minHeight: editMode ? "52dvh" : undefined }}
       >
         {viewportWidth > 0 && (
           <div
@@ -292,6 +296,7 @@ export function MobileMuralCanvas({
                     selected={editMode && block.id === selectedBlockId}
                     draggable={canDrag && (!draft || block.id === draft.block.id)}
                     scale={scale}
+                    themeColors={themes[mural.theme].colors}
                     draft={block.id === draft?.block.id}
                     invalid={block.id === draft?.block.id && !draft.valid}
                     books={books}
@@ -390,6 +395,7 @@ export function MobileMuralCanvas({
       {focused && (
         <MuralBlockDetail
           block={focused}
+          theme={mural.theme}
           books={books}
           images={images}
           profile={profile}

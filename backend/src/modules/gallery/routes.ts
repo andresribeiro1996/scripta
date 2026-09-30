@@ -22,7 +22,7 @@ function statusForGalleryError(err: GalleryError): number {
 
 const idParamSchema = z.object({ id: z.string().uuid() });
 
-export function buildGalleryRoutes(service: GalleryService) {
+export function buildGalleryRoutes(service: GalleryService, publicUrlFor: (id: string) => string) {
   return async function galleryRoutes(app: FastifyInstance) {
     app.get("/gallery", { preHandler: authGuard }, async (request, reply) => {
       return reply.send({ images: service.listImages(request.user.id) });
@@ -61,32 +61,19 @@ export function buildGalleryRoutes(service: GalleryService) {
       if (!parsed.success) {
         return reply.code(400).send({ error: "Invalid image id." });
       }
-      const deleted = service.deleteImage(request.user.id, parsed.data.id);
+      const deleted = await service.deleteImage(request.user.id, parsed.data.id);
       if (!deleted) {
         return reply.code(404).send({ error: "No image with that id in your gallery." });
       }
       return reply.code(204).send();
     });
 
-    // Deliberately NOT behind authGuard — see domain/types.ts's
-    // GalleryImage.url comment for why this needs to work as a plain
-    // <img src>. Access control here is "the id is an unguessable UUID",
-    // same trust model this app already applies to Kobo/Open Library
-    // cover URLs, not a session check.
     app.get("/gallery/:id/file", async (request, reply) => {
       const parsed = idParamSchema.safeParse(request.params);
       if (!parsed.success) {
         return reply.code(400).send({ error: "Invalid image id." });
       }
-      const file = service.getImageFile(parsed.data.id);
-      if (!file) {
-        return reply.code(404).send({ error: "No such image." });
-      }
-      // Re-encoded output never changes once uploaded (there's no "edit"
-      // operation — only upload/delete), so this is safe to cache
-      // aggressively; a deleted image's id simply 404s from then on.
-      reply.header("Cache-Control", "public, max-age=31536000, immutable");
-      return reply.type(file.mimeType).send(file.buffer);
+      return reply.redirect(publicUrlFor(parsed.data.id), 301);
     });
   };
 }

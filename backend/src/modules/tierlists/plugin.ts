@@ -2,13 +2,15 @@
 // modules/murals/plugin.ts's shape: two route builders, each registered in
 // its OWN Fastify encapsulation scope so each carries its own rate limit.
 
+import fastifyMultipart from "@fastify/multipart";
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
 import { openTierlistsDb } from "./adapters/sqlite/connection.js";
 import { createSqliteTierlistsRepository } from "./adapters/sqlite/sqliteTierlistsRepository.js";
-import { buildPublicTierlistRoutes, buildTierlistRoutes } from "./routes.js";
+import { buildPublicTierlistRoutes, buildTierlistRoutes, buildTierlistShareVideoRoutes } from "./routes.js";
 import type { EmitPublished, EmitVotedOn, TierlistsPublicApi } from "./service.js";
 import { createTierlistsPublicApi, createTierlistsService } from "./service.js";
+import { MAX_SHARE_IMAGE_BYTES } from "./shareVideo.js";
 
 export interface TierlistsPluginOptions {
   emitPublished?: EmitPublished;
@@ -27,6 +29,12 @@ export async function tierlistsPlugin(app: FastifyInstance, opts: TierlistsPlugi
   // same posture as modules/murals' own authenticated routes (see that
   // module's plugin.ts).
   await app.register(buildTierlistRoutes(tierlistsService));
+
+  await app.register(async (scoped) => {
+    await scoped.register(fastifyRateLimit, { max: 3, timeWindow: "1 minute" });
+    await scoped.register(fastifyMultipart, { limits: { fileSize: MAX_SHARE_IMAGE_BYTES, files: 1 } });
+    await scoped.register(buildTierlistShareVideoRoutes(tierlistsService));
+  });
 
   // The public surface is the one that needs a tight limit: it is
   // unauthenticated, it WRITES (a ballot), and a community tier list is
@@ -56,6 +64,12 @@ export function getTierlistsPublicApi(): TierlistsPublicApi {
     cachedApi = createTierlistsPublicApi(service);
   }
   return cachedApi;
+}
+
+let rekeyingTierlists: ReturnType<typeof createSqliteTierlistsRepository> | undefined;
+
+export function rekeyTierlistsBooks(userId: string, fromKeys: string[], toKey: string) {
+  (rekeyingTierlists ??= createSqliteTierlistsRepository(openTierlistsDb())).rekeyBooks(userId, fromKeys, toKey);
 }
 
 let erasingTierlists: ReturnType<typeof createSqliteTierlistsRepository> | undefined;

@@ -17,7 +17,6 @@ const scratch = join(tmpdir(), "library-service-test");
 process.env.AUTH_DB_PATH = join(scratch, "auth.sqlite");
 process.env.LIBRARY_DB_PATH = join(scratch, "library.sqlite");
 process.env.GALLERY_DB_PATH = join(scratch, "gallery.sqlite");
-process.env.GALLERY_STORAGE_PATH = join(scratch, "gallery-files");
 process.env.JWT_ACCESS_SECRET = "a".repeat(64);
 process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
@@ -42,6 +41,19 @@ function setup() {
     events.push(...batch.map((event) => ({ userId, ...event })));
   });
   return { db, service, events };
+}
+
+function setupCovers() {
+  const db = new DatabaseSync(":memory:");
+  db.exec(`CREATE TABLE library_documents (
+    user_id TEXT PRIMARY KEY,
+    data TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    share_token TEXT UNIQUE
+  )`);
+  const batches: unknown[][] = [];
+  const service = createLibraryService(createSqliteLibraryRepository(db), () => "", undefined, (lookups) => { batches.push(lookups); });
+  return { service, batches };
 }
 
 function booksOf(service: ReturnType<typeof createLibraryService>, userId: string): Array<Record<string, unknown>> {
@@ -289,4 +301,100 @@ test("readerGlyphFor returns null when the user has no library document", () => 
 test("readerGlyphFor returns null for an unparseable library document", () => {
   seedLibraryDocument("corrupt-user", "not json");
   assert.equal(readerGlyphFor("corrupt-user"), null);
+});
+
+test("an import save queues covers for every book once; other saves queue nothing", () => {
+  const { service, batches } = setupCovers();
+  const data = { books: [
+    { Title: "Orlando", Attribution: "Virginia Woolf", ISBN: "9780141184272", ImageId: "2f1c6a1e-3b0d-4b6e-9a53-1d2f9c0a7b11" },
+    { Title: "Dune", Attribution: "Frank Herbert" },
+    { ReadStatus: 1 },
+    "junk"
+  ] };
+  service.saveLibrary("user-1", data, undefined, "import");
+  assert.deepEqual(batches, [[
+    { isbn: "9780141184272", imageId: "2f1c6a1e-3b0d-4b6e-9a53-1d2f9c0a7b11", title: "Orlando", author: "Virginia Woolf" },
+    { isbn: undefined, imageId: undefined, title: "Dune", author: "Frank Herbert" }
+  ]]);
+  const saved = service.getLibrary("user-1")!;
+  service.saveLibrary("user-1", data, saved.updatedAt);
+  assert.equal(batches.length, 1);
+});
+
+function setupMerge() {
+  const db = new DatabaseSync(":memory:");
+  db.exec(`CREATE TABLE library_documents (
+    user_id TEXT PRIMARY KEY,
+    data TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    share_token TEXT UNIQUE
+  )`);
+  const rekeys: Array<[string, string[], string]> = [];
+  const service = createLibraryService(createSqliteLibraryRepository(db), () => "", undefined, undefined, (userId, fromKeys, toKey) => {
+    rekeys.push([userId, fromKeys, toKey]);
+  });
+  return { service, rekeys };
+}
+
+const koboDune = { ContentID: "k1", Title: "Dune", Attribution: "Frank Herbert", ReadStatus: 1 };
+const goodreadsDune = { ContentID: "g1", Title: "Dune", Attribution: "Frank Herbert", ISBN: "9780441013593", ReadStatus: 2 };
+
+test("mergeBooks rewrites references, then saves the merged library", () => {
+  const { service, rekeys } = setupMerge();
+  const saved = service.saveLibrary("u1", { books: [koboDune, goodreadsDune], groups: [{ id: "g", type: "collection", name: "c", bookKeys: [bookKey(goodreadsDune)], createdAt: "t", updatedAt: "t" }] });
+  const merged = service.mergeBooks("u1", bookKey(koboDune), [bookKey(goodreadsDune)], saved.updatedAt);
+  assert.deepEqual(rekeys, [["u1", [bookKey(goodreadsDune)], bookKey(koboDune)]]);
+  const data = merged.data as { books: Array<Record<string, unknown>>; groups: Array<{ bookKeys: string[] }> };
+  assert.equal(data.books.length, 1);
+  assert.equal(data.books[0]!.ReadStatus, 2);
+  assert.deepEqual(data.groups[0]!.bookKeys, [bookKey(koboDune)]);
+  assert.equal(bookKey(data.books[0]!), bookKey(koboDune));
+});
+
+test("mergeBooks with a stale updatedAt throws a conflict before touching any reference", () => {
+  const { service, rekeys } = setupMerge();
+  service.saveLibrary("u1", { books: [koboDune, goodreadsDune] });
+  assert.throws(() => service.mergeBooks("u1", bookKey(koboDune), [bookKey(goodreadsDune)], "2000-01-01T00:00:00.000Z"), LibraryConflictError);
+  assert.deepEqual(rekeys, []);
+});
+
+test("mergeBooks is a no-op when the keys are already gone", () => {
+  const { service, rekeys } = setupMerge();
+  const saved = service.saveLibrary("u1", { books: [koboDune] });
+  const again = service.mergeBooks("u1", bookKey(koboDune), [bookKey(goodreadsDune)], saved.updatedAt);
+  assert.equal(again.updatedAt, saved.updatedAt);
+  assert.deepEqual(rekeys, []);
+});
+
+test("mergeBooks with a stale updatedAt still succeeds when the keys are already gone", () => {
+  const { service, rekeys } = setupMerge();
+  const saved = service.saveLibrary("u1", { books: [koboDune] });
+  const again = service.mergeBooks("u1", bookKey(koboDune), [bookKey(goodreadsDune)], "2000-01-01T00:00:00.000Z");
+  assert.equal(again.updatedAt, saved.updatedAt);
+  assert.deepEqual(rekeys, []);
+});
+
+test("mergeBooks without a library throws NoLibraryDocumentError", async () => {
+  const { NoLibraryDocumentError } = await import("./domain/errors.js");
+  const { service } = setupMerge();
+  assert.throws(() => service.mergeBooks("nobody", "a", ["b"], "2000-01-01T00:00:00.000Z"), NoLibraryDocumentError);
+});
+
+test("mergeBooks does not save the library when a reference rewrite fails", () => {
+  const db = new DatabaseSync(":memory:");
+  db.exec(`CREATE TABLE library_documents (user_id TEXT PRIMARY KEY, data TEXT NOT NULL, updated_at TEXT NOT NULL, share_token TEXT UNIQUE)`);
+  const service = createLibraryService(createSqliteLibraryRepository(db), () => "", undefined, undefined, () => {
+    throw new Error("murals db locked");
+  });
+  const saved = service.saveLibrary("u1", { books: [koboDune, goodreadsDune] });
+  assert.throws(() => service.mergeBooks("u1", bookKey(koboDune), [bookKey(goodreadsDune)], saved.updatedAt), /murals db locked/);
+  assert.equal((service.getLibrary("u1")!.data as { books: unknown[] }).books.length, 2);
+});
+
+test("addBook matches an ISBN-less copy by title and author", () => {
+  const { service } = setup();
+  service.saveLibrary("u1", { books: [koboDune] });
+  const result = service.addBook("u1", { title: "Dune", author: "Frank Herbert", isbn: "9780441013593", readStatus: 2 });
+  assert.equal(result.updated, true);
+  assert.equal(booksOf(service, "u1").length, 1);
 });

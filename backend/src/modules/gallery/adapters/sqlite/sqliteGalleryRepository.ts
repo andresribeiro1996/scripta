@@ -12,7 +12,6 @@ export function createSqliteGalleryRepository(db: DatabaseSync): GalleryReposito
     VALUES ($id, $user_id, $filename, $mime_type, $extension, $width, $height, $byte_size, $created_at)
   `);
   const listStmt = db.prepare(`SELECT * FROM gallery_images WHERE user_id = ? ORDER BY created_at DESC`);
-  const getByIdStmt = db.prepare(`SELECT * FROM gallery_images WHERE id = ?`);
   const getOwnedStmt = db.prepare(`SELECT * FROM gallery_images WHERE id = ? AND user_id = ?`);
   const deleteStmt = db.prepare(`DELETE FROM gallery_images WHERE id = ? AND user_id = ?`);
   const totalBytesStmt = db.prepare(`SELECT COALESCE(SUM(byte_size), 0) AS total FROM gallery_images WHERE user_id = ?`);
@@ -37,10 +36,6 @@ export function createSqliteGalleryRepository(db: DatabaseSync): GalleryReposito
         $byte_size: row.byte_size,
         $created_at: row.created_at
       });
-    },
-
-    getImageById(id) {
-      return getByIdStmt.get(id) as GalleryImageRow | undefined;
     },
 
     getOwnedImage(id, userId) {

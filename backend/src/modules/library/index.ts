@@ -4,7 +4,7 @@
 // modules/auth/index.ts for when something eventually does.
 
 export { libraryPlugin as registerLibraryModule, deleteLibraryUserData } from "./plugin.js";
-export type { BookEvent, EmitBookEvents } from "./service.js";
+export type { BookEvent, EmitBookEvents, EnqueueCovers, RekeyBooks } from "./service.js";
 // Startup-migration read/write steps — see migration.ts and
 // backend/src/migrations/runStartupMigrations.ts for the full picture.
 export { readEmbeddedMurals, clearEmbeddedMuralsField } from "./migration.js";

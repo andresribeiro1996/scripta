@@ -3,16 +3,18 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import type { ThemeId } from "@scripta/shared/themes";
 import { FolderCycleError, InvalidFolderReferenceError, MuralConflictError } from "./domain/errors.js";
 import type { MuralsRepository } from "./domain/ports.js";
 import type { MuralFolderRow, MuralRow } from "./domain/types.js";
 import { createSqliteMuralsRepository } from "./adapters/sqlite/sqliteMuralsRepository.js";
 import { createMuralsService } from "./service.js";
 
+process.env.JWT_ACCESS_SECRET ??= "a".repeat(64);
+process.env.JWT_REFRESH_SECRET ??= "b".repeat(64);
 process.env.AUTH_DB_PATH ??= join(tmpdir(), "murals-test-auth.sqlite");
 process.env.LIBRARY_DB_PATH ??= join(tmpdir(), "murals-test-library.sqlite");
 process.env.GALLERY_DB_PATH ??= join(tmpdir(), "murals-test-gallery.sqlite");
-process.env.GALLERY_STORAGE_PATH ??= join(tmpdir(), "murals-test-gallery-files");
 
 function createInMemoryRepo(): MuralsRepository {
   const murals = new Map<string, MuralRow>();
@@ -20,6 +22,7 @@ function createInMemoryRepo(): MuralsRepository {
 
   return {
     deleteUserData() {},
+    rekeyBooks() {},
     listByUser(userId) {
       return [...murals.values()].filter((m) => m.user_id === userId);
     },
@@ -95,8 +98,8 @@ function createInMemoryRepo(): MuralsRepository {
 
 const urlFor = (token: string) => `http://x/shared/murals/${token}`;
 
-function makeService() {
-  return createMuralsService(createInMemoryRepo(), urlFor);
+function makeService(ownerTheme: ThemeId = "light") {
+  return createMuralsService(createInMemoryRepo(), urlFor, () => ownerTheme);
 }
 
 const UNKNOWN_UUID = "00000000-0000-4000-8000-000000000000";
@@ -230,8 +233,6 @@ test("updateMural stores a shelf block's role as sent", () => {
 });
 
 test("openMuralsDb migration is idempotent and preserves data", async () => {
-  process.env.JWT_ACCESS_SECRET ??= "a".repeat(64);
-  process.env.JWT_REFRESH_SECRET ??= "b".repeat(64);
   const tmpDir = mkdtempSync(join(tmpdir(), "murals-test-"));
   process.env.MURALS_DB_PATH = join(tmpDir, "murals.sqlite");
 
@@ -243,6 +244,7 @@ test("openMuralsDb migration is idempotent and preserves data", async () => {
   const second = openMuralsDb();
   const columns = second.prepare(`PRAGMA table_info(murals)`).all() as { name: string }[];
   assert.ok(columns.some((c) => c.name === "folder_id"));
+  assert.ok(columns.some((c) => c.name === "theme"));
   const row = second.prepare(`SELECT name FROM murals WHERE id = 'm1'`).get() as { name: string };
   assert.equal(row.name, "Keep me");
   const repository = createSqliteMuralsRepository(second);
@@ -256,4 +258,78 @@ test("openMuralsDb migration is idempotent and preserves data", async () => {
     .get();
   assert.ok(foldersTable);
   second.close();
+});
+
+test("createMural stores an explicit theme and defaults to the owner's account theme", () => {
+  const service = makeService("sepia");
+  assert.equal(service.createMural("u1", "Explicit", null, "dark").theme, "dark");
+  assert.equal(service.createMural("u1", "Default").theme, "sepia");
+});
+
+test("updateMural changes only the theme and persists it", () => {
+  const service = makeService();
+  const mural = service.createMural("u1", "M");
+  const updated = service.updateMural("u1", mural.id, { theme: "forest" });
+  assert.equal(updated?.theme, "forest");
+  assert.equal(updated?.name, "M");
+  assert.equal(service.getMural("u1", mural.id)?.theme, "forest");
+});
+
+test("murals routes validate theme on create and update", async () => {
+  const { buildMuralRoutes } = await import("./routes.js");
+  const { getAuthenticatedUserFromAccessToken } = await import("../auth/tokens.js");
+  const { default: Fastify } = await import("fastify");
+  const { default: jwt } = await import("jsonwebtoken");
+  const service = makeService("midnight");
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", (token: string) => getAuthenticatedUserFromAccessToken(token, (id) => ({
+    id, email: `${id}@example.test`, username: id, avatar_id: null, google_id: null, password_hash: null, created_at: ""
+  })));
+  await app.register(buildMuralRoutes(service));
+  const headers = { authorization: `Bearer ${jwt.sign({ sub: "u1", email: "u1@example.test", username: "u1" }, process.env.JWT_ACCESS_SECRET!, { expiresIn: "5m" })}` };
+
+  assert.equal((await app.inject({ method: "POST", url: "/murals", headers, payload: { name: "Bad", theme: "vaporwave" } })).statusCode, 400);
+  assert.equal((await app.inject({ method: "POST", url: "/murals", headers, payload: { name: "Bad", theme: "system" } })).statusCode, 400);
+  const created = await app.inject({ method: "POST", url: "/murals", headers, payload: { name: "Older client" } });
+  assert.equal(created.statusCode, 201);
+  assert.equal(created.json().theme, "midnight");
+  const chosen = await app.inject({ method: "POST", url: "/murals", headers, payload: { name: "Chosen", theme: "matrix" } });
+  assert.equal(chosen.json().theme, "matrix");
+
+  const id = created.json().id;
+  assert.equal((await app.inject({ method: "PUT", url: `/murals/${id}`, headers, payload: { theme: "vaporwave" } })).statusCode, 400);
+  assert.equal((await app.inject({ method: "PUT", url: `/murals/${id}`, headers, payload: {} })).statusCode, 400);
+  const updated = await app.inject({ method: "PUT", url: `/murals/${id}`, headers, payload: { theme: "oxblood" } });
+  assert.equal(updated.statusCode, 200);
+  assert.equal(updated.json().theme, "oxblood");
+  await app.close();
+});
+
+test("public payload carries the mural's theme", async () => {
+  const { resolveMuralPublicPayload } = await import("./domain/publicPayload.js");
+  const service = makeService();
+  const mural = service.createMural("u1", "Shared", null, "synthwave");
+  const row = { id: mural.id, user_id: "u1", name: "Shared", theme: "synthwave", blocks: "[]", cover_image_id: null, cover_image_url: null, share_token: null, folder_id: null, created_at: "", updated_at: "" };
+  assert.equal(resolveMuralPublicPayload(row, []).mural.theme, "synthwave");
+});
+
+test("backfillMuralThemes sets only NULL themes from each owner's resolved theme", async () => {
+  const { DatabaseSync } = await import("node:sqlite");
+  const { readFileSync } = await import("node:fs");
+  const { backfillMuralThemes } = await import("./migration.js");
+  const db = new DatabaseSync(":memory:");
+  db.exec(readFileSync(new URL("./adapters/sqlite/schema.sql", import.meta.url), "utf8"));
+  const insert = db.prepare("INSERT INTO murals (id, user_id, name, theme) VALUES (?, ?, 'M', ?)");
+  insert.run("a1", "u1", null);
+  insert.run("a2", "u1", "dark");
+  insert.run("b1", "u2", null);
+  const themeFor = (userId: string): ThemeId => (userId === "u1" ? "sepia" : "light");
+
+  backfillMuralThemes(themeFor, db);
+  const themes = () => Object.fromEntries((db.prepare("SELECT id, theme FROM murals").all() as Array<{ id: string; theme: string }>).map((r) => [r.id, r.theme]));
+  assert.deepEqual(themes(), { a1: "sepia", a2: "dark", b1: "light" });
+
+  backfillMuralThemes(() => "forest", db);
+  assert.deepEqual(themes(), { a1: "sepia", a2: "dark", b1: "light" });
+  db.close();
 });

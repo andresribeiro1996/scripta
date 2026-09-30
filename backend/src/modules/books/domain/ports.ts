@@ -1,15 +1,15 @@
 import type { BookMetadata, BookSearchResult } from "@scripta/shared";
-import type { BookRow, CoverImageRow, CoverSourceName, CoverStatus, NewBook } from "./types.js";
+import type { BookRow, CoverImageRow, CoverSourceName, CoverStatus, DataSource, NewBook } from "./types.js";
 
 export interface CoverBlobStore {
-  save(id: string, extension: string, bytes: Buffer): void;
-  read(id: string, extension: string): Buffer | null;
+  save(id: string, extension: string, bytes: Buffer): Promise<void>;
 }
 
 export interface BooksRepository {
   findBookByKey(key: string): BookRow | undefined;
   getBook(id: string): BookRow | undefined;
-  createBook(input: NewBook, key: string, createdAt: string): BookRow;
+  createBook(input: NewBook, keys: string[], createdAt: string): BookRow;
+  addKey(key: string, bookId: string): void;
   fillIdentity(id: string, title: string, author: string): void;
   makeSearchable(id: string): void;
   getImage(id: string): CoverImageRow | undefined;
@@ -17,9 +17,10 @@ export interface BooksRepository {
   setCover(bookId: string, cover: { imageId: string | null; status: CoverStatus | null; checkedAt: string | null }): void;
   addRejection(bookId: string, sourceUrl: string, createdAt: string): void;
   listRejectedUrls(bookId: string): Set<string>;
-  saveDetails(bookId: string, details: BookMetadata, checkedAt: string): void;
+  saveDetails(bookId: string, details: BookMetadata, sources: DataSource[], checkedAt: string): void;
   markDetailsMissing(bookId: string, checkedAt: string): void;
   searchBooks(tokens: string[], limit: number): BookRow[];
+  listUncheckedCoverIds(): string[];
 }
 
 export interface CoverCandidate {
@@ -40,9 +41,15 @@ export interface CoverSource {
 export interface CatalogSearchHit {
   result: BookSearchResult;
   olCoverId: number | null;
+  source: DataSource;
+}
+
+export interface CatalogDetails {
+  metadata: BookMetadata;
+  sources: DataSource[];
 }
 
 export interface BookCatalog {
-  fetchDetails(lookup: { isbn: string | null; title: string; author: string }): Promise<BookMetadata | null>;
+  fetchDetails(lookup: { isbn: string | null; title: string; author: string }): Promise<CatalogDetails | null>;
   search(query: { isbn: string } | { text: string }): Promise<CatalogSearchHit[]>;
 }

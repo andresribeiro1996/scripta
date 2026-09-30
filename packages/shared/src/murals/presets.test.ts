@@ -3,7 +3,8 @@ import { test } from "node:test";
 import { bookKey } from "../library/merge.js";
 import { readerIdentity } from "../library/readerIdentity.js";
 import { buildMuralPreset, MURAL_PRESETS, presetAvailability, shelfPresetSummary } from "./presets.js";
-import { updateBlock, type Mural, type MuralBlock } from "./murals.js";
+import { DEFAULT_BLOCK_STYLE } from "../library/libraryStyle.js";
+import { ensureBookBlockHeights, updateBlock, type Mural, type MuralBlock } from "./murals.js";
 
 const book = (title: string, fields: Record<string, unknown> = {}) => ({ Title: title, Attribution: "Author", ...fields });
 const key = (title: string) => `ta:${title.toLowerCase()}|author`;
@@ -74,6 +75,10 @@ test("the My shelf preset stacks profile, stats, reading, finished, then passage
   assert.equal(stats.layout.h, 4);
   const profile = blocks.find((block) => block.type === "profile")!;
   assert.equal(profile.layout.h, 5);
+  const reading = blocks.find((block) => block.type === "currentlyReading")!;
+  assert.equal(reading.layout.h, 6);
+  assert.equal(finished.layout.y, reading.layout.y + 6);
+  assert.equal(ensureBookBlockHeights(blocks), blocks);
 });
 
 test("the My shelf preset leaves out blocks with no data and widens a lone bottom block", () => {
@@ -95,6 +100,15 @@ test("preset blocks never overlap", () => {
   }
 });
 
+test("preset blocks follow the theme: no colour or chrome overrides, only the heading's display font", () => {
+  for (const { id } of MURAL_PRESETS) {
+    for (const block of buildMuralPreset(id, library).blocks) {
+      if (block.type === "text") assert.deepEqual(block.style, { ...DEFAULT_BLOCK_STYLE, fontFamily: "playfairDisplay" }, `${id}: heading style`);
+      else assert.equal(block.style, undefined, `${id}: ${block.type} has a style override`);
+    }
+  }
+});
+
 test("shelfPresetSummary counts the reader's books", () => {
   assert.equal(shelfPresetSummary(library, false), "Made from your 5 books: 1 you're reading and 3 you've finished. Only you can see it.");
   assert.equal(shelfPresetSummary([book("One", { ReadStatus: 1 })], false), "Made from your 1 book: 1 you're reading and 0 you've finished. Only you can see it.");
@@ -106,7 +120,7 @@ test("shelfPresetSummary warns a published profile that visitors will see the ke
 
 test("editing a shelf block through updateBlock keeps its role", () => {
   const shelf = buildMuralPreset("shelf", library).blocks.find((block) => block.type === "shelf")!;
-  const mural: Mural = { id: "m1", name: "My shelf", blocks: [shelf], createdAt: "", updatedAt: "", shareToken: null, shareUrl: null, folderId: null };
+  const mural: Mural = { id: "m1", name: "My shelf", theme: "light", blocks: [shelf], createdAt: "", updatedAt: "", shareToken: null, shareUrl: null, folderId: null };
   const edited = shelf.type === "shelf" ? { ...shelf, title: "Read in 2026" } : shelf;
   const [saved] = updateBlock([mural], "m1", edited)[0].blocks;
   assert.equal(saved.type === "shelf" ? saved.role : undefined, "finished");
@@ -121,8 +135,8 @@ test("the My shelf preset places a settled reader card beside stats, below the p
   const profile = blocks.find((block) => block.type === "profile")!;
   assert.ok(card, "settled card is placed");
   const cardBottom = profile.layout.y + profile.layout.h;
-  assert.deepEqual(card!.layout, { x: 0, y: cardBottom, w: 6, h: 7 });
-  assert.deepEqual(stats.layout, { x: 6, y: cardBottom, w: 6, h: 7 });
+  assert.deepEqual(card!.layout, { x: 0, y: cardBottom, w: 6, h: 6 });
+  assert.deepEqual(stats.layout, { x: 6, y: cardBottom, w: 6, h: 6 });
   assert.equal(buildMuralPreset("shelf", books.slice(0, 4), []).blocks.some((block) => block.type === "readerCard"), false);
 });
 

@@ -1,6 +1,18 @@
 @import "tailwindcss";
 @import "./themes.css";
 
+@utility block-p-* {
+  padding: calc(var(--spacing) * --value(number) * var(--block-pad, 1));
+}
+
+@utility block-px-* {
+  padding-inline: calc(var(--spacing) * --value(number) * var(--block-pad, 1));
+}
+
+@utility block-py-* {
+  padding-block: calc(var(--spacing) * --value(number) * var(--block-pad, 1));
+}
+
 /* Self-hosted (not linked live from fonts.googleapis.com) — same
    offline-friendly, self-hosted-app reasoning as everywhere else in this
    codebase that touches fonts (see lib/libraryStyle.ts's
