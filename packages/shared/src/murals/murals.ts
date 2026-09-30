@@ -322,9 +322,9 @@ export function createBlockCandidate(type: BlockType, blocks: MuralBlock[]): Mur
   return defaultBlockForType(newId(), type, findAvailableLayout(blocks, w, h));
 }
 
-export function profileOnlyMural(): Mural {
+export function profileOnlyMural(theme: ThemeId): Mural {
   const block = createBlockCandidate("profile", []);
-  return { id: "profile", name: "", theme: "light", blocks: [{ ...block, layout: { x: 0, y: 0, w: GRID_COLUMNS, h: 3 } }], createdAt: "", updatedAt: "", shareToken: null, shareUrl: null, folderId: null };
+  return { id: "profile", name: "", theme, blocks: [{ ...block, layout: { x: 0, y: 0, w: GRID_COLUMNS, h: 3 } }], createdAt: "", updatedAt: "", shareToken: null, shareUrl: null, folderId: null };
 }
 
 export function createDuplicateCandidate(block: MuralBlock, blocks: MuralBlock[]): MuralBlock {
