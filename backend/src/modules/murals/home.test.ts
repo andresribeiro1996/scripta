@@ -9,7 +9,6 @@ import jwt from "jsonwebtoken";
 
 const scratch = mkdtempSync(join(tmpdir(), "scripta-home-test-"));
 for (const key of ["AUTH", "LIBRARY", "MURALS", "COVERS", "GALLERY", "TIERLISTS", "ARENA"]) process.env[`${key}_DB_PATH`] = join(scratch, `${key}.sqlite`);
-process.env.GALLERY_STORAGE_PATH = join(scratch, "gallery");
 process.env.JWT_ACCESS_SECRET = "a".repeat(64);
 process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 const { createSqliteMuralsRepository } = await import("./adapters/sqlite/sqliteMuralsRepository.js");

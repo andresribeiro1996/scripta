@@ -10,7 +10,6 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 process.env.AUTH_DB_PATH = join(tempRoot, "auth.sqlite");
 process.env.LIBRARY_DB_PATH = join(tempRoot, "library.sqlite");
 process.env.GALLERY_DB_PATH = join(tempRoot, "gallery.sqlite");
-process.env.GALLERY_STORAGE_PATH = join(tempRoot, "gallery-files");
 
 const { openAuthDb } = await import("./adapters/sqlite/connection.js");
 const db = openAuthDb();

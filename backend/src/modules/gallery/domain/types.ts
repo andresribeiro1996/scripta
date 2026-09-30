@@ -4,9 +4,8 @@
 // served generically enough to support other uses later.
 
 /** Row shape as stored. `filename` is the original upload's name kept
- *  purely for display in the gallery UI — never used to build a
- *  filesystem path (see adapters/fs/fsImageBlobStore.ts, which paths by
- *  `id` instead) — so it's safe even if it contains `../` or other
+ *  purely for display in the gallery UI — never used to build an
+ *  object key (plugin.ts keys by `id` instead) — so it's safe even if it contains `../` or other
  *  path-traversal-shaped garbage. `extension`/`mime_type` describe the
  *  RE-ENCODED file actually on disk, not whatever the upload originally
  *  was (see service.ts's uploadImage — every upload is normalized to a

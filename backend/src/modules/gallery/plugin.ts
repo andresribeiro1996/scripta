@@ -6,19 +6,29 @@
 import fastifyMultipart from "@fastify/multipart";
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
-import { env } from "../../config/env.js";
-import { createFsImageBlobStore } from "./adapters/fs/fsImageBlobStore.js";
+import { createObjectStore } from "../../storage/createObjectStore.js";
 import { createSqliteGalleryRepository } from "./adapters/sqlite/sqliteGalleryRepository.js";
 import { openGalleryDb } from "./adapters/sqlite/connection.js";
 import { buildGalleryRoutes } from "./routes.js";
-import { createGalleryService, MAX_UPLOAD_BYTES } from "./service.js";
+import { createGalleryService, deleteAllGalleryImages, MAX_UPLOAD_BYTES } from "./service.js";
+import type { ImageBlobStore } from "./domain/ports.js";
+
+const keyFor = (id: string) => `gallery/${id}.webp`;
+const galleryUrlFor = (id: string) => createObjectStore().urlFor(keyFor(id));
+
+function imageBlobStore(): ImageBlobStore {
+  return {
+    save: (id, bytes) => createObjectStore().put(keyFor(id), bytes, "image/webp"),
+    delete: (id) => createObjectStore().delete(keyFor(id))
+  };
+}
 
 export async function galleryPlugin(app: FastifyInstance) {
   // --- composition: swap either block to change storage technology ---
   const db = openGalleryDb();
   const galleryRepository = createSqliteGalleryRepository(db);
-  const blobStore = createFsImageBlobStore(env.GALLERY_STORAGE_PATH);
-  const publicUrlFor = (id: string) => `${env.PUBLIC_API_URL}/gallery/${id}/file`;
+  const blobStore = imageBlobStore();
+  const publicUrlFor = galleryUrlFor;
   const galleryService = createGalleryService(galleryRepository, blobStore, publicUrlFor);
   // -----------------------------------------------------------------------
 
@@ -38,12 +48,12 @@ export async function galleryPlugin(app: FastifyInstance) {
     }
   });
 
-  await app.register(buildGalleryRoutes(galleryService));
+  await app.register(buildGalleryRoutes(galleryService, publicUrlFor));
 }
 
 let erasingGallery: ReturnType<typeof createSqliteGalleryRepository> | undefined;
 
-export function deleteGalleryUserData(userId: string) {
-  (erasingGallery ??= createSqliteGalleryRepository(openGalleryDb())).deleteUserData(userId);
-  createFsImageBlobStore(env.GALLERY_STORAGE_PATH).deleteAll(userId);
+export async function deleteGalleryUserData(userId: string): Promise<void> {
+  erasingGallery ??= createSqliteGalleryRepository(openGalleryDb());
+  await deleteAllGalleryImages(erasingGallery, imageBlobStore(), userId);
 }

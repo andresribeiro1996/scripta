@@ -13,7 +13,6 @@ const scratchDir = mkdtempSync(join(tmpdir(), "quizzes-routes-test-"));
 process.env.AUTH_DB_PATH = join(scratchDir, "auth.sqlite");
 process.env.LIBRARY_DB_PATH = join(scratchDir, "library.sqlite");
 process.env.GALLERY_DB_PATH = join(scratchDir, "gallery.sqlite");
-process.env.GALLERY_STORAGE_PATH = join(scratchDir, "gallery-files");
 process.env.COVERS_DB_PATH = join(scratchDir, "covers.sqlite");
 process.env.TIERLISTS_DB_PATH = join(scratchDir, "tierlists.sqlite");
 process.env.QUIZZES_DB_PATH = join(scratchDir, "quizzes.sqlite");
