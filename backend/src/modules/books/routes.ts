@@ -15,14 +15,29 @@ const fileParamsSchema = z.object({ id: z.string().uuid(), size: z.enum(["file",
 const FORBIDDEN = { error: "Only the admin can change shared covers." };
 const NOT_FOUND = { error: "No such book." };
 
+const MAX_BATCH = 100;
+const batchSchema = z.array(lookupSchema).max(MAX_BATCH);
+
+function isLookable(lookup: z.infer<typeof lookupSchema>) {
+  return Boolean(lookup.isbn || lookup.title);
+}
+
 export function buildResolveRoutes(service: BooksService) {
   return async function resolveRoutes(app: FastifyInstance) {
     app.get("/covers/resolve", { preHandler: authGuard }, async (request, reply) => {
       const parsed = lookupSchema.safeParse(request.query);
-      if (!parsed.success || (!parsed.data.isbn && !parsed.data.title)) {
+      if (!parsed.success || !isLookable(parsed.data)) {
         return reply.code(400).send({ error: "Send an isbn or a title (author optional)." });
       }
-      return reply.send(service.resolveCover(parsed.data));
+      return reply.send(service.resolveCover(parsed.data, true));
+    });
+
+    app.post("/covers/resolve/batch", { preHandler: authGuard }, async (request, reply) => {
+      const parsed = batchSchema.safeParse(request.body);
+      if (!parsed.success || !parsed.data.every(isLookable)) {
+        return reply.code(400).send({ error: `Send up to ${MAX_BATCH} lookups, each with an isbn or a title (author optional).` });
+      }
+      return reply.send({ results: parsed.data.map((lookup) => service.resolveCover(lookup)) });
     });
   };
 }

@@ -10,9 +10,10 @@ import { createIsbndbSource } from "./adapters/sources/isbndb.js";
 import { createOpenLibraryCoverSource } from "./adapters/sources/openLibrary.js";
 import { openBooksDb } from "./adapters/sqlite/connection.js";
 import { createSqliteBooksRepository } from "./adapters/sqlite/sqliteBooksRepository.js";
-import { createBooksService, MAX_UPLOAD_BYTES } from "./booksService.js";
+import { createBooksService, MAX_UPLOAD_BYTES, type BooksService } from "./booksService.js";
 import type { FetchCoverImage } from "./coverResolver.js";
 import { encodeCover } from "./domain/images.js";
+import type { BookLookup } from "./domain/normalize.js";
 import { buildAdminRoutes, buildCatalogRoutes, buildCoverFileRoutes, buildResolveRoutes } from "./routes.js";
 import { createCoverWorker } from "./worker.js";
 
@@ -20,6 +21,13 @@ const ISBNDB_GAP_MS = 1100;
 const APPLE_GAP_MS = 3200;
 const OPEN_LIBRARY_GAP_MS = 1000;
 const OPEN_LIBRARY_COVER_GAP_MS = 3100;
+
+let activeService: BooksService | null = null;
+
+export function enqueueBookCovers(lookups: BookLookup[]) {
+  if (!activeService) throw new Error("Books module is not registered.");
+  activeService.enqueueCovers(lookups);
+}
 
 export async function booksPlugin(app: FastifyInstance) {
   const repo = createSqliteBooksRepository(openBooksDb());
@@ -50,7 +58,11 @@ export async function booksPlugin(app: FastifyInstance) {
     (bookId) => service.processBook(bookId),
     (error, bookId) => app.log.error({ err: error, bookId }, "cover lookup failed")
   );
-  app.addHook("onClose", async () => worker.stop());
+  activeService = service;
+  app.addHook("onClose", async () => {
+    activeService = null;
+    worker.stop();
+  });
 
   await app.register(async (scoped) => {
     await scoped.register(fastifyRateLimit, { max: 1200, timeWindow: "1 minute" });

@@ -44,6 +44,19 @@ function setup() {
   return { db, service, events };
 }
 
+function setupCovers() {
+  const db = new DatabaseSync(":memory:");
+  db.exec(`CREATE TABLE library_documents (
+    user_id TEXT PRIMARY KEY,
+    data TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    share_token TEXT UNIQUE
+  )`);
+  const batches: unknown[][] = [];
+  const service = createLibraryService(createSqliteLibraryRepository(db), () => "", undefined, (lookups) => { batches.push(lookups); });
+  return { service, batches };
+}
+
 function booksOf(service: ReturnType<typeof createLibraryService>, userId: string): Array<Record<string, unknown>> {
   const data = service.getLibrary(userId)?.data as { books?: Array<Record<string, unknown>> } | null;
   return data?.books ?? [];
@@ -289,4 +302,22 @@ test("readerGlyphFor returns null when the user has no library document", () => 
 test("readerGlyphFor returns null for an unparseable library document", () => {
   seedLibraryDocument("corrupt-user", "not json");
   assert.equal(readerGlyphFor("corrupt-user"), null);
+});
+
+test("an import save queues covers for every book once; other saves queue nothing", () => {
+  const { service, batches } = setupCovers();
+  const data = { books: [
+    { Title: "Orlando", Attribution: "Virginia Woolf", ISBN: "9780141184272", ImageId: "2f1c6a1e-3b0d-4b6e-9a53-1d2f9c0a7b11" },
+    { Title: "Dune", Attribution: "Frank Herbert" },
+    { ReadStatus: 1 },
+    "junk"
+  ] };
+  service.saveLibrary("user-1", data, undefined, "import");
+  assert.deepEqual(batches, [[
+    { isbn: "9780141184272", imageId: "2f1c6a1e-3b0d-4b6e-9a53-1d2f9c0a7b11", title: "Orlando", author: "Virginia Woolf" },
+    { isbn: undefined, imageId: undefined, title: "Dune", author: "Frank Herbert" }
+  ]]);
+  const saved = service.getLibrary("user-1")!;
+  service.saveLibrary("user-1", data, saved.updatedAt);
+  assert.equal(batches.length, 1);
 });

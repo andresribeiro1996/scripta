@@ -152,10 +152,39 @@ test("an unavailable source records no miss and backs off for 10 minutes", async
   assert.equal(h.warnings[0]!.details.source, "apple");
   assert.equal(h.warnings[0]!.message, "cover source unavailable");
   h.enqueued.length = 0;
-  assert.equal(h.service.resolveCover(orlando).pending, false);
+  assert.deepEqual(h.service.resolveCover(orlando), { url: null, fullUrl: null, pending: true });
   assert.equal(h.enqueued.length, 0);
   h.advance(10 * 60 * 1000);
   assert.equal(h.service.resolveCover(orlando).pending, true);
+  assert.equal(h.enqueued.length, 1);
+});
+
+test("resolve queues at the back unless asked to jump the queue", () => {
+  const { service, enqueued } = harness();
+  service.resolveCover(orlando);
+  service.resolveCover(orlando, true);
+  assert.deepEqual(enqueued.map((entry) => entry.front), [false, true]);
+});
+
+test("enqueueCovers queues each unresolved book at the back and skips resolved ones", async () => {
+  const dune = { title: "Dune", author: "Frank Herbert" };
+  const h = harness({ sources: { isbndb: null, apple: isbnSource("https://a/1"), openlibrary: emptySource } });
+  h.sizes.set("https://a/1", [900, 1400]);
+  h.service.resolveCover(orlando);
+  await h.service.processBook(h.bookId("isbn:9780141184272"));
+  h.enqueued.length = 0;
+  h.service.enqueueCovers([orlando, dune, { title: "" }]);
+  assert.deepEqual(h.enqueued, [{ bookId: h.bookId("ta:dune|frank herbert"), front: false }]);
+});
+
+test("enqueueCovers skips a book in backoff", async () => {
+  const failing: CoverSource = { byIsbn: async () => { throw new SourceUnavailableError("apple", "HTTP 429"); }, byTitle: async () => [] };
+  const h = harness({ sources: { isbndb: null, apple: failing, openlibrary: emptySource } });
+  h.service.resolveCover(orlando);
+  await h.service.processBook(h.bookId("isbn:9780141184272"));
+  h.enqueued.length = 0;
+  h.service.enqueueCovers([orlando]);
+  assert.equal(h.enqueued.length, 0);
 });
 
 test("a low-res image found while a source was down is stored without advancing the check time", async () => {
@@ -187,10 +216,39 @@ test("an unexpected error during processing sets a 10-minute backoff and rethrow
   const id = h.bookId("isbn:9780141184272");
   await assert.rejects(h.service.processBook(id), /disk full/);
   h.enqueued.length = 0;
-  assert.equal(h.service.resolveCover(orlando).pending, false);
+  assert.deepEqual(h.service.resolveCover(orlando), { url: null, fullUrl: null, pending: true });
   assert.equal(h.enqueued.length, 0);
   h.advance(10 * 60 * 1000);
   assert.equal(h.service.resolveCover(orlando).pending, true);
+  assert.equal(h.enqueued.length, 1);
+});
+
+test("resolve queues at the back unless asked to jump the queue", () => {
+  const { service, enqueued } = harness();
+  service.resolveCover(orlando);
+  service.resolveCover(orlando, true);
+  assert.deepEqual(enqueued.map((entry) => entry.front), [false, true]);
+});
+
+test("enqueueCovers queues each unresolved book at the back and skips resolved ones", async () => {
+  const dune = { title: "Dune", author: "Frank Herbert" };
+  const h = harness({ sources: { isbndb: null, apple: isbnSource("https://a/1"), openlibrary: emptySource } });
+  h.sizes.set("https://a/1", [900, 1400]);
+  h.service.resolveCover(orlando);
+  await h.service.processBook(h.bookId("isbn:9780141184272"));
+  h.enqueued.length = 0;
+  h.service.enqueueCovers([orlando, dune, { title: "" }]);
+  assert.deepEqual(h.enqueued, [{ bookId: h.bookId("ta:dune|frank herbert"), front: false }]);
+});
+
+test("enqueueCovers skips a book in backoff", async () => {
+  const failing: CoverSource = { byIsbn: async () => { throw new SourceUnavailableError("apple", "HTTP 429"); }, byTitle: async () => [] };
+  const h = harness({ sources: { isbndb: null, apple: failing, openlibrary: emptySource } });
+  h.service.resolveCover(orlando);
+  await h.service.processBook(h.bookId("isbn:9780141184272"));
+  h.enqueued.length = 0;
+  h.service.enqueueCovers([orlando]);
+  assert.equal(h.enqueued.length, 0);
 });
 
 test("manual covers are never processed", async () => {

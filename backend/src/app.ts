@@ -9,6 +9,7 @@
 // imports between modules at all."
 
 import fastifyCors from "@fastify/cors";
+import type { CoverLookupParams } from "@scripta/shared";
 import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
 import { STATUS_CODES } from "node:http";
 import { isAllowedOrigin } from "./config/corsOrigin.js";
@@ -29,7 +30,7 @@ import {
 } from "./modules/auth/index.js";
 import { deleteArenaUserData, getArenaPublicApi, registerArenaModule } from "./modules/arena/index.js";
 import { deleteCommunityUserData, getCommunityPublicApi, registerCommunityModule } from "./modules/community/index.js";
-import { registerBooksModule } from "./modules/books/index.js";
+import { enqueueBookCovers, registerBooksModule } from "./modules/books/index.js";
 import { deleteGalleryUserData, registerGalleryModule } from "./modules/gallery/index.js";
 import { deleteLibraryUserData, registerLibraryModule, resolvePublicLibrary, readerGlyphFor, type BookEvent } from "./modules/library/index.js";
 import { deleteMuralsUserData, getMuralsPublicApi, registerMuralsModule } from "./modules/murals/index.js";
@@ -125,6 +126,13 @@ export function buildApp() {
         } catch (error) {
           app.log.error(error, "failed to record book activity event");
         }
+      }
+    },
+    enqueueCovers: (lookups: CoverLookupParams[]) => {
+      try {
+        enqueueBookCovers(lookups);
+      } catch (error) {
+        app.log.error(error, "failed to queue covers for imported library");
       }
     }
   });

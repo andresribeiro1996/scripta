@@ -80,6 +80,18 @@ test("resolve needs auth, needs an ISBN or title, and ignores imageId", async ()
   assert.deepEqual(res.json(), { url: null, fullUrl: null, pending: true });
 });
 
+test("batch resolve answers each lookup in order and validates the whole list", async () => {
+  const { service } = makeService();
+  const post = (payload: unknown, user?: string) => call(service, { method: "POST", url: "/covers/resolve/batch", payload: payload as object }, user);
+  assert.equal((await post([{ title: "Dune" }])).statusCode, 401);
+  assert.equal((await post({ title: "Dune" }, "u1")).statusCode, 400);
+  assert.equal((await post([{ title: "Dune" }, { author: "Nobody" }], "u1")).statusCode, 400);
+  assert.equal((await post(Array.from({ length: 101 }, (_, i) => ({ title: `Book ${i}` })), "u1")).statusCode, 400);
+  const res = await post([{ title: "Dune" }, { isbn: "9780441013593", imageId: "ignored" }], "u1");
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.json(), { results: [{ url: null, fullUrl: null, pending: true }, { url: null, fullUrl: null, pending: true }] });
+});
+
 test("cover files serve WebP with immutable caching; thumb falls back to the full file", async () => {
   const { service, files } = makeService();
   const id = "11111111-1111-4111-8111-111111111111";
