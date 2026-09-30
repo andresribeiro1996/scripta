@@ -58,7 +58,7 @@ export function unionHighlights(existing: unknown, incoming: unknown): Array<Rec
 }
 
 /** For a book present in both — the newest import wins for everything
- *  (title, author, progress, status, ...), except: `_coverUrl` is kept
+ *  (progress, status, ...), except: `_coverUrl` is kept
  *  from whichever side actually has one, and highlights union rather
  *  than replace. `_coverUrl` is set by bookCovers.ts's setBookCover
  *  (a genuine custom gallery cover) — auto-resolved covers no longer
@@ -102,14 +102,20 @@ function withIdentityOf(book: Record<string, unknown>, source: Record<string, un
 function collapseCertain(books: Array<Record<string, unknown>>): Array<Record<string, unknown>> {
   const kept: Array<Record<string, unknown>> = [];
   const facts: ReturnType<typeof matchFacts>[] = [];
+  const isbns: Array<Set<string>> = [];
   for (const book of books) {
     const bookFacts = matchFacts(book);
-    const index = facts.findIndex((other) => certainFacts(other, bookFacts));
+    const index = facts.findIndex(
+      (other, i) =>
+        certainFacts(other, bookFacts) && (bookFacts.isbn === "" || [...isbns[i]!].every((isbn) => isbn === bookFacts.isbn))
+    );
     if (index < 0) {
       kept.push(book);
       facts.push(bookFacts);
+      isbns.push(new Set(bookFacts.isbn === "" ? [] : [bookFacts.isbn]));
     } else {
       kept[index] = withIdentityOf(mergeBookPair(kept[index]!, book), kept[index]!);
+      if (bookFacts.isbn !== "") isbns[index]!.add(bookFacts.isbn);
     }
   }
   return kept;

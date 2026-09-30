@@ -45,3 +45,24 @@ test("each existing book pairs at most once", () => {
   ]);
   assert.equal(merged.length, 2);
 });
+
+test("an ISBN-less book cannot bridge two different ISBNs inside one import", () => {
+  const dune = { Title: "Dune", Attribution: "Frank Herbert" };
+  const merged = mergeBookLists([], [
+    { ...dune },
+    { ...dune, ISBN: "9780441013593" },
+    { ...dune, ISBN: "9780593099322" }
+  ]);
+  assert.equal(merged.length, 2);
+});
+
+test("an ISBN-less existing book pairs with one of two different-ISBN imports and the other is appended", () => {
+  const dune = { Title: "Dune", Attribution: "Frank Herbert" };
+  const merged = mergeBookLists([{ ...dune, ContentID: "e" }], [
+    { ...dune, ContentID: "b", ISBN: "9780441013593" },
+    { ...dune, ContentID: "c", ISBN: "9780593099322" }
+  ]);
+  assert.equal(merged.length, 2);
+  assert.equal(merged[0]!.ContentID, "b");
+  assert.equal(merged[1]!.ContentID, "c");
+});
