@@ -25,6 +25,8 @@ interface LegacyCoverRow {
 
 export function applyBooksMigrations(db: DatabaseSync): void {
   db.exec(readFileSync(`${adapterDir}/books.sql`, "utf8"));
+  const columns = db.prepare("PRAGMA table_info(books)").all() as Array<{ name: string }>;
+  if (!columns.some((column) => column.name === "data_sources")) db.exec("ALTER TABLE books ADD COLUMN data_sources TEXT NOT NULL DEFAULT '[]'");
   const legacy = db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'cover_cache'`).get();
   if (!legacy) return;
 
@@ -61,6 +63,7 @@ export function openBooksDb(): DatabaseSync {
   mkdirSync(dirname(env.COVERS_DB_PATH), { recursive: true });
   const db = new DatabaseSync(env.COVERS_DB_PATH);
   db.exec("PRAGMA journal_mode = WAL");
+  db.exec("PRAGMA busy_timeout = 5000");
   applyBooksMigrations(db);
   return db;
 }

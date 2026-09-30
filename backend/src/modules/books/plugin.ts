@@ -2,8 +2,10 @@ import fastifyMultipart from "@fastify/multipart";
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
 import { env, isbndbConfigured } from "../../config/env.js";
+import { createCompositeCatalog } from "./adapters/catalog/compositeCatalog.js";
 import { createFsCoverBlobStore } from "./adapters/fs/fsCoverBlobStore.js";
 import { createThrottle, fetchBytes } from "./adapters/http/http.js";
+import { createIsbndbCatalog } from "./adapters/isbndb/isbndbCatalog.js";
 import { createOpenLibraryCatalog } from "./adapters/openlibrary/openLibraryCatalog.js";
 import { createAppleSource } from "./adapters/sources/apple.js";
 import { createIsbndbSource } from "./adapters/sources/isbndb.js";
@@ -31,6 +33,7 @@ export function enqueueBookCovers(lookups: BookLookup[]) {
 
 export async function booksPlugin(app: FastifyInstance) {
   const repo = createSqliteBooksRepository(openBooksDb());
+  const isbndbThrottle = createThrottle(ISBNDB_GAP_MS);
   const openLibraryThrottle = createThrottle(OPEN_LIBRARY_GAP_MS);
   const openLibraryCoverThrottle = createThrottle(OPEN_LIBRARY_COVER_GAP_MS);
   const fetchImage: FetchCoverImage = async (candidate) => {
@@ -43,11 +46,14 @@ export async function booksPlugin(app: FastifyInstance) {
     repo,
     blobs: createFsCoverBlobStore(env.COVERS_STORAGE_PATH),
     sources: {
-      isbndb: isbndbConfigured ? createIsbndbSource(env.ISBNDB_API_KEY, createThrottle(ISBNDB_GAP_MS)) : null,
+      isbndb: isbndbConfigured ? createIsbndbSource(env.ISBNDB_API_KEY, isbndbThrottle) : null,
       apple: createAppleSource(createThrottle(APPLE_GAP_MS)),
       openlibrary: createOpenLibraryCoverSource(openLibraryThrottle)
     },
-    catalog: createOpenLibraryCatalog(openLibraryThrottle),
+    catalog: createCompositeCatalog(
+      createOpenLibraryCatalog(openLibraryThrottle),
+      isbndbConfigured ? createIsbndbCatalog(env.ISBNDB_API_KEY, isbndbThrottle) : null
+    ),
     fetchImage,
     enqueue: (bookId, front) => worker.enqueue(bookId, front),
     publicUrlFor: (id, size) => `${env.PUBLIC_API_URL}/covers/cached/${id}/${size}`,

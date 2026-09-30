@@ -7,8 +7,8 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const byKeyStmt = db.prepare(`SELECT books.* FROM book_keys JOIN books ON books.id = book_keys.book_id WHERE book_keys.key = ?`);
   const byIdStmt = db.prepare(`SELECT * FROM books WHERE id = ?`);
   const insertBookStmt = db.prepare(`
-    INSERT INTO books (id, title, author, year, publisher, isbn, ol_cover_id, genres, created_at)
-    VALUES ($id, $title, $author, $year, $publisher, $isbn, $ol_cover_id, $genres, $created_at)
+    INSERT INTO books (id, title, author, year, publisher, isbn, ol_cover_id, genres, data_sources, created_at)
+    VALUES ($id, $title, $author, $year, $publisher, $isbn, $ol_cover_id, $genres, $data_sources, $created_at)
   `);
   const insertKeyStmt = db.prepare(`INSERT INTO book_keys (key, book_id) VALUES (?, ?)`);
   const fillIdentityStmt = db.prepare(`UPDATE books SET title = ?, author = ? WHERE id = ? AND title = ''`);
@@ -26,7 +26,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const rejectionsStmt = db.prepare(`SELECT source_url FROM cover_rejections WHERE book_id = ?`);
   const saveDetailsStmt = db.prepare(`
     UPDATE books
-    SET summary = ?, rating = ?, rating_count = ?, genres = ?, source_url = ?, details_status = 'found', details_checked_at = ?
+    SET summary = ?, rating = ?, rating_count = ?, genres = ?, data_sources = ?, source_url = ?, details_status = 'found', details_checked_at = ?
     WHERE id = ?
   `);
   const detailsMissingStmt = db.prepare(`UPDATE books SET details_status = 'missing', details_checked_at = ? WHERE id = ?`);
@@ -59,6 +59,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
           $isbn: input.isbn,
           $ol_cover_id: input.olCoverId ?? null,
           $genres: JSON.stringify(input.genres ?? []),
+          $data_sources: JSON.stringify(input.sources ?? []),
           $created_at: createdAt
         });
         insertKeyStmt.run(key, id);
@@ -105,8 +106,8 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       return new Set((rejectionsStmt.all(bookId) as Array<{ source_url: string }>).map((row) => row.source_url));
     },
 
-    saveDetails(bookId, details, checkedAt) {
-      saveDetailsStmt.run(details.summary, details.rating, details.ratingCount, JSON.stringify(details.genres), details.sourceUrl, checkedAt, bookId);
+    saveDetails(bookId, details, sources, checkedAt) {
+      saveDetailsStmt.run(details.summary, details.rating, details.ratingCount, JSON.stringify(details.genres), JSON.stringify(sources), details.sourceUrl, checkedAt, bookId);
     },
 
     markDetailsMissing(bookId, checkedAt) {
