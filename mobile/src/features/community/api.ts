@@ -46,7 +46,7 @@ export function markDashboardSeen() {
   return apiClient.request("/community/dashboard/seen", { method: "POST", auth: true });
 }
 
-export async function fetchDiscover(type: DiscoverType, q: string, offset = 0, signedIn = true) {
+export async function fetchDiscover(type: DiscoverType, q: string, offset: number, signedIn: boolean) {
   const params = new URLSearchParams({ type, q, offset: String(offset) });
   return apiClient.request<{ items: DiscoverItem[]; nextOffset: number | null }>(`/community/discover?${params}`, { auth: signedIn });
 }

@@ -65,7 +65,7 @@ export function DiscoverPane({ linkAuthors = true }: { linkAuthors?: boolean }) 
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.grow}>
-      {discover.isRefetchError ? <Toast visible message="Couldn't refresh Discover." tone="error" /> : null}
+      {discover.isRefetchError && !discover.isRefetching ? <Toast visible message="Couldn't refresh Discover." tone="error" /> : null}
       <View ref={frame} style={styles.grow}>
         <View style={styles.grow}>
           {discover.isPending ? (
@@ -206,6 +206,7 @@ function DiscoverRow({ item, onPreviewBooks, linkAuthor }: { item: DiscoverItem;
                   accessibilityLabel={`See all ${content.bookCount} books in ${content.name}`}
                   hitSlop={spacing.sm}
                   onPress={() => onPreviewBooks({ id: content.id, name: content.name })}
+                  style={styles.rowAction}
                 >
                   <Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.accent }]}>See books</Text>
                 </Pressable>
@@ -320,6 +321,7 @@ const styles = StyleSheet.create({
   nameRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   metaName: { flexShrink: 1 },
   statusRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.xs },
+  rowAction: { minHeight: minimumTouchTarget - spacing.lg, justifyContent: "center", paddingVertical: spacing.xs },
   badge: { borderWidth: 1, borderRadius: radii.full, paddingHorizontal: spacing.sm },
   thumb: { width: THUMB_WIDTH, height: THUMB_HEIGHT },
   ladder: { position: "absolute", left: 0, top: (THUMB_HEIGHT - FAN_HEIGHT) / 2, width: LADDER_WIDTH, height: FAN_HEIGHT, borderRadius: 2, overflow: "hidden" },
