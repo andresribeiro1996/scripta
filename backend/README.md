@@ -319,7 +319,7 @@ Litestream 0.5.17 streams every SQLite file on the Railway volume to the private
 - **Boot:** the script refuses to start unless `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` and `R2_BACKUPS_BUCKET` are set, and unless every `*_DB_PATH` in the environment is in `litestream.yml`. It then restores each database that is missing locally (`-if-db-not-exists -if-replica-exists`) and runs `litestream replicate -exec "node dist/server.js"`, so replication starts and stops with the server. A failed check fails the healthcheck and Railway keeps the previous deployment.
 - **Fresh or empty volume:** every database comes back from R2 on boot, no manual step. If the bucket has nothing for a database (the very first deploy), it starts empty and is replicated from then on.
 - **Volume check:** on Railway (`RAILWAY_VOLUME_MOUNT_PATH` set), `config/env.ts` exits at boot if any `*_DB_PATH` is outside the volume.
-- **Snapshots:** Litestream's defaults, a full snapshot every 24h kept for 24h, changes replicated about every second.
+- **Snapshots:** a full snapshot every 24h, kept for 14 days (`snapshot.retention: 336h` in `litestream.yml`; Litestream's default is 24h). Changes replicate about every second; restores within the last few minutes are exact to the transaction, older ones land on Litestream's compacted levels and so are coarser.
 - **Local dev** never touches Litestream: `npm run dev` starts the server directly.
 
 Verify objects are appearing (any machine with the four `R2_*` values exported, and Litestream 0.5.17 installed):

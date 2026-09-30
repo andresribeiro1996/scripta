@@ -1,6 +1,10 @@
 access-key-id: ${R2_ACCESS_KEY_ID}
 secret-access-key: ${R2_SECRET_ACCESS_KEY}
 
+snapshot:
+  interval: 24h
+  retention: 336h
+
 dbs:
   - path: /data/auth.sqlite
     replica:
