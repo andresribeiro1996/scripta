@@ -19,3 +19,13 @@ test("bookMatchKeys lets a book with an ISBN match the same book without one", (
   const withoutIsbn = bookMatchKeys({ Title: "DUNE", Attribution: "frank herbert" });
   assert.ok(withoutIsbn.some((key) => withIsbn.includes(key)));
 });
+
+test("bookMatchKeys omits the title-and-author key when title and author are both empty", () => {
+  assert.deepEqual(bookMatchKeys({ Title: "", Attribution: "  " }), []);
+  assert.deepEqual(bookMatchKeys({ ISBN: "978-0-00-000000-2", Title: "", Attribution: "" }), ["isbn:9780000000002"]);
+});
+
+test("bookMatchKeys keeps the title-and-author key when only one of them is empty", () => {
+  assert.deepEqual(bookMatchKeys({ Title: "Dune" }), ["ta:dune|"]);
+  assert.deepEqual(bookMatchKeys({ Attribution: "Frank Herbert" }), ["ta:|frank herbert"]);
+});
