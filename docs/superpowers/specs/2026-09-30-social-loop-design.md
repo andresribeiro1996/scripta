@@ -102,7 +102,7 @@ The fix:
   author tap pushed a second copy of the tab shell, with Home highlighted and
   no back arrow. So:
   - Games → Browse pushes an in-tab Discover at `(app)/(arena)/discover`.
-  - The profile route becomes a shared route, `(app)/(home,arena)/u/[username]`,
+  - The profile route becomes a shared route, `(app)/(home,arena,library)/u/[username]`,
     so an author tap stays inside the Games tab.
   - The Games stack anchors `my-arena` as its first screen, so the new route
     can't become the tab's default.

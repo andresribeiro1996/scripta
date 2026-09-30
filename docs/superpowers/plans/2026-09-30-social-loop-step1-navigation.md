@@ -818,14 +818,14 @@ no header back arrow, and two Back presses were needed to reach Games.
 - Modify: `mobile/src/features/arena/ArenaHomeScreen.tsx:83`, so Browse pushes
   `/discover`
 - Move: `mobile/src/app/(app)/(home)/u/[username].tsx` →
-  `mobile/src/app/(app)/(home,arena)/u/[username].tsx`
+  `mobile/src/app/(app)/(home,arena,library)/u/[username].tsx`
 
 **Interfaces:**
 - Produces:
   - `DiscoverPane({ linkAuthors = true }: { linkAuthors?: boolean })`
   - `DiscoverScreen({ inTabs }: { inTabs: boolean })`
   - the in-tab route `/discover`
-  - the shared profile route `/u/[username]` in both the Home and Games stacks
+  - the shared profile route `/u/[username]` in the Home, Games and Library stacks
 
 - [ ] **Step 1: Let the pane show author names as plain text**
 
@@ -907,11 +907,11 @@ export default function ArenaStackLayout() {
 
 - In `ArenaHomeScreen.tsx:83`, change `router.push("/arena" as never)` to
   `router.push("/discover" as never)`.
-- Move the profile route so the Home and Games stacks share it:
+- Move the profile route so the Home, Games and Library stacks share it. Library is included because My shelf's Activity tab pushes `/u/<name>` from the Library stack:
 
   ```bash
-  mkdir -p "mobile/src/app/(app)/(home,arena)/u"
-  /usr/bin/git mv "mobile/src/app/(app)/(home)/u/[username].tsx" "mobile/src/app/(app)/(home,arena)/u/[username].tsx"
+  mkdir -p "mobile/src/app/(app)/(home,arena,library)/u"
+  /usr/bin/git mv "mobile/src/app/(app)/(home)/u/[username].tsx" "mobile/src/app/(app)/(home,arena,library)/u/[username].tsx"
   ```
 
   Remove the now-empty `(home)/u` directory if it's left behind.
@@ -922,7 +922,7 @@ Run: `npm run typecheck --workspace mobile` and `npm test --workspace mobile`.
 Expected: both exit 0, with 133 tests.
 
 Then run `find "mobile/src/app" -path "*u/\[username\].tsx"`. Expected: only
-`mobile/src/app/(app)/(home,arena)/u/[username].tsx`.
+`mobile/src/app/(app)/(home,arena,library)/u/[username].tsx`.
 
 - [ ] **Step 6: Commit**
 
