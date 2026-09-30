@@ -12,9 +12,7 @@ const scratch = mkdtempSync(join(tmpdir(), "books-routes-test-"));
 process.env.AUTH_DB_PATH = join(scratch, "auth.sqlite");
 process.env.LIBRARY_DB_PATH = join(scratch, "library.sqlite");
 process.env.GALLERY_DB_PATH = join(scratch, "gallery.sqlite");
-process.env.GALLERY_STORAGE_PATH = join(scratch, "gallery-files");
 process.env.COVERS_DB_PATH = join(scratch, "covers.sqlite");
-process.env.COVERS_STORAGE_PATH = join(scratch, "covers-files");
 process.env.JWT_ACCESS_SECRET = "a".repeat(64);
 process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
@@ -25,25 +23,25 @@ const { SourceUnavailableError } = await import("./domain/errors.js");
 const { buildAdminRoutes, buildCatalogRoutes, buildCoverFileRoutes, buildResolveRoutes } = await import("./routes.js");
 
 type Deps = Parameters<typeof createBooksService>[0];
+const publicUrlFor = (id: string, size: string) => `https://images.test/covers/${id}${size === "thumb" ? "-thumb" : ""}.webp`;
 const empty = { byIsbn: async () => [], byTitle: async () => [] };
 
 function makeService(overrides: Partial<Deps> = {}) {
   const db = new DatabaseSync(":memory:");
   applyBooksMigrations(db);
-  const files = new Map<string, Buffer>();
   const service = createBooksService({
     repo: createSqliteBooksRepository(db),
-    blobs: { save: (id, ext, bytes) => { files.set(`${id}.${ext}`, bytes); }, read: (id, ext) => files.get(`${id}.${ext}`) ?? null },
+    blobs: { save: async () => {} },
     sources: { isbndb: null, apple: empty, openlibrary: empty },
     catalog: { fetchDetails: async () => null, search: async () => [] },
     fetchImage: async () => null,
     enqueue: () => {},
-    publicUrlFor: (id, size) => `https://api.test/covers/cached/${id}/${size}`,
+    publicUrlFor,
     adminUserId: "admin",
     warn: () => {},
     ...overrides
   });
-  return { service, files };
+  return { service };
 }
 
 async function call(service: ReturnType<typeof createBooksService>, options: InjectOptions, signedInAs?: string) {
@@ -51,7 +49,7 @@ async function call(service: ReturnType<typeof createBooksService>, options: Inj
   app.decorate("authenticateAccessToken", (token: string) => (token === signedInAs ? { id: token, email: `${token}@example.test`, username: token, avatarId: null } : null));
   await app.register(fastifyMultipart, { limits: { fileSize: MAX_UPLOAD_BYTES, files: 1 } });
   await app.register(buildResolveRoutes(service));
-  await app.register(buildCoverFileRoutes(service));
+  await app.register(buildCoverFileRoutes(publicUrlFor));
   await app.register(buildCatalogRoutes(service));
   await app.register(buildAdminRoutes(service));
   const res = await app.inject(signedInAs ? { ...options, headers: { ...options.headers, authorization: `Bearer ${signedInAs}` } } : options);
@@ -92,17 +90,16 @@ test("batch resolve answers each lookup in order and validates the whole list", 
   assert.deepEqual(res.json(), { results: [{ url: null, fullUrl: null, pending: true }, { url: null, fullUrl: null, pending: true }] });
 });
 
-test("cover files serve WebP with immutable caching; thumb falls back to the full file", async () => {
-  const { service, files } = makeService();
+test("the old cover URLs redirect permanently to the stored file; a bad id is a 400", async () => {
+  const { service } = makeService();
   const id = "11111111-1111-4111-8111-111111111111";
-  files.set(`${id}.webp`, Buffer.from("full"));
-  const res = await call(service, { method: "GET", url: `/covers/cached/${id}/thumb` });
-  assert.equal(res.statusCode, 200);
-  assert.equal(res.headers["content-type"], "image/webp");
-  assert.equal(res.headers["cache-control"], "public, max-age=31536000, immutable");
-  assert.equal(res.body, "full");
-  assert.equal((await call(service, { method: "GET", url: "/covers/cached/22222222-2222-4222-8222-222222222222/file" })).statusCode, 404);
-  assert.equal((await call(service, { method: "GET", url: "/covers/cached/not-a-uuid/file" })).statusCode, 400);
+  const thumb = await call(service, { method: "GET", url: `/covers/cached/${id}/thumb` });
+  assert.equal(thumb.statusCode, 301);
+  assert.equal(thumb.headers.location, publicUrlFor(id, "thumb"));
+  const file = await call(service, { method: "GET", url: `/covers/cached/${id}/file` });
+  assert.equal(file.statusCode, 301);
+  assert.equal(file.headers.location, publicUrlFor(id, "file"));
+  assert.equal((await call(service, { method: "GET", url: "/covers/cached/not-a-uuid/thumb" })).statusCode, 400);
 });
 
 test("details and search wrap their payloads and map an unavailable catalog to 502", async () => {
@@ -140,7 +137,7 @@ test("the admin can upload a cover and non-images are refused", async () => {
   const photo = await sharp({ create: { width: 600, height: 900, channels: 3, background: "#224466" } }).jpeg().toBuffer();
   const ok = await call(service, { method: "PUT", url: "/books/cover?title=Dune&author=Frank%20Herbert", ...multipart(photo) }, "admin");
   assert.equal(ok.statusCode, 200);
-  assert.match(ok.json().url, /\/thumb$/);
+  assert.match(ok.json().url, /-thumb\.webp$/);
   const bad = await call(service, { method: "PUT", url: "/books/cover?title=Dune&author=Frank%20Herbert", ...multipart(Buffer.from("nope")) }, "admin");
   assert.equal(bad.statusCode, 422);
 });

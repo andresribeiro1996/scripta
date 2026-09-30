@@ -11,7 +11,6 @@ process.env.JWT_REFRESH_SECRET ??= "b".repeat(64);
 process.env.AUTH_DB_PATH ??= join(scratchDir, "auth.sqlite");
 process.env.LIBRARY_DB_PATH ??= join(scratchDir, "library.sqlite");
 process.env.GALLERY_DB_PATH ??= join(scratchDir, "gallery.sqlite");
-process.env.GALLERY_STORAGE_PATH ??= join(scratchDir, "gallery-files");
 
 const { applyQuizzesMigrations } = await import("./connection.js");
 import { createSqliteQuizzesRepository } from "./sqliteQuizzesRepository.js";
