@@ -251,6 +251,36 @@ test("enqueueCovers skips a book in backoff", async () => {
   assert.equal(h.enqueued.length, 0);
 });
 
+test("enqueueUnchecked queues never-checked books at the back, oldest first, and skips checked ones", async () => {
+  const h = harness({ sources: { isbndb: null, apple: isbnSource("https://a/1"), openlibrary: emptySource } });
+  h.sizes.set("https://a/1", [900, 1400]);
+  h.service.resolveCover(orlando);
+  await h.service.processBook(h.bookId("isbn:9780141184272"));
+  h.advance(1000);
+  h.service.resolveCover({ title: "Dune", author: "Frank Herbert" });
+  h.advance(1000);
+  h.service.resolveCover({ title: "Emma", author: "Jane Austen" });
+  h.enqueued.length = 0;
+  h.service.enqueueUnchecked();
+  assert.deepEqual(h.enqueued, [
+    { bookId: h.bookId("ta:dune|frank herbert"), front: false },
+    { bookId: h.bookId("ta:emma|jane austen"), front: false }
+  ]);
+});
+
+test("enqueueUnchecked skips a book in backoff", async () => {
+  const failing: CoverSource = { byIsbn: async () => { throw new SourceUnavailableError("apple", "HTTP 429"); }, byTitle: async () => [] };
+  const h = harness({ sources: { isbndb: null, apple: failing, openlibrary: emptySource } });
+  h.service.resolveCover(orlando);
+  await h.service.processBook(h.bookId("isbn:9780141184272"));
+  h.enqueued.length = 0;
+  h.service.enqueueUnchecked();
+  assert.equal(h.enqueued.length, 0);
+  h.advance(10 * 60 * 1000);
+  h.service.enqueueUnchecked();
+  assert.equal(h.enqueued.length, 1);
+});
+
 test("manual covers are never processed", async () => {
   const calls: string[] = [];
   const h = harness({ sources: { isbndb: null, apple: isbnSource("https://a/1", calls), openlibrary: emptySource } });

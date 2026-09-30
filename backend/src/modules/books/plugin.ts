@@ -58,6 +58,7 @@ export async function booksPlugin(app: FastifyInstance) {
     (bookId) => service.processBook(bookId),
     (error, bookId) => app.log.error({ err: error, bookId }, "cover lookup failed")
   );
+  service.enqueueUnchecked();
   activeService = service;
   app.addHook("onClose", async () => {
     activeService = null;

@@ -20,6 +20,7 @@ export interface BooksRepository {
   saveDetails(bookId: string, details: BookMetadata, checkedAt: string): void;
   markDetailsMissing(bookId: string, checkedAt: string): void;
   searchBooks(tokens: string[], limit: number): BookRow[];
+  listUncheckedCoverIds(): string[];
 }
 
 export interface CoverCandidate {

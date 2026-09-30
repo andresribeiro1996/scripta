@@ -42,6 +42,7 @@ export interface BooksServiceDeps {
 export interface BooksService {
   resolveCover(lookup: BookLookup, front?: boolean): ResolvedCover;
   enqueueCovers(lookups: BookLookup[]): void;
+  enqueueUnchecked(): void;
   processBook(bookId: string): Promise<void>;
   getCoverFile(id: string, size: CoverFileSize): { buffer: Buffer; mimeType: string } | null;
   getDetails(lookup: BookLookup): Promise<BookMetadata | null>;
@@ -150,6 +151,10 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
 
     enqueueCovers(lookups) {
       for (const lookup of lookups) this.resolveCover(lookup);
+    },
+
+    enqueueUnchecked() {
+      for (const id of deps.repo.listUncheckedCoverIds()) schedule(id);
     },
 
     async processBook(bookId) {
