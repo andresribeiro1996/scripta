@@ -154,31 +154,3 @@ export function mergeDuplicateBooks(library: LibraryData, keep: string, merge: s
     ...(library.distinctBooks ? { distinctBooks: rekeyPairs(library.distinctBooks, from, keep) } : {})
   };
 }
-
-export interface MergeableDocument {
-  data: LibraryData;
-  updatedAt: string;
-}
-
-async function mergeGroups<D extends MergeableDocument>(document: D, mergeBooks: (keep: string, merge: string[], updatedAt: string) => Promise<D>): Promise<D> {
-  let current = document;
-  for (const [keep, ...merge] of findDuplicates(document.data).certain) {
-    current = await mergeBooks(keep!, merge, current.updatedAt);
-  }
-  return current;
-}
-
-export async function mergeCertainDuplicates<D extends MergeableDocument>(
-  document: D,
-  mergeBooks: (keep: string, merge: string[], updatedAt: string) => Promise<D>,
-  refetch: () => Promise<D | null>,
-  isConflict: (error: unknown) => boolean
-): Promise<D> {
-  try {
-    return await mergeGroups(document, mergeBooks);
-  } catch (error) {
-    if (!isConflict(error)) throw error;
-    const fresh = await refetch();
-    return fresh ? mergeGroups(fresh, mergeBooks) : document;
-  }
-}

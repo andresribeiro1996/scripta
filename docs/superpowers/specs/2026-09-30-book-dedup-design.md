@@ -25,8 +25,9 @@ tier lists, arena, quizzes), so it cannot simply be changed.
 ## Goals
 
 1. Imports stop creating duplicates that are certainly the same book.
-2. Duplicates already in a library are merged: certain ones automatically,
-   likely ones after the owner confirms.
+2. Duplicates already in a library are merged after the owner confirms.
+   Imports and add-book already prevent new certain duplicates, so there is
+   no automatic merge on load.
 3. The catalog resolves variant titles, ISBN-less copies and other editions
    to one catalog book.
 4. Merging never breaks a reference the owner can still edit.
@@ -157,14 +158,11 @@ and non-seeding slots, published quizzes, community events (keyed by
 
 - `LibraryData` gains `distinctBooks?: string[][]`, pairs the owner said are
   different.
-- When the library loads, the client runs `findDuplicates`. For each certain
-  group it calls the merge endpoint (`keep` = first in the group) one at a
-  time, then uses the returned document. This runs once per library load,
-  never in a loop, so a group the server declines to merge can't retrigger
-  itself.
-- If likely groups remain, the library screen shows a "N possible duplicates"
-  banner. It opens a sheet listing each group: cover, title, author, ISBN,
-  status. **Merge** calls the endpoint. **Not the same** adds the group's
+- There is no automatic merge on load. Imports and add-book already pair
+  certain matches as they save, so a library has no certain backlog.
+- If `findDuplicates` returns any certain or likely groups, the library
+  screen shows a "N possible duplicates" banner. It opens a sheet listing each
+  group, certain first: cover, title, author, ISBN, status. **Merge** calls the endpoint. **Not the same** adds the group's
   pairs to `distinctBooks` through the normal library save.
 - Web: `LibraryPage`. Mobile: the library tab screen plus a sheet, following
   the existing sheet components.
@@ -190,9 +188,8 @@ no confirm step.
   409 on conflict. A failure in a module's rewrite aborts before the library
   is saved and returns 500. Rewrites already committed only point at `keep`,
   so the state stays consistent and a retry finishes the job.
-- Clients: a 409 during auto-merge reloads and reruns `findDuplicates` once.
-  Any other error stops auto-merge for that load and leaves the library as
-  it is. It must not surface as a silent success.
+- Clients: a failed or conflicting Merge from the sheet surfaces as an error
+  and leaves the library as it is. It must not surface as a silent success.
 
 ## Testing
 
@@ -216,13 +213,11 @@ no confirm step.
   - `addBook` uses the certain rule.
 - Catalog: an ISBN miss that resolves through the title key adds the alias;
   volumes stay apart; the backfill.
-- Clients have no component test harness, so the auto-merge runner lives in
-  `@scripta/shared` and is unit-tested there. The banner and sheet are
-  verified by typecheck, lint and a manual check.
+- Clients have no component test harness. The banner and sheet are verified
+  by typecheck, lint and a manual check.
 
 ## Rollout
 
 Before deploying, run the production count script
 (`genre-dupe-count.mjs`) to size certain vs likely duplicates. Take a Railway
-volume snapshot first, since auto-merge rewrites user data the first time
-each owner opens the app.
+volume snapshot first, since merging rewrites user data.

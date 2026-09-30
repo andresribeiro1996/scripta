@@ -86,7 +86,11 @@ export function LibraryPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { scrubBooks } = useMurals();
   const { data: library, isLoading, updateLibrary, share: shareLibraryDoc, unshare: unshareLibraryDoc } = useLibrary();
-  const likelyDuplicates = useMemo(() => (library ? findDuplicates(library.data).likely : []), [library]);
+  const possibleDuplicates = useMemo(() => {
+    if (!library) return [];
+    const { certain, likely } = findDuplicates(library.data);
+    return [...certain, ...likely];
+  }, [library]);
   const toast = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const suppressClickAfterDragRef = useRef(false);
@@ -696,13 +700,13 @@ export function LibraryPage() {
         />
       )}
 
-      {likelyDuplicates.length > 0 && (
+      {possibleDuplicates.length > 0 && (
         <button
           type="button"
           onClick={() => setReviewingDuplicates(true)}
           className="mb-3 flex min-h-11 w-full items-center justify-between rounded-lg border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover)"
         >
-          <span>{likelyDuplicates.length === 1 ? "1 possible duplicate" : `${likelyDuplicates.length} possible duplicates`}</span>
+          <span>{possibleDuplicates.length === 1 ? "1 possible duplicate" : `${possibleDuplicates.length} possible duplicates`}</span>
           <span className="font-semibold">Review</span>
         </button>
       )}
@@ -810,8 +814,8 @@ export function LibraryPage() {
 
       {addingBook && <AddBookModal onAdd={(book) => handleAddBook(book)} onClose={() => setAddingBook(false)} />}
 
-      {reviewingDuplicates && library && likelyDuplicates.length > 0 && (
-        <DuplicatesSheet groups={likelyDuplicates} library={library} onClose={() => setReviewingDuplicates(false)} />
+      {reviewingDuplicates && library && possibleDuplicates.length > 0 && (
+        <DuplicatesSheet groups={possibleDuplicates} library={library} onClose={() => setReviewingDuplicates(false)} />
       )}
 
       {syncingGoodreads && (

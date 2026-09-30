@@ -77,7 +77,11 @@ export function LibraryScreen() {
   const style = resolveLibraryStyle(library?.data.style);
   const ordered = useMemo(() => orderLibraryBooks(library?.data.books ?? [], library?.data.groups ?? []), [library]);
   const bookSeriesGroup = useMemo(() => seriesGroupByBookKey(library?.data.books ?? [], library?.data.groups ?? []), [library]);
-  const likelyDuplicates = useMemo(() => (library ? findDuplicates(library.data).likely : []), [library]);
+  const possibleDuplicates = useMemo(() => {
+    if (!library) return [];
+    const { certain, likely } = findDuplicates(library.data);
+    return [...certain, ...likely];
+  }, [library]);
   // The status shown is a shelf (one of the three tabs), not a clearable
   // filter — only search and sort get reset here.
   const toolbarActive = query.trim() !== "" || sortKey !== "manual";
@@ -250,14 +254,14 @@ export function LibraryScreen() {
                       </Pressable>
                     </Menu>
                   </View>
-                  {likelyDuplicates.length > 0 ? (
+                  {possibleDuplicates.length > 0 ? (
                     <Pressable
                       accessibilityRole="button"
                       onPress={() => setReviewingDuplicates(true)}
                       style={({ pressed }) => [styles.sortPill, { borderColor: colors.border }, pressed ? { backgroundColor: colors.surfacePressed } : null]}
                     >
                       <Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.text }]}>
-                        {likelyDuplicates.length === 1 ? "1 possible duplicate · Review" : `${likelyDuplicates.length} possible duplicates · Review`}
+                        {possibleDuplicates.length === 1 ? "1 possible duplicate · Review" : `${possibleDuplicates.length} possible duplicates · Review`}
                       </Text>
                     </Pressable>
                   ) : null}
@@ -295,8 +299,8 @@ export function LibraryScreen() {
         <Input label="Library name" autoFocus value={nameDraft} onChangeText={setNameDraft} onSubmitEditing={() => void handleRenameLibrary()} onBlur={() => void handleRenameLibrary()} />
       </Sheet>
 
-      <Sheet visible={reviewingDuplicates && likelyDuplicates.length > 0} title="Possible duplicates" onClose={() => setReviewingDuplicates(false)}>
-        {library ? <DuplicatesSheetBody groups={likelyDuplicates} library={library} /> : null}
+      <Sheet visible={reviewingDuplicates && possibleDuplicates.length > 0} title="Possible duplicates" onClose={() => setReviewingDuplicates(false)}>
+        {library ? <DuplicatesSheetBody groups={possibleDuplicates} library={library} /> : null}
       </Sheet>
     </Screen>
   );
