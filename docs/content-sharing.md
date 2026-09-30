@@ -8,7 +8,7 @@ The first implementation is mobile: tier-list and mural images, plus website lin
 | --- | --- |
 | Tier-list editor | Visible Share icon in the top-right header, beside the existing actions. Rank remains the bottom primary action. |
 | Public tier-list voting page | Visible Share icon in the top-right header. |
-| Mural editor | Share in the bottom toolbar, beside Add block. |
+| Mural editor | Share icon in the top-right header, beside Save. |
 | Mural list | Existing Share action in each mural's menu. |
 | Tournament | Visible Share icon in the top-right header, beside the existing actions. |
 

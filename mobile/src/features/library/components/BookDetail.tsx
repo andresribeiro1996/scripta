@@ -4,7 +4,7 @@
 
 import { Alert, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../../ui/Text";
-import { statusLabel, type FinishRating, type ReadStatus } from "@scripta/shared";
+import { readingPercent, statusLabel, type FinishRating, type ReadStatus } from "@scripta/shared";
 import { Button, Segmented } from "../../../ui/components";
 import { spacing, typography, useTheme } from "../../../ui/theme";
 import { CoverImage } from "./CoverImage";
@@ -47,7 +47,7 @@ export function BookDetail({
   const highlights = Array.isArray(book.highlights)
     ? (book.highlights as Array<Record<string, unknown>>).filter((h) => String(h.Text ?? "").trim() !== "")
     : [];
-  const percent = typeof book.___PercentRead === "number" ? Math.round(book.___PercentRead) : null;
+  const percent = readingPercent(book);
 
   return (
     <>

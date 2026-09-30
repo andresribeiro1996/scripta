@@ -66,3 +66,9 @@ export function setReadStatus(book: LibraryBook, status: ReadStatus, day: string
   if (status === 2) return { ...book, ReadStatus: 2, DateLastRead: day, ___PercentRead: 100 };
   return { ...book, ReadStatus: status };
 }
+
+export function readingPercent(book: LibraryBook): number | null {
+  const raw = book.___PercentRead;
+  if (typeof raw !== "number" || !Number.isFinite(raw)) return null;
+  return Math.min(100, Math.max(0, Math.round(raw)));
+}

@@ -1,7 +1,7 @@
 import type { GalleryImage } from "../../../api/gallery";
-import { computeStat } from "../../../lib/muralStats";
-import { calculateShelfTheme, STAT_METRIC_LABELS, type MuralBlock, type ReaderProfile, type ShelfTheme } from "../../../lib/murals";
-import { EmptyBlockState } from "./BookBlocks";
+import { computeStat, libraryBreakdown } from "../../../lib/muralStats";
+import { calculateShelfTheme, STAT_METRIC_LABELS, type MuralBlock, type ReaderProfile, type ShelfTheme, type StatMetric } from "../../../lib/murals";
+import { BlockEyebrow, EmptyBlockState } from "./BookBlocks";
 
 /** A heading and/or freeform note — connective tissue between the other
  *  blocks ("2026 was a big reading year because..."). Either field can be
@@ -90,21 +90,60 @@ export function StatsBlockView({
   if (block.metrics.length === 0) {
     return <EmptyBlockState message="Pick which numbers to show." />;
   }
-  return (
-    <div className="flex h-full items-center justify-around gap-2 overflow-x-auto block-p-2.5">
-      {block.metrics.map((metric) => (
-        <div key={metric} className="shrink-0 text-center">
-          {/* Deliberately accent-colored, not `textColor` — same
-              "this is a badge, not body content" reasoning as
-              BookCard.tsx's highlight-count badge. The block wrapper
-              sets --block-accent to the text colour when the accent
-              can't be read on the block's own background. */}
-          <div className="text-[1.6em] font-bold text-[var(--block-accent,var(--color-accent))]">
-            {statsOverride && metric in statsOverride ? statsOverride[metric] : computeStat(metric, books)}
+  const value = (metric: StatMetric) => (statsOverride && metric in statsOverride ? statsOverride[metric] : computeStat(metric, books));
+  const breakdown = libraryBreakdown(block.metrics, value);
+  if (!breakdown) {
+    return (
+      <div className="flex h-full items-center justify-around gap-2 overflow-x-auto block-p-2.5">
+        {block.metrics.map((metric) => (
+          <div key={metric} className="shrink-0 text-center">
+            {/* Deliberately accent-colored, not `textColor` — same
+                "this is a badge, not body content" reasoning as
+                BookCard.tsx's highlight-count badge. The block wrapper
+                sets --block-accent to the text colour when the accent
+                can't be read on the block's own background. */}
+            <div className="text-[1.6em] font-bold text-[var(--block-accent,var(--color-accent))]">{value(metric)}</div>
+            <div className="text-[0.75em] text-(--color-text-dim)">{STAT_METRIC_LABELS[metric]}</div>
           </div>
-          <div className="text-[0.75em] text-(--color-text-dim)">{STAT_METRIC_LABELS[metric]}</div>
+        ))}
+      </div>
+    );
+  }
+  const segments = [
+    { count: breakdown.finished, color: "bg-[var(--block-accent,var(--color-accent))]", label: "finished" },
+    { count: breakdown.reading, color: "bg-(--color-accent-fill)", label: "reading" },
+    { count: breakdown.toRead, color: "bg-(--color-border)", label: "to read" }
+  ];
+  return (
+    <div className="h-full overflow-y-auto block-p-2.5">
+      <BlockEyebrow>Your library</BlockEyebrow>
+      <p>
+        <span className="text-[2.8em] leading-none font-bold text-[var(--block-accent,var(--color-accent))]">{breakdown.finished}</span>{" "}
+        <span className="text-[0.85em] text-(--color-text-dim)">of {breakdown.total} finished</span>
+      </p>
+      <div className={`mt-2 flex h-2.5 gap-0.5 overflow-hidden rounded-full ${breakdown.total === 0 ? "bg-(--color-border)" : ""}`}>
+        {segments.filter((segment) => segment.count > 0).map((segment) => (
+          <div key={segment.label} className={segment.color} style={{ flexGrow: segment.count }} />
+        ))}
+      </div>
+      <div className="mt-2 flex flex-col gap-1 text-[0.85em] text-(--color-text-dim)">
+        {segments.map((segment) => (
+          <div key={segment.label} className="flex items-center gap-1.5">
+            <span className={`h-2 w-2 shrink-0 rounded-full ${segment.color}`} />
+            {segment.count} {segment.label}
+          </div>
+        ))}
+      </div>
+      {breakdown.others.length > 0 && (
+        <div className="mt-2 flex flex-col gap-0.5">
+          {breakdown.others.map((metric) => (
+            <div key={metric} className="flex items-baseline gap-1.5">
+              <span className="font-bold text-[var(--block-accent,var(--color-accent))]">{value(metric)}</span>
+              <span className="text-[0.85em] text-(--color-text-dim)">{STAT_METRIC_LABELS[metric]}</span>
+            </div>
+          ))}
         </div>
-      ))}
+      )}
     </div>
   );
 }

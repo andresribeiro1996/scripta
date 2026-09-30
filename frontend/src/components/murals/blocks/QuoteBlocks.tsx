@@ -1,5 +1,5 @@
 import { resolveQuote, resolveQuoteCollection, type MuralBlock } from "../../../lib/murals";
-import { EmptyBlockState } from "./BookBlocks";
+import { BlockEyebrow, EmptyBlockState } from "./BookBlocks";
 
 /** One featured highlight, shown large — the "top quote from a book"
  *  case. `Annotation` (a Kobo/Goodreads note attached to the highlight,
@@ -40,7 +40,7 @@ export function QuoteCollectionBlockView({
   const resolved = resolveQuoteCollection(block, books);
   return (
     <div className="flex h-full flex-col overflow-hidden block-p-2.5">
-      <div className="mb-1.5 shrink-0 truncate text-[1.1em] font-semibold">{block.title || "Untitled quotes"}</div>
+      <BlockEyebrow>{block.title || "Untitled quotes"}</BlockEyebrow>
       {resolved.length === 0 ? (
         <EmptyBlockState message="No quotes picked yet." />
       ) : (
