@@ -16,6 +16,7 @@ import {
 import { OfflineBanner } from "../components/OfflineBanner";
 import { useAccountAppearanceSync } from "../hooks/useAccountAppearanceSync";
 import { useDismissible } from "../hooks/useDismissible";
+import { useDuplicateMerge } from "../hooks/useDuplicateMerge";
 import { useGenreEnrichment } from "../hooks/useGenreEnrichment";
 import { useLibrary } from "../hooks/useLibrary";
 import { useScrollLock } from "../hooks/useScrollLock";
@@ -69,6 +70,7 @@ export function DashboardLayout() {
   const { session, logout } = useAuth();
   const { data: library, updateLibrary } = useLibrary();
   useGenreEnrichment(library?.data.books ?? [], updateLibrary);
+  useDuplicateMerge(library);
   useAccountAppearanceSync();
   const [drawerOpen, setDrawerOpen] = useState(false);
   // Set by the mural editor while it's in edit mode: the canvas is the

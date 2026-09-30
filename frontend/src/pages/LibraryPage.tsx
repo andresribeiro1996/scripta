@@ -5,6 +5,7 @@ import { flushSync } from "react-dom";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   addReaderNote,
+  findDuplicates,
   newId,
   readSnapshot,
   removeReaderNote,
@@ -20,6 +21,7 @@ import { BookCard } from "../components/BookCard";
 import { BookDetailSheet } from "../components/BookDetailSheet";
 import { BookGrid } from "../components/BookGrid";
 import { CoverPickerModal } from "../components/CoverPickerModal";
+import { DuplicatesSheet } from "../components/DuplicatesSheet";
 import { EmptyState } from "../components/EmptyState";
 import { FinishSheet } from "../components/FinishSheet";
 import { LibraryCanvas } from "../components/LibraryCanvas";
@@ -84,6 +86,7 @@ export function LibraryPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { scrubBooks } = useMurals();
   const { data: library, isLoading, updateLibrary, share: shareLibraryDoc, unshare: unshareLibraryDoc } = useLibrary();
+  const likelyDuplicates = useMemo(() => (library ? findDuplicates(library.data).likely : []), [library]);
   const toast = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const suppressClickAfterDragRef = useRef(false);
@@ -94,6 +97,7 @@ export function LibraryPage() {
   const [importError, setImportError] = useState<string | null>(null);
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const [syncingGoodreads, setSyncingGoodreads] = useState(false);
+  const [reviewingDuplicates, setReviewingDuplicates] = useState(false);
   const [addingBook, setAddingBook] = useState(searchParams.get("action") === "add");
 
   const [editingName, setEditingName] = useState(false);
@@ -692,6 +696,17 @@ export function LibraryPage() {
         />
       )}
 
+      {likelyDuplicates.length > 0 && (
+        <button
+          type="button"
+          onClick={() => setReviewingDuplicates(true)}
+          className="mb-3 flex min-h-11 w-full items-center justify-between rounded-lg border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover)"
+        >
+          <span>{likelyDuplicates.length === 1 ? "1 possible duplicate" : `${likelyDuplicates.length} possible duplicates`}</span>
+          <span className="font-semibold">Review</span>
+        </button>
+      )}
+
       {books.length > 0 && displayBooks.length > 0 && (
         <DndContext
           sensors={sensors}
@@ -794,6 +809,10 @@ export function LibraryPage() {
       )}
 
       {addingBook && <AddBookModal onAdd={(book) => handleAddBook(book)} onClose={() => setAddingBook(false)} />}
+
+      {reviewingDuplicates && library && likelyDuplicates.length > 0 && (
+        <DuplicatesSheet groups={likelyDuplicates} library={library} onClose={() => setReviewingDuplicates(false)} />
+      )}
 
       {syncingGoodreads && (
         <SyncGoodreadsModal
