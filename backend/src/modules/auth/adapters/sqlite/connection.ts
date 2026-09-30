@@ -62,6 +62,7 @@ export function openAuthDb(): DatabaseSync {
 
   const db = new DatabaseSync(env.AUTH_DB_PATH);
   db.exec("PRAGMA journal_mode = WAL");
+  db.exec("PRAGMA busy_timeout = 5000");
   db.exec("PRAGMA foreign_keys = ON");
 
   applyAuthMigrations(db);

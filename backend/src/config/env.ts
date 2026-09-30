@@ -4,7 +4,7 @@
 // deep inside a request handler.
 
 import "dotenv/config";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 import { z } from "zod";
 
 // "15m", "1h", "30d" — a single integer + unit. Kept intentionally
@@ -183,6 +183,15 @@ const envSchema = z.object({
 
 const parsed = envSchema
   .transform((e) => ({ ...e, WAITLIST_DB_PATH: e.WAITLIST_DB_PATH ?? join(dirname(e.AUTH_DB_PATH), "waitlist.sqlite") }))
+  .superRefine((e, ctx) => {
+    const volume = process.env.RAILWAY_VOLUME_MOUNT_PATH;
+    if (!volume) return;
+    for (const [key, value] of Object.entries(e)) {
+      if (key.endsWith("_DB_PATH") && !resolve(String(value)).startsWith(resolve(volume) + sep)) {
+        ctx.addIssue({ code: "custom", path: [key], message: `must be under the volume at ${volume}, or every deploy wipes it` });
+      }
+    }
+  })
   .safeParse(process.env);
 
 if (!parsed.success) {
