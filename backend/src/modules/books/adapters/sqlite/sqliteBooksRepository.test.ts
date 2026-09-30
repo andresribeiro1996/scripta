@@ -131,3 +131,15 @@ test("covers, rejections and details round-trip", () => {
   repo.markDetailsMissing(book.id, NOW);
   assert.equal(repo.getBook(book.id)!.details_status, "missing");
 });
+
+test("listUncheckedCoverIds returns only never-checked books, oldest first", () => {
+  const { repo } = freshRepo();
+  const newer = repo.createBook({ title: "Emma", author: "Jane Austen", isbn: null }, "ta:emma|jane austen", "2026-10-02T00:00:00.000Z");
+  const older = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: null }, "ta:dune|frank herbert", "2026-10-01T00:00:00.000Z");
+  const good = repo.createBook({ title: "Orlando", author: "Virginia Woolf", isbn: null }, "ta:orlando|virginia woolf", NOW);
+  const missing = repo.createBook({ title: "Ulysses", author: "James Joyce", isbn: null }, "ta:ulysses|james joyce", NOW);
+  repo.insertImage({ id: "img-1", book_id: good.id, source: "apple", source_url: null, width: 900, height: 1400, byte_size: 10, created_at: NOW });
+  repo.setCover(good.id, { imageId: "img-1", status: "good", checkedAt: NOW });
+  repo.setCover(missing.id, { imageId: null, status: "missing", checkedAt: NOW });
+  assert.deepEqual(repo.listUncheckedCoverIds(), [older.id, newer.id]);
+});

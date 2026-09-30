@@ -35,6 +35,10 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     WHERE books_fts MATCH ? ORDER BY bm25(books_fts) LIMIT ?
   `);
 
+  const uncheckedStmt = db.prepare(`
+    SELECT id FROM books WHERE cover_image_id IS NULL AND cover_status IS NULL ORDER BY created_at, rowid
+  `);
+
   return {
     findBookByKey: (key) => byKeyStmt.get(key) as BookRow | undefined,
 
@@ -112,6 +116,10 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     searchBooks(tokens, limit) {
       if (tokens.length === 0) return [];
       return searchStmt.all(tokens.map((token) => `"${token}"`).join(" "), limit) as unknown as BookRow[];
+    },
+
+    listUncheckedCoverIds() {
+      return (uncheckedStmt.all() as Array<{ id: string }>).map((row) => row.id);
     }
   };
 }

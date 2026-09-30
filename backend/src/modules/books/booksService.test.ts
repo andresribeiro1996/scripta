@@ -223,32 +223,34 @@ test("an unexpected error during processing sets a 10-minute backoff and rethrow
   assert.equal(h.enqueued.length, 1);
 });
 
-test("resolve queues at the back unless asked to jump the queue", () => {
-  const { service, enqueued } = harness();
-  service.resolveCover(orlando);
-  service.resolveCover(orlando, true);
-  assert.deepEqual(enqueued.map((entry) => entry.front), [false, true]);
-});
-
-test("enqueueCovers queues each unresolved book at the back and skips resolved ones", async () => {
-  const dune = { title: "Dune", author: "Frank Herbert" };
+test("enqueueUnchecked queues never-checked books at the back, oldest first, and skips checked ones", async () => {
   const h = harness({ sources: { isbndb: null, apple: isbnSource("https://a/1"), openlibrary: emptySource } });
   h.sizes.set("https://a/1", [900, 1400]);
   h.service.resolveCover(orlando);
   await h.service.processBook(h.bookId("isbn:9780141184272"));
+  h.advance(1000);
+  h.service.resolveCover({ title: "Dune", author: "Frank Herbert" });
+  h.advance(1000);
+  h.service.resolveCover({ title: "Emma", author: "Jane Austen" });
   h.enqueued.length = 0;
-  h.service.enqueueCovers([orlando, dune, { title: "" }]);
-  assert.deepEqual(h.enqueued, [{ bookId: h.bookId("ta:dune|frank herbert"), front: false }]);
+  h.service.enqueueUnchecked();
+  assert.deepEqual(h.enqueued, [
+    { bookId: h.bookId("ta:dune|frank herbert"), front: false },
+    { bookId: h.bookId("ta:emma|jane austen"), front: false }
+  ]);
 });
 
-test("enqueueCovers skips a book in backoff", async () => {
+test("enqueueUnchecked skips a book in backoff", async () => {
   const failing: CoverSource = { byIsbn: async () => { throw new SourceUnavailableError("apple", "HTTP 429"); }, byTitle: async () => [] };
   const h = harness({ sources: { isbndb: null, apple: failing, openlibrary: emptySource } });
   h.service.resolveCover(orlando);
   await h.service.processBook(h.bookId("isbn:9780141184272"));
   h.enqueued.length = 0;
-  h.service.enqueueCovers([orlando]);
+  h.service.enqueueUnchecked();
   assert.equal(h.enqueued.length, 0);
+  h.advance(10 * 60 * 1000);
+  h.service.enqueueUnchecked();
+  assert.equal(h.enqueued.length, 1);
 });
 
 test("manual covers are never processed", async () => {
