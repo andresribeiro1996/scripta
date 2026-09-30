@@ -1,4 +1,8 @@
-import { normalizeIsbn } from "@scripta/shared";
+import { firstAuthor, normalizeIsbn, normalizeTitle, normalizeWords, titleNumbers } from "@scripta/shared";
+import type { BooksRepository } from "./ports.js";
+import type { BookRow } from "./types.js";
+
+export { normalizeTitle, normalizeWords } from "@scripta/shared";
 
 const MAX_SEARCH_TOKENS = 8;
 
@@ -10,23 +14,10 @@ export interface BookLookup {
 
 export interface BookIdentity {
   key: string;
+  titleKey: string | null;
   isbn: string | null;
   title: string;
   author: string;
-}
-
-export function normalizeWords(value: string): string {
-  return value
-    .normalize("NFKD")
-    .replace(/\p{M}/gu, "")
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu, " ")
-    .trim();
-}
-
-export function normalizeTitle(value: string): string {
-  const withoutBrackets = value.replace(/\([^)]*\)|\[[^\]]*\]/g, " ");
-  return normalizeWords(withoutBrackets.split(":")[0] ?? "");
 }
 
 export function titleMatches(wanted: string, candidate: string): boolean {
@@ -46,11 +37,20 @@ export function searchTokens(query: string): string[] {
   return normalizeWords(query).split(" ").filter(Boolean).slice(0, MAX_SEARCH_TOKENS);
 }
 
+export function catalogTitleKey(title: string, author: string): string | null {
+  const main = normalizeTitle(title);
+  return main ? `ta:${main}|${firstAuthor(author)}|${titleNumbers(title)}` : null;
+}
+
 export function lookupIdentity(lookup: BookLookup): BookIdentity | null {
   const isbn = normalizeIsbn(lookup.isbn ?? "") || null;
   const title = (lookup.title ?? "").trim();
   const author = (lookup.author ?? "").trim();
-  if (isbn) return { key: `isbn:${isbn}`, isbn, title, author };
-  const normalized = normalizeTitle(title);
-  return normalized ? { key: `ta:${normalized}|${normalizeWords(author)}`, isbn: null, title, author } : null;
+  const titleKey = catalogTitleKey(title, author);
+  if (isbn) return { key: `isbn:${isbn}`, titleKey, isbn, title, author };
+  return titleKey ? { key: titleKey, titleKey, isbn: null, title, author } : null;
+}
+
+export function findByIdentity(repo: Pick<BooksRepository, "findBookByKey">, identity: BookIdentity): BookRow | undefined {
+  return repo.findBookByKey(identity.key) ?? (identity.titleKey && identity.titleKey !== identity.key ? repo.findBookByKey(identity.titleKey) : undefined);
 }

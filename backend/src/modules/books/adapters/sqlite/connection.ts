@@ -8,6 +8,7 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { env } from "../../../../config/env.js";
 import { MIN_GOOD_WIDTH } from "../../domain/constants.js";
+import { catalogTitleKey } from "../../domain/normalize.js";
 
 const adapterDir = dirname(fileURLToPath(import.meta.url));
 
@@ -26,30 +27,50 @@ interface LegacyCoverRow {
 export function applyBooksMigrations(db: DatabaseSync): void {
   db.exec(readFileSync(`${adapterDir}/books.sql`, "utf8"));
   const legacy = db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'cover_cache'`).get();
-  if (!legacy) return;
+  if (legacy) {
+    const rows = db.prepare(`SELECT id, cache_key, source, width, height, byte_size, created_at FROM cover_cache`).all() as unknown as LegacyCoverRow[];
+    const insertBook = db.prepare(`
+      INSERT INTO books (id, title, author, isbn, cover_image_id, cover_status, cover_checked_at, created_at)
+      VALUES (?, '', '', ?, ?, ?, ?, ?)
+    `);
+    const insertKey = db.prepare(`INSERT OR IGNORE INTO book_keys (key, book_id) VALUES (?, ?)`);
+    const insertImage = db.prepare(`
+      INSERT OR IGNORE INTO cover_images (id, book_id, source, source_url, width, height, byte_size, created_at)
+      VALUES (?, ?, ?, NULL, ?, ?, ?, ?)
+    `);
 
-  const rows = db.prepare(`SELECT id, cache_key, source, width, height, byte_size, created_at FROM cover_cache`).all() as unknown as LegacyCoverRow[];
-  const insertBook = db.prepare(`
-    INSERT INTO books (id, title, author, isbn, cover_image_id, cover_status, cover_checked_at, created_at)
-    VALUES (?, '', '', ?, ?, ?, ?, ?)
-  `);
-  const insertKey = db.prepare(`INSERT OR IGNORE INTO book_keys (key, book_id) VALUES (?, ?)`);
-  const insertImage = db.prepare(`
-    INSERT OR IGNORE INTO cover_images (id, book_id, source, source_url, width, height, byte_size, created_at)
-    VALUES (?, ?, ?, NULL, ?, ?, ?, ?)
-  `);
+    db.exec("BEGIN");
+    try {
+      for (const row of rows) {
+        if (!row.cache_key.startsWith("isbn:")) continue;
+        const bookId = randomUUID();
+        const status = row.width >= MIN_GOOD_WIDTH ? "good" : "low_res";
+        insertBook.run(bookId, row.cache_key.slice("isbn:".length), row.id, status, LEGACY_CHECKED_AT, row.created_at);
+        insertKey.run(row.cache_key, bookId);
+        insertImage.run(row.id, bookId, row.source, row.width, row.height, row.byte_size, row.created_at);
+      }
+      db.exec("DROP TABLE cover_cache");
+      db.exec("COMMIT");
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+  backfillTitleKeys(db);
+}
 
+function backfillTitleKeys(db: DatabaseSync): void {
+  const { user_version: version } = db.prepare("PRAGMA user_version").get() as { user_version: number };
+  if (version >= 1) return;
+  const rows = db.prepare("SELECT id, title, author FROM books WHERE title != '' ORDER BY created_at ASC").all() as Array<{ id: string; title: string; author: string }>;
+  const insertKey = db.prepare("INSERT OR IGNORE INTO book_keys (key, book_id) VALUES (?, ?)");
   db.exec("BEGIN");
   try {
     for (const row of rows) {
-      if (!row.cache_key.startsWith("isbn:")) continue;
-      const bookId = randomUUID();
-      const status = row.width >= MIN_GOOD_WIDTH ? "good" : "low_res";
-      insertBook.run(bookId, row.cache_key.slice("isbn:".length), row.id, status, LEGACY_CHECKED_AT, row.created_at);
-      insertKey.run(row.cache_key, bookId);
-      insertImage.run(row.id, bookId, row.source, row.width, row.height, row.byte_size, row.created_at);
+      const key = catalogTitleKey(row.title, row.author);
+      if (key) insertKey.run(key, row.id);
     }
-    db.exec("DROP TABLE cover_cache");
+    db.exec("PRAGMA user_version = 1");
     db.exec("COMMIT");
   } catch (error) {
     db.exec("ROLLBACK");

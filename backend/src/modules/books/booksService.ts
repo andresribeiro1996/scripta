@@ -4,7 +4,7 @@ import { findBestCover, type CoverSources, type FetchCoverImage } from "./coverR
 import { MIN_GOOD_WIDTH } from "./domain/constants.js";
 import { BookNotFoundError, FileTooLargeError, InvalidImageError } from "./domain/errors.js";
 import { encodeCover, type EncodedCover } from "./domain/images.js";
-import { lookupIdentity, searchTokens, type BookLookup } from "./domain/normalize.js";
+import { findByIdentity, lookupIdentity, searchTokens, type BookIdentity, type BookLookup } from "./domain/normalize.js";
 import type { BookCatalog, BooksRepository, CatalogSearchHit, CoverBlobStore } from "./domain/ports.js";
 import type { BookRow, CoverSourceName, CoverStatus } from "./domain/types.js";
 
@@ -57,14 +57,27 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
 
   const olderThan = (iso: string | null, ms: number) => iso === null || now().getTime() - Date.parse(iso) >= ms;
 
+  function keysOf(identity: BookIdentity): string[] {
+    return identity.titleKey && identity.titleKey !== identity.key ? [identity.key, identity.titleKey] : [identity.key];
+  }
+
+  function findExisting(identity: BookIdentity): BookRow | undefined {
+    const direct = deps.repo.findBookByKey(identity.key);
+    if (direct) return direct;
+    const byTitle = findByIdentity(deps.repo, identity);
+    if (byTitle) deps.repo.addKey(identity.key, byTitle.id);
+    return byTitle;
+  }
+
   function findOrCreate(lookup: BookLookup): BookRow | null {
     const identity = lookupIdentity(lookup);
     if (!identity) return null;
-    const existing = deps.repo.findBookByKey(identity.key);
+    const existing = findExisting(identity);
     if (!existing) {
-      return deps.repo.createBook({ title: identity.title, author: identity.author, isbn: identity.isbn }, identity.key, now().toISOString());
+      return deps.repo.createBook({ title: identity.title, author: identity.author, isbn: identity.isbn }, keysOf(identity), now().toISOString());
     }
     if (!existing.title && identity.title) {
+      if (identity.titleKey) deps.repo.addKey(identity.titleKey, existing.id);
       deps.repo.fillIdentity(existing.id, identity.title, identity.author);
       return deps.repo.getBook(existing.id) ?? existing;
     }
@@ -124,9 +137,9 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       const author = result.authors.join(", ");
       const identity = lookupIdentity({ isbn: result.isbn, title: result.title, author });
       if (!identity) return result;
-      const book = deps.repo.findBookByKey(identity.key) ?? deps.repo.createBook(
+      const book = findExisting(identity) ?? deps.repo.createBook(
         { title: result.title, author, isbn: identity.isbn, year: result.year, publisher: result.publisher, olCoverId, genres: result.genres },
-        identity.key,
+        keysOf(identity),
         now().toISOString()
       );
       if (!book.title) deps.repo.fillIdentity(book.id, result.title, author);
@@ -225,7 +238,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
 
     rejectCover(lookup) {
       const identity = lookupIdentity(lookup);
-      const book = identity ? deps.repo.findBookByKey(identity.key) : undefined;
+      const book = identity ? findByIdentity(deps.repo, identity) : undefined;
       if (!book) throw new BookNotFoundError();
       const image = book.cover_image_id ? deps.repo.getImage(book.cover_image_id) : undefined;
       if (image?.source_url) deps.repo.addRejection(book.id, image.source_url, now().toISOString());

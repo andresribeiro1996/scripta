@@ -174,7 +174,7 @@ test("enqueueCovers queues each unresolved book at the back and skips resolved o
   await h.service.processBook(h.bookId("isbn:9780141184272"));
   h.enqueued.length = 0;
   h.service.enqueueCovers([orlando, dune, { title: "" }]);
-  assert.deepEqual(h.enqueued, [{ bookId: h.bookId("ta:dune|frank herbert"), front: false }]);
+  assert.deepEqual(h.enqueued, [{ bookId: h.bookId("ta:dune|frank herbert|"), front: false }]);
 });
 
 test("enqueueCovers skips a book in backoff", async () => {
@@ -238,7 +238,7 @@ test("enqueueCovers queues each unresolved book at the back and skips resolved o
   await h.service.processBook(h.bookId("isbn:9780141184272"));
   h.enqueued.length = 0;
   h.service.enqueueCovers([orlando, dune, { title: "" }]);
-  assert.deepEqual(h.enqueued, [{ bookId: h.bookId("ta:dune|frank herbert"), front: false }]);
+  assert.deepEqual(h.enqueued, [{ bookId: h.bookId("ta:dune|frank herbert|"), front: false }]);
 });
 
 test("enqueueCovers skips a book in backoff", async () => {
@@ -265,7 +265,7 @@ test("manual covers are never processed", async () => {
 test("an EPUB urn:uuid ISBN falls back to the title key", () => {
   const h = harness();
   h.service.resolveCover({ isbn: "urn:uuid:ac11a7ae-d21e-42bb-8cfe-b85022867ac4", title: "The Stranger", author: "Albert Camus" });
-  const book = h.repo.findBookByKey("ta:the stranger|albert camus");
+  const book = h.repo.findBookByKey("ta:the stranger|albert camus|");
   assert.ok(book);
   assert.equal(book.isbn, null);
 });
@@ -279,7 +279,7 @@ test("a title that normalizes to nothing creates no book", () => {
 
 test("a migrated book with no title gets its title from the first lookup that has one", () => {
   const h = harness();
-  h.repo.createBook({ title: "", author: "", isbn: "9780141184272" }, "isbn:9780141184272", "2026-01-01T00:00:00.000Z");
+  h.repo.createBook({ title: "", author: "", isbn: "9780141184272" }, ["isbn:9780141184272"], "2026-01-01T00:00:00.000Z");
   h.service.resolveCover(orlando);
   assert.equal(h.repo.findBookByKey("isbn:9780141184272")!.title, "Orlando");
 });
@@ -366,7 +366,7 @@ test("free text returns saved matches first and falls back to Open Library, savi
   assert.deepEqual(calls, ["search:dune"]);
   assert.equal(fromOpenLibrary.length, 2);
   assert.equal(fromOpenLibrary[0]!.coverUrl, "https://covers.openlibrary.org/b/id/7-M.jpg");
-  assert.ok(h.repo.findBookByKey("ta:dune encyclopedia|willis e mcnelly"));
+  assert.ok(h.repo.findBookByKey("ta:dune encyclopedia|willis e mcnelly|"));
 
   const saved = await h.service.search("Dune");
   assert.equal(calls.length, 1);
@@ -439,7 +439,7 @@ test("rejecting a cover blocks its URL, clears the pointer and queues the book f
 
 test("rejecting a migrated cover with no recorded URL just clears it", () => {
   const h = harness();
-  const book = h.repo.createBook({ title: "", author: "", isbn: "9780141184272" }, "isbn:9780141184272", "2026-01-01T00:00:00.000Z");
+  const book = h.repo.createBook({ title: "", author: "", isbn: "9780141184272" }, ["isbn:9780141184272"], "2026-01-01T00:00:00.000Z");
   h.repo.insertImage({ id: "legacy", book_id: book.id, source: "openlibrary", source_url: null, width: 300, height: 460, byte_size: 1, created_at: "2026-01-01T00:00:00.000Z" });
   h.repo.setCover(book.id, { imageId: "legacy", status: "low_res", checkedAt: "1970-01-01T00:00:00.000Z" });
   h.service.rejectCover(orlando);
@@ -516,4 +516,15 @@ test("an admin reject during an in-flight lookup is not undone by that lookup", 
   const rerun = h.repo.getBook(id)!;
   assert.equal(rerun.cover_image_id, null);
   assert.equal(rerun.cover_status, "missing");
+});
+
+test("an edition's ISBN resolves through the title alias to the existing catalog book", () => {
+  const { service, repo } = harness();
+  service.resolveCover({ isbn: "9780441013593", title: "Dune", author: "Frank Herbert" });
+  const first = repo.findBookByKey("isbn:9780441013593")!;
+  service.resolveCover({ isbn: "9780593099322", title: "Dune: Deluxe Edition", author: "Frank Herbert" });
+  assert.equal(repo.findBookByKey("isbn:9780593099322")?.id, first.id);
+  service.resolveCover({ title: "Complete Works: Volume 1", author: "A Poet" });
+  service.resolveCover({ title: "Complete Works: Volume 2", author: "A Poet" });
+  assert.notEqual(repo.findBookByKey("ta:complete works|a poet|1")?.id, repo.findBookByKey("ta:complete works|a poet|2")?.id);
 });

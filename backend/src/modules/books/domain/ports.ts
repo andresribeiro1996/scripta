@@ -9,7 +9,8 @@ export interface CoverBlobStore {
 export interface BooksRepository {
   findBookByKey(key: string): BookRow | undefined;
   getBook(id: string): BookRow | undefined;
-  createBook(input: NewBook, key: string, createdAt: string): BookRow;
+  createBook(input: NewBook, keys: string[], createdAt: string): BookRow;
+  addKey(key: string, bookId: string): void;
   fillIdentity(id: string, title: string, author: string): void;
   makeSearchable(id: string): void;
   getImage(id: string): CoverImageRow | undefined;

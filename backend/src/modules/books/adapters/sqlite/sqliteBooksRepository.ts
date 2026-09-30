@@ -10,7 +10,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     INSERT INTO books (id, title, author, year, publisher, isbn, ol_cover_id, genres, created_at)
     VALUES ($id, $title, $author, $year, $publisher, $isbn, $ol_cover_id, $genres, $created_at)
   `);
-  const insertKeyStmt = db.prepare(`INSERT INTO book_keys (key, book_id) VALUES (?, ?)`);
+  const insertKeyIfMissingStmt = db.prepare(`INSERT OR IGNORE INTO book_keys (key, book_id) VALUES (?, ?)`);
   const fillIdentityStmt = db.prepare(`UPDATE books SET title = ?, author = ? WHERE id = ? AND title = ''`);
   const makeSearchableStmt = db.prepare(`
     INSERT INTO books_fts (book_id, title, author)
@@ -40,8 +40,8 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
 
     getBook: (id) => byIdStmt.get(id) as BookRow | undefined,
 
-    createBook(input, key, createdAt) {
-      const existing = byKeyStmt.get(key) as BookRow | undefined;
+    createBook(input, keys, createdAt) {
+      const existing = keys.map((key) => byKeyStmt.get(key) as BookRow | undefined).find(Boolean);
       if (existing) return existing;
       const id = randomUUID();
       db.exec("BEGIN");
@@ -57,13 +57,17 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
           $genres: JSON.stringify(input.genres ?? []),
           $created_at: createdAt
         });
-        insertKeyStmt.run(key, id);
+        for (const key of keys) insertKeyIfMissingStmt.run(key, id);
         db.exec("COMMIT");
       } catch (error) {
         db.exec("ROLLBACK");
         throw error;
       }
       return byIdStmt.get(id) as unknown as BookRow;
+    },
+
+    addKey(key, bookId) {
+      insertKeyIfMissingStmt.run(key, bookId);
     },
 
     fillIdentity(id, title, author) {
