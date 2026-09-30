@@ -19,6 +19,7 @@ import {
   emailEnabled,
   findUserIdByUsername,
   getDashboardSeenAt,
+  getUserTheme,
   registerAuthModule,
   resolvePublicReaderProfile,
   resolvePublicReaderProfiles,
@@ -133,6 +134,7 @@ export function buildApp() {
   app.register(registerSocialsModule);
   app.register(registerWaitlistModule, { sendEmail: emailEnabled ? sendAccountEmail : undefined });
   app.register(registerMuralsModule, {
+    resolveOwnerTheme: getUserTheme,
     // Cross-module wiring, same shape as covers' peekCachedCoverUrl
     // consumers: the murals module never imports tierlists' internals —
     // app.ts hands it this one function, and only for the public shared

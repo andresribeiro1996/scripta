@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS murals (
   id               TEXT PRIMARY KEY,
   user_id          TEXT NOT NULL,
   name             TEXT NOT NULL,
+  theme            TEXT,
   blocks           TEXT NOT NULL DEFAULT '[]',
   cover_image_id   TEXT,
   cover_image_url  TEXT,

@@ -26,5 +26,6 @@ export {
   findUserIdByUsername,
   searchUsernameOwners,
   getDashboardSeenAt,
-  setDashboardSeenAt
+  setDashboardSeenAt,
+  getUserTheme
 } from "./publicProfile.js";

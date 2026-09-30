@@ -1,5 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { ReaderProfile } from "@scripta/shared";
+import { parseThemePreference, type ThemeId } from "@scripta/shared/themes";
 import { env } from "../../config/env.js";
 import { openAuthDb } from "./adapters/sqlite/connection.js";
 
@@ -10,6 +11,7 @@ interface CachedStatements {
   search: ReturnType<DatabaseSync["prepare"]>;
   getSeen: ReturnType<DatabaseSync["prepare"]>;
   setSeen: ReturnType<DatabaseSync["prepare"]>;
+  getTheme: ReturnType<DatabaseSync["prepare"]>;
 }
 
 let cached: CachedStatements | null = null;
@@ -23,7 +25,8 @@ function statements(): CachedStatements {
       findIdByUsername: db.prepare("SELECT id FROM users WHERE username = ?"),
       search: db.prepare("SELECT id FROM users WHERE username LIKE ? ESCAPE '\\' ORDER BY username LIMIT ?"),
       getSeen: db.prepare("SELECT dashboard_seen_at FROM users WHERE id = ?"),
-      setSeen: db.prepare("UPDATE users SET dashboard_seen_at = ? WHERE id = ?")
+      setSeen: db.prepare("UPDATE users SET dashboard_seen_at = ? WHERE id = ?"),
+      getTheme: db.prepare("SELECT theme FROM users WHERE id = ?")
     };
   }
   return cached;
@@ -69,4 +72,10 @@ export function getDashboardSeenAt(userId: string): string | null {
 
 export function setDashboardSeenAt(userId: string, seenAt: string): void {
   statements().setSeen.run(seenAt, userId);
+}
+
+export function getUserTheme(userId: string): ThemeId {
+  const row = statements().getTheme.get(userId) as { theme: string | null } | undefined;
+  const preference = parseThemePreference(row?.theme);
+  return preference === "system" ? "light" : preference;
 }

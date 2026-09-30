@@ -10,6 +10,7 @@
 // not a normal CRUD write.
 
 import { createHash, randomUUID } from "node:crypto";
+import type { ThemeId } from "@scripta/shared/themes";
 import type { DatabaseSync } from "node:sqlite";
 import { openMuralsDb } from "./adapters/sqlite/connection.js";
 
@@ -128,4 +129,10 @@ export function listHomeDesignations(db: DatabaseSync = openMuralsDb()): Array<{
 export function dropMuralHomes(db: DatabaseSync = openMuralsDb()): void {
   db.exec("DROP TRIGGER IF EXISTS clear_mural_home");
   db.exec("DROP TABLE IF EXISTS mural_homes");
+}
+
+export function backfillMuralThemes(resolveOwnerTheme: (userId: string) => ThemeId, db: DatabaseSync = openMuralsDb()): void {
+  const owners = db.prepare("SELECT DISTINCT user_id FROM murals WHERE theme IS NULL").all() as Array<{ user_id: string }>;
+  const update = db.prepare("UPDATE murals SET theme = ? WHERE user_id = ? AND theme IS NULL");
+  for (const { user_id } of owners) update.run(resolveOwnerTheme(user_id), user_id);
 }

@@ -106,7 +106,7 @@ test("shelfPresetSummary warns a published profile that visitors will see the ke
 
 test("editing a shelf block through updateBlock keeps its role", () => {
   const shelf = buildMuralPreset("shelf", library).blocks.find((block) => block.type === "shelf")!;
-  const mural: Mural = { id: "m1", name: "My shelf", blocks: [shelf], createdAt: "", updatedAt: "", shareToken: null, shareUrl: null, folderId: null };
+  const mural: Mural = { id: "m1", name: "My shelf", theme: "light", blocks: [shelf], createdAt: "", updatedAt: "", shareToken: null, shareUrl: null, folderId: null };
   const edited = shelf.type === "shelf" ? { ...shelf, title: "Read in 2026" } : shelf;
   const [saved] = updateBlock([mural], "m1", edited)[0].blocks;
   assert.equal(saved.type === "shelf" ? saved.role : undefined, "finished");
