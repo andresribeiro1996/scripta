@@ -128,11 +128,11 @@ export function HomeScreen() {
                     <Skeleton height={80} />
                   </View>
                 </>
-              ) : dashboard.isError ? (
+              ) : dashboard.isError && !dashboard.data ? (
                 <>
                   <SectionHeader title="Activity" />
                   <View style={styles.sectionPad}>
-                    <ErrorState body="Couldn't load activity from people you follow." actionLabel="Retry" onAction={() => void dashboard.refetch()} />
+                    <ErrorState body="Couldn't load activity." actionLabel="Retry" onAction={() => void dashboard.refetch()} />
                   </View>
                 </>
               ) : feedItems.length ? (

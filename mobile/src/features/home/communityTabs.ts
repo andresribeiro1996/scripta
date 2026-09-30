@@ -27,6 +27,6 @@ export function parseCommunityTab(value: string | undefined): CommunityTab | und
   return COMMUNITY_TABS.find((tab) => tab.value === value)?.value;
 }
 
-export function shouldMarkSeen(tab: CommunityTab, loaded: boolean, loadFailed: boolean): boolean {
-  return tab === "activity" && loaded && !loadFailed;
+export function shouldMarkSeen(tab: CommunityTab, loaded: boolean, loadFailed: boolean, fetching: boolean): boolean {
+  return tab === "activity" && loaded && !loadFailed && !fetching;
 }

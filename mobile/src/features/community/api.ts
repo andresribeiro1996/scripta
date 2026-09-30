@@ -1,5 +1,5 @@
 import type { LibraryData, MuralBlock, PublicReaderCard, ResolvedTierlist, ShelfTheme } from "@scripta/shared";
-import type { DashboardFeedPage } from "@scripta/shared/dashboard";
+import { withKnownDigestItems, type DashboardFeedPage } from "@scripta/shared/dashboard";
 import type { ThemeId } from "@scripta/shared/themes";
 import type {
   ActivityItem,
@@ -40,7 +40,7 @@ export type CommunityPage<T> = Page<T>;
 
 export async function fetchDashboard(cursor?: string) {
   const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
-  return apiClient.request<DashboardFeedPage>(`/community/dashboard${query}`, { auth: true });
+  return withKnownDigestItems(await apiClient.request<DashboardFeedPage>(`/community/dashboard${query}`, { auth: true }));
 }
 
 export function markDashboardSeen() {

@@ -9,7 +9,7 @@ import { DiscoverPane } from "../community/DiscoverPane";
 import { PeoplePane } from "../community/PeoplePane";
 import { markDashboardSeen } from "../community/api";
 import { communityTabOptions, defaultCommunityTab, shouldMarkSeen, type CommunityTab } from "./communityTabs";
-import { FeedRow, useDashboardFeed, useFollowBack, useSkipEmptyPages } from "./FeedRow";
+import { DASHBOARD_QUERY_KEY, FeedRow, useDashboardFeed, useFollowBack, useSkipEmptyPages } from "./FeedRow";
 import { digestRoute } from "./feedRowModel";
 
 export function CommunityScreen({ initialTab }: { initialTab?: CommunityTab }) {
@@ -33,14 +33,14 @@ export function CommunityScreen({ initialTab }: { initialTab?: CommunityTab }) {
   const tab = chosenTab ?? "activity";
 
   useEffect(() => {
-    if (!markedRef.current && shouldMarkSeen(tab, loaded, dashboard.isError)) {
+    if (!markedRef.current && shouldMarkSeen(tab, loaded, dashboard.isError, dashboard.isFetching)) {
       markedRef.current = true;
       void markDashboardSeen().then(
-        () => queryClient.setQueryData<InfiniteData<DashboardFeedPage>>(["community", "dashboard"], (data) => (data ? clearDashboardCounts(data) : data)),
+        () => queryClient.setQueryData<InfiniteData<DashboardFeedPage>>(DASHBOARD_QUERY_KEY, (data) => (data ? clearDashboardCounts(data) : data)),
         () => { markedRef.current = false; },
       );
     }
-  }, [tab, loaded, dashboard.isError, queryClient]);
+  }, [tab, loaded, dashboard.isError, dashboard.isFetching, queryClient]);
 
   const { followingId, followError, followBack } = useFollowBack(dashboard.refetch);
 

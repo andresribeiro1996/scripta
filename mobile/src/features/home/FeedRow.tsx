@@ -11,9 +11,11 @@ import { ReaderGlyph } from "../community/ReaderGlyph";
 import { fetchDashboard, followUser } from "../community/api";
 import { feedRowAccessibilityLabel, feedRowModel, relativeTime } from "./feedRowModel";
 
+export const DASHBOARD_QUERY_KEY = ["community", "dashboard"] as const;
+
 export function useDashboardFeed() {
   return useInfiniteQuery({
-    queryKey: ["community", "dashboard"],
+    queryKey: DASHBOARD_QUERY_KEY,
     queryFn: ({ pageParam }) => fetchDashboard(pageParam),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
