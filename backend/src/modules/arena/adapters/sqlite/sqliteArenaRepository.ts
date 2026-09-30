@@ -102,6 +102,26 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
     GROUP BY t.id
     ORDER BY last_vote_at DESC
   `);
+  const participationStmt = db.prepare(`
+    SELECT t.id, t.name, COUNT(*) AS participants, MAX(p.first_at) AS latest_at
+    FROM (
+      SELECT d.tournament_id, COALESCE(v.voter_user_id, v.voter_token) AS voter, MIN(v.created_at) AS first_at
+      FROM votes v
+      JOIN duels d ON d.id = v.duel_id
+      JOIN tournaments o ON o.id = d.tournament_id
+      WHERE o.owner_user_id = ? AND (v.voter_user_id IS NULL OR v.voter_user_id != o.owner_user_id)
+      GROUP BY d.tournament_id, voter
+    ) p
+    JOIN tournaments t ON t.id = p.tournament_id
+    WHERE t.status != 'seeding'
+    GROUP BY t.id
+  `);
+  const recentVotersStmt = db.prepare(`
+    SELECT v.voter_user_id AS user_id, MIN(v.created_at) AS at
+    FROM votes v JOIN duels d ON d.id = v.duel_id
+    WHERE d.tournament_id = ? AND v.voter_user_id IS NOT NULL AND v.voter_user_id != ?
+    GROUP BY v.voter_user_id ORDER BY at DESC LIMIT ?
+  `);
 
   return {
     deleteUserData(userId) {
@@ -250,6 +270,13 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
     },
     listVotedByUser(voterUserId) {
       return listVotedByUserStmt.all(voterUserId, voterUserId) as unknown as TournamentRow[];
+    },
+    listParticipation(ownerUserId) {
+      const rows = participationStmt.all(ownerUserId) as unknown as Array<{ id: string; name: string; participants: number; latest_at: string }>;
+      return rows.map((r) => ({ ...r, participants: Number(r.participants) }));
+    },
+    listRecentVoters(tournamentId, ownerUserId, limit) {
+      return recentVotersStmt.all(tournamentId, ownerUserId, limit) as unknown as Array<{ user_id: string; at: string }>;
     }
   };
 }

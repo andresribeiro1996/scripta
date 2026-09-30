@@ -82,7 +82,9 @@ function createInMemoryRepo(): QuizzesRepository {
         correctCount: s.correctCount,
         picks: [...s.picks.entries()].map(([choiceIndex, count]) => ({ choiceIndex, count }))
       }));
-    }
+    },
+    listParticipation: () => [],
+    listRecentPlayers: () => []
   };
 }
 

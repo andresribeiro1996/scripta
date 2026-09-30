@@ -148,6 +148,14 @@ function createInMemoryRepo(): TierlistsRepository {
       const counts = new Map<string, number>();
       for (const b of ballots.values()) counts.set(b.tierlist_id, (counts.get(b.tierlist_id) ?? 0) + 1);
       return counts;
+    },
+
+    listParticipation() {
+      return [];
+    },
+
+    listRecentVoters() {
+      return [];
     }
   };
 }

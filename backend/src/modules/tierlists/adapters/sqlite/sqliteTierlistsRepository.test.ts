@@ -238,3 +238,32 @@ test("deleteUserData removes the user's tier lists with their ballots and unlink
   assert.deepEqual(db.prepare(`SELECT id, voter_user_id FROM tierlist_ballots`).all().map((r) => ({ ...r })), [{ id: "b2", voter_user_id: null }]);
   assert.deepEqual(db.prepare(`SELECT ballot_id FROM tierlist_ballot_placements`).all().map((r) => r.ballot_id), ["b2"]);
 });
+
+test("participation counts other people's ballots on the creator's published lists by creation time", () => {
+  const repo = createSqliteTierlistsRepository(freshDb());
+  const publicBooks = JSON.stringify([{ coverUrl: "https://covers.test/a.jpg" }]);
+  insertPublished(repo, row({ id: "c1", name: "Fantasy", vote_code: "code1", voting_open: 1, public_books: publicBooks }), ballot({ id: "own1", tierlist_id: "c1", voter_user_id: "u1" }), []);
+  repo.saveBallot(ballot({ id: "b2", tierlist_id: "c1", voter_user_id: "u2", created_at: "2026-01-02T00:00:00.000Z" }), []);
+  repo.saveBallot(ballot({ id: "b3", tierlist_id: "c1", voter_user_id: null, created_at: "2026-01-03T00:00:00.000Z" }), []);
+  repo.saveBallot(ballot({ id: "b4", tierlist_id: "c1", voter_user_id: "u3", created_at: "2026-01-04T00:00:00.000Z" }), []);
+  repo.saveBallot(ballot({ id: "b2", tierlist_id: "c1", voter_user_id: "u2", created_at: "2026-01-02T00:00:00.000Z", updated_at: "2026-03-01T00:00:00.000Z" }), []);
+
+  insertPublished(repo, row({ id: "c2", name: "Promoted", vote_code: "code2", voting_open: 1 }), ballot({ id: "own2", tierlist_id: "c2", voter_user_id: "u1" }), []);
+  repo.saveBallot(ballot({ id: "r2", tierlist_id: "c2", voter_user_id: "u2", created_at: "2026-02-01T00:00:00.000Z" }), []);
+  repo.promote("c2", "2026-02-02T00:00:00.000Z");
+
+  repo.insert(row({ id: "draft", name: "Draft" }));
+  repo.saveBallot(ballot({ id: "d1", tierlist_id: "draft", voter_user_id: "u2" }), []);
+  insertPublished(repo, row({ id: "theirs", owner_user_id: "u9", origin_user_id: "u9", vote_code: "code9", voting_open: 1 }), ballot({ id: "t1", tierlist_id: "theirs", voter_user_id: "u2" }), []);
+
+  const rows = repo.listParticipation("u1").map((r) => ({ ...r })).sort((a, b) => a.id.localeCompare(b.id));
+  assert.deepEqual(rows, [
+    { id: "c1", name: "Fantasy", public_books: publicBooks, participants: 3, latest_at: "2026-01-04T00:00:00.000Z" },
+    { id: "c2", name: "Promoted", public_books: null, participants: 1, latest_at: "2026-02-01T00:00:00.000Z" }
+  ]);
+  assert.deepEqual(repo.listRecentVoters("c1", "u1", 10).map((r) => ({ ...r })), [
+    { user_id: "u3", at: "2026-01-04T00:00:00.000Z" },
+    { user_id: "u2", at: "2026-01-02T00:00:00.000Z" }
+  ]);
+  assert.deepEqual(repo.listRecentVoters("c1", "u1", 1).map((r) => r.user_id), ["u3"]);
+});

@@ -7,7 +7,8 @@ import type { FastifyInstance } from "fastify";
 import { openQuizzesDb } from "./adapters/sqlite/connection.js";
 import { createSqliteQuizzesRepository } from "./adapters/sqlite/sqliteQuizzesRepository.js";
 import { buildPublicQuizRoutes, buildQuizRoutes } from "./routes.js";
-import { createQuizzesService } from "./service.js";
+import type { QuizzesPublicApi } from "./service.js";
+import { createQuizzesPublicApi, createQuizzesService } from "./service.js";
 
 export async function quizzesPlugin(app: FastifyInstance) {
   // --- composition: swap this one block to change storage technology ---
@@ -23,6 +24,13 @@ export async function quizzesPlugin(app: FastifyInstance) {
     await scoped.register(fastifyRateLimit, { max: 30, timeWindow: "1 minute" });
     await scoped.register(buildPublicQuizRoutes(quizzesService));
   });
+}
+
+let cachedApi: QuizzesPublicApi | null = null;
+
+export function getQuizzesPublicApi(): QuizzesPublicApi {
+  if (!cachedApi) cachedApi = createQuizzesPublicApi(createQuizzesService(createSqliteQuizzesRepository(openQuizzesDb())));
+  return cachedApi;
 }
 
 let erasingQuizzes: ReturnType<typeof createSqliteQuizzesRepository> | undefined;

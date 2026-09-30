@@ -4,6 +4,7 @@
 
 import { randomBytes, randomUUID } from "node:crypto";
 import { DEFAULT_TIER_PRESET } from "@scripta/shared";
+import type { GameParticipation } from "@scripta/shared/community";
 import type { TierlistsRepository } from "./domain/ports.js";
 import type { BallotRow, HistogramCell, Placement, Tierlist, TierlistRow, VoteAccess } from "./domain/types.js";
 
@@ -99,6 +100,7 @@ export interface TierlistsService {
    *  own polls excluded (openVoting seeds the owner's ballot, which is
    *  not participation). Feeds the "Voted on" section of the games list. */
   listVotedByUser(voterUserId: string): PublishedTierlistRef[];
+  participationByOwner(ownerUserId: string): GameParticipation[];
 }
 
 /** Where a new tier list starts — the familiar S–D ladder, matching the
@@ -132,6 +134,7 @@ function readDocument(tierlist: Tierlist): TierlistDocument {
 }
 
 const COVER_PREVIEW_LIMIT = 8;
+const RECENT_PARTICIPANT_LIMIT = 10;
 
 /** Covers come from the published snapshot rather than the owner's live
  *  library: a stranger reading the feed can't resolve the owner's books,
@@ -392,6 +395,17 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
     listVotedByUser(voterUserId) {
       const counts = repo.ballotCountsByTierlist();
       return repo.listVotedByUser(voterUserId).map((row) => ({ ...toPublishedRef(row, counts.get(row.id) ?? 0), eligibleVoteCount: repo.eligibleVoteCount(row.id, row.origin_user_id) }));
+    },
+
+    participationByOwner(ownerUserId) {
+      return repo.listParticipation(ownerUserId).map((row) => ({
+        id: row.id,
+        name: row.name,
+        covers: publishedCovers(row.public_books),
+        participantCount: row.participants,
+        latestAt: row.latest_at,
+        recent: repo.listRecentVoters(row.id, ownerUserId, RECENT_PARTICIPANT_LIMIT).map((r) => ({ userId: r.user_id, at: r.at }))
+      }));
     }
   };
 }
@@ -419,6 +433,7 @@ export interface TierlistsPublicApi {
   getPublished(id: string): PublishedTierlistRef | undefined;
   listPublishedByOwner(ownerUserId: string): PublishedTierlistRef[];
   listVotedByUser(voterUserId: string): PublishedTierlistRef[];
+  participationByOwner(ownerUserId: string): GameParticipation[];
 }
 
 /** Factory over the service. app.ts can't call this directly — it has no
@@ -435,6 +450,7 @@ export function createTierlistsPublicApi(service: TierlistsService): TierlistsPu
     listPublished: (limit, offset) => service.listPublishedRefs(limit, offset),
     getPublished: (id) => service.getPublishedRef(id),
     listPublishedByOwner: (ownerUserId) => service.listPublishedRefsByOwner(ownerUserId),
-    listVotedByUser: (voterUserId) => service.listVotedByUser(voterUserId)
+    listVotedByUser: (voterUserId) => service.listVotedByUser(voterUserId),
+    participationByOwner: (ownerUserId) => service.participationByOwner(ownerUserId)
   };
 }

@@ -50,4 +50,6 @@ export interface TierlistsRepository {
   /** Ballot totals for every tier list at once — one grouped count, so
    *  listing the public directory doesn't fire a query per row. */
   ballotCountsByTierlist(): Map<string, number>;
+  listParticipation(ownerUserId: string): Array<{ id: string; name: string; public_books: string | null; participants: number; latest_at: string }>;
+  listRecentVoters(tierlistId: string, ownerUserId: string, limit: number): Array<{ user_id: string; at: string }>;
 }
