@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { ensureBookBlockHeights, type MuralBlock } from "./murals.js";
+import { ensureBookBlockHeights, muralThemeId, type MuralBlock } from "./murals.js";
 
 const reading = (y: number, h: number): MuralBlock => ({ id: "r", type: "currentlyReading", layout: { x: 0, y, w: 12, h } });
 const text = (id: string, y: number, h: number): MuralBlock => ({ id, type: "text", heading: id, layout: { x: 0, y, w: 12, h } });
@@ -24,4 +24,9 @@ test("a shelf keeps its 4 row minimum and a tierlist its 8", () => {
 test("blocks already tall enough come back untouched", () => {
   const blocks = [text("above", 0, 3), reading(3, 6)];
   assert.equal(ensureBookBlockHeights(blocks), blocks);
+});
+
+test("muralThemeId passes a valid theme through and falls back to light otherwise", () => {
+  assert.equal(muralThemeId("dark"), "dark");
+  for (const bad of [undefined, null, "", "system", "nope"]) assert.equal(muralThemeId(bad), "light");
 });
