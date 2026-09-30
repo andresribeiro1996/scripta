@@ -16,7 +16,7 @@ import { contentDetail, contentKindLabel, contentTarget } from "./communityHome"
 import { ReaderGlyph } from "./ReaderGlyph";
 
 export function ProfileScreen({ username }: { username: string }) {
-  const { colors } = useTheme();
+  const { colors, id: viewerTheme } = useTheme();
   const queryClient = useQueryClient();
   const profile = useQuery({
     queryKey: ["community", "profile", username],
@@ -78,6 +78,7 @@ export function ProfileScreen({ username }: { username: string }) {
     ? {
         id: muralData.mural.id,
         name: muralData.mural.name,
+        theme: muralData.mural.theme,
         blocks: ensureBookBlockHeights(muralData.mural.blocks),
         createdAt: "",
         updatedAt: "",
@@ -134,7 +135,7 @@ export function ProfileScreen({ username }: { username: string }) {
                       statsOverride={muralData?.library.stats}
                     />
                   ) : (
-                    <MuralCanvas mural={profileOnlyMural()} books={[]} images={[]} tierlists={[]} profile={profileUser} />
+                    <MuralCanvas mural={profileOnlyMural(viewerTheme)} books={[]} images={[]} tierlists={[]} profile={profileUser} />
                   )}
                   <Button
                     label={view!.profile.viewerFollows === true ? "Following" : "Follow"}

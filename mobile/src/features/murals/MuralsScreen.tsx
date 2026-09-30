@@ -26,7 +26,7 @@ import { MuralShareSheet } from "./MuralShareSheet";
 import { useMuralFolders, useMurals } from "./useMurals";
 
 export function MuralsScreen() {
-  const { colors } = useTheme();
+  const { colors, id: theme } = useTheme();
   const router = useRouter();
   const murals = useMurals();
   const folders = useMuralFolders();
@@ -67,7 +67,7 @@ export function MuralsScreen() {
     setPresetError(null);
     try {
       const preset = buildMuralPreset(id, libraryQuery.data?.data.books ?? [], libraryQuery.data?.data.groups ?? []);
-      const target = pendingPreset.current?.preset === id ? pendingPreset.current : { id: (await murals.create(preset.name, folderId ?? null)).id, preset: id };
+      const target = pendingPreset.current?.preset === id ? pendingPreset.current : { id: (await murals.create(preset.name, theme, folderId ?? null)).id, preset: id };
       pendingPreset.current = target;
       const updated = await murals.update(target.id, { blocks: preset.blocks });
       pendingPreset.current = null;
@@ -145,7 +145,7 @@ export function MuralsScreen() {
               <Menu
                 title="New mural"
                 items={[
-                  { label: "Blank mural", onPress: () => void murals.create("Untitled mural", folderId ?? null).then((mural) => router.push(`/murals/${mural.id}` as never)) },
+                  { label: "Blank mural", onPress: () => void murals.create("Untitled mural", theme, folderId ?? null).then((mural) => router.push(`/murals/${mural.id}` as never)) },
                   { label: "Start from a preset…", onPress: openPresets },
                 ]}
               >

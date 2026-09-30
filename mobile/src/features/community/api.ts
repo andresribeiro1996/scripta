@@ -1,5 +1,6 @@
 import type { LibraryData, MuralBlock, PublicReaderCard, ResolvedTierlist, ShelfTheme } from "@scripta/shared";
 import type { DashboardFeedPage } from "@scripta/shared/dashboard";
+import type { ThemeId } from "@scripta/shared/themes";
 import type {
   ActivityItem,
   DiscoverItem,
@@ -18,7 +19,7 @@ import type { PublicBookData, PublicHighlight } from "../public/api";
 export interface CommunityProfileView {
   profile: PublishedProfile;
   mural: {
-    mural: { id: string; name: string; blocks: MuralBlock[]; coverImageUrl: string | null };
+    mural: { id: string; name: string; theme: ThemeId; blocks: MuralBlock[]; coverImageUrl: string | null };
     library: {
       books: PublicBookData[];
       highlights: PublicHighlight[];

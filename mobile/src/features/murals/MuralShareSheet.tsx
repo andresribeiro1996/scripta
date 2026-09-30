@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Group, Mural, ReaderProfile } from "@scripta/shared";
+import { themes } from "@scripta/shared/themes";
 import { View } from "react-native";
 import { Text } from "../../ui/Text";
 import { Button } from "../../ui";
@@ -39,6 +40,6 @@ export function MuralShareSheet({ mural, books, groups, images, tierlists, profi
     imageReady={contentReady && !contentError && imageReady}
     previewControls={contentError ? <View style={{ gap: spacing.sm }}><Text accessibilityRole="alert" style={[typography.caption, { color: colors.danger }]}>{contentError}</Text><Button label="Retry preview" variant="secondary" onPress={onRetryContent} /></View> : undefined}
   >
-    {mural ? <View style={{ backgroundColor: colors.background, padding: spacing.sm }}><MuralCanvas mural={mural} books={books} groups={groups} images={images} tierlists={tierlists} profile={profile} onImageReadyChange={setImageReady} /></View> : null}
+    {mural ? <View style={{ backgroundColor: themes[mural.theme].colors.background, padding: spacing.sm }}><MuralCanvas mural={mural} books={books} groups={groups} images={images} tierlists={tierlists} profile={profile} onImageReadyChange={setImageReady} /></View> : null}
   </ContentShareSheet>;
 }

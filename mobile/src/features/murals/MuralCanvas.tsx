@@ -23,6 +23,7 @@ import {
   type ReaderProfile,
   type ShelfTheme,
 } from "@scripta/shared";
+import { themes, type ThemeId } from "@scripta/shared/themes";
 import { CoverImage } from "../library/components/CoverImage";
 import { ReaderCardBlock } from "./ReaderCardBlock";
 import { Image } from "expo-image";
@@ -33,7 +34,7 @@ import { commitHaptic, liftHaptic } from "../../ui/haptics";
 import { Platform, Pressable, StyleSheet, View, type StyleProp, type TextStyle } from "react-native";
 import { Text } from "../../ui/Text";
 import { blockFontFamily, resolveBorderColor, resolveBorderStyle } from "../../ui/libraryStyle";
-import { minimumTouchTarget, radii, spacing, useTheme, type ThemeColors } from "../../ui/theme";
+import { minimumTouchTarget, MuralThemeScope, radii, spacing, useTheme, type ThemeColors } from "../../ui/theme";
 import type { GalleryImage } from "../gallery/api";
 import type { Tierlist } from "../tierlists/api";
 import { selectionBorderColor } from "./blockStyleOptions";
@@ -224,7 +225,8 @@ function CanvasBlock({ block, columnWidth, editable, selected, books, images, ti
   return editable ? <GestureDetector gesture={gesture}>{content}</GestureDetector> : content;
 }
 
-export function BlockPreview({ block, canvasWidth, maxHeight, books, images, tierlists, profile, groups = [] }: {
+export function BlockPreview({ theme, block, canvasWidth, maxHeight, books, images, tierlists, profile, groups = [] }: {
+  theme: ThemeId;
   block: MuralBlock;
   canvasWidth: number;
   maxHeight: number;
@@ -234,7 +236,7 @@ export function BlockPreview({ block, canvasWidth, maxHeight, books, images, tie
   profile?: ReaderProfile;
   groups?: Group[];
 }) {
-  const { colors } = useTheme();
+  const colors = themes[theme].colors;
   const [boxWidth, setBoxWidth] = useState(0);
   const [day] = useState(() => new Date().toISOString().slice(0, 10));
   const resolved = useMemo(() => resolveHomeBlock(block, books, groups, day), [block, books, groups, day]);
@@ -244,6 +246,7 @@ export function BlockPreview({ block, canvasWidth, maxHeight, books, images, tie
   const room = boxWidth - spacing.md * 2;
   const scale = room > 0 && canvasWidth > 0 ? Math.min(1, room / width, maxHeight / height) : 0;
   return (
+    <MuralThemeScope theme={theme}>
     <View
       accessibilityLabel={`Preview of this ${BLOCK_TYPE_LABELS[block.type]} block`}
       onLayout={(event) => setBoxWidth(event.nativeEvent.layout.width)}
@@ -259,6 +262,7 @@ export function BlockPreview({ block, canvasWidth, maxHeight, books, images, tie
         </View>
       ) : null}
     </View>
+    </MuralThemeScope>
   );
 }
 
@@ -278,7 +282,7 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThe
   onLayoutChange?: (id: string, layout: BlockLayout) => void;
   onImageReadyChange?: (ready: boolean) => void;
 }) {
-  const { colors } = useTheme();
+  const colors = themes[mural.theme].colors;
   const [width, setWidth] = useState(0);
   const [day] = useState(() => new Date().toISOString().slice(0, 10));
   const [readyAssets, setReadyAssets] = useState<Set<string>>(() => new Set());
@@ -317,7 +321,7 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThe
       />) : null}
     </View>
   );
-  return editable ? <Pressable accessible={false} onPress={() => onSelectBlock?.(null)}>{canvas}</Pressable> : canvas;
+  return <MuralThemeScope theme={mural.theme}>{editable ? <Pressable accessible={false} onPress={() => onSelectBlock?.(null)}>{canvas}</Pressable> : canvas}</MuralThemeScope>;
 }
 
 const styles = StyleSheet.create({
