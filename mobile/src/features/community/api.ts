@@ -1,10 +1,12 @@
-import type { LibraryData, MuralBlock, ResolvedTierlist, ShelfTheme } from "@scripta/shared";
+import type { LibraryData, MuralBlock, PublicReaderCard, ResolvedTierlist, ShelfTheme } from "@scripta/shared";
 import type { DashboardFeedPage } from "@scripta/shared/dashboard";
+import type { ThemeId } from "@scripta/shared/themes";
 import type {
   ActivityItem,
   DiscoverItem,
   DiscoverType,
   FeedSettings,
+  OwnProfile,
   Page,
   PersonResult,
   PublishedProfile,
@@ -15,15 +17,17 @@ import { apiClient } from "../../core/api";
 import type { PublicBookData, PublicHighlight } from "../public/api";
 
 export interface CommunityProfileView {
+  private: boolean;
   profile: PublishedProfile;
   mural: {
-    mural: { id: string; name: string; blocks: MuralBlock[]; coverImageUrl: string | null };
+    mural: { id: string; name: string; theme: ThemeId; blocks: MuralBlock[]; coverImageUrl: string | null };
     library: {
       books: PublicBookData[];
       highlights: PublicHighlight[];
       currentlyReading: PublicBookData[];
       stats: Record<string, number>;
       shelfTheme?: ShelfTheme;
+      readerCard?: PublicReaderCard;
     };
     imageUrls: Record<string, string | null>;
     tierlists: Record<string, ResolvedTierlist>;
@@ -58,7 +62,7 @@ export async function fetchProfile(username: string) {
 
 export async function fetchActivity(username: string, cursor?: string): Promise<Page<ActivityItem>> {
   const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
-  return apiClient.request<Page<ActivityItem>>(`/community/profiles/${encodeURIComponent(username)}/activity${query}`);
+  return apiClient.request<Page<ActivityItem>>(`/community/profiles/${encodeURIComponent(username)}/activity${query}`, { auth: true });
 }
 
 export async function fetchProfileLibrary(username: string) {
@@ -83,4 +87,12 @@ export function publishProfile(muralId: string) {
 
 export function unpublishProfile() {
   return apiClient.request("/community/profile/publish", { method: "DELETE", auth: true });
+}
+
+export function fetchOwnProfile() {
+  return apiClient.request<OwnProfile>("/community/profile", { auth: true });
+}
+
+export function setShelfMural(muralId: string) {
+  return apiClient.request("/community/profile/mural", { method: "PUT", body: { muralId }, auth: true });
 }

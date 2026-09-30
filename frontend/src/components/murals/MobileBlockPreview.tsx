@@ -1,9 +1,11 @@
+import type { Group, PublicReaderCard } from "@scripta/shared";
 import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
 import { bookKey } from "../../lib/merge";
 import { computeStat } from "../../lib/muralStats";
 import { calculateShelfTheme, muralBlockTitle, resolveQuote, resolveQuoteCollection, resolveShelfBooks, type MuralBlock, type ReaderProfile, type ShelfTheme } from "../../lib/murals";
 import { CoverImage } from "../BookCard";
+import { ReaderCardBlockView } from "./blocks/ReaderCardBlock";
 
 const PREVIEW_STAT_LABELS = {
   totalBooks: "Library",
@@ -18,7 +20,9 @@ export function MobileBlockPreview({
   books,
   images,
   profile,
+  groups,
   shelfThemeOverride,
+  readerCardOverride,
   width,
   height,
   statsOverride,
@@ -28,7 +32,9 @@ export function MobileBlockPreview({
   books: Array<Record<string, unknown>>;
   images: GalleryImage[];
   profile?: ReaderProfile;
+  groups?: Group[];
   shelfThemeOverride?: ShelfTheme;
+  readerCardOverride?: PublicReaderCard;
   width: number;
   height: number;
   statsOverride?: Record<string, number>;
@@ -38,7 +44,7 @@ export function MobileBlockPreview({
   const compact = height < 64 || width < 80;
   const heading = <p className="shrink-0 truncate text-[14px] leading-5 font-semibold">{title}</p>;
   const placeholder = (
-    <div className="flex h-full items-center justify-center gap-2 overflow-hidden p-2 text-[13px] text-(--color-text-dim)">
+    <div className="flex h-full items-center justify-center gap-2 overflow-hidden block-p-2 text-[13px] text-(--color-text-dim)">
       <span aria-hidden="true">◇</span>
       {width >= 60 && <span className="truncate">{title}</span>}
     </div>
@@ -46,7 +52,14 @@ export function MobileBlockPreview({
   if (block.type === "empty") return null;
   if (block.type === "profile") {
     const theme = shelfThemeOverride ?? calculateShelfTheme(books);
-    return <div className="flex h-full flex-col gap-2 overflow-hidden p-2"><div className="flex items-center gap-2">{profile?.avatarUrl ? <img src={profile.avatarUrl} alt="" className="h-10 w-10 rounded-full object-cover" /> : <div className="flex h-10 w-10 items-center justify-center rounded-full bg-(--color-accent-soft) font-bold text-(--color-accent)">{(profile?.username || "Reader")[0]?.toUpperCase()}</div>}<div className="min-w-0"><p className="truncate font-semibold">@{profile?.username || "reader"}</p>{block.bio && height >= 80 ? <p className="line-clamp-2 text-[12px] text-(--color-text-dim)">{block.bio}</p> : null}</div></div>{height >= 100 && theme.genres.length > 0 ? <p className="truncate text-[12px] text-(--color-text-dim)">{theme.genres.join(" · ")}</p> : null}</div>;
+    return <div className="flex h-full flex-col gap-2 overflow-hidden block-p-2"><div className="flex items-center gap-2">{profile?.avatarUrl ? <img src={profile.avatarUrl} alt="" className="h-10 w-10 rounded-full object-cover" /> : <div className="flex h-10 w-10 items-center justify-center rounded-full bg-(--color-accent-soft) font-bold text-(--color-accent)">{(profile?.username || "Reader")[0]?.toUpperCase()}</div>}<div className="min-w-0"><p className="truncate font-semibold">@{profile?.username || "reader"}</p>{block.bio && height >= 80 ? <p className="line-clamp-2 text-[12px] text-(--color-text-dim)">{block.bio}</p> : null}</div></div>{height >= 100 && theme.genres.length > 0 ? <p className="truncate text-[12px] text-(--color-text-dim)">{theme.genres.join(" · ")}</p> : null}</div>;
+  }
+  if (block.type === "readerCard") {
+    return (
+      <div className="flex h-full items-center justify-center overflow-hidden block-p-1">
+        <ReaderCardBlockView books={books} groups={groups ?? []} readerCardOverride={readerCardOverride} readerName={profile?.username || "reader"} />
+      </div>
+    );
   }
   if ((height < 32 || width < 48) && block.type !== "image" && block.type !== "spotlight") {
     const symbol =
@@ -69,7 +82,7 @@ export function MobileBlockPreview({
         <div className="relative min-h-0 flex-1">
           <CoverImage book={book} fit="contain" />
         </div>
-        {height >= 110 && <div className="shrink-0 px-2 py-1.5">{heading}</div>}
+        {height >= 110 && <div className="shrink-0 block-px-2 block-py-1.5">{heading}</div>}
       </div>
     );
   }
@@ -87,7 +100,7 @@ export function MobileBlockPreview({
       const coverWidth = (height - 12) * 0.75;
       const visible = resolved.slice(0, Math.max(1, Math.floor((width - 92) / (coverWidth + 8))));
       return (
-        <div className="flex h-full gap-2 overflow-hidden p-1.5">
+        <div className="flex h-full gap-2 overflow-hidden block-p-1.5">
           <div className="flex w-20 shrink-0 flex-col">
             <div className="line-clamp-3 text-[14px] leading-5 font-semibold">{title}</div>
             <span className="mt-auto text-[12px] text-(--color-text-dim)">{resolved.length} books ›</span>
@@ -104,7 +117,7 @@ export function MobileBlockPreview({
     }
     const visible = resolved.slice(0, Math.max(1, Math.floor((width - 16) / 80)));
     return (
-      <div className="flex h-full flex-col gap-1 overflow-hidden px-2 pt-1 pb-1">
+      <div className="flex h-full flex-col gap-1 overflow-hidden block-px-2 block-py-1">
         <div className="flex shrink-0 items-center gap-2">
           <div className="min-w-0 flex-1">{heading}</div>
           {width >= 120 && <span className="shrink-0 text-[12px] text-(--color-text-dim)">{resolved.length} ›</span>}
@@ -127,10 +140,10 @@ export function MobileBlockPreview({
     const visible = block.metrics.slice(0, count);
     if (visible.length === 0) return placeholder;
     return (
-      <div className="flex h-full items-center gap-2 overflow-hidden p-2">
+      <div className="flex h-full items-center gap-2 overflow-hidden block-p-2">
         {visible.map((metric) => (
           <div key={metric} className="min-w-0 flex-1">
-            <p className="truncate text-[20px] leading-6 font-bold text-(--color-accent)">
+            <p className="truncate text-[20px] leading-6 font-bold text-[var(--block-accent,var(--color-accent))]">
               {statsOverride && metric in statsOverride ? statsOverride[metric] : computeStat(metric, books)}
             </p>
             {height >= 48 && <p className="truncate text-[12px] leading-4 text-(--color-text-dim)">{PREVIEW_STAT_LABELS[metric]}</p>}
@@ -150,7 +163,7 @@ export function MobileBlockPreview({
         : undefined;
   const body = block.type === "text" ? block.body : quote ? `“${String(quote.highlight.Text ?? "")}”` : undefined;
   return (
-    <div className="flex h-full flex-col gap-1 overflow-hidden p-2">
+    <div className="flex h-full flex-col gap-1 overflow-hidden block-p-2">
       <p className={`shrink-0 text-[14px] leading-5 font-semibold ${height >= 56 ? "line-clamp-2" : "truncate"}`}>{title}</p>
       {!compact && body && <p className="line-clamp-3 text-[14px] leading-5 whitespace-pre-wrap">{body}</p>}
       {!compact && !body && <p className="text-[12px] text-(--color-text-dim)">Tap to open</p>}

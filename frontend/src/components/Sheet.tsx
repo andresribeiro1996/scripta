@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import type { OptionsMenuItem } from "./OptionsMenu";
 import { useDismissible } from "../hooks/useDismissible";
 import { useScrollLock } from "../hooks/useScrollLock";
@@ -26,12 +26,14 @@ export function Sheet({
   title,
   children,
   onClose,
-  onBack
+  onBack,
+  style
 }: {
   title: string;
   children: ReactNode;
   onClose: () => void;
   onBack?: () => void;
+  style?: CSSProperties;
 }) {
   useScrollLock();
   useDismissible(onClose);
@@ -52,6 +54,7 @@ export function Sheet({
         // scrolling body), so without it the last row sits under a
         // gesture bar.
         className="flex max-h-[90dvh] w-full flex-col overflow-hidden rounded-t-3xl bg-(--color-surface) pb-[env(safe-area-inset-bottom,0px)] shadow-xl sm:max-w-md sm:rounded-2xl sm:pb-0"
+        style={style}
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(event) => {
           if (event.key !== "Tab") return;

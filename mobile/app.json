@@ -49,6 +49,11 @@
               "scheme": "https",
               "host": "atmyshelf.com",
               "pathPrefix": "/vote/"
+            },
+            {
+              "scheme": "https",
+              "host": "atmyshelf.com",
+              "pathPrefix": "/play/"
             }
           ]
         }
@@ -80,7 +85,16 @@
         }
       ],
       "expo-image",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-sharing",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": false,
+          "savePhotosPermission": "Allow Atmyshelf to save your shared images.",
+          "granularPermissions": []
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

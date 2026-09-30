@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, View } from "react-native";
+import { Text } from "../../ui/Text";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { Stack, useRouter } from "expo-router";
@@ -8,6 +9,8 @@ import { radii, spacing, typography, useTheme } from "../../ui/theme";
 import { useAuth } from "../../core/auth";
 import { API_URL } from "../../core/config";
 import { SocialsSection } from "../socials";
+import { FontPicker } from "./FontPicker";
+import { ThemePicker } from "./ThemePicker";
 
 export function SettingsScreen() {
   const { colors } = useTheme();
@@ -50,6 +53,12 @@ export function SettingsScreen() {
       <Stack.Screen options={{ headerShown: true, title: "Settings" }} />
       <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
       <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Text style={[styles.heading, { color: colors.text }]}>Appearance</Text>
+        <ThemePicker />
+        <FontPicker slot="display" />
+        <FontPicker slot="text" />
+      </View>
+      <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <Text style={[styles.heading, { color: colors.text }]}>Account</Text>
         <View style={styles.profile}>
           {user?.avatarId ? <Image source={{ uri: `${API_URL}/auth/avatar/${user.avatarId}/file` }} style={styles.avatar} /> : <View style={[styles.avatar, styles.initial, { backgroundColor: colors.accentSoft }]}><Text style={[styles.initialText, { color: colors.accent }]}>{(user?.username ?? user?.email ?? "S")[0]?.toUpperCase()}</Text></View>}
@@ -67,7 +76,7 @@ export function SettingsScreen() {
         {error ? <Text accessibilityRole="alert" style={[typography.caption, { color: colors.danger }]}>{error}</Text> : null}
       </View>
       <Button label="Open gallery" variant="secondary" onPress={() => router.push("/gallery")} />
-      <Button label="Password and email" variant="secondary" onPress={() => router.push("/account-security")} />
+      <Button label="Account" variant="secondary" onPress={() => router.push("/account-security")} />
       <SocialsSection />
       <Button label="Sign out" variant="destructive" onPress={confirmSignOut} />
     </ScrollView>

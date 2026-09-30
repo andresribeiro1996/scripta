@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { THEME_IDS, type ThemeId } from "@scripta/shared/themes";
 import { Link, useNavigate, useOutletContext, useParams, useSearchParams } from "react-router-dom";
 import { EmptyState } from "../components/EmptyState";
 import { AddBlockMenu } from "../components/murals/AddBlockMenu";
@@ -9,14 +10,16 @@ import type { MobileMuralDraft } from "../components/murals/MobileMuralCanvas";
 import { MuralsIcon } from "../components/NavIcons";
 import { PageContainer } from "../components/PageContainer";
 import { ShareModal } from "../components/ShareModal";
+import { Sheet } from "../components/Sheet";
+import { ThemeOptionGrid } from "../components/ThemeOptionGrid";
 import { useToast } from "../components/Toaster";
-import { ChevronLeftIcon, FullscreenIcon, PencilIcon, ShareIcon, toolbarIconClass } from "../components/Toolbar";
+import { ChevronLeftIcon, FullscreenIcon, PaletteIcon, PencilIcon, ShareIcon, toolbarIconClass } from "../components/Toolbar";
 import { useGalleryImages } from "../hooks/useGalleryImages";
 import { useLibrary } from "../hooks/useLibrary";
-import { useGenreEnrichment } from "../hooks/useGenreEnrichment";
 import { useMuralFullscreen } from "../hooks/useMuralFullscreen";
 import { useMurals } from "../hooks/useMurals";
 import { useTierlists } from "../hooks/useTierlists";
+import { muralThemeStyle, useResolvedTheme } from "../lib/theme";
 import { type BlockStyle } from "../lib/libraryStyle";
 import { useAuth } from "../auth/AuthContext";
 import { avatarUrlFor } from "../components/Avatar";
@@ -26,6 +29,7 @@ import {
   createDuplicateCandidate,
   duplicateBlock,
   isValidBlockLayout,
+  muralThemeId,
   removeBlock,
   updateBlock,
   type BlockLayout,
@@ -45,8 +49,9 @@ export function MuralEditorPage() {
   const { muralId } = useParams<{ muralId: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { data: library, updateLibrary } = useLibrary();
-  const { data: muralsData, isLoading, refetch, create, rename, saveBlocks, currentMural, share, unshare } = useMurals();
+  const { data: library } = useLibrary();
+  const { data: muralsData, isLoading, refetch, create, rename, setTheme, saveBlocks, currentMural, share, unshare } = useMurals();
+  const viewerTheme = useResolvedTheme();
   const toast = useToast();
   const { images } = useGalleryImages();
   // Tier-list blocks reference Arena tier lists by id; the canvas resolves
@@ -71,7 +76,6 @@ export function MuralEditorPage() {
   // it unchanged.
   const isDraft = muralId === "new";
   const mural = isDraft ? undefined : murals.find((m) => m.id === muralId);
-  const genreEnrichment = useGenreEnrichment(books, mural?.blocks.some((block) => block.type === "profile") ?? false, updateLibrary);
   // Which folder the draft belongs to, carried from the list page so a
   // mural created from inside a folder lands in it.
   const draftFolderId = searchParams.get("folder");
@@ -83,6 +87,7 @@ export function MuralEditorPage() {
   const backFolderId = mural?.folderId ?? draftFolderId;
   const backToMurals = backFolderId ? `/dashboard/murals?folder=${encodeURIComponent(backFolderId)}` : "/dashboard/murals";
   const [draftName, setDraftName] = useState("Untitled mural");
+  const [draftTheme, setDraftTheme] = useState<ThemeId>(viewerTheme);
   // Guards against a double-create: two quick actions on a draft (add a
   // block, then another before the first resolves) would otherwise each
   // see `mural` still undefined and POST their own mural. A ref, not
@@ -99,7 +104,7 @@ export function MuralEditorPage() {
     if (!isDraft || creatingRef.current) return null;
     creatingRef.current = true;
     try {
-      const created = await create(draftName.trim() || "Untitled mural", draftFolderId);
+      const created = await create(draftName.trim() || "Untitled mural", draftTheme, draftFolderId);
       // `replace` so Back skips the draft URL — returning to it would
       // open a second empty draft, not the mural just created.
       navigate(`/dashboard/murals/${created.id}`, { replace: true });
@@ -124,6 +129,7 @@ export function MuralEditorPage() {
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const [sharing, setSharing] = useState(false);
+  const [pickingTheme, setPickingTheme] = useState(false);
   const { ref: fullscreenRef, fullscreen, enterFullscreen, exitFullscreen } = useMuralFullscreen();
   // Bumped only when a save fails; see guard() below for why a
   // remount is what puts a block back where it was.
@@ -165,7 +171,7 @@ export function MuralEditorPage() {
       // the mural WITH that name rather than creating an "Untitled" one
       // and immediately renaming it.
       setDraftName(name);
-      const created = await create(name, draftFolderId);
+      const created = await create(name, draftTheme, draftFolderId);
       navigate(`/dashboard/murals/${created.id}`, { replace: true });
       return;
     }
@@ -221,11 +227,16 @@ export function MuralEditorPage() {
     const { murals: updated, blockId } = addBlock([target], target.id, type);
     await saveBlocks(target.id, updated[0].blocks);
     editVersionRef.current++;
-    // "currentlyReading" and "empty" have nothing to configure at all —
-    // skip straight to them just sitting on the canvas. Every other type
-    // opens its config panel right away, same "add then configure" flow
-    // as the rest of the app.
-    if (type !== "currentlyReading" && type !== "empty") setConfiguringBlockId(blockId);
+    // "currentlyReading", "readerCard" and "empty" have nothing to
+    // configure at all — skip straight to them just sitting on the
+    // canvas. Every other type opens its config panel right away, same
+    // "add then configure" flow as the rest of the app.
+    if (type !== "currentlyReading" && type !== "readerCard" && type !== "empty") setConfiguringBlockId(blockId);
+  }
+
+  async function handleChooseTheme(theme: ThemeId) {
+    if (mural) await setTheme(mural.id, theme);
+    else setDraftTheme(theme);
   }
 
   async function handleSaveBlockConfig(block: MuralBlock) {
@@ -342,7 +353,7 @@ export function MuralEditorPage() {
         editVersionRef.current++;
         setMobileDraft(null);
         setSelectedBlockId(finishedDraft.block.id);
-        if (alreadyInserted && finishedDraft.kind === "add" && finishedDraft.block.type !== "currentlyReading" && finishedDraft.block.type !== "empty") {
+        if (alreadyInserted && finishedDraft.kind === "add" && finishedDraft.block.type !== "currentlyReading" && finishedDraft.block.type !== "readerCard" && finishedDraft.block.type !== "empty") {
           setConfiguringBlockId(finishedDraft.block.id);
         }
         return;
@@ -390,7 +401,7 @@ export function MuralEditorPage() {
           }
         });
       }
-      if (finishedDraft.kind === "add" && finishedDraft.block.type !== "currentlyReading" && finishedDraft.block.type !== "empty") {
+      if (finishedDraft.kind === "add" && finishedDraft.block.type !== "currentlyReading" && finishedDraft.block.type !== "readerCard" && finishedDraft.block.type !== "empty") {
         const inserted = saved.blocks.find((block) => block.id === finishedDraft.block.id);
         if (inserted) setConfiguringBlockId(inserted.id);
       }
@@ -421,9 +432,10 @@ export function MuralEditorPage() {
     );
   }
 
-  const view: Mural = mural ?? {
+  const view: Mural = mural ? { ...mural, theme: muralThemeId(mural.theme) } : {
     id: "",
     name: draftName,
+    theme: draftTheme,
     blocks: [],
     createdAt: "",
     updatedAt: "",
@@ -479,6 +491,9 @@ export function MuralEditorPage() {
               <FullscreenIcon />
             </button>
           )}
+          <button onClick={() => setPickingTheme(true)} aria-label="Mural theme" title="Mural theme" className={toolbarIconClass()}>
+            <PaletteIcon />
+          </button>
           <button onClick={() => setSharing(true)} aria-label="Share this mural" title="Share this mural" className={toolbarIconClass()}>
             <ShareIcon />
           </button>
@@ -501,6 +516,12 @@ export function MuralEditorPage() {
               Fullscreen
             </button>
           )}
+          <button
+            onClick={() => setPickingTheme(true)}
+            className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm font-semibold hover:bg-(--color-surface-hover)"
+          >
+            Theme
+          </button>
           {/* Nothing to share until the mural exists. Hidden rather
               than disabled on a draft: a greyed button invites a tap
               that can't do anything, and the button reappears the
@@ -516,15 +537,13 @@ export function MuralEditorPage() {
           <button
             onClick={toggleEditMode}
             className={`rounded-lg px-3 py-2 text-sm font-semibold ${
-              editMode ? "bg-(--color-accent) text-white" : "border border-(--color-border) bg-(--color-surface) hover:bg-(--color-surface-hover)"
+              editMode ? "bg-(--color-accent) text-(--color-on-accent)" : "border border-(--color-border) bg-(--color-surface) hover:bg-(--color-surface-hover)"
             }`}
           >
             {editMode ? "Done editing" : "Edit"}
           </button>
         </div>
       </header>
-
-      {genreEnrichment.error && <p role="alert" className="mb-4 text-sm text-(--color-danger)">{genreEnrichment.error}</p>}
 
       {view.blocks.length === 0 && !mobileDraft && (
         // Editing is already on in the second case, so telling you to turn
@@ -536,7 +555,7 @@ export function MuralEditorPage() {
           body={editMode ? "Add your first block with the + button above." : "Turn on editing and add your first block."}
           action={
             !editMode && (
-              <button onClick={() => setEditMode(true)} className="rounded-lg bg-(--color-accent) px-4 py-2 font-semibold text-white">
+              <button onClick={() => setEditMode(true)} className="rounded-lg bg-(--color-accent) px-4 py-2 font-semibold text-(--color-on-accent)">
                 Start building
               </button>
             )
@@ -547,6 +566,7 @@ export function MuralEditorPage() {
       {(view.blocks.length > 0 || mobileDraft) && (
         <div
           ref={fullscreenRef}
+          style={fullscreen ? muralThemeStyle(view.theme) : undefined}
           className={fullscreen ? "fixed inset-0 z-50 overflow-y-auto bg-(--color-bg) px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]" : ""}
         >
           {fullscreen && (
@@ -605,6 +625,14 @@ export function MuralEditorPage() {
           onSave={(blockStyle) => void guard(handleSaveBlockStyle(stylingBlock.id, blockStyle), "Couldn't save that style.")}
           onClose={() => setStylingBlockId(null)}
         />
+      )}
+
+      {pickingTheme && (
+        <Sheet title="Mural theme" onClose={() => setPickingTheme(false)}>
+          <div className="p-2">
+            <ThemeOptionGrid options={THEME_IDS} value={view.theme} onChange={(theme) => void guard(handleChooseTheme(theme), "Couldn't save that theme.")} />
+          </div>
+        </Sheet>
       )}
 
       {sharing && mural && (

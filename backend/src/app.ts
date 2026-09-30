@@ -9,29 +9,36 @@
 // imports between modules at all."
 
 import fastifyCors from "@fastify/cors";
+import type { CoverLookupParams } from "@scripta/shared";
 import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
 import { STATUS_CODES } from "node:http";
 import { isAllowedOrigin } from "./config/corsOrigin.js";
+import { env } from "./config/env.js";
 import { devHttps } from "./config/devCerts.js";
 import { runStartupMigrations } from "./migrations/runStartupMigrations.js";
 import {
+  emailEnabled,
   findUserIdByUsername,
   getDashboardSeenAt,
+  getUserTheme,
   registerAuthModule,
   resolvePublicReaderProfile,
   resolvePublicReaderProfiles,
   searchUsernameOwners,
+  sendAccountEmail,
   setDashboardSeenAt,
   userHasUsername
 } from "./modules/auth/index.js";
-import { getArenaPublicApi, registerArenaModule } from "./modules/arena/index.js";
-import { getCommunityPublicApi, registerCommunityModule } from "./modules/community/index.js";
-import { registerCoversModule } from "./modules/covers/index.js";
-import { registerGalleryModule } from "./modules/gallery/index.js";
-import { registerLibraryModule, resolvePublicLibrary, type BookEvent } from "./modules/library/index.js";
-import { getMuralsPublicApi, registerMuralsModule } from "./modules/murals/index.js";
-import { registerSocialsModule } from "./modules/socials/index.js";
-import { registerTierlistsModule, getTierlistsPublicApi } from "./modules/tierlists/index.js";
+import { deleteArenaUserData, getArenaPublicApi, registerArenaModule } from "./modules/arena/index.js";
+import { deleteCommunityUserData, getCommunityPublicApi, registerCommunityModule } from "./modules/community/index.js";
+import { enqueueBookCovers, registerBooksModule } from "./modules/books/index.js";
+import { deleteGalleryUserData, registerGalleryModule } from "./modules/gallery/index.js";
+import { deleteLibraryUserData, registerLibraryModule, resolvePublicLibrary, readerGlyphFor, type BookEvent } from "./modules/library/index.js";
+import { deleteMuralsUserData, getMuralsPublicApi, registerMuralsModule } from "./modules/murals/index.js";
+import { deleteQuizzesUserData, registerQuizzesModule } from "./modules/quizzes/index.js";
+import { deleteSocialsUserData, registerSocialsModule } from "./modules/socials/index.js";
+import { deleteTierlistsUserData, registerTierlistsModule, getTierlistsPublicApi } from "./modules/tierlists/index.js";
+import { registerWaitlistModule } from "./modules/waitlist/index.js";
 
 export function buildApp() {
   // Moves any still-embedded library.murals[] into the new murals table
@@ -52,7 +59,9 @@ export function buildApp() {
   // plain-http one — this app never touches request.raw/reply.raw (the
   // only APIs that would actually differ between an http.Server and an
   // https.Server), so nothing downstream needs the more specific type.
-  const app: FastifyInstance = devHttps ? (Fastify({ logger: true, https: devHttps }) as FastifyInstance) : Fastify({ logger: true });
+  const app: FastifyInstance = devHttps
+    ? (Fastify({ logger: true, https: devHttps, trustProxy: true }) as FastifyInstance)
+    : Fastify({ logger: true, trustProxy: true });
 
   // Genuinely app-wide (unlike each module's own rate limiter) — the
   // frontend is a separate origin from this API in dev (Vite on 5173,
@@ -76,6 +85,7 @@ export function buildApp() {
   });
 
   app.get("/health", async () => ({ status: "ok" }));
+  app.get("/public-config", async () => ({ frontendUrl: env.FRONTEND_URL }));
 
   // Fastify's default 500 serializer forwards the raw error message to
   // the client — SQLite constraint text, file paths, JSON.parse details —
@@ -93,7 +103,12 @@ export function buildApp() {
     return reply.code(statusCode).send({ statusCode, error: STATUS_CODES[statusCode] ?? "Error", message: error.message });
   });
 
-  app.register(registerAuthModule, { authRoot: app });
+  app.register(registerAuthModule, {
+    authRoot: app,
+    deleteUserData: (userId: string) => {
+      for (const erase of [deleteLibraryUserData, deleteGalleryUserData, deleteSocialsUserData, deleteMuralsUserData, deleteArenaUserData, deleteTierlistsUserData, deleteQuizzesUserData, deleteCommunityUserData]) erase(userId);
+    }
+  });
   app.register(registerArenaModule, {
     emitPublished: (tournamentId: string, ownerUserId: string) => getCommunityPublicApi().emitEvent(ownerUserId, "tournament_published", "tournament", tournamentId),
     emitVotedOn: (voterUserId: string, tournamentId: string, name: string | null) => {
@@ -113,12 +128,21 @@ export function buildApp() {
           app.log.error(error, "failed to record book activity event");
         }
       }
+    },
+    enqueueCovers: (lookups: CoverLookupParams[]) => {
+      try {
+        enqueueBookCovers(lookups);
+      } catch (error) {
+        app.log.error(error, "failed to queue covers for imported library");
+      }
     }
   });
   app.register(registerGalleryModule);
-  app.register(registerCoversModule);
+  app.register(registerBooksModule);
   app.register(registerSocialsModule);
+  app.register(registerWaitlistModule, { sendEmail: emailEnabled ? sendAccountEmail : undefined });
   app.register(registerMuralsModule, {
+    resolveOwnerTheme: getUserTheme,
     // Cross-module wiring, same shape as covers' peekCachedCoverUrl
     // consumers: the murals module never imports tierlists' internals —
     // app.ts hands it this one function, and only for the public shared
@@ -129,6 +153,7 @@ export function buildApp() {
     resolveProfile: resolvePublicReaderProfile,
     resolveProfiles: resolvePublicReaderProfiles,
     resolveLibrary: resolvePublicLibrary,
+    readerGlyphFor,
     userHasUsername,
     findUserIdByUsername,
     searchUsernameOwners,
@@ -158,6 +183,7 @@ export function buildApp() {
       }
     }
   });
+  app.register(registerQuizzesModule);
 
   return app;
 }

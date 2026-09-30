@@ -6,7 +6,8 @@
 // which this task doesn't own).
 
 import { useEffect, useRef, useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
+import { Text } from "../../../ui/Text";
 import {
   CARD_GAP_RANGE,
   CARD_MIN_WIDTH_RANGE,
@@ -24,7 +25,7 @@ import { BookCard } from "./BookCard";
 import { PerCardStyleFields } from "./PerCardStyleFields";
 import { ColorSwatchRow, Section, StepperRow } from "./StyleControls";
 
-const SAMPLE_COVER = "https://covers.openlibrary.org/b/id/240727-M.jpg";
+const SAMPLE_COVER = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='300'%3E%3Crect width='200' height='300' fill='%235b7a9d'/%3E%3C/svg%3E";
 
 const PREVIEW_BOOKS: Array<Record<string, unknown>> = [
   { ContentID: "preview-1", Title: "Sample Book One", Attribution: "A. Author", ReadStatus: 1, ___PercentRead: 55, highlights: [], _coverUrl: SAMPLE_COVER },

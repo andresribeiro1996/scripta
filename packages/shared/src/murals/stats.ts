@@ -18,11 +18,16 @@ function isInProgress(book: Record<string, unknown>): boolean {
   return book.ReadStatus === 1;
 }
 
+const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
+
 function finishedInYear(book: Record<string, unknown>, year: number): boolean {
   if (!isFinished(book)) return false;
   const raw = book.DateLastRead;
   if (typeof raw !== "string" || !raw) return false;
-  const parsed = new Date(raw);
+  const dateOnly = DATE_ONLY.exec(raw);
+  const parsed = dateOnly
+    ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
+    : new Date(raw);
   return !Number.isNaN(parsed.getTime()) && parsed.getFullYear() === year;
 }
 
@@ -46,4 +51,23 @@ export function computeStat(metric: StatMetric, books: Array<Record<string, unkn
     case "totalHighlights":
       return books.reduce((sum, b) => sum + highlightCount(b), 0);
   }
+}
+
+const BREAKDOWN_METRICS: StatMetric[] = ["totalBooks", "booksFinished", "booksInProgress"];
+
+export function libraryBreakdown(
+  metrics: StatMetric[],
+  value: (metric: StatMetric) => number
+): { finished: number; reading: number; toRead: number; total: number; others: StatMetric[] } | null {
+  if (!BREAKDOWN_METRICS.every((metric) => metrics.includes(metric))) return null;
+  const total = value("totalBooks");
+  const finished = value("booksFinished");
+  const reading = value("booksInProgress");
+  return {
+    finished,
+    reading,
+    toRead: Math.max(0, total - finished - reading),
+    total,
+    others: metrics.filter((metric) => !BREAKDOWN_METRICS.includes(metric))
+  };
 }

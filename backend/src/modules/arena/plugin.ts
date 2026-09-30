@@ -1,4 +1,4 @@
-// Composition root — mirrors modules/covers/plugin.ts's shape, plus this
+// Composition root — mirrors modules/books/plugin.ts's shape, plus this
 // module's own addition: a background interval that settles duels whose
 // timer has expired and advances the bracket. The FIRST background timer
 // in this codebase (no job queue/cron exists elsewhere) — a plain
@@ -57,4 +57,10 @@ export function getArenaPublicApi(): ArenaPublicApi {
     cachedApi = createArenaPublicApi(service);
   }
   return cachedApi;
+}
+
+let erasingArena: ReturnType<typeof createSqliteArenaRepository> | undefined;
+
+export function deleteArenaUserData(userId: string) {
+  (erasingArena ??= createSqliteArenaRepository(openArenaDb())).deleteUserData(userId);
 }

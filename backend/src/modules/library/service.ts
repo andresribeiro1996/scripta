@@ -3,7 +3,7 @@
 // modules/auth/service.ts.
 
 import { randomUUID } from "node:crypto";
-import { buildManualBook } from "@scripta/shared";
+import { buildManualBook, localDay, seedCoverLookup, setReadStatus, type CoverLookupParams } from "@scripta/shared";
 import type { BookRecommendationInput } from "@scripta/shared/community";
 import { LibraryConflictError, NoLibraryDocumentError } from "./domain/errors.js";
 import type { LibraryRepository } from "./domain/ports.js";
@@ -13,6 +13,8 @@ import { toPublicLibraryData } from "./publicResolver.js";
 export type BookEvent = { type: "book_added" | "book_finished"; refId: string; payload: Record<string, unknown> };
 
 export type EmitBookEvents = (userId: string, events: BookEvent[]) => void;
+
+export type EnqueueCovers = (lookups: CoverLookupParams[]) => void;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -94,7 +96,12 @@ export interface LibraryService {
   getPublicByToken(token: string): { data: unknown } | null;
 }
 
-export function createLibraryService(repo: LibraryRepository, publicUrlFor: (token: string) => string, emitBookEvents?: EmitBookEvents): LibraryService {
+function coverLookupsOf(data: unknown): CoverLookupParams[] {
+  const books = isRecord(data) && Array.isArray(data.books) ? data.books : [];
+  return books.filter(isRecord).flatMap((book) => seedCoverLookup(book) ?? []);
+}
+
+export function createLibraryService(repo: LibraryRepository, publicUrlFor: (token: string) => string, emitBookEvents?: EmitBookEvents, enqueueCovers?: EnqueueCovers): LibraryService {
   return {
     getLibrary(userId) {
       const row = repo.getDocument(userId);
@@ -115,6 +122,7 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
           // successful save (e.g. an unparsable previous document).
         }
       }
+      if (source === "import" && enqueueCovers) enqueueCovers(coverLookupsOf(data));
       return toLibraryDocument(row, publicUrlFor);
     },
 
@@ -146,12 +154,7 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
       if (match) {
         const key = contentId(match);
         if (Number(match.ReadStatus ?? 0) === input.readStatus) return { key, updated: false };
-        const updatedBook = {
-          ...match,
-          ReadStatus: input.readStatus,
-          ___PercentRead: input.readStatus === 2 ? 100 : 0,
-          DateLastRead: input.readStatus === 2 ? new Date().toISOString().slice(0, 10) : null
-        };
+        const updatedBook = setReadStatus(match, input.readStatus, input.day ?? localDay());
         const saved = repo.upsertDocument(userId, JSON.stringify({ ...doc, books: books.map((b) => (b === match ? updatedBook : b)) }), row?.updated_at);
         if (!saved) throw new LibraryConflictError();
         if (input.readStatus === 2 && emitBookEvents) {
@@ -173,7 +176,7 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
           publisher: null,
           readStatus: input.readStatus,
           rating: null,
-          dateRead: input.readStatus === 2 ? new Date().toISOString().slice(0, 10) : null
+          dateRead: input.readStatus === 2 ? (input.day ?? localDay()) : null
         },
         id
       );

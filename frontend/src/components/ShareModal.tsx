@@ -181,7 +181,7 @@ export function ShareModal({
             <button
               onClick={() => void handleShare()}
               disabled={sharing}
-              className="rounded-lg bg-(--color-accent) px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+              className="rounded-lg bg-(--color-accent) px-4 py-2 text-sm font-semibold text-(--color-on-accent) disabled:opacity-60"
             >
               {sharing ? "Creating…" : "Create share link"}
             </button>
@@ -258,7 +258,7 @@ export function ShareModal({
                   <button
                     onClick={() => void handlePost()}
                     disabled={posting || composeText.trim().length === 0}
-                    className="rounded-lg bg-(--color-accent) px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-60"
+                    className="rounded-lg bg-(--color-accent) px-3 py-1.5 text-sm font-semibold text-(--color-on-accent) disabled:opacity-60"
                   >
                     {posting ? "Posting…" : `Post to ${PLATFORM_LABELS[composing]}`}
                   </button>

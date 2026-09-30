@@ -37,7 +37,8 @@
 // as nested Pressables, so tapping one doesn't also open the sheet.
 
 import { Fragment, useRef, useState } from "react";
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Text } from "../../ui/Text";
 import { bracketShape, countdownLabel, needsVote, sharePercent, type BracketSlot, type Duel, type DuelSide } from "@scripta/shared";
 import { Icon, Sheet, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "./BookCover";
@@ -402,7 +403,7 @@ const styles = StyleSheet.create({
   block: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1 },
   labelRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs, paddingBottom: spacing.xs, paddingHorizontal: spacing.xs },
   meta: { fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6 },
-  roundHead: { paddingTop: spacing.md, paddingBottom: spacing.sm, paddingHorizontal: spacing.lg, gap: 2 },
+  roundHead: { paddingTop: spacing.lg, paddingBottom: spacing.sm, paddingHorizontal: spacing.lg, gap: 2 },
   pair: { flexDirection: "row", alignItems: "stretch", gap: spacing.sm },
   brace: { width: 3, borderRadius: 2 },
   braceFill: { position: "absolute", left: 0, width: 3, height: "50%", borderRadius: 2 },

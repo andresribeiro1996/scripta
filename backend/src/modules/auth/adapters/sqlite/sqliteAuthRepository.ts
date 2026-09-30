@@ -53,6 +53,15 @@ export function createSqliteAuthRepository(db: DatabaseSync): AuthRepository {
   }
 
   return {
+    revokeSessions(userId) {
+      transaction(() => {
+        revokeSessions(userId);
+        return true;
+      });
+    },
+    deleteUser(userId) {
+      db.prepare("DELETE FROM users WHERE id = ?").run(userId);
+    },
     saveAccountToken(token) {
       const now = new Date().toISOString();
       db.prepare("DELETE FROM account_tokens WHERE expires_at <= ?").run(now);
@@ -153,6 +162,12 @@ export function createSqliteAuthRepository(db: DatabaseSync): AuthRepository {
 
     setAvatarId(userId, avatarId) {
       setAvatarIdStmt.run(avatarId, userId);
+    },
+
+    setAppearance(userId, fields) {
+      const columns = (["theme", "display_font", "text_font"] as const).filter((column) => fields[column] !== undefined);
+      if (columns.length === 0) return;
+      db.prepare(`UPDATE users SET ${columns.map((column) => `${column} = ?`).join(", ")} WHERE id = ?`).run(...columns.map((column) => fields[column] as string), userId);
     },
 
     findUserIdByAvatarId(avatarId) {

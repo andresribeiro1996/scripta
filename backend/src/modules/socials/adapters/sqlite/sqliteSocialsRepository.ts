@@ -25,6 +25,9 @@ export function createSqliteSocialsRepository(db: DatabaseSync): SocialsReposito
   const deleteStmt = db.prepare(`DELETE FROM social_connections WHERE user_id = ? AND provider = ?`);
 
   return {
+    deleteUserData(userId) {
+      db.prepare("DELETE FROM social_connections WHERE user_id = ?").run(userId);
+    },
     listConnections(userId) {
       return listStmt.all(userId) as unknown as SocialConnectionRow[];
     },

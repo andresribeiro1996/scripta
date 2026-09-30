@@ -2,13 +2,14 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import type { Quiz } from "../quizzes/api.js";
 import type { Tierlist, VotedTierlist } from "../tierlists/api.js";
 import type { TournamentSummary } from "./api.js";
 import { ARENA_TABS, coverRemainder, emptyCopy, filterItems, filterSections, homeSections, ownedItems, previewCovers, tabAtIndex, tabIndex, tierDistribution, tournamentProgress, votedTierlistDetail, type OwnedItem, type SectionedItem } from "./arenaHome.js";
 
-const tierDetail = (items: OwnedItem[]): string | undefined => {
+const itemDetail = (items: OwnedItem[]): string | undefined => {
   const first = items[0];
-  return first?.kind === "tierlist" ? first.detail : undefined;
+  return first?.kind === "tierlist" || first?.kind === "quiz" ? first.detail : undefined;
 };
 
 const tournament = (over: Partial<TournamentSummary> = {}): TournamentSummary => ({
@@ -41,14 +42,26 @@ const tierlist = (over: Partial<Tierlist> = {}): Tierlist => ({
   ...over,
 });
 
+const quiz = (over: Partial<Quiz> = {}): Quiz => ({
+  id: "q1",
+  name: "Cover quiz",
+  data: { sourceLabel: "", questionCount: 10, allowedTypes: [], books: [{ key: "k", title: "T", author: "A", coverUrl: null, quote: null, blurb: null }], questions: null },
+  voteCode: null,
+  playOpen: false,
+  createdAt: "2026-01-01T00:00:00.000Z",
+  updatedAt: "2026-01-01T00:00:00.000Z",
+  ...over,
+});
+
 test("tab index round-trips through the pager's numeric page", () => {
-  assert.deepEqual(ARENA_TABS.map((tab) => tab.value), ["tournaments", "tierlists"]);
+  assert.deepEqual(ARENA_TABS.map((tab) => tab.value), ["tournaments", "tierlists", "quizzes"]);
   for (const tab of ARENA_TABS) assert.equal(tabAtIndex(tabIndex(tab.value)), tab.value);
   assert.equal(tabIndex("tierlists"), 1);
+  assert.equal(tabIndex("quizzes"), 2);
   // A pager can report a page outside the range mid-fling; clamping keeps the
   // indicator on a real tab instead of undefined.
   assert.equal(tabAtIndex(-1), "tournaments");
-  assert.equal(tabAtIndex(9), "tierlists");
+  assert.equal(tabAtIndex(9), "quizzes");
 });
 
 test("owned items summarise each kind for its card", () => {
@@ -56,14 +69,25 @@ test("owned items summarise each kind for its card", () => {
   assert.equal(tourney?.kind, "tournament");
   assert.equal(tourney?.name, "Best of 2025");
 
-  assert.equal(tierDetail(ownedItems("tierlists", [], [tierlist()])), "0 books · 1 tier");
-  assert.equal(tierDetail(ownedItems("tierlists", [], [tierlist({ voteCode: "abc", votingOpen: true })])), "0 books · 1 tier · voting open");
+  assert.equal(itemDetail(ownedItems("tierlists", [], [tierlist()])), "0 books · 1 tier");
+  assert.equal(itemDetail(ownedItems("tierlists", [], [tierlist({ voteCode: "abc", votingOpen: true })])), "0 books · 1 tier · voting open");
 
   const sorted = tierlist({ data: { tiers: [
     { id: "s", label: "S", color: "#c9482f", bookKeys: ["a", "b"] },
     { id: "a", label: "A", color: "#d98a3d", bookKeys: ["c"] },
   ], pool: [] } });
-  assert.equal(tierDetail(ownedItems("tierlists", [], [sorted])), "3 books · 2 tiers");
+  assert.equal(itemDetail(ownedItems("tierlists", [], [sorted])), "3 books · 2 tiers");
+});
+
+test("owned quiz items summarise book count and stage", () => {
+  assert.equal(itemDetail(ownedItems("quizzes", [], [], [quiz()])), "1 book · draft");
+  assert.equal(itemDetail(ownedItems("quizzes", [], [], [quiz({ voteCode: "abc", playOpen: true })])), "1 book · open");
+  assert.equal(itemDetail(ownedItems("quizzes", [], [], [quiz({ voteCode: "abc", playOpen: false })])), "1 book · closed");
+});
+
+test("the quizzes tab has no voted section and its own empty copy", () => {
+  assert.deepEqual(homeSections("quizzes", ownedItems("quizzes", [], [], [quiz()]), [], []).length, 1);
+  assert.equal(emptyCopy("quizzes", false).title, "No quizzes yet");
 });
 
 test("search filters on name, case-insensitively, and ignores surrounding space", () => {

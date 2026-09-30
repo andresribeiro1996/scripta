@@ -4,7 +4,8 @@
 // without needing one at all.
 
 import { useState } from "react";
-import { Alert, Text, View } from "react-native";
+import { Alert, View } from "react-native";
+import { Text } from "../../../ui/Text";
 import { Button, Input } from "../../../ui/components";
 import { spacing, typography, useTheme } from "../../../ui/theme";
 import { ShareActions } from "../../socials";

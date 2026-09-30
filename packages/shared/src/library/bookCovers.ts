@@ -14,7 +14,7 @@
 // which books' `_coverUrl` it's actually responsible for. Auto-resolved
 // covers no longer touch `_coverUrl` at all (see covers.ts's own top
 // comment) — resolution's own persistence is a global cache server-side
-// now (backend/src/modules/covers), so `_coverUrl` unset means exactly
+// now (backend/src/modules/books), so `_coverUrl` unset means exactly
 // one thing today: "no custom cover assigned," nothing ambiguous about
 // whether ordinary auto-resolution happened to write it.
 

@@ -30,6 +30,7 @@ import {
   cardFontFamilyCss,
   effectiveCardStyle,
   extractPerCardStyle,
+  BLOCK_PAD_SCALE,
   CARD_OVERLAY_COMPACT_WIDTH,
   CARD_OVERLAY_TEXT_MIN_WIDTH,
   PHONE_COLUMNS_AT_DEFAULT_SIZE,
@@ -187,6 +188,10 @@ console.log("\n8. BlockStyle — resolveBlockStyle fills in defaults, doesn't ca
   const partial = resolveBlockStyle({ cardRadius: 4 });
   check("a partial override fills in everything else from the default", partial.cardRadius === 4 && partial.cardShadow === DEFAULT_BLOCK_STYLE.cardShadow);
   check("backgroundColor defaults to null (theme surface)", resolveBlockStyle(undefined).backgroundColor === null);
+  check("textAlign defaults to left and innerSpacing to normal (today's rendering)", DEFAULT_BLOCK_STYLE.textAlign === "left" && DEFAULT_BLOCK_STYLE.innerSpacing === "normal");
+  check("a style saved before textAlign/innerSpacing existed resolves to today's rendering", resolveBlockStyle({ cardRadius: 4 }).textAlign === "left" && resolveBlockStyle({ cardRadius: 4 }).innerSpacing === "normal");
+  check("Normal inner spacing pads exactly as before", BLOCK_PAD_SCALE.normal === 1);
+  check("Tight pads less and Roomy more than Normal", BLOCK_PAD_SCALE.tight < 1 && BLOCK_PAD_SCALE.roomy > 1);
   check(
     "PerCardStyle's cover-only fields (cardAspectRatio/overlayIntensity/showTitleAuthor) aren't part of BlockStyle at all",
     !("cardAspectRatio" in resolved) && !("overlayIntensity" in resolved) && !("showTitleAuthor" in resolved)

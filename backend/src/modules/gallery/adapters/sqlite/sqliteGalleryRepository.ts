@@ -18,6 +18,9 @@ export function createSqliteGalleryRepository(db: DatabaseSync): GalleryReposito
   const totalBytesStmt = db.prepare(`SELECT COALESCE(SUM(byte_size), 0) AS total FROM gallery_images WHERE user_id = ?`);
 
   return {
+    deleteUserData(userId) {
+      db.prepare("DELETE FROM gallery_images WHERE user_id = ?").run(userId);
+    },
     listImages(userId) {
       return listStmt.all(userId) as unknown as GalleryImageRow[];
     },

@@ -150,3 +150,34 @@ test("revokeAllRefreshTokensForUser only touches that user's still-active tokens
   assert.ok(repo.findRefreshTokenById(aTokenId)?.revoked_at);
   assert.equal(repo.findRefreshTokenById(bTokenId)?.revoked_at, null);
 });
+
+test("a fresh database has the appearance columns", () => {
+  const cols = columnNames(freshDb(), "users");
+  for (const column of ["theme", "display_font", "text_font"]) assert.ok(cols.includes(column), column);
+});
+
+test("migrating a database without the appearance columns adds them, NULL for existing users, and setAppearance updates only the given ones", () => {
+  const db = new DatabaseSync(":memory:");
+  db.exec(`
+    CREATE TABLE users (
+      id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, username TEXT UNIQUE,
+      password_hash TEXT, google_id TEXT UNIQUE, avatar_id TEXT UNIQUE,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+    );
+  `);
+  db.prepare(`INSERT INTO users (id, email, username, password_hash) VALUES ('u1','a@b.c','andre','x')`).run();
+
+  applyAuthMigrations(db);
+
+  const cols = columnNames(db, "users");
+  for (const column of ["theme", "display_font", "text_font"]) assert.ok(cols.includes(column), column);
+  const repo = createSqliteAuthRepository(db);
+  const row = () => repo.findUserById("u1");
+  assert.deepEqual([row()?.theme, row()?.display_font, row()?.text_font], [null, null, null]);
+  repo.setAppearance("u1", { theme: "midnight" });
+  assert.deepEqual([row()?.theme, row()?.display_font, row()?.text_font], ["midnight", null, null]);
+  repo.setAppearance("u1", { display_font: "vt323", text_font: "atkinson" });
+  assert.deepEqual([row()?.theme, row()?.display_font, row()?.text_font], ["midnight", "vt323", "atkinson"]);
+  repo.setAppearance("u1", {});
+  assert.deepEqual([row()?.theme, row()?.display_font, row()?.text_font], ["midnight", "vt323", "atkinson"]);
+});

@@ -1,8 +1,11 @@
 import { AccountSecuritySection } from "../auth/AccountSecuritySection";
+import { DeleteAccountSection } from "../auth/DeleteAccountSection";
 import { useRef, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
 import { Avatar } from "../components/Avatar";
+import { FontPicker } from "../components/FontPicker";
 import { SocialsSection } from "../components/SocialsSection";
+import { ThemePicker } from "../components/ThemePicker";
 
 export function SettingsPage() {
   const { session, setUsername, uploadAvatar, removeAvatar } = useAuth();
@@ -64,6 +67,15 @@ export function SettingsPage() {
       <h2 className="mb-6 text-lg font-bold">Settings</h2>
 
       <section className="rounded-xl border border-(--color-border) bg-(--color-surface) p-5">
+        <h3 className="mb-4 text-sm font-semibold">Appearance</h3>
+        <ThemePicker />
+        <div className="mt-5 space-y-4">
+          <FontPicker slot="display" />
+          <FontPicker slot="text" />
+        </div>
+      </section>
+
+      <section className="mt-5 rounded-xl border border-(--color-border) bg-(--color-surface) p-5">
         <h3 className="mb-4 text-sm font-semibold">Account</h3>
 
         {session && (
@@ -137,7 +149,7 @@ export function SettingsPage() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="rounded-lg bg-(--color-accent) px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-60"
+                className="rounded-lg bg-(--color-accent) px-3 py-1.5 text-sm font-semibold text-(--color-on-accent) disabled:opacity-60"
               >
                 Save
               </button>
@@ -157,6 +169,7 @@ export function SettingsPage() {
 
       <AccountSecuritySection />
       <SocialsSection />
+      <DeleteAccountSection />
     </div>
   );
 }

@@ -1,8 +1,10 @@
+import { RankingMethodSelector } from "./RankingMethodSelector";
 import { useEffect, useRef, useState } from "react";
 import { aggregate, AGGREGATION_MODES, type AggregationMode, type HistogramCell } from "@scripta/shared";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Text } from "../../ui/Text";
 import { Sheet, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
-import { authorOf, keyOf, TierCover, titleOf, type TierBook } from "./TierBoard";
+import { authorOf, keyOf, TierCover, TierRowScroll, titleOf, type TierBook } from "./TierBoard";
 
 const descriptions: Record<AggregationMode, string> = {
   average: "Balances every vote into a tier.",
@@ -10,7 +12,7 @@ const descriptions: Record<AggregationMode, string> = {
   median: "Uses the middle vote in tier order.",
 };
 
-export function TierlistResults({ histogram, tiers, pool, books, ballotCount, eligibleVoteCount, votingOpen, promoted, ownPlacements = [], active = true }: {
+export function TierlistResults({ histogram, tiers, pool, books, ballotCount, eligibleVoteCount, votingOpen, promoted, ownPlacements = [], active = true, mode = "average", onModeChange }: {
   histogram: HistogramCell[];
   tiers: Array<{ id: string; label: string; color: string }>;
   pool: string[];
@@ -21,10 +23,11 @@ export function TierlistResults({ histogram, tiers, pool, books, ballotCount, el
   promoted?: boolean;
   ownPlacements?: Array<{ bookKey: string; tierId: string }>;
   active?: boolean;
+  mode?: AggregationMode;
+  onModeChange?: (mode: AggregationMode) => void;
 }) {
   const { colors } = useTheme();
   const boardScroll = useRef<ScrollView>(null);
-  const [mode, setMode] = useState<AggregationMode>("average");
   const [selected, setSelected] = useState<string | null>(null);
   const [showMine, setShowMine] = useState(false);
   const [explain, setExplain] = useState(false);
@@ -44,7 +47,7 @@ export function TierlistResults({ histogram, tiers, pool, books, ballotCount, el
   useEffect(() => { if (active) boardScroll.current?.scrollTo({ y: 0, animated: false }); }, [active]);
 
   function renderBooks(rows: typeof results) {
-    return <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.books}>
+    return <TierRowScroll contentContainerStyle={styles.books}>
       {rows.length ? rows.map((result) => {
         const book = byKey.get(result.bookKey);
         const personal = tiers.find((item) => item.id === mine.get(result.bookKey));
@@ -53,7 +56,7 @@ export function TierlistResults({ histogram, tiers, pool, books, ballotCount, el
           {showMine && personal ? <View style={[styles.badge, { backgroundColor: colors.surface }]}><Text style={[typography.caption, { color: colors.text }]}>You: {personal.label}</Text></View> : null}
         </Pressable>;
       }) : <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>–</Text>}
-    </ScrollView>;
+    </TierRowScroll>;
   }
 
   return <View style={styles.root}>
@@ -74,7 +77,7 @@ export function TierlistResults({ histogram, tiers, pool, books, ballotCount, el
       {unrankedBooks.length ? <View style={styles.footer}><Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.textDim }]}>No votes · {unrankedBooks.length}</Text>{renderBooks(unrankedBooks)}</View> : null}
     </ScrollView>
     <View style={[styles.dock, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <View accessibilityRole="radiogroup" accessibilityLabel="Ranking method" style={[styles.methods, { backgroundColor: colors.background }]}>{AGGREGATION_MODES.map((item) => <Pressable key={item.mode} accessibilityRole="radio" accessibilityState={{ checked: mode === item.mode }} onPress={() => setMode(item.mode)} style={[styles.method, mode === item.mode && { backgroundColor: colors.accentSoft }]}><Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.strong, { color: mode === item.mode ? colors.text : colors.textDim }]}>{item.label === "Most-voted" ? "Most voted" : item.label}</Text></Pressable>)}</View>
+      <RankingMethodSelector mode={mode} onChange={(next) => onModeChange?.(next)} />
       <Pressable accessibilityRole="button" accessibilityLabel="About ranking methods" onPress={() => setExplain(true)} style={styles.infoButton}><Text {...dynamicType} style={[typography.body, { color: colors.accent }]}>ⓘ</Text></Pressable>
     </View>
     <Sheet visible={explain} title="Ranking methods" onClose={() => setExplain(false)}><View style={styles.detailBody}>{AGGREGATION_MODES.map((item) => <Text key={item.mode} {...dynamicType} style={[typography.body, { color: colors.text }]}><Text style={styles.strong}>{item.label}: </Text>{descriptions[item.mode]} Ties favour the higher tier.</Text>)}</View></Sheet>
@@ -93,7 +96,7 @@ export function TierlistResults({ histogram, tiers, pool, books, ballotCount, el
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, gap: spacing.sm, paddingTop: spacing.md },
+  root: { flex: 1, gap: spacing.sm, paddingTop: spacing.lg },
   summary: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", gap: spacing.sm },
   metaActions: { flexDirection: "row", justifyContent: "space-between", gap: spacing.sm },
   metaButton: { minHeight: 44, justifyContent: "center" },
@@ -108,8 +111,6 @@ const styles = StyleSheet.create({
   footer: { gap: spacing.xs, paddingTop: spacing.sm },
   badge: { position: "absolute", bottom: 2, alignSelf: "center", paddingHorizontal: 3, borderRadius: radii.sm },
   dock: { flexDirection: "row", alignItems: "center", gap: spacing.xs, padding: spacing.xs, borderWidth: 1, borderRadius: radii.lg },
-  methods: { flex: 1, flexDirection: "row", borderRadius: radii.md, padding: 2 },
-  method: { flex: 1, minWidth: 0, minHeight: 44, alignItems: "center", justifyContent: "center", borderRadius: radii.sm },
   infoButton: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
   detailBody: { gap: spacing.md, paddingBottom: spacing.md },
   detailHead: { flexDirection: "row", gap: spacing.md },

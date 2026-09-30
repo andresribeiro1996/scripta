@@ -20,6 +20,7 @@ import {
   UsernameInUseError
 } from "./domain/errors.js";
 import { RECOVERY_MESSAGE } from "@scripta/shared";
+import { DISPLAY_FONT_PREFERENCES, TEXT_FONT_PREFERENCES, THEME_PREFERENCES } from "@scripta/shared/themes";
 import { AccountActionError, type AccountSecurityService } from "./accountSecurity.js";
 import type { AuthService } from "./service.js";
 import { MAX_AVATAR_UPLOAD_BYTES } from "./service.js";
@@ -60,6 +61,12 @@ const setUsernameSchema = z.object({
 
 const avatarIdParamSchema = z.object({ id: z.string().uuid() });
 
+const setAppearanceSchema = z
+  .object({ theme: z.enum(THEME_PREFERENCES), displayFont: z.enum(DISPLAY_FONT_PREFERENCES), textFont: z.enum(TEXT_FONT_PREFERENCES) })
+  .partial()
+  .strict()
+  .refine((body) => Object.keys(body).length > 0);
+
 function statusForAvatarError(err: AvatarError): number {
   if (err instanceof AvatarTooLargeError) return 413;
   if (err instanceof InvalidAvatarError || err instanceof AvatarDimensionsTooLargeError) return 422;
@@ -97,6 +104,12 @@ export function buildAuthRoutes(service: AuthService, security?: AccountSecurity
         const parsed = z.object({ currentPassword: z.string().min(1), password: signupSchema.shape.password }).safeParse(request.body);
         if (!parsed.success) return reply.code(400).send({ error: "Enter your current password and a new password between 8 and 128 characters." });
         await security.changePassword(request.user.id, parsed.data.currentPassword, parsed.data.password);
+        return reply.code(204).send();
+      });
+      app.post("/auth/delete-account", { preHandler: authGuard, config: { rateLimit: { max: 5, timeWindow: "1 minute" } } }, async (request, reply) => {
+        const parsed = z.object({ password: z.string().max(128).optional(), confirmation: z.string().max(320).optional() }).safeParse(request.body ?? {});
+        if (!parsed.success) return reply.code(400).send({ error: "Confirm with your password, or your username if you sign in with Google." });
+        await security.deleteAccount(request.user.id, parsed.data.password, parsed.data.confirmation);
         return reply.code(204).send();
       });
       app.post("/auth/verification-email", { preHandler: authGuard, config: { rateLimit: { max: 3, timeWindow: "1 minute" } } }, async (request, reply) => {
@@ -216,6 +229,15 @@ export function buildAuthRoutes(service: AuthService, security?: AccountSecurity
         if (err instanceof UsernameInUseError) return reply.code(409).send({ error: err.message, field: "username" });
         throw err;
       }
+    });
+
+    app.get("/auth/appearance", { preHandler: authGuard, config: { rateLimit: { max: 120, timeWindow: "1 minute" } } }, async (request) => service.getAppearance(request.user.id));
+
+    app.put("/auth/appearance", { preHandler: authGuard, config: { rateLimit: { max: 120, timeWindow: "1 minute" } } }, async (request, reply) => {
+      const parsed = setAppearanceSchema.safeParse(request.body);
+      if (!parsed.success) return reply.code(400).send({ error: "Unknown appearance." });
+      service.setAppearance(request.user.id, parsed.data);
+      return reply.code(204).send();
     });
 
     app.post(

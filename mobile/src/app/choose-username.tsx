@@ -1,6 +1,7 @@
 import { authDestination, startAuthNavigation } from "../features/auth/navigation";
 import { useState } from "react";
-import { ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet, View } from "react-native";
+import { Text } from "../ui/Text";
 import { Redirect, useLocalSearchParams } from "expo-router";
 import { useAuth } from "../core/auth";
 import { Button, Input, Screen } from "../ui";

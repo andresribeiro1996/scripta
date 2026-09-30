@@ -1,7 +1,8 @@
 import { pathWithQuery } from "../features/auth/navigation";
 import { usePathname, useGlobalSearchParams } from "expo-router";
 import { useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
+import { Text } from "../ui/Text";
 import {
   Button,
   Dialog,

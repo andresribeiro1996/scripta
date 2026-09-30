@@ -53,7 +53,7 @@ let cachedApi: TierlistsPublicApi | null = null;
  *  a mural's `tierlist` block references server-side. Opens its own lazy
  *  connection to TIERLISTS_DB_PATH rather than reaching for the service
  *  instance tierlistsPlugin closes over — same idiom as
- *  modules/covers/publicCoverLookup.ts: app.ts wires modules together at
+ *  modules/books/publicCoverLookup.ts: app.ts wires modules together at
  *  register() time, BEFORE Fastify has booted any plugin (plugins only
  *  run at ready()/listen() time), so the plugin's own composition result
  *  doesn't exist yet. SQLite in WAL mode supports multiple connections to
@@ -64,4 +64,10 @@ export function getTierlistsPublicApi(): TierlistsPublicApi {
     cachedApi = createTierlistsPublicApi(service);
   }
   return cachedApi;
+}
+
+let erasingTierlists: ReturnType<typeof createSqliteTierlistsRepository> | undefined;
+
+export function deleteTierlistsUserData(userId: string) {
+  (erasingTierlists ??= createSqliteTierlistsRepository(openTierlistsDb())).deleteUserData(userId);
 }

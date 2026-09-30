@@ -1,25 +1,23 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Stack, router } from "expo-router";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
-import { bookKey, ensureBookBlockHeights, profileOnlyMural, type Mural } from "@scripta/shared";
-import { DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
-import { ApiError } from "../../core/api";
-import { useAuth } from "../../core/auth";
-import { Button, Dialog, EmptyState, ErrorState, Icon, IconButton, Menu, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { FlatList, Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
+import { Text } from "../../ui/Text";
+import { ensureBookBlockHeights, profileOnlyMural, readerGlyphLabel, type IdentityKey, type Mural } from "@scripta/shared";
+import { Button, Dialog, EmptyState, ErrorState, Icon, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { MuralCanvas } from "../murals";
 import { useMurals } from "../murals/useMurals";
 import { reconstructBooks, reconstructTierlists } from "../public/adapters";
 import { PublicLibraryGrid } from "../public/PublicLibraryGrid";
 import type { GalleryImage } from "../gallery/api";
 import { ActivityList } from "./ActivityList";
-import { FeedSettingsDialog } from "./FeedSettingsDialog";
-import { fetchProfile, fetchProfileLibrary, followUser, publishProfile, unfollowUser, unpublishProfile, type CommunityProfileView } from "./api";
+import { AuthorAvatar } from "./AuthorAvatar";
+import { fetchProfile, fetchProfileLibrary, followUser, unfollowUser, type CommunityProfileView } from "./api";
 import { contentDetail, contentKindLabel, contentTarget } from "./communityHome";
+import { ReaderGlyph } from "./ReaderGlyph";
 
 export function ProfileScreen({ username }: { username: string }) {
-  const { colors } = useTheme();
-  const { user } = useAuth();
+  const { colors, id: viewerTheme } = useTheme();
   const queryClient = useQueryClient();
   const profile = useQuery({
     queryKey: ["community", "profile", username],
@@ -28,17 +26,11 @@ export function ProfileScreen({ username }: { username: string }) {
     retry: false,
   });
 
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [confirmingUnpublish, setConfirmingUnpublish] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [tab, setTab] = useState<ProfileTab>("mural");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const isUnpublished = profile.error instanceof ApiError && profile.error.status === 404;
   const view = profile.data;
-  const isSelf = view?.profile.user.userId === user?.id;
-  const isOwnHandle = user?.username === username;
 
   const muralData = view?.mural ?? null;
   const books = useMemo(() => (muralData ? reconstructBooks(muralData.library.books, muralData.library.currentlyReading, muralData.library.highlights) : []), [muralData]);
@@ -75,33 +67,6 @@ export function ProfileScreen({ username }: { username: string }) {
   if (profile.isPending) return <Centered><Skeleton height={180} /></Centered>;
 
   if (profile.isError) {
-    if (isOwnHandle && isUnpublished) {
-      return (
-        <Centered>
-          <Stack.Screen options={{ headerShown: true, title: "My profile" }} />
-          <EmptyState title="Your profile isn't published" body="Publish one of your murals to appear in the community." />
-          <Button label="Publish profile" loading={busy} onPress={() => setPickerOpen(true)} />
-          <Button label="Open your library" variant="secondary" onPress={() => router.push("/library" as never)} />
-          {error ? <Toast visible message={error} tone="error" /> : null}
-          <MuralPicker
-            visible={pickerOpen}
-            busy={busy}
-            onClose={() => setPickerOpen(false)}
-            onPick={(muralId) => run(async () => {
-              await publishProfile(muralId);
-              setPickerOpen(false);
-            })}
-          />
-        </Centered>
-      );
-    }
-    if (isOwnHandle) {
-      return (
-        <Centered>
-          <ErrorState title="Profile unavailable" body="Couldn't load your profile." actionLabel="Retry" onAction={() => void profile.refetch()} />
-        </Centered>
-      );
-    }
     return (
       <Centered>
         <Stack.Screen options={{ headerShown: true, title: username }} />
@@ -110,10 +75,23 @@ export function ProfileScreen({ username }: { username: string }) {
     );
   }
 
+  if (view!.private) {
+    return (
+      <Centered>
+        <Stack.Screen options={{ headerShown: true, title: view!.profile.user.username }} />
+        <View style={styles.privateAvatar}>
+          <AuthorAvatar username={view!.profile.user.username} avatarUrl={view!.profile.user.avatarUrl} size={72} />
+        </View>
+        <EmptyState title="This profile is private" />
+      </Centered>
+    );
+  }
+
   const mural: Mural | null = muralData
     ? {
         id: muralData.mural.id,
         name: muralData.mural.name,
+        theme: muralData.mural.theme,
         blocks: ensureBookBlockHeights(muralData.mural.blocks),
         createdAt: "",
         updatedAt: "",
@@ -132,23 +110,8 @@ export function ProfileScreen({ username }: { username: string }) {
         options={{
           headerShown: true,
           title: profileUser.username,
-          headerRight: isSelf
-            ? () => (
-                <View style={styles.headerActions}>
-                  <IconButton framed accessibilityLabel="Your library" label="Library" name="library" onPress={() => router.push("/library" as never)} />
-                  <Menu
-                    title="Your profile"
-                    items={[
-                      { label: "Switch mural…", onPress: () => setPickerOpen(true) },
-                      { label: "Feed settings…", onPress: () => setSettingsOpen(true) },
-                      { label: "Unpublish profile…", destructive: true, onPress: () => setConfirmingUnpublish(true) },
-                    ]}
-                  >
-                    <IconButton framed accessibilityLabel="Profile options" name="more" />
-                  </Menu>
-                </View>
-              )
-            : undefined,
+          headerLargeTitleEnabled: false,
+          headerTitle: () => <ProfileHeaderTitle username={profileUser.username} identity={profileUser.readerGlyph} />,
         }}
       />
       {error ? <Toast visible message={error} tone="error" /> : null}
@@ -162,7 +125,7 @@ export function ProfileScreen({ username }: { username: string }) {
           if (value === "library") {
             if (library.isPending) return <View style={styles.page}><Skeleton height={180} /></View>;
             if (library.isError) return <View style={styles.page}><ErrorState body="Couldn't load this library." actionLabel="Retry" onAction={() => void library.refetch()} /></View>;
-            return <PublicLibraryGrid library={library.data.data} onPressBook={isSelf ? (book) => router.push(`/book/${encodeURIComponent(bookKey(book))}` as never) : undefined} />;
+            return <PublicLibraryGrid library={library.data.data} topInset={spacing.lg} />;
           }
           return (
             <FlatList
@@ -181,34 +144,18 @@ export function ProfileScreen({ username }: { username: string }) {
                       tierlists={tierlists}
                       profile={profileUser}
                       shelfThemeOverride={muralData?.library.shelfTheme}
+                      readerCardOverride={muralData?.library.readerCard}
                       statsOverride={muralData?.library.stats}
                     />
-                  ) : isSelf ? (
-                    <View style={[styles.muralPrompt, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-                      <View style={styles.muralPromptRow}>
-                        <Icon name="murals" size={22} color={colors.accent} />
-                        <View style={styles.grow}>
-                          <Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>
-                            {mural ? "Your mural is empty" : "No profile mural yet"}
-                          </Text>
-                          <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
-                            It's the first thing people see on your profile.
-                          </Text>
-                        </View>
-                      </View>
-                      <Button label={mural ? "Edit mural" : "Create a mural"} onPress={() => router.push((mural ? `/murals/${mural.id}` : "/murals") as never)} />
-                    </View>
                   ) : (
-                    <MuralCanvas mural={profileOnlyMural()} books={[]} images={[]} tierlists={[]} profile={profileUser} />
+                    <MuralCanvas mural={profileOnlyMural(viewerTheme)} books={[]} images={[]} tierlists={[]} profile={profileUser} />
                   )}
-                  {!isSelf ? (
-                    <Button
-                      label={view!.profile.viewerFollows === true ? "Following" : "Follow"}
-                      variant={view!.profile.viewerFollows === true ? "secondary" : "primary"}
-                      loading={busy}
-                      onPress={() => void toggleFollow()}
-                    />
-                  ) : null}
+                  <Button
+                    label={view!.profile.viewerFollows === true ? "Following" : "Follow"}
+                    variant={view!.profile.viewerFollows === true ? "secondary" : "primary"}
+                    loading={busy}
+                    onPress={() => void toggleFollow()}
+                  />
                   <Text {...dynamicType} style={[typography.caption, styles.eyebrow, { color: colors.textDim }]}>
                     Published
                   </Text>
@@ -240,34 +187,6 @@ export function ProfileScreen({ username }: { username: string }) {
           );
         }}
       />
-      <MuralPicker
-        visible={pickerOpen}
-        busy={busy}
-        onClose={() => setPickerOpen(false)}
-        onPick={(muralId) => run(async () => {
-          await publishProfile(muralId);
-          setPickerOpen(false);
-        })}
-      />
-      <FeedSettingsDialog
-        visible={settingsOpen}
-        settings={view!.feedSettings ?? DEFAULT_FEED_SETTINGS}
-        onClose={() => {
-          setSettingsOpen(false);
-          void queryClient.invalidateQueries({ queryKey: ["community", "profile", username] });
-        }}
-      />
-      <Dialog visible={confirmingUnpublish} title="Unpublish your profile?" onClose={() => setConfirmingUnpublish(false)}>
-        <View style={styles.dialogGap}>
-          <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>
-            Your page disappears and people stop finding you in search. You can publish again any time.
-          </Text>
-          <Button label="Unpublish" variant="destructive" loading={busy} onPress={() => run(async () => {
-            await unpublishProfile();
-            setConfirmingUnpublish(false);
-          })} />
-        </View>
-      </Dialog>
     </Screen>
   );
 }
@@ -293,19 +212,46 @@ function publishedRows(view: CommunityProfileView): PublishedRow[] {
   return rows;
 }
 
+function ProfileHeaderTitle({ username, identity }: { username: string; identity?: IdentityKey }) {
+  const { colors } = useTheme();
+  const { width } = useWindowDimensions();
+  const label = readerGlyphLabel(identity);
+  return (
+    <View
+      accessible
+      accessibilityRole="header"
+      accessibilityLabel={label ? `${username}, ${label}` : username}
+      style={[styles.headerTitleRow, { maxWidth: width * 0.6 }]}
+    >
+      <Text numberOfLines={1} {...dynamicType} style={[typography.title, styles.strong, styles.metaName, { color: colors.text }]}>
+        {username}
+      </Text>
+      <ReaderGlyph identity={identity} />
+    </View>
+  );
+}
+
 function Centered({ children }: { children: ReactNode }) {
   const { colors } = useTheme();
   return <View style={[styles.centered, { backgroundColor: colors.background }]}>{children}</View>;
 }
 
-function MuralPicker({
+export function MuralPicker({
   visible,
   busy,
+  title,
+  description,
+  actionLabel,
+  error,
   onClose,
   onPick,
 }: {
   visible: boolean;
   busy: boolean;
+  title: string;
+  description: string;
+  actionLabel: string;
+  error?: string | null;
   onClose: () => void;
   onPick: (muralId: string) => void;
 }) {
@@ -314,11 +260,12 @@ function MuralPicker({
   const [selected, setSelected] = useState<string | null>(null);
   const items = murals.data ?? [];
   return (
-    <Dialog visible={visible} title="Publish profile" onClose={onClose}>
+    <Dialog visible={visible} title={title} onClose={onClose}>
       <View style={styles.dialogGap}>
         <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>
-          Pick the mural that becomes your public page.
+          {description}
         </Text>
+        {error ? <Toast visible message={error} tone="error" /> : null}
         {murals.isPending ? (
           <Skeleton height={120} />
         ) : (
@@ -341,7 +288,7 @@ function MuralPicker({
           />
         )}
         <Button
-          label="Publish"
+          label={actionLabel}
           disabled={!selected}
           loading={busy}
           onPress={() => selected && onPick(selected)}
@@ -354,14 +301,14 @@ function MuralPicker({
 const styles = StyleSheet.create({
   grow: { flex: 1 },
   strong: { fontWeight: "700" },
-  headerActions: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  privateAvatar: { alignItems: "center" },
   centered: { flex: 1, justifyContent: "center", padding: spacing.lg, gap: spacing.md },
+  headerTitleRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
+  metaName: { flexShrink: 1 },
   page: { flex: 1, padding: spacing.lg },
   list: { padding: spacing.lg, gap: spacing.sm, paddingBottom: spacing.huge },
   eyebrow: { textTransform: "uppercase", letterSpacing: 0.8, fontWeight: "600" },
   muralHeader: { gap: spacing.lg, marginBottom: spacing.xs },
-  muralPrompt: { borderWidth: 1, borderRadius: radii.lg, padding: spacing.lg, gap: spacing.md },
-  muralPromptRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   card: { flexDirection: "row", alignItems: "center", gap: spacing.md, borderWidth: 1, borderRadius: radii.lg, paddingVertical: spacing.md, paddingHorizontal: spacing.lg },
   dialogGap: { gap: spacing.md },
   pickerList: { maxHeight: 240, flexGrow: 0 },

@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text } from "../../ui/Text";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { interpolate, ReduceMotion, useAnimatedStyle, useReducedMotion, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
@@ -93,7 +94,7 @@ function VoteHalf({
         <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: colors.success }, winTint]} />
         <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: colors.danger }, loseTint]} />
         <Animated.View pointerEvents="none" style={[styles.badge, styles.badgeTop, { backgroundColor: colors.success }, winBadge]}><Text style={styles.badgeText}>WINS</Text></Animated.View>
-        <Animated.View pointerEvents="none" style={[styles.badge, styles.badgeBottom, { backgroundColor: colors.danger }, loseBadge]}><Text style={styles.badgeText}>LOSES</Text></Animated.View>
+        <Animated.View pointerEvents="none" style={[styles.badge, styles.badgeBottom, { backgroundColor: colors.danger }, loseBadge]}><Text style={[styles.badgeText, { color: colors.onDanger }]}>LOSES</Text></Animated.View>
         <View pointerEvents="none" style={[styles.scrim, { backgroundColor: colors.scrim }]} />
         <View pointerEvents="none" style={styles.textOverlay}>
           <Text numberOfLines={2} {...dynamicType} style={[typography.body, styles.strong, { color: "#ffffff" }]}>{side.title}</Text>

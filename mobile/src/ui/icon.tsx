@@ -28,12 +28,21 @@ const GLYPHS = {
   settings: { ios: "gearshape", android: "settings" },
   add: { ios: "plus", android: "add" },
   confirm: { ios: "checkmark", android: "check" },
+  save: { ios: "square.and.arrow.down", android: "save" },
+  edit: { ios: "pencil", android: "edit" },
   // Vertical on Android: a toolbar or row overflow is drawn that way there,
   // so it's where the thumb already goes. iOS spells the same thing sideways.
   more: { ios: "ellipsis", android: "more_vert" },
   search: { ios: "magnifyingglass", android: "search" },
   filter: { ios: "line.3.horizontal.decrease", android: "filter_list" },
   public: { ios: "globe", android: "public" },
+  lock: { ios: "lock", android: "lock" },
+  image: { ios: "photo", android: "image" },
+  link: { ios: "link", android: "link" },
+  qr: { ios: "qrcode", android: "qr_code_2" },
+  close: { ios: "xmark", android: "close" },
+  back: { ios: "chevron.left", android: "chevron_left" },
+  share: { ios: "square.and.arrow.up", android: "share" },
   delete: { ios: "trash", android: "delete" },
   chevronRight: { ios: "chevron.right", android: "chevron_right" },
   tierlist: { ios: "list.number", android: "format_list_numbered" },
@@ -43,6 +52,10 @@ const GLYPHS = {
   vote: { ios: "checkmark.circle", android: "how_to_vote" },
   book: { ios: "book.closed", android: "book" },
   follow: { ios: "person.badge.plus", android: "person_add" },
+  style: { ios: "paintbrush", android: "brush" },
+  theme: { ios: "circle.lefthalf.filled", android: "contrast" },
+  resize: { ios: "arrow.up.left.and.arrow.down.right", android: "open_in_full" },
+  duplicate: { ios: "plus.square.on.square", android: "content_copy" },
 } as const satisfies Record<string, Glyph>;
 
 /** Only these five have a solid counterpart worth using; the rest read the

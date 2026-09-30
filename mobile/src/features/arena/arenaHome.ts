@@ -1,10 +1,12 @@
 import type { TierDefinition } from "@scripta/shared";
+import type { Quiz } from "../quizzes/api";
 import type { Tierlist, VotedTierlist } from "../tierlists/api";
 import type { TournamentSummary } from "./api";
 
 export const ARENA_TABS = [
   { value: "tournaments", label: "Tournaments" },
   { value: "tierlists", label: "Tier lists" },
+  { value: "quizzes", label: "Quizzes" },
 ] as const;
 
 export type ArenaTab = (typeof ARENA_TABS)[number]["value"];
@@ -14,7 +16,8 @@ export type ArenaTab = (typeof ARENA_TABS)[number]["value"];
 // count and stays one.
 export type OwnedItem =
   | { id: string; name: string; kind: "tournament"; source: TournamentSummary }
-  | { id: string; name: string; detail: string; kind: "tierlist"; source: Tierlist };
+  | { id: string; name: string; detail: string; kind: "tierlist"; source: Tierlist }
+  | { id: string; name: string; detail: string; kind: "quiz"; source: Quiz };
 
 /** One FlatList row: either a plain-text section header, one of the
  *  account's own items, or content from someone else the account voted
@@ -35,7 +38,7 @@ export function tabAtIndex(index: number): ArenaTab {
   return ARENA_TABS[Math.min(ARENA_TABS.length - 1, Math.max(0, index))]!.value;
 }
 
-export function ownedItems(tab: ArenaTab, tournaments: TournamentSummary[], tierlists: Tierlist[]): OwnedItem[] {
+export function ownedItems(tab: ArenaTab, tournaments: TournamentSummary[], tierlists: Tierlist[], quizzes: Quiz[] = []): OwnedItem[] {
   if (tab === "tournaments") {
     return tournaments.map((source) => ({
       id: source.id,
@@ -43,6 +46,18 @@ export function ownedItems(tab: ArenaTab, tournaments: TournamentSummary[], tier
       kind: "tournament",
       source,
     }));
+  }
+  if (tab === "quizzes") {
+    return quizzes.map((source) => {
+      const status = source.voteCode === null ? "draft" : source.playOpen ? "open" : "closed";
+      return {
+        id: source.id,
+        name: source.name,
+        detail: `${source.data.books.length} ${source.data.books.length === 1 ? "book" : "books"} · ${status}`,
+        kind: "quiz",
+        source,
+      };
+    });
   }
   return tierlists.map((source) => {
     const tiers = source.data.tiers.length;
@@ -71,7 +86,7 @@ export function homeSections(
   votedTournaments: TournamentSummary[],
   votedTierlists: VotedTierlist[]
 ): SectionedItem[] {
-  const voted = tab === "tournaments" ? votedTournaments : votedTierlists;
+  const voted = tab === "tournaments" ? votedTournaments : tab === "tierlists" ? votedTierlists : [];
   if (voted.length === 0) return owned.map((item) => ({ kind: "owned", key: item.id, item }));
 
   const sectionTitle = tab === "tournaments" ? "Voting in" : "Voted on";
@@ -117,6 +132,7 @@ export function filterSections(sections: SectionedItem[], search: string): Secti
 
 export function emptyCopy(tab: ArenaTab, searching: boolean): { title: string; body: string } {
   if (searching) return { title: "Nothing matches", body: "Try a different search." };
+  if (tab === "quizzes") return { title: "No quizzes yet", body: "Create one and turn your books into trivia." };
   return tab === "tournaments"
     ? { title: "No tournaments yet", body: "Create one and seed it from your library." }
     : { title: "No tier lists yet", body: "Create one to rank books into tiers." };

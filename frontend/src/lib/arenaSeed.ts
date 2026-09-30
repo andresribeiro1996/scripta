@@ -23,7 +23,7 @@ async function resolveBookCover(book: Record<string, unknown>): Promise<string |
   const params = seedCoverLookup(book);
   if (!params) return null;
   try {
-    return await resolveCover(params);
+    return await resolveCover(params, { poll: false });
   } catch {
     // Same "a lookup failure is just a miss" contract CoverImage itself
     // follows — never block seeding on a flaky/rate-limited cover lookup.

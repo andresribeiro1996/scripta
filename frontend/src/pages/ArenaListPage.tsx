@@ -8,8 +8,10 @@
 import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { contentDetail, contentTarget } from "@scripta/shared/community";
+import type { Quiz } from "../api/quizzes";
 import type { Tierlist } from "../api/tierlists";
 import { TournamentStatusBadge } from "../components/arena/TournamentStatusBadge";
+import { QuizStatusBadge, quizStatus } from "../components/quizzes/QuizStatusBadge";
 import { useConfirm } from "../components/ConfirmDialog";
 import { EmptyState } from "../components/EmptyState";
 import { ArenaIcon } from "../components/NavIcons";
@@ -18,6 +20,7 @@ import { SkeletonCardGrid } from "../components/Skeleton";
 import { PlusIcon, TOOLBAR_CONTROL_CLASS, ToolbarRow } from "../components/Toolbar";
 import { useDelayedShow } from "../hooks/useDelayedShow";
 import { useMyTournaments } from "../hooks/useMyTournaments";
+import { useQuizzes } from "../hooks/useQuizzes";
 import { useTierlists } from "../hooks/useTierlists";
 import { useVotedTierlists } from "../hooks/useVotedTierlists";
 import { useVotedTournaments } from "../hooks/useVotedTournaments";
@@ -27,6 +30,9 @@ export function ArenaListPage() {
   const { tournaments, isLoading } = useMyTournaments();
   const showSkeleton = useDelayedShow(isLoading);
   const { tournaments: votedTournaments } = useVotedTournaments();
+  const { data: quizzesData, isLoading: quizzesLoading, remove: removeQuiz } = useQuizzes();
+  const quizzes = quizzesData ?? [];
+  const showQuizSkeleton = useDelayedShow(quizzesLoading);
   const { data: tierlistsData, isLoading: tierlistsLoading, rename, remove } = useTierlists();
   const showTierlistSkeleton = useDelayedShow(tierlistsLoading);
   const { tierlists: votedTierlists } = useVotedTierlists();
@@ -34,13 +40,13 @@ export function ArenaListPage() {
   const navigate = useNavigate();
   const confirm = useConfirm();
   const [searchParams, setSearchParams] = useSearchParams();
-  const tab = searchParams.get("tab") === "tierlists" ? "tierlists" : "tournaments";
+  const tab = searchParams.get("tab") === "tierlists" ? "tierlists" : searchParams.get("tab") === "quizzes" ? "quizzes" : "tournaments";
   const [createError, setCreateError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [renamingTierlistId, setRenamingTierlistId] = useState<string | null>(null);
   const [tierlistNameDraft, setTierlistNameDraft] = useState("");
 
-  function handleTabSwitch(next: "tournaments" | "tierlists") {
+  function handleTabSwitch(next: "tournaments" | "tierlists" | "quizzes") {
     const params = new URLSearchParams(searchParams);
     if (next === "tournaments") params.delete("tab");
     else params.set("tab", next);
@@ -81,6 +87,11 @@ export function ArenaListPage() {
     await remove(tierlist.id);
   }
 
+  async function handleDeleteQuiz(quiz: Quiz) {
+    if (!(await confirm({ title: `Delete "${quiz.name}"?`, body: "This can't be undone." }))) return;
+    await removeQuiz(quiz.id);
+  }
+
   return (
     <div className="mx-auto max-w-5xl px-5 py-8">
       {/* Desktop-only title, like the other list pages — the bottom tab
@@ -88,12 +99,12 @@ export function ArenaListPage() {
           what a phone actually needs at the top. */}
       <h2 className="mb-6 hidden text-lg font-bold sm:block">Games</h2>
 
-      {/* The two Arena contents, one segmented control — same component
+      {/* The three Arena contents, one segmented control — same component
           shape ArenaViewPage's round control uses, so switching between
           tournaments and tier lists reads as the same gesture as
           switching rounds. */}
-      <div className="mb-4 flex items-stretch overflow-hidden rounded-lg border border-(--color-border) bg-(--color-surface) sm:w-72">
-        {(["tournaments", "tierlists"] as const).map((t, i) => (
+      <div className="mb-4 flex items-stretch overflow-hidden rounded-lg border border-(--color-border) bg-(--color-surface) min-w-72 sm:w-fit">
+        {(["tournaments", "tierlists", "quizzes"] as const).map((t, i) => (
           <button
             key={t}
             onClick={() => handleTabSwitch(t)}
@@ -102,7 +113,7 @@ export function ArenaListPage() {
               i > 0 ? "border-l border-(--color-border)" : ""
             } ${tab === t ? "bg-(--color-accent-soft) text-(--color-accent)" : "text-(--color-text-dim) hover:bg-(--color-surface-hover)"}`}
           >
-            {t === "tournaments" ? "Tournaments" : "Tier lists"}
+            {t === "tournaments" ? "Tournaments" : t === "tierlists" ? "Tier lists" : "Quizzes"}
           </button>
         ))}
       </div>
@@ -268,6 +279,59 @@ export function ArenaListPage() {
               </div>
             </>
           )}
+        </>
+      )}
+
+      {tab === "quizzes" && (
+        <>
+          {showQuizSkeleton && <SkeletonCardGrid count={3} label="Loading quizzes" tileClassName="min-h-[86px]" />}
+
+          {!quizzesLoading && quizzes.length === 0 && (
+            <EmptyState
+              icon={ArenaIcon}
+              title="No quizzes yet."
+              body="A quiz turns your books into trivia — guess the title from a blurred cover, or the book from a famous line."
+            />
+          )}
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <button
+              onClick={() => navigate("/dashboard/arena/quiz/new")}
+              className="flex min-h-14 items-center justify-center gap-2 rounded-xl border-2 border-dashed border-(--color-border) p-4 text-(--color-text-dim) transition-colors hover:border-(--color-accent) hover:text-(--color-accent) disabled:opacity-60"
+            >
+              <PlusIcon />
+              <span className="text-sm font-semibold">New quiz</span>
+            </button>
+
+            {quizzes.map((quiz) => (
+              <div
+                key={quiz.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => navigate(`/dashboard/arena/quiz/${quiz.id}`)}
+                onKeyDown={(e) => {
+                  if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) {
+                    e.preventDefault();
+                    navigate(`/dashboard/arena/quiz/${quiz.id}`);
+                  }
+                }}
+                className="relative cursor-pointer rounded-xl border border-(--color-border) bg-(--color-surface) hover:border-(--color-accent)"
+              >
+                <div className="p-4 pr-12">
+                  <h3 className="font-semibold">{quiz.name}</h3>
+                  <p className="flex flex-wrap items-center gap-1.5 text-sm text-(--color-text-dim)">
+                    {quiz.data.books.length} books
+                    <QuizStatusBadge status={quizStatus(quiz)} />
+                  </p>
+                </div>
+                <OptionsMenu
+                  title="Quiz settings"
+                  triggerClassName="absolute top-3 right-3 flex h-9 w-9 items-center justify-center rounded-lg text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"
+                  items={[{ label: "Delete", onClick: () => void handleDeleteQuiz(quiz), danger: true }]}
+                />
+              </div>
+            ))}
+          </div>
         </>
       )}
     </div>

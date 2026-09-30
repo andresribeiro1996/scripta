@@ -17,7 +17,8 @@
 // phone for actions this frequent.
 
 import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Text } from "../../ui/Text";
 import { bracketShape, countdownLabel, needsVote, type BracketSlot, type Duel, type DuelSide } from "@scripta/shared";
 import { Icon, Sheet, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "./BookCover";
@@ -38,7 +39,7 @@ function MatchSide({ side, isWinner, decided, onPick, busy }: { side: DuelSide; 
         </View>
         {isWinner ? (
           <View style={[styles.checkBadge, { backgroundColor: colors.accent }]}>
-            <Text style={styles.checkMark}>✓</Text>
+            <Text style={[styles.checkMark, { color: colors.onAccent }]}>✓</Text>
           </View>
         ) : null}
       </View>
@@ -120,7 +121,7 @@ function MatchTile({
           hitSlop={6}
           style={[styles.settleButton, { backgroundColor: colors.accent, borderColor: colors.surface, opacity: busy ? 0.5 : 1 }]}
         >
-          <Icon name="confirm" size={11} color="#fff" />
+          <Icon name="confirm" size={11} color={colors.onAccent} />
         </Pressable>
       ) : null}
     </Pressable>
@@ -328,7 +329,7 @@ const styles = StyleSheet.create({
   emptyCover: { opacity: 0.4 },
   loserCover: { opacity: 0.45 },
   checkBadge: { position: "absolute", top: -3, right: -3, width: 14, height: 14, borderRadius: radii.full, alignItems: "center", justifyContent: "center" },
-  checkMark: { color: "#fff", fontSize: 9, fontWeight: "700" },
+  checkMark: { fontSize: 9, fontWeight: "700" },
   voteDot: { position: "absolute", top: -3, right: -3, zIndex: 1, width: 10, height: 10, borderRadius: radii.full, borderWidth: 2 },
   // Bottom-LEFT corner, not centred: the centre is where the round's
   // connector lines land (see hLine/stub, both `left: "50%"`), and an

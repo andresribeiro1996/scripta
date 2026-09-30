@@ -268,7 +268,7 @@ function BlueskyConnectModal({
           <button
             type="submit"
             disabled={submitting}
-            className="rounded-lg bg-(--color-accent) px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-60"
+            className="rounded-lg bg-(--color-accent) px-3 py-1.5 text-sm font-semibold text-(--color-on-accent) disabled:opacity-60"
           >
             {submitting ? "Connecting…" : "Connect"}
           </button>

@@ -13,7 +13,8 @@
 // remount instead of showing the previous target's draft.
 
 import { useState } from "react";
-import { ScrollView, Text } from "react-native";
+import { ScrollView } from "react-native";
+import { Text } from "../../../ui/Text";
 import { extractPerCardStyle, resolvePerCardStyle, type LibraryStyleSettings, type PerCardStyle } from "@scripta/shared";
 import { Sheet } from "../../../ui/components";
 import { spacing, typography, useTheme } from "../../../ui/theme";

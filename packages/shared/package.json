@@ -22,6 +22,10 @@
       "types": "./dist/tierlists/*.d.ts",
       "default": "./dist/tierlists/*.js"
     },
+    "./quizzes/*": {
+      "types": "./dist/quizzes/*.d.ts",
+      "default": "./dist/quizzes/*.js"
+    },
     "./community": {
       "types": "./dist/community/index.d.ts",
       "default": "./dist/community/index.js"
@@ -29,6 +33,14 @@
     "./dashboard": {
       "types": "./dist/dashboard.d.ts",
       "default": "./dist/dashboard.js"
+    },
+    "./readerCards": {
+      "types": "./dist/readerCards/index.d.ts",
+      "default": "./dist/readerCards/index.js"
+    },
+    "./themes": {
+      "types": "./dist/themes/index.d.ts",
+      "default": "./dist/themes/index.js"
     }
   },
   "files": [

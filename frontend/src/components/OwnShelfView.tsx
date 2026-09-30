@@ -1,0 +1,393 @@
+import { useMemo, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ownGlyphPreview, readerIdentity } from "@scripta/shared";
+import type { FeedCategory, FeedSettings } from "@scripta/shared/community";
+import { DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
+import { fetchOwnProfile, publishProfile, setShelfMural, unpublishProfile, updateFeedSettings } from "../api/community";
+import { useAuth } from "../auth/AuthContext";
+import { avatarUrlFor } from "./Avatar";
+import { useConfirm } from "./ConfirmDialog";
+import { EmptyState } from "./EmptyState";
+import { MuralsIcon } from "./NavIcons";
+import { ReaderGlyph } from "./ReaderGlyph";
+import { MuralCanvas } from "./murals/MuralCanvas";
+import { ProfileActivity } from "./ProfileActivity";
+import { Sheet } from "./Sheet";
+import { SkeletonCardGrid } from "./Skeleton";
+import { SwipeTabs } from "./SwipeTabs";
+import { useCommunityActivity } from "../hooks/useCommunity";
+import { useGalleryImages } from "../hooks/useGalleryImages";
+import { useLibrary } from "../hooks/useLibrary";
+import { useMurals } from "../hooks/useMurals";
+import { orderLibraryBooks } from "../lib/libraryOrder";
+import { buildMuralPreset, shelfPresetSummary } from "../lib/muralPresets";
+import type { Mural } from "../lib/murals";
+import { useResolvedTheme } from "../lib/theme";
+
+const OWN_SHELF_TABS = [
+  { value: "mural", label: "Mural" },
+  { value: "activity", label: "Activity" }
+] as const;
+
+type OwnShelfTab = (typeof OWN_SHELF_TABS)[number]["value"];
+
+export function OwnShelfView({ username }: { username: string }) {
+  const { session } = useAuth();
+  const queryClient = useQueryClient();
+  const confirm = useConfirm();
+  const navigate = useNavigate();
+  const own = useQuery({ queryKey: ["community", "own-profile"], queryFn: fetchOwnProfile });
+  const murals = useMurals();
+  const viewerTheme = useResolvedTheme();
+  const libraryQuery = useLibrary();
+  const library = libraryQuery.data;
+  const { images } = useGalleryImages();
+  const activity = useCommunityActivity(username);
+  const [tab, setTab] = useState<OwnShelfTab>("mural");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const books = useMemo(() => library?.data.books ?? [], [library]);
+  const groups = useMemo(() => library?.data.groups ?? [], [library]);
+  const ordered = useMemo(() => orderLibraryBooks(books, groups), [books, groups]);
+  const preview = useMemo(() => buildMuralPreset("shelf", ordered, groups), [ordered, groups]);
+  const previewMural: Mural = { id: "shelf-preview", name: preview.name, theme: viewerTheme, blocks: preview.blocks, createdAt: "", updatedAt: "", shareToken: null, shareUrl: null, folderId: null };
+  const pendingShelf = useRef<string | null>(null);
+  const working = useRef(false);
+
+  async function run(action: () => Promise<void>): Promise<boolean> {
+    setBusy(true);
+    setError(null);
+    try {
+      await action();
+      await queryClient.invalidateQueries({ queryKey: ["community", "own-profile"] });
+      await queryClient.invalidateQueries({ queryKey: ["community", "profile", username] });
+      await queryClient.invalidateQueries({ queryKey: ["community", "activity", username] });
+      return true;
+    } catch {
+      setError("Something went wrong. Try again.");
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handlePublish() {
+    const muralId = own.data?.muralId;
+    if (!muralId) return;
+    const confirmed = await confirm({
+      title: "Publish your shelf?",
+      body: `It becomes a public page at /u/${username}, and people can follow you.`,
+      confirmLabel: "Publish",
+      danger: false
+    });
+    if (!confirmed) return;
+    await run(() => publishProfile(muralId));
+  }
+
+  async function shelfTargetId() {
+    const id = own.data?.muralId ?? pendingShelf.current ?? (await murals.create("My shelf", viewerTheme)).id;
+    pendingShelf.current = id;
+    return id;
+  }
+
+  async function keepShelf() {
+    if (working.current) return;
+    working.current = true;
+    try {
+      await run(async () => {
+        const id = await shelfTargetId();
+        await murals.saveBlocks(id, preview.blocks);
+        if (own.data?.muralId !== id) await setShelfMural(id);
+      });
+    } finally {
+      working.current = false;
+    }
+  }
+
+  async function startBlank() {
+    if (working.current) return;
+    working.current = true;
+    try {
+      let id: string | null = null;
+      const ok = await run(async () => {
+        id = await shelfTargetId();
+        if (own.data?.muralId !== id) await setShelfMural(id);
+      });
+      if (ok && id) navigate(`/dashboard/murals/${id}`);
+    } finally {
+      working.current = false;
+    }
+  }
+
+  if (own.isPending || murals.isLoading) {
+    return (
+      <div className="mx-auto max-w-3xl p-6">
+        <SkeletonCardGrid count={2} label="Loading your shelf" tileClassName="min-h-[120px]" />
+      </div>
+    );
+  }
+
+  if (own.isError || murals.isError) {
+    return (
+      <div className="mx-auto max-w-3xl p-6">
+        <EmptyState
+          title="Shelf unavailable."
+          body="Couldn't load your shelf."
+          action={
+            <button
+              onClick={() => {
+                void own.refetch();
+                void murals.refetch();
+              }}
+              className="rounded-lg border border-(--color-border) px-3 py-1.5 text-sm hover:border-(--color-accent)"
+            >
+              Retry
+            </button>
+          }
+        />
+      </div>
+    );
+  }
+
+  const ownData = own.data;
+  const shelfMural = murals.data?.find((item) => item.id === ownData.muralId) ?? null;
+  const muralHasBlocks = Boolean(shelfMural && shelfMural.blocks.length > 0);
+  const profile = session?.user.username
+    ? { username: session.user.username, avatarUrl: session.user.avatarId ? avatarUrlFor(session.user.avatarId) : null }
+    : undefined;
+
+  return (
+    <div className="mx-auto max-w-4xl px-4 pt-3 pb-10 sm:px-6 sm:pt-6">
+      <header className="flex items-center justify-between gap-4 pb-3">
+        <h1 className="min-w-0 truncate text-xl font-bold tracking-tight sm:text-2xl">{username}</h1>
+        <div className="flex shrink-0 items-center gap-2">
+          <span
+            className={`rounded-full border px-3 py-1.5 text-sm font-semibold ${
+              ownData.published ? "border-(--color-accent) bg-(--color-accent-soft) text-(--color-accent)" : "border-(--color-border) text-(--color-text-dim)"
+            }`}
+          >
+            {ownData.published ? "Published" : "Private"}
+          </span>
+          {!ownData.published && (
+            <button
+              onClick={() => void handlePublish()}
+              disabled={busy || !ownData.muralId}
+              className="rounded-full bg-(--color-accent) px-4 py-1.5 text-sm font-semibold text-(--color-on-accent) disabled:opacity-50"
+            >
+              Publish…
+            </button>
+          )}
+          <OwnerControls
+            busy={busy}
+            published={ownData.published}
+            currentMuralId={ownData.muralId}
+            feedSettings={ownData.feedSettings}
+            onSwitch={(muralId) => void run(() => setShelfMural(muralId))}
+            onUnpublish={() => void run(() => unpublishProfile())}
+            onSaveSettings={(settings) => void run(() => updateFeedSettings(settings))}
+          />
+        </div>
+      </header>
+      {error && <p className="mb-4 text-sm text-(--color-danger)">{error}</p>}
+      <SwipeTabs tabs={OWN_SHELF_TABS} value={tab} onChange={setTab} label="Shelf sections">
+        {(panel) => {
+          if (panel === "activity") return <ProfileActivity activity={activity} />;
+          return (
+            <div className="mb-8">
+              {shelfMural && muralHasBlocks ? (
+                <MuralCanvas mural={shelfMural} editMode={false} groups={groups} books={books} images={images} profile={profile} />
+              ) : libraryQuery.isPending ? (
+                <SkeletonCardGrid count={2} label="Loading your library" tileClassName="min-h-[120px]" />
+              ) : libraryQuery.isError ? (
+                <EmptyState
+                  title="Library unavailable."
+                  body="Couldn't load your library."
+                  action={
+                    <button onClick={() => void libraryQuery.refetch()} className="rounded-lg border border-(--color-border) px-3 py-1.5 text-sm hover:border-(--color-accent)">
+                      Retry
+                    </button>
+                  }
+                />
+              ) : books.length === 0 ? (
+                <EmptyState
+                  icon={MuralsIcon}
+                  title="Start your library"
+                  body="Import your existing collection, or add your first book manually."
+                  action={
+                    <div className="flex flex-wrap justify-center gap-2">
+                      <Link to="/dashboard/library?action=import" className="rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-(--color-on-accent)">
+                        Import library
+                      </Link>
+                      <Link to="/dashboard/library?action=add" className="rounded-lg border border-(--color-border) px-3 py-2 text-sm">
+                        Add a book manually
+                      </Link>
+                    </div>
+                  }
+                />
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-sm text-(--color-text-dim)">{shelfPresetSummary(books, ownData.published)}</p>
+                  <div className="flex flex-wrap gap-2">
+                    <button onClick={() => void keepShelf()} disabled={busy} className="rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-(--color-on-accent) disabled:opacity-50">
+                      Keep this shelf
+                    </button>
+                    <button onClick={() => void startBlank()} disabled={busy} className="rounded-lg border border-(--color-border) px-3 py-2 text-sm disabled:opacity-50">
+                      Start blank
+                    </button>
+                  </div>
+                  <MuralCanvas mural={previewMural} editMode={false} groups={groups} books={books} images={images} profile={profile} />
+                </div>
+              )}
+            </div>
+          );
+        }}
+      </SwipeTabs>
+    </div>
+  );
+}
+
+const FEED_SETTING_ROWS: Array<{ key: FeedCategory; label: string }> = [
+  { key: "publications", label: "Publications" },
+  { key: "reading", label: "Reading activity" },
+  { key: "votes", label: "Votes" },
+  { key: "follows", label: "Follows" }
+];
+
+function OwnerControls({
+  busy,
+  currentMuralId,
+  feedSettings,
+  published,
+  onSwitch,
+  onUnpublish,
+  onSaveSettings
+}: {
+  busy: boolean;
+  currentMuralId: string | null;
+  feedSettings?: FeedSettings;
+  published: boolean;
+  onSwitch: (muralId: string) => void;
+  onUnpublish: () => void;
+  onSaveSettings: (settings: FeedSettings) => void;
+}) {
+  const { data: murals } = useMurals();
+  const { data: library } = useLibrary();
+  const [open, setOpen] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [muralId, setMuralId] = useState<string>(currentMuralId ?? "");
+  const [next, setNext] = useState<FeedSettings>(feedSettings ?? DEFAULT_FEED_SETTINGS);
+  const sectionLabel = "px-3 pt-4 pb-2 text-[11px] font-semibold tracking-wider text-(--color-text-dim) uppercase";
+  const glyphPreview = useMemo(
+    () => ownGlyphPreview(readerIdentity(library?.data.books ?? [], library?.data.groups ?? [])),
+    [library]
+  );
+  return (
+    <>
+      <button
+        onClick={() => {
+          setMuralId(currentMuralId ?? murals?.[0]?.id ?? "");
+          setNext(feedSettings ?? DEFAULT_FEED_SETTINGS);
+          setOpen(true);
+        }}
+        className="shrink-0 rounded-full border border-(--color-border) bg-(--color-surface) px-4 py-1.5 text-sm font-semibold hover:border-(--color-accent)"
+      >
+        Manage profile
+      </button>
+      {open && (
+        <Sheet title="Manage profile" onClose={() => setOpen(false)}>
+          <p className={sectionLabel}>Shelf mural</p>
+          <div className="flex items-center gap-2 px-3">
+            <select
+              value={muralId}
+              onChange={(e) => setMuralId(e.target.value)}
+              aria-label="Shelf mural"
+              className="min-w-0 flex-1 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
+            >
+              {(murals ?? []).map((mural) => (
+                <option key={mural.id} value={mural.id}>
+                  {mural.name}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={() => muralId && muralId !== currentMuralId && onSwitch(muralId)}
+              disabled={busy || !muralId || muralId === currentMuralId}
+              className="rounded-lg border border-(--color-border) px-3 py-2 text-sm font-semibold hover:border-(--color-accent) disabled:opacity-50"
+            >
+              {busy ? "Working…" : "Switch"}
+            </button>
+          </div>
+          <p className={sectionLabel}>Shown in your feed</p>
+          {FEED_SETTING_ROWS.map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setNext((settings) => ({ ...settings, [key]: !settings[key] }))}
+              aria-pressed={next[key]}
+              className={`flex min-h-12 w-full items-center justify-between rounded-lg px-3 text-left text-[15px] hover:bg-(--color-surface-hover) ${
+                next[key] ? "" : "text-(--color-text-dim)"
+              }`}
+            >
+              {label}
+              {next[key] && (
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+              )}
+            </button>
+          ))}
+          <button
+            onClick={() => setNext((settings) => ({ ...settings, readerGlyph: !(settings.readerGlyph ?? false) }))}
+            aria-pressed={next.readerGlyph ?? false}
+            className={`flex min-h-12 w-full items-center justify-between rounded-lg px-3 text-left text-[15px] hover:bg-(--color-surface-hover) ${
+              (next.readerGlyph ?? false) ? "" : "text-(--color-text-dim)"
+            }`}
+          >
+            Show my reader glyph next to my name
+            {(next.readerGlyph ?? false) && (
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+            )}
+          </button>
+          <p className="flex items-center gap-1.5 px-3 text-sm text-(--color-text-dim)">
+            <span aria-hidden="true">
+              <ReaderGlyph identity={glyphPreview.glyph ?? undefined} />
+            </span>
+            {glyphPreview.line}
+          </p>
+          <div className="px-3 pt-2">
+            <button
+              onClick={() => onSaveSettings(next)}
+              disabled={busy}
+              className="w-full rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-(--color-on-accent) disabled:opacity-50"
+            >
+              {busy ? "Saving…" : "Save feed settings"}
+            </button>
+          </div>
+          {published && (
+            <div className="mt-4 border-t border-(--color-border) p-3">
+              {confirming ? (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm text-(--color-text-dim)">Hide your profile from the community?</span>
+                  <span className="flex shrink-0 items-center gap-2">
+                    <button onClick={() => setConfirming(false)} className="px-2 py-1.5 text-sm text-(--color-text-dim) hover:text-(--color-text)">
+                      Cancel
+                    </button>
+                    <button onClick={onUnpublish} disabled={busy} className="rounded-lg bg-(--color-danger) px-3 py-1.5 text-sm font-semibold text-(--color-on-danger) disabled:opacity-50">
+                      Unpublish
+                    </button>
+                  </span>
+                </div>
+              ) : (
+                <button onClick={() => setConfirming(true)} className="text-sm font-semibold text-(--color-danger)">
+                  Unpublish profile
+                </button>
+              )}
+            </div>
+          )}
+        </Sheet>
+      )}
+    </>
+  );
+}

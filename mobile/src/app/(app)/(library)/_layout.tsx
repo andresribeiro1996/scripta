@@ -1,8 +1,8 @@
 import { Stack } from "expo-router";
 import { useScreenOptions, useSheetOptions } from "@/ui/navigation";
 
-// Without this, tapping the Profile tab landed on whichever screen in this
-// group Expo Router picked as its default (add-book) instead of the profile.
+// Without this, tapping the My shelf tab landed on whichever screen in this
+// group Expo Router picked as its default (add-book) instead of the shelf.
 export const unstable_settings = {
   initialRouteName: "me",
 };
@@ -31,6 +31,7 @@ export default function LibraryStackLayout() {
       <Stack.Screen name="collection/[id]" options={{ ...sheet, title: "Collection" }} />
       <Stack.Screen name="book/[key]/style" options={{ ...sheet, title: "Card style" }} />
       <Stack.Screen name="book/[key]/cover" options={{ ...sheet, title: "Cover" }} />
+      <Stack.Screen name="book/[key]/finished" options={{ ...sheet, title: "Finished" }} />
     </Stack>
   );
 }

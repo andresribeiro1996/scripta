@@ -10,14 +10,15 @@
 // target for e.g. the Home mural's "Open collection" button.
 //
 // Rendered both as the Library screen's "Collections" tab and as the
-// standalone /collections route. Both hosts own the native header search
-// bar and a "+" button themselves (see LibraryScreen.tsx and
-// app/(app)/(library)/collections.tsx) — `search` is a controlled prop and
-// `startCreating` is exposed via ref so those headers can drive this list
+// standalone /collections route. Both hosts own the search text and a "New"
+// button in their header (see LibraryScreen.tsx and
+// app/(app)/(library)/collections.tsx) — `search` is a controlled prop
+// and `startCreating` is exposed via ref so those headers can drive this list
 // without it needing its own header.
 
 import { forwardRef, useImperativeHandle, useMemo, useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Text } from "../../../ui/Text";
 import { router } from "expo-router";
 import { makeGroup, orderedGroupBooks, type GroupType } from "@scripta/shared";
 import { EmptyState, Input, Segmented } from "../../../ui/components";
@@ -57,7 +58,7 @@ const GROUP_TYPE_LABEL: Record<GroupType, string> = { series: "Series", collecti
 
 export type GroupsViewHandle = { startCreating: () => void };
 
-export const GroupsView = forwardRef<GroupsViewHandle, { search: string }>(function GroupsView({ search }, ref) {
+export const GroupsView = forwardRef<GroupsViewHandle, { search: string; onSearchChange: (value: string) => void }>(function GroupsView({ search, onSearchChange }, ref) {
   const { data: library, updateLibrary } = useLibrary();
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   // "All" has no single creatable type; a manually-added group there is a
@@ -102,6 +103,7 @@ export const GroupsView = forwardRef<GroupsViewHandle, { search: string }>(funct
 
   return (
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
+      <Input icon="search" accessibilityLabel="Search collections" placeholder="Search collections" value={search} onChangeText={onSearchChange} autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" returnKeyType="search" />
       <Segmented accessibilityLabel="Filter by type" options={TYPE_FILTER_OPTIONS} value={typeFilter} onChange={setTypeFilter} />
 
       {drafting && (

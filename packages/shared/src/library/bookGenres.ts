@@ -31,8 +31,8 @@ export type BookGenre = (typeof BOOK_GENRES)[number];
 
 const RULES: Array<[BookGenre, RegExp]> = [
   ["Science Fiction", /\b(?:science fiction|sci fi|scifi)\b/],
-  ["Historical Fiction", /\bhistorical fiction\b/],
-  ["Literary Fiction", /\bliterary fiction\b/],
+  ["Historical Fiction", /\bhistorical fiction\b|\bfiction historical\b/],
+  ["Literary Fiction", /\bliterary fiction\b|\bfiction literary\b/],
   ["Classics", /\bclassics?\b|\bclassic literature\b/],
   ["Biography & Memoir", /\b(?:biograph\w*|autobiograph\w*|memoirs?)\b/],
   ["Comics & Graphic Novels", /\b(?:comics?|graphic novels?|manga)\b/],
@@ -79,6 +79,35 @@ export function genresForBook(book: Record<string, unknown>): BookGenre[] {
 
 export function needsGenreMetadata(book: Record<string, unknown>): boolean {
   return !Object.prototype.hasOwnProperty.call(book, "_genres");
+}
+
+export function isFinishedBook(book: Record<string, unknown>): boolean {
+  return book.ReadStatus === 2;
+}
+
+export const GENRE_LOOKUP_BATCH = 20;
+export const GENRE_LOOKUP_CONCURRENCY = 4;
+
+export function genreLookupOrder(books: Array<Record<string, unknown>>): Array<Record<string, unknown>> {
+  const candidates = books.filter(needsGenreMetadata);
+  return [...candidates.filter(isFinishedBook), ...candidates.filter((book) => !isFinishedBook(book))];
+}
+
+export async function settleWithConcurrency<T, R>(items: T[], limit: number, run: (item: T) => Promise<R>): Promise<PromiseSettledResult<R>[]> {
+  const results: PromiseSettledResult<R>[] = new Array(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const index = next++;
+      try {
+        results[index] = { status: "fulfilled", value: await run(items[index]!) };
+      } catch (reason) {
+        results[index] = { status: "rejected", reason };
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
 }
 
 export interface ShelfTheme {

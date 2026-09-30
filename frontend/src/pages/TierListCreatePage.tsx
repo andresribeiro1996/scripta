@@ -86,7 +86,7 @@ export function TierListCreatePage() {
       </>}
       <div className="flex justify-end gap-3 pt-2">
         {step > 0 && <button type="button" onClick={() => setStep((value) => value - 1)} className="min-h-11 rounded-lg border border-(--color-border) px-4">Back</button>}
-        {step < 2 ? <button type="button" disabled={step === 0 ? !pool.length || isError : tiers.some((tier) => !tier.label.trim())} onClick={() => setStep((value) => value + 1)} className="min-h-11 rounded-lg bg-(--color-accent) px-4 font-semibold text-white disabled:opacity-50">Next</button> : <button type="button" disabled={busy} onClick={() => void submit()} className="min-h-11 rounded-lg bg-(--color-accent) px-4 font-semibold text-white disabled:opacity-50">{busy ? "Creating…" : "Create tier list"}</button>}
+        {step < 2 ? <button type="button" disabled={step === 0 ? !pool.length || isError : tiers.some((tier) => !tier.label.trim())} onClick={() => setStep((value) => value + 1)} className="min-h-11 rounded-lg bg-(--color-accent) px-4 font-semibold text-(--color-on-accent) disabled:opacity-50">Next</button> : <button type="button" disabled={busy} onClick={() => void submit()} className="min-h-11 rounded-lg bg-(--color-accent) px-4 font-semibold text-(--color-on-accent) disabled:opacity-50">{busy ? "Creating…" : "Create tier list"}</button>}
       </div>
     </div>
   </PageContainer>;

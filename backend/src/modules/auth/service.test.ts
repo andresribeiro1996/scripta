@@ -34,11 +34,23 @@ function createInMemoryRepo(): AuthRepository & { rows: Map<string, UserRow>; re
 
   return {
     saveAccountToken() { throw new Error("Unused in this test"); },
+    revokeSessions() { throw new Error("Unused in this test"); },
+    deleteUser() { throw new Error("Unused in this test"); },
     findAccountToken() { throw new Error("Unused in this test"); },
     completePasswordReset() { throw new Error("Unused in this test"); },
     changePassword() { throw new Error("Unused in this test"); },
     verifyEmail() { throw new Error("Unused in this test"); },
     markEmailVerified() { throw new Error("Unused in this test"); },
+    setAppearance(userId, fields) {
+      const row = rows.get(userId);
+      if (!row) return;
+      rows.set(userId, {
+        ...row,
+        theme: fields.theme ?? row.theme,
+        display_font: fields.display_font ?? row.display_font,
+        text_font: fields.text_font ?? row.text_font,
+      });
+    },
     rows,
     refreshTokens,
     createUser(input) {
@@ -137,6 +149,7 @@ function createInMemoryBlobStore(): AvatarBlobStore & { saved: Map<string, Buffe
     save(userId, avatarId, bytes) {
       saved.set(key(userId, avatarId), bytes);
     },
+    deleteAll() { throw new Error("Unused in this test"); },
     read(userId, avatarId) {
       return saved.get(key(userId, avatarId)) ?? null;
     },
@@ -411,4 +424,26 @@ test("concurrent refreshes of the same token both succeed without revoking unrel
 
   const secondRow = findRowByToken(repo, second.tokens.refreshToken);
   assert.equal(secondRow?.revoked_at, null, "a race between two refreshes of the SAME token must not look like theft to an unrelated session");
+});
+
+test("getAppearance is all null until something is saved, and setAppearance updates only the given fields", () => {
+  const { service, repo } = makeService();
+  const row = repo.createUser({ email: "t@example.test", username: "themer", passwordHash: null, googleId: null });
+  assert.deepEqual(service.getAppearance(row.id), { theme: null, displayFont: null, textFont: null });
+  service.setAppearance(row.id, { theme: "oxblood" });
+  assert.deepEqual(service.getAppearance(row.id), { theme: "oxblood", displayFont: null, textFont: null });
+  service.setAppearance(row.id, { displayFont: "righteous", textFont: "theme" });
+  assert.deepEqual(service.getAppearance(row.id), { theme: "oxblood", displayFont: "righteous", textFont: "theme" });
+});
+
+test("getAppearance reads stored values this server no longer knows as the defaults", () => {
+  const { service, repo } = makeService();
+  const row = repo.createUser({ email: "old@example.test", username: "oldtheme", passwordHash: null, googleId: null });
+  repo.rows.set(row.id, { ...row, theme: "vaporwave", display_font: "comic", text_font: "vt323" });
+  assert.deepEqual(service.getAppearance(row.id), { theme: "system", displayFont: "theme", textFont: "theme" });
+});
+
+test("getAppearance is all null for an unknown user", () => {
+  const { service } = makeService();
+  assert.deepEqual(service.getAppearance("nobody"), { theme: null, displayFont: null, textFont: null });
 });

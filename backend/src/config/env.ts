@@ -4,6 +4,7 @@
 // deep inside a request handler.
 
 import "dotenv/config";
+import { dirname, join } from "node:path";
 import { z } from "zod";
 
 // "15m", "1h", "30d" — a single integer + unit. Kept intentionally
@@ -76,13 +77,6 @@ const envSchema = z.object({
   // every other module's *_DB_PATH above.
   MURALS_DB_PATH: z.string().min(1).default("./data/murals.sqlite"),
 
-  // The auto-resolved cover cache (modules/covers) — a GLOBAL store, one
-  // row per book identifier (isbn/imageId) shared across every account,
-  // unlike gallery's own per-account images. Not optional/key-gated the
-  // way HARDCOVER_API_KEY is below — this caches Kobo CDN/Open Library
-  // hits too, which need no key at all, so it's always on. Defaults
-  // provided (same style as the DB/storage paths above) since there's no
-  // real reason a deployment would need to opt out of this.
   COVERS_DB_PATH: z.string().min(1).default("./data/covers.sqlite"),
   COVERS_STORAGE_PATH: z.string().min(1).default("./data/covers-files"),
   // modules/socials' own SQLite file — same one-file-per-module isolation
@@ -94,7 +88,9 @@ const envSchema = z.object({
   // modules/tierlists' own SQLite file — same one-file-per-module
   // isolation as every other module's *_DB_PATH above.
   TIERLISTS_DB_PATH: z.string().min(1).default("./data/tierlists.sqlite"),
+  QUIZZES_DB_PATH: z.string().min(1).default("./data/quizzes.sqlite"),
   COMMUNITY_DB_PATH: z.string().min(1).default("./data/community.sqlite"),
+  WAITLIST_DB_PATH: z.string().min(1).optional(),
   // This API's own externally-reachable base URL — needed to build
   // absolute image URLs (GET /gallery/:id/file) that resolve correctly
   // from the frontend's own origin, which a relative path wouldn't (see
@@ -133,15 +129,12 @@ const envSchema = z.object({
   GOOGLE_CALLBACK_URL: z.string().optional().default(""),
   OAUTH_SUCCESS_REDIRECT_URL: z.string().optional().default(""),
 
-  // Optional — from https://hardcover.app account settings. See
-  // modules/covers. Left blank, the covers module simply doesn't
-  // register its route (same "optional integration, quietly skipped"
-  // shape Google OAuth above already uses).
-  HARDCOVER_API_KEY: z.string().optional().default(""),
+  ISBNDB_API_KEY: z.string().optional().default(""),
+  ADMIN_USER_ID: z.string().optional().default(""),
 
   // modules/socials — one client id/secret/callback triple per platform,
-  // same "optional, quietly skipped if blank" shape as Google/Hardcover
-  // above. Each platform requires the user to register a real developer
+  // same "optional, quietly skipped if blank" shape as Google above.
+  // Each platform requires the user to register a real developer
   // app on that platform's own site; see backend/.env.example for links.
   X_CLIENT_ID: z.string().optional().default(""),
   X_CLIENT_SECRET: z.string().optional().default(""),
@@ -188,7 +181,9 @@ const envSchema = z.object({
     )
 });
 
-const parsed = envSchema.safeParse(process.env);
+const parsed = envSchema
+  .transform((e) => ({ ...e, WAITLIST_DB_PATH: e.WAITLIST_DB_PATH ?? join(dirname(e.AUTH_DB_PATH), "waitlist.sqlite") }))
+  .safeParse(process.env);
 
 if (!parsed.success) {
   console.error("Invalid environment configuration:");
@@ -205,8 +200,7 @@ export const env = parsed.data;
 export const googleOAuthConfigured =
   env.GOOGLE_CLIENT_ID !== "" && env.GOOGLE_CLIENT_SECRET !== "" && env.GOOGLE_CALLBACK_URL !== "";
 
-// Same idea, one variable instead of three — see modules/covers/plugin.ts.
-export const hardcoverConfigured = env.HARDCOVER_API_KEY !== "";
+export const isbndbConfigured = env.ISBNDB_API_KEY !== "";
 
 // modules/socials — same "all three or none" shape as googleOAuthConfigured
 // above, one per platform. See modules/socials/providerConfig.ts for where

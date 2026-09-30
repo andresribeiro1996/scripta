@@ -5,7 +5,8 @@
       "namespace": "android_app",
       "package_name": "com.atmyshelf.app",
       "sha256_cert_fingerprints": [
-        "82:54:8B:5E:D7:D5:61:59:4E:9F:82:B4:5D:B0:C9:D6:DA:70:07:E1:29:45:AA:A6:C5:4F:A4:2A:19:1D:C6:85"
+        "82:54:8B:5E:D7:D5:61:59:4E:9F:82:B4:5D:B0:C9:D6:DA:70:07:E1:29:45:AA:A6:C5:4F:A4:2A:19:1D:C6:85",
+        "76:0E:84:03:52:B9:D1:88:B6:13:5E:F6:84:CC:A4:A7:4A:3F:42:B4:8A:2B:8D:43:A2:7C:BF:95:67:16:5F:DD"
       ]
     }
   }

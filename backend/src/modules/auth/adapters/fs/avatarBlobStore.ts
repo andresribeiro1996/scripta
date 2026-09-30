@@ -17,6 +17,10 @@ function pathFor(root: string, userId: string, avatarId: string): string {
 
 export function createFsAvatarBlobStore(root: string): AvatarBlobStore {
   return {
+    deleteAll(userId) {
+      if (!/^[A-Za-z0-9-]+$/.test(userId)) throw new Error("Refusing to delete files for an unexpected user id.");
+      rmSync(join(root, userId), { recursive: true, force: true });
+    },
     save(userId, avatarId, bytes) {
       mkdirSync(join(root, userId), { recursive: true });
       writeFileSync(pathFor(root, userId, avatarId), bytes);

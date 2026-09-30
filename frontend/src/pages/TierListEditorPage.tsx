@@ -218,7 +218,7 @@ export function TierListEditorPage() {
               onClick={() => (editing ? exitEditing() : setEditing(true))}
               className={`min-h-9 shrink-0 rounded-lg px-3 text-sm font-semibold ${
                 editing
-                  ? "bg-(--color-accent) text-white"
+                  ? "bg-(--color-accent) text-(--color-on-accent)"
                   : "border border-(--color-border) bg-(--color-surface) hover:bg-(--color-surface-hover)"
               }`}
             >
@@ -257,7 +257,7 @@ export function TierListEditorPage() {
                 <button
                   onClick={() => void handleOpenVoting()}
                   disabled={openingVoting}
-                  className="min-h-9 flex-1 rounded-lg bg-(--color-accent) px-3 text-sm font-semibold text-white disabled:opacity-60"
+                  className="min-h-9 flex-1 rounded-lg bg-(--color-accent) px-3 text-sm font-semibold text-(--color-on-accent) disabled:opacity-60"
                 >
                   {openingVoting ? "Opening…" : "Confirm and open"}
                 </button>

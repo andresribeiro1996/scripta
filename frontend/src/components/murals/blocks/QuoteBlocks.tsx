@@ -1,5 +1,5 @@
 import { resolveQuote, resolveQuoteCollection, type MuralBlock } from "../../../lib/murals";
-import { EmptyBlockState } from "./BookBlocks";
+import { BlockEyebrow, EmptyBlockState } from "./BookBlocks";
 
 /** One featured highlight, shown large — the "top quote from a book"
  *  case. `Annotation` (a Kobo/Goodreads note attached to the highlight,
@@ -18,7 +18,7 @@ export function QuoteBlockView({ block, books }: { block: Extract<MuralBlock, { 
   }
   const { book, highlight } = resolved;
   return (
-    <div className="flex h-full flex-col justify-center gap-3 overflow-y-auto p-4">
+    <div className="flex h-full flex-col justify-center gap-3 overflow-y-auto block-p-4">
       <p className="text-[1.1em] leading-snug italic">"{String(highlight.Text ?? "")}"</p>
       {highlight.Annotation ? <p className="text-[0.85em] text-(--color-text-dim)">{String(highlight.Annotation)}</p> : null}
       <p className="text-[0.85em] font-medium text-(--color-text-dim)">
@@ -39,14 +39,14 @@ export function QuoteCollectionBlockView({
 }) {
   const resolved = resolveQuoteCollection(block, books);
   return (
-    <div className="flex h-full flex-col overflow-hidden p-2.5">
-      <div className="mb-1.5 shrink-0 truncate text-[1.1em] font-semibold">{block.title || "Untitled quotes"}</div>
+    <div className="flex h-full flex-col overflow-hidden block-p-2.5">
+      <BlockEyebrow>{block.title || "Untitled quotes"}</BlockEyebrow>
       {resolved.length === 0 ? (
         <EmptyBlockState message="No quotes picked yet." />
       ) : (
         <div className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto">
           {resolved.map(({ book, highlight }, i) => (
-            <div key={String(highlight.BookmarkID ?? i)} className="border-l-2 border-(--color-accent) pl-2.5">
+            <div key={String(highlight.BookmarkID ?? i)} className="border-l-2 border-[var(--block-accent,var(--color-accent))] pl-2.5">
               <p className="text-[0.9em] leading-snug italic">"{String(highlight.Text ?? "")}"</p>
               <p className="mt-0.5 text-[0.75em] text-(--color-text-dim)">— {String(book.Title ?? "Untitled")}</p>
             </div>

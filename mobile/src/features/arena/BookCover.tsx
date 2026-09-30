@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Image } from "expo-image";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text } from "../../ui/Text";
 import { dynamicType, radii, typography, useTheme } from "../../ui";
 
 type BookCoverProps =

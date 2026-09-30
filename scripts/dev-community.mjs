@@ -79,7 +79,8 @@ const FINISHED_BOOK = { title: "Piranesi", author: "Susanna Clarke", isbn: "9781
  *  the first call, since the finished event's payload is built from the
  *  stored book rather than from its request. */
 async function ensureReadingEvent(user) {
-  await call("PUT", "/community/profile/feed-settings", { publications: true, reading: true, votes: true, follows: true }, user.token);
+  const { feedSettings } = await call("GET", "/community/profile", undefined, user.token);
+  await call("PUT", "/community/profile/feed-settings", { ...feedSettings, publications: true, reading: true, votes: true, follows: true }, user.token);
   const books = (await call("GET", "/library", undefined, user.token)).data?.books ?? [];
   const existing = books.find((book) => book.Title === FINISHED_BOOK.title);
   if (existing?.ReadStatus === 2) return;

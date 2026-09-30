@@ -1,27 +1,11 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Text } from "../../../ui/Text";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
-import { Button, ErrorState, Sheet } from "../../../ui/components";
+import { Button, ErrorState } from "../../../ui/components";
 import { minimumTouchTarget, radii, spacing, typography, useTheme } from "../../../ui/theme";
 import { deleteGalleryImage, fetchGalleryImages, uploadGalleryImage, type GalleryImage } from "../../gallery/api";
-
-type CoverPickerProps = {
-  title: string;
-  currentImageId: string | null;
-  onSelect: (image: GalleryImage) => void;
-  onRemoveCover: () => void;
-  onClose: () => void;
-};
-
-/** Presented as a modal from a screen that has its own chrome (GroupsView). */
-export function CoverPickerSheet({ visible, ...props }: CoverPickerProps & { visible: boolean }) {
-  return (
-    <Sheet visible={visible} title={`Cover for "${props.title}"`} onClose={props.onClose}>
-      <CoverPicker {...props} />
-    </Sheet>
-  );
-}
 
 export function CoverPicker({
   title,

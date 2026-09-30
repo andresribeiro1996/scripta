@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { bookKey, type TierDefinition, type TierlistData } from "@scripta/shared";
-import { Pressable, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
+import { Text } from "../../ui/Text";
 import { Button, Dialog, IconButton, Input, Menu, type MenuItem, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { CoverImage } from "../library/components/CoverImage";
 
@@ -13,13 +14,19 @@ export function keyOf(book: TierBook) {
   return bookKey({ Title: book.title, Attribution: book.author, ISBN: book.isbn, ImageId: book.imageId });
 }
 
-export function TierCover({ book, style }: { book: TierBook; style?: StyleProp<ViewStyle> }) {
+export function TierCover({ book, style, onLoadEnd }: { book: TierBook; style?: StyleProp<ViewStyle>; onLoadEnd?: () => void }) {
   const { colors } = useTheme();
   const [hasCover, setHasCover] = useState(false);
   return <View style={[styles.cover, style]}>
-    <CoverImage book={book} onHasCoverChange={setHasCover} />
+    <CoverImage book={book} onHasCoverChange={setHasCover} onLoadEnd={onLoadEnd} />
     {!hasCover ? <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.fallback, { backgroundColor: colors.accentSoft }]}><Text numberOfLines={3} {...dynamicType} style={[styles.fallbackTitle, { color: colors.accent }]}>{titleOf(book)}</Text><Text numberOfLines={1} {...dynamicType} style={[styles.fallbackAuthor, { color: colors.textDim }]}>{authorOf(book)}</Text></View> : null}
   </View>;
+}
+
+export function TierRowScroll({ style, contentContainerStyle, children }: { style?: StyleProp<ViewStyle>; contentContainerStyle?: StyleProp<ViewStyle>; children: ReactNode }) {
+  const [viewport, setViewport] = useState(0);
+  const [content, setContent] = useState(0);
+  return <ScrollView horizontal showsHorizontalScrollIndicator={false} scrollEnabled={content > viewport + 1} onLayout={(event) => setViewport(event.nativeEvent.layout.width)} onContentSizeChange={(width) => setContent(width)} style={style} contentContainerStyle={contentContainerStyle}>{children}</ScrollView>;
 }
 
 function BookChip({ book, onReassign }: { book: TierBook; onReassign?: () => void }) {
@@ -46,7 +53,7 @@ export function TierBoard({ data, books, onChange, structureEditable, poolLabel 
   function renderBooks(section: string) {
     const keys = keysFor(section).filter((key) => byKey.has(key));
     if (!keys.length) return <Text {...dynamicType} style={[typography.caption, styles.empty, { color: colors.textDim }]}>{section === "pool" ? "Books unavailable" : "–"}</Text>;
-    return <ScrollView horizontal showsHorizontalScrollIndicator={false} style={section === "pool" ? styles.poolBooks : styles.booksScroll} contentContainerStyle={styles.books}>{keys.map((key) => <BookChip key={key} book={byKey.get(key)!} onReassign={onReassign ? () => onReassign(key) : undefined} />)}</ScrollView>;
+    return <TierRowScroll style={section === "pool" ? styles.poolBooks : styles.booksScroll} contentContainerStyle={styles.books}>{keys.map((key) => <BookChip key={key} book={byKey.get(key)!} onReassign={onReassign ? () => onReassign(key) : undefined} />)}</TierRowScroll>;
   }
 
   return (

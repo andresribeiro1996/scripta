@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { ReaderProfile } from "@scripta/shared";
+import type { IdentityKey, ReaderProfile } from "@scripta/shared";
 import type { DiscoverItem } from "@scripta/shared/community";
 import { DEFAULT_FEED_SETTINGS, normalizeFeedSettings } from "@scripta/shared/community";
 import type { PublishedTierlistRef } from "../tierlists/service.js";
@@ -17,6 +17,7 @@ function createRepoFake() {
   const events: EventRow[] = [];
   const key = (a: string, b: string) => `${a}:${b}`;
   const repo: CommunityRepository = {
+    deleteUserData() {},
     insertFollow(row) {
       const k = key(row.follower_id, row.followee_id);
       if (follows.has(k)) return false;
@@ -98,6 +99,8 @@ function createDeps(repo: CommunityRepository) {
   const seenAt = { value: null as string | null };
   const votes = new Set<string>();
   const tournamentVotes = new Set<string>();
+  const readerGlyphs = new Map<string, IdentityKey | null>();
+  const readerGlyphCalls: string[] = [];
   const deps: CommunityDeps = {
     repo,
     getDashboardSeenAt: () => seenAt.value,
@@ -114,6 +117,10 @@ function createDeps(repo: CommunityRepository) {
       return out;
     },
     resolveLibrary: (id) => libraries.get(id) ?? null,
+    readerGlyphFor: (id) => {
+      readerGlyphCalls.push(id);
+      return readerGlyphs.get(id) ?? null;
+    },
     userHasUsername: (id) => usernames.has(id),
     findUserIdByUsername: (name) => [...usernames.entries()].find(([, n]) => n === name)?.[0],
     searchUsernameOwners: (q, limit) =>
@@ -138,7 +145,7 @@ function createDeps(repo: CommunityRepository) {
       listVotedByUser: (voter) => [...tournamentRefs.values()].filter((r) => tournamentVotes.has(`${voter}:${r.id}`)).sort(byNewest)
     }
   };
-  return { deps, readerProfiles, usernames, ownedMurals, muralPayloads, libraries, tierlistRefs, tournamentRefs, seenAt, votes, tournamentVotes };
+  return { deps, readerProfiles, usernames, ownedMurals, muralPayloads, libraries, tierlistRefs, tournamentRefs, seenAt, votes, tournamentVotes, readerGlyphs, readerGlyphCalls };
 }
 
 function profileRow(userId: string, overrides: Partial<ProfileRow> = {}): ProfileRow {
@@ -300,13 +307,74 @@ test("getProfileByUsername assembles identity, mural, and published content", ()
   assert.equal(anonymous.profile.viewerFollows, undefined);
 });
 
-test("getProfileByUsername 404s for unknown and unpublished profiles", () => {
+test("getProfileByUsername's user carries a reader glyph only when published, switched on, and settled", () => {
   const { repo, profiles } = createRepoFake();
-  const { deps } = createDeps(repo);
+  const { deps, readerProfiles, usernames, readerGlyphs, readerGlyphCalls } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  readerProfiles.set("alice", reader("alice"));
+  profiles.set("alice", profileRow("alice"));
+  repo.updateFeedSettings("alice", { ...DEFAULT_FEED_SETTINGS, readerGlyph: true });
+  readerGlyphs.set("alice", "star");
+
+  const view = service.getProfileByUsername("alice");
+  assert.equal(view.profile.user.readerGlyph, "star");
+  assert.deepEqual(readerGlyphCalls, ["alice"]);
+});
+
+test("getProfileByUsername 404s for an unknown username and for the viewer's own unpublished profile", () => {
+  const { repo, profiles } = createRepoFake();
+  const { deps, usernames, readerProfiles } = createDeps(repo);
   const service = createCommunityService(deps);
   assert.throws(() => service.getProfileByUsername("ghost"), ProfileNotFoundError);
+  usernames.set("alice", "alice");
+  readerProfiles.set("alice", reader("alice"));
   profiles.set("alice", profileRow("alice", { published: 0 }));
-  assert.throws(() => service.getProfileByUsername("alice"), ProfileNotFoundError);
+  assert.throws(() => service.getProfileByUsername("alice", "alice"), ProfileNotFoundError);
+});
+
+test("getProfileByUsername shows an unpublished user as private, with nothing published", () => {
+  const { repo, profiles } = createRepoFake();
+  const { deps, usernames, readerProfiles, ownedMurals, muralPayloads, tierlistRefs, tournamentRefs, readerGlyphs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  usernames.set("bob", "bob");
+  readerProfiles.set("alice", reader("alice"));
+  readerProfiles.set("bob", reader("bob"));
+  ownedMurals.add("alice:m1");
+  muralPayloads.set("alice:m1", fakePayload);
+  tierlistRefs.set("t1", tierRef("t1", "alice"));
+  tournamentRefs.set("g1", tournRef("g1", "alice"));
+  readerGlyphs.set("alice", "star");
+  profiles.set("alice", profileRow("alice", { published: 0, mural_id: "m1" }));
+  service.follow("me", "alice");
+  service.follow("bob", "alice");
+  service.follow("alice", "bob");
+
+  const view = service.getProfileByUsername("alice", "me");
+  assert.equal(view.private, true);
+  assert.equal(view.profile.user.username, "user-alice");
+  assert.equal(view.profile.user.readerGlyph, undefined);
+  assert.equal(view.profile.publishedAt, null);
+  assert.equal(view.profile.followerCount, 2);
+  assert.equal(view.profile.followingCount, 1);
+  assert.equal(view.profile.viewerFollows, true);
+  assert.equal(view.mural, null);
+  assert.deepEqual(view.published, { tierlists: [], tournaments: [] });
+
+  assert.equal(service.getProfileByUsername("bob").private, true);
+});
+
+test("getProfileByUsername marks a published profile as not private", () => {
+  const { repo, profiles } = createRepoFake();
+  const { deps, usernames, readerProfiles } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  readerProfiles.set("alice", reader("alice"));
+  profiles.set("alice", profileRow("alice"));
+  const view = service.getProfileByUsername("alice");
+  assert.equal(view.private, false);
+  assert.equal(view.profile.publishedAt, "2026-09-01T00:00:00.000Z");
 });
 
 test("a profile mural deleted later resolves to null without breaking the view", () => {
@@ -341,6 +409,65 @@ test("dashboard merges followees' publications and incoming follows newest first
   assert.equal((page.items[0] as { actor: { userId: string } }).actor.userId, "alice");
   assert.ok(page.items.some((item) => item.kind === "follow" && item.id === "bob"));
   assert.ok(!page.items.some((item) => item.kind === "follow" && item.id === "carol"));
+});
+
+test("dashboard actors carry a reader glyph only when published and switched on, and the lookup runs once per author", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs, readerGlyphs, readerGlyphCalls } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("a", reader("a"));
+  readerProfiles.set("b", reader("b"));
+  readerProfiles.set("c", reader("c"));
+  repo.upsertProfile(profileRow("a"));
+  repo.updateFeedSettings("a", { ...DEFAULT_FEED_SETTINGS, readerGlyph: true });
+  readerGlyphs.set("a", "star");
+  repo.upsertProfile(profileRow("b"));
+  repo.updateFeedSettings("b", { ...DEFAULT_FEED_SETTINGS, readerGlyph: false });
+  repo.upsertProfile(profileRow("c", { published: 0 }));
+  repo.updateFeedSettings("c", { ...DEFAULT_FEED_SETTINGS, readerGlyph: true });
+  readerGlyphs.set("c", "star");
+  repo.insertFollow({ follower_id: "viewer", followee_id: "a", created_at: "2026-09-01T00:00:00.000Z" });
+  repo.insertFollow({ follower_id: "viewer", followee_id: "b", created_at: "2026-09-01T00:00:00.000Z" });
+  repo.insertFollow({ follower_id: "viewer", followee_id: "c", created_at: "2026-09-01T00:00:00.000Z" });
+
+  for (let i = 0; i < 5; i++) {
+    service.emitEvent("a", "tierlist_published", "tierlist", `a${i}`);
+    tierlistRefs.set(`a${i}`, tierRef(`a${i}`, "a"));
+  }
+  service.emitEvent("b", "tierlist_published", "tierlist", "b1");
+  tierlistRefs.set("b1", tierRef("b1", "b"));
+  service.emitEvent("c", "tierlist_published", "tierlist", "c1");
+  tierlistRefs.set("c1", tierRef("c1", "c"));
+
+  const page = service.getDashboard("viewer", undefined, 20);
+  const actorFor = (userId: string) =>
+    (page.items.find((item) => (item as { actor: { userId: string } }).actor.userId === userId) as { actor: { readerGlyph?: string } }).actor;
+  assert.equal(actorFor("a").readerGlyph, "star");
+  assert.equal(actorFor("b").readerGlyph, undefined);
+  assert.equal(actorFor("c").readerGlyph, undefined);
+  assert.equal(readerGlyphCalls.filter((id) => id === "a").length, 1);
+  assert.equal(readerGlyphCalls.includes("b"), false);
+  assert.deepEqual(Object.keys(actorFor("a")).sort(), ["avatarUrl", "readerGlyph", "userId", "username"]);
+});
+
+test("dashboard never looks up glyphs for authors whose rows are dropped by the page limit", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, readerGlyphs, readerGlyphCalls, tierlistRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  const ids = ["a", "b", "c", "d"];
+  ids.forEach((id, i) => {
+    readerProfiles.set(id, reader(id));
+    repo.upsertProfile(profileRow(id));
+    repo.updateFeedSettings(id, { ...DEFAULT_FEED_SETTINGS, readerGlyph: true });
+    readerGlyphs.set(id, "star");
+    repo.insertFollow({ follower_id: "viewer", followee_id: id, created_at: "2026-09-01T00:00:00.000Z" });
+    tierlistRefs.set(`t-${id}`, tierRef(`t-${id}`, id));
+    repo.insertEvent({ id: `e-${id}`, user_id: id, type: "tierlist_published", ref_type: "tierlist", ref_id: `t-${id}`, payload: null, created_at: `2026-09-0${4 - i}T00:00:00.000Z` });
+  });
+
+  const page = service.getDashboard("viewer", undefined, 2);
+  assert.equal(page.items.length, 2);
+  assert.deepEqual(readerGlyphCalls.sort(), ["a", "b"]);
 });
 
 test("follow rows surface only to the followee and retract on unfollow", () => {
@@ -488,25 +615,106 @@ test("discover marks the content the viewer has voted in, and only for a signed-
   assert.deepEqual(voted(service.getDiscover("all", "", 10, 0).items), [false, false, false, false]);
 });
 
-test("people search excludes self and unpublished profiles", () => {
+test("discover authors carry a reader glyph only when published and switched on", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs, readerGlyphs, readerGlyphCalls } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  readerProfiles.set("bob", reader("bob"));
+  repo.upsertProfile(profileRow("alice"));
+  repo.updateFeedSettings("alice", { ...DEFAULT_FEED_SETTINGS, readerGlyph: true });
+  readerGlyphs.set("alice", "star");
+  repo.upsertProfile(profileRow("bob"));
+  repo.updateFeedSettings("bob", { ...DEFAULT_FEED_SETTINGS, readerGlyph: false });
+  tierlistRefs.set("t1", tierRef("t1", "alice", { createdAt: "2026-09-02T00:00:00.000Z" }));
+  tierlistRefs.set("t2", tierRef("t2", "bob", { createdAt: "2026-09-01T00:00:00.000Z" }));
+
+  const items = service.getDiscover("all", "", 10, 0).items;
+  assert.equal(items.find((i) => i.content.id === "t1")?.author.readerGlyph, "star");
+  assert.equal(items.find((i) => i.content.id === "t2")?.author.readerGlyph, undefined);
+  assert.equal(readerGlyphCalls.includes("bob"), false);
+});
+
+test("discover carries no glyph for an unpublished author with the switch on", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs, readerGlyphs, readerGlyphCalls } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("carol", reader("carol"));
+  repo.upsertProfile(profileRow("carol", { published: 0 }));
+  repo.updateFeedSettings("carol", { ...DEFAULT_FEED_SETTINGS, readerGlyph: true });
+  readerGlyphs.set("carol", "star");
+  tierlistRefs.set("t1", tierRef("t1", "carol"));
+
+  const items = service.getDiscover("all", "", 10, 0).items;
+  assert.equal(items.find((i) => i.content.id === "t1")?.author.readerGlyph, undefined);
+  assert.equal(readerGlyphCalls.includes("carol"), false);
+});
+
+test("discover only looks up glyphs for authors on the returned page, not the whole scan window", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs, readerGlyphs, readerGlyphCalls } = createDeps(repo);
+  const service = createCommunityService(deps);
+  const ids = ["a", "b", "c", "d", "e"];
+  ids.forEach((id, i) => {
+    readerProfiles.set(id, reader(id));
+    repo.upsertProfile(profileRow(id));
+    repo.updateFeedSettings(id, { ...DEFAULT_FEED_SETTINGS, readerGlyph: true });
+    readerGlyphs.set(id, "star");
+    tierlistRefs.set(`t-${id}`, tierRef(`t-${id}`, id, { createdAt: `2026-09-0${i + 1}T00:00:00.000Z` }));
+  });
+
+  const page = service.getDiscover("all", "", 2, 0);
+  assert.equal(page.items.length, 2);
+  assert.deepEqual(readerGlyphCalls.sort(), ["d", "e"]);
+});
+
+test("people search finds unpublished users as private and excludes self", () => {
   const { repo, profiles } = createRepoFake();
   const { deps, readerProfiles, usernames } = createDeps(repo);
   const service = createCommunityService(deps);
   usernames.set("alice", "alice");
   usernames.set("alina", "alina");
+  usernames.set("alix", "alix");
   usernames.set("bob", "bobby");
+  usernames.set("me", "alison");
   readerProfiles.set("alice", reader("alice"));
   readerProfiles.set("alina", reader("alina"));
+  readerProfiles.set("alix", reader("alix"));
+  readerProfiles.set("me", reader("me"));
   profiles.set("alice", profileRow("alice"));
   profiles.set("alina", profileRow("alina", { published: 0 }));
 
   const results = service.searchPeople("me", "ali", 10);
-  assert.deepEqual(results.map((r) => r.user.username), ["user-alice"]);
-  assert.deepEqual(results.map((r) => r.viewerFollows), [false]);
+  assert.deepEqual(results.map((r) => r.user.username), ["user-alice", "user-alina", "user-alix"]);
+  assert.deepEqual(results.map((r) => r.private), [false, true, true]);
+  assert.deepEqual(results.map((r) => r.viewerFollows), [false, false, false]);
 
   service.follow("me", "alice");
   const after = service.searchPeople("me", "ali", 10);
-  assert.deepEqual(after.map((r) => r.viewerFollows), [true]);
+  assert.deepEqual(after.map((r) => r.viewerFollows), [true, false, false]);
+
+  assert.equal(service.searchPeople("me", "ali", 2).length, 2);
+});
+
+test("people search results carry a reader glyph only when published and switched on", () => {
+  const { repo, profiles } = createRepoFake();
+  const { deps, readerProfiles, usernames, readerGlyphs, readerGlyphCalls } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  usernames.set("bob", "bob");
+  readerProfiles.set("alice", reader("alice"));
+  readerProfiles.set("bob", reader("bob"));
+  profiles.set("alice", profileRow("alice"));
+  repo.updateFeedSettings("alice", { ...DEFAULT_FEED_SETTINGS, readerGlyph: true });
+  readerGlyphs.set("alice", "star");
+  profiles.set("bob", profileRow("bob"));
+  repo.updateFeedSettings("bob", { ...DEFAULT_FEED_SETTINGS, readerGlyph: false });
+
+  const aliceResults = service.searchPeople("me", "alice", 10);
+  const bobResults = service.searchPeople("me", "bob", 10);
+  assert.equal(aliceResults[0]?.user.readerGlyph, "star");
+  assert.equal(bobResults[0]?.user.readerGlyph, undefined);
+  assert.equal(readerGlyphCalls.includes("bob"), false);
 });
 
 test("publishProfile emits mural_published only when the mural changes", () => {
@@ -524,6 +732,32 @@ test("publishProfile emits mural_published only when the mural changes", () => {
   assert.equal(murals.length, 1);
   assert.equal(murals[0]?.ref_type, "mural");
   assert.equal(murals[0]?.ref_id, "m2");
+});
+
+test("publishing a privately chosen shelf for the first time announces it", () => {
+  const { repo, events } = createRepoFake();
+  const { deps, usernames, ownedMurals } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  ownedMurals.add("alice:m1");
+  service.setShelfMural("alice", "m1");
+  service.publishProfile("alice", "m1");
+  const announcements = events.filter((event) => event.type === "mural_published");
+  assert.equal(announcements.length, 1);
+  assert.equal(announcements[0]?.ref_id, "m1");
+});
+
+test("republishing the same mural after unpublish stays silent", () => {
+  const { repo, events } = createRepoFake();
+  const { deps, usernames, ownedMurals } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  ownedMurals.add("alice:m1");
+  service.publishProfile("alice", "m1");
+  service.unpublishProfile("alice");
+  const before = events.filter((event) => event.type === "mural_published").length;
+  service.publishProfile("alice", "m1");
+  assert.equal(events.filter((event) => event.type === "mural_published").length, before);
 });
 
 test("follow emits following once; refollow emits nothing", () => {
@@ -565,6 +799,7 @@ test("getActivity 404s on unknown username and unpublished profile", () => {
   usernames.set("alice", "alice");
   profiles.set("alice", profileRow("alice", { published: 0 }));
   assert.throws(() => service.getActivity("alice", undefined, undefined, 20), ProfileNotFoundError);
+  assert.throws(() => service.getActivity("alice", "me", undefined, 20), ProfileNotFoundError);
 });
 
 test("an unparseable activity cursor is a 400-worthy error", () => {
@@ -679,6 +914,65 @@ test("getLibrary reads a published owner with no library as null", () => {
   usernames.set("alice", "alice");
   profiles.set("alice", profileRow("alice"));
   assert.deepEqual(service.getLibrary("alice"), { data: null });
+});
+
+test("own profile reports a private shelf without a profiles row", () => {
+  const { repo } = createRepoFake();
+  const { deps } = createDeps(repo);
+  const service = createCommunityService(deps);
+  assert.deepEqual(service.getOwnProfile("alice"), { muralId: null, published: false, feedSettings: DEFAULT_FEED_SETTINGS });
+});
+
+test("choosing the shelf mural keeps the profile private and checks ownership", () => {
+  const { repo } = createRepoFake();
+  const { deps, ownedMurals } = createDeps(repo);
+  const service = createCommunityService(deps);
+  ownedMurals.add("alice:m1");
+  assert.throws(() => service.setShelfMural("alice", "m2"), MuralNotOwnedError);
+  service.setShelfMural("alice", "m1");
+  const row = repo.getProfileRow("alice")!;
+  assert.equal(row.published, 0);
+  assert.equal(row.mural_id, "m1");
+  assert.equal(row.published_at, null);
+  assert.deepEqual(service.getOwnProfile("alice"), { muralId: "m1", published: false, feedSettings: DEFAULT_FEED_SETTINGS });
+});
+
+test("getOwnProfile clears a dangling muralId once the mural is gone", () => {
+  const { repo } = createRepoFake();
+  const { deps, ownedMurals } = createDeps(repo);
+  const service = createCommunityService(deps);
+  ownedMurals.add("alice:m1");
+  service.setShelfMural("alice", "m1");
+  ownedMurals.delete("alice:m1");
+  assert.deepEqual(service.getOwnProfile("alice"), { muralId: null, published: false, feedSettings: DEFAULT_FEED_SETTINGS });
+});
+
+test("switching a published shelf announces the new mural once", () => {
+  const { repo, events } = createRepoFake();
+  const { deps, usernames, ownedMurals } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  ownedMurals.add("alice:m1");
+  ownedMurals.add("alice:m2");
+  service.publishProfile("alice", "m1");
+  const announcements = () => events.filter((event) => event.type === "mural_published").length;
+  const before = announcements();
+  service.setShelfMural("alice", "m2");
+  service.setShelfMural("alice", "m2");
+  assert.equal(announcements(), before + 1);
+  assert.equal(repo.getProfileRow("alice")!.published, 1);
+});
+
+test("owners read their own activity before publishing; visitors still get 404", () => {
+  const { repo } = createRepoFake();
+  const { deps, usernames, ownedMurals } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  ownedMurals.add("alice:m1");
+  service.setShelfMural("alice", "m1");
+  assert.doesNotThrow(() => service.getActivity("alice", "alice", undefined, 20));
+  assert.throws(() => service.getActivity("alice", "bob", undefined, 20), ProfileNotFoundError);
+  assert.throws(() => service.getActivity("alice", undefined, undefined, 20), ProfileNotFoundError);
 });
 
 test("getActivity links votes to what was voted on, and leaves vanished ones plain", () => {

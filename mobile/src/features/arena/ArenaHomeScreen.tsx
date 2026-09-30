@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import { Stack, router } from "expo-router";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, View } from "react-native";
+import { Text } from "../../ui/Text";
 import { Image } from "expo-image";
 import { Button, Dialog, EmptyState, ErrorState, Fab, Icon, IconButton, Input, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { deleteQuiz, fetchQuizzes, type Quiz } from "../quizzes/api";
 import { deleteTierlist, fetchTierlists, fetchVotedTierlists, type Tierlist, type VotedTierlist } from "../tierlists/api";
 import { deleteTournament, fetchMyTournaments, fetchVotedTournaments, type TournamentSummary } from "./api";
 import {
@@ -22,7 +24,9 @@ import {
   type SectionedItem,
 } from "./arenaHome";
 
-type Doomed = { kind: "tournament" | "tierlist"; id: string; name: string };
+type Doomed = { kind: "tournament" | "tierlist" | "quiz"; id: string; name: string };
+
+const noVoted = { data: [], isRefetching: false, isError: false, refetch: () => {} };
 
 export function ArenaHomeScreen() {
   const { colors } = useTheme();
@@ -33,6 +37,7 @@ export function ArenaHomeScreen() {
   const [error, setError] = useState<string | null>(null);
   const tournaments = useQuery({ queryKey: ["arena", "mine"], queryFn: fetchMyTournaments, retry: false });
   const tierlists = useQuery({ queryKey: ["tierlists"], queryFn: fetchTierlists, retry: false });
+  const quizzes = useQuery({ queryKey: ["quizzes"], queryFn: fetchQuizzes, retry: false });
   const votedTournaments = useQuery({ queryKey: ["arena", "voted"], queryFn: fetchVotedTournaments, retry: false });
   const votedTierlists = useQuery({ queryKey: ["tierlists", "voted"], queryFn: fetchVotedTierlists, retry: false });
 
@@ -44,6 +49,9 @@ export function ArenaHomeScreen() {
       if (deleting.kind === "tournament") {
         await deleteTournament(deleting.id);
         await queryClient.invalidateQueries({ queryKey: ["arena", "mine"] });
+      } else if (deleting.kind === "quiz") {
+        await deleteQuiz(deleting.id);
+        queryClient.setQueryData<Quiz[]>(["quizzes"], (items = []) => items.filter((item) => item.id !== deleting.id));
       } else {
         await deleteTierlist(deleting.id);
         queryClient.setQueryData<Tierlist[]>(["tierlists"], (items = []) => items.filter((item) => item.id !== deleting.id));
@@ -59,6 +67,7 @@ export function ArenaHomeScreen() {
   // A tournament still being seeded reopens its seeding screen; anything else
   // opens the bracket. Both are pushes, so the back gesture unwinds them.
   function open(item: OwnedItem) {
+    if (item.kind === "quiz") return router.push(`/quiz/${item.id}` as never);
     if (item.kind === "tierlist") return router.push(`/tierlist/${item.id}` as never);
     return router.push((item.source.status === "seeding" ? `/seed/${item.id}` : `/arena/${item.id}`) as never);
   }
@@ -81,11 +90,11 @@ export function ArenaHomeScreen() {
       value={tab}
       onChange={setTab}
       renderPage={(pageTab) => {
-        const owned = ownedItems(pageTab, tournaments.data ?? [], tierlists.data ?? []);
-        const voted = pageTab === "tournaments" ? votedTournaments : votedTierlists;
+        const owned = ownedItems(pageTab, tournaments.data ?? [], tierlists.data ?? [], quizzes.data ?? []);
+        const voted = pageTab === "tournaments" ? votedTournaments : pageTab === "tierlists" ? votedTierlists : noVoted;
         return <ArenaList
           tab={pageTab}
-          query={pageTab === "tournaments" ? tournaments : tierlists}
+          query={pageTab === "tournaments" ? tournaments : pageTab === "tierlists" ? tierlists : quizzes}
           votedQuery={voted}
           sections={homeSections(pageTab, owned, votedTournaments.data ?? [], votedTierlists.data ?? [])}
           rowCount={owned.length + (voted.data?.length ?? 0)}
@@ -96,9 +105,9 @@ export function ArenaHomeScreen() {
     />
     <Fab
       label="New"
-      accessibilityLabel={tab === "tournaments" ? "New tournament" : "New tier list"}
+      accessibilityLabel={tab === "tournaments" ? "New tournament" : tab === "quizzes" ? "New quiz" : "New tier list"}
       loading={busy && !deleting}
-      onPress={() => tab === "tournaments" ? router.push("/seed/new" as never) : router.push("/tierlist/new" as never)}
+      onPress={() => tab === "tournaments" ? router.push("/seed/new" as never) : tab === "quizzes" ? router.push("/quiz/new" as never) : router.push("/tierlist/new" as never)}
     />
     <Dialog visible={deleting !== null} title={`Delete “${deleting?.name ?? ""}”?`} onClose={() => setDeleting(null)}><View style={styles.dialog}><Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>This cannot be undone.</Text><Button label="Delete" variant="destructive" loading={busy} onPress={() => void remove()} /></View></Dialog>
   </Screen>;
@@ -118,7 +127,7 @@ function ArenaList({
 }: {
   tab: ArenaTab;
   query: UseQueryResult<unknown>;
-  votedQuery: UseQueryResult<unknown>;
+  votedQuery: { isRefetching: boolean; isError: boolean; refetch: () => void };
   sections: SectionedItem[];
   rowCount: number;
   onOpen: (item: OwnedItem) => void;
@@ -145,7 +154,7 @@ function ArenaList({
     // In the list header rather than pinned above it: searching is something
     // you reach for, and as fixed chrome it appearing with the first item
     // shoved the whole screen down.
-    ListHeaderComponent={rowCount ? <Input icon="search" accessibilityLabel={`Search ${tab === "tournaments" ? "tournaments" : "tier lists"}`} value={search} onChangeText={setSearch} placeholder={`Search ${tab === "tournaments" ? "tournaments" : "tier lists"}`} autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" returnKeyType="search" /> : null}
+    ListHeaderComponent={rowCount ? <Input icon="search" accessibilityLabel={`Search ${tab === "tournaments" ? "tournaments" : tab === "tierlists" ? "tier lists" : "quizzes"}`} value={search} onChangeText={setSearch} placeholder={`Search ${tab === "tournaments" ? "tournaments" : tab === "tierlists" ? "tier lists" : "quizzes"}`} autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" returnKeyType="search" /> : null}
     ListEmptyComponent={<EmptyState title={empty.title} body={empty.body} />}
     ListFooterComponent={votedQuery.isError ? <ErrorState body="Couldn't load the games you voted in." actionLabel="Retry" onAction={() => void votedQuery.refetch()} /> : null}
     renderItem={({ item }) => {
@@ -155,7 +164,7 @@ function ArenaList({
       if (item.kind === "owned") {
         return <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Pressable accessibilityRole="button" accessibilityLabel={`Open ${item.item.name}`} onPress={() => onOpen(item.item)} style={styles.grow}>
-            {item.item.kind === "tournament" ? <TournamentBody tournament={item.item.source} /> : <TierlistBody item={item.item} />}
+            {item.item.kind === "tournament" ? <TournamentBody tournament={item.item.source} /> : item.item.kind === "quiz" ? <QuizBody item={item.item} /> : <TierlistBody item={item.item} />}
           </Pressable>
           <IconButton
             accessibilityLabel={`Delete ${item.item.name}`}
@@ -204,7 +213,7 @@ function TournamentBody({ tournament }: { tournament: TournamentSummary }) {
         <Icon filled name="arena" size={24} color={colors.success} />
       </View>
     ) : tournament.covers.length === 0 ? <View style={[styles.tile, { backgroundColor: colors.accentSoft }]}>
-      <Text {...dynamicType} style={[styles.tileCount, { color: colors.accent }]}>{tournament.bracketSize}</Text>
+      <Text {...dynamicType} display={false} style={[styles.tileCount, { color: colors.accent }]}>{tournament.bracketSize}</Text>
       <Text {...dynamicType} style={[styles.tileLabel, { color: colors.accent }]}>BOOKS</Text>
     </View> : null}
     <View style={styles.grow}>
@@ -225,6 +234,14 @@ function TournamentBody({ tournament }: { tournament: TournamentSummary }) {
         {progress.label ? <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.grow, { color: colors.textDim }]}>{progress.label}</Text> : null}
       </View>
     </View>
+  </View>;
+}
+
+function QuizBody({ item }: { item: Extract<OwnedItem, { kind: "quiz" }> }) {
+  const { colors } = useTheme();
+  return <View style={styles.grow}>
+    <Text numberOfLines={1} {...dynamicType} style={[typography.title, styles.strong, { color: colors.text }]}>{item.name}</Text>
+    <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{item.detail}</Text>
   </View>;
 }
 

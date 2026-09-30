@@ -16,6 +16,7 @@ const BLOCK_CHOICES: Array<{ type: BlockType; description: string }> = [
   { type: "image", description: "A photo from your gallery" },
   { type: "text", description: "A heading or freeform note" },
   { type: "profile", description: "Your avatar, biography, favourite genres, and shelf theme" },
+  { type: "readerCard", description: "Your reading identity, drawn as a bookplate" },
   { type: "currentlyReading", description: "Auto-updates from your reading status" },
   { type: "stats", description: "Auto-computed numbers, e.g. books finished this year" },
   { type: "empty", description: "A plain styled block — no content, just background/border/etc." },
@@ -59,7 +60,7 @@ export function AddBlockMenu({ onAdd }: { onAdd: (type: BlockType) => void }) {
       <div className="relative hidden sm:block">
         <button
           onClick={() => setOpen((o) => !o)}
-          className="rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-white"
+          className="rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-(--color-on-accent)"
         >
           + Add block
         </button>

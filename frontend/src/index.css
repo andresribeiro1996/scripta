@@ -1,4 +1,17 @@
 @import "tailwindcss";
+@import "./themes.css";
+
+@utility block-p-* {
+  padding: calc(var(--spacing) * --value(number) * var(--block-pad, 1));
+}
+
+@utility block-px-* {
+  padding-inline: calc(var(--spacing) * --value(number) * var(--block-pad, 1));
+}
+
+@utility block-py-* {
+  padding-block: calc(var(--spacing) * --value(number) * var(--block-pad, 1));
+}
 
 /* Self-hosted (not linked live from fonts.googleapis.com) — same
    offline-friendly, self-hosted-app reasoning as everywhere else in this
@@ -8,12 +21,7 @@
    with no network at all once the app itself is loaded. Only the Latin
    subset of each (unicode-range below matches what Google's own CSS API
    serves as the "latin" block) — this app has no i18n, no reason to ship
-   Cyrillic/Greek/Vietnamese glyph data nobody will ever render. Regular
-   weight only, for the same file-count-vs-benefit reason PerCardStyle's/
-   BlockStyle's new `bold` toggle uses the browser's synthesized bold
-   (`font-synthesis`, on by default) instead of a second downloaded file
-   per family — three real, distinctive typefaces beats twelve files for
-   marginally crisper bold/italic on a personal app. */
+   Cyrillic/Greek/Vietnamese glyph data nobody will ever render. */
 @font-face {
   font-family: "Playfair Display";
   src: url("/fonts/playfair-display-regular.woff2") format("woff2");
@@ -30,65 +38,12 @@
   font-display: swap;
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+2000-206F, U+2122;
 }
-@font-face {
-  font-family: "JetBrains Mono";
-  src: url("/fonts/jetbrains-mono-regular.woff2") format("woff2");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+2000-206F, U+2122;
-}
-
-@theme {
-  --color-bg: #f2f0ec;
-  --color-surface: #ffffff;
-  --color-surface-hover: #f7f5f1;
-  --color-text: #201e1c;
-  --color-text-dim: #6b6560;
-  --color-border: #ddd8d0;
-  --color-accent: #a85c32;
-  --color-accent-soft: #f1e2d8;
-  --color-danger: #b3432f;
-  --color-danger-soft: #f6dfda;
-  /* "Finished, and it went fine" — the only genuinely positive state in
-     the app, added for tournament status where seeding/active/completed
-     otherwise had to share one colour. Desaturated and warm-leaning so
-     it sits with the ink-and-paper palette rather than reading as a
-     system-green alert. */
-  --color-success: #47713c;
-  --color-success-soft: #e4efdf;
-  --color-info: #285f7a;
-  --color-info-soft: #dcebf2;
-  --color-reference: #6b4f8f;
-  --color-reference-soft: #ebe4f3;
-}
-
-@media (prefers-color-scheme: dark) {
-  @theme {
-    --color-bg: #141210;
-    --color-surface: #2a2724;
-    --color-surface-hover: #333029;
-    --color-text: #ece8e3;
-    --color-text-dim: #a8a199;
-    --color-border: #45403a;
-    --color-accent: #e08a52;
-    --color-accent-soft: #3a2c22;
-    --color-danger: #e08072;
-    --color-danger-soft: #3a2420;
-    --color-success: #8fbf7f;
-    --color-success-soft: #262f21;
-    --color-info: #7fb8d4;
-    --color-info-soft: #1f2d33;
-    --color-reference: #b9a3d6;
-    --color-reference-soft: #2c2536;
-  }
-}
 
 body {
   margin: 0;
   background: var(--color-bg);
   color: var(--color-text);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--font-text);
   /* Chrome on Android has its own edge-swipe-to-navigate-back gesture,
      which otherwise fires alongside EdgeSwipeBack.tsx's — the two race,
      and Chrome's own history navigation wins visually (the whole page
@@ -96,6 +51,18 @@ body {
      topmost dialog. overscroll-behavior-x suppresses that native
      gesture without touching normal vertical scrolling/pull-to-refresh. */
   overscroll-behavior-x: none;
+}
+
+@layer base {
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+  }
+
+  [data-own-font] :is(h1, h2, h3) {
+    font-family: inherit;
+  }
 }
 
 /* Themed scrollbars — every scrollable area in the app (the page itself,
@@ -401,6 +368,9 @@ input[type="range"]:focus-visible::-moz-range-thumb {
    forever. Measured, not guessed — it left every dialog in the app at
    opacity 0. */
 @media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
   /* One class on the backdrop covers both halves: the scrim fades and
      its panel child rises. Saves adding a second class to ten separate
      dialogs, all of which are a full-screen backdrop wrapping exactly
@@ -424,6 +394,31 @@ input[type="range"]:focus-visible::-moz-range-thumb {
   }
   .menu-in {
     animation: scripta-menu 130ms ease-out both;
+  }
+  .tier-drop {
+    animation: scripta-pop 220ms cubic-bezier(0.32, 0.72, 0, 1) both;
+  }
+  .mark-scan {
+    animation: scripta-mark-scan var(--mark-ms) steps(var(--mark-steps), end) both;
+  }
+  .mark-rise {
+    animation: scripta-mark-rise var(--mark-ms) cubic-bezier(0.32, 0.72, 0, 1) both;
+  }
+  .mark-fan .mark-layer {
+    animation: scripta-mark-layer var(--mark-ms) cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+  .mark-register .mark-layer {
+    animation: scripta-mark-layer var(--mark-ms) cubic-bezier(0.32, 0.72, 0, 1) both;
+  }
+  .mark-gild .mark-gild-frame {
+    animation: scripta-mark-draw var(--mark-ms) cubic-bezier(0.32, 0.72, 0, 1) both;
+  }
+  .mark-gild .mark-gild-mark {
+    animation: scripta-fade var(--mark-gild-ms) ease-out var(--mark-gild-delay) both;
+  }
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 250ms;
   }
 }
 
@@ -472,6 +467,17 @@ input[type="range"]:focus-visible::-moz-range-thumb {
   }
 }
 
+@keyframes scripta-pop {
+  from {
+    opacity: 0.4;
+    transform: scale(0.5);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 @keyframes scripta-slide-left {
   from {
     opacity: 0;
@@ -480,5 +486,67 @@ input[type="range"]:focus-visible::-moz-range-thumb {
   to {
     opacity: 1;
     transform: none;
+  }
+}
+
+@keyframes scripta-arena-pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes scripta-arena-drop {
+  from {
+    opacity: 0;
+    transform: scale(0.6) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes scripta-mark-scan {
+  from {
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes scripta-mark-rise {
+  from {
+    opacity: 0;
+    transform: translateY(var(--mark-rise));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes scripta-mark-layer {
+  from {
+    opacity: var(--mark-from-opacity);
+    transform: translate(var(--mark-from-x), var(--mark-from-y));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes scripta-mark-draw {
+  from {
+    stroke-dashoffset: var(--mark-dash);
+  }
+  to {
+    stroke-dashoffset: 0;
   }
 }

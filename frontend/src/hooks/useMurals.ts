@@ -15,6 +15,7 @@
 // save — books/groups data still lives in the library blob, but murals no
 // longer do.
 
+import type { ThemeId } from "@scripta/shared/themes";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   clearMuralCoverApi,
@@ -52,14 +53,20 @@ export function useMurals() {
     setMurals(current().map((m) => (m.id === updated.id ? { ...updated, blocks: ensureBookBlockHeights(updated.blocks) } : m)));
   }
 
-  async function create(name: string, folderId: string | null = null): Promise<Mural> {
-    const created = await createMuralApi(name, folderId);
+  async function create(name: string, theme: ThemeId, folderId: string | null = null): Promise<Mural> {
+    const created = await createMuralApi(name, theme, folderId);
     setMurals([...current(), created]);
     return created;
   }
 
   async function rename(id: string, name: string): Promise<Mural> {
     const updated = await updateMuralApi(id, { name });
+    replaceOne(updated);
+    return updated;
+  }
+
+  async function setTheme(id: string, theme: ThemeId): Promise<Mural> {
+    const updated = await updateMuralApi(id, { theme });
     replaceOne(updated);
     return updated;
   }
@@ -73,6 +80,7 @@ export function useMurals() {
   async function remove(id: string): Promise<void> {
     await deleteMuralApi(id);
     setMurals(current().filter((m) => m.id !== id));
+    await queryClient.invalidateQueries({ queryKey: ["community", "own-profile"] });
   }
 
   async function setCover(id: string, imageId: string, url: string): Promise<Mural> {
@@ -149,5 +157,5 @@ export function useMurals() {
     setMurals(results);
   }
 
-  return { ...query, create, rename, saveBlocks, currentMural, remove, setCover, clearCover, share, unshare, move, scrubBooks, scrubImage };
+  return { ...query, create, rename, setTheme, saveBlocks, currentMural, remove, setCover, clearCover, share, unshare, move, scrubBooks, scrubImage };
 }

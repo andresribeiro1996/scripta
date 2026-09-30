@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from "react-native";
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
+import { Text } from "../ui/Text";
 import { Redirect, router, Stack } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { PASSWORD_HINT, type AccountSecurity } from "@scripta/shared";
@@ -20,6 +21,9 @@ export default function AccountSecurityPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [confirmation, setConfirmation] = useState("");
+  const [deleteError, setDeleteError] = useState("");
   if (ready && !user) return <Redirect href={{ pathname: "/login", params: { returnTo: "/account-security" } }} />;
 
   async function run(action: "verify" | "password" | "email") {
@@ -38,7 +42,19 @@ export default function AccountSecurityPage() {
     finally { setBusy(false); }
   }
 
-  return <Screen top={false} bottom><Stack.Screen options={{ headerShown: true, title: "Password and email" }} />
+  async function deleteAccount() {
+    if (busy) return;
+    setDeleteError(""); setBusy(true);
+    try {
+      await apiClient.request("/auth/delete-account", { method: "POST", auth: true, body: account.data?.hasPassword ? { password: confirmation } : { confirmation } });
+      await signOut();
+      router.replace("/login");
+      Alert.alert("Account deleted", "Your account and everything in it have been deleted.");
+    } catch (reason) { setDeleteError(reason instanceof Error ? reason.message : "Please try again."); }
+    finally { setBusy(false); }
+  }
+
+  return <Screen top={false} bottom><Stack.Screen options={{ headerShown: true, title: "Account" }} />
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: spacing.xl, gap: spacing.lg }}>
         {account.isPending ? <Text style={{ color: colors.text }}>Loading account…</Text> : account.isError ? <Button label="Couldn’t load account. Try again" onPress={() => void account.refetch()} /> : <>
@@ -59,6 +75,18 @@ export default function AccountSecurityPage() {
           </>}
           <Button label={mode === "email" ? "Send confirmation" : "Save new password"} loading={busy} onPress={() => void run(mode)} />
           <Button label="Cancel" variant="secondary" disabled={busy} onPress={() => { setMode(null); setCurrent(""); setPassword(""); setConfirm(""); }} />
+        </View>}
+        {account.data && <View style={{ gap: spacing.md, marginTop: spacing.xl }}>
+          <Text accessibilityRole="header" style={[typography.title, { color: colors.text }]}>Delete account</Text>
+          <Text style={[typography.body, { color: colors.textDim }]}>Permanently deletes your account and everything in it: your library and highlights, murals, gallery images, tier lists, tournaments, follows and connected accounts. Share links stop working. This can’t be undone.</Text>
+          {!deleting ? <Button label="Delete account…" variant="destructive" disabled={busy} onPress={() => { setDeleting(true); setDeleteError(""); }} /> : <>
+            {account.data.hasPassword
+              ? <Input label="Enter your password to confirm" secureTextEntry autoComplete="current-password" textContentType="password" value={confirmation} onChangeText={setConfirmation} editable={!busy} />
+              : <Input label={`Type ${user?.username ?? account.data.email} to confirm`} autoCapitalize="none" autoCorrect={false} value={confirmation} onChangeText={setConfirmation} editable={!busy} />}
+            {deleteError ? <Text accessibilityRole="alert" selectable style={{ color: colors.danger }}>{deleteError}</Text> : null}
+            <Button label="Delete my account" variant="destructive" loading={busy} disabled={!confirmation} onPress={() => void deleteAccount()} />
+            <Button label="Cancel" variant="secondary" disabled={busy} onPress={() => { setDeleting(false); setConfirmation(""); setDeleteError(""); }} />
+          </>}
         </View>}
       </ScrollView>
     </KeyboardAvoidingView>

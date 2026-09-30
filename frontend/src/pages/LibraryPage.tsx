@@ -3,6 +3,16 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import {
+  addReaderNote,
+  newId,
+  readSnapshot,
+  removeReaderNote,
+  restoreReadState,
+  setRating,
+  type FinishRating,
+  type ReadSnapshot
+} from "@scripta/shared";
 import type { GalleryImage } from "../api/gallery";
 import type { LibraryData, LibraryDocument } from "../api/library";
 import { AddBookModal } from "../components/AddBookModal";
@@ -11,6 +21,7 @@ import { BookDetailSheet } from "../components/BookDetailSheet";
 import { BookGrid } from "../components/BookGrid";
 import { CoverPickerModal } from "../components/CoverPickerModal";
 import { EmptyState } from "../components/EmptyState";
+import { FinishSheet } from "../components/FinishSheet";
 import { LibraryCanvas } from "../components/LibraryCanvas";
 import { LibraryToolbar } from "../components/LibraryToolbar";
 import { LibraryIcon } from "../components/NavIcons";
@@ -30,7 +41,7 @@ import { parseImportedFile } from "../lib/fileImport";
 import { deriveSeriesGroups, removeBooksFromAllGroups } from "../lib/groups";
 import { assignBookOrder, orderLibraryBooks, reorderOnDrop, seriesGroupByBookKey } from "../lib/libraryOrder";
 import { effectiveCardStyle, resolveLibraryStyle, type PerCardStyle } from "../lib/libraryStyle";
-import { filterBooks, nextReadStatus, sortBooks, type SortKey, type StatusFilter } from "../lib/libraryView";
+import { filterBooks, localDay, setReadStatus, sortBooks, type ReadStatus, type SortKey, type StatusFilter } from "../lib/libraryView";
 import { bookKey, mergeLibraryData } from "../lib/merge";
 import { restoreDeletedBooks } from "../lib/restoreDeletedBooks";
 
@@ -70,7 +81,7 @@ function updateWithViewTransition(applyUpdate: () => void) {
 export function LibraryPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { scrubBooks } = useMurals();
   const { data: library, isLoading, updateLibrary, share: shareLibraryDoc, unshare: unshareLibraryDoc } = useLibrary();
   const toast = useToast();
@@ -90,6 +101,7 @@ export function LibraryPage() {
   const [styleBookKey, setStyleBookKey] = useState<string | null>(null);
   const [coverBookKey, setCoverBookKey] = useState<string | null>(null);
   const [detailBookKey, setDetailBookKey] = useState<string | null>(null);
+  const [finishing, setFinishing] = useState<{ key: string; before: ReadSnapshot } | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [sharing, setSharing] = useState(false);
@@ -219,17 +231,85 @@ export function LibraryPage() {
     }
   }
 
-  async function handleSetBookStatus(book: Record<string, unknown>) {
+  async function handleSetBookStatus(book: Record<string, unknown>, status: ReadStatus): Promise<boolean> {
     const current = queryClient.getQueryData<LibraryDocument>(["library"]);
-    if (!current) return;
+    if (!current) return false;
+    const key = bookKey(book);
+    const day = localDay();
+    try {
+      await updateLibrary((data) => ({
+        ...data,
+        books: data.books.map((b) => (bookKey(b) === key ? setReadStatus(b, status, day) : b))
+      }));
+      return true;
+    } catch {
+      toast({ message: "Couldn't save the status change.", kind: "error" });
+      return false;
+    }
+  }
+
+  async function handleSetRating(book: Record<string, unknown>, rating: FinishRating): Promise<boolean> {
+    const current = queryClient.getQueryData<LibraryDocument>(["library"]);
+    if (!current) return false;
+    const key = bookKey(book);
+    if (setRating(book, rating) === book) return true;
+    try {
+      await updateLibrary((data) => ({
+        ...data,
+        books: data.books.map((b) => (bookKey(b) === key ? setRating(b, rating) : b))
+      }));
+      return true;
+    } catch {
+      toast({ message: "Couldn't save the rating.", kind: "error" });
+      return false;
+    }
+  }
+
+  async function handleAddNote(book: Record<string, unknown>, text: string): Promise<boolean> {
+    const current = queryClient.getQueryData<LibraryDocument>(["library"]);
+    if (!current) return false;
     const key = bookKey(book);
     try {
       await updateLibrary((data) => ({
         ...data,
-        books: data.books.map((b) => (bookKey(b) === key ? { ...b, ReadStatus: nextReadStatus(b.ReadStatus) } : b))
+        books: data.books.map((b) => (bookKey(b) === key ? addReaderNote(b, text, localDay(), newId()) : b))
       }));
+      return true;
     } catch {
-      toast({ message: "Couldn't save the status change.", kind: "error" });
+      toast({ message: "Couldn't save your note.", kind: "error" });
+      return false;
+    }
+  }
+
+  async function handleDeleteNote(book: Record<string, unknown>, bookmarkId: string): Promise<boolean> {
+    const current = queryClient.getQueryData<LibraryDocument>(["library"]);
+    if (!current) return false;
+    const key = bookKey(book);
+    try {
+      await updateLibrary((data) => ({
+        ...data,
+        books: data.books.map((b) => (bookKey(b) === key ? removeReaderNote(b, bookmarkId) : b))
+      }));
+      return true;
+    } catch {
+      toast({ message: "Couldn't delete the note.", kind: "error" });
+      return false;
+    }
+  }
+
+  async function handleRestoreRead(book: Record<string, unknown>, before: ReadSnapshot): Promise<boolean> {
+    const current = queryClient.getQueryData<LibraryDocument>(["library"]);
+    if (!current) return false;
+    const key = bookKey(book);
+    try {
+      await updateLibrary((data) => ({
+        ...data,
+        books: data.books.map((b) => (bookKey(b) === key ? restoreReadState(b, before) : b))
+      }));
+      return true;
+    } catch {
+      toast({ message: "Couldn't undo the status change.", kind: "error" });
+      return false;
     }
   }
 
@@ -358,7 +438,9 @@ export function LibraryPage() {
   const bookSeriesGroup = useMemo(() => seriesGroupByBookKey(library?.data.books ?? [], library?.data.groups ?? []), [library]);
   const styleBook = styleBookKey ? books.find((b) => bookKey(b) === styleBookKey) : null;
   const coverBook = coverBookKey ? books.find((b) => bookKey(b) === coverBookKey) : null;
-  const detailBook = detailBookKey ? books.find((b) => bookKey(b) === detailBookKey) : null;
+  const detailKey = detailBookKey ?? searchParams.get("book");
+  const detailBook = detailKey ? books.find((b) => bookKey(b) === detailKey) : null;
+  const finishingBook = finishing ? books.find((b) => bookKey(b) === finishing.key) : null;
 
   // The phone's only route to these actions — there is no header on a
   // phone to hold them. Passed to LibraryToolbar as ITEMS rather than a
@@ -405,7 +487,7 @@ export function LibraryPage() {
 
   return (
     <PageContainer maxWidth={style.contentMaxWidth}>
-      {searchParams.get("action") === "import" ? <div className="mb-4 rounded-lg border border-(--color-border) p-4"><h2 className="font-semibold">Import your library</h2><button className="mt-2 min-h-11 rounded-lg bg-(--color-accent) px-4 py-2 text-white" onClick={() => fileInputRef.current?.click()}>Choose import file</button></div> : null}
+      {searchParams.get("action") === "import" ? <div className="mb-4 rounded-lg border border-(--color-border) p-4"><h2 className="font-semibold">Import your library</h2><button className="mt-2 min-h-11 rounded-lg bg-(--color-accent) px-4 py-2 text-(--color-on-accent)" onClick={() => fileInputRef.current?.click()}>Choose import file</button></div> : null}
       {/* Desktop-only, with one exception: renaming. On a phone the whole
           header is gone — its actions moved into the toolbar row and the
           library name into that row's menu — but "Rename library…" in
@@ -453,7 +535,7 @@ export function LibraryPage() {
               <button
                 onClick={() => void handleDeleteSelected()}
                 disabled={selectedKeys.size === 0}
-                className="min-h-11 rounded-lg bg-(--color-danger) px-3.5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+                className="min-h-11 rounded-lg bg-(--color-danger) px-3.5 py-2.5 text-sm font-semibold text-(--color-on-danger) hover:opacity-90 disabled:opacity-50"
               >
                 Delete selected
               </button>
@@ -469,7 +551,7 @@ export function LibraryPage() {
           <div className={`hidden items-center gap-2 sm:flex ${selectionMode ? "sm:hidden" : ""}`}>
             <button
               onClick={() => setAddingBook(true)}
-              className="min-h-11 rounded-lg bg-(--color-accent) px-3.5 py-2.5 text-sm font-semibold text-white hover:opacity-90"
+              className="min-h-11 rounded-lg bg-(--color-accent) px-3.5 py-2.5 text-sm font-semibold text-(--color-on-accent) hover:opacity-90"
             >
               Add book
             </button>
@@ -573,7 +655,7 @@ export function LibraryPage() {
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={importing}
-                className="rounded-lg bg-(--color-accent) px-4 py-2.5 font-semibold text-white disabled:opacity-60"
+                className="rounded-lg bg-(--color-accent) px-4 py-2.5 font-semibold text-(--color-on-accent) disabled:opacity-60"
               >
                 {importing ? "Importing…" : "Choose a file"}
               </button>
@@ -655,8 +737,33 @@ export function LibraryPage() {
           book={detailBook}
           onOpenStyle={(b) => setStyleBookKey(bookKey(b))}
           onOpenCoverPicker={(b) => setCoverBookKey(bookKey(b))}
-          onSetStatus={(b) => void handleSetBookStatus(b)}
-          onClose={() => setDetailBookKey(null)}
+          onSetStatus={async (b, status) => {
+            const before = readSnapshot(b);
+            const wasFinished = b.ReadStatus === 2;
+            if ((await handleSetBookStatus(b, status)) && status === 2 && !wasFinished) setFinishing({ key: bookKey(b), before });
+          }}
+          onSetRating={(b, rating) => void handleSetRating(b, rating)}
+          onDeleteNote={(b, bookmarkId) => void handleDeleteNote(b, bookmarkId)}
+          onClose={() => {
+            setDetailBookKey(null);
+            if (searchParams.has("book")) {
+              const next = new URLSearchParams(searchParams);
+              next.delete("book");
+              setSearchParams(next, { replace: true });
+            }
+          }}
+        />
+      )}
+
+      {finishingBook && finishing && (
+        <FinishSheet
+          book={finishingBook}
+          books={books}
+          before={finishing.before}
+          onSetRating={handleSetRating}
+          onAddNote={handleAddNote}
+          onRestoreRead={handleRestoreRead}
+          onClose={() => setFinishing(null)}
         />
       )}
 

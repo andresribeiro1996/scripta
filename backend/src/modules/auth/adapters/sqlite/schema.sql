@@ -20,6 +20,9 @@ CREATE TABLE IF NOT EXISTS users (
                                     -- id changes on every replacement, which doubles
                                     -- as the cache-buster for the immutable file route
   dashboard_seen_at TEXT,          -- last time this user consumed their Home digest
+  theme         TEXT,
+  display_font  TEXT,
+  text_font     TEXT,
   created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 

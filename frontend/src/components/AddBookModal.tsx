@@ -20,12 +20,12 @@ import type { IScannerControls } from "@zxing/browser";
 import { useDismissible } from "../hooks/useDismissible";
 import { useScrollLock } from "../hooks/useScrollLock";
 import { normalizeIsbn } from "../lib/covers";
-import { buildManualBook, searchBooks, type BookSearchResult } from "../lib/bookSearch";
+import { bookSearchApi, buildManualBook, searchInsideOutside, type BookSearchResult } from "../lib/bookSearch";
 
 const STATUS_OPTIONS = [
   { value: 2, label: "Finished" },
   { value: 1, label: "Reading" },
-  { value: 0, label: "Not read" }
+  { value: 0, label: "To read" }
 ];
 
 export function AddBookModal({
@@ -43,6 +43,9 @@ export function AddBookModal({
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<BookSearchResult[] | null>(null);
   const [searching, setSearching] = useState(false);
+  const [outsidePending, setOutsidePending] = useState(false);
+  const [outsideFailed, setOutsideFailed] = useState(false);
+  const searchRunRef = useRef(0);
   const [searchError, setSearchError] = useState<string | null>(null);
 
   const [scanning, setScanning] = useState(false);
@@ -68,24 +71,36 @@ export function AddBookModal({
     setPublisher(result.publisher ?? "");
     setGenres(result.genres);
     setResults(null);
+    searchRunRef.current++;
+    setSearching(false);
+    setOutsidePending(false);
+    setOutsideFailed(false);
   }
 
   async function runSearch(raw: string) {
     const q = raw.trim();
     if (!q) return;
+    const run = ++searchRunRef.current;
     setSearching(true);
     setSearchError(null);
     setResults(null);
+    setOutsidePending(false);
+    setOutsideFailed(false);
     try {
-      const found = await searchBooks(q);
-      setResults(found);
-      // The common case for an ISBN lookup (typed or scanned): exactly
-      // one edition — skip the tap and go straight to the filled form.
-      if (found.length === 1) selectResult(found[0]);
+      await searchInsideOutside(q, bookSearchApi, (state) => {
+        if (run !== searchRunRef.current) return;
+        setSearching(false);
+        setResults(state.results);
+        setOutsidePending(state.outsidePending);
+        setOutsideFailed(state.outsideFailed);
+        // The common case for an ISBN lookup (typed or scanned): exactly
+        // one edition — skip the tap and go straight to the filled form.
+        if (!state.outsidePending && !state.outsideFailed && state.results.length === 1) selectResult(state.results[0]);
+      });
     } catch (err) {
-      setSearchError(err instanceof Error ? err.message : "Search failed — try again.");
-    } finally {
+      if (run !== searchRunRef.current) return;
       setSearching(false);
+      setSearchError(err instanceof Error ? err.message : "Search failed — try again.");
     }
   }
 
@@ -202,7 +217,7 @@ export function AddBookModal({
           <button
             type="submit"
             disabled={searching || query.trim() === ""}
-            className="shrink-0 rounded-lg bg-(--color-accent) px-3.5 py-2 text-sm font-semibold text-white disabled:opacity-60"
+            className="shrink-0 rounded-lg bg-(--color-accent) px-3.5 py-2 text-sm font-semibold text-(--color-on-accent) disabled:opacity-60"
           >
             {searching ? "Searching…" : "Search"}
           </button>
@@ -238,7 +253,7 @@ export function AddBookModal({
 
         {results !== null && !scanning && (
           <div className="mt-3 max-h-64 overflow-y-auto overscroll-contain rounded-lg border border-(--color-border)">
-            {results.length === 0 && (
+            {results.length === 0 && !outsidePending && (
               <p className="p-3 text-xs text-(--color-text-dim)">
                 No matches — fill the form in below by hand instead.
               </p>
@@ -262,6 +277,8 @@ export function AddBookModal({
                 </span>
               </button>
             ))}
+            {outsidePending && <p className="p-3 text-xs text-(--color-text-dim)">Searching Open Library…</p>}
+            {outsideFailed && <p className="p-3 text-xs text-(--color-text-dim)">Couldn't reach Open Library</p>}
           </div>
         )}
 
@@ -337,7 +354,7 @@ export function AddBookModal({
           <button
             onClick={() => void handleSave()}
             disabled={saving || title.trim() === "" || author.trim() === ""}
-            className="w-full rounded-lg bg-(--color-accent) px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+            className="w-full rounded-lg bg-(--color-accent) px-4 py-2.5 text-sm font-semibold text-(--color-on-accent) disabled:opacity-60"
           >
             {saving ? "Adding…" : "Add book"}
           </button>

@@ -6,19 +6,20 @@
 // @scripta/shared buildManualBook record onAdd runs through the normal
 // merge/order/save pipeline, same as the web version.
 
-import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useRef, useState } from "react";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Text } from "../../../ui/Text";
 import { Image } from "expo-image";
-import { buildManualBook, normalizeIsbn } from "@scripta/shared";
+import { buildManualBook, normalizeIsbn, searchInsideOutside } from "@scripta/shared";
 import { Button, Input } from "../../../ui/components";
 import { spacing, typography, useTheme } from "../../../ui/theme";
-import { searchBooks, type BookSearchResult } from "../api/search";
+import { bookSearchApi, type BookSearchResult } from "../api/search";
 import { SelectRow } from "./StyleControls";
 
 const STATUS_OPTIONS = [
   { value: "2", label: "Finished" },
   { value: "1", label: "Reading" },
-  { value: "0", label: "Not read" },
+  { value: "0", label: "To read" },
 ];
 
 export function AddBookForm({
@@ -32,6 +33,9 @@ export function AddBookForm({
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<BookSearchResult[] | null>(null);
   const [searching, setSearching] = useState(false);
+  const [outsidePending, setOutsidePending] = useState(false);
+  const [outsideFailed, setOutsideFailed] = useState(false);
+  const searchRun = useRef(0);
   const [searchError, setSearchError] = useState<string | null>(null);
 
   const [title, setTitle] = useState("");
@@ -50,22 +54,34 @@ export function AddBookForm({
     setPublisher(result.publisher ?? "");
     setGenres(result.genres);
     setResults(null);
+    searchRun.current++;
+    setSearching(false);
+    setOutsidePending(false);
+    setOutsideFailed(false);
   }
 
   async function runSearch() {
     const q = query.trim();
     if (!q) return;
+    const run = ++searchRun.current;
     setSearching(true);
     setSearchError(null);
     setResults(null);
+    setOutsidePending(false);
+    setOutsideFailed(false);
     try {
-      const found = await searchBooks(q);
-      setResults(found);
-      if (found.length === 1) selectResult(found[0]);
+      await searchInsideOutside(q, bookSearchApi, (state) => {
+        if (run !== searchRun.current) return;
+        setSearching(false);
+        setResults(state.results);
+        setOutsidePending(state.outsidePending);
+        setOutsideFailed(state.outsideFailed);
+        if (!state.outsidePending && !state.outsideFailed && state.results.length === 1) selectResult(state.results[0]);
+      });
     } catch (err) {
-      setSearchError(err instanceof Error ? err.message : "Search failed — try again.");
-    } finally {
+      if (run !== searchRun.current) return;
       setSearching(false);
+      setSearchError(err instanceof Error ? err.message : "Search failed — try again.");
     }
   }
 
@@ -118,7 +134,7 @@ export function AddBookForm({
 
         {results !== null && (
           <View style={{ gap: spacing.xs }}>
-            {results.length === 0 && <Text style={[typography.body, { color: colors.textDim }]}>No matches — fill the form in below by hand instead.</Text>}
+            {results.length === 0 && !outsidePending && <Text style={[typography.body, { color: colors.textDim }]}>No matches — fill the form in below by hand instead.</Text>}
             {results.map((r, i) => (
               <Pressable
                 accessibilityRole="button"
@@ -141,6 +157,8 @@ export function AddBookForm({
                 </View>
               </Pressable>
             ))}
+            {outsidePending && <Text style={[typography.caption, { color: colors.textDim }]}>Searching Open Library…</Text>}
+            {outsideFailed && <Text style={[typography.caption, { color: colors.textDim }]}>Couldn't reach Open Library</Text>}
           </View>
         )}
 

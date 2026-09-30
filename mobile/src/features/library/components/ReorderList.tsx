@@ -16,7 +16,8 @@
 // re-implement that, it just calls reorderOnDrop with the adjacent
 // item's key as the drop target, same as a drag-and-drop would.
 
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, View } from "react-native";
+import { Text } from "../../../ui/Text";
 import { bookKey } from "@scripta/shared";
 import { minimumTouchTarget, radii, spacing, typography, useTheme } from "../../../ui/theme";
 

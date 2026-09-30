@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, View } from "react-native";
+import { Text } from "../../ui/Text";
 import { EmptyState, ErrorState, Sheet, Skeleton, dynamicType, spacing, typography, useTheme } from "../../ui";
 import { fetchTournament } from "./api";
 import { BookCover } from "./BookCover";

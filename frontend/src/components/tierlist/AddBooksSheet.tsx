@@ -94,7 +94,7 @@ export function AddBooksSheet({
                   >
                     <MiniBookTile book={book} showTitle={false} showAuthor={false} />
                     {isSelected && (
-                      <span className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-(--color-accent) text-white">
+                      <span className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-(--color-accent) text-(--color-on-accent)">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M20 6 9 17l-5-5" />
                         </svg>
@@ -117,7 +117,7 @@ export function AddBooksSheet({
               onClose();
             }}
             disabled={selected.size === 0}
-            className="min-h-11 rounded-lg bg-(--color-accent) px-4 text-sm font-semibold text-white disabled:opacity-50"
+            className="min-h-11 rounded-lg bg-(--color-accent) px-4 text-sm font-semibold text-(--color-on-accent) disabled:opacity-50"
           >
             Add {selected.size > 0 ? selected.size : ""} {selected.size === 1 ? "book" : "books"}
           </button>

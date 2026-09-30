@@ -1,60 +1,24 @@
-import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
-import { AccessibilityInfo, useColorScheme } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { AccessibilityInfo, Animated, Appearance, Easing, StyleSheet, useColorScheme } from "react-native";
+import {
+  MOTION,
+  parseFontPreference,
+  parseThemePreference,
+  resolveFonts,
+  resolveTheme,
+  themes,
+  type FontId,
+  type FontPreference,
+  type FontSlot,
+  type ThemeColors,
+  type ThemeId,
+  type ThemePreference,
+  type ThemeScheme,
+} from "@scripta/shared/themes";
+import { nextVeil, shouldFadeTheme, type Veil } from "./themeFade";
 
-export const palettes = {
-  light: {
-    background: "#f2f0ec",
-    surface: "#ffffff",
-    surfacePressed: "#f7f5f1",
-    text: "#201e1c",
-    textDim: "#6b6560",
-    border: "#ddd8d0",
-    accent: "#a85c32",
-    accentSoft: "#f1e2d8",
-    // A fill that has to outrank a border. accentSoft is a wash for things
-    // that sit behind accent-coloured text (avatars, cover fallbacks,
-    // badges), so it is deliberately weak — at 1.11:1 in light and 1.39:1
-    // in dark it separates from the page LESS than a hairline does (1.25
-    // and 1.82), which puts structure above meaning wherever it marks a
-    // selection. This one carries more of the accent: 24% in light, 34% in
-    // dark, both landing just above their borders with body text still over
-    // 8:1 on top.
-    accentFill: "#e0ccbf",
-    danger: "#b3432f",
-    dangerSoft: "#f6dfda",
-    success: "#47713c",
-    successSoft: "#e4efdf",
-    info: "#285f7a",
-    infoSoft: "#dcebf2",
-    reference: "#6b4f8f",
-    referenceSoft: "#ebe4f3",
-    scrim: "rgba(32, 30, 28, 0.48)",
-    onAccent: "#ffffff",
-    onDanger: "#ffffff",
-  },
-  dark: {
-    background: "#141210",
-    surface: "#2a2724",
-    surfacePressed: "#333029",
-    text: "#ece8e3",
-    textDim: "#a8a199",
-    border: "#45403a",
-    accent: "#e08a52",
-    accentSoft: "#3a2c22",
-    accentFill: "#593b26",
-    danger: "#e08072",
-    dangerSoft: "#3a2420",
-    success: "#8fbf7f",
-    successSoft: "#262f21",
-    info: "#7fb8d4",
-    infoSoft: "#1f2d33",
-    reference: "#b9a3d6",
-    referenceSoft: "#2c2536",
-    scrim: "rgba(0, 0, 0, 0.64)",
-    onAccent: "#141210",
-    onDanger: "#141210",
-  },
-} as const;
+export type { ThemeColors };
 
 export const spacing = { none: 0, xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 24, xxxl: 32, huge: 48 } as const;
 export const radii = { sm: 6, md: 8, lg: 12, xl: 16, full: 999 } as const;
@@ -68,27 +32,136 @@ export const typography = {
 export const minimumTouchTarget = 44;
 export const dynamicType = { allowFontScaling: true } as const;
 
-export type ThemeMode = keyof typeof palettes;
-export type ThemeColors = (typeof palettes)[ThemeMode];
-export type Theme = { mode: ThemeMode; colors: ThemeColors };
+type ActiveVeil = Veil & { opacity: Animated.Value };
 
+export type ThemeMode = ThemeScheme;
+export type Theme = {
+  id: ThemeId;
+  mode: ThemeMode;
+  colors: ThemeColors;
+  preference: ThemePreference;
+  setPreference: (preference: ThemePreference, options?: { fade?: boolean }) => void;
+  fonts: { display: FontId; text: FontId };
+  displayFont: FontPreference;
+  textFont: FontPreference;
+  setFontPreference: (slot: FontSlot, preference: FontPreference) => void;
+};
+
+const STORAGE_KEY = "theme";
+const FONT_KEYS: Record<FontSlot, string> = { display: "fontDisplay", text: "fontText" };
+const SYSTEM_FONTS = { display: "system", text: "system" } as const;
 const ThemeContext = createContext<Theme | undefined>(undefined);
 
-function systemTheme(scheme: ReturnType<typeof useColorScheme>): Theme {
-  const mode: ThemeMode = scheme === "dark" ? "dark" : "light";
-  return { mode, colors: palettes[mode] };
+function osScheme(scheme: ReturnType<typeof useColorScheme>): ThemeScheme {
+  return scheme === "dark" ? "dark" : "light";
 }
 
-export function ThemeProvider({ children, mode }: { children: ReactNode; mode?: ThemeMode }) {
+function applyNativeScheme(preference: ThemePreference): void {
+  Appearance.setColorScheme(preference === "system" ? "unspecified" : themes[preference].scheme);
+}
+
+export function ThemeProvider({ children, bundledFonts }: { children: ReactNode; bundledFonts: boolean }) {
   const scheme = useColorScheme();
-  const resolvedMode = mode ?? (scheme === "dark" ? "dark" : "light");
-  return <ThemeContext.Provider value={{ mode: resolvedMode, colors: palettes[resolvedMode] }}>{children}</ThemeContext.Provider>;
+  const [preference, setPreferenceState] = useState<ThemePreference | null>(null);
+  const [displayFont, setDisplayFont] = useState<FontPreference>("theme");
+  const [textFont, setTextFont] = useState<FontPreference>("theme");
+
+  useEffect(() => {
+    AsyncStorage.multiGet([STORAGE_KEY, FONT_KEYS.display, FONT_KEYS.text]).then(
+      (entries) => {
+        const stored = new Map(entries);
+        const parsed = parseThemePreference(stored.get(STORAGE_KEY));
+        applyNativeScheme(parsed);
+        setDisplayFont(parseFontPreference("display", stored.get(FONT_KEYS.display)));
+        setTextFont(parseFontPreference("text", stored.get(FONT_KEYS.text)));
+        setPreferenceState(parsed);
+      },
+      (err: unknown) => {
+        console.warn("Couldn't read the saved appearance; following the system.", err);
+        setPreferenceState("system");
+      },
+    );
+  }, []);
+
+  const reduced = useReducedMotion();
+  const [veil, setVeil] = useState<ActiveVeil | null>(null);
+  const current = useRef<{ id: ThemeId | null; scheme: typeof scheme; reduced: boolean }>({ id: null, scheme, reduced });
+
+  const setPreference = useCallback((next: ThemePreference, options?: { fade?: boolean }) => {
+    const { id: from, scheme: os, reduced: less } = current.current;
+    if (from && shouldFadeTheme({ fade: options?.fade ?? false, reduced: less, from, to: resolveTheme(next, osScheme(os)) })) {
+      setVeil((previous) => ({ ...nextVeil(previous, themes[from].colors.background), opacity: new Animated.Value(1) }));
+    }
+    applyNativeScheme(next);
+    setPreferenceState(next);
+    AsyncStorage.setItem(STORAGE_KEY, next).catch((err: unknown) => {
+      console.warn("Couldn't save the theme on this device.", err);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!veil) return;
+    const animation = Animated.timing(veil.opacity, { toValue: 0, duration: MOTION.themeFadeMs, easing: Easing.bezier(MOTION.ease[0], MOTION.ease[1], MOTION.ease[2], MOTION.ease[3]), useNativeDriver: true });
+    animation.start(({ finished }) => {
+      if (finished) setVeil((now) => (now?.key === veil.key ? null : now));
+    });
+    return () => animation.stop();
+  }, [veil]);
+
+  const setFontPreference = useCallback((slot: FontSlot, next: FontPreference) => {
+    if (slot === "display") setDisplayFont(next);
+    else setTextFont(next);
+    AsyncStorage.setItem(FONT_KEYS[slot], next).catch((err: unknown) => {
+      console.warn("Couldn't save the font on this device.", err);
+    });
+  }, []);
+
+  const value = useMemo<Theme | null>(() => {
+    if (!preference) return null;
+    const id = resolveTheme(preference, osScheme(scheme));
+    const fonts = bundledFonts ? resolveFonts(id, displayFont, textFont) : SYSTEM_FONTS;
+    return { id, mode: themes[id].scheme, colors: themes[id].colors, preference, setPreference, fonts, displayFont, textFont, setFontPreference };
+  }, [preference, scheme, setPreference, bundledFonts, displayFont, textFont, setFontPreference]);
+
+  useEffect(() => {
+    current.current = { id: value ? value.id : null, scheme, reduced };
+  }, [value, scheme, reduced]);
+
+  if (!value) return null;
+  return (
+    <ThemeContext.Provider value={value}>
+      {children}
+      {veil ? <Animated.View key={veil.key} pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: veil.color, opacity: veil.opacity }]} /> : null}
+    </ThemeContext.Provider>
+  );
 }
 
 export function useTheme(): Theme {
   const context = useContext(ThemeContext);
   const scheme = useColorScheme();
-  return context ?? systemTheme(scheme);
+  if (context) return context;
+  const id = osScheme(scheme);
+  return {
+    id,
+    mode: id,
+    colors: themes[id].colors,
+    preference: "system",
+    setPreference: () => {
+      throw new Error("setPreference needs a ThemeProvider above it.");
+    },
+    fonts: SYSTEM_FONTS,
+    displayFont: "theme",
+    textFont: "theme",
+    setFontPreference: () => {
+      throw new Error("setFontPreference needs a ThemeProvider above it.");
+    },
+  };
+}
+
+export function MuralThemeScope({ theme, children }: { theme: ThemeId; children: ReactNode }) {
+  const parent = useTheme();
+  const value = useMemo<Theme>(() => ({ ...parent, id: theme, mode: themes[theme].scheme, colors: themes[theme].colors }), [parent, theme]);
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
 export function useReducedMotion(): boolean {

@@ -16,6 +16,7 @@
 
 export { authPlugin as registerAuthModule } from "./plugin.js";
 export { authGuard, getOptionalAuthenticatedUser } from "./guard.js";
+export { emailEnabled, sendAccountEmail } from "./email.js";
 export type { AuthenticatedUser } from "./domain/types.js";
 export { EmailInUseError, InvalidCredentialsError } from "./domain/errors.js";
 export {
@@ -25,5 +26,6 @@ export {
   findUserIdByUsername,
   searchUsernameOwners,
   getDashboardSeenAt,
-  setDashboardSeenAt
+  setDashboardSeenAt,
+  getUserTheme
 } from "./publicProfile.js";

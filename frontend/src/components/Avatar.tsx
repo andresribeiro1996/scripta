@@ -32,7 +32,7 @@ export function Avatar({ user, size = 32, className = "" }: { user: Session["use
   return (
     <div
       aria-hidden="true"
-      className={`flex shrink-0 items-center justify-center rounded-full bg-(--color-accent) font-semibold text-white ${className}`}
+      className={`flex shrink-0 items-center justify-center rounded-full bg-(--color-accent) font-semibold text-(--color-on-accent) ${className}`}
       style={{ width: size, height: size, fontSize: Math.round(size * 0.45) }}
     >
       {initial}

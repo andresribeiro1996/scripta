@@ -1,30 +1,40 @@
-import { createContext, type ReactNode, type Ref, type RefObject, useCallback, useContext, useEffect, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  Animated,
-  Keyboard,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  type TextInputProps,
-  View,
-  type ViewStyle,
-} from "react-native";
+import { createContext, memo, type ReactNode, type Ref, type RefObject, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Animated, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, type TextInputProps, View, type ViewStyle } from "react-native";
+import { SvgXml } from "react-native-svg";
+import { Text } from "./Text";
 import MenuView, { type MenuAction } from "@expo/ui/community/menu";
 import PagerView from "react-native-pager-view";
 import { Icon, type IconName } from "./icon";
 import SegmentedControl from "@expo/ui/community/segmented-control";
+import { Host, SegmentedButton, SingleChoiceSegmentedButtonRow, Text as ComposeText } from "@expo/ui/jetpack-compose";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { errorHaptic, successHaptic } from "./haptics";
+import { fontStyleFor } from "./fontStyle";
 import { revealOffset } from "./keyboardScroll";
+import { SYSTEM_FAMILY } from "./systemFont";
 import { dynamicType, minimumTouchTarget, radii, spacing, typography, useReducedMotion, useTheme } from "./theme";
+import { THEME_DECOR, withOpacity, type ThemeId } from "@scripta/shared/themes";
+import { decorLayerStyle, pieceStyle } from "./decorLayout";
 
 const AnimatedPagerView = Animated.createAnimatedComponent(PagerView);
+
+const DecorLayer = memo(function DecorLayer({ id, top, bottom, insetTop, insetBottom }: { id: ThemeId; top: boolean; bottom: boolean; insetTop: number; insetBottom: number }) {
+  const decor = THEME_DECOR[id];
+  if (!decor) return null;
+  return (
+    <View pointerEvents="none" style={decorLayerStyle(top, bottom, { top: insetTop, bottom: insetBottom })}>
+      {decor.frame?.lines.map((line) => (
+        <View
+          key={line.inset}
+          style={{ position: "absolute", top: line.inset, left: line.inset, right: line.inset, bottom: line.inset, borderWidth: line.width, borderRadius: line.radius, borderColor: withOpacity(decor.frame!.color, line.opacity) }}
+        />
+      ))}
+      {decor.pieces.map((piece, index) => (
+        <SvgXml key={index} xml={piece.svg} width={piece.width === "full" ? "100%" : piece.width} height={piece.height} style={pieceStyle(piece)} />
+      ))}
+    </View>
+  );
+});
 
 // Every screen root: paints the themed background and pays whichever safe-area
 // insets nothing else is covering.
@@ -44,7 +54,7 @@ export function Screen({
   bottom?: boolean;
   style?: ViewStyle;
 }) {
-  const { colors } = useTheme();
+  const { colors, id } = useTheme();
   const insets = useSafeAreaInsets();
   return (
     <View
@@ -55,6 +65,7 @@ export function Screen({
         style,
       ]}
     >
+      <DecorLayer id={id} top={top} bottom={bottom} insetTop={insets.top} insetBottom={insets.bottom} />
       {children}
     </View>
   );
@@ -215,7 +226,7 @@ export function IconButton({
    *  — a globe could be public, or language, or region. */
   label?: string;
   onPress?: () => void;
-  tone?: "default" | "danger";
+  tone?: "default" | "danger" | "accent";
   /** Draws the 44pt target instead of leaving it implied. A bare glyph in a
    *  header reads as smaller than it is and people aim at the ink, not the
    *  box; a row's own overflow button doesn't want the chrome, so this is
@@ -223,23 +234,30 @@ export function IconButton({
   framed?: boolean;
 }) {
   const { colors } = useTheme();
-  const color = tone === "danger" ? colors.danger : colors.textDim;
+  const color = tone === "danger" ? colors.danger : tone === "accent" ? colors.onAccent : colors.textDim;
   return (
     <Pressable
       accessibilityLabel={accessibilityLabel}
       accessibilityRole="button"
       hitSlop={8}
       onPress={onPress}
-      style={({ pressed }) => [
-        label ? styles.labelledIconButton : styles.iconButton,
-        framed ? { borderWidth: 1, borderColor: colors.border } : null,
-        { backgroundColor: pressed ? colors.surfacePressed : framed ? colors.surface : "transparent" },
-      ]}
+      style={({ pressed }) => {
+        const background = tone === "accent" ? (pressed ? colors.accentSoft : colors.accent) : pressed ? colors.surfacePressed : framed ? colors.surface : "transparent";
+        return [
+          label ? styles.labelledIconButton : styles.iconButton,
+          framed ? { borderWidth: 1, borderColor: tone === "accent" ? background : colors.border } : null,
+          { backgroundColor: background },
+        ];
+      }}
     >
       <Icon color={color} name={name} size={22} />
       {label ? <Text {...dynamicType} numberOfLines={1} style={[typography.body, { color }]}>{label}</Text> : null}
     </Pressable>
   );
+}
+
+export function HeaderActions({ children }: { children: ReactNode }) {
+  return <View style={styles.headerActions}>{children}</View>;
 }
 
 export function Input({
@@ -258,7 +276,7 @@ export function Input({
   ref,
   ...props
 }: TextInputProps & { label?: string; error?: string; hint?: string; icon?: IconName; ref?: Ref<TextInput> }) {
-  const { colors } = useTheme();
+  const { colors, fonts } = useTheme();
   const [visible, setVisible] = useState(false);
   const inputRef = useRef<TextInput>(null);
   const fieldRef = useRef<View>(null);
@@ -288,6 +306,7 @@ export function Input({
           icon ? { paddingLeft: minimumTouchTarget } : null,
           secureTextEntry ? { paddingRight: minimumTouchTarget + spacing.sm } : null,
           style,
+          fontStyleFor(fonts.text, "text", { fontSize: typography.input.fontSize }) ?? { fontFamily: SYSTEM_FAMILY },
         ]}
       />
       {secureTextEntry && <Pressable accessibilityRole="button" accessibilityLabel={visible ? "Hide password" : "Show password"} accessibilityState={{ disabled: !editable }}
@@ -376,6 +395,32 @@ export function Segmented<T extends string>({
 }) {
   const { colors, mode } = useTheme();
   const index = Math.max(0, options.findIndex((option) => option.value === value));
+
+  if (Platform.OS === "android") {
+    const segmentColors = {
+      activeContainerColor: colors.accentFill,
+      activeContentColor: colors.text,
+      inactiveContainerColor: colors.surface,
+      inactiveContentColor: colors.text,
+      activeBorderColor: colors.border,
+      inactiveBorderColor: colors.border,
+    };
+    return (
+      <View accessibilityLabel={accessibilityLabel} accessibilityRole="tablist">
+        <Host matchContents={{ vertical: true }} colorScheme={mode}>
+          <SingleChoiceSegmentedButtonRow>
+            {options.map((option, position) => (
+              <SegmentedButton key={option.value} selected={position === index} onClick={() => onChange(option.value)} colors={segmentColors}>
+                <SegmentedButton.Label>
+                  <ComposeText>{option.label}</ComposeText>
+                </SegmentedButton.Label>
+              </SegmentedButton>
+            ))}
+          </SingleChoiceSegmentedButtonRow>
+        </Host>
+      </View>
+    );
+  }
 
   return (
     <View accessibilityLabel={accessibilityLabel} accessibilityRole="tablist">
@@ -719,7 +764,7 @@ export function ModalBody({ children }: { children: ReactNode }) {
 
 const styles = StyleSheet.create({
   button: { minHeight: minimumTouchTarget, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: radii.md, borderWidth: 1, alignItems: "center", justifyContent: "center" },
-  buttonText: { ...typography.body, fontWeight: "600" },
+  buttonText: { ...typography.body, fontWeight: "600", textAlign: "center", alignSelf: "stretch" },
   // 48 is Material's minimum and clears HIG's 44. It is also the ceiling here:
   // padding past it measured as having no effect, because the native header
   // clamps its subview's width — verified by probing taps either side of the
@@ -735,6 +780,7 @@ const styles = StyleSheet.create({
   tabIndicator: { position: "absolute", left: 0, bottom: 0, height: 3, borderTopLeftRadius: radii.sm, borderTopRightRadius: radii.sm },
   fab: { position: "absolute", right: spacing.lg, bottom: spacing.lg, minHeight: 56, flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingHorizontal: spacing.lg, borderRadius: radii.full, elevation: 6, shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
   fabLabel: { fontWeight: "700" },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   iconButton: { minHeight: minimumTouchTarget, minWidth: minimumTouchTarget, alignItems: "center", justifyContent: "center", borderRadius: radii.full },
   field: { gap: spacing.xs },
   label: { ...typography.body, fontWeight: "600" },
@@ -754,7 +800,7 @@ const styles = StyleSheet.create({
   state: { flexGrow: 1, justifyContent: "center", paddingVertical: spacing.xxl, paddingHorizontal: spacing.lg },
   emptyCard: { alignItems: "center", gap: spacing.md },
   errorCard: { alignItems: "center", gap: spacing.md, borderRadius: radii.lg, padding: spacing.lg },
-  stateTitle: { ...typography.title, fontWeight: "700", textAlign: "center" },
+  stateTitle: { ...typography.title, fontWeight: "700", textAlign: "center", alignSelf: "stretch" },
   centerText: { textAlign: "center" },
   banner: { minHeight: minimumTouchTarget, justifyContent: "center", paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
   bannerText: { fontWeight: "600", textAlign: "center" },

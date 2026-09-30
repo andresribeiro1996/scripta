@@ -296,7 +296,7 @@ export function ArenaSeedPage() {
         <button
           onClick={() => void handleStart()}
           disabled={!canStart || starting}
-          className="rounded-lg bg-(--color-accent) px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="rounded-lg bg-(--color-accent) px-4 py-2 text-sm font-medium text-(--color-on-accent) disabled:opacity-50"
         >
           {starting ? "Starting…" : "Start tournament"}
         </button>

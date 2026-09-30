@@ -6,12 +6,12 @@
 // collection" button).
 
 import { useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Text } from "../../../ui/Text";
 import { router, Stack } from "expo-router";
 import {
   addBookToGroup,
   bookKey,
-  clearBookCover,
   deleteGroup,
   effectiveCardStyle,
   orderedGroupBooks,
@@ -20,7 +20,6 @@ import {
   renameGroup,
   resolveLibraryStyle,
   seriesGroupByBookKey,
-  setBookCover,
   setGroupStyle,
   type Group,
   type LibraryData,
@@ -28,13 +27,11 @@ import {
 } from "@scripta/shared";
 import { Button, EmptyState, ErrorState, IconButton, Input, Menu, Screen, Sheet, Skeleton, type MenuItem } from "../../../ui/components";
 import { spacing, typography, useTheme } from "../../../ui/theme";
-import type { GalleryImage } from "../../gallery/api";
 import { useMurals } from "../../murals/useMurals";
 import { useLibrary } from "../hooks/useLibrary";
 import { attemptUpdate } from "../lib/attemptUpdate";
 import { BookCard } from "./BookCard";
 import { BookWrapGrid } from "./BookWrapGrid";
-import { CoverPickerSheet } from "./CoverPicker";
 import { PerCardStyleSheet } from "./PerCardStyleForm";
 
 export function GroupDetail({ groupId }: { groupId: string }) {
@@ -52,8 +49,6 @@ export function GroupDetail({ groupId }: { groupId: string }) {
   const [nameDraft, setNameDraft] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [styleOpen, setStyleOpen] = useState(false);
-  const [styleBookKey, setStyleBookKey] = useState<string | null>(null);
-  const [coverBookKey, setCoverBookKey] = useState<string | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
 
@@ -93,21 +88,6 @@ export function GroupDetail({ groupId }: { groupId: string }) {
     void runUpdate((data) => ({ ...data, groups: setGroupStyle(data.groups ?? [], group.id, groupStyle) }));
   }
 
-  function handleSaveBookStyle(book: Record<string, unknown>, bookStyle: PerCardStyle | undefined) {
-    const key = bookKey(book);
-    void runUpdate((data) => ({ ...data, books: data.books.map((b) => (bookKey(b) === key ? { ...b, _style: bookStyle } : b)) }));
-  }
-
-  function handleSaveBookCover(book: Record<string, unknown>, image: GalleryImage) {
-    const key = bookKey(book);
-    void runUpdate((data) => ({ ...data, books: data.books.map((b) => (bookKey(b) === key ? setBookCover(b, image.id, image.url) : b)) }));
-  }
-
-  function handleRemoveBookCover(book: Record<string, unknown>) {
-    const key = bookKey(book);
-    void runUpdate((data) => ({ ...data, books: data.books.map((b) => (bookKey(b) === key ? clearBookCover(b) : b)) }));
-  }
-
   function handleToggleSelect(book: Record<string, unknown>) {
     const key = bookKey(book);
     setSelectedKeys((prev) => {
@@ -143,9 +123,6 @@ export function GroupDetail({ groupId }: { groupId: string }) {
       },
     ]);
   }
-
-  const styleBook = styleBookKey ? books.find((b) => bookKey(b) === styleBookKey) ?? null : null;
-  const coverBook = coverBookKey ? books.find((b) => bookKey(b) === coverBookKey) ?? null : null;
 
   const menuItems: MenuItem[] = group
     ? [
@@ -234,9 +211,6 @@ export function GroupDetail({ groupId }: { groupId: string }) {
                   book={book}
                   onPress={selectionMode ? () => {} : () => router.push(`/book/${encodeURIComponent(bookKey(book))}` as never)}
                   style={effectiveCardStyle(style, bookSeriesGroup.get(bookKey(book))?.style, book._style as PerCardStyle | undefined)}
-                  onOpenStyle={selectionMode ? undefined : () => setStyleBookKey(bookKey(book))}
-                  onOpenCoverPicker={selectionMode ? undefined : () => setCoverBookKey(bookKey(book))}
-                  showActions
                   selectable={selectionMode}
                   selected={selectedKeys.has(bookKey(book))}
                   onToggleSelect={handleToggleSelect}
@@ -257,30 +231,6 @@ export function GroupDetail({ groupId }: { groupId: string }) {
         seedStyle={style}
         onSave={handleSaveGroupStyle}
         onClose={() => setStyleOpen(false)}
-      />
-
-      {/* Keyed on the target id — PerCardStyleSheet seeds its draft from
-          props only on mount (see its own top comment), so switching which
-          book is being styled without a remount would leave the sheet
-          showing the PREVIOUS book's draft. */}
-      <PerCardStyleSheet
-        key={`book-${styleBookKey ?? "none"}`}
-        visible={styleBook !== null}
-        name={String(styleBook?.Title ?? "")}
-        priorityText="the series and library-wide"
-        currentOverride={styleBook?._style as PerCardStyle | undefined}
-        seedStyle={effectiveCardStyle(style, bookSeriesGroup.get(styleBookKey ?? "")?.style)}
-        onSave={(bookStyle) => styleBook && handleSaveBookStyle(styleBook, bookStyle)}
-        onClose={() => setStyleBookKey(null)}
-      />
-
-      <CoverPickerSheet
-        visible={coverBook !== null}
-        title={String(coverBook?.Title ?? "")}
-        currentImageId={typeof coverBook?._coverImageId === "string" ? (coverBook._coverImageId as string) : null}
-        onSelect={(image) => coverBook && handleSaveBookCover(coverBook, image)}
-        onRemoveCover={() => coverBook && handleRemoveBookCover(coverBook)}
-        onClose={() => setCoverBookKey(null)}
       />
     </Screen>
   );

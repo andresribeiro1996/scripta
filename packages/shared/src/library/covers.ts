@@ -18,10 +18,10 @@
 // (shared across every account, since the same public book has the same
 // cover for everyone) of the actual downloaded/re-encoded image bytes,
 // not just a remembered URL — now lives entirely in
-// backend/src/modules/covers, checked BEFORE any external source is
-// ever contacted. See that module's own service.ts for where the chain
-// this file used to hold actually lives now, and its README section for
-// the full reasoning.
+// backend/src/modules/books, checked BEFORE any external source is
+// ever contacted. See that module's own booksService.ts for where the
+// chain this file used to hold actually lives now, and its README
+// section for the full reasoning.
 
 export function normalizeIsbn(raw: unknown): string {
   const cleaned = String(raw ?? "")
@@ -40,5 +40,5 @@ export function normalizeImageId(raw: unknown): string {
 export function statusLabel(status: unknown): string {
   if (status === 2) return "Finished";
   if (status === 1) return "Reading";
-  return "Not read";
+  return "To read";
 }

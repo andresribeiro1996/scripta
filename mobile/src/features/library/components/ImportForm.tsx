@@ -16,7 +16,8 @@
 
 import { useState } from "react";
 import { File } from "expo-file-system";
-import { ScrollView, Text, View } from "react-native";
+import { ScrollView, View } from "react-native";
+import { Text } from "../../../ui/Text";
 import type { LibraryData } from "@scripta/shared";
 import { Button, ErrorState, Skeleton } from "../../../ui/components";
 import { spacing, typography, useTheme } from "../../../ui/theme";

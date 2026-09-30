@@ -23,6 +23,9 @@ export function createSqliteLibraryRepository(db: DatabaseSync): LibraryReposito
   const getByShareTokenStmt = db.prepare(`SELECT * FROM library_documents WHERE share_token = ?`);
 
   return {
+    deleteUserData(userId) {
+      db.prepare("DELETE FROM library_documents WHERE user_id = ?").run(userId);
+    },
     getDocument(userId) {
       return getStmt.get(userId) as LibraryDocumentRow | undefined;
     },

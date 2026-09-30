@@ -64,9 +64,8 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
   // OR IGNORE, not a plain INSERT — two votes for the same (duel_id,
   // voter_token) racing (a double-click, a retried request) would
   // otherwise throw on the UNIQUE constraint instead of just quietly
-  // staying "already voted" — same reasoning modules/covers' own
-  // cover_cache insert already documents. Since idx_votes_duel_user
-  // (schema.sql), OR IGNORE equally absorbs the signed-in case: a second
+  // staying "already voted". Since idx_votes_duel_user (schema.sql),
+  // OR IGNORE equally absorbs the signed-in case: a second
   // token voting a duel the ACCOUNT already voted conflicts on that
   // partial unique index, so a signed-in voter can't inflate a tally by
   // minting fresh tokens.
@@ -105,6 +104,17 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
   `);
 
   return {
+    deleteUserData(userId) {
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        db.prepare("DELETE FROM tournaments WHERE owner_user_id = ?").run(userId);
+        db.prepare("UPDATE votes SET voter_user_id = NULL WHERE voter_user_id = ?").run(userId);
+        db.exec("COMMIT");
+      } catch (error) {
+        db.exec("ROLLBACK");
+        throw error;
+      }
+    },
     insertTournament(row) {
       insertTournamentStmt.run({
         $id: row.id,
