@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { BLOCK_FONT_SIZE_RANGE, CARD_BORDER_OPACITY_RANGE, CARD_OPACITY_RANGE, CARD_RADIUS_RANGE, DEFAULT_BLOCK_STYLE, type BlockStyle } from "@scripta/shared";
 import { THEME_IDS, themes } from "@scripta/shared/themes";
-import { BORDER_STRENGTH_PRESETS, CORNER_PRESETS, FADE_PRESETS, QUICK_LOOKS, SIZE_PRESETS, applyLook, isHardToRead, matchPreset, matchSides, selectionBorderColor } from "./blockStyleOptions.js";
+import { BORDER_STRENGTH_PRESETS, COLOR_LOOKS, COLOR_LOOK_FIELDS, CORNER_PRESETS, FADE_PRESETS, FRAME_LOOKS, FRAME_LOOK_FIELDS, SIZE_PRESETS, applyLook, isHardToRead, matchPreset, matchSides, selectionBorderColor } from "./blockStyleOptions.js";
 
 const onGrid = (value: number, range: { min: number; max: number; step: number }) => value >= range.min && value <= range.max && (value - range.min) % range.step === 0;
 
@@ -23,10 +23,51 @@ test("every preset sits on the grid the web sliders use", () => {
   for (const preset of FADE_PRESETS) assert.ok(onGrid(preset.value, CARD_OPACITY_RANGE), preset.key);
 });
 
-test("a look leaves size, alignment, spacing and fade alone", () => {
-  const before: BlockStyle = { ...DEFAULT_BLOCK_STYLE, fontSize: 20, textAlign: "center", innerSpacing: "roomy", cardOpacity: 72, cardHoverEffect: true };
-  for (const look of QUICK_LOOKS) {
+const sorted = (values: readonly string[]) => [...values].sort();
+const both: BlockStyle = {
+  ...DEFAULT_BLOCK_STYLE,
+  backgroundColor: "#123456",
+  textColor: "#fedcba",
+  cardBorderColor: "#abcdef",
+  cardRadius: 24,
+  cardBorderWidth: 3,
+  cardBorderStyle: "dashed",
+  cardBorderOpacity: 40,
+  cardBorderSides: { top: true, right: false, bottom: true, left: false },
+  cardShadow: false,
+};
+
+test("colour looks and frame looks never share a field", () => {
+  for (const field of COLOR_LOOK_FIELDS) assert.ok(!(FRAME_LOOK_FIELDS as readonly string[]).includes(field), field);
+});
+
+test("every colour look sets the colour fields, and only clear also sets the shadow", () => {
+  for (const look of COLOR_LOOKS) assert.deepEqual(sorted(Object.keys(look.style)), sorted(look.key === "clear" ? [...COLOR_LOOK_FIELDS, "cardShadow"] : COLOR_LOOK_FIELDS), look.key);
+});
+
+test("every frame look sets exactly the frame fields", () => {
+  for (const look of FRAME_LOOKS) assert.deepEqual(sorted(Object.keys(look.style)), sorted(FRAME_LOOK_FIELDS), look.key);
+});
+
+test("a colour look keeps the frame and a frame look keeps the colours", () => {
+  for (const look of COLOR_LOOKS) {
+    const after = applyLook(both, look);
+    for (const field of FRAME_LOOK_FIELDS) if (!(look.key === "clear" && field === "cardShadow")) assert.deepEqual(after[field], both[field], `${look.key} ${field}`);
+  }
+  for (const look of FRAME_LOOKS) {
+    const after = applyLook(both, look);
+    for (const field of COLOR_LOOK_FIELDS) assert.deepEqual(after[field], both[field], `${look.key} ${field}`);
+  }
+});
+
+test("a look leaves font, emphasis, size, alignment, spacing and fade alone", () => {
+  const before: BlockStyle = { ...DEFAULT_BLOCK_STYLE, fontFamily: "mono", bold: true, italic: true, codeStyle: true, fontSize: 20, textAlign: "center", innerSpacing: "roomy", cardOpacity: 72, cardHoverEffect: true };
+  for (const look of [...COLOR_LOOKS, ...FRAME_LOOKS]) {
     const after = applyLook(before, look);
+    assert.equal(after.fontFamily, "mono", look.key);
+    assert.equal(after.bold, true, look.key);
+    assert.equal(after.italic, true, look.key);
+    assert.equal(after.codeStyle, true, look.key);
     assert.equal(after.fontSize, 20, look.key);
     assert.equal(after.textAlign, "center", look.key);
     assert.equal(after.innerSpacing, "roomy", look.key);
@@ -35,22 +76,16 @@ test("a look leaves size, alignment, spacing and fade alone", () => {
   }
 });
 
-test("a look resets web-only border settings to plain ones", () => {
+test("a frame look resets web-only border settings to plain ones", () => {
   const web: BlockStyle = { ...DEFAULT_BLOCK_STYLE, cardBorderStyle: "groove", cardBorderOpacity: 60, cardBorderSides: { top: true, right: false, bottom: false, left: false } };
-  const after = applyLook(web, QUICK_LOOKS.find((look) => look.key === "plain")!);
+  const after = applyLook(web, FRAME_LOOKS.find((look) => look.key === "framed")!);
   assert.equal(after.cardBorderStyle, "solid");
   assert.equal(after.cardBorderOpacity, 100);
   assert.equal(matchSides(after.cardBorderSides), "all");
 });
 
-test("every theme look is readable in every theme", () => {
-  for (const look of QUICK_LOOKS.filter((item) => item.group === "theme")) {
-    for (const id of THEME_IDS) assert.equal(isHardToRead(applyLook(DEFAULT_BLOCK_STYLE, look), themes[id].colors), false, `${look.key} in ${id}`);
-  }
-});
-
-test("every fixed look is readable, whatever the theme", () => {
-  for (const look of QUICK_LOOKS.filter((item) => item.group === "fixed")) {
+test("every colour look is readable in every theme", () => {
+  for (const look of COLOR_LOOKS) {
     for (const id of THEME_IDS) assert.equal(isHardToRead(applyLook(DEFAULT_BLOCK_STYLE, look), themes[id].colors), false, `${look.key} in ${id}`);
   }
 });
