@@ -13,6 +13,7 @@ function createInMemoryRepo(): QuizzesRepository {
   const plays = new Map<string, PlayRow>();
   const answers = new Map<string, AnswerRow[]>();
   return {
+    rekeyBooks() {},
     listByUser: (userId) => [...quizzes.values()].filter((q) => q.owner_user_id === userId),
     getOwned: (id, userId) => {
       const q = quizzes.get(id);

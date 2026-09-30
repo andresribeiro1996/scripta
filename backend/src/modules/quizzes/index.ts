@@ -2,4 +2,4 @@
 // modules/quizzes/ is private implementation — same convention as
 // modules/tierlists/index.ts.
 
-export { quizzesPlugin as registerQuizzesModule, deleteQuizzesUserData } from "./plugin.js";
+export { quizzesPlugin as registerQuizzesModule, deleteQuizzesUserData, rekeyQuizzesBooks } from "./plugin.js";
