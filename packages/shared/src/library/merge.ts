@@ -28,6 +28,12 @@ export function bookKey(book: Record<string, unknown>): string {
   return `ta:${title}|${author}`;
 }
 
+export function bookMatchKeys(book: Record<string, unknown>): string[] {
+  const isbn = normalizeIsbn(book.ISBN);
+  const ta = `ta:${normalizeForMatch(book.Title)}|${normalizeForMatch(book.Attribution)}`;
+  return isbn ? [`isbn:${isbn}`, ta] : [ta];
+}
+
 function normalizeForMatch(value: unknown): string {
   return String(value ?? "")
     .trim()

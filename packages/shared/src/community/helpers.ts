@@ -5,7 +5,8 @@ import type {
   FeedCategory,
   FeedSettings,
   FeedItem,
-  PublishedContent
+  PublishedContent,
+  SuggestedReader
 } from "./types.js";
 
 export function contentKindLabel(content: PublishedContent): string {
@@ -155,4 +156,9 @@ export function activityDay(iso: string, now: Date = new Date()): string {
   if (days === 1) return "Yesterday";
   if (days < 7) return date.toLocaleDateString(undefined, { weekday: "long" });
   return date.toLocaleDateString(undefined, { month: "long", day: "numeric", ...(date.getFullYear() === now.getFullYear() ? {} : { year: "numeric" }) });
+}
+
+export function suggestionReason(reader: Pick<SuggestedReader, "sharedCount">): string {
+  if (reader.sharedCount === 0) return "Recently active";
+  return `You share ${reader.sharedCount} ${reader.sharedCount === 1 ? "book" : "books"}`;
 }
