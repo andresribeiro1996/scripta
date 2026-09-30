@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, V
 import { Text } from "../../ui/Text";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
 import { bookKey, buildDashboardCards, resolveQuote } from "@scripta/shared";
-import { BrandMark, Button, EmptyState, ErrorState, Screen, Skeleton, Toast, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
+import { BrandMark, Button, EmptyState, ErrorState, IconButton, Screen, Skeleton, Toast, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { useAuth } from "../../core/auth";
 import { useLibrary } from "../library/hooks/useLibrary";
 import { CoverImage } from "../library/components/CoverImage";
@@ -60,6 +60,9 @@ export function HomeScreen() {
           title: "Home",
           headerShown: true,
           headerLeft: () => <View style={styles.mark}><BrandMark size={24} /></View>,
+          headerRight: () => (
+            <IconButton framed name="community" label="Community" accessibilityLabel="Community" onPress={() => router.push("/community" as never)} />
+          ),
         }}
       />
       {library.isPending ? (
@@ -140,12 +143,12 @@ export function HomeScreen() {
                       following={followingId === item.actor.userId}
                     />
                   ))}
-                  <Pressable accessibilityRole="button" onPress={() => router.push("/activity" as never)} style={styles.linkRow}>
+                  <Pressable accessibilityRole="button" onPress={() => router.push("/community?tab=activity" as never)} style={styles.linkRow}>
                     <Text {...dynamicType} style={[typography.body, styles.heading, { color: colors.accent }]}>All activity</Text>
                   </Pressable>
                 </>
               ) : (
-                <Pressable accessibilityRole="button" onPress={() => router.push("/activity?tab=people" as never)} style={styles.linkRow}>
+                <Pressable accessibilityRole="button" onPress={() => router.push("/community?tab=people" as never)} style={styles.linkRow}>
                   <Text {...dynamicType} style={[typography.body, styles.heading, { color: colors.accent }]}>Find readers</Text>
                 </Pressable>
               )}

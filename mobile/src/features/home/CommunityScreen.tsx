@@ -6,25 +6,26 @@ import { ErrorState, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, spacin
 import { DiscoverPane } from "../community/DiscoverPane";
 import { PeoplePane } from "../community/PeoplePane";
 import { markDashboardSeen } from "../community/api";
-import { defaultHomeTab, homeTabOptions, type HomeTab } from "./homeTabs";
+import { communityTabOptions, defaultCommunityTab, shouldMarkSeen, type CommunityTab } from "./communityTabs";
 import { FeedRow, digestRoute, useDashboardFeed, useFollowBack } from "./FeedRow";
 
-export function ActivityScreen({ initialTab }: { initialTab?: HomeTab }) {
+export function CommunityScreen({ initialTab }: { initialTab?: CommunityTab }) {
   const { colors } = useTheme();
   const router = useRouter();
-  const [tab, setTab] = useState<HomeTab>(initialTab ?? "activity");
+  const [tab, setTab] = useState<CommunityTab>(initialTab ?? "activity");
   const tabInitedRef = useRef(Boolean(initialTab));
   const markedRef = useRef(false);
   const dashboard = useDashboardFeed();
-  useEffect(() => {
-    if (!markedRef.current && dashboard.data) {
-      markedRef.current = true;
-      void markDashboardSeen().catch(() => {});
-    }
-  }, [dashboard.data]);
 
   const items = dashboard.data?.pages.flatMap((page) => page.items) ?? [];
   const newCount = dashboard.data?.pages[0]?.newCount ?? 0;
+
+  useEffect(() => {
+    if (!markedRef.current && shouldMarkSeen(tab, items.length)) {
+      markedRef.current = true;
+      void markDashboardSeen().catch(() => {});
+    }
+  }, [tab, items.length]);
 
   // Picks the opening tab once real data has arrived, then leaves the user's
   // own tab choice alone — otherwise a later refetch could yank them back to
@@ -32,7 +33,7 @@ export function ActivityScreen({ initialTab }: { initialTab?: HomeTab }) {
   useEffect(() => {
     if (!tabInitedRef.current && dashboard.data) {
       tabInitedRef.current = true;
-      setTab(defaultHomeTab(items.length));
+      setTab(defaultCommunityTab(items.length));
     }
   }, [dashboard.data, items.length]);
 
@@ -42,7 +43,7 @@ export function ActivityScreen({ initialTab }: { initialTab?: HomeTab }) {
     <Screen top={false}>
       <Stack.Screen
         options={{
-          title: "Activity",
+          title: "Community",
           headerShown: true,
         }}
       />
@@ -58,8 +59,8 @@ export function ActivityScreen({ initialTab }: { initialTab?: HomeTab }) {
         <View style={styles.grow}>
           {followError ? <Toast visible message={followError} tone="error" /> : null}
           <SwipeableTabs
-            accessibilityLabel="Activity sections"
-            options={homeTabOptions(newCount)}
+            accessibilityLabel="Community sections"
+            options={communityTabOptions(newCount)}
             value={tab}
             onChange={setTab}
             renderPage={(value) => {
