@@ -7,6 +7,7 @@ import { encodeCover, type EncodedCover } from "./domain/images.js";
 import { findByIdentity, lookupIdentity, SEARCH_LIMIT, searchTokens, type BookIdentity, type BookLookup } from "./domain/normalize.js";
 import type { BookCatalog, BooksRepository, CatalogSearchHit, CoverBlobStore } from "./domain/ports.js";
 import type { BookRow, CoverSourceName, CoverStatus } from "./domain/types.js";
+import type { CoverPriority } from "./worker.js";
 
 const RETRY_AFTER_MS = 30 * 24 * 60 * 60 * 1000;
 const UNAVAILABLE_BACKOFF_MS = 10 * 60 * 1000;
@@ -30,7 +31,7 @@ export interface BooksServiceDeps {
   sources: CoverSources;
   catalog: BookCatalog;
   fetchImage: FetchCoverImage;
-  enqueue: (bookId: string, front?: boolean) => void;
+  enqueue: (bookId: string, priority?: CoverPriority) => void;
   publicUrlFor: (imageId: string, size: CoverFileSize) => string;
   adminUserId: string;
   warn: (details: Record<string, unknown>, message: string) => void;
@@ -94,9 +95,9 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
     };
   }
 
-  function schedule(bookId: string, front = false) {
+  function schedule(bookId: string, priority: CoverPriority = "normal") {
     if ((backoffUntil.get(bookId) ?? 0) > now().getTime()) return;
-    deps.enqueue(bookId, front);
+    deps.enqueue(bookId, priority);
   }
 
   async function storeImage(bookId: string, source: CoverSourceName, sourceUrl: string | null, image: EncodedCover, at: string): Promise<string> {
@@ -154,11 +155,11 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       const book = findOrCreate(lookup);
       if (!book) return NO_COVER;
       if (book.cover_image_id) {
-        if (book.cover_status === "low_res" && olderThan(book.cover_checked_at, RETRY_AFTER_MS)) schedule(book.id, front);
+        if (book.cover_status === "low_res" && olderThan(book.cover_checked_at, RETRY_AFTER_MS)) schedule(book.id, front ? "front" : "normal");
         return coverOf(book);
       }
       if (book.cover_status === "missing" && !olderThan(book.cover_checked_at, RETRY_AFTER_MS)) return NO_COVER;
-      schedule(book.id, front);
+      schedule(book.id, front ? "front" : "normal");
       return PENDING;
     },
 
@@ -167,7 +168,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
     },
 
     enqueueUnchecked() {
-      for (const id of deps.repo.listUncheckedCoverIds()) schedule(id);
+      for (const id of deps.repo.listUncheckedCoverIds()) schedule(id, "background");
     },
 
     async processBook(bookId) {
@@ -219,7 +220,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       if (!trimmed) return [];
       if (looksLikeIsbnQuery(trimmed)) {
         const saved = deps.repo.findBookByKey(`isbn:${normalizeIsbn(trimmed)}`);
-        return saved ? [toSearchResult(saved)] : [];
+        return saved && saved.data_sources !== "[]" ? [toSearchResult(saved)] : [];
       }
       const tokens = searchTokens(trimmed);
       return tokens.length === 0 ? [] : deps.repo.searchBooks(tokens, SEARCH_LIMIT).map(toSearchResult);
@@ -245,7 +246,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       if (image?.source_url) deps.repo.addRejection(book.id, image.source_url, now().toISOString());
       deps.repo.setCover(book.id, { imageId: null, status: null, checkedAt: null });
       backoffUntil.delete(book.id);
-      deps.enqueue(book.id, true);
+      deps.enqueue(book.id, "front");
       return { url: null, fullUrl: null, pending: true };
     },
 

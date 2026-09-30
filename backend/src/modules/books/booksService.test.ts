@@ -43,7 +43,7 @@ function harness(overrides: Partial<Deps> = {}) {
   const blobs = {
     save: async (id: string, extension: string, bytes: Buffer) => { files.set(`${id}.${extension}`, bytes); }
   };
-  const enqueued: Array<{ bookId: string; front: boolean }> = [];
+  const enqueued: Array<{ bookId: string; priority: string }> = [];
   const warnings: Array<{ details: Record<string, unknown>; message: string }> = [];
   let clock = Date.parse("2026-10-01T00:00:00.000Z");
   const sizes = new Map<string, [number, number]>();
@@ -59,7 +59,7 @@ function harness(overrides: Partial<Deps> = {}) {
       const size = sizes.get(candidate.url);
       return size ? { full: Buffer.from(`full:${candidate.url}`), thumb: Buffer.from(`thumb:${candidate.url}`), width: size[0], height: size[1] } : null;
     },
-    enqueue: (bookId, front = false) => { enqueued.push({ bookId, front }); },
+    enqueue: (bookId, priority = "normal") => { enqueued.push({ bookId, priority }); },
     publicUrlFor: (id, size) => `https://api.test/covers/cached/${id}/${size}`,
     adminUserId: "",
     warn: (details, message) => { warnings.push({ details, message }); },
@@ -160,7 +160,7 @@ test("resolve queues at the back unless asked to jump the queue", () => {
   const { service, enqueued } = harness();
   service.resolveCover(orlando);
   service.resolveCover(orlando, true);
-  assert.deepEqual(enqueued.map((entry) => entry.front), [false, true]);
+  assert.deepEqual(enqueued.map((entry) => entry.priority), ["normal", "front"]);
 });
 
 test("enqueueCovers queues each unresolved book at the back and skips resolved ones", async () => {
@@ -171,7 +171,7 @@ test("enqueueCovers queues each unresolved book at the back and skips resolved o
   await h.service.processBook(h.bookId("isbn:9780141184272"));
   h.enqueued.length = 0;
   h.service.enqueueCovers([orlando, dune, { title: "" }]);
-  assert.deepEqual(h.enqueued, [{ bookId: h.bookId("ta:dune|frank herbert|"), front: false }]);
+  assert.deepEqual(h.enqueued, [{ bookId: h.bookId("ta:dune|frank herbert|"), priority: "normal" }]);
 });
 
 test("enqueueCovers skips a book in backoff", async () => {
@@ -220,7 +220,7 @@ test("an unexpected error during processing sets a 10-minute backoff and rethrow
   assert.equal(h.enqueued.length, 1);
 });
 
-test("enqueueUnchecked queues never-checked books at the back, oldest first, and skips checked ones", async () => {
+test("enqueueUnchecked queues never-checked books on the background lane, oldest first, and skips checked ones", async () => {
   const h = harness({ sources: { isbndb: null, apple: isbnSource("https://a/1"), openlibrary: emptySource } });
   h.sizes.set("https://a/1", [900, 1400]);
   h.service.resolveCover(orlando);
@@ -232,8 +232,8 @@ test("enqueueUnchecked queues never-checked books at the back, oldest first, and
   h.enqueued.length = 0;
   h.service.enqueueUnchecked();
   assert.deepEqual(h.enqueued, [
-    { bookId: h.bookId("ta:dune|frank herbert|"), front: false },
-    { bookId: h.bookId("ta:emma|jane austen|"), front: false }
+    { bookId: h.bookId("ta:dune|frank herbert|"), priority: "background" },
+    { bookId: h.bookId("ta:emma|jane austen|"), priority: "background" }
   ]);
 });
 
@@ -358,12 +358,22 @@ test("a details failure propagates and records nothing", async () => {
   assert.equal(h.repo.findBookByKey("isbn:9780441013593")!.details_status, null);
 });
 
-test("an ISBN search is answered from a saved book without calling Open Library", () => {
+test("an ISBN search is answered from a saved book that has external details, without calling Open Library", async () => {
+  const { calls, catalog } = recordingCatalog();
+  const h = harness({ catalog });
+  await h.service.searchExternal("978-0-441-01359-3");
+  calls.length = 0;
+  const results = h.service.search("978-0-441-01359-3");
+  assert.equal(results[0]!.title, "Dune");
+  assert.deepEqual(calls, []);
+});
+
+test("an ISBN search ignores a saved row with no external details so the outside search can fill it in", () => {
   const { calls, catalog } = recordingCatalog();
   const h = harness({ catalog });
   h.service.resolveCover(dune);
-  const results = h.service.search("978-0-441-01359-3");
-  assert.equal(results[0]!.title, "Dune");
+  assert.equal(h.repo.findBookByKey("isbn:9780441013593")!.data_sources, "[]");
+  assert.deepEqual(h.service.search("978-0-441-01359-3"), []);
   assert.deepEqual(calls, []);
 });
 
@@ -491,7 +501,7 @@ test("rejecting a cover blocks its URL, clears the pointer and queues the book f
   h.enqueued.length = 0;
 
   assert.deepEqual(h.service.rejectCover(orlando), { url: null, fullUrl: null, pending: true });
-  assert.deepEqual(h.enqueued, [{ bookId: id, front: true }]);
+  assert.deepEqual(h.enqueued, [{ bookId: id, priority: "front" }]);
   assert.equal(h.repo.getBook(id)!.cover_image_id, null);
   assert.deepEqual([...h.repo.listRejectedUrls(id)], ["https://a/1"]);
 
