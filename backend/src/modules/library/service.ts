@@ -3,7 +3,7 @@
 // modules/auth/service.ts.
 
 import { randomUUID } from "node:crypto";
-import { buildManualBook, localDay, setReadStatus } from "@scripta/shared";
+import { buildManualBook, localDay, seedCoverLookup, setReadStatus, type CoverLookupParams } from "@scripta/shared";
 import type { BookRecommendationInput } from "@scripta/shared/community";
 import { LibraryConflictError, NoLibraryDocumentError } from "./domain/errors.js";
 import type { LibraryRepository } from "./domain/ports.js";
@@ -13,6 +13,8 @@ import { toPublicLibraryData } from "./publicResolver.js";
 export type BookEvent = { type: "book_added" | "book_finished"; refId: string; payload: Record<string, unknown> };
 
 export type EmitBookEvents = (userId: string, events: BookEvent[]) => void;
+
+export type EnqueueCovers = (lookups: CoverLookupParams[]) => void;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -94,7 +96,12 @@ export interface LibraryService {
   getPublicByToken(token: string): { data: unknown } | null;
 }
 
-export function createLibraryService(repo: LibraryRepository, publicUrlFor: (token: string) => string, emitBookEvents?: EmitBookEvents): LibraryService {
+function coverLookupsOf(data: unknown): CoverLookupParams[] {
+  const books = isRecord(data) && Array.isArray(data.books) ? data.books : [];
+  return books.filter(isRecord).flatMap((book) => seedCoverLookup(book) ?? []);
+}
+
+export function createLibraryService(repo: LibraryRepository, publicUrlFor: (token: string) => string, emitBookEvents?: EmitBookEvents, enqueueCovers?: EnqueueCovers): LibraryService {
   return {
     getLibrary(userId) {
       const row = repo.getDocument(userId);
@@ -115,6 +122,7 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
           // successful save (e.g. an unparsable previous document).
         }
       }
+      if (source === "import" && enqueueCovers) enqueueCovers(coverLookupsOf(data));
       return toLibraryDocument(row, publicUrlFor);
     },
 

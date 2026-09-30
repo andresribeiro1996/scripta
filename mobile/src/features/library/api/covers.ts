@@ -8,6 +8,8 @@ const STORAGE_KEY = "scripta.covers.resolved.v2";
 
 const resolver = createCoverResolver({
   fetchResolve: (query) => apiClient.request<ResolvedCoverResponse>(`/covers/resolve?${query}`, { auth: true }),
+  fetchResolveBatch: async (lookups) =>
+    (await apiClient.request<{ results: ResolvedCoverResponse[] }>("/covers/resolve/batch", { method: "POST", body: lookups, auth: true })).results,
   persist(entries) {
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(entries)).catch(() => undefined);
   }

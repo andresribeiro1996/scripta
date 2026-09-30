@@ -4,16 +4,16 @@ import { findBestCover, type CoverSources, type FetchCoverImage } from "./coverR
 import { MIN_GOOD_WIDTH } from "./domain/constants.js";
 import { BookNotFoundError, FileTooLargeError, InvalidImageError } from "./domain/errors.js";
 import { encodeCover, type EncodedCover } from "./domain/images.js";
-import { lookupIdentity, searchTokens, type BookLookup } from "./domain/normalize.js";
+import { lookupIdentity, SEARCH_LIMIT, searchTokens, type BookLookup } from "./domain/normalize.js";
 import type { BookCatalog, BooksRepository, CatalogSearchHit, CoverBlobStore } from "./domain/ports.js";
 import type { BookRow, CoverSourceName, CoverStatus } from "./domain/types.js";
 
 const RETRY_AFTER_MS = 30 * 24 * 60 * 60 * 1000;
 const UNAVAILABLE_BACKOFF_MS = 10 * 60 * 1000;
-const SEARCH_LIMIT = 12;
 const COVER_EXTENSION = "webp";
 const COVER_MIME_TYPE = "image/webp";
 const NO_COVER: ResolvedCover = { url: null, fullUrl: null, pending: false };
+const PENDING: ResolvedCover = { url: null, fullUrl: null, pending: true };
 
 export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 
@@ -39,11 +39,14 @@ export interface BooksServiceDeps {
 }
 
 export interface BooksService {
-  resolveCover(lookup: BookLookup): ResolvedCover;
+  resolveCover(lookup: BookLookup, front?: boolean): ResolvedCover;
+  enqueueCovers(lookups: BookLookup[]): void;
+  enqueueUnchecked(): void;
   processBook(bookId: string): Promise<void>;
   getCoverFile(id: string, size: CoverFileSize): { buffer: Buffer; mimeType: string } | null;
   getDetails(lookup: BookLookup): Promise<BookMetadata | null>;
-  search(query: string): Promise<BookSearchResult[]>;
+  search(query: string): BookSearchResult[];
+  searchExternal(query: string): Promise<BookSearchResult[]>;
   isAdmin(userId: string): boolean;
   rejectCover(lookup: BookLookup): ResolvedCover;
   uploadCover(lookup: BookLookup, bytes: Buffer): Promise<ResolvedCover>;
@@ -78,10 +81,9 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
     };
   }
 
-  function schedule(bookId: string): boolean {
-    if ((backoffUntil.get(bookId) ?? 0) > now().getTime()) return false;
-    deps.enqueue(bookId);
-    return true;
+  function schedule(bookId: string, front = false) {
+    if ((backoffUntil.get(bookId) ?? 0) > now().getTime()) return;
+    deps.enqueue(bookId, front);
   }
 
   function storeImage(bookId: string, source: CoverSourceName, sourceUrl: string | null, image: EncodedCover, at: string): string {
@@ -119,12 +121,12 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
   }
 
   function saveHits(hits: CatalogSearchHit[]): BookSearchResult[] {
-    return hits.map(({ result, olCoverId }) => {
+    return hits.map(({ result, olCoverId, source }) => {
       const author = result.authors.join(", ");
       const identity = lookupIdentity({ isbn: result.isbn, title: result.title, author });
       if (!identity) return result;
       const book = deps.repo.findBookByKey(identity.key) ?? deps.repo.createBook(
-        { title: result.title, author, isbn: identity.isbn, year: result.year, publisher: result.publisher, olCoverId, genres: result.genres },
+        { title: result.title, author, isbn: identity.isbn, year: result.year, publisher: result.publisher, olCoverId, genres: result.genres, sources: [source] },
         identity.key,
         now().toISOString()
       );
@@ -135,15 +137,24 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
   }
 
   return {
-    resolveCover(lookup) {
+    resolveCover(lookup, front = false) {
       const book = findOrCreate(lookup);
       if (!book) return NO_COVER;
       if (book.cover_image_id) {
-        if (book.cover_status === "low_res" && olderThan(book.cover_checked_at, RETRY_AFTER_MS)) schedule(book.id);
+        if (book.cover_status === "low_res" && olderThan(book.cover_checked_at, RETRY_AFTER_MS)) schedule(book.id, front);
         return coverOf(book);
       }
       if (book.cover_status === "missing" && !olderThan(book.cover_checked_at, RETRY_AFTER_MS)) return NO_COVER;
-      return { url: null, fullUrl: null, pending: schedule(book.id) };
+      schedule(book.id, front);
+      return PENDING;
+    },
+
+    enqueueCovers(lookups) {
+      for (const lookup of lookups) this.resolveCover(lookup);
+    },
+
+    enqueueUnchecked() {
+      for (const id of deps.repo.listUncheckedCoverIds()) schedule(id);
     },
 
     async processBook(bookId) {
@@ -190,26 +201,29 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       if (!book) return null;
       if (book.details_status === "found") return detailsOf(book);
       if (book.details_status === "missing" && !olderThan(book.details_checked_at, RETRY_AFTER_MS)) return null;
-      const metadata = await deps.catalog.fetchDetails({ isbn: book.isbn, title: book.title, author: book.author });
+      const details = await deps.catalog.fetchDetails({ isbn: book.isbn, title: book.title, author: book.author });
       const at = now().toISOString();
-      if (metadata) deps.repo.saveDetails(book.id, metadata, at);
+      if (details) deps.repo.saveDetails(book.id, details.metadata, details.sources, at);
       else deps.repo.markDetailsMissing(book.id, at);
-      return metadata;
+      return details?.metadata ?? null;
     },
 
-    async search(query) {
+    search(query) {
       const trimmed = query.trim();
       if (!trimmed) return [];
       if (looksLikeIsbnQuery(trimmed)) {
-        const isbn = normalizeIsbn(trimmed);
-        const saved = deps.repo.findBookByKey(`isbn:${isbn}`);
-        if (saved) return [toSearchResult(saved)];
-        return saveHits(await deps.catalog.search({ isbn }));
+        const saved = deps.repo.findBookByKey(`isbn:${normalizeIsbn(trimmed)}`);
+        return saved ? [toSearchResult(saved)] : [];
       }
       const tokens = searchTokens(trimmed);
-      if (tokens.length === 0) return [];
-      const saved = deps.repo.searchBooks(tokens, SEARCH_LIMIT);
-      if (saved.length > 0) return saved.map(toSearchResult);
+      return tokens.length === 0 ? [] : deps.repo.searchBooks(tokens, SEARCH_LIMIT).map(toSearchResult);
+    },
+
+    async searchExternal(query) {
+      const trimmed = query.trim();
+      if (!trimmed) return [];
+      if (looksLikeIsbnQuery(trimmed)) return saveHits(await deps.catalog.search({ isbn: normalizeIsbn(trimmed) }));
+      if (searchTokens(trimmed).length === 0) return [];
       return saveHits(await deps.catalog.search({ text: trimmed }));
     },
 

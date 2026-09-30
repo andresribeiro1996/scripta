@@ -4,12 +4,14 @@ import { useLibrary } from "../../hooks/useLibrary";
 import { useMurals } from "../../hooks/useMurals";
 import { buildMuralPreset, MURAL_PRESETS, presetAvailability, type MuralPresetId } from "../../lib/muralPresets";
 import { bookKey } from "../../lib/merge";
+import { useResolvedTheme } from "../../lib/theme";
 import { Sheet } from "../Sheet";
 
 export function MuralPresetPicker({ folderId, onClose }: { folderId: string | null; onClose: () => void }) {
   const { data: library, isLoading, isError } = useLibrary();
   const { create, saveBlocks } = useMurals();
   const navigate = useNavigate();
+  const viewerTheme = useResolvedTheme();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [pending, setPending] = useState<{ id: string; preset: MuralPresetId } | null>(null);
@@ -24,7 +26,7 @@ export function MuralPresetPicker({ folderId, onClose }: { folderId: string | nu
     setError("");
     try {
       const preset = buildMuralPreset(id, books, groups);
-      const target = pending ?? { id: (await create(preset.name, folderId)).id, preset: id };
+      const target = pending ?? { id: (await create(preset.name, viewerTheme, folderId)).id, preset: id };
       setPending(target);
       await saveBlocks(target.id, preset.blocks);
       navigate(`/dashboard/murals/${target.id}`);

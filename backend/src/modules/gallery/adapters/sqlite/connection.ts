@@ -15,6 +15,7 @@ export function openGalleryDb(): DatabaseSync {
 
   const db = new DatabaseSync(env.GALLERY_DB_PATH);
   db.exec("PRAGMA journal_mode = WAL");
+  db.exec("PRAGMA busy_timeout = 5000");
 
   const schema = readFileSync(`${adapterDir}/schema.sql`, "utf8");
   db.exec(schema);

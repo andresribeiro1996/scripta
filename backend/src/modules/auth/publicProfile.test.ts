@@ -22,7 +22,7 @@ insertUser.run("u2", "noname@test.dev", null);
 insertUser.run("u3", "bob@test.dev", "bobby");
 insertUser.run("u4", "alina@test.dev", "alina");
 
-const { resolvePublicReaderProfile, resolvePublicReaderProfiles, userHasUsername, findUserIdByUsername, searchUsernameOwners } = await import("./publicProfile.js");
+const { getUserTheme, resolvePublicReaderProfile, resolvePublicReaderProfiles, userHasUsername, findUserIdByUsername, searchUsernameOwners } = await import("./publicProfile.js");
 
 test("resolvePublicReaderProfile keeps its existing shape", () => {
   assert.deepEqual(resolvePublicReaderProfile("u1"), { username: "alice", avatarUrl: null });
@@ -58,4 +58,14 @@ test("dashboard seen marker round-trips and defaults to null", async () => {
   setDashboardSeenAt("seen-user", "2026-09-18T11:00:00.000Z");
   assert.equal(getDashboardSeenAt("seen-user"), "2026-09-18T11:00:00.000Z");
   assert.equal(getDashboardSeenAt("stranger"), null);
+});
+
+test("getUserTheme resolves a concrete theme and treats system or unset as light", () => {
+  const setTheme = db.prepare("UPDATE users SET theme = ? WHERE id = ?");
+  setTheme.run("sepia", "u1");
+  setTheme.run("system", "u3");
+  assert.equal(getUserTheme("u1"), "sepia");
+  assert.equal(getUserTheme("u3"), "light");
+  assert.equal(getUserTheme("u2"), "light");
+  assert.equal(getUserTheme("missing"), "light");
 });

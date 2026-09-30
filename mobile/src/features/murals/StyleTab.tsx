@@ -1,15 +1,16 @@
-import { BLOCK_FONT_FAMILY_OPTIONS, BLOCK_INNER_SPACING_OPTIONS, BLOCK_TEXT_ALIGN_OPTIONS, BLOCK_THEME_COLOR_LABELS, resolveBlockColor, themeColorRef, type BlockStyle, type BlockThemeColorKey } from "@scripta/shared";
-import type { ReactNode } from "react";
+import { BLOCK_BACKGROUND_FINISH_OPTIONS, BLOCK_FONT_FAMILY_OPTIONS, BLOCK_INNER_SPACING_OPTIONS, BLOCK_TEXT_ALIGN_OPTIONS, BLOCK_THEME_COLOR_LABELS, normalizeHexColor, resolveBlockColor, themeColorRef, type BlockStyle, type BlockThemeColorKey } from "@scripta/shared";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { Button } from "../../ui";
+import { Button, Icon } from "../../ui";
 import { Text } from "../../ui/Text";
 import { blockFontFamily } from "../../ui/libraryStyle";
-import { minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui/theme";
+import { minimumTouchTarget, radii, spacing, typography, useTheme, type ThemeColors } from "../../ui/theme";
 import { SelectRow, SWATCHES } from "../library/components/StyleControls";
+import { ColorEditor } from "./ColorEditor";
 import {
   BACKGROUND_FIXED_SWATCHES, BACKGROUND_THEME_SWATCHES, BORDER_SIDE_PRESETS, BORDER_STRENGTH_PRESETS, BORDER_STYLE_CHOICES, BORDER_THEME_SWATCHES,
-  BORDER_WIDTH_PRESETS, CORNER_PRESETS, FADE_PRESETS, QUICK_LOOKS, SIZE_PRESETS, TEXT_THEME_SWATCHES,
-  applyLook, isHardToRead, matchPreset, matchSides, type Preset, type QuickLook,
+  BORDER_WIDTH_PRESETS, COLOR_LOOKS, CORNER_PRESETS, FADE_PRESETS, FRAME_LOOKS, SIZE_PRESETS, TEXT_THEME_SWATCHES,
+  applyLook, customColorStart, isHardToRead, matchPreset, matchSides, type CustomColorTarget, type Look, type Preset,
 } from "./blockStyleOptions";
 
 function Group({ title, children }: { title: string; children: ReactNode }) {
@@ -50,13 +51,16 @@ function PresetRow({ label, presets, value, onChange }: { label: string; presets
   return <SelectRow label={label} value={matchPreset(presets, value)} options={presets.map((preset) => ({ value: preset.key, label: preset.label }))} onChange={(key) => onChange(presets.find((preset) => preset.key === key)!.value)} />;
 }
 
-function ColorRow({ label, value, defaults, themeKeys, fixed, onChange }: {
+function ColorRow({ label, palette, value, defaults, themeKeys, fixed, onChange, onCustom, editor }: {
   label: string;
+  palette: ThemeColors;
   value: string | null;
   defaults: Array<{ label: string; value: string | null }>;
   themeKeys: readonly BlockThemeColorKey[];
   fixed: readonly string[];
   onChange: (value: string | null) => void;
+  onCustom: () => void;
+  editor: ReactNode;
 }) {
   const { colors } = useTheme();
   const current = value?.toLowerCase() ?? null;
@@ -64,36 +68,43 @@ function ColorRow({ label, value, defaults, themeKeys, fixed, onChange }: {
     const selected = current === stored.toLowerCase();
     return <Pressable key={key} accessibilityRole="button" accessibilityLabel={accessibilityLabel} accessibilityState={{ selected }} onPress={() => onChange(stored)} style={[styles.swatch, { backgroundColor: fill, borderColor: selected ? colors.accent : colors.border, borderWidth: selected ? 3 : 1 }]} />;
   };
+  const custom = current && normalizeHexColor(current) && !fixed.some((hex) => hex.toLowerCase() === current) ? current : null;
   return (
     <View style={styles.colorRow}>
       <Text style={[typography.body, styles.rowLabel, { color: colors.text }]}>{label}</Text>
       <View style={styles.wrap}>{defaults.map((option) => <Chip key={option.label} label={option.label} selected={value === option.value} onPress={() => onChange(option.value)} />)}</View>
-      <Caption>Theme · changes with the theme</Caption>
-      <View style={styles.wrap}>{themeKeys.map((key) => swatch(key, `${BLOCK_THEME_COLOR_LABELS[key]}, theme color`, colors[key], themeColorRef(key)))}</View>
+      <Caption>Theme · follows the mural theme</Caption>
+      <View style={styles.wrap}>{themeKeys.map((key) => swatch(key, `${BLOCK_THEME_COLOR_LABELS[key]}, theme color`, palette[key], themeColorRef(key)))}</View>
       <Caption>Fixed</Caption>
-      <View style={styles.wrap}>{fixed.map((hex) => swatch(hex, `Use ${hex}`, hex, hex))}</View>
+      <View style={styles.wrap}>{fixed.map((hex) => swatch(hex, `Use ${hex}`, hex, hex))}
+        <Pressable accessibilityRole="button" accessibilityLabel={custom ? `Custom color, ${custom}` : "Custom color"} accessibilityState={{ selected: custom !== null }} onPress={onCustom} style={[styles.swatch, styles.custom, { backgroundColor: custom ?? colors.surface, borderColor: custom ? colors.accent : colors.border, borderWidth: custom ? 3 : 1 }]}>
+          {custom ? null : <Icon name="add" size={20} color={colors.text} />}
+        </Pressable>
+      </View>
+      {editor}
     </View>
   );
 }
 
-function LookCard({ look, onPress }: { look: QuickLook; onPress: () => void }) {
+function LookCard({ look, style, palette, onPress }: { look: Look; style: BlockStyle; palette: ThemeColors; onPress: () => void }) {
   const { colors } = useTheme();
-  const { style } = look;
-  const background = resolveBlockColor(style.backgroundColor, colors) ?? colors.surface;
-  const text = resolveBlockColor(style.textColor, colors) ?? colors.text;
-  const border = resolveBlockColor(style.cardBorderColor, colors) ?? colors.border;
+  const preview = applyLook(style, look);
+  const background = resolveBlockColor(preview.backgroundColor, palette) ?? palette.surface;
+  const text = resolveBlockColor(preview.textColor, palette) ?? palette.text;
+  const border = resolveBlockColor(preview.cardBorderColor, palette) ?? palette.border;
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={`Apply the ${look.label} look`} onPress={onPress} style={styles.lookWrap}>
-      <View style={[styles.look, { backgroundColor: background, borderColor: style.cardBorderWidth ? border : colors.border, borderWidth: Math.max(1, style.cardBorderWidth), borderStyle: style.cardBorderWidth ? "solid" : "dashed", borderRadius: Math.min(style.cardRadius, radii.lg) }]}>
-        <Text style={{ color: text, fontFamily: blockFontFamily(style.fontFamily), fontWeight: style.bold ? "700" : "400", fontSize: 16 }}>Aa</Text>
+      <View style={[styles.look, { backgroundColor: background, borderColor: preview.cardBorderWidth ? border : palette.border, borderWidth: Math.max(1, preview.cardBorderWidth), borderStyle: preview.cardBorderWidth ? "solid" : "dashed", borderRadius: Math.min(preview.cardRadius, radii.lg) }]}>
+        <Text style={{ color: text, fontFamily: blockFontFamily(preview.fontFamily), fontWeight: preview.bold ? "700" : "400", fontSize: 16 }}>Aa</Text>
       </View>
       <Text style={[typography.caption, { color: colors.textDim }]}>{look.label}</Text>
     </Pressable>
   );
 }
 
-export function StyleTab({ style, onChange, onReset, onCopy, onPaste, canPaste }: {
+export function StyleTab({ style, palette, onChange, onReset, onCopy, onPaste, canPaste }: {
   style: BlockStyle;
+  palette: ThemeColors;
   onChange: (style: BlockStyle) => void;
   onReset: () => void;
   onCopy: () => void;
@@ -102,28 +113,44 @@ export function StyleTab({ style, onChange, onReset, onCopy, onPaste, canPaste }
 }) {
   const { colors } = useTheme();
   const set = (patch: Partial<BlockStyle>) => onChange({ ...style, ...patch });
-  const looks = (group: QuickLook["group"]) => (
+  const [editing, setEditing] = useState<{ target: CustomColorTarget; previous: string | null } | null>(null);
+  const latest = useRef({ style, onChange, editing });
+  latest.current = { style, onChange, editing };
+  useEffect(() => () => {
+    const { style: current, onChange: change, editing: open } = latest.current;
+    if (open) change({ ...current, [open.target]: open.previous });
+  }, []);
+  const customRow = (target: CustomColorTarget) => ({
+    onCustom: () => { if (editing?.target !== target) setEditing({ target, previous: style[target] }); },
+    editor: editing?.target === target ? (
+      <ColorEditor
+        key={target}
+        color={customColorStart(target, style, palette)}
+        onChange={(hex) => set({ [target]: hex })}
+        onDone={() => setEditing(null)}
+        onCancel={() => { set({ [target]: editing.previous }); setEditing(null); }}
+      />
+    ) : null,
+  });
+  const looks = (catalog: readonly Look[]) => (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.looks}>
-      {QUICK_LOOKS.filter((look) => look.group === group).map((look) => <LookCard key={look.key} look={look} onPress={() => onChange(applyLook(style, look))} />)}
+      {catalog.map((look) => <LookCard key={look.key} look={look} style={style} palette={palette} onPress={() => onChange(applyLook(style, look))} />)}
     </ScrollView>
   );
   return (
     <View style={styles.tab}>
-      <Group title="Quick looks">
-        <Caption>Theme looks change with the theme</Caption>
-        {looks("theme")}
-        <Caption>Fixed looks</Caption>
-        {looks("fixed")}
+      <Group title="Looks">
+        <Caption>Color</Caption>
+        {looks(COLOR_LOOKS)}
+        <Caption>Frame</Caption>
+        {looks(FRAME_LOOKS)}
       </Group>
-      <ColorRow label="Background" value={style.backgroundColor} defaults={[{ label: "None", value: "transparent" }, { label: "Theme", value: null }]} themeKeys={BACKGROUND_THEME_SWATCHES} fixed={BACKGROUND_FIXED_SWATCHES} onChange={(backgroundColor) => set(backgroundColor === "transparent" ? { backgroundColor, cardShadow: false } : { backgroundColor })} />
-      <Group title="Corners">
-        <View style={styles.wrap}>
-          {CORNER_PRESETS.map(({ key, label, value: radius }) => (
-            <Tile key={key} label={label} selected={style.cardRadius === radius} onPress={() => set({ cardRadius: radius })}>
-              <View style={[styles.corner, { borderColor: colors.text, borderTopLeftRadius: radius }]} />
-            </Tile>
-          ))}
-        </View>
+      <Group title="Color">
+        <ColorRow palette={palette} label="Background" value={style.backgroundColor} defaults={[{ label: "None", value: "transparent" }, { label: "Theme", value: null }]} themeKeys={BACKGROUND_THEME_SWATCHES} fixed={BACKGROUND_FIXED_SWATCHES} onChange={(backgroundColor) => set(backgroundColor === "transparent" ? { backgroundColor, cardShadow: false } : { backgroundColor })} {...customRow("backgroundColor")} />
+        <SelectRow label="Finish" value={style.backgroundFinish} options={BLOCK_BACKGROUND_FINISH_OPTIONS} onChange={(backgroundFinish) => set({ backgroundFinish })} />
+        {style.backgroundColor === "transparent" ? <Caption>Shows when the block has a background</Caption> : null}
+        <ColorRow palette={palette} label="Text color" value={style.textColor} defaults={[{ label: "Auto", value: null }]} themeKeys={TEXT_THEME_SWATCHES} fixed={SWATCHES} onChange={(textColor) => set({ textColor })} {...customRow("textColor")} />
+        {isHardToRead(style, palette) ? <Text accessibilityLiveRegion="polite" style={[typography.caption, { color: colors.danger }]}>Hard to read on this background</Text> : null}
       </Group>
       <Group title="Text">
         <View style={styles.wrap}>
@@ -136,10 +163,15 @@ export function StyleTab({ style, onChange, onReset, onCopy, onPaste, canPaste }
           <Chip label="Code" selected={style.codeStyle} onPress={() => set({ codeStyle: !style.codeStyle })} />
         </View>
         <SelectRow label="Alignment" value={style.textAlign} options={BLOCK_TEXT_ALIGN_OPTIONS} onChange={(textAlign) => set({ textAlign })} />
-        <ColorRow label="Text color" value={style.textColor} defaults={[{ label: "Auto", value: null }]} themeKeys={TEXT_THEME_SWATCHES} fixed={SWATCHES} onChange={(textColor) => set({ textColor })} />
-        {isHardToRead(style, colors) ? <Text accessibilityLiveRegion="polite" style={[typography.caption, { color: colors.danger }]}>Hard to read on this background</Text> : null}
       </Group>
-      <Group title="Border">
+      <Group title="Frame">
+        <View style={styles.wrap}>
+          {CORNER_PRESETS.map(({ key, label, value: radius }) => (
+            <Tile key={key} label={label} selected={style.cardRadius === radius} onPress={() => set({ cardRadius: radius })}>
+              <View style={[styles.corner, { borderColor: colors.text, borderTopLeftRadius: radius }]} />
+            </Tile>
+          ))}
+        </View>
         <PresetRow label="Width" presets={BORDER_WIDTH_PRESETS} value={style.cardBorderWidth} onChange={(cardBorderWidth) => set({ cardBorderWidth })} />
         {style.cardBorderWidth > 0 ? <>
           <SelectRow label="Style" value={BORDER_STYLE_CHOICES.some((choice) => choice.value === style.cardBorderStyle) ? style.cardBorderStyle : null} options={BORDER_STYLE_CHOICES} onChange={(cardBorderStyle) => set({ cardBorderStyle })} />
@@ -155,12 +187,14 @@ export function StyleTab({ style, onChange, onReset, onCopy, onPaste, canPaste }
               );
             })}
           </View>
-          <ColorRow label="Border color" value={style.cardBorderColor} defaults={[{ label: "Auto", value: null }]} themeKeys={BORDER_THEME_SWATCHES} fixed={SWATCHES} onChange={(cardBorderColor) => set({ cardBorderColor })} />
+          <ColorRow palette={palette} label="Border color" value={style.cardBorderColor} defaults={[{ label: "Auto", value: null }]} themeKeys={BORDER_THEME_SWATCHES} fixed={SWATCHES} onChange={(cardBorderColor) => set({ cardBorderColor })} {...customRow("cardBorderColor")} />
         </> : null}
+        <SelectRow label="Shadow" value={style.cardShadow ? "soft" : "none"} options={[{ value: "none", label: "None" }, { value: "soft", label: "Soft" }]} onChange={(value) => set({ cardShadow: value === "soft" })} />
       </Group>
-      <SelectRow label="Shadow" value={style.cardShadow ? "soft" : "none"} options={[{ value: "none", label: "None" }, { value: "soft", label: "Soft" }]} onChange={(value) => set({ cardShadow: value === "soft" })} />
-      <PresetRow label="Fade" presets={FADE_PRESETS} value={style.cardOpacity} onChange={(cardOpacity) => set({ cardOpacity })} />
-      <SelectRow label="Inner spacing" value={style.innerSpacing} options={BLOCK_INNER_SPACING_OPTIONS} onChange={(innerSpacing) => set({ innerSpacing })} />
+      <Group title="Spacing & fade">
+        <SelectRow label="Inner spacing" value={style.innerSpacing} options={BLOCK_INNER_SPACING_OPTIONS} onChange={(innerSpacing) => set({ innerSpacing })} />
+        <PresetRow label="Fade" presets={FADE_PRESETS} value={style.cardOpacity} onChange={(cardOpacity) => set({ cardOpacity })} />
+      </Group>
       <View style={styles.footer}>
         <Button label="Reset" variant="secondary" onPress={onReset} />
         <Button label="Copy style" variant="secondary" onPress={onCopy} />
@@ -183,6 +217,7 @@ const styles = StyleSheet.create({
   sides: { width: 32, height: 22, borderWidth: 2 },
   colorRow: { gap: spacing.sm },
   swatch: { width: minimumTouchTarget, height: minimumTouchTarget, borderRadius: radii.full },
+  custom: { alignItems: "center", justifyContent: "center" },
   looks: { gap: spacing.sm },
   lookWrap: { alignItems: "center", gap: spacing.xs },
   look: { width: 64, height: 44, alignItems: "center", justifyContent: "center" },

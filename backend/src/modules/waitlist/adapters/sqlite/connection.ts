@@ -11,6 +11,7 @@ export function openWaitlistDb(): DatabaseSync {
 
   const db = new DatabaseSync(env.WAITLIST_DB_PATH);
   db.exec("PRAGMA journal_mode = WAL");
+  db.exec("PRAGMA busy_timeout = 5000");
 
   const schema = readFileSync(`${adapterDir}/schema.sql`, "utf8");
   db.exec(schema);

@@ -15,3 +15,4 @@ Fastify/TypeScript API, modular monolith. Read `README.md` before changing it.
 - Put logic shared with the web or mobile client in `@scripta/shared`; do not duplicate it.
 - `npm test` names its test files explicitly — add new `*.test.ts` files to that list or CI will not run them.
 - Never weaken auth, import validation, or error handling to make a test pass.
+- A new `*_DB_PATH` must be under `/data` and listed in `litestream.yml`, or the deploy fails at boot.

@@ -1,12 +1,12 @@
 import { blockTextColors, resolveBlockColor, type Group, type PublicReaderCard } from "@scripta/shared";
-import { resolveTheme, themes } from "@scripta/shared/themes";
+import { themes, type ThemeColors } from "@scripta/shared/themes";
 import GridLayout from "react-grid-layout";
 import { useRef, useState, type CSSProperties } from "react";
 import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
-import { BLOCK_PAD_SCALE, blockFontFamilyCss, resolveBlockStyle, resolveBorderColor } from "../../lib/libraryStyle";
+import { BLOCK_PAD_SCALE, blockFinishImage, blockFontFamilyCss, resolveBlockStyle, resolveBorderColor } from "../../lib/libraryStyle";
 import { muralBlockTitle, GRID_COLUMNS, screenPointToGrid, type BlockLayout, type Mural, type MuralBlock, type ReaderProfile, type ShelfTheme } from "../../lib/murals";
-import { osScheme, useThemePreference } from "../../lib/theme";
+import { muralThemeStyle } from "../../lib/theme";
 import { ActionSheet } from "../Sheet";
 import { MobileBlockPreview } from "./MobileBlockPreview";
 import { MuralBlockDetail } from "./MuralBlockDetail";
@@ -65,7 +65,8 @@ function BlockFrame({
   tierlistData,
   onActivate,
   buttonRef,
-  scale
+  scale,
+  themeColors
 }: {
   block: MuralBlock;
   selected: boolean;
@@ -83,10 +84,10 @@ function BlockFrame({
   onActivate: () => void;
   buttonRef?: (element: HTMLDivElement | null) => void;
   scale: number;
+  themeColors: ThemeColors;
 }) {
   const style = resolveBlockStyle(block.style);
   const pointerStart = useRef<{ x: number; y: number } | null>(null);
-  const themeColors = themes[resolveTheme(useThemePreference(), osScheme())].colors;
   const overridden = style.backgroundColor || style.textColor ? blockTextColors(style, themeColors) : null;
   return (
     <div
@@ -113,6 +114,7 @@ function BlockFrame({
         borderRadius: `${style.cardRadius}px`,
         opacity: (style.cardOpacity / 100) * (draft ? 0.8 : 1),
         backgroundColor: resolveBlockColor(style.backgroundColor, themeColors) ?? "var(--color-surface)",
+        backgroundImage: blockFinishImage(style, themeColors),
         borderTopWidth: `${style.cardBorderSides.top ? style.cardBorderWidth : 0}px`,
         borderRightWidth: `${style.cardBorderSides.right ? style.cardBorderWidth : 0}px`,
         borderBottomWidth: `${style.cardBorderSides.bottom ? style.cardBorderWidth : 0}px`,
@@ -244,8 +246,8 @@ export function MobileMuralCanvas({
     <div className={`relative bg-(--color-bg) ${controlsPadding}`}>
       <div
         ref={setViewport}
-        className="mural-overview-stage relative w-full overflow-hidden bg-(--color-bg)"
-        style={{ height: logicalHeight * scale, minHeight: editMode ? "52dvh" : undefined }}
+        className="mural-overview-stage relative w-full overflow-hidden"
+        style={{ ...muralThemeStyle(mural.theme), height: logicalHeight * scale, minHeight: editMode ? "52dvh" : undefined }}
       >
         {viewportWidth > 0 && (
           <div
@@ -294,6 +296,7 @@ export function MobileMuralCanvas({
                     selected={editMode && block.id === selectedBlockId}
                     draggable={canDrag && (!draft || block.id === draft.block.id)}
                     scale={scale}
+                    themeColors={themes[mural.theme].colors}
                     draft={block.id === draft?.block.id}
                     invalid={block.id === draft?.block.id && !draft.valid}
                     books={books}
@@ -392,6 +395,7 @@ export function MobileMuralCanvas({
       {focused && (
         <MuralBlockDetail
           block={focused}
+          theme={mural.theme}
           books={books}
           images={images}
           profile={profile}

@@ -28,8 +28,9 @@ import type { GalleryImage } from "../api/gallery";
 import { MuralCanvas } from "../components/murals/MuralCanvas";
 import { FullscreenIcon, toolbarIconClass } from "../components/Toolbar";
 import { useMuralFullscreen } from "../hooks/useMuralFullscreen";
-import { ensureBookBlockHeights, type Mural } from "../lib/murals";
+import { ensureBookBlockHeights, muralThemeId, type Mural } from "../lib/murals";
 import { buildReconstructedBooks } from "../lib/sharedMural";
+import { muralThemeStyle } from "../lib/theme";
 
 function InfoScreen({ message }: { message: string }) {
   return (
@@ -76,6 +77,7 @@ export function SharedMuralPage() {
   const mural: Mural = {
     id: data.mural.id,
     name: data.mural.name,
+    theme: muralThemeId(data.mural.theme),
     blocks: ensureBookBlockHeights(data.mural.blocks),
     createdAt: "",
     updatedAt: "",
@@ -100,6 +102,7 @@ export function SharedMuralPage() {
       ) : (
         <div
           ref={fullscreenRef}
+          style={fullscreen ? muralThemeStyle(mural.theme) : undefined}
           className={fullscreen ? "fixed inset-0 z-50 overflow-y-auto bg-(--color-bg) px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]" : ""}
         >
           {fullscreen && (

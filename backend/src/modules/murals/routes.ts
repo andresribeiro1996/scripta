@@ -21,6 +21,7 @@
 // limit, same as it always did.
 
 import type { FastifyInstance } from "fastify";
+import { THEME_IDS } from "@scripta/shared/themes";
 import { z } from "zod";
 import { authGuard } from "../auth/index.js";
 import type { TierlistData } from "../tierlists/index.js";
@@ -32,7 +33,8 @@ const idParamSchema = z.object({ id: z.string().uuid() });
 
 const createMuralSchema = z.object({
   name: z.string().min(1, "name is required and must be non-empty."),
-  folderId: z.string().uuid().nullable().optional()
+  folderId: z.string().uuid().nullable().optional(),
+  theme: z.enum(THEME_IDS).optional()
 });
 
 // Deliberately light-touch, same treatment modules/library/routes.ts
@@ -41,12 +43,13 @@ const createMuralSchema = z.object({
 const updateMuralSchema = z
   .object({
     name: z.string().min(1).optional(),
+    theme: z.enum(THEME_IDS).optional(),
     blocks: z.array(z.unknown()).optional(),
     folderId: z.string().uuid().nullable().optional(),
     updatedAt: z.string().datetime().optional()
   })
-  .refine((body) => body.name !== undefined || body.blocks !== undefined || body.folderId !== undefined, {
-    message: "At least one of name, blocks, or folderId must be provided."
+  .refine((body) => body.name !== undefined || body.theme !== undefined || body.blocks !== undefined || body.folderId !== undefined, {
+    message: "At least one of name, theme, blocks, or folderId must be provided."
   });
 
 const setCoverSchema = z.object({
@@ -85,7 +88,7 @@ export function buildMuralRoutes(service: MuralsService) {
         return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? "Invalid request." });
       }
       try {
-        const mural = service.createMural(request.user.id, parsed.data.name, parsed.data.folderId ?? null);
+        const mural = service.createMural(request.user.id, parsed.data.name, parsed.data.folderId ?? null, parsed.data.theme);
         return reply.code(201).send(mural);
       } catch (err) {
         if (err instanceof InvalidFolderReferenceError) return reply.code(400).send({ error: err.message });

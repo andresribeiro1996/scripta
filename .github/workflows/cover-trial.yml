@@ -1,0 +1,55 @@
+name: Cover source trial
+
+on:
+  workflow_dispatch:
+    inputs:
+      eng:
+        description: English books to sample
+        default: "1800"
+      por:
+        description: Portuguese books to sample
+        default: "200"
+
+concurrency:
+  group: cover-trial
+  cancel-in-progress: false
+
+jobs:
+  trial:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+      - run: npm ci
+      - run: npm run build --workspace @scripta/shared
+      - uses: actions/cache/restore@v4
+        with:
+          path: backend/data/seed
+          key: cover-trial-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: cover-trial-
+      - if: hashFiles('backend/data/seed/seed-list.jsonl') == ''
+        run: npx tsx scripts/build-seed-list.ts
+        working-directory: backend
+      - run: npx tsx scripts/cover-source-trial.ts --eng "${{ inputs.eng }}" --por "${{ inputs.por }}"
+        timeout-minutes: 320
+        working-directory: backend
+        env:
+          ISBNDB_API_KEY: ${{ secrets.ISBNDB_API_KEY }}
+      - if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: backend/data/seed
+          key: cover-trial-${{ github.run_id }}-${{ github.run_attempt }}
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cover-trial
+          path: |
+            backend/data/seed/trial-rows.jsonl
+            backend/data/seed/trial-summary.json
+            backend/data/seed/seed-list.jsonl
+          if-no-files-found: warn

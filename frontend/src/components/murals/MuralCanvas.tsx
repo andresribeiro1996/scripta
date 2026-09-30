@@ -1,16 +1,16 @@
 import { MuralBlockDetail } from "./MuralBlockDetail";
 import { blockTextColors, resolveBlockColor, resolveHomeBlock, type Group, type PublicReaderCard } from "@scripta/shared";
-import { resolveTheme, themes } from "@scripta/shared/themes";
+import { themes } from "@scripta/shared/themes";
 import GridLayout from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 import { useEffect, useState, type CSSProperties } from "react";
 import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
-import { BLOCK_PAD_SCALE, blockFontFamilyCss, resolveBlockStyle, resolveBorderColor } from "../../lib/libraryStyle";
-import { GRID_COLUMNS, type BlockLayout, type Mural, type MuralBlock, type ReaderProfile, type ShelfTheme } from "../../lib/murals";
+import { BLOCK_PAD_SCALE, blockFinishImage, blockFontFamilyCss, resolveBlockStyle, resolveBorderColor } from "../../lib/libraryStyle";
+import { GRID_COLUMNS, muralThemeId, type BlockLayout, type Mural, type MuralBlock, type ReaderProfile, type ShelfTheme } from "../../lib/murals";
 import { useMuralBookMetadata } from "../../hooks/useMuralBookMetadata";
-import { osScheme, useThemePreference } from "../../lib/theme";
+import { muralThemeStyle } from "../../lib/theme";
 import { OptionsMenu } from "../OptionsMenu";
 import { BlockRenderer } from "./BlockRenderer";
 import { MobileMuralCanvas, type MobileMuralDraft } from "./MobileMuralCanvas";
@@ -74,9 +74,9 @@ export function MuralCanvas({
 }) {
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [day] = useState(() => new Date().toISOString().slice(0, 10));
-  const themeColors = themes[resolveTheme(useThemePreference(), osScheme())].colors;
-  const mural = { ...originalMural, blocks: originalMural.blocks.map((block) => resolveHomeBlock(block, books, groups, day)) };
+  const mural = { ...originalMural, theme: muralThemeId(originalMural.theme), blocks: originalMural.blocks.map((block) => resolveHomeBlock(block, books, groups, day)) };
   const originalBlock = (block: MuralBlock) => originalMural.blocks.find((item) => item.id === block.id) ?? block;
+  const themeColors = themes[mural.theme].colors;
   useMuralBookMetadata(mural.blocks, books, tierlistData);
   const [compactMode, setCompactMode] = useState(
     () => typeof window !== "undefined" && (window.innerWidth < 768 || Boolean(window.matchMedia?.("(pointer: coarse)").matches))
@@ -132,6 +132,7 @@ export function MuralCanvas({
 
   return (
     <>
+    <div style={muralThemeStyle(mural.theme)}>
     <ResponsiveGridLayout
       key={revertNonce}
       layout={layout}
@@ -157,6 +158,7 @@ export function MuralCanvas({
               borderRadius: `${style.cardRadius}px`,
               opacity: style.cardOpacity / 100,
               backgroundColor: resolveBlockColor(style.backgroundColor, themeColors) ?? "var(--color-surface)",
+              backgroundImage: blockFinishImage(style, themeColors),
               borderTopWidth: `${style.cardBorderSides.top ? style.cardBorderWidth : 0}px`,
               borderRightWidth: `${style.cardBorderSides.right ? style.cardBorderWidth : 0}px`,
               borderBottomWidth: `${style.cardBorderSides.bottom ? style.cardBorderWidth : 0}px`,
@@ -192,7 +194,8 @@ export function MuralCanvas({
         );
       })}
     </ResponsiveGridLayout>
-    {focusedId && mural.blocks.some((block) => block.id === focusedId) ? <MuralBlockDetail block={mural.blocks.find((block) => block.id === focusedId)!} books={books} images={images} profile={profile} groups={groups} shelfThemeOverride={shelfThemeOverride} readerCardOverride={readerCardOverride} statsOverride={statsOverride} tierlistData={tierlistData} onClose={() => setFocusedId(null)} /> : null}
+    </div>
+    {focusedId && mural.blocks.some((block) => block.id === focusedId) ? <MuralBlockDetail theme={mural.theme} block={mural.blocks.find((block) => block.id === focusedId)!} books={books} images={images} profile={profile} groups={groups} shelfThemeOverride={shelfThemeOverride} readerCardOverride={readerCardOverride} statsOverride={statsOverride} tierlistData={tierlistData} onClose={() => setFocusedId(null)} /> : null}
     </>
   );
 }

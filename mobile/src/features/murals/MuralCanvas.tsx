@@ -2,14 +2,18 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   BLOCK_TYPE_LABELS,
   DEFAULT_BORDER_SIDES,
+  FINISH_TILE_SIZE,
+  blockFinish,
   blockTextColors,
   calculateShelfTheme,
+  finishTileMarkup,
   resolveHomeBlock,
   type Group,
   GRID_COLUMNS,
   bookKey,
   computeStat,
   libraryBreakdown,
+  muralThemeId,
   readingPercent,
   resolveBlockColor,
   resolveBlockStyle,
@@ -26,9 +30,11 @@ import {
   type ShelfTheme,
   type StatMetric,
 } from "@scripta/shared";
+import { themes, type ThemeId } from "@scripta/shared/themes";
 import { CoverImage } from "../library/components/CoverImage";
 import { ReaderCardBlock } from "./ReaderCardBlock";
 import { Image } from "expo-image";
+import { SvgXml } from "react-native-svg";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
@@ -36,7 +42,7 @@ import { commitHaptic, liftHaptic } from "../../ui/haptics";
 import { PixelRatio, Platform, Pressable, ScrollView, StyleSheet, View, type StyleProp, type TextStyle } from "react-native";
 import { Text } from "../../ui/Text";
 import { blockFontFamily, resolveBorderColor, resolveBorderStyle } from "../../ui/libraryStyle";
-import { minimumTouchTarget, radii, spacing, useTheme, type ThemeColors } from "../../ui/theme";
+import { minimumTouchTarget, MuralThemeScope, radii, spacing, useTheme, type ThemeColors } from "../../ui/theme";
 import type { GalleryImage } from "../gallery/api";
 import type { Tierlist } from "../tierlists/api";
 import { selectionBorderColor } from "./blockStyleOptions";
@@ -78,6 +84,13 @@ function blockFrameStyle(style: BlockStyle, colors: ThemeColors) {
     borderRadius: style.cardRadius,
     opacity: style.cardOpacity / 100,
   };
+}
+
+function FinishOverlay({ id, style, colors }: { id: string; style: BlockStyle; colors: ThemeColors }) {
+  const finish = blockFinish(style, colors);
+  if (!finish) return null;
+  const xml = `<svg xmlns="http://www.w3.org/2000/svg"><defs><pattern id="finish-${id}" patternUnits="userSpaceOnUse" width="${FINISH_TILE_SIZE}" height="${FINISH_TILE_SIZE}">${finishTileMarkup(finish.finish, finish.ink)}</pattern></defs><rect width="100%" height="100%" fill="url(#finish-${id})"/></svg>`;
+  return <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={StyleSheet.absoluteFill}><SvgXml xml={xml} width="100%" height="100%" /></View>;
 }
 
 function frameShadow(style: BlockStyle) {
@@ -278,12 +291,14 @@ function CanvasBlock({ block, columnWidth, editable, selected, books, images, ti
         },
         animated,
       ]}>
+        <FinishOverlay id={block.id} style={style} colors={colors} />
         {editable ? <Pressable accessibilityRole="button" accessibilityLabel={`${BLOCK_TYPE_LABELS[block.type]} block. Long press and drag to move`} accessibilityActions={MOVE_ACTIONS} onAccessibilityAction={(event) => { const move = MOVES[event.nativeEvent.actionName]; if (move) onMove(move[0], move[1]); }} onPress={onSelect} style={[styles.blockPress, blockPadding(style)]}>{body}</Pressable> : <View style={[styles.blockPress, blockPadding(style)]}>{body}</View>}
       </Animated.View>;
   return editable ? <GestureDetector gesture={gesture}>{content}</GestureDetector> : content;
 }
 
-export function BlockPreview({ block, canvasWidth, maxHeight, books, images, tierlists, profile, groups = [] }: {
+export function BlockPreview({ theme, block, canvasWidth, maxHeight, books, images, tierlists, profile, groups = [] }: {
+  theme: ThemeId;
   block: MuralBlock;
   canvasWidth: number;
   maxHeight: number;
@@ -293,7 +308,7 @@ export function BlockPreview({ block, canvasWidth, maxHeight, books, images, tie
   profile?: ReaderProfile;
   groups?: Group[];
 }) {
-  const { colors } = useTheme();
+  const colors = themes[theme].colors;
   const [boxWidth, setBoxWidth] = useState(0);
   const [day] = useState(() => new Date().toISOString().slice(0, 10));
   const resolved = useMemo(() => resolveHomeBlock(block, books, groups, day), [block, books, groups, day]);
@@ -303,6 +318,7 @@ export function BlockPreview({ block, canvasWidth, maxHeight, books, images, tie
   const room = boxWidth - spacing.md * 2;
   const scale = room > 0 && canvasWidth > 0 ? Math.min(1, room / width, maxHeight / height) : 0;
   return (
+    <MuralThemeScope theme={theme}>
     <View
       accessibilityLabel={`Preview of this ${BLOCK_TYPE_LABELS[block.type]} block`}
       onLayout={(event) => setBoxWidth(event.nativeEvent.layout.width)}
@@ -310,6 +326,7 @@ export function BlockPreview({ block, canvasWidth, maxHeight, books, images, tie
     >
       {scale ? (
         <View style={[styles.previewBlock, frameShadow(style), blockFrameStyle(style, colors), { width, height, transform: [{ scale }] }]}>
+          <FinishOverlay id={block.id} style={style} colors={colors} />
           <View style={[styles.blockPress, blockPadding(style)]}>
             <View style={styles.blockBody}>
               <BlockContent block={resolved} books={books} images={images} tierlists={tierlists} profile={profile} groups={groups} editable />
@@ -318,6 +335,7 @@ export function BlockPreview({ block, canvasWidth, maxHeight, books, images, tie
         </View>
       ) : null}
     </View>
+    </MuralThemeScope>
   );
 }
 
@@ -337,7 +355,8 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThe
   onLayoutChange?: (id: string, layout: BlockLayout) => void;
   onImageReadyChange?: (ready: boolean) => void;
 }) {
-  const { colors } = useTheme();
+  const theme = muralThemeId(mural.theme);
+  const colors = themes[theme].colors;
   const [width, setWidth] = useState(0);
   const [day] = useState(() => new Date().toISOString().slice(0, 10));
   const [readyAssets, setReadyAssets] = useState<Set<string>>(() => new Set());
@@ -376,7 +395,7 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThe
       />) : null}
     </View>
   );
-  return editable ? <Pressable accessible={false} onPress={() => onSelectBlock?.(null)}>{canvas}</Pressable> : canvas;
+  return <MuralThemeScope theme={theme}>{editable ? <Pressable accessible={false} onPress={() => onSelectBlock?.(null)}>{canvas}</Pressable> : canvas}</MuralThemeScope>;
 }
 
 const styles = StyleSheet.create({
