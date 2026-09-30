@@ -262,7 +262,7 @@ test("erasing an account deletes its avatar blob after the other modules' data",
   const { avatarId } = await createAuthService(repo, store).setAvatar(user.id, await pngBuffer(100, 100));
   const events: string[] = [];
 
-  await createUserDataEraser(repo, { ...store, delete: async (id) => { events.push(`delete ${id}`); } }, (id) => { events.push(`erase ${id}`); })(user.id);
+  await createUserDataEraser(repo, { ...store, delete: async (id) => { events.push(`delete ${id}`); } }, async (id) => { await Promise.resolve(); events.push(`erase ${id}`); })(user.id);
 
   assert.deepEqual(events, [`erase ${user.id}`, `delete ${avatarId}`]);
 });
@@ -272,7 +272,7 @@ test("erasing an account with no avatar deletes no blob", async () => {
   const user = repo.createUser({ email: "a@b.c", username: "andre", passwordHash: "x", googleId: null });
   const failing = { ...createInMemoryBlobStore(), delete: async () => { throw new Error("unexpected"); } };
 
-  await createUserDataEraser(repo, failing, () => {})(user.id);
+  await createUserDataEraser(repo, failing, async () => {})(user.id);
 });
 
 test("erasing an account whose avatar delete rejects propagates the error", async () => {
@@ -281,7 +281,7 @@ test("erasing an account whose avatar delete rejects propagates the error", asyn
   const user = repo.createUser({ email: "a@b.c", username: "andre", passwordHash: "x", googleId: null });
   await createAuthService(repo, store).setAvatar(user.id, await pngBuffer(100, 100));
 
-  await assert.rejects(createUserDataEraser(repo, { ...store, delete: async () => { throw new Error("r2 down"); } }, () => {})(user.id), /r2 down/);
+  await assert.rejects(createUserDataEraser(repo, { ...store, delete: async () => { throw new Error("r2 down"); } }, async () => {})(user.id), /r2 down/);
 });
 
 // --- Task 4A: refresh-rotation grace window --------------------------------

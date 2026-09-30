@@ -121,8 +121,8 @@ export function buildApp() {
 
   app.register(registerAuthModule, {
     authRoot: app,
-    deleteUserData: (userId: string) => {
-      for (const erase of [deleteLibraryUserData, deleteGalleryUserData, deleteSocialsUserData, deleteMuralsUserData, deleteArenaUserData, deleteTierlistsUserData, deleteQuizzesUserData, deleteCommunityUserData]) erase(userId);
+    deleteUserData: async (userId: string) => {
+      for (const erase of [deleteLibraryUserData, deleteGalleryUserData, deleteSocialsUserData, deleteMuralsUserData, deleteArenaUserData, deleteTierlistsUserData, deleteQuizzesUserData, deleteCommunityUserData]) await erase(userId);
     }
   });
   app.register(registerArenaModule, {

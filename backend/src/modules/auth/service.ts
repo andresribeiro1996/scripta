@@ -322,10 +322,10 @@ export function createAuthService(repo: AuthRepository, avatarStore: AvatarBlobS
   };
 }
 
-export function createUserDataEraser(repo: AuthRepository, avatarStore: AvatarBlobStore, deleteOtherData: (userId: string) => void) {
+export function createUserDataEraser(repo: AuthRepository, avatarStore: AvatarBlobStore, deleteOtherData: (userId: string) => Promise<void>) {
   return async (userId: string): Promise<void> => {
     const avatarId = repo.findUserById(userId)?.avatar_id;
-    deleteOtherData(userId);
+    await deleteOtherData(userId);
     if (avatarId) await avatarStore.delete(avatarId);
   };
 }

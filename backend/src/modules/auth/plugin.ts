@@ -77,7 +77,7 @@ function avatarBlobStore(): AvatarBlobStore {
   };
 }
 
-export async function authPlugin(app: FastifyInstance, options: { authRoot?: FastifyInstance; deleteUserData?: (userId: string) => void } = {}) {
+export async function authPlugin(app: FastifyInstance, options: { authRoot?: FastifyInstance; deleteUserData?: (userId: string) => Promise<void> } = {}) {
   // --- composition: swap this one block to change storage technology ---
   const db = openAuthDb();
   const authRepository = createSqliteAuthRepository(db);
@@ -85,9 +85,9 @@ export async function authPlugin(app: FastifyInstance, options: { authRoot?: Fas
   const security = createAccountSecurity(authRepository, async (to, subject, text) => {
     try { await sendAccountEmail(to, subject, text); }
     catch (error) { app.log.error("Account email delivery failed; check email configuration and provider status."); throw error; }
-  }, env.FRONTEND_URL, emailEnabled, createUserDataEraser(authRepository, avatarBlobStore(), (userId) => {
+  }, env.FRONTEND_URL, emailEnabled, createUserDataEraser(authRepository, avatarBlobStore(), async (userId) => {
     if (!options.deleteUserData) throw new Error("Account deletion needs the other modules' data erasers, and none were configured.");
-    options.deleteUserData(userId);
+    await options.deleteUserData(userId);
   }));
   const authService = createAuthService(authRepository, avatarBlobStore());
   (options.authRoot ?? app).decorate("authenticateAccessToken", (token: string) => getAuthenticatedUserFromAccessToken(token, authRepository.findUserById));

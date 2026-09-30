@@ -26,7 +26,7 @@ function setup(enabled = true) {
   const emails: { to: string; subject: string; text: string }[] = [];
   const erased: string[] = [];
   let eraseFails = false;
-  const security = createAccountSecurity(repo, async (to, subject, text) => { emails.push({ to, subject, text }); }, "https://scripta.example", enabled, (userId) => {
+  const security = createAccountSecurity(repo, async (to, subject, text) => { emails.push({ to, subject, text }); }, "https://scripta.example", enabled, async (userId) => {
     if (eraseFails) throw new Error("erase failed");
     erased.push(userId);
   });
@@ -177,7 +177,7 @@ test("an account without a password confirms deletion by typing its username", a
   } finally { db.close(); }
 });
 
-test("a failed erase keeps the account so deleting again can finish the job", async () => {
+test("a rejected erase fails the deletion and keeps the account so deleting again can finish the job", async () => {
   const { db, repo, auth, security, failErase } = setup();
   try {
     const session = await auth.signup("reader@example.com", "reader", "a password");
