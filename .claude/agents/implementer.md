@@ -18,6 +18,8 @@ Before writing code, read the root `AGENTS.md` and the `AGENTS.md` and `README.m
 
 Git in a worktree: `cd` to the worktree root in its own Bash call, then run `/usr/bin/git …` as a single plain command. Plain `git`, `git -C` and `cd … && git` are refused there. Stage and commit in one call.
 
+Before trusting any test run, `ls node_modules` at the worktree root. Missing → `npm run dev:link-deps`; afterwards `readlink node_modules/@scripta/shared` must print `../../packages/shared`. Otherwise tests resolve the main checkout's stale copy and a failure looks "pre-existing".
+
 Verify before committing — run every Verify command from each touched package's `AGENTS.md`. If you touched `packages/shared`, run `npm run build --workspace @scripta/shared` first, since consumers read `dist/`. Also run `npm run lint --workspace frontend` for frontend changes.
 
 Do not start dev servers or take the emulator. If the task needs a device check, say so in your report and stop; the main session dispatches `device-checker`.
