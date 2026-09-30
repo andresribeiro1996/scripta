@@ -243,7 +243,7 @@ new events at vote time was considered and rejected:
 | Quiz | a play | the play's `created_at` |
 
 **The dashboard** merges these as
-`{ kind: "participation", id: "<kind>:<gameId>", content, actors, count, createdAt: latestAt }`
+`{ kind: "participation", id: "<kind>:<gameId>", game, actors, count, createdAt: latestAt }`
 rows into the existing keyset stream on `(createdAt, id)`.
 
 **Page 1 carries three new fields** in place of `newCount`:
