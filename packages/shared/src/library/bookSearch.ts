@@ -59,6 +59,48 @@ export function mergeSearchResults(inside: BookSearchResult[], outside: BookSear
   return merged;
 }
 
+export interface BookSearchApi {
+  inside: (query: string) => Promise<BookSearchResult[]>;
+  outside: (query: string) => Promise<BookSearchResult[]>;
+}
+
+export interface BookSearchState {
+  results: BookSearchResult[];
+  outsidePending: boolean;
+  outsideFailed: boolean;
+}
+
+type Settled<T> = { ok: true; value: T } | { ok: false; error: unknown };
+
+function settle<T>(promise: Promise<T>): Promise<Settled<T>> {
+  return promise.then((value) => ({ ok: true, value }), (error: unknown) => ({ ok: false, error }));
+}
+
+/** Runs the inside (saved) and outside (Open Library) searches together
+ *  and reports each step through onState: inside results as soon as they
+ *  land, then the merged list. An ISBN that inside already answers skips
+ *  outside. Rejects when inside fails, or when outside fails with nothing
+ *  inside to show; outside failing behind inside results is reported as
+ *  outsideFailed instead. */
+export async function searchInsideOutside(query: string, api: BookSearchApi, onState: (state: BookSearchState) => void): Promise<void> {
+  const isbnQuery = looksLikeIsbnQuery(query);
+  const insidePromise = api.inside(query);
+  const early = isbnQuery ? null : settle(api.outside(query));
+  const inside = await insidePromise;
+  if (isbnQuery && inside.length > 0) {
+    onState({ results: inside, outsidePending: false, outsideFailed: false });
+    return;
+  }
+  onState({ results: inside, outsidePending: true, outsideFailed: false });
+  const outside = await (early ?? settle(api.outside(query)));
+  if (outside.ok) {
+    onState({ results: mergeSearchResults(inside, outside.value), outsidePending: false, outsideFailed: false });
+    return;
+  }
+  if (inside.length === 0) throw outside.error;
+  onState({ results: inside, outsidePending: false, outsideFailed: true });
+}
+
 /** One Open Library search "doc" -> the slim shape the result list
  *  renders. Exported for scripts/test-book-search.mts. Returns null for
  *  docs with no usable title (Open Library's index has plenty). */
