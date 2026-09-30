@@ -5,6 +5,7 @@ import {
   bookKey,
   createBlockCandidate,
   createDuplicateCandidate,
+  muralThemeId,
   resolveBlockStyle,
   type BlockStyle,
   type BlockType,
@@ -64,7 +65,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
   const mural = muralQuery.data;
   const currentBlocks = blocks ?? mural?.blocks ?? [];
   const currentName = name ?? mural?.name ?? "Mural";
-  const currentTheme = theme ?? mural?.theme ?? "light";
+  const currentTheme = theme ?? muralThemeId(mural?.theme);
   const selected = currentBlocks.find((block) => block.id === selectedId) ?? null;
   const books = library?.data.books ?? [];
   const groups = library?.data.groups ?? [];
@@ -83,7 +84,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
   }, [muralQuery.refetch]));
 
   const draftMural = useMemo(() => mural ? { ...mural, name: currentName, theme: currentTheme, blocks: currentBlocks } : null, [mural, currentName, currentTheme, currentBlocks]);
-  const unsaved = useMemo(() => !!mural && ((currentName.trim() || mural.name) !== mural.name || currentTheme !== mural.theme || JSON.stringify(currentBlocks) !== JSON.stringify(mural.blocks)), [mural, currentName, currentTheme, currentBlocks]);
+  const unsaved = useMemo(() => !!mural && ((currentName.trim() || mural.name) !== mural.name || currentTheme !== muralThemeId(mural.theme) || JSON.stringify(currentBlocks) !== JSON.stringify(mural.blocks)), [mural, currentName, currentTheme, currentBlocks]);
 
   function updateSelected(transform: (block: MuralBlock) => MuralBlock) {
     if (!selected) return;

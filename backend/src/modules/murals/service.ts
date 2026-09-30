@@ -3,17 +3,17 @@
 // module's service.ts.
 
 import { randomUUID } from "node:crypto";
+import { muralThemeId } from "@scripta/shared";
 import { FolderCycleError, InvalidFolderReferenceError, MuralConflictError } from "./domain/errors.js";
 import type { ThemeId } from "@scripta/shared/themes";
 import type { MuralsRepository } from "./domain/ports.js";
-import { muralRowTheme } from "./domain/theme.js";
 import type { Mural, MuralFolder, MuralFolderRow, MuralRow } from "./domain/types.js";
 
 function toMural(row: MuralRow, publicUrlFor: (token: string) => string): Mural {
   return {
     id: row.id,
     name: row.name,
-    theme: muralRowTheme(row),
+    theme: muralThemeId(row.theme),
     blocks: JSON.parse(row.blocks),
     coverImageId: row.cover_image_id,
     coverImageUrl: row.cover_image_url,

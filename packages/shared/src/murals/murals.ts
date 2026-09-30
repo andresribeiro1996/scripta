@@ -18,7 +18,7 @@
 import type { BlockStyle } from "../library/libraryStyle.js";
 import type { BookGenre } from "../library/bookGenres.js";
 import { bookKey } from "../library/merge.js";
-import type { ThemeId } from "../themes/palettes.js";
+import { THEME_IDS, type ThemeId } from "../themes/palettes.js";
 
 export type BlockLayout = { x: number; y: number; w: number; h: number };
 
@@ -324,6 +324,10 @@ function defaultBlockForType(id: string, type: BlockType, layout: BlockLayout): 
 export function createBlockCandidate(type: BlockType, blocks: MuralBlock[]): MuralBlock {
   const { w, h } = DEFAULT_SIZE_BY_TYPE[type];
   return defaultBlockForType(newId(), type, findAvailableLayout(blocks, w, h));
+}
+
+export function muralThemeId(theme: unknown): ThemeId {
+  return THEME_IDS.find((id) => id === theme) ?? "light";
 }
 
 export function profileOnlyMural(theme: ThemeId): Mural {
