@@ -165,6 +165,9 @@ The fix:
 
 ### Carried over from step 1
 
+Done in step 2: the first two bullets. Still deferred: Discover's repeated
+rows, your own profile inside Games, and the untested paths.
+
 - **Keep what's already loaded.** Community keeps its cached rows, and its
   Discover and People tabs, when a dashboard refetch or next page fails.
   Follow the pattern `DiscoverPane` uses: a footer retry for a failed page,
@@ -315,8 +318,9 @@ Clients display at most "99+".
 - **Deleted participant account:** their ballots, votes and plays are
   unlinked from them, not deleted (each module's `deleteUserData`). The counts
   stay, and the name drops into "others".
-- **Promoted tier list:** ownership stays `origin_user_id`, matching
-  `listPublishedByOwner`.
+- **Promoted tier list:** excluded from participation. A promoted list
+  belongs to the app (`owner_user_id = '__app__'`), and its creator's owner
+  page can't open it, so a row would lead to "not found".
 - **Unpublished owner:** still sees their own participation rows.
 
 ### Testing
