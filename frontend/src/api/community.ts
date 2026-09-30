@@ -19,6 +19,7 @@ import type { PublicBookData, PublicHighlight } from "./sharedMurals";
 import type { ResolvedTierlist } from "./tierlists";
 
 export interface CommunityProfileView {
+  private: boolean;
   profile: PublishedProfile;
   mural: {
     mural: { id: string; name: string; blocks: MuralBlock[]; coverImageUrl: string | null };
