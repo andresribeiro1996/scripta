@@ -56,11 +56,12 @@ export interface PersonResult {
   user: CommunityAuthor;
   followerCount: number;
   viewerFollows?: boolean;
+  private: boolean;
 }
 
 export interface PublishedProfile {
   user: CommunityAuthor;
-  publishedAt: string;
+  publishedAt: string | null;
   followerCount: number;
   followingCount: number;
   viewerFollows?: boolean;

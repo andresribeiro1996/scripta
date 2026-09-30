@@ -88,16 +88,18 @@ export function PeoplePane() {
                       <ReaderGlyph identity={item.user.readerGlyph} />
                     </View>
                     <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
-                      {item.followerCount} {item.followerCount === 1 ? "follower" : "followers"}
+                      {item.private ? "Private" : `${item.followerCount} ${item.followerCount === 1 ? "follower" : "followers"}`}
                     </Text>
                   </View>
                 </Pressable>
-                <Button
-                  label={item.viewerFollows ? "Following" : "Follow"}
-                  variant={item.viewerFollows ? "secondary" : "primary"}
-                  loading={busyId === item.user.userId}
-                  onPress={() => void toggle(item)}
-                />
+                {item.private ? null : (
+                  <Button
+                    label={item.viewerFollows ? "Following" : "Follow"}
+                    variant={item.viewerFollows ? "secondary" : "primary"}
+                    loading={busyId === item.user.userId}
+                    onPress={() => void toggle(item)}
+                  />
+                )}
               </View>
             );
           }}
