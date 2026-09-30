@@ -60,8 +60,8 @@ test("a colour look keeps the frame and a frame look keeps the colours", () => {
   }
 });
 
-test("a look leaves font, emphasis, size, alignment, spacing and fade alone", () => {
-  const before: BlockStyle = { ...DEFAULT_BLOCK_STYLE, fontFamily: "mono", bold: true, italic: true, codeStyle: true, fontSize: 20, textAlign: "center", innerSpacing: "roomy", cardOpacity: 72, cardHoverEffect: true };
+test("a look leaves font, emphasis, size, alignment, spacing, fade and finish alone", () => {
+  const before: BlockStyle = { ...DEFAULT_BLOCK_STYLE, fontFamily: "mono", bold: true, italic: true, codeStyle: true, fontSize: 20, textAlign: "center", innerSpacing: "roomy", cardOpacity: 72, cardHoverEffect: true, backgroundFinish: "linen" };
   for (const look of [...COLOR_LOOKS, ...FRAME_LOOKS]) {
     const after = applyLook(before, look);
     assert.equal(after.fontFamily, "mono", look.key);
@@ -73,6 +73,7 @@ test("a look leaves font, emphasis, size, alignment, spacing and fade alone", ()
     assert.equal(after.innerSpacing, "roomy", look.key);
     assert.equal(after.cardOpacity, 72, look.key);
     assert.equal(after.cardHoverEffect, true, look.key);
+    assert.equal(after.backgroundFinish, "linen", look.key);
   }
 });
 
