@@ -98,6 +98,16 @@ The fix:
     position intact.
 - `fetchPublicTournaments` and `fetchPublicTierlists` lose their only caller
   and are deleted. The backend endpoints stay (compatibility).
+- **Correction found in the device pass.** From the root-stack `/arena`, an
+  author tap pushed a second copy of the tab shell, with Home highlighted and
+  no back arrow. So:
+  - Games → Browse pushes an in-tab Discover at `(app)/(arena)/discover`.
+  - The profile route becomes a shared route, `(app)/(home,arena)/u/[username]`,
+    so an author tap stays inside the Games tab.
+  - The Games stack anchors `my-arena` as its first screen, so the new route
+    can't become the tab's default.
+  - `/arena` stays the public entry for links and guests. It shows author
+    names as plain text, so it never pushes into the tab shell.
 
 **`DiscoverPane` gains:**
 - **Pagination.** `useInfiniteQuery` over `offset`/`nextOffset`, loading the

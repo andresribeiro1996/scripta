@@ -801,6 +801,161 @@ Only if the emulator is free. This pass renders; it doesn't change code.
 
 ---
 
+### Task 7: Keep signed-in Discover inside the Games tab
+
+Added after the Task 6 device pass. From the root-stack `/arena`, tapping an
+author pushed a second copy of the tab shell: Home was highlighted, there was
+no header back arrow, and two Back presses were needed to reach Games.
+
+**Files:**
+- Modify: `mobile/src/features/community/DiscoverPane.tsx`, adding an optional
+  `linkAuthors` prop
+- Modify: `mobile/src/features/community/DiscoverScreen.tsx`, adding an
+  `inTabs` prop
+- Modify: `mobile/src/app/arena/index.tsx`
+- Create: `mobile/src/app/(app)/(arena)/discover.tsx`
+- Modify: `mobile/src/app/(app)/(arena)/_layout.tsx`, anchoring `my-arena`
+- Modify: `mobile/src/features/arena/ArenaHomeScreen.tsx:83`, so Browse pushes
+  `/discover`
+- Move: `mobile/src/app/(app)/(home)/u/[username].tsx` →
+  `mobile/src/app/(app)/(home,arena)/u/[username].tsx`
+
+**Interfaces:**
+- Produces:
+  - `DiscoverPane({ linkAuthors = true }: { linkAuthors?: boolean })`
+  - `DiscoverScreen({ inTabs }: { inTabs: boolean })`
+  - the in-tab route `/discover`
+  - the shared profile route `/u/[username]` in both the Home and Games stacks
+
+- [ ] **Step 1: Let the pane show author names as plain text**
+
+In `DiscoverPane.tsx`:
+- Change the signature to
+  `export function DiscoverPane({ linkAuthors = true }: { linkAuthors?: boolean }) {`.
+- Pass the prop to each row:
+  `renderItem={({ item }) => <DiscoverRow item={item} onPreviewBooks={setPreview} linkAuthor={linkAuthors} />}`.
+- Change `DiscoverRow`'s signature to
+  `function DiscoverRow({ item, onPreviewBooks, linkAuthor }: { item: DiscoverItem; onPreviewBooks: (tournament: { id: string; name: string }) => void; linkAuthor: boolean }) {`.
+- Change the author condition from `{author.unavailable ? (` to
+  `{author.unavailable || !linkAuthor ? (`. The existing plain-text branch
+  (name plus `ReaderGlyph`, no `Pressable`) then renders.
+
+- [ ] **Step 2: One screen, two placements**
+
+Replace the whole of `DiscoverScreen.tsx` with:
+
+```tsx
+import { Stack } from "expo-router";
+import { Screen } from "../../ui";
+import { DiscoverPane } from "./DiscoverPane";
+
+export function DiscoverScreen({ inTabs }: { inTabs: boolean }) {
+  return (
+    <Screen bottom={!inTabs} top={false}>
+      <Stack.Screen options={{ headerShown: true, title: "Discover" }} />
+      <DiscoverPane linkAuthors={inTabs} />
+    </Screen>
+  );
+}
+```
+
+Replace the whole of `mobile/src/app/arena/index.tsx` with:
+
+```tsx
+import { DiscoverScreen } from "../../features/community/DiscoverScreen";
+
+export default function ArenaPublicRoute() {
+  return <DiscoverScreen inTabs={false} />;
+}
+```
+
+Create `mobile/src/app/(app)/(arena)/discover.tsx`:
+
+```tsx
+import { DiscoverScreen } from "@/features/community/DiscoverScreen";
+
+export default function DiscoverRoute() {
+  return <DiscoverScreen inTabs />;
+}
+```
+
+- [ ] **Step 3: Keep My Games as the Games tab's first screen**
+
+Undeclared routes are sorted, so `discover` would come before `my-arena` and
+become the tab's default. That's the trap the Library stack's comments
+describe. Replace the whole of `mobile/src/app/(app)/(arena)/_layout.tsx`
+with:
+
+```tsx
+import { Stack } from "expo-router";
+import { useScreenOptions } from "@/ui/navigation";
+
+export const unstable_settings = {
+  initialRouteName: "my-arena",
+};
+
+export default function ArenaStackLayout() {
+  return (
+    <Stack screenOptions={useScreenOptions()}>
+      <Stack.Screen name="my-arena" />
+    </Stack>
+  );
+}
+```
+
+- [ ] **Step 4: Browse pushes the in-tab Discover, and profiles open in either tab**
+
+- In `ArenaHomeScreen.tsx:83`, change `router.push("/arena" as never)` to
+  `router.push("/discover" as never)`.
+- Move the profile route so the Home and Games stacks share it:
+
+  ```bash
+  mkdir -p "mobile/src/app/(app)/(home,arena)/u"
+  /usr/bin/git mv "mobile/src/app/(app)/(home)/u/[username].tsx" "mobile/src/app/(app)/(home,arena)/u/[username].tsx"
+  ```
+
+  Remove the now-empty `(home)/u` directory if it's left behind.
+
+- [ ] **Step 5: Run the checks**
+
+Run: `npm run typecheck --workspace mobile` and `npm test --workspace mobile`.
+Expected: both exit 0, with 133 tests.
+
+Then run `find "mobile/src/app" -path "*u/\[username\].tsx"`. Expected: only
+`mobile/src/app/(app)/(home,arena)/u/[username].tsx`.
+
+- [ ] **Step 6: Commit**
+
+```bash
+/usr/bin/git add -A mobile/src
+/usr/bin/git commit -m "Keep Browse's Discover and the profiles it opens inside the Games tab"
+```
+
+The commit body should say why. Pushing a profile from the root-stack
+`/arena` stacked a second tab shell with no back arrow. `/arena` stays the
+public and link entry, with author names as plain text.
+
+---
+
+### Task 8: Device recheck (mobile), short
+
+The same rules as Task 6: the lease check first, UI-only state changes, zoom
+into labels, time-boxed, and `npm run dev:release` at the end. Check:
+
+1. Tapping the Games tab opens **My Games**, not Discover.
+2. Games → **Browse** opens **Discover**. The Games tab stays highlighted and
+   the header has a back arrow.
+3. In that Discover, tap an author's name. The profile opens with the Games
+   tab still highlighted and a back arrow. Back returns to Discover, and Back
+   again returns to Games.
+4. Home header **Community** → the **Discover** tab → an author's name opens
+   the profile in the Home tab. Back returns to Community.
+5. Open `/arena` directly by deep link, per `docs/dev-workflow.md`'s
+   "Driving the app". Discover shows, and author names are plain text, not
+   tappable.
+
+---
+
 ## After the tasks
 
 1. Run a whole-branch review and every check listed in Global Constraints.
