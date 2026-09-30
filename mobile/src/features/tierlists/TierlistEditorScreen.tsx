@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import { Stack, router } from "expo-router";
 import { ballotBoard, bookKey, createTier, filterBooks, type TierlistData } from "@scripta/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import * as Linking from "expo-linking";
-import { FlatList, Pressable, Share, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { apiClient, ApiError } from "../../core/api";
 import { Button, Dialog, EmptyState, ErrorState, Fab, IconButton, Input, Menu, type MenuItem, Screen, Sheet, Skeleton, SwipeableTabs, Toast, dynamicType, spacing, typography, useTheme } from "../../ui";
 import { fetchMyBallot, fetchTierlistResults, fetchVotingBoard, openVoting, setVotingState, updateTierlist, type Tierlist } from "./api";
@@ -11,6 +10,7 @@ import { moveBookTo } from "./tierBoardData";
 import { TierBoard } from "./TierBoard";
 import { TierlistResults } from "./TierlistResults";
 import { TierSortDeck } from "./TierSortDeck";
+import { TierlistShareSheet } from "./TierlistShareSheet";
 
 interface LibraryResponse { data: { books?: Array<Record<string, unknown>> } | null }
 
@@ -32,6 +32,7 @@ export function TierlistEditorScreen({ tierlist, onUpdated, startInRank = false 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmingVoting, setConfirmingVoting] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const library = useQuery({ queryKey: ["library"], queryFn: () => apiClient.request<LibraryResponse>("/library", { auth: true }), retry: false });
   const board = useQuery({ queryKey: ["tierlists", "voting", current.voteCode], queryFn: () => fetchVotingBoard(current.voteCode!), enabled: Boolean(current.voteCode), retry: false });
   const results = useQuery({ queryKey: ["tierlists", "results", current.id], queryFn: () => fetchTierlistResults(current.id), enabled: Boolean(current.voteCode), retry: false });
@@ -102,7 +103,7 @@ export function TierlistEditorScreen({ tierlist, onUpdated, startInRank = false 
   const save = () => run(() => updateTierlist(current.id, { data }));
   const actionItems: MenuItem[] = frozen
     ? [
-      { label: "Share voting link", onPress: () => void Share.share({ message: Linking.createURL(`/vote/${current.voteCode}`) }) },
+      { label: "Share…", onPress: () => setSharing(true) },
       { label: current.votingOpen ? "Close voting" : "Reopen voting", onPress: () => void run(() => setVotingState(current.id, { open: !current.votingOpen })) },
       { label: current.voteAccess === "anonymous" ? "Require members" : "Allow anyone", onPress: () => void run(() => setVotingState(current.id, { access: current.voteAccess === "anonymous" ? "members" : "anonymous" })) },
     ]
@@ -141,6 +142,7 @@ export function TierlistEditorScreen({ tierlist, onUpdated, startInRank = false 
         <Button label="Members only" variant="secondary" loading={busy} onPress={() => void openCommunityVoting("members")} />
       </View>
     </Dialog>
+    {sharing && current.voteCode ? <TierlistShareSheet visible onClose={() => setSharing(false)} id={current.id} name={current.name} code={current.voteCode} data={boardData} books={books} /> : null}
   </Screen>;
 }
 
