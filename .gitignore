@@ -19,6 +19,7 @@ Thumbs.db
 !**/.claude/settings.json
 !**/.claude/skills/
 !**/.claude/commands/
+!**/.claude/agents/
 
 # The exporter's own output against a real device — an actual person's
 # reading history and highlights/annotations, not source code or a
