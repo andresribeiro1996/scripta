@@ -7,7 +7,8 @@ import { DiscoverPane } from "../community/DiscoverPane";
 import { PeoplePane } from "../community/PeoplePane";
 import { markDashboardSeen } from "../community/api";
 import { communityTabOptions, defaultCommunityTab, shouldMarkSeen, type CommunityTab } from "./communityTabs";
-import { FeedRow, digestRoute, useDashboardFeed, useFollowBack } from "./FeedRow";
+import { FeedRow, useDashboardFeed, useFollowBack } from "./FeedRow";
+import { digestRoute } from "./feedRowModel";
 
 export function CommunityScreen({ initialTab }: { initialTab?: CommunityTab }) {
   const { colors } = useTheme();

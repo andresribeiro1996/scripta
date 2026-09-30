@@ -7,7 +7,8 @@ import { BrandMark, Button, EmptyState, ErrorState, IconButton, Screen, Skeleton
 import { useAuth } from "../../core/auth";
 import { useLibrary } from "../library/hooks/useLibrary";
 import { CoverImage } from "../library/components/CoverImage";
-import { FeedRow, digestRoute, useDashboardFeed, useFollowBack } from "./FeedRow";
+import { FeedRow, useDashboardFeed, useFollowBack } from "./FeedRow";
+import { digestRoute } from "./feedRowModel";
 import { PickNextSheet } from "./PickNextSheet";
 
 export function HomeScreen() {

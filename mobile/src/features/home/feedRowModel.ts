@@ -1,17 +1,19 @@
 import { contentDetail, contentKindLabel, relativeTime } from "@scripta/shared/community";
-import { digestHeading, participationLead, readerGlyphLabel, type DigestItem } from "@scripta/shared";
+import { digestHeading, digestTarget, participationLead, readerGlyphLabel, type DigestItem } from "@scripta/shared";
 import type { IconName } from "../../ui";
 
 export interface FeedRowModel {
   /** Covers for the leading slot, widest first in the fan. Empty means the
-   *  slot falls back to the actor's avatar. */
+   *  slot falls back to avatars: the actor's, or a participation row's
+   *  participants, or a group icon when it names no one. */
   covers: string[];
   /** Names the kind of thing the event is about, beside the label that says
    *  what happened to it. */
   icon: IconName;
   label: string;
-  /** Accent for a publication or a vote, dim for an event that is only about
-   *  its actor, success for a book someone finished. */
+  /** Accent for a publication, a vote or someone taking part in your game,
+   *  dim for an event that is only about its actor, success for a book
+   *  someone finished. */
   tone: "accent" | "dim" | "success";
   /** The line a reader scans for. Empty when the event is its own headline —
    *  a follow or a vote says everything in one sentence. */
@@ -78,4 +80,13 @@ export function feedRowModel(item: DigestItem): FeedRowModel {
         action: null
       };
   }
+}
+
+// Mobile's profile route is /u/<name>; the shared target is the web app's
+// /community/u/<name>, so the two kinds that point at a person are remapped.
+// A participation row's tier list or quiz is remapped too, from the web
+// dashboard's /dashboard/arena/<kind>/<id> to its own native screen.
+export function digestRoute(item: DigestItem): string {
+  if (item.kind === "participation") return item.game.kind === "tournament" ? `/arena/${item.game.id}` : `/${item.game.kind}/${item.game.id}`;
+  return item.kind === "follow" || item.kind === "reading" ? `/u/${item.actor.username}` : digestTarget(item);
 }
