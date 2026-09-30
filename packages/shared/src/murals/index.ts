@@ -5,3 +5,4 @@ export * from "./stats.js";
 export * from "./presets.js";
 export * from "./home.js";
 export * from "./finish.js";
+export * from "./backgroundFinish.js";

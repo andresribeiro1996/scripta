@@ -377,6 +377,7 @@ export const BLOCK_FONT_SIZE_RANGE = { min: 10, max: 24, step: 1 };
 
 export type BlockTextAlign = "left" | "center" | "right";
 export type BlockInnerSpacing = "tight" | "normal" | "roomy";
+export type BlockBackgroundFinish = "none" | "paper" | "linen";
 
 export const BLOCK_TEXT_ALIGN_OPTIONS: Array<{ value: BlockTextAlign; label: string }> = [
   { value: "left", label: "Left" },
@@ -388,6 +389,12 @@ export const BLOCK_INNER_SPACING_OPTIONS: Array<{ value: BlockInnerSpacing; labe
   { value: "tight", label: "Tight" },
   { value: "normal", label: "Normal" },
   { value: "roomy", label: "Roomy" }
+];
+
+export const BLOCK_BACKGROUND_FINISH_OPTIONS: Array<{ value: BlockBackgroundFinish; label: string }> = [
+  { value: "none", label: "Plain" },
+  { value: "paper", label: "Paper" },
+  { value: "linen", label: "Linen" }
 ];
 
 /** A FULLY INDEPENDENT type — deliberately NOT `Omit<PerCardStyle, ...> &
@@ -411,6 +418,9 @@ export type BlockStyle = {
    *  mural block has no cover art of its own, so this is a genuinely new
    *  field here. */
   backgroundColor: string | null;
+  /** A texture drawn over the background colour and under the content,
+   *  independent of the colour itself. */
+  backgroundFinish: BlockBackgroundFinish;
   /** The block's typeface — see BlockFontFamily above. */
   fontFamily: BlockFontFamily;
   /** The block's BASE text size, in px — applied to the block wrapper
@@ -462,6 +472,7 @@ export type BlockStyle = {
 
 export const DEFAULT_BLOCK_STYLE: BlockStyle = {
   backgroundColor: null,
+  backgroundFinish: "none",
   fontFamily: "sans",
   fontSize: 14, // roughly matches the block text sizes hardcoded before this setting existed
   textColor: null,
@@ -483,7 +494,9 @@ export const DEFAULT_BLOCK_STYLE: BlockStyle = {
 
 /** Same "fill in whatever's missing" reasoning as resolvePerCardStyle(). */
 export function resolveBlockStyle(style: Partial<BlockStyle> | undefined): BlockStyle {
-  return { ...DEFAULT_BLOCK_STYLE, ...style };
+  const resolved = { ...DEFAULT_BLOCK_STYLE, ...style };
+  if (!BLOCK_BACKGROUND_FINISH_OPTIONS.some((option) => option.value === resolved.backgroundFinish)) resolved.backgroundFinish = "none";
+  return resolved;
 }
 
 /** Overlay text tiers, by the card's REAL rendered width.

@@ -4,7 +4,7 @@ import GridLayout from "react-grid-layout";
 import { useRef, useState, type CSSProperties } from "react";
 import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
-import { BLOCK_PAD_SCALE, blockFontFamilyCss, resolveBlockStyle, resolveBorderColor } from "../../lib/libraryStyle";
+import { BLOCK_PAD_SCALE, blockFinishImage, blockFontFamilyCss, resolveBlockStyle, resolveBorderColor } from "../../lib/libraryStyle";
 import { muralBlockTitle, GRID_COLUMNS, screenPointToGrid, type BlockLayout, type Mural, type MuralBlock, type ReaderProfile, type ShelfTheme } from "../../lib/murals";
 import { muralThemeStyle } from "../../lib/theme";
 import { ActionSheet } from "../Sheet";
@@ -114,6 +114,7 @@ function BlockFrame({
         borderRadius: `${style.cardRadius}px`,
         opacity: (style.cardOpacity / 100) * (draft ? 0.8 : 1),
         backgroundColor: resolveBlockColor(style.backgroundColor, themeColors) ?? "var(--color-surface)",
+        backgroundImage: blockFinishImage(style, themeColors),
         borderTopWidth: `${style.cardBorderSides.top ? style.cardBorderWidth : 0}px`,
         borderRightWidth: `${style.cardBorderSides.right ? style.cardBorderWidth : 0}px`,
         borderBottomWidth: `${style.cardBorderSides.bottom ? style.cardBorderWidth : 0}px`,

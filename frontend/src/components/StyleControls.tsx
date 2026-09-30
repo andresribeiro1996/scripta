@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { BLOCK_THEME_COLOR_LABELS, parseThemeColorRef } from "@scripta/shared";
 import {
+  BLOCK_BACKGROUND_FINISH_OPTIONS,
   BLOCK_FONT_FAMILY_OPTIONS,
   BLOCK_FONT_SIZE_RANGE,
   BLOCK_INNER_SPACING_OPTIONS,
@@ -14,6 +15,7 @@ import {
   CARD_OPACITY_RANGE,
   CARD_RADIUS_RANGE,
   OVERLAY_INTENSITY_RANGE,
+  type BlockBackgroundFinish,
   type BlockFontFamily,
   type BlockInnerSpacing,
   type BlockStyle,
@@ -375,7 +377,7 @@ export function CardTextSection({ idPrefix, draft, onApply, onSaveNow }: { idPre
   );
 }
 
-type BlockAppearanceFields = "backgroundColor" | "cardRadius" | "cardOpacity" | "cardShadow" | "cardHoverEffect" | "innerSpacing";
+type BlockAppearanceFields = "backgroundColor" | "backgroundFinish" | "cardRadius" | "cardOpacity" | "cardShadow" | "cardHoverEffect" | "innerSpacing";
 
 /** BlockStyle's counterpart to CardAppearanceSection — same radius/
  *  opacity/shadow/hover controls, minus the two cover-specific ones
@@ -429,6 +431,25 @@ export function BlockAppearanceSection({
         {usingCustomBackground && (
           <ColorValueInput value={draft.backgroundColor ?? "#ffffff"} fallback="#ffffff" onChange={(color) => onApply({ backgroundColor: color })} />
         )}
+      </div>
+
+      <div className="mb-4">
+        <label className="mb-1 block text-sm font-semibold" htmlFor={`${idPrefix}-background-finish`}>
+          Finish
+        </label>
+        <select
+          id={`${idPrefix}-background-finish`}
+          value={draft.backgroundFinish}
+          onChange={(e) => onSaveNow({ backgroundFinish: e.target.value as BlockBackgroundFinish })}
+          className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
+        >
+          {BLOCK_BACKGROUND_FINISH_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+        {transparent && <p className="mt-1 text-xs text-(--color-text-dim)">Shows when the block has a background</p>}
       </div>
 
       <SliderRow

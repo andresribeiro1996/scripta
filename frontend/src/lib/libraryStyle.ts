@@ -11,7 +11,8 @@
 // `var()` nor `color-mix()`; Task 4D builds its own equivalents rather
 // than reusing these.
 
-import { BLOCK_FONT_FAMILY_OPTIONS, CARD_FONT_FAMILY_OPTIONS, type BlockFontFamily, type BlockInnerSpacing, type CardFontFamily } from "@scripta/shared";
+import { BLOCK_FONT_FAMILY_OPTIONS, CARD_FONT_FAMILY_OPTIONS, blockFinish, finishPatternSvg, type BlockFontFamily, type BlockInnerSpacing, type BlockStyle, type CardFontFamily } from "@scripta/shared";
+import type { ThemeColors } from "@scripta/shared/themes";
 
 export type {
   CardAspectRatio,
@@ -20,6 +21,7 @@ export type {
   BorderSides,
   LibraryStyleSettings,
   PerCardStyle,
+  BlockBackgroundFinish,
   BlockFontFamily,
   BlockInnerSpacing,
   BlockStyle,
@@ -46,6 +48,7 @@ export {
   PER_CARD_STYLE_KEYS,
   extractPerCardStyle,
   resolvePerCardStyle,
+  BLOCK_BACKGROUND_FINISH_OPTIONS,
   BLOCK_FONT_FAMILY_OPTIONS,
   BLOCK_FONT_SIZE_RANGE,
   BLOCK_INNER_SPACING_OPTIONS,
@@ -58,6 +61,11 @@ export {
   PHONE_GRID_BREAKPOINT,
   effectiveCardStyle
 } from "@scripta/shared";
+
+export function blockFinishImage(style: BlockStyle, palette: ThemeColors): string | undefined {
+  const finish = blockFinish(style, palette);
+  return finish ? `url("data:image/svg+xml,${encodeURIComponent(finishPatternSvg(finish.finish, finish.ink))}")` : undefined;
+}
 
 export const BLOCK_PAD_SCALE: Record<BlockInnerSpacing, number> = { tight: 0.5, normal: 1, roomy: 1.6 };
 
