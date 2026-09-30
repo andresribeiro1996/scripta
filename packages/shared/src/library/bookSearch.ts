@@ -19,6 +19,8 @@
 // result-mapping logic.
 
 import { normalizeBookGenres, type BookGenre } from "./bookGenres.js";
+import { normalizeIsbn } from "./covers.js";
+import { bookKey } from "./merge.js";
 
 export interface BookSearchResult {
   title: string;
@@ -36,6 +38,25 @@ export interface BookSearchResult {
 export function looksLikeIsbnQuery(text: string): boolean {
   const digits = text.replace(/[\s-]/g, "");
   return /^(?:97[89]\d{10}|\d{9}[\dXx])$/.test(digits);
+}
+
+function isSameBook(a: BookSearchResult, b: BookSearchResult): boolean {
+  const isbnA = normalizeIsbn(a.isbn);
+  const isbnB = normalizeIsbn(b.isbn);
+  if (isbnA && isbnB) return isbnA === isbnB;
+  const titleAndAuthor = (r: BookSearchResult) => bookKey({ Title: r.title, Attribution: r.authors[0] ?? "" });
+  return titleAndAuthor(a) === titleAndAuthor(b);
+}
+
+/** Inside (saved) results first, then the outside (Open Library) results
+ *  that aren't already listed: same ISBN, or same title + first author
+ *  when either side has no ISBN. */
+export function mergeSearchResults(inside: BookSearchResult[], outside: BookSearchResult[]): BookSearchResult[] {
+  const merged = [...inside];
+  for (const result of outside) {
+    if (!merged.some((existing) => isSameBook(existing, result))) merged.push(result);
+  }
+  return merged;
 }
 
 /** One Open Library search "doc" -> the slim shape the result list
