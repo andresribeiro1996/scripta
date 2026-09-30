@@ -8,8 +8,8 @@ import { minimumTouchTarget, radii, spacing, typography, useTheme, type ThemeCol
 import { SelectRow, SWATCHES } from "../library/components/StyleControls";
 import {
   BACKGROUND_FIXED_SWATCHES, BACKGROUND_THEME_SWATCHES, BORDER_SIDE_PRESETS, BORDER_STRENGTH_PRESETS, BORDER_STYLE_CHOICES, BORDER_THEME_SWATCHES,
-  BORDER_WIDTH_PRESETS, CORNER_PRESETS, FADE_PRESETS, QUICK_LOOKS, SIZE_PRESETS, TEXT_THEME_SWATCHES,
-  applyLook, isHardToRead, matchPreset, matchSides, type Preset, type QuickLook,
+  BORDER_WIDTH_PRESETS, COLOR_LOOKS, CORNER_PRESETS, FADE_PRESETS, FRAME_LOOKS, SIZE_PRESETS, TEXT_THEME_SWATCHES,
+  applyLook, isHardToRead, matchPreset, matchSides, type Look, type Preset,
 } from "./blockStyleOptions";
 
 function Group({ title, children }: { title: string; children: ReactNode }) {
@@ -77,16 +77,16 @@ function ColorRow({ label, palette, value, defaults, themeKeys, fixed, onChange 
   );
 }
 
-function LookCard({ look, palette, onPress }: { look: QuickLook; palette: ThemeColors; onPress: () => void }) {
+function LookCard({ look, style, palette, onPress }: { look: Look; style: BlockStyle; palette: ThemeColors; onPress: () => void }) {
   const { colors } = useTheme();
-  const { style } = look;
-  const background = resolveBlockColor(style.backgroundColor, palette) ?? palette.surface;
-  const text = resolveBlockColor(style.textColor, palette) ?? palette.text;
-  const border = resolveBlockColor(style.cardBorderColor, palette) ?? palette.border;
+  const preview = applyLook(style, look);
+  const background = resolveBlockColor(preview.backgroundColor, palette) ?? palette.surface;
+  const text = resolveBlockColor(preview.textColor, palette) ?? palette.text;
+  const border = resolveBlockColor(preview.cardBorderColor, palette) ?? palette.border;
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={`Apply the ${look.label} look`} onPress={onPress} style={styles.lookWrap}>
-      <View style={[styles.look, { backgroundColor: background, borderColor: style.cardBorderWidth ? border : palette.border, borderWidth: Math.max(1, style.cardBorderWidth), borderStyle: style.cardBorderWidth ? "solid" : "dashed", borderRadius: Math.min(style.cardRadius, radii.lg) }]}>
-        <Text style={{ color: text, fontFamily: blockFontFamily(style.fontFamily), fontWeight: style.bold ? "700" : "400", fontSize: 16 }}>Aa</Text>
+      <View style={[styles.look, { backgroundColor: background, borderColor: preview.cardBorderWidth ? border : palette.border, borderWidth: Math.max(1, preview.cardBorderWidth), borderStyle: preview.cardBorderWidth ? "solid" : "dashed", borderRadius: Math.min(preview.cardRadius, radii.lg) }]}>
+        <Text style={{ color: text, fontFamily: blockFontFamily(preview.fontFamily), fontWeight: preview.bold ? "700" : "400", fontSize: 16 }}>Aa</Text>
       </View>
       <Text style={[typography.caption, { color: colors.textDim }]}>{look.label}</Text>
     </Pressable>
@@ -104,28 +104,23 @@ export function StyleTab({ style, palette, onChange, onReset, onCopy, onPaste, c
 }) {
   const { colors } = useTheme();
   const set = (patch: Partial<BlockStyle>) => onChange({ ...style, ...patch });
-  const looks = (group: QuickLook["group"]) => (
+  const looks = (catalog: readonly Look[]) => (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.looks}>
-      {QUICK_LOOKS.filter((look) => look.group === group).map((look) => <LookCard key={look.key} look={look} palette={palette} onPress={() => onChange(applyLook(style, look))} />)}
+      {catalog.map((look) => <LookCard key={look.key} look={look} style={style} palette={palette} onPress={() => onChange(applyLook(style, look))} />)}
     </ScrollView>
   );
   return (
     <View style={styles.tab}>
-      <Group title="Quick looks">
-        <Caption>Theme looks follow the mural theme</Caption>
-        {looks("theme")}
-        <Caption>Fixed looks</Caption>
-        {looks("fixed")}
+      <Group title="Looks">
+        <Caption>Color</Caption>
+        {looks(COLOR_LOOKS)}
+        <Caption>Frame</Caption>
+        {looks(FRAME_LOOKS)}
       </Group>
-      <ColorRow palette={palette} label="Background" value={style.backgroundColor} defaults={[{ label: "None", value: "transparent" }, { label: "Theme", value: null }]} themeKeys={BACKGROUND_THEME_SWATCHES} fixed={BACKGROUND_FIXED_SWATCHES} onChange={(backgroundColor) => set(backgroundColor === "transparent" ? { backgroundColor, cardShadow: false } : { backgroundColor })} />
-      <Group title="Corners">
-        <View style={styles.wrap}>
-          {CORNER_PRESETS.map(({ key, label, value: radius }) => (
-            <Tile key={key} label={label} selected={style.cardRadius === radius} onPress={() => set({ cardRadius: radius })}>
-              <View style={[styles.corner, { borderColor: colors.text, borderTopLeftRadius: radius }]} />
-            </Tile>
-          ))}
-        </View>
+      <Group title="Color">
+        <ColorRow palette={palette} label="Background" value={style.backgroundColor} defaults={[{ label: "None", value: "transparent" }, { label: "Theme", value: null }]} themeKeys={BACKGROUND_THEME_SWATCHES} fixed={BACKGROUND_FIXED_SWATCHES} onChange={(backgroundColor) => set(backgroundColor === "transparent" ? { backgroundColor, cardShadow: false } : { backgroundColor })} />
+        <ColorRow palette={palette} label="Text color" value={style.textColor} defaults={[{ label: "Auto", value: null }]} themeKeys={TEXT_THEME_SWATCHES} fixed={SWATCHES} onChange={(textColor) => set({ textColor })} />
+        {isHardToRead(style, palette) ? <Text accessibilityLiveRegion="polite" style={[typography.caption, { color: colors.danger }]}>Hard to read on this background</Text> : null}
       </Group>
       <Group title="Text">
         <View style={styles.wrap}>
@@ -138,10 +133,15 @@ export function StyleTab({ style, palette, onChange, onReset, onCopy, onPaste, c
           <Chip label="Code" selected={style.codeStyle} onPress={() => set({ codeStyle: !style.codeStyle })} />
         </View>
         <SelectRow label="Alignment" value={style.textAlign} options={BLOCK_TEXT_ALIGN_OPTIONS} onChange={(textAlign) => set({ textAlign })} />
-        <ColorRow palette={palette} label="Text color" value={style.textColor} defaults={[{ label: "Auto", value: null }]} themeKeys={TEXT_THEME_SWATCHES} fixed={SWATCHES} onChange={(textColor) => set({ textColor })} />
-        {isHardToRead(style, palette) ? <Text accessibilityLiveRegion="polite" style={[typography.caption, { color: colors.danger }]}>Hard to read on this background</Text> : null}
       </Group>
-      <Group title="Border">
+      <Group title="Frame">
+        <View style={styles.wrap}>
+          {CORNER_PRESETS.map(({ key, label, value: radius }) => (
+            <Tile key={key} label={label} selected={style.cardRadius === radius} onPress={() => set({ cardRadius: radius })}>
+              <View style={[styles.corner, { borderColor: colors.text, borderTopLeftRadius: radius }]} />
+            </Tile>
+          ))}
+        </View>
         <PresetRow label="Width" presets={BORDER_WIDTH_PRESETS} value={style.cardBorderWidth} onChange={(cardBorderWidth) => set({ cardBorderWidth })} />
         {style.cardBorderWidth > 0 ? <>
           <SelectRow label="Style" value={BORDER_STYLE_CHOICES.some((choice) => choice.value === style.cardBorderStyle) ? style.cardBorderStyle : null} options={BORDER_STYLE_CHOICES} onChange={(cardBorderStyle) => set({ cardBorderStyle })} />
@@ -159,10 +159,12 @@ export function StyleTab({ style, palette, onChange, onReset, onCopy, onPaste, c
           </View>
           <ColorRow palette={palette} label="Border color" value={style.cardBorderColor} defaults={[{ label: "Auto", value: null }]} themeKeys={BORDER_THEME_SWATCHES} fixed={SWATCHES} onChange={(cardBorderColor) => set({ cardBorderColor })} />
         </> : null}
+        <SelectRow label="Shadow" value={style.cardShadow ? "soft" : "none"} options={[{ value: "none", label: "None" }, { value: "soft", label: "Soft" }]} onChange={(value) => set({ cardShadow: value === "soft" })} />
       </Group>
-      <SelectRow label="Shadow" value={style.cardShadow ? "soft" : "none"} options={[{ value: "none", label: "None" }, { value: "soft", label: "Soft" }]} onChange={(value) => set({ cardShadow: value === "soft" })} />
-      <PresetRow label="Fade" presets={FADE_PRESETS} value={style.cardOpacity} onChange={(cardOpacity) => set({ cardOpacity })} />
-      <SelectRow label="Inner spacing" value={style.innerSpacing} options={BLOCK_INNER_SPACING_OPTIONS} onChange={(innerSpacing) => set({ innerSpacing })} />
+      <Group title="Spacing & fade">
+        <SelectRow label="Inner spacing" value={style.innerSpacing} options={BLOCK_INNER_SPACING_OPTIONS} onChange={(innerSpacing) => set({ innerSpacing })} />
+        <PresetRow label="Fade" presets={FADE_PRESETS} value={style.cardOpacity} onChange={(cardOpacity) => set({ cardOpacity })} />
+      </Group>
       <View style={styles.footer}>
         <Button label="Reset" variant="secondary" onPress={onReset} />
         <Button label="Copy style" variant="secondary" onPress={onCopy} />
