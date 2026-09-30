@@ -12,7 +12,9 @@ import { join } from "node:path";
 import { ensureBackendEnv } from "./dev-account.mjs";
 import { assertResourcesAvailable, DEFAULT_LIMITS, probePorts, readHost, worktreeIdentity } from "./devHost.mjs";
 import { claimSlot, isSlotLive, portsForSlot, readRegistry, registryPath, slotForWorktree } from "./devRegistry.mjs";
+import { writeLaunchConfig } from "./devLaunchConfig.mjs";
 import { applySlotEnv } from "./devSlotEnv.mjs";
+import { mobileCertsExist } from "./mobileCertPaths.mjs";
 
 // The 4-stack gate must never block a worktree re-running its OWN
 // already-live stack — dev-emulator.mjs documents itself as "Idempotent:
@@ -75,6 +77,7 @@ export async function claimThisWorktreeSlot({ repoRoot, transport = "loopback", 
   ensureBackendEnv(join(repoRoot, "backend"));
 
   applySlotEnv({ repoRoot, ports, transport, lanAddress });
+  writeLaunchConfig({ repoRoot, ports, https: mobileCertsExist() });
 
   return { slot, ports, branch, worktree, isPortFree };
 }

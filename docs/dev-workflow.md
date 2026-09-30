@@ -6,6 +6,8 @@ Port slots, the emulator lease, and how concurrent agent sessions share this rep
 
 Run `node scripts/dev-emulator.mjs` (claims this worktree's port slot) and `npm run dev:release` when done. Never hardcode 3000/8081/5173, and never kill another worktree's process to free a port.
 
+`dev:claim` also writes `.claude/launch.json`, so `preview_start` with `web` / `api` starts this worktree's servers on its slot ports.
+
 Run `npm run dev:status` to see which worktrees hold slots, which ports they bound, and who holds an emulator — agents should use `node scripts/dev-status.mjs --json` instead.
 
 `adb root` drops the emulator's reverse tunnels; `npm run dev:tunnels` puts this worktree's back, and `dev:status` warns when they are gone.
