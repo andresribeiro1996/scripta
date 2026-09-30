@@ -121,8 +121,11 @@ export function suggestionReason(reader: Pick<SuggestedReader, "sharedCount">): 
   ```ts
   export function bookMatchKeys(book: Record<string, unknown>): string[] {
     const isbn = normalizeIsbn(book.ISBN);
-    const ta = `ta:${normalizeForMatch(book.Title)}|${normalizeForMatch(book.Attribution)}`;
-    return isbn ? [`isbn:${isbn}`, ta] : [ta];
+    const title = normalizeForMatch(book.Title);
+    const author = normalizeForMatch(book.Attribution);
+    const keys = isbn ? [`isbn:${isbn}`] : [];
+    if (title || author) keys.push(`ta:${title}|${author}`);
+    return keys;
   }
 
   export function suggestionReason(reader: Pick<SuggestedReader, "sharedCount">): string {
