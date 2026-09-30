@@ -46,7 +46,8 @@ export interface BooksService {
   processBook(bookId: string): Promise<void>;
   getCoverFile(id: string, size: CoverFileSize): { buffer: Buffer; mimeType: string } | null;
   getDetails(lookup: BookLookup): Promise<BookMetadata | null>;
-  search(query: string): Promise<BookSearchResult[]>;
+  search(query: string): BookSearchResult[];
+  searchExternal(query: string): Promise<BookSearchResult[]>;
   isAdmin(userId: string): boolean;
   rejectCover(lookup: BookLookup): ResolvedCover;
   uploadCover(lookup: BookLookup, bytes: Buffer): Promise<ResolvedCover>;
@@ -208,19 +209,22 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       return metadata;
     },
 
-    async search(query) {
+    search(query) {
       const trimmed = query.trim();
       if (!trimmed) return [];
       if (looksLikeIsbnQuery(trimmed)) {
-        const isbn = normalizeIsbn(trimmed);
-        const saved = deps.repo.findBookByKey(`isbn:${isbn}`);
-        if (saved) return [toSearchResult(saved)];
-        return saveHits(await deps.catalog.search({ isbn }));
+        const saved = deps.repo.findBookByKey(`isbn:${normalizeIsbn(trimmed)}`);
+        return saved ? [toSearchResult(saved)] : [];
       }
       const tokens = searchTokens(trimmed);
-      if (tokens.length === 0) return [];
-      const saved = deps.repo.searchBooks(tokens, SEARCH_LIMIT);
-      if (saved.length > 0) return saved.map(toSearchResult);
+      return tokens.length === 0 ? [] : deps.repo.searchBooks(tokens, SEARCH_LIMIT).map(toSearchResult);
+    },
+
+    async searchExternal(query) {
+      const trimmed = query.trim();
+      if (!trimmed) return [];
+      if (looksLikeIsbnQuery(trimmed)) return saveHits(await deps.catalog.search({ isbn: normalizeIsbn(trimmed) }));
+      if (searchTokens(trimmed).length === 0) return [];
       return saveHits(await deps.catalog.search({ text: trimmed }));
     },
 
