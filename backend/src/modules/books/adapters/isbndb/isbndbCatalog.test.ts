@@ -107,3 +107,16 @@ test("a text search maps each book and skips the untitled", async () => {
   respond(404, {});
   assert.deepEqual(await createIsbndbCatalog("k", direct).search({ text: "nothing" }), []);
 });
+
+test("catalog calls use the urgent lane", async () => {
+  const lanes: Array<boolean | undefined> = [];
+  const recording: Throttle = (task, options) => {
+    lanes.push(options?.urgent);
+    return task();
+  };
+  respond(200, { book: dune });
+  const catalog = createIsbndbCatalog("k", recording);
+  await catalog.fetchDetails({ isbn: "9780441013593", title: "", author: "" });
+  await catalog.search({ isbn: "9780441013593" });
+  assert.deepEqual(lanes, [true, true]);
+});

@@ -1,3 +1,5 @@
+const SLOTS = 3;
+
 export interface CoverWorker {
   enqueue(bookId: string, front?: boolean): void;
   idle(): Promise<void>;
@@ -11,34 +13,39 @@ export function createCoverWorker(
   const queue: string[] = [];
   const queued = new Set<string>();
   const requeue = new Set<string>();
-  let current: string | null = null;
-  let draining: Promise<void> | null = null;
+  const active = new Set<string>();
+  const idleWaiters: Array<() => void> = [];
+  let running = 0;
   let stopped = false;
 
   async function drain() {
-    while (queue.length > 0 && !stopped) {
-      const bookId = queue.shift()!;
-      queued.delete(bookId);
-      current = bookId;
-      try {
-        await processBook(bookId);
-      } catch (error) {
-        onError(error, bookId);
-      } finally {
-        current = null;
+    try {
+      while (queue.length > 0 && !stopped) {
+        const bookId = queue.shift()!;
+        queued.delete(bookId);
+        active.add(bookId);
+        try {
+          await processBook(bookId);
+        } catch (error) {
+          onError(error, bookId);
+        } finally {
+          active.delete(bookId);
+        }
+        if (requeue.delete(bookId) && !queued.has(bookId)) {
+          queued.add(bookId);
+          queue.unshift(bookId);
+        }
       }
-      if (requeue.delete(bookId) && !queued.has(bookId)) {
-        queued.add(bookId);
-        queue.unshift(bookId);
-      }
+    } finally {
+      running--;
+      if (running === 0) idleWaiters.splice(0).forEach((resolve) => resolve());
     }
-    draining = null;
   }
 
   return {
     enqueue(bookId, front = false) {
       if (stopped) return;
-      if (bookId === current) {
+      if (active.has(bookId)) {
         if (front) requeue.add(bookId);
         return;
       }
@@ -50,11 +57,14 @@ export function createCoverWorker(
       }
       if (front) queue.unshift(bookId);
       else queue.push(bookId);
-      draining ??= drain();
+      if (running < SLOTS) {
+        running++;
+        void drain();
+      }
     },
 
     idle() {
-      return draining ?? Promise.resolve();
+      return running === 0 ? Promise.resolve() : new Promise<void>((resolve) => idleWaiters.push(resolve));
     },
 
     stop() {

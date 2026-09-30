@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import type { Throttle } from "../http/http.js";
-import { appleArtworkUrl, createAppleSource, parseAppleResults } from "./apple.js";
+import { appleArtworkUrl, createAppleSource, parseAppleResults, storefrontsFor } from "./apple.js";
 import { createIsbndbSource, parseIsbndbBooks } from "./isbndb.js";
 import { createOpenLibraryCoverSource } from "./openLibrary.js";
 
@@ -61,10 +61,26 @@ test("Apple artwork is requested at 1400px", () => {
 });
 
 test("Apple ISBN lookup walks the storefronts until one answers", async () => {
-  const urls = stub((url) => Response.json(url.includes("country=pt") ? { results: [] } : { results: [{ trackName: "Orlando", artistName: "Virginia Woolf", artworkUrl100: "https://x/100x100bb.jpg" }] }));
-  const found = await createAppleSource(direct).byIsbn("9780141184272");
+  const urls = stub((url) => Response.json(url.includes("country=us") ? { results: [] } : { results: [{ trackName: "Orlando", artistName: "Virginia Woolf", artworkUrl100: "https://x/100x100bb.jpg" }] }));
+  const found = await createAppleSource(direct).byIsbn("9788325408763");
   assert.deepEqual(found, [{ source: "apple", url: "https://x/1400x1400bb.jpg" }]);
-  assert.deepEqual(urls.map((url) => new URL(url).searchParams.get("country")), ["pt", "us"]);
+  assert.deepEqual(urls.map((url) => new URL(url).searchParams.get("country")), ["us", "pt"]);
+});
+
+test("Apple storefronts follow the ISBN registration group", () => {
+  assert.deepEqual(storefrontsFor("978-85-359-0277-8"), ["br", "pt", "us"]);
+  assert.deepEqual(storefrontsFor("9786555320015"), ["br", "pt", "us"]);
+  assert.deepEqual(storefrontsFor("9789722115520"), ["pt", "br", "us"]);
+  assert.deepEqual(storefrontsFor("9789896572549"), ["pt", "br", "us"]);
+  assert.deepEqual(storefrontsFor("9780141184272"), ["us"]);
+  assert.deepEqual(storefrontsFor("9781501110368"), ["us"]);
+  assert.deepEqual(storefrontsFor("9788325408763"), ["us", "pt", "br"]);
+  assert.deepEqual(storefrontsFor("9791032700000"), ["us", "pt", "br"]);
+  assert.deepEqual(storefrontsFor("8535902775"), ["br", "pt", "us"]);
+  assert.deepEqual(storefrontsFor("972211552X"), ["pt", "br", "us"]);
+  assert.deepEqual(storefrontsFor("0141184272"), ["us"]);
+  assert.deepEqual(storefrontsFor(null), ["us", "pt", "br"]);
+  assert.deepEqual(storefrontsFor("not an isbn"), ["us", "pt", "br"]);
 });
 
 test("Apple title search sends the title alone and moves on when nothing is accepted", async () => {
@@ -73,6 +89,7 @@ test("Apple title search sends the title alone and moves on when nothing is acce
     : { results: [{ trackName: "Something else", artistName: "Nobody", artworkUrl100: "https://y/100x100bb.jpg" }] }));
   const found = await createAppleSource(direct).byTitle("A Quinta dos Animais", "Paulo Faria, George Orwell", (c) => c.title === "A Quinta dos Animais");
   assert.deepEqual(found, [{ source: "apple", url: "https://x/1400x1400bb.jpg" }]);
+  assert.deepEqual(urls.map((url) => new URL(url).searchParams.get("country")), ["us"]);
   const first = new URL(urls[0]!);
   assert.equal(first.searchParams.get("term"), "A Quinta dos Animais");
   assert.equal(first.searchParams.get("media"), "ebook");
@@ -88,4 +105,16 @@ test("Open Library ISBN covers need no API call; title search maps cover ids", a
   assert.equal(urls.length, 0);
   assert.deepEqual(await source.byTitle("Dune", "Frank Herbert", acceptAll), [{ source: "openlibrary", url: "https://covers.openlibrary.org/b/id/42-L.jpg" }]);
   assert.equal(new URL(urls[0]!).searchParams.get("author"), null);
+});
+
+test("cover lookups stay in the normal lane", async () => {
+  const lanes: Array<boolean | undefined> = [];
+  const recording: Throttle = (task, options) => {
+    lanes.push(options?.urgent === true);
+    return task();
+  };
+  stub(() => Response.json({}));
+  await createIsbndbSource("k", recording).byIsbn("9780441013593");
+  await createAppleSource(recording).byIsbn("9780441013593");
+  assert.deepEqual(lanes, [false, false]);
 });
