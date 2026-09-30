@@ -24,6 +24,9 @@ export function openMuralsDb(): DatabaseSync {
   if (!columns.some((c) => c.name === "folder_id")) {
     db.exec(`ALTER TABLE murals ADD COLUMN folder_id TEXT`);
   }
+  if (!columns.some((c) => c.name === "theme")) {
+    db.exec(`ALTER TABLE murals ADD COLUMN theme TEXT`);
+  }
 
   return db;
 }

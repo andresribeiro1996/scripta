@@ -1,4 +1,5 @@
 import type { Mural, MuralBlock, MuralFolder } from "@scripta/shared";
+import type { ThemeId } from "@scripta/shared/themes";
 import { apiClient } from "../../core/api";
 
 export async function fetchMurals(): Promise<Mural[]> {
@@ -9,11 +10,11 @@ export function fetchMural(id: string): Promise<Mural> {
   return apiClient.request(`/murals/${id}`, { auth: true });
 }
 
-export function createMural(name: string, folderId: string | null = null): Promise<Mural> {
-  return apiClient.request("/murals", { method: "POST", body: { name, folderId }, auth: true });
+export function createMural(name: string, theme: ThemeId, folderId: string | null = null): Promise<Mural> {
+  return apiClient.request("/murals", { method: "POST", body: { name, theme, folderId }, auth: true });
 }
 
-export function updateMural(id: string, patch: { name?: string; blocks?: MuralBlock[]; folderId?: string | null; updatedAt?: string }): Promise<Mural> {
+export function updateMural(id: string, patch: { name?: string; theme?: ThemeId; blocks?: MuralBlock[]; folderId?: string | null; updatedAt?: string }): Promise<Mural> {
   return apiClient.request(`/murals/${id}`, { method: "PUT", body: patch, auth: true });
 }
 

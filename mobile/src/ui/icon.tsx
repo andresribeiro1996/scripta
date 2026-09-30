@@ -53,6 +53,7 @@ const GLYPHS = {
   book: { ios: "book.closed", android: "book" },
   follow: { ios: "person.badge.plus", android: "person_add" },
   style: { ios: "paintbrush", android: "brush" },
+  theme: { ios: "circle.lefthalf.filled", android: "contrast" },
   resize: { ios: "arrow.up.left.and.arrow.down.right", android: "open_in_full" },
   duplicate: { ios: "plus.square.on.square", android: "content_copy" },
 } as const satisfies Record<string, Glyph>;

@@ -1,4 +1,4 @@
-import { DEFAULT_BORDER_SIDES, contrastRatio, effectiveBlockColors, resolveBlockColor, themeColorRef, type BlockStyle, type BlockThemeColorKey, type BorderSides, type CardBorderStyle } from "@scripta/shared";
+import { DEFAULT_BORDER_SIDES, contrastRatio, effectiveBlockColors, normalizeHexColor, resolveBlockColor, themeColorRef, type BlockStyle, type BlockThemeColorKey, type BorderSides, type CardBorderStyle } from "@scripta/shared";
 import type { ThemeColors } from "@scripta/shared/themes";
 
 export type Preset<T> = { key: string; label: string; value: T };
@@ -40,6 +40,7 @@ export const BORDER_SIDE_PRESETS: Preset<BorderSides>[] = [
   { key: "topBottom", label: "Top & bottom", value: { top: true, right: false, bottom: true, left: false } },
   { key: "leftRight", label: "Left & right", value: { top: false, right: true, bottom: false, left: true } },
   { key: "bottom", label: "Bottom only", value: { top: false, right: false, bottom: true, left: false } },
+  { key: "left", label: "Left only", value: { top: false, right: false, bottom: false, left: true } },
 ];
 
 export const BORDER_STYLE_CHOICES: Array<{ value: CardBorderStyle; label: string }> = [
@@ -53,36 +54,42 @@ export const TEXT_THEME_SWATCHES: BlockThemeColorKey[] = ["accent", "onAccent"];
 export const BORDER_THEME_SWATCHES: BlockThemeColorKey[] = ["accent", "text"];
 export const BACKGROUND_FIXED_SWATCHES = ["#ffffff", "#f1e2d8", "#e4efdf", "#dcebf2", "#ebe4f3", "#fff3b0", "#201e1c"];
 
-type LookField = "backgroundColor" | "textColor" | "fontFamily" | "bold" | "italic" | "codeStyle" | "cardRadius" | "cardBorderWidth" | "cardBorderColor" | "cardBorderStyle" | "cardBorderOpacity" | "cardBorderSides" | "cardShadow";
+export const COLOR_LOOK_FIELDS = ["backgroundColor", "textColor", "cardBorderColor"] as const;
+export const FRAME_LOOK_FIELDS = ["cardRadius", "cardBorderWidth", "cardBorderStyle", "cardBorderOpacity", "cardBorderSides", "cardShadow"] as const;
 
-export type QuickLook = { key: string; label: string; group: "theme" | "fixed"; style: Pick<BlockStyle, LookField> };
+export type ColorLook = { key: string; label: string; style: Pick<BlockStyle, (typeof COLOR_LOOK_FIELDS)[number]> & Partial<Pick<BlockStyle, "cardShadow">> };
+export type FrameLook = { key: string; label: string; style: Pick<BlockStyle, (typeof FRAME_LOOK_FIELDS)[number]> };
+export type Look = ColorLook | FrameLook;
 
-const LOOK_BASE: Pick<BlockStyle, LookField> = {
-  backgroundColor: null,
-  textColor: null,
-  fontFamily: "sans",
-  bold: false,
-  italic: false,
-  codeStyle: false,
-  cardRadius: 12,
-  cardBorderWidth: 0,
-  cardBorderColor: null,
-  cardBorderStyle: "solid",
-  cardBorderOpacity: 100,
-  cardBorderSides: DEFAULT_BORDER_SIDES,
-  cardShadow: true,
-};
+export const COLOR_LOOKS: ColorLook[] = [
+  { key: "theme", label: "Theme", style: { backgroundColor: null, textColor: null, cardBorderColor: null } },
+  { key: "clear", label: "Clear", style: { backgroundColor: "transparent", textColor: null, cardBorderColor: null, cardShadow: false } },
+  { key: "tinted", label: "Tinted", style: { backgroundColor: themeColorRef("accentSoft"), textColor: null, cardBorderColor: null } },
+  { key: "accent", label: "Accent", style: { backgroundColor: themeColorRef("accent"), textColor: themeColorRef("onAccent"), cardBorderColor: null } },
+  { key: "parchment", label: "Parchment", style: { backgroundColor: "#f6efe3", textColor: "#201e1c", cardBorderColor: null } },
+  { key: "note", label: "Note", style: { backgroundColor: "#fff3b0", textColor: "#201e1c", cardBorderColor: null } },
+  { key: "ink", label: "Ink", style: { backgroundColor: "#201e1c", textColor: "#f2f0ec", cardBorderColor: null } },
+  { key: "clay", label: "Clay", style: { backgroundColor: "#97532d", textColor: "#ffffff", cardBorderColor: null } },
+  { key: "sage", label: "Sage", style: { backgroundColor: "#e4efdf", textColor: "#263729", cardBorderColor: null } },
+  { key: "seaGlass", label: "Sea-glass", style: { backgroundColor: "#dcebf2", textColor: "#223943", cardBorderColor: null } },
+  { key: "lilac", label: "Lilac", style: { backgroundColor: "#ebe4f3", textColor: "#3b2b4b", cardBorderColor: null } },
+  { key: "rose", label: "Rose", style: { backgroundColor: "#f3e0e5", textColor: "#4b2932", cardBorderColor: null } },
+  { key: "ochre", label: "Ochre", style: { backgroundColor: "#f4e4b9", textColor: "#4a3515", cardBorderColor: null } },
+];
 
-export const QUICK_LOOKS: QuickLook[] = [
-  { key: "plain", label: "Plain", group: "theme", style: { ...LOOK_BASE, cardBorderWidth: 1 } },
-  { key: "bare", label: "Bare", group: "theme", style: { ...LOOK_BASE, backgroundColor: "transparent", cardShadow: false } },
-  { key: "tinted", label: "Tinted", group: "theme", style: { ...LOOK_BASE, backgroundColor: themeColorRef("accentSoft") } },
-  { key: "accent", label: "Accent", group: "theme", style: { ...LOOK_BASE, backgroundColor: themeColorRef("accent"), textColor: themeColorRef("onAccent"), bold: true } },
-  { key: "outline", label: "Outline", group: "theme", style: { ...LOOK_BASE, backgroundColor: "transparent", cardBorderWidth: 3, cardBorderColor: themeColorRef("accent"), cardShadow: false } },
-  { key: "paper", label: "Paper", group: "fixed", style: { ...LOOK_BASE, backgroundColor: "#f6efe3", textColor: "#201e1c", fontFamily: "serif", cardRadius: 4, cardBorderWidth: 1 } },
-  { key: "note", label: "Note", group: "fixed", style: { ...LOOK_BASE, backgroundColor: "#fff3b0", textColor: "#201e1c", fontFamily: "mono", cardRadius: 0 } },
-  { key: "ink", label: "Ink", group: "fixed", style: { ...LOOK_BASE, backgroundColor: "#201e1c", textColor: "#f2f0ec", fontFamily: "serif" } },
-  { key: "clay", label: "Clay", group: "fixed", style: { ...LOOK_BASE, backgroundColor: "#97532d", textColor: "#ffffff", bold: true } },
+const frameLook = (key: string, label: string, cardBorderWidth: number, cardShadow: boolean, cardRadius = 12, cardBorderSides = DEFAULT_BORDER_SIDES): FrameLook => ({
+  key,
+  label,
+  style: { cardRadius, cardBorderWidth, cardBorderStyle: "solid", cardBorderOpacity: 100, cardBorderSides, cardShadow },
+});
+
+export const FRAME_LOOKS: FrameLook[] = [
+  frameLook("card", "Card", 0, true),
+  frameLook("framed", "Framed", 1, true),
+  frameLook("flat", "Flat", 0, false),
+  frameLook("outline", "Outline", 3, false),
+  frameLook("bookplate", "Bookplate", 1, false, 4),
+  frameLook("marginNote", "Margin note", 3, false, 0, { top: false, right: false, bottom: false, left: true }),
 ];
 
 export function matchPreset(presets: readonly Preset<number>[], value: number): string | null {
@@ -93,7 +100,7 @@ export function matchSides(sides: BorderSides): string | null {
   return BORDER_SIDE_PRESETS.find(({ value }) => value.top === sides.top && value.right === sides.right && value.bottom === sides.bottom && value.left === sides.left)?.key ?? null;
 }
 
-export function applyLook(style: BlockStyle, look: QuickLook): BlockStyle {
+export function applyLook(style: BlockStyle, look: Look): BlockStyle {
   return { ...style, ...look.style };
 }
 
@@ -106,4 +113,12 @@ export function isHardToRead(style: Pick<BlockStyle, "backgroundColor" | "textCo
 export function selectionBorderColor(style: Pick<BlockStyle, "backgroundColor" | "cardBorderColor">, colors: Pick<ThemeColors, BlockThemeColorKey>): string {
   const isAccent = (value: string | null) => resolveBlockColor(value, colors)?.toLowerCase() === colors.accent.toLowerCase();
   return isAccent(style.backgroundColor) || isAccent(style.cardBorderColor) ? colors.text : colors.accent;
+}
+
+export type CustomColorTarget = "backgroundColor" | "textColor" | "cardBorderColor";
+
+export function customColorStart(target: CustomColorTarget, style: Pick<BlockStyle, CustomColorTarget>, palette: Pick<ThemeColors, BlockThemeColorKey | "border">): string {
+  const { text, background } = effectiveBlockColors(style, palette);
+  const start = target === "backgroundColor" ? background : target === "textColor" ? text : resolveBlockColor(style.cardBorderColor, palette) ?? palette.border;
+  return normalizeHexColor(start) ?? palette.text;
 }

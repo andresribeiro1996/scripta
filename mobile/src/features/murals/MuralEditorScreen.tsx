@@ -1,9 +1,11 @@
 import { useCallback, useMemo, useState } from "react";
+import { THEME_IDS, themes, type ThemeId } from "@scripta/shared/themes";
 import {
   BLOCK_TYPE_LABELS,
   bookKey,
   createBlockCandidate,
   createDuplicateCandidate,
+  muralThemeId,
   resolveBlockStyle,
   type BlockStyle,
   type BlockType,
@@ -15,6 +17,7 @@ import { Stack, useFocusEffect, useRouter } from "expo-router";
 import { AccessibilityInfo, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { Button, Dialog, EmptyState, ErrorState, Fab, HeaderActions, Icon, IconButton, Input, Screen, Sheet, Toast } from "../../ui";
+import { ThemeGrid } from "../../ui/ThemeGrid";
 import { spacing, typography, useTheme } from "../../ui/theme";
 import { fetchGalleryImages } from "../gallery/api";
 import { useLibrary } from "../library/hooks/useLibrary";
@@ -45,6 +48,8 @@ export function MuralEditorScreen({ id }: { id: string }) {
   const gallery = useQuery({ queryKey: ["gallery"], queryFn: fetchGalleryImages });
   const tierlists = useQuery({ queryKey: ["tierlists"], queryFn: fetchTierlists });
   const [name, setName] = useState<string | null>(null);
+  const [theme, setTheme] = useState<ThemeId | null>(null);
+  const [themeOpen, setThemeOpen] = useState(false);
   const [blocks, setBlocks] = useState<MuralBlock[] | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sheetTab, setSheetTab] = useState<SheetTab | null>(null);
@@ -60,6 +65,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
   const mural = muralQuery.data;
   const currentBlocks = blocks ?? mural?.blocks ?? [];
   const currentName = name ?? mural?.name ?? "Mural";
+  const currentTheme = theme ?? muralThemeId(mural?.theme);
   const selected = currentBlocks.find((block) => block.id === selectedId) ?? null;
   const books = library?.data.books ?? [];
   const groups = library?.data.groups ?? [];
@@ -72,12 +78,13 @@ export function MuralEditorScreen({ id }: { id: string }) {
     void muralQuery.refetch().then(({ data }) => {
       if (!data) return;
       setName(data.name);
+      setTheme(data.theme);
       setBlocks(data.blocks);
     });
   }, [muralQuery.refetch]));
 
-  const draftMural = useMemo(() => mural ? { ...mural, name: currentName, blocks: currentBlocks } : null, [mural, currentName, currentBlocks]);
-  const unsaved = useMemo(() => !!mural && ((currentName.trim() || mural.name) !== mural.name || JSON.stringify(currentBlocks) !== JSON.stringify(mural.blocks)), [mural, currentName, currentBlocks]);
+  const draftMural = useMemo(() => mural ? { ...mural, name: currentName, theme: currentTheme, blocks: currentBlocks } : null, [mural, currentName, currentTheme, currentBlocks]);
+  const unsaved = useMemo(() => !!mural && ((currentName.trim() || mural.name) !== mural.name || currentTheme !== muralThemeId(mural.theme) || JSON.stringify(currentBlocks) !== JSON.stringify(mural.blocks)), [mural, currentName, currentTheme, currentBlocks]);
 
   function updateSelected(transform: (block: MuralBlock) => MuralBlock) {
     if (!selected) return;
@@ -99,9 +106,10 @@ export function MuralEditorScreen({ id }: { id: string }) {
   }
 
   async function persist() {
-    const updated = await updateMural(id, { name: currentName.trim() || mural!.name, blocks: currentBlocks, updatedAt: mural!.updatedAt });
+    const updated = await updateMural(id, { name: currentName.trim() || mural!.name, theme: currentTheme, blocks: currentBlocks, updatedAt: mural!.updatedAt });
     cacheMural(updated);
     setName(updated.name);
+    setTheme(updated.theme);
     setBlocks(updated.blocks);
     return updated;
   }
@@ -139,6 +147,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
           headerLargeTitleEnabled: false,
           headerRight: () => <HeaderActions>
             <IconButton framed tone={unsaved ? "accent" : "default"} accessibilityLabel={unsaved ? "Save changes" : "All changes saved"} name="save" onPress={() => { if (unsaved && !busy) void save(); }} />
+            <IconButton framed accessibilityLabel="Mural theme" name="theme" onPress={() => setThemeOpen(true)} />
             <IconButton framed accessibilityLabel="Share mural" name="share" onPress={() => setShareFor(draftMural)} />
           </HeaderActions>,
         }}
@@ -159,9 +168,9 @@ export function MuralEditorScreen({ id }: { id: string }) {
       <Dialog visible={renaming} title="Rename mural" onClose={() => setRenaming(false)}>
         <View style={styles.dialog}><Input label="Mural name" value={currentName} onChangeText={setName} /><Button label="Done" onPress={() => setRenaming(false)} /></View>
       </Dialog>
-      <MuralShareSheet mural={shareFor} books={books} groups={groups} images={gallery.data ?? []} tierlists={tierlists.data ?? []} profile={profile} draft={shareFor !== null && (shareFor.name !== mural.name || shareFor.blocks !== mural.blocks)} contentReady={!libraryQuery.isPending && !gallery.isPending && !tierlists.isPending} contentError={libraryQuery.error?.message ?? gallery.error?.message ?? tierlists.error?.message ?? undefined} onRetryContent={() => { void libraryQuery.refetch(); void gallery.refetch(); void tierlists.refetch(); }} onClose={() => setShareFor(null)} onEnableLink={async () => {
+      <MuralShareSheet mural={shareFor} books={books} groups={groups} images={gallery.data ?? []} tierlists={tierlists.data ?? []} profile={profile} draft={shareFor !== null && (shareFor.name !== mural.name || shareFor.theme !== mural.theme || shareFor.blocks !== mural.blocks)} contentReady={!libraryQuery.isPending && !gallery.isPending && !tierlists.isPending} contentError={libraryQuery.error?.message ?? gallery.error?.message ?? tierlists.error?.message ?? undefined} onRetryContent={() => { void libraryQuery.refetch(); void gallery.refetch(); void tierlists.refetch(); }} onClose={() => setShareFor(null)} onEnableLink={async () => {
         if (shareFor === null) return;
-        if (shareFor.name !== mural.name || shareFor.blocks !== mural.blocks) setShareFor(await persist());
+        if (shareFor.name !== mural.name || shareFor.theme !== mural.theme || shareFor.blocks !== mural.blocks) setShareFor(await persist());
         const updated = await shareMural(id);
         cacheMural(updated);
         setShareFor(updated);
@@ -169,8 +178,9 @@ export function MuralEditorScreen({ id }: { id: string }) {
       }} onDisableLink={async () => {
         const updated = await unshareMural(id);
         cacheMural(updated);
-        setShareFor({ ...updated, name: currentName, blocks: currentBlocks });
+        setShareFor({ ...updated, name: currentName, theme: currentTheme, blocks: currentBlocks });
       }} />
+      <Sheet visible={themeOpen} title="Theme" onClose={() => setThemeOpen(false)}><ScrollView contentContainerStyle={styles.sheet}><ThemeGrid options={THEME_IDS} value={currentTheme} onChange={(next) => { setTheme(next); setThemeOpen(false); }} /></ScrollView></Sheet>
       <Sheet visible={adding} title="Add block" onClose={() => setAdding(false)}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheet}>{BLOCK_TYPES.map((type) => <Button key={type} label={BLOCK_TYPE_LABELS[type]} variant="secondary" onPress={() => add(type)} />)}</ScrollView></Sheet>
       <BlockSheet
         block={selected}
@@ -178,10 +188,11 @@ export function MuralEditorScreen({ id }: { id: string }) {
         tab={sheetTab}
         onTabChange={setSheetTab}
         onClose={() => setSheetTab(null)}
-        preview={selected ? <BlockPreview block={selected} canvasWidth={windowWidth - spacing.sm * 2} maxHeight={200} books={books} images={gallery.data ?? []} tierlists={tierlists.data ?? []} profile={profile} groups={groups} /> : null}
+        preview={selected ? <BlockPreview theme={currentTheme} block={selected} canvasWidth={windowWidth - spacing.sm * 2} maxHeight={200} books={books} images={gallery.data ?? []} tierlists={tierlists.data ?? []} profile={profile} groups={groups} /> : null}
         content={selected && hasContentFields(selected.type) ? <ContentTab block={selected} books={books} groups={groups} images={gallery.data ?? []} tierlists={tierlists.data ?? []} update={updateSelected} onPick={setPicking} /> : null}
         style={selected ? <StyleTab
           style={resolveBlockStyle(selected.style)}
+          palette={themes[currentTheme].colors}
           onChange={(style) => updateSelected((block) => ({ ...block, style }))}
           onReset={() => updateSelected((block) => { const next = { ...block }; delete next.style; return next; })}
           onCopy={() => setCopiedStyle(resolveBlockStyle(selected.style))}

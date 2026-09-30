@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { blockTextColors, contrastRatio, mutedTextColor, parseThemeColorRef, resolveBlockColor, themeColorRef } from "./blockTextColors.js";
+import { blockTextColors, contrastRatio, mutedTextColor, normalizeHexColor, parseHexColor, parseThemeColorRef, resolveBlockColor, themeColorRef, toHex } from "./blockTextColors.js";
 import { themes } from "../themes/palettes.js";
 
 const light = themes.light.colors;
@@ -151,4 +151,24 @@ test("blockTextColors swaps the accent for the text colour on a fixed background
 
 test("blockTextColors keeps the theme accent where it reads against the block background", () => {
   assert.equal(blockTextColors({ backgroundColor: "#ffffff", textColor: null }, light).accent, light.accent);
+});
+
+test("normalizeHexColor expands shorthand, lowercases and trims", () => {
+  assert.equal(normalizeHexColor("#abc"), "#aabbcc");
+  assert.equal(normalizeHexColor("#AABBCC"), "#aabbcc");
+  assert.equal(normalizeHexColor("  #1A2b3C \n"), "#1a2b3c");
+});
+
+test("normalizeHexColor rejects anything that is not #rgb or #rrggbb", () => {
+  for (const input of ["abc", "#abcd", "#ggg", "#12345", "", "rgb(0,0,0)"]) assert.equal(normalizeHexColor(input), null, input);
+});
+
+test("parseHexColor and toHex round-trip", () => {
+  for (const hex of ["#000000", "#ffffff", "#1a2b3c", "#97532d"]) assert.equal(toHex(parseHexColor(hex)!), hex);
+  assert.deepEqual(parseHexColor("#0080ff"), { r: 0, g: 128, b: 255 });
+});
+
+test("toHex rounds and clamps each channel", () => {
+  assert.equal(toHex({ r: 127.6, g: -3, b: 300 }), "#8000ff");
+  assert.equal(toHex({ r: 127.99998, g: 0.4, b: 254.5 }), "#8000ff");
 });

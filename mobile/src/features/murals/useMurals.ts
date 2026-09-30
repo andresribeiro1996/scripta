@@ -1,4 +1,5 @@
 import { ensureBookBlockHeights, scrubBooksFromMurals, scrubImageFromMurals, type Mural, type MuralBlock, type MuralFolder } from "@scripta/shared";
+import type { ThemeId } from "@scripta/shared/themes";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as api from "./api";
 
@@ -15,7 +16,7 @@ export function useMurals() {
   const replace = (mural: Mural) => client.setQueryData<Mural[]>(MURALS_QUERY_KEY, current().map((item) => item.id === mural.id ? mural : item));
   return {
     ...query,
-    async create(name: string, folderId: string | null = null) { const mural = await api.createMural(name, folderId); client.setQueryData(MURALS_QUERY_KEY, [...current(), mural]); return mural; },
+    async create(name: string, theme: ThemeId, folderId: string | null = null) { const mural = await api.createMural(name, theme, folderId); client.setQueryData(MURALS_QUERY_KEY, [...current(), mural]); return mural; },
     async update(id: string, patch: { name?: string; blocks?: MuralBlock[]; folderId?: string | null }) { const mural = await api.updateMural(id, { ...patch, updatedAt: current().find((item) => item.id === id)?.updatedAt }); replace(mural); return mural; },
     async remove(id: string) { await api.deleteMural(id); await client.invalidateQueries({ queryKey: ["home"] }); await client.invalidateQueries({ queryKey: ["community", "own-profile"] }); client.setQueryData(MURALS_QUERY_KEY, current().filter((item) => item.id !== id)); },
     async setCover(id: string, imageId: string, url: string) { const mural = await api.setMuralCover(id, imageId, url); replace(mural); return mural; },
