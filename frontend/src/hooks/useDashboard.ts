@@ -1,6 +1,5 @@
-import { useEffect, useRef } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { fetchDashboard, markDashboardSeen } from "../api/community";
+import { fetchDashboard } from "../api/community";
 
 export function useDashboard() {
   const query = useInfiniteQuery({
@@ -10,18 +9,18 @@ export function useDashboard() {
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     refetchOnMount: "always"
   });
-  const markedRef = useRef(false);
-  useEffect(() => {
-    if (!markedRef.current && query.data) {
-      markedRef.current = true;
-      void markDashboardSeen().catch(() => {});
-    }
-  }, [query.data]);
+  const firstPage = query.data?.pages[0];
   return {
     items: query.data?.pages.flatMap((page) => page.items) ?? [],
-    newCount: query.data?.pages[0]?.newCount ?? 0,
+    seenAt: firstPage?.seenAt ?? null,
+    personalNewCount: firstPage?.personalNewCount ?? 0,
+    followingNewCount: firstPage?.followingNewCount ?? 0,
     isLoading: query.isPending,
     error: query.error,
+    isFetching: query.isFetching,
+    isFetchNextPageError: query.isFetchNextPageError,
+    isRefetchError: query.isRefetchError,
+    isRefetching: query.isRefetching,
     hasNextPage: query.hasNextPage,
     isFetchingNextPage: query.isFetchingNextPage,
     fetchNextPage: query.fetchNextPage,

@@ -1,5 +1,6 @@
 import { Fragment, useState, type ComponentType } from "react";
 import { Link, NavLink, Outlet } from "react-router-dom";
+import { newCountLabel } from "@scripta/shared";
 import { useAuth } from "../auth/AuthContext";
 import { Avatar } from "../components/Avatar";
 import { BrandLockup } from "../components/BrandLockup";
@@ -15,6 +16,7 @@ import {
 } from "../components/NavIcons";
 import { OfflineBanner } from "../components/OfflineBanner";
 import { useAccountAppearanceSync } from "../hooks/useAccountAppearanceSync";
+import { useDashboard } from "../hooks/useDashboard";
 import { useDismissible } from "../hooks/useDismissible";
 import { useGenreEnrichment } from "../hooks/useGenreEnrichment";
 import { useLibrary } from "../hooks/useLibrary";
@@ -68,6 +70,7 @@ const TAB_ITEMS = NAV_GROUPS[0].items;
 export function DashboardLayout() {
   const { session, logout } = useAuth();
   const { data: library, updateLibrary } = useLibrary();
+  const { personalNewCount } = useDashboard();
   useGenreEnrichment(library?.data.books ?? [], updateLibrary);
   useAccountAppearanceSync();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -89,6 +92,13 @@ export function DashboardLayout() {
         : "text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"
     }`;
 
+  const homeBadge = newCountLabel(personalNewCount);
+  const homeLabel = (item: NavItem) => (item.to === "/dashboard" && homeBadge ? `Home, ${homeBadge} new` : undefined);
+  const badge = (item: NavItem, position: string) =>
+    item.to === "/dashboard" && homeBadge ? (
+      <span className={`${position} rounded-full bg-(--color-accent) px-1.5 text-[10px] font-bold text-(--color-on-accent)`}>{homeBadge}</span>
+    ) : null;
+
   return (
     <div className="flex min-h-screen">
       <aside className="hidden w-56 shrink-0 flex-col border-r border-(--color-border) bg-(--color-surface) px-3 py-5 lg:flex">
@@ -98,7 +108,7 @@ export function DashboardLayout() {
             <Fragment key={groupIndex}>
               {groupIndex > 0 && <div className="my-3 border-t border-(--color-border)" />}
               {group.items.map((item) => (
-                <NavLink key={item.to} to={item.to} end={item.end} title={item.description} className={navLinkClass}>
+                <NavLink key={item.to} to={item.to} end={item.end} title={item.description} aria-label={homeLabel(item)} className={navLinkClass}>
                   {/* mt-px optically centres an 18px glyph on a 20px
                       first line; the row is items-start so the drawer's
                       two-line entries keep the icon beside the label
@@ -107,6 +117,7 @@ export function DashboardLayout() {
                     <item.icon size={18} />
                   </span>
                   <span>{item.label}</span>
+                  {badge(item, "ml-auto self-center")}
                 </NavLink>
               ))}
             </Fragment>
@@ -150,13 +161,17 @@ export function DashboardLayout() {
               key={item.to}
               to={item.to}
               end={item.end}
+              aria-label={homeLabel(item)}
               className={({ isActive }) =>
                 `flex h-14 flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-medium ${
                   isActive ? "text-(--color-accent)" : "text-(--color-text-dim)"
                 }`
               }
             >
-              <item.icon size={22} />
+              <span className="relative">
+                <item.icon size={22} />
+                {badge(item, "absolute -top-1 left-1/2")}
+              </span>
               {item.label}
             </NavLink>
           ))}
@@ -189,6 +204,7 @@ export function DashboardLayout() {
                       key={item.to}
                       to={item.to}
                       end={item.end}
+                      aria-label={homeLabel(item)}
                       className={navLinkClass}
                       onClick={() => setDrawerOpen(false)}
                     >
@@ -201,6 +217,7 @@ export function DashboardLayout() {
                           <span className="block text-xs font-normal text-(--color-text-dim)">{item.description}</span>
                         )}
                       </span>
+                      {badge(item, "ml-auto self-center")}
                     </NavLink>
                   ))}
                 </Fragment>

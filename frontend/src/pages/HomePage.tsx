@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { bookKey, buildDashboardCards, digestAction, digestTarget, resolveQuote } from "@scripta/shared";
+import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
+import { bookKey, buildDashboardCards, clearDashboardCounts, digestAction, digestHeading, digestTarget, isNewDigestItem, newCountLabel, resolveQuote, type DashboardFeedPage } from "@scripta/shared";
+import { markDashboardSeen } from "../api/community";
 import { useDashboard } from "../hooks/useDashboard";
 import { useLibrary } from "../hooks/useLibrary";
 import { useAuth } from "../auth/AuthContext";
@@ -17,10 +19,40 @@ const button = "inline-flex min-h-11 items-center justify-center rounded-lg bord
 export function HomePage() {
   const navigate = useNavigate();
   const { session } = useAuth();
+  const queryClient = useQueryClient();
   const dashboard = useDashboard();
   const library = useLibrary();
   const [day] = useState(() => new Date().toISOString().slice(0, 10));
   const [picking, setPicking] = useState(false);
+  const [activity, setActivity] = useState<HTMLElement | null>(null);
+  const markedRef = useRef(false);
+  const { fetchNextPage } = dashboard;
+  const skippingEmptyPage = dashboard.items.length === 0 && dashboard.hasNextPage && !dashboard.isFetchNextPageError;
+  const loadingActivity = dashboard.isLoading || skippingEmptyPage;
+  const settled = !loadingActivity && !dashboard.error && !dashboard.isFetching;
+  const newLabel = newCountLabel(dashboard.personalNewCount);
+
+  useEffect(() => {
+    if (skippingEmptyPage && !dashboard.isFetching) void fetchNextPage();
+  }, [skippingEmptyPage, dashboard.isFetching, fetchNextPage]);
+
+  useEffect(() => {
+    if (!activity || !settled) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (markedRef.current || !entries.some((entry) => entry.isIntersecting)) return;
+        markedRef.current = true;
+        void markDashboardSeen().then(
+          () => queryClient.setQueryData<InfiniteData<DashboardFeedPage>>(["community", "dashboard"], (data) => data && clearDashboardCounts(data)),
+          () => { markedRef.current = false; }
+        );
+      },
+      { rootMargin: "0px 0px -25% 0px" }
+    );
+    observer.observe(activity);
+    return () => observer.disconnect();
+  }, [activity, settled, queryClient]);
+
   const books = library.data?.data.books ?? [];
   const style = resolveLibraryStyle(library.data?.data.style);
   const byKey = new Map(books.map((book) => [bookKey(book), book] as const));
@@ -36,7 +68,7 @@ export function HomePage() {
           <Link className={button} to="/community/discover">Discover</Link>
         </div>
       </header>
-      {dashboard.isLoading || library.isPending ? <p role="status">Loading home…</p> : dashboard.error || library.isError ? <div role="alert"><p>Couldn't load your home.</p><button className={button} onClick={() => { void dashboard.refetch(); void library.refetch(); }}>Retry</button></div> : <>
+      {library.isPending ? <p role="status">Loading home…</p> : library.isError ? <div role="alert"><p>Couldn't load your home.</p><button className={button} onClick={() => { void dashboard.refetch(); void library.refetch(); }}>Retry</button></div> : <>
         {!books.length ? <div className="space-y-3 rounded-xl border border-(--color-border) p-6"><h2 className="text-xl">Start your library</h2><p>Import your existing collection, or add your first book manually.</p><div className="flex flex-wrap gap-2"><Link className={`${button} bg-(--color-accent) text-(--color-on-accent)`} to="/dashboard/library?action=import">Import library</Link><Link className={button} to="/dashboard/library?action=add">Add a book manually</Link></div></div>
           : cards.map((card) => {
             if (card.kind === "currentlyReading" || card.kind === "upNext") {
@@ -65,38 +97,62 @@ export function HomePage() {
               </blockquote>
             </section>;
           })}
-        <section aria-label="Following" className="space-y-3">
-          <h2 className="text-xl">Following</h2>
-          {dashboard.newCount > 0 ? <p className="text-sm font-semibold text-(--color-accent)">You have {dashboard.newCount} new</p> : null}
-          {dashboard.items.length === 0 ? <p className="text-sm text-(--color-text-dim)">Nothing here yet. Follow people to see what they publish.</p> : (
-            <div className="space-y-3">
-              {dashboard.items.map((item) => (
-                <div key={`${item.kind}:${item.id}`} className="rounded-xl border border-(--color-border) bg-(--color-surface) p-4">
-                  <Link to={digestTarget(item)} className="flex items-center gap-2">
-                    <AuthorAvatar author={item.actor} />
-                    <span>
-                      <span className="block text-sm font-semibold">
-                        <span className="inline-flex items-center gap-1">
-                          {item.actor.username}
-                          <ReaderGlyph identity={item.actor.readerGlyph} />
-                        </span>{" "}
-                        {digestAction(item)}
-                      </span>
-                      {item.kind === "publication" ? <span className="block text-sm text-(--color-text-dim)">{item.content.name}</span> : null}
-                    </span>
-                  </Link>
-                </div>
-              ))}
-            </div>
-          )}
-          {dashboard.hasNextPage && (
-            <button
-              onClick={() => void dashboard.fetchNextPage()}
-              disabled={dashboard.isFetchingNextPage}
-              className="w-full rounded-lg border border-(--color-border) px-3 py-2 text-sm text-(--color-text-dim) hover:border-(--color-accent) disabled:opacity-50"
-            >
-              {dashboard.isFetchingNextPage ? "Loading…" : "Load more"}
-            </button>
+        <section ref={setActivity} aria-label="Activity" className="space-y-3">
+          <h2 className="text-xl">Activity</h2>
+          {newLabel ? <p className="text-sm font-semibold text-(--color-accent)">{newLabel} new for you</p> : null}
+          {loadingActivity ? <p role="status">Loading activity…</p> : dashboard.error && dashboard.items.length === 0 ? (
+            <div role="alert"><p>Couldn't load activity.</p><button className={button} onClick={() => void dashboard.refetch()}>Retry</button></div>
+          ) : dashboard.items.length === 0 ? <p className="text-sm text-(--color-text-dim)">Nothing here yet. Follow people to see what they publish.</p> : (
+            <>
+              {dashboard.isRefetchError && !dashboard.isRefetching ? <p role="alert" className="text-sm text-(--color-danger)">Couldn't refresh activity.</p> : null}
+              <div className="space-y-3">
+                {dashboard.items.map((item) => (
+                  <div key={`${item.kind}:${item.id}`} className="rounded-xl border border-(--color-border) bg-(--color-surface) p-4">
+                    <Link to={digestTarget(item)} className="flex items-center gap-2">
+                      {item.kind === "participation" ? (
+                        <>
+                          {item.actors.length > 0 && (
+                            <span className="flex shrink-0 -space-x-1">
+                              {item.actors.map((actor) => (
+                                <span key={actor.userId} className="rounded-full ring-2 ring-(--color-bg)">
+                                  <AuthorAvatar author={actor} />
+                                </span>
+                              ))}
+                            </span>
+                          )}
+                          <span className="text-sm font-semibold">{digestHeading(item)}</span>
+                        </>
+                      ) : (
+                        <>
+                          <AuthorAvatar author={item.actor} />
+                          <span>
+                            <span className="block text-sm font-semibold">
+                              <span className="inline-flex items-center gap-1">
+                                {item.actor.username}
+                                <ReaderGlyph identity={item.actor.readerGlyph} />
+                              </span>{" "}
+                              {digestAction(item)}
+                            </span>
+                            {item.kind === "publication" ? <span className="block text-sm text-(--color-text-dim)">{item.content.name}</span> : null}
+                          </span>
+                        </>
+                      )}
+                      {isNewDigestItem(item, dashboard.seenAt) ? <span className="ml-auto rounded-full bg-(--color-accent-soft) px-2 text-xs font-semibold text-(--color-accent)">New</span> : null}
+                    </Link>
+                  </div>
+                ))}
+              </div>
+              {dashboard.isFetchNextPageError && !dashboard.isFetchingNextPage ? <p role="alert" className="text-sm text-(--color-danger)">Couldn't load more.</p> : null}
+              {dashboard.hasNextPage && (
+                <button
+                  onClick={() => void dashboard.fetchNextPage()}
+                  disabled={dashboard.isFetchingNextPage}
+                  className="w-full rounded-lg border border-(--color-border) px-3 py-2 text-sm text-(--color-text-dim) hover:border-(--color-accent) disabled:opacity-50"
+                >
+                  {dashboard.isFetchingNextPage ? "Loading…" : "Load more"}
+                </button>
+              )}
+            </>
           )}
         </section>
       </>}
