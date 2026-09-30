@@ -903,7 +903,7 @@ export default function ArenaStackLayout() {
 }
 ```
 
-- [ ] **Step 4: Browse pushes the in-tab Discover, and profiles open in either tab**
+- [ ] **Step 4: Browse pushes the in-tab Discover, and profiles open in the tab you're in**
 
 - In `ArenaHomeScreen.tsx:83`, change `router.push("/arena" as never)` to
   `router.push("/discover" as never)`.
@@ -953,6 +953,9 @@ into labels, time-boxed, and `npm run dev:release` at the end. Check:
 5. Open `/arena` directly by deep link, per `docs/dev-workflow.md`'s
    "Driving the app". Discover shows, and author names are plain text, not
    tappable.
+6. My shelf → **Activity** tab → a "Followed …" row, if the dev account has
+   one, opens that profile with the **My shelf** tab still highlighted.
+   Back returns to My shelf. If there's no such row, report "not checked".
 
 ---
 
