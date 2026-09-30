@@ -1,4 +1,5 @@
-import { Host, Slider } from "@expo/ui";
+import { Host } from "@expo/ui";
+import { Slider } from "@expo/ui/jetpack-compose";
 import { ColorPicker } from "@expo/ui/swift-ui";
 import { normalizeHexColor, parseHexColor, toHex } from "@scripta/shared";
 import { useState } from "react";
@@ -60,7 +61,7 @@ export function ColorEditor({ color, onChange, onDone, onCancel }: {
               <Text style={[typography.body, { color: colors.textDim }]}>{rgb[key]}</Text>
             </View>
             <Host matchContents={{ vertical: true }} colorScheme={mode}>
-              <Slider value={rgb[key]} min={0} max={255} step={1} onValueChange={(value) => pick(toHex({ ...rgb, [key]: value }))} />
+              <Slider value={rgb[key]} min={0} max={255} colors={{ thumbColor: colors.accent, activeTrackColor: colors.accent, inactiveTrackColor: colors.border }} onValueChange={(value) => pick(toHex({ ...rgb, [key]: value }))} />
             </Host>
           </View>
         ))
