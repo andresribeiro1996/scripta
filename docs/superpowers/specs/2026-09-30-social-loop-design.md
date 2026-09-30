@@ -256,6 +256,25 @@ Both counts come from the same row-building code as the list, so hidden and
 unrendered events no longer count. This replaces `countEventsByUsersSince`.
 Clients display at most "99+".
 
+**Decided while planning step 2:**
+- **The window fix.** Each followee's events are fetched already filtered to
+  the types their feed settings broadcast and the digest renders:
+  - publications: `tierlist_published`, `tournament_published`;
+  - votes: `voted_on`;
+  - reading: `book_added`, `book_finished`.
+
+  `following` and `mural_published` stay profile-only. So hidden events can
+  no longer fill a page and push visible ones out of reach.
+- **Counting caps.** Each count is capped at 100 and computed on its own
+  (personal rows, followee rows), so one can't crowd out the other.
+- **No marker yet.** With no seen marker (`seenAt` null), every row counts
+  as new, so existing participation surfaces on the first visit.
+- **Where the shape lives.** `GameParticipation` lives in
+  `@scripta/shared/community`, the neutral place the three game modules and
+  community all import.
+- **Quizzes carry no covers** in v1, so their rows show the players'
+  avatars.
+
 ### Shared
 
 - `DigestItem` gains `participation`. `digestAction`, `digestHeading` and
@@ -290,8 +309,9 @@ Clients display at most "99+".
 ### Edge cases
 
 - **Deleted game:** the module returns nothing for it, so there is no row.
-- **Deleted participant account:** their ballots, votes and plays go with it,
-  and the counts drop.
+- **Deleted participant account:** their ballots, votes and plays are
+  unlinked from them, not deleted (each module's `deleteUserData`). The counts
+  stay, and the name drops into "others".
 - **Promoted tier list:** ownership stays `origin_user_id`, matching
   `listPublishedByOwner`.
 - **Unpublished owner:** still sees their own participation rows.
