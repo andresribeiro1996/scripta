@@ -18,7 +18,7 @@ assert(!(flags.has("--reset") && shared), "--reset --shared is not supported: re
 // at (scripts/devDataDir.mjs's backend/data/dev/, set up by the caller)
 // instead of this file's own isolated backend/data/three-users/ — so it
 // never generates secrets, never blanks OAuth/socials env vars, and
-// never overrides *_DB_PATH/*_STORAGE_PATH. The manifest and lock live
+// never overrides *_DB_PATH/FILES_STORAGE_PATH. The manifest and lock live
 // next to those ambient databases, derived from AUTH_DB_PATH, so they
 // don't collide with (or depend on) the isolated fixture's own directory.
 //
@@ -32,7 +32,7 @@ assert(!(flags.has("--reset") && shared), "--reset --shared is not supported: re
 // three fixture users into a developer's own library.
 assert(
   !shared || process.env.AUTH_DB_PATH,
-  "--shared needs AUTH_DB_PATH (and the other *_DB_PATH/*_STORAGE_PATH vars) already pointing at the shared dev data directory — see scripts/devDataDir.mjs; scripts/dev-emulator.mjs sets them for you.",
+  "--shared needs AUTH_DB_PATH (and the other *_DB_PATH/FILES_STORAGE_PATH vars) already pointing at the shared dev data directory — see scripts/devDataDir.mjs; scripts/dev-emulator.mjs sets them for you.",
 );
 const directory = checking
   ? mkdtempSync(join(tmpdir(), "scripta-three-users-"))
@@ -72,7 +72,6 @@ if (!shared) {
   for (const module of ["auth", "library", "gallery", "covers", "socials", "arena", "murals", "tierlists", "community"]) {
     process.env[`${module.toUpperCase()}_DB_PATH`] = join(directory, `${module}.sqlite`);
   }
-  for (const storage of ["gallery"]) process.env[`${storage.toUpperCase()}_STORAGE_PATH`] = join(directory, `${storage}-files`);
   process.env.FILES_STORAGE_PATH = join(directory, "files");
 }
 const { buildApp } = await import("../src/app.ts");

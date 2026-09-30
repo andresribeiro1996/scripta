@@ -10,7 +10,7 @@
 //      backend/.env.example with fresh random JWT secrets. Every other
 //      field stays at .env.example's own default (LAN/OAuth/socials all
 //      stay off, same as a normal fresh checkout).
-//   2. points every *_DB_PATH/*_STORAGE_PATH at backend/data/dev/ (see
+//   2. points every *_DB_PATH/FILES_STORAGE_PATH at backend/data/dev/ (see
 //      devDataDir.mjs) instead of backend/.env's own paths — so this never
 //      touches a developer's own backend/data/*.sqlite, and so the server
 //      scripts/dev-emulator.mjs starts afterward (with the same overrides)
