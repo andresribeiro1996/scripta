@@ -73,7 +73,8 @@ relations) and returns `{ certain: string[][]; likely: string[][] }` of
 `bookKey` groups, each group ordered by library position. A certain group
 that ends up holding two or more distinct canonical ISBNs is demoted to
 likely. Pairs recorded in `distinctBooks` (section 4) are never paired.
-Books sharing an identical `bookKey` are a certain group too.
+Books with an empty normalized title never match anything, even when their
+`bookKey`s are identical.
 
 ## 2. Imports
 
@@ -213,8 +214,9 @@ no confirm step.
   - `addBook` uses the certain rule.
 - Catalog: an ISBN miss that resolves through the title key adds the alias;
   volumes stay apart; the backfill.
-- Clients: the auto-merge loop, and the banner and sheet actions (web and
-  mobile component tests).
+- Clients have no component test harness, so the auto-merge runner lives in
+  `@scripta/shared` and is unit-tested there. The banner and sheet are
+  verified by typecheck, lint and a manual check.
 
 ## Rollout
 
