@@ -413,7 +413,7 @@ code.
   - `communityTabOptions(newCount: number)`
   - `defaultCommunityTab(activityItemCount: number): CommunityTab`
   - `parseCommunityTab(value: string | undefined): CommunityTab | undefined`
-  - `shouldMarkSeen(tab: CommunityTab, activityItemCount: number): boolean`
+  - `shouldMarkSeen(tab: CommunityTab, activityItemCount: number, loadFailed: boolean): boolean`
   - `CommunityScreen({ initialTab?: CommunityTab })`
   - the route `/community?tab=activity|discover|people`
 
@@ -459,10 +459,11 @@ test("a tab param opens that tab, and anything else falls back to the default", 
 });
 
 test("activity counts as seen only while its rows are on screen", () => {
-  assert.equal(shouldMarkSeen("activity", 2), true);
-  assert.equal(shouldMarkSeen("activity", 0), false);
-  assert.equal(shouldMarkSeen("discover", 2), false);
-  assert.equal(shouldMarkSeen("people", 2), false);
+  assert.equal(shouldMarkSeen("activity", 2, false), true);
+  assert.equal(shouldMarkSeen("activity", 0, false), false);
+  assert.equal(shouldMarkSeen("activity", 2, true), false);
+  assert.equal(shouldMarkSeen("discover", 2, false), false);
+  assert.equal(shouldMarkSeen("people", 2, false), false);
 });
 ```
 
@@ -505,8 +506,8 @@ export function parseCommunityTab(value: string | undefined): CommunityTab | und
   return COMMUNITY_TABS.find((tab) => tab.value === value)?.value;
 }
 
-export function shouldMarkSeen(tab: CommunityTab, activityItemCount: number): boolean {
-  return tab === "activity" && activityItemCount > 0;
+export function shouldMarkSeen(tab: CommunityTab, activityItemCount: number, loadFailed: boolean): boolean {
+  return tab === "activity" && activityItemCount > 0 && !loadFailed;
 }
 ```
 
@@ -535,11 +536,11 @@ In `mobile/src/features/home/CommunityScreen.tsx`:
 
   ```tsx
   useEffect(() => {
-    if (!markedRef.current && shouldMarkSeen(tab, items.length)) {
+    if (!markedRef.current && shouldMarkSeen(tab, items.length, dashboard.isError)) {
       markedRef.current = true;
       void markDashboardSeen().catch(() => {});
     }
-  }, [tab, items.length]);
+  }, [tab, items.length, dashboard.isError]);
   ```
 
 - In the tab-initialising effect, change `setTab(defaultHomeTab(items.length))`
