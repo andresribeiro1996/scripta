@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { useInfiniteQuery } from "@tanstack/react-query";
@@ -19,6 +19,12 @@ export function useDashboardFeed() {
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     refetchOnMount: "always",
   });
+}
+
+export function useSkipEmptyPages({ hasNextPage, isFetchingNextPage, isFetchNextPageError, fetchNextPage }: ReturnType<typeof useDashboardFeed>, rows: number) {
+  useEffect(() => {
+    if (rows === 0 && hasNextPage && !isFetchingNextPage && !isFetchNextPageError) void fetchNextPage();
+  }, [rows, hasNextPage, isFetchingNextPage, isFetchNextPageError, fetchNextPage]);
 }
 
 export function useFollowBack(refetch: () => Promise<unknown>) {
@@ -47,7 +53,7 @@ export function useFollowBack(refetch: () => Promise<unknown>) {
  *  for a book, the actor's avatar for anything that is only about them. A
  *  participation row gets its game's covers with the first participant on
  *  them, else up to three participants' avatars stacked, else a group icon. */
-export function FeedRow({ item, onOpen, onFollowBack, following }: { item: DigestItem; onOpen: () => void; onFollowBack: () => void; following: boolean }) {
+export function FeedRow({ item, onOpen, onFollowBack, following, isNew = false }: { item: DigestItem; onOpen: () => void; onFollowBack: () => void; following: boolean; isNew?: boolean }) {
   const { colors } = useTheme();
   const row = feedRowModel(item);
   const labelColor = row.tone === "accent" ? colors.accent : row.tone === "success" ? colors.success : colors.textDim;
@@ -56,7 +62,7 @@ export function FeedRow({ item, onOpen, onFollowBack, following }: { item: Diges
   const face = faces.at(0);
 
   return (
-    <Pressable accessibilityRole="link" accessibilityLabel={feedRowAccessibilityLabel(item)} onPress={onOpen}>
+    <Pressable accessibilityRole="link" accessibilityLabel={isNew ? `${feedRowAccessibilityLabel(item)}, new` : feedRowAccessibilityLabel(item)} onPress={onOpen}>
       {({ pressed }) => (
         <View style={[styles.feedRow, { backgroundColor: pressed ? colors.surfacePressed : "transparent", borderBottomColor: colors.border }]}>
           <View style={styles.slot}>
@@ -91,9 +97,12 @@ export function FeedRow({ item, onOpen, onFollowBack, following }: { item: Diges
               <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.heading, { color: labelColor }]}>
                 {row.label}
               </Text>
-              <Text {...dynamicType} style={[typography.caption, styles.timestamp, { color: colors.textDim }]}>
-                {relativeTime(item.createdAt)}
-              </Text>
+              <View style={styles.stamp}>
+                {isNew ? <View style={[styles.newDot, { backgroundColor: colors.accent }]} /> : null}
+                <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
+                  {relativeTime(item.createdAt)}
+                </Text>
+              </View>
             </View>
             {row.title ? (
               <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.heading, { color: colors.text }]}>
@@ -160,7 +169,8 @@ const styles = StyleSheet.create({
   nameRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   metaName: { flexShrink: 1 },
   metaDetail: { flex: 1 },
-  timestamp: { flexShrink: 0, marginLeft: "auto" },
+  stamp: { flexDirection: "row", alignItems: "center", gap: spacing.xs, flexShrink: 0, marginLeft: "auto" },
+  newDot: { width: 8, height: 8, borderRadius: radii.full },
   // Padded to clear the 44px floor: the label alone is a 16px-tall target.
   rowAction: { minHeight: minimumTouchTarget - spacing.lg, justifyContent: "center", paddingVertical: spacing.xs },
 });

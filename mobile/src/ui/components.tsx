@@ -219,6 +219,7 @@ export function IconButton({
   onPress,
   tone = "default",
   framed = false,
+  badge,
 }: {
   name: IconName;
   accessibilityLabel: string;
@@ -232,12 +233,13 @@ export function IconButton({
    *  box; a row's own overflow button doesn't want the chrome, so this is
    *  off unless asked for. */
   framed?: boolean;
+  badge?: string | null;
 }) {
   const { colors } = useTheme();
   const color = tone === "danger" ? colors.danger : tone === "accent" ? colors.onAccent : colors.textDim;
   return (
     <Pressable
-      accessibilityLabel={accessibilityLabel}
+      accessibilityLabel={badge ? `${accessibilityLabel}, ${badge} new` : accessibilityLabel}
       accessibilityRole="button"
       hitSlop={8}
       onPress={onPress}
@@ -252,6 +254,7 @@ export function IconButton({
     >
       <Icon color={color} name={name} size={22} />
       {label ? <Text {...dynamicType} numberOfLines={1} style={[typography.body, { color }]}>{label}</Text> : null}
+      {badge ? <View style={[styles.tabBadge, styles.iconBadge, { backgroundColor: colors.accent }]}><Text style={[styles.tabBadgeText, { color: colors.onAccent }]}>{badge}</Text></View> : null}
     </Pressable>
   );
 }
@@ -456,7 +459,7 @@ export function SwipeableTabs<T extends string>({
   renderPage,
   accessibilityLabel,
 }: {
-  options: readonly { readonly value: T; readonly label: string; readonly badge?: number; readonly accessibilityLabel?: string }[];
+  options: readonly { readonly value: T; readonly label: string; readonly badge?: number | string; readonly accessibilityLabel?: string }[];
   value: T;
   onChange: (value: T) => void;
   renderPage: (value: T, active: boolean) => ReactNode;
@@ -777,6 +780,7 @@ const styles = StyleSheet.create({
   tabLabel: { fontWeight: "700" },
   tabBadge: { minWidth: 20, height: 20, paddingHorizontal: spacing.xs, borderRadius: radii.full, alignItems: "center", justifyContent: "center" },
   tabBadgeText: { fontSize: 12, lineHeight: 16, fontWeight: "700" },
+  iconBadge: { position: "absolute", top: -6, right: -6 },
   tabIndicator: { position: "absolute", left: 0, bottom: 0, height: 3, borderTopLeftRadius: radii.sm, borderTopRightRadius: radii.sm },
   fab: { position: "absolute", right: spacing.lg, bottom: spacing.lg, minHeight: 56, flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingHorizontal: spacing.lg, borderRadius: radii.full, elevation: 6, shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
   fabLabel: { fontWeight: "700" },
