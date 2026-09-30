@@ -418,8 +418,6 @@ export type BlockStyle = {
    *  mural block has no cover art of its own, so this is a genuinely new
    *  field here. */
   backgroundColor: string | null;
-  /** A texture drawn over the background colour and under the content,
-   *  independent of the colour itself. */
   backgroundFinish: BlockBackgroundFinish;
   /** The block's typeface — see BlockFontFamily above. */
   fontFamily: BlockFontFamily;
