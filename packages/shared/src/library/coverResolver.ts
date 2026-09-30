@@ -20,13 +20,10 @@ export interface CoverCacheEntry {
 export type CoverSize = "thumb" | "full";
 
 export const COVER_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-export const COVER_POLL_MAX_ATTEMPTS = 10;
-const COVER_POLL_BASE_MS = 5_000;
-const COVER_POLL_CAP_MS = 300_000;
-
-export function coverPollDelayMs(attempt: number): number {
-  return Math.min(COVER_POLL_BASE_MS * 2 ** attempt, COVER_POLL_CAP_MS);
-}
+export const COVER_POLL_INTERVAL_MS = 3_000;
+export const COVER_POLL_GIVE_UP_MS = 30 * 60 * 1000;
+export const COVER_BATCH_SIZE = 100;
+export const COVER_POLL_MAX_FAILED_TICKS = 3;
 
 export function coverQueryKey(params: CoverLookupParams): string {
   const query = new URLSearchParams();
@@ -38,6 +35,7 @@ export function coverQueryKey(params: CoverLookupParams): string {
 
 export interface CoverResolverDeps {
   fetchResolve(query: string): Promise<ResolvedCoverResponse>;
+  fetchResolveBatch(lookups: CoverLookupParams[]): Promise<ResolvedCoverResponse[]>;
   persist(entries: Record<string, CoverCacheEntry>): void;
   now?: () => number;
   sleep?: (ms: number) => Promise<void>;
@@ -51,11 +49,21 @@ export interface CoverResolver {
   remember(params: CoverLookupParams, cover: { url: string | null; fullUrl: string | null }): void;
 }
 
+interface PendingCover {
+  lookup: CoverLookupParams;
+  since: number;
+  resolve(entry: CoverCacheEntry | null): void;
+  reject(error: unknown): void;
+}
+
 export function createCoverResolver(deps: CoverResolverDeps): CoverResolver {
   const now = deps.now ?? Date.now;
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const entries = new Map<string, CoverCacheEntry>();
   const inFlight = new Map<string, Promise<CoverCacheEntry | null>>();
+  const pending = new Map<string, PendingCover>();
+  let polling = false;
+  let failedTicks = 0;
 
   const fresh = (entry: CoverCacheEntry | undefined) => (entry && now() - entry.at < COVER_CACHE_TTL_MS ? entry : undefined);
   const pick = (entry: CoverCacheEntry, size: CoverSize) => (size === "full" ? entry.fullUrl ?? entry.url : entry.url);
@@ -64,11 +72,72 @@ export function createCoverResolver(deps: CoverResolverDeps): CoverResolver {
     deps.persist(Object.fromEntries([...entries].filter(([, entry]) => entry.url !== null)));
   }
 
-  function store(key: string, cover: { url: string | null; fullUrl: string | null }): CoverCacheEntry {
+  function put(key: string, cover: { url: string | null; fullUrl: string | null }): CoverCacheEntry {
     const entry = { url: cover.url, fullUrl: cover.fullUrl, at: now() };
     entries.set(key, entry);
+    return entry;
+  }
+
+  function store(key: string, cover: { url: string | null; fullUrl: string | null }): CoverCacheEntry {
+    const entry = put(key, cover);
     persist();
     return entry;
+  }
+
+  async function pollOnce() {
+    const keys = [...pending.keys()];
+    let succeeded = false;
+    let failure: { error: unknown } | null = null;
+    for (let start = 0; start < keys.length; start += COVER_BATCH_SIZE) {
+      const chunk = keys.slice(start, start + COVER_BATCH_SIZE);
+      try {
+        const bodies = await deps.fetchResolveBatch(chunk.map((key) => pending.get(key)!.lookup));
+        succeeded = true;
+        let settled = false;
+        chunk.forEach((key, index) => {
+          const body = bodies[index];
+          if (!body || body.pending) return;
+          const waiter = pending.get(key)!;
+          pending.delete(key);
+          waiter.resolve(put(key, body));
+          settled = true;
+        });
+        if (settled) persist();
+      } catch (error) {
+        failure = { error };
+      }
+    }
+    if (succeeded || !failure) failedTicks = 0;
+    else if (++failedTicks >= COVER_POLL_MAX_FAILED_TICKS) {
+      for (const waiter of pending.values()) waiter.reject(failure.error);
+      pending.clear();
+    }
+    for (const [key, waiter] of pending) {
+      if (now() - waiter.since < COVER_POLL_GIVE_UP_MS) continue;
+      pending.delete(key);
+      waiter.resolve(null);
+    }
+  }
+
+  async function pollWhilePending() {
+    try {
+      while (pending.size > 0) {
+        await sleep(COVER_POLL_INTERVAL_MS);
+        await pollOnce();
+      }
+    } finally {
+      polling = false;
+      failedTicks = 0;
+    }
+  }
+
+  function waitForCover(key: string): Promise<CoverCacheEntry | null> {
+    return new Promise((resolve, reject) => {
+      pending.set(key, { lookup: Object.fromEntries(new URLSearchParams(key)), since: now(), resolve, reject });
+      if (polling) return;
+      polling = true;
+      void pollWhilePending();
+    });
   }
 
   return {
@@ -93,12 +162,9 @@ export function createCoverResolver(deps: CoverResolverDeps): CoverResolver {
       if (!request) {
         request = (async () => {
           try {
-            for (let attempt = 0; ; attempt++) {
-              const body = await deps.fetchResolve(key);
-              if (!body.pending) return store(key, body);
-              if (!poll || attempt + 1 >= COVER_POLL_MAX_ATTEMPTS) return null;
-              await sleep(coverPollDelayMs(attempt));
-            }
+            const body = await deps.fetchResolve(key);
+            if (!body.pending) return store(key, body);
+            return poll ? await waitForCover(key) : null;
           } finally {
             inFlight.delete(flightKey);
           }

@@ -14,6 +14,7 @@ const SEARCH_LIMIT = 12;
 const COVER_EXTENSION = "webp";
 const COVER_MIME_TYPE = "image/webp";
 const NO_COVER: ResolvedCover = { url: null, fullUrl: null, pending: false };
+const PENDING: ResolvedCover = { url: null, fullUrl: null, pending: true };
 
 export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 
@@ -39,7 +40,8 @@ export interface BooksServiceDeps {
 }
 
 export interface BooksService {
-  resolveCover(lookup: BookLookup): ResolvedCover;
+  resolveCover(lookup: BookLookup, front?: boolean): ResolvedCover;
+  enqueueCovers(lookups: BookLookup[]): void;
   processBook(bookId: string): Promise<void>;
   getCoverFile(id: string, size: CoverFileSize): { buffer: Buffer; mimeType: string } | null;
   getDetails(lookup: BookLookup): Promise<BookMetadata | null>;
@@ -78,10 +80,9 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
     };
   }
 
-  function schedule(bookId: string): boolean {
-    if ((backoffUntil.get(bookId) ?? 0) > now().getTime()) return false;
-    deps.enqueue(bookId);
-    return true;
+  function schedule(bookId: string, front = false) {
+    if ((backoffUntil.get(bookId) ?? 0) > now().getTime()) return;
+    deps.enqueue(bookId, front);
   }
 
   function storeImage(bookId: string, source: CoverSourceName, sourceUrl: string | null, image: EncodedCover, at: string): string {
@@ -135,15 +136,20 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
   }
 
   return {
-    resolveCover(lookup) {
+    resolveCover(lookup, front = false) {
       const book = findOrCreate(lookup);
       if (!book) return NO_COVER;
       if (book.cover_image_id) {
-        if (book.cover_status === "low_res" && olderThan(book.cover_checked_at, RETRY_AFTER_MS)) schedule(book.id);
+        if (book.cover_status === "low_res" && olderThan(book.cover_checked_at, RETRY_AFTER_MS)) schedule(book.id, front);
         return coverOf(book);
       }
       if (book.cover_status === "missing" && !olderThan(book.cover_checked_at, RETRY_AFTER_MS)) return NO_COVER;
-      return { url: null, fullUrl: null, pending: schedule(book.id) };
+      schedule(book.id, front);
+      return PENDING;
+    },
+
+    enqueueCovers(lookups) {
+      for (const lookup of lookups) this.resolveCover(lookup);
     },
 
     async processBook(bookId) {

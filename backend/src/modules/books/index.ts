@@ -2,7 +2,7 @@
 // modules/books/ is private implementation — same convention as
 // modules/library/index.ts and modules/gallery/index.ts.
 
-export { booksPlugin as registerBooksModule } from "./plugin.js";
+export { booksPlugin as registerBooksModule, enqueueBookCovers } from "./plugin.js";
 // Cross-module cache-only cover lookup: a pure database read with no
 // side effects, unlike the authGuard'd GET /covers/resolve route, which
 // can create the book row and queue a background lookup — neither one
