@@ -588,8 +588,10 @@ Run: `npm run typecheck --workspace mobile` and `npm test --workspace mobile`.
 
 Expected: both exit 0 and the mobile test count is 133. `homeTabs.test.ts` had
 2 tests; `communityTabs.test.ts` has 5. Then run
-`grep -rn "ActivityScreen\|homeTabs\|/activity" mobile/src`. Expected: no
-matches.
+`grep -rn 'ActivityScreen\|homeTabs\|"/activity' mobile/src`. Expected: no
+matches. The profile activity API path `/community/profiles/…/activity` in
+`community/api.ts` is unrelated; the leading quote in the pattern excludes
+it.
 
 - [ ] **Step 9: Commit**
 
