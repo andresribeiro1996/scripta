@@ -17,11 +17,19 @@ function hitKey({ result }: CatalogSearchHit): string | null {
   return lookupIdentity({ isbn: result.isbn, title: result.title, author: result.authors.join(", ") })?.key ?? null;
 }
 
-function hitsOf(attempts: Array<Attempt<CatalogSearchHit[]>>): CatalogSearchHit[] {
-  const hits = attempts.flatMap((one) => (one.ok ? one.value : []));
+function listsOf(attempts: Array<Attempt<CatalogSearchHit[]>>): CatalogSearchHit[][] {
+  const lists = attempts.map((one) => (one.ok ? one.value : []));
   const failed = attempts.find((one) => !one.ok);
-  if (hits.length === 0 && failed && !failed.ok) throw failed.error;
-  return hits;
+  if (lists.every((list) => list.length === 0) && failed && !failed.ok) throw failed.error;
+  return lists;
+}
+
+function interleave(first: CatalogSearchHit[], second: CatalogSearchHit[]): CatalogSearchHit[] {
+  const merged: CatalogSearchHit[] = [];
+  for (let index = 0; index < Math.max(first.length, second.length); index++) {
+    for (const list of [first, second]) if (index < list.length) merged.push(list[index]!);
+  }
+  return merged;
 }
 
 export function createCompositeCatalog(primary: BookCatalog, secondary: BookCatalog | null): BookCatalog {
@@ -44,10 +52,13 @@ export function createCompositeCatalog(primary: BookCatalog, secondary: BookCata
         return second.value;
       }
       if (!second.value) return found;
+      const fillSummary = !found.summary && Boolean(second.value.summary);
+      const fillGenres = found.genres.length === 0 && second.value.genres.length > 0;
       return {
         ...found,
-        summary: found.summary || second.value.summary,
-        genres: found.genres.length > 0 ? found.genres : second.value.genres
+        summary: fillSummary ? second.value.summary : found.summary,
+        genres: fillGenres ? second.value.genres : found.genres,
+        sourceUrl: fillSummary || fillGenres ? second.value.sourceUrl : found.sourceUrl
       };
     },
 
@@ -55,11 +66,12 @@ export function createCompositeCatalog(primary: BookCatalog, secondary: BookCata
       if ("isbn" in query) {
         const first = await attempt(secondary.search(query));
         if (first.ok && first.value.length > 0) return first.value;
-        return hitsOf([first, await attempt(primary.search(query))]);
+        return listsOf([first, await attempt(primary.search(query))]).flat();
       }
       const [first, second] = await Promise.all([attempt(primary.search(query)), attempt(secondary.search(query))]);
       const seen = new Set<string>();
-      return hitsOf([first, second])
+      const [primaryHits, secondaryHits] = listsOf([first, second]);
+      return interleave(primaryHits!, secondaryHits!)
         .filter((hit) => {
           const key = hitKey(hit);
           if (key === null) return true;
