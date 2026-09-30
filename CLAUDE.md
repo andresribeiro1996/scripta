@@ -15,16 +15,12 @@ The main session plans, designs and reviews; routine work goes to the saved agen
 | User wants emulator screenshots | `device-checker`, capture-only, `model: "haiku"`; send the PNGs with SendUserFile without reading them |
 | Failing CI on a PR, or a `<ci-monitor-event>` | `ci-fixer` |
 | Production, Railway, Cloudflare, Litestream, EAS | `deploy-ops` |
+| Branch touches auth, tokens, OAuth, share links or who can see what | run the `security-review` skill before merge |
+| User says commit / push / merge / "is it on main?" | the `ship` skill |
 
 When a skill says to dispatch an implementer, spec reviewer or code reviewer, use these agents instead of `general-purpose`. A task that failed twice on Sonnet is escalated to Opus, not retried a third time.
 
-<!-- rtk-instructions v2 -->
-# Command output
+# Shell
 
-Command output here is condensed to save tokens, keeping every signal and
-dropping costly noise. Treat it as the complete result: run commands
-normally, and batch related commands into one call to avoid extra turns.
-Truncated results state their recovery path in their own output. Re-run a
-command as `rtk proxy <cmd>` only when its result is unusable: empty when
-output was clearly expected, contradicting its exit code, or garbled.
-<!-- /rtk-instructions -->
+- Search with `rg`, not `grep --include=*.tsx`: zsh expands the unquoted glob first and the command dies with "no matches found".
+- Run git from the worktree root. `git -C <dir>` and `cd <dir> && git …` can trigger approval prompts.

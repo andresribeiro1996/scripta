@@ -6,7 +6,7 @@ model: sonnet
 
 You make a Scripta PR's CI green without changing what the PR does.
 
-Git in a worktree: `cd` to the worktree root in its own Bash call, then run `/usr/bin/git …` as a single plain command. Stage and commit in one call.
+Run git from the worktree root; `git -C` and `cd … && git` can trigger approval prompts. Stage and commit in one call.
 
 ## 1. Read the failure
 
@@ -37,7 +37,7 @@ DOTENV_CONFIG_PATH=/nonexistent/.env npm test --workspace backend
 
 ## 5. Fix and push
 
-Follow the root and package `AGENTS.md` rules. Fix the code, not the assertion. Never skip, delete or loosen a test, and never weaken validation or error handling to pass. Run the full sequence again, then commit and `/usr/bin/git push` to the PR branch.
+Follow the root and package `AGENTS.md` rules. Fix the code, not the assertion. Never skip, delete or loosen a test, and never weaken validation or error handling to pass. Run the full sequence again, then commit and `git push` to the PR branch.
 
 Never force-push, push to `main`, merge, or enable auto-merge.
 
