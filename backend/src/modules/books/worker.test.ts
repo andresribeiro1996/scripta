@@ -240,3 +240,43 @@ test("stop drops background books", async () => {
   await worker.idle();
   assert.deepEqual(gate.started, ["h1", "h2", "h3"]);
 });
+
+test("a promoted background book runs once, not again when its stale background entry comes up", async () => {
+  const gate = gated();
+  const worker = createCoverWorker(gate.processBook, () => {});
+  await holdSlots(worker, gate);
+  for (let i = 1; i <= 3; i++) worker.enqueue(`bg${i}`, "background");
+  worker.enqueue("bg2");
+  worker.enqueue("bg3", "front");
+  await drainAll(worker, gate);
+  assert.deepEqual(gate.started.slice(3).sort(), ["bg1", "bg2", "bg3"]);
+  assert.equal(gate.started.filter((id) => id === "bg2").length, 1);
+  assert.equal(gate.started.filter((id) => id === "bg3").length, 1);
+});
+
+test("at most one background book runs at a time and all of them complete", async () => {
+  const gate = gated();
+  const worker = createCoverWorker(gate.processBook, () => {});
+  for (let i = 1; i <= 5; i++) worker.enqueue(`bg${i}`, "background");
+  await tick();
+  assert.deepEqual(gate.started, ["bg1"]);
+  await drainAll(worker, gate);
+  assert.deepEqual(gate.started, ["bg1", "bg2", "bg3", "bg4", "bg5"]);
+  assert.equal(gate.peak(), 1);
+});
+
+test("normal books still use all three slots while a background book runs", async () => {
+  const gate = gated();
+  const worker = createCoverWorker(gate.processBook, () => {});
+  worker.enqueue("bg1", "background");
+  worker.enqueue("bg2", "background");
+  await tick();
+  for (const id of ["n1", "n2", "n3"]) worker.enqueue(id);
+  await tick();
+  assert.deepEqual(gate.started, ["bg1", "n1", "n2"]);
+  gate.release("n1");
+  await tick();
+  assert.deepEqual(gate.started, ["bg1", "n1", "n2", "n3"]);
+  await drainAll(worker, gate);
+  assert.deepEqual(gate.started.slice(4), ["bg2"]);
+});

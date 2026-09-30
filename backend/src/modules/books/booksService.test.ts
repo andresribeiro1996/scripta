@@ -358,12 +358,22 @@ test("a details failure propagates and records nothing", async () => {
   assert.equal(h.repo.findBookByKey("isbn:9780441013593")!.details_status, null);
 });
 
-test("an ISBN search is answered from a saved book without calling Open Library", () => {
+test("an ISBN search is answered from a saved book that has external details, without calling Open Library", async () => {
+  const { calls, catalog } = recordingCatalog();
+  const h = harness({ catalog });
+  await h.service.searchExternal("978-0-441-01359-3");
+  calls.length = 0;
+  const results = h.service.search("978-0-441-01359-3");
+  assert.equal(results[0]!.title, "Dune");
+  assert.deepEqual(calls, []);
+});
+
+test("an ISBN search ignores a saved row with no external details so the outside search can fill it in", () => {
   const { calls, catalog } = recordingCatalog();
   const h = harness({ catalog });
   h.service.resolveCover(dune);
-  const results = h.service.search("978-0-441-01359-3");
-  assert.equal(results[0]!.title, "Dune");
+  assert.equal(h.repo.findBookByKey("isbn:9780441013593")!.data_sources, "[]");
+  assert.deepEqual(h.service.search("978-0-441-01359-3"), []);
   assert.deepEqual(calls, []);
 });
 

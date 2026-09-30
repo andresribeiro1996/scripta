@@ -28,6 +28,12 @@ function printStatus() {
 
 async function seed() {
   const counts = { eng: Number(values.eng), por: Number(values.por) };
+  for (const [flag, count] of Object.entries(counts)) {
+    if (!Number.isFinite(count) || count < 0) {
+      console.error(`--${flag} must be a non-negative number, got "${values[flag]}"`);
+      process.exit(1);
+    }
+  }
   const { collectRanked } = await import("../dist/modules/books/seed/fetchRankedWorks.js");
   const { mergeSeedLists } = await import("../dist/modules/books/seed/seedList.js");
   const { seedCatalog } = await import("../dist/modules/books/seed/seedCatalog.js");

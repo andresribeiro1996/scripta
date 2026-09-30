@@ -14,25 +14,39 @@ export function createCoverWorker(
 ): CoverWorker {
   const queue: string[] = [];
   const background: string[] = [];
+  const inBackground = new Set<string>();
   const queued = new Set<string>();
   const requeue = new Set<string>();
   const active = new Set<string>();
   const idleWaiters: Array<() => void> = [];
   let running = 0;
+  let backgroundRunning = 0;
   let stopped = false;
+
+  function next() {
+    if (queue.length > 0) return { bookId: queue.shift()!, isBackground: false };
+    if (backgroundRunning > 0) return undefined;
+    while (background.length > 0) {
+      const bookId = background.shift()!;
+      if (inBackground.delete(bookId)) return { bookId, isBackground: true };
+    }
+    return undefined;
+  }
 
   async function drain() {
     try {
-      while ((queue.length > 0 || background.length > 0) && !stopped) {
-        const bookId = (queue.length > 0 ? queue : background).shift()!;
+      for (let item = next(); item && !stopped; item = next()) {
+        const { bookId, isBackground } = item;
         queued.delete(bookId);
         active.add(bookId);
+        if (isBackground) backgroundRunning++;
         try {
           await processBook(bookId);
         } catch (error) {
           onError(error, bookId);
         } finally {
           active.delete(bookId);
+          if (isBackground) backgroundRunning--;
         }
         if (requeue.delete(bookId) && !queued.has(bookId)) {
           queued.add(bookId);
@@ -55,16 +69,19 @@ export function createCoverWorker(
       }
       if (queued.has(bookId)) {
         if (priority === "background") return;
-        const inBackground = background.indexOf(bookId);
-        if (inBackground >= 0) background.splice(inBackground, 1);
-        else if (!front) return;
-        else queue.splice(queue.indexOf(bookId), 1);
+        if (!inBackground.delete(bookId)) {
+          if (!front) return;
+          queue.splice(queue.indexOf(bookId), 1);
+        }
       } else {
         queued.add(bookId);
       }
       if (front) queue.unshift(bookId);
       else if (priority === "normal") queue.push(bookId);
-      else background.push(bookId);
+      else {
+        background.push(bookId);
+        inBackground.add(bookId);
+      }
       if (running < SLOTS) {
         running++;
         void drain();
@@ -79,6 +96,7 @@ export function createCoverWorker(
       stopped = true;
       queue.length = 0;
       background.length = 0;
+      inBackground.clear();
       queued.clear();
       requeue.clear();
     }
