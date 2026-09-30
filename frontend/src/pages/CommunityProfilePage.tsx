@@ -16,6 +16,7 @@ import { SkeletonCardGrid } from "../components/Skeleton";
 import { SwipeTabs } from "../components/SwipeTabs";
 import { useCommunityActivity, useCommunityLibrary, useCommunityProfile } from "../hooks/useCommunity";
 import { ensureBookBlockHeights, profileOnlyMural, type Mural } from "../lib/murals";
+import { useResolvedTheme } from "../lib/theme";
 import { buildReconstructedBooks } from "../lib/sharedMural";
 
 function retryButton(refetch: () => void) {
@@ -30,6 +31,7 @@ export function CommunityProfilePage() {
   const { username } = useParams<{ username: string }>();
   const { session } = useAuth();
   const queryClient = useQueryClient();
+  const viewerTheme = useResolvedTheme();
   const { view, isLoading, isNotFound } = useCommunityProfile(username ?? "");
   const activity = useCommunityActivity(username ?? "");
   const library = useCommunityLibrary(username ?? "", Boolean(view));
@@ -83,6 +85,7 @@ export function CommunityProfilePage() {
     ? {
         id: muralData.mural.id,
         name: muralData.mural.name,
+        theme: muralData.mural.theme,
         blocks: ensureBookBlockHeights(muralData.mural.blocks),
         createdAt: "",
         updatedAt: "",
@@ -144,7 +147,7 @@ export function CommunityProfilePage() {
                     tierlistData={(tierlistId) => muralData.tierlists[tierlistId]}
                   />
                 ) : (
-                  <MuralCanvas mural={profileOnlyMural()} editMode={false} books={[]} images={[]} profile={user} />
+                  <MuralCanvas mural={profileOnlyMural(viewerTheme)} editMode={false} books={[]} images={[]} profile={user} />
                 )}
               </div>
               <h2 className="mb-3 text-[11px] font-semibold tracking-wider text-(--color-text-dim) uppercase">Published</h2>

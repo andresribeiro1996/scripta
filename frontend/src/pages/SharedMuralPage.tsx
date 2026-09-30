@@ -76,6 +76,7 @@ export function SharedMuralPage() {
   const mural: Mural = {
     id: data.mural.id,
     name: data.mural.name,
+    theme: data.mural.theme,
     blocks: ensureBookBlockHeights(data.mural.blocks),
     createdAt: "",
     updatedAt: "",

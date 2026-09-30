@@ -5,6 +5,7 @@
 // re-declared here) since that's also where every pure function that
 // operates on them lives.
 
+import type { ThemeId } from "@scripta/shared/themes";
 import type { Mural, MuralBlock, MuralFolder } from "../lib/murals";
 import { apiFetch } from "./client";
 
@@ -17,11 +18,11 @@ export async function fetchMural(id: string): Promise<Mural> {
   return (await apiFetch(`/murals/${id}`)) as Mural;
 }
 
-export async function createMuralApi(name: string, folderId: string | null = null): Promise<Mural> {
-  return (await apiFetch("/murals", { method: "POST", body: JSON.stringify({ name, folderId }) })) as Mural;
+export async function createMuralApi(name: string, theme: ThemeId, folderId: string | null = null): Promise<Mural> {
+  return (await apiFetch("/murals", { method: "POST", body: JSON.stringify({ name, theme, folderId }) })) as Mural;
 }
 
-export async function updateMuralApi(id: string, patch: { name?: string; blocks?: MuralBlock[]; folderId?: string | null; updatedAt?: string }): Promise<Mural> {
+export async function updateMuralApi(id: string, patch: { name?: string; theme?: ThemeId; blocks?: MuralBlock[]; folderId?: string | null; updatedAt?: string }): Promise<Mural> {
   return (await apiFetch(`/murals/${id}`, { method: "PUT", body: JSON.stringify(patch) })) as Mural;
 }
 

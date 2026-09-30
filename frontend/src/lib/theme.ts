@@ -1,6 +1,36 @@
-import { useSyncExternalStore } from "react";
+import { useSyncExternalStore, type CSSProperties } from "react";
 import { flushSync } from "react-dom";
-import { parseFontPreference, parseThemePreference, resolveTheme, type Appearance, type FontPreference, type FontSlot, type ThemePreference, type ThemeScheme } from "@scripta/shared/themes";
+import { parseFontPreference, parseThemePreference, resolveTheme, themes, type Appearance, type FontPreference, type FontSlot, type ThemeColors, type ThemeId, type ThemePreference, type ThemeScheme } from "@scripta/shared/themes";
+
+export const WEB_TOKENS: Array<[keyof ThemeColors, string]> = [
+  ["background", "--color-bg"],
+  ["surface", "--color-surface"],
+  ["surfacePressed", "--color-surface-hover"],
+  ["text", "--color-text"],
+  ["textDim", "--color-text-dim"],
+  ["border", "--color-border"],
+  ["accent", "--color-accent"],
+  ["accentSoft", "--color-accent-soft"],
+  ["onAccent", "--color-on-accent"],
+  ["danger", "--color-danger"],
+  ["dangerSoft", "--color-danger-soft"],
+  ["success", "--color-success"],
+  ["successSoft", "--color-success-soft"],
+  ["info", "--color-info"],
+  ["infoSoft", "--color-info-soft"],
+  ["reference", "--color-reference"],
+  ["referenceSoft", "--color-reference-soft"],
+  ["onDanger", "--color-on-danger"],
+];
+
+export function themeColorVariables(colors: ThemeColors): Record<string, string> {
+  return Object.fromEntries(WEB_TOKENS.map(([token, name]) => [name, colors[token]]));
+}
+
+export function muralThemeStyle(id: ThemeId): CSSProperties {
+  const { scheme, colors } = themes[id];
+  return { ...themeColorVariables(colors), colorScheme: scheme, backgroundColor: colors.background, color: colors.text } as CSSProperties;
+}
 
 const STORAGE_KEY = "theme";
 const CHANGE_EVENT = "themechange";
@@ -49,6 +79,10 @@ function subscribe(onChange: () => void): () => void {
 
 export function useThemePreference(): ThemePreference {
   return useSyncExternalStore(subscribe, readThemePreference);
+}
+
+export function useResolvedTheme(): ThemeId {
+  return resolveTheme(useThemePreference(), osScheme());
 }
 
 const FONT_KEYS: Record<FontSlot, "fontDisplay" | "fontText"> = { display: "fontDisplay", text: "fontText" };
