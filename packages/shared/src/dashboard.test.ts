@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { DigestItem } from "./dashboard.js";
-import { digestAction, digestHeading, upNextPair } from "./dashboard.js";
+import type { DigestItem, ParticipationItem } from "./dashboard.js";
+import { clearDashboardCounts, digestAction, digestHeading, digestTarget, isNewDigestItem, newCountLabel, participationLead, upNextPair } from "./dashboard.js";
 
 const actor = { userId: "u1", username: "alice", avatarUrl: null };
 const tierlist = { kind: "tierlist" as const, id: "t1", voteCode: "abc", name: "Fantasy doorstoppers", poolSize: 5, ballotCount: 1, votingOpen: true, promotedAt: null, covers: [] };
@@ -20,6 +20,64 @@ test("digestHeading is the actor's username followed by digestAction, for every 
   assert.equal(digestAction(items[1]!), "ranked books on Fantasy doorstoppers");
   assert.equal(digestAction(items[2]!), "finished Hyperion");
   assert.equal(digestAction(items[3]!), "started following you");
+});
+
+const participation = (overrides: Partial<ParticipationItem> = {}): ParticipationItem => ({
+  kind: "participation",
+  id: "tierlist:t1",
+  game: { kind: "tierlist", id: "t1", name: "Sci-fi", covers: [] },
+  actors: [],
+  count: 1,
+  createdAt: "2026-09-30T10:00:00.000Z",
+  ...overrides
+});
+const named = (username: string) => ({ userId: username, username, avatarUrl: null });
+
+test("participationLead names up to three readers and counts the rest", () => {
+  assert.equal(participationLead(participation({ count: 5 })), "5 people");
+  assert.equal(participationLead(participation({ count: 1 })), "1 person");
+  assert.equal(participationLead(participation({ actors: [named("ana")], count: 1 })), "ana");
+  assert.equal(participationLead(participation({ actors: [named("ana"), named("rui")], count: 2 })), "ana and rui");
+  assert.equal(participationLead(participation({ actors: [named("ana"), named("rui"), named("bo")], count: 3 })), "ana, rui and bo");
+  assert.equal(participationLead(participation({ actors: [named("ana"), named("rui")], count: 3 })), "ana, rui and 1 other");
+  assert.equal(participationLead(participation({ actors: [named("ana"), named("rui")], count: 12 })), "ana, rui and 10 others");
+});
+
+test("participation rows say what happened to which game, and link to the owner's view", () => {
+  const tier = participation({ actors: [named("ana")], count: 4 });
+  assert.equal(digestAction(tier), "ranked your tier list Sci-fi");
+  assert.equal(digestHeading(tier), "ana and 3 others ranked your tier list Sci-fi");
+  assert.equal(digestTarget(tier), "/dashboard/arena/tierlist/t1");
+  const cup = participation({ id: "tournament:g1", game: { kind: "tournament", id: "g1", name: "Cup", covers: [] }, count: 2 });
+  assert.equal(digestHeading(cup), "2 people voted in your tournament Cup");
+  assert.equal(digestTarget(cup), "/arena/g1");
+  const quiz = participation({ id: "quiz:q1", game: { kind: "quiz", id: "q1", name: "Covers", covers: [] }, actors: [named("bo")], count: 1 });
+  assert.equal(digestHeading(quiz), "bo played your quiz Covers");
+  assert.equal(digestTarget(quiz), "/dashboard/arena/quiz/q1");
+});
+
+test("newCountLabel hides zero and caps at 99+", () => {
+  assert.equal(newCountLabel(0), null);
+  assert.equal(newCountLabel(7), "7");
+  assert.equal(newCountLabel(99), "99");
+  assert.equal(newCountLabel(100), "99+");
+});
+
+test("a row is new when it came after the seen marker, or when there is none", () => {
+  const item = participation({ createdAt: "2026-09-30T10:00:00.000Z" });
+  assert.equal(isNewDigestItem(item, null), true);
+  assert.equal(isNewDigestItem(item, "2026-09-30T09:00:00.000Z"), true);
+  assert.equal(isNewDigestItem(item, "2026-09-30T10:00:00.000Z"), false);
+});
+
+test("clearing the counts keeps the rows and the seen marker", () => {
+  const page = { items: [participation()], nextCursor: null, seenAt: "2026-09-30T09:00:00.000Z", personalNewCount: 3, followingNewCount: 2 };
+  const cleared = clearDashboardCounts({ pages: [page, { ...page, personalNewCount: 0, followingNewCount: 0 }], pageParams: [undefined, "c"] });
+  assert.equal(cleared.pages[0]!.personalNewCount, 0);
+  assert.equal(cleared.pages[0]!.followingNewCount, 0);
+  assert.equal(cleared.pages[0]!.seenAt, page.seenAt);
+  assert.equal(cleared.pages[0]!.items.length, 1);
+  assert.deepEqual(cleared.pageParams, [undefined, "c"]);
 });
 
 test("two keys pairs both, at any offset", () => {
