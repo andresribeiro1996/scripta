@@ -5,7 +5,7 @@ import { Image } from "expo-image";
 import { Animated, Dimensions, FlatList, Keyboard, KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { DEFAULT_TIER_PRESET, readerGlyphLabel } from "@scripta/shared";
-import { EmptyState, ErrorState, Icon, Input, Skeleton, dynamicType, minimumTouchTarget, radii, spacing, typography, useReducedMotion, useTheme, type IconName } from "../../ui";
+import { EmptyState, ErrorState, Icon, Input, Skeleton, Toast, dynamicType, minimumTouchTarget, radii, spacing, typography, useReducedMotion, useTheme, type IconName } from "../../ui";
 import type { ContentTone, DiscoverItem, PublishedContent } from "@scripta/shared/community";
 import { useAuth } from "../../core/auth";
 import { ArenaBooksSheet } from "../arena/ArenaBooksSheet";
@@ -65,6 +65,7 @@ export function DiscoverPane() {
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.grow}>
+      {discover.isRefetchError ? <Toast visible message="Couldn't refresh Discover." tone="error" /> : null}
       <View ref={frame} style={styles.grow}>
         <View style={styles.grow}>
           {discover.isPending ? (
