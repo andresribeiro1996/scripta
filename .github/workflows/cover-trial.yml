@@ -29,7 +29,7 @@ jobs:
       - uses: actions/cache/restore@v4
         with:
           path: backend/data/seed
-          key: cover-trial-${{ github.run_id }}
+          key: cover-trial-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: cover-trial-
       - if: hashFiles('backend/data/seed/seed-list.jsonl') == ''
         run: npx tsx scripts/build-seed-list.ts
@@ -42,7 +42,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: backend/data/seed
-          key: cover-trial-${{ github.run_id }}
+          key: cover-trial-${{ github.run_id }}-${{ github.run_attempt }}
       - if: always()
         uses: actions/upload-artifact@v4
         with:
