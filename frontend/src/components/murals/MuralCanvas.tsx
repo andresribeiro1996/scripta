@@ -195,7 +195,7 @@ export function MuralCanvas({
       })}
     </ResponsiveGridLayout>
     </div>
-    {focusedId && mural.blocks.some((block) => block.id === focusedId) ? <MuralBlockDetail block={mural.blocks.find((block) => block.id === focusedId)!} books={books} images={images} profile={profile} groups={groups} shelfThemeOverride={shelfThemeOverride} readerCardOverride={readerCardOverride} statsOverride={statsOverride} tierlistData={tierlistData} onClose={() => setFocusedId(null)} /> : null}
+    {focusedId && mural.blocks.some((block) => block.id === focusedId) ? <MuralBlockDetail theme={mural.theme} block={mural.blocks.find((block) => block.id === focusedId)!} books={books} images={images} profile={profile} groups={groups} shelfThemeOverride={shelfThemeOverride} readerCardOverride={readerCardOverride} statsOverride={statsOverride} tierlistData={tierlistData} onClose={() => setFocusedId(null)} /> : null}
     </>
   );
 }

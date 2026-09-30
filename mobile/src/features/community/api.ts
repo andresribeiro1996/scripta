@@ -17,6 +17,7 @@ import { apiClient } from "../../core/api";
 import type { PublicBookData, PublicHighlight } from "../public/api";
 
 export interface CommunityProfileView {
+  private: boolean;
   profile: PublishedProfile;
   mural: {
     mural: { id: string; name: string; theme: ThemeId; blocks: MuralBlock[]; coverImageUrl: string | null };

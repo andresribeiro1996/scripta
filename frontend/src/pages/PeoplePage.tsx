@@ -67,19 +67,21 @@ function PeoplePane() {
                     <ReaderGlyph identity={person.user.readerGlyph} />
                   </span>
                   <span className="block text-xs text-(--color-text-dim)">
-                    {person.followerCount} {person.followerCount === 1 ? "follower" : "followers"}
+                    {person.private ? "Private" : `${person.followerCount} ${person.followerCount === 1 ? "follower" : "followers"}`}
                   </span>
                 </span>
               </Link>
-              <button
-                onClick={() => void toggle(person)}
-                disabled={busyId === person.user.userId}
-                className={`shrink-0 rounded-full border px-3 py-1 text-xs font-semibold disabled:opacity-50 ${
-                  person.viewerFollows ? "border-(--color-border) text-(--color-text-dim)" : "border-(--color-accent) bg-(--color-accent-soft) text-(--color-accent)"
-                }`}
-              >
-                {busyId === person.user.userId ? "…" : person.viewerFollows ? "Following" : "Follow"}
-              </button>
+              {!person.private && (
+                <button
+                  onClick={() => void toggle(person)}
+                  disabled={busyId === person.user.userId}
+                  className={`shrink-0 rounded-full border px-3 py-1 text-xs font-semibold disabled:opacity-50 ${
+                    person.viewerFollows ? "border-(--color-border) text-(--color-text-dim)" : "border-(--color-accent) bg-(--color-accent-soft) text-(--color-accent)"
+                  }`}
+                >
+                  {busyId === person.user.userId ? "…" : person.viewerFollows ? "Following" : "Follow"}
+                </button>
+              )}
             </div>
           ))}
         </div>

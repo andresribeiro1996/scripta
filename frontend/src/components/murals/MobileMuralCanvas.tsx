@@ -395,6 +395,7 @@ export function MobileMuralCanvas({
       {focused && (
         <MuralBlockDetail
           block={focused}
+          theme={mural.theme}
           books={books}
           images={images}
           profile={profile}
