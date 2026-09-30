@@ -14,9 +14,9 @@
 //
 // The actual Open Library fetch now runs server-side
 // (backend/src/modules/books/adapters/openlibrary/openLibraryCatalog.ts);
-// frontend/src/lib/bookSearch.ts's searchBooks just calls GET
-// /books/search. This module holds only the pure query-shape and
-// result-mapping logic.
+// both clients' bookSearchApi calls GET /books/search (saved books) and
+// GET /books/search/external (Open Library). This module holds only the
+// pure query-shape, merge and result-mapping logic.
 
 import { normalizeBookGenres, type BookGenre } from "./bookGenres.js";
 import { normalizeIsbn } from "./covers.js";
