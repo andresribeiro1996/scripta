@@ -4,13 +4,12 @@ import { findBestCover, type CoverSources, type FetchCoverImage } from "./coverR
 import { MIN_GOOD_WIDTH } from "./domain/constants.js";
 import { BookNotFoundError, FileTooLargeError, InvalidImageError } from "./domain/errors.js";
 import { encodeCover, type EncodedCover } from "./domain/images.js";
-import { lookupIdentity, searchTokens, type BookLookup } from "./domain/normalize.js";
+import { lookupIdentity, SEARCH_LIMIT, searchTokens, type BookLookup } from "./domain/normalize.js";
 import type { BookCatalog, BooksRepository, CatalogSearchHit, CoverBlobStore } from "./domain/ports.js";
 import type { BookRow, CoverSourceName, CoverStatus } from "./domain/types.js";
 
 const RETRY_AFTER_MS = 30 * 24 * 60 * 60 * 1000;
 const UNAVAILABLE_BACKOFF_MS = 10 * 60 * 1000;
-const SEARCH_LIMIT = 12;
 const COVER_EXTENSION = "webp";
 const COVER_MIME_TYPE = "image/webp";
 const NO_COVER: ResolvedCover = { url: null, fullUrl: null, pending: false };
