@@ -37,8 +37,8 @@ Details and measurements for the cover pipeline are in `backend/README.md`, "Kno
 
 ## Phases
 
-### 0. Put the quizzes database on the volume. Do this now; it's the user's action.
-`QUIZZES_DB_PATH` isn't set on Railway, so it defaults to `./data/quizzes.sqlite` inside the container. That is outside `/data`, and every deploy wipes it. Set `QUIZZES_DB_PATH=/data/quizzes.sqlite` on the `scripta` service. `WAITLIST_DB_PATH` is fine: it defaults beside `AUTH_DB_PATH`. After this, every `*_DB_PATH` must point into `/data`. Phase 1's config should fail the deploy if one doesn't.
+### 0. Put the quizzes database on the volume. Done 2026-09-30.
+`QUIZZES_DB_PATH` wasn't set on Railway, so it defaulted to `./data/quizzes.sqlite` inside the container. That is outside `/data`, and every deploy wiped it. It's now set to `/data/quizzes.sqlite` on the `scripta` service. Quizzes created before this were already lost. `WAITLIST_DB_PATH` is fine: it defaults beside `AUTH_DB_PATH`. After this, every `*_DB_PATH` must point into `/data`. Phase 1's config should fail the deploy if one doesn't.
 
 ### 1. R2 setup and Litestream backups
 - **User:**
@@ -90,3 +90,4 @@ After seeding, measure how many of a new user's books are already in the catalog
 - PR #75: covers queued at import, and one batched poll every 3 s.
 - PR #76: never-checked covers re-queued on boot, plus the limitations write-up.
 - PR #77: inside/outside book search.
+- PR #79: ISBNdb feeds book details and external search, not only covers, and every catalog row records its sources in `books.data_sources`. `ISBNDB_API_KEY` was set on Railway on 2026-09-30. The integration still has to be checked against real responses: a search by ISBN, a search by title, and a details view.
