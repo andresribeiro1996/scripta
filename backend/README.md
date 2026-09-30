@@ -149,6 +149,12 @@ Measured on production on 2026-09-30, after a tester imported a 167-book library
 - **Matching is an exact key.** It's either `isbn:<isbn>` or a normalized `ta:<title>|<author>`. Kobo titles such as "Wool Omnibus (Silo, #1)" miss a catalog entry saved without the series suffix.
   - *Option:* normalize series suffixes out of titles. The risk is false matches between different books.
 - **Search is split into inside and outside.** A single local-first endpoint only reached Open Library on zero local hits, so "Dune" returned just a saved *Dune Messiah*. `GET /books/search` (saved books) and `GET /books/search/external` (Open Library) are now separate, and clients run both and merge, so a partial local match can't hide the catalog.
+  - *Decided 2026-09-30: every text search always calls Open Library too.* Inside matches words, so an inside hit doesn't mean the searched book is saved: "Dune" finds a saved *Dune Messiah* and not *Dune*. The cost is one Open Library request per search, even when the saved result was the right one, and those requests also grow the catalog. Only an ISBN query that inside already answers skips outside, because an ISBN identifies one book.
+  - *Rejected alternatives:*
+    - **Outside only on demand:** automatic when inside is empty, otherwise a "Not here? Search more" row. No wasted requests, but a user who misses the row thinks the book doesn't exist.
+    - **Skip outside on an exact inside title match:** fails when several books share a title ("It", "Emma").
+  - *Revisit if* outside becomes metered (ISBNdb is paid per request and only used for covers today), or if the 300/min catalog limit, shared by details, inside and outside, starts to bind.
+  - *Known quirk:* results are inside first, then new outside rows appended. The best match can therefore sit below a weaker saved one until someone adds ranking, e.g. exact title matches first once outside lands.
 - **The client stops waiting after 30 minutes.** The shared resolver (`packages/shared/src/library/coverResolver.ts`) gives up on a cover after 30 minutes without caching the miss. For an import that takes longer than that, the remaining covers appear the next time their cell mounts.
 
 ### `socials`
