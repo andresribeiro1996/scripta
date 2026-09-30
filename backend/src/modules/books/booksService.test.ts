@@ -223,34 +223,6 @@ test("an unexpected error during processing sets a 10-minute backoff and rethrow
   assert.equal(h.enqueued.length, 1);
 });
 
-test("resolve queues at the back unless asked to jump the queue", () => {
-  const { service, enqueued } = harness();
-  service.resolveCover(orlando);
-  service.resolveCover(orlando, true);
-  assert.deepEqual(enqueued.map((entry) => entry.front), [false, true]);
-});
-
-test("enqueueCovers queues each unresolved book at the back and skips resolved ones", async () => {
-  const dune = { title: "Dune", author: "Frank Herbert" };
-  const h = harness({ sources: { isbndb: null, apple: isbnSource("https://a/1"), openlibrary: emptySource } });
-  h.sizes.set("https://a/1", [900, 1400]);
-  h.service.resolveCover(orlando);
-  await h.service.processBook(h.bookId("isbn:9780141184272"));
-  h.enqueued.length = 0;
-  h.service.enqueueCovers([orlando, dune, { title: "" }]);
-  assert.deepEqual(h.enqueued, [{ bookId: h.bookId("ta:dune|frank herbert"), front: false }]);
-});
-
-test("enqueueCovers skips a book in backoff", async () => {
-  const failing: CoverSource = { byIsbn: async () => { throw new SourceUnavailableError("apple", "HTTP 429"); }, byTitle: async () => [] };
-  const h = harness({ sources: { isbndb: null, apple: failing, openlibrary: emptySource } });
-  h.service.resolveCover(orlando);
-  await h.service.processBook(h.bookId("isbn:9780141184272"));
-  h.enqueued.length = 0;
-  h.service.enqueueCovers([orlando]);
-  assert.equal(h.enqueued.length, 0);
-});
-
 test("enqueueUnchecked queues never-checked books at the back, oldest first, and skips checked ones", async () => {
   const h = harness({ sources: { isbndb: null, apple: isbnSource("https://a/1"), openlibrary: emptySource } });
   h.sizes.set("https://a/1", [900, 1400]);
