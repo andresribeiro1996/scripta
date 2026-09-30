@@ -2,11 +2,13 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   COVER_CACHE_TTL_MS,
-  COVER_POLL_MAX_ATTEMPTS,
-  coverPollDelayMs,
+  COVER_BATCH_SIZE,
+  COVER_POLL_GIVE_UP_MS,
+  COVER_POLL_INTERVAL_MS,
   coverQueryKey,
   createCoverResolver,
   type CoverCacheEntry,
+  type CoverLookupParams,
   type ResolvedCoverResponse
 } from "./coverResolver.js";
 
@@ -14,9 +16,12 @@ const found: ResolvedCoverResponse = { url: "https://api.test/covers/cached/a/th
 const pending: ResolvedCoverResponse = { url: null, fullUrl: null, pending: true };
 const params = { isbn: "9780141184272", title: "Orlando", author: "Virginia Woolf" };
 
-function setup(answers: ResolvedCoverResponse[]) {
+type BatchAnswer = (lookups: CoverLookupParams[]) => ResolvedCoverResponse[];
+
+function setup(answers: ResolvedCoverResponse[], batchAnswer: BatchAnswer = (lookups) => lookups.map(() => pending)) {
   let clock = 1_000_000;
   const queries: string[] = [];
+  const batches: CoverLookupParams[][] = [];
   const sleeps: number[] = [];
   const persisted: Array<Record<string, CoverCacheEntry>> = [];
   const resolver = createCoverResolver({
@@ -26,6 +31,10 @@ function setup(answers: ResolvedCoverResponse[]) {
       if (!next) throw new Error("no more answers");
       return next;
     },
+    fetchResolveBatch: async (lookups) => {
+      batches.push(lookups);
+      return batchAnswer(lookups);
+    },
     persist: (entries) => persisted.push(entries),
     now: () => clock,
     sleep: async (ms) => {
@@ -33,15 +42,11 @@ function setup(answers: ResolvedCoverResponse[]) {
       clock += ms;
     }
   });
-  return { resolver, queries, sleeps, persisted, advance: (ms: number) => { clock += ms; } };
+  return { resolver, queries, batches, sleeps, persisted, advance: (ms: number) => { clock += ms; } };
 }
 
 test("the query key drops imageId", () => {
   assert.equal(coverQueryKey({ ...params, imageId: "file____mnt_onboard_x" }), "isbn=9780141184272&title=Orlando&author=Virginia+Woolf");
-});
-
-test("poll delays double from 5s and cap at 5 minutes", () => {
-  assert.deepEqual([0, 1, 2, 3, 4, 5, 6, 7].map(coverPollDelayMs), [5000, 10000, 20000, 40000, 80000, 160000, 300000, 300000]);
 });
 
 test("a found cover is cached and served as thumb or full without refetching", async () => {
@@ -54,11 +59,14 @@ test("a found cover is cached and served as thumb or full without refetching", a
   assert.equal(queries.length, 1);
 });
 
-test("a pending answer is polled with growing delays until it settles", async () => {
-  const { resolver, queries, sleeps } = setup([pending, pending, found]);
+test("a pending answer resolves within one tick of becoming ready", async () => {
+  const { resolver, queries, batches, sleeps, persisted } = setup([pending], () => [found]);
   assert.equal(await resolver.resolve(params), found.url);
-  assert.equal(queries.length, 3);
-  assert.deepEqual(sleeps, [5000, 10000]);
+  assert.equal(queries.length, 1);
+  assert.deepEqual(sleeps, [COVER_POLL_INTERVAL_MS]);
+  assert.deepEqual(batches, [[{ isbn: params.isbn, title: params.title, author: params.author }]]);
+  assert.equal(resolver.peek(params), found.url);
+  assert.deepEqual(Object.keys(persisted.at(-1)!), [coverQueryKey(params)]);
 });
 
 test("poll: false returns null on a pending answer and caches nothing", async () => {
@@ -69,11 +77,60 @@ test("poll: false returns null on a pending answer and caches nothing", async ()
   assert.equal(await resolver.resolve(params), found.url);
 });
 
-test("polling gives up after the maximum number of attempts", async () => {
-  const { resolver, queries } = setup(Array.from({ length: COVER_POLL_MAX_ATTEMPTS }, () => pending));
+test("every pending key goes out in one batch per tick and only unsettled keys stay", async () => {
+  const titles = ["A", "B", "C"];
+  let tick = 0;
+  const { resolver, queries, batches, sleeps } = setup(titles.map(() => pending), (lookups) => {
+    tick++;
+    return lookups.map((lookup) => (lookup.title === "B" || tick > 1 ? found : pending));
+  });
+  const urls = await Promise.all(titles.map((title) => resolver.resolve({ title })));
+  assert.deepEqual(urls, [found.url, found.url, found.url]);
+  assert.equal(queries.length, 3);
+  assert.deepEqual(batches.map((batch) => batch.map((lookup) => lookup.title)), [["A", "B", "C"], ["A", "C"]]);
+  assert.deepEqual(sleeps, [COVER_POLL_INTERVAL_MS, COVER_POLL_INTERVAL_MS]);
+});
+
+test("a batch is chunked at the batch size", async () => {
+  const total = COVER_BATCH_SIZE + 1;
+  const { resolver, batches } = setup(Array.from({ length: total }, () => pending), (lookups) => lookups.map(() => found));
+  await Promise.all(Array.from({ length: total }, (_, index) => resolver.resolve({ title: `Book ${index}` })));
+  assert.deepEqual(batches.map((batch) => batch.length), [COVER_BATCH_SIZE, 1]);
+});
+
+test("a book that stays pending keeps being polled until it is ready", async () => {
+  let calls = 0;
+  const { resolver, sleeps } = setup([pending], (lookups) => lookups.map(() => (++calls < 200 ? pending : found)));
+  assert.equal(await resolver.resolve(params), found.url);
+  assert.equal(sleeps.length, 200);
+});
+
+test("polling gives up after the limit without caching, and a later resolve tries again", async () => {
+  const { resolver, sleeps, batches } = setup([pending, found]);
   assert.equal(await resolver.resolve(params), null);
-  assert.equal(queries.length, COVER_POLL_MAX_ATTEMPTS);
+  assert.equal(sleeps.length, COVER_POLL_GIVE_UP_MS / COVER_POLL_INTERVAL_MS);
+  assert.equal(batches.length, sleeps.length);
   assert.equal(resolver.peek(params), undefined);
+  assert.equal(await resolver.resolve(params), found.url);
+});
+
+test("the poll loop stops when nothing is pending and restarts for the next book", async () => {
+  const { resolver, sleeps } = setup([pending, pending], (lookups) => lookups.map(() => found));
+  await resolver.resolve({ title: "A" });
+  await resolver.resolve({ title: "B" });
+  assert.deepEqual(sleeps, [COVER_POLL_INTERVAL_MS, COVER_POLL_INTERVAL_MS]);
+});
+
+test("a failed batch rejects its waiters, caches nothing and leaves the loop restartable", async () => {
+  let fail = true;
+  const { resolver } = setup([pending, pending], (lookups) => {
+    if (fail) throw new Error("offline");
+    return lookups.map(() => found);
+  });
+  await assert.rejects(resolver.resolve(params), /offline/);
+  assert.equal(resolver.peek(params), undefined);
+  fail = false;
+  assert.equal(await resolver.resolve(params), found.url);
 });
 
 test("concurrent resolves for the same book share one request", async () => {
