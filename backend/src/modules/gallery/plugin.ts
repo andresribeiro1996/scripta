@@ -24,12 +24,11 @@ function imageBlobStore(): ImageBlobStore {
 }
 
 export async function galleryPlugin(app: FastifyInstance) {
-  // --- composition: swap either block to change storage technology ---
+  // --- composition: the repository and the blob store are the two swappable parts ---
   const db = openGalleryDb();
   const galleryRepository = createSqliteGalleryRepository(db);
   const blobStore = imageBlobStore();
-  const publicUrlFor = galleryUrlFor;
-  const galleryService = createGalleryService(galleryRepository, blobStore, publicUrlFor);
+  const galleryService = createGalleryService(galleryRepository, blobStore, galleryUrlFor);
   // -----------------------------------------------------------------------
 
   // Scoped to this plugin only, same reasoning as auth's own rate-limit
@@ -48,7 +47,7 @@ export async function galleryPlugin(app: FastifyInstance) {
     }
   });
 
-  await app.register(buildGalleryRoutes(galleryService, publicUrlFor));
+  await app.register(buildGalleryRoutes(galleryService, galleryUrlFor));
 }
 
 let erasingGallery: ReturnType<typeof createSqliteGalleryRepository> | undefined;

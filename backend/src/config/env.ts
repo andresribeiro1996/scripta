@@ -93,9 +93,9 @@ const envSchema = z.object({
   COMMUNITY_DB_PATH: z.string().min(1).default("./data/community.sqlite"),
   WAITLIST_DB_PATH: z.string().min(1).optional(),
   // This API's own externally-reachable base URL — needed to build
-  // absolute image URLs (GET /gallery/:id/file) that resolve correctly
-  // from the frontend's own origin, which a relative path wouldn't (see
-  // modules/gallery/plugin.ts's publicUrlFor). Defaults to the dev
+  // absolute URLs (the filesystem object store's GET /files/*, shared
+  // mural images) that resolve correctly from the frontend's own origin,
+  // which a relative path wouldn't. Defaults to the dev
   // backend's own address; set this to the real deployed origin in prod.
   PUBLIC_API_URL: z.string().url().default("http://localhost:3000"),
 

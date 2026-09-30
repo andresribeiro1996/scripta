@@ -7,7 +7,7 @@
  *  purely for display in the gallery UI — never used to build an
  *  object key (plugin.ts keys by `id` instead) — so it's safe even if it contains `../` or other
  *  path-traversal-shaped garbage. `extension`/`mime_type` describe the
- *  RE-ENCODED file actually on disk, not whatever the upload originally
+ *  RE-ENCODED file actually stored, not whatever the upload originally
  *  was (see service.ts's uploadImage — every upload is normalized to a
  *  single output format). */
 export interface GalleryImageRow {
@@ -32,8 +32,8 @@ export interface GalleryImage {
   byteSize: number;
   createdAt: string;
   /** Where the raw bytes can be fetched — deliberately a plain,
-   *  unauthenticated URL keyed by this image's random `id` (see
-   *  routes.ts's GET /gallery/:id/file). It has to be usable directly as
+   *  unauthenticated object-store URL keyed by this image's random `id`
+   *  (see plugin.ts's galleryUrlFor). It has to be usable directly as
    *  an `<img src>` with no Authorization header attached, the same trust
    *  model this app already uses for the books module's own
    *  GET /covers/cached/:id/:size URLs — an unguessable UUID is the

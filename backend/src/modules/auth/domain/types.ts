@@ -47,7 +47,7 @@ export interface AuthenticatedUser {
   email: string;
   username: string | null;
   /** Server-generated id of the account's avatar image, served (unauthenticated,
-   *  same UUID-trust model as gallery) at GET /auth/avatar/:id/file. NULL until
+   *  same UUID-trust model as gallery) from the object store; GET /auth/avatar/:id/file redirects there. NULL until
    *  one is uploaded — the frontend renders an initial in that case. Regenerated
    *  on every replacement, so the file URL changes and immutable caching stays
    *  correct. Note: in `request.user` (built from JWT claims by guard.ts) this

@@ -274,8 +274,8 @@ export function buildAuthRoutes(service: AuthService, avatarUrlFor: (id: string)
 
     // Deliberately NOT behind authGuard — a plain <img src> target, same
     // as gallery's file route. Access control is "the id is an
-    // unguessable UUID"; the id regenerates on every replacement, so the
-    // immutable caching below can't serve a stale avatar after a change.
+    // unguessable UUID"; the id regenerates on every replacement, so a
+    // cached redirect can't serve a stale avatar after a change.
     app.get("/auth/avatar/:id/file", async (request, reply) => {
       const parsed = avatarIdParamSchema.safeParse(request.params);
       if (!parsed.success) {
