@@ -5,6 +5,7 @@ import { contentDetail, contentKindLabel, contentTarget } from "@scripta/shared/
 import { followUser, unfollowUser } from "../api/community";
 import type { GalleryImage } from "../api/gallery";
 import { useAuth } from "../auth/AuthContext";
+import { AuthorAvatar } from "../components/CommunityAuthorAvatar";
 import { EmptyState } from "../components/EmptyState";
 import { CommunityIcon } from "../components/NavIcons";
 import { MuralCanvas } from "../components/murals/MuralCanvas";
@@ -69,6 +70,18 @@ export function CommunityProfilePage() {
   if (isNotFound || !view) {
     return (
       <div className="mx-auto max-w-3xl p-6">
+        <PrivateProfileState />
+      </div>
+    );
+  }
+
+  if (view.private) {
+    return (
+      <div className="mx-auto max-w-3xl space-y-6 p-6">
+        <h1 className="flex items-center gap-3 text-xl font-bold tracking-tight sm:text-2xl">
+          <AuthorAvatar author={view.profile.user} size={40} />
+          <span className="truncate">{view.profile.user.username}</span>
+        </h1>
         <PrivateProfileState />
       </div>
     );
