@@ -40,6 +40,7 @@ export const BORDER_SIDE_PRESETS: Preset<BorderSides>[] = [
   { key: "topBottom", label: "Top & bottom", value: { top: true, right: false, bottom: true, left: false } },
   { key: "leftRight", label: "Left & right", value: { top: false, right: true, bottom: false, left: true } },
   { key: "bottom", label: "Bottom only", value: { top: false, right: false, bottom: true, left: false } },
+  { key: "left", label: "Left only", value: { top: false, right: false, bottom: false, left: true } },
 ];
 
 export const BORDER_STYLE_CHOICES: Array<{ value: CardBorderStyle; label: string }> = [
@@ -69,12 +70,17 @@ export const COLOR_LOOKS: ColorLook[] = [
   { key: "note", label: "Note", style: { backgroundColor: "#fff3b0", textColor: "#201e1c", cardBorderColor: null } },
   { key: "ink", label: "Ink", style: { backgroundColor: "#201e1c", textColor: "#f2f0ec", cardBorderColor: null } },
   { key: "clay", label: "Clay", style: { backgroundColor: "#97532d", textColor: "#ffffff", cardBorderColor: null } },
+  { key: "sage", label: "Sage", style: { backgroundColor: "#e4efdf", textColor: "#263729", cardBorderColor: null } },
+  { key: "seaGlass", label: "Sea-glass", style: { backgroundColor: "#dcebf2", textColor: "#223943", cardBorderColor: null } },
+  { key: "lilac", label: "Lilac", style: { backgroundColor: "#ebe4f3", textColor: "#3b2b4b", cardBorderColor: null } },
+  { key: "rose", label: "Rose", style: { backgroundColor: "#f3e0e5", textColor: "#4b2932", cardBorderColor: null } },
+  { key: "ochre", label: "Ochre", style: { backgroundColor: "#f4e4b9", textColor: "#4a3515", cardBorderColor: null } },
 ];
 
-const frameLook = (key: string, label: string, cardBorderWidth: number, cardShadow: boolean): FrameLook => ({
+const frameLook = (key: string, label: string, cardBorderWidth: number, cardShadow: boolean, cardRadius = 12, cardBorderSides = DEFAULT_BORDER_SIDES): FrameLook => ({
   key,
   label,
-  style: { cardRadius: 12, cardBorderWidth, cardBorderStyle: "solid", cardBorderOpacity: 100, cardBorderSides: DEFAULT_BORDER_SIDES, cardShadow },
+  style: { cardRadius, cardBorderWidth, cardBorderStyle: "solid", cardBorderOpacity: 100, cardBorderSides, cardShadow },
 });
 
 export const FRAME_LOOKS: FrameLook[] = [
@@ -82,6 +88,8 @@ export const FRAME_LOOKS: FrameLook[] = [
   frameLook("framed", "Framed", 1, true),
   frameLook("flat", "Flat", 0, false),
   frameLook("outline", "Outline", 3, false),
+  frameLook("bookplate", "Bookplate", 1, false, 4),
+  frameLook("marginNote", "Margin note", 3, false, 0, { top: false, right: false, bottom: false, left: true }),
 ];
 
 export function matchPreset(presets: readonly Preset<number>[], value: number): string | null {
