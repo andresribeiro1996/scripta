@@ -58,14 +58,16 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
   const olderThan = (iso: string | null, ms: number) => iso === null || now().getTime() - Date.parse(iso) >= ms;
 
   function keysOf(identity: BookIdentity): string[] {
-    return identity.titleKey && identity.titleKey !== identity.key ? [identity.key, identity.titleKey] : [identity.key];
+    const titleKey = identity.titleKey;
+    return titleKey && titleKey !== identity.key && !deps.repo.findBookByKey(titleKey) ? [identity.key, titleKey] : [identity.key];
   }
 
   function findExisting(identity: BookIdentity): BookRow | undefined {
     const direct = deps.repo.findBookByKey(identity.key);
     if (direct) return direct;
     const byTitle = findByIdentity(deps.repo, identity);
-    if (byTitle) deps.repo.addKey(identity.key, byTitle.id);
+    if (!byTitle || byTitle.isbn) return undefined;
+    deps.repo.addKey(identity.key, byTitle.id);
     return byTitle;
   }
 

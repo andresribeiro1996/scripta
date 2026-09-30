@@ -518,13 +518,24 @@ test("an admin reject during an in-flight lookup is not undone by that lookup", 
   assert.equal(rerun.cover_status, "missing");
 });
 
-test("an edition's ISBN resolves through the title alias to the existing catalog book", () => {
+test("an edition with a different ISBN gets its own catalog book instead of the title-matched one", () => {
   const { service, repo } = harness();
   service.resolveCover({ isbn: "9780441013593", title: "Dune", author: "Frank Herbert" });
   const first = repo.findBookByKey("isbn:9780441013593")!;
   service.resolveCover({ isbn: "9780593099322", title: "Dune: Deluxe Edition", author: "Frank Herbert" });
-  assert.equal(repo.findBookByKey("isbn:9780593099322")?.id, first.id);
+  const deluxe = repo.findBookByKey("isbn:9780593099322")!;
+  assert.ok(deluxe);
+  assert.notEqual(deluxe.id, first.id);
   service.resolveCover({ title: "Complete Works: Volume 1", author: "A Poet" });
   service.resolveCover({ title: "Complete Works: Volume 2", author: "A Poet" });
   assert.notEqual(repo.findBookByKey("ta:complete works|a poet|1")?.id, repo.findBookByKey("ta:complete works|a poet|2")?.id);
+});
+
+test("an ISBN lookup adopts a title-matched catalog book that has no ISBN of its own", () => {
+  const { service, repo } = harness();
+  service.resolveCover({ title: "Dune", author: "Frank Herbert" });
+  const first = repo.findBookByKey("ta:dune|frank herbert|")!;
+  assert.ok(first);
+  service.resolveCover({ isbn: "9780441013593", title: "Dune", author: "Frank Herbert" });
+  assert.equal(repo.findBookByKey("isbn:9780441013593")?.id, first.id);
 });
