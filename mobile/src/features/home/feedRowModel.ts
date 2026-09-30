@@ -1,5 +1,5 @@
 import { contentDetail, contentKindLabel, relativeTime } from "@scripta/shared/community";
-import { digestHeading, readerGlyphLabel, type DigestItem } from "@scripta/shared";
+import { digestHeading, participationLead, readerGlyphLabel, type DigestItem } from "@scripta/shared";
 import type { IconName } from "../../ui";
 
 export interface FeedRowModel {
@@ -26,6 +26,7 @@ export { relativeTime };
 
 export function feedRowAccessibilityLabel(item: DigestItem): string {
   const heading = digestHeading(item);
+  if (item.kind === "participation") return heading;
   const label = readerGlyphLabel(item.actor.readerGlyph);
   return label ? `${heading}, ${label}` : heading;
 }
@@ -66,5 +67,15 @@ export function feedRowModel(item: DigestItem): FeedRowModel {
       // Offered only one way round: following back is the reply to being
       // followed, and there is nothing to offer once it is mutual.
       return { covers: [], icon: "follow", label: "New follower", tone: "dim", title: "", action: item.viewerFollows ? null : "followBack" };
+    case "participation":
+      return {
+        covers: item.game.covers,
+        icon: item.game.kind === "tierlist" ? "tierlist" : item.game.kind === "tournament" ? "bracket" : "champion",
+        label: item.game.kind === "tierlist" ? "Ranked" : item.game.kind === "tournament" ? "Voted" : "Played",
+        tone: "accent",
+        title: item.game.name,
+        detail: participationLead(item),
+        action: null
+      };
   }
 }

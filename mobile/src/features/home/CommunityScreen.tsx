@@ -16,7 +16,7 @@ export function CommunityScreen({ initialTab }: { initialTab?: CommunityTab }) {
   const dashboard = useDashboardFeed();
 
   const items = dashboard.data?.pages.flatMap((page) => page.items) ?? [];
-  const newCount = dashboard.data?.pages[0]?.newCount ?? 0;
+  const newCount = dashboard.data?.pages[0]?.personalNewCount ?? 0;
   const loaded = dashboard.data !== undefined;
 
   // Picks the opening tab once real data has arrived, then leaves the user's
@@ -84,8 +84,8 @@ export function CommunityScreen({ initialTab }: { initialTab?: CommunityTab }) {
                     <FeedRow
                       item={item}
                       onOpen={() => router.push(digestRoute(item) as never)}
-                      onFollowBack={() => void followBack(item.actor.userId)}
-                      following={followingId === item.actor.userId}
+                      onFollowBack={() => { if (item.kind === "follow") void followBack(item.actor.userId); }}
+                      following={item.kind === "follow" && followingId === item.actor.userId}
                     />
                   )}
                 />

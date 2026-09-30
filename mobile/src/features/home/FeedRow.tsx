@@ -14,6 +14,7 @@ import { feedRowAccessibilityLabel, feedRowModel, relativeTime } from "./feedRow
 // Mobile's profile route is /u/<name>; the shared target is the web app's
 // /community/u/<name>, so the two kinds that point at a person are remapped.
 export function digestRoute(item: DigestItem): string {
+  if (item.kind === "participation") return item.game.kind === "tournament" ? `/arena/${item.game.id}` : `/${item.game.kind}/${item.game.id}`;
   return item.kind === "follow" || item.kind === "reading" ? `/u/${item.actor.username}` : digestTarget(item);
 }
 
@@ -55,6 +56,8 @@ export function FeedRow({ item, onOpen, onFollowBack, following }: { item: Diges
   const { colors } = useTheme();
   const row = feedRowModel(item);
   const labelColor = row.tone === "accent" ? colors.accent : row.tone === "success" ? colors.success : colors.textDim;
+  const actor = item.kind === "participation" ? null : item.actor;
+  const face = item.kind === "participation" ? item.actors.at(0) : item.actor;
 
   return (
     <Pressable accessibilityRole="link" accessibilityLabel={feedRowAccessibilityLabel(item)} onPress={onOpen}>
@@ -64,14 +67,18 @@ export function FeedRow({ item, onOpen, onFollowBack, following }: { item: Diges
             {row.covers.length ? (
               <>
                 <CoverFan covers={row.covers} />
-                <View style={[styles.slotAvatar, { borderColor: colors.background }]}>
-                  <AuthorAvatar username={item.actor.username} avatarUrl={item.actor.avatarUrl} />
-                </View>
+                {face ? (
+                  <View style={[styles.slotAvatar, { borderColor: colors.background }]}>
+                    <AuthorAvatar username={face.username} avatarUrl={face.avatarUrl} />
+                  </View>
+                ) : null}
               </>
-            ) : (
+            ) : face ? (
               // Nothing to preview, so the actor stands in for the covers —
               // at avatar size, not the fan-sized slot, which dwarfed a face.
-              <AuthorAvatar username={item.actor.username} avatarUrl={item.actor.avatarUrl} size={AVATAR_SIZE} />
+              <AuthorAvatar username={face.username} avatarUrl={face.avatarUrl} size={AVATAR_SIZE} />
+            ) : (
+              <Icon name="community" size={AVATAR_SIZE / 2} color={colors.textDim} />
             )}
           </View>
           <View style={styles.grow}>
@@ -90,20 +97,24 @@ export function FeedRow({ item, onOpen, onFollowBack, following }: { item: Diges
               </Text>
             ) : null}
             <View style={styles.nameRow}>
-              <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.metaName, { color: colors.textDim }]}>
-                {item.actor.username}
-              </Text>
-              <ReaderGlyph identity={item.actor.readerGlyph} />
+              {actor ? (
+                <>
+                  <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.metaName, { color: colors.textDim }]}>
+                    {actor.username}
+                  </Text>
+                  <ReaderGlyph identity={actor.readerGlyph} />
+                </>
+              ) : null}
               {row.detail ? (
                 <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.metaDetail, { color: colors.textDim }]}>
-                  {` · ${row.detail}`}
+                  {actor ? ` · ${row.detail}` : row.detail}
                 </Text>
               ) : null}
             </View>
-            {row.action === "followBack" ? (
+            {actor && row.action === "followBack" ? (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={`Follow ${item.actor.username} back`}
+                accessibilityLabel={`Follow ${actor.username} back`}
                 accessibilityState={{ busy: following }}
                 disabled={following}
                 hitSlop={spacing.sm}

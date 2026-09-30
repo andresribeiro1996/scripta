@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { DigestItem } from "@scripta/shared";
+import { digestHeading, type DigestItem } from "@scripta/shared";
 import { feedRowAccessibilityLabel, feedRowModel, relativeTime } from "./feedRowModel.js";
 
 const actor = { userId: "u1", username: "alice", avatarUrl: null };
@@ -82,6 +82,25 @@ test("the row's accessibility label names the glyph when the actor has one, and 
   assert.equal(feedRowAccessibilityLabel(withGlyph), "alice started following you, the Stargazer");
   const withoutGlyph: DigestItem = { kind: "follow", id: "f2", actor, createdAt: "2026-09-17T00:00:00.000Z", viewerFollows: false };
   assert.equal(feedRowAccessibilityLabel(withoutGlyph), "alice started following you");
+});
+
+test("participation in your game leads with the game and names who took part", () => {
+  const item: DigestItem = {
+    kind: "participation",
+    id: "tierlist:t1",
+    game: { kind: "tierlist", id: "t1", name: "Sci-fi", covers: ["a.png"] },
+    actors: [{ userId: "u1", username: "ana", avatarUrl: null }],
+    count: 4,
+    createdAt: "2026-09-30T00:00:00.000Z"
+  };
+  const row = feedRowModel(item);
+  assert.equal(row.label, "Ranked");
+  assert.equal(row.icon, "tierlist");
+  assert.equal(row.title, "Sci-fi");
+  assert.equal(row.detail, "ana and 3 others");
+  assert.deepEqual(row.covers, ["a.png"]);
+  assert.equal(row.action, null);
+  assert.equal(feedRowAccessibilityLabel(item), digestHeading(item));
 });
 
 test("no other row kind carries an action", () => {

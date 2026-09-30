@@ -40,7 +40,7 @@ export function HomeScreen() {
   const quote = rediscoverCard ? resolveQuote({ type: "quote", bookKey: rediscoverCard.bookKey, highlightId: rediscoverCard.highlightId } as never, books) : null;
 
   const feedItems = dashboard.data?.pages[0]?.items.slice(0, 3) ?? [];
-  const newCount = dashboard.data?.pages[0]?.newCount ?? 0;
+  const newCount = dashboard.data?.pages[0]?.personalNewCount ?? 0;
 
   const openBook = (key: string) => router.push(`/book/${encodeURIComponent(key)}` as never);
 
@@ -139,8 +139,8 @@ export function HomeScreen() {
                       key={`${item.kind}:${item.id}`}
                       item={item}
                       onOpen={() => router.push(digestRoute(item) as never)}
-                      onFollowBack={() => void followBack(item.actor.userId)}
-                      following={followingId === item.actor.userId}
+                      onFollowBack={() => { if (item.kind === "follow") void followBack(item.actor.userId); }}
+                      following={item.kind === "follow" && followingId === item.actor.userId}
                     />
                   ))}
                   <Pressable accessibilityRole="button" onPress={() => router.push("/community?tab=activity" as never)} style={styles.linkRow}>
