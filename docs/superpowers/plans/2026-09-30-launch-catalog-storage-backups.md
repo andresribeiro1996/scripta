@@ -40,7 +40,9 @@ Details and measurements for the cover pipeline are in `backend/README.md`, "Kno
 ### 0. Put the quizzes database on the volume. Done 2026-09-30.
 `QUIZZES_DB_PATH` wasn't set on Railway, so it defaulted to `./data/quizzes.sqlite` inside the container. That is outside `/data`, and every deploy wiped it. It's now set to `/data/quizzes.sqlite` on the `scripta` service. Quizzes created before this were already lost. `WAITLIST_DB_PATH` is fine: it defaults beside `AUTH_DB_PATH`. After this, every `*_DB_PATH` must point into `/data`. Phase 1's config should fail the deploy if one doesn't.
 
-### 1. R2 setup and Litestream backups
+### 1. R2 setup and Litestream backups. Done 2026-09-30.
+Buckets `atmyshelf-images` (on `images.atmyshelf.com`) and `atmyshelf-backups`, both WEUR, were created. PR #80 added Litestream 0.5.17. PR #83 added the rollback runbook and 14-day retention. Deployed at `139268d4`: all 11 databases replicate. A restore of all 11 from R2 into `/tmp` in the container passed `PRAGMA integrity_check`. The original steps follow for reference.
+
 - **User:**
   - Create two R2 buckets: one for images, public, on a custom domain such as `covers.atmyshelf.com`; one for backups, private.
   - Create an R2 API token scoped to both buckets.
@@ -85,6 +87,14 @@ Import subjects from Open Library's CC0 works dump into the catalog. Seeded and 
 
 ### 6. Measure and repeat
 After seeding, measure how many of a new user's books are already in the catalog. Use a real import, or a sample library through the read-only count script (`railway ssh`, run by the user). Seed further where coverage is thin, particularly books without ISBNs, which match on title + author only.
+
+### Before 2026-12-01: move Railway config off `railway.json`
+- **Why:** Railway's CLI warns that Config as Code (`railway.json`) stops working on 2026-12-01, inside the launch window. After that, deploys would lose the build command, the start command (Litestream) and the health check.
+- **Seen on 2026-09-30:** a redeploy triggered by a variable change already ran without them and failed with "No start command detected".
+- **Options:**
+  - migrate with `railway config migrate` to `.railway/railway.ts`, or
+  - set the build command, start command and health check path in the service settings.
+- **Verify** with a deploy triggered both by a commit and by a variable change.
 
 ## Already done
 - PR #75: covers queued at import, and one batched poll every 3 s.
