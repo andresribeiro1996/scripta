@@ -38,7 +38,7 @@ function toResult(record: Record<string, unknown>): BookSearchResult | null {
 }
 
 export function createIsbndbCatalog(apiKey: string, throttle: Throttle): BookCatalog {
-  const get = createIsbndbGet(apiKey, throttle);
+  const get = createIsbndbGet(apiKey, throttle, true);
   return {
     async fetchDetails({ isbn }) {
       if (!isbn) return null;

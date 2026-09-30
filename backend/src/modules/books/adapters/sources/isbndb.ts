@@ -10,8 +10,8 @@ export function isbndbRecords(json: unknown): Array<Record<string, unknown>> {
   return list.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object");
 }
 
-export function createIsbndbGet(apiKey: string, throttle: Throttle) {
-  return (url: string) => throttle(() => fetchJson("isbndb", url, { Authorization: apiKey }));
+export function createIsbndbGet(apiKey: string, throttle: Throttle, urgent = false) {
+  return (url: string) => throttle(() => fetchJson("isbndb", url, { Authorization: apiKey }), { urgent });
 }
 
 export function parseIsbndbBooks(json: unknown): TitledCandidate[] {

@@ -84,3 +84,16 @@ test("search maps docs and keeps the Open Library cover id", async () => {
   assert.deepEqual(await createOpenLibraryCatalog(direct).search({ isbn: "9780441013593" }), []);
   assert.equal(new URL(isbnRequests[0]!).searchParams.get("isbn"), "9780441013593");
 });
+
+test("catalog calls use the urgent lane", async () => {
+  const lanes: Array<boolean | undefined> = [];
+  const recording: Throttle = (task, options) => {
+    lanes.push(options?.urgent);
+    return task();
+  };
+  respond([{ docs: [doc] }, {}, { docs: [] }]);
+  const catalog = createOpenLibraryCatalog(recording);
+  await catalog.fetchDetails({ isbn: "9780553348477", title: "", author: "" });
+  await catalog.search({ text: "dune" });
+  assert.deepEqual(lanes, [true, true, true]);
+});
