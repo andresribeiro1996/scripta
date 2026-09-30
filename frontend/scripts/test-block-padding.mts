@@ -16,3 +16,9 @@ test("every block view pads itself with the scaled utilities", () => {
     assert.match(read(`../src/components/murals/${file}`), /block-p[xy]?-/, file);
   }
 });
+
+test("no block view pads its root with an unscaled utility", () => {
+  for (const file of ["blocks/BookBlocks.tsx", "blocks/MiscBlocks.tsx", "blocks/QuoteBlocks.tsx", "MobileBlockPreview.tsx"]) {
+    assert.doesNotMatch(read(`../src/components/murals/${file}`), /overflow-\S+ p[xy]?-[\d.]+"/, file);
+  }
+});

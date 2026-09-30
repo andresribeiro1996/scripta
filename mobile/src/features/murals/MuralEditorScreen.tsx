@@ -14,7 +14,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
 import { AccessibilityInfo, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { Text } from "../../ui/Text";
-import { Button, EmptyState, ErrorState, IconButton, Input, Screen, Sheet, Toast } from "../../ui";
+import { Button, Dialog, EmptyState, ErrorState, Fab, HeaderActions, Icon, IconButton, Input, Screen, Sheet, Toast } from "../../ui";
 import { spacing, typography, useTheme } from "../../ui/theme";
 import { fetchGalleryImages } from "../gallery/api";
 import { useLibrary } from "../library/hooks/useLibrary";
@@ -28,7 +28,7 @@ import { BlockPreview, MuralCanvas } from "./MuralCanvas";
 import { MuralShareSheet } from "./MuralShareSheet";
 import { StyleTab } from "./StyleTab";
 import { fetchMural, shareMural, unshareMural, updateMural } from "./api";
-import { MURALS_QUERY_KEY } from "./useMurals";
+import { MURALS_QUERY_KEY, withGrownBlocks } from "./useMurals";
 import { useAuth } from "../../core/auth";
 import { API_URL } from "../../core/config";
 
@@ -39,7 +39,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
   const { user } = useAuth();
   const router = useRouter();
   const client = useQueryClient();
-  const muralQuery = useQuery({ queryKey: ["murals", id], queryFn: () => fetchMural(id), retry: false });
+  const muralQuery = useQuery({ queryKey: ["murals", id], queryFn: () => fetchMural(id), select: withGrownBlocks, retry: false });
   const libraryQuery = useLibrary();
   const { data: library } = libraryQuery;
   const gallery = useQuery({ queryKey: ["gallery"], queryFn: fetchGalleryImages });
@@ -50,6 +50,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
   const [sheetTab, setSheetTab] = useState<SheetTab | null>(null);
   const [copiedStyle, setCopiedStyle] = useState<BlockStyle | null>(null);
   const [adding, setAdding] = useState(false);
+  const [renaming, setRenaming] = useState(false);
   const [picking, setPicking] = useState<PickerKind | null>(null);
   const [search, setSearch] = useState("");
   const [quoteBook, setQuoteBook] = useState<Record<string, unknown> | null>(null);
@@ -76,6 +77,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
   }, [muralQuery.refetch]));
 
   const draftMural = useMemo(() => mural ? { ...mural, name: currentName, blocks: currentBlocks } : null, [mural, currentName, currentBlocks]);
+  const unsaved = useMemo(() => !!mural && ((currentName.trim() || mural.name) !== mural.name || JSON.stringify(currentBlocks) !== JSON.stringify(mural.blocks)), [mural, currentName, currentBlocks]);
 
   function updateSelected(transform: (block: MuralBlock) => MuralBlock) {
     if (!selected) return;
@@ -133,25 +135,30 @@ export function MuralEditorScreen({ id }: { id: string }) {
       <Stack.Screen
         options={{
           headerShown: true,
-          title: currentName || "Mural",
-          headerRight: () => <IconButton framed accessibilityLabel="Save mural" label="Save" name="confirm" onPress={() => { if (!busy) void save(); }} />,
+          title: "",
+          headerLargeTitleEnabled: false,
+          headerRight: () => <HeaderActions>
+            <IconButton framed tone={unsaved ? "accent" : "default"} accessibilityLabel={unsaved ? "Save changes" : "All changes saved"} name="save" onPress={() => { if (unsaved && !busy) void save(); }} />
+            <IconButton framed accessibilityLabel="Share mural" name="share" onPress={() => setShareFor(draftMural)} />
+          </HeaderActions>,
         }}
       />
-      <View style={styles.nameRow}><Input label="Mural name" value={currentName} onChangeText={setName} /></View>
       {error ? <Toast visible message={error} tone="error" /> : null}
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.canvasScroll}>
+        <Pressable accessibilityLabel={`Rename mural, ${currentName}`} accessibilityRole="button" hitSlop={spacing.sm} onPress={() => setRenaming(true)} style={styles.heading}>
+          <Text display numberOfLines={2} style={[typography.title, styles.headingText, { color: colors.text }]}>{currentName}</Text>
+          <Icon color={colors.textDim} name="edit" size={18} />
+        </Pressable>
         <MuralCanvas mural={draftMural} books={books} groups={groups} images={gallery.data ?? []} tierlists={tierlists.data ?? []} profile={profile} editable selectedBlockId={selectedId} onSelectBlock={(blockId) => { setSelectedId(blockId); if (blockId === null) setSheetTab(null); }} onLayoutChange={(blockId, layout) => {
           const next = changeBlockLayout(currentBlocks, blockId, layout);
           if (next === currentBlocks) AccessibilityInfo.announceForAccessibility("Can't move there");
           else setBlocks(next);
         }} />
       </ScrollView>
-      <View style={[styles.dock, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        {selected ? <BlockActionBar actions={blockActions} /> : <>
-          <Button label="Add block" onPress={() => setAdding(true)} />
-          <Button label="Share" variant="secondary" onPress={() => setShareFor(draftMural)} />
-        </>}
-      </View>
+      {selected ? <View style={[styles.dock, { backgroundColor: colors.surface, borderColor: colors.border }]}><BlockActionBar actions={blockActions} /></View> : <Fab label="Add" accessibilityLabel="Add block" onPress={() => setAdding(true)} />}
+      <Dialog visible={renaming} title="Rename mural" onClose={() => setRenaming(false)}>
+        <View style={styles.dialog}><Input label="Mural name" value={currentName} onChangeText={setName} /><Button label="Done" onPress={() => setRenaming(false)} /></View>
+      </Dialog>
       <MuralShareSheet mural={shareFor} books={books} groups={groups} images={gallery.data ?? []} tierlists={tierlists.data ?? []} profile={profile} draft={shareFor !== null && (shareFor.name !== mural.name || shareFor.blocks !== mural.blocks)} contentReady={!libraryQuery.isPending && !gallery.isPending && !tierlists.isPending} contentError={libraryQuery.error?.message ?? gallery.error?.message ?? tierlists.error?.message ?? undefined} onRetryContent={() => { void libraryQuery.refetch(); void gallery.refetch(); void tierlists.refetch(); }} onClose={() => setShareFor(null)} onEnableLink={async () => {
         if (shareFor === null) return;
         if (shareFor.name !== mural.name || shareFor.blocks !== mural.blocks) setShareFor(await persist());
@@ -208,8 +215,10 @@ export function MuralEditorScreen({ id }: { id: string }) {
 const styles = StyleSheet.create({
   screen: {},
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  nameRow: { paddingHorizontal: spacing.md, paddingTop: spacing.sm },
-  canvasScroll: { paddingHorizontal: spacing.sm, paddingBottom: 120 },
+  canvasScroll: { paddingHorizontal: spacing.sm, paddingTop: spacing.md, paddingBottom: 120 },
   dock: { position: "absolute", left: 0, right: 0, bottom: 0, borderTopWidth: 1, padding: spacing.sm, flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  heading: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingHorizontal: spacing.sm, marginBottom: spacing.sm },
+  headingText: { flex: 1, fontWeight: "700" },
+  dialog: { gap: spacing.md },
   sheet: { gap: spacing.sm, paddingBottom: spacing.xl },
 });

@@ -1,13 +1,16 @@
-import { scrubBooksFromMurals, scrubImageFromMurals, type Mural, type MuralBlock, type MuralFolder } from "@scripta/shared";
+import { ensureBookBlockHeights, scrubBooksFromMurals, scrubImageFromMurals, type Mural, type MuralBlock, type MuralFolder } from "@scripta/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as api from "./api";
 
 export const MURALS_QUERY_KEY = ["murals"] as const;
 export const MURAL_FOLDERS_QUERY_KEY = ["mural-folders"] as const;
 
+export const withGrownBlocks = (mural: Mural): Mural => ({ ...mural, blocks: ensureBookBlockHeights(mural.blocks) });
+const withGrownBlocksAll = (murals: Mural[]) => murals.map(withGrownBlocks);
+
 export function useMurals() {
   const client = useQueryClient();
-  const query = useQuery({ queryKey: MURALS_QUERY_KEY, queryFn: api.fetchMurals });
+  const query = useQuery({ queryKey: MURALS_QUERY_KEY, queryFn: api.fetchMurals, select: withGrownBlocksAll });
   const current = () => client.getQueryData<Mural[]>(MURALS_QUERY_KEY) ?? [];
   const replace = (mural: Mural) => client.setQueryData<Mural[]>(MURALS_QUERY_KEY, current().map((item) => item.id === mural.id ? mural : item));
   return {
@@ -17,8 +20,8 @@ export function useMurals() {
     async remove(id: string) { await api.deleteMural(id); await client.invalidateQueries({ queryKey: ["home"] }); await client.invalidateQueries({ queryKey: ["community", "own-profile"] }); client.setQueryData(MURALS_QUERY_KEY, current().filter((item) => item.id !== id)); },
     async setCover(id: string, imageId: string, url: string) { const mural = await api.setMuralCover(id, imageId, url); replace(mural); return mural; },
     async clearCover(id: string) { const mural = await api.clearMuralCover(id); replace(mural); return mural; },
-    async share(id: string) { const mural = await api.shareMural(id); replace(mural); return mural; },
-    async unshare(id: string) { const mural = await api.unshareMural(id); replace(mural); return mural; },
+    async share(id: string) { const mural = await api.shareMural(id); replace(mural); return withGrownBlocks(mural); },
+    async unshare(id: string) { const mural = await api.unshareMural(id); replace(mural); return withGrownBlocks(mural); },
     async scrubBooks(keys: Iterable<string>) {
       const before = current();
       const after = scrubBooksFromMurals(before, keys);

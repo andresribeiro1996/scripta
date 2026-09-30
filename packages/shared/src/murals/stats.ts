@@ -52,3 +52,22 @@ export function computeStat(metric: StatMetric, books: Array<Record<string, unkn
       return books.reduce((sum, b) => sum + highlightCount(b), 0);
   }
 }
+
+const BREAKDOWN_METRICS: StatMetric[] = ["totalBooks", "booksFinished", "booksInProgress"];
+
+export function libraryBreakdown(
+  metrics: StatMetric[],
+  value: (metric: StatMetric) => number
+): { finished: number; reading: number; toRead: number; total: number; others: StatMetric[] } | null {
+  if (!BREAKDOWN_METRICS.every((metric) => metrics.includes(metric))) return null;
+  const total = value("totalBooks");
+  const finished = value("booksFinished");
+  const reading = value("booksInProgress");
+  return {
+    finished,
+    reading,
+    toRead: Math.max(0, total - finished - reading),
+    total,
+    others: metrics.filter((metric) => !BREAKDOWN_METRICS.includes(metric))
+  };
+}

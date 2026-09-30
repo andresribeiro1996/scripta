@@ -1,4 +1,6 @@
 import { useDraggable, useDroppable } from "@dnd-kit/core";
+import { readingPercent } from "@scripta/shared";
+import type { ReactNode } from "react";
 import { CoverImage } from "../../BookCard";
 import type { ResolvedTierlist } from "../../../api/tierlists";
 import { bookKey } from "../../../lib/merge";
@@ -50,7 +52,7 @@ export function MiniBookTile({
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-lg">
       <div className={`relative min-h-0 overflow-hidden bg-(--color-border) ${showFooter ? "flex-1" : "h-full"}`}>
-        <CoverImage book={book} fit="contain" />
+        <CoverImage book={book} fit="contain" alt={showTitle ? "" : String(book.Title ?? "Untitled")} />
       </div>
       {showFooter && (
         <div className="shrink-0 px-1.5 py-1">
@@ -58,6 +60,15 @@ export function MiniBookTile({
           {showAuthor && <div className="truncate text-[0.65em] text-(--color-text-dim)">{String(book.Attribution ?? "Unknown author")}</div>}
         </div>
       )}
+    </div>
+  );
+}
+
+export function BlockEyebrow({ children, count }: { children: ReactNode; count?: number }) {
+  return (
+    <div className="mb-1.5 flex shrink-0 items-baseline justify-between gap-2">
+      <span className="min-w-0 truncate text-[0.7em] font-bold tracking-wide text-(--color-text-dim) uppercase">{children}</span>
+      {count !== undefined && <span className="shrink-0 text-[0.7em] text-(--color-text-dim)">{count === 1 ? "1 book" : `${count} books`}</span>}
     </div>
   );
 }
@@ -90,7 +101,7 @@ export function ShelfBlockView({ block, books }: { block: Extract<MuralBlock, { 
   const resolved = resolveShelfBooks(block, books);
   return (
     <div className="flex h-full flex-col overflow-hidden block-p-2.5">
-      <div className="mb-1.5 shrink-0 truncate text-[1.1em] font-semibold">{block.title || "Untitled shelf"}</div>
+      <BlockEyebrow count={resolved.length}>{block.title || "Untitled shelf"}</BlockEyebrow>
       {resolved.length === 0 ? (
         <EmptyBlockState message="No books picked yet." />
       ) : (
@@ -109,18 +120,36 @@ export function ShelfBlockView({ block, books }: { block: Extract<MuralBlock, { 
 /** Auto-computed, no picker at all — every book with ReadStatus === 1. */
 export function CurrentlyReadingBlockView({ books }: { books: Array<Record<string, unknown>> }) {
   const reading = books.filter((b) => b.ReadStatus === 1);
+  const showProgress = reading.some((b) => readingPercent(b) !== null);
   return (
     <div className="flex h-full flex-col overflow-hidden block-p-2.5">
-      <div className="mb-1.5 shrink-0 text-[1.1em] font-semibold">Currently reading</div>
+      <BlockEyebrow count={reading.length}>Currently reading</BlockEyebrow>
       {reading.length === 0 ? (
         <EmptyBlockState message="Nothing marked as reading right now." />
       ) : (
         <div className="flex min-h-0 flex-1 gap-2 overflow-x-auto">
-          {reading.map((book, i) => (
-            <div key={String(book.ContentID ?? i)} className="aspect-[2/3] h-full shrink-0 overflow-hidden">
-              <MiniBookTile book={book} />
-            </div>
-          ))}
+          {reading.map((book, i) => {
+            const percent = readingPercent(book);
+            return (
+              <div key={String(book.ContentID ?? i)} className="flex h-full shrink-0 flex-col">
+                <div className={`aspect-[2/3] overflow-hidden ${showProgress ? "h-[calc(100%-2em)]" : "h-full"}`}>
+                  <MiniBookTile book={book} showTitle={false} showAuthor={false} />
+                </div>
+                {showProgress && (
+                  <div className="h-[2em] pt-1">
+                    {percent !== null && (
+                      <>
+                        <div className="h-1 overflow-hidden rounded-full bg-(--color-border)">
+                          <div className="h-full rounded-full bg-[var(--block-accent,var(--color-accent))]" style={{ width: `${percent}%` }} />
+                        </div>
+                        <div className="mt-0.5 text-[0.75em] leading-none text-(--color-text-dim)">{percent}%</div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -337,7 +366,7 @@ export function TierListBlockView({ tierlist, books }: { tierlist: ResolvedTierl
       {/* Always rendered, with a fallback — same "always show SOME title
           line" convention ShelfBlockView's own `block.title || "Untitled
           shelf"` already follows. */}
-      <div className="mb-1.5 shrink-0 truncate text-[1.1em] font-semibold">{tierlist.name || "Untitled tier list"}</div>
+      <BlockEyebrow>{tierlist.name || "Untitled tier list"}</BlockEyebrow>
       {tierlist.tiers.length === 0 ? (
         <EmptyBlockState message="No tiers yet." />
       ) : (

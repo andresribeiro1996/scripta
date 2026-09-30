@@ -18,3 +18,12 @@ test("accent-on-accent-soft pairs keep the theme accent, the stat number reads -
   assert.equal(softPairs.length, 2);
   assert.match(source, /font-bold text-\[var\(--block-accent,var\(--color-accent\)\)\]/);
 });
+
+test("accent drawn on a block's own background reads --block-accent", () => {
+  const misc = read("blocks/MiscBlocks.tsx");
+  const softPairs = misc.match(/bg-\(--color-accent-soft\)[^"]*text-\(--color-accent\)/g) ?? [];
+  const bare = misc.match(/(?:bg|text|border)-\(--color-accent\)/g) ?? [];
+  assert.equal(bare.length, softPairs.length);
+  assert.doesNotMatch(read("blocks/QuoteBlocks.tsx"), /(?:bg|text|border)-\(--color-accent\)/);
+  assert.match(read("blocks/BookBlocks.tsx"), /bg-\[var\(--block-accent,var\(--color-accent\)\)\]/);
+});
