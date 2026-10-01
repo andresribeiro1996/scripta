@@ -30,7 +30,6 @@ process.env.JWT_REFRESH_SECRET ??= "b".repeat(64);
 process.env.AUTH_DB_PATH ??= join(scratchDir, "auth.sqlite");
 process.env.LIBRARY_DB_PATH ??= join(scratchDir, "library.sqlite");
 process.env.GALLERY_DB_PATH ??= join(scratchDir, "gallery.sqlite");
-process.env.GALLERY_STORAGE_PATH ??= join(scratchDir, "gallery-files");
 
 const { buildAuthRoutes } = await import("./routes.js");
 const { createAuthorizationCode } = await import("./authorizationCode.js");
@@ -50,10 +49,11 @@ function s256(verifier: string): string {
 // own top comment — so an empty stub is enough to satisfy buildAuthRoutes'
 // parameter type without exercising any of its methods.
 const unusedService = {} as AuthService;
+const avatarUrlFor = (id: string) => `https://images.test/avatars/${id}.webp`;
 
 async function call(options: InjectOptions) {
   const app = Fastify();
-  await app.register(buildAuthRoutes(unusedService));
+  await app.register(buildAuthRoutes(unusedService, avatarUrlFor));
   const res = await app.inject(options);
   await app.close();
   return { status: res.statusCode, body: res.json() as Record<string, unknown> };
@@ -157,7 +157,7 @@ function appearanceService(stored: Map<string, AccountAppearance>): AuthService 
 async function callAppearanceRoute(service: AuthService, options: InjectOptions, token?: string) {
   const app = Fastify();
   app.decorate("authenticateAccessToken", (candidate: string) => (candidate === "valid-token" ? user : null));
-  await app.register(buildAuthRoutes(service));
+  await app.register(buildAuthRoutes(service, avatarUrlFor));
   const res = await app.inject(token ? { ...options, headers: { ...options.headers, authorization: `Bearer ${token}` } } : options);
   await app.close();
   return { status: res.statusCode, body: res.body ? (res.json() as Record<string, unknown>) : null };
@@ -206,7 +206,7 @@ test("appearance routes carry their own rate limit, separate from the shared aut
   const app = Fastify();
   await app.register(fastifyRateLimit, { max: 2, timeWindow: "1 minute" });
   app.decorate("authenticateAccessToken", (candidate: string) => (candidate === "valid-token" ? user : null));
-  await app.register(buildAuthRoutes(service));
+  await app.register(buildAuthRoutes(service, avatarUrlFor));
 
   const headers = { authorization: "Bearer valid-token" };
   for (let i = 0; i < 5; i++) {
@@ -217,4 +217,23 @@ test("appearance routes carry their own rate limit, separate from the shared aut
   assert.equal((await app.inject({ method: "GET", url: "/auth/me", headers })).statusCode, 200);
   assert.equal((await app.inject({ method: "GET", url: "/auth/me", headers })).statusCode, 429);
   await app.close();
+});
+
+test("the old avatar file url redirects to the public image url", async () => {
+  const id = "123e4567-e89b-42d3-a456-426614174000";
+  const app = Fastify();
+  await app.register(buildAuthRoutes(unusedService, avatarUrlFor));
+  const res = await app.inject({ url: `/auth/avatar/${id}/file` });
+  await app.close();
+  assert.equal(res.statusCode, 301);
+  assert.equal(res.headers.location, avatarUrlFor(id));
+});
+
+test("an avatar file url whose id is not a uuid answers 400", async () => {
+  const app = Fastify();
+  await app.register(buildAuthRoutes(unusedService, avatarUrlFor));
+  const res = await app.inject({ url: "/auth/avatar/not-a-uuid/file" });
+  await app.close();
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.headers.location, undefined);
 });

@@ -75,3 +75,20 @@ test("the throttle spaces task starts and survives a failing task", async () => 
   await assert.rejects(throttle(async () => { throw new Error("boom"); }), /boom/);
   assert.equal(await throttle(async () => "after"), "after");
 });
+
+test("an urgent task runs before queued normal tasks, the gap holds, and each lane is FIFO", async () => {
+  let clock = 0;
+  const throttle = createThrottle(1000, () => clock, async (ms) => {
+    clock += ms;
+  });
+  const order: Array<[string, number]> = [];
+  const mark = (name: string) => async () => { order.push([name, clock]); };
+  await Promise.all([
+    throttle(mark("n1")),
+    throttle(mark("n2")),
+    throttle(mark("n3")),
+    throttle(mark("u1"), { urgent: true }),
+    throttle(mark("u2"), { urgent: true })
+  ]);
+  assert.deepEqual(order, [["n1", 0], ["u1", 1000], ["u2", 2000], ["n2", 3000], ["n3", 4000]]);
+});

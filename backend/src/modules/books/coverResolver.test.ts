@@ -34,13 +34,21 @@ function sources(partial: Partial<CoverSources>): CoverSources {
   return { isbndb: null, apple: source(), openlibrary: source(), ...partial };
 }
 
-test("the first good cover in chain order wins and later sources are not asked", async () => {
+test("Apple is asked before ISBNdb for an exact edition and a good cover ends the chain", async () => {
   const isbndb = source({ isbn: [{ source: "isbndb", url: "https://i/1" }] });
   const apple = source({ isbn: [{ source: "apple", url: "https://a/1" }] });
   const outcome = await findBestCover(orlando, new Set(), sources({ isbndb, apple }), images({ "https://i/1": [900, 1400], "https://a/1": [900, 1400] }));
-  assert.equal(outcome.found?.candidate.url, "https://i/1");
+  assert.equal(outcome.found?.candidate.url, "https://a/1");
   assert.equal(outcome.complete, true);
-  assert.deepEqual(apple.calls, []);
+  assert.deepEqual(apple.calls, ["isbn:9780141184272"]);
+  assert.deepEqual(isbndb.calls, []);
+});
+
+test("ISBNdb fills the gap when Apple has no cover for the edition", async () => {
+  const isbndb = source({ isbn: [{ source: "isbndb", url: "https://i/1" }] });
+  const outcome = await findBestCover(orlando, new Set(), sources({ isbndb }), images({ "https://i/1": [900, 1400] }));
+  assert.equal(outcome.found?.candidate.url, "https://i/1");
+  assert.deepEqual(isbndb.calls, ["isbn:9780141184272"]);
 });
 
 test("a later good cover beats earlier small ones", async () => {

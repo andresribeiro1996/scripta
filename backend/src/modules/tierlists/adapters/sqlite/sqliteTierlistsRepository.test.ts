@@ -15,7 +15,6 @@ process.env.JWT_REFRESH_SECRET ??= "b".repeat(64);
 process.env.AUTH_DB_PATH ??= join(scratchDir, "auth.sqlite");
 process.env.LIBRARY_DB_PATH ??= join(scratchDir, "library.sqlite");
 process.env.GALLERY_DB_PATH ??= join(scratchDir, "gallery.sqlite");
-process.env.GALLERY_STORAGE_PATH ??= join(scratchDir, "gallery-files");
 
 const { applyTierlistsMigrations } = await import("./connection.js");
 
@@ -265,4 +264,20 @@ test("participation counts other people's ballots on the creator's published lis
     { user_id: "u2", at: "2026-01-02T00:00:00.000Z" }
   ]);
   assert.deepEqual(repo.listRecentVoters("c1", "u1", 1).map((r) => r.user_id), ["u3"]);
+});
+
+test("rekeyBooks rewrites the owner's unpublished tier lists only", async () => {
+  const { createSqliteTierlistsRepository } = await import("./sqliteTierlistsRepository.js");
+  const db = freshDb();
+  const insert = db.prepare("INSERT INTO tierlists (id, owner_user_id, origin_user_id, name, data, vote_code, created_at, updated_at) VALUES (?, ?, ?, 'n', ?, ?, 't0', 't0')");
+  const data = JSON.stringify({ tiers: [{ id: "s", label: "S", color: "#000000", bookKeys: ["old"] }], pool: ["new", "y"] });
+  insert.run("draft", "u1", "u1", data, null);
+  insert.run("published", "u1", "u1", data, "CODE1");
+  insert.run("other", "u2", "u2", data, null);
+  createSqliteTierlistsRepository(db).rekeyBooks("u1", ["old"], "new");
+  const read = (id: string) => db.prepare("SELECT data, updated_at FROM tierlists WHERE id = ?").get(id) as { data: string; updated_at: string };
+  assert.deepEqual(JSON.parse(read("draft").data), { tiers: [{ id: "s", label: "S", color: "#000000", bookKeys: ["new"] }], pool: ["y"] });
+  assert.notEqual(read("draft").updated_at, "t0");
+  assert.equal(read("published").data, data);
+  assert.equal(read("other").data, data);
 });

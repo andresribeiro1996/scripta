@@ -2,8 +2,8 @@
 // outside world. Two separate ports rather than one, deliberately — row
 // metadata (searchable, small) and raw image bytes (large, write-once)
 // are different enough storage problems that SQLite backing the former
-// and the filesystem backing the latter (see adapters/sqlite/ and
-// adapters/fs/) shouldn't have to pretend to be the same port. service.ts
+// and the object store backing the latter (see adapters/sqlite/ and
+// plugin.ts) shouldn't have to pretend to be the same port. service.ts
 // is written against both interfaces only, with no idea what's on the
 // other side of either.
 
@@ -13,10 +13,6 @@ export interface GalleryRepository {
   deleteUserData(userId: string): void;
   listImages(userId: string): GalleryImageRow[];
   insertImage(row: GalleryImageRow): void;
-  /** No ownership filter — needed by the public, unauthenticated
-   *  GET /gallery/:id/file route (see routes.ts) to look up which
-   *  account's blob to read, keyed only by the unguessable `id`. */
-  getImageById(id: string): GalleryImageRow | undefined;
   /** Ownership-checked lookup — for anything that mutates or discloses
    *  more than the raw image bytes (currently just delete). */
   getOwnedImage(id: string, userId: string): GalleryImageRow | undefined;
@@ -30,8 +26,6 @@ export interface GalleryRepository {
 }
 
 export interface ImageBlobStore {
-  deleteAll(userId: string): void;
-  save(userId: string, id: string, extension: string, bytes: Buffer): void;
-  read(userId: string, id: string, extension: string): Buffer | null;
-  delete(userId: string, id: string, extension: string): void;
+  save(id: string, bytes: Buffer): Promise<void>;
+  delete(id: string): Promise<void>;
 }

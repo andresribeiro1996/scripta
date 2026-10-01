@@ -190,11 +190,13 @@ function reader(userId: string): ReaderProfile {
 
 const at = (day: number) => `2026-09-${String(day).padStart(2, "0")}T00:00:00.000Z`;
 
-const pageThrough = (service: CommunityService, limit: number): string[] => {
+const ALL_KINDS: ReadonlySet<string> = new Set(["publication", "vote", "reading", "follow", "participation"]);
+
+const pageThrough = (service: CommunityService, limit: number, kinds?: ReadonlySet<string>): string[] => {
   const ids: string[] = [];
   let cursor: string | null | undefined;
   for (let pages = 0; cursor !== null && pages < 50; pages++) {
-    const page = service.getDashboard("viewer", cursor ?? undefined, limit);
+    const page = service.getDashboard("viewer", cursor ?? undefined, limit, kinds);
     assert.ok(page.items.length <= limit);
     ids.push(...page.items.map((item) => item.id));
     cursor = page.nextCursor;
@@ -666,7 +668,7 @@ test("your games' participation shows as one row per game", () => {
   readerProfiles.set("ana", reader("ana"));
   repo.upsertProfile(profileRow("ana"));
   tierlistParticipation.push({ id: "t1", name: "Sci-fi", covers: ["a", "b", "c", "d"], participantCount: 4, latestAt: at(2), recent: [{ userId: "ana", at: at(2) }, { userId: "ghost", at: at(1) }] });
-  const { items } = service.getDashboard("viewer", undefined, 20);
+  const { items } = service.getDashboard("viewer", undefined, 20, ALL_KINDS);
   assert.equal(items.length, 1);
   const row = items[0] as ParticipationItem;
   assert.equal(row.kind, "participation");
@@ -685,7 +687,7 @@ test("each kind of game keeps its own kind and id", () => {
   tierlistParticipation.push(game("a", 1));
   tournamentParticipation.push(game("a", 2));
   quizParticipation.push(game("a", 3));
-  const rows = service.getDashboard("viewer", undefined, 20).items as ParticipationItem[];
+  const rows = service.getDashboard("viewer", undefined, 20, ALL_KINDS).items as ParticipationItem[];
   assert.deepEqual(rows.map((row) => [row.id, row.game.kind, row.game.id]), [["quiz:a", "quiz", "a"], ["tournament:a", "tournament", "a"], ["tierlist:a", "tierlist", "a"]]);
 });
 
@@ -699,7 +701,7 @@ test("participants who are private or hide their votes are counted, never named"
   repo.upsertProfile(profileRow("cy"));
   repo.updateFeedSettings("cy", { ...DEFAULT_FEED_SETTINGS, votes: false });
   tierlistParticipation.push({ id: "t1", name: "Sci-fi", covers: [], participantCount: 2, latestAt: at(2), recent: [{ userId: "bo", at: at(2) }, { userId: "cy", at: at(1) }] });
-  const row = service.getDashboard("viewer", undefined, 20).items[0] as ParticipationItem;
+  const row = service.getDashboard("viewer", undefined, 20, ALL_KINDS).items[0] as ParticipationItem;
   assert.deepEqual(row.actors, []);
   assert.equal(row.count, 2);
 });
@@ -714,7 +716,7 @@ test("no more than three participants are named", () => {
     repo.upsertProfile(profileRow(id));
   }
   tierlistParticipation.push({ id: "t1", name: "Sci-fi", covers: [], participantCount: 4, latestAt: at(4), recent: ids.map((userId, i) => ({ userId, at: at(4 - i) })) });
-  const row = service.getDashboard("viewer", undefined, 20).items[0] as ParticipationItem;
+  const row = service.getDashboard("viewer", undefined, 20, ALL_KINDS).items[0] as ParticipationItem;
   assert.deepEqual(row.actors.map((actor) => actor.username), ["user-p1", "user-p2", "user-p3"]);
   assert.equal(row.count, 4);
 });
@@ -756,7 +758,7 @@ test("counts come from the rows the list shows", () => {
   tierlistParticipation.push({ id: "g-old", name: "Old", covers: [], participantCount: 1, latestAt: at(9), recent: [] });
   tierlistParticipation.push({ id: "g-seen", name: "Seen", covers: [], participantCount: 1, latestAt: at(10), recent: [] });
   tierlistParticipation.push({ id: "g-new", name: "New", covers: [], participantCount: 1, latestAt: at(12), recent: [] });
-  const page = service.getDashboard("viewer", undefined, 20);
+  const page = service.getDashboard("viewer", undefined, 20, ALL_KINDS);
   assert.equal(page.followingNewCount, 1);
   assert.equal(page.personalNewCount, 2);
   assert.equal(page.seenAt, at(10));
@@ -787,7 +789,7 @@ test("with no seen marker every row counts", () => {
   readerProfiles.set("bob", reader("bob"));
   repo.insertFollow({ follower_id: "bob", followee_id: "viewer", created_at: at(2) });
   tierlistParticipation.push({ id: "t1", name: "Sci-fi", covers: [], participantCount: 1, latestAt: at(3), recent: [] });
-  const page = service.getDashboard("viewer", undefined, 20);
+  const page = service.getDashboard("viewer", undefined, 20, ALL_KINDS);
   assert.equal(page.seenAt, null);
   assert.equal(page.personalNewCount, 2);
   assert.equal(page.followingNewCount, 0);
@@ -802,7 +804,7 @@ test("participation rows page with the cursor, without repeats or gaps", () => {
     readerProfiles.set(id, reader(id));
     repo.insertFollow({ follower_id: id, followee_id: "viewer", created_at: at(day) });
   }
-  assert.deepEqual(pageThrough(service, 2), ["f3", "tierlist:g3", "f2", "tierlist:g2", "f1", "tierlist:g1"]);
+  assert.deepEqual(pageThrough(service, 2, ALL_KINDS), ["f3", "tierlist:g3", "f2", "tierlist:g2", "f1", "tierlist:g1"]);
 });
 
 test("a cursor page carries no counts", () => {
@@ -851,7 +853,7 @@ test("a window of unrenderable rows can't make the page skip a visible row behin
   }
   tierlistRefs.set("t-a4", tierRef("t-a4", "carol"));
   for (const [id, day] of [["g1", 16], ["g2", 15], ["g3", 14]] as const) tierlistParticipation.push({ id, name: id, covers: [], participantCount: 1, latestAt: at(day), recent: [] });
-  assert.deepEqual(pageThrough(service, 2), ["a4", "tierlist:g1", "tierlist:g2", "tierlist:g3"]);
+  assert.deepEqual(pageThrough(service, 2, ALL_KINDS), ["a4", "tierlist:g1", "tierlist:g2", "tierlist:g3"]);
 });
 
 test("rows from a quieter source don't jump ahead of the unfetched rows of a busier one", () => {
@@ -939,7 +941,7 @@ test("an event, a follow and a participation row sharing a time each appear once
   repo.insertEvent({ id: "e-tie", user_id: "alice", type: "tierlist_published", ref_type: "tierlist", ref_id: "t1", payload: null, created_at: at(5) });
   repo.insertFollow({ follower_id: "fan", followee_id: "viewer", created_at: at(5) });
   tierlistParticipation.push({ id: "g-tie", name: "Tie", covers: [], participantCount: 1, latestAt: at(5), recent: [] });
-  assert.deepEqual(pageThrough(service, 1), ["tierlist:g-tie", "fan", "e-tie"]);
+  assert.deepEqual(pageThrough(service, 1, ALL_KINDS), ["tierlist:g-tie", "fan", "e-tie"]);
 });
 
 test("rows tied with the fetch horizon's time are split by id, so none is skipped", () => {
@@ -969,9 +971,82 @@ test("only the participants that get named have a glyph looked up", () => {
     readerGlyphs.set(id, "star");
   }
   tierlistParticipation.push({ id: "t1", name: "Sci-fi", covers: [], participantCount: 5, latestAt: at(5), recent: ids.map((userId, i) => ({ userId, at: at(5 - i) })) });
-  const row = service.getDashboard("viewer", undefined, 20).items[0] as ParticipationItem;
+  const row = service.getDashboard("viewer", undefined, 20, ALL_KINDS).items[0] as ParticipationItem;
   assert.deepEqual(row.actors.map((actor) => actor.username), ["user-p2", "user-p3", "user-p4"]);
   assert.deepEqual(readerGlyphCalls, ["p2", "p3", "p4"]);
+});
+
+function serviceWithEveryKindOfRow(): CommunityService {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs, tierlistParticipation, tournamentParticipation, quizParticipation } = createDeps(repo);
+  const service = createCommunityService(deps);
+  for (const id of ["alice", "bob"]) readerProfiles.set(id, reader(id));
+  repo.upsertProfile(profileRow("alice"));
+  repo.updateFeedSettings("alice", { ...DEFAULT_FEED_SETTINGS, reading: true });
+  repo.insertFollow({ follower_id: "viewer", followee_id: "alice", created_at: at(1) });
+  tierlistRefs.set("t-mine", tierRef("t-mine", "alice"));
+  tierlistRefs.set("t-other", tierRef("t-other", "carol"));
+  repo.insertEvent({ id: "e-pub", user_id: "alice", type: "tierlist_published", ref_type: "tierlist", ref_id: "t-mine", payload: null, created_at: at(3) });
+  repo.insertEvent({ id: "e-vote", user_id: "alice", type: "voted_on", ref_type: "tierlist", ref_id: "t-other", payload: null, created_at: at(4) });
+  repo.insertEvent({ id: "e-read", user_id: "alice", type: "book_added", ref_type: "book", ref_id: "b1", payload: JSON.stringify({ title: "Dune", author: "Herbert" }), created_at: at(5) });
+  repo.insertFollow({ follower_id: "bob", followee_id: "viewer", created_at: at(6) });
+  const game = (id: string, day: number) => ({ id, name: `Game ${id}`, covers: [], participantCount: 1, latestAt: at(day), recent: [] });
+  tierlistParticipation.push(game("g-tier", 7));
+  tournamentParticipation.push(game("g-cup", 8));
+  quizParticipation.push(game("g-quiz", 9));
+  return service;
+}
+
+test("a dashboard without kinds gets only the four kinds builds before step 2 can draw", () => {
+  const page = serviceWithEveryKindOfRow().getDashboard("viewer", undefined, 20);
+  assert.deepEqual(page.items.map((item) => item.kind), ["follow", "reading", "vote", "publication"]);
+  assert.equal(page.personalNewCount, 1);
+  assert.equal(page.followingNewCount, 3);
+});
+
+test("the kinds a client lists come back, and are counted", () => {
+  const page = serviceWithEveryKindOfRow().getDashboard("viewer", undefined, 20, ALL_KINDS);
+  assert.deepEqual(page.items.map((item) => item.id), ["quiz:g-quiz", "tournament:g-cup", "tierlist:g-tier", "bob", "e-read", "e-vote", "e-pub"]);
+  assert.equal(page.personalNewCount, 4);
+  assert.equal(page.followingNewCount, 3);
+});
+
+test("rows of a kind the client didn't list are never fetched, so every page but the last stays full", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  repo.upsertProfile(profileRow("alice"));
+  repo.updateFeedSettings("alice", { ...DEFAULT_FEED_SETTINGS, reading: true });
+  repo.insertFollow({ follower_id: "viewer", followee_id: "alice", created_at: at(1) });
+  for (let i = 0; i < 5; i++) {
+    tierlistRefs.set(`t${i}`, tierRef(`t${i}`, "alice"));
+    repo.insertEvent({ id: `e${i}`, user_id: "alice", type: "tierlist_published", ref_type: "tierlist", ref_id: `t${i}`, payload: null, created_at: at(10 + i) });
+  }
+  for (let i = 0; i < 16; i++) {
+    readerProfiles.set(`fan${i}`, reader(`fan${i}`));
+    repo.insertFollow({ follower_id: `fan${i}`, followee_id: "viewer", created_at: at(20) });
+    repo.insertEvent({ id: `r${i}`, user_id: "alice", type: "book_added", ref_type: "book", ref_id: `b${i}`, payload: JSON.stringify({ title: "T", author: "A" }), created_at: at(15) });
+  }
+  const kinds = new Set(["publication", "vote", "participation"]);
+  const pages: string[][] = [];
+  let cursor: string | undefined;
+  do {
+    const page = service.getDashboard("viewer", cursor, 2, kinds);
+    pages.push(page.items.map((item) => item.id));
+    cursor = page.nextCursor ?? undefined;
+  } while (cursor !== undefined && pages.length < 10);
+  assert.deepEqual(pages, [["e4", "e3"], ["e2", "e1"], ["e0"]]);
+  const counted = service.getDashboard("viewer", undefined, 2, kinds);
+  assert.equal(counted.personalNewCount, 0);
+  assert.equal(counted.followingNewCount, 5);
+});
+
+test("kind names this server doesn't know are ignored", () => {
+  const page = serviceWithEveryKindOfRow().getDashboard("viewer", undefined, 20, new Set(["publication", "reply"]));
+  assert.deepEqual(page.items.map((item) => item.kind), ["publication"]);
+  assert.equal(page.personalNewCount, 0);
+  assert.equal(page.followingNewCount, 1);
 });
 
 test("discover merges both content kinds newest first", () => {

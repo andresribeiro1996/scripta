@@ -15,7 +15,6 @@ process.env.JWT_REFRESH_SECRET ??= "b".repeat(64);
 process.env.AUTH_DB_PATH ??= join(scratchDir, "auth.sqlite");
 process.env.LIBRARY_DB_PATH ??= join(scratchDir, "library.sqlite");
 process.env.GALLERY_DB_PATH ??= join(scratchDir, "gallery.sqlite");
-process.env.GALLERY_STORAGE_PATH ??= join(scratchDir, "gallery-files");
 
 const { applyArenaMigrations } = await import("./connection.js");
 
@@ -256,4 +255,22 @@ test("participation counts each voter once per started tournament, at their firs
     { user_id: "u2", at: "2026-01-02T00:00:00.000Z" }
   ]);
   assert.deepEqual(repo.listRecentVoters("t1", "u1", 1).map((r) => r.user_id), ["u3"]);
+});
+
+test("rekeyBooks rewrites seeding slots only and drops a slot that would duplicate the survivor", () => {
+  const db = freshDb();
+  const tournament = db.prepare("INSERT INTO tournaments (id, owner_user_id, name, bracket_size, round_duration_minutes, status) VALUES (?, ?, 'n', 8, 60, ?)");
+  tournament.run("seeding", "u1", "seeding");
+  tournament.run("both", "u1", "seeding");
+  tournament.run("active", "u1", "active");
+  const slot = db.prepare("INSERT INTO tournament_slots (tournament_id, slot_index, book_key, title, author) VALUES (?, ?, ?, 't', 'a')");
+  slot.run("seeding", 0, "old");
+  slot.run("both", 0, "new");
+  slot.run("both", 1, "old");
+  slot.run("active", 0, "old");
+  createSqliteArenaRepository(db).rekeyBooks("u1", ["old"], "new");
+  const keys = (id: string) => (db.prepare("SELECT book_key FROM tournament_slots WHERE tournament_id = ? ORDER BY slot_index").all(id) as Array<{ book_key: string }>).map((row) => row.book_key);
+  assert.deepEqual(keys("seeding"), ["new"]);
+  assert.deepEqual(keys("both"), ["new"]);
+  assert.deepEqual(keys("active"), ["old"]);
 });

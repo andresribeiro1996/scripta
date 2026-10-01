@@ -2,14 +2,14 @@ import type { BookMetadata, BookSearchResult } from "@scripta/shared";
 import type { BookRow, CoverImageRow, CoverSourceName, CoverStatus, DataSource, NewBook } from "./types.js";
 
 export interface CoverBlobStore {
-  save(id: string, extension: string, bytes: Buffer): void;
-  read(id: string, extension: string): Buffer | null;
+  save(id: string, extension: string, bytes: Buffer): Promise<void>;
 }
 
 export interface BooksRepository {
   findBookByKey(key: string): BookRow | undefined;
   getBook(id: string): BookRow | undefined;
-  createBook(input: NewBook, key: string, createdAt: string): BookRow;
+  createBook(input: NewBook, keys: string[], createdAt: string): BookRow;
+  addKey(key: string, bookId: string): void;
   fillIdentity(id: string, title: string, author: string): void;
   makeSearchable(id: string): void;
   getImage(id: string): CoverImageRow | undefined;
@@ -21,6 +21,8 @@ export interface BooksRepository {
   markDetailsMissing(bookId: string, checkedAt: string): void;
   searchBooks(tokens: string[], limit: number): BookRow[];
   listUncheckedCoverIds(): string[];
+  setUpgradeWanted(bookId: string, at: string | null): void;
+  listUpgradeWantedIds(): string[];
 }
 
 export interface CoverCandidate {

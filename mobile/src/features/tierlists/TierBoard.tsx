@@ -37,6 +37,10 @@ function BookChip({ book, onReassign }: { book: TierBook; onReassign?: () => voi
   );
 }
 
+export function TierHead({ children }: { children: ReactNode }) {
+  return <View style={styles.head}>{children}</View>;
+}
+
 export function TierBoard({ data, books, onChange, structureEditable, poolLabel = "Pool", onReassign, bottomClearance = 0 }: { data: TierlistData; books: TierBook[]; onChange: (data: TierlistData) => void; structureEditable: boolean; poolLabel?: string; onReassign?: (bookKey: string) => void; bottomClearance?: number }) {
   const { colors } = useTheme();
   const [editing, setEditing] = useState<TierDefinition | null>(null);
@@ -88,6 +92,7 @@ export function TierBoard({ data, books, onChange, structureEditable, poolLabel 
 }
 
 const styles = StyleSheet.create({
+  head: { gap: spacing.sm, minHeight: typography.caption.lineHeight * 2 + spacing.sm },
   board: { flexGrow: 1 },
   tier: { height: 84, flexDirection: "row", overflow: "hidden" },
   topCorners: { borderTopLeftRadius: radii.md, borderTopRightRadius: radii.md },

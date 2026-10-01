@@ -2,6 +2,7 @@
 // this module that knows SQL — service.ts only ever sees the
 // TierlistsRepository interface this fulfills.
 
+import { rekeyTierBoard } from "@scripta/shared";
 import type { DatabaseSync } from "node:sqlite";
 import type { TierlistsRepository } from "../../domain/ports.js";
 import type { TierlistRow, BallotRow, Placement } from "../../domain/types.js";
@@ -108,6 +109,23 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
   }
 
   return {
+    rekeyBooks(userId, fromKeys, toKey) {
+      const from = new Set(fromKeys);
+      const now = new Date().toISOString();
+      const update = db.prepare("UPDATE tierlists SET data = ?, updated_at = ? WHERE id = ?");
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        for (const row of db.prepare("SELECT id, data FROM tierlists WHERE owner_user_id = ? AND vote_code IS NULL").all(userId) as Array<{ id: string; data: string }>) {
+          const parsed = JSON.parse(row.data) as Record<string, unknown>;
+          const after = JSON.stringify(rekeyTierBoard(parsed, from, toKey));
+          if (after !== JSON.stringify(parsed)) update.run(after, now, row.id);
+        }
+        db.exec("COMMIT");
+      } catch (error) {
+        db.exec("ROLLBACK");
+        throw error;
+      }
+    },
     deleteUserData(userId) {
       db.exec("BEGIN IMMEDIATE");
       try {

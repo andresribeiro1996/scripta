@@ -3,7 +3,7 @@ import { SourceUnavailableError } from "../../domain/errors.js";
 const TIMEOUT_MS = 10_000;
 const USER_AGENT = "Atmyshelf/1.0 (book covers)";
 
-export type Throttle = <T>(task: () => Promise<T>) => Promise<T>;
+export type Throttle = <T>(task: () => Promise<T>, options?: { urgent?: boolean }) => Promise<T>;
 
 async function readBody<T>(source: string, read: () => Promise<T>): Promise<T> {
   try {
@@ -44,19 +44,26 @@ export function createThrottle(
   now: () => number = Date.now,
   sleep: (ms: number) => Promise<void> = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 ): Throttle {
-  let tail: Promise<unknown> = Promise.resolve();
+  const urgent: Array<() => Promise<void>> = [];
+  const normal: Array<() => Promise<void>> = [];
+  let running = false;
   let lastStart = Number.NEGATIVE_INFINITY;
-  return <T>(task: () => Promise<T>) => {
-    const run = tail.then(async () => {
+
+  async function pump() {
+    running = true;
+    while (urgent.length > 0 || normal.length > 0) {
       const wait = lastStart + minGapMs - now();
       if (wait > 0) await sleep(wait);
+      const job = (urgent.shift() ?? normal.shift())!;
       lastStart = now();
-      return task();
+      await job();
+    }
+    running = false;
+  }
+
+  return <T>(task: () => Promise<T>, options?: { urgent?: boolean }) =>
+    new Promise<T>((resolve, reject) => {
+      (options?.urgent ? urgent : normal).push(() => task().then(resolve, reject));
+      if (!running) void pump();
     });
-    tail = run.then(
-      () => undefined,
-      () => undefined
-    );
-    return run;
-  };
 }

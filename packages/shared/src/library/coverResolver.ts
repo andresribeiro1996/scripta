@@ -9,17 +9,20 @@ export interface ResolvedCoverResponse {
   url: string | null;
   fullUrl: string | null;
   pending: boolean;
+  upgrading?: boolean;
 }
 
 export interface CoverCacheEntry {
   url: string | null;
   fullUrl: string | null;
   at: number;
+  upgrading?: boolean;
 }
 
 export type CoverSize = "thumb" | "full";
 
 export const COVER_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+export const COVER_UPGRADE_TTL_MS = 10 * 60 * 1000;
 export const COVER_POLL_INTERVAL_MS = 3_000;
 export const COVER_POLL_GIVE_UP_MS = 30 * 60 * 1000;
 export const COVER_BATCH_SIZE = 100;
@@ -65,20 +68,21 @@ export function createCoverResolver(deps: CoverResolverDeps): CoverResolver {
   let polling = false;
   let failedTicks = 0;
 
-  const fresh = (entry: CoverCacheEntry | undefined) => (entry && now() - entry.at < COVER_CACHE_TTL_MS ? entry : undefined);
+  const fresh = (entry: CoverCacheEntry | undefined) =>
+    entry && now() - entry.at < (entry.upgrading ? COVER_UPGRADE_TTL_MS : COVER_CACHE_TTL_MS) ? entry : undefined;
   const pick = (entry: CoverCacheEntry, size: CoverSize) => (size === "full" ? entry.fullUrl ?? entry.url : entry.url);
 
   function persist() {
-    deps.persist(Object.fromEntries([...entries].filter(([, entry]) => entry.url !== null)));
+    deps.persist(Object.fromEntries([...entries].filter(([, entry]) => entry.url !== null && !entry.upgrading)));
   }
 
-  function put(key: string, cover: { url: string | null; fullUrl: string | null }): CoverCacheEntry {
-    const entry = { url: cover.url, fullUrl: cover.fullUrl, at: now() };
+  function put(key: string, cover: { url: string | null; fullUrl: string | null; upgrading?: boolean }): CoverCacheEntry {
+    const entry: CoverCacheEntry = { url: cover.url, fullUrl: cover.fullUrl, at: now(), ...(cover.upgrading ? { upgrading: true } : {}) };
     entries.set(key, entry);
     return entry;
   }
 
-  function store(key: string, cover: { url: string | null; fullUrl: string | null }): CoverCacheEntry {
+  function store(key: string, cover: { url: string | null; fullUrl: string | null; upgrading?: boolean }): CoverCacheEntry {
     const entry = put(key, cover);
     persist();
     return entry;

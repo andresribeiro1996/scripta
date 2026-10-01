@@ -10,7 +10,7 @@ import rateLimit from "@fastify/rate-limit";
 const scratch = mkdtempSync(join(tmpdir(), "scripta-account-test-"));
 process.env.JWT_ACCESS_SECRET ??= "a".repeat(64);
 process.env.JWT_REFRESH_SECRET ??= "b".repeat(64);
-for (const key of ["AUTH_DB_PATH", "LIBRARY_DB_PATH", "GALLERY_DB_PATH", "GALLERY_STORAGE_PATH"]) process.env[key] ??= join(scratch, key);
+for (const key of ["AUTH_DB_PATH", "LIBRARY_DB_PATH", "GALLERY_DB_PATH"]) process.env[key] ??= join(scratch, key);
 const { applyAuthMigrations } = await import("./adapters/sqlite/connection.js");
 const { createSqliteAuthRepository } = await import("./adapters/sqlite/sqliteAuthRepository.js");
 const { createAuthService } = await import("./service.js");
@@ -26,11 +26,11 @@ function setup(enabled = true) {
   const emails: { to: string; subject: string; text: string }[] = [];
   const erased: string[] = [];
   let eraseFails = false;
-  const security = createAccountSecurity(repo, async (to, subject, text) => { emails.push({ to, subject, text }); }, "https://scripta.example", enabled, (userId) => {
+  const security = createAccountSecurity(repo, async (to, subject, text) => { emails.push({ to, subject, text }); }, "https://scripta.example", enabled, async (userId) => {
     if (eraseFails) throw new Error("erase failed");
     erased.push(userId);
   });
-  const auth = createAuthService(repo, { save() {}, read() { return null; }, delete() {}, deleteAll() {} });
+  const auth = createAuthService(repo, { save: async () => {}, delete: async () => {} });
   const token = () => new URLSearchParams(new URL(emails.at(-1)!.text.match(/https:\/\/\S+/)![0]).hash.slice(1)).get("token")!;
   return { db, repo, emails, erased, security, auth, token, failErase: () => { eraseFails = true; } };
 }
@@ -132,7 +132,7 @@ test("recovery responses hide account existence, validate input and enforce IP t
   try {
     await auth.signup("reader@example.com", "reader", "old password");
     await app.register(rateLimit);
-    await app.register(buildAuthRoutes(auth, security));
+    await app.register(buildAuthRoutes(auth, () => "", security));
     const known = await app.inject({ method: "POST", url: "/auth/forgot-password", payload: { email: "reader@example.com" } });
     const unknown = await app.inject({ method: "POST", url: "/auth/forgot-password", payload: { email: "missing@example.com" } });
     assert.equal(known.statusCode, 202);
@@ -177,7 +177,7 @@ test("an account without a password confirms deletion by typing its username", a
   } finally { db.close(); }
 });
 
-test("a failed erase keeps the account so deleting again can finish the job", async () => {
+test("a rejected erase fails the deletion and keeps the account so deleting again can finish the job", async () => {
   const { db, repo, auth, security, failErase } = setup();
   try {
     const session = await auth.signup("reader@example.com", "reader", "a password");

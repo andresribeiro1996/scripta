@@ -22,6 +22,7 @@ export interface BookRow {
   cover_image_id: string | null;
   cover_status: CoverStatus | null;
   cover_checked_at: string | null;
+  cover_upgrade_wanted_at: string | null;
   created_at: string;
 }
 

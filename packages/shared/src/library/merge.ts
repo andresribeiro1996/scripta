@@ -12,6 +12,7 @@
 // unchanged `saveLibrary` call.
 
 import type { LibraryData } from "./types.js";
+import { certainFacts, matchFacts } from "./bookMatch.js";
 import { normalizeIsbn } from "./covers.js";
 
 /** Identifies "the same book" across sources whose native IDs aren't
@@ -28,15 +29,6 @@ export function bookKey(book: Record<string, unknown>): string {
   return `ta:${title}|${author}`;
 }
 
-export function bookMatchKeys(book: Record<string, unknown>): string[] {
-  const isbn = normalizeIsbn(book.ISBN);
-  const title = normalizeForMatch(book.Title);
-  const author = normalizeForMatch(book.Attribution);
-  const keys = isbn ? [`isbn:${isbn}`] : [];
-  if (title || author) keys.push(`ta:${title}|${author}`);
-  return keys;
-}
-
 function normalizeForMatch(value: unknown): string {
   return String(value ?? "")
     .trim()
@@ -50,7 +42,7 @@ function normalizeForMatch(value: unknown): string {
  *  source's highlights (e.g. a Goodreads review, which uses its own
  *  "goodreads-review:..." id scheme) never collides with a Kobo one, so
  *  both survive. */
-function unionHighlights(existing: unknown, incoming: unknown): Array<Record<string, unknown>> {
+export function unionHighlights(existing: unknown, incoming: unknown): Array<Record<string, unknown>> {
   const existingList = Array.isArray(existing) ? existing : [];
   const incomingList = Array.isArray(incoming) ? incoming : [];
   const seen = new Set(existingList.map((h) => (h as Record<string, unknown>).BookmarkID));
@@ -66,7 +58,7 @@ function unionHighlights(existing: unknown, incoming: unknown): Array<Record<str
 }
 
 /** For a book present in both — the newest import wins for everything
- *  (title, author, progress, status, ...), except: `_coverUrl` is kept
+ *  (progress, status, ...), except: `_coverUrl` is kept
  *  from whichever side actually has one, and highlights union rather
  *  than replace. `_coverUrl` is set by bookCovers.ts's setBookCover
  *  (a genuine custom gallery cover) — auto-resolved covers no longer
@@ -96,42 +88,59 @@ function mergeBookPair(
   };
 }
 
+const IDENTITY_FIELDS = ["Title", "Attribution", "ISBN"] as const;
+
+export function withIdentityOf(book: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> {
+  const next = { ...book };
+  for (const field of IDENTITY_FIELDS) {
+    if (field in source) next[field] = source[field];
+    else delete next[field];
+  }
+  return next;
+}
+
+function collapseCertain(books: Array<Record<string, unknown>>): Array<Record<string, unknown>> {
+  const kept: Array<Record<string, unknown>> = [];
+  const facts: ReturnType<typeof matchFacts>[] = [];
+  const isbns: Array<Set<string>> = [];
+  for (const book of books) {
+    const bookFacts = matchFacts(book);
+    const index = facts.findIndex(
+      (other, i) =>
+        certainFacts(other, bookFacts) && (bookFacts.isbn === "" || [...isbns[i]!].every((isbn) => isbn === bookFacts.isbn))
+    );
+    if (index < 0) {
+      kept.push(book);
+      facts.push(bookFacts);
+      isbns.push(new Set(bookFacts.isbn === "" ? [] : [bookFacts.isbn]));
+    } else {
+      kept[index] = withIdentityOf(mergeBookPair(kept[index]!, book), kept[index]!);
+      if (bookFacts.isbn !== "") isbns[index]!.add(bookFacts.isbn);
+    }
+  }
+  return kept;
+}
+
 /** Existing books keep their position (updated in place if matched);
  *  genuinely new incoming books are appended in their original import
- *  order. Deliberately does NOT deduplicate incoming's own internal
- *  entries against each other — only existing-vs-incoming matching is in
- *  scope here, so any duplicate-book quirks already present within a
- *  single import are left exactly as they were (not a behavior change
- *  this feature was asked to make). */
+ *  order. */
 export function mergeBookLists(
   existingBooks: Array<Record<string, unknown>>,
   incomingBooks: Array<Record<string, unknown>>
 ): Array<Record<string, unknown>> {
-  const incomingByKey = new Map<string, Record<string, unknown>>();
-  for (const b of incomingBooks) {
-    const key = bookKey(b);
-    if (!incomingByKey.has(key)) incomingByKey.set(key, b);
-  }
-
-  const usedIncomingKeys = new Set<string>();
-  const merged = existingBooks.map((existingBook) => {
-    const key = bookKey(existingBook);
-    const incomingMatch = incomingByKey.get(key);
-    if (incomingMatch) {
-      usedIncomingKeys.add(key);
-      return mergeBookPair(existingBook, incomingMatch);
+  const existingFacts = existingBooks.map(matchFacts);
+  const paired = new Set<number>();
+  const merged = [...existingBooks];
+  for (const book of collapseCertain(incomingBooks)) {
+    const facts = matchFacts(book);
+    const index = existingFacts.findIndex((other, i) => !paired.has(i) && certainFacts(other, facts));
+    if (index < 0) {
+      merged.push(book);
+      continue;
     }
-    return existingBook;
-  });
-
-  for (const b of incomingBooks) {
-    const key = bookKey(b);
-    if (!usedIncomingKeys.has(key)) {
-      merged.push(b);
-      usedIncomingKeys.add(key);
-    }
+    paired.add(index);
+    merged[index] = withIdentityOf(mergeBookPair(existingBooks[index]!, book), existingBooks[index]!);
   }
-
   return merged;
 }
 

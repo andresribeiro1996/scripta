@@ -1,0 +1,20 @@
+name: Android release
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    name: Build Android
+    type: build
+    params:
+      platform: android
+      profile: production
+
+  submit:
+    name: Upload to Play internal testing
+    needs: [build]
+    type: submit
+    params:
+      build_id: ${{ needs.build.outputs.build_id }}
+      profile: production

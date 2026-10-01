@@ -9,7 +9,8 @@ const followSchema = z.object({ userId: z.string().min(1) });
 const shelfMuralSchema = z.object({ muralId: z.string().min(1) });
 const publishSchema = z.object({ muralId: z.string().min(1).optional(), shareReading: z.boolean().optional() });
 const dashboardQuerySchema = z.object({
-  cursor: z.string().min(1).optional(),
+  cursor: z.string().min(1).max(200).optional(),
+  kinds: z.string().max(200).regex(/^[a-z_]+(,[a-z_]+)*$/).optional(),
   limit: z.coerce.number().int().min(1).max(50).default(20)
 });
 const peopleQuerySchema = z.object({
@@ -105,9 +106,9 @@ export function buildCommunityRoutes(service: CommunityService) {
 
     app.get("/community/dashboard", { preHandler: authGuard }, async (request, reply) => {
       const parsed = dashboardQuerySchema.safeParse(request.query);
-      if (!parsed.success) return reply.code(400).send({ error: "Invalid cursor/limit." });
+      if (!parsed.success) return reply.code(400).send({ error: "Invalid cursor/limit/kinds." });
       try {
-        return reply.send(service.getDashboard(request.user.id, parsed.data.cursor, parsed.data.limit));
+        return reply.send(service.getDashboard(request.user.id, parsed.data.cursor, parsed.data.limit, parsed.data.kinds ? new Set(parsed.data.kinds.split(",")) : undefined));
       } catch (err) {
         if (err instanceof CommunityError) return reply.code(statusForCommunityError(err)).send({ error: err.message });
         throw err;

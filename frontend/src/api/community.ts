@@ -12,7 +12,7 @@ import type {
   TierlistSummary,
   TournamentSummary
 } from "@scripta/shared/community";
-import { withKnownDigestItems, type DashboardFeedPage } from "@scripta/shared/dashboard";
+import { dashboardQuery, withKnownDigestItems, type DashboardFeedPage } from "@scripta/shared/dashboard";
 import type { PublicReaderCard } from "@scripta/shared";
 import type { ThemeId } from "@scripta/shared/themes";
 import type { MuralBlock, ShelfTheme } from "../lib/murals";
@@ -42,8 +42,7 @@ export interface CommunityProfileView {
 }
 
 export async function fetchDashboard(cursor?: string): Promise<DashboardFeedPage> {
-  const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
-  return withKnownDigestItems((await apiFetch(`/community/dashboard${query}`)) as DashboardFeedPage);
+  return withKnownDigestItems((await apiFetch(`/community/dashboard${dashboardQuery(cursor)}`)) as DashboardFeedPage);
 }
 
 export async function markDashboardSeen(): Promise<void> {

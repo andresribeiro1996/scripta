@@ -3,6 +3,7 @@
 // MuralsRepository interface this fulfills.
 
 import type { DatabaseSync } from "node:sqlite";
+import { rekeyBlocks } from "../../domain/rekeyBlocks.js";
 import type { MuralsRepository } from "../../domain/ports.js";
 import type { MuralFolderRow, MuralRow } from "../../domain/types.js";
 
@@ -52,6 +53,23 @@ export function createSqliteMuralsRepository(db: DatabaseSync): MuralsRepository
       try {
         db.prepare("DELETE FROM murals WHERE user_id = ?").run(userId);
         db.prepare("DELETE FROM mural_folders WHERE user_id = ?").run(userId);
+        db.exec("COMMIT");
+      } catch (error) {
+        db.exec("ROLLBACK");
+        throw error;
+      }
+    },
+    rekeyBooks(userId, fromKeys, toKey) {
+      const from = new Set(fromKeys);
+      const now = new Date().toISOString();
+      const update = db.prepare("UPDATE murals SET blocks = ?, updated_at = ? WHERE id = ?");
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        for (const row of db.prepare("SELECT id, blocks FROM murals WHERE user_id = ?").all(userId) as Array<{ id: string; blocks: string }>) {
+          const before = JSON.stringify(JSON.parse(row.blocks));
+          const after = JSON.stringify(rekeyBlocks(JSON.parse(row.blocks), from, toKey));
+          if (after !== before) update.run(after, now, row.id);
+        }
         db.exec("COMMIT");
       } catch (error) {
         db.exec("ROLLBACK");

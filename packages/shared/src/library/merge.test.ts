@@ -1,31 +1,68 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { bookKey, bookMatchKeys } from "./merge.js";
+import { bookKey, mergeBookLists } from "./merge.js";
 
-test("bookMatchKeys returns the ISBN key then the title-and-author key, normalized like bookKey", () => {
-  const book = { ISBN: "978-0-00-000000-2", Title: " Dune ", Attribution: "Frank  Herbert" };
-  assert.deepEqual(bookMatchKeys(book), ["isbn:9780000000002", "ta:dune|frank herbert"]);
-  assert.equal(bookMatchKeys(book)[0], bookKey(book));
+test("a Goodreads row with an ISBN merges into the ISBN-less Kobo copy and keeps the Kobo key", () => {
+  const kobo = { ContentID: "k1", Title: "Dune", Attribution: "Frank Herbert", ReadStatus: 1, highlights: [{ BookmarkID: "h1" }] };
+  const goodreads = { ContentID: "goodreads:9", Title: "Dune", Attribution: "Frank Herbert", ISBN: "9780441013593", ReadStatus: 2 };
+  const merged = mergeBookLists([kobo], [goodreads]);
+  assert.equal(merged.length, 1);
+  assert.equal(bookKey(merged[0]!), bookKey(kobo));
+  assert.equal("ISBN" in merged[0]!, false);
+  assert.equal(merged[0]!.ReadStatus, 2);
+  assert.deepEqual(merged[0]!.highlights, [{ BookmarkID: "h1" }]);
 });
 
-test("bookMatchKeys returns only the title-and-author key without a usable ISBN", () => {
-  const book = { Title: "Dune", Attribution: "Frank Herbert" };
-  assert.deepEqual(bookMatchKeys(book), ["ta:dune|frank herbert"]);
-  assert.deepEqual(bookMatchKeys({ ...book, ISBN: "not an isbn" }), [bookKey(book)]);
+test("ISBN-10 and ISBN-13 of the same book pair", () => {
+  const merged = mergeBookLists([{ Title: "Dune", Attribution: "Frank Herbert", ISBN: "0441013597" }], [{ Title: "Dune", Attribution: "Frank Herbert", ISBN: "9780441013593" }]);
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0]!.ISBN, "0441013597");
 });
 
-test("bookMatchKeys lets a book with an ISBN match the same book without one", () => {
-  const withIsbn = bookMatchKeys({ ISBN: "9780000000002", Title: "Dune", Attribution: "Frank Herbert" });
-  const withoutIsbn = bookMatchKeys({ Title: "DUNE", Attribution: "frank herbert" });
-  assert.ok(withoutIsbn.some((key) => withIsbn.includes(key)));
+test("likely matches and different ISBNs are appended, not merged", () => {
+  const existing = [{ Title: "Dune", Attribution: "Frank Herbert", ISBN: "9780441013593" }];
+  const merged = mergeBookLists(existing, [
+    { Title: "Dune (Dune Chronicles #1)", Attribution: "Frank Herbert" },
+    { Title: "Dune", Attribution: "Frank Herbert", ISBN: "9780593099322" }
+  ]);
+  assert.equal(merged.length, 3);
 });
 
-test("bookMatchKeys omits the title-and-author key when title and author are both empty", () => {
-  assert.deepEqual(bookMatchKeys({ Title: "", Attribution: "  " }), []);
-  assert.deepEqual(bookMatchKeys({ ISBN: "978-0-00-000000-2", Title: "", Attribution: "" }), ["isbn:9780000000002"]);
+test("certain duplicates inside one import collapse into the first", () => {
+  const merged = mergeBookLists([], [
+    { ContentID: "a", Title: "Dune", Attribution: "Frank Herbert", ReadStatus: 0 },
+    { ContentID: "b", Title: "DUNE", Attribution: "Frank Herbert", ISBN: "9780441013593", ReadStatus: 2 }
+  ]);
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0]!.Title, "Dune");
+  assert.equal(merged[0]!.ReadStatus, 2);
 });
 
-test("bookMatchKeys keeps the title-and-author key when only one of them is empty", () => {
-  assert.deepEqual(bookMatchKeys({ Title: "Dune" }), ["ta:dune|"]);
-  assert.deepEqual(bookMatchKeys({ Attribution: "Frank Herbert" }), ["ta:|frank herbert"]);
+test("each existing book pairs at most once", () => {
+  const merged = mergeBookLists([{ Title: "Dune", Attribution: "Frank Herbert" }], [
+    { Title: "Dune", Attribution: "Frank Herbert", ISBN: "9780441013593" },
+    { Title: "Dune", Attribution: "Frank Herbert", ISBN: "9780593099322" }
+  ]);
+  assert.equal(merged.length, 2);
+});
+
+test("an ISBN-less book cannot bridge two different ISBNs inside one import", () => {
+  const dune = { Title: "Dune", Attribution: "Frank Herbert" };
+  const merged = mergeBookLists([], [
+    { ...dune },
+    { ...dune, ISBN: "9780441013593" },
+    { ...dune, ISBN: "9780593099322" }
+  ]);
+  assert.equal(merged.length, 2);
+});
+
+test("an ISBN-less existing book pairs with one of two different-ISBN imports and the other is appended", () => {
+  const dune = { Title: "Dune", Attribution: "Frank Herbert" };
+  const merged = mergeBookLists([{ ...dune, ContentID: "e" }], [
+    { ...dune, ContentID: "b", ISBN: "9780441013593" },
+    { ...dune, ContentID: "c", ISBN: "9780593099322" }
+  ]);
+  assert.equal(merged.length, 2);
+  assert.equal(merged[0]!.ContentID, "b");
+  assert.equal(merged[1]!.ContentID, "c");
 });

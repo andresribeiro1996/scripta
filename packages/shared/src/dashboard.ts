@@ -34,6 +34,8 @@ export type DigestItem =
   | { kind: "follow"; id: string; actor: CommunityAuthor; createdAt: string; viewerFollows: boolean }
   | ParticipationItem;
 
+export type DigestKind = DigestItem["kind"];
+
 export interface DashboardFeedPage {
   items: DigestItem[];
   nextCursor: string | null;
@@ -42,10 +44,15 @@ export interface DashboardFeedPage {
   followingNewCount: number;
 }
 
-const DIGEST_KINDS: Record<DigestItem["kind"], true> = { publication: true, vote: true, reading: true, follow: true, participation: true };
+const DIGEST_KINDS: Record<DigestKind, true> = { publication: true, vote: true, reading: true, follow: true, participation: true };
 
 export function withKnownDigestItems(page: DashboardFeedPage): DashboardFeedPage {
-  return { ...page, items: page.items.filter((item) => DIGEST_KINDS[item.kind as DigestItem["kind"]] === true) };
+  return { ...page, items: page.items.filter((item) => DIGEST_KINDS[item.kind as DigestKind] === true) };
+}
+
+export function dashboardQuery(cursor?: string): string {
+  const query = `?kinds=${Object.keys(DIGEST_KINDS).join(",")}`;
+  return cursor ? `${query}&cursor=${encodeURIComponent(cursor)}` : query;
 }
 
 export type DashboardCard =

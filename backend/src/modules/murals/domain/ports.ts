@@ -8,6 +8,7 @@ import type { MuralFolderRow, MuralRow } from "./types.js";
 
 export interface MuralsRepository {
   deleteUserData(userId: string): void;
+  rekeyBooks(userId: string, fromKeys: string[], toKey: string): void;
   listByUser(userId: string): MuralRow[];
   /** Ownership-checked lookup — undefined if no row with that id exists,
    *  or it exists but isn't owned by userId. service.ts treats both cases
@@ -35,7 +36,7 @@ export interface MuralsRepository {
   /** Looks up a mural by its live share token — backs the public
    *  GET /murals/shared/:token route. No ownership/userId involved: the
    *  token itself is the credential, same trust model as
-   *  modules/library's getByShareToken/modules/gallery's getImageById.
+   *  modules/library's getByShareToken and modules/gallery's image ids.
    *  Returns the RAW row (including user_id) — callers of this one
    *  method are trusted to keep user_id server-side only. */
   getByShareToken(token: string): MuralRow | undefined;
