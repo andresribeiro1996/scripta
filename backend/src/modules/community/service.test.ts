@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { IdentityKey, ReaderProfile } from "@scripta/shared";
-import type { DiscoverItem, GameParticipation, SuggestedReader } from "@scripta/shared/community";
+import type { DiscoverItem, GameParticipation, SharedBook, SuggestedReader } from "@scripta/shared/community";
 import { DEFAULT_FEED_SETTINGS, encodeCursor, normalizeFeedSettings } from "@scripta/shared/community";
 import type { ParticipationItem } from "@scripta/shared/dashboard";
 import type { PublishedTierlistRef } from "../tierlists/service.js";
@@ -109,6 +109,11 @@ function createDeps(repo: CommunityRepository) {
   const ownedMurals = new Set<string>();
   const muralPayloads = new Map<string, MuralPublicPayload | null>();
   const libraries = new Map<string, Record<string, unknown>>();
+  const libraryCalls: string[] = [];
+  const sharedCounts = new Map<string, number>();
+  const sharedShelves = new Map<string, SharedBook[]>();
+  const sharedBookCountsCalls: Array<{ viewerId: string; candidateIds: string[] }> = [];
+  const sharedBooksCalls: Array<{ viewerId: string; candidateId: string; limit: number }> = [];
   const tierlistRefs = new Map<string, PublishedTierlistRef>();
   const tournamentRefs = new Map<string, PublishedTournamentRef>();
   const byNewest = <T extends { createdAt: string }>(a: T, b: T) => b.createdAt.localeCompare(a.createdAt);
@@ -135,7 +140,18 @@ function createDeps(repo: CommunityRepository) {
       }
       return out;
     },
-    resolveLibrary: (id) => libraries.get(id) ?? null,
+    resolveLibrary: (id) => {
+      libraryCalls.push(id);
+      return libraries.get(id) ?? null;
+    },
+    sharedBookCounts: (viewerId, candidateIds) => {
+      sharedBookCountsCalls.push({ viewerId, candidateIds: [...candidateIds] });
+      return new Map(candidateIds.flatMap((id) => (sharedCounts.has(id) ? [[id, sharedCounts.get(id)!] as [string, number]] : [])));
+    },
+    sharedBooks: (viewerId, candidateId, limit) => {
+      sharedBooksCalls.push({ viewerId, candidateId, limit });
+      return (sharedShelves.get(candidateId) ?? []).slice(0, limit);
+    },
     readerGlyphFor: (id) => {
       readerGlyphCalls.push(id);
       return readerGlyphs.get(id) ?? null;
@@ -169,7 +185,7 @@ function createDeps(repo: CommunityRepository) {
       quizzes: () => quizParticipation
     }
   };
-  return { deps, readerProfiles, usernames, ownedMurals, muralPayloads, libraries, tierlistRefs, tournamentRefs, seenAt, votes, tournamentVotes, readerGlyphs, readerGlyphCalls, tierlistParticipation, tournamentParticipation, quizParticipation };
+  return { deps, readerProfiles, usernames, ownedMurals, muralPayloads, libraries, libraryCalls, sharedCounts, sharedShelves, sharedBookCountsCalls, sharedBooksCalls, tierlistRefs, tournamentRefs, seenAt, votes, tournamentVotes, readerGlyphs, readerGlyphCalls, tierlistParticipation, tournamentParticipation, quizParticipation };
 }
 
 function profileRow(userId: string, overrides: Partial<ProfileRow> = {}): ProfileRow {
@@ -234,16 +250,50 @@ export function tournRef(id: string, owner: string, overrides: Partial<Published
   };
 }
 
-test("follow needs an existing user, not a published profile", () => {
+test("follow needs an existing user who isn't you", () => {
   const { repo } = createRepoFake();
   const { deps, readerProfiles } = createDeps(repo);
   const service = createCommunityService(deps);
   assert.throws(() => service.follow("bob", "ghost"), ProfileNotFoundError);
-  readerProfiles.set("alice", reader("alice"));
-  service.follow("bob", "alice");
+  readerProfiles.set("bob", reader("bob"));
+  repo.upsertProfile(profileRow("bob"));
   assert.throws(() => service.follow("bob", "bob"), SelfFollowError);
+});
+
+test("a published reader can be followed, and following again changes nothing", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  repo.upsertProfile(profileRow("alice"));
+  service.follow("bob", "alice");
   service.follow("bob", "alice");
   assert.equal(repo.countFollowers("alice"), 1);
+});
+
+test("an unpublished reader who doesn't follow you can't be followed", () => {
+  const { repo, events } = createRepoFake();
+  const { deps, readerProfiles } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  readerProfiles.set("carol", reader("carol"));
+  repo.upsertProfile(profileRow("carol", { published: 0 }));
+  assert.throws(() => service.follow("bob", "alice"), ProfileNotFoundError);
+  assert.throws(() => service.follow("bob", "carol"), ProfileNotFoundError);
+  assert.equal(repo.countFollowing("bob"), 0);
+  assert.equal(events.length, 0);
+});
+
+test("an unpublished reader who follows you can be followed back, and nobody else can follow them", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  repo.upsertProfile(profileRow("alice", { published: 0 }));
+  repo.insertFollow({ follower_id: "alice", followee_id: "bob", created_at: at(1) });
+  service.follow("bob", "alice");
+  assert.notEqual(repo.getFollow("bob", "alice"), undefined);
+  assert.throws(() => service.follow("dave", "alice"), ProfileNotFoundError);
 });
 
 test("unfollow without an existing follow throws", () => {
@@ -259,6 +309,8 @@ test("follow state reports direction-specific counts", () => {
   const service = createCommunityService(deps);
   readerProfiles.set("alice", reader("alice"));
   readerProfiles.set("dave", reader("dave"));
+  repo.upsertProfile(profileRow("alice"));
+  repo.upsertProfile(profileRow("dave"));
   service.follow("bob", "alice");
   service.follow("carol", "alice");
   service.follow("alice", "dave");
@@ -469,9 +521,9 @@ test("getProfileByUsername shows an unpublished user as private, with nothing pu
   tournamentRefs.set("g1", tournRef("g1", "alice"));
   readerGlyphs.set("alice", "star");
   profiles.set("alice", profileRow("alice", { published: 0, mural_id: "m1" }));
-  service.follow("me", "alice");
-  service.follow("bob", "alice");
-  service.follow("alice", "bob");
+  repo.insertFollow({ follower_id: "me", followee_id: "alice", created_at: at(1) });
+  repo.insertFollow({ follower_id: "bob", followee_id: "alice", created_at: at(1) });
+  repo.insertFollow({ follower_id: "alice", followee_id: "bob", created_at: at(1) });
 
   const view = service.getProfileByUsername("alice", "me");
   assert.equal(view.private, true);
@@ -1576,125 +1628,127 @@ test("getActivity links votes to what was voted on, and leaves vanished ones pla
 
 function suggestionFixture() {
   const { repo } = createRepoFake();
-  const { deps, libraries, readerProfiles, readerGlyphs } = createDeps(repo);
+  const { deps, readerProfiles, readerGlyphs, libraryCalls, sharedCounts, sharedShelves, sharedBookCountsCalls, sharedBooksCalls } = createDeps(repo);
   const service = createCommunityService(deps);
-  const addReader = (id: string, books: Array<Record<string, unknown>>, updatedAt = at(1)) => {
+  const addReader = (id: string, shared = 0, updatedAt = at(1)) => {
     readerProfiles.set(id, reader(id));
-    libraries.set(id, { books });
     repo.upsertProfile(profileRow(id, { updated_at: updatedAt }));
+    if (shared > 0) {
+      sharedCounts.set(id, shared);
+      sharedShelves.set(id, Array.from({ length: shared }, (_, n) => ({ title: `Book ${n + 1}`, author: "A. Writer", coverUrl: null })));
+    }
   };
   const suggested = (limit = 20) => service.suggestPeople("viewer", limit);
-  return { repo, service, libraries, readerProfiles, readerGlyphs, addReader, suggested };
+  return { repo, service, readerProfiles, readerGlyphs, libraryCalls, sharedCounts, sharedShelves, sharedBookCountsCalls, sharedBooksCalls, addReader, suggested };
 }
 
-const shelfBook = (title: string, extra: Record<string, unknown> = {}) => ({ Title: title, Attribution: "A. Writer", ...extra });
 const suggestedIds = (people: SuggestedReader[]) => people.map((person) => person.user.userId);
 const suggestedCounts = (people: SuggestedReader[]) => people.map((person) => [person.user.userId, person.sharedCount]);
 
 test("suggested readers are ranked by shared books, then by how recently they were active", () => {
-  const { libraries, addReader, suggested } = suggestionFixture();
-  const shelf = [shelfBook("A"), shelfBook("B"), shelfBook("C")];
-  libraries.set("viewer", { books: shelf });
-  addReader("one-old", [shelfBook("A")], at(1));
-  addReader("one-new", [shelfBook("A")], at(6));
-  addReader("three", shelf, at(2));
-  addReader("two", [shelfBook("A"), shelfBook("B")], at(3));
+  const { addReader, suggested } = suggestionFixture();
+  addReader("one-old", 1, at(1));
+  addReader("one-new", 1, at(6));
+  addReader("three", 3, at(2));
+  addReader("two", 2, at(3));
   assert.deepEqual(suggestedCounts(suggested()), [["three", 3], ["two", 2], ["one-new", 1], ["one-old", 1]]);
 });
 
-test("a book matches on ISBN even when the titles differ, and on title and author when one side has no ISBN", () => {
-  const { libraries, addReader, suggested } = suggestionFixture();
-  libraries.set("viewer", { books: [{ Title: "Dune", Attribution: "Frank Herbert", ISBN: "9780441172719" }, { Title: "Emma", Attribution: "Jane Austen" }] });
-  addReader("by-isbn", [{ Title: "Dune (Deluxe Edition)", Attribution: "F. Herbert", ISBN: "978-0-441-17271-9" }], at(3));
-  addReader("by-title", [{ Title: " EMMA ", Attribution: "Jane  Austen", ISBN: "9780141439587" }], at(2));
-  addReader("neither", [{ Title: "Emma", Attribution: "Someone Else", ISBN: "9780000000002" }], at(1));
-  assert.deepEqual(suggestedCounts(suggested()), [["by-isbn", 1], ["by-title", 1], ["neither", 0]]);
-});
-
 test("suggested readers leave out the viewer, people they follow, unpublished readers and readers with no profile", () => {
-  const { repo, libraries, addReader, suggested } = suggestionFixture();
-  const shelf = [shelfBook("A")];
-  addReader("viewer", shelf, at(6));
-  addReader("followed", shelf, at(5));
-  addReader("unpublished", shelf, at(4));
-  addReader("stranger", shelf, at(3));
-  addReader("follower", shelf, at(2));
+  const { repo, sharedCounts, addReader, suggested } = suggestionFixture();
+  addReader("viewer", 1, at(6));
+  addReader("followed", 1, at(5));
+  addReader("unpublished", 1, at(4));
+  addReader("stranger", 1, at(3));
+  addReader("follower", 1, at(2));
   repo.upsertProfile(profileRow("unpublished", { published: 0, updated_at: at(4) }));
   repo.insertFollow({ follower_id: "viewer", followee_id: "followed", created_at: at(7) });
   repo.insertFollow({ follower_id: "follower", followee_id: "viewer", created_at: at(7) });
-  libraries.set("nameless", { books: shelf });
+  sharedCounts.set("nameless", 1);
   repo.upsertProfile(profileRow("nameless", { updated_at: at(8) }));
   assert.deepEqual(suggestedIds(suggested()), ["stranger", "follower"]);
 });
 
 test("fewer than five overlapping readers are topped up with recently active ones, newest first", () => {
-  const { libraries, addReader, suggested } = suggestionFixture();
-  libraries.set("viewer", { books: [shelfBook("A")] });
-  addReader("match", [shelfBook("A")], at(1));
-  addReader("quiet", [], at(2));
-  addReader("busy", [shelfBook("Z")], at(9));
-  addReader("fresh", [], at(5));
+  const { addReader, suggested } = suggestionFixture();
+  addReader("match", 1, at(1));
+  addReader("quiet", 0, at(2));
+  addReader("busy", 0, at(9));
+  addReader("fresh", 0, at(5));
   assert.deepEqual(suggestedCounts(suggested()), [["match", 1], ["busy", 0], ["fresh", 0], ["quiet", 0]]);
 });
 
 test("the top-up stops once five readers overlap", () => {
-  const { libraries, addReader, suggested } = suggestionFixture();
-  libraries.set("viewer", { books: [shelfBook("A")] });
-  for (let n = 1; n <= 4; n++) addReader(`match-${n}`, [shelfBook("A")], at(n));
-  addReader("other", [], at(9));
+  const { addReader, suggested } = suggestionFixture();
+  for (let n = 1; n <= 4; n++) addReader(`match-${n}`, 1, at(n));
+  addReader("other", 0, at(9));
   assert.deepEqual(suggestedIds(suggested()), ["match-4", "match-3", "match-2", "match-1", "other"]);
-  addReader("match-5", [shelfBook("A")], at(5));
+  addReader("match-5", 1, at(5));
   assert.deepEqual(suggestedIds(suggested()), ["match-5", "match-4", "match-3", "match-2", "match-1"]);
 });
 
-test("a missing, malformed or junk-padded library never breaks suggestions", () => {
-  const { repo, libraries, readerProfiles, addReader, suggested } = suggestionFixture();
-  libraries.set("viewer", { books: [null, 7, shelfBook("A")] });
-  addReader("padded", [], at(4));
-  libraries.set("padded", { books: [null, 7, shelfBook("A")] });
-  addReader("malformed", [], at(3));
-  libraries.set("malformed", { books: "none" });
-  readerProfiles.set("absent", reader("absent"));
-  repo.upsertProfile(profileRow("absent", { updated_at: at(2) }));
-  assert.deepEqual(suggestedCounts(suggested()), [["padded", 1], ["malformed", 0], ["absent", 0]]);
-});
-
-test("a viewer with no library is shown recently active readers", () => {
+test("a viewer who shares no books with anyone is shown recently active readers", () => {
   const { addReader, suggested } = suggestionFixture();
-  addReader("older", [shelfBook("A")], at(1));
-  addReader("newer", [shelfBook("B")], at(2));
+  addReader("older", 0, at(1));
+  addReader("newer", 0, at(2));
   assert.deepEqual(suggestedCounts(suggested()), [["newer", 0], ["older", 0]]);
 });
 
-test("a suggestion lists up to three shared books, with covers from the reader's own library", () => {
-  const { libraries, addReader, suggested } = suggestionFixture();
-  libraries.set("viewer", { books: ["A", "B", "C", "D"].map((title) => shelfBook(title, { _coverUrl: "https://covers.test/viewer.jpg" })) });
-  addReader("reader", [shelfBook("A", { _coverUrl: "https://covers.test/a.jpg" }), shelfBook("B"), shelfBook("C", { _coverUrl: null }), shelfBook("D", { _coverUrl: "https://covers.test/d.jpg" })]);
-  const [suggestion] = suggested();
-  assert.equal(suggestion?.sharedCount, 4);
-  assert.deepEqual(suggestion?.sharedBooks, [
+test("a suggestion lists the shared books the library module returns, up to three", () => {
+  const { sharedShelves, sharedBooksCalls, addReader, suggested } = suggestionFixture();
+  addReader("reader", 4);
+  const shelf: SharedBook[] = [
     { title: "A", author: "A. Writer", coverUrl: "https://covers.test/a.jpg" },
     { title: "B", author: "A. Writer", coverUrl: null },
-    { title: "C", author: "A. Writer", coverUrl: null }
-  ]);
+    { title: "C", author: "A. Writer", coverUrl: null },
+    { title: "D", author: "A. Writer", coverUrl: "https://covers.test/d.jpg" }
+  ];
+  sharedShelves.set("reader", shelf);
+  const [suggestion] = suggested();
+  assert.equal(suggestion?.sharedCount, 4);
+  assert.deepEqual(suggestion?.sharedBooks, shelf.slice(0, 3));
+  assert.deepEqual(sharedBooksCalls, [{ viewerId: "viewer", candidateId: "reader", limit: 3 }]);
+});
+
+test("shared books are looked up only for the returned readers who share some", () => {
+  const { sharedBooksCalls, addReader, suggested } = suggestionFixture();
+  addReader("big", 3, at(1));
+  addReader("small", 1, at(2));
+  addReader("fill", 0, at(9));
+  const people = suggested(3);
+  assert.deepEqual(sharedBooksCalls.map((call) => call.candidateId), ["big", "small"]);
+  assert.deepEqual(people[2]?.sharedBooks, []);
+  sharedBooksCalls.length = 0;
+  suggested(1);
+  assert.deepEqual(sharedBooksCalls.map((call) => call.candidateId), ["big"]);
+});
+
+test("overlap comes from one counting call over the candidates, and no library is resolved", () => {
+  const { repo, libraryCalls, sharedBookCountsCalls, addReader, suggested } = suggestionFixture();
+  addReader("viewer", 0, at(6));
+  addReader("followed", 1, at(5));
+  addReader("one", 1, at(3));
+  addReader("two", 2, at(2));
+  repo.insertFollow({ follower_id: "viewer", followee_id: "followed", created_at: at(7) });
+  suggested();
+  assert.deepEqual(sharedBookCountsCalls, [{ viewerId: "viewer", candidateIds: ["one", "two"] }]);
+  assert.deepEqual(libraryCalls, []);
 });
 
 test("suggested readers stop at the limit, overlapping ones first", () => {
-  const { libraries, addReader, suggested } = suggestionFixture();
-  libraries.set("viewer", { books: [shelfBook("A"), shelfBook("B")] });
-  addReader("one", [shelfBook("A")], at(1));
-  addReader("two", [shelfBook("A"), shelfBook("B")], at(2));
-  addReader("none", [], at(3));
+  const { addReader, suggested } = suggestionFixture();
+  addReader("one", 1, at(1));
+  addReader("two", 2, at(2));
+  addReader("none", 0, at(3));
   assert.deepEqual(suggestedIds(suggested(1)), ["two"]);
   assert.deepEqual(suggestedIds(suggested(2)), ["two", "one"]);
   assert.deepEqual(suggestedIds(suggested(3)), ["two", "one", "none"]);
 });
 
 test("a suggestion carries the card fields and the follower count, and a reader glyph only when switched on", () => {
-  const { repo, libraries, readerGlyphs, addReader, suggested } = suggestionFixture();
-  libraries.set("viewer", { books: [shelfBook("A")] });
-  addReader("glyphed", [shelfBook("A")], at(2));
-  addReader("plain", [shelfBook("A")], at(1));
+  const { repo, readerGlyphs, addReader, suggested } = suggestionFixture();
+  addReader("glyphed", 1, at(2));
+  addReader("plain", 1, at(1));
   repo.updateFeedSettings("glyphed", { ...DEFAULT_FEED_SETTINGS, readerGlyph: true });
   readerGlyphs.set("glyphed", "star");
   readerGlyphs.set("plain", "star");
@@ -1706,7 +1760,7 @@ test("a suggestion carries the card fields and the follower count, and a reader 
     viewerFollows: false,
     private: false,
     sharedCount: 1,
-    sharedBooks: [{ title: "A", author: "A. Writer", coverUrl: null }]
+    sharedBooks: [{ title: "Book 1", author: "A. Writer", coverUrl: null }]
   });
   assert.equal(plain?.user.readerGlyph, undefined);
 });

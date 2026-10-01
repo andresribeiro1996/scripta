@@ -1,8 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { bookMatchKeys } from "@scripta/shared";
 import type { IdentityKey, ReaderProfile } from "@scripta/shared";
 import { categoryFor, contentDetail, decodeCursor, encodeCursor, DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
-import type { ActivityEventType, ActivityItem, CommunityAuthor, CommunityEventType, DiscoverItem, DiscoverType, FeedSettings, FollowState, GameParticipation, OwnProfile, Page, ParticipationGameKind, PersonResult, PublishProfileInput, PublishedContent, PublishedProfile, SuggestedReader, TierlistSummary, TournamentSummary } from "@scripta/shared/community";
+import type { ActivityEventType, ActivityItem, CommunityAuthor, CommunityEventType, DiscoverItem, DiscoverType, FeedSettings, FollowState, GameParticipation, OwnProfile, Page, ParticipationGameKind, PersonResult, PublishProfileInput, PublishedContent, PublishedProfile, SharedBook, SuggestedReader, TierlistSummary, TournamentSummary } from "@scripta/shared/community";
 import type { DashboardFeedPage, DigestItem, DigestKind, ParticipationItem } from "@scripta/shared/dashboard";
 import type { PublishedTournamentRef } from "../arena/service.js";
 import type { MuralsPublicApi } from "../murals/publicApi.js";
@@ -40,10 +39,6 @@ function parseEventPayload(raw: string | null): Record<string, unknown> | undefi
   }
 }
 
-function libraryBooks(doc: Record<string, unknown> | null): Record<string, unknown>[] {
-  return doc && Array.isArray(doc.books) ? doc.books.filter((book): book is Record<string, unknown> => typeof book === "object" && book !== null) : [];
-}
-
 export interface PublicProfileView {
   private: boolean;
   profile: PublishedProfile;
@@ -72,6 +67,8 @@ export interface CommunityDeps {
   resolveProfiles(userIds: string[]): Map<string, ReaderProfile>;
   resolveLibrary(userId: string): Record<string, unknown> | null;
   readerGlyphFor(userId: string): IdentityKey | null;
+  sharedBookCounts(viewerId: string, candidateIds: string[]): Map<string, number>;
+  sharedBooks(viewerId: string, candidateId: string, limit: number): SharedBook[];
   userHasUsername(userId: string): boolean;
   findUserIdByUsername(username: string): string | undefined;
   searchUsernameOwners(query: string, limit: number): string[];
@@ -262,6 +259,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
     follow(followerId, followeeId) {
       if (followerId === followeeId) throw new SelfFollowError();
       if (!deps.resolveProfiles([followeeId]).has(followeeId)) throw new ProfileNotFoundError();
+      if (repo.getProfileRow(followeeId)?.published !== 1 && !repo.getFollow(followeeId, followerId)) throw new ProfileNotFoundError();
       const inserted = repo.insertFollow({ follower_id: followerId, followee_id: followeeId, created_at: new Date().toISOString() });
       if (inserted) {
         const author = deps.resolveProfiles([followeeId]).get(followeeId);
@@ -425,30 +423,27 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
       });
     },
     suggestPeople(viewerId, limit) {
-      const own = new Set<string>();
-      for (const book of libraryBooks(deps.resolveLibrary(viewerId))) for (const key of bookMatchKeys(book)) own.add(key);
       const followees = new Set(repo.listFollowees(viewerId));
       const candidates = repo
         .listPublishedProfiles(SUGGESTION_SCAN_CAP)
         .map((row) => row.user_id)
         .filter((id) => id !== viewerId && !followees.has(id));
       const profiles = deps.resolveProfiles(candidates);
+      const counts = deps.sharedBookCounts(viewerId, candidates);
       const scored = candidates.flatMap((id, recency) => {
         const user = profiles.get(id);
-        if (!user) return [];
-        const shared = libraryBooks(deps.resolveLibrary(id)).filter((book) => bookMatchKeys(book).some((key) => own.has(key)));
-        return [{ id, user, recency, shared }];
+        return user ? [{ id, user, recency, shared: counts.get(id) ?? 0 }] : [];
       });
-      const overlapping = scored.filter((entry) => entry.shared.length > 0).sort((a, b) => b.shared.length - a.shared.length || a.recency - b.recency);
-      const fill = overlapping.length < SUGGESTION_OVERLAP_FLOOR ? scored.filter((entry) => entry.shared.length === 0) : [];
+      const overlapping = scored.filter((entry) => entry.shared > 0).sort((a, b) => b.shared - a.shared || a.recency - b.recency);
+      const fill = overlapping.length < SUGGESTION_OVERLAP_FLOOR ? scored.filter((entry) => entry.shared === 0) : [];
       const glyphOf = glyphLookup();
       return [...overlapping, ...fill].slice(0, limit).map((entry) => ({
         user: withGlyph(entry.user, entry.id, glyphOf),
         followerCount: repo.countFollowers(entry.id),
         viewerFollows: false,
         private: false,
-        sharedCount: entry.shared.length,
-        sharedBooks: entry.shared.slice(0, SHARED_BOOKS_SHOWN).map((book) => ({ title: String(book.Title ?? ""), author: String(book.Attribution ?? ""), coverUrl: typeof book._coverUrl === "string" ? book._coverUrl : null }))
+        sharedCount: entry.shared,
+        sharedBooks: entry.shared > 0 ? deps.sharedBooks(viewerId, entry.id, SHARED_BOOKS_SHOWN) : []
       }));
     },
     getLibrary(username) {

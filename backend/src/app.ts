@@ -36,7 +36,7 @@ import { deleteArenaUserData, getArenaPublicApi, registerArenaModule, rekeyArena
 import { deleteCommunityUserData, getCommunityPublicApi, registerCommunityModule } from "./modules/community/index.js";
 import { enqueueBookCovers, registerBooksModule } from "./modules/books/index.js";
 import { deleteGalleryUserData, registerGalleryModule } from "./modules/gallery/index.js";
-import { deleteLibraryUserData, registerLibraryModule, resolvePublicLibrary, readerGlyphFor, type BookEvent } from "./modules/library/index.js";
+import { deleteLibraryUserData, registerLibraryModule, resolvePublicLibrary, readerGlyphFor, sharedBookCounts, sharedBooks, type BookEvent } from "./modules/library/index.js";
 import { deleteMuralsUserData, getMuralsPublicApi, registerMuralsModule, rekeyMuralsBooks } from "./modules/murals/index.js";
 import { deleteQuizzesUserData, getQuizzesPublicApi, registerQuizzesModule, rekeyQuizzesBooks } from "./modules/quizzes/index.js";
 import { deleteSocialsUserData, registerSocialsModule } from "./modules/socials/index.js";
@@ -173,6 +173,8 @@ export function buildApp() {
     resolveProfiles: resolvePublicReaderProfiles,
     resolveLibrary: resolvePublicLibrary,
     readerGlyphFor,
+    sharedBookCounts,
+    sharedBooks,
     userHasUsername,
     findUserIdByUsername,
     searchUsernameOwners,

@@ -149,6 +149,28 @@ test("activity endpoint derives the viewer from the bearer token, not a fixed us
   await app.close();
 });
 
+test("activity endpoint rejects a cursor over 200 characters with 400", async () => {
+  const seen: Array<string | undefined> = [];
+  const app = Fastify();
+  await app.register(
+    buildPublicCommunityRoutes(
+      fakeService({
+        getActivity: (_username, _viewerId, cursor) => {
+          seen.push(cursor);
+          return { items: [], nextCursor: null };
+        }
+      })
+    )
+  );
+  const longest = await app.inject({ method: "GET", url: `/community/profiles/alice/activity?cursor=${"a".repeat(200)}` });
+  assert.equal(longest.statusCode, 200);
+  const tooLong = await app.inject({ method: "GET", url: `/community/profiles/alice/activity?cursor=${"a".repeat(201)}` });
+  assert.equal(tooLong.statusCode, 400);
+  assert.equal(tooLong.json().error, "Invalid activity query.");
+  assert.deepEqual(seen, ["a".repeat(200)]);
+  await app.close();
+});
+
 test("activity endpoint rejects a bad limit with 400", async () => {
   const app = Fastify();
   await app.register(buildPublicCommunityRoutes(fakeService()));
@@ -272,6 +294,30 @@ test("publish PUT reports a mural the user doesn't own as a 400", async () => {
   );
   const res = await app.inject({ method: "PUT", url: "/community/profile/publish", headers: { authorization: "Bearer x" }, payload: { muralId: "theirs" } });
   assert.equal(res.statusCode, 400);
+  await app.close();
+});
+
+test("follow POST passes both ids through, and answers 404 for a reader who can't be followed", async () => {
+  const followed: Array<[string, string]> = [];
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", () => ({ id: "viewer", email: "v@example.test", username: "v", avatarId: null }));
+  await app.register(
+    buildCommunityRoutes(
+      fakeService({
+        follow: (followerId, followeeId) => {
+          if (followeeId === "private") throw new ProfileNotFoundError();
+          followed.push([followerId, followeeId]);
+        }
+      })
+    )
+  );
+  const auth = { authorization: "Bearer x" };
+  const ok = await app.inject({ method: "POST", url: "/community/follows", headers: auth, payload: { userId: "alice" } });
+  assert.equal(ok.statusCode, 204);
+  const refused = await app.inject({ method: "POST", url: "/community/follows", headers: auth, payload: { userId: "private" } });
+  assert.equal(refused.statusCode, 404);
+  assert.equal(refused.json().error, "No published profile at that address.");
+  assert.deepEqual(followed, [["viewer", "alice"]]);
   await app.close();
 });
 
