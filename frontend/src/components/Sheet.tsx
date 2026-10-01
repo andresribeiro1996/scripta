@@ -1,25 +1,8 @@
-import { useEffect, useRef, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import type { OptionsMenuItem } from "./OptionsMenu";
 import { useDismissible } from "../hooks/useDismissible";
 import { useScrollLock } from "../hooks/useScrollLock";
-
-export function keepTabInside(event: KeyboardEvent<HTMLElement>) {
-  if (event.key !== "Tab") return;
-  const controls = Array.from(
-    event.currentTarget.querySelectorAll<HTMLElement>(
-      'button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]'
-    )
-  ).filter((element) => element.getClientRects().length > 0);
-  const first = controls[0];
-  const last = controls[controls.length - 1];
-  if (event.shiftKey && document.activeElement === first) {
-    event.preventDefault();
-    last?.focus();
-  } else if (!event.shiftKey && document.activeElement === last) {
-    event.preventDefault();
-    first?.focus();
-  }
-}
+import { keepTabInside } from "../lib/keepTabInside";
 
 /** The shared shell behind every bottom sheet: backdrop, Escape and
  *  click-outside dismissal, and the bottom-anchored-on-mobile /
