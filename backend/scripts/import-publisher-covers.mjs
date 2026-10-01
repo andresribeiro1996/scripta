@@ -30,13 +30,16 @@ const fetchBytes = (url) => guarded(url, async (res) => (res.ok ? Buffer.from(aw
 
 const openLibraryThrottle = createThrottle(OPEN_LIBRARY_GAP_MS);
 
+const openLibrary = (url) => openLibraryThrottle(() => fetchJson("openlibrary", url));
+
 async function lookupOpenLibrary(isbn) {
-  const query = new URLSearchParams({ q: `isbn:${isbn}`, fields: "author_name,editions,editions.title", limit: "1" });
-  const data = await openLibraryThrottle(() => fetchJson("openlibrary", `https://openlibrary.org/search.json?${query}`));
-  const doc = data?.docs?.[0];
-  const authors = Array.isArray(doc?.author_name) ? doc.author_name.filter((name) => typeof name === "string") : [];
-  const edition = doc?.editions?.docs?.[0]?.title;
-  return authors.length > 0 ? { title: typeof edition === "string" && edition.trim() ? edition.trim() : null, author: authors.join(", ") } : null;
+  const query = new URLSearchParams({ q: `isbn:${isbn}`, fields: "author_name", limit: "1" });
+  const data = await openLibrary(`https://openlibrary.org/search.json?${query}`);
+  const authors = Array.isArray(data?.docs?.[0]?.author_name) ? data.docs[0].author_name.filter((name) => typeof name === "string") : [];
+  if (authors.length === 0) return null;
+  const edition = await openLibrary(`https://openlibrary.org/isbn/${isbn}.json`);
+  const title = typeof edition?.title === "string" ? edition.title.trim() : "";
+  return { title: title || null, author: authors.join(", ") };
 }
 
 const store = createObjectStore();
