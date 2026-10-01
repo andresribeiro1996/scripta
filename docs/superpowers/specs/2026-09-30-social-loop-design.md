@@ -13,8 +13,8 @@ the app broadcasts but never answers back:
 - **You can't answer anyone.** A feed row's only action is "Follow back".
   There are no replies, reactions or reports anywhere in the schema.
 - **Hard to become visible.** Since #74 every username is findable, but an
-  unpublished user shows as Private, with no Follow button and no profile,
-  Activity or Library to open. Publishing needs a mural, and reading
+  unpublished user shows as Private, with no Follow button, and their page
+  says only "This profile is private". Publishing needs a mural, and reading
   activity is off by default (`DEFAULT_FEED_SETTINGS`).
 - **No reason to follow anyone.** People search stays empty until you type,
   and nothing suggests readers.
@@ -415,9 +415,9 @@ Clients display at most "99+".
 - **People search failures say so.** Mobile used to show "No people found";
   both clients now show "Couldn't search." with Retry, and a failed follow
   shows "Couldn't update who you follow."
-- **Read-only murals on mobile fit their content.** Only the editor keeps
-  the 520-point minimum, so a profile without a mural no longer pushes
-  Follow below an empty canvas.
+- **Read-only murals on mobile fit their content.** Only the editor and an
+  empty mural keep the 520-point minimum, so a profile without a mural no
+  longer pushes Follow below an empty canvas.
 - **"Recently active"** means the profile's `updated_at`: publishing, a
   shelf switch or a feed-settings save. It is not reading activity.
 
