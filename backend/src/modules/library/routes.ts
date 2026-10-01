@@ -97,7 +97,7 @@ export function buildLibraryRoutes(service: LibraryService) {
     });
 
     app.put("/library", {
-      preHandler: authGuard,
+      onRequest: authGuard,
       bodyLimit: env.LIBRARY_BODY_LIMIT_BYTES,
       errorHandler(error, _request, reply) {
         if (error.statusCode === 413) {

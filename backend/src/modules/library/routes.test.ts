@@ -45,6 +45,15 @@ test("PUT /library saves a book whose fields aren't text", async () => {
   await app.close();
 });
 
+test("PUT /library rejects an anonymous caller before the body is read", async () => {
+  const { app } = await setup();
+  const send = (headers: Record<string, string>) =>
+    app.inject({ method: "PUT", url: "/library", headers: { "content-type": "application/json", ...headers }, payload: "{not json" });
+  assert.equal((await send({})).statusCode, 401);
+  assert.equal((await send({ authorization: "Bearer u1" })).statusCode, 400);
+  await app.close();
+});
+
 test("POST /library/books/merge requires a signed-in user", async () => {
   const { app, merge } = await setup();
   const res = await merge({ keep: "a", merge: ["b"], updatedAt: "2026-01-01T00:00:00.000Z" }, null);
