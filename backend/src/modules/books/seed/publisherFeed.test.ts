@@ -122,29 +122,63 @@ test("isDisallowed matches prefixes, wildcards and end anchors", () => {
   assert.equal(isDisallowed("/products.json?limit=250&page=1", ["/*sort="]), false);
 });
 
-const page = (body: string) => `<html><head><style>.a{content:"9789726084679"}</style><script>var isbn = "9789726084679";</script></head><body>${body}</body></html>`;
+const page = (body: string) => `<html><head><style>.a{content:"9789726084679"}</style><script>var isbn = "9780306406157";</script></head><body>${body}</body></html>`;
+const OWN = "9789726084679";
+const RELATED = "9789726084945";
+const FAR = `<p>${"texto ".repeat(10)}</p>`;
 
-test("findPageIsbn prefers a labelled ISBN over another Portugal ISBN on the page", () => {
-  assert.equal(findPageIsbn(page("<p>Relacionado 9789726084945</p><p>ISBN: <b>978-972-608-467-9</b></p>")), "9789726084679");
-  assert.equal(findPageIsbn(page("<li>ISBN&nbsp;978&#8209;972&#8209;608&#8209;467&#8209;9</li><li>9789726084945</li>")), "9789726084679");
+test("findPageIsbn takes the single labelled Portugal ISBN over unlabelled ones", () => {
+  assert.equal(findPageIsbn(page(`<p>Relacionado ${RELATED}</p>${FAR}<p>ISBN: <b>978-972-608-467-9</b></p>`)), OWN);
+  assert.equal(findPageIsbn(page(`<li>ISBN&nbsp;978&#8209;972&#8209;608&#8209;467&#8209;9</li>${FAR}<li>${RELATED}</li>`)), OWN);
 });
 
 test("findPageIsbn takes a single unlabelled Portugal ISBN", () => {
-  assert.equal(findPageIsbn(page("<p>Código 9789726084945</p><p>Outro 9789726084945</p>")), "9789726084945");
+  assert.equal(findPageIsbn(page(`<p>Código ${RELATED}</p><p>Outro ${RELATED}</p>`)), RELATED);
 });
 
 test("findPageIsbn gives nothing for two distinct unlabelled Portugal ISBNs", () => {
-  assert.equal(findPageIsbn(page("<p>9789726084945</p><p>9789726084679</p>")), null);
+  assert.equal(findPageIsbn(page(`<p>${RELATED}</p><p>${OWN}</p>`)), null);
 });
 
-test("findPageIsbn ignores an ISBN more than 40 characters after its label", () => {
-  assert.equal(findPageIsbn(page(`<p>ISBN ${"x".repeat(41)} 9789726084945</p><p>9789726084679</p>`)), null);
+test("findPageIsbn gives nothing for one Portugal and one Brazilian unlabelled ISBN", () => {
+  assert.equal(findPageIsbn(page(`<p>${OWN}</p><p>9788535206234</p>`)), null);
+  assert.equal(findPageIsbn(page(`<p>${OWN}</p><p>0-306-40615-2</p>`)), null);
+});
+
+test("findPageIsbn gives nothing when the labelled ISBN is foreign, even with a Portugal one elsewhere", () => {
+  assert.equal(findPageIsbn(page(`<p>ISBN: 978-84-376-0494-7</p>${FAR}<div class="related">Outro ${RELATED}</div>`)), null);
+  assert.equal(findPageIsbn(page(`<p>ISBN 0-306-40615-2</p>${FAR}<div class="related">Outro ${RELATED}</div>`)), null);
+  assert.equal(findPageIsbn(page("<p>ISBN 978-85-3520-623-4</p>")), null);
+});
+
+test("findPageIsbn reads a labelled ISBN-10 and converts it to ISBN-13", () => {
+  assert.equal(findPageIsbn(page(`<p>ISBN 972-608-467-9</p>${FAR}<div>${RELATED}</div>`)), OWN);
+});
+
+test("findPageIsbn gives nothing for two distinct labelled ISBNs", () => {
+  assert.equal(findPageIsbn(page(`<p>ISBN ${RELATED}</p><p>ISBN: 978-972-608-467-9</p>`)), null);
+});
+
+test("findPageIsbn counts an ISBN-10 and its ISBN-13 as the same book", () => {
+  assert.equal(findPageIsbn(page("<p>ISBN 972-608-467-9</p><p>ISBN 978-972-608-467-9</p>")), OWN);
+});
+
+test("findPageIsbn pins what it returns for a page whose only ISBN is a labelled related book", () => {
+  assert.equal(findPageIsbn(page(`<h1>Moeda</h1><div class="related"><p>ISBN: ${RELATED}</p></div>`)), RELATED);
+});
+
+test("findPageIsbn reaches an ISBN exactly 40 characters after its label and not 41", () => {
+  assert.equal(findPageIsbn(page(`<p>ISBN${"x".repeat(40)}${RELATED}</p><p>${OWN}</p>`)), RELATED);
+  assert.equal(findPageIsbn(page(`<p>ISBN${"x".repeat(41)}${RELATED}</p><p>${OWN}</p>`)), null);
 });
 
 test("findPageIsbn ignores scripts and styles", () => {
-  assert.equal(findPageIsbn(page("<p>9789726084945</p>")), "9789726084945");
+  assert.equal(findPageIsbn(page(`<p>${RELATED}</p>`)), RELATED);
 });
 
-test("findPageIsbn gives nothing for a Brazilian-only page", () => {
-  assert.equal(findPageIsbn(page("<p>ISBN 978-85-3520-623-4</p>")), null);
+test("a feed product whose product page URL cannot be built has no page fallback", () => {
+  const product = (permalink: string, sku: string) => [{ name: "Livro", permalink, sku, images: [{ src: "https://x.example/a.jpg" }] }];
+  assert.deepEqual(parseWooProducts(product("/produto/livro/", ""), relogio), []);
+  assert.equal(parseWooProducts(product("/produto/livro/", "9789726084679"), relogio)[0]?.isbn, "9789726084679");
+  assert.equal(parseWooProducts(product("https://x.example/livro/", ""), relogio)[0]?.isbn, null);
 });

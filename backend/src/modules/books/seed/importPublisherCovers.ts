@@ -10,6 +10,7 @@ import { seedBook } from "./seedCatalog.js";
 
 const MIN_WAIT_MS = 3000;
 const MAX_PAGES = 200;
+const PAGE_PROGRESS_EVERY = 100;
 
 export interface SiteReport {
   skipped?: string;
@@ -17,6 +18,8 @@ export interface SiteReport {
   products: number;
   books: number;
   fromPage: number;
+  pagesNoIsbn: number;
+  pagesBlocked: number;
   coversSet: number;
   created: number;
   noAuthor: number;
@@ -38,7 +41,7 @@ export interface ImportDeps {
 
 class SiteSkipped extends Error {}
 
-const emptyReport = (): SiteReport => ({ products: 0, books: 0, fromPage: 0, coversSet: 0, created: 0, noAuthor: 0, unchanged: 0, rejectedImage: 0, failed: 0 });
+const emptyReport = (): SiteReport => ({ products: 0, books: 0, fromPage: 0, pagesNoIsbn: 0, pagesBlocked: 0, coversSet: 0, created: 0, noAuthor: 0, unchanged: 0, rejectedImage: 0, failed: 0 });
 
 function commonPrefix(urls: string[]): string {
   let prefix = urls[0] ?? "";
@@ -94,6 +97,8 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
   }
 
   const resolved: ResolvedBook[] = [];
+  const pagesTotal = books.filter((book) => !book.isbn).length;
+  let pagesRequested = 0;
   for (const book of books) {
     if (book.isbn) {
       resolved.push({ ...book, isbn: book.isbn });
@@ -101,6 +106,7 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
     }
     const page = new URL(book.productUrl);
     if (isDisallowed(page.pathname + page.search, disallow)) continue;
+    if (++pagesRequested % PAGE_PROGRESS_EVERY === 0) deps.log(`${site.name}: pages ${pagesRequested}/${pagesTotal}`);
     let response: { status: number; text: string };
     try {
       response = await request(() => deps.fetchText(book.productUrl));
@@ -109,8 +115,14 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
       report.failed++;
       continue;
     }
-    const isbn = response.status === 200 ? findPageIsbn(response.text) : null;
+    if (response.status === 404) continue;
+    if (response.status !== 200) {
+      report.pagesBlocked++;
+      continue;
+    }
+    const isbn = findPageIsbn(response.text);
     if (isbn) resolved.push({ ...book, isbn });
+    else report.pagesNoIsbn++;
   }
 
   const strongest = new Map<string, ResolvedBook>();

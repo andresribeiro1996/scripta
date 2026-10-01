@@ -122,6 +122,8 @@ test("an existing book gets the publisher cover as a manual cover and loses its 
     products: 7,
     books: 4,
     fromPage: 0,
+    pagesNoIsbn: 2,
+    pagesBlocked: 0,
     imageUrlPrefix: "https://cdn.shopify.com/s/files/1/",
     coversSet: 4,
     created: 3,
@@ -552,4 +554,46 @@ test("product page requests wait the same time as feed requests", async () => {
   assert.ok(h.requests.includes(pageUrl("Sem Codigo")));
   assert.equal(h.sleeps.length, h.requests.length - 1);
   assert.ok(h.sleeps.every((ms) => ms === 5000));
+});
+
+test("a page that answers 403 counts as blocked and a page without an ISBN counts as no ISBN", async () => {
+  const feed = shopifyPage([unlabelled("Bloqueado", "https://cdn.example/a.jpg"), unlabelled("Vazio", "https://cdn.example/b.jpg"), unlabelled("Perdido", "https://cdn.example/c.jpg")]);
+  const h = await harness({
+    feeds: {
+      [FEED_1]: { text: feed },
+      [pageUrl("Bloqueado")]: { status: 403, text: "" },
+      [pageUrl("Vazio")]: { text: "<html><body>sem codigo</body></html>" },
+      [pageUrl("Perdido")]: { status: 404, text: "" }
+    }
+  });
+
+  const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  assert.equal(reports["Antígona"]!.pagesBlocked, 1);
+  assert.equal(reports["Antígona"]!.pagesNoIsbn, 1);
+  assert.equal(reports["Antígona"]!.failed, 0);
+  assert.equal(reports["Antígona"]!.books, 0);
+});
+
+test("a malformed product URL does not stop the site", async () => {
+  const feed = JSON.stringify([
+    { name: "Sem Link", permalink: "/produto/sem-link/", sku: "", images: [{ src: "https://x.example/a.jpg" }] },
+    { name: "Com ISBN", permalink: "/produto/com-isbn/", sku: MUSEU, images: [{ src: "https://x.example/b.jpg" }] }
+  ]);
+  const h = await harness({ feeds: { "https://www.relogiodagua.pt/wp-json/wc/store/v1/products?per_page=100&page=1": { text: feed } } });
+
+  const reports = await importPublisherCovers(h.deps, [relogio], { dryRun: false });
+
+  assert.equal(reports["Relógio d'Água"]!.skipped, undefined);
+  assert.equal(reports["Relógio d'Água"]!.books, 1);
+  assert.equal(reports["Relógio d'Água"]!.products, 2);
+});
+
+test("the importer logs page progress every 100 page requests", async () => {
+  const products = Array.from({ length: 150 }, (_, index) => unlabelled(`Livro ${index}`, `https://cdn.example/${index}.jpg`));
+  const h = await harness({ feeds: { [FEED_1]: { text: shopifyPage(products) } } });
+
+  await importPublisherCovers(h.deps, [antigona], { dryRun: true });
+
+  assert.deepEqual(h.logs.filter((line) => line.includes(": pages ")), ["Antígona: pages 100/150"]);
 });

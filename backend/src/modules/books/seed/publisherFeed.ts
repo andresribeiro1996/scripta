@@ -16,6 +16,7 @@ export const PAGE_RANK = 3;
 const LABEL_REACH = 40;
 
 const ISBN_CANDIDATE = /(?<!\d)97[89](?:[\p{Pd}\s.]?\d){10}(?!\d)/gu;
+const ISBN10_CANDIDATE = /(?<!\d)\d(?:[\p{Pd}\s.]?\d){8}[\p{Pd}\s.]?[\dXx](?![\dXx])/gu;
 const PORTUGAL_PREFIX = /^978(?:972|989)/;
 const NAMED_ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
 
@@ -24,15 +25,35 @@ function checksumOk(digits: string): boolean {
   return sum % 10 === 0;
 }
 
-function portugalIsbns(text: string): { isbn: string; index: number }[] {
+function isbn10Ok(digits: string): boolean {
+  const sum = [...digits].reduce((total, digit, index) => total + (digit === "X" ? 10 : Number(digit)) * (10 - index), 0);
+  return sum % 11 === 0;
+}
+
+function isbn10To13(isbn10: string): string {
+  const body = `978${isbn10.slice(0, 9)}`;
+  const sum = [...body].reduce((total, digit, index) => total + Number(digit) * (index % 2 === 0 ? 1 : 3), 0);
+  return `${body}${(10 - (sum % 10)) % 10}`;
+}
+
+function isbn13s(text: string): { isbn: string; index: number }[] {
   return [...text.matchAll(ISBN_CANDIDATE)].flatMap((match) => {
     const digits = match[0].replace(/\D/g, "");
-    return PORTUGAL_PREFIX.test(digits) && checksumOk(digits) ? [{ isbn: digits, index: match.index }] : [];
+    return checksumOk(digits) ? [{ isbn: digits, index: match.index }] : [];
   });
 }
 
+function pageIsbns(text: string): { isbn: string; index: number }[] {
+  const masked = text.replace(ISBN_CANDIDATE, (match) => "#".repeat(match.length));
+  const tens = [...masked.matchAll(ISBN10_CANDIDATE)].flatMap((match) => {
+    const digits = match[0].replace(/[^\dXx]/g, "").toUpperCase();
+    return isbn10Ok(digits) ? [{ isbn: isbn10To13(digits), index: match.index }] : [];
+  });
+  return [...isbn13s(text), ...tens].sort((a, b) => a.index - b.index);
+}
+
 export function findPortugalIsbn(text: string): string | null {
-  return portugalIsbns(text)[0]?.isbn ?? null;
+  return isbn13s(text).find(({ isbn }) => PORTUGAL_PREFIX.test(isbn))?.isbn ?? null;
 }
 
 function decodeEntities(text: string): string {
@@ -45,12 +66,11 @@ function decodeEntities(text: string): string {
 
 export function findPageIsbn(html: string): string | null {
   const content = decodeEntities(html.replace(/<(script|style)\b[\s\S]*?<\/\1\s*>/gi, " ").replace(/<[^>]*>/g, " "));
-  const found = portugalIsbns(content);
+  const found = pageIsbns(content);
   const labelEnds = [...content.matchAll(/ISBN/gi)].map((label) => label.index + label[0].length);
-  const labelled = found.find(({ index }) => labelEnds.some((end) => index >= end && index - end <= LABEL_REACH));
-  if (labelled) return labelled.isbn;
-  const distinct = new Set(found.map(({ isbn }) => isbn));
-  return distinct.size === 1 ? [...distinct][0]! : null;
+  const labelled = found.filter(({ index }) => labelEnds.some((end) => index >= end && index - end <= LABEL_REACH));
+  const distinct = [...new Set((labelled.length > 0 ? labelled : found).map(({ isbn }) => isbn))];
+  return distinct.length === 1 && PORTUGAL_PREFIX.test(distinct[0]!) ? distinct[0]! : null;
 }
 
 function record(value: unknown): Record<string, unknown> | null {
@@ -102,9 +122,11 @@ export function parseShopifyProducts(json: unknown, site: PublisherSite): Publis
       [fileName(imageUrl)],
       [JSON.stringify(product)]
     ]);
+    const productUrl = `${site.origin}/products/${handle}`;
+    if (!found && !URL.canParse(productUrl)) return [];
     const vendor = text(product.vendor).trim();
     const author = site.authorFromVendor && vendor && normalizeWords(vendor) !== normalizeWords(site.name) ? vendor : null;
-    return [{ isbn: found?.isbn ?? null, rank: found?.rank ?? PAGE_RANK, title, author, imageUrl, productUrl: `${site.origin}/products/${handle}` }];
+    return [{ isbn: found?.isbn ?? null, rank: found?.rank ?? PAGE_RANK, title, author, imageUrl, productUrl }];
   });
 }
 
@@ -126,6 +148,7 @@ export function parseWooProducts(json: unknown, site: PublisherSite): PublisherB
     const title = decodeEntities(text(product.name)).trim();
     if (!imageUrl || !productUrl || !title) return [];
     const found = firstIsbn([[text(product.sku)], [fileName(imageUrl)], [JSON.stringify(product)]]);
+    if (!found && !URL.canParse(productUrl)) return [];
     return [{ isbn: found?.isbn ?? null, rank: found?.rank ?? PAGE_RANK, title, author: wooAuthor(product), imageUrl, productUrl }];
   });
 }
