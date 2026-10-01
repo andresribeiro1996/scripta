@@ -42,7 +42,7 @@ export interface BooksService {
   resolveCover(lookup: BookLookup, front?: boolean): ResolvedCover;
   enqueueCovers(lookups: BookLookup[]): void;
   enqueueUnchecked(): void;
-  processBook(bookId: string): Promise<void>;
+  processBook(bookId: string, lane?: CoverPriority): Promise<void>;
   getDetails(lookup: BookLookup): Promise<BookMetadata | null>;
   search(query: string): BookSearchResult[];
   searchExternal(query: string): Promise<BookSearchResult[]>;
