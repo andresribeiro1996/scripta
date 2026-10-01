@@ -1,0 +1,60 @@
+name: Production update
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - mobile/**
+      - packages/shared/**
+      - package.json
+      - package-lock.json
+      - patches/**
+      - '!**/*.md'
+
+concurrency:
+  cancel_in_progress: true
+  group: ${{ workflow.filename }}-${{ github.ref }}
+
+jobs:
+  fingerprint:
+    name: Fingerprint
+    type: fingerprint
+    environment: production
+
+  get_build:
+    name: Find matching Android build
+    needs: [fingerprint]
+    type: get-build
+    params:
+      platform: android
+      profile: production
+      channel: production
+      fingerprint_hash: ${{ needs.fingerprint.outputs.android_fingerprint_hash }}
+
+  update:
+    name: Publish update
+    needs: [get_build]
+    if: ${{ needs.get_build.outputs.build_id }}
+    type: update
+    environment: production
+    env:
+      EXPO_PUBLIC_API_URL: https://api.atmyshelf.com
+    params:
+      platform: android
+      channel: production
+    hooks:
+      after_install_node_modules:
+        - name: Build shared package
+          run: npm run build --workspace @scripta/shared
+
+  native_release_needed:
+    name: Native release needed
+    needs: [get_build, fingerprint]
+    if: ${{ !needs.get_build.outputs.build_id }}
+    steps:
+      - name: Report
+        run: |
+          echo "Native release needed: no production Android build matches fingerprint ${{ needs.fingerprint.outputs.android_fingerprint_hash }}."
+          echo "Run from mobile/: npx eas-cli workflow:run .eas/workflows/android-release.yml"
+          exit 1
