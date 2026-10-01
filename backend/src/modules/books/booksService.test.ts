@@ -416,6 +416,19 @@ test("a publisher synopsis links to the publisher's page and other synopses to t
   assert.deepEqual([details?.summarySource, details?.sourceUrl], ["openlibrary", "https://openlibrary.org/works/OL1W"]);
 });
 
+test("an ISBNdb synopsis links to ISBNdb even when Open Library supplied the rating", async () => {
+  const olRating = { metadata: { summary: null, rating: 3.8, ratingCount: 42, sourceUrl: "https://openlibrary.org/works/OL5W", genres: ["Science Fiction" as const], pages: null, publisher: null, year: null, translator: null }, sources: ["openlibrary" as const], summarySource: null };
+  const primary: Catalog = { fetchDetails: async () => olRating, search: async () => [] };
+  const secondary: Catalog = {
+    fetchDetails: async () => ({ metadata: { summary: "Spice.", rating: null, ratingCount: 0, sourceUrl: "https://isbndb.com/book/9780441013593", genres: [], pages: null, publisher: null, year: null, translator: null }, sources: ["isbndb"], summarySource: "isbndb" }),
+    search: async () => []
+  };
+  const h = harness({ catalog: createCompositeCatalog(primary, secondary) });
+  const details = await h.service.getDetails(dune);
+  assert.deepEqual([details?.rating, details?.summarySource, details?.sourceUrl], [3.8, "isbndb", "https://isbndb.com/book/9780441013593"]);
+  assert.equal(h.repo.findBookByKey("isbn:9780441013593")!.source_url, "https://openlibrary.org/works/OL5W");
+});
+
 test("a details miss is remembered for 30 days", async () => {
   const { calls, catalog } = recordingCatalog({ fetchDetails: async () => { calls.push("details"); return null; } });
   const h = harness({ catalog });

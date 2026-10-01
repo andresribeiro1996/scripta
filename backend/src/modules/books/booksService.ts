@@ -131,12 +131,18 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
     return coverId === null ? null : `https://covers.openlibrary.org/b/id/${coverId}-M.jpg`;
   }
 
+  function summaryLink(book: BookRow): string {
+    if (book.summary_source === "publisher") return book.publisher_url ?? "";
+    if (book.summary_source === "isbndb") return book.isbn ? `https://isbndb.com/book/${book.isbn}` : "";
+    return book.source_url ?? "";
+  }
+
   function detailsOf(book: BookRow): BookMetadata {
     return {
       summary: book.summary,
       rating: book.rating,
       ratingCount: book.rating_count,
-      sourceUrl: book.summary_source === "publisher" ? book.publisher_url ?? "" : book.source_url ?? "",
+      sourceUrl: summaryLink(book),
       genres: JSON.parse(book.genres) as BookGenre[],
       pages: book.pages,
       publisher: book.publisher,
