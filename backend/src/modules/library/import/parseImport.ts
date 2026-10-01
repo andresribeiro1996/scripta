@@ -17,7 +17,6 @@ export interface ImportPreview {
 
 const SAFE_IMPORT_ERRORS = new Set([
   "The import contains too many rows.",
-  "The import result is too large.",
   "`content` table has none of the required Kobo columns.",
   "Couldn't decode that file as text, and it isn't a SQLite database.",
   'That JSON is missing a "books" array.',
@@ -30,11 +29,13 @@ const SAFE_IMPORT_ERRORS = new Set([
 ]);
 
 const SAFE_TABLE_ERROR = /^`(content|Bookmark)` must be a real SQLite table\.$/;
+const SAFE_TOO_LARGE_ERROR = /^This import is over \d+ MB, the most Scripta can store\. Import fewer books or highlights\.$/;
 
 export function sanitizeImportError(raw: string | undefined): string {
   if (!raw) return "Couldn't parse that import file.";
   if (SAFE_IMPORT_ERRORS.has(raw)) return raw;
   if (SAFE_TABLE_ERROR.test(raw)) return raw;
+  if (SAFE_TOO_LARGE_ERROR.test(raw)) return raw;
   return "Couldn't parse that import file.";
 }
 

@@ -87,3 +87,20 @@ test("POST /library/books/merge merges the books and returns the saved document"
   assert.equal(bookKey(body.data.books[0]!), bookKey(goodreads));
   await app.close();
 });
+
+test("PUT /library over the default cap tells the reader it is 10 MB", async () => {
+  const { app } = await setup();
+  const res = await app.inject({
+    method: "PUT",
+    url: "/library",
+    headers: { authorization: "Bearer u1", "content-type": "application/json" },
+    payload: JSON.stringify({ data: { books: [], padding: "x".repeat(10 * 1024 * 1024) } })
+  });
+  assert.equal(res.statusCode, 413);
+  assert.deepEqual(res.json(), {
+    error: "Your library is over 10 MB, the most Scripta can store. Remove some books or highlights and try again.",
+    code: "LIBRARY_BODY_TOO_LARGE",
+    maxBytes: 10485760
+  });
+  await app.close();
+});
