@@ -2,8 +2,8 @@ import { buildBookMetadata, findOpenLibraryMatch, mapOpenLibraryDoc } from "@scr
 import type { BookCatalog } from "../../domain/ports.js";
 import { fetchJson, type Throttle } from "../http/http.js";
 
-export function createOpenLibraryCatalog(throttle: Throttle): BookCatalog {
-  const get = (url: string) => throttle(() => fetchJson("openlibrary", url), { urgent: true });
+export function createOpenLibraryCatalog(throttle: Throttle, urgent = true): BookCatalog {
+  const get = (url: string) => throttle(() => fetchJson("openlibrary", url), { urgent });
   return {
     async fetchDetails({ isbn, title, author }) {
       if (!isbn && (!title || !author)) return null;

@@ -162,6 +162,19 @@ test("listUncheckedCoverIds returns only never-checked books, oldest first", () 
   assert.deepEqual(repo.listUncheckedCoverIds(), [older.id, newer.id]);
 });
 
+test("listUncheckedDetailIds returns never-checked books, oldest first, up to the limit", () => {
+  const { repo } = freshRepo();
+  const newest = repo.createBook({ title: "Emma", author: "Jane Austen", isbn: null }, ["ta:emma|jane austen|"], "2026-10-03T00:00:00.000Z");
+  const oldest = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: null }, ["ta:dune|frank herbert|"], "2026-10-01T00:00:00.000Z");
+  const middle = repo.createBook({ title: "Orlando", author: "Virginia Woolf", isbn: null }, ["ta:orlando|virginia woolf|"], "2026-10-02T00:00:00.000Z");
+  const found = repo.createBook({ title: "Ulysses", author: "James Joyce", isbn: null }, ["ta:ulysses|james joyce|"], NOW);
+  const missing = repo.createBook({ title: "Kim", author: "Rudyard Kipling", isbn: null }, ["ta:kim|rudyard kipling|"], NOW);
+  repo.saveDetails(found.id, richDetails, ["openlibrary"], "openlibrary", NOW);
+  repo.markDetailsMissing(missing.id, NOW);
+  assert.deepEqual(repo.listUncheckedDetailIds(10), [oldest.id, middle.id, newest.id]);
+  assert.deepEqual(repo.listUncheckedDetailIds(2), [oldest.id, middle.id]);
+});
+
 test("createBook stores the sources of a new row and defaults to none", () => {
   const { repo } = freshRepo();
   const tagged = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: null, sources: ["isbndb"] }, ["ta:dune|frank herbert|"], NOW);

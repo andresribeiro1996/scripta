@@ -131,3 +131,14 @@ test("catalog calls use the urgent lane", async () => {
   await catalog.search({ isbn: "9780441013593" });
   assert.deepEqual(lanes, [true, true]);
 });
+
+test("a catalog built for the background uses the normal lane", async () => {
+  const lanes: Array<boolean | undefined> = [];
+  const recording: Throttle = (task, options) => {
+    lanes.push(options?.urgent);
+    return task();
+  };
+  respond(200, { book: dune });
+  await createIsbndbCatalog("k", recording, gate, false).fetchDetails({ isbn: "9780441013593", title: "", author: "" });
+  assert.deepEqual(lanes, [false]);
+});

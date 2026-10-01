@@ -13,7 +13,7 @@ import { createIsbndbSource } from "./adapters/sources/isbndb.js";
 import { createOpenLibraryCoverSource } from "./adapters/sources/openLibrary.js";
 import { openBooksDb } from "./adapters/sqlite/connection.js";
 import { createSqliteBooksRepository } from "./adapters/sqlite/sqliteBooksRepository.js";
-import { startBackfill } from "./backfill.js";
+import { DETAILS_BATCH_SIZE, startBackfill, startDetailsBackfill } from "./backfill.js";
 import { createBooksService, MAX_UPLOAD_BYTES, type BooksService } from "./booksService.js";
 import type { FetchCoverImage } from "./coverResolver.js";
 import { encodeCover } from "./domain/images.js";
@@ -69,6 +69,10 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
       createOpenLibraryCatalog(openLibraryThrottle),
       isbndbConfigured ? createIsbndbCatalog(env.ISBNDB_API_KEY, isbndbThrottle, isbndbGate) : null
     ),
+    backgroundCatalog: createCompositeCatalog(
+      createOpenLibraryCatalog(openLibraryThrottle, false),
+      isbndbConfigured ? createIsbndbCatalog(env.ISBNDB_API_KEY, isbndbThrottle, isbndbGate, false) : null
+    ),
     fetchImage,
     enqueue: (bookId, priority) => worker.enqueue(bookId, priority),
     publicUrlFor: coverUrlFor,
@@ -81,10 +85,15 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
   );
   service.enqueueUnchecked();
   const stopBackfill = startBackfill(() => service.enqueueUnchecked());
+  const stopDetailsBackfill = startDetailsBackfill(
+    (signal) => service.backfillDetails(DETAILS_BATCH_SIZE, signal),
+    (error) => app.log.error({ err: error }, "details backfill failed")
+  );
   activeService = service;
   app.addHook("onClose", async () => {
     activeService = null;
     stopBackfill();
+    stopDetailsBackfill();
     worker.stop();
   });
 

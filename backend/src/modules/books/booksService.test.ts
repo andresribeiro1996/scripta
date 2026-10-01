@@ -18,6 +18,8 @@ const { createSqliteBooksRepository } = await import("./adapters/sqlite/sqliteBo
 const { createBooksService } = await import("./booksService.js");
 const { SourcePausedError, SourceUnavailableError } = await import("./domain/errors.js");
 const { createCoverWorker } = await import("./worker.js");
+const { createThrottle } = await import("./adapters/http/http.js");
+const { createOpenLibraryCatalog } = await import("./adapters/openlibrary/openLibraryCatalog.js");
 
 type Deps = Parameters<typeof createBooksService>[0];
 type CoverSource = Deps["sources"]["apple"];
@@ -53,6 +55,10 @@ function harness(overrides: Partial<Deps> = {}) {
     blobs,
     sources: { isbndb: null, apple: emptySource, openlibrary: emptySource },
     catalog: {
+      fetchDetails: async () => { throw new Error("catalog not expected"); },
+      search: async () => { throw new Error("catalog not expected"); }
+    },
+    backgroundCatalog: {
       fetchDetails: async () => { throw new Error("catalog not expected"); },
       search: async () => { throw new Error("catalog not expected"); }
     },
@@ -1026,4 +1032,135 @@ test("an outside search stores the work key on created and existing rows", async
   const none = harness({ catalog: recordingCatalog({ search: async () => [hit(null)] }).catalog });
   await none.service.searchExternal("dune");
   assert.equal(none.repo.findBookByKey("isbn:9780441013593")!.ol_work_key, null);
+});
+
+function backfillBooks(h: ReturnType<typeof harness>, count: number) {
+  for (let index = 0; index < count; index++) {
+    h.service.resolveCover({ isbn: null, title: `Book ${index}`, author: "Author" });
+    h.advance(1000);
+  }
+  return h.repo.listUncheckedDetailIds(count);
+}
+
+const spiceAnswer = { metadata: { summary: "Spice.", rating: 4.2, ratingCount: 10, sourceUrl: "https://openlibrary.org/works/OL1W", genres: ["Science Fiction" as const], pages: 544, publisher: "Ace", year: 1965, translator: null }, sources: ["openlibrary" as const], summarySource: "openlibrary" as const };
+
+test("the details backfill takes the oldest unchecked books up to the limit, one lookup at a time", async () => {
+  const seen: string[] = [];
+  let active = 0;
+  let overlap = 0;
+  const catalog: Catalog = {
+    fetchDetails: async (lookup) => {
+      seen.push(lookup.title);
+      overlap = Math.max(overlap, ++active);
+      await new Promise((resolve) => setImmediate(resolve));
+      active--;
+      return spiceAnswer;
+    },
+    search: async () => []
+  };
+  const h = harness({ backgroundCatalog: catalog });
+  const ids = backfillBooks(h, 3);
+  await h.service.backfillDetails(2);
+  assert.deepEqual(seen, ["Book 0", "Book 1"]);
+  assert.equal(overlap, 1);
+  assert.deepEqual(ids.map((id) => h.repo.getBook(id)!.details_status), ["found", "found", null]);
+  assert.equal(h.repo.getBook(ids[0]!)!.summary, "Spice.");
+  assert.equal(h.repo.getBook(ids[0]!)!.data_sources, '["openlibrary"]');
+});
+
+test("the details backfill saves through the merge rules and leaves a publisher synopsis alone", async () => {
+  const h = harness({ backgroundCatalog: { fetchDetails: async () => spiceAnswer, search: async () => [] } });
+  const [id] = backfillBooks(h, 1);
+  h.repo.mergeDetails(id!, { summary: "Sinopse da editora.", pages: 500, year: null, publisher: null, translator: "Maria" }, "publisher");
+  await h.service.backfillDetails(50);
+  const row = h.repo.getBook(id!)!;
+  assert.deepEqual([row.summary, row.summary_source, row.pages, row.year, row.publisher, row.translator, row.details_status], ["Sinopse da editora.", "publisher", 500, 1965, "Ace", "Maria", "found"]);
+});
+
+test("the details backfill never uses the catalog that serves users", async () => {
+  const h = harness({ backgroundCatalog: { fetchDetails: async () => spiceAnswer, search: async () => [] } });
+  const [id] = backfillBooks(h, 1);
+  await h.service.backfillDetails(50);
+  assert.equal(h.repo.getBook(id!)!.details_status, "found");
+});
+
+test("an unavailable source leaves the book unchecked, is retried later and does not stop the batch", async () => {
+  const outcomes = new Map<string, Error | null>([
+    ["Book 0", new SourceUnavailableError("openlibrary", "HTTP 503")],
+    ["Book 1", new SourcePausedError("isbndb", "paused", { retryAt: 1 })],
+    ["Book 2", null]
+  ]);
+  const catalog: Catalog = {
+    fetchDetails: async (lookup) => {
+      const failure = outcomes.get(lookup.title);
+      if (failure) throw failure;
+      return spiceAnswer;
+    },
+    search: async () => []
+  };
+  const h = harness({ backgroundCatalog: catalog });
+  const ids = backfillBooks(h, 3);
+  await h.service.backfillDetails(50);
+  assert.deepEqual(ids.map((id) => h.repo.getBook(id)!.details_status), [null, null, "found"]);
+  assert.deepEqual(h.warnings, [{ details: { bookId: ids[0], source: "openlibrary", error: "openlibrary unavailable: HTTP 503" }, message: "details source unavailable" }]);
+  outcomes.set("Book 0", null);
+  await h.service.backfillDetails(50);
+  assert.deepEqual(ids.map((id) => h.repo.getBook(id)!.details_status), ["found", null, "found"]);
+});
+
+test("a bug in a details lookup propagates instead of being skipped", async () => {
+  const h = harness({ backgroundCatalog: { fetchDetails: async () => { throw new TypeError("boom"); }, search: async () => [] } });
+  backfillBooks(h, 1);
+  await assert.rejects(h.service.backfillDetails(50), TypeError);
+});
+
+test("the details backfill skips books already checked, found or missing", async () => {
+  const seen: string[] = [];
+  const h = harness({ backgroundCatalog: { fetchDetails: async (lookup) => { seen.push(lookup.title); return null; }, search: async () => [] } });
+  const [found, missing, fresh] = backfillBooks(h, 3);
+  h.repo.saveDetails(found!, spiceAnswer.metadata, ["openlibrary"], "openlibrary", "2026-10-01T00:00:00.000Z");
+  h.repo.markDetailsMissing(missing!, "2026-10-01T00:00:00.000Z");
+  await h.service.backfillDetails(50);
+  assert.deepEqual(seen, ["Book 2"]);
+  assert.equal(h.repo.getBook(fresh!)!.details_status, "missing");
+  await h.service.backfillDetails(50);
+  assert.deepEqual(seen, ["Book 2"]);
+});
+
+test("an aborted details backfill starts no further lookups", async () => {
+  const seen: string[] = [];
+  const controller = new AbortController();
+  const h = harness({ backgroundCatalog: { fetchDetails: async (lookup) => { seen.push(lookup.title); controller.abort(); return null; }, search: async () => [] } });
+  backfillBooks(h, 3);
+  await h.service.backfillDetails(50, controller.signal);
+  assert.deepEqual(seen, ["Book 0"]);
+});
+
+test("a user's details request jumps ahead of the backfill's queued lookups", async () => {
+  const originalFetch = globalThis.fetch;
+  const requested: string[] = [];
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    requested.push(new URL(String(input)).searchParams.get("isbn") ?? String(input));
+    return Response.json({ docs: [] });
+  }) as typeof fetch;
+  try {
+    const throttle = createThrottle(0);
+    let release!: () => void;
+    const held = throttle(() => new Promise<void>((resolve) => { release = resolve; }), { urgent: true });
+    const h = harness({
+      catalog: createOpenLibraryCatalog(throttle),
+      backgroundCatalog: createOpenLibraryCatalog(throttle, false)
+    });
+    h.service.resolveCover(orlando);
+    const backfill = h.service.backfillDetails(50);
+    await new Promise((resolve) => setImmediate(resolve));
+    const user = h.service.getDetails(dune);
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.deepEqual(requested, []);
+    release();
+    await Promise.all([held, backfill, user]);
+    assert.deepEqual(requested, ["9780441013593", "9780141184272"]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

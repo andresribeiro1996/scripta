@@ -50,6 +50,9 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const uncheckedStmt = db.prepare(`
     SELECT id FROM books WHERE cover_image_id IS NULL AND cover_status IS NULL ORDER BY created_at, rowid
   `);
+  const uncheckedDetailsStmt = db.prepare(`
+    SELECT id FROM books WHERE details_status IS NULL ORDER BY created_at, rowid LIMIT ?
+  `);
   const setUpgradeWantedStmt = db.prepare(`UPDATE books SET cover_upgrade_wanted_at = ? WHERE id = ?`);
   const setWorkKeyStmt = db.prepare(`UPDATE books SET ol_work_key = ? WHERE id = ? AND ol_work_key IS NULL`);
   const setPublisherUrlStmt = db.prepare(`UPDATE books SET publisher_url = ? WHERE id = ? AND publisher_url IS NULL`);
@@ -167,6 +170,10 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
 
     listUncheckedCoverIds() {
       return (uncheckedStmt.all() as Array<{ id: string }>).map((row) => row.id);
+    },
+
+    listUncheckedDetailIds(limit) {
+      return (uncheckedDetailsStmt.all(limit) as Array<{ id: string }>).map((row) => row.id);
     },
 
     setUpgradeWanted(bookId, at) {

@@ -5,7 +5,7 @@ import { MIN_GOOD_WIDTH } from "./domain/constants.js";
 import { BookNotFoundError, FileTooLargeError, InvalidImageError, SourcePausedError, SourceUnavailableError } from "./domain/errors.js";
 import { encodeCover, type EncodedCover } from "./domain/images.js";
 import { findByIdentity, isPortugueseIsbn, lookupIdentity, SEARCH_LIMIT, searchTokens, type BookIdentity, type BookLookup } from "./domain/normalize.js";
-import type { BookCatalog, BooksRepository, CatalogDetails, CatalogSearchHit, CoverBlobStore, CoverSource } from "./domain/ports.js";
+import type { BookCatalog, BooksRepository, CatalogSearchHit, CoverBlobStore, CoverSource } from "./domain/ports.js";
 import type { BookRow, CoverSourceName, CoverStatus } from "./domain/types.js";
 import type { CoverPriority } from "./worker.js";
 
@@ -32,6 +32,7 @@ export interface BooksServiceDeps {
   blobs: CoverBlobStore;
   sources: CoverSources;
   catalog: BookCatalog;
+  backgroundCatalog: BookCatalog;
   fetchImage: FetchCoverImage;
   enqueue: (bookId: string, priority?: CoverPriority) => void;
   publicUrlFor: (imageId: string, size: CoverFileSize) => string;
@@ -46,6 +47,7 @@ export interface BooksService {
   enqueueUnchecked(): void;
   processBook(bookId: string, lane: CoverPriority): Promise<void>;
   getDetails(lookup: BookLookup): Promise<BookMetadata | null>;
+  backfillDetails(limit: number, signal?: AbortSignal): Promise<void>;
   search(query: string): BookSearchResult[];
   searchExternal(query: string): Promise<BookSearchResult[]>;
   isAdmin(userId: string): boolean;
@@ -172,6 +174,21 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
     });
   }
 
+  async function lookupDetails(book: BookRow, catalog: BookCatalog) {
+    const details = await catalog.fetchDetails({ isbn: book.isbn, title: book.title, author: book.author });
+    const at = now().toISOString();
+    if (details && (details.metadata.summary || details.metadata.genres.length > 0 || details.metadata.rating !== null)) {
+      deps.repo.saveDetails(book.id, details.metadata, details.sources, details.summarySource, at);
+      deps.repo.setWorkKey(book.id, details.workKey);
+      return;
+    }
+    if (details) {
+      deps.repo.mergeDetails(book.id, { ...details.metadata, summary: null }, null);
+      deps.repo.setWorkKey(book.id, details.workKey);
+    }
+    deps.repo.markDetailsMissing(book.id, at);
+  }
+
   return {
     resolveCover(lookup, front = false) {
       const book = findOrCreate(lookup);
@@ -243,26 +260,28 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       if (!book) return null;
       if (book.details_status === "found") return detailsOf(book);
       if (book.details_status === "missing" && !olderThan(book.details_checked_at, RETRY_AFTER_MS)) return book.summary ? detailsOf(book) : null;
-      let details: CatalogDetails | null;
       try {
-        details = await deps.catalog.fetchDetails({ isbn: book.isbn, title: book.title, author: book.author });
+        await lookupDetails(book, deps.catalog);
       } catch (error) {
         if (error instanceof SourceUnavailableError && book.summary) return detailsOf(book);
         throw error;
       }
-      const at = now().toISOString();
-      if (details && (details.metadata.summary || details.metadata.genres.length > 0 || details.metadata.rating !== null)) {
-        deps.repo.saveDetails(book.id, details.metadata, details.sources, details.summarySource, at);
-        deps.repo.setWorkKey(book.id, details.workKey);
-      } else {
-        if (details) {
-          deps.repo.mergeDetails(book.id, { ...details.metadata, summary: null }, null);
-          deps.repo.setWorkKey(book.id, details.workKey);
-        }
-        deps.repo.markDetailsMissing(book.id, at);
-      }
       const latest = deps.repo.getBook(book.id) ?? book;
       return latest.details_status === "found" || latest.summary ? detailsOf(latest) : null;
+    },
+
+    async backfillDetails(limit, signal) {
+      for (const id of deps.repo.listUncheckedDetailIds(limit)) {
+        if (signal?.aborted) return;
+        const book = deps.repo.getBook(id);
+        if (!book || book.details_status !== null) continue;
+        try {
+          await lookupDetails(book, deps.backgroundCatalog);
+        } catch (error) {
+          if (!(error instanceof SourceUnavailableError)) throw error;
+          if (!(error instanceof SourcePausedError)) deps.warn({ bookId: id, source: error.source, error: error.message }, "details source unavailable");
+        }
+      }
     },
 
     search(query) {

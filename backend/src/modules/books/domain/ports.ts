@@ -24,6 +24,7 @@ export interface BooksRepository {
   markDetailsMissing(bookId: string, checkedAt: string): void;
   searchBooks(tokens: string[], limit: number): BookRow[];
   listUncheckedCoverIds(): string[];
+  listUncheckedDetailIds(limit: number): string[];
   setUpgradeWanted(bookId: string, at: string | null): void;
   setWorkKey(id: string, key: string | null | undefined): void;
   setPublisherUrl(id: string, url: string): void;
