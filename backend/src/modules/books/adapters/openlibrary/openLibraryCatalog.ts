@@ -7,7 +7,7 @@ export function createOpenLibraryCatalog(throttle: Throttle, urgent = true): Boo
   return {
     async fetchDetails({ isbn, title, author }) {
       if (!isbn && (!title || !author)) return null;
-      const query = new URLSearchParams({ fields: "key,title,author_name,ratings_average,ratings_count,subject,number_of_pages_median,first_publish_year,publisher", limit: "5" });
+      const query = new URLSearchParams({ fields: "key,title,author_name,ratings_average,ratings_count,subject", limit: "5" });
       if (isbn) query.set("isbn", isbn);
       else {
         query.set("title", title);

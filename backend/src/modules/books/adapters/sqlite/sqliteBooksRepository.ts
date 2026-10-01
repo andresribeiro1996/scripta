@@ -25,7 +25,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const setCoverStmt = db.prepare(`UPDATE books SET cover_image_id = ?, cover_status = ?, cover_checked_at = ? WHERE id = ?`);
   const addRejectionStmt = db.prepare(`INSERT OR IGNORE INTO cover_rejections (book_id, source_url, created_at) VALUES (?, ?, ?)`);
   const rejectionsStmt = db.prepare(`SELECT source_url FROM cover_rejections WHERE book_id = ?`);
-  const takesSummary = `$summary IS NOT NULL AND (summary IS NULL OR summary = '' OR ($summary_source = 'publisher' AND summary_source IS NOT 'publisher'))`;
+  const takesSummary = `$summary IS NOT NULL AND (summary IS NULL OR summary = '' OR $summary_source = 'publisher')`;
   const mergeDetailsStmt = db.prepare(`
     UPDATE books
     SET summary_source = CASE WHEN ${takesSummary} THEN $summary_source ELSE summary_source END,

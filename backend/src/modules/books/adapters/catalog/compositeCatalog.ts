@@ -1,4 +1,4 @@
-import type { BookMetadata } from "@scripta/shared";
+import type { CatalogBookMetadata } from "@scripta/shared";
 import { SourceUnavailableError } from "../../domain/errors.js";
 import { lookupIdentity, SEARCH_LIMIT } from "../../domain/normalize.js";
 import type { BookCatalog, CatalogSearchHit } from "../../domain/ports.js";
@@ -56,7 +56,7 @@ export function createCompositeCatalog(primary: BookCatalog, secondary: BookCata
       if (!second.value) return found;
       const have = found.metadata;
       const extra = second.value.metadata;
-      const metadata: BookMetadata = {
+      const metadata: CatalogBookMetadata = {
         ...have,
         summary: have.summary ?? extra.summary,
         genres: have.genres.length > 0 ? have.genres : extra.genres,

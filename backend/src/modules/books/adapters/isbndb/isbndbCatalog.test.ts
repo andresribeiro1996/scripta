@@ -76,6 +76,11 @@ test("details fall back to the overview, and need an ISBN and something to show"
   const facts = await catalog.fetchDetails({ isbn: "9780441013593", title: "Dune", author: "" });
   assert.deepEqual([facts?.metadata.summary, facts?.metadata.pages, facts?.metadata.year, facts?.metadata.publisher, facts?.summarySource], [null, 544, 2005, "Ace", null]);
 
+  respond(200, { book: { isbn13: "9780441013593", pages: 544, date_published: "0000", publisher: "Ace" } });
+  assert.equal((await catalog.fetchDetails({ isbn: "9780441013593", title: "Dune", author: "" }))?.metadata.year, null);
+  respond(200, { book: { isbn13: "9780441013593", pages: 544, date_published: `${new Date().getFullYear() + 1}-01-01` } });
+  assert.equal((await catalog.fetchDetails({ isbn: "9780441013593", title: "Dune", author: "" }))?.metadata.year, null);
+
   respond(404, { errorMessage: "Not Found" });
   assert.equal(await catalog.fetchDetails({ isbn: "9780441013593", title: "Dune", author: "" }), null);
 });

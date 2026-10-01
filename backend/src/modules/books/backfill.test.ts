@@ -97,3 +97,22 @@ test("stopping the details backfill clears the timer and aborts the running batc
   assert.equal(signal.aborted, true);
   assert.deepEqual(state.cleared, [handle]);
 });
+
+test("a batch that reports a pause makes the details backfill skip ticks until then", async () => {
+  const { state, timers } = fakeTimers();
+  let clock = 1_000;
+  const results: Array<number | null> = [5_000, null];
+  let batches = 0;
+  startDetailsBackfill(async () => { batches++; return results.shift() ?? null; }, () => {}, 1000, timers, () => clock);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(batches, 1);
+  clock = 4_999;
+  state.callback!();
+  assert.equal(batches, 1);
+  clock = 5_000;
+  state.callback!();
+  assert.equal(batches, 2);
+  await new Promise((resolve) => setImmediate(resolve));
+  state.callback!();
+  assert.equal(batches, 3);
+});

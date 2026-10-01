@@ -20,8 +20,8 @@ function plainText(value: unknown): string | null {
 }
 
 function yearOf(value: unknown): number | null {
-  const year = typeof value === "string" ? /^\d{4}/.exec(value)?.[0] : undefined;
-  return year ? Number(year) : null;
+  const year = typeof value === "string" && /^\d{4}/.test(value) ? Number(value.slice(0, 4)) : null;
+  return year !== null && year >= 1450 && year <= new Date().getFullYear() ? year : null;
 }
 
 function isbnOf(record: Record<string, unknown>): string | null {

@@ -16,17 +16,20 @@ export function startBackfill(
 }
 
 export function startDetailsBackfill(
-  runBatch: (signal: AbortSignal) => Promise<void>,
+  runBatch: (signal: AbortSignal) => Promise<number | null | void>,
   onError: (error: unknown) => void,
   intervalMs: number = BACKFILL_INTERVAL_MS,
-  timers?: Timers
+  timers?: Timers,
+  now: () => number = Date.now
 ): () => void {
   const controller = new AbortController();
   let running = false;
+  let pausedUntil = 0;
   const tick = () => {
-    if (running) return;
+    if (running || now() < pausedUntil) return;
     running = true;
     runBatch(controller.signal)
+      .then((retryAt) => { pausedUntil = retryAt ?? 0; })
       .catch(onError)
       .finally(() => { running = false; });
   };

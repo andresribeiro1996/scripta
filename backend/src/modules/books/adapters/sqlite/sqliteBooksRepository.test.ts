@@ -368,7 +368,7 @@ test("setPublisherUrl fills a null value and never overwrites it", () => {
 
 const noDetails = { summary: null, pages: null, year: null, publisher: null, translator: null };
 
-test("a publisher synopsis replaces an Open Library one, and never the other way round", () => {
+test("a publisher synopsis replaces any earlier summary including a publisher one, and others never replace it", () => {
   const { repo } = freshRepo();
   const book = repo.createBook({ title: "A", author: "A", isbn: null }, ["ta:a|a|"], NOW);
   repo.saveDetails(book.id, richDetails, ["openlibrary"], "openlibrary", NOW);
@@ -377,10 +377,12 @@ test("a publisher synopsis replaces an Open Library one, and never the other way
   repo.mergeDetails(book.id, { ...noDetails, summary: "Sinopse da editora." }, "publisher");
   assert.deepEqual([repo.getBook(book.id)!.summary, repo.getBook(book.id)!.summary_source], ["Sinopse da editora.", "publisher"]);
 
-  repo.mergeDetails(book.id, { ...noDetails, summary: "Outra sinopse." }, "publisher");
   repo.saveDetails(book.id, { ...richDetails, summary: "Later Open Library synopsis." }, ["openlibrary"], "openlibrary", NOW);
   repo.mergeDetails(book.id, { ...noDetails, summary: "ISBNdb synopsis." }, "isbndb");
   assert.deepEqual([repo.getBook(book.id)!.summary, repo.getBook(book.id)!.summary_source], ["Sinopse da editora.", "publisher"]);
+
+  repo.mergeDetails(book.id, { ...noDetails, summary: "Sinopse corrigida." }, "publisher");
+  assert.deepEqual([repo.getBook(book.id)!.summary, repo.getBook(book.id)!.summary_source], ["Sinopse corrigida.", "publisher"]);
 });
 
 test("a non-publisher synopsis only fills an empty summary and an absent one changes nothing", () => {

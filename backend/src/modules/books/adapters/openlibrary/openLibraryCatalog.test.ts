@@ -33,9 +33,9 @@ test("details come from the matching work", async () => {
       ratingCount: 42,
       sourceUrl: "https://openlibrary.org/works/OL123W",
       genres: ["Science Fiction"],
-      pages: 311,
-      publisher: "Bantam",
-      year: 1975,
+      pages: null,
+      publisher: null,
+      year: null,
       translator: null
     },
     sources: ["openlibrary"],
@@ -43,7 +43,7 @@ test("details come from the matching work", async () => {
     workKey: "/works/OL123W"
   });
   assert.equal(new URL(requests[0]!).searchParams.get("isbn"), "9780553348477");
-  assert.match(new URL(requests[0]!).searchParams.get("fields")!, /number_of_pages_median.*first_publish_year.*publisher/);
+  assert.doesNotMatch(new URL(requests[0]!).searchParams.get("fields")!, /number_of_pages_median|first_publish_year|publisher/);
 
   respond([{ docs: [doc] }, { description: "**Plain summary.** Source: [Wikipedia](https://en.wikipedia.org/wiki/Ecotopia)" }]);
   assert.equal((await catalog.fetchDetails({ isbn: null, title: "ECOTOPIA", author: "Ernest Callenbach" }))?.metadata.summary, "Plain summary. Source: Wikipedia");

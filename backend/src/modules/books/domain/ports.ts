@@ -1,4 +1,4 @@
-import type { BookMetadata, BookSearchResult } from "@scripta/shared";
+import type { BookMetadata, BookSearchResult, CatalogBookMetadata } from "@scripta/shared";
 import type { BookRow, CoverImageRow, CoverSourceName, CoverStatus, DataSource, NewBook, SummarySource } from "./types.js";
 
 export type MergeableDetails = Pick<BookMetadata, "summary" | "pages" | "year" | "publisher" | "translator">;
@@ -19,7 +19,7 @@ export interface BooksRepository {
   setCover(bookId: string, cover: { imageId: string | null; status: CoverStatus | null; checkedAt: string | null }): void;
   addRejection(bookId: string, sourceUrl: string, createdAt: string): void;
   listRejectedUrls(bookId: string): Set<string>;
-  saveDetails(bookId: string, details: BookMetadata, sources: DataSource[], summarySource: DataSource | null, checkedAt: string): void;
+  saveDetails(bookId: string, details: CatalogBookMetadata, sources: DataSource[], summarySource: DataSource | null, checkedAt: string): void;
   mergeDetails(bookId: string, details: MergeableDetails, summarySource: SummarySource | null): void;
   markDetailsMissing(bookId: string, checkedAt: string): void;
   markDetailsAttempted(bookId: string, checkedAt: string): void;
@@ -55,7 +55,7 @@ export interface CatalogSearchHit {
 }
 
 export interface CatalogDetails {
-  metadata: BookMetadata;
+  metadata: CatalogBookMetadata;
   sources: DataSource[];
   summarySource: DataSource | null;
   workKey?: string | null;

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { BookMetadata } from "@scripta/shared";
+import type { CatalogBookMetadata } from "@scripta/shared";
 import { SourcePausedError, SourceUnavailableError } from "../../domain/errors.js";
 import type { BookCatalog, CatalogDetails, CatalogSearchHit } from "../../domain/ports.js";
 import { capDailyCalls } from "../isbndb/isbndbDailyCap.js";
@@ -9,12 +9,12 @@ import { createCompositeCatalog } from "./compositeCatalog.js";
 const lookup = { isbn: "9780441013593", title: "Dune", author: "Frank Herbert" };
 const down = () => new SourceUnavailableError("test", "HTTP 503");
 
-const olMetadata: BookMetadata = { summary: "OL summary.", rating: 4.2, ratingCount: 10, sourceUrl: "https://openlibrary.org/works/OL1W", genres: ["Science Fiction"], pages: 412, publisher: "Ace", year: 1965, translator: "Ana" };
-const bnMetadata: BookMetadata = { summary: "ISBNdb summary.", rating: null, ratingCount: 0, sourceUrl: "https://isbndb.com/book/9780441013593", genres: ["Fantasy"], pages: 544, publisher: "Penguin", year: 2005, translator: "Bob" };
+const olMetadata: CatalogBookMetadata = { summary: "OL summary.", rating: 4.2, ratingCount: 10, sourceUrl: "https://openlibrary.org/works/OL1W", genres: ["Science Fiction"], pages: 412, publisher: "Ace", year: 1965, translator: "Ana" };
+const bnMetadata: CatalogBookMetadata = { summary: "ISBNdb summary.", rating: null, ratingCount: 0, sourceUrl: "https://isbndb.com/book/9780441013593", genres: ["Fantasy"], pages: 544, publisher: "Penguin", year: 2005, translator: "Bob" };
 const openLibrary: CatalogDetails = { metadata: olMetadata, sources: ["openlibrary"], summarySource: "openlibrary" };
 const isbndb: CatalogDetails = { metadata: bnMetadata, sources: ["isbndb"], summarySource: "isbndb" };
-const ol = (changes: Partial<BookMetadata>): CatalogDetails => ({ ...openLibrary, metadata: { ...olMetadata, ...changes } });
-const bn = (changes: Partial<BookMetadata>): CatalogDetails => ({ ...isbndb, metadata: { ...bnMetadata, ...changes } });
+const ol = (changes: Partial<CatalogBookMetadata>): CatalogDetails => ({ ...openLibrary, metadata: { ...olMetadata, ...changes } });
+const bn = (changes: Partial<CatalogBookMetadata>): CatalogDetails => ({ ...isbndb, metadata: { ...bnMetadata, ...changes } });
 
 function hit(title: string, isbn: string | null, author = "Frank Herbert", source: CatalogSearchHit["source"] = "openlibrary"): CatalogSearchHit {
   return { result: { title, authors: [author], year: null, isbn, publisher: null, coverUrl: null, genres: [] }, olCoverId: null, source };

@@ -119,6 +119,37 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
   const pagesTotal = books.filter((book) => !book.isbn).length;
   let pagesRequested = 0;
   let pageFailed = false;
+  const readPage = async (book: PublisherBook, retryLater: PublisherBook[] | null) => {
+    let response: { status: number; text: string };
+    try {
+      response = await request(() => deps.fetchText(book.productUrl));
+    } catch (error) {
+      if (!(error instanceof SourceUnavailableError)) throw error;
+      if (retryLater) retryLater.push(book);
+      else {
+        report.failed++;
+        pageFailed = true;
+      }
+      return;
+    }
+    if (response.status === 404) return;
+    if (response.status === 429 || response.status >= 500) {
+      if (retryLater) retryLater.push(book);
+      else {
+        report.pagesBlocked++;
+        pageFailed = true;
+      }
+      return;
+    }
+    if (response.status !== 200) {
+      report.pagesBlocked++;
+      return;
+    }
+    const isbn = findPageIsbn(response.text);
+    if (isbn) resolved.push({ ...book, isbn, details: withPageText(book.details, response.text) });
+    else report.pagesNoIsbn++;
+  };
+  const retry: PublisherBook[] = [];
   for (const book of books) {
     if (book.isbn) {
       resolved.push({ ...book, isbn: book.isbn });
@@ -127,25 +158,9 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
     const page = new URL(book.productUrl);
     if (isDisallowed(page.pathname + page.search, disallow)) continue;
     if (++pagesRequested % PAGE_PROGRESS_EVERY === 0) deps.log(`${site.name}: pages ${pagesRequested}/${pagesTotal}`);
-    let response: { status: number; text: string };
-    try {
-      response = await request(() => deps.fetchText(book.productUrl));
-    } catch (error) {
-      if (!(error instanceof SourceUnavailableError)) throw error;
-      report.failed++;
-      pageFailed = true;
-      continue;
-    }
-    if (response.status === 404) continue;
-    if (response.status !== 200) {
-      report.pagesBlocked++;
-      pageFailed = true;
-      continue;
-    }
-    const isbn = findPageIsbn(response.text);
-    if (isbn) resolved.push({ ...book, isbn, details: withPageText(book.details, response.text) });
-    else report.pagesNoIsbn++;
+    await readPage(book, retry);
   }
+  for (const book of retry) await readPage(book, null);
 
   const pageClaims = new Map<string, number>();
   for (const book of resolved) if (book.rank === PAGE_RANK) pageClaims.set(book.isbn, (pageClaims.get(book.isbn) ?? 0) + 1);

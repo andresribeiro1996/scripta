@@ -365,7 +365,7 @@ test("details are fetched once and then served from the database", async () => {
   const { calls, catalog } = recordingCatalog();
   const h = harness({ catalog });
   assert.equal((await h.service.getDetails(dune))?.summary, "Spice.");
-  assert.deepEqual(await h.service.getDetails(dune), { summary: "Spice.", rating: 4.2, ratingCount: 10, sourceUrl: "https://openlibrary.org/works/OL1W", genres: ["Science Fiction"], pages: 544, publisher: "Ace", year: 1965, translator: null });
+  assert.deepEqual(await h.service.getDetails(dune), { summary: "Spice.", rating: 4.2, ratingCount: 10, sourceUrl: "https://openlibrary.org/works/OL1W", genres: ["Science Fiction"], pages: 544, publisher: "Ace", year: 1965, translator: null, summarySource: "openlibrary" });
   assert.deepEqual(calls, ["details:9780441013593"]);
   assert.equal(h.repo.findBookByKey("isbn:9780441013593")!.data_sources, '["openlibrary"]');
 });
@@ -390,15 +390,30 @@ test("a first lookup returns the merged row and keeps a publisher synopsis", asy
     summary: "Sinopse da editora.",
     rating: 4.2,
     ratingCount: 10,
-    sourceUrl: "https://openlibrary.org/works/OL1W",
+    sourceUrl: "",
     genres: ["Science Fiction"],
     pages: 500,
     publisher: "Antígona",
     year: 1965,
-    translator: "Maria"
+    translator: "Maria",
+    summarySource: "publisher"
   });
   assert.equal(h.repo.getBook(id)!.summary_source, "publisher");
   assert.equal(h.repo.getBook(id)!.data_sources, '["openlibrary"]');
+});
+
+test("a publisher synopsis links to the publisher's page and other synopses to their own source", async () => {
+  const h = harness({ catalog: recordingCatalog().catalog });
+  h.service.resolveCover(dune);
+  const id = h.bookId("isbn:9780441013593");
+  h.repo.mergeDetails(id, { summary: "Sinopse da editora.", pages: null, year: null, publisher: null, translator: null }, "publisher");
+  h.repo.setPublisherUrl(id, "https://antigona.pt/products/dune");
+  const publisher = await h.service.getDetails(dune);
+  assert.deepEqual([publisher?.summarySource, publisher?.sourceUrl], ["publisher", "https://antigona.pt/products/dune"]);
+
+  const other = harness({ catalog: recordingCatalog().catalog });
+  const details = await other.service.getDetails(dune);
+  assert.deepEqual([details?.summarySource, details?.sourceUrl], ["openlibrary", "https://openlibrary.org/works/OL1W"]);
 });
 
 test("a details miss is remembered for 30 days", async () => {
@@ -418,7 +433,7 @@ test("a book with a publisher synopsis still returns it when the catalog finds n
   h.service.resolveCover(dune);
   const id = h.bookId("isbn:9780441013593");
   h.repo.mergeDetails(id, { summary: "Sinopse da editora.", pages: 500, year: 2001, publisher: "Antígona", translator: "Maria" }, "publisher");
-  const expected = { summary: "Sinopse da editora.", rating: null, ratingCount: 0, sourceUrl: "", genres: [], pages: 500, publisher: "Antígona", year: 2001, translator: "Maria" };
+  const expected = { summary: "Sinopse da editora.", rating: null, ratingCount: 0, sourceUrl: "", genres: [], pages: 500, publisher: "Antígona", year: 2001, translator: "Maria", summarySource: "publisher" };
   assert.deepEqual(await h.service.getDetails(dune), expected);
   assert.equal(h.repo.getBook(id)!.details_status, "missing");
   assert.deepEqual(await h.service.getDetails(dune), expected);
@@ -442,7 +457,7 @@ test("a facts-only answer stores its facts and leaves the book missing, so a lat
 test("an Open Library answer with only a rating is stored as found with its rating and work key", async () => {
   const metadata = { summary: null, rating: 3.8, ratingCount: 42, sourceUrl: "https://openlibrary.org/works/OL5W", genres: [], pages: null, publisher: null, year: null, translator: null };
   const h = harness({ catalog: recordingCatalog({ fetchDetails: async () => ({ metadata, sources: ["openlibrary"], summarySource: null, workKey: "/works/OL5W" }) }).catalog });
-  assert.deepEqual(await h.service.getDetails(dune), metadata);
+  assert.deepEqual(await h.service.getDetails(dune), { ...metadata, summarySource: null });
   const row = h.repo.findBookByKey("isbn:9780441013593")!;
   assert.deepEqual([row.details_status, row.rating, row.rating_count, row.source_url, row.ol_work_key, row.data_sources], ["found", 3.8, 42, "https://openlibrary.org/works/OL5W", "OL5W", '["openlibrary"]']);
 });
@@ -1088,8 +1103,7 @@ test("the details backfill never uses the catalog that serves users", async () =
 test("an unavailable source leaves the book unchecked, is retried later and does not stop the batch", async () => {
   const outcomes = new Map<string, Error | null>([
     ["Book 0", new SourceUnavailableError("openlibrary", "HTTP 503")],
-    ["Book 1", new SourcePausedError("isbndb", "paused", { retryAt: 1 })],
-    ["Book 2", null]
+    ["Book 1", null]
   ]);
   const catalog: Catalog = {
     fetchDetails: async (lookup) => {
@@ -1100,13 +1114,32 @@ test("an unavailable source leaves the book unchecked, is retried later and does
     search: async () => []
   };
   const h = harness({ backgroundCatalog: catalog });
-  const ids = backfillBooks(h, 3);
-  await h.service.backfillDetails(50);
-  assert.deepEqual(ids.map((id) => h.repo.getBook(id)!.details_status), [null, null, "found"]);
+  const ids = backfillBooks(h, 2);
+  assert.equal(await h.service.backfillDetails(50), null);
+  assert.deepEqual(ids.map((id) => h.repo.getBook(id)!.details_status), [null, "found"]);
   assert.deepEqual(h.warnings, [{ details: { bookId: ids[0], source: "openlibrary", error: "openlibrary unavailable: HTTP 503" }, message: "details source unavailable" }]);
   outcomes.set("Book 0", null);
   await h.service.backfillDetails(50);
-  assert.deepEqual(ids.map((id) => h.repo.getBook(id)!.details_status), ["found", null, "found"]);
+  assert.deepEqual(ids.map((id) => h.repo.getBook(id)!.details_status), ["found", "found"]);
+});
+
+test("a paused source ends the batch at once, stamps nothing and reports when to resume", async () => {
+  const seen: string[] = [];
+  const catalog: Catalog = {
+    fetchDetails: async (lookup) => {
+      seen.push(lookup.title);
+      if (lookup.title === "Book 1") throw new SourcePausedError("isbndb", "paused", { retryAt: 123_456 });
+      return spiceAnswer;
+    },
+    search: async () => []
+  };
+  const h = harness({ backgroundCatalog: catalog });
+  const ids = backfillBooks(h, 4);
+  assert.equal(await h.service.backfillDetails(50), 123_456);
+  assert.deepEqual(seen, ["Book 0", "Book 1"]);
+  assert.deepEqual(ids.map((id) => h.repo.getBook(id)!.details_status), ["found", null, null, null]);
+  assert.deepEqual(ids.map((id) => h.repo.getBook(id)!.details_checked_at === null), [false, true, true, true]);
+  assert.deepEqual(h.warnings, []);
 });
 
 test("a bug in a details lookup propagates instead of being skipped", async () => {
@@ -1204,6 +1237,5 @@ test("a strict background catalog leaves a book unchanged when ISBNdb is paused 
   const id = h.bookId("isbn:9780141184272");
   await h.service.backfillDetails(50);
   const row = h.repo.getBook(id)!;
-  assert.deepEqual([row.details_status, row.rating, row.genres, row.pages, row.summary, row.data_sources], [null, null, "[]", null, null, "[]"]);
-  assert.notEqual(row.details_checked_at, null);
+  assert.deepEqual([row.details_status, row.rating, row.genres, row.pages, row.summary, row.data_sources, row.details_checked_at], [null, null, "[]", null, null, "[]", null]);
 });

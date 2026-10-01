@@ -49,7 +49,7 @@ function product(isbn: string, title: string, image: string) {
   };
 }
 
-async function harness(options: { feeds?: Record<string, { status?: number; text?: string } | Error>; images?: Record<string, Buffer | null | Error>; lookup?: Deps["lookupOpenLibrary"]; beforeImage?: (url: string) => void } = {}) {
+async function harness(options: { feeds?: Record<string, { status?: number; text?: string } | Error | Array<{ status?: number; text?: string } | Error>>; images?: Record<string, Buffer | null | Error>; lookup?: Deps["lookupOpenLibrary"]; beforeImage?: (url: string) => void } = {}) {
   const db = new DatabaseSync(":memory:");
   applyBooksMigrations(db);
   const repo = createSqliteBooksRepository(db);
@@ -63,7 +63,8 @@ async function harness(options: { feeds?: Record<string, { status?: number; text
   const deps: Deps = {
     fetchText: async (url) => {
       requests.push(url);
-      const feed = options.feeds?.[url];
+      const entry = options.feeds?.[url];
+      const feed = Array.isArray(entry) ? entry.shift() : entry;
       if (feed instanceof Error) throw feed;
       if (feed) return { status: feed.status ?? 200, text: feed.text ?? "" };
       if (url.endsWith("/robots.txt")) return { status: 200, text: "User-agent: *\nDisallow: /cart\n" };
@@ -709,19 +710,51 @@ test("an ambiguous page ISBN does not stop an unrelated unique page ISBN", async
   assert.equal(h.repo.findBookByKey(`isbn:${MUSEU}`), undefined);
 });
 
-test("when any page failed or was blocked, no page claim is accepted and feed books still import", async () => {
-  for (const broken of [new SourceUnavailableError("fetch", "HTTP 503"), { status: 403, text: "" }]) {
+test("when a page still fails after its retry, no page claim is accepted and feed books still import", async () => {
+  for (const broken of [new SourceUnavailableError("fetch", "HTTP 503"), { status: 503, text: "" }, { status: 429, text: "" }]) {
     const feed = shopifyPage([unlabelled("Quebrada", "https://cdn.example/a.jpg"), unlabelled("Moeda Dourada", "https://cdn.example/b.jpg"), product(GUERRA, "Com Codigo", "https://cdn.example/feed.jpg")]);
-    const h = await harness({ feeds: { [FEED_1]: { text: feed }, [pageUrl("Quebrada")]: broken, [pageUrl("Moeda Dourada")]: isbnPage(MUSEU) } });
+    const h = await harness({ feeds: { [FEED_1]: { text: feed }, [pageUrl("Quebrada")]: [broken, broken], [pageUrl("Moeda Dourada")]: isbnPage(MUSEU) } });
 
     const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
 
+    assert.equal(h.requests.filter((url) => url === pageUrl("Quebrada")).length, 2);
     assert.equal(reports["Antígona"]!.pagesDeferred, 1);
     assert.equal(reports["Antígona"]!.fromPage, 0);
     assert.equal(reports["Antígona"]!.books, 1);
     assert.deepEqual(h.imageRequests, ["https://cdn.example/feed.jpg"]);
     assert.equal(h.repo.findBookByKey(`isbn:${MUSEU}`), undefined);
   }
+});
+
+test("a page that fails once and succeeds on the retry does not defer the site's page claims", async () => {
+  for (const flaky of [new SourceUnavailableError("fetch", "HTTP 503"), { status: 503, text: "" }]) {
+    const feed = shopifyPage([unlabelled("Instavel", "https://cdn.example/a.jpg"), unlabelled("Moeda Dourada", "https://cdn.example/b.jpg")]);
+    const h = await harness({ feeds: { [FEED_1]: { text: feed }, [pageUrl("Instavel")]: [flaky, isbnPage(GUERRA)], [pageUrl("Moeda Dourada")]: isbnPage(MUSEU) } });
+
+    const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+    assert.equal(h.requests.filter((url) => url === pageUrl("Instavel")).length, 2);
+    assert.equal(h.requests.indexOf(pageUrl("Instavel"), h.requests.indexOf(pageUrl("Instavel")) + 1) > h.requests.indexOf(pageUrl("Moeda Dourada")), true);
+    assert.equal(reports["Antígona"]!.pagesDeferred, 0);
+    assert.equal(reports["Antígona"]!.failed, 0);
+    assert.equal(reports["Antígona"]!.pagesBlocked, 0);
+    assert.equal(reports["Antígona"]!.fromPage, 2);
+    assert.ok(h.repo.findBookByKey(`isbn:${MUSEU}`));
+    assert.ok(h.repo.findBookByKey(`isbn:${GUERRA}`));
+  }
+});
+
+test("a persistent 4xx page counts as blocked but does not defer the site's page claims", async () => {
+  const feed = shopifyPage([unlabelled("Bloqueado", "https://cdn.example/a.jpg"), unlabelled("Moeda Dourada", "https://cdn.example/b.jpg")]);
+  const h = await harness({ feeds: { [FEED_1]: { text: feed }, [pageUrl("Bloqueado")]: { status: 403, text: "" }, [pageUrl("Moeda Dourada")]: isbnPage(MUSEU) } });
+
+  const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  assert.equal(h.requests.filter((url) => url === pageUrl("Bloqueado")).length, 1);
+  assert.equal(reports["Antígona"]!.pagesBlocked, 1);
+  assert.equal(reports["Antígona"]!.pagesDeferred, 0);
+  assert.equal(reports["Antígona"]!.fromPage, 1);
+  assert.ok(h.repo.findBookByKey(`isbn:${MUSEU}`));
 });
 
 test("a page book with no author anywhere still gets Open Library's author, title and work key", async () => {
@@ -873,7 +906,7 @@ test("an existing book gets the details on a re-run, and its own values are kept
   assert.deepEqual(detailsOf(h, MUSEU), { summary: SYNOPSIS, summary_source: "publisher", pages: 300, year: 2019, publisher: "Relógio d'Água", translator: "Ana Lima", details_status: null });
 });
 
-test("a re-run replaces a non-publisher summary but never a publisher one", async () => {
+test("a re-run replaces any earlier summary, including a publisher one", async () => {
   const h = await harness({ feeds: { [WOO_FEED]: { text: richFeed } } });
   const book = addBook(h.repo, MUSEU);
   h.repo.mergeDetails(book.id, { summary: "Open Library synopsis.", pages: null, year: null, publisher: null, translator: null }, "openlibrary");
@@ -883,7 +916,7 @@ test("a re-run replaces a non-publisher summary but never a publisher one", asyn
 
   const other = JSON.stringify([{ ...JSON.parse(richFeed)[0], description: `<p>${SYNOPSIS} Outra edição, outro texto.</p>` }]);
   await importPublisherCovers({ ...h.deps, fetchText: async (url) => (url === WOO_FEED ? { status: 200, text: other } : h.deps.fetchText(url)) }, [relogio], { dryRun: false });
-  assert.equal(detailsOf(h, MUSEU).summary, SYNOPSIS);
+  assert.equal(detailsOf(h, MUSEU).summary, `${SYNOPSIS} Outra edição, outro texto.`);
 });
 
 test("a page-sourced book gets pages and translator from its product page text", async () => {

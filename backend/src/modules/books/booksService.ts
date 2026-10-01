@@ -47,7 +47,7 @@ export interface BooksService {
   enqueueUnchecked(): void;
   processBook(bookId: string, lane: CoverPriority): Promise<void>;
   getDetails(lookup: BookLookup): Promise<BookMetadata | null>;
-  backfillDetails(limit: number, signal?: AbortSignal): Promise<void>;
+  backfillDetails(limit: number, signal?: AbortSignal): Promise<number | null>;
   search(query: string): BookSearchResult[];
   searchExternal(query: string): Promise<BookSearchResult[]>;
   isAdmin(userId: string): boolean;
@@ -136,12 +136,13 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       summary: book.summary,
       rating: book.rating,
       ratingCount: book.rating_count,
-      sourceUrl: book.source_url ?? "",
+      sourceUrl: book.summary_source === "publisher" ? book.publisher_url ?? "" : book.source_url ?? "",
       genres: JSON.parse(book.genres) as BookGenre[],
       pages: book.pages,
       publisher: book.publisher,
       year: book.year,
-      translator: book.translator
+      translator: book.translator,
+      summarySource: book.summary_source
     };
   }
 
@@ -272,17 +273,19 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
 
     async backfillDetails(limit, signal) {
       for (const id of deps.repo.listUncheckedDetailIds(limit)) {
-        if (signal?.aborted) return;
+        if (signal?.aborted) return null;
         const book = deps.repo.getBook(id);
         if (!book || book.details_status !== null) continue;
         try {
           await lookupDetails(book, deps.backgroundCatalog);
         } catch (error) {
+          if (error instanceof SourcePausedError) return error.retryAt;
           if (!(error instanceof SourceUnavailableError)) throw error;
           deps.repo.markDetailsAttempted(id, now().toISOString());
-          if (!(error instanceof SourcePausedError)) deps.warn({ bookId: id, source: error.source, error: error.message }, "details source unavailable");
+          deps.warn({ bookId: id, source: error.source, error: error.message }, "details source unavailable");
         }
       }
+      return null;
     },
 
     search(query) {
