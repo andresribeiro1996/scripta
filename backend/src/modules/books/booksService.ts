@@ -151,7 +151,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
   }
 
   function saveHits(hits: CatalogSearchHit[]): BookSearchResult[] {
-    return hits.map(({ result, olCoverId, source }) => {
+    return hits.map(({ result, olCoverId, workKey, source }) => {
       const author = result.authors.join(", ");
       const identity = lookupIdentity({ isbn: result.isbn, title: result.title, author });
       if (!identity) return result;
@@ -161,6 +161,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
         now().toISOString()
       );
       if (!book.title) deps.repo.fillIdentity(book.id, result.title, author);
+      deps.repo.setWorkKey(book.id, workKey);
       deps.repo.makeSearchable(book.id);
       return book.cover_image_id ? { ...result, coverUrl: deps.publicUrlFor(book.cover_image_id, "thumb") } : result;
     });
@@ -239,8 +240,12 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       if (book.details_status === "missing" && !olderThan(book.details_checked_at, RETRY_AFTER_MS)) return null;
       const details = await deps.catalog.fetchDetails({ isbn: book.isbn, title: book.title, author: book.author });
       const at = now().toISOString();
-      if (details) deps.repo.saveDetails(book.id, details.metadata, details.sources, at);
-      else deps.repo.markDetailsMissing(book.id, at);
+      if (details) {
+        deps.repo.saveDetails(book.id, details.metadata, details.sources, at);
+        deps.repo.setWorkKey(book.id, details.workKey);
+      } else {
+        deps.repo.markDetailsMissing(book.id, at);
+      }
       return details?.metadata ?? null;
     },
 

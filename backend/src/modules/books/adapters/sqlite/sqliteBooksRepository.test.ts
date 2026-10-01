@@ -219,3 +219,40 @@ test("the ISBNdb lapse cleanup clears only rows tagged with it", () => {
   }
   assert.deepEqual([repo.getBook(open.id)!.summary, repo.getBook(open.id)!.data_sources], ["Spice.", '["openlibrary"]']);
 });
+
+test("an existing database gains ol_work_key on boot, empty", () => {
+  const db = new DatabaseSync(":memory:");
+  db.exec(`CREATE TABLE books (
+    id TEXT PRIMARY KEY, title TEXT NOT NULL, author TEXT NOT NULL, year INTEGER, publisher TEXT, isbn TEXT, ol_cover_id INTEGER,
+    summary TEXT, rating REAL, rating_count INTEGER NOT NULL DEFAULT 0, genres TEXT NOT NULL DEFAULT '[]', source_url TEXT,
+    details_status TEXT, details_checked_at TEXT, cover_image_id TEXT, cover_status TEXT, cover_checked_at TEXT, created_at TEXT NOT NULL
+  )`);
+  db.prepare(`INSERT INTO books (id, title, author, created_at) VALUES ('old', 'Dune', 'Frank Herbert', ?)`).run(NOW);
+  applyBooksMigrations(db);
+  applyBooksMigrations(db);
+  assert.equal(createSqliteBooksRepository(db).getBook("old")!.ol_work_key, null);
+});
+
+test("createBook stores a work key as the bare id and nulls a malformed one", () => {
+  const { repo } = freshRepo();
+  const bare = repo.createBook({ title: "A", author: "A", isbn: null, workKey: "OL82563W" }, ["ta:a|a|"], NOW);
+  const prefixed = repo.createBook({ title: "B", author: "B", isbn: null, workKey: "/works/OL1W" }, ["ta:b|b|"], NOW);
+  assert.equal(bare.ol_work_key, "OL82563W");
+  assert.equal(prefixed.ol_work_key, "OL1W");
+  const bad = ["/books/OL1M", "OL1", "//untrusted.test/works/OL1W", "", null, undefined].map((workKey, index) =>
+    repo.createBook({ title: `C${index}`, author: "C", isbn: null, workKey }, [`ta:c${index}|c|`], NOW)
+  );
+  assert.deepEqual(bad.map((book) => book.ol_work_key), [null, null, null, null, null, null]);
+});
+
+test("setWorkKey fills a null key, never overwrites one, and ignores a malformed key", () => {
+  const { repo } = freshRepo();
+  const book = repo.createBook({ title: "A", author: "A", isbn: null }, ["ta:a|a|"], NOW);
+  repo.setWorkKey(book.id, "not a key");
+  repo.setWorkKey(book.id, null);
+  assert.equal(repo.getBook(book.id)!.ol_work_key, null);
+  repo.setWorkKey(book.id, "/works/OL1W");
+  assert.equal(repo.getBook(book.id)!.ol_work_key, "OL1W");
+  repo.setWorkKey(book.id, "OL2W");
+  assert.equal(repo.getBook(book.id)!.ol_work_key, "OL1W");
+});

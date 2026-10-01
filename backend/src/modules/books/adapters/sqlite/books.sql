@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS books (
   cover_status        TEXT,
   cover_checked_at    TEXT,
   cover_upgrade_wanted_at TEXT,
+  ol_work_key         TEXT,
   created_at          TEXT NOT NULL
 );
 

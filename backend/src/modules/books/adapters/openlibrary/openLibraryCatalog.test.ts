@@ -34,7 +34,8 @@ test("details come from the matching work", async () => {
       sourceUrl: "https://openlibrary.org/works/OL123W",
       genres: ["Science Fiction"]
     },
-    sources: ["openlibrary"]
+    sources: ["openlibrary"],
+    workKey: "/works/OL123W"
   });
   assert.equal(new URL(requests[0]!).searchParams.get("isbn"), "9780553348477");
 
@@ -78,6 +79,7 @@ test("search maps docs and keeps the Open Library cover id", async () => {
   assert.equal(hits.length, 1);
   assert.equal(hits[0]!.result.isbn, "9780441013593");
   assert.equal(hits[0]!.olCoverId, 7);
+  assert.equal(hits[0]!.workKey, "/works/OL1W");
   assert.equal(new URL(requests[0]!).searchParams.get("q"), "dune");
 
   const isbnRequests = respond([{ docs: [] }]);

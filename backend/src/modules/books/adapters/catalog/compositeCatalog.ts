@@ -56,6 +56,7 @@ export function createCompositeCatalog(primary: BookCatalog, secondary: BookCata
       const fillGenres = found.metadata.genres.length === 0 && second.value.metadata.genres.length > 0;
       if (!fillSummary && !fillGenres) return found;
       return {
+        ...found,
         metadata: {
           ...found.metadata,
           summary: fillSummary ? second.value.metadata.summary : found.metadata.summary,

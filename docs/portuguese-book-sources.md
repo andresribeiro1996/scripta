@@ -48,6 +48,8 @@ Research notes from 2026-10-01 on where to get Portugal-edition books and covers
 - **Shopify** has a public `GET /products.json?limit=250&page=N`. Tested on Antígona: `vendor` is the author, and images are up to 1476×2480.
 - **WooCommerce** has a public `GET /wp-json/wc/store/v1/products?per_page=100&page=N`. Tested on Relógio d'Água: `sku` is empty, and the ISBN is in the image file name.
 
+The full per-provider catalog, with each shop's quirks, the contact-first list and an email draft, is in [`publisher-catalog.md`](publisher-catalog.md). The table below is the first survey.
+
 **Survey of 32 publishers, 2026-10-01.**
 - It read each site through a fetcher, so the platform is inferred from URL patterns.
 - "?" marks anything the survey couldn't confirm.

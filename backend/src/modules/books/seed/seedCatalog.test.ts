@@ -98,3 +98,23 @@ test("seedBook leaves a titled row alone and does not steal a taken title key", 
   assert.equal(repo.getBook(blank.id)!.title, "Two");
   assert.equal(repo.findBookByKey(catalogTitleKey("Two", "Author")!)?.id, titled.id);
 });
+
+test("seed entries store their work key on created rows, fill empty ones, and never replace one", () => {
+  const { repo } = setup();
+  const created = seedBook({ isbn: "9780141184272", title: "One", author: "Author", workKey: "/works/OL1W" }, repo, () => NOW);
+  assert.equal(created.outcome, "created");
+  assert.equal(repo.getBook(created.book!.id)!.ol_work_key, "OL1W");
+
+  const bare = repo.createBook({ title: "Two", author: "Author", isbn: "9780374520731" }, ["isbn:9780374520731"], NOW.toISOString());
+  assert.equal(seedBook({ isbn: "9780374520731", title: "Two", author: "Author", workKey: "/works/OL2W" }, repo, () => NOW).outcome, "existing");
+  assert.equal(repo.getBook(bare.id)!.ol_work_key, "OL2W");
+
+  seedBook({ isbn: "9780141184272", title: "One", author: "Author", workKey: "/works/OL9W" }, repo, () => NOW);
+  assert.equal(repo.getBook(created.book!.id)!.ol_work_key, "OL1W");
+});
+
+test("seedCatalog passes each entry's work key through", () => {
+  const { repo } = setup();
+  seedCatalog([{ ...entry("9780141184272", "One"), workKey: "/works/OL5W" }], repo, () => NOW);
+  assert.equal(repo.findBookByKey("isbn:9780141184272")!.ol_work_key, "OL5W");
+});

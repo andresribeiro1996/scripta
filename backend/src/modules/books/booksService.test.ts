@@ -925,3 +925,33 @@ test("enqueueUnchecked queues books that still want an upgrade on the upgrade la
   h.service.enqueueUnchecked();
   assert.deepEqual(h.enqueued, [{ bookId: id, priority: "upgrade" }]);
 });
+
+test("details store the catalog's work key, fill-only", async () => {
+  const details = (workKey: string) => async () => ({ metadata: { summary: "Spice.", rating: null, ratingCount: 0, sourceUrl: "https://openlibrary.org/works/OL1W", genres: [] }, sources: ["openlibrary" as const], workKey });
+  const h = harness({ catalog: recordingCatalog({ fetchDetails: details("/works/OL1W") }).catalog });
+  await h.service.getDetails(dune);
+  assert.equal(h.repo.findBookByKey("isbn:9780441013593")!.ol_work_key, "OL1W");
+
+  const keep = harness({ catalog: recordingCatalog({ fetchDetails: details("/works/OL2W") }).catalog });
+  keep.service.resolveCover(dune);
+  keep.repo.setWorkKey(keep.bookId("isbn:9780441013593"), "OL9W");
+  await keep.service.getDetails(dune);
+  assert.equal(keep.repo.findBookByKey("isbn:9780441013593")!.ol_work_key, "OL9W");
+});
+
+test("an outside search stores the work key on created and existing rows", async () => {
+  const hit = (workKey: string | null) => ({ result: { title: "Dune", authors: ["Frank Herbert"], year: 1965, isbn: "9780441013593", publisher: null, coverUrl: null, genres: [] }, olCoverId: null, workKey, source: "openlibrary" as const });
+  const created = harness({ catalog: recordingCatalog({ search: async () => [hit("/works/OL1W")] }).catalog });
+  await created.service.searchExternal("dune");
+  assert.equal(created.repo.findBookByKey("isbn:9780441013593")!.ol_work_key, "OL1W");
+
+  const existing = harness({ catalog: recordingCatalog({ search: async () => [hit("/works/OL1W")] }).catalog });
+  existing.service.resolveCover(dune);
+  assert.equal(existing.repo.findBookByKey("isbn:9780441013593")!.ol_work_key, null);
+  await existing.service.searchExternal("dune");
+  assert.equal(existing.repo.findBookByKey("isbn:9780441013593")!.ol_work_key, "OL1W");
+
+  const none = harness({ catalog: recordingCatalog({ search: async () => [hit(null)] }).catalog });
+  await none.service.searchExternal("dune");
+  assert.equal(none.repo.findBookByKey("isbn:9780441013593")!.ol_work_key, null);
+});

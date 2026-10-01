@@ -22,6 +22,7 @@ export interface BooksRepository {
   searchBooks(tokens: string[], limit: number): BookRow[];
   listUncheckedCoverIds(): string[];
   setUpgradeWanted(bookId: string, at: string | null): void;
+  setWorkKey(id: string, key: string | null | undefined): void;
   listUpgradeWantedIds(): string[];
 }
 
@@ -43,12 +44,14 @@ export interface CoverSource {
 export interface CatalogSearchHit {
   result: BookSearchResult;
   olCoverId: number | null;
+  workKey?: string | null;
   source: DataSource;
 }
 
 export interface CatalogDetails {
   metadata: BookMetadata;
   sources: DataSource[];
+  workKey?: string | null;
 }
 
 export interface BookCatalog {

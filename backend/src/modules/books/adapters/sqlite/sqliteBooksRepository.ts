@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
+import { normalizeWorkKey } from "../../domain/normalize.js";
 import type { BooksRepository } from "../../domain/ports.js";
 import type { BookRow, CoverImageRow } from "../../domain/types.js";
 
@@ -7,8 +8,8 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const byKeyStmt = db.prepare(`SELECT books.* FROM book_keys JOIN books ON books.id = book_keys.book_id WHERE book_keys.key = ?`);
   const byIdStmt = db.prepare(`SELECT * FROM books WHERE id = ?`);
   const insertBookStmt = db.prepare(`
-    INSERT INTO books (id, title, author, year, publisher, isbn, ol_cover_id, genres, data_sources, created_at)
-    VALUES ($id, $title, $author, $year, $publisher, $isbn, $ol_cover_id, $genres, $data_sources, $created_at)
+    INSERT INTO books (id, title, author, year, publisher, isbn, ol_cover_id, ol_work_key, genres, data_sources, created_at)
+    VALUES ($id, $title, $author, $year, $publisher, $isbn, $ol_cover_id, $ol_work_key, $genres, $data_sources, $created_at)
   `);
   const insertKeyIfMissingStmt = db.prepare(`INSERT OR IGNORE INTO book_keys (key, book_id) VALUES (?, ?)`);
   const fillIdentityStmt = db.prepare(`UPDATE books SET title = ?, author = ? WHERE id = ? AND title = ''`);
@@ -39,6 +40,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     SELECT id FROM books WHERE cover_image_id IS NULL AND cover_status IS NULL ORDER BY created_at, rowid
   `);
   const setUpgradeWantedStmt = db.prepare(`UPDATE books SET cover_upgrade_wanted_at = ? WHERE id = ?`);
+  const setWorkKeyStmt = db.prepare(`UPDATE books SET ol_work_key = ? WHERE id = ? AND ol_work_key IS NULL`);
   const upgradeWantedStmt = db.prepare(`SELECT id FROM books WHERE cover_upgrade_wanted_at IS NOT NULL ORDER BY cover_upgrade_wanted_at, rowid`);
 
   return {
@@ -60,6 +62,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
           $publisher: input.publisher ?? null,
           $isbn: input.isbn,
           $ol_cover_id: input.olCoverId ?? null,
+          $ol_work_key: normalizeWorkKey(input.workKey),
           $genres: JSON.stringify(input.genres ?? []),
           $data_sources: JSON.stringify(input.sources ?? []),
           $created_at: createdAt
@@ -131,6 +134,11 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
 
     setUpgradeWanted(bookId, at) {
       setUpgradeWantedStmt.run(at, bookId);
+    },
+
+    setWorkKey(id, key) {
+      const workKey = normalizeWorkKey(key);
+      if (workKey) setWorkKeyStmt.run(workKey, id);
     },
 
     listUpgradeWantedIds() {

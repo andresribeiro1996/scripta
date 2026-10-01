@@ -29,6 +29,7 @@ export function applyBooksMigrations(db: DatabaseSync): void {
   const columns = db.prepare("PRAGMA table_info(books)").all() as Array<{ name: string }>;
   if (!columns.some((column) => column.name === "data_sources")) db.exec("ALTER TABLE books ADD COLUMN data_sources TEXT NOT NULL DEFAULT '[]'");
   if (!columns.some((column) => column.name === "cover_upgrade_wanted_at")) db.exec("ALTER TABLE books ADD COLUMN cover_upgrade_wanted_at TEXT");
+  if (!columns.some((column) => column.name === "ol_work_key")) db.exec("ALTER TABLE books ADD COLUMN ol_work_key TEXT");
   const legacy = db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'cover_cache'`).get();
   if (legacy) {
     const rows = db.prepare(`SELECT id, cache_key, source, width, height, byte_size, created_at FROM cover_cache`).all() as unknown as LegacyCoverRow[];
