@@ -311,7 +311,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
     },
     getDiscover(type, q, limit, offset, viewerId) {
       const needle = q.trim().toLowerCase();
-      const window = Math.min(offset + limit, DISCOVER_SCAN_CAP);
+      const window = needle ? DISCOVER_SCAN_CAP : Math.min(offset + limit + 1, DISCOVER_SCAN_CAP);
       const entries: Array<{ userId: string; content: PublishedContent; createdAt: string }> = [];
       if (type !== "tournament") {
         const voted = viewerId ? new Set(deps.tierlists.listVotedByUser(viewerId).map((ref) => ref.id)) : null;

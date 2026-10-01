@@ -23,8 +23,25 @@ export function useCommunityActivity(username: string) {
 }
 
 export function useCommunityDiscover(type: DiscoverType, q: string) {
-  const query = useQuery({ queryKey: ["community", "discover", type, q], queryFn: () => fetchDiscover(type, q), retry: false });
-  return { items: query.data?.items ?? [], isLoading: query.isPending, error: query.error, refetch: query.refetch };
+  const query = useInfiniteQuery({
+    queryKey: ["community", "discover", type, q],
+    queryFn: ({ pageParam }) => fetchDiscover(type, q, pageParam),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) => lastPage.nextOffset ?? undefined,
+    retry: false
+  });
+  return {
+    items: query.data?.pages.flatMap((page) => page.items) ?? [],
+    isLoading: query.isPending,
+    error: query.error,
+    refetch: query.refetch,
+    hasNextPage: query.hasNextPage,
+    isFetchingNextPage: query.isFetchingNextPage,
+    fetchNextPage: query.fetchNextPage,
+    isFetchNextPageError: query.isFetchNextPageError,
+    isRefetchError: query.isRefetchError,
+    isRefetching: query.isRefetching
+  };
 }
 
 export function useCommunityPeople(q: string) {

@@ -40,10 +40,6 @@ export async function fetchVotedTournaments() {
   return (await apiClient.request<{ tournaments: TournamentSummary[] }>("/arenas/voted", { auth: true })).tournaments;
 }
 
-export async function fetchPublicTournaments() {
-  return (await apiClient.request<{ tournaments: TournamentSummary[] }>("/arenas/public")).tournaments;
-}
-
 export async function fetchTournament(id: string, voterToken?: string) {
   return (await apiClient.request<{ tournament: TournamentView }>(`/arenas/${id}${voterToken ? `?voterToken=${encodeURIComponent(voterToken)}` : ""}`)).tournament;
 }

@@ -1,5 +1,5 @@
-import { ArenaPublicListScreen } from "../../features/arena/ArenaPublicListScreen";
+import { DiscoverScreen } from "../../features/community/DiscoverScreen";
 
 export default function ArenaPublicRoute() {
-  return <ArenaPublicListScreen />;
+  return <DiscoverScreen inTabs={false} />;
 }

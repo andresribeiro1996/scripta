@@ -1,30 +1,38 @@
 import { useEffect, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { Image } from "expo-image";
 import { Animated, Dimensions, FlatList, Keyboard, KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { DEFAULT_TIER_PRESET, readerGlyphLabel } from "@scripta/shared";
-import { EmptyState, ErrorState, Icon, Input, Skeleton, dynamicType, minimumTouchTarget, radii, spacing, typography, useReducedMotion, useTheme, type IconName } from "../../ui";
+import { EmptyState, ErrorState, Icon, Input, Skeleton, Toast, dynamicType, minimumTouchTarget, radii, spacing, typography, useReducedMotion, useTheme, type IconName } from "../../ui";
 import type { ContentTone, DiscoverItem, PublishedContent } from "@scripta/shared/community";
+import { useAuth } from "../../core/auth";
+import { ArenaBooksSheet } from "../arena/ArenaBooksSheet";
 import { fetchDiscover } from "./api";
 import { DISCOVER_FILTERS, contentKindLabel, contentStats, contentStatus, contentTarget, type DiscoverFilter } from "./communityHome";
+import { AddBookSheet } from "./AddBookSheet";
 import { openProfile } from "./AuthorAvatar";
 import { ReaderGlyph } from "./ReaderGlyph";
 
 const FILTER_ICONS: Record<DiscoverFilter, IconName> = { all: "filter", tierlist: "tierlist", tournament: "bracket" };
 
-export function DiscoverPane() {
+export function DiscoverPane({ linkAuthors = true }: { linkAuthors?: boolean }) {
   const { colors } = useTheme();
   const [filter, setFilter] = useState<DiscoverFilter>("all");
   const [search, setSearch] = useState("");
   const needle = search.trim();
-  const discover = useQuery({
+  const { user } = useAuth();
+  const discover = useInfiniteQuery({
     queryKey: ["community", "discover", filter, needle],
-    queryFn: () => fetchDiscover(filter, needle),
+    queryFn: ({ pageParam }) => fetchDiscover(filter, needle, pageParam, Boolean(user)),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) => lastPage.nextOffset ?? undefined,
     retry: false,
   });
-  const items = discover.data?.items ?? [];
+  const items = discover.data?.pages.flatMap((page) => page.items) ?? [];
+  const [preview, setPreview] = useState<{ id: string; name: string } | null>(null);
+  const [addBook, setAddBook] = useState<{ title: string; author: string; coverUrl?: string | null } | null>(null);
   const index = DISCOVER_FILTERS.findIndex((option) => option.value === filter);
   const current = DISCOVER_FILTERS[index];
   const next = DISCOVER_FILTERS[(index + 1) % DISCOVER_FILTERS.length];
@@ -57,13 +65,14 @@ export function DiscoverPane() {
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.grow}>
+      {discover.isRefetchError && !discover.isRefetching ? <Toast visible message="Couldn't refresh Discover." tone="error" /> : null}
       <View ref={frame} style={styles.grow}>
         <View style={styles.grow}>
           {discover.isPending ? (
             <View style={styles.page}>
               <Skeleton height={160} />
             </View>
-          ) : discover.isError ? (
+          ) : discover.isError && !discover.data ? (
             <View style={styles.page}>
               <ErrorState body="Couldn't load tier lists and tournaments." actionLabel="Retry" onAction={() => void discover.refetch()} />
             </View>
@@ -85,7 +94,18 @@ export function DiscoverPane() {
                   <EmptyState title="Nothing published yet" body="Check back later for new tier lists and tournaments." />
                 </View>
               }
-              renderItem={({ item }) => <DiscoverRow item={item} />}
+              onEndReached={() => {
+                if (discover.hasNextPage && !discover.isFetchingNextPage && !discover.isFetchNextPageError) void discover.fetchNextPage();
+              }}
+              onEndReachedThreshold={0.4}
+              ListFooterComponent={
+                discover.isFetchingNextPage ? (
+                  <View style={styles.page}><Skeleton height={80} /></View>
+                ) : discover.isFetchNextPageError ? (
+                  <View style={styles.page}><ErrorState body="Couldn't load more." actionLabel="Retry" onAction={() => void discover.fetchNextPage()} /></View>
+                ) : null
+              }
+              renderItem={({ item }) => <DiscoverRow item={item} onPreviewBooks={setPreview} linkAuthor={linkAuthors} />}
             />
           )}
         </View>
@@ -118,11 +138,21 @@ export function DiscoverPane() {
           </Pressable>
         </Animated.View>
       </View>
+      <ArenaBooksSheet
+        id={preview?.id ?? null}
+        name={preview?.name ?? "Tournament"}
+        onAddBook={(book) => {
+          setPreview(null);
+          setAddBook(book);
+        }}
+        onClose={() => setPreview(null)}
+      />
+      {addBook ? <AddBookSheet book={addBook} onClose={() => setAddBook(null)} /> : null}
     </KeyboardAvoidingView>
   );
 }
 
-function DiscoverRow({ item }: { item: DiscoverItem }) {
+function DiscoverRow({ item, onPreviewBooks, linkAuthor }: { item: DiscoverItem; onPreviewBooks: (tournament: { id: string; name: string }) => void; linkAuthor: boolean }) {
   const { colors } = useTheme();
   const { content, author } = item;
   const status = contentStatus(content);
@@ -140,7 +170,7 @@ function DiscoverRow({ item }: { item: DiscoverItem }) {
               <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
                 {contentKindLabel(content)} ·{" "}
               </Text>
-              {author.unavailable ? (
+              {author.unavailable || !linkAuthor ? (
                 <View style={[styles.nameRow, styles.shrink]}>
                   <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.metaName, { color: colors.textDim }]}>
                     {author.username}
@@ -170,6 +200,17 @@ function DiscoverRow({ item }: { item: DiscoverItem }) {
                   <Text style={[styles.strong, { color: colors.text }]}>{stat.value}</Text> {stat.label}
                 </Text>
               ))}
+              {content.kind === "tournament" ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`See all ${content.bookCount} books in ${content.name}`}
+                  hitSlop={spacing.sm}
+                  onPress={() => onPreviewBooks({ id: content.id, name: content.name })}
+                  style={styles.rowAction}
+                >
+                  <Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.accent }]}>See books</Text>
+                </Pressable>
+              ) : null}
             </View>
           </View>
         </View>
@@ -280,6 +321,7 @@ const styles = StyleSheet.create({
   nameRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   metaName: { flexShrink: 1 },
   statusRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.xs },
+  rowAction: { minHeight: minimumTouchTarget - spacing.lg, justifyContent: "center", paddingVertical: spacing.xs },
   badge: { borderWidth: 1, borderRadius: radii.full, paddingHorizontal: spacing.sm },
   thumb: { width: THUMB_WIDTH, height: THUMB_HEIGHT },
   ladder: { position: "absolute", left: 0, top: (THUMB_HEIGHT - FAN_HEIGHT) / 2, width: LADDER_WIDTH, height: FAN_HEIGHT, borderRadius: 2, overflow: "hidden" },
