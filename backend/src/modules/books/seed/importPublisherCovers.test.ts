@@ -841,7 +841,7 @@ const richFeed = JSON.stringify([
     name: "Puro",
     permalink: "https://www.relogiodagua.pt/produto/puro/",
     sku: MUSEU,
-    description: `LIVRO EM PRÉ-VENDA. ENVIOS DIA 13 DE OUTUBRO.\n${SYNOPSIS}`,
+    description: `<p>LIVRO EM PRÉ-VENDA. ENVIOS DIA 13 DE OUTUBRO.</p><p>${SYNOPSIS}</p>`,
     short_description: "",
     images: [{ src: "https://x.example/puro.jpg" }],
     attributes: [{ name: "Núm. páginas", terms: [{ name: "240" }] }, { name: "Ano", terms: [{ name: "2019" }] }, { name: "Tradutor", terms: [{ name: "Ana Lima" }] }]
@@ -881,14 +881,14 @@ test("a re-run replaces a non-publisher summary but never a publisher one", asyn
   await importPublisherCovers(h.deps, [relogio], { dryRun: false });
   assert.equal(detailsOf(h, MUSEU).summary, SYNOPSIS);
 
-  const other = JSON.stringify([{ ...JSON.parse(richFeed)[0], description: `${SYNOPSIS} Outra edição, outro texto.` }]);
+  const other = JSON.stringify([{ ...JSON.parse(richFeed)[0], description: `<p>${SYNOPSIS} Outra edição, outro texto.</p>` }]);
   await importPublisherCovers({ ...h.deps, fetchText: async (url) => (url === WOO_FEED ? { status: 200, text: other } : h.deps.fetchText(url)) }, [relogio], { dryRun: false });
   assert.equal(detailsOf(h, MUSEU).summary, SYNOPSIS);
 });
 
 test("a page-sourced book gets pages and translator from its product page text", async () => {
   const feed = JSON.stringify([{ name: "Sem Codigo", permalink: "https://www.relogiodagua.pt/produto/sem-codigo/", sku: "", description: "", short_description: "", images: [{ src: "https://x.example/sem.jpg" }], attributes: [] }]);
-  const page = { text: `<html><body><p>ISBN ${MUSEU}</p><p>Tradução de Ana Lima</p><p>240 págs</p></body></html>` };
+  const page = { text: `<html><body><p>ISBN ${MUSEU}</p><p>Tradução de Ana Lima</p><p>Páginas: 240</p></body></html>` };
   const h = await harness({ lookup: async () => ({ title: "Sem Codigo", author: "Alguem" }), feeds: { [WOO_FEED]: { text: feed }, "https://www.relogiodagua.pt/produto/sem-codigo/": page } });
 
   await importPublisherCovers(h.deps, [relogio], { dryRun: false });

@@ -199,12 +199,12 @@ test("a Shopify synopsis comes out as plain text with paragraph breaks", () => {
 });
 
 test("a WooCommerce description drops a leading shop notice and keeps the synopsis", () => {
-  const description = `LIVRO EM PRÉ-VENDA. ENVIOS DIA 13 DE OUTUBRO.\n${SYNOPSIS}`;
+  const description = `<p>LIVRO EM PRÉ-VENDA. ENVIOS DIA 13 DE OUTUBRO.</p><p>${SYNOPSIS}</p>`;
   assert.equal(wooDetails({ description }).summary, SYNOPSIS);
 });
 
 test("a notice is matched on whole words, so a paragraph about transportes is kept", () => {
-  const description = `LIVRO EM PRÉ-VENDA. ENVIOS DIA 13 DE OUTUBRO.\nOs transportes públicos de Lisboa param, e uma cidade inteira descobre o que é esperar, durante um verão sem fim.`;
+  const description = `<p>LIVRO EM PRÉ-VENDA. ENVIOS DIA 13 DE OUTUBRO.</p><p>Os transportes públicos de Lisboa param, e uma cidade inteira descobre o que é esperar, durante um verão sem fim.</p>`;
   assert.equal(wooDetails({ description }).summary, "Os transportes públicos de Lisboa param, e uma cidade inteira descobre o que é esperar, durante um verão sem fim.");
 });
 
@@ -246,10 +246,10 @@ test("a year, an ISBN digit run, a price or an out-of-range count is not taken a
 
 test("the translator comes from an attribute or from a Tradução line", () => {
   assert.equal(wooDetails({ attributes: [attribute("Tradutor", "Ana Lima")] }).translator, "Ana Lima");
-  assert.equal(wooDetails({ description: "Um romance.\nTradução de Ana Lima. Capa de Rui." }).translator, "Ana Lima");
-  assert.equal(wooDetails({ description: "Tradução: Maria Gomes | 240 págs" }).translator, "Maria Gomes");
+  assert.equal(wooDetails({ description: "<p>Um romance.</p><p>Tradução de Ana Lima. Capa de Rui.</p>" }).translator, "Ana Lima");
+  assert.equal(wooDetails({ description: "<p>Tradução: Maria Gomes | 240 págs</p>" }).translator, "Maria Gomes");
   assert.equal(shopifyDetails("<p>Traduzido por João Matos</p>").translator, "João Matos");
-  assert.equal(wooDetails({ description: "Tradução: Ana Lima" }).translator, "Ana Lima");
+  assert.equal(wooDetails({ description: "<p>Tradução: Ana Lima</p>" }).translator, "Ana Lima");
   assert.equal(wooDetails({ description: "Um romance em que a tradução portuguesa mantém o ritmo do original." }).translator, null);
 });
 
@@ -267,8 +267,65 @@ test("a product with nothing to extract has all-null details", () => {
 });
 
 test("withPageText fills pages and translator the feed lacked, and keeps what the feed gave", () => {
-  const page = "<html><body><p>Tradução de Ana Lima</p><p>240 págs</p></body></html>";
+  const page = "<html><body><p>Tradução de Ana Lima</p><p>Páginas: 240</p></body></html>";
   const empty = { summary: SYNOPSIS, pages: null, year: 2019, translator: null };
   assert.deepEqual(withPageText(empty, page), { summary: SYNOPSIS, pages: 240, year: 2019, translator: "Ana Lima" });
   assert.deepEqual(withPageText({ ...empty, pages: 100, translator: "Rui" }, page), { summary: SYNOPSIS, pages: 100, year: 2019, translator: "Rui" });
+});
+
+test("the translator comes only from a line that starts with the label, and only as a name", () => {
+  assert.equal(wooDetails({ description: "<p>Esta tradução de Camilo Pessanha para francês mantém o ritmo do original.</p>" }).translator, null);
+  assert.equal(wooDetails({ description: "<p>Tradução de Ana Lima e revisão de Rui Costa</p>" }).translator, "Ana Lima");
+  assert.equal(wooDetails({ description: "<p>Tradução de Ana Lima, revisão de Rui Costa, capa de Joana</p>" }).translator, "Ana Lima");
+  assert.equal(wooDetails({ description: "<p>Tradução: Maria do Carmo Abreu</p>" }).translator, "Maria do Carmo Abreu");
+  assert.equal(wooDetails({ description: "<ul><li>- Tradutora: Ana Lima</li></ul>" }).translator, "Ana Lima");
+  assert.equal(wooDetails({ description: "<p>Tradução de poesia portuguesa</p>" }).translator, null);
+});
+
+test("a product page gives only line-anchored labelled pages and a translator, never loose text", () => {
+  const empty = { summary: null, pages: null, year: null, translator: null };
+  const related = "<html><body><ul><li>Tradução de Poesia</li></ul><div>Outro livro 320 págs</div><p>Edição brochada, 410 págs.</p></body></html>";
+  assert.deepEqual(withPageText(empty, related), empty);
+  assert.equal(withPageText(empty, "<p>Páginas: 180</p>").pages, 180);
+  assert.equal(withPageText(empty, "<ul><li>N.º de páginas 240</li></ul>").pages, 240);
+  assert.equal(withPageText(empty, "<ul><li>Nº págs.: 240</li></ul>").pages, 240);
+  assert.equal(withPageText(empty, "<table><tr><td>Páginas</td><td>192</td></tr></table>").pages, 192);
+});
+
+test("metadata, bullets and lines of only figures are kept out of the synopsis", () => {
+  const html = `<p>${SYNOPSIS}</p><p>- ISBN: 978-972-608-494-5</p><p>• Páginas: 240</p><p>9789726084945</p><p>15 x 23 cm</p><p>€ 16,50</p><p>Título original: Les Misérables</p>`;
+  assert.equal(shopifyDetails(html).summary, SYNOPSIS);
+});
+
+test("common named entities decode and an out-of-range numeric entity is left as text", () => {
+  const html = `<p>${SYNOPSIS} &Eacute;&ccedil;a &ndash; &laquo;fim&raquo;&hellip; &#99999999; &#x110000; &agrave; &otilde;</p>`;
+  assert.equal(shopifyDetails(html).summary, `${SYNOPSIS} Éça – «fim»… &#99999999; &#x110000; à õ`);
+});
+
+test("inline tags add no space and table cells do", () => {
+  const html = `<p><em>Os Maias</em>, de Eça de Queirós, é um romance sobre três gerações de uma família lisboeta do século XIX.</p><table><tr><td>Um</td><td>dois</td></tr></table>`;
+  assert.equal(shopifyDetails(html).summary, "Os Maias, de Eça de Queirós, é um romance sobre três gerações de uma família lisboeta do século XIX.\n\nUm dois");
+});
+
+test("a newline inside a paragraph is a space, not a paragraph break", () => {
+  const html = `<p>Paris, 1785. Um jovem e ambicioso engenheiro, Jean-Baptiste Baratte,\nrecebe a missão de limpar o maior\ncemitério da cidade.</p>`;
+  assert.equal(shopifyDetails(html).summary, "Paris, 1785. Um jovem e ambicioso engenheiro, Jean-Baptiste Baratte, recebe a missão de limpar o maior cemitério da cidade.");
+});
+
+test("a notice needs the plural envios, and tolerates a spaced pré venda", () => {
+  const kept = "O envio de uma carta anónima muda a vida de uma família inteira, numa aldeia onde ninguém escreve a ninguém.";
+  assert.equal(wooDetails({ description: `<p>${kept}</p>` }).summary, kept);
+  assert.equal(wooDetails({ description: `<p>Livro em pré venda.</p><p>${SYNOPSIS}</p>` }).summary, SYNOPSIS);
+});
+
+test("pages with a thousands separator are read whole, and a decimal tail is not a count", () => {
+  assert.equal(wooDetails({ description: "<p>Brochado, 1.200 páginas.</p>" }).pages, 1200);
+  assert.equal(wooDetails({ attributes: [attribute("Páginas", "1.024")] }).pages, 1024);
+  assert.equal(wooDetails({ description: "<p>Preço 12.240 págs</p>" }).pages, null);
+  assert.equal(wooDetails({ description: "<p>Versão 3.9 240 págs</p>" }).pages, 240);
+});
+
+test("a year attribute name must be a whole word", () => {
+  assert.equal(wooDetails({ attributes: [attribute("Anotações", "2019")] }).year, null);
+  assert.equal(wooDetails({ attributes: [attribute("Ano", "2019")] }).year, 2019);
 });

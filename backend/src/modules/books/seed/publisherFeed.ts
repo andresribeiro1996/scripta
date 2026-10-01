@@ -27,21 +27,35 @@ const LABEL_REACH = 40;
 const ISBN_CANDIDATE = /(?<!\d)97[89](?:[\p{Pd}\s.]?\d){10}(?!\d)/gu;
 const ISBN10_CANDIDATE = /(?<!\d)\d(?:[\p{Pd}\s.]?\d){8}[\p{Pd}\s.]?[\dXx](?![\dXx])/gu;
 const PORTUGAL_PREFIX = /^978(?:972|989)/;
+const BREAK = "\u0001";
 const BLOCK_TAG = /<\/?(?:p|div|br|li|ul|ol|h[1-6]|tr|table|blockquote)\b[^>]*>/gi;
-const SHOP_NOTICE = /\b(?:pr[ée]-venda|envios?|portes|stock|esgotad[oa])\b/i;
-const METADATA_LINE = /^(?:ISBN|Tradu[çc][ãa]o|Tradutor[a]?|Traduzido|P[áa]ginas|N[úu]m\.?\s*p[áa]g\w*|Dimens[õo]es|Encaderna[çc][ãa]o|Edi[çc][ãa]o|Formato|Peso|Pre[çc]o|Ano|Data|Cole[çc][ãa]o|Autor[a]?)\b/i;
+const CELL_TAG = /<\/?(?:td|th)\b[^>]*>/gi;
+const LEAD = String.raw`^[\s\-–—•*·|]*`;
+const SHOP_NOTICE = /\b(?:pr[ée][- ]?venda|envios|portes|stock|esgotad[oa])\b/i;
+const METADATA_LINE = new RegExp(String.raw`${LEAD}(?:ISBN|T[íi]tulo original|Tradu[çc][ãa]o|Tradutor[a]?|Traduzido|P[áa]ginas|N[úu]m\.?\s*p[áa]g\w*|Dimens[õo]es|Encaderna[çc][ãa]o|Edi[çc][ãa]o|Formato|Peso|Pre[çc]o|Ano|Data|Cole[çc][ãa]o|Autor[a]?)\b`, "i");
+const ONLY_FIGURES = /^[\d\sxX×.,€$£cm\-]+$/;
 const NOTICE_REACH = 200;
 const MIN_SYNOPSIS = 80;
 const MIN_PAGES = 8;
 const MAX_PAGES = 5000;
 const FIRST_YEAR = 1900;
 const PAGES_ATTRIBUTE = /p[áa]ginas|n[úu]m\.? ?p[áa]g/i;
-const PAGES_TEXT = /(?<!\d)(\d{2,4})\s*(?:p[áa]g(?:inas|s)?\.?)(?![a-z])/i;
+const PAGES_LINE = new RegExp(String.raw`${LEAD}(?:n(?:[úu]m)?\.?\s*[º°]?\.?\s*(?:de\s+)?)?p[áa]g(?:inas|s)?\.?\s*:?\s*(\d[\d.]*)\s*$`, "i");
+const PAGES_TEXT = /(?<![\d.])(\d{1,3}(?:\.\d{3})+|\d{2,4}) *(?:p[áa]g(?:inas|s)?\.?)(?![a-z])/i;
 const TRANSLATOR_ATTRIBUTE = /^tradu/i;
-const TRANSLATOR_TEXT = /Tradu(?:ção|zido)(?:\s+(?:de|por)\b|:)\s*([^\n.;|]{3,60})/i;
-const YEAR_ATTRIBUTE = /^(ano|data|edi[cç][aã]o)/i;
+const TRANSLATOR_LINE = new RegExp(String.raw`${LEAD}(?:Tradu(?:ção|zido)|Tradutor(?:a)?)(?:\s+(?:de|por)\b|\s*:)\s*(.*)$`, "i");
+const NAME_WORD = /^\p{Lu}[\p{L}'’-]*$/u;
+const NAME_PARTICLES = new Set(["de", "da", "do", "dos", "das", "e"]);
+const MAX_NAME_WORDS = 6;
+const YEAR_ATTRIBUTE = /^(?:ano|data|edi[cç][aã]o)\b/i;
 const YEAR_VALUE = /(?<!\d)(?:19|20)\d{2}(?!\d)/;
-const NAMED_ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
+const MAX_CODE_POINT = 0x10ffff;
+const NAMED_ENTITIES: Record<string, string> = {
+  amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ",
+  hellip: "…", ndash: "–", mdash: "—", laquo: "«", raquo: "»", lsquo: "‘", rsquo: "’", ldquo: "“", rdquo: "”", ordm: "º", ordf: "ª",
+  aacute: "á", eacute: "é", iacute: "í", oacute: "ó", uacute: "ú", agrave: "à", atilde: "ã", otilde: "õ", acirc: "â", ecirc: "ê", ocirc: "ô", ccedil: "ç",
+  Aacute: "Á", Eacute: "É", Iacute: "Í", Oacute: "Ó", Uacute: "Ú", Agrave: "À", Atilde: "Ã", Otilde: "Õ", Acirc: "Â", Ecirc: "Ê", Ocirc: "Ô", Ccedil: "Ç"
+};
 
 function checksumOk(digits: string): boolean {
   const sum = [...digits].reduce((total, digit, index) => total + Number(digit) * (index % 2 === 0 ? 1 : 3), 0);
@@ -75,28 +89,49 @@ export function findPortugalIsbn(text: string): string | null {
 
 function decodeEntities(text: string): string {
   return text.replace(/&(?:#(\d+)|#x([0-9a-f]+)|([a-z]+));/gi, (whole, decimal, hex, name) => {
-    if (decimal) return String.fromCodePoint(Number(decimal));
-    if (hex) return String.fromCodePoint(parseInt(hex, 16));
-    return NAMED_ENTITIES[name.toLowerCase()] ?? whole;
+    if (decimal || hex) {
+      const codePoint = decimal ? Number(decimal) : parseInt(hex, 16);
+      return codePoint > MAX_CODE_POINT ? whole : String.fromCodePoint(codePoint);
+    }
+    return NAMED_ENTITIES[name] ?? NAMED_ENTITIES[name.toLowerCase()] ?? whole;
   });
 }
 
-function plainText(html: string): string {
-  return decodeEntities(html.replace(/<(script|style)\b[\s\S]*?<\/\1\s*>/gi, " ").replace(BLOCK_TAG, "\n").replace(/<[^>]*>/g, " "));
+function textLines(html: string): string[] {
+  const marked = html.replace(/<(script|style)\b[\s\S]*?<\/\1\s*>/gi, " ").replace(BLOCK_TAG, BREAK).replace(CELL_TAG, " ").replace(/<[^>]*>/g, "");
+  return decodeEntities(marked)
+    .split(BREAK)
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter((line) => line !== "");
 }
 
-function synopsis(html: string): string | null {
-  const lines = plainText(html)
-    .split("\n")
-    .map((line) => line.replace(/\s+/g, " ").trim())
-    .filter((line) => line !== "" && !METADATA_LINE.test(line) && !SHOP_NOTICE.test(line.slice(0, NOTICE_REACH)));
-  const joined = lines.join("\n\n");
+function synopsis(lines: string[]): string | null {
+  const joined = lines.filter((line) => !METADATA_LINE.test(line) && !ONLY_FIGURES.test(line) && !SHOP_NOTICE.test(line.slice(0, NOTICE_REACH))).join("\n\n");
   return joined.length >= MIN_SYNOPSIS ? joined : null;
 }
 
 function pageCount(value: string | null | undefined): number | null {
-  const count = Number(value?.match(/\d+/)?.[0]);
+  const count = Number(value?.match(/\d[\d.]*/)?.[0]?.replace(/\./g, ""));
   return count >= MIN_PAGES && count <= MAX_PAGES ? count : null;
+}
+
+function personName(text: string): string | null {
+  const words: string[] = [];
+  for (const token of text.split(/[,;.|]/)[0]!.trim().split(/\s+/)) {
+    const fits = NAME_WORD.test(token) || (words.length > 0 && NAME_PARTICLES.has(token));
+    if (!fits || words.length === MAX_NAME_WORDS) break;
+    words.push(token);
+  }
+  while (NAME_PARTICLES.has(words.at(-1)!)) words.pop();
+  return words.length >= 2 ? words.join(" ") : null;
+}
+
+function labelledPages(lines: string[]): number | null {
+  return lines.map((line) => pageCount(PAGES_LINE.exec(line)?.[1])).find((count) => count !== null) ?? null;
+}
+
+function labelledTranslator(lines: string[]): string | null {
+  return lines.map((line) => personName(TRANSLATOR_LINE.exec(line)?.[1] ?? "")).find((name) => name !== null) ?? null;
 }
 
 function publicationYear(value: string | null): number | null {
@@ -104,13 +139,13 @@ function publicationYear(value: string | null): number | null {
   return year >= FIRST_YEAR && year <= new Date().getFullYear() ? year : null;
 }
 
-function textDetails(text: string): Pick<ProductDetails, "pages" | "translator"> {
-  return { pages: pageCount(PAGES_TEXT.exec(text)?.[1]), translator: TRANSLATOR_TEXT.exec(text)?.[1]?.trim() || null };
+function feedTextDetails(lines: string[]): Pick<ProductDetails, "pages" | "translator"> {
+  return { pages: labelledPages(lines) ?? pageCount(PAGES_TEXT.exec(lines.join("\n"))?.[1]), translator: labelledTranslator(lines) };
 }
 
 export function withPageText(details: ProductDetails, html: string): ProductDetails {
-  const page = textDetails(plainText(html));
-  return { ...details, pages: details.pages ?? page.pages, translator: details.translator ?? page.translator };
+  const lines = textLines(html);
+  return { ...details, pages: details.pages ?? labelledPages(lines), translator: details.translator ?? labelledTranslator(lines) };
 }
 
 export function findPageIsbn(html: string): string | null {
@@ -175,8 +210,8 @@ export function parseShopifyProducts(json: unknown, site: PublisherSite): Publis
     if (!found && !URL.canParse(productUrl)) return [];
     const vendor = text(product.vendor).trim();
     const author = site.authorFromVendor && vendor && normalizeWords(vendor) !== normalizeWords(site.name) ? vendor : null;
-    const body = text(product.body_html);
-    const details = { summary: synopsis(body), year: null, ...textDetails(plainText(body)) };
+    const lines = textLines(text(product.body_html));
+    const details = { summary: synopsis(lines), year: null, ...feedTextDetails(lines) };
     return [{ isbn: found?.isbn ?? null, rank: found?.rank ?? PAGE_RANK, title, author, imageUrl, productUrl, details }];
   });
 }
@@ -191,9 +226,9 @@ function wooAttribute(product: Record<string, unknown>, name: RegExp): string | 
 }
 
 function wooDetails(product: Record<string, unknown>): ProductDetails {
-  const description = text(product.description);
-  const shortDescription = text(product.short_description);
-  const fromText = textDetails(plainText(`${description}\n${shortDescription}`));
+  const description = textLines(text(product.description));
+  const shortDescription = textLines(text(product.short_description));
+  const fromText = feedTextDetails([...description, ...shortDescription]);
   return {
     summary: synopsis(description) ?? synopsis(shortDescription),
     pages: pageCount(wooAttribute(product, PAGES_ATTRIBUTE)) ?? fromText.pages,
