@@ -9,13 +9,14 @@ export interface SeedResult {
   invalid: number;
 }
 
-type SeedRepo = Pick<BooksRepository, "findBookByKey" | "createBook" | "addKey" | "fillIdentity">;
+type SeedRepo = Pick<BooksRepository, "findBookByKey" | "createBook" | "addKey" | "fillIdentity" | "setWorkKey">;
 
-export function seedBook(input: { isbn: string; title: string; author: string }, repo: SeedRepo, now: () => Date): { outcome: "created" | "existing" | "invalid"; book?: BookRow } {
+export function seedBook(input: { isbn: string; title: string; author: string; workKey?: string }, repo: SeedRepo, now: () => Date): { outcome: "created" | "existing" | "invalid"; book?: BookRow } {
   const identity = lookupIdentity(input);
   if (!identity) return { outcome: "invalid" };
   const existing = repo.findBookByKey(identity.key);
   if (existing) {
+    repo.setWorkKey(existing.id, input.workKey);
     if (!existing.title && identity.title) {
       if (identity.titleKey && !repo.findBookByKey(identity.titleKey)) repo.addKey(identity.titleKey, existing.id);
       repo.fillIdentity(existing.id, identity.title, identity.author);
@@ -24,7 +25,7 @@ export function seedBook(input: { isbn: string; title: string; author: string },
   }
   const { titleKey } = identity;
   const keys = titleKey && titleKey !== identity.key && !repo.findBookByKey(titleKey) ? [identity.key, titleKey] : [identity.key];
-  return { outcome: "created", book: repo.createBook({ title: identity.title, author: identity.author, isbn: identity.isbn }, keys, now().toISOString()) };
+  return { outcome: "created", book: repo.createBook({ title: identity.title, author: identity.author, isbn: identity.isbn, workKey: input.workKey }, keys, now().toISOString()) };
 }
 
 export function seedCatalog(entries: SeedEntry[], repo: SeedRepo, now: () => Date): SeedResult {

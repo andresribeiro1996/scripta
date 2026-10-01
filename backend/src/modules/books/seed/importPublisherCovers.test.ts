@@ -695,3 +695,37 @@ test("a feed ISBN is not title-checked", async () => {
   assert.equal(reports["Antígona"]!.coversSet, 1);
   assert.equal(reports["Antígona"]!.pageTitleMismatch, 0);
 });
+
+test("a looked-up work key lands on the created row and a book that needed no lookup keeps null", async () => {
+  const h = await harness({ lookup: async () => ({ title: "Guerra Branca", author: "Bruno Maçães", workKey: "/works/OL7W" }) });
+
+  await importPublisherCovers(h.deps, [relogio], { dryRun: false });
+
+  assert.equal(h.repo.findBookByKey(`isbn:${GUERRA}`)!.ol_work_key, "OL7W");
+  assert.equal(h.repo.findBookByKey("isbn:9789899061354")!.ol_work_key, null);
+});
+
+test("a work key with no author still lands on the blank row", async () => {
+  const h = await harness({ lookup: async () => ({ title: null, author: "", workKey: "/works/OL7W" }) });
+
+  const reports = await importPublisherCovers(h.deps, [relogio], { dryRun: false });
+
+  assert.equal(reports["Relógio d'Água"]!.noAuthor, 5);
+  const row = h.repo.findBookByKey(`isbn:${GUERRA}`)!;
+  assert.equal(row.title, "");
+  assert.equal(row.ol_work_key, "OL7W");
+});
+
+test("a looked-up work key fills an existing row without one and a dry run writes none", async () => {
+  const lookup = async () => ({ title: "Moeda Dourada", author: "Alguem", workKey: "/works/OL3W" });
+  const dry = await pageHarness({ title: "Moeda Dourada", lookup });
+  const book = dry.repo.createBook({ title: "", author: "", isbn: MUSEU }, [`isbn:${MUSEU}`], NOW.toISOString());
+  await importPublisherCovers(dry.deps, [antigona], { dryRun: true });
+  assert.deepEqual(dry.lookups, [MUSEU]);
+  assert.equal(dry.repo.getBook(book.id)!.ol_work_key, null);
+
+  const h = await pageHarness({ title: "Moeda Dourada", lookup });
+  const existing = h.repo.createBook({ title: "", author: "", isbn: MUSEU }, [`isbn:${MUSEU}`], NOW.toISOString());
+  await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+  assert.equal(h.repo.getBook(existing.id)!.ol_work_key, "OL3W");
+});

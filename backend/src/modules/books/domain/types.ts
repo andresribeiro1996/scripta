@@ -23,6 +23,7 @@ export interface BookRow {
   cover_status: CoverStatus | null;
   cover_checked_at: string | null;
   cover_upgrade_wanted_at: string | null;
+  ol_work_key: string | null;
   created_at: string;
 }
 
@@ -44,6 +45,7 @@ export interface NewBook {
   year?: number | null;
   publisher?: string | null;
   olCoverId?: number | null;
+  workKey?: string | null;
   genres?: string[];
   sources?: DataSource[];
 }

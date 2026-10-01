@@ -30,11 +30,17 @@ export interface SiteReport {
   failed: number;
 }
 
+export interface OpenLibraryEdition {
+  title: string | null;
+  author: string;
+  workKey?: string | null;
+}
+
 export interface ImportDeps {
   fetchText(url: string): Promise<{ status: number; text: string }>;
   fetchBytes(url: string): Promise<Buffer | null>;
-  lookupOpenLibrary(isbn: string): Promise<{ title: string | null; author: string } | null>;
-  repo: Pick<BooksRepository, "findBookByKey" | "getBook" | "createBook" | "addKey" | "fillIdentity" | "getImage" | "insertImage" | "setCover" | "listRejectedUrls" | "setUpgradeWanted">;
+  lookupOpenLibrary(isbn: string): Promise<OpenLibraryEdition | null>;
+  repo: Pick<BooksRepository, "findBookByKey" | "getBook" | "createBook" | "addKey" | "fillIdentity" | "setWorkKey" | "getImage" | "insertImage" | "setCover" | "listRejectedUrls" | "setUpgradeWanted">;
   blobs: CoverBlobStore;
   now: () => Date;
   sleep: (ms: number) => Promise<void>;
@@ -151,16 +157,16 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
 
   for (const book of unique) {
     let row = deps.repo.findBookByKey(`isbn:${book.isbn}`);
-    let looked: { edition: { title: string | null; author: string } | null } | null = null;
+    const memo: { looked?: { edition: OpenLibraryEdition | null } } = {};
     const lookup = async () => {
-      if (looked) return looked;
+      if (memo.looked) return memo.looked;
       try {
-        looked = { edition: await deps.lookupOpenLibrary(book.isbn) };
+        memo.looked = { edition: await deps.lookupOpenLibrary(book.isbn) };
       } catch (error) {
         if (!(error instanceof SourceUnavailableError)) throw error;
         report.failed++;
       }
-      return looked;
+      return memo.looked;
     };
     if (book.rank === PAGE_RANK) {
       let known = row?.title ?? "";
@@ -179,7 +185,7 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
       if (!author) {
         const result = await lookup();
         if (!result) continue;
-        if (result.edition) {
+        if (result.edition?.author) {
           title = result.edition.title ?? title;
           author = result.edition.author;
         } else {
@@ -195,6 +201,7 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
       }
       row = seedBook({ isbn: book.isbn, title, author }, deps.repo, deps.now).book!;
     }
+    if (!options.dryRun) deps.repo.setWorkKey(row.id, memo.looked?.edition?.workKey);
 
     const before = settle(row, book.imageUrl, null);
     if (before) {

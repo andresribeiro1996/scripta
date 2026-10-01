@@ -10,6 +10,11 @@ const PORTUGUESE_ISBN10_PREFIXES = ["85", "65", "972", "989"];
 
 export const SEARCH_LIMIT = 12;
 
+export function normalizeWorkKey(raw: string | null | undefined): string | null {
+  const key = raw?.replace(/^\/works\//, "") ?? "";
+  return /^OL\d+W$/.test(key) ? key : null;
+}
+
 export interface BookLookup {
   isbn?: string | null;
   title?: string | null;

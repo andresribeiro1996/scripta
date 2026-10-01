@@ -142,3 +142,9 @@ test("without ISBNdb the Open Library catalog is used as is", () => {
   const ol = fake(openLibrary);
   assert.equal(createCompositeCatalog(ol.catalog, null), ol.catalog);
 });
+
+test("a merged details record keeps Open Library's work key", async () => {
+  const merged = await createCompositeCatalog(fake({ ...ol({ summary: null }), workKey: "/works/OL1W" }).catalog, fake(isbndb).catalog).fetchDetails(lookup);
+  assert.equal(merged?.workKey, "/works/OL1W");
+  assert.deepEqual(merged?.sources, ["openlibrary", "isbndb"]);
+});

@@ -15,7 +15,7 @@ export function createOpenLibraryCatalog(throttle: Throttle): BookCatalog {
       }
       const match = findOpenLibraryMatch(await get(`https://openlibrary.org/search.json?${query}`), isbn ?? "", title, author);
       if (!match) return null;
-      return { metadata: buildBookMetadata(match, await get(`https://openlibrary.org${String(match.key)}.json`)), sources: ["openlibrary"] };
+      return { metadata: buildBookMetadata(match, await get(`https://openlibrary.org${String(match.key)}.json`)), sources: ["openlibrary"], workKey: String(match.key) };
     },
 
     async search(query) {
@@ -29,7 +29,7 @@ export function createOpenLibraryCatalog(throttle: Throttle): BookCatalog {
         if (!item || typeof item !== "object") return [];
         const doc = item as Record<string, unknown>;
         const result = mapOpenLibraryDoc(doc);
-        return result ? [{ result, olCoverId: typeof doc.cover_i === "number" ? doc.cover_i : null, source: "openlibrary" as const }] : [];
+        return result ? [{ result, olCoverId: typeof doc.cover_i === "number" ? doc.cover_i : null, workKey: typeof doc.key === "string" ? doc.key : null, source: "openlibrary" as const }] : [];
       });
     }
   };

@@ -36,10 +36,10 @@ async function lookupOpenLibrary(isbn) {
   const query = new URLSearchParams({ q: `isbn:${isbn}`, fields: "author_name", limit: "1" });
   const data = await openLibrary(`https://openlibrary.org/search.json?${query}`);
   const authors = Array.isArray(data?.docs?.[0]?.author_name) ? data.docs[0].author_name.filter((name) => typeof name === "string") : [];
-  if (authors.length === 0) return null;
   const edition = await openLibrary(`https://openlibrary.org/isbn/${isbn}.json`);
   const title = typeof edition?.title === "string" ? edition.title.trim() : "";
-  return { title: title || null, author: authors.join(", ") };
+  const workKey = typeof edition?.works?.[0]?.key === "string" ? edition.works[0].key : null;
+  return { title: authors.length > 0 ? title || null : null, author: authors.join(", "), workKey };
 }
 
 const store = createObjectStore();
