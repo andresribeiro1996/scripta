@@ -7,6 +7,8 @@ import type {
   Page,
   PersonResult,
   PublishedProfile,
+  PublishProfileInput,
+  SuggestedReader,
   TierlistSummary,
   TournamentSummary
 } from "@scripta/shared/community";
@@ -58,6 +60,11 @@ export async function fetchPeople(q: string): Promise<PersonResult[]> {
   return body.people;
 }
 
+export async function fetchSuggestedPeople(): Promise<SuggestedReader[]> {
+  const body = (await apiFetch("/community/people/suggested")) as { people: SuggestedReader[] };
+  return body.people;
+}
+
 export async function fetchCommunityProfile(username: string): Promise<CommunityProfileView> {
   return (await apiFetch(`/community/profiles/${encodeURIComponent(username)}`)) as CommunityProfileView;
 }
@@ -83,8 +90,8 @@ export async function unfollowUser(userId: string): Promise<void> {
   await apiFetch(`/community/follows/${userId}`, { method: "DELETE" });
 }
 
-export async function publishProfile(muralId: string): Promise<void> {
-  await apiFetch("/community/profile/publish", { method: "PUT", body: JSON.stringify({ muralId }) });
+export async function publishProfile(input: PublishProfileInput): Promise<void> {
+  await apiFetch("/community/profile/publish", { method: "PUT", body: JSON.stringify(input) });
 }
 
 export async function unpublishProfile(): Promise<void> {
