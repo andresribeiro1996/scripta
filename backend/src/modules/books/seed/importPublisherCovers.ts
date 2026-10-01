@@ -21,6 +21,7 @@ export interface SiteReport {
   fromPage: number;
   pagesNoIsbn: number;
   pagesBlocked: number;
+  pagesDeferred: number;
   pageAmbiguous: number;
   pageTitleMismatch: number;
   coversSet: number;
@@ -50,7 +51,7 @@ export interface ImportDeps {
 
 class SiteSkipped extends Error {}
 
-const emptyReport = (): SiteReport => ({ products: 0, books: 0, fromPage: 0, pagesNoIsbn: 0, pagesBlocked: 0, pageAmbiguous: 0, pageTitleMismatch: 0, coversSet: 0, created: 0, noAuthor: 0, unchanged: 0, rejectedImage: 0, failed: 0 });
+const emptyReport = (): SiteReport => ({ products: 0, books: 0, fromPage: 0, pagesNoIsbn: 0, pagesBlocked: 0, pagesDeferred: 0, pageAmbiguous: 0, pageTitleMismatch: 0, coversSet: 0, created: 0, noAuthor: 0, unchanged: 0, rejectedImage: 0, failed: 0 });
 
 function sameTitle(known: string, productTitle: string): boolean {
   const [short, long] = [normalizeTitle(known), normalizeTitle(productTitle)].sort((a, b) => a.length - b.length) as [string, string];
@@ -113,6 +114,7 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
   const resolved: ResolvedBook[] = [];
   const pagesTotal = books.filter((book) => !book.isbn).length;
   let pagesRequested = 0;
+  let pageFailed = false;
   for (const book of books) {
     if (book.isbn) {
       resolved.push({ ...book, isbn: book.isbn });
@@ -127,11 +129,13 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
     } catch (error) {
       if (!(error instanceof SourceUnavailableError)) throw error;
       report.failed++;
+      pageFailed = true;
       continue;
     }
     if (response.status === 404) continue;
     if (response.status !== 200) {
       report.pagesBlocked++;
+      pageFailed = true;
       continue;
     }
     const isbn = findPageIsbn(response.text);
@@ -141,10 +145,15 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
 
   const pageClaims = new Map<string, number>();
   for (const book of resolved) if (book.rank === PAGE_RANK) pageClaims.set(book.isbn, (pageClaims.get(book.isbn) ?? 0) + 1);
+  const feedIsbns = new Set(resolved.filter((book) => book.rank !== PAGE_RANK).map((book) => book.isbn));
   const strongest = new Map<string, ResolvedBook>();
   for (const book of resolved) {
+    if (book.rank === PAGE_RANK && pageFailed) {
+      report.pagesDeferred++;
+      continue;
+    }
     if (book.rank === PAGE_RANK && pageClaims.get(book.isbn)! > 1) {
-      report.pageAmbiguous++;
+      if (!feedIsbns.has(book.isbn)) report.pageAmbiguous++;
       continue;
     }
     const kept = strongest.get(book.isbn);

@@ -124,6 +124,7 @@ test("an existing book gets the publisher cover as a manual cover and loses its 
     fromPage: 0,
     pagesNoIsbn: 2,
     pagesBlocked: 0,
+    pagesDeferred: 0,
     pageAmbiguous: 0,
     pageTitleMismatch: 0,
     imageUrlPrefix: "https://cdn.shopify.com/s/files/1/",
@@ -690,9 +691,37 @@ test("a feed ISBN wins over ambiguous page claims for it", async () => {
 
   const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
 
+  assert.equal(reports["Antígona"]!.pageAmbiguous, 0);
   assert.equal(reports["Antígona"]!.books, 1);
   assert.equal(reports["Antígona"]!.fromPage, 0);
   assert.deepEqual(h.imageRequests, ["https://cdn.example/feed.jpg"]);
+});
+
+test("an ambiguous page ISBN does not stop an unrelated unique page ISBN", async () => {
+  const feed = shopifyPage([unlabelled("Moeda Dourada", "https://cdn.example/a.jpg"), unlabelled("Moeda Prateada", "https://cdn.example/b.jpg"), unlabelled("Outro Livro", "https://cdn.example/c.jpg")]);
+  const h = await harness({ feeds: { [FEED_1]: { text: feed }, [pageUrl("Moeda Dourada")]: isbnPage(MUSEU), [pageUrl("Moeda Prateada")]: isbnPage(MUSEU), [pageUrl("Outro Livro")]: isbnPage(GUERRA) } });
+
+  const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  assert.equal(reports["Antígona"]!.pageAmbiguous, 2);
+  assert.equal(reports["Antígona"]!.books, 1);
+  assert.deepEqual(h.imageRequests, ["https://cdn.example/c.jpg"]);
+  assert.equal(h.repo.findBookByKey(`isbn:${MUSEU}`), undefined);
+});
+
+test("when any page failed or was blocked, no page claim is accepted and feed books still import", async () => {
+  for (const broken of [new SourceUnavailableError("fetch", "HTTP 503"), { status: 403, text: "" }]) {
+    const feed = shopifyPage([unlabelled("Quebrada", "https://cdn.example/a.jpg"), unlabelled("Moeda Dourada", "https://cdn.example/b.jpg"), product(GUERRA, "Com Codigo", "https://cdn.example/feed.jpg")]);
+    const h = await harness({ feeds: { [FEED_1]: { text: feed }, [pageUrl("Quebrada")]: broken, [pageUrl("Moeda Dourada")]: isbnPage(MUSEU) } });
+
+    const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+    assert.equal(reports["Antígona"]!.pagesDeferred, 1);
+    assert.equal(reports["Antígona"]!.fromPage, 0);
+    assert.equal(reports["Antígona"]!.books, 1);
+    assert.deepEqual(h.imageRequests, ["https://cdn.example/feed.jpg"]);
+    assert.equal(h.repo.findBookByKey(`isbn:${MUSEU}`), undefined);
+  }
 });
 
 test("a page book with no author anywhere still gets Open Library's author, title and work key", async () => {
