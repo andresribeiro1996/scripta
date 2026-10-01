@@ -28,7 +28,8 @@ const ISBN_CANDIDATE = /(?<!\d)97[89](?:[\p{Pd}\s.]?\d){10}(?!\d)/gu;
 const ISBN10_CANDIDATE = /(?<!\d)\d(?:[\p{Pd}\s.]?\d){8}[\p{Pd}\s.]?[\dXx](?![\dXx])/gu;
 const PORTUGAL_PREFIX = /^978(?:972|989)/;
 const BLOCK_TAG = /<\/?(?:p|div|br|li|ul|ol|h[1-6]|tr|table|blockquote)\b[^>]*>/gi;
-const SHOP_NOTICE = /pr[ée]-venda|envios|portes|stock|esgotado/i;
+const SHOP_NOTICE = /\b(?:pr[ée]-venda|envios?|portes|stock|esgotad[oa])\b/i;
+const METADATA_LINE = /^(?:ISBN|Tradu[çc][ãa]o|Tradutor[a]?|Traduzido|P[áa]ginas|N[úu]m\.?\s*p[áa]g\w*|Dimens[õo]es|Encaderna[çc][ãa]o|Edi[çc][ãa]o|Formato|Peso|Pre[çc]o|Ano|Data|Cole[çc][ãa]o|Autor[a]?)\b/i;
 const NOTICE_REACH = 200;
 const MIN_SYNOPSIS = 80;
 const MIN_PAGES = 8;
@@ -37,7 +38,7 @@ const FIRST_YEAR = 1900;
 const PAGES_ATTRIBUTE = /p[áa]ginas|n[úu]m\.? ?p[áa]g/i;
 const PAGES_TEXT = /(?<!\d)(\d{2,4})\s*(?:p[áa]g(?:inas|s)?\.?)(?![a-z])/i;
 const TRANSLATOR_ATTRIBUTE = /^tradu/i;
-const TRANSLATOR_TEXT = /Tradu(?:ção|zido)(?: de| por)?:?\s*([^\n.;|]{3,60})/i;
+const TRANSLATOR_TEXT = /Tradu(?:ção|zido)(?:\s+(?:de|por)\b|:)\s*([^\n.;|]{3,60})/i;
 const YEAR_ATTRIBUTE = /^(ano|data|edi[cç][aã]o)/i;
 const YEAR_VALUE = /(?<!\d)(?:19|20)\d{2}(?!\d)/;
 const NAMED_ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
@@ -88,7 +89,7 @@ function synopsis(html: string): string | null {
   const lines = plainText(html)
     .split("\n")
     .map((line) => line.replace(/\s+/g, " ").trim())
-    .filter((line) => line !== "" && !SHOP_NOTICE.test(line.slice(0, NOTICE_REACH)));
+    .filter((line) => line !== "" && !METADATA_LINE.test(line) && !SHOP_NOTICE.test(line.slice(0, NOTICE_REACH)));
   const joined = lines.join("\n\n");
   return joined.length >= MIN_SYNOPSIS ? joined : null;
 }

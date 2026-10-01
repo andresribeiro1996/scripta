@@ -203,6 +203,18 @@ test("a WooCommerce description drops a leading shop notice and keeps the synops
   assert.equal(wooDetails({ description }).summary, SYNOPSIS);
 });
 
+test("a notice is matched on whole words, so a paragraph about transportes is kept", () => {
+  const description = `LIVRO EM PRÉ-VENDA. ENVIOS DIA 13 DE OUTUBRO.\nOs transportes públicos de Lisboa param, e uma cidade inteira descobre o que é esperar, durante um verão sem fim.`;
+  assert.equal(wooDetails({ description }).summary, "Os transportes públicos de Lisboa param, e uma cidade inteira descobre o que é esperar, durante um verão sem fim.");
+});
+
+test("metadata lines are left out of the synopsis while the translator is still captured", () => {
+  const html = `<p>${SYNOPSIS}</p>\n<ul>\n<li>\n<strong>ISBN</strong><span> 978‑972‑608‑494‑5</span>\n</li>\n<li>Tradução de Ana Lima</li>\n<li>Núm. páginas: 240</li>\n</ul>`;
+  const details = shopifyDetails(html);
+  assert.equal(details.summary, SYNOPSIS);
+  assert.equal(details.translator, "Ana Lima");
+});
+
 test("a synopsis under 80 characters, or one that is only a notice, is not stored", () => {
   assert.equal(wooDetails({ description: "Um livro curto sobre o mar." }).summary, null);
   assert.equal(wooDetails({ description: "LIVRO EM PRÉ-VENDA. ENVIOS DIA 13 DE OUTUBRO. Reserve já o seu exemplar e receba-o em casa no dia do lançamento." }).summary, null);
@@ -237,6 +249,8 @@ test("the translator comes from an attribute or from a Tradução line", () => {
   assert.equal(wooDetails({ description: "Um romance.\nTradução de Ana Lima. Capa de Rui." }).translator, "Ana Lima");
   assert.equal(wooDetails({ description: "Tradução: Maria Gomes | 240 págs" }).translator, "Maria Gomes");
   assert.equal(shopifyDetails("<p>Traduzido por João Matos</p>").translator, "João Matos");
+  assert.equal(wooDetails({ description: "Tradução: Ana Lima" }).translator, "Ana Lima");
+  assert.equal(wooDetails({ description: "Um romance em que a tradução portuguesa mantém o ritmo do original." }).translator, null);
 });
 
 test("the year comes from a year attribute, between 1900 and this year", () => {
