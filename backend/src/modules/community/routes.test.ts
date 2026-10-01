@@ -304,6 +304,18 @@ test("suggested people GET is authed, defaults the limit to 20, and validates it
   await app.close();
 });
 
+test("suggested people GET allows 30 requests a minute, and no other authed route shares that limit", async () => {
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", () => ({ id: "viewer", email: "v@example.test", username: "v", avatarId: null }));
+  await app.register(buildCommunityRoutes(fakeService()));
+  const auth = { authorization: "Bearer x" };
+  const suggested = () => app.inject({ method: "GET", url: "/community/people/suggested", headers: auth });
+  for (let request = 1; request <= 30; request++) assert.equal((await suggested()).statusCode, 200);
+  assert.equal((await suggested()).statusCode, 429);
+  assert.equal((await app.inject({ method: "GET", url: "/community/people?q=reader", headers: auth })).statusCode, 200);
+  await app.close();
+});
+
 test("own profile GET and shelf mural PUT are authed and validate the body", async () => {
   const calls: Array<Record<string, unknown>> = [];
   const app = Fastify();

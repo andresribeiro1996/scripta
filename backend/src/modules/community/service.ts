@@ -419,10 +419,11 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
     suggestPeople(viewerId, limit) {
       const own = new Set<string>();
       for (const book of libraryBooks(deps.resolveLibrary(viewerId))) for (const key of bookMatchKeys(book)) own.add(key);
+      const followees = new Set(repo.listFollowees(viewerId));
       const candidates = repo
         .listPublishedProfiles(SUGGESTION_SCAN_CAP)
         .map((row) => row.user_id)
-        .filter((id) => id !== viewerId && !repo.getFollow(viewerId, id));
+        .filter((id) => id !== viewerId && !followees.has(id));
       const profiles = deps.resolveProfiles(candidates);
       const scored = candidates.flatMap((id, recency) => {
         const user = profiles.get(id);

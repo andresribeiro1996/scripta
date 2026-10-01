@@ -1214,6 +1214,19 @@ test("publishing a privately chosen shelf for the first time announces it", () =
   assert.equal(announcements[0]?.ref_id, "m1");
 });
 
+test("choosing a mural on a later publish announces it, though the first publish had none", () => {
+  const { repo, events } = createRepoFake();
+  const { deps, usernames, ownedMurals } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  ownedMurals.add("alice:m1");
+  const announced = () => events.filter((event) => event.type === "mural_published").map((event) => event.ref_id);
+  service.publishProfile("alice", {});
+  assert.deepEqual(announced(), []);
+  service.publishProfile("alice", { muralId: "m1" });
+  assert.deepEqual(announced(), ["m1"]);
+});
+
 test("republishing the same mural after unpublish stays silent", () => {
   const { repo, events } = createRepoFake();
   const { deps, usernames, ownedMurals } = createDeps(repo);
@@ -1621,4 +1634,16 @@ test("a suggestion carries the card fields and the follower count, and a reader 
     sharedBooks: [{ title: "A", author: "A. Writer", coverUrl: null }]
   });
   assert.equal(plain?.user.readerGlyph, undefined);
+});
+
+test("suggested readers scan at most the 500 most recently active published profiles", () => {
+  const { repo, suggested } = suggestionFixture();
+  const requested: number[] = [];
+  const listPublishedProfiles = repo.listPublishedProfiles;
+  repo.listPublishedProfiles = (limit) => {
+    requested.push(limit);
+    return listPublishedProfiles(limit);
+  };
+  suggested();
+  assert.deepEqual(requested, [500]);
 });

@@ -5,6 +5,7 @@ import type {
   FeedCategory,
   FeedSettings,
   FeedItem,
+  PersonResult,
   PublishedContent,
   SuggestedReader
 } from "./types.js";
@@ -161,4 +162,10 @@ export function activityDay(iso: string, now: Date = new Date()): string {
 export function suggestionReason(reader: Pick<SuggestedReader, "sharedCount">): string {
   if (reader.sharedCount === 0) return "Recently active";
   return `You share ${reader.sharedCount} ${reader.sharedCount === 1 ? "book" : "books"}`;
+}
+
+export function personCaption(person: PersonResult | SuggestedReader): string {
+  if ("sharedCount" in person) return suggestionReason(person);
+  if (person.private) return "Private";
+  return `${person.followerCount} ${person.followerCount === 1 ? "follower" : "followers"}`;
 }

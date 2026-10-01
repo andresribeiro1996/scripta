@@ -1,3 +1,4 @@
+import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { authGuard, getOptionalAuthenticatedUser } from "../auth/index.js";
@@ -124,10 +125,13 @@ export function buildCommunityRoutes(service: CommunityService) {
       return reply.send({ people: service.searchPeople(request.user.id, parsed.data.q, parsed.data.limit) });
     });
 
-    app.get("/community/people/suggested", { preHandler: authGuard }, async (request, reply) => {
-      const parsed = suggestedQuerySchema.safeParse(request.query);
-      if (!parsed.success) return reply.code(400).send({ error: "Expected optional ?limit= between 1 and 50." });
-      return reply.send({ people: service.suggestPeople(request.user.id, parsed.data.limit) });
+    await app.register(async (scoped) => {
+      await scoped.register(fastifyRateLimit, { max: 30, timeWindow: "1 minute" });
+      scoped.get("/community/people/suggested", { preHandler: authGuard }, async (request, reply) => {
+        const parsed = suggestedQuerySchema.safeParse(request.query);
+        if (!parsed.success) return reply.code(400).send({ error: "Expected optional ?limit= between 1 and 50." });
+        return reply.send({ people: service.suggestPeople(request.user.id, parsed.data.limit) });
+      });
     });
   };
 }
