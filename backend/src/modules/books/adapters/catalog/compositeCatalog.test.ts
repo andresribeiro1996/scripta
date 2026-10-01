@@ -58,18 +58,24 @@ test("details fill what Open Library lacks, keep its rating and source URL, and 
   });
 });
 
-test("details keep Open Library's pages, year and publisher and fill the empty ones from ISBNdb", async () => {
+test("when ISBNdb is asked anyway, its pages, year and publisher fill what Open Library left empty", async () => {
+  assert.deepEqual(await createCompositeCatalog(fake(ol({ genres: [], pages: null, year: null, publisher: null })).catalog, fake(isbndb).catalog).fetchDetails(lookup), {
+    metadata: { ...olMetadata, genres: ["Fantasy"], pages: 544, year: 2005, publisher: "Penguin" },
+    sources: ["openlibrary", "isbndb"],
+    summarySource: "openlibrary"
+  });
+  assert.deepEqual(await createCompositeCatalog(fake(ol({ summary: null, pages: 300 })).catalog, fake(isbndb).catalog).fetchDetails(lookup), {
+    metadata: { ...olMetadata, summary: "ISBNdb summary.", pages: 300 },
+    sources: ["openlibrary", "isbndb"],
+    summarySource: "isbndb"
+  });
+});
+
+test("missing pages, year or publisher alone never ask ISBNdb", async () => {
   const bnFake = fake(isbndb);
-  assert.deepEqual(await createCompositeCatalog(fake(ol({ pages: null, year: null, publisher: null })).catalog, bnFake.catalog).fetchDetails(lookup), {
-    metadata: { ...olMetadata, pages: 544, year: 2005, publisher: "Penguin" },
-    sources: ["openlibrary", "isbndb"],
-    summarySource: "openlibrary"
-  });
-  assert.deepEqual(await createCompositeCatalog(fake(ol({ pages: null })).catalog, bnFake.catalog).fetchDetails(lookup), {
-    metadata: { ...olMetadata, pages: 544 },
-    sources: ["openlibrary", "isbndb"],
-    summarySource: "openlibrary"
-  });
+  const partial = ol({ pages: null, year: null, publisher: null });
+  assert.deepEqual(await createCompositeCatalog(fake(partial).catalog, bnFake.catalog).fetchDetails(lookup), partial);
+  assert.deepEqual(bnFake.calls, []);
 });
 
 test("details name only Open Library when ISBNdb adds nothing", async () => {

@@ -242,7 +242,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       const book = findOrCreate(lookup);
       if (!book) return null;
       if (book.details_status === "found") return detailsOf(book);
-      if (book.details_status === "missing" && !olderThan(book.details_checked_at, RETRY_AFTER_MS)) return null;
+      if (book.details_status === "missing" && !olderThan(book.details_checked_at, RETRY_AFTER_MS)) return book.summary ? detailsOf(book) : null;
       const details = await deps.catalog.fetchDetails({ isbn: book.isbn, title: book.title, author: book.author });
       const at = now().toISOString();
       if (details) {
@@ -251,7 +251,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       } else {
         deps.repo.markDetailsMissing(book.id, at);
       }
-      return details ? detailsOf(deps.repo.getBook(book.id) ?? book) : null;
+      return details || book.summary ? detailsOf(deps.repo.getBook(book.id) ?? book) : null;
     },
 
     search(query) {

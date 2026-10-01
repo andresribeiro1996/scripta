@@ -405,6 +405,18 @@ test("a details miss is remembered for 30 days", async () => {
   assert.equal(calls.length, 2);
 });
 
+test("a book with a publisher synopsis still returns it when the catalog finds nothing", async () => {
+  const { catalog } = recordingCatalog({ fetchDetails: async () => null });
+  const h = harness({ catalog });
+  h.service.resolveCover(dune);
+  const id = h.bookId("isbn:9780441013593");
+  h.repo.mergeDetails(id, { summary: "Sinopse da editora.", pages: 500, year: 2001, publisher: "Antígona", translator: "Maria" }, "publisher");
+  const expected = { summary: "Sinopse da editora.", rating: null, ratingCount: 0, sourceUrl: "", genres: [], pages: 500, publisher: "Antígona", year: 2001, translator: "Maria" };
+  assert.deepEqual(await h.service.getDetails(dune), expected);
+  assert.equal(h.repo.getBook(id)!.details_status, "missing");
+  assert.deepEqual(await h.service.getDetails(dune), expected);
+});
+
 test("a details failure propagates and records nothing", async () => {
   const h = harness({ catalog: recordingCatalog({ fetchDetails: async () => { throw new SourceUnavailableError("openlibrary", "HTTP 503"); } }).catalog });
   await assert.rejects(h.service.getDetails(dune), SourceUnavailableError);

@@ -3,10 +3,6 @@ import { SourceUnavailableError } from "../../domain/errors.js";
 import { lookupIdentity, SEARCH_LIMIT } from "../../domain/normalize.js";
 import type { BookCatalog, CatalogSearchHit } from "../../domain/ports.js";
 
-function isComplete(metadata: BookMetadata): boolean {
-  return Boolean(metadata.summary && metadata.publisher) && metadata.genres.length > 0 && metadata.pages !== null && metadata.year !== null;
-}
-
 type Attempt<T> = { ok: true; value: T } | { ok: false; error: SourceUnavailableError };
 
 async function attempt<T>(task: Promise<T>): Promise<Attempt<T>> {
@@ -43,7 +39,7 @@ export function createCompositeCatalog(primary: BookCatalog, secondary: BookCata
     async fetchDetails(lookup) {
       const first = await attempt(primary.fetchDetails(lookup));
       const found = first.ok ? first.value : null;
-      if ((found && isComplete(found.metadata)) || !lookup.isbn) {
+      if ((found?.metadata.summary && found.metadata.genres.length > 0) || !lookup.isbn) {
         if (!first.ok) throw first.error;
         return found;
       }
