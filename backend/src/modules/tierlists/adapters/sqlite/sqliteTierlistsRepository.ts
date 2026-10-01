@@ -5,7 +5,7 @@
 import { normalizeWords, rekeyTierBoard } from "@scripta/shared";
 import type { DatabaseSync } from "node:sqlite";
 import type { TierlistsRepository } from "../../domain/ports.js";
-import type { TierlistRow, BallotRow, Placement } from "../../domain/types.js";
+import type { TierlistRow, BallotRow, BallotTotals, Placement, TierlistDiscoverRow } from "../../domain/types.js";
 
 export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepository {
   const insertStmt = db.prepare(`
@@ -30,6 +30,27 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
     `SELECT * FROM tierlists WHERE vote_code IS NOT NULL ORDER BY created_at DESC LIMIT ? OFFSET ?`
   );
   const getPublicByIdStmt = db.prepare(`SELECT * FROM tierlists WHERE id = ? AND vote_code IS NOT NULL`);
+  const discoverWindowStmt = db.prepare(
+    `SELECT id, created_at, origin_user_id, promoted_at FROM tierlists WHERE vote_code IS NOT NULL ORDER BY created_at DESC LIMIT ?`
+  );
+  const discoverSearchStmt = db.prepare(
+    `SELECT id, created_at, origin_user_id, promoted_at FROM tierlists WHERE vote_code IS NOT NULL AND name_key LIKE '%' || ? || '%' ORDER BY created_at DESC LIMIT ?`
+  );
+  const listPublicByIdsStmt = db.prepare(`SELECT * FROM tierlists WHERE vote_code IS NOT NULL AND id IN (SELECT value FROM json_each(?))`);
+  const ballotTotalsForStmt = db.prepare(`
+    SELECT b.tierlist_id,
+      COUNT(*) AS ballots,
+      SUM(CASE WHEN b.voter_user_id IS NOT NULL AND b.voter_user_id != t.origin_user_id AND EXISTS (SELECT 1 FROM tierlist_ballot_placements WHERE ballot_id = b.id) THEN 1 ELSE 0 END) AS eligible
+    FROM tierlist_ballots b
+    JOIN tierlists t ON t.id = b.tierlist_id
+    WHERE b.tierlist_id IN (SELECT value FROM json_each(?))
+    GROUP BY b.tierlist_id
+  `);
+  const votedAmongStmt = db.prepare(`
+    SELECT t.id FROM tierlists t
+    WHERE t.id IN (SELECT value FROM json_each(?)) AND t.origin_user_id != ?
+      AND EXISTS (SELECT 1 FROM tierlist_ballots b WHERE b.tierlist_id = t.id AND b.voter_user_id = ?)
+  `);
   const listPublicByUserStmt = db.prepare(
     `SELECT * FROM tierlists WHERE origin_user_id = ? AND vote_code IS NOT NULL ORDER BY created_at DESC`
   );
@@ -253,6 +274,24 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
 
     listVotedByUser(voterUserId) {
       return listVotedByUserStmt.all(voterUserId, voterUserId) as unknown as TierlistRow[];
+    },
+
+    discoverWindow(needle, limit) {
+      const rows = needle ? discoverSearchStmt.all(needle, limit) : discoverWindowStmt.all(limit);
+      return rows as unknown as TierlistDiscoverRow[];
+    },
+
+    listPublicByIds(ids) {
+      return listPublicByIdsStmt.all(JSON.stringify(ids)) as unknown as TierlistRow[];
+    },
+
+    ballotTotalsFor(ids) {
+      const rows = ballotTotalsForStmt.all(JSON.stringify(ids)) as unknown as { tierlist_id: string; ballots: number; eligible: number }[];
+      return new Map<string, BallotTotals>(rows.map((r) => [r.tierlist_id, { ballots: Number(r.ballots), eligible: Number(r.eligible) }]));
+    },
+
+    votedAmong(voterUserId, ids) {
+      return (votedAmongStmt.all(JSON.stringify(ids), voterUserId, voterUserId) as unknown as { id: string }[]).map((r) => r.id);
     },
 
     getBallotById(tierlistId, ballotId) {

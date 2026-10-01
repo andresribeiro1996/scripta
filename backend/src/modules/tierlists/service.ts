@@ -72,6 +72,13 @@ export interface PublishedTierlistRef {
   covers: string[];
 }
 
+export interface TierlistDiscoverRef {
+  id: string;
+  createdAt: string;
+  ownerUserId: string;
+  promotedAt: string | null;
+}
+
 export interface TierlistsService {
   listTierlists(userId: string): Tierlist[];
   createTierlist(userId: string, name: string, data?: TierlistDocument, access?: VoteAccess, publicBooks?: unknown[]): Tierlist;
@@ -94,6 +101,9 @@ export interface TierlistsService {
   getVotingBoard(code: string): VotingBoard | undefined;
   listPublicTierlists(limit: number, offset: number): PublicTierlistSummary[];
   listPublishedRefs(limit: number, offset: number): PublishedTierlistRef[];
+  discoverWindow(needle: string, limit: number): TierlistDiscoverRef[];
+  getPublishedRefs(ids: string[]): PublishedTierlistRef[];
+  votedAmong(voterUserId: string, ids: string[]): string[];
   getPublishedRef(id: string): PublishedTierlistRef | undefined;
   listPublishedRefsByOwner(ownerUserId: string): PublishedTierlistRef[];
   /** Public tier lists the account has a ballot on, latest ballot first —
@@ -382,6 +392,22 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
       return repo.listPublic(limit, offset).map((row) => ({ ...toPublishedRef(row, counts.get(row.id) ?? 0), eligibleVoteCount: repo.eligibleVoteCount(row.id, row.origin_user_id) }));
     },
 
+    discoverWindow(needle, limit) {
+      return repo.discoverWindow(needle, limit).map((row) => ({ id: row.id, createdAt: row.created_at, ownerUserId: row.origin_user_id, promotedAt: row.promoted_at }));
+    },
+
+    getPublishedRefs(ids) {
+      const totals = repo.ballotTotalsFor(ids);
+      return repo.listPublicByIds(ids).map((row) => {
+        const total = totals.get(row.id);
+        return { ...toPublishedRef(row, total?.ballots ?? 0), eligibleVoteCount: total?.eligible ?? 0 };
+      });
+    },
+
+    votedAmong(voterUserId, ids) {
+      return repo.votedAmong(voterUserId, ids);
+    },
+
     getPublishedRef(id) {
       const row = repo.getPublicById(id);
       return row ? { ...toPublishedRef(row, repo.ballotCount(id)), eligibleVoteCount: repo.eligibleVoteCount(row.id, row.origin_user_id) } : undefined;
@@ -430,6 +456,9 @@ export interface TierlistData {
 export interface TierlistsPublicApi {
   getTierlistData(ownerUserId: string, tierlistId: string): TierlistData | undefined;
   listPublished(limit: number, offset: number): PublishedTierlistRef[];
+  discoverWindow(needle: string, limit: number): TierlistDiscoverRef[];
+  getPublishedMany(ids: string[]): PublishedTierlistRef[];
+  votedAmong(voterUserId: string, ids: string[]): string[];
   getPublished(id: string): PublishedTierlistRef | undefined;
   listPublishedByOwner(ownerUserId: string): PublishedTierlistRef[];
   listVotedByUser(voterUserId: string): PublishedTierlistRef[];
@@ -448,6 +477,9 @@ export function createTierlistsPublicApi(service: TierlistsService): TierlistsPu
       return { name: tierlist.name, tiers: data.tiers ?? [], pool: data.pool ?? [] };
     },
     listPublished: (limit, offset) => service.listPublishedRefs(limit, offset),
+    discoverWindow: (needle, limit) => service.discoverWindow(needle, limit),
+    getPublishedMany: (ids) => service.getPublishedRefs(ids),
+    votedAmong: (voterUserId, ids) => service.votedAmong(voterUserId, ids),
     getPublished: (id) => service.getPublishedRef(id),
     listPublishedByOwner: (ownerUserId) => service.listPublishedRefsByOwner(ownerUserId),
     listVotedByUser: (voterUserId) => service.listVotedByUser(voterUserId),

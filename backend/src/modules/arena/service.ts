@@ -48,6 +48,12 @@ export interface TournamentSummary {
   winner: SeedBookInput | null;
 }
 
+export interface TournamentDiscoverRef {
+  id: string;
+  createdAt: string;
+  ownerUserId: string;
+}
+
 export interface DuelSideView extends SeedBookInput {
   votes: number;
 }
@@ -74,6 +80,9 @@ export interface ArenaService {
   createTournament(ownerUserId: string, input: { name: string; bracketSize: number; roundDurationMinutes: number }): TournamentSummary;
   listMine(ownerUserId: string): TournamentSummary[];
   listPublic(limit: number, offset: number): TournamentSummary[];
+  discoverWindow(needle: string, limit: number): TournamentDiscoverRef[];
+  listPublicByIds(ids: string[]): TournamentSummary[];
+  votedAmong(voterUserId: string, ids: string[]): string[];
   getTournamentView(id: string, voterToken?: string, viewerUserId?: string | null): TournamentView | null;
   setSlotsManual(tournamentId: string, ownerUserId: string, entries: Array<{ slotIndex: number; book: SeedBookInput }>): void;
   randomFill(tournamentId: string, ownerUserId: string, pool: SeedBookInput[]): void;
@@ -310,6 +319,18 @@ export function createArenaService(repo: ArenaRepository, emitPublished?: EmitPu
       return summariesWithPreviews(repo, repo.listPublicTournaments(limit, offset));
     },
 
+    discoverWindow(needle, limit) {
+      return repo.discoverWindow(needle, limit).map((row) => ({ id: row.id, createdAt: row.created_at, ownerUserId: row.owner_user_id }));
+    },
+
+    listPublicByIds(ids) {
+      return summariesWithPreviews(repo, repo.listPublicByIds(ids));
+    },
+
+    votedAmong(voterUserId, ids) {
+      return repo.votedAmong(voterUserId, ids);
+    },
+
     getTournamentView(id, voterToken, viewerUserId) {
       const tournament = repo.getTournament(id);
       if (!tournament) return null;
@@ -473,6 +494,9 @@ export interface PublishedTournamentRef {
 
 export interface ArenaPublicApi {
   listPublished(limit: number, offset: number): PublishedTournamentRef[];
+  discoverWindow(needle: string, limit: number): TournamentDiscoverRef[];
+  getPublishedMany(ids: string[]): PublishedTournamentRef[];
+  votedAmong(voterUserId: string, ids: string[]): string[];
   getPublished(id: string): PublishedTournamentRef | undefined;
   listPublishedByOwner(ownerUserId: string): PublishedTournamentRef[];
   listVotedByUser(voterUserId: string): PublishedTournamentRef[];
@@ -494,6 +518,9 @@ function toPublishedRef(summary: TournamentSummary): PublishedTournamentRef {
 export function createArenaPublicApi(service: ArenaService): ArenaPublicApi {
   return {
     listPublished: (limit, offset) => service.listPublic(limit, offset).map(toPublishedRef),
+    discoverWindow: (needle, limit) => service.discoverWindow(needle, limit),
+    getPublishedMany: (ids) => service.listPublicByIds(ids).map(toPublishedRef),
+    votedAmong: (voterUserId, ids) => service.votedAmong(voterUserId, ids),
     getPublished: (id) => {
       const summary = service.getPublicSummary(id);
       return summary ? toPublishedRef(summary) : undefined;

@@ -334,3 +334,63 @@ test("a database from before name_key gets the column, the public index and fill
   const index = db.prepare(`SELECT name FROM sqlite_master WHERE type='index' AND name='idx_tournaments_public'`).get();
   assert.ok(index, "the public listing index exists after migrating");
 });
+
+test("discoverWindow returns started tournaments whose name_key contains the needle, newest first, up to the limit", () => {
+  const repo = createSqliteArenaRepository(freshDb());
+  repo.insertTournament(tournament({ id: "habits", name: "Hábitos Atómicos", status: "active", created_at: "2026-01-01T00:00:00.000Z" }));
+  repo.insertTournament(tournament({ id: "fantasy", name: "Fantasy Cup", status: "active", owner_user_id: "u2", created_at: "2026-02-01T00:00:00.000Z" }));
+  repo.insertTournament(tournament({ id: "done", name: "Hábitos Concluídos", status: "completed", created_at: "2026-03-01T00:00:00.000Z" }));
+  repo.insertTournament(tournament({ id: "draft", name: "Hábitos rascunho", status: "seeding", created_at: "2026-04-01T00:00:00.000Z" }));
+  const ids = (needle: string, limit = 10) => repo.discoverWindow(needle, limit).map((r) => r.id);
+
+  assert.deepEqual(ids("habitos"), ["done", "habits"]);
+  assert.deepEqual(ids("habitos", 1), ["done"]);
+  assert.deepEqual(ids("habitos atom"), ["habits"]);
+  assert.deepEqual(ids("fantasy"), ["fantasy"]);
+  assert.deepEqual(ids("nothing like it"), []);
+  assert.deepEqual(ids(""), ["done", "fantasy", "habits"]);
+  assert.deepEqual(ids("", 2), ["done", "fantasy"]);
+  assert.deepEqual(repo.discoverWindow("fantasy", 10).map((r) => ({ ...r })), [{ id: "fantasy", created_at: "2026-02-01T00:00:00.000Z", owner_user_id: "u2" }]);
+});
+
+test("a renamed tournament is found by its new name and no longer by the old one", () => {
+  const repo = createSqliteArenaRepository(freshDb());
+  repo.insertTournament(tournament({ id: "t1", name: "Old name", status: "active" }));
+  repo.renameTournament("t1", "Novo Título");
+
+  assert.deepEqual(repo.discoverWindow("novo titulo", 10).map((r) => r.id), ["t1"]);
+  assert.deepEqual(repo.discoverWindow("old name", 10), []);
+});
+
+test("listPublicByIds returns the started tournaments among the ids and nothing else", () => {
+  const repo = createSqliteArenaRepository(freshDb());
+  repo.insertTournament(tournament({ id: "t1", status: "active" }));
+  repo.insertTournament(tournament({ id: "t2", status: "completed" }));
+  repo.insertTournament(tournament({ id: "t3", status: "active" }));
+  repo.insertTournament(tournament({ id: "draft", status: "seeding" }));
+
+  assert.deepEqual(repo.listPublicByIds(["t1", "draft", "ghost", "t3"]).map((r) => r.id).sort(), ["t1", "t3"]);
+  assert.deepEqual(repo.listPublicByIds([]), []);
+});
+
+test("votedAmong returns the requested tournaments the account has voted in, never its own", () => {
+  const db = freshDb();
+  seedTournament(db, "t1", "u1", "One");
+  seedTournament(db, "t2", "u1", "Two");
+  seedTournament(db, "t3", "voter-1", "Own");
+  seedTournament(db, "t4", "u1", "Anonymous only");
+  seedTournament(db, "t5", "u1", "Other voter");
+  const repo = createSqliteArenaRepository(db);
+  repo.insertVote(vote("v1", "duel-t1", "tok-1", "voter-1", "2026-01-01T00:00:00.000Z"));
+  repo.insertVote(vote("v2", "duel-t2", "tok-1", "voter-1", "2026-01-02T00:00:00.000Z"));
+  repo.insertVote(vote("v3", "duel-t3", "tok-1", "voter-1", "2026-01-03T00:00:00.000Z"));
+  repo.insertVote(vote("v4", "duel-t4", "tok-2", null, "2026-01-04T00:00:00.000Z"));
+  repo.insertVote(vote("v5", "duel-t5", "tok-3", "voter-2", "2026-01-05T00:00:00.000Z"));
+  const sorted = (ids: string[]) => [...ids].sort();
+
+  assert.deepEqual(sorted(repo.votedAmong("voter-1", ["t1", "t3", "t4", "t5", "ghost"])), ["t1"]);
+  assert.deepEqual(sorted(repo.votedAmong("voter-1", ["t1", "t2"])), ["t1", "t2"]);
+  assert.deepEqual(repo.votedAmong("voter-1", []), []);
+  assert.deepEqual(repo.votedAmong("nobody", ["t1", "t2", "t3", "t4", "t5"]), []);
+  assert.deepEqual(sorted(repo.votedAmong("voter-1", ["t1", "t2", "t3", "t4", "t5"])), sorted(repo.listVotedByUser("voter-1").map((t) => t.id)));
+});
