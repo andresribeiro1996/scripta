@@ -259,6 +259,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
     follow(followerId, followeeId) {
       if (followerId === followeeId) throw new SelfFollowError();
       if (!deps.resolveProfiles([followeeId]).has(followeeId)) throw new ProfileNotFoundError();
+      if (repo.getFollow(followerId, followeeId)) return;
       if (repo.getProfileRow(followeeId)?.published !== 1 && !repo.getFollow(followeeId, followerId)) throw new ProfileNotFoundError();
       const inserted = repo.insertFollow({ follower_id: followerId, followee_id: followeeId, created_at: new Date().toISOString() });
       if (inserted) {

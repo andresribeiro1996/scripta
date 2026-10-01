@@ -24,11 +24,29 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+function text(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+function textFields(book: Record<string, unknown>): Record<string, unknown> {
+  return {
+    ReadStatus: book.ReadStatus,
+    Title: text(book.Title),
+    Attribution: text(book.Attribution),
+    ISBN: text(book.ISBN),
+    ContentID: text(book.ContentID),
+    _genres: book._genres,
+    _coverUrl: text(book._coverUrl),
+    highlights: Array.isArray(book.highlights) ? book.highlights.filter(isRecord).map((mark) => ({ Type: mark.Type, Text: text(mark.Text), Annotation: text(mark.Annotation) })) : undefined
+  };
+}
+
 export function deriveLibraryData(data: unknown): LibraryDerived {
   const parts = libraryParts(data);
   if (!parts) return { glyph: null, keys: [] };
-  const identity = readerIdentity(parts.allBooks, toReaderGroups(parts.groupRecords));
-  const keys = parts.allBooks.slice(0, LIBRARY_MATCH_BOOK_CAP).flatMap((book, bookRef) =>
+  const books = parts.allBooks.map(textFields);
+  const identity = readerIdentity(books, toReaderGroups(parts.groupRecords));
+  const keys = books.slice(0, LIBRARY_MATCH_BOOK_CAP).flatMap((book, bookRef) =>
     bookMatchKeys(book).map((key) => ({
       key,
       book_ref: bookRef,

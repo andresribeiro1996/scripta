@@ -101,13 +101,15 @@ export function clearEmbeddedMuralsField(userIds: string[]): void {
 }
 
 function deriveStoredDocument(userId: string, dataJson: string): LibraryDerived {
+  let parsed: unknown;
   try {
-    return deriveLibraryData(JSON.parse(dataJson));
+    parsed = JSON.parse(dataJson);
   } catch (error) {
-    if (!(error instanceof SyntaxError || error instanceof TypeError)) throw error;
+    if (!(error instanceof SyntaxError)) throw error;
     console.error(`library backfill: storing ${userId}'s library without derived data`, error);
     return { glyph: null, keys: [] };
   }
+  return deriveLibraryData(parsed);
 }
 
 export function backfillLibraryDerived(): void {

@@ -296,6 +296,19 @@ test("an unpublished reader who follows you can be followed back, and nobody els
   assert.throws(() => service.follow("dave", "alice"), ProfileNotFoundError);
 });
 
+test("following again a reader who has since gone private changes nothing", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  repo.upsertProfile(profileRow("alice"));
+  service.follow("bob", "alice");
+  repo.upsertProfile(profileRow("alice", { published: 0 }));
+  service.follow("bob", "alice");
+  assert.equal(repo.countFollowers("alice"), 1);
+  assert.notEqual(repo.getFollow("bob", "alice"), undefined);
+});
+
 test("unfollow without an existing follow throws", () => {
   const { repo } = createRepoFake();
   const { deps } = createDeps(repo);

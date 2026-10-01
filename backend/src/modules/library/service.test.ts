@@ -425,6 +425,30 @@ test("deriveLibraryData skips books that have no key and survives a document wit
   for (const junk of [{ books: "none" }, {}, [], null, "text", 7]) assert.deepEqual(deriveLibraryData(junk), { glyph: null, keys: [] });
 });
 
+test("deriveLibraryData keys a book by the fields that are text, whatever its others hold", () => {
+  const odd = { toString: 5 };
+  const derived = deriveLibraryData({
+    books: [
+      { Title: "Dune", Attribution: odd, ISBN: "9780441013593", ReadStatus: 2 },
+      { Title: odd, Attribution: "Jane Austen", ReadStatus: 2 },
+      { Title: "Emma", Attribution: "Jane Austen", ISBN: odd, ReadStatus: 2 },
+      { Title: 42, Attribution: ["Someone"], ISBN: 9780441013593 }
+    ]
+  });
+  assert.deepEqual(derived.keys, [
+    { key: "isbn:9780441013593", book_ref: 0, title: "Dune", author: "", isbn: "9780441013593", cover: null },
+    { key: "ta:emma|jane austen", book_ref: 2, title: "Emma", author: "Jane Austen", isbn: null, cover: null }
+  ]);
+});
+
+test("deriveLibraryData settles the glyph whatever the odd books around it hold", () => {
+  const odd = { toString: 5 };
+  const books = shelf(10);
+  books[5] = { ...books[5], Attribution: odd, ContentID: odd, highlights: [{ Type: "highlight", Text: odd, Annotation: odd }, null, 7] };
+  books[6] = { ...books[6], Title: odd, ISBN: odd };
+  assert.equal(deriveLibraryData({ books, groups: [seriesGroup(books.slice(0, 3))] }).glyph, "carto");
+});
+
 test("deriveLibraryData keys the first 20,000 books but settles the glyph on all of them", () => {
   const filler = Array.from({ length: LIBRARY_MATCH_BOOK_CAP }, (_, i) => ({ Title: `Filler ${i}`, Attribution: `Writer ${i}`, ReadStatus: 0 }));
   const finished = shelf(10);
@@ -548,6 +572,7 @@ test("deleting a user's data clears the document and its derived rows, and only 
 test("the backfill derives every document that has no derived row, and a second run changes nothing", () => {
   const books = shelf(10);
   rawDocument("backfill-settled", JSON.stringify({ books, groups: [seriesGroup(books.slice(0, 3))] }));
+  rawDocument("backfill-odd", JSON.stringify({ books: [{ Title: "Dune", Attribution: { toString: 5 }, ISBN: "9780441013593", ReadStatus: 2 }] }));
   fileService.saveLibrary("backfill-saved", { books: [{ Title: "Dune", Attribution: "Frank Herbert" }] });
 
   backfillLibraryDerived();
@@ -555,6 +580,7 @@ test("the backfill derives every document that has no derived row, and a second 
   assert.equal(storedGlyph(fileDb, "backfill-settled"), "carto");
   assert.equal(keyRows(fileDb, "backfill-settled").length, 10);
   assert.equal(keyRows(fileDb, "backfill-saved").length, 1);
+  assert.deepEqual(keyRows(fileDb, "backfill-odd").map((row) => row.key), ["isbn:9780441013593"]);
 
   rawDocument("backfill-settled", JSON.stringify({ books: [{ Title: "Other", Attribution: "Writer" }] }));
   backfillLibraryDerived();
@@ -563,35 +589,33 @@ test("the backfill derives every document that has no derived row, and a second 
   assert.equal(keyRows(fileDb, "backfill-settled").length, 10);
 });
 
-test("the backfill stores an unreadable document without keys, says so, and never retries it", () => {
+test("the backfill stores an unparseable document without keys, says so, and never retries it", () => {
   const logged = mock.method(console, "error", () => undefined);
   try {
     rawDocument("backfill-corrupt", "not json");
-    rawDocument("backfill-poisoned", JSON.stringify({ books: [{ Title: "Dune", Attribution: { toString: 5 }, ReadStatus: 2 }] }));
 
     backfillLibraryDerived();
 
-    for (const userId of ["backfill-corrupt", "backfill-poisoned"]) {
-      assert.equal(storedGlyph(fileDb, userId), null);
-      assert.deepEqual(keyRows(fileDb, userId), []);
-    }
-    assert.equal(logged.mock.callCount(), 2);
+    assert.equal(storedGlyph(fileDb, "backfill-corrupt"), null);
+    assert.deepEqual(keyRows(fileDb, "backfill-corrupt"), []);
+    assert.equal(logged.mock.callCount(), 1);
 
     rawDocument("backfill-corrupt", JSON.stringify({ books: [{ Title: "Fixed", Attribution: "Writer" }] }));
     backfillLibraryDerived();
 
     assert.deepEqual(keyRows(fileDb, "backfill-corrupt"), []);
-    assert.equal(logged.mock.callCount(), 2);
+    assert.equal(logged.mock.callCount(), 1);
   } finally {
     logged.mock.restore();
   }
 });
 
-test("a document whose values can't be read as text is refused, and nothing is stored", () => {
-  const { db, repo, service } = setup();
-  assert.throws(() => service.saveLibrary("u1", { books: [{ Title: "Dune", Attribution: { toString: 5 }, ReadStatus: 2 }] }), TypeError);
-  assert.equal(repo.getDocument("u1"), undefined);
-  assert.deepEqual(keyRows(db, "u1"), []);
+test("saving a library with a book whose fields aren't text succeeds, and keys the book by what is", () => {
+  const { db, service } = setup();
+  const books = [{ Title: "Dune", Attribution: { toString: 5 }, ISBN: "9780441013593", ReadStatus: 2 }, { Title: "Emma", Attribution: "Jane Austen", ReadStatus: 2 }];
+  service.saveLibrary("u1", { books });
+  assert.deepEqual(service.getLibrary("u1")?.data, { books });
+  assert.deepEqual(keyRows(db, "u1").map((row) => [row.book_ref, row.key]), [[0, "isbn:9780441013593"], [1, "ta:emma|jane austen"]]);
   db.close();
 });
 

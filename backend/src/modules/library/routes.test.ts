@@ -36,6 +36,15 @@ async function setup() {
   return { app, service, merge };
 }
 
+test("PUT /library saves a book whose fields aren't text", async () => {
+  const { app } = await setup();
+  const book = { Title: "Dune", Attribution: { toString: 5 }, ISBN: "9780441013593", ReadStatus: 2 };
+  const res = await app.inject({ method: "PUT", url: "/library", headers: { authorization: "Bearer u1" }, payload: { data: { books: [book] } } });
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual((res.json() as { data: { books: unknown[] } }).data.books, [book]);
+  await app.close();
+});
+
 test("POST /library/books/merge requires a signed-in user", async () => {
   const { app, merge } = await setup();
   const res = await merge({ keep: "a", merge: ["b"], updatedAt: "2026-01-01T00:00:00.000Z" }, null);
