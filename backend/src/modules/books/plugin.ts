@@ -63,7 +63,7 @@ export async function booksPlugin(app: FastifyInstance) {
     warn: (details, message) => app.log.warn(details, message)
   });
   const worker = createCoverWorker(
-    (bookId) => service.processBook(bookId),
+    (bookId, lane) => service.processBook(bookId, lane),
     (error, bookId) => app.log.error({ err: error, bookId }, "cover lookup failed")
   );
   service.enqueueUnchecked();

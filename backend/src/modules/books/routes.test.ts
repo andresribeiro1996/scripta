@@ -75,7 +75,7 @@ test("resolve needs auth, needs an ISBN or title, and ignores imageId", async ()
   assert.equal((await call(service, { method: "GET", url: "/covers/resolve?imageId=abc" }, "u1")).statusCode, 400);
   const res = await call(service, { method: "GET", url: "/covers/resolve?title=Dune&author=Frank%20Herbert&imageId=abc" }, "u1");
   assert.equal(res.statusCode, 200);
-  assert.deepEqual(res.json(), { url: null, fullUrl: null, pending: true });
+  assert.deepEqual(res.json(), { url: null, fullUrl: null, pending: true, upgrading: false });
 });
 
 test("batch resolve answers each lookup in order and validates the whole list", async () => {
@@ -87,7 +87,7 @@ test("batch resolve answers each lookup in order and validates the whole list", 
   assert.equal((await post(Array.from({ length: 101 }, (_, i) => ({ title: `Book ${i}` })), "u1")).statusCode, 400);
   const res = await post([{ title: "Dune" }, { isbn: "9780441013593", imageId: "ignored" }], "u1");
   assert.equal(res.statusCode, 200);
-  assert.deepEqual(res.json(), { results: [{ url: null, fullUrl: null, pending: true }, { url: null, fullUrl: null, pending: true }] });
+  assert.deepEqual(res.json(), { results: [{ url: null, fullUrl: null, pending: true, upgrading: false }, { url: null, fullUrl: null, pending: true, upgrading: false }] });
 });
 
 test("the old cover URLs redirect permanently to the stored file; a bad id is a 400", async () => {

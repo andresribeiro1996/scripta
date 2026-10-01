@@ -1,21 +1,23 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createCoverWorker } from "./worker.js";
+import { createCoverWorker, type CoverPriority } from "./worker.js";
 
 function gated() {
   const started: string[] = [];
+  const lanes = new Map<string, CoverPriority>();
   const gates = new Map<string, () => void>();
   let inFlight = 0;
   let peak = 0;
-  const processBook = async (id: string) => {
+  const processBook = async (id: string, lane: CoverPriority) => {
     started.push(id);
+    lanes.set(id, lane);
     inFlight++;
     peak = Math.max(peak, inFlight);
     await new Promise<void>((resolve) => gates.set(id, resolve));
     inFlight--;
   };
   const release = (id: string) => gates.get(id)!();
-  return { started, processBook, release, peak: () => peak };
+  return { started, lanes, processBook, release, peak: () => peak };
 }
 
 const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
@@ -279,4 +281,179 @@ test("normal books still use all three slots while a background book runs", asyn
   assert.deepEqual(gate.started, ["bg1", "n1", "n2", "n3"]);
   await drainAll(worker, gate);
   assert.deepEqual(gate.started.slice(4), ["bg2"]);
+});
+
+test("upgrade books run before background books queued earlier", async () => {
+  const gate = gated();
+  const worker = createCoverWorker(gate.processBook, () => {});
+  await holdSlots(worker, gate);
+  worker.enqueue("bg1", "background");
+  worker.enqueue("up1", "upgrade");
+  worker.enqueue("bg2", "background");
+  worker.enqueue("up2", "upgrade");
+  for (const id of ["h1", "h2", "h3"]) gate.release(id);
+  await tick();
+  assert.deepEqual(gate.started.slice(3), ["up1"]);
+  await drainAll(worker, gate);
+  assert.deepEqual(gate.started.slice(3), ["up1", "up2", "bg1", "bg2"]);
+});
+
+test("upgrade and background together never exceed one running book", async () => {
+  const gate = gated();
+  const worker = createCoverWorker(gate.processBook, () => {});
+  worker.enqueue("bg1", "background");
+  worker.enqueue("up1", "upgrade");
+  worker.enqueue("bg2", "background");
+  worker.enqueue("up2", "upgrade");
+  await tick();
+  assert.deepEqual(gate.started, ["bg1"]);
+  await drainAll(worker, gate);
+  assert.deepEqual(gate.started, ["bg1", "up1", "up2", "bg2"]);
+  assert.equal(gate.peak(), 1);
+});
+
+test("normal books still use all three slots while an upgrade runs", async () => {
+  const gate = gated();
+  const worker = createCoverWorker(gate.processBook, () => {});
+  worker.enqueue("up1", "upgrade");
+  worker.enqueue("up2", "upgrade");
+  await tick();
+  for (const id of ["n1", "n2", "n3"]) worker.enqueue(id);
+  await tick();
+  assert.deepEqual(gate.started, ["up1", "n1", "n2"]);
+  gate.release("n1");
+  await tick();
+  assert.deepEqual(gate.started, ["up1", "n1", "n2", "n3"]);
+  await drainAll(worker, gate);
+  assert.deepEqual(gate.started.slice(4), ["up2"]);
+});
+
+test("a normal request for a book queued as upgrade leaves it there and runs it once", async () => {
+  const gate = gated();
+  const worker = createCoverWorker(gate.processBook, () => {});
+  await holdSlots(worker, gate);
+  worker.enqueue("up1", "upgrade");
+  worker.enqueue("n1");
+  worker.enqueue("up1");
+  gate.release("h1");
+  await tick();
+  assert.deepEqual(gate.started.slice(3), ["n1"]);
+  await drainAll(worker, gate);
+  assert.deepEqual(gate.started.slice(3), ["n1", "up1"]);
+  assert.equal(gate.lanes.get("up1"), "upgrade");
+});
+
+test("a front request for a book queued as upgrade promotes it and it runs once", async () => {
+  const gate = gated();
+  const worker = createCoverWorker(gate.processBook, () => {});
+  await holdSlots(worker, gate);
+  worker.enqueue("up1", "upgrade");
+  worker.enqueue("up2", "upgrade");
+  worker.enqueue("n1");
+  worker.enqueue("up2", "front");
+  gate.release("h1");
+  await tick();
+  assert.deepEqual(gate.started.slice(3), ["up2"]);
+  assert.equal(gate.lanes.get("up2"), "front");
+  await drainAll(worker, gate);
+  assert.deepEqual(gate.started.slice(3), ["up2", "n1", "up1"]);
+  assert.equal(gate.lanes.get("up1"), "upgrade");
+});
+
+test("upgrade is a no-op for a book already queued fast or queued as background", async () => {
+  const gate = gated();
+  const worker = createCoverWorker(gate.processBook, () => {});
+  await holdSlots(worker, gate);
+  worker.enqueue("n1");
+  worker.enqueue("bg1", "background");
+  worker.enqueue("n1", "upgrade");
+  worker.enqueue("bg1", "upgrade");
+  await drainAll(worker, gate);
+  assert.deepEqual(gate.started.slice(3), ["n1", "bg1"]);
+  assert.equal(gate.lanes.get("bg1"), "background");
+});
+
+test("an upgrade request for an active book is remembered and runs on the upgrade lane afterwards", async () => {
+  const gate = gated();
+  const worker = createCoverWorker(gate.processBook, () => {});
+  await holdSlots(worker, gate);
+  worker.enqueue("h1", "upgrade");
+  worker.enqueue("h1", "upgrade");
+  gate.release("h1");
+  await drainAll(worker, gate);
+  assert.deepEqual(gate.started.slice(3), ["h1"]);
+  assert.equal(gate.lanes.get("h1"), "upgrade");
+});
+
+test("a front request for an active book beats a remembered upgrade", async () => {
+  const gate = gated();
+  const worker = createCoverWorker(gate.processBook, () => {});
+  await holdSlots(worker, gate);
+  worker.enqueue("h1", "upgrade");
+  worker.enqueue("h1", "front");
+  worker.enqueue("h1", "upgrade");
+  gate.release("h1");
+  await tick();
+  assert.deepEqual(gate.started.slice(3), ["h1"]);
+  assert.equal(gate.lanes.get("h1"), "front");
+  gate.release("h1");
+  await drainAll(worker, gate);
+  assert.deepEqual(gate.started.slice(3), ["h1"]);
+});
+
+test("a background request for an active book is ignored", async () => {
+  const gate = gated();
+  const worker = createCoverWorker(gate.processBook, () => {});
+  await holdSlots(worker, gate);
+  worker.enqueue("h1", "background");
+  await drainAll(worker, gate);
+  assert.deepEqual(gate.started.slice(3), []);
+});
+
+test("processBook receives the lane each book was taken from", async () => {
+  const gate = gated();
+  const worker = createCoverWorker(gate.processBook, () => {});
+  await holdSlots(worker, gate);
+  worker.enqueue("n1");
+  worker.enqueue("f1", "front");
+  worker.enqueue("up1", "upgrade");
+  worker.enqueue("bg1", "background");
+  worker.enqueue("bg2", "background");
+  worker.enqueue("bg2");
+  await drainAll(worker, gate);
+  assert.equal(gate.lanes.get("h1"), "normal");
+  assert.equal(gate.lanes.get("n1"), "normal");
+  assert.equal(gate.lanes.get("f1"), "front");
+  assert.equal(gate.lanes.get("up1"), "upgrade");
+  assert.equal(gate.lanes.get("bg1"), "background");
+  assert.equal(gate.lanes.get("bg2"), "normal");
+});
+
+test("a normal book promoted to front is passed the front lane, and a requeued one too", async () => {
+  const gate = gated();
+  const worker = createCoverWorker(gate.processBook, () => {});
+  await holdSlots(worker, gate);
+  worker.enqueue("n1");
+  worker.enqueue("n1", "front");
+  worker.enqueue("h1", "front");
+  gate.release("h1");
+  await tick();
+  assert.deepEqual(gate.started.slice(3), ["h1"]);
+  assert.equal(gate.lanes.get("h1"), "front");
+  gate.release("h2");
+  await tick();
+  assert.deepEqual(gate.started.slice(3), ["h1", "n1"]);
+  assert.equal(gate.lanes.get("n1"), "front");
+  await drainAll(worker, gate);
+});
+
+test("stop drops upgrade books", async () => {
+  const gate = gated();
+  const worker = createCoverWorker(gate.processBook, () => {});
+  await holdSlots(worker, gate);
+  worker.enqueue("up1", "upgrade");
+  worker.stop();
+  for (const id of ["h1", "h2", "h3"]) gate.release(id);
+  await worker.idle();
+  assert.deepEqual(gate.started, ["h1", "h2", "h3"]);
 });

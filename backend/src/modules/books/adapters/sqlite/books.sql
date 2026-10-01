@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS books (
   cover_image_id      TEXT,
   cover_status        TEXT,
   cover_checked_at    TEXT,
+  cover_upgrade_wanted_at TEXT,
   created_at          TEXT NOT NULL
 );
 
