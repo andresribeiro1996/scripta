@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { bookKey, localDay, setReadStatus, upNextPair } from "@scripta/shared";
+import { bookKey, localDay, saveFailureMessage, setReadStatus, upNextPair } from "@scripta/shared";
 import { useLibrary } from "../hooks/useLibrary";
 import { CoverImage } from "./BookCard";
 import { DuelButton } from "./DuelButton";
@@ -26,8 +26,8 @@ export function PickNextSheet({ keys, books, onClose }: { keys: string[]; books:
     try {
       await updateLibrary((data) => ({ ...data, books: data.books.map((b) => (bookKey(b) === key ? setReadStatus(b, 1, day) : b)) }));
       onClose();
-    } catch {
-      toast({ message: "Couldn't save the status change.", kind: "error" });
+    } catch (error) {
+      toast({ message: saveFailureMessage(error, "Couldn't save the status change."), kind: "error" });
     } finally {
       setSaving(false);
     }

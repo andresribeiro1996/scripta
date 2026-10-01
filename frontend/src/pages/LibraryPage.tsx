@@ -10,6 +10,7 @@ import {
   readSnapshot,
   removeReaderNote,
   restoreReadState,
+  saveFailureMessage,
   setRating,
   type FinishRating,
   type ReadSnapshot
@@ -129,8 +130,8 @@ export function LibraryPage() {
     if ((base.name ?? "") === name) return; // unchanged — nothing to save
     try {
       await updateLibrary((data) => ({ ...data, name }));
-    } catch {
-      toast({ message: "Couldn't save the new name.", kind: "error" });
+    } catch (error) {
+      toast({ message: saveFailureMessage(error, "Couldn't save the new name."), kind: "error" });
     }
   }
 
@@ -208,7 +209,7 @@ export function LibraryPage() {
 
     saving.catch((err) => {
       console.error("Failed to persist new book order:", err);
-      toast({ message: "Couldn't save the new order — moved back.", kind: "error" });
+      toast({ message: saveFailureMessage(err, "Couldn't save the new order — moved back."), kind: "error" });
       queryClient.setQueryData<LibraryDocument | null>(["library"], (latest) => latest === optimistic ? current : latest);
       void queryClient.invalidateQueries({ queryKey: ["library"] });
     });
@@ -234,8 +235,8 @@ export function LibraryPage() {
         ...data,
         books: data.books.map((b) => (bookKey(b) === key ? { ...b, _style: bookStyle } : b))
       }));
-    } catch {
-      toast({ message: "Couldn't save the style change.", kind: "error" });
+    } catch (error) {
+      toast({ message: saveFailureMessage(error, "Couldn't save the style change."), kind: "error" });
     }
   }
 
@@ -250,8 +251,8 @@ export function LibraryPage() {
         books: data.books.map((b) => (bookKey(b) === key ? setReadStatus(b, status, day) : b))
       }));
       return true;
-    } catch {
-      toast({ message: "Couldn't save the status change.", kind: "error" });
+    } catch (error) {
+      toast({ message: saveFailureMessage(error, "Couldn't save the status change."), kind: "error" });
       return false;
     }
   }
@@ -267,8 +268,8 @@ export function LibraryPage() {
         books: data.books.map((b) => (bookKey(b) === key ? setRating(b, rating) : b))
       }));
       return true;
-    } catch {
-      toast({ message: "Couldn't save the rating.", kind: "error" });
+    } catch (error) {
+      toast({ message: saveFailureMessage(error, "Couldn't save the rating."), kind: "error" });
       return false;
     }
   }
@@ -283,8 +284,8 @@ export function LibraryPage() {
         books: data.books.map((b) => (bookKey(b) === key ? addReaderNote(b, text, localDay(), newId()) : b))
       }));
       return true;
-    } catch {
-      toast({ message: "Couldn't save your note.", kind: "error" });
+    } catch (error) {
+      toast({ message: saveFailureMessage(error, "Couldn't save your note."), kind: "error" });
       return false;
     }
   }
@@ -299,8 +300,8 @@ export function LibraryPage() {
         books: data.books.map((b) => (bookKey(b) === key ? removeReaderNote(b, bookmarkId) : b))
       }));
       return true;
-    } catch {
-      toast({ message: "Couldn't delete the note.", kind: "error" });
+    } catch (error) {
+      toast({ message: saveFailureMessage(error, "Couldn't delete the note."), kind: "error" });
       return false;
     }
   }
@@ -315,8 +316,8 @@ export function LibraryPage() {
         books: data.books.map((b) => (bookKey(b) === key ? restoreReadState(b, before) : b))
       }));
       return true;
-    } catch {
-      toast({ message: "Couldn't undo the status change.", kind: "error" });
+    } catch (error) {
+      toast({ message: saveFailureMessage(error, "Couldn't undo the status change."), kind: "error" });
       return false;
     }
   }
@@ -336,8 +337,8 @@ export function LibraryPage() {
         ...data,
         books: data.books.map((b) => (bookKey(b) === key ? setBookCover(b, image.id, image.url) : b))
       }));
-    } catch {
-      toast({ message: "Couldn't save the cover change.", kind: "error" });
+    } catch (error) {
+      toast({ message: saveFailureMessage(error, "Couldn't save the cover change."), kind: "error" });
     }
   }
 
@@ -350,8 +351,8 @@ export function LibraryPage() {
         ...data,
         books: data.books.map((b) => (bookKey(b) === key ? clearBookCover(b) : b))
       }));
-    } catch {
-      toast({ message: "Couldn't save the cover change.", kind: "error" });
+    } catch (error) {
+      toast({ message: saveFailureMessage(error, "Couldn't save the cover change."), kind: "error" });
     }
   }
 
@@ -393,8 +394,8 @@ export function LibraryPage() {
           groups: removeBooksFromAllGroups(data.groups ?? [], keys)
         };
       });
-    } catch {
-      toast({ message: "Couldn't delete — nothing was changed.", kind: "error" });
+    } catch (error) {
+      toast({ message: saveFailureMessage(error, "Couldn't delete — nothing was changed."), kind: "error" });
       return;
     }
     setSelectedKeys(new Set());
@@ -410,8 +411,8 @@ export function LibraryPage() {
             try {
               await updateLibrary((data) => restoreDeletedBooks(data, snapshot, keys));
               toast({ message: "Restored." });
-            } catch {
-              toast({ message: "Couldn't restore — check your connection.", kind: "error" });
+            } catch (error) {
+              toast({ message: saveFailureMessage(error, "Couldn't restore — check your connection."), kind: "error" });
             }
           })();
         }
