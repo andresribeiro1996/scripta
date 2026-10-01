@@ -504,6 +504,11 @@ quiz names), with no report path yet.
   module scope.
 - **Parity:** every step ships on web and mobile.
 - **Notifications stay in-app.** Push is out of scope.
+- **Installed builds keep working.** Clients send `kinds`, the digest kinds
+  they can draw, with every dashboard request. A request without it (build 9,
+  old web tabs) gets only `publication`, `vote`, `reading` and `follow`, and
+  counts only those. A kind added in steps 4–5 is therefore invisible to
+  builds that predate it, and their badges count only rows they show.
 
 ## Out of scope
 
