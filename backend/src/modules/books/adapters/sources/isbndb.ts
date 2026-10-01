@@ -1,5 +1,6 @@
 import type { CoverCandidate, CoverSource, TitledCandidate } from "../../domain/ports.js";
 import { fetchJson, type Throttle } from "../http/http.js";
+import type { IsbndbGate } from "../isbndb/isbndbGate.js";
 
 const strip = ({ source, url }: TitledCandidate): CoverCandidate => ({ source, url });
 
@@ -10,8 +11,9 @@ export function isbndbRecords(json: unknown): Array<Record<string, unknown>> {
   return list.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object");
 }
 
-export function createIsbndbGet(apiKey: string, throttle: Throttle, urgent = false) {
-  return (url: string) => throttle(() => fetchJson("isbndb", url, { Authorization: apiKey }), { urgent });
+export function createIsbndbGet(apiKey: string, throttle: Throttle, gate: IsbndbGate, urgent = false) {
+  return (url: string) =>
+    gate.run(() => throttle(() => gate.run(() => fetchJson("isbndb", url, { Authorization: apiKey })), { urgent }));
 }
 
 export function parseIsbndbBooks(json: unknown): TitledCandidate[] {
@@ -23,8 +25,8 @@ export function parseIsbndbBooks(json: unknown): TitledCandidate[] {
   });
 }
 
-export function createIsbndbSource(apiKey: string, throttle: Throttle): CoverSource {
-  const get = createIsbndbGet(apiKey, throttle);
+export function createIsbndbSource(apiKey: string, throttle: Throttle, gate: IsbndbGate): CoverSource {
+  const get = createIsbndbGet(apiKey, throttle, gate);
   return {
     async byIsbn(isbn) {
       return parseIsbndbBooks(await get(`https://api2.isbndb.com/book/${encodeURIComponent(isbn)}`)).map(strip);

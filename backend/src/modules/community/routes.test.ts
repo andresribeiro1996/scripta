@@ -34,10 +34,11 @@ function fakeService(overrides: Partial<CommunityService> = {}): CommunityServic
     getProfileByUsername: () => {
       throw new ProfileNotFoundError();
     },
-    getDashboard: () => ({ items: [], nextCursor: null, newCount: 0 }),
+    getDashboard: () => ({ items: [], nextCursor: null, seenAt: null, personalNewCount: 0, followingNewCount: 0, newCount: 0 }),
     markDashboardSeen: () => {},
     getDiscover: () => ({ items: [], nextOffset: null }),
     searchPeople: () => [],
+    suggestPeople: () => [],
     emitEvent: () => {},
     getActivity: () => ({ items: [], nextCursor: null }),
     getLibrary: () => {
@@ -148,6 +149,28 @@ test("activity endpoint derives the viewer from the bearer token, not a fixed us
   await app.close();
 });
 
+test("activity endpoint rejects a cursor over 200 characters with 400", async () => {
+  const seen: Array<string | undefined> = [];
+  const app = Fastify();
+  await app.register(
+    buildPublicCommunityRoutes(
+      fakeService({
+        getActivity: (_username, _viewerId, cursor) => {
+          seen.push(cursor);
+          return { items: [], nextCursor: null };
+        }
+      })
+    )
+  );
+  const longest = await app.inject({ method: "GET", url: `/community/profiles/alice/activity?cursor=${"a".repeat(200)}` });
+  assert.equal(longest.statusCode, 200);
+  const tooLong = await app.inject({ method: "GET", url: `/community/profiles/alice/activity?cursor=${"a".repeat(201)}` });
+  assert.equal(tooLong.statusCode, 400);
+  assert.equal(tooLong.json().error, "Invalid activity query.");
+  assert.deepEqual(seen, ["a".repeat(200)]);
+  await app.close();
+});
+
 test("activity endpoint rejects a bad limit with 400", async () => {
   const app = Fastify();
   await app.register(buildPublicCommunityRoutes(fakeService()));
@@ -221,6 +244,123 @@ test("feed-settings PUT accepts an optional readerGlyph flag", async () => {
   await app.close();
 });
 
+test("publish PUT takes a muralId, a shareReading flag, both or neither, and rejects anything else", async () => {
+  const calls: Array<Record<string, unknown>> = [];
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", () => ({ id: "viewer", email: "v@example.test", username: "v", avatarId: null }));
+  await app.register(
+    buildCommunityRoutes(
+      fakeService({
+        publishProfile: (userId, input) => {
+          calls.push({ userId, input });
+        }
+      })
+    )
+  );
+  const noAuth = await app.inject({ method: "PUT", url: "/community/profile/publish", payload: {} });
+  assert.equal(noAuth.statusCode, 401);
+  const auth = { authorization: "Bearer x" };
+  const send = (payload: object) => app.inject({ method: "PUT", url: "/community/profile/publish", headers: auth, payload });
+  assert.equal((await send({})).statusCode, 200);
+  assert.equal((await send({ muralId: "m1" })).statusCode, 200);
+  assert.equal((await send({ shareReading: false })).statusCode, 200);
+  assert.equal((await send({ muralId: "m1", shareReading: true })).statusCode, 200);
+  assert.deepEqual(calls, [
+    { userId: "viewer", input: {} },
+    { userId: "viewer", input: { muralId: "m1" } },
+    { userId: "viewer", input: { shareReading: false } },
+    { userId: "viewer", input: { muralId: "m1", shareReading: true } }
+  ]);
+  const badFlag = await send({ shareReading: "yes" });
+  assert.equal(badFlag.statusCode, 400);
+  assert.equal(badFlag.json().error, "Expected {muralId?, shareReading?}.");
+  assert.equal((await send({ muralId: "" })).statusCode, 400);
+  assert.equal((await send({ muralId: 7 })).statusCode, 400);
+  assert.equal(calls.length, 4);
+  await app.close();
+});
+
+test("publish PUT reports a mural the user doesn't own as a 400", async () => {
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", () => ({ id: "viewer", email: "v@example.test", username: "v", avatarId: null }));
+  await app.register(
+    buildCommunityRoutes(
+      fakeService({
+        publishProfile: () => {
+          throw new MuralNotOwnedError();
+        }
+      })
+    )
+  );
+  const res = await app.inject({ method: "PUT", url: "/community/profile/publish", headers: { authorization: "Bearer x" }, payload: { muralId: "theirs" } });
+  assert.equal(res.statusCode, 400);
+  await app.close();
+});
+
+test("follow POST passes both ids through, and answers 404 for a reader who can't be followed", async () => {
+  const followed: Array<[string, string]> = [];
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", () => ({ id: "viewer", email: "v@example.test", username: "v", avatarId: null }));
+  await app.register(
+    buildCommunityRoutes(
+      fakeService({
+        follow: (followerId, followeeId) => {
+          if (followeeId === "private") throw new ProfileNotFoundError();
+          followed.push([followerId, followeeId]);
+        }
+      })
+    )
+  );
+  const auth = { authorization: "Bearer x" };
+  const ok = await app.inject({ method: "POST", url: "/community/follows", headers: auth, payload: { userId: "alice" } });
+  assert.equal(ok.statusCode, 204);
+  const refused = await app.inject({ method: "POST", url: "/community/follows", headers: auth, payload: { userId: "private" } });
+  assert.equal(refused.statusCode, 404);
+  assert.equal(refused.json().error, "No published profile at that address.");
+  assert.deepEqual(followed, [["viewer", "alice"]]);
+  await app.close();
+});
+
+test("suggested people GET is authed, defaults the limit to 20, and validates it", async () => {
+  const seen: Array<Record<string, unknown>> = [];
+  const suggestion = { user: { username: "reader", avatarUrl: null, userId: "u1" }, followerCount: 0, viewerFollows: false, private: false, sharedCount: 1, sharedBooks: [{ title: "Dune", author: "Frank Herbert", coverUrl: null }] };
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", () => ({ id: "viewer", email: "v@example.test", username: "v", avatarId: null }));
+  await app.register(
+    buildCommunityRoutes(
+      fakeService({
+        suggestPeople: (viewerId, limit) => {
+          seen.push({ viewerId, limit });
+          return [suggestion];
+        }
+      })
+    )
+  );
+  const noAuth = await app.inject({ method: "GET", url: "/community/people/suggested" });
+  assert.equal(noAuth.statusCode, 401);
+  const auth = { authorization: "Bearer x" };
+  const res = await app.inject({ method: "GET", url: "/community/people/suggested", headers: auth });
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.json(), { people: [suggestion] });
+  assert.equal((await app.inject({ method: "GET", url: "/community/people/suggested?limit=5", headers: auth })).statusCode, 200);
+  assert.equal((await app.inject({ method: "GET", url: "/community/people/suggested?limit=0", headers: auth })).statusCode, 400);
+  assert.equal((await app.inject({ method: "GET", url: "/community/people/suggested?limit=51", headers: auth })).statusCode, 400);
+  assert.deepEqual(seen, [{ viewerId: "viewer", limit: 20 }, { viewerId: "viewer", limit: 5 }]);
+  await app.close();
+});
+
+test("suggested people GET allows 30 requests a minute, and no other authed route shares that limit", async () => {
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", () => ({ id: "viewer", email: "v@example.test", username: "v", avatarId: null }));
+  await app.register(buildCommunityRoutes(fakeService()));
+  const auth = { authorization: "Bearer x" };
+  const suggested = () => app.inject({ method: "GET", url: "/community/people/suggested", headers: auth });
+  for (let request = 1; request <= 30; request++) assert.equal((await suggested()).statusCode, 200);
+  assert.equal((await suggested()).statusCode, 429);
+  assert.equal((await app.inject({ method: "GET", url: "/community/people?q=reader", headers: auth })).statusCode, 200);
+  await app.close();
+});
+
 test("own profile GET and shelf mural PUT are authed and validate the body", async () => {
   const calls: Array<Record<string, unknown>> = [];
   const app = Fastify();
@@ -262,7 +402,7 @@ test("dashboard routes pass cursor/limit through and mark seen", async () => {
       fakeService({
         getDashboard: (_viewerId, cursor, limit) => {
           seen.push({ cursor, limit });
-          return { items: [], nextCursor: null, newCount: 0 };
+          return { items: [], nextCursor: null, seenAt: null, personalNewCount: 0, followingNewCount: 0, newCount: 3 };
         },
         markDashboardSeen: () => {
           marked += 1;
@@ -273,10 +413,47 @@ test("dashboard routes pass cursor/limit through and mark seen", async () => {
   const auth = { authorization: "Bearer x" };
   const res = await app.inject({ method: "GET", url: "/community/dashboard?cursor=abc&limit=5", headers: auth });
   assert.equal(res.statusCode, 200);
+  assert.equal(res.json().newCount, 3);
   assert.deepEqual(seen, [{ cursor: "abc", limit: 5 }]);
   const seenRes = await app.inject({ method: "POST", url: "/community/dashboard/seen", headers: auth });
   assert.equal(seenRes.statusCode, 204);
   assert.equal(marked, 1);
+  await app.close();
+});
+
+test("dashboard forwards the kinds the client lists, and nothing when it lists none", async () => {
+  const seen: Array<ReadonlySet<string> | undefined> = [];
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", () => ({ id: "viewer", email: "v@example.test", username: "v", avatarId: null }));
+  await app.register(
+    buildCommunityRoutes(
+      fakeService({
+        getDashboard: (_viewerId, _cursor, _limit, kinds) => {
+          seen.push(kinds);
+          return { items: [], nextCursor: null, seenAt: null, personalNewCount: 0, followingNewCount: 0, newCount: 0 };
+        }
+      })
+    )
+  );
+  const auth = { authorization: "Bearer x" };
+  const listed = await app.inject({ method: "GET", url: "/community/dashboard?kinds=publication,participation", headers: auth });
+  assert.equal(listed.statusCode, 200);
+  const unlisted = await app.inject({ method: "GET", url: "/community/dashboard", headers: auth });
+  assert.equal(unlisted.statusCode, 200);
+  assert.deepEqual(seen, [new Set(["publication", "participation"]), undefined]);
+  await app.close();
+});
+
+test("dashboard rejects an empty, malformed or oversized kinds, and an oversized cursor, with 400", async () => {
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", () => ({ id: "viewer", email: "v@example.test", username: "v", avatarId: null }));
+  await app.register(buildCommunityRoutes(fakeService()));
+  const auth = { authorization: "Bearer x" };
+  for (const query of ["kinds=", "kinds=Pub!", `kinds=${"a".repeat(201)}`, `cursor=${"a".repeat(201)}`]) {
+    const res = await app.inject({ method: "GET", url: `/community/dashboard?${query}`, headers: auth });
+    assert.equal(res.statusCode, 400, query);
+    assert.equal(res.json().error, "Invalid cursor/limit/kinds.");
+  }
   await app.close();
 });
 

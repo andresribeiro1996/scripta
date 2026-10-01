@@ -59,12 +59,28 @@ export interface PersonResult {
   private: boolean;
 }
 
+export interface SharedBook {
+  title: string;
+  author: string;
+  coverUrl: string | null;
+}
+
+export interface SuggestedReader extends PersonResult {
+  sharedCount: number;
+  sharedBooks: SharedBook[];
+}
+
 export interface PublishedProfile {
   user: CommunityAuthor;
   publishedAt: string | null;
   followerCount: number;
   followingCount: number;
   viewerFollows?: boolean;
+}
+
+export interface PublishProfileInput {
+  muralId?: string;
+  shareReading?: boolean;
 }
 
 export interface Page<T> {
@@ -110,4 +126,15 @@ export interface BookRecommendationInput {
   coverUrl?: string | null;
   readStatus: 0 | 1 | 2;
   day?: string;
+}
+
+export type ParticipationGameKind = "tierlist" | "tournament" | "quiz";
+
+export interface GameParticipation {
+  id: string;
+  name: string;
+  covers: string[];
+  participantCount: number;
+  latestAt: string;
+  recent: Array<{ userId: string; at: string }>;
 }

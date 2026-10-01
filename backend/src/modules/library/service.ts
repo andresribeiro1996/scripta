@@ -3,12 +3,13 @@
 // modules/auth/service.ts.
 
 import { randomUUID } from "node:crypto";
-import { bookKey, buildManualBook, isCertainMatch, localDay, mergeDuplicateBooks, seedCoverLookup, setReadStatus, type CoverLookupParams, type LibraryData } from "@scripta/shared";
+import { bookKey, bookMatchKeys, buildManualBook, isCertainMatch, localDay, mergeDuplicateBooks, readerIdentity, seedCoverLookup, setReadStatus, type CoverLookupParams, type LibraryData } from "@scripta/shared";
 import type { BookRecommendationInput } from "@scripta/shared/community";
+import { COVER_URL_MAX_LENGTH, DISPLAY_TEXT_MAX_LENGTH, LIBRARY_MATCH_BOOK_CAP, MATCH_KEY_MAX_LENGTH } from "./domain/constants.js";
 import { LibraryConflictError, NoLibraryDocumentError } from "./domain/errors.js";
 import type { LibraryRepository } from "./domain/ports.js";
-import type { LibraryDocument, LibraryDocumentRow } from "./domain/types.js";
-import { toPublicLibraryData } from "./publicResolver.js";
+import type { LibraryDerived, LibraryDocument, LibraryDocumentRow, LibraryMatchKeyRow } from "./domain/types.js";
+import { libraryParts, normalizeIsbn, toPublicLibraryData, toReaderGroups } from "./publicResolver.js";
 
 export type BookEvent = { type: "book_added" | "book_finished"; refId: string; payload: Record<string, unknown> };
 
@@ -20,6 +21,47 @@ export type RekeyBooks = (userId: string, fromKeys: string[], toKey: string) => 
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function text(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+function textFields(book: Record<string, unknown>): Record<string, unknown> {
+  return {
+    ReadStatus: book.ReadStatus,
+    Title: text(book.Title),
+    Attribution: text(book.Attribution),
+    ISBN: text(book.ISBN),
+    ContentID: text(book.ContentID),
+    _genres: book._genres,
+    _coverUrl: text(book._coverUrl),
+    highlights: Array.isArray(book.highlights) ? book.highlights.filter(isRecord).map((mark) => ({ Type: mark.Type, Text: text(mark.Text), Annotation: text(mark.Annotation) })) : undefined
+  };
+}
+
+export function deriveLibraryData(data: unknown): LibraryDerived {
+  const parts = libraryParts(data);
+  if (!parts) return { glyph: null, keys: [] };
+  const books = parts.allBooks.map(textFields);
+  const identity = readerIdentity(books, toReaderGroups(parts.groupRecords));
+  const emitted = new Set<string>();
+  const keys: LibraryMatchKeyRow[] = [];
+  books.slice(0, LIBRARY_MATCH_BOOK_CAP).forEach((book, bookRef) => {
+    for (const key of bookMatchKeys(book)) {
+      if (key.length > MATCH_KEY_MAX_LENGTH || emitted.has(key)) continue;
+      emitted.add(key);
+      keys.push({
+        key,
+        book_ref: bookRef,
+        title: String(book.Title ?? "").slice(0, DISPLAY_TEXT_MAX_LENGTH),
+        author: String(book.Attribution ?? "").slice(0, DISPLAY_TEXT_MAX_LENGTH),
+        isbn: normalizeIsbn(book.ISBN) || null,
+        cover: typeof book._coverUrl === "string" && book._coverUrl.length <= COVER_URL_MAX_LENGTH && /^https?:\/\//.test(book._coverUrl) ? book._coverUrl : null
+      });
+    }
+  });
+  return { glyph: identity.state === "settled" ? identity.identity : null, keys };
 }
 
 function bookPayload(book: Record<string, unknown>, status: number): Record<string, unknown> {
@@ -114,7 +156,7 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
 
     saveLibrary(userId, data, expectedUpdatedAt, source) {
       const previous = source === "import" ? undefined : repo.getDocument(userId);
-      const row = repo.upsertDocument(userId, JSON.stringify(data), expectedUpdatedAt);
+      const row = repo.upsertDocument(userId, JSON.stringify(data), deriveLibraryData(data), expectedUpdatedAt);
       if (!row) throw new LibraryConflictError();
       if (previous !== undefined && emitBookEvents) {
         try {
@@ -151,7 +193,8 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
         const key = contentId(match);
         if (Number(match.ReadStatus ?? 0) === input.readStatus) return { key, updated: false };
         const updatedBook = setReadStatus(match, input.readStatus, input.day ?? localDay());
-        const saved = repo.upsertDocument(userId, JSON.stringify({ ...doc, books: books.map((b) => (b === match ? updatedBook : b)) }), row?.updated_at);
+        const reshelved = { ...doc, books: books.map((b) => (b === match ? updatedBook : b)) };
+        const saved = repo.upsertDocument(userId, JSON.stringify(reshelved), deriveLibraryData(reshelved), row?.updated_at);
         if (!saved) throw new LibraryConflictError();
         if (input.readStatus === 2 && emitBookEvents) {
           try {
@@ -177,7 +220,8 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
         id
       );
       const book = input.coverUrl ? { ...built, _coverUrl: input.coverUrl } : built;
-      const saved = repo.upsertDocument(userId, JSON.stringify({ ...doc, books: [...books, book] }), row?.updated_at);
+      const appended = { ...doc, books: [...books, book] };
+      const saved = repo.upsertDocument(userId, JSON.stringify(appended), deriveLibraryData(appended), row?.updated_at);
       if (!saved) throw new LibraryConflictError();
       if (emitBookEvents) {
         try {
@@ -201,7 +245,7 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
       const present = new Set(library.books.filter(isRecord).map(bookKey));
       const fromKeys = merge.filter((key) => key !== keep && present.has(key));
       if (fromKeys.length > 0 && rekeyBooks) rekeyBooks(userId, fromKeys, keep);
-      const saved = repo.upsertDocument(userId, JSON.stringify(next), row.updated_at);
+      const saved = repo.upsertDocument(userId, JSON.stringify(next), deriveLibraryData(next), row.updated_at);
       if (!saved) throw new LibraryConflictError();
       return toLibraryDocument(saved, publicUrlFor);
     },

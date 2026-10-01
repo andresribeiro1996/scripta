@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { authorMatches, catalogTitleKey, lookupIdentity, normalizeTitle, searchTokens, titleMatches } from "./normalize.js";
+import { authorMatches, catalogTitleKey, isPortugueseIsbn, lookupIdentity, normalizeTitle, searchTokens, titleMatches } from "./normalize.js";
 
 test("titles drop series brackets, subtitles and diacritics", () => {
   assert.equal(normalizeTitle("Red Rising (Red Rising Saga, #1)"), "red rising");
@@ -54,4 +54,13 @@ test("catalogTitleKey ignores series brackets and later authors but keeps volume
   assert.equal(catalogTitleKey("Dune (Dune Chronicles #1)", "Frank Herbert, Brian Herbert"), catalogTitleKey("Dune", "Frank Herbert"));
   assert.notEqual(catalogTitleKey("Complete Works: Volume 1", "A Poet"), catalogTitleKey("Complete Works: Volume 2", "A Poet"));
   assert.equal(catalogTitleKey("", "Anyone"), null);
+});
+
+test("Portuguese and Brazilian ISBNs are recognised by group prefix in both ISBN forms", () => {
+  for (const isbn of ["9788535914849", "978-65-5921-001-1", "9789722518888", "9789896410001", "8535914846", "6559210014", "9722518887", "989641000X"]) {
+    assert.equal(isPortugueseIsbn(isbn), true, isbn);
+  }
+  for (const isbn of ["9780141184272", "9782070360024", "0141184272", "2070360024", "9788420412146", "not an isbn", "", null]) {
+    assert.equal(isPortugueseIsbn(isbn), false, String(isbn));
+  }
 });

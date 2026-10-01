@@ -5,6 +5,8 @@ import type { BookRow } from "./types.js";
 export { normalizeTitle, normalizeWords } from "@scripta/shared";
 
 const MAX_SEARCH_TOKENS = 8;
+const PORTUGUESE_ISBN13_PREFIXES = ["97885", "97865", "978972", "978989"];
+const PORTUGUESE_ISBN10_PREFIXES = ["85", "65", "972", "989"];
 
 export const SEARCH_LIMIT = 12;
 
@@ -25,6 +27,12 @@ export interface BookIdentity {
 export function titleMatches(wanted: string, candidate: string): boolean {
   const normalized = normalizeTitle(wanted);
   return normalized !== "" && normalized === normalizeTitle(candidate);
+}
+
+export function isPortugueseIsbn(isbn: string | null): boolean {
+  const normalized = normalizeIsbn(isbn ?? "");
+  const prefixes = normalized.length === 13 ? PORTUGUESE_ISBN13_PREFIXES : PORTUGUESE_ISBN10_PREFIXES;
+  return normalized !== "" && prefixes.some((prefix) => normalized.startsWith(prefix));
 }
 
 export function authorMatches(wantedAttribution: string, candidateAuthors: string[]): boolean {

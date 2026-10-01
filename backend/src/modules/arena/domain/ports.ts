@@ -75,4 +75,6 @@ export interface ArenaRepository {
    *  under listTournamentsByOwner, and "Voting in" means other people's
    *  content. */
   listVotedByUser(voterUserId: string): TournamentRow[];
+  listParticipation(ownerUserId: string): Array<{ id: string; name: string; participants: number; latest_at: string }>;
+  listRecentVoters(tournamentId: string, ownerUserId: string, limit: number): Array<{ user_id: string; at: string }>;
 }

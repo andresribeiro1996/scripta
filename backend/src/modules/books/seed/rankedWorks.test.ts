@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { parseRankedWorks, rankedWorksUrl } from "./rankedWorks.js";
+import { PORTUGAL_ISBN_PREFIXES, parseRankedWorks, rankedWorksUrl } from "./rankedWorks.js";
 
 const page = {
   docs: [
@@ -57,4 +57,28 @@ test("asks Open Library for that language's editions, ranked by reading log", ()
   assert.equal(url.searchParams.get("sort"), "readinglog");
   assert.equal(url.searchParams.get("offset"), "2000");
   assert.equal(url.searchParams.get("limit"), "1000");
+});
+
+test("searches by ISBN prefix instead of language when given one", () => {
+  const url = new URL(rankedWorksUrl("por", 0, 1000, "978972"));
+  assert.equal(url.searchParams.get("q"), "isbn:978972*");
+  assert.equal(url.searchParams.get("lang"), "por");
+  assert.equal(url.searchParams.get("sort"), "readinglog");
+  assert.deepEqual([...PORTUGAL_ISBN_PREFIXES], ["978972", "978989"]);
+});
+
+const withEdition = (edition: Record<string, unknown>) => ({ docs: [{ key: "/works/OL5W", title: "Work", author_name: ["G"], readinglog_count: 5, editions: { docs: [edition] } }] });
+
+test("with a prefix, keeps an edition that has no language field", () => {
+  const entries = parseRankedWorks(withEdition({ title: "A Guerra dos Tronos", isbn: ["9789896370107"] }), "por", "978989");
+  assert.equal(entries[0]?.isbn, "9789896370107");
+});
+
+test("with a prefix, drops an edition whose ISBNs do not start with it", () => {
+  assert.deepEqual(parseRankedWorks(withEdition({ language: ["por"], isbn: ["8550807567", "9788550807560"] }), "por", "978989"), []);
+});
+
+test("with a prefix, prefers the 13-digit ISBN", () => {
+  const entries = parseRankedWorks(withEdition({ isbn: ["9722365592", "9789722365598"] }), "por", "978972");
+  assert.equal(entries[0]?.isbn, "9789722365598");
 });

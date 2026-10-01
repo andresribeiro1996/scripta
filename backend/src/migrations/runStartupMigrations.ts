@@ -20,7 +20,7 @@
 // rule described in app.ts's own header comment — never reaches into
 // either module's adapters/domain/service.ts directly.
 
-import { readEmbeddedMurals, clearEmbeddedMuralsField } from "../modules/library/index.js";
+import { readEmbeddedMurals, clearEmbeddedMuralsField, backfillLibraryDerived } from "../modules/library/index.js";
 import { getUserTheme } from "../modules/auth/index.js";
 import { insertMigratedMurals, listHomeDesignations, dropMuralHomes, resetPresetBlockStyles, backfillMuralThemes } from "../modules/murals/index.js";
 import { applyHomeMuralMigration } from "../modules/community/index.js";
@@ -36,6 +36,8 @@ export function runStartupMigrations(): void {
     insertMigratedMurals(extracted);
     clearEmbeddedMuralsField([...new Set(extracted.map((r) => r.userId))]);
   }
+
+  backfillLibraryDerived();
 
   backfillMuralThemes(getUserTheme);
 }

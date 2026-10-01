@@ -1,11 +1,17 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { landingDestination, modeFromSearch } from "../src/lib/landing.ts";
+import { discoverDestination, landingDestination, modeFromSearch } from "../src/lib/landing.ts";
 
 test("a session routes to the dashboard; a stranger gets the landing page", () => {
   const session = { user: { id: "reader", email: "reader@example.com", username: "reader", avatarId: null }, accessToken: "access", refreshToken: "refresh" };
   assert.equal(landingDestination(session), "/dashboard");
   assert.equal(landingDestination(null), null);
+});
+
+test("a session takes /arena to the signed-in Discover; a stranger browses the public one", () => {
+  const session = { user: { id: "reader", email: "reader@example.com", username: "reader", avatarId: null }, accessToken: "access", refreshToken: "refresh" };
+  assert.equal(discoverDestination(session), "/community/discover");
+  assert.equal(discoverDestination(null), null);
 });
 
 test("modeFromSearch reads mode=signup as signup; everything else as login", () => {

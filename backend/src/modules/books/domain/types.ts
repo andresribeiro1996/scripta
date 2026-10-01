@@ -1,7 +1,7 @@
 export type CoverStatus = "good" | "low_res" | "missing" | "manual";
 export type DetailsStatus = "found" | "missing";
 export type DataSource = "openlibrary" | "isbndb";
-export type CoverSourceName = "isbndb" | "apple" | "openlibrary" | "upload";
+export type CoverSourceName = "isbndb" | "apple" | "openlibrary" | "upload" | "publisher";
 
 export interface BookRow {
   id: string;
@@ -22,6 +22,7 @@ export interface BookRow {
   cover_image_id: string | null;
   cover_status: CoverStatus | null;
   cover_checked_at: string | null;
+  cover_upgrade_wanted_at: string | null;
   created_at: string;
 }
 

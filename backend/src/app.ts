@@ -36,9 +36,9 @@ import { deleteArenaUserData, getArenaPublicApi, registerArenaModule, rekeyArena
 import { deleteCommunityUserData, getCommunityPublicApi, registerCommunityModule } from "./modules/community/index.js";
 import { enqueueBookCovers, registerBooksModule } from "./modules/books/index.js";
 import { deleteGalleryUserData, registerGalleryModule } from "./modules/gallery/index.js";
-import { deleteLibraryUserData, registerLibraryModule, resolvePublicLibrary, readerGlyphFor, type BookEvent } from "./modules/library/index.js";
+import { deleteLibraryUserData, registerLibraryModule, resolvePublicLibrary, readerGlyphFor, sharedBookCounts, sharedBooks, type BookEvent } from "./modules/library/index.js";
 import { deleteMuralsUserData, getMuralsPublicApi, registerMuralsModule, rekeyMuralsBooks } from "./modules/murals/index.js";
-import { deleteQuizzesUserData, registerQuizzesModule, rekeyQuizzesBooks } from "./modules/quizzes/index.js";
+import { deleteQuizzesUserData, getQuizzesPublicApi, registerQuizzesModule, rekeyQuizzesBooks } from "./modules/quizzes/index.js";
 import { deleteSocialsUserData, registerSocialsModule } from "./modules/socials/index.js";
 import { deleteTierlistsUserData, registerTierlistsModule, getTierlistsPublicApi, rekeyTierlistsBooks } from "./modules/tierlists/index.js";
 import { registerWaitlistModule } from "./modules/waitlist/index.js";
@@ -157,7 +157,9 @@ export function buildApp() {
     }
   });
   app.register(registerGalleryModule);
-  app.register(registerBooksModule);
+  app.register(registerBooksModule, {
+    alert: emailEnabled && env.ALERT_EMAIL ? (subject: string, text: string) => sendAccountEmail(env.ALERT_EMAIL, subject, text) : undefined
+  });
   app.register(registerSocialsModule);
   app.register(registerWaitlistModule, { sendEmail: emailEnabled ? sendAccountEmail : undefined });
   app.register(registerMuralsModule, {
@@ -173,6 +175,8 @@ export function buildApp() {
     resolveProfiles: resolvePublicReaderProfiles,
     resolveLibrary: resolvePublicLibrary,
     readerGlyphFor,
+    sharedBookCounts,
+    sharedBooks,
     userHasUsername,
     findUserIdByUsername,
     searchUsernameOwners,
@@ -190,6 +194,11 @@ export function buildApp() {
       get: getArenaPublicApi().getPublished,
       listByOwner: getArenaPublicApi().listPublishedByOwner,
       listVotedByUser: getArenaPublicApi().listVotedByUser
+    },
+    participation: {
+      tierlists: getTierlistsPublicApi().participationByOwner,
+      tournaments: getArenaPublicApi().participationByOwner,
+      quizzes: getQuizzesPublicApi().participationByOwner
     }
   });
   app.register(registerTierlistsModule, {

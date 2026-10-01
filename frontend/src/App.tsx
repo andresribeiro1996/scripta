@@ -14,7 +14,7 @@ import { QuizEditorPage } from "./pages/QuizEditorPage";
 import { ChooseUsernamePage } from "./pages/ChooseUsernamePage";
 import { CollectionsPage } from "./pages/CollectionsPage";
 import { CommunityProfilePage } from "./pages/CommunityProfilePage";
-import { DiscoverPage } from "./pages/DiscoverPage";
+import { DiscoverPage, PublicDiscoverPage } from "./pages/DiscoverPage";
 import { GalleryPage } from "./pages/GalleryPage";
 import { LandingPage } from "./pages/LandingPage";
 import { LibraryPage } from "./pages/LibraryPage";
@@ -47,7 +47,7 @@ export function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/oauth-success" element={<OAuthSuccessPage />} />
-        <Route path="/arena" element={<Navigate to="/community/discover" replace />} />
+        <Route path="/arena" element={<PublicDiscoverPage />} />
         <Route path="/arena/:id" element={<ArenaViewPage />} />
         {/* Public share-viewer pages — no session at all, so these must sit
             outside every RequireAuth/RequireUsername wrapper below, same as

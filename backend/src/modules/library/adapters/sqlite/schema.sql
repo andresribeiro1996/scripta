@@ -10,3 +10,21 @@ CREATE TABLE IF NOT EXISTS library_documents (
   data        TEXT NOT NULL,
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
+
+CREATE TABLE IF NOT EXISTS library_derived (
+  user_id           TEXT PRIMARY KEY,
+  glyph             TEXT,
+  source_updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS library_match_keys (
+  user_id  TEXT NOT NULL,
+  key      TEXT NOT NULL,
+  book_ref INTEGER NOT NULL,
+  title    TEXT NOT NULL,
+  author   TEXT NOT NULL,
+  isbn     TEXT,
+  cover    TEXT,
+  PRIMARY KEY (user_id, key)
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS idx_library_match_keys_key ON library_match_keys (key, user_id);

@@ -7,10 +7,12 @@ import type {
   Page,
   PersonResult,
   PublishedProfile,
+  PublishProfileInput,
+  SuggestedReader,
   TierlistSummary,
   TournamentSummary
 } from "@scripta/shared/community";
-import type { DashboardFeedPage } from "@scripta/shared/dashboard";
+import { dashboardQuery, withKnownDigestItems, type DashboardFeedPage } from "@scripta/shared/dashboard";
 import type { PublicReaderCard } from "@scripta/shared";
 import type { ThemeId } from "@scripta/shared/themes";
 import type { MuralBlock, ShelfTheme } from "../lib/murals";
@@ -40,8 +42,7 @@ export interface CommunityProfileView {
 }
 
 export async function fetchDashboard(cursor?: string): Promise<DashboardFeedPage> {
-  const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
-  return (await apiFetch(`/community/dashboard${query}`)) as DashboardFeedPage;
+  return withKnownDigestItems((await apiFetch(`/community/dashboard${dashboardQuery(cursor)}`)) as DashboardFeedPage);
 }
 
 export async function markDashboardSeen(): Promise<void> {
@@ -55,6 +56,11 @@ export async function fetchDiscover(type: DiscoverType, q: string, offset = 0): 
 
 export async function fetchPeople(q: string): Promise<PersonResult[]> {
   const body = (await apiFetch(`/community/people?q=${encodeURIComponent(q)}`)) as { people: PersonResult[] };
+  return body.people;
+}
+
+export async function fetchSuggestedPeople(): Promise<SuggestedReader[]> {
+  const body = (await apiFetch("/community/people/suggested")) as { people: SuggestedReader[] };
   return body.people;
 }
 
@@ -83,8 +89,8 @@ export async function unfollowUser(userId: string): Promise<void> {
   await apiFetch(`/community/follows/${userId}`, { method: "DELETE" });
 }
 
-export async function publishProfile(muralId: string): Promise<void> {
-  await apiFetch("/community/profile/publish", { method: "PUT", body: JSON.stringify({ muralId }) });
+export async function publishProfile(input: PublishProfileInput): Promise<void> {
+  await apiFetch("/community/profile/publish", { method: "PUT", body: JSON.stringify(input) });
 }
 
 export async function unpublishProfile(): Promise<void> {

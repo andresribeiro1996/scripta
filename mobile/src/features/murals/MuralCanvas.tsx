@@ -372,7 +372,7 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThe
   const imageReady = width > 0 && assetKeys.every((key) => readyAssets.has(key));
   useEffect(() => { onImageReadyChange?.(imageReady); }, [imageReady, onImageReadyChange]);
   const columnWidth = gridColumnWidth(width);
-  const height = muralCanvasHeight(mural.blocks, ROW_HEIGHT, onImageReadyChange && mural.blocks.length ? 0 : undefined);
+  const height = muralCanvasHeight(mural.blocks, ROW_HEIGHT, !editable && mural.blocks.length ? 0 : undefined);
   const canvas = (
     <View onLayout={(event) => setWidth(event.nativeEvent.layout.width)} style={[styles.canvas, { height, backgroundColor: colors.background }]}>
       {width > 0 ? resolvedBlocks.map((block) => <CanvasBlock

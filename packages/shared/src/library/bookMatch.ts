@@ -19,7 +19,25 @@ export function normalizeWords(value: string): string {
 }
 
 function withoutBrackets(value: string): string {
-  return value.replace(/\([^)]*\)|\[[^\]]*\]/g, " ");
+  let result = "";
+  let copied = 0;
+  let noParen = false;
+  let noBracket = false;
+  for (let index = 0; index < value.length; index++) {
+    const char = value[index];
+    const closer = char === "(" && !noParen ? ")" : char === "[" && !noBracket ? "]" : undefined;
+    if (!closer) continue;
+    const end = value.indexOf(closer, index + 1);
+    if (end === -1) {
+      if (char === "(") noParen = true;
+      else noBracket = true;
+      continue;
+    }
+    result += `${value.slice(copied, index)} `;
+    copied = end + 1;
+    index = end;
+  }
+  return result + value.slice(copied);
 }
 
 export function normalizeTitle(value: string): string {
@@ -54,6 +72,11 @@ export function matchFacts(book: Book): MatchFacts {
     loose: mainTitle && surname ? `${mainTitle}|${surname}` : "",
     numbers: titleNumbers(title)
   };
+}
+
+export function bookMatchKeys(book: Book): string[] {
+  const facts = matchFacts(book);
+  return [...(facts.isbn ? [`isbn:${facts.isbn}`] : []), ...(facts.exact ? [`ta:${facts.exact}`] : [])];
 }
 
 export function certainFacts(a: MatchFacts, b: MatchFacts): boolean {

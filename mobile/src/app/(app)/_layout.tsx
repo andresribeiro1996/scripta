@@ -2,7 +2,9 @@ import { pathWithQuery } from "../../features/auth/navigation";
 import { usePathname, useGlobalSearchParams } from "expo-router";
 import { ActivityIndicator, View } from "react-native";
 import { Redirect, Tabs } from "expo-router";
+import { newCountLabel } from "@scripta/shared";
 import { useAuth } from "../../core/auth";
+import { useDashboardFeed } from "../../features/home/FeedRow";
 import { useAccountAppearanceSync } from "../../features/settings/appearanceSync";
 import { useGenreEnrichment } from "../../features/library/hooks/useGenreEnrichment";
 import { useLibrary } from "../../features/library/hooks/useLibrary";
@@ -22,12 +24,52 @@ function AppearanceSync() {
   return null;
 }
 
+function AppTabs() {
+  const { colors, fonts } = useTheme();
+  const { data } = useDashboardFeed();
+  const newCount = data?.pages[0]?.personalNewCount ?? 0;
+
+  // Each tab is a group holding its own Stack, so a drill-down inside a tab is
+  // a real push — with the platform's back chevron and swipe-back — rather than
+  // another tab screen hidden with href: null. The group segments don't appear
+  // in the URL, so every path is unchanged.
+  return (
+    <>
+      <GenreEnrichment />
+      <AppearanceSync />
+      <Tabs
+        screenOptions={{
+          headerShown: false,
+          tabBarActiveTintColor: colors.accent,
+          tabBarInactiveTintColor: colors.textDim,
+          tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
+          tabBarLabelStyle: fontStyleFor(fonts.text, "text", { fontSize: 10 }) ?? undefined,
+        }}
+      >
+        <Tabs.Screen
+          name="(home)"
+          options={{
+            title: "Home",
+            tabBarBadge: newCountLabel(newCount) ?? undefined,
+            tabBarBadgeStyle: { backgroundColor: colors.accent, color: colors.onAccent },
+            tabBarIcon: ({ color, focused, size }) => <Icon name="home" filled={focused} color={color} size={size} />,
+          }}
+        />
+        <Tabs.Screen name="(library)" options={{ title: "My shelf", tabBarIcon: ({ color, focused, size }) => <Icon name="library" filled={focused} color={color} size={size} /> }} />
+        <Tabs.Screen name="(arena)" options={{ title: "Games", tabBarIcon: ({ color, focused, size }) => <Icon name="arena" filled={focused} color={color} size={size} /> }} />
+        <Tabs.Screen name="(murals)" options={{ title: "Murals", tabBarIcon: ({ color, focused, size }) => <Icon name="murals" filled={focused} color={color} size={size} /> }} />
+        <Tabs.Screen name="(settings)" options={{ title: "Settings", tabBarIcon: ({ color, focused, size }) => <Icon name="settings" filled={focused} color={color} size={size} /> }} />
+      </Tabs>
+    </>
+  );
+}
+
 export default function AppLayout() {
   const pathname = usePathname();
   const params = useGlobalSearchParams();
   const returnTo = pathWithQuery(pathname, params);
   const { ready, user, unreachable, retry } = useAuth();
-  const { colors, fonts } = useTheme();
+  const { colors } = useTheme();
   if (!ready) {
     return (
       <View style={{ flex: 1, alignItems: "center", backgroundColor: colors.background, justifyContent: "center" }}>
@@ -56,29 +98,5 @@ export default function AppLayout() {
   // top comment, mirrors the PWA's RequireUsername guard.
   if (!user.username) return <Redirect href={{ pathname: "/choose-username", params: { returnTo } }} />;
 
-  // Each tab is a group holding its own Stack, so a drill-down inside a tab is
-  // a real push — with the platform's back chevron and swipe-back — rather than
-  // another tab screen hidden with href: null. The group segments don't appear
-  // in the URL, so every path is unchanged.
-  return (
-    <>
-      <GenreEnrichment />
-      <AppearanceSync />
-      <Tabs
-        screenOptions={{
-          headerShown: false,
-          tabBarActiveTintColor: colors.accent,
-          tabBarInactiveTintColor: colors.textDim,
-          tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
-          tabBarLabelStyle: fontStyleFor(fonts.text, "text", { fontSize: 10 }) ?? undefined,
-        }}
-      >
-        <Tabs.Screen name="(home)" options={{ title: "Home", tabBarIcon: ({ color, focused, size }) => <Icon name="home" filled={focused} color={color} size={size} /> }} />
-        <Tabs.Screen name="(library)" options={{ title: "My shelf", tabBarIcon: ({ color, focused, size }) => <Icon name="library" filled={focused} color={color} size={size} /> }} />
-        <Tabs.Screen name="(arena)" options={{ title: "Games", tabBarIcon: ({ color, focused, size }) => <Icon name="arena" filled={focused} color={color} size={size} /> }} />
-        <Tabs.Screen name="(murals)" options={{ title: "Murals", tabBarIcon: ({ color, focused, size }) => <Icon name="murals" filled={focused} color={color} size={size} /> }} />
-        <Tabs.Screen name="(settings)" options={{ title: "Settings", tabBarIcon: ({ color, focused, size }) => <Icon name="settings" filled={focused} color={color} size={size} /> }} />
-      </Tabs>
-    </>
-  );
+  return <AppTabs />;
 }

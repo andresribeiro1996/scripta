@@ -1,21 +1,24 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { IdentityKey, ReaderProfile } from "@scripta/shared";
-import type { DiscoverItem } from "@scripta/shared/community";
-import { DEFAULT_FEED_SETTINGS, normalizeFeedSettings } from "@scripta/shared/community";
+import type { DiscoverItem, GameParticipation, SharedBook, SuggestedReader } from "@scripta/shared/community";
+import { DEFAULT_FEED_SETTINGS, encodeCursor, normalizeFeedSettings } from "@scripta/shared/community";
+import type { ParticipationItem } from "@scripta/shared/dashboard";
 import type { PublishedTierlistRef } from "../tierlists/service.js";
 import type { PublishedTournamentRef } from "../arena/service.js";
 import type { MuralPublicPayload } from "../murals/index.js";
 import type { CommunityRepository, CursorKeyset } from "./domain/ports.js";
 import type { EventRow, FollowRow, ProfileRow } from "./domain/types.js";
 import { InvalidCursorError, MuralNotOwnedError, NotFollowingError, ProfileNotFoundError, SelfFollowError, UsernameRequiredError } from "./domain/errors.js";
-import { createCommunityService, type CommunityDeps } from "./service.js";
+import { createCommunityService, type CommunityDeps, type CommunityService } from "./service.js";
 
 function createRepoFake() {
   const follows = new Map<string, FollowRow>();
   const profiles = new Map<string, ProfileRow>();
   const events: EventRow[] = [];
   const key = (a: string, b: string) => `${a}:${b}`;
+  const newestEvent = (a: EventRow, b: EventRow) => (a.created_at === b.created_at ? (a.id > b.id ? -1 : 1) : b.created_at.localeCompare(a.created_at));
+  const newestFollow = (a: FollowRow, b: FollowRow) => (a.created_at === b.created_at ? (a.follower_id > b.follower_id ? -1 : 1) : b.created_at.localeCompare(a.created_at));
   const repo: CommunityRepository = {
     deleteUserData() {},
     insertFollow(row) {
@@ -45,6 +48,12 @@ function createRepoFake() {
     upsertProfile(row) {
       profiles.set(row.user_id, { ...row });
     },
+    listPublishedProfiles(limit) {
+      return [...profiles.values()]
+        .filter((row) => row.published === 1)
+        .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
+        .slice(0, limit);
+    },
     getFeedSettings(userId) {
       const row = profiles.get(userId);
       if (!row || row.feed_settings === null) return null;
@@ -63,25 +72,32 @@ function createRepoFake() {
       if (events.some((e) => e.ref_type === row.ref_type && e.ref_id === row.ref_id)) return;
       events.push({ ...row });
     },
-    listEventsByUser(userId, keyset: CursorKeyset | undefined, limit) {
+    listEventsByUser(userId, keyset: CursorKeyset | undefined, limit, types) {
       return events
         .filter((e) => e.user_id === userId)
+        .filter((e) => !types || types.includes(e.type))
         .filter((e) => !keyset || e.created_at < keyset.createdAt || (e.created_at === keyset.createdAt && e.id < keyset.id))
-        .sort((a, b) => (a.created_at === b.created_at ? (a.id > b.id ? -1 : 1) : b.created_at.localeCompare(a.created_at)))
+        .sort(newestEvent)
+        .slice(0, limit);
+    },
+    listEventsByUserSince(userId, since, limit, types) {
+      return events
+        .filter((e) => e.user_id === userId && types.includes(e.type) && e.created_at > since)
+        .sort(newestEvent)
         .slice(0, limit);
     },
     listFollowersByFollowee(followeeId, keyset, limit) {
       return [...follows.values()]
         .filter((row) => row.followee_id === followeeId)
         .filter((row) => !keyset || row.created_at < keyset.createdAt || (row.created_at === keyset.createdAt && row.follower_id < keyset.id))
-        .sort((a, b) => (a.created_at === b.created_at ? (a.follower_id > b.follower_id ? -1 : 1) : b.created_at.localeCompare(a.created_at)))
+        .sort(newestFollow)
         .slice(0, limit);
     },
-    countEventsByUsersSince(userIds, since) {
-      return events.filter((e) => userIds.includes(e.user_id) && e.created_at > since).length;
-    },
-    countFollowersSince(followeeId, since) {
-      return [...follows.values()].filter((row) => row.followee_id === followeeId && row.created_at > since).length;
+    listFollowersSince(followeeId, since, limit) {
+      return [...follows.values()]
+        .filter((row) => row.followee_id === followeeId && row.created_at > since)
+        .sort(newestFollow)
+        .slice(0, limit);
     }
   };
   return { repo, follows, profiles, events };
@@ -93,6 +109,11 @@ function createDeps(repo: CommunityRepository) {
   const ownedMurals = new Set<string>();
   const muralPayloads = new Map<string, MuralPublicPayload | null>();
   const libraries = new Map<string, Record<string, unknown>>();
+  const libraryCalls: string[] = [];
+  const sharedCounts = new Map<string, number>();
+  const sharedShelves = new Map<string, SharedBook[]>();
+  const sharedBookCountsCalls: Array<{ viewerId: string; candidateIds: string[] }> = [];
+  const sharedBooksCalls: Array<{ viewerId: string; candidateId: string; limit: number }> = [];
   const tierlistRefs = new Map<string, PublishedTierlistRef>();
   const tournamentRefs = new Map<string, PublishedTournamentRef>();
   const byNewest = <T extends { createdAt: string }>(a: T, b: T) => b.createdAt.localeCompare(a.createdAt);
@@ -101,6 +122,9 @@ function createDeps(repo: CommunityRepository) {
   const tournamentVotes = new Set<string>();
   const readerGlyphs = new Map<string, IdentityKey | null>();
   const readerGlyphCalls: string[] = [];
+  const tierlistParticipation: GameParticipation[] = [];
+  const tournamentParticipation: GameParticipation[] = [];
+  const quizParticipation: GameParticipation[] = [];
   const deps: CommunityDeps = {
     repo,
     getDashboardSeenAt: () => seenAt.value,
@@ -116,7 +140,18 @@ function createDeps(repo: CommunityRepository) {
       }
       return out;
     },
-    resolveLibrary: (id) => libraries.get(id) ?? null,
+    resolveLibrary: (id) => {
+      libraryCalls.push(id);
+      return libraries.get(id) ?? null;
+    },
+    sharedBookCounts: (viewerId, candidateIds) => {
+      sharedBookCountsCalls.push({ viewerId, candidateIds: [...candidateIds] });
+      return new Map(candidateIds.flatMap((id) => (sharedCounts.has(id) ? [[id, sharedCounts.get(id)!] as [string, number]] : [])));
+    },
+    sharedBooks: (viewerId, candidateId, limit) => {
+      sharedBooksCalls.push({ viewerId, candidateId, limit });
+      return (sharedShelves.get(candidateId) ?? []).slice(0, limit);
+    },
     readerGlyphFor: (id) => {
       readerGlyphCalls.push(id);
       return readerGlyphs.get(id) ?? null;
@@ -143,9 +178,14 @@ function createDeps(repo: CommunityRepository) {
       get: (id) => tournamentRefs.get(id),
       listByOwner: (owner) => [...tournamentRefs.values()].filter((r) => r.ownerUserId === owner).sort(byNewest),
       listVotedByUser: (voter) => [...tournamentRefs.values()].filter((r) => tournamentVotes.has(`${voter}:${r.id}`)).sort(byNewest)
+    },
+    participation: {
+      tierlists: () => tierlistParticipation,
+      tournaments: () => tournamentParticipation,
+      quizzes: () => quizParticipation
     }
   };
-  return { deps, readerProfiles, usernames, ownedMurals, muralPayloads, libraries, tierlistRefs, tournamentRefs, seenAt, votes, tournamentVotes, readerGlyphs, readerGlyphCalls };
+  return { deps, readerProfiles, usernames, ownedMurals, muralPayloads, libraries, libraryCalls, sharedCounts, sharedShelves, sharedBookCountsCalls, sharedBooksCalls, tierlistRefs, tournamentRefs, seenAt, votes, tournamentVotes, readerGlyphs, readerGlyphCalls, tierlistParticipation, tournamentParticipation, quizParticipation };
 }
 
 function profileRow(userId: string, overrides: Partial<ProfileRow> = {}): ProfileRow {
@@ -163,6 +203,22 @@ function profileRow(userId: string, overrides: Partial<ProfileRow> = {}): Profil
 function reader(userId: string): ReaderProfile {
   return { username: `user-${userId}`, avatarUrl: null };
 }
+
+const at = (day: number) => `2026-09-${String(day).padStart(2, "0")}T00:00:00.000Z`;
+
+const ALL_KINDS: ReadonlySet<string> = new Set(["publication", "vote", "reading", "follow", "participation"]);
+
+const pageThrough = (service: CommunityService, limit: number, kinds?: ReadonlySet<string>): string[] => {
+  const ids: string[] = [];
+  let cursor: string | null | undefined;
+  for (let pages = 0; cursor !== null && pages < 50; pages++) {
+    const page = service.getDashboard("viewer", cursor ?? undefined, limit, kinds);
+    assert.ok(page.items.length <= limit);
+    ids.push(...page.items.map((item) => item.id));
+    cursor = page.nextCursor;
+  }
+  return ids;
+};
 
 export function tierRef(id: string, owner: string, overrides: Partial<PublishedTierlistRef> = {}): PublishedTierlistRef {
   return {
@@ -194,16 +250,63 @@ export function tournRef(id: string, owner: string, overrides: Partial<Published
   };
 }
 
-test("follow needs an existing user, not a published profile", () => {
+test("follow needs an existing user who isn't you", () => {
   const { repo } = createRepoFake();
   const { deps, readerProfiles } = createDeps(repo);
   const service = createCommunityService(deps);
   assert.throws(() => service.follow("bob", "ghost"), ProfileNotFoundError);
-  readerProfiles.set("alice", reader("alice"));
-  service.follow("bob", "alice");
+  readerProfiles.set("bob", reader("bob"));
+  repo.upsertProfile(profileRow("bob"));
   assert.throws(() => service.follow("bob", "bob"), SelfFollowError);
+});
+
+test("a published reader can be followed, and following again changes nothing", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  repo.upsertProfile(profileRow("alice"));
+  service.follow("bob", "alice");
   service.follow("bob", "alice");
   assert.equal(repo.countFollowers("alice"), 1);
+});
+
+test("an unpublished reader who doesn't follow you can't be followed", () => {
+  const { repo, events } = createRepoFake();
+  const { deps, readerProfiles } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  readerProfiles.set("carol", reader("carol"));
+  repo.upsertProfile(profileRow("carol", { published: 0 }));
+  assert.throws(() => service.follow("bob", "alice"), ProfileNotFoundError);
+  assert.throws(() => service.follow("bob", "carol"), ProfileNotFoundError);
+  assert.equal(repo.countFollowing("bob"), 0);
+  assert.equal(events.length, 0);
+});
+
+test("an unpublished reader who follows you can be followed back, and nobody else can follow them", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  repo.upsertProfile(profileRow("alice", { published: 0 }));
+  repo.insertFollow({ follower_id: "alice", followee_id: "bob", created_at: at(1) });
+  service.follow("bob", "alice");
+  assert.notEqual(repo.getFollow("bob", "alice"), undefined);
+  assert.throws(() => service.follow("dave", "alice"), ProfileNotFoundError);
+});
+
+test("following again a reader who has since gone private changes nothing", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  repo.upsertProfile(profileRow("alice"));
+  service.follow("bob", "alice");
+  repo.upsertProfile(profileRow("alice", { published: 0 }));
+  service.follow("bob", "alice");
+  assert.equal(repo.countFollowers("alice"), 1);
+  assert.notEqual(repo.getFollow("bob", "alice"), undefined);
 });
 
 test("unfollow without an existing follow throws", () => {
@@ -219,6 +322,8 @@ test("follow state reports direction-specific counts", () => {
   const service = createCommunityService(deps);
   readerProfiles.set("alice", reader("alice"));
   readerProfiles.set("dave", reader("dave"));
+  repo.upsertProfile(profileRow("alice"));
+  repo.upsertProfile(profileRow("dave"));
   service.follow("bob", "alice");
   service.follow("carol", "alice");
   service.follow("alice", "dave");
@@ -243,11 +348,11 @@ test("publish requires a username, then an owned mural", () => {
   const { deps, usernames, ownedMurals } = createDeps(repo);
   const service = createCommunityService(deps);
   profiles.set("alice", profileRow("alice", { published: 0 }));
-  assert.throws(() => service.publishProfile("alice", "m1"), UsernameRequiredError);
+  assert.throws(() => service.publishProfile("alice", { muralId: "m1" }), UsernameRequiredError);
   usernames.set("alice", "alice");
-  assert.throws(() => service.publishProfile("alice", "m1"), MuralNotOwnedError);
+  assert.throws(() => service.publishProfile("alice", { muralId: "m1" }), MuralNotOwnedError);
   ownedMurals.add("alice:m1");
-  service.publishProfile("alice", "m1");
+  service.publishProfile("alice", { muralId: "m1" });
   const row = repo.getProfileRow("alice")!;
   assert.equal(row.published, 1);
   assert.equal(row.mural_id, "m1");
@@ -260,12 +365,94 @@ test("republish swaps the mural and keeps the original published_at", () => {
   usernames.set("alice", "alice");
   ownedMurals.add("alice:m1");
   ownedMurals.add("alice:m2");
-  service.publishProfile("alice", "m1");
+  service.publishProfile("alice", { muralId: "m1" });
   const first = repo.getProfileRow("alice")!;
-  service.publishProfile("alice", "m2");
+  service.publishProfile("alice", { muralId: "m2" });
   const second = repo.getProfileRow("alice")!;
   assert.equal(second.mural_id, "m2");
   assert.equal(second.published_at, first.published_at);
+});
+
+test("publishing without a mural needs a username, then publishes with none and announces nothing", () => {
+  const { repo, events } = createRepoFake();
+  const { deps, usernames } = createDeps(repo);
+  const service = createCommunityService(deps);
+  assert.throws(() => service.publishProfile("alice", {}), UsernameRequiredError);
+  assert.equal(repo.getProfileRow("alice"), undefined);
+  usernames.set("alice", "alice");
+  service.publishProfile("alice", {});
+  const row = repo.getProfileRow("alice")!;
+  assert.equal(row.published, 1);
+  assert.equal(row.mural_id, null);
+  assert.equal(events.filter((event) => event.type === "mural_published").length, 0);
+});
+
+test("publishing without a mural keeps the shelf mural already chosen and announces it the first time", () => {
+  const { repo, events } = createRepoFake();
+  const { deps, usernames, ownedMurals } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  ownedMurals.add("alice:m1");
+  service.setShelfMural("alice", "m1");
+  service.publishProfile("alice", {});
+  const row = repo.getProfileRow("alice")!;
+  assert.equal(row.published, 1);
+  assert.equal(row.mural_id, "m1");
+  assert.deepEqual(events.filter((event) => event.type === "mural_published").map((event) => event.ref_id), ["m1"]);
+});
+
+test("publishing without a mural drops a shelf mural that has since been deleted", () => {
+  const { repo, events } = createRepoFake();
+  const { deps, usernames, ownedMurals } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  ownedMurals.add("alice:m1");
+  service.setShelfMural("alice", "m1");
+  ownedMurals.delete("alice:m1");
+  service.publishProfile("alice", {});
+  const row = repo.getProfileRow("alice")!;
+  assert.equal(row.published, 1);
+  assert.equal(row.mural_id, null);
+  assert.equal(events.filter((event) => event.type === "mural_published").length, 0);
+});
+
+test("publishing a mural the user doesn't own fails and changes nothing, even with a shelf mural already chosen", () => {
+  const { repo } = createRepoFake();
+  const { deps, usernames, ownedMurals } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  ownedMurals.add("alice:m1");
+  service.setShelfMural("alice", "m1");
+  assert.throws(() => service.publishProfile("alice", { muralId: "theirs", shareReading: true }), MuralNotOwnedError);
+  const row = repo.getProfileRow("alice")!;
+  assert.equal(row.published, 0);
+  assert.equal(row.mural_id, "m1");
+  assert.equal(service.getFeedSettings("alice").reading, false);
+});
+
+test("a first publish can choose to share reading, and can later choose not to", () => {
+  const { repo } = createRepoFake();
+  const { deps, usernames } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  service.publishProfile("alice", { shareReading: true });
+  assert.equal(repo.getProfileRow("alice")!.published, 1);
+  assert.deepEqual(service.getFeedSettings("alice"), { ...DEFAULT_FEED_SETTINGS, reading: true });
+  service.publishProfile("alice", { shareReading: false });
+  assert.deepEqual(service.getFeedSettings("alice"), { ...DEFAULT_FEED_SETTINGS, reading: false });
+});
+
+test("publishing changes only the reading switch, and only when asked to", () => {
+  const { repo } = createRepoFake();
+  const { deps, usernames } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  repo.upsertProfile(profileRow("alice", { published: 0 }));
+  repo.updateFeedSettings("alice", { ...DEFAULT_FEED_SETTINGS, votes: false, follows: false });
+  service.publishProfile("alice", { shareReading: true });
+  assert.deepEqual(service.getFeedSettings("alice"), { ...DEFAULT_FEED_SETTINGS, votes: false, follows: false, reading: true });
+  service.publishProfile("alice", {});
+  assert.deepEqual(service.getFeedSettings("alice"), { ...DEFAULT_FEED_SETTINGS, votes: false, follows: false, reading: true });
 });
 
 test("unpublish clears published, keeps the row, and is a no-op when never published", () => {
@@ -276,7 +463,7 @@ test("unpublish clears published, keeps the row, and is a no-op when never publi
   profiles.set("alice", profileRow("alice"));
   usernames.set("alice", "alice");
   ownedMurals.add("alice:m1");
-  service.publishProfile("alice", "m1");
+  service.publishProfile("alice", { muralId: "m1" });
   service.unpublishProfile("alice");
   const row = repo.getProfileRow("alice")!;
   assert.equal(row.published, 0);
@@ -347,9 +534,9 @@ test("getProfileByUsername shows an unpublished user as private, with nothing pu
   tournamentRefs.set("g1", tournRef("g1", "alice"));
   readerGlyphs.set("alice", "star");
   profiles.set("alice", profileRow("alice", { published: 0, mural_id: "m1" }));
-  service.follow("me", "alice");
-  service.follow("bob", "alice");
-  service.follow("alice", "bob");
+  repo.insertFollow({ follower_id: "me", followee_id: "alice", created_at: at(1) });
+  repo.insertFollow({ follower_id: "bob", followee_id: "alice", created_at: at(1) });
+  repo.insertFollow({ follower_id: "alice", followee_id: "bob", created_at: at(1) });
 
   const view = service.getProfileByUsername("alice", "me");
   assert.equal(view.private, true);
@@ -483,7 +670,7 @@ test("follow rows surface only to the followee and retract on unfollow", () => {
   assert.equal(service.getDashboard("viewer", undefined, 20).items.length, 0);
 });
 
-test("newCount counts unseen rows and the seen marker resets it", () => {
+test("personalNewCount counts unseen rows and the seen marker resets it", () => {
   const { repo } = createRepoFake();
   const { deps, seenAt, readerProfiles } = createDeps(repo);
   const service = createCommunityService(deps);
@@ -492,11 +679,11 @@ test("newCount counts unseen rows and the seen marker resets it", () => {
   repo.upsertProfile(profileRow("viewer"));
   repo.insertFollow({ follower_id: "alice", followee_id: "viewer", created_at: "2026-09-05T00:00:00.000Z" });
   repo.insertFollow({ follower_id: "bob", followee_id: "viewer", created_at: "2026-09-06T00:00:00.000Z" });
-  assert.equal(service.getDashboard("viewer", undefined, 20).newCount, 0);
+  assert.equal(service.getDashboard("viewer", undefined, 20).personalNewCount, 2);
   seenAt.value = "2026-09-05T12:00:00.000Z";
-  assert.equal(service.getDashboard("viewer", undefined, 20).newCount, 1);
+  assert.equal(service.getDashboard("viewer", undefined, 20).personalNewCount, 1);
   service.markDashboardSeen("viewer");
-  assert.equal(service.getDashboard("viewer", undefined, 20).newCount, 0);
+  assert.equal(service.getDashboard("viewer", undefined, 20).personalNewCount, 0);
 });
 
 test("dashboard pagination by keyset spans both sources", () => {
@@ -539,6 +726,423 @@ test("an unparseable dashboard cursor is a 400-worthy error", () => {
   assert.throws(() => service.getDashboard("viewer", "###", 20), InvalidCursorError);
 });
 
+test("your games' participation shows as one row per game", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistParticipation } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("ana", reader("ana"));
+  repo.upsertProfile(profileRow("ana"));
+  tierlistParticipation.push({ id: "t1", name: "Sci-fi", covers: ["a", "b", "c", "d"], participantCount: 4, latestAt: at(2), recent: [{ userId: "ana", at: at(2) }, { userId: "ghost", at: at(1) }] });
+  const { items } = service.getDashboard("viewer", undefined, 20, ALL_KINDS);
+  assert.equal(items.length, 1);
+  const row = items[0] as ParticipationItem;
+  assert.equal(row.kind, "participation");
+  assert.equal(row.id, "tierlist:t1");
+  assert.equal(row.game.covers.length, 3);
+  assert.equal(row.count, 4);
+  assert.equal(row.createdAt, at(2));
+  assert.deepEqual(row.actors.map((actor) => actor.username), ["user-ana"]);
+});
+
+test("each kind of game keeps its own kind and id", () => {
+  const { repo } = createRepoFake();
+  const { deps, tierlistParticipation, tournamentParticipation, quizParticipation } = createDeps(repo);
+  const service = createCommunityService(deps);
+  const game = (id: string, day: number) => ({ id, name: `Game ${id}`, covers: [], participantCount: 1, latestAt: at(day), recent: [] });
+  tierlistParticipation.push(game("a", 1));
+  tournamentParticipation.push(game("a", 2));
+  quizParticipation.push(game("a", 3));
+  const rows = service.getDashboard("viewer", undefined, 20, ALL_KINDS).items as ParticipationItem[];
+  assert.deepEqual(rows.map((row) => [row.id, row.game.kind, row.game.id]), [["quiz:a", "quiz", "a"], ["tournament:a", "tournament", "a"], ["tierlist:a", "tierlist", "a"]]);
+});
+
+test("participants who are private or hide their votes are counted, never named", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistParticipation } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("bo", reader("bo"));
+  readerProfiles.set("cy", reader("cy"));
+  repo.upsertProfile(profileRow("bo", { published: 0 }));
+  repo.upsertProfile(profileRow("cy"));
+  repo.updateFeedSettings("cy", { ...DEFAULT_FEED_SETTINGS, votes: false });
+  tierlistParticipation.push({ id: "t1", name: "Sci-fi", covers: [], participantCount: 2, latestAt: at(2), recent: [{ userId: "bo", at: at(2) }, { userId: "cy", at: at(1) }] });
+  const row = service.getDashboard("viewer", undefined, 20, ALL_KINDS).items[0] as ParticipationItem;
+  assert.deepEqual(row.actors, []);
+  assert.equal(row.count, 2);
+});
+
+test("no more than three participants are named", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistParticipation } = createDeps(repo);
+  const service = createCommunityService(deps);
+  const ids = ["p1", "p2", "p3", "p4"];
+  for (const id of ids) {
+    readerProfiles.set(id, reader(id));
+    repo.upsertProfile(profileRow(id));
+  }
+  tierlistParticipation.push({ id: "t1", name: "Sci-fi", covers: [], participantCount: 4, latestAt: at(4), recent: ids.map((userId, i) => ({ userId, at: at(4 - i) })) });
+  const row = service.getDashboard("viewer", undefined, 20, ALL_KINDS).items[0] as ParticipationItem;
+  assert.deepEqual(row.actors.map((actor) => actor.username), ["user-p1", "user-p2", "user-p3"]);
+  assert.equal(row.count, 4);
+});
+
+test("hidden events can't push a visible one off the first page", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  repo.upsertProfile(profileRow("alice"));
+  repo.insertFollow({ follower_id: "viewer", followee_id: "alice", created_at: at(1) });
+  tierlistRefs.set("t1", tierRef("t1", "alice"));
+  repo.insertEvent({ id: "e-pub", user_id: "alice", type: "tierlist_published", ref_type: "tierlist", ref_id: "t1", payload: null, created_at: at(2) });
+  for (let i = 0; i < 30; i++) {
+    repo.insertEvent({ id: `e-book-${i}`, user_id: "alice", type: "book_added", ref_type: "book", ref_id: `b${i}`, payload: JSON.stringify({ title: "T", author: "A" }), created_at: `2026-09-03T00:00:${String(i).padStart(2, "0")}.000Z` });
+  }
+  assert.deepEqual(service.getDashboard("viewer", undefined, 20).items.map((item) => item.id), ["e-pub"]);
+});
+
+test("counts come from the rows the list shows", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs, tierlistParticipation, seenAt } = createDeps(repo);
+  const service = createCommunityService(deps);
+  seenAt.value = at(10);
+  for (const id of ["alice", "bob", "old-fan"]) readerProfiles.set(id, reader(id));
+  repo.upsertProfile(profileRow("alice"));
+  repo.insertFollow({ follower_id: "viewer", followee_id: "alice", created_at: at(1) });
+  tierlistRefs.set("t-old", tierRef("t-old", "alice"));
+  tierlistRefs.set("t-new", tierRef("t-new", "alice"));
+  repo.insertEvent({ id: "e-old", user_id: "alice", type: "tierlist_published", ref_type: "tierlist", ref_id: "t-old", payload: null, created_at: at(9) });
+  repo.insertEvent({ id: "e-new", user_id: "alice", type: "tierlist_published", ref_type: "tierlist", ref_id: "t-new", payload: null, created_at: at(11) });
+  for (let i = 0; i < 5; i++) {
+    repo.insertEvent({ id: `e-book-${i}`, user_id: "alice", type: "book_added", ref_type: "book", ref_id: `b${i}`, payload: JSON.stringify({ title: "T", author: "A" }), created_at: at(12) });
+  }
+  repo.insertEvent({ id: "e-following", user_id: "alice", type: "following", ref_type: "user", ref_id: "bob", payload: JSON.stringify({ username: "user-bob" }), created_at: at(12) });
+  repo.insertEvent({ id: "e-mural", user_id: "alice", type: "mural_published", ref_type: "mural", ref_id: "m1", payload: null, created_at: at(12) });
+  repo.insertFollow({ follower_id: "old-fan", followee_id: "viewer", created_at: at(9) });
+  repo.insertFollow({ follower_id: "bob", followee_id: "viewer", created_at: at(11) });
+  tierlistParticipation.push({ id: "g-old", name: "Old", covers: [], participantCount: 1, latestAt: at(9), recent: [] });
+  tierlistParticipation.push({ id: "g-seen", name: "Seen", covers: [], participantCount: 1, latestAt: at(10), recent: [] });
+  tierlistParticipation.push({ id: "g-new", name: "New", covers: [], participantCount: 1, latestAt: at(12), recent: [] });
+  const page = service.getDashboard("viewer", undefined, 20, ALL_KINDS);
+  assert.equal(page.followingNewCount, 1);
+  assert.equal(page.personalNewCount, 2);
+  assert.equal(page.seenAt, at(10));
+});
+
+test("each count stops at 100", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  repo.upsertProfile(profileRow("alice"));
+  repo.insertFollow({ follower_id: "viewer", followee_id: "alice", created_at: at(1) });
+  for (let i = 0; i < 105; i++) {
+    readerProfiles.set(`fan${i}`, reader(`fan${i}`));
+    repo.insertFollow({ follower_id: `fan${i}`, followee_id: "viewer", created_at: at(2) });
+    tierlistRefs.set(`t${i}`, tierRef(`t${i}`, "alice"));
+    repo.insertEvent({ id: `e${i}`, user_id: "alice", type: "tierlist_published", ref_type: "tierlist", ref_id: `t${i}`, payload: null, created_at: at(3) });
+  }
+  const page = service.getDashboard("viewer", undefined, 20);
+  assert.equal(page.personalNewCount, 100);
+  assert.equal(page.followingNewCount, 100);
+});
+
+test("with no seen marker every row counts", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistParticipation } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("bob", reader("bob"));
+  repo.insertFollow({ follower_id: "bob", followee_id: "viewer", created_at: at(2) });
+  tierlistParticipation.push({ id: "t1", name: "Sci-fi", covers: [], participantCount: 1, latestAt: at(3), recent: [] });
+  const page = service.getDashboard("viewer", undefined, 20, ALL_KINDS);
+  assert.equal(page.seenAt, null);
+  assert.equal(page.personalNewCount, 2);
+  assert.equal(page.followingNewCount, 0);
+});
+
+test("participation rows page with the cursor, without repeats or gaps", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistParticipation } = createDeps(repo);
+  const service = createCommunityService(deps);
+  for (const [id, day] of [["g1", 1], ["g2", 3], ["g3", 5]] as const) tierlistParticipation.push({ id, name: id, covers: [], participantCount: 1, latestAt: at(day), recent: [] });
+  for (const [id, day] of [["f1", 2], ["f2", 4], ["f3", 6]] as const) {
+    readerProfiles.set(id, reader(id));
+    repo.insertFollow({ follower_id: id, followee_id: "viewer", created_at: at(day) });
+  }
+  assert.deepEqual(pageThrough(service, 2, ALL_KINDS), ["f3", "tierlist:g3", "f2", "tierlist:g2", "f1", "tierlist:g1"]);
+});
+
+test("a cursor page carries no counts", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, seenAt } = createDeps(repo);
+  const service = createCommunityService(deps);
+  seenAt.value = at(1);
+  for (const [id, day] of [["f1", 2], ["f2", 3], ["f3", 4]] as const) {
+    readerProfiles.set(id, reader(id));
+    repo.insertFollow({ follower_id: id, followee_id: "viewer", created_at: at(day) });
+  }
+  const first = service.getDashboard("viewer", undefined, 2);
+  assert.equal(first.seenAt, at(1));
+  assert.equal(first.personalNewCount, 3);
+  const next = service.getDashboard("viewer", first.nextCursor!, 2);
+  assert.deepEqual(next.items.map((item) => item.id), ["f1"]);
+  assert.equal(next.seenAt, null);
+  assert.equal(next.personalNewCount, 0);
+  assert.equal(next.followingNewCount, 0);
+});
+
+test("one unrenderable row in a fetch window can't end the feed early", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  repo.upsertProfile(profileRow("alice"));
+  repo.insertFollow({ follower_id: "viewer", followee_id: "alice", created_at: at(1) });
+  for (let i = 0; i < 22; i++) {
+    const n = String(i).padStart(2, "0");
+    repo.insertEvent({ id: `v${n}`, user_id: "alice", type: "voted_on", ref_type: "tierlist", ref_id: `t${n}`, payload: null, created_at: `2026-09-02T00:00:${n}.000Z` });
+    if (i !== 21) tierlistRefs.set(`t${n}`, tierRef(`t${n}`, "carol"));
+  }
+  assert.deepEqual(pageThrough(service, 20), Array.from({ length: 21 }, (_, i) => `v${String(20 - i).padStart(2, "0")}`));
+});
+
+test("a window of unrenderable rows can't make the page skip a visible row behind it", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs, tierlistParticipation } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  repo.upsertProfile(profileRow("alice"));
+  repo.insertFollow({ follower_id: "viewer", followee_id: "alice", created_at: at(1) });
+  for (const [id, day] of [["a1", 20], ["a2", 19], ["a3", 18], ["a4", 17]] as const) {
+    repo.insertEvent({ id, user_id: "alice", type: "voted_on", ref_type: "tierlist", ref_id: `t-${id}`, payload: null, created_at: at(day) });
+  }
+  tierlistRefs.set("t-a4", tierRef("t-a4", "carol"));
+  for (const [id, day] of [["g1", 16], ["g2", 15], ["g3", 14]] as const) tierlistParticipation.push({ id, name: id, covers: [], participantCount: 1, latestAt: at(day), recent: [] });
+  assert.deepEqual(pageThrough(service, 2, ALL_KINDS), ["a4", "tierlist:g1", "tierlist:g2", "tierlist:g3"]);
+});
+
+test("rows from a quieter source don't jump ahead of the unfetched rows of a busier one", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  for (const id of ["alice", "bob"]) {
+    readerProfiles.set(id, reader(id));
+    repo.upsertProfile(profileRow(id));
+    repo.insertFollow({ follower_id: "viewer", followee_id: id, created_at: at(1) });
+  }
+  for (const [id, user, day] of [["b1", "bob", 20], ["b2", "bob", 19], ["b3", "bob", 18], ["b4", "bob", 17], ["a1", "alice", 16], ["a2", "alice", 15], ["a3", "alice", 14]] as const) {
+    repo.insertEvent({ id, user_id: user, type: "voted_on", ref_type: "tierlist", ref_id: `t-${id}`, payload: null, created_at: at(day) });
+    if (id !== "b1" && id !== "b2" && id !== "b3") tierlistRefs.set(`t-${id}`, tierRef(`t-${id}`, "carol"));
+  }
+  assert.deepEqual(pageThrough(service, 2), ["b4", "a1", "a2", "a3"]);
+});
+
+test("a run of unrenderable rows longer than a page's refills doesn't strand what comes after it", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  repo.upsertProfile(profileRow("alice"));
+  repo.insertFollow({ follower_id: "viewer", followee_id: "alice", created_at: at(1) });
+  const second = (n: number) => `2026-09-10T00:00:${String(n).padStart(2, "0")}.000Z`;
+  repo.insertEvent({ id: "x1", user_id: "alice", type: "voted_on", ref_type: "tierlist", ref_id: "t-x1", payload: null, created_at: second(40) });
+  for (let i = 1; i <= 20; i++) repo.insertEvent({ id: `d${String(i).padStart(2, "0")}`, user_id: "alice", type: "voted_on", ref_type: "tierlist", ref_id: `t-d${i}`, payload: null, created_at: second(40 - i) });
+  repo.insertEvent({ id: "x2", user_id: "alice", type: "voted_on", ref_type: "tierlist", ref_id: "t-x2", payload: null, created_at: second(5) });
+  tierlistRefs.set("t-x1", tierRef("t-x1", "carol"));
+  tierlistRefs.set("t-x2", tierRef("t-x2", "carol"));
+  assert.deepEqual(pageThrough(service, 2), ["x1", "x2"]);
+});
+
+test("a page gives up refilling after five fetches and hands back a cursor", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  repo.upsertProfile(profileRow("alice"));
+  repo.insertFollow({ follower_id: "viewer", followee_id: "alice", created_at: at(1) });
+  for (let i = 0; i < 40; i++) {
+    const n = String(i).padStart(2, "0");
+    repo.insertEvent({ id: `d${n}`, user_id: "alice", type: "voted_on", ref_type: "tierlist", ref_id: `t-d${n}`, payload: null, created_at: `2026-09-10T00:00:${n}.000Z` });
+  }
+  const listEventsByUser = repo.listEventsByUser;
+  let fetches = 0;
+  repo.listEventsByUser = (...args) => {
+    fetches++;
+    return listEventsByUser(...args);
+  };
+  const page = service.getDashboard("viewer", encodeCursor({ createdAt: at(11), id: "z" }), 2);
+  assert.deepEqual(page.items, []);
+  assert.ok(page.nextCursor);
+  assert.equal(fetches, 5);
+});
+
+test("a page that finds too few rows in its first fetch tops up from the next", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  repo.upsertProfile(profileRow("alice"));
+  repo.insertFollow({ follower_id: "viewer", followee_id: "alice", created_at: at(1) });
+  for (const [id, day] of [["x1", 20], ["d1", 19], ["d2", 18], ["x2", 17], ["x3", 16], ["x4", 15]] as const) {
+    repo.insertEvent({ id, user_id: "alice", type: "voted_on", ref_type: "tierlist", ref_id: `t-${id}`, payload: null, created_at: at(day) });
+    if (id.startsWith("x")) tierlistRefs.set(`t-${id}`, tierRef(`t-${id}`, "carol"));
+  }
+  const first = service.getDashboard("viewer", undefined, 2);
+  assert.deepEqual(first.items.map((item) => item.id), ["x1", "x2"]);
+  const second = service.getDashboard("viewer", first.nextCursor!, 2);
+  assert.deepEqual(second.items.map((item) => item.id), ["x3", "x4"]);
+  assert.equal(second.nextCursor, null);
+});
+
+test("an event, a follow and a participation row sharing a time each appear once, largest id first", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs, tierlistParticipation } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  readerProfiles.set("fan", reader("fan"));
+  repo.upsertProfile(profileRow("alice"));
+  repo.insertFollow({ follower_id: "viewer", followee_id: "alice", created_at: at(1) });
+  tierlistRefs.set("t1", tierRef("t1", "alice"));
+  repo.insertEvent({ id: "e-tie", user_id: "alice", type: "tierlist_published", ref_type: "tierlist", ref_id: "t1", payload: null, created_at: at(5) });
+  repo.insertFollow({ follower_id: "fan", followee_id: "viewer", created_at: at(5) });
+  tierlistParticipation.push({ id: "g-tie", name: "Tie", covers: [], participantCount: 1, latestAt: at(5), recent: [] });
+  assert.deepEqual(pageThrough(service, 1, ALL_KINDS), ["tierlist:g-tie", "fan", "e-tie"]);
+});
+
+test("rows tied with the fetch horizon's time are split by id, so none is skipped", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  for (const id of ["alice", "c"]) readerProfiles.set(id, reader(id));
+  repo.upsertProfile(profileRow("alice"));
+  repo.insertFollow({ follower_id: "viewer", followee_id: "alice", created_at: at(1) });
+  for (const [id, day] of [["a1", 12], ["a2", 11], ["m", 10], ["e", 10]] as const) {
+    repo.insertEvent({ id, user_id: "alice", type: "voted_on", ref_type: "tierlist", ref_id: `t-${id}`, payload: null, created_at: at(day) });
+    if (day === 10) tierlistRefs.set(`t-${id}`, tierRef(`t-${id}`, "carol"));
+  }
+  repo.insertFollow({ follower_id: "c", followee_id: "viewer", created_at: at(10) });
+  assert.deepEqual(pageThrough(service, 2), ["m", "e", "c"]);
+});
+
+test("only the participants that get named have a glyph looked up", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, readerGlyphs, readerGlyphCalls, tierlistParticipation } = createDeps(repo);
+  const service = createCommunityService(deps);
+  const ids = ["p1", "p2", "p3", "p4", "p5"];
+  for (const id of ids) {
+    if (id !== "p1") readerProfiles.set(id, reader(id));
+    repo.upsertProfile(profileRow(id));
+    repo.updateFeedSettings(id, { ...DEFAULT_FEED_SETTINGS, readerGlyph: true });
+    readerGlyphs.set(id, "star");
+  }
+  tierlistParticipation.push({ id: "t1", name: "Sci-fi", covers: [], participantCount: 5, latestAt: at(5), recent: ids.map((userId, i) => ({ userId, at: at(5 - i) })) });
+  const row = service.getDashboard("viewer", undefined, 20, ALL_KINDS).items[0] as ParticipationItem;
+  assert.deepEqual(row.actors.map((actor) => actor.username), ["user-p2", "user-p3", "user-p4"]);
+  assert.deepEqual(readerGlyphCalls, ["p2", "p3", "p4"]);
+});
+
+function serviceWithEveryKindOfRow(seen: string | null = null): CommunityService {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, seenAt, tierlistRefs, tierlistParticipation, tournamentParticipation, quizParticipation } = createDeps(repo);
+  seenAt.value = seen;
+  const service = createCommunityService(deps);
+  for (const id of ["alice", "bob"]) readerProfiles.set(id, reader(id));
+  repo.upsertProfile(profileRow("alice"));
+  repo.updateFeedSettings("alice", { ...DEFAULT_FEED_SETTINGS, reading: true });
+  repo.insertFollow({ follower_id: "viewer", followee_id: "alice", created_at: at(1) });
+  tierlistRefs.set("t-mine", tierRef("t-mine", "alice"));
+  tierlistRefs.set("t-other", tierRef("t-other", "carol"));
+  repo.insertEvent({ id: "e-pub", user_id: "alice", type: "tierlist_published", ref_type: "tierlist", ref_id: "t-mine", payload: null, created_at: at(3) });
+  repo.insertEvent({ id: "e-vote", user_id: "alice", type: "voted_on", ref_type: "tierlist", ref_id: "t-other", payload: null, created_at: at(4) });
+  repo.insertEvent({ id: "e-read", user_id: "alice", type: "book_added", ref_type: "book", ref_id: "b1", payload: JSON.stringify({ title: "Dune", author: "Herbert" }), created_at: at(5) });
+  repo.insertFollow({ follower_id: "bob", followee_id: "viewer", created_at: at(6) });
+  const game = (id: string, day: number) => ({ id, name: `Game ${id}`, covers: [], participantCount: 1, latestAt: at(day), recent: [] });
+  tierlistParticipation.push(game("g-tier", 7));
+  tournamentParticipation.push(game("g-cup", 8));
+  quizParticipation.push(game("g-quiz", 9));
+  return service;
+}
+
+test("a dashboard without kinds gets only the four kinds builds before step 2 can draw", () => {
+  const page = serviceWithEveryKindOfRow().getDashboard("viewer", undefined, 20);
+  assert.deepEqual(page.items.map((item) => item.kind), ["follow", "reading", "vote", "publication"]);
+  assert.equal(page.personalNewCount, 1);
+  assert.equal(page.followingNewCount, 3);
+});
+
+test("a dashboard without kinds also returns newCount, the two counts together, for builds that predate them", () => {
+  const page = serviceWithEveryKindOfRow(at(2)).getDashboard("viewer", undefined, 20);
+  assert.equal(page.personalNewCount, 1);
+  assert.equal(page.followingNewCount, 3);
+  assert.equal(page.newCount, 4);
+});
+
+test("newCount counts only the kinds the client lists", () => {
+  const page = serviceWithEveryKindOfRow(at(2)).getDashboard("viewer", undefined, 20, new Set(["publication", "follow"]));
+  assert.equal(page.personalNewCount, 1);
+  assert.equal(page.followingNewCount, 1);
+  assert.equal(page.newCount, 2);
+});
+
+test("a cursor page returns a newCount of 0", () => {
+  const service = serviceWithEveryKindOfRow(at(2));
+  const first = service.getDashboard("viewer", undefined, 1);
+  assert.equal(first.newCount, 4);
+  assert.ok(first.nextCursor);
+  assert.equal(service.getDashboard("viewer", first.nextCursor, 1).newCount, 0);
+});
+
+test("with no seen marker newCount is 0, though every row counts toward the two newer counts", () => {
+  const page = serviceWithEveryKindOfRow().getDashboard("viewer", undefined, 20);
+  assert.equal(page.personalNewCount + page.followingNewCount, 4);
+  assert.equal(page.newCount, 0);
+});
+
+test("the kinds a client lists come back, and are counted", () => {
+  const page = serviceWithEveryKindOfRow().getDashboard("viewer", undefined, 20, ALL_KINDS);
+  assert.deepEqual(page.items.map((item) => item.id), ["quiz:g-quiz", "tournament:g-cup", "tierlist:g-tier", "bob", "e-read", "e-vote", "e-pub"]);
+  assert.equal(page.personalNewCount, 4);
+  assert.equal(page.followingNewCount, 3);
+});
+
+test("rows of a kind the client didn't list are never fetched, so every page but the last stays full", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  repo.upsertProfile(profileRow("alice"));
+  repo.updateFeedSettings("alice", { ...DEFAULT_FEED_SETTINGS, reading: true });
+  repo.insertFollow({ follower_id: "viewer", followee_id: "alice", created_at: at(1) });
+  for (let i = 0; i < 5; i++) {
+    tierlistRefs.set(`t${i}`, tierRef(`t${i}`, "alice"));
+    repo.insertEvent({ id: `e${i}`, user_id: "alice", type: "tierlist_published", ref_type: "tierlist", ref_id: `t${i}`, payload: null, created_at: at(10 + i) });
+  }
+  for (let i = 0; i < 16; i++) {
+    readerProfiles.set(`fan${i}`, reader(`fan${i}`));
+    repo.insertFollow({ follower_id: `fan${i}`, followee_id: "viewer", created_at: at(20) });
+    repo.insertEvent({ id: `r${i}`, user_id: "alice", type: "book_added", ref_type: "book", ref_id: `b${i}`, payload: JSON.stringify({ title: "T", author: "A" }), created_at: at(15) });
+  }
+  const kinds = new Set(["publication", "vote", "participation"]);
+  const pages: string[][] = [];
+  let cursor: string | undefined;
+  do {
+    const page = service.getDashboard("viewer", cursor, 2, kinds);
+    pages.push(page.items.map((item) => item.id));
+    cursor = page.nextCursor ?? undefined;
+  } while (cursor !== undefined && pages.length < 10);
+  assert.deepEqual(pages, [["e4", "e3"], ["e2", "e1"], ["e0"]]);
+  const counted = service.getDashboard("viewer", undefined, 2, kinds);
+  assert.equal(counted.personalNewCount, 0);
+  assert.equal(counted.followingNewCount, 5);
+});
+
+test("kind names this server doesn't know are ignored", () => {
+  const page = serviceWithEveryKindOfRow().getDashboard("viewer", undefined, 20, new Set(["publication", "reply"]));
+  assert.deepEqual(page.items.map((item) => item.kind), ["publication"]);
+  assert.equal(page.personalNewCount, 0);
+  assert.equal(page.followingNewCount, 1);
+});
+
 test("discover merges both content kinds newest first", () => {
   const { repo } = createRepoFake();
   const { deps, readerProfiles, tierlistRefs, tournamentRefs } = createDeps(repo);
@@ -578,6 +1182,38 @@ test("discover filters by type and by name substring, and paginates by offset", 
   const page3 = service.getDiscover("all", "", 1, 2);
   assert.equal(page3.items.length, 1);
   assert.equal(page3.nextOffset, null);
+});
+
+test("a single-type discover filter reports its next page", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  tierlistRefs.set("t1", tierRef("t1", "alice", { createdAt: "2026-09-01T00:00:00.000Z" }));
+  tierlistRefs.set("t2", tierRef("t2", "alice", { createdAt: "2026-09-02T00:00:00.000Z" }));
+  tierlistRefs.set("t3", tierRef("t3", "alice", { createdAt: "2026-09-03T00:00:00.000Z" }));
+
+  const page1 = service.getDiscover("tierlist", "", 2, 0);
+  assert.deepEqual(page1.items.map((i) => i.content.id), ["t3", "t2"]);
+  assert.equal(page1.nextOffset, 2);
+  const page2 = service.getDiscover("tierlist", "", 2, 2);
+  assert.deepEqual(page2.items.map((i) => i.content.id), ["t1"]);
+  assert.equal(page2.nextOffset, null);
+});
+
+test("discover search finds a match older than the first page", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  tierlistRefs.set("old", tierRef("old", "alice", { name: "Fantasy classics", createdAt: "2026-09-01T00:00:00.000Z" }));
+  for (let day = 2; day <= 9; day++) {
+    tierlistRefs.set(`t${day}`, tierRef(`t${day}`, "alice", { name: `List ${day}`, createdAt: `2026-09-0${day}T00:00:00.000Z` }));
+  }
+
+  const page = service.getDiscover("all", "fantasy", 2, 0);
+  assert.deepEqual(page.items.map((i) => i.content.id), ["old"]);
+  assert.equal(page.nextOffset, null);
 });
 
 test("discover drops rows whose author has no reader profile", () => {
@@ -725,9 +1361,9 @@ test("publishProfile emits mural_published only when the mural changes", () => {
   ownedMurals.add("alice:m1");
   ownedMurals.add("alice:m2");
   repo.upsertProfile(profileRow("alice", { mural_id: "m1" }));
-  service.publishProfile("alice", "m1");
+  service.publishProfile("alice", { muralId: "m1" });
   assert.equal(events.filter((e) => e.type === "mural_published").length, 0);
-  service.publishProfile("alice", "m2");
+  service.publishProfile("alice", { muralId: "m2" });
   const murals = events.filter((e) => e.type === "mural_published");
   assert.equal(murals.length, 1);
   assert.equal(murals[0]?.ref_type, "mural");
@@ -741,10 +1377,23 @@ test("publishing a privately chosen shelf for the first time announces it", () =
   usernames.set("alice", "alice");
   ownedMurals.add("alice:m1");
   service.setShelfMural("alice", "m1");
-  service.publishProfile("alice", "m1");
+  service.publishProfile("alice", { muralId: "m1" });
   const announcements = events.filter((event) => event.type === "mural_published");
   assert.equal(announcements.length, 1);
   assert.equal(announcements[0]?.ref_id, "m1");
+});
+
+test("choosing a mural on a later publish announces it, though the first publish had none", () => {
+  const { repo, events } = createRepoFake();
+  const { deps, usernames, ownedMurals } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  ownedMurals.add("alice:m1");
+  const announced = () => events.filter((event) => event.type === "mural_published").map((event) => event.ref_id);
+  service.publishProfile("alice", {});
+  assert.deepEqual(announced(), []);
+  service.publishProfile("alice", { muralId: "m1" });
+  assert.deepEqual(announced(), ["m1"]);
 });
 
 test("republishing the same mural after unpublish stays silent", () => {
@@ -753,10 +1402,10 @@ test("republishing the same mural after unpublish stays silent", () => {
   const service = createCommunityService(deps);
   usernames.set("alice", "alice");
   ownedMurals.add("alice:m1");
-  service.publishProfile("alice", "m1");
+  service.publishProfile("alice", { muralId: "m1" });
   service.unpublishProfile("alice");
   const before = events.filter((event) => event.type === "mural_published").length;
-  service.publishProfile("alice", "m1");
+  service.publishProfile("alice", { muralId: "m1" });
   assert.equal(events.filter((event) => event.type === "mural_published").length, before);
 });
 
@@ -877,6 +1526,33 @@ test("dashboard omits publications from actors who disabled them but keeps follo
   );
 });
 
+test("dashboard shows a followee's reading and votes only while their switches are on, and their follows and murals never crowd them out", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  for (const id of ["alice", "bob"]) {
+    readerProfiles.set(id, reader(id));
+    repo.upsertProfile(profileRow(id));
+    repo.insertFollow({ follower_id: "viewer", followee_id: id, created_at: at(1) });
+    tierlistRefs.set(`t-${id}`, tierRef(`t-${id}`, "carol"));
+    repo.insertEvent({ id: `${id}-added`, user_id: id, type: "book_added", ref_type: "book", ref_id: `${id}-b1`, payload: JSON.stringify({ title: "Dune", author: "Herbert", coverUrl: "https://covers.test/dune.jpg" }), created_at: at(2) });
+    repo.insertEvent({ id: `${id}-finished`, user_id: id, type: "book_finished", ref_type: "book", ref_id: `${id}-b2`, payload: JSON.stringify({ title: "Emma", author: "Austen" }), created_at: at(3) });
+    repo.insertEvent({ id: `${id}-vote`, user_id: id, type: "voted_on", ref_type: "tierlist", ref_id: `t-${id}`, payload: JSON.stringify({ game: "tierlist" }), created_at: at(4) });
+    for (let i = 0; i < 25; i++) {
+      const createdAt = `2026-09-05T00:00:${String(i).padStart(2, "0")}.000Z`;
+      repo.insertEvent({ id: `${id}-following-${i}`, user_id: id, type: "following", ref_type: "user", ref_id: `${id}-x${i}`, payload: null, created_at: createdAt });
+      repo.insertEvent({ id: `${id}-mural-${i}`, user_id: id, type: "mural_published", ref_type: "mural", ref_id: `${id}-m${i}`, payload: null, created_at: createdAt });
+    }
+  }
+  repo.updateFeedSettings("alice", { ...DEFAULT_FEED_SETTINGS, reading: true, votes: false });
+  const { items } = service.getDashboard("viewer", undefined, 3);
+  assert.deepEqual(items.map((item) => [item.kind, item.id]), [["vote", "bob-vote"], ["reading", "alice-finished"], ["reading", "alice-added"]]);
+  assert.deepEqual(items.flatMap((item) => (item.kind === "reading" ? [[item.finished, item.book]] : [])), [
+    [true, { title: "Emma", author: "Austen", coverUrl: null }],
+    [false, { title: "Dune", author: "Herbert", coverUrl: "https://covers.test/dune.jpg" }]
+  ]);
+});
+
 test("feed settings round-trip and reach only the owner's profile view", () => {
   const { repo, profiles } = createRepoFake();
   const { deps, usernames, readerProfiles } = createDeps(repo);
@@ -954,7 +1630,7 @@ test("switching a published shelf announces the new mural once", () => {
   usernames.set("alice", "alice");
   ownedMurals.add("alice:m1");
   ownedMurals.add("alice:m2");
-  service.publishProfile("alice", "m1");
+  service.publishProfile("alice", { muralId: "m1" });
   const announcements = () => events.filter((event) => event.type === "mural_published").length;
   const before = announcements();
   service.setShelfMural("alice", "m2");
@@ -990,4 +1666,155 @@ test("getActivity links votes to what was voted on, and leaves vanished ones pla
   assert.deepEqual(payloads.t1, { game: "tierlist", id: "t1", name: "List t1", covers: ["a", "b", "c"], href: "/vote/code-t1" });
   assert.deepEqual(payloads.g1, { game: "tournament", id: "g1", name: "Cup g1", covers: ["x"], href: "/arena/g1" });
   assert.deepEqual(payloads.gone, { game: "tournament", id: "gone", name: "Old cup" });
+});
+
+function suggestionFixture() {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, readerGlyphs, libraryCalls, sharedCounts, sharedShelves, sharedBookCountsCalls, sharedBooksCalls } = createDeps(repo);
+  const service = createCommunityService(deps);
+  const addReader = (id: string, shared = 0, updatedAt = at(1)) => {
+    readerProfiles.set(id, reader(id));
+    repo.upsertProfile(profileRow(id, { updated_at: updatedAt }));
+    if (shared > 0) {
+      sharedCounts.set(id, shared);
+      sharedShelves.set(id, Array.from({ length: shared }, (_, n) => ({ title: `Book ${n + 1}`, author: "A. Writer", coverUrl: null })));
+    }
+  };
+  const suggested = (limit = 20) => service.suggestPeople("viewer", limit);
+  return { repo, service, readerProfiles, readerGlyphs, libraryCalls, sharedCounts, sharedShelves, sharedBookCountsCalls, sharedBooksCalls, addReader, suggested };
+}
+
+const suggestedIds = (people: SuggestedReader[]) => people.map((person) => person.user.userId);
+const suggestedCounts = (people: SuggestedReader[]) => people.map((person) => [person.user.userId, person.sharedCount]);
+
+test("suggested readers are ranked by shared books, then by how recently they were active", () => {
+  const { addReader, suggested } = suggestionFixture();
+  addReader("one-old", 1, at(1));
+  addReader("one-new", 1, at(6));
+  addReader("three", 3, at(2));
+  addReader("two", 2, at(3));
+  assert.deepEqual(suggestedCounts(suggested()), [["three", 3], ["two", 2], ["one-new", 1], ["one-old", 1]]);
+});
+
+test("suggested readers leave out the viewer, people they follow, unpublished readers and readers with no profile", () => {
+  const { repo, sharedCounts, addReader, suggested } = suggestionFixture();
+  addReader("viewer", 1, at(6));
+  addReader("followed", 1, at(5));
+  addReader("unpublished", 1, at(4));
+  addReader("stranger", 1, at(3));
+  addReader("follower", 1, at(2));
+  repo.upsertProfile(profileRow("unpublished", { published: 0, updated_at: at(4) }));
+  repo.insertFollow({ follower_id: "viewer", followee_id: "followed", created_at: at(7) });
+  repo.insertFollow({ follower_id: "follower", followee_id: "viewer", created_at: at(7) });
+  sharedCounts.set("nameless", 1);
+  repo.upsertProfile(profileRow("nameless", { updated_at: at(8) }));
+  assert.deepEqual(suggestedIds(suggested()), ["stranger", "follower"]);
+});
+
+test("fewer than five overlapping readers are topped up with recently active ones, newest first", () => {
+  const { addReader, suggested } = suggestionFixture();
+  addReader("match", 1, at(1));
+  addReader("quiet", 0, at(2));
+  addReader("busy", 0, at(9));
+  addReader("fresh", 0, at(5));
+  assert.deepEqual(suggestedCounts(suggested()), [["match", 1], ["busy", 0], ["fresh", 0], ["quiet", 0]]);
+});
+
+test("the top-up stops once five readers overlap", () => {
+  const { addReader, suggested } = suggestionFixture();
+  for (let n = 1; n <= 4; n++) addReader(`match-${n}`, 1, at(n));
+  addReader("other", 0, at(9));
+  assert.deepEqual(suggestedIds(suggested()), ["match-4", "match-3", "match-2", "match-1", "other"]);
+  addReader("match-5", 1, at(5));
+  assert.deepEqual(suggestedIds(suggested()), ["match-5", "match-4", "match-3", "match-2", "match-1"]);
+});
+
+test("a viewer who shares no books with anyone is shown recently active readers", () => {
+  const { addReader, suggested } = suggestionFixture();
+  addReader("older", 0, at(1));
+  addReader("newer", 0, at(2));
+  assert.deepEqual(suggestedCounts(suggested()), [["newer", 0], ["older", 0]]);
+});
+
+test("a suggestion lists the shared books the library module returns, up to three", () => {
+  const { sharedShelves, sharedBooksCalls, addReader, suggested } = suggestionFixture();
+  addReader("reader", 4);
+  const shelf: SharedBook[] = [
+    { title: "A", author: "A. Writer", coverUrl: "https://covers.test/a.jpg" },
+    { title: "B", author: "A. Writer", coverUrl: null },
+    { title: "C", author: "A. Writer", coverUrl: null },
+    { title: "D", author: "A. Writer", coverUrl: "https://covers.test/d.jpg" }
+  ];
+  sharedShelves.set("reader", shelf);
+  const [suggestion] = suggested();
+  assert.equal(suggestion?.sharedCount, 4);
+  assert.deepEqual(suggestion?.sharedBooks, shelf.slice(0, 3));
+  assert.deepEqual(sharedBooksCalls, [{ viewerId: "viewer", candidateId: "reader", limit: 3 }]);
+});
+
+test("shared books are looked up only for the returned readers who share some", () => {
+  const { sharedBooksCalls, addReader, suggested } = suggestionFixture();
+  addReader("big", 3, at(1));
+  addReader("small", 1, at(2));
+  addReader("fill", 0, at(9));
+  const people = suggested(3);
+  assert.deepEqual(sharedBooksCalls.map((call) => call.candidateId), ["big", "small"]);
+  assert.deepEqual(people[2]?.sharedBooks, []);
+  sharedBooksCalls.length = 0;
+  suggested(1);
+  assert.deepEqual(sharedBooksCalls.map((call) => call.candidateId), ["big"]);
+});
+
+test("overlap comes from one counting call over the candidates, and no library is resolved", () => {
+  const { repo, libraryCalls, sharedBookCountsCalls, addReader, suggested } = suggestionFixture();
+  addReader("viewer", 0, at(6));
+  addReader("followed", 1, at(5));
+  addReader("one", 1, at(3));
+  addReader("two", 2, at(2));
+  repo.insertFollow({ follower_id: "viewer", followee_id: "followed", created_at: at(7) });
+  suggested();
+  assert.deepEqual(sharedBookCountsCalls, [{ viewerId: "viewer", candidateIds: ["one", "two"] }]);
+  assert.deepEqual(libraryCalls, []);
+});
+
+test("suggested readers stop at the limit, overlapping ones first", () => {
+  const { addReader, suggested } = suggestionFixture();
+  addReader("one", 1, at(1));
+  addReader("two", 2, at(2));
+  addReader("none", 0, at(3));
+  assert.deepEqual(suggestedIds(suggested(1)), ["two"]);
+  assert.deepEqual(suggestedIds(suggested(2)), ["two", "one"]);
+  assert.deepEqual(suggestedIds(suggested(3)), ["two", "one", "none"]);
+});
+
+test("a suggestion carries the card fields and the follower count, and a reader glyph only when switched on", () => {
+  const { repo, readerGlyphs, addReader, suggested } = suggestionFixture();
+  addReader("glyphed", 1, at(2));
+  addReader("plain", 1, at(1));
+  repo.updateFeedSettings("glyphed", { ...DEFAULT_FEED_SETTINGS, readerGlyph: true });
+  readerGlyphs.set("glyphed", "star");
+  readerGlyphs.set("plain", "star");
+  repo.insertFollow({ follower_id: "fan", followee_id: "glyphed", created_at: at(3) });
+  const [glyphed, plain] = suggested();
+  assert.deepEqual(glyphed, {
+    user: { username: "user-glyphed", avatarUrl: null, userId: "glyphed", readerGlyph: "star" },
+    followerCount: 1,
+    viewerFollows: false,
+    private: false,
+    sharedCount: 1,
+    sharedBooks: [{ title: "Book 1", author: "A. Writer", coverUrl: null }]
+  });
+  assert.equal(plain?.user.readerGlyph, undefined);
+});
+
+test("suggested readers scan at most the 500 most recently active published profiles", () => {
+  const { repo, suggested } = suggestionFixture();
+  const requested: number[] = [];
+  const listPublishedProfiles = repo.listPublishedProfiles;
+  repo.listPublishedProfiles = (limit) => {
+    requested.push(limit);
+    return listPublishedProfiles(limit);
+  };
+  suggested();
+  assert.deepEqual(requested, [500]);
 });

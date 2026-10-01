@@ -2,18 +2,19 @@ import { randomUUID } from "node:crypto";
 import { looksLikeIsbnQuery, normalizeIsbn, type BookGenre, type BookMetadata, type BookSearchResult } from "@scripta/shared";
 import { findBestCover, type CoverSources, type FetchCoverImage } from "./coverResolver.js";
 import { MIN_GOOD_WIDTH } from "./domain/constants.js";
-import { BookNotFoundError, FileTooLargeError, InvalidImageError } from "./domain/errors.js";
+import { BookNotFoundError, FileTooLargeError, InvalidImageError, SourcePausedError } from "./domain/errors.js";
 import { encodeCover, type EncodedCover } from "./domain/images.js";
-import { findByIdentity, lookupIdentity, SEARCH_LIMIT, searchTokens, type BookIdentity, type BookLookup } from "./domain/normalize.js";
-import type { BookCatalog, BooksRepository, CatalogSearchHit, CoverBlobStore } from "./domain/ports.js";
+import { findByIdentity, isPortugueseIsbn, lookupIdentity, SEARCH_LIMIT, searchTokens, type BookIdentity, type BookLookup } from "./domain/normalize.js";
+import type { BookCatalog, BooksRepository, CatalogSearchHit, CoverBlobStore, CoverSource } from "./domain/ports.js";
 import type { BookRow, CoverSourceName, CoverStatus } from "./domain/types.js";
 import type { CoverPriority } from "./worker.js";
 
 const RETRY_AFTER_MS = 30 * 24 * 60 * 60 * 1000;
 const UNAVAILABLE_BACKOFF_MS = 10 * 60 * 1000;
 const COVER_EXTENSION = "webp";
-const NO_COVER: ResolvedCover = { url: null, fullUrl: null, pending: false };
-const PENDING: ResolvedCover = { url: null, fullUrl: null, pending: true };
+const NO_SOURCE: CoverSource = { byIsbn: async () => [], byTitle: async () => [] };
+const NO_COVER: ResolvedCover = { url: null, fullUrl: null, pending: false, upgrading: false };
+const PENDING: ResolvedCover = { url: null, fullUrl: null, pending: true, upgrading: false };
 
 export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 
@@ -23,6 +24,7 @@ export interface ResolvedCover {
   url: string | null;
   fullUrl: string | null;
   pending: boolean;
+  upgrading: boolean;
 }
 
 export interface BooksServiceDeps {
@@ -42,13 +44,28 @@ export interface BooksService {
   resolveCover(lookup: BookLookup, front?: boolean): ResolvedCover;
   enqueueCovers(lookups: BookLookup[]): void;
   enqueueUnchecked(): void;
-  processBook(bookId: string): Promise<void>;
+  processBook(bookId: string, lane: CoverPriority): Promise<void>;
   getDetails(lookup: BookLookup): Promise<BookMetadata | null>;
   search(query: string): BookSearchResult[];
   searchExternal(query: string): Promise<BookSearchResult[]>;
   isAdmin(userId: string): boolean;
   rejectCover(lookup: BookLookup): ResolvedCover;
   uploadCover(lookup: BookLookup, bytes: Buffer): Promise<ResolvedCover>;
+}
+
+export async function storeCoverImage(
+  deps: { repo: Pick<BooksRepository, "insertImage">; blobs: CoverBlobStore },
+  bookId: string,
+  source: CoverSourceName,
+  sourceUrl: string | null,
+  image: EncodedCover,
+  at: string
+): Promise<string> {
+  const id = randomUUID();
+  await deps.blobs.save(id, COVER_EXTENSION, image.full);
+  await deps.blobs.save(`${id}-thumb`, COVER_EXTENSION, image.thumb);
+  deps.repo.insertImage({ id, book_id: bookId, source, source_url: sourceUrl, width: image.width, height: image.height, byte_size: image.full.byteLength, created_at: at });
+  return id;
 }
 
 export function createBooksService(deps: BooksServiceDeps): BooksService {
@@ -91,21 +108,20 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
     return {
       url: deps.publicUrlFor(book.cover_image_id, "thumb"),
       fullUrl: deps.publicUrlFor(book.cover_image_id, "file"),
-      pending: false
+      pending: false,
+      upgrading: book.cover_upgrade_wanted_at !== null
     };
+  }
+
+  function sourcesFor(lane: CoverPriority): CoverSources {
+    if (lane === "front" || lane === "normal") return { apple: NO_SOURCE, isbndb: deps.sources.isbndb, openlibrary: deps.sources.openlibrary };
+    if (lane === "upgrade") return { apple: deps.sources.apple, isbndb: null, openlibrary: NO_SOURCE };
+    return deps.sources;
   }
 
   function schedule(bookId: string, priority: CoverPriority = "normal") {
     if ((backoffUntil.get(bookId) ?? 0) > now().getTime()) return;
     deps.enqueue(bookId, priority);
-  }
-
-  async function storeImage(bookId: string, source: CoverSourceName, sourceUrl: string | null, image: EncodedCover, at: string): Promise<string> {
-    const id = randomUUID();
-    await deps.blobs.save(id, COVER_EXTENSION, image.full);
-    await deps.blobs.save(`${id}-thumb`, COVER_EXTENSION, image.thumb);
-    deps.repo.insertImage({ id, book_id: bookId, source, source_url: sourceUrl, width: image.width, height: image.height, byte_size: image.full.byteLength, created_at: at });
-    return id;
   }
 
   function openLibraryThumb(coverId: number | null): string | null {
@@ -169,14 +185,15 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
 
     enqueueUnchecked() {
       for (const id of deps.repo.listUncheckedCoverIds()) schedule(id, "background");
+      for (const id of deps.repo.listUpgradeWantedIds()) schedule(id, "upgrade");
     },
 
-    async processBook(bookId) {
+    async processBook(bookId, lane) {
       const book = deps.repo.getBook(bookId);
       if (!book || book.cover_status === "manual") return;
       try {
-        const outcome = await findBestCover({ isbn: book.isbn, title: book.title, author: book.author }, deps.repo.listRejectedUrls(bookId), deps.sources, deps.fetchImage);
-        for (const failure of outcome.failures) deps.warn({ bookId, source: failure.source, error: failure.message }, "cover source unavailable");
+        const outcome = await findBestCover({ isbn: book.isbn, title: book.title, author: book.author }, deps.repo.listRejectedUrls(bookId), sourcesFor(lane), deps.fetchImage);
+        for (const failure of outcome.failures.filter((failure) => !(failure instanceof SourcePausedError))) deps.warn({ bookId, source: failure.source, error: failure.message }, "cover source unavailable");
 
         const latest = deps.repo.getBook(bookId);
         if (!latest || latest.cover_image_id !== book.cover_image_id || latest.cover_status !== book.cover_status) return;
@@ -184,18 +201,30 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
         const at = now().toISOString();
         let imageId = latest.cover_image_id;
         let width = current?.width ?? 0;
-        if (outcome.found && outcome.found.image.width > width) {
-          imageId = await storeImage(bookId, outcome.found.candidate.source, outcome.found.candidate.url, outcome.found.image, at);
-          width = outcome.found.image.width;
+        let source = current?.source;
+        const portuguese = isPortugueseIsbn(book.isbn);
+        const found = outcome.found;
+        const replacesWatermark = lane === "upgrade" && found !== null && found.image.width >= MIN_GOOD_WIDTH && source === "isbndb" && portuguese;
+        if (found && (found.image.width > width || replacesWatermark)) {
+          imageId = await storeCoverImage(deps, bookId, found.candidate.source, found.candidate.url, found.image, at);
+          width = found.image.width;
+          source = found.candidate.source;
         }
         const status: CoverStatus = imageId === null ? "missing" : width >= MIN_GOOD_WIDTH ? "good" : "low_res";
 
         if (outcome.complete) {
           backoffUntil.delete(bookId);
           deps.repo.setCover(bookId, { imageId, status, checkedAt: at });
+          if (lane === "upgrade") {
+            deps.repo.setUpgradeWanted(bookId, null);
+          } else if (lane !== "background") {
+            const wanted = status !== "good" || (source === "isbndb" && portuguese);
+            deps.repo.setUpgradeWanted(bookId, wanted ? at : null);
+            if (wanted) schedule(bookId, "upgrade");
+          }
           return;
         }
-        backoffUntil.set(bookId, now().getTime() + UNAVAILABLE_BACKOFF_MS);
+        backoffUntil.set(bookId, Math.max(now().getTime() + UNAVAILABLE_BACKOFF_MS, ...outcome.failures.map((failure) => failure.retryAt ?? 0)));
         if (imageId !== latest.cover_image_id) deps.repo.setCover(bookId, { imageId, status, checkedAt: latest.cover_checked_at });
       } catch (error) {
         backoffUntil.set(bookId, now().getTime() + UNAVAILABLE_BACKOFF_MS);
@@ -247,7 +276,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       deps.repo.setCover(book.id, { imageId: null, status: null, checkedAt: null });
       backoffUntil.delete(book.id);
       deps.enqueue(book.id, "front");
-      return { url: null, fullUrl: null, pending: true };
+      return { url: null, fullUrl: null, pending: true, upgrading: false };
     },
 
     async uploadCover(lookup, bytes) {
@@ -258,8 +287,9 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       const book = findOrCreate(lookup);
       if (!book) throw new BookNotFoundError();
       const at = now().toISOString();
-      const imageId = await storeImage(book.id, "upload", null, image, at);
+      const imageId = await storeCoverImage(deps, book.id, "upload", null, image, at);
       deps.repo.setCover(book.id, { imageId, status: "manual", checkedAt: at });
+      deps.repo.setUpgradeWanted(book.id, null);
       backoffUntil.delete(book.id);
       return coverOf(deps.repo.getBook(book.id) ?? book);
     }

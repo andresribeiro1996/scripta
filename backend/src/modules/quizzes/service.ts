@@ -4,6 +4,7 @@
 
 import { randomBytes, randomUUID } from "node:crypto";
 import { QUIZ_QUESTION_TYPES, generateQuizQuestions, gradeAnswers, type PublicQuizQuestion, type QuestionStat, type QuizBook, type QuizQuestion, type QuizQuestionType, type ResultPlay, type SubmittedAnswer } from "@scripta/shared";
+import type { GameParticipation } from "@scripta/shared/community";
 import type { QuizzesRepository } from "./domain/ports.js";
 import type { AnswerRow, PlayRow, Quiz, QuizRow } from "./domain/types.js";
 
@@ -110,7 +111,10 @@ export interface QuizzesService {
   getPlay(code: string, player: Player): PlayOutcome;
   getResults(userId: string, id: string): QuizResults | undefined;
   getPublicResults(code: string): { plays: Array<Omit<ResultPlay, "playId">>; questionCount: number } | undefined;
+  participationByOwner(ownerUserId: string): GameParticipation[];
 }
+
+const RECENT_PARTICIPANT_LIMIT = 10;
 
 export function createQuizzesService(repo: QuizzesRepository): QuizzesService {
   return {
@@ -281,6 +285,25 @@ export function createQuizzesService(repo: QuizzesRepository): QuizzesService {
         }),
         questionCount: readDocument(toQuiz(row)).questionCount
       };
+    },
+
+    participationByOwner(ownerUserId) {
+      return repo.listParticipation(ownerUserId).map((row) => ({
+        id: row.id,
+        name: row.name,
+        covers: [],
+        participantCount: row.participants,
+        latestAt: row.latest_at,
+        recent: repo.listRecentPlayers(row.id, ownerUserId, RECENT_PARTICIPANT_LIMIT).map((r) => ({ userId: r.user_id, at: r.at }))
+      }));
     }
   };
+}
+
+export interface QuizzesPublicApi {
+  participationByOwner(ownerUserId: string): GameParticipation[];
+}
+
+export function createQuizzesPublicApi(service: QuizzesService): QuizzesPublicApi {
+  return { participationByOwner: (ownerUserId) => service.participationByOwner(ownerUserId) };
 }

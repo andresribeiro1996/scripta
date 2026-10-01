@@ -1,13 +1,15 @@
 import { useState, type CSSProperties } from "react";
-import { Link } from "react-router-dom";
+import { Link, Navigate, useLocation } from "react-router-dom";
 import { DEFAULT_TIER_PRESET } from "@scripta/shared";
 import type { ContentTone, DiscoverItem, DiscoverType } from "@scripta/shared/community";
 import { contentKindLabel, contentStats, contentStatus, contentTarget } from "@scripta/shared/community";
+import { useAuth } from "../auth/AuthContext";
 import { EmptyState } from "../components/EmptyState";
 import { CommunityIcon } from "../components/NavIcons";
 import { ReaderGlyph } from "../components/ReaderGlyph";
 import { SkeletonCardGrid } from "../components/Skeleton";
 import { useCommunityDiscover } from "../hooks/useCommunity";
+import { discoverDestination } from "../lib/landing";
 
 const DISCOVER_FILTERS: Array<{ value: DiscoverType; label: string }> = [
   { value: "all", label: "All" },
@@ -60,10 +62,30 @@ export function DiscoverPage() {
   );
 }
 
+export function PublicDiscoverPage() {
+  const { session } = useAuth();
+  const location = useLocation();
+  const destination = discoverDestination(session);
+  if (destination) return <Navigate to={destination} replace />;
+  return (
+    <div className="min-h-screen bg-(--color-bg) text-(--color-text)">
+      <div className="mx-auto max-w-3xl p-6">
+        <header className="mb-6 flex items-center justify-between gap-3">
+          <h1 className="text-lg font-bold">Discover</h1>
+          <Link to="/login" state={{ from: location }} className="text-sm text-(--color-accent) hover:underline">
+            Sign in
+          </Link>
+        </header>
+        <DiscoverPane />
+      </div>
+    </div>
+  );
+}
+
 function DiscoverPane() {
   const [type, setType] = useState<DiscoverType>("all");
   const [search, setSearch] = useState("");
-  const { items, isLoading, error, refetch } = useCommunityDiscover(type, search.trim());
+  const { items, isLoading, error, refetch, hasNextPage, isFetchingNextPage, fetchNextPage, isFetchNextPageError, isRefetchError, isRefetching } = useCommunityDiscover(type, search.trim());
 
   return (
     <div>
@@ -76,16 +98,37 @@ function DiscoverPane() {
         ))}
       </div>
       {isLoading && <SkeletonCardGrid count={4} label="Loading published games" tileClassName="min-h-[110px]" />}
-      {!isLoading && error && <EmptyState title="Couldn't load tier lists and tournaments." action={retryButton(refetch)} />}
+      {!isLoading && error && items.length === 0 && <EmptyState title="Couldn't load tier lists and tournaments." action={retryButton(refetch)} />}
       {!isLoading && !error && items.length === 0 && (
         <EmptyState icon={CommunityIcon} title="Nothing published yet." body="Published tier lists and tournaments show up here." />
       )}
-      {!isLoading && !error && items.length > 0 && (
-        <ul className="border-t border-(--color-border)">
-          {items.map((item) => (
-            <DiscoverRow key={`${item.content.kind}:${item.content.id}`} item={item} />
-          ))}
-        </ul>
+      {!isLoading && items.length > 0 && (
+        <>
+          {isRefetchError && !isRefetching && (
+            <p role="alert" className="mb-3 text-sm text-(--color-danger)">
+              Couldn't refresh Discover.
+            </p>
+          )}
+          <ul className="border-t border-(--color-border)">
+            {items.map((item) => (
+              <DiscoverRow key={`${item.content.kind}:${item.content.id}`} item={item} />
+            ))}
+          </ul>
+          {isFetchNextPageError && !isFetchingNextPage && (
+            <p role="alert" className="mt-3 text-sm text-(--color-danger)">
+              Couldn't load more.
+            </p>
+          )}
+          {hasNextPage && (
+            <button
+              onClick={() => void fetchNextPage()}
+              disabled={isFetchingNextPage}
+              className="mt-3 w-full rounded-lg border border-(--color-border) px-3 py-2 text-sm text-(--color-text-dim) hover:border-(--color-accent) disabled:opacity-50"
+            >
+              {isFetchingNextPage ? "Loading…" : "Load more"}
+            </button>
+          )}
+        </>
       )}
     </div>
   );

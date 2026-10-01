@@ -4,7 +4,7 @@
 
 import type { DatabaseSync } from "node:sqlite";
 import type { LibraryRepository } from "../../domain/ports.js";
-import type { LibraryDocumentRow } from "../../domain/types.js";
+import type { LibraryDerived, LibraryDocumentRow } from "../../domain/types.js";
 
 export function createSqliteLibraryRepository(db: DatabaseSync): LibraryRepository {
   const getStmt = db.prepare(`SELECT * FROM library_documents WHERE user_id = ?`);
@@ -21,26 +21,81 @@ export function createSqliteLibraryRepository(db: DatabaseSync): LibraryReposito
   // an existing share link.
   const setShareTokenStmt = db.prepare(`UPDATE library_documents SET share_token = ? WHERE user_id = ?`);
   const getByShareTokenStmt = db.prepare(`SELECT * FROM library_documents WHERE share_token = ?`);
+  const deleteKeysStmt = db.prepare(`DELETE FROM library_match_keys WHERE user_id = ?`);
+  const insertKeyStmt = db.prepare(`
+    INSERT INTO library_match_keys (user_id, key, book_ref, title, author, isbn, cover)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `);
+  const setDerivedStmt = db.prepare(`
+    INSERT INTO library_derived (user_id, glyph, source_updated_at) VALUES (?, ?, ?)
+    ON CONFLICT(user_id) DO UPDATE SET glyph = excluded.glyph, source_updated_at = excluded.source_updated_at
+  `);
+  const listStaleStmt = db.prepare(`
+    SELECT library_documents.user_id FROM library_documents
+    LEFT JOIN library_derived ON library_derived.user_id = library_documents.user_id
+    WHERE library_derived.user_id IS NULL OR library_derived.source_updated_at != library_documents.updated_at
+  `);
+
+  function writeDerived(userId: string, derived: LibraryDerived, sourceUpdatedAt: string) {
+    deleteKeysStmt.run(userId);
+    for (const row of derived.keys) insertKeyStmt.run(userId, row.key, row.book_ref, row.title, row.author, row.isbn, row.cover);
+    setDerivedStmt.run(userId, derived.glyph, sourceUpdatedAt);
+  }
+
+  function inTransaction<T>(write: () => T): T {
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      const result = write();
+      db.exec("COMMIT");
+      return result;
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
+  }
 
   return {
     deleteUserData(userId) {
-      db.prepare("DELETE FROM library_documents WHERE user_id = ?").run(userId);
+      inTransaction(() => {
+        db.prepare("DELETE FROM library_documents WHERE user_id = ?").run(userId);
+        db.prepare("DELETE FROM library_derived WHERE user_id = ?").run(userId);
+        deleteKeysStmt.run(userId);
+      });
     },
     getDocument(userId) {
       return getStmt.get(userId) as LibraryDocumentRow | undefined;
     },
 
-    upsertDocument(userId, dataJson, expectedUpdatedAt) {
-      const current = getStmt.get(userId) as LibraryDocumentRow | undefined;
-      const updatedAt = new Date(Math.max(Date.now(), current ? Date.parse(current.updated_at) + 1 : 0)).toISOString();
-      const result = upsertStmt.run({
-        $user_id: userId,
-        $data: dataJson,
-        $updated_at: updatedAt,
-        $expected_updated_at: expectedUpdatedAt ?? null
+    upsertDocument(userId, dataJson, derived, expectedUpdatedAt) {
+      return inTransaction(() => {
+        const current = getStmt.get(userId) as LibraryDocumentRow | undefined;
+        const updatedAt = new Date(Math.max(Date.now(), current ? Date.parse(current.updated_at) + 1 : 0)).toISOString();
+        const result = upsertStmt.run({
+          $user_id: userId,
+          $data: dataJson,
+          $updated_at: updatedAt,
+          $expected_updated_at: expectedUpdatedAt ?? null
+        });
+        if (result.changes === 0) return undefined;
+        writeDerived(userId, derived, updatedAt);
+        return getStmt.get(userId) as unknown as LibraryDocumentRow;
       });
-      if (result.changes === 0) return undefined;
-      return getStmt.get(userId) as unknown as LibraryDocumentRow;
+    },
+
+    listStaleUserIds() {
+      return (listStaleStmt.all() as Array<{ user_id: string }>).map((row) => row.user_id);
+    },
+
+    setDerived(userId, derived, sourceUpdatedAt) {
+      inTransaction(() => writeDerived(userId, derived, sourceUpdatedAt));
+    },
+
+    deleteOrphanedDerived() {
+      const orphaned = `NOT EXISTS (SELECT 1 FROM library_documents WHERE library_documents.user_id = library_derived.user_id)`;
+      inTransaction(() => {
+        db.exec(`DELETE FROM library_match_keys WHERE user_id IN (SELECT user_id FROM library_derived WHERE ${orphaned})`);
+        db.exec(`DELETE FROM library_derived WHERE ${orphaned}`);
+      });
     },
 
     setShareToken(userId, token) {

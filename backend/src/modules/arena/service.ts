@@ -11,6 +11,7 @@
 // whether closes_at must already have passed.
 
 import { randomUUID } from "node:crypto";
+import type { GameParticipation } from "@scripta/shared/community";
 import {
   AlreadyVotedError,
   DuelNotFoundError,
@@ -87,6 +88,7 @@ export interface ArenaService {
   /** Tournaments the account has voted in, most recent vote first —
    *  own tournaments excluded (listMine already shows those). */
   listVoted(voterUserId: string): TournamentSummary[];
+  participationByOwner(ownerUserId: string): GameParticipation[];
   settleEarly(tournamentId: string, ownerUserId: string, duelId: string): void;
   tiebreak(tournamentId: string, ownerUserId: string, duelId: string, winnerBookKey: string): void;
   /** Renames a tournament. Allowed at ANY status, unlike seeding or
@@ -103,6 +105,7 @@ function isPowerOfTwo(n: number): boolean {
 }
 
 const COVER_PREVIEW_LIMIT = 8;
+const RECENT_PARTICIPANT_LIMIT = 10;
 const EMPTY_PREVIEW: SeedPreview = { covers: [], filledSlots: 0 };
 
 // The preview and winner are required arguments rather than optional ones:
@@ -292,6 +295,17 @@ export function createArenaService(repo: ArenaRepository, emitPublished?: EmitPu
       return summariesWithPreviews(repo, repo.listVotedByUser(voterUserId));
     },
 
+    participationByOwner(ownerUserId) {
+      return repo.listParticipation(ownerUserId).map((row) => ({
+        id: row.id,
+        name: row.name,
+        covers: previewFromSlots(repo.getSlots(row.id)).covers,
+        participantCount: row.participants,
+        latestAt: row.latest_at,
+        recent: repo.listRecentVoters(row.id, ownerUserId, RECENT_PARTICIPANT_LIMIT).map((r) => ({ userId: r.user_id, at: r.at }))
+      }));
+    },
+
     listPublic(limit, offset) {
       return summariesWithPreviews(repo, repo.listPublicTournaments(limit, offset));
     },
@@ -462,6 +476,7 @@ export interface ArenaPublicApi {
   getPublished(id: string): PublishedTournamentRef | undefined;
   listPublishedByOwner(ownerUserId: string): PublishedTournamentRef[];
   listVotedByUser(voterUserId: string): PublishedTournamentRef[];
+  participationByOwner(ownerUserId: string): GameParticipation[];
 }
 
 function toPublishedRef(summary: TournamentSummary): PublishedTournamentRef {
@@ -485,6 +500,7 @@ export function createArenaPublicApi(service: ArenaService): ArenaPublicApi {
     },
     listPublishedByOwner: (ownerUserId) =>
       service.listMine(ownerUserId).filter((s) => s.status !== "seeding").map(toPublishedRef),
-    listVotedByUser: (voterUserId) => service.listVoted(voterUserId).map(toPublishedRef)
+    listVotedByUser: (voterUserId) => service.listVoted(voterUserId).map(toPublishedRef),
+    participationByOwner: (ownerUserId) => service.participationByOwner(ownerUserId)
   };
 }

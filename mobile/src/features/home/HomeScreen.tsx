@@ -2,12 +2,13 @@ import { useCallback, useState } from "react";
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
-import { bookKey, buildDashboardCards, resolveQuote } from "@scripta/shared";
-import { BrandMark, Button, EmptyState, ErrorState, Screen, Skeleton, Toast, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
+import { bookKey, buildDashboardCards, isNewDigestItem, newCountLabel, resolveQuote } from "@scripta/shared";
+import { BrandMark, Button, EmptyState, ErrorState, IconButton, Screen, Skeleton, Toast, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { useAuth } from "../../core/auth";
 import { useLibrary } from "../library/hooks/useLibrary";
 import { CoverImage } from "../library/components/CoverImage";
-import { FeedRow, digestRoute, useDashboardFeed, useFollowBack } from "./FeedRow";
+import { FeedRow, useDashboardFeed, useFollowBack, useSkipEmptyPages } from "./FeedRow";
+import { digestRoute } from "./feedRowModel";
 import { PickNextSheet } from "./PickNextSheet";
 
 export function HomeScreen() {
@@ -39,8 +40,11 @@ export function HomeScreen() {
   const rediscoverCard = cards.find((card) => card.kind === "rediscover");
   const quote = rediscoverCard ? resolveQuote({ type: "quote", bookKey: rediscoverCard.bookKey, highlightId: rediscoverCard.highlightId } as never, books) : null;
 
-  const feedItems = dashboard.data?.pages[0]?.items.slice(0, 3) ?? [];
-  const newCount = dashboard.data?.pages[0]?.newCount ?? 0;
+  const feedItems = dashboard.data?.pages.flatMap((page) => page.items).slice(0, 3) ?? [];
+  const newLabel = newCountLabel(dashboard.data?.pages[0]?.personalNewCount ?? 0);
+  const seenAt = dashboard.data?.pages[0]?.seenAt ?? null;
+  const feedLoading = dashboard.isPending || (dashboard.hasNextPage && !dashboard.isError && !feedItems.length);
+  useSkipEmptyPages(dashboard, feedItems.length);
 
   const openBook = (key: string) => router.push(`/book/${encodeURIComponent(key)}` as never);
 
@@ -60,6 +64,9 @@ export function HomeScreen() {
           title: "Home",
           headerShown: true,
           headerLeft: () => <View style={styles.mark}><BrandMark size={24} /></View>,
+          headerRight: () => (
+            <IconButton framed name="community" label="Community" accessibilityLabel="Community" badge={newLabel} onPress={() => router.push("/community" as never)} />
+          ),
         }}
       />
       {library.isPending ? (
@@ -114,38 +121,39 @@ export function HomeScreen() {
               </>
             )}
             <View style={styles.section}>
-              {dashboard.isPending ? (
+              {feedLoading ? (
                 <>
-                  <SectionHeader title="From people you follow" />
+                  <SectionHeader title="Activity" />
                   <View style={styles.sectionPad}>
                     <Skeleton height={80} />
                   </View>
                 </>
-              ) : dashboard.isError ? (
+              ) : dashboard.isError && !dashboard.data ? (
                 <>
-                  <SectionHeader title="From people you follow" />
+                  <SectionHeader title="Activity" />
                   <View style={styles.sectionPad}>
-                    <ErrorState body="Couldn't load activity from people you follow." actionLabel="Retry" onAction={() => void dashboard.refetch()} />
+                    <ErrorState body="Couldn't load activity." actionLabel="Retry" onAction={() => void dashboard.refetch()} />
                   </View>
                 </>
               ) : feedItems.length ? (
                 <>
-                  <SectionHeader title="From people you follow" count={newCount > 0 ? `· ${newCount} new` : undefined} />
+                  <SectionHeader title="Activity" count={newLabel ? `· ${newLabel} new` : undefined} />
                   {feedItems.map((item) => (
                     <FeedRow
                       key={`${item.kind}:${item.id}`}
                       item={item}
                       onOpen={() => router.push(digestRoute(item) as never)}
-                      onFollowBack={() => void followBack(item.actor.userId)}
-                      following={followingId === item.actor.userId}
+                      onFollowBack={() => { if (item.kind === "follow") void followBack(item.actor.userId); }}
+                      following={item.kind === "follow" && followingId === item.actor.userId}
+                      isNew={isNewDigestItem(item, seenAt)}
                     />
                   ))}
-                  <Pressable accessibilityRole="button" onPress={() => router.push("/activity" as never)} style={styles.linkRow}>
+                  <Pressable accessibilityRole="button" onPress={() => router.push("/community?tab=activity" as never)} style={styles.linkRow}>
                     <Text {...dynamicType} style={[typography.body, styles.heading, { color: colors.accent }]}>All activity</Text>
                   </Pressable>
                 </>
               ) : (
-                <Pressable accessibilityRole="button" onPress={() => router.push("/activity?tab=people" as never)} style={styles.linkRow}>
+                <Pressable accessibilityRole="button" onPress={() => router.push("/community?tab=people" as never)} style={styles.linkRow}>
                   <Text {...dynamicType} style={[typography.body, styles.heading, { color: colors.accent }]}>Find readers</Text>
                 </Pressable>
               )}

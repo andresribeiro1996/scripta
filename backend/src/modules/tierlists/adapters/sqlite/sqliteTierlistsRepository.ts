@@ -73,6 +73,19 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
   const publishStmt = db.prepare(`UPDATE tierlists SET data = ?, vote_access = ?, vote_code = ?, voting_open = 1, public_books = ?, updated_at = ? WHERE id = ? AND owner_user_id = ? AND vote_code IS NULL AND promoted_at IS NULL`);
   const promoteStmt = db.prepare(`UPDATE tierlists SET owner_user_id = '__app__', promoted_at = ?, voting_open = 0, updated_at = ? WHERE id = ? AND promoted_at IS NULL`);
   const eligibleCountStmt = db.prepare(`SELECT COUNT(*) AS n FROM tierlist_ballots AS ballot WHERE ballot.tierlist_id = ? AND ballot.voter_user_id IS NOT NULL AND ballot.voter_user_id != ? AND EXISTS (SELECT 1 FROM tierlist_ballot_placements WHERE ballot_id = ballot.id)`);
+  const participationStmt = db.prepare(`
+    SELECT t.id, t.name, t.public_books, COUNT(b.id) AS participants, MAX(b.created_at) AS latest_at
+    FROM tierlists t
+    JOIN tierlist_ballots b ON b.tierlist_id = t.id
+    WHERE t.origin_user_id = ? AND t.vote_code IS NOT NULL AND t.promoted_at IS NULL
+      AND (b.voter_user_id IS NULL OR b.voter_user_id != t.origin_user_id)
+    GROUP BY t.id
+  `);
+  const recentVotersStmt = db.prepare(`
+    SELECT voter_user_id AS user_id, created_at AS at FROM tierlist_ballots
+    WHERE tierlist_id = ? AND voter_user_id IS NOT NULL AND voter_user_id != ?
+    ORDER BY created_at DESC LIMIT ?
+  `);
 
   function saveBallotRow(ballot: BallotRow, placements: Placement[]): void {
     insertBallotStmt.run({
@@ -267,6 +280,15 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
     ballotCountsByTierlist() {
       const rows = ballotCountsStmt.all() as unknown as { tierlist_id: string; n: number }[];
       return new Map(rows.map((r) => [r.tierlist_id, Number(r.n)]));
+    },
+
+    listParticipation(ownerUserId) {
+      const rows = participationStmt.all(ownerUserId) as unknown as { id: string; name: string; public_books: string | null; participants: number; latest_at: string }[];
+      return rows.map((r) => ({ ...r, participants: Number(r.participants) }));
+    },
+
+    listRecentVoters(tierlistId, ownerUserId, limit) {
+      return recentVotersStmt.all(tierlistId, ownerUserId, limit) as unknown as { user_id: string; at: string }[];
     }
   };
 }

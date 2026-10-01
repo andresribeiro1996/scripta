@@ -1,5 +1,5 @@
 import type { LibraryData, MuralBlock, PublicReaderCard, ResolvedTierlist, ShelfTheme } from "@scripta/shared";
-import type { DashboardFeedPage } from "@scripta/shared/dashboard";
+import { dashboardQuery, withKnownDigestItems, type DashboardFeedPage } from "@scripta/shared/dashboard";
 import type { ThemeId } from "@scripta/shared/themes";
 import type {
   ActivityItem,
@@ -10,6 +10,8 @@ import type {
   Page,
   PersonResult,
   PublishedProfile,
+  PublishProfileInput,
+  SuggestedReader,
   TierlistSummary,
   TournamentSummary,
 } from "@scripta/shared/community";
@@ -39,21 +41,24 @@ export interface CommunityProfileView {
 export type CommunityPage<T> = Page<T>;
 
 export async function fetchDashboard(cursor?: string) {
-  const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
-  return apiClient.request<DashboardFeedPage>(`/community/dashboard${query}`, { auth: true });
+  return withKnownDigestItems(await apiClient.request<DashboardFeedPage>(`/community/dashboard${dashboardQuery(cursor)}`, { auth: true }));
 }
 
 export function markDashboardSeen() {
   return apiClient.request("/community/dashboard/seen", { method: "POST", auth: true });
 }
 
-export async function fetchDiscover(type: DiscoverType, q: string, offset = 0) {
+export async function fetchDiscover(type: DiscoverType, q: string, offset: number, signedIn: boolean) {
   const params = new URLSearchParams({ type, q, offset: String(offset) });
-  return apiClient.request<{ items: DiscoverItem[]; nextOffset: number | null }>(`/community/discover?${params}`, { auth: true });
+  return apiClient.request<{ items: DiscoverItem[]; nextOffset: number | null }>(`/community/discover?${params}`, { auth: signedIn });
 }
 
 export async function searchPeople(q: string) {
   return apiClient.request<{ people: PersonResult[] }>(`/community/people?q=${encodeURIComponent(q)}`, { auth: true });
+}
+
+export async function fetchSuggestedPeople() {
+  return apiClient.request<{ people: SuggestedReader[] }>("/community/people/suggested", { auth: true });
 }
 
 export async function fetchProfile(username: string) {
@@ -81,8 +86,8 @@ export function unfollowUser(userId: string) {
   return apiClient.request(`/community/follows/${userId}`, { method: "DELETE", auth: true });
 }
 
-export function publishProfile(muralId: string) {
-  return apiClient.request("/community/profile/publish", { method: "PUT", body: { muralId }, auth: true });
+export function publishProfile(input: PublishProfileInput) {
+  return apiClient.request("/community/profile/publish", { method: "PUT", body: input, auth: true });
 }
 
 export function unpublishProfile() {

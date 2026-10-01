@@ -2,6 +2,7 @@ import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import type { OptionsMenuItem } from "./OptionsMenu";
 import { useDismissible } from "../hooks/useDismissible";
 import { useScrollLock } from "../hooks/useScrollLock";
+import { keepTabInside } from "../lib/keepTabInside";
 
 /** The shared shell behind every bottom sheet: backdrop, Escape and
  *  click-outside dismissal, and the bottom-anchored-on-mobile /
@@ -56,23 +57,7 @@ export function Sheet({
         className="flex max-h-[90dvh] w-full flex-col overflow-hidden rounded-t-3xl bg-(--color-surface) pb-[env(safe-area-inset-bottom,0px)] shadow-xl sm:max-w-md sm:rounded-2xl sm:pb-0"
         style={style}
         onClick={(e) => e.stopPropagation()}
-        onKeyDown={(event) => {
-          if (event.key !== "Tab") return;
-          const controls = Array.from(
-            event.currentTarget.querySelectorAll<HTMLElement>(
-              'button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]'
-            )
-          ).filter((element) => element.getClientRects().length > 0);
-          const first = controls[0];
-          const last = controls[controls.length - 1];
-          if (event.shiftKey && document.activeElement === first) {
-            event.preventDefault();
-            last?.focus();
-          } else if (!event.shiftKey && document.activeElement === last) {
-            event.preventDefault();
-            first?.focus();
-          }
-        }}
+        onKeyDown={keepTabInside}
         role="dialog"
         aria-modal="true"
         aria-label={title}

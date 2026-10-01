@@ -168,6 +168,23 @@ test("createBook stores the sources of a new row and defaults to none", () => {
   assert.equal(repo.createBook({ title: "Emma", author: "Jane Austen", isbn: null }, ["ta:emma|jane austen|"], NOW).data_sources, "[]");
 });
 
+test("the upgrade-wanted mark round-trips and lists oldest first", () => {
+  const { repo } = freshRepo();
+  const a = repo.createBook({ title: "A", author: "A", isbn: null }, ["ta:a|a|"], NOW);
+  const b = repo.createBook({ title: "B", author: "B", isbn: null }, ["ta:b|b|"], NOW);
+  const c = repo.createBook({ title: "C", author: "C", isbn: null }, ["ta:c|c|"], NOW);
+  assert.equal(a.cover_upgrade_wanted_at, null);
+  assert.deepEqual(repo.listUpgradeWantedIds(), []);
+  repo.setUpgradeWanted(b.id, "2026-10-01T00:00:02.000Z");
+  repo.setUpgradeWanted(a.id, "2026-10-01T00:00:01.000Z");
+  assert.equal(repo.getBook(a.id)!.cover_upgrade_wanted_at, "2026-10-01T00:00:01.000Z");
+  assert.deepEqual(repo.listUpgradeWantedIds(), [a.id, b.id]);
+  repo.setUpgradeWanted(a.id, null);
+  assert.equal(repo.getBook(a.id)!.cover_upgrade_wanted_at, null);
+  assert.deepEqual(repo.listUpgradeWantedIds(), [b.id]);
+  assert.equal(repo.getBook(c.id)!.cover_upgrade_wanted_at, null);
+});
+
 test("the migration adds data_sources to a books table that predates it", () => {
   const db = new DatabaseSync(":memory:");
   db.exec(`CREATE TABLE books (
@@ -180,6 +197,9 @@ test("the migration adds data_sources to a books table that predates it", () => 
   applyBooksMigrations(db);
   const repo = createSqliteBooksRepository(db);
   assert.equal(repo.getBook("old")!.data_sources, "[]");
+  assert.equal(repo.getBook("old")!.cover_upgrade_wanted_at, null);
+  repo.setUpgradeWanted("old", NOW);
+  assert.deepEqual(repo.listUpgradeWantedIds(), ["old"]);
   repo.saveDetails("old", { summary: "Spice.", rating: null, ratingCount: 0, sourceUrl: "https://isbndb.com/book/1", genres: [] }, ["isbndb"], NOW);
   assert.equal(repo.getBook("old")!.data_sources, '["isbndb"]');
 });

@@ -7,16 +7,14 @@ import { mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { env } from "../../../../config/env.js";
+import { LIBRARY_DERIVED_VERSION } from "../../domain/constants.js";
 
 const adapterDir = dirname(fileURLToPath(import.meta.url));
 
-export function openLibraryDb(): DatabaseSync {
-  mkdirSync(dirname(env.LIBRARY_DB_PATH), { recursive: true });
-
-  const db = new DatabaseSync(env.LIBRARY_DB_PATH);
-  db.exec("PRAGMA journal_mode = WAL");
-  db.exec("PRAGMA busy_timeout = 5000");
-
+export function applyLibrarySchema(db: DatabaseSync, derivedVersion = LIBRARY_DERIVED_VERSION): void {
+  const { user_version: storedVersion } = db.prepare("PRAGMA user_version").get() as { user_version: number };
+  const rederive = storedVersion < derivedVersion;
+  if (rederive) db.exec("DROP TABLE IF EXISTS library_derived; DROP TABLE IF EXISTS library_match_keys");
   const schema = readFileSync(`${adapterDir}/schema.sql`, "utf8");
   db.exec(schema);
 
@@ -35,6 +33,16 @@ export function openLibraryDb(): DatabaseSync {
   // among non-null tokens, doesn't choke on every unshared row being NULL.
   db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_library_documents_share_token
            ON library_documents(share_token) WHERE share_token IS NOT NULL`);
+  if (rederive) db.exec(`PRAGMA user_version = ${derivedVersion}`);
+}
+
+export function openLibraryDb(): DatabaseSync {
+  mkdirSync(dirname(env.LIBRARY_DB_PATH), { recursive: true });
+
+  const db = new DatabaseSync(env.LIBRARY_DB_PATH);
+  db.exec("PRAGMA journal_mode = WAL");
+  db.exec("PRAGMA busy_timeout = 5000");
+  applyLibrarySchema(db);
 
   return db;
 }

@@ -2,6 +2,7 @@ import { normalizeBookGenres, normalizeIsbn, type BookSearchResult } from "@scri
 import type { BookCatalog } from "../../domain/ports.js";
 import type { Throttle } from "../http/http.js";
 import { createIsbndbGet, isbndbRecords } from "../sources/isbndb.js";
+import type { IsbndbGate } from "./isbndbGate.js";
 
 const API = "https://api2.isbndb.com";
 const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', "#39": "'", nbsp: " " };
@@ -37,8 +38,8 @@ function toResult(record: Record<string, unknown>): BookSearchResult | null {
   };
 }
 
-export function createIsbndbCatalog(apiKey: string, throttle: Throttle): BookCatalog {
-  const get = createIsbndbGet(apiKey, throttle, true);
+export function createIsbndbCatalog(apiKey: string, throttle: Throttle, gate: IsbndbGate): BookCatalog {
+  const get = createIsbndbGet(apiKey, throttle, gate, true);
   return {
     async fetchDetails({ isbn }) {
       if (!isbn) return null;
