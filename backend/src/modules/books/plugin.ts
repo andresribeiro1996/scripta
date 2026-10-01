@@ -6,6 +6,7 @@ import { createObjectStore } from "../../storage/createObjectStore.js";
 import { createCompositeCatalog } from "./adapters/catalog/compositeCatalog.js";
 import { createThrottle, fetchBytes } from "./adapters/http/http.js";
 import { createIsbndbCatalog } from "./adapters/isbndb/isbndbCatalog.js";
+import { capDailyCalls } from "./adapters/isbndb/isbndbDailyCap.js";
 import { createIsbndbGate } from "./adapters/isbndb/isbndbGate.js";
 import { createOpenLibraryCatalog } from "./adapters/openlibrary/openLibraryCatalog.js";
 import { createAppleSource } from "./adapters/sources/apple.js";
@@ -26,6 +27,7 @@ const ISBNDB_GAP_MS = 1100;
 const APPLE_GAP_MS = 3200;
 const OPEN_LIBRARY_GAP_MS = 1000;
 const OPEN_LIBRARY_COVER_GAP_MS = 3100;
+const BACKGROUND_ISBNDB_DAILY_CAP = 1500;
 
 let activeService: BooksService | null = null;
 
@@ -71,7 +73,8 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     ),
     backgroundCatalog: createCompositeCatalog(
       createOpenLibraryCatalog(openLibraryThrottle, false),
-      isbndbConfigured ? createIsbndbCatalog(env.ISBNDB_API_KEY, isbndbThrottle, isbndbGate, false) : null
+      isbndbConfigured ? capDailyCalls(createIsbndbCatalog(env.ISBNDB_API_KEY, isbndbThrottle, isbndbGate, false), BACKGROUND_ISBNDB_DAILY_CAP) : null,
+      true
     ),
     fetchImage,
     enqueue: (bookId, priority) => worker.enqueue(bookId, priority),

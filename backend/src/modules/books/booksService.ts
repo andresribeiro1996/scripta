@@ -279,6 +279,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
           await lookupDetails(book, deps.backgroundCatalog);
         } catch (error) {
           if (!(error instanceof SourceUnavailableError)) throw error;
+          deps.repo.markDetailsAttempted(id, now().toISOString());
           if (!(error instanceof SourcePausedError)) deps.warn({ bookId: id, source: error.source, error: error.message }, "details source unavailable");
         }
       }

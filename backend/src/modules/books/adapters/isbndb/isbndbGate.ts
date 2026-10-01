@@ -9,7 +9,7 @@ export interface IsbndbGate {
   run<T>(call: () => Promise<T>): Promise<T>;
 }
 
-function nextUtcMidnight(now: number): number {
+export function nextUtcMidnight(now: number): number {
   const date = new Date(now);
   return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + 1);
 }

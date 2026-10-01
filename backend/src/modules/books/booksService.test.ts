@@ -18,6 +18,7 @@ const { createSqliteBooksRepository } = await import("./adapters/sqlite/sqliteBo
 const { createBooksService } = await import("./booksService.js");
 const { SourcePausedError, SourceUnavailableError } = await import("./domain/errors.js");
 const { createCoverWorker } = await import("./worker.js");
+const { createCompositeCatalog } = await import("./adapters/catalog/compositeCatalog.js");
 const { createThrottle } = await import("./adapters/http/http.js");
 const { createOpenLibraryCatalog } = await import("./adapters/openlibrary/openLibraryCatalog.js");
 
@@ -1163,4 +1164,46 @@ test("a user's details request jumps ahead of the backfill's queued lookups", as
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("failing books move behind untried ones, so a second batch reaches a good newer book", async () => {
+  const catalog: Catalog = {
+    fetchDetails: async (lookup) => {
+      if (lookup.title === "Good") return spiceAnswer;
+      throw new SourceUnavailableError("openlibrary", "HTTP 503");
+    },
+    search: async () => []
+  };
+  const h = harness({ backgroundCatalog: catalog });
+  const failing = backfillBooks(h, 50);
+  h.service.resolveCover({ isbn: null, title: "Good", author: "Author" });
+  const good = h.repo.listUncheckedDetailIds(51)[50]!;
+  h.advance(1000);
+  await h.service.backfillDetails(50);
+  assert.equal(h.repo.getBook(good)!.details_status, null);
+  assert.ok(failing.every((id) => h.repo.getBook(id)!.details_checked_at !== null && h.repo.getBook(id)!.details_status === null));
+  await h.service.backfillDetails(50);
+  assert.equal(h.repo.getBook(good)!.details_status, "found");
+});
+
+test("an attempted but unchecked book is still looked up by a user's request", async () => {
+  const { calls, catalog } = recordingCatalog();
+  const h = harness({ catalog, backgroundCatalog: { fetchDetails: async () => { throw new SourceUnavailableError("openlibrary", "HTTP 503"); }, search: async () => [] } });
+  h.service.resolveCover(dune);
+  await h.service.backfillDetails(50);
+  assert.equal((await h.service.getDetails(dune))?.summary, "Spice.");
+  assert.deepEqual(calls, ["details:9780441013593"]);
+});
+
+test("a strict background catalog leaves a book unchanged when ISBNdb is paused after a partial Open Library answer", async () => {
+  const partial = { metadata: { summary: null, rating: 4, ratingCount: 9, sourceUrl: "https://openlibrary.org/works/OL1W", genres: ["Science Fiction" as const], pages: 300, publisher: null, year: null, translator: null }, sources: ["openlibrary" as const], summarySource: null };
+  const primary: Catalog = { fetchDetails: async () => partial, search: async () => [] };
+  const secondary: Catalog = { fetchDetails: async () => { throw new SourcePausedError("isbndb", "paused", { retryAt: 1 }); }, search: async () => [] };
+  const h = harness({ backgroundCatalog: createCompositeCatalog(primary, secondary, true) });
+  h.service.resolveCover(orlando);
+  const id = h.bookId("isbn:9780141184272");
+  await h.service.backfillDetails(50);
+  const row = h.repo.getBook(id)!;
+  assert.deepEqual([row.details_status, row.rating, row.genres, row.pages, row.summary, row.data_sources], [null, null, "[]", null, null, "[]"]);
+  assert.notEqual(row.details_checked_at, null);
 });

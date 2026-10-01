@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { BookMetadata } from "@scripta/shared";
-import { SourceUnavailableError } from "../../domain/errors.js";
+import { SourcePausedError, SourceUnavailableError } from "../../domain/errors.js";
 import type { BookCatalog, CatalogDetails, CatalogSearchHit } from "../../domain/ports.js";
 import { createCompositeCatalog } from "./compositeCatalog.js";
 
@@ -169,4 +169,19 @@ test("a merged details record keeps Open Library's work key", async () => {
   const merged = await createCompositeCatalog(fake({ ...ol({ summary: null }), workKey: "/works/OL1W" }).catalog, fake(isbndb).catalog).fetchDetails(lookup);
   assert.equal(merged?.workKey, "/works/OL1W");
   assert.deepEqual(merged?.sources, ["openlibrary", "isbndb"]);
+});
+
+test("a strict catalog refuses a partial Open Library answer when ISBNdb is unavailable, a normal one returns it", async () => {
+  const partial = ol({ summary: null });
+  for (const failure of [down(), new SourcePausedError("isbndb", "paused", { retryAt: 1 })]) {
+    await assert.rejects(createCompositeCatalog(fake(partial).catalog, fake(failure).catalog, true).fetchDetails(lookup), failure.constructor as typeof SourceUnavailableError);
+    assert.deepEqual(await createCompositeCatalog(fake(partial).catalog, fake(failure).catalog).fetchDetails(lookup), partial);
+  }
+});
+
+test("a strict catalog behaves as usual when ISBNdb answers or is not asked", async () => {
+  assert.deepEqual((await createCompositeCatalog(fake(ol({ summary: null })).catalog, fake(isbndb).catalog, true).fetchDetails(lookup))?.metadata.summary, "ISBNdb summary.");
+  const bnFake = fake(down());
+  assert.deepEqual(await createCompositeCatalog(fake(openLibrary).catalog, bnFake.catalog, true).fetchDetails(lookup), openLibrary);
+  assert.deepEqual(bnFake.calls, []);
 });

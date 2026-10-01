@@ -42,6 +42,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     WHERE id = ?
   `);
   const detailsMissingStmt = db.prepare(`UPDATE books SET details_status = 'missing', details_checked_at = ? WHERE id = ?`);
+  const detailsAttemptedStmt = db.prepare(`UPDATE books SET details_checked_at = ? WHERE id = ?`);
   const searchStmt = db.prepare(`
     SELECT books.* FROM books_fts JOIN books ON books.id = books_fts.book_id
     WHERE books_fts MATCH ? ORDER BY bm25(books_fts) LIMIT ?
@@ -51,7 +52,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     SELECT id FROM books WHERE cover_image_id IS NULL AND cover_status IS NULL ORDER BY created_at, rowid
   `);
   const uncheckedDetailsStmt = db.prepare(`
-    SELECT id FROM books WHERE details_status IS NULL ORDER BY created_at, rowid LIMIT ?
+    SELECT id FROM books WHERE details_status IS NULL ORDER BY details_checked_at IS NOT NULL, details_checked_at, created_at, rowid LIMIT ?
   `);
   const setUpgradeWantedStmt = db.prepare(`UPDATE books SET cover_upgrade_wanted_at = ? WHERE id = ?`);
   const setWorkKeyStmt = db.prepare(`UPDATE books SET ol_work_key = ? WHERE id = ? AND ol_work_key IS NULL`);
@@ -161,6 +162,10 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
 
     markDetailsMissing(bookId, checkedAt) {
       detailsMissingStmt.run(checkedAt, bookId);
+    },
+
+    markDetailsAttempted(bookId, checkedAt) {
+      detailsAttemptedStmt.run(checkedAt, bookId);
     },
 
     searchBooks(tokens, limit) {

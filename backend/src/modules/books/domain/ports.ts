@@ -22,6 +22,7 @@ export interface BooksRepository {
   saveDetails(bookId: string, details: BookMetadata, sources: DataSource[], summarySource: DataSource | null, checkedAt: string): void;
   mergeDetails(bookId: string, details: MergeableDetails, summarySource: SummarySource | null): void;
   markDetailsMissing(bookId: string, checkedAt: string): void;
+  markDetailsAttempted(bookId: string, checkedAt: string): void;
   searchBooks(tokens: string[], limit: number): BookRow[];
   listUncheckedCoverIds(): string[];
   listUncheckedDetailIds(limit: number): string[];

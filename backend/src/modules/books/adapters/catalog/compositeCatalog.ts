@@ -33,7 +33,7 @@ function interleave(first: CatalogSearchHit[], second: CatalogSearchHit[]): Cata
   return merged;
 }
 
-export function createCompositeCatalog(primary: BookCatalog, secondary: BookCatalog | null): BookCatalog {
+export function createCompositeCatalog(primary: BookCatalog, secondary: BookCatalog | null, strict = false): BookCatalog {
   if (!secondary) return primary;
   return {
     async fetchDetails(lookup) {
@@ -45,7 +45,7 @@ export function createCompositeCatalog(primary: BookCatalog, secondary: BookCata
       }
       const second = await attempt(secondary.fetchDetails(lookup));
       if (!second.ok) {
-        if (found) return found;
+        if (found && !strict) return found;
         throw second.error;
       }
       if (!found) {

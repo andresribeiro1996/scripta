@@ -175,6 +175,15 @@ test("listUncheckedDetailIds returns never-checked books, oldest first, up to th
   assert.deepEqual(repo.listUncheckedDetailIds(2), [oldest.id, middle.id]);
 });
 
+test("a book whose lookup failed moves behind the untried ones without being marked checked", () => {
+  const { repo } = freshRepo();
+  const failed = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: null }, ["ta:dune|frank herbert|"], "2026-10-01T00:00:00.000Z");
+  const untried = repo.createBook({ title: "Emma", author: "Jane Austen", isbn: null }, ["ta:emma|jane austen|"], "2026-10-02T00:00:00.000Z");
+  repo.markDetailsAttempted(failed.id, NOW);
+  assert.deepEqual(repo.listUncheckedDetailIds(10), [untried.id, failed.id]);
+  assert.equal(repo.getBook(failed.id)!.details_status, null);
+});
+
 test("createBook stores the sources of a new row and defaults to none", () => {
   const { repo } = freshRepo();
   const tagged = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: null, sources: ["isbndb"] }, ["ta:dune|frank herbert|"], NOW);
