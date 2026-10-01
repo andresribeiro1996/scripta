@@ -1,6 +1,6 @@
 import { setTimeout as sleep } from "node:timers/promises";
 import { createThrottle } from "../adapters/http/http.js";
-import { parseRankedWorks, rankedWorksUrl, type SeedEntry, type SeedLanguage } from "./rankedWorks.js";
+import { PORTUGAL_ISBN_PREFIXES, parseRankedWorks, rankedWorksUrl, type SeedEntry, type SeedLanguage } from "./rankedWorks.js";
 
 const PAGE = 1000;
 const TIMEOUT_MS = 60_000;
@@ -28,14 +28,26 @@ async function fetchPage(url: string, log: (line: string) => void): Promise<unkn
   }
 }
 
-export async function collectRanked(lang: SeedLanguage, wanted: number, log: (line: string) => void): Promise<SeedEntry[]> {
+async function collectPrefix(lang: SeedLanguage, wanted: number, isbnPrefix: string | undefined, log: (line: string) => void): Promise<SeedEntry[]> {
   const entries: SeedEntry[] = [];
   const isbns = new Set<string>();
   for (let offset = 0; isbns.size < wanted * 1.1; offset += PAGE) {
-    const page = parseRankedWorks(await throttle(() => fetchPage(rankedWorksUrl(lang, offset, PAGE), log)), lang);
+    const page = parseRankedWorks(await throttle(() => fetchPage(rankedWorksUrl(lang, offset, PAGE, isbnPrefix), log)), lang, isbnPrefix);
     if (page.length === 0) break;
     for (const entry of page) if (!isbns.has(entry.isbn)) { isbns.add(entry.isbn); entries.push(entry); }
-    log(`${lang}: offset ${offset}, ${isbns.size} unique`);
+    log(`${isbnPrefix ?? lang}: offset ${offset}, ${isbns.size} unique`);
   }
   return entries;
+}
+
+export async function collectRanked(lang: SeedLanguage, wanted: number, log: (line: string) => void): Promise<SeedEntry[]> {
+  if (lang !== "por") return collectPrefix(lang, wanted, undefined, log);
+  const byWork = new Map<string, SeedEntry>();
+  for (const prefix of PORTUGAL_ISBN_PREFIXES) {
+    for (const entry of await collectPrefix(lang, wanted, prefix, log)) {
+      const kept = byWork.get(entry.workKey);
+      if (!kept || entry.readers > kept.readers) byWork.set(entry.workKey, entry);
+    }
+  }
+  return [...byWork.values()].sort((a, b) => b.readers - a.readers);
 }

@@ -16,7 +16,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 const { applyBooksMigrations } = await import("./adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("./adapters/sqlite/sqliteBooksRepository.js");
 const { createBooksService } = await import("./booksService.js");
-const { SourceUnavailableError } = await import("./domain/errors.js");
+const { SourcePausedError, SourceUnavailableError } = await import("./domain/errors.js");
 const { createCoverWorker } = await import("./worker.js");
 
 type Deps = Parameters<typeof createBooksService>[0];
@@ -154,6 +154,38 @@ test("an unavailable source records no miss and backs off for 10 minutes", async
   assert.equal(h.enqueued.length, 0);
   h.advance(10 * 60 * 1000);
   assert.equal(h.service.resolveCover(orlando).pending, true);
+  assert.equal(h.enqueued.length, 1);
+});
+
+test("a paused source backs the book off until the pause ends and is not warned about per book", async () => {
+  const HOUR = 60 * 60 * 1000;
+  const retryAt = Date.parse("2026-10-01T00:00:00.000Z") + 5 * HOUR;
+  const paused: CoverSource = { byIsbn: async () => { throw new SourcePausedError("isbndb", "paused", { retryAt }); }, byTitle: async () => [] };
+  const h = harness({ sources: { isbndb: paused, apple: emptySource, openlibrary: emptySource } });
+  h.service.resolveCover(orlando);
+  await h.service.processBook(h.bookId("isbn:9780141184272"), "background");
+  assert.equal(h.warnings.length, 0);
+  h.enqueued.length = 0;
+  h.advance(5 * HOUR - 1);
+  h.service.resolveCover(orlando);
+  assert.equal(h.enqueued.length, 0);
+  h.advance(1);
+  h.service.resolveCover(orlando);
+  assert.equal(h.enqueued.length, 1);
+});
+
+test("a plain 503 keeps the 10-minute backoff and is still warned about", async () => {
+  const failing: CoverSource = { byIsbn: async () => { throw new SourceUnavailableError("apple", "HTTP 503", { status: 503 }); }, byTitle: async () => [] };
+  const h = harness({ sources: { isbndb: null, apple: failing, openlibrary: emptySource } });
+  h.service.resolveCover(orlando);
+  await h.service.processBook(h.bookId("isbn:9780141184272"), "background");
+  assert.equal(h.warnings.length, 1);
+  h.enqueued.length = 0;
+  h.advance(10 * 60 * 1000 - 1);
+  h.service.resolveCover(orlando);
+  assert.equal(h.enqueued.length, 0);
+  h.advance(1);
+  h.service.resolveCover(orlando);
   assert.equal(h.enqueued.length, 1);
 });
 

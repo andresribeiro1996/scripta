@@ -131,6 +131,7 @@ const envSchema = z.object({
   OAUTH_SUCCESS_REDIRECT_URL: z.string().optional().default(""),
 
   ISBNDB_API_KEY: z.string().optional().default(""),
+  ALERT_EMAIL: z.string().optional().default(""),
   ADMIN_USER_ID: z.string().optional().default(""),
 
   // modules/socials — one client id/secret/callback triple per platform,

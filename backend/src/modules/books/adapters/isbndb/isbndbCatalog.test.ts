@@ -3,8 +3,10 @@ import { afterEach, test } from "node:test";
 import { SourceUnavailableError } from "../../domain/errors.js";
 import type { Throttle } from "../http/http.js";
 import { createIsbndbCatalog } from "./isbndbCatalog.js";
+import { createIsbndbGate } from "./isbndbGate.js";
 
 const direct: Throttle = (task) => task();
+const gate = createIsbndbGate({ onPause: () => {} });
 const originalFetch = globalThis.fetch;
 afterEach(() => {
   globalThis.fetch = originalFetch;
@@ -37,7 +39,7 @@ const dune = {
 
 test("details come from the synopsis and subjects of the ISBN lookup", async () => {
   const requests = respond(200, { book: dune });
-  assert.deepEqual(await createIsbndbCatalog("secret", direct).fetchDetails({ isbn: "9780441013593", title: "Dune", author: "Frank Herbert" }), {
+  assert.deepEqual(await createIsbndbCatalog("secret", direct, gate).fetchDetails({ isbn: "9780441013593", title: "Dune", author: "Frank Herbert" }), {
     metadata: {
       summary: 'Set on the desert planet Arrakis.\nPaul & Jessica "flee".\nThe spice must flow.',
       rating: null,
@@ -52,7 +54,7 @@ test("details come from the synopsis and subjects of the ISBN lookup", async () 
 
 test("details fall back to the overview, and need an ISBN and something to show", async () => {
   const requests = respond(200, { book: { isbn: "0441013597", overview: "Short overview.", subjects: ["Unmapped"] } });
-  const catalog = createIsbndbCatalog("k", direct);
+  const catalog = createIsbndbCatalog("k", direct, gate);
   const details = await catalog.fetchDetails({ isbn: "0441013597", title: "Dune", author: "Frank Herbert" });
   assert.equal(details?.metadata.summary, "Short overview.");
   assert.equal(details?.metadata.sourceUrl, "https://isbndb.com/book/0441013597");
@@ -71,12 +73,12 @@ test("details fall back to the overview, and need an ISBN and something to show"
 
 test("an ISBNdb failure is a source failure", async () => {
   respond(429, {});
-  await assert.rejects(createIsbndbCatalog("k", direct).fetchDetails({ isbn: "9780441013593", title: "", author: "" }), SourceUnavailableError);
+  await assert.rejects(createIsbndbCatalog("k", direct, gate).fetchDetails({ isbn: "9780441013593", title: "", author: "" }), SourceUnavailableError);
 });
 
 test("an ISBN search returns the one book", async () => {
   const requests = respond(200, { book: dune });
-  assert.deepEqual(await createIsbndbCatalog("k", direct).search({ isbn: "9780441013593" }), [{
+  assert.deepEqual(await createIsbndbCatalog("k", direct, gate).search({ isbn: "9780441013593" }), [{
     result: {
       title: "Dune",
       authors: ["Frank Herbert"],
@@ -97,7 +99,7 @@ test("a text search maps each book and skips the untitled", async () => {
     total: 3,
     books: [dune, { isbn: "1234567890", authors: [] }, { title: "Dune Messiah", isbn13: "9780593098233", date_published: "2019", authors: ["Frank Herbert"], subjects: [] }]
   });
-  const hits = await createIsbndbCatalog("k", direct).search({ text: "dune & more" });
+  const hits = await createIsbndbCatalog("k", direct, gate).search({ text: "dune & more" });
   assert.deepEqual(hits.map((hit) => [hit.result.title, hit.result.isbn, hit.result.year, hit.olCoverId]), [
     ["Dune", "9780441013593", 2005, null],
     ["Dune Messiah", "9780593098233", 2019, null]
@@ -105,7 +107,7 @@ test("a text search maps each book and skips the untitled", async () => {
   assert.equal(requests[0]!.url, "https://api2.isbndb.com/books/dune%20%26%20more?page=1&pageSize=20");
 
   respond(404, {});
-  assert.deepEqual(await createIsbndbCatalog("k", direct).search({ text: "nothing" }), []);
+  assert.deepEqual(await createIsbndbCatalog("k", direct, gate).search({ text: "nothing" }), []);
 });
 
 test("catalog calls use the urgent lane", async () => {
@@ -115,7 +117,7 @@ test("catalog calls use the urgent lane", async () => {
     return task();
   };
   respond(200, { book: dune });
-  const catalog = createIsbndbCatalog("k", recording);
+  const catalog = createIsbndbCatalog("k", recording, gate);
   await catalog.fetchDetails({ isbn: "9780441013593", title: "", author: "" });
   await catalog.search({ isbn: "9780441013593" });
   assert.deepEqual(lanes, [true, true]);

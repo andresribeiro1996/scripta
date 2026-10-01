@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
-import type { Throttle } from "../http/http.js";
+import { SourcePausedError, SourceUnavailableError } from "../../domain/errors.js";
+import { createThrottle, type Throttle } from "../http/http.js";
 import { appleArtworkUrl, createAppleSource, parseAppleResults, storefrontsFor } from "./apple.js";
-import { createIsbndbSource, parseIsbndbBooks } from "./isbndb.js";
+import { createIsbndbGate } from "../isbndb/isbndbGate.js";
+import { createIsbndbGet, createIsbndbSource, parseIsbndbBooks } from "./isbndb.js";
 import { createOpenLibraryCoverSource } from "./openLibrary.js";
 
 const direct: Throttle = (task) => task();
+const gate = createIsbndbGate({ onPause: () => {} });
 const acceptAll = () => true;
 const originalFetch = globalThis.fetch;
 afterEach(() => {
@@ -35,7 +38,7 @@ test("ISBNdb lookups send the key and treat 404 as no candidates", async () => {
     auth = new Headers(init?.headers).get("Authorization");
     return Response.json({ book: { title: "Dune", authors: ["Frank Herbert"], image_original: "https://i/o.jpg" } });
   });
-  const source = createIsbndbSource("secret", direct);
+  const source = createIsbndbSource("secret", direct, gate);
   assert.deepEqual(await source.byIsbn("9780441013593"), [{ source: "isbndb", url: "https://i/o.jpg" }]);
   assert.equal(urls[0], "https://api2.isbndb.com/book/9780441013593");
   assert.equal(auth, "secret");
@@ -48,7 +51,7 @@ test("ISBNdb title search keeps only accepted books", async () => {
     { title: "Dune", authors: ["Frank Herbert"], image: "https://i/1.jpg" },
     { title: "Dune Messiah", authors: ["Frank Herbert"], image: "https://i/2.jpg" }
   ] }));
-  const found = await createIsbndbSource("k", direct).byTitle("Dune", "Frank Herbert", (c) => c.title === "Dune");
+  const found = await createIsbndbSource("k", direct, gate).byTitle("Dune", "Frank Herbert", (c) => c.title === "Dune");
   assert.deepEqual(found, [{ source: "isbndb", url: "https://i/1.jpg" }]);
   assert.equal(urls[0], "https://api2.isbndb.com/books/Dune?page=1&pageSize=20&column=title");
 });
@@ -114,7 +117,28 @@ test("cover lookups stay in the normal lane", async () => {
     return task();
   };
   stub(() => Response.json({}));
-  await createIsbndbSource("k", recording).byIsbn("9780441013593");
+  await createIsbndbSource("k", recording, gate).byIsbn("9780441013593");
   await createAppleSource(recording).byIsbn("9780441013593");
   assert.deepEqual(lanes, [false, false]);
+});
+
+test("a call queued behind the one that exhausts the quota never reaches ISBNdb", async () => {
+  const urls = stub(() => new Response("Daily quota exceeded", { status: 429 }));
+  const pauses: number[] = [];
+  const get = createIsbndbGet("k", createThrottle(0), createIsbndbGate({ onPause: ({ until }) => pauses.push(until) }));
+  const results = await Promise.allSettled([get("https://api2.isbndb.com/book/1"), get("https://api2.isbndb.com/book/2")]);
+  assert.deepEqual(results.map((result) => result.status === "rejected" && result.reason instanceof SourcePausedError), [true, true]);
+  assert.equal(urls.length, 1);
+  assert.equal(pauses.length, 1);
+});
+
+test("a 429 that lifts in a second is retried per book, one that lifts in an hour pauses ISBNdb", async () => {
+  const pauses: number[] = [];
+  const get = createIsbndbGet("k", direct, createIsbndbGate({ onPause: ({ until }) => pauses.push(until) }));
+  stub(() => new Response("", { status: 429, headers: { "retry-after": "1" } }));
+  await assert.rejects(get("https://api2.isbndb.com/book/1"), (error: unknown) => error instanceof SourceUnavailableError && !(error instanceof SourcePausedError) && error.status === 429);
+  assert.deepEqual(pauses, []);
+  stub(() => new Response("", { status: 429, headers: { "retry-after": "3600" } }));
+  await assert.rejects(get("https://api2.isbndb.com/book/1"), SourcePausedError);
+  assert.equal(pauses.length, 1);
 });

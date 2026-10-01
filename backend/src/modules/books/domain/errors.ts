@@ -1,7 +1,29 @@
+export interface SourceErrorOptions {
+  status?: number;
+  retryAt?: number;
+  quota?: boolean;
+}
+
 export class SourceUnavailableError extends Error {
-  constructor(readonly source: string, detail: string) {
+  readonly status?: number;
+  readonly retryAt?: number;
+  readonly quota?: boolean;
+
+  constructor(readonly source: string, detail: string, options: SourceErrorOptions = {}) {
     super(`${source} unavailable: ${detail}`);
     this.name = "SourceUnavailableError";
+    this.status = options.status;
+    this.retryAt = options.retryAt;
+    this.quota = options.quota;
+  }
+}
+
+export class SourcePausedError extends SourceUnavailableError {
+  declare readonly retryAt: number;
+
+  constructor(source: string, detail: string, options: { retryAt: number }) {
+    super(source, detail, options);
+    this.name = "SourcePausedError";
   }
 }
 

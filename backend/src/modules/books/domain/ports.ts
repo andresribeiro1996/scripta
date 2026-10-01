@@ -26,7 +26,7 @@ export interface BooksRepository {
 }
 
 export interface CoverCandidate {
-  source: Exclude<CoverSourceName, "upload">;
+  source: Exclude<CoverSourceName, "upload" | "publisher">;
   url: string;
 }
 

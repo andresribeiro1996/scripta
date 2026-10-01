@@ -35,6 +35,37 @@ test("fetchJson reports rate limits, server errors, auth errors and network fail
   await assert.rejects(fetchJson("apple", "https://api.test/a"), SourceUnavailableError);
 });
 
+test("fetchJson records the status and when a rate limit lifts", async () => {
+  const before = Date.now();
+  const failure = async (response: Response): Promise<SourceUnavailableError> => {
+    stub(() => response);
+    try {
+      await fetchJson("isbndb", "https://api.test/a");
+    } catch (error) {
+      assert.ok(error instanceof SourceUnavailableError);
+      return error;
+    }
+    throw new Error("expected fetchJson to fail");
+  };
+  const retryAfter = await failure(new Response("slow down", { status: 429, headers: { "retry-after": "120" } }));
+  assert.equal(retryAfter.status, 429);
+  assert.ok(retryAfter.retryAt! >= before + 120_000 && retryAfter.retryAt! <= Date.now() + 120_000);
+  assert.match(retryAfter.message, /slow down/);
+
+  const ratelimit = await failure(new Response("", { status: 429, headers: { ratelimit: "limit=5000, remaining=0, reset=3600" } }));
+  assert.ok(ratelimit.retryAt! >= before + 3_600_000 && ratelimit.retryAt! <= Date.now() + 3_600_000);
+  assert.equal(ratelimit.quota, true);
+
+  const bare = await failure(new Response("", { status: 429 }));
+  assert.equal(bare.status, 429);
+  assert.equal(bare.retryAt, undefined);
+  assert.equal(bare.quota, undefined);
+
+  const server = await failure(new Response("", { status: 500 }));
+  assert.equal(server.status, 500);
+  assert.equal(server.retryAt, undefined);
+});
+
 test("fetchBytes skips a missing or forbidden image but reports a server error", async () => {
   stub(() => new Response(new Uint8Array([1, 2, 3])));
   assert.deepEqual([...(await fetchBytes("apple", "https://img.test/a"))!], [1, 2, 3]);
