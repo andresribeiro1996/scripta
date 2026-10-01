@@ -184,6 +184,16 @@ test("books users brought in come before the seed and publisher backlog, whateve
   assert.deepEqual(batch.slice(1), seeded.slice(0, 49).map((book) => book.id));
 });
 
+test("failing user books fall behind every untried book and cannot starve the backlog", () => {
+  const { repo } = freshRepo();
+  const failing = Array.from({ length: 60 }, (_, index) => repo.createBook({ title: `Mine ${index}`, author: "Reader", isbn: null }, [`ta:mine ${index}|reader|`], "2026-09-01T00:00:00.000Z"));
+  for (const book of failing) repo.markDetailsAttempted(book.id, NOW);
+  const seed = repo.createBook({ title: "Seed", author: "Author", isbn: null, createdBy: "seed" }, ["ta:seed|author|"], "2026-10-02T00:00:00.000Z");
+  const batch = repo.listUncheckedDetailIds(50);
+  assert.equal(batch[0], seed.id);
+  assert.equal(batch.length, 50);
+});
+
 test("a book whose lookup failed moves behind the untried ones without being marked checked", () => {
   const { repo } = freshRepo();
   const failed = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: null }, ["ta:dune|frank herbert|"], "2026-10-01T00:00:00.000Z");
