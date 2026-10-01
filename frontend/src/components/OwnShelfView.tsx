@@ -12,7 +12,7 @@ import { MuralsIcon } from "./NavIcons";
 import { ReaderGlyph } from "./ReaderGlyph";
 import { MuralCanvas } from "./murals/MuralCanvas";
 import { ProfileActivity } from "./ProfileActivity";
-import { Sheet } from "./Sheet";
+import { Sheet, keepTabInside } from "./Sheet";
 import { SkeletonCardGrid } from "./Skeleton";
 import { SwipeTabs } from "./SwipeTabs";
 import { useCommunityActivity } from "../hooks/useCommunity";
@@ -247,7 +247,11 @@ function PublishDialog({ username, onAnswer, onCancel }: { username: string; onA
   useScrollLock();
   useDismissible(onCancel);
   useEffect(() => {
-    cancelButtonRef.current?.focus();
+    const previous = document.activeElement;
+    cancelButtonRef.current?.focus({ preventScroll: true });
+    return () => {
+      if (previous instanceof HTMLElement && previous.isConnected) previous.focus({ preventScroll: true });
+    };
   }, []);
 
   return (
@@ -255,6 +259,7 @@ function PublishDialog({ username, onAnswer, onCancel }: { username: string; onA
       <div
         className="w-full max-w-sm rounded-xl border border-(--color-border) bg-(--color-surface) p-5 shadow-lg"
         onClick={(e) => e.stopPropagation()}
+        onKeyDown={keepTabInside}
         role="dialog"
         aria-modal="true"
         aria-labelledby="publish-dialog-title"

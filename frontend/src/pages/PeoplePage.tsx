@@ -37,13 +37,17 @@ function PeoplePane() {
   const suggested = useSuggestedPeople(needle.length === 0);
   const queryClient = useQueryClient();
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [followError, setFollowError] = useState<string | null>(null);
 
   async function toggle(person: PersonResult) {
     setBusyId(person.user.userId);
+    setFollowError(null);
     try {
       if (person.viewerFollows) await unfollowUser(person.user.userId);
       else await followUser(person.user.userId);
       await queryClient.invalidateQueries({ queryKey: ["community", "people"] });
+    } catch {
+      setFollowError("Couldn't update who you follow.");
     } finally {
       setBusyId(null);
     }
@@ -52,16 +56,21 @@ function PeoplePane() {
   return (
     <div>
       <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by username" aria-label="Search people by username" className={searchInput} />
+      {followError && (
+        <p role="alert" className="mb-3 text-sm text-(--color-danger)">
+          {followError}
+        </p>
+      )}
       {needle.length === 0 &&
-        (suggested.error ? (
-          <EmptyState title="Couldn't load suggestions." action={retryButton(suggested.refetch)} />
-        ) : suggested.people.length === 0 ? (
-          <EmptyState icon={CommunityIcon} title="Find people." body="Search a username to follow them." />
-        ) : (
+        (suggested.people.length > 0 ? (
           <>
             <h3 className="mb-3 text-sm font-semibold text-(--color-text-dim)">Readers you might like</h3>
             <PersonList people={suggested.people} busyId={busyId} onToggle={toggle} />
           </>
+        ) : suggested.error ? (
+          <EmptyState title="Couldn't load suggestions." action={retryButton(suggested.refetch)} />
+        ) : (
+          <EmptyState icon={CommunityIcon} title="Find people." body="Search a username to follow them." />
         ))}
       {needle.length > 0 && isLoading && <SkeletonCardGrid count={2} label="Searching" tileClassName="min-h-[72px]" />}
       {needle.length > 0 && !isLoading && error && <EmptyState title="Couldn't search." action={retryButton(refetch)} />}
@@ -91,7 +100,7 @@ function PersonList({
         const suggestion = "sharedCount" in person ? person : null;
         return (
           <div key={person.user.userId} className="flex items-center justify-between gap-3 rounded-xl border border-(--color-border) bg-(--color-surface) p-4">
-            <Link to={`/community/u/${person.user.username}`} className="flex min-w-0 items-center gap-2">
+            <Link to={`/community/u/${person.user.username}`} className="flex min-w-0 flex-1 items-center gap-2">
               <AuthorAvatar author={person.user} size={32} />
               <span className="min-w-0">
                 <span className="flex items-center gap-1 text-sm font-semibold">
@@ -102,14 +111,14 @@ function PersonList({
                   {suggestion ? suggestionReason(suggestion) : person.private ? "Private" : `${person.followerCount} ${person.followerCount === 1 ? "follower" : "followers"}`}
                 </span>
               </span>
+              {suggestion && suggestion.sharedBooks.length > 0 && (
+                <span className="ml-auto flex shrink-0 -space-x-1.5">
+                  {suggestion.sharedBooks.slice(0, 3).map((book, index) => (
+                    <SharedCover key={`${index}:${book.coverUrl}`} src={book.coverUrl} />
+                  ))}
+                </span>
+              )}
             </Link>
-            {suggestion && suggestion.sharedBooks.length > 0 && (
-              <span className="ml-auto flex shrink-0 -space-x-1.5">
-                {suggestion.sharedBooks.slice(0, 3).map((book, index) => (
-                  <SharedCover key={`${index}:${book.coverUrl}`} src={book.coverUrl} />
-                ))}
-              </span>
-            )}
             {!person.private && (
               <button
                 onClick={() => void onToggle(person)}
