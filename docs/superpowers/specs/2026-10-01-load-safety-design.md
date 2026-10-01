@@ -1,8 +1,8 @@
 # Load safety: bounded work per request
 
 Date: 2026-10-01
-Status: decisions approved in conversation; plans for workstreams 1–4 written,
-workstream 5 awaiting approval of the inbox design
+Status: decisions approved in conversation, including the inbox and trace
+ids for workstream 5; a plan exists for each workstream
 
 ## Problem
 
@@ -51,8 +51,8 @@ after another: at 52 ms a page the last person waits ~5 s; with the inbox,
 
 ## Workstreams
 
-Five independent workstreams. 1–4 can run in parallel. 5 starts once its
-design (below) is approved.
+Five workstreams. 1–4 run in parallel and ship as one PR. 5 starts from
+that PR's branch.
 
 ### 1. Abuse guards
 
@@ -127,9 +127,10 @@ design (below) is approved.
 - Dropped from the audit: cutting stored cover URLs to 512 characters. The
   tables it shrinks are replaced by library rows.
 
-### 5. Dashboard feed (awaiting approval)
+### 5. Dashboard feed
 
-Decided in conversation:
+Decided in conversation (the inbox follows standard social-feed practice,
+"fan-out on write"):
 
 - **Events are hot for 30 days.** A job moves older rows from `events` to a
   new `events_history` table (same columns), kept for metrics; when to clean
@@ -146,7 +147,16 @@ Decided in conversation:
   SQL. The boot migration copies the JSON; an unreadable row becomes all
   off and is logged (privacy fails closed). The API shape is unchanged.
 
-Proposed (needs approval): **an inbox written when an event happens.**
+- **Every event records what caused it.** `trace_id` is the id of the request
+  that emitted it; the same id is `reqId` on every log line of that request,
+  so an event can be followed from the click through the logs to the inbox
+  rows. `source` is the route pattern (`POST /tierlists/:id/open-voting`).
+  Request ids become UUIDs so they stay unique across restarts. Both columns
+  move to `events_history` with the event. Every emitter today runs inside a
+  request; a future background job that emits events sets `source` to
+  `job:<name>`.
+
+**An inbox written when an event happens:**
 
 - `feed_inbox (viewer_id, created_at, event_id, author_id)`, primary key
   `(viewer_id, created_at, event_id)`, plus indexes on
