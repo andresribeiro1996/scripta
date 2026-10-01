@@ -8,10 +8,10 @@ import { createCompositeCatalog } from "./compositeCatalog.js";
 const lookup = { isbn: "9780441013593", title: "Dune", author: "Frank Herbert" };
 const down = () => new SourceUnavailableError("test", "HTTP 503");
 
-const olMetadata: BookMetadata = { summary: "OL summary.", rating: 4.2, ratingCount: 10, sourceUrl: "https://openlibrary.org/works/OL1W", genres: ["Science Fiction"] };
-const bnMetadata: BookMetadata = { summary: "ISBNdb summary.", rating: null, ratingCount: 0, sourceUrl: "https://isbndb.com/book/9780441013593", genres: ["Fantasy"] };
-const openLibrary: CatalogDetails = { metadata: olMetadata, sources: ["openlibrary"] };
-const isbndb: CatalogDetails = { metadata: bnMetadata, sources: ["isbndb"] };
+const olMetadata: BookMetadata = { summary: "OL summary.", rating: 4.2, ratingCount: 10, sourceUrl: "https://openlibrary.org/works/OL1W", genres: ["Science Fiction"], pages: 412, publisher: "Ace", year: 1965, translator: "Ana" };
+const bnMetadata: BookMetadata = { summary: "ISBNdb summary.", rating: null, ratingCount: 0, sourceUrl: "https://isbndb.com/book/9780441013593", genres: ["Fantasy"], pages: 544, publisher: "Penguin", year: 2005, translator: "Bob" };
+const openLibrary: CatalogDetails = { metadata: olMetadata, sources: ["openlibrary"], summarySource: "openlibrary" };
+const isbndb: CatalogDetails = { metadata: bnMetadata, sources: ["isbndb"], summarySource: "isbndb" };
 const ol = (changes: Partial<BookMetadata>): CatalogDetails => ({ ...openLibrary, metadata: { ...olMetadata, ...changes } });
 const bn = (changes: Partial<BookMetadata>): CatalogDetails => ({ ...isbndb, metadata: { ...bnMetadata, ...changes } });
 
@@ -48,11 +48,27 @@ test("details fill what Open Library lacks, keep its rating and source URL, and 
   const bnFake = fake(isbndb);
   assert.deepEqual(await createCompositeCatalog(fake(ol({ summary: null })).catalog, bnFake.catalog).fetchDetails(lookup), {
     metadata: { ...olMetadata, summary: "ISBNdb summary." },
-    sources: ["openlibrary", "isbndb"]
+    sources: ["openlibrary", "isbndb"],
+    summarySource: "isbndb"
   });
   assert.deepEqual(await createCompositeCatalog(fake(ol({ genres: [] })).catalog, bnFake.catalog).fetchDetails(lookup), {
     metadata: { ...olMetadata, genres: ["Fantasy"] },
-    sources: ["openlibrary", "isbndb"]
+    sources: ["openlibrary", "isbndb"],
+    summarySource: "openlibrary"
+  });
+});
+
+test("details keep Open Library's pages, year and publisher and fill the empty ones from ISBNdb", async () => {
+  const bnFake = fake(isbndb);
+  assert.deepEqual(await createCompositeCatalog(fake(ol({ pages: null, year: null, publisher: null })).catalog, bnFake.catalog).fetchDetails(lookup), {
+    metadata: { ...olMetadata, pages: 544, year: 2005, publisher: "Penguin" },
+    sources: ["openlibrary", "isbndb"],
+    summarySource: "openlibrary"
+  });
+  assert.deepEqual(await createCompositeCatalog(fake(ol({ pages: null })).catalog, bnFake.catalog).fetchDetails(lookup), {
+    metadata: { ...olMetadata, pages: 544 },
+    sources: ["openlibrary", "isbndb"],
+    summarySource: "openlibrary"
   });
 });
 

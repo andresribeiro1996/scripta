@@ -1,6 +1,7 @@
 export type CoverStatus = "good" | "low_res" | "missing" | "manual";
 export type DetailsStatus = "found" | "missing";
 export type DataSource = "openlibrary" | "isbndb";
+export type SummarySource = DataSource | "publisher";
 export type CoverSourceName = "isbndb" | "apple" | "openlibrary" | "upload" | "publisher";
 
 export type BookCreator = "seed" | "publisher";
@@ -18,6 +19,9 @@ export interface BookRow {
   rating_count: number;
   genres: string;
   data_sources: string;
+  summary_source: SummarySource | null;
+  pages: number | null;
+  translator: string | null;
   source_url: string | null;
   details_status: DetailsStatus | null;
   details_checked_at: string | null;

@@ -35,7 +35,7 @@ test("opening details reuses completed and in-flight preloads", async (t) => {
   let requests = 0;
   globalThis.fetch = async () => {
     requests++;
-    return Response.json({ metadata: { summary: "Ready before tapping.", rating: null, ratingCount: 0, sourceUrl: "https://openlibrary.org/works/OL1W", genres: [] } });
+    return Response.json({ metadata: { summary: "Ready before tapping.", rating: null, ratingCount: 0, sourceUrl: "https://openlibrary.org/works/OL1W", genres: [], pages: null, publisher: null, year: null, translator: null } });
   };
   t.after(() => { globalThis.fetch = originalFetch; client.clear(); });
   const book = { ISBN: "9780553348477", Title: "Ecotopia", Attribution: "Ernest Callenbach" };

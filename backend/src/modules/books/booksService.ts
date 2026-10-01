@@ -135,7 +135,11 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       rating: book.rating,
       ratingCount: book.rating_count,
       sourceUrl: book.source_url ?? "",
-      genres: JSON.parse(book.genres) as BookGenre[]
+      genres: JSON.parse(book.genres) as BookGenre[],
+      pages: book.pages,
+      publisher: book.publisher,
+      year: book.year,
+      translator: book.translator
     };
   }
 
@@ -242,12 +246,12 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       const details = await deps.catalog.fetchDetails({ isbn: book.isbn, title: book.title, author: book.author });
       const at = now().toISOString();
       if (details) {
-        deps.repo.saveDetails(book.id, details.metadata, details.sources, at);
+        deps.repo.saveDetails(book.id, details.metadata, details.sources, details.summarySource, at);
         deps.repo.setWorkKey(book.id, details.workKey);
       } else {
         deps.repo.markDetailsMissing(book.id, at);
       }
-      return details?.metadata ?? null;
+      return details ? detailsOf(deps.repo.getBook(book.id) ?? book) : null;
     },
 
     search(query) {

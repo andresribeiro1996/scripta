@@ -21,7 +21,7 @@ function respond(bodies: unknown[]) {
   return requests;
 }
 
-const doc = { key: "/works/OL123W", title: "Ecotopia", author_name: ["Ernest Callenbach"], ratings_average: 3.8, ratings_count: 42 };
+const doc = { key: "/works/OL123W", title: "Ecotopia", author_name: ["Ernest Callenbach"], ratings_average: 3.8, ratings_count: 42, number_of_pages_median: 311, first_publish_year: 1975, publisher: ["Bantam", "Banyan Tree"] };
 
 test("details come from the matching work", async () => {
   const catalog = createOpenLibraryCatalog(direct);
@@ -32,12 +32,18 @@ test("details come from the matching work", async () => {
       rating: 3.8,
       ratingCount: 42,
       sourceUrl: "https://openlibrary.org/works/OL123W",
-      genres: ["Science Fiction"]
+      genres: ["Science Fiction"],
+      pages: 311,
+      publisher: "Bantam",
+      year: 1975,
+      translator: null
     },
     sources: ["openlibrary"],
+    summarySource: "openlibrary",
     workKey: "/works/OL123W"
   });
   assert.equal(new URL(requests[0]!).searchParams.get("isbn"), "9780553348477");
+  assert.match(new URL(requests[0]!).searchParams.get("fields")!, /number_of_pages_median.*first_publish_year.*publisher/);
 
   respond([{ docs: [doc] }, { description: "**Plain summary.** Source: [Wikipedia](https://en.wikipedia.org/wiki/Ecotopia)" }]);
   assert.equal((await catalog.fetchDetails({ isbn: null, title: "ECOTOPIA", author: "Ernest Callenbach" }))?.metadata.summary, "Plain summary. Source: Wikipedia");
@@ -57,12 +63,14 @@ test("details reject mismatches and untrusted keys", async () => {
 });
 
 test("details tolerate invalid ratings and an empty work", async () => {
-  respond([{ docs: [{ ...doc, ratings_average: 8, ratings_count: -2 }] }, {}]);
+  respond([{ docs: [{ ...doc, ratings_average: 8, ratings_count: -2, number_of_pages_median: 0, first_publish_year: "1975", publisher: [] }] }, {}]);
   const missing = await createOpenLibraryCatalog(direct).fetchDetails({ isbn: "9780553348477", title: "", author: "" });
   assert.equal(missing?.metadata.summary, null);
   assert.equal(missing?.metadata.rating, null);
   assert.equal(missing?.metadata.ratingCount, 0);
   assert.deepEqual(missing?.metadata.genres, []);
+  assert.deepEqual([missing?.metadata.pages, missing?.metadata.publisher, missing?.metadata.year], [null, null, null]);
+  assert.equal(missing?.summarySource, null);
 });
 
 test("a network failure is reported as unavailable", async () => {

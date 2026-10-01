@@ -338,7 +338,7 @@ function recordingCatalog(overrides: Partial<Catalog> = {}) {
   const catalog: Catalog = {
     fetchDetails: async (lookup) => {
       calls.push(`details:${lookup.isbn ?? lookup.title}`);
-      return { metadata: { summary: "Spice.", rating: 4.2, ratingCount: 10, sourceUrl: "https://openlibrary.org/works/OL1W", genres: ["Science Fiction"] }, sources: ["openlibrary"] };
+      return { metadata: { summary: "Spice.", rating: 4.2, ratingCount: 10, sourceUrl: "https://openlibrary.org/works/OL1W", genres: ["Science Fiction"], pages: 544, publisher: "Ace", year: 1965, translator: null }, sources: ["openlibrary"], summarySource: "openlibrary" };
     },
     search: async (query) => {
       calls.push("isbn" in query ? `search-isbn:${query.isbn}` : `search:${query.text}`);
@@ -358,20 +358,40 @@ test("details are fetched once and then served from the database", async () => {
   const { calls, catalog } = recordingCatalog();
   const h = harness({ catalog });
   assert.equal((await h.service.getDetails(dune))?.summary, "Spice.");
-  assert.deepEqual(await h.service.getDetails(dune), { summary: "Spice.", rating: 4.2, ratingCount: 10, sourceUrl: "https://openlibrary.org/works/OL1W", genres: ["Science Fiction"] });
+  assert.deepEqual(await h.service.getDetails(dune), { summary: "Spice.", rating: 4.2, ratingCount: 10, sourceUrl: "https://openlibrary.org/works/OL1W", genres: ["Science Fiction"], pages: 544, publisher: "Ace", year: 1965, translator: null });
   assert.deepEqual(calls, ["details:9780441013593"]);
   assert.equal(h.repo.findBookByKey("isbn:9780441013593")!.data_sources, '["openlibrary"]');
 });
 
 test("details fetched from ISBNdb are tagged with it", async () => {
   const { catalog } = recordingCatalog({
-    fetchDetails: async () => ({ metadata: { summary: "Spice.", rating: null, ratingCount: 0, sourceUrl: "https://isbndb.com/book/9780441013593", genres: [] }, sources: ["isbndb"] })
+    fetchDetails: async () => ({ metadata: { summary: "Spice.", rating: null, ratingCount: 0, sourceUrl: "https://isbndb.com/book/9780441013593", genres: [], pages: null, publisher: null, year: null, translator: null }, sources: ["isbndb"], summarySource: "isbndb" })
   });
   const h = harness({ catalog });
   await h.service.getDetails(dune);
   const row = h.repo.findBookByKey("isbn:9780441013593")!;
   assert.equal(row.data_sources, '["isbndb"]');
   assert.equal(row.source_url, "https://isbndb.com/book/9780441013593");
+});
+
+test("a first lookup returns the merged row and keeps a publisher synopsis", async () => {
+  const h = harness({ catalog: recordingCatalog().catalog });
+  h.service.resolveCover(dune);
+  const id = h.bookId("isbn:9780441013593");
+  h.repo.mergeDetails(id, { summary: "Sinopse da editora.", pages: 500, year: null, publisher: "Antígona", translator: "Maria" }, "publisher");
+  assert.deepEqual(await h.service.getDetails(dune), {
+    summary: "Sinopse da editora.",
+    rating: 4.2,
+    ratingCount: 10,
+    sourceUrl: "https://openlibrary.org/works/OL1W",
+    genres: ["Science Fiction"],
+    pages: 500,
+    publisher: "Antígona",
+    year: 1965,
+    translator: "Maria"
+  });
+  assert.equal(h.repo.getBook(id)!.summary_source, "publisher");
+  assert.equal(h.repo.getBook(id)!.data_sources, '["openlibrary"]');
 });
 
 test("a details miss is remembered for 30 days", async () => {
@@ -927,7 +947,7 @@ test("enqueueUnchecked queues books that still want an upgrade on the upgrade la
 });
 
 test("details store the catalog's work key, fill-only", async () => {
-  const details = (workKey: string) => async () => ({ metadata: { summary: "Spice.", rating: null, ratingCount: 0, sourceUrl: "https://openlibrary.org/works/OL1W", genres: [] }, sources: ["openlibrary" as const], workKey });
+  const details = (workKey: string) => async () => ({ metadata: { summary: "Spice.", rating: null, ratingCount: 0, sourceUrl: "https://openlibrary.org/works/OL1W", genres: [], pages: null, publisher: null, year: null, translator: null }, sources: ["openlibrary" as const], summarySource: "openlibrary" as const, workKey });
   const h = harness({ catalog: recordingCatalog({ fetchDetails: details("/works/OL1W") }).catalog });
   await h.service.getDetails(dune);
   assert.equal(h.repo.findBookByKey("isbn:9780441013593")!.ol_work_key, "OL1W");

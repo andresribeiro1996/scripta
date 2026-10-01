@@ -1,6 +1,11 @@
+import type { BookMetadata } from "@scripta/shared";
 import { SourceUnavailableError } from "../../domain/errors.js";
 import { lookupIdentity, SEARCH_LIMIT } from "../../domain/normalize.js";
 import type { BookCatalog, CatalogSearchHit } from "../../domain/ports.js";
+
+function isComplete(metadata: BookMetadata): boolean {
+  return Boolean(metadata.summary && metadata.publisher) && metadata.genres.length > 0 && metadata.pages !== null && metadata.year !== null;
+}
 
 type Attempt<T> = { ok: true; value: T } | { ok: false; error: SourceUnavailableError };
 
@@ -38,7 +43,7 @@ export function createCompositeCatalog(primary: BookCatalog, secondary: BookCata
     async fetchDetails(lookup) {
       const first = await attempt(primary.fetchDetails(lookup));
       const found = first.ok ? first.value : null;
-      if ((found?.metadata.summary && found.metadata.genres.length > 0) || !lookup.isbn) {
+      if ((found && isComplete(found.metadata)) || !lookup.isbn) {
         if (!first.ok) throw first.error;
         return found;
       }
@@ -52,17 +57,23 @@ export function createCompositeCatalog(primary: BookCatalog, secondary: BookCata
         return second.value;
       }
       if (!second.value) return found;
-      const fillSummary = !found.metadata.summary && Boolean(second.value.metadata.summary);
-      const fillGenres = found.metadata.genres.length === 0 && second.value.metadata.genres.length > 0;
-      if (!fillSummary && !fillGenres) return found;
+      const have = found.metadata;
+      const extra = second.value.metadata;
+      const metadata: BookMetadata = {
+        ...have,
+        summary: have.summary ?? extra.summary,
+        genres: have.genres.length > 0 ? have.genres : extra.genres,
+        pages: have.pages ?? extra.pages,
+        publisher: have.publisher ?? extra.publisher,
+        year: have.year ?? extra.year,
+        translator: have.translator ?? extra.translator
+      };
+      if (JSON.stringify(metadata) === JSON.stringify(have)) return found;
       return {
         ...found,
-        metadata: {
-          ...found.metadata,
-          summary: fillSummary ? second.value.metadata.summary : found.metadata.summary,
-          genres: fillGenres ? second.value.metadata.genres : found.metadata.genres
-        },
-        sources: [...found.sources, ...second.value.sources]
+        metadata,
+        sources: [...found.sources, ...second.value.sources],
+        summarySource: have.summary ? found.summarySource : extra.summary ? second.value.summarySource : null
       };
     },
 

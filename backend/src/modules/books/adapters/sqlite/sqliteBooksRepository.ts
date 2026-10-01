@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { normalizeWorkKey } from "../../domain/normalize.js";
-import type { BooksRepository } from "../../domain/ports.js";
-import type { BookRow, CoverImageRow } from "../../domain/types.js";
+import type { BooksRepository, MergeableDetails } from "../../domain/ports.js";
+import type { BookRow, CoverImageRow, SummarySource } from "../../domain/types.js";
 
 export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const byKeyStmt = db.prepare(`SELECT books.* FROM book_keys JOIN books ON books.id = book_keys.book_id WHERE book_keys.key = ?`);
@@ -25,9 +25,20 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const setCoverStmt = db.prepare(`UPDATE books SET cover_image_id = ?, cover_status = ?, cover_checked_at = ? WHERE id = ?`);
   const addRejectionStmt = db.prepare(`INSERT OR IGNORE INTO cover_rejections (book_id, source_url, created_at) VALUES (?, ?, ?)`);
   const rejectionsStmt = db.prepare(`SELECT source_url FROM cover_rejections WHERE book_id = ?`);
+  const takesSummary = `$summary IS NOT NULL AND (summary IS NULL OR summary = '' OR ($summary_source = 'publisher' AND summary_source IS NOT 'publisher'))`;
+  const mergeDetailsStmt = db.prepare(`
+    UPDATE books
+    SET summary_source = CASE WHEN ${takesSummary} THEN $summary_source ELSE summary_source END,
+        summary = CASE WHEN ${takesSummary} THEN $summary ELSE summary END,
+        pages = COALESCE(pages, $pages),
+        year = COALESCE(year, $year),
+        publisher = COALESCE(publisher, $publisher),
+        translator = COALESCE(translator, $translator)
+    WHERE id = $id
+  `);
   const saveDetailsStmt = db.prepare(`
     UPDATE books
-    SET summary = ?, rating = ?, rating_count = ?, genres = ?, data_sources = ?, source_url = ?, details_status = 'found', details_checked_at = ?
+    SET rating = ?, rating_count = ?, genres = CASE WHEN genres = '[]' THEN ? ELSE genres END, data_sources = ?, source_url = ?, details_status = 'found', details_checked_at = ?
     WHERE id = ?
   `);
   const detailsMissingStmt = db.prepare(`UPDATE books SET details_status = 'missing', details_checked_at = ? WHERE id = ?`);
@@ -43,6 +54,18 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const setWorkKeyStmt = db.prepare(`UPDATE books SET ol_work_key = ? WHERE id = ? AND ol_work_key IS NULL`);
   const setPublisherUrlStmt = db.prepare(`UPDATE books SET publisher_url = ? WHERE id = ? AND publisher_url IS NULL`);
   const upgradeWantedStmt = db.prepare(`SELECT id FROM books WHERE cover_upgrade_wanted_at IS NOT NULL ORDER BY cover_upgrade_wanted_at, rowid`);
+
+  function mergeDetails(bookId: string, details: MergeableDetails, summarySource: SummarySource | null) {
+    mergeDetailsStmt.run({
+      $id: bookId,
+      $summary: details.summary,
+      $summary_source: summarySource,
+      $pages: details.pages,
+      $year: details.year,
+      $publisher: details.publisher,
+      $translator: details.translator
+    });
+  }
 
   return {
     findBookByKey: (key) => byKeyStmt.get(key) as BookRow | undefined,
@@ -118,9 +141,19 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       return new Set((rejectionsStmt.all(bookId) as Array<{ source_url: string }>).map((row) => row.source_url));
     },
 
-    saveDetails(bookId, details, sources, checkedAt) {
-      saveDetailsStmt.run(details.summary, details.rating, details.ratingCount, JSON.stringify(details.genres), JSON.stringify(sources), details.sourceUrl, checkedAt, bookId);
+    saveDetails(bookId, details, sources, summarySource, checkedAt) {
+      db.exec("BEGIN");
+      try {
+        mergeDetails(bookId, details, summarySource);
+        saveDetailsStmt.run(details.rating, details.ratingCount, JSON.stringify(details.genres), JSON.stringify(sources), details.sourceUrl, checkedAt, bookId);
+        db.exec("COMMIT");
+      } catch (error) {
+        db.exec("ROLLBACK");
+        throw error;
+      }
     },
+
+    mergeDetails,
 
     markDetailsMissing(bookId, checkedAt) {
       detailsMissingStmt.run(checkedAt, bookId);

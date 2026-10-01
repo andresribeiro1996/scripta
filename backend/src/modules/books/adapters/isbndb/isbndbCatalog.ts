@@ -19,6 +19,11 @@ function plainText(value: unknown): string | null {
   return text || null;
 }
 
+function yearOf(value: unknown): number | null {
+  const year = typeof value === "string" ? /^\d{4}/.exec(value)?.[0] : undefined;
+  return year ? Number(year) : null;
+}
+
 function isbnOf(record: Record<string, unknown>): string | null {
   return normalizeIsbn(record.isbn13) || normalizeIsbn(record.isbn) || null;
 }
@@ -26,11 +31,10 @@ function isbnOf(record: Record<string, unknown>): string | null {
 function toResult(record: Record<string, unknown>): BookSearchResult | null {
   const title = plainText(record.title);
   if (!title) return null;
-  const year = typeof record.date_published === "string" ? /^\d{4}/.exec(record.date_published)?.[0] : undefined;
   return {
     title,
     authors: Array.isArray(record.authors) ? record.authors.filter((name): name is string => typeof name === "string" && name.trim() !== "") : [],
-    year: year ? Number(year) : null,
+    year: yearOf(record.date_published),
     isbn: isbnOf(record),
     publisher: plainText(record.publisher),
     coverUrl: null,
@@ -47,8 +51,15 @@ export function createIsbndbCatalog(apiKey: string, throttle: Throttle, gate: Is
       if (!record) return null;
       const summary = plainText(record.synopsis) ?? plainText(record.overview);
       const genres = normalizeBookGenres(record.subjects);
-      if (!summary && genres.length === 0) return null;
-      return { metadata: { summary, rating: null, ratingCount: 0, sourceUrl: `https://isbndb.com/book/${isbnOf(record) ?? isbn}`, genres }, sources: ["isbndb"] };
+      const pages = typeof record.pages === "number" && Number.isInteger(record.pages) && record.pages > 0 ? record.pages : null;
+      const year = yearOf(record.date_published);
+      const publisher = plainText(record.publisher);
+      if (!summary && genres.length === 0 && pages === null && year === null && !publisher) return null;
+      return {
+        metadata: { summary, rating: null, ratingCount: 0, sourceUrl: `https://isbndb.com/book/${isbnOf(record) ?? isbn}`, genres, pages, publisher, year, translator: null },
+        sources: ["isbndb"],
+        summarySource: summary ? "isbndb" : null
+      };
     },
 
     async search(query) {

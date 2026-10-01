@@ -7,7 +7,7 @@ export function createOpenLibraryCatalog(throttle: Throttle): BookCatalog {
   return {
     async fetchDetails({ isbn, title, author }) {
       if (!isbn && (!title || !author)) return null;
-      const query = new URLSearchParams({ fields: "key,title,author_name,ratings_average,ratings_count,subject", limit: "5" });
+      const query = new URLSearchParams({ fields: "key,title,author_name,ratings_average,ratings_count,subject,number_of_pages_median,first_publish_year,publisher", limit: "5" });
       if (isbn) query.set("isbn", isbn);
       else {
         query.set("title", title);
@@ -15,7 +15,8 @@ export function createOpenLibraryCatalog(throttle: Throttle): BookCatalog {
       }
       const match = findOpenLibraryMatch(await get(`https://openlibrary.org/search.json?${query}`), isbn ?? "", title, author);
       if (!match) return null;
-      return { metadata: buildBookMetadata(match, await get(`https://openlibrary.org${String(match.key)}.json`)), sources: ["openlibrary"], workKey: String(match.key) };
+      const metadata = buildBookMetadata(match, await get(`https://openlibrary.org${String(match.key)}.json`));
+      return { metadata, sources: ["openlibrary"], summarySource: metadata.summary ? "openlibrary" : null, workKey: String(match.key) };
     },
 
     async search(query) {
