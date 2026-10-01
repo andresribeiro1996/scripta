@@ -73,8 +73,8 @@ function harness(overrides: Partial<Deps> = {}) {
 
 test("a new book answers pending and repeat requests reuse the same row", () => {
   const { service, enqueued, db } = harness();
-  assert.deepEqual(service.resolveCover(orlando), { url: null, fullUrl: null, pending: true });
-  assert.deepEqual(service.resolveCover(orlando), { url: null, fullUrl: null, pending: true });
+  assert.deepEqual(service.resolveCover(orlando), { url: null, fullUrl: null, pending: true, upgrading: false });
+  assert.deepEqual(service.resolveCover(orlando), { url: null, fullUrl: null, pending: true, upgrading: false });
   assert.equal((db.prepare(`SELECT COUNT(*) AS n FROM books`).get() as { n: number }).n, 1);
   assert.equal(enqueued.length, 2);
   assert.equal(enqueued[0]!.bookId, enqueued[1]!.bookId);
@@ -102,7 +102,7 @@ test("a complete miss is remembered for 30 days", async () => {
   await h.service.processBook(h.bookId("isbn:9780141184272"), "background");
   assert.equal(h.repo.findBookByKey("isbn:9780141184272")!.cover_status, "missing");
   h.enqueued.length = 0;
-  assert.deepEqual(h.service.resolveCover(orlando), { url: null, fullUrl: null, pending: false });
+  assert.deepEqual(h.service.resolveCover(orlando), { url: null, fullUrl: null, pending: false, upgrading: false });
   assert.equal(h.enqueued.length, 0);
   h.advance(30 * DAY);
   assert.equal(h.service.resolveCover(orlando).pending, true);
@@ -150,7 +150,7 @@ test("an unavailable source records no miss and backs off for 10 minutes", async
   assert.equal(h.warnings[0]!.details.source, "apple");
   assert.equal(h.warnings[0]!.message, "cover source unavailable");
   h.enqueued.length = 0;
-  assert.deepEqual(h.service.resolveCover(orlando), { url: null, fullUrl: null, pending: true });
+  assert.deepEqual(h.service.resolveCover(orlando), { url: null, fullUrl: null, pending: true, upgrading: false });
   assert.equal(h.enqueued.length, 0);
   h.advance(10 * 60 * 1000);
   assert.equal(h.service.resolveCover(orlando).pending, true);
@@ -214,7 +214,7 @@ test("an unexpected error during processing sets a 10-minute backoff and rethrow
   const id = h.bookId("isbn:9780141184272");
   await assert.rejects(h.service.processBook(id, "background"), /disk full/);
   h.enqueued.length = 0;
-  assert.deepEqual(h.service.resolveCover(orlando), { url: null, fullUrl: null, pending: true });
+  assert.deepEqual(h.service.resolveCover(orlando), { url: null, fullUrl: null, pending: true, upgrading: false });
   assert.equal(h.enqueued.length, 0);
   h.advance(10 * 60 * 1000);
   assert.equal(h.service.resolveCover(orlando).pending, true);
@@ -272,7 +272,7 @@ test("an EPUB urn:uuid ISBN falls back to the title key", () => {
 
 test("a title that normalizes to nothing creates no book", () => {
   const h = harness();
-  assert.deepEqual(h.service.resolveCover({ title: "?!" }), { url: null, fullUrl: null, pending: false });
+  assert.deepEqual(h.service.resolveCover({ title: "?!" }), { url: null, fullUrl: null, pending: false, upgrading: false });
   assert.equal((h.db.prepare(`SELECT COUNT(*) AS n FROM books`).get() as { n: number }).n, 0);
   assert.equal(h.enqueued.length, 0);
 });
@@ -501,7 +501,7 @@ test("rejecting a cover blocks its URL, clears the pointer and queues the book f
   await h.service.processBook(id, "background");
   h.enqueued.length = 0;
 
-  assert.deepEqual(h.service.rejectCover(orlando), { url: null, fullUrl: null, pending: true });
+  assert.deepEqual(h.service.rejectCover(orlando), { url: null, fullUrl: null, pending: true, upgrading: false });
   assert.deepEqual(h.enqueued, [{ bookId: id, priority: "front" }]);
   assert.equal(h.repo.getBook(id)!.cover_image_id, null);
   assert.deepEqual([...h.repo.listRejectedUrls(id)], ["https://a/1"]);
@@ -536,6 +536,18 @@ test("an uploaded cover becomes manual and the worker leaves it alone", async ()
   assert.equal(h.repo.getImage(book.cover_image_id!)!.source, "upload");
   await h.service.processBook(id, "background");
   assert.deepEqual(calls, []);
+});
+
+test("an upload clears a pending upgrade so the tick stops requeueing the book", async () => {
+  const h = harness();
+  h.service.resolveCover(orlando);
+  const id = h.bookId("isbn:9780141184272");
+  h.repo.setUpgradeWanted(id, "2026-01-01T00:00:00.000Z");
+  const photo = await sharp({ create: { width: 600, height: 900, channels: 3, background: "#224466" } }).jpeg().toBuffer();
+  const cover = await h.service.uploadCover(orlando, photo);
+  assert.equal(h.repo.getBook(id)!.cover_upgrade_wanted_at, null);
+  assert.equal(cover.upgrading, false);
+  assert.deepEqual(h.repo.listUpgradeWantedIds(), []);
 });
 
 test("uploads that are too large or not images are refused", async () => {
@@ -687,6 +699,16 @@ test("a good Open Library cover on a Portuguese ISBN queues no upgrade", async (
   const { h, id } = prepare(PORTUGUESE, { isbndb: null, apple: emptySource, openlibrary: recording("openlibrary", [], "https://o/1") }, [["https://o/1", 900]]);
   await h.service.processBook(id, "normal");
   assert.deepEqual(h.enqueued, []);
+});
+
+test("a cover with an upgrade pending is served as upgrading, and a settled one is not", async () => {
+  const { h, id } = prepare(orlando, { isbndb: recording("isbndb", [], "https://i/1"), apple: emptySource, openlibrary: emptySource }, [["https://i/1", 300]]);
+  await h.service.processBook(id, "normal");
+  assert.equal(h.service.resolveCover(orlando).upgrading, true);
+  await h.service.processBook(id, "upgrade");
+  const settled = h.service.resolveCover(orlando);
+  assert.equal(settled.url === null, false);
+  assert.equal(settled.upgrading, false);
 });
 
 test("a fast lookup that ends missing queues an upgrade", async () => {

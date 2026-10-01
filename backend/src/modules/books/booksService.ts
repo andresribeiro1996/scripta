@@ -13,8 +13,8 @@ const RETRY_AFTER_MS = 30 * 24 * 60 * 60 * 1000;
 const UNAVAILABLE_BACKOFF_MS = 10 * 60 * 1000;
 const COVER_EXTENSION = "webp";
 const NO_SOURCE: CoverSource = { byIsbn: async () => [], byTitle: async () => [] };
-const NO_COVER: ResolvedCover = { url: null, fullUrl: null, pending: false };
-const PENDING: ResolvedCover = { url: null, fullUrl: null, pending: true };
+const NO_COVER: ResolvedCover = { url: null, fullUrl: null, pending: false, upgrading: false };
+const PENDING: ResolvedCover = { url: null, fullUrl: null, pending: true, upgrading: false };
 
 export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 
@@ -24,6 +24,7 @@ export interface ResolvedCover {
   url: string | null;
   fullUrl: string | null;
   pending: boolean;
+  upgrading: boolean;
 }
 
 export interface BooksServiceDeps {
@@ -92,7 +93,8 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
     return {
       url: deps.publicUrlFor(book.cover_image_id, "thumb"),
       fullUrl: deps.publicUrlFor(book.cover_image_id, "file"),
-      pending: false
+      pending: false,
+      upgrading: book.cover_upgrade_wanted_at !== null
     };
   }
 
@@ -267,7 +269,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       deps.repo.setCover(book.id, { imageId: null, status: null, checkedAt: null });
       backoffUntil.delete(book.id);
       deps.enqueue(book.id, "front");
-      return { url: null, fullUrl: null, pending: true };
+      return { url: null, fullUrl: null, pending: true, upgrading: false };
     },
 
     async uploadCover(lookup, bytes) {
@@ -280,6 +282,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       const at = now().toISOString();
       const imageId = await storeImage(book.id, "upload", null, image, at);
       deps.repo.setCover(book.id, { imageId, status: "manual", checkedAt: at });
+      deps.repo.setUpgradeWanted(book.id, null);
       backoffUntil.delete(book.id);
       return coverOf(deps.repo.getBook(book.id) ?? book);
     }
