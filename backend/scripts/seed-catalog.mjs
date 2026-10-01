@@ -22,7 +22,9 @@ function printStatus() {
   const counts = Object.fromEntries(rows.map((row) => [row.status ?? "null", row.n]));
   const total = rows.reduce((sum, row) => sum + row.n, 0);
   const withImage = db.prepare("SELECT COUNT(*) AS n FROM books WHERE cover_image_id IS NOT NULL").get().n;
-  log(JSON.stringify({ total, null: 0, good: 0, low_res: 0, missing: 0, manual: 0, ...counts, withImage }));
+  const portugalRows = db.prepare("SELECT cover_status AS status, COUNT(*) AS n FROM books WHERE isbn LIKE '978972%' OR isbn LIKE '978989%' GROUP BY cover_status").all();
+  const portugal = { total: portugalRows.reduce((sum, row) => sum + row.n, 0), good: 0, low_res: 0, missing: 0, manual: 0, null: 0, ...Object.fromEntries(portugalRows.map((row) => [row.status ?? "null", row.n])) };
+  log(JSON.stringify({ total, null: 0, good: 0, low_res: 0, missing: 0, manual: 0, ...counts, withImage, portugal }));
   db.close();
 }
 
