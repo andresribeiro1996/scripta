@@ -28,10 +28,12 @@
 - **No users yet.** The seed may use the whole ISBNdb quota. There's no per-lane reserve.
 - **ISBNdb quota.** 5,000 requests a day, resetting at 00:00 UTC. Over the quota, ISBNdb answers 429 "Daily quota exceeded". Its docs pages refuse automated reads, so this is from search results. The gate therefore also reads the reset from the response headers when present: `retry-after` in seconds, or `reset=<seconds>` inside a `ratelimit` header.
 - **Pause rules.**
-  - 429: pause until `now + reset` from the headers, or until the next 00:00 UTC without them.
+  - 429 counts as the daily quota only when the headers gave a reset (`retryAt` set), the `ratelimit` header shows `remaining=0`, or the body matches `/daily quota/i`. Then pause until `retryAt`, or until the next 00:00 UTC without it. Any other 429 is ISBNdb's per-second limit: no pause, and today's 10-minute per-book backoff applies. `fetchJson` puts the first 200 characters of a 429 body into the error detail so the gate can read it.
   - 401/403: pause until the next 00:00 UTC.
   - While paused, no ISBNdb request reaches the network. That includes calls already waiting in the throttle when the pause starts.
   - Each pause start logs one warning. A 401/403 pause start also sends one email to `ALERT_EMAIL` when it and Resend are configured.
+  - The call that starts a pause throws `SourcePausedError` (with `retryAt: until`), like every call after it.
+  - The pause lives in memory, so a restart while the key is still rejected sends one more email: one per pause per process.
 - **Per-book backoff** after an incomplete lookup is `max(now + 10 min, the latest retryAt among its failures)`. A paused-gate failure isn't logged per book.
 - **Google Books is out.** The 2026-09-27 bake-off measured it at 11 good covers out of 139: thumbnails only.
 - **No separate Portuguese trial.** `seed-catalog.mjs --status` gains a Portugal-ISBN breakdown, which measures the same thing after the seed.
@@ -46,7 +48,12 @@
   - Shopify: `GET {origin}/products.json?limit=250&page=N`. Read `title`, `vendor` (the author at Antígona), `body_html`, `variants[].sku/barcode`, `images[0].src/width/height`, and the product URL `{origin}/products/{handle}`.
   - WooCommerce: `GET {origin}/wp-json/wc/store/v1/products?per_page=100&page=N`. Read `name`, `sku`, `description`, `short_description`, `attributes`, `images[0].src`, `permalink`. Relógio has an empty `sku`, and the ISBN is in the image file name.
   - Stop at an empty page, or at a 400 past the last page.
-- **ISBN of a product:** scan the product's whole JSON text for ISBN-13 candidates. A candidate is `97[89]` plus 10 more digits, optionally separated by `-`, space or `.`. It must pass the checksum and start with `978972` or `978989`. Take the first match. A product with none is skipped: not a book, or not a Portugal edition.
+- **ISBN of a product:** a candidate is `97[89]` plus 10 more digits, optionally separated by `-`, space or `.`. It must pass the checksum and start with `978972` or `978989`. Look in this order and take the first hit:
+  1. Shopify `variants[].barcode`, then `variants[].sku`; WooCommerce `sku`;
+  2. the `images[0].src` file name;
+  3. the rest of the product's JSON text.
+
+  So a description that cites another book's ISBN can't beat the product's own. A product with none is skipped: not a book, or not a Portugal edition.
 - **Author of a new book:**
   - Shopify `vendor`, when the site's `authorFromVendor` is true and the vendor isn't the publisher's own name.
   - Otherwise Open Library: `search.json?q=isbn:{isbn}&fields=title,author_name`, 1 request a second. Its title is then preferred over the shop's, because some shops write titles in capitals.
@@ -56,7 +63,13 @@
   - Use it when it's at least `MIN_GOOD_WIDTH` (400), or when the book has no cover.
   - Never replace a cover whose image source is `upload` (an admin upload).
   - Skip when the current image's `source_url` is already this image URL, so re-runs are no-ops.
+  - Skip when the URL is in `repo.listRejectedUrls(bookId)`: an admin rejected it.
   - Store the cover with source `publisher` and status `manual`, then clear `cover_upgrade_wanted_at`.
+- **Site failures:**
+  - The script's `fetchText` and `fetchBytes` map `TypeError`, `TimeoutError`, 429 and 5xx to `SourceUnavailableError`, as `http.ts` does.
+  - A robots or feed request that throws that, answers non-200 (other than the 400 past the last page), or isn't JSON skips the whole site with a reason.
+  - An image fetch that throws it counts as `failed` for that book.
+  - One site never stops the others.
 - **Politeness:**
   - User agent `Atmyshelf/1.0 (+https://atmyshelf.com)`.
   - Read `{origin}/robots.txt` and skip the site when the `User-agent: *` group disallows the feed path.
@@ -76,11 +89,11 @@
 
 ## Review Focus
 
-1. **Quota hit mid-seed.** After the 429, no ISBNdb request goes out until the reset, including calls queued in the throttle. The affected books are retried after the reset, not every 10 minutes, and the log gets one warning, not one per book. Pinned in Task 1.
-2. **Key rejected.** One email per pause, at most one a day. A failing email send is logged and crashes nothing. With no `ALERT_EMAIL`, it only logs. Pinned in Task 1.
-3. **A publisher product with a Brazilian ISBN, or two ISBNs** (e.g. an original edition's ISBN mentioned in the description): only a Portugal ISBN is used, and Brazil-only products are skipped. Pinned in Task 3.
-4. **Running the importer twice** stores no second image for any book, and an admin-uploaded cover is never replaced. Pinned in Task 3.
-5. **A site whose robots.txt disallows the feed path,** or whose feed returns non-JSON, is skipped with a reason. The other sites still run. Pinned in Task 3.
+1. **Quota hit mid-seed.** After the quota 429, no ISBNdb request goes out until the reset, including calls queued in the throttle. The affected books, the one that hit the 429 included, are retried after the reset, not every 10 minutes, and the log gets one warning, not one per book. A per-second 429 pauses nothing. Pinned in Task 1.
+2. **Key rejected.** One email per pause per process. A failing email send is logged and crashes nothing. With no `ALERT_EMAIL`, it only logs. Pinned in Task 1.
+3. **A publisher product with a Brazilian ISBN, or a description citing another Portugal ISBN:** only the product's own Portugal ISBN is used, and Brazil-only products are skipped. Pinned in Task 3.
+4. **Running the importer twice** stores no second image for any book, an admin-uploaded cover is never replaced, and a cover an admin rejected is never restored. Pinned in Task 3.
+5. **A site whose robots.txt disallows the feed path,** or whose feed times out or returns non-JSON, is skipped with a reason. The other sites still run. Pinned in Task 3.
 
 ---
 
@@ -90,7 +103,7 @@
 - Modify: `backend/src/modules/books/domain/errors.ts`:
   - `SourceUnavailableError` gains optional `status?: number` and `retryAt?: number` (epoch ms) through a third constructor argument `options: { status?: number; retryAt?: number } = {}`.
   - Add `export class SourcePausedError extends SourceUnavailableError`, with a required `retryAt`.
-- Modify: `backend/src/modules/books/adapters/http/http.ts`. `fetchJson`'s non-ok branch passes `status`. For 429 it passes `retryAt` from `retry-after`, or from `reset=` in `ratelimit`, as `now + seconds*1000`.
+- Modify: `backend/src/modules/books/adapters/http/http.ts`. `fetchJson`'s non-ok branch passes `status`. For 429 it passes `retryAt` from `retry-after`, or from `reset=` in `ratelimit`, as `now + seconds*1000`; `quota: true` when `ratelimit` shows `remaining=0`; and the first 200 characters of the body in the detail. Add `quota?: boolean` to the error options.
 - Create: `backend/src/modules/books/adapters/isbndb/isbndbGate.ts`.
 - Modify: `backend/src/modules/books/adapters/sources/isbndb.ts`. `createIsbndbGet(apiKey, throttle, gate, urgent = false)` and `createIsbndbSource(apiKey, throttle, gate)`.
 - Modify: `backend/src/modules/books/adapters/isbndb/isbndbCatalog.ts`: `createIsbndbCatalog(apiKey, throttle, gate)`.
@@ -99,7 +112,7 @@
   - `onPause` logs `app.log.warn({ reason, until }, "ISBNdb paused")`. For reason `"key"` it also calls `options.alert?.(...)` and catches and logs a failed send.
   - The plugin takes options `{ alert?: (subject: string, text: string) => Promise<void> }`.
 - Modify: `backend/src/app.ts`: `app.register(registerBooksModule, { alert: emailEnabled && env.ALERT_EMAIL ? (subject, text) => sendAccountEmail(env.ALERT_EMAIL, subject, text) : undefined })`.
-- Modify: `backend/src/config/env.ts`: `ALERT_EMAIL: z.string().optional().default("")`, following `ISBNDB_API_KEY`'s pattern.
+- Modify: `backend/src/config/env.ts`: `ALERT_EMAIL: z.string().optional().default("")`, following `ISBNDB_API_KEY`'s pattern. Add `ALERT_EMAIL=` to `backend/.env.example` beside `ISBNDB_API_KEY`.
 - Modify: `backend/src/modules/books/booksService.ts` (`processBook`): the backoff rule, and no warning for `SourcePausedError`.
 - Modify: `backend/scripts/cover-source-trial.ts`: pass a gate whose `onPause` does nothing.
 - Test: `isbndbGate.test.ts` (new), `http.test.ts`, `booksService.test.ts`, `isbndb` source and catalog tests where their signatures changed.
@@ -108,13 +121,15 @@
 - `createIsbndbGate(options: { now?: () => number; onPause: (pause: { reason: "quota" | "key"; until: number }) => void }): IsbndbGate`
 - `interface IsbndbGate { run<T>(call: () => Promise<T>): Promise<T> }`
   - `run` throws `new SourcePausedError("isbndb", "paused until <ISO>", { retryAt: until })` while paused, without calling `call`.
-  - Otherwise it awaits `call`. On a `SourceUnavailableError` with `status` 429, 401 or 403 it starts a pause (as in Decisions) unless one is already running, calls `onPause` once, and rethrows.
+  - Otherwise it awaits `call`. On a quota 429 (as in Decisions) or a 401/403 it starts a pause unless one is already running, calls `onPause` once, and throws `SourcePausedError` with `retryAt: until` in place of the original. Any other error, a per-second 429 included, is rethrown unchanged.
   - `createIsbndbGet` wraps both sides of the throttle: `gate.run(() => throttle(() => gate.run(fetch), { urgent }))`. So a call queued before the pause doesn't hit the network.
   - The inner rethrow mustn't start a second pause or call `onPause` twice.
 
 - [ ] **Step 1: Write failing tests:**
   - **Gate:**
-    - A 429 with no headers pauses until the next 00:00 UTC.
+    - A 429 whose detail contains "Daily quota exceeded" and no headers pauses until the next 00:00 UTC.
+    - A bare 429 (no headers, other body) doesn't pause and is rethrown as-is.
+    - The call that starts a pause throws `SourcePausedError`.
     - A 429 whose `retryAt` is set pauses until it.
     - 401 and 403 pause with reason `"key"`.
     - `onPause` is called once for a burst of failures.
@@ -126,7 +141,7 @@
   - **`processBook`:** a lookup whose ISBNdb failure is `SourcePausedError` with `retryAt` 5 h ahead sets the book's backoff to that time, so `schedule` ignores it before then. It warns for none of those failures. A plain 503 failure keeps the 10-minute backoff and still warns.
 - [ ] **Step 2:** Run them and watch them fail.
 - [ ] **Step 3:** Implement.
-- [ ] **Step 4:** `cd backend && npm run typecheck && DOTENV_CONFIG_PATH=/nonexistent/.env npm test`.
+- [ ] **Step 4:** `cd backend && npm run typecheck && DOTENV_CONFIG_PATH=/nonexistent/.env npm test`, plus `npx tsc --noEmit --module nodenext --moduleResolution nodenext --strict --skipLibCheck scripts/cover-source-trial.ts`, since the backend tsconfig doesn't include `scripts/`.
 - [ ] **Step 5: Commit.** Message: `Pause ISBNdb for the day when its quota runs out or it rejects the key`. The body explains: 5,000 requests a day against roughly 10,000 the seed needs, and why a per-book 10-minute retry turned a used-up quota into a loop.
 
 ---
@@ -138,7 +153,7 @@
   - Export `PORTUGAL_ISBN_PREFIXES = ["978972", "978989"] as const`.
   - `rankedWorksUrl(lang, offset, limit, isbnPrefix?: string)` uses `q=isbn:${isbnPrefix}*` when it's given, and `language:${lang}` otherwise. `lang` and `sort` stay as they are.
   - `parseRankedWorks(json, lang, isbnPrefix?)`: with a prefix, skip the language check and keep only an edition ISBN starting with the prefix, preferring 13 digits.
-- Modify: `backend/src/modules/books/seed/fetchRankedWorks.ts`. `collectRanked("por", wanted, log)` collects each prefix in turn, as it does today for one query, then returns the union sorted by `readers` descending and deduped by ISBN. `"eng"` is unchanged.
+- Modify: `backend/src/modules/books/seed/fetchRankedWorks.ts`. `collectRanked("por", wanted, log)` collects each prefix in turn with its own ISBN set, each up to `wanted * 1.1` or until it runs out, then returns the union sorted by `readers` descending and deduped by ISBN. `"eng"` is unchanged.
 - Modify: `backend/scripts/seed-catalog.mjs`. `--status` adds `portugal: { total, good, low_res, missing, manual, null }` for books whose `isbn` starts with `978972` or `978989`.
 - Test: `rankedWorks.test.ts`, `fetchRankedWorks.test.ts` (fake fetch). Check that the scripts tests cover `seed-catalog.mjs --status`, and extend them if they do.
 
@@ -170,11 +185,13 @@
     - `fetchBytes(url): Promise<Buffer | null>`
     - `lookupOpenLibrary(isbn): Promise<{ title: string; author: string } | null>`
     - `repo`, `blobs`, `now`, `sleep`, `log`
-  - `SiteReport = { skipped?: string; products: number; books: number; coversSet: number; created: number; noAuthor: number; unchanged: number; rejectedImage: number; failed: number }`
+  - `SiteReport = { skipped?: string; imageUrlPrefix?: string; products: number; books: number; coversSet: number; created: number; noAuthor: number; unchanged: number; rejectedImage: number; failed: number }`
   - `failed` counts books whose image fetch threw `SourceUnavailableError`. Other errors propagate.
+  - `imageUrlPrefix` is the longest common prefix of the site's image URLs, ending at a `/`.
 - Modify: `backend/src/modules/books/booksService.ts`. Move `storeImage` to an exported module-level `storeCoverImage(deps: { repo, blobs }, bookId, source, sourceUrl, image, at)`, and use it from both places.
-- Modify: `backend/src/modules/books/seed/seedCatalog.ts`. Extract the per-entry body into an exported `seedBook(input: { isbn, title, author }, repo, now): "created" | "existing" | "invalid"`, used by `seedCatalog` and the importer.
+- Modify: `backend/src/modules/books/seed/seedCatalog.ts`. Extract the per-entry body into an exported `seedBook(input: { isbn, title, author }, repo, now): { outcome: "created" | "existing" | "invalid"; book?: BookRow }`, used by `seedCatalog` and the importer.
 - Modify: `backend/src/modules/books/domain/types.ts`: add `"publisher"` to `CoverSourceName`. `cover_images.source` is plain TEXT, so no migration is needed.
+- Modify: `backend/src/modules/books/domain/ports.ts`: `CoverCandidate.source` becomes `Exclude<CoverSourceName, "upload" | "publisher">`, so no lookup source can claim it.
 - Create: `backend/scripts/import-publisher-covers.mjs`.
   - Plain ESM, built like `seed-catalog.mjs`. It imports `dist`.
   - It builds `deps` from `fetch` (UA and 30 s timeout), `encodeCover`, the sqlite repository (`openBooksDb`), and `createObjectStore()` saving `covers/<id>.webp`.
@@ -189,6 +206,7 @@
 
   Set `authorFromVendor` true only when, on page 1, ≥80% of products with an ISBN have a `vendor` that differs from the publisher's name. Drop sites whose feed isn't JSON from `PUBLISHERS`, and list them in the report with the reason.
 - [ ] **Step 2: Write failing tests:**
+  - **ISBN choice:** a fixture product whose description cites another `978972…` ISBN, while its barcode/sku (or image file name) holds its own, resolves to its own.
   - **`findPortugalIsbn`:**
     - hyphenated `978-972-608-467-9`, dotted `978.989.9061.31.6`, and inside a file name `9789897837579-scaled.jpg`;
     - a bad checksum gives null;
@@ -200,12 +218,15 @@
     - an existing book gets the cover, with status `manual`, source `publisher` and the upgrade mark cleared;
     - an `upload` cover is untouched;
     - a second run is `unchanged` with no new image row;
+    - a URL in `listRejectedUrls` isn't stored again;
     - a sub-400 image is used only when the book has no cover;
     - a new book takes the vendor author;
     - a new book without a vendor takes Open Library's title and author;
     - neither gives `noAuthor` and no book row;
     - a robots disallow of the feed path skips the site with a reason and no feed request;
     - a non-JSON feed skips the site;
+    - a feed fetch that throws `SourceUnavailableError` (a timeout) skips that site, and the next site still imports;
+    - `imageUrlPrefix` is computed as specified;
     - `dryRun` writes nothing and fetches no image;
     - the wait between one site's requests is `max(3000, crawl delay)`.
 - [ ] **Step 3:** Run and watch them fail.
@@ -217,6 +238,7 @@
 
 ### Task 4: Docs
 
+- [ ] Tell the user to set `ALERT_EMAIL` on Railway. They set variables themselves.
 - [ ] `backend/README.md`:
   - **Books section:**
     - the ISBNdb gate and its pause rules;
@@ -226,6 +248,6 @@
     - Portugal editions;
     - the run order (importer `--dry-run`, importer, seed) with the exact `railway ssh` commands in the existing `-- sh -c` form;
     - the publisher list and politeness rules;
-    - **takedown:** how to remove one publisher's covers. List the image ids with `source = 'publisher' AND source_url LIKE '<cdn or origin>%'`, delete the R2 objects, clear the pointers and delete the rows, the same way as the ISBNdb deletion steps.
+    - **takedown:** how to remove one publisher's covers. List the image ids with `source = 'publisher' AND source_url LIKE '<that site's imageUrlPrefix>%'`. Never use the bare `https://cdn.shopify.com/`, which every Shopify shop shares. Record each site's prefix in the README table after the first run, delete the R2 objects, clear the pointers and delete the rows, the same way as the ISBNdb deletion steps.
   - **Known limitations:** the seed's ISBNdb gap-filling takes about 2–3 days at 5,000 a day.
 - [ ] Commit: `Document the ISBNdb pause, Portugal seed and publisher importer`.
