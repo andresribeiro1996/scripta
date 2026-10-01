@@ -16,7 +16,8 @@ Expo/React Native app. Read `README.md` before changing it.
 
 - Put logic shared with the web client in `@scripta/shared`; do not duplicate it.
 - Install Expo packages with `npx expo install` to preserve SDK compatibility.
-- Normal development and CI must not run `eas build`, `eas submit`, `eas update`, or create APK/AAB artifacts.
+- Normal development and CI must not run `eas build` or `eas submit`, or create APK/AAB artifacts.
+- JavaScript reaches installed builds over the air: `.eas/workflows/production-update.yml` publishes an `eas update` to the `production` channel on pushes to `main` that touch the app, but only when a production Android build with the same fingerprint exists. Never run `eas update` by hand unless the user asks. When that run fails with "native release needed", tell the user a release is due; don't start a build.
 - Use Expo Go or an already-installed development client during normal development.
 - Rebuild the development client only when native dependencies or native configuration change and the user explicitly requests it.
 - Never run `expo prebuild --clean` unless explicitly requested.
