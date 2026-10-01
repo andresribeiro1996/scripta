@@ -373,9 +373,14 @@ Clients display at most "99+".
 ### A clear choice about reading visibility
 
 - **Publishing asks one question with nothing preselected:** "Share what you
-  read and finish with followers?" The answers are **Share my reading** or
-  **Keep my reading private**. It sets `feedSettings.reading`, and Feed
-  settings still changes it later.
+  add and finish on your page and with followers?" The answers are **Share
+  my reading** or **Don't share my reading**, with equal visual weight. It
+  sets `feedSettings.reading`, and Feed settings still changes it later.
+- **The dialog says what becomes public:** "It becomes a public page at
+  /u/<username> with your library, and readers can find and follow you."
+  The library and its statuses are public either way. The answer only
+  decides whether added and finished books also show in the page's
+  Activity and in followers' feeds. So the answer can't promise "private".
 - **Existing published users** keep their current setting and are not asked
   again.
 
@@ -394,6 +399,26 @@ Clients display at most "99+".
   The scan covers up to 500 published profiles, and the default limit is 20.
 - **Both clients' People tabs** show the suggestions whenever the search box
   is empty.
+
+### Decided while finishing step 3
+
+- **Clients publish with `{ shareReading }` only.** The server keeps the
+  current shelf mural itself, computed exactly as the own-profile `muralId`
+  is. Sending a cached id could undo a shelf switch made on another device.
+  `muralId` stays accepted for old clients.
+- **`GET /community/people/suggested` has its own 30/min limit.** It is the
+  module's most expensive route: it reads up to 500 public libraries per
+  request.
+- **Rows show one caption from a shared `personCaption`:** the reason on a
+  suggestion, otherwise "Private" or the follower count.
+- **People search failures say so.** Mobile used to show "No people found";
+  both clients now show "Couldn't search." with Retry, and a failed follow
+  shows "Couldn't update who you follow."
+- **Read-only murals on mobile fit their content.** Only the editor keeps
+  the 520-point minimum, so a profile without a mural no longer pushes
+  Follow below an empty canvas.
+- **"Recently active"** means the profile's `updated_at`: publishing, a
+  shelf switch or a feed-settings save. It is not reading activity.
 
 ### Testing
 
@@ -516,8 +541,10 @@ quiz names), with no report path yet.
 
 - **Account deletion:** community's `deleteUserData` also removes replies,
   reports, blocks, polls and votes.
-- **Rate limits:** the new routes fall under community's existing 30/min
-  module scope.
+- **Rate limits:** community's 30/min limiter covers only its public routes;
+  its authed routes have none. Each new authed route that writes user content
+  (replies, reports, polls, votes) or is expensive registers its own 30/min
+  limit, as `GET /community/people/suggested` does.
 - **Parity:** every step ships on web and mobile.
 - **Notifications stay in-app.** Push is out of scope.
 
