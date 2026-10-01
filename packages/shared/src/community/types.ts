@@ -59,12 +59,28 @@ export interface PersonResult {
   private: boolean;
 }
 
+export interface SharedBook {
+  title: string;
+  author: string;
+  coverUrl: string | null;
+}
+
+export interface SuggestedReader extends PersonResult {
+  sharedCount: number;
+  sharedBooks: SharedBook[];
+}
+
 export interface PublishedProfile {
   user: CommunityAuthor;
   publishedAt: string | null;
   followerCount: number;
   followingCount: number;
   viewerFollows?: boolean;
+}
+
+export interface PublishProfileInput {
+  muralId?: string;
+  shareReading?: boolean;
 }
 
 export interface Page<T> {

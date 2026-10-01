@@ -19,6 +19,7 @@ export interface CommunityRepository {
 
   getProfileRow(userId: string): ProfileRow | undefined;
   upsertProfile(row: ProfileRow): void;
+  listPublishedProfiles(limit: number): ProfileRow[];
   getFeedSettings(userId: string): FeedSettings | null;
   updateFeedSettings(userId: string, settings: FeedSettings): void;
 

@@ -3,9 +3,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { FlatList, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { readerGlyphLabel } from "@scripta/shared";
-import { Button, EmptyState, Input, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
-import type { PersonResult } from "@scripta/shared/community";
-import { followUser, searchPeople, unfollowUser } from "./api";
+import { Button, EmptyState, ErrorState, Input, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { personCaption, type PersonResult, type SuggestedReader } from "@scripta/shared/community";
+import { BookCover } from "../arena/BookCover";
+import { fetchSuggestedPeople, followUser, searchPeople, unfollowUser } from "./api";
 import { AuthorAvatar, openProfile } from "./AuthorAvatar";
 import { ReaderGlyph } from "./ReaderGlyph";
 
@@ -17,12 +18,18 @@ export function PeoplePane() {
   const [error, setError] = useState<string | null>(null);
   const needle = query.trim();
   const people = useQuery({
-    queryKey: ["community", "people", needle],
+    queryKey: ["community", "people", "search", needle],
     queryFn: () => searchPeople(needle),
     enabled: needle.length > 0,
     retry: false,
   });
-  const results = people.data?.people ?? [];
+  const suggested = useQuery({
+    queryKey: ["community", "people", "suggested"],
+    queryFn: fetchSuggestedPeople,
+    enabled: needle.length === 0,
+    retry: false,
+  });
+  const results: (PersonResult | SuggestedReader)[] = (needle.length > 0 ? people.data?.people : suggested.data?.people) ?? [];
 
   async function toggle(person: PersonResult) {
     setBusyId(person.user.userId);
@@ -51,19 +58,30 @@ export function PeoplePane() {
           contentContainerStyle={styles.list}
           keyboardShouldPersistTaps="handled"
           ListHeaderComponent={
-            <Input
-              label="Search people"
-              value={query}
-              onChangeText={setQuery}
-              placeholder="Search by username"
-              autoCapitalize="none"
-              autoCorrect={false}
-              clearButtonMode="while-editing"
-              returnKeyType="search"
-            />
+            <>
+              <Input
+                label="Search people"
+                value={query}
+                onChangeText={setQuery}
+                placeholder="Search by username"
+                autoCapitalize="none"
+                autoCorrect={false}
+                clearButtonMode="while-editing"
+                returnKeyType="search"
+              />
+              {needle.length === 0 && results.length > 0 ? (
+                <Text accessibilityRole="header" {...dynamicType} style={[typography.caption, styles.suggestionsCaption, { color: colors.textDim }]}>
+                  Readers you might like
+                </Text>
+              ) : null}
+            </>
           }
           ListEmptyComponent={
-            needle.length > 0 && !people.isPending ? (
+            needle.length === 0 && suggested.isError ? (
+              <ErrorState title="Couldn't load suggestions." actionLabel="Retry" onAction={() => void suggested.refetch()} />
+            ) : needle.length > 0 && people.isError ? (
+              <ErrorState title="Couldn't search." actionLabel="Retry" onAction={() => void people.refetch()} />
+            ) : needle.length > 0 && !people.isPending ? (
               <EmptyState title="No people found" body="Try another username." />
             ) : (
               <EmptyState title="Find people" body="Search a username to follow them." />
@@ -71,11 +89,13 @@ export function PeoplePane() {
           }
           renderItem={({ item }) => {
             const glyphLabel = readerGlyphLabel(item.user.readerGlyph);
+            const suggestion = "sharedCount" in item ? item : null;
+            const caption = personCaption(item);
             return (
               <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={glyphLabel ? `Open ${item.user.username}'s profile, ${glyphLabel}` : `Open ${item.user.username}'s profile`}
+                  accessibilityLabel={[`Open ${item.user.username}'s profile`, glyphLabel, caption].filter(Boolean).join(", ")}
                   onPress={() => openProfile(item.user.username)}
                   style={[styles.actorRow, styles.grow]}
                 >
@@ -88,9 +108,18 @@ export function PeoplePane() {
                       <ReaderGlyph identity={item.user.readerGlyph} />
                     </View>
                     <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
-                      {item.private ? "Private" : `${item.followerCount} ${item.followerCount === 1 ? "follower" : "followers"}`}
+                      {caption}
                     </Text>
                   </View>
+                  {suggestion?.sharedBooks.length ? (
+                    <View style={styles.covers}>
+                      {suggestion.sharedBooks.slice(0, 3).map((book, index) => (
+                        <View key={`${index}:${book.coverUrl}`} style={index > 0 ? styles.overlap : undefined}>
+                          <BookCover cover={book.coverUrl} title={book.title} width={24} height={36} />
+                        </View>
+                      ))}
+                    </View>
+                  ) : null}
                 </Pressable>
                 {item.private ? null : (
                   <Button
@@ -118,4 +147,7 @@ const styles = StyleSheet.create({
   actorRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   nameRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   metaName: { flexShrink: 1 },
+  suggestionsCaption: { marginTop: spacing.sm },
+  covers: { flexDirection: "row", alignItems: "center" },
+  overlap: { marginLeft: -6 },
 });

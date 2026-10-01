@@ -1,5 +1,7 @@
 // Domain types for the library module.
 
+import type { IdentityKey } from "@scripta/shared";
+
 /** Row shape as stored — `data` is the library JSON as raw text. Nothing
  *  in this module needs to look inside that JSON (no server-side search
  *  or filtering yet), so it's kept opaque all the way down: parsed only
@@ -26,4 +28,18 @@ export interface LibraryDocument {
    *  — null whenever shareToken is null. Same "compute at the edge, off a
    *  publicUrlFor closure" pattern as modules/gallery's GalleryImage.url. */
   shareUrl: string | null;
+}
+
+export interface LibraryMatchKeyRow {
+  key: string;
+  book_ref: number;
+  title: string;
+  author: string;
+  isbn: string | null;
+  cover: string | null;
+}
+
+export interface LibraryDerived {
+  glyph: IdentityKey | null;
+  keys: LibraryMatchKeyRow[];
 }

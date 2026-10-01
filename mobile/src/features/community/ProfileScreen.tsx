@@ -61,6 +61,7 @@ export function ProfileScreen({ username }: { username: string }) {
     await run(async () => {
       if (view.profile.viewerFollows) await unfollowUser(view.profile.user.userId);
       else await followUser(view.profile.user.userId);
+      await queryClient.invalidateQueries({ queryKey: ["community", "people"] });
     });
   }
 

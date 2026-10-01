@@ -15,6 +15,7 @@ process.env.GALLERY_STORAGE_PATH = join(scratch, "gallery-files");
 process.env.JWT_ACCESS_SECRET = "a".repeat(64);
 process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
+const { applyLibrarySchema } = await import("./adapters/sqlite/connection.js");
 const { createSqliteLibraryRepository } = await import("./adapters/sqlite/sqliteLibraryRepository.js");
 const { createLibraryService } = await import("./service.js");
 const { buildLibraryRoutes } = await import("./routes.js");
@@ -24,12 +25,7 @@ const goodreads = { ContentID: "g1", Title: "Dune", Attribution: "Frank Herbert"
 
 async function setup() {
   const db = new DatabaseSync(":memory:");
-  db.exec(`CREATE TABLE library_documents (
-    user_id TEXT PRIMARY KEY,
-    data TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    share_token TEXT UNIQUE
-  )`);
+  applyLibrarySchema(db);
   const service = createLibraryService(createSqliteLibraryRepository(db), () => "", undefined, undefined, () => undefined);
   const app = Fastify();
   app.decorate("authenticateAccessToken", (token: string) => ({ id: token, email: `${token}@example.test`, username: token, avatarId: null }));
@@ -39,6 +35,15 @@ async function setup() {
     app.inject({ method: "POST", url: "/library/books/merge", headers: token ? { authorization: `Bearer ${token}` } : {}, payload: payload as object });
   return { app, service, merge };
 }
+
+test("PUT /library saves a book whose fields aren't text", async () => {
+  const { app } = await setup();
+  const book = { Title: "Dune", Attribution: { toString: 5 }, ISBN: "9780441013593", ReadStatus: 2 };
+  const res = await app.inject({ method: "PUT", url: "/library", headers: { authorization: "Bearer u1" }, payload: { data: { books: [book] } } });
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual((res.json() as { data: { books: unknown[] } }).data.books, [book]);
+  await app.close();
+});
 
 test("POST /library/books/merge requires a signed-in user", async () => {
   const { app, merge } = await setup();

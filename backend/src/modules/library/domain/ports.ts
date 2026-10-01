@@ -3,7 +3,7 @@
 // service.ts is written against this interface only, with no idea
 // whether SQLite, Postgres, or an in-memory fake is on the other side.
 
-import type { LibraryDocumentRow } from "./types.js";
+import type { LibraryDerived, LibraryDocumentRow } from "./types.js";
 
 export interface LibraryRepository {
   deleteUserData(userId: string): void;
@@ -11,7 +11,10 @@ export interface LibraryRepository {
   /** Insert-or-replace: one document per user. Returns the stored row
    *  (with its server-assigned updatedAt) so the service doesn't need to
    *  compute or guess it. */
-  upsertDocument(userId: string, dataJson: string, expectedUpdatedAt?: string): LibraryDocumentRow | undefined;
+  upsertDocument(userId: string, dataJson: string, derived: LibraryDerived, expectedUpdatedAt?: string): LibraryDocumentRow | undefined;
+  listStaleUserIds(): string[];
+  setDerived(userId: string, derived: LibraryDerived, sourceUpdatedAt: string): void;
+  deleteOrphanedDerived(): void;
   /** Sets (or, with `token: null`, clears) the share token on this user's
    *  existing library document. Returns undefined if this user has no
    *  library document yet — service.ts turns that into a clear "nothing

@@ -80,6 +80,7 @@ curl -X PUT http://localhost:3000/library \
 ### `library`
 - **One JSON document per account** — the same shape the [exporter](../exporter/export.py) produces (`{source, schema_version, book_count, books}`). Full replace, not a merge: saving overwrites whatever was there before, same mental model as the old viewer's drag-and-drop.
 - Validation is deliberately light: the body must be `{"data": {"books": [...], ...}}` — an object with a `books` array. What's *inside* each book isn't checked; this module treats the document as an opaque blob it stores and returns, not something it understands the internals of.
+- **Derived data is written with the document.** Every save also replaces that account's rows in `library_derived` (its reader glyph, and the `updated_at` of the document it came from) and `library_match_keys` (one row per distinct match key among its first 20,000 books, from the first book that has the key; keys over 300 characters are skipped, titles and authors are cut to 200 characters, and a cover is kept only as an `http(s)` URL of at most 2,048), in the same transaction, so other modules read stored rows and never parse a document. A startup step re-derives every account whose rows are missing or came from another version of its document, and deletes the rows of accounts with no document. Raising `LIBRARY_DERIVED_VERSION` drops both tables the next time the database is opened (the version lives in `PRAGMA user_version`), so the same step re-derives everyone.
 
 | Method | Path | Auth required | Notes |
 |---|---|---|---|

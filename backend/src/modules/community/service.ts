@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { IdentityKey, ReaderProfile } from "@scripta/shared";
 import { categoryFor, contentDetail, decodeCursor, encodeCursor, DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
-import type { ActivityEventType, ActivityItem, CommunityAuthor, CommunityEventType, DiscoverItem, DiscoverType, FeedSettings, FollowState, GameParticipation, OwnProfile, Page, ParticipationGameKind, PersonResult, PublishedContent, PublishedProfile, TierlistSummary, TournamentSummary } from "@scripta/shared/community";
+import type { ActivityEventType, ActivityItem, CommunityAuthor, CommunityEventType, DiscoverItem, DiscoverType, FeedSettings, FollowState, GameParticipation, OwnProfile, Page, ParticipationGameKind, PersonResult, PublishProfileInput, PublishedContent, PublishedProfile, SharedBook, SuggestedReader, TierlistSummary, TournamentSummary } from "@scripta/shared/community";
 import type { DashboardFeedPage, DigestItem, DigestKind, ParticipationItem } from "@scripta/shared/dashboard";
 import type { PublishedTournamentRef } from "../arena/service.js";
 import type { MuralsPublicApi } from "../murals/publicApi.js";
@@ -12,6 +12,9 @@ import type { CommunityRepository, CursorKeyset } from "./domain/ports.js";
 import type { EventRow, FollowRow } from "./domain/types.js";
 
 const DISCOVER_SCAN_CAP = 500;
+const SUGGESTION_SCAN_CAP = 500;
+const SUGGESTION_OVERLAP_FLOOR = 5;
+const SHARED_BOOKS_SHOWN = 3;
 const DASHBOARD_COUNT_CAP = 100;
 const DASHBOARD_REFILL_ROUNDS = 5;
 const NAMED_PARTICIPANTS = 3;
@@ -64,6 +67,8 @@ export interface CommunityDeps {
   resolveProfiles(userIds: string[]): Map<string, ReaderProfile>;
   resolveLibrary(userId: string): Record<string, unknown> | null;
   readerGlyphFor(userId: string): IdentityKey | null;
+  sharedBookCounts(viewerId: string, candidateIds: string[]): Map<string, number>;
+  sharedBooks(viewerId: string, candidateId: string, limit: number): SharedBook[];
   userHasUsername(userId: string): boolean;
   findUserIdByUsername(username: string): string | undefined;
   searchUsernameOwners(query: string, limit: number): string[];
@@ -92,15 +97,16 @@ export interface CommunityService {
   unfollow(followerId: string, followeeId: string): void;
   getFollowState(viewerId: string, userId: string): FollowState;
   emitEvent(userId: string, type: ActivityEventType, refType: CommunityRefType, refId: string, payload?: Record<string, unknown>): void;
-  publishProfile(userId: string, muralId: string): void;
+  publishProfile(userId: string, input: PublishProfileInput): void;
   unpublishProfile(userId: string): void;
   getOwnProfile(userId: string): OwnProfile;
   setShelfMural(userId: string, muralId: string): void;
   getProfileByUsername(username: string, viewerId?: string): PublicProfileView;
-  getDashboard(viewerId: string, cursor: string | undefined, limit: number, kinds?: ReadonlySet<string>): DashboardFeedPage;
+  getDashboard(viewerId: string, cursor: string | undefined, limit: number, kinds?: ReadonlySet<string>): DashboardFeedPage & { newCount: number };
   markDashboardSeen(viewerId: string): void;
   getDiscover(type: DiscoverType, q: string, limit: number, offset: number, viewerId?: string): { items: DiscoverItem[]; nextOffset: number | null };
   searchPeople(viewerId: string, q: string, limit: number): PersonResult[];
+  suggestPeople(viewerId: string, limit: number): SuggestedReader[];
   getActivity(username: string, viewerId: string | undefined, cursor: string | undefined, limit: number): Page<ActivityItem>;
   getLibrary(username: string): { data: Record<string, unknown> | null };
   getFeedSettings(userId: string): FeedSettings;
@@ -253,6 +259,8 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
     follow(followerId, followeeId) {
       if (followerId === followeeId) throw new SelfFollowError();
       if (!deps.resolveProfiles([followeeId]).has(followeeId)) throw new ProfileNotFoundError();
+      if (repo.getFollow(followerId, followeeId)) return;
+      if (repo.getProfileRow(followeeId)?.published !== 1 && !repo.getFollow(followeeId, followerId)) throw new ProfileNotFoundError();
       const inserted = repo.insertFollow({ follower_id: followerId, followee_id: followeeId, created_at: new Date().toISOString() });
       if (inserted) {
         const author = deps.resolveProfiles([followeeId]).get(followeeId);
@@ -270,11 +278,12 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
       };
     },
     emitEvent: emit,
-    publishProfile(userId, muralId) {
+    publishProfile(userId, input) {
       if (!deps.userHasUsername(userId)) throw new UsernameRequiredError();
-      if (!deps.murals.ownsMural(userId, muralId)) throw new MuralNotOwnedError();
+      if (input.muralId !== undefined && !deps.murals.ownsMural(userId, input.muralId)) throw new MuralNotOwnedError();
       const existing = repo.getProfileRow(userId);
-      const previousMuralId = existing?.mural_id ?? null;
+      const keptMural = existing?.mural_id && deps.murals.ownsMural(userId, existing.mural_id) ? existing.mural_id : null;
+      const muralId = input.muralId ?? keptMural;
       const now = new Date().toISOString();
       repo.upsertProfile({
         user_id: userId,
@@ -284,7 +293,8 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
         updated_at: now,
         feed_settings: existing?.feed_settings ?? null
       });
-      if (!existing?.published_at || previousMuralId !== muralId) emit(userId, "mural_published", "mural", muralId);
+      if (input.shareReading !== undefined) repo.updateFeedSettings(userId, { ...settingsFor(userId), reading: input.shareReading });
+      if (muralId && (!existing?.published_at || existing.mural_id !== muralId)) emit(userId, "mural_published", "mural", muralId);
     },
     unpublishProfile(userId) {
       const existing = repo.getProfileRow(userId);
@@ -358,12 +368,12 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
         if (last) pageBound = { keyset: last };
       }
       const nextCursor = more && last ? encodeCursor({ createdAt: last.createdAt, id: last.id }) : null;
-      if (keyset) return { items, nextCursor, seenAt: null, personalNewCount: 0, followingNewCount: 0 };
+      if (keyset) return { items, nextCursor, seenAt: null, personalNewCount: 0, followingNewCount: 0, newCount: 0 };
       const seenAt = deps.getDashboardSeenAt(viewerId);
       const countBound: Bound = seenAt ? { since: seenAt } : {};
       const personalNewCount = countItems([...followers(countBound, DASHBOARD_COUNT_CAP), ...participationRows(participation, countBound)], followees);
       const followingNewCount = countItems(followingWindows(followees, countBound, DASHBOARD_COUNT_CAP, kinds).flat(), followees);
-      return { items, nextCursor, seenAt, personalNewCount, followingNewCount };
+      return { items, nextCursor, seenAt, personalNewCount, followingNewCount, newCount: seenAt ? personalNewCount + followingNewCount : 0 };
     },
     markDashboardSeen(viewerId) {
       deps.setDashboardSeenAt(viewerId, new Date().toISOString());
@@ -412,6 +422,30 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
         if (!user) return [];
         return [{ user: withGlyph(user, id, glyphOf), followerCount: repo.countFollowers(id), viewerFollows: repo.getFollow(viewerId, id) !== undefined, private: repo.getProfileRow(id)?.published !== 1 }];
       });
+    },
+    suggestPeople(viewerId, limit) {
+      const followees = new Set(repo.listFollowees(viewerId));
+      const candidates = repo
+        .listPublishedProfiles(SUGGESTION_SCAN_CAP)
+        .map((row) => row.user_id)
+        .filter((id) => id !== viewerId && !followees.has(id));
+      const profiles = deps.resolveProfiles(candidates);
+      const counts = deps.sharedBookCounts(viewerId, candidates);
+      const scored = candidates.flatMap((id, recency) => {
+        const user = profiles.get(id);
+        return user ? [{ id, user, recency, shared: counts.get(id) ?? 0 }] : [];
+      });
+      const overlapping = scored.filter((entry) => entry.shared > 0).sort((a, b) => b.shared - a.shared || a.recency - b.recency);
+      const fill = overlapping.length < SUGGESTION_OVERLAP_FLOOR ? scored.filter((entry) => entry.shared === 0) : [];
+      const glyphOf = glyphLookup();
+      return [...overlapping, ...fill].slice(0, limit).map((entry) => ({
+        user: withGlyph(entry.user, entry.id, glyphOf),
+        followerCount: repo.countFollowers(entry.id),
+        viewerFollows: false,
+        private: false,
+        sharedCount: entry.shared,
+        sharedBooks: entry.shared > 0 ? deps.sharedBooks(viewerId, entry.id, SHARED_BOOKS_SHOWN) : []
+      }));
     },
     getLibrary(username) {
       return { data: deps.resolveLibrary(publishedUserId(username)) };

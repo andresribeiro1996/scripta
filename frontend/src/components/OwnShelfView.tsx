@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ownGlyphPreview, readerIdentity } from "@scripta/shared";
@@ -7,7 +7,6 @@ import { DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
 import { fetchOwnProfile, publishProfile, setShelfMural, unpublishProfile, updateFeedSettings } from "../api/community";
 import { useAuth } from "../auth/AuthContext";
 import { avatarUrlFor } from "./Avatar";
-import { useConfirm } from "./ConfirmDialog";
 import { EmptyState } from "./EmptyState";
 import { MuralsIcon } from "./NavIcons";
 import { ReaderGlyph } from "./ReaderGlyph";
@@ -17,9 +16,12 @@ import { Sheet } from "./Sheet";
 import { SkeletonCardGrid } from "./Skeleton";
 import { SwipeTabs } from "./SwipeTabs";
 import { useCommunityActivity } from "../hooks/useCommunity";
+import { useDismissible } from "../hooks/useDismissible";
 import { useGalleryImages } from "../hooks/useGalleryImages";
 import { useLibrary } from "../hooks/useLibrary";
 import { useMurals } from "../hooks/useMurals";
+import { useScrollLock } from "../hooks/useScrollLock";
+import { keepTabInside } from "../lib/keepTabInside";
 import { orderLibraryBooks } from "../lib/libraryOrder";
 import { buildMuralPreset, shelfPresetSummary } from "../lib/muralPresets";
 import type { Mural } from "../lib/murals";
@@ -35,7 +37,6 @@ type OwnShelfTab = (typeof OWN_SHELF_TABS)[number]["value"];
 export function OwnShelfView({ username }: { username: string }) {
   const { session } = useAuth();
   const queryClient = useQueryClient();
-  const confirm = useConfirm();
   const navigate = useNavigate();
   const own = useQuery({ queryKey: ["community", "own-profile"], queryFn: fetchOwnProfile });
   const murals = useMurals();
@@ -46,6 +47,7 @@ export function OwnShelfView({ username }: { username: string }) {
   const activity = useCommunityActivity(username);
   const [tab, setTab] = useState<OwnShelfTab>("mural");
   const [busy, setBusy] = useState(false);
+  const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const books = useMemo(() => library?.data.books ?? [], [library]);
   const groups = useMemo(() => library?.data.groups ?? [], [library]);
@@ -72,17 +74,9 @@ export function OwnShelfView({ username }: { username: string }) {
     }
   }
 
-  async function handlePublish() {
-    const muralId = own.data?.muralId;
-    if (!muralId) return;
-    const confirmed = await confirm({
-      title: "Publish your shelf?",
-      body: `It becomes a public page at /u/${username}, and people can follow you.`,
-      confirmLabel: "Publish",
-      danger: false
-    });
-    if (!confirmed) return;
-    await run(() => publishProfile(muralId));
+  function publish(shareReading: boolean) {
+    setPublishing(false);
+    void run(() => publishProfile({ shareReading }));
   }
 
   async function shelfTargetId() {
@@ -171,13 +165,14 @@ export function OwnShelfView({ username }: { username: string }) {
           </span>
           {!ownData.published && (
             <button
-              onClick={() => void handlePublish()}
-              disabled={busy || !ownData.muralId}
+              onClick={() => setPublishing(true)}
+              disabled={busy}
               className="rounded-full bg-(--color-accent) px-4 py-1.5 text-sm font-semibold text-(--color-on-accent) disabled:opacity-50"
             >
               Publish…
             </button>
           )}
+          {publishing && <PublishDialog username={username} onAnswer={publish} onCancel={() => setPublishing(false)} />}
           <OwnerControls
             busy={busy}
             published={ownData.published}
@@ -247,6 +242,52 @@ export function OwnShelfView({ username }: { username: string }) {
   );
 }
 
+const answerButton = "rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2.5 text-sm font-semibold hover:bg-(--color-surface-hover)";
+
+function PublishDialog({ username, onAnswer, onCancel }: { username: string; onAnswer: (shareReading: boolean) => void; onCancel: () => void }) {
+  const cancelButtonRef = useRef<HTMLButtonElement>(null);
+  useScrollLock();
+  useDismissible(onCancel);
+  useEffect(() => {
+    const previous = document.activeElement;
+    cancelButtonRef.current?.focus({ preventScroll: true });
+    return () => {
+      if (previous instanceof HTMLElement && previous.isConnected) previous.focus({ preventScroll: true });
+    };
+  }, []);
+
+  return (
+    <div className="overlay-in fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onCancel}>
+      <div
+        className="w-full max-w-sm rounded-xl border border-(--color-border) bg-(--color-surface) p-5 shadow-lg"
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={keepTabInside}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="publish-dialog-title"
+        aria-describedby="publish-dialog-body publish-dialog-question"
+      >
+        <h3 id="publish-dialog-title" className="text-sm font-semibold">
+          Publish your shelf?
+        </h3>
+        <p id="publish-dialog-body" className="mt-1.5 text-xs text-(--color-text-dim)">{`It becomes a public page at /u/${username} with your library, and readers can find and follow you.`}</p>
+        <p id="publish-dialog-question" className="mt-3 text-sm">Share what you add and finish on your page and with followers?</p>
+        <div className="mt-5 flex flex-col gap-2">
+          <button onClick={() => onAnswer(true)} className={answerButton}>
+            Share my reading
+          </button>
+          <button onClick={() => onAnswer(false)} className={answerButton}>
+            Don't share my reading
+          </button>
+          <button ref={cancelButtonRef} onClick={onCancel} className="rounded-lg px-3 py-2.5 text-sm font-semibold text-(--color-text-dim) hover:text-(--color-text)">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const FEED_SETTING_ROWS: Array<{ key: FeedCategory; label: string }> = [
   { key: "publications", label: "Publications" },
   { key: "reading", label: "Reading activity" },
@@ -288,6 +329,7 @@ function OwnerControls({
         onClick={() => {
           setMuralId(currentMuralId ?? murals?.[0]?.id ?? "");
           setNext(feedSettings ?? DEFAULT_FEED_SETTINGS);
+          setConfirming(false);
           setOpen(true);
         }}
         className="shrink-0 rounded-full border border-(--color-border) bg-(--color-surface) px-4 py-1.5 text-sm font-semibold hover:border-(--color-accent)"

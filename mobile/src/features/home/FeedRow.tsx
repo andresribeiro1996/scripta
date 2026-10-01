@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import type { DigestItem } from "@scripta/shared";
 import { ApiError } from "../../core/api";
 import { Icon, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
@@ -30,6 +30,7 @@ export function useSkipEmptyPages({ hasNextPage, isFetchingNextPage, isFetchNext
 }
 
 export function useFollowBack(refetch: () => Promise<unknown>) {
+  const queryClient = useQueryClient();
   const [followingId, setFollowingId] = useState<string | null>(null);
   const [followError, setFollowError] = useState<string | null>(null);
   // Refetches rather than patching the row in place: the follow lands as an
@@ -39,6 +40,7 @@ export function useFollowBack(refetch: () => Promise<unknown>) {
     setFollowingId(userId);
     try {
       await followUser(userId);
+      await queryClient.invalidateQueries({ queryKey: ["community", "people"] });
       await refetch();
     } catch (reason) {
       setFollowError(reason instanceof ApiError ? reason.message : "Couldn't follow them. Try again.");

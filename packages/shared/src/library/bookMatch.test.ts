@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { canonicalIsbn, firstAuthor, isCertainMatch, isLikelyMatch, normalizeTitle, titleNumbers } from "./bookMatch.js";
+import { bookMatchKeys, canonicalIsbn, firstAuthor, isCertainMatch, isLikelyMatch, normalizeTitle, titleNumbers } from "./bookMatch.js";
 
 const dune = { Title: "Dune", Attribution: "Frank Herbert" };
 
@@ -43,4 +43,53 @@ test("books without a title never match", () => {
   const untitled = { Title: "", Attribution: "" };
   assert.equal(isCertainMatch(untitled, { ...untitled }), false);
   assert.equal(isLikelyMatch(untitled, { ...untitled }), false);
+});
+
+test("bookMatchKeys returns the ISBN key then the title-and-author key", () => {
+  const book = { ISBN: "978-0-00-000000-2", Title: " Dune ", Attribution: "Frank  Herbert" };
+  assert.deepEqual(bookMatchKeys(book), ["isbn:9780000000002", "ta:dune|frank herbert"]);
+});
+
+test("bookMatchKeys gives an ISBN-10 and its ISBN-13 the same isbn key", () => {
+  assert.deepEqual(bookMatchKeys({ ISBN: "0-441-01359-7" }), ["isbn:9780441013593"]);
+  assert.deepEqual(bookMatchKeys({ ISBN: "9780441013593" }), ["isbn:9780441013593"]);
+});
+
+test("bookMatchKeys returns only the title-and-author key without a usable ISBN", () => {
+  assert.deepEqual(bookMatchKeys(dune), ["ta:dune|frank herbert"]);
+  assert.deepEqual(bookMatchKeys({ ...dune, ISBN: "not an isbn" }), ["ta:dune|frank herbert"]);
+});
+
+test("bookMatchKeys lets a book with an ISBN share a key with the same book without one", () => {
+  const withIsbn = bookMatchKeys({ ...dune, ISBN: "9780441013593" });
+  const withoutIsbn = bookMatchKeys({ Title: "DUNE", Attribution: "frank herbert" });
+  assert.ok(withoutIsbn.some((key) => withIsbn.includes(key)));
+});
+
+test("bookMatchKeys omits the title-and-author key unless both title and author are present", () => {
+  assert.deepEqual(bookMatchKeys({ Title: "Dune" }), []);
+  assert.deepEqual(bookMatchKeys({ Attribution: "Frank Herbert" }), []);
+  assert.deepEqual(bookMatchKeys({ Title: "", Attribution: "  " }), []);
+  assert.deepEqual(bookMatchKeys({}), []);
+  assert.deepEqual(bookMatchKeys({ ISBN: "978-0-00-000000-2", Title: "Dune" }), ["isbn:9780000000002"]);
+});
+
+test("bookMatchKeys keys the exact title and the first author, so a bracketed series stays part of the title", () => {
+  assert.deepEqual(bookMatchKeys({ Title: "Dune", Attribution: "Frank Herbert, Brian Herbert" }), ["ta:dune|frank herbert"]);
+  assert.deepEqual(bookMatchKeys({ Title: "Dune (Dune Chronicles #1)", Attribution: "Frank Herbert" }), ["ta:dune dune chronicles 1|frank herbert"]);
+});
+
+test("a bracketed part ends at the first closing bracket, and an unclosed bracket stays in the title", () => {
+  assert.equal(normalizeTitle("Dune (Chronicles (Book 1)) Extra"), "dune extra");
+  assert.equal(normalizeTitle("Dune (Chronicles"), "dune chronicles");
+  assert.equal(normalizeTitle("Dune [Deluxe] (Edition)"), "dune");
+  assert.equal(titleNumbers("Vol 2 [3] (4"), "2 4");
+  assert.equal(titleNumbers("Vol 2 (a (3) 4) 5"), "2 4 5");
+});
+
+test("a title made of unclosed brackets is normalized in linear time", () => {
+  const started = performance.now();
+  normalizeTitle("(".repeat(300000));
+  titleNumbers("[".repeat(300000));
+  assert.ok(performance.now() - started < 1000);
 });

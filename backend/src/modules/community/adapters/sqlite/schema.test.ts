@@ -61,3 +61,21 @@ test("legacy events table is rebuilt preserving rows", () => {
   assert.ok(eventIndexNames(db).includes("idx_events_publication_ref"));
   db.close();
 });
+
+test("published profiles are indexed by recency, on a new database and on an existing one", () => {
+  const path = process.env.COMMUNITY_DB_PATH!;
+  rmSync(path, { force: true });
+  rmSync(`${path}-wal`, { force: true });
+  rmSync(`${path}-shm`, { force: true });
+  const existing = new DatabaseSync(path);
+  existing.exec("CREATE TABLE profiles (user_id TEXT PRIMARY KEY, published INTEGER NOT NULL DEFAULT 0, mural_id TEXT, published_at TEXT, updated_at TEXT NOT NULL, feed_settings TEXT)");
+  existing.close();
+
+  for (const _ of [1, 2]) {
+    const db = openCommunityDb();
+    const plan = (db.prepare("EXPLAIN QUERY PLAN SELECT * FROM profiles WHERE published = 1 ORDER BY updated_at DESC LIMIT 500").all() as Array<{ detail: string }>).map((row) => row.detail).join(" ");
+    assert.match(plan, /idx_profiles_published_updated/);
+    assert.doesNotMatch(plan, /TEMP B-TREE/);
+    db.close();
+  }
+});

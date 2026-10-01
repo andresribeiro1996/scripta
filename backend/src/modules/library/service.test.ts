@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
+import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { test } from "node:test";
+import { mock, test } from "node:test";
 import { bookKey, localDay } from "@scripta/shared";
 
 // service.js reaches config/env.ts through covers/index.js (peekCachedCoverUrl),
@@ -10,47 +11,47 @@ import { bookKey, localDay } from "@scripta/shared";
 // the required vars before the deferred imports below, exactly as
 // import/parseImport.test.ts and the other env-reaching tests do — a static
 // import would hoist above these assignments. The LibraryService tests below
-// run against :memory:; the readerGlyphFor tests further down are the
-// exception — they open the real file at LIBRARY_DB_PATH, since that's the
-// connection publicResolver.js's own module-scoped cache uses.
-const scratch = join(tmpdir(), "library-service-test");
+// run against :memory:; the tests of the cross-module readers and the backfill
+// further down are the exception — they open the real file at LIBRARY_DB_PATH,
+// since that's the connection publicResolver.js's own module-scoped cache uses.
+const scratch = mkdtempSync(join(tmpdir(), "library-service-test-"));
 process.env.AUTH_DB_PATH = join(scratch, "auth.sqlite");
 process.env.LIBRARY_DB_PATH = join(scratch, "library.sqlite");
 process.env.GALLERY_DB_PATH = join(scratch, "gallery.sqlite");
+process.env.COVERS_DB_PATH = join(scratch, "covers.sqlite");
+process.env.FILES_STORAGE_PATH = join(scratch, "files");
 process.env.JWT_ACCESS_SECRET = "a".repeat(64);
 process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
 const { createSqliteLibraryRepository } = await import("./adapters/sqlite/sqliteLibraryRepository.js");
-const { openLibraryDb } = await import("./adapters/sqlite/connection.js");
+const { applyLibrarySchema, openLibraryDb } = await import("./adapters/sqlite/connection.js");
 const { LibraryConflictError } = await import("./domain/errors.js");
-const { createLibraryService } = await import("./service.js");
-const { readerGlyphFor } = await import("./publicResolver.js");
+const { backfillLibraryDerived } = await import("./migration.js");
+const { LIBRARY_DERIVED_VERSION, LIBRARY_MATCH_BOOK_CAP } = await import("./domain/constants.js");
+const { createLibraryService, deriveLibraryData } = await import("./service.js");
+const { readerGlyphFor, sharedBookCounts, sharedBooks } = await import("./publicResolver.js");
+const { peekCachedCoverUrl } = await import("../books/index.js");
+
+function memoryDb(): DatabaseSync {
+  const db = new DatabaseSync(":memory:");
+  applyLibrarySchema(db);
+  return db;
+}
 
 type RecordedEvent = { userId: string; type: "book_added" | "book_finished"; refId: string; payload: Record<string, unknown> };
 
 function setup() {
-  const db = new DatabaseSync(":memory:");
-  db.exec(`CREATE TABLE library_documents (
-    user_id TEXT PRIMARY KEY,
-    data TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    share_token TEXT UNIQUE
-  )`);
+  const db = memoryDb();
+  const repo = createSqliteLibraryRepository(db);
   const events: RecordedEvent[] = [];
-  const service = createLibraryService(createSqliteLibraryRepository(db), () => "", (userId, batch) => {
+  const service = createLibraryService(repo, () => "", (userId, batch) => {
     events.push(...batch.map((event) => ({ userId, ...event })));
   });
-  return { db, service, events };
+  return { db, repo, service, events };
 }
 
 function setupCovers() {
-  const db = new DatabaseSync(":memory:");
-  db.exec(`CREATE TABLE library_documents (
-    user_id TEXT PRIMARY KEY,
-    data TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    share_token TEXT UNIQUE
-  )`);
+  const db = memoryDb();
   const batches: unknown[][] = [];
   const service = createLibraryService(createSqliteLibraryRepository(db), () => "", undefined, (lookups) => { batches.push(lookups); });
   return { service, batches };
@@ -267,30 +268,37 @@ type Book = Record<string, unknown>;
 const shelf = (count: number): Book[] => Array.from({ length: count }, (_, i) => ({ Title: `Book ${i}`, Attribution: `Author ${i}`, ReadStatus: 2 }));
 const seriesGroup = (books: Book[]) => ({ id: "g1", type: "series", name: "Discworld", bookKeys: books.map(bookKey) });
 
-function seedLibraryDocument(userId: string, data: unknown) {
-  const db = openLibraryDb();
-  db.prepare(`INSERT OR REPLACE INTO library_documents (user_id, data, updated_at) VALUES (?, ?, ?)`).run(
-    userId,
-    typeof data === "string" ? data : JSON.stringify(data),
-    new Date().toISOString()
-  );
+const fileDb = openLibraryDb();
+const fileService = createLibraryService(createSqliteLibraryRepository(fileDb), () => "");
+
+function rawDocument(userId: string, data: string, updatedAt = new Date().toISOString()) {
+  fileDb.prepare(`INSERT OR REPLACE INTO library_documents (user_id, data, updated_at) VALUES (?, ?, ?)`).run(userId, data, updatedAt);
 }
+
+const keyRows = (db: DatabaseSync, userId: string) =>
+  (db.prepare(`SELECT key, book_ref, title, author, isbn, cover FROM library_match_keys WHERE user_id = ? ORDER BY book_ref, key`).all(userId) as Array<Record<string, unknown>>).map((row) => ({ ...row }));
+
+const storedGlyph = (db: DatabaseSync, userId: string) => (db.prepare(`SELECT glyph FROM library_derived WHERE user_id = ?`).get(userId) as { glyph: string | null } | undefined)?.glyph;
+
+const derivedSource = (db: DatabaseSync, userId: string) => (db.prepare(`SELECT source_updated_at FROM library_derived WHERE user_id = ?`).get(userId) as { source_updated_at: string } | undefined)?.source_updated_at;
+
+const userVersion = (db: DatabaseSync) => (db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version;
 
 test("readerGlyphFor returns the settled identity for a library that clears the threshold", () => {
   const books = shelf(10);
-  seedLibraryDocument("settled-user", { books, groups: [seriesGroup(books.slice(0, 3))] });
+  fileService.saveLibrary("settled-user", { books, groups: [seriesGroup(books.slice(0, 3))] });
   assert.equal(readerGlyphFor("settled-user"), "carto");
 });
 
 test("readerGlyphFor returns null for a library that only leans toward an identity", () => {
   const books = shelf(11);
-  seedLibraryDocument("leaning-user", { books, groups: [seriesGroup(books.slice(0, 3))] });
+  fileService.saveLibrary("leaning-user", { books, groups: [seriesGroup(books.slice(0, 3))] });
   assert.equal(readerGlyphFor("leaning-user"), null);
 });
 
 test("readerGlyphFor returns null for an Unwritten library, distinct from a missing document", () => {
   const books = shelf(3);
-  seedLibraryDocument("unwritten-user", { books, groups: [] });
+  fileService.saveLibrary("unwritten-user", { books, groups: [] });
   assert.equal(readerGlyphFor("unwritten-user"), null);
 });
 
@@ -298,9 +306,11 @@ test("readerGlyphFor returns null when the user has no library document", () => 
   assert.equal(readerGlyphFor("ghost-user"), null);
 });
 
-test("readerGlyphFor returns null for an unparseable library document", () => {
-  seedLibraryDocument("corrupt-user", "not json");
-  assert.equal(readerGlyphFor("corrupt-user"), null);
+test("readerGlyphFor returns the stored glyph without reading the document", () => {
+  const books = shelf(10);
+  fileService.saveLibrary("stored-user", { books, groups: [seriesGroup(books.slice(0, 3))] });
+  fileDb.prepare(`UPDATE library_documents SET data = ? WHERE user_id = ?`).run("not json", "stored-user");
+  assert.equal(readerGlyphFor("stored-user"), "carto");
 });
 
 test("an import save queues covers for every book once; other saves queue nothing", () => {
@@ -322,18 +332,12 @@ test("an import save queues covers for every book once; other saves queue nothin
 });
 
 function setupMerge() {
-  const db = new DatabaseSync(":memory:");
-  db.exec(`CREATE TABLE library_documents (
-    user_id TEXT PRIMARY KEY,
-    data TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    share_token TEXT UNIQUE
-  )`);
+  const db = memoryDb();
   const rekeys: Array<[string, string[], string]> = [];
   const service = createLibraryService(createSqliteLibraryRepository(db), () => "", undefined, undefined, (userId, fromKeys, toKey) => {
     rekeys.push([userId, fromKeys, toKey]);
   });
-  return { service, rekeys };
+  return { db, service, rekeys };
 }
 
 const koboDune = { ContentID: "k1", Title: "Dune", Attribution: "Frank Herbert", ReadStatus: 1 };
@@ -381,8 +385,7 @@ test("mergeBooks without a library throws NoLibraryDocumentError", async () => {
 });
 
 test("mergeBooks does not save the library when a reference rewrite fails", () => {
-  const db = new DatabaseSync(":memory:");
-  db.exec(`CREATE TABLE library_documents (user_id TEXT PRIMARY KEY, data TEXT NOT NULL, updated_at TEXT NOT NULL, share_token TEXT UNIQUE)`);
+  const db = memoryDb();
   const service = createLibraryService(createSqliteLibraryRepository(db), () => "", undefined, undefined, () => {
     throw new Error("murals db locked");
   });
@@ -397,4 +400,429 @@ test("addBook matches an ISBN-less copy by title and author", () => {
   const result = service.addBook("u1", { title: "Dune", author: "Frank Herbert", isbn: "9780441013593", readStatus: 2 });
   assert.equal(result.updated, true);
   assert.equal(booksOf(service, "u1").length, 1);
+});
+
+test("an existing library database gains the derived tables and keeps its documents", () => {
+  const db = new DatabaseSync(":memory:");
+  db.exec(`CREATE TABLE library_documents (user_id TEXT PRIMARY KEY, data TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')))`);
+  db.prepare(`INSERT INTO library_documents (user_id, data) VALUES ('old', '{"books":[]}')`).run();
+  applyLibrarySchema(db);
+  const tables = (db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table'`).all() as Array<{ name: string }>).map((row) => row.name);
+  assert.ok(tables.includes("library_derived"));
+  assert.ok(tables.includes("library_match_keys"));
+  assert.equal((db.prepare(`SELECT data FROM library_documents WHERE user_id = 'old'`).get() as { data: string }).data, '{"books":[]}');
+  db.close();
+});
+
+test("deriveLibraryData gives each book one row per match key, numbered by its place among the records", () => {
+  const derived = deriveLibraryData({
+    books: [null, 7, { Title: "Dune", Attribution: "Frank Herbert", ISBN: "978-0-441-01359-3", _coverUrl: "https://covers.test/dune.jpg" }, { Title: "Emma", Attribution: "Jane Austen", _coverUrl: 5 }]
+  });
+  assert.deepEqual(derived.keys, [
+    { key: "isbn:9780441013593", book_ref: 0, title: "Dune", author: "Frank Herbert", isbn: "9780441013593", cover: "https://covers.test/dune.jpg" },
+    { key: "ta:dune|frank herbert", book_ref: 0, title: "Dune", author: "Frank Herbert", isbn: "9780441013593", cover: "https://covers.test/dune.jpg" },
+    { key: "ta:emma|jane austen", book_ref: 1, title: "Emma", author: "Jane Austen", isbn: null, cover: null }
+  ]);
+});
+
+test("deriveLibraryData skips books that have no key and survives a document without books", () => {
+  assert.deepEqual(deriveLibraryData({ books: [{ Title: "Untitled" }, { ReadStatus: 2 }] }), { glyph: null, keys: [] });
+  for (const junk of [{ books: "none" }, {}, [], null, "text", 7]) assert.deepEqual(deriveLibraryData(junk), { glyph: null, keys: [] });
+});
+
+test("deriveLibraryData keys a book by the fields that are text, whatever its others hold", () => {
+  const odd = { toString: 5 };
+  const derived = deriveLibraryData({
+    books: [
+      { Title: "Dune", Attribution: odd, ISBN: "9780441013593", ReadStatus: 2 },
+      { Title: odd, Attribution: "Jane Austen", ReadStatus: 2 },
+      { Title: "Emma", Attribution: "Jane Austen", ISBN: odd, ReadStatus: 2 },
+      { Title: 42, Attribution: ["Someone"], ISBN: 9780441013593 }
+    ]
+  });
+  assert.deepEqual(derived.keys, [
+    { key: "isbn:9780441013593", book_ref: 0, title: "Dune", author: "", isbn: "9780441013593", cover: null },
+    { key: "ta:emma|jane austen", book_ref: 2, title: "Emma", author: "Jane Austen", isbn: null, cover: null }
+  ]);
+});
+
+test("deriveLibraryData settles the glyph whatever the odd books around it hold", () => {
+  const odd = { toString: 5 };
+  const books = shelf(10);
+  books[5] = { ...books[5], Attribution: odd, ContentID: odd, highlights: [{ Type: "highlight", Text: odd, Annotation: odd }, null, 7] };
+  books[6] = { ...books[6], Title: odd, ISBN: odd };
+  assert.equal(deriveLibraryData({ books, groups: [seriesGroup(books.slice(0, 3))] }).glyph, "carto");
+});
+
+test("deriveLibraryData stores each key once, for the first book that has it", () => {
+  const derived = deriveLibraryData({
+    books: [
+      { Title: "Dune", Attribution: "Frank Herbert", ReadStatus: 2 },
+      { Title: "Dune", Attribution: "Frank Herbert", ISBN: "9780441013593", ReadStatus: 2 },
+      { Title: "Dune", Attribution: "Frank Herbert", ISBN: "9780441013593", ReadStatus: 0 }
+    ]
+  });
+  assert.deepEqual(derived.keys.map((row) => [row.key, row.book_ref]), [["ta:dune|frank herbert", 0], ["isbn:9780441013593", 1]]);
+});
+
+test("deriveLibraryData stores a title and author cut to 200 characters, and no title key longer than 300", () => {
+  const derived = deriveLibraryData({
+    books: [
+      { Title: "t".repeat(600), Attribution: "a".repeat(600), ISBN: "9780441013593" },
+      { Title: "u".repeat(600), Attribution: "Writer" }
+    ]
+  });
+  assert.deepEqual(derived.keys.map((row) => [row.key, row.title.length, row.author.length]), [["isbn:9780441013593", 200, 200]]);
+  const keyLengths = (titleLength: number) => deriveLibraryData({ books: [{ Title: "t".repeat(titleLength), Attribution: "a" }] }).keys.map((row) => row.key.length);
+  assert.deepEqual(keyLengths(295), [300]);
+  assert.deepEqual(keyLengths(296), []);
+});
+
+test("deriveLibraryData stores a cover only when it is an http or https URL of at most 2,048 characters", () => {
+  const coverOf = (_coverUrl: unknown) => deriveLibraryData({ books: [{ Title: "Dune", Attribution: "Frank Herbert", _coverUrl }] }).keys[0]?.cover;
+  const url = (length: number) => `https://covers.test/${"c".repeat(length - 20)}`;
+  assert.equal(coverOf("https://covers.test/dune.jpg"), "https://covers.test/dune.jpg");
+  assert.equal(coverOf("http://covers.test/dune.jpg"), "http://covers.test/dune.jpg");
+  assert.equal(coverOf(url(2048)), url(2048));
+  assert.equal(coverOf(url(2049)), null);
+  assert.equal(coverOf(url(24000)), null);
+  assert.equal(coverOf("data:image/png;base64,AAAA"), null);
+  assert.equal(coverOf("javascript:alert(1)"), null);
+  assert.equal(coverOf("/covers/dune.jpg"), null);
+});
+
+test("deriveLibraryData keys the first 20,000 books but settles the glyph on all of them", () => {
+  const filler = Array.from({ length: LIBRARY_MATCH_BOOK_CAP }, (_, i) => ({ Title: `Filler ${i}`, Attribution: `Writer ${i}`, ReadStatus: 0 }));
+  const finished = shelf(10);
+  const derived = deriveLibraryData({ books: [...filler, ...finished], groups: [seriesGroup(finished.slice(0, 3))] });
+  assert.equal(derived.keys.length, LIBRARY_MATCH_BOOK_CAP);
+  assert.equal(derived.keys.at(-1)?.book_ref, LIBRARY_MATCH_BOOK_CAP - 1);
+  assert.equal(derived.glyph, "carto");
+});
+
+test("saving a library stores each book's match keys and its reader glyph", () => {
+  const { db, service } = setup();
+  const books = shelf(10);
+  books[0] = { ...books[0], ISBN: "978-0-441-01359-3", _coverUrl: "https://covers.test/0.jpg" };
+  const saved = service.saveLibrary("u1", { books, groups: [seriesGroup(books.slice(0, 3))] });
+  assert.equal(storedGlyph(db, "u1"), "carto");
+  assert.equal(derivedSource(db, "u1"), saved.updatedAt);
+  const rows = keyRows(db, "u1");
+  assert.equal(rows.length, 11);
+  assert.deepEqual(rows.slice(0, 3), [
+    { key: "isbn:9780441013593", book_ref: 0, title: "Book 0", author: "Author 0", isbn: "9780441013593", cover: "https://covers.test/0.jpg" },
+    { key: "ta:book 0|author 0", book_ref: 0, title: "Book 0", author: "Author 0", isbn: "9780441013593", cover: "https://covers.test/0.jpg" },
+    { key: "ta:book 1|author 1", book_ref: 1, title: "Book 1", author: "Author 1", isbn: null, cover: null }
+  ]);
+  db.close();
+});
+
+test("a thousand copies of one book store two key rows, for the first copy", () => {
+  const { db, service } = setup();
+  const copy = { Title: "Dune", Attribution: "Frank Herbert", ISBN: "9780441013593" };
+  service.saveLibrary("u1", { books: Array.from({ length: 1000 }, () => copy) });
+  assert.deepEqual(keyRows(db, "u1").map((row) => [row.key, row.book_ref]), [["isbn:9780441013593", 0], ["ta:dune|frank herbert", 0]]);
+  db.close();
+});
+
+test("saving again replaces the stored keys and glyph", () => {
+  const { db, service } = setup();
+  const books = shelf(10);
+  const first = service.saveLibrary("u1", { books, groups: [seriesGroup(books.slice(0, 3))] });
+  service.saveLibrary("u1", { books: [{ Title: "Only", Attribution: "One" }] }, first.updatedAt);
+  assert.equal(storedGlyph(db, "u1"), null);
+  assert.deepEqual(keyRows(db, "u1").map((row) => row.key), ["ta:only|one"]);
+  db.close();
+});
+
+test("addBook stores the keys of the book it appends and recomputes the glyph", () => {
+  const { db, service } = setup();
+  const books = shelf(10);
+  service.saveLibrary("u1", { books, groups: [seriesGroup(books.slice(0, 3))] });
+  assert.equal(storedGlyph(db, "u1"), "carto");
+
+  service.addBook("u1", { title: "Stoner", author: "John Williams", isbn: "9780394729685", coverUrl: "https://covers.test/stoner.jpg", readStatus: 2 });
+
+  assert.equal(storedGlyph(db, "u1"), null);
+  assert.deepEqual(keyRows(db, "u1").filter((row) => row.book_ref === 10), [
+    { key: "isbn:9780394729685", book_ref: 10, title: "Stoner", author: "John Williams", isbn: "9780394729685", cover: "https://covers.test/stoner.jpg" },
+    { key: "ta:stoner|john williams", book_ref: 10, title: "Stoner", author: "John Williams", isbn: "9780394729685", cover: "https://covers.test/stoner.jpg" }
+  ]);
+  db.close();
+});
+
+test("addBook re-shelving a book recomputes the glyph", () => {
+  const { db, service } = setup();
+  const books = shelf(11);
+  service.saveLibrary("u1", { books, groups: [seriesGroup(books.slice(0, 3))] });
+  assert.equal(storedGlyph(db, "u1"), null);
+
+  service.addBook("u1", { title: "Book 10", author: "Author 10", readStatus: 0 });
+
+  assert.equal(storedGlyph(db, "u1"), "carto");
+  assert.equal(keyRows(db, "u1").length, 11);
+  db.close();
+});
+
+test("mergeBooks replaces the stored keys with those of the merged library", () => {
+  const { db, service } = setupMerge();
+  const saved = service.saveLibrary("u1", { books: [koboDune, goodreadsDune] });
+  assert.deepEqual(keyRows(db, "u1").map((row) => [row.book_ref, row.key]), [[0, "ta:dune|frank herbert"], [1, "isbn:9780441013593"]]);
+
+  service.mergeBooks("u1", bookKey(koboDune), [bookKey(goodreadsDune)], saved.updatedAt);
+
+  assert.deepEqual(keyRows(db, "u1").map((row) => [row.book_ref, row.key]), [[0, "ta:dune|frank herbert"]]);
+  db.close();
+});
+
+test("a save rejected for a stale version leaves the stored keys and glyph as they were", () => {
+  const { db, service } = setup();
+  const books = shelf(10);
+  const first = service.saveLibrary("u1", { books: [{ Title: "First", Attribution: "Writer" }] });
+  const second = service.saveLibrary("u1", { books, groups: [seriesGroup(books.slice(0, 3))] }, first.updatedAt);
+  const before = keyRows(db, "u1");
+
+  assert.throws(() => service.saveLibrary("u1", { books: [{ Title: "Stale", Attribution: "Writer" }] }, first.updatedAt), LibraryConflictError);
+  assert.throws(() => service.saveLibrary("u1", { books: [] }), LibraryConflictError);
+
+  assert.deepEqual(keyRows(db, "u1"), before);
+  assert.equal(storedGlyph(db, "u1"), "carto");
+  assert.equal(derivedSource(db, "u1"), second.updatedAt);
+  db.close();
+});
+
+test("the document and its derived rows are written in one transaction", () => {
+  const { db, repo } = setup();
+  const first = repo.upsertDocument("u1", JSON.stringify({ books: [] }), { glyph: null, keys: [] })!;
+  const row = { key: "ta:a|b", book_ref: 0, title: "A", author: "B", isbn: null, cover: null };
+
+  assert.throws(() => repo.upsertDocument("u1", JSON.stringify({ books: ["changed"] }), { glyph: null, keys: [row, row] }, first.updated_at), /UNIQUE/);
+
+  assert.equal(repo.getDocument("u1")?.data, JSON.stringify({ books: [] }));
+  assert.deepEqual(keyRows(db, "u1"), []);
+  assert.equal(derivedSource(db, "u1"), first.updated_at);
+  assert.ok(repo.upsertDocument("u1", JSON.stringify({ books: ["next"] }), { glyph: null, keys: [row] }, first.updated_at));
+  assert.equal(keyRows(db, "u1").length, 1);
+  db.close();
+});
+
+test("deleting a user's data clears the document and its derived rows, and only theirs", () => {
+  const { db, repo, service } = setup();
+  const books = shelf(10);
+  service.saveLibrary("gone", { books, groups: [seriesGroup(books.slice(0, 3))] });
+  service.saveLibrary("kept", { books: [{ Title: "Dune", Attribution: "Frank Herbert" }] });
+
+  repo.deleteUserData("gone");
+
+  assert.equal(repo.getDocument("gone"), undefined);
+  assert.equal(storedGlyph(db, "gone"), undefined);
+  assert.deepEqual(keyRows(db, "gone"), []);
+  assert.equal(keyRows(db, "kept").length, 1);
+  assert.equal(storedGlyph(db, "kept"), null);
+  db.close();
+});
+
+const dune = (extra: Book = {}): Book => ({ Title: "Dune", Attribution: "Frank Herbert", ISBN: "9780441013593", ...extra });
+const emma: Book = { Title: "Emma", Attribution: "Jane Austen" };
+
+test("the backfill derives every document that has no derived row", () => {
+  const books = shelf(10);
+  rawDocument("backfill-settled", JSON.stringify({ books, groups: [seriesGroup(books.slice(0, 3))] }));
+  rawDocument("backfill-odd", JSON.stringify({ books: [{ Title: "Dune", Attribution: { toString: 5 }, ISBN: "9780441013593", ReadStatus: 2 }] }));
+  fileService.saveLibrary("backfill-saved", { books: [{ Title: "Dune", Attribution: "Frank Herbert" }] });
+
+  backfillLibraryDerived();
+
+  assert.equal(storedGlyph(fileDb, "backfill-settled"), "carto");
+  assert.equal(keyRows(fileDb, "backfill-settled").length, 10);
+  assert.equal(keyRows(fileDb, "backfill-saved").length, 1);
+  assert.deepEqual(keyRows(fileDb, "backfill-odd").map((row) => row.key), ["isbn:9780441013593"]);
+  assert.equal(derivedSource(fileDb, "backfill-settled"), fileService.getLibrary("backfill-settled")?.updatedAt);
+});
+
+test("a backfill leaves rows that were derived from the current document alone", () => {
+  fileService.saveLibrary("noop-user", { books: [dune()] });
+  fileDb.prepare(`UPDATE library_derived SET glyph = 'star' WHERE user_id = 'noop-user'`).run();
+  fileDb.prepare(`DELETE FROM library_match_keys WHERE user_id = 'noop-user' AND key LIKE 'ta:%'`).run();
+
+  backfillLibraryDerived();
+  backfillLibraryDerived();
+
+  assert.equal(storedGlyph(fileDb, "noop-user"), "star");
+  assert.deepEqual(keyRows(fileDb, "noop-user").map((row) => row.key), ["isbn:9780441013593"]);
+});
+
+test("the backfill re-derives a library whose document was replaced behind its rows", () => {
+  fileService.saveLibrary("replaced-user", { books: [dune()] });
+  rawDocument("replaced-user", JSON.stringify({ books: [emma] }), "2099-01-01T00:00:00.000Z");
+
+  backfillLibraryDerived();
+
+  assert.deepEqual(keyRows(fileDb, "replaced-user").map((row) => row.key), ["ta:emma|jane austen"]);
+  assert.equal(derivedSource(fileDb, "replaced-user"), "2099-01-01T00:00:00.000Z");
+});
+
+test("the backfill deletes the derived rows of users who have no document", () => {
+  fileDb.prepare(`INSERT INTO library_derived (user_id, glyph, source_updated_at) VALUES ('orphan', 'star', '2026-01-01T00:00:00.000Z')`).run();
+  fileDb.prepare(`INSERT INTO library_match_keys (user_id, key, book_ref, title, author) VALUES ('orphan', 'ta:a|b', 0, 'A', 'B')`).run();
+  fileService.saveLibrary("not-orphan", { books: [dune()] });
+
+  backfillLibraryDerived();
+
+  assert.equal(storedGlyph(fileDb, "orphan"), undefined);
+  assert.deepEqual(keyRows(fileDb, "orphan"), []);
+  assert.equal(keyRows(fileDb, "not-orphan").length, 2);
+});
+
+test("the backfill stores an unparseable document without keys, says so, and does not retry it while it is unchanged", () => {
+  const logged = mock.method(console, "error", () => undefined);
+  try {
+    rawDocument("backfill-corrupt", "not json");
+
+    backfillLibraryDerived();
+    backfillLibraryDerived();
+
+    assert.equal(storedGlyph(fileDb, "backfill-corrupt"), null);
+    assert.deepEqual(keyRows(fileDb, "backfill-corrupt"), []);
+    assert.equal(logged.mock.callCount(), 1);
+
+    rawDocument("backfill-corrupt", JSON.stringify({ books: [{ Title: "Fixed", Attribution: "Writer" }] }), "2099-01-01T00:00:00.000Z");
+    backfillLibraryDerived();
+
+    assert.deepEqual(keyRows(fileDb, "backfill-corrupt").map((row) => row.key), ["ta:fixed|writer"]);
+    assert.equal(logged.mock.callCount(), 1);
+  } finally {
+    logged.mock.restore();
+  }
+});
+
+test("raising the derived version re-derives every library at the next backfill", () => {
+  const logged = mock.method(console, "error", () => undefined);
+  try {
+    fileService.saveLibrary("bump-a", { books: [dune()] });
+    fileService.saveLibrary("bump-b", { books: [emma] });
+    fileDb.prepare(`UPDATE library_derived SET glyph = 'star' WHERE user_id IN ('bump-a', 'bump-b')`).run();
+    backfillLibraryDerived();
+    assert.equal(storedGlyph(fileDb, "bump-a"), "star");
+
+    applyLibrarySchema(fileDb, LIBRARY_DERIVED_VERSION + 1);
+    assert.equal(storedGlyph(fileDb, "bump-a"), undefined);
+    backfillLibraryDerived();
+
+    assert.equal(storedGlyph(fileDb, "bump-a"), null);
+    assert.equal(storedGlyph(fileDb, "bump-b"), null);
+    assert.deepEqual(keyRows(fileDb, "bump-a").map((row) => row.key), ["isbn:9780441013593", "ta:dune|frank herbert"]);
+    assert.deepEqual(keyRows(fileDb, "bump-b").map((row) => row.key), ["ta:emma|jane austen"]);
+  } finally {
+    logged.mock.restore();
+  }
+});
+
+test("opening a database that holds the old derived tables rebuilds them once, in the new shape", () => {
+  const db = new DatabaseSync(":memory:");
+  db.exec(`
+    CREATE TABLE library_documents (user_id TEXT PRIMARY KEY, data TEXT NOT NULL, updated_at TEXT NOT NULL);
+    CREATE TABLE library_derived (user_id TEXT PRIMARY KEY, glyph TEXT);
+    CREATE TABLE library_match_keys (user_id TEXT NOT NULL, key TEXT NOT NULL, book_ref INTEGER NOT NULL, title TEXT NOT NULL, author TEXT NOT NULL, isbn TEXT, cover TEXT, PRIMARY KEY (user_id, key, book_ref)) WITHOUT ROWID;
+    INSERT INTO library_derived (user_id, glyph) VALUES ('old', 'star');
+    INSERT INTO library_match_keys (user_id, key, book_ref, title, author) VALUES ('old', 'ta:a|b', 0, 'A', 'B');
+  `);
+
+  applyLibrarySchema(db);
+
+  const columns = (db.prepare(`PRAGMA table_info(library_derived)`).all() as Array<{ name: string }>).map((column) => column.name);
+  assert.ok(columns.includes("source_updated_at"));
+  assert.equal(userVersion(db), LIBRARY_DERIVED_VERSION);
+  assert.equal(storedGlyph(db, "old"), undefined);
+  assert.deepEqual(keyRows(db, "old"), []);
+  const insertKey = (bookRef: number) => db.prepare(`INSERT INTO library_match_keys (user_id, key, book_ref, title, author) VALUES ('u', 'ta:a|b', ?, 'A', 'B')`).run(bookRef);
+  insertKey(0);
+  assert.throws(() => insertKey(1), /UNIQUE/);
+
+  db.prepare(`INSERT INTO library_derived (user_id, glyph, source_updated_at) VALUES ('new', NULL, '2026-01-01T00:00:00.000Z')`).run();
+  applyLibrarySchema(db);
+  assert.equal(storedGlyph(db, "new"), null);
+  assert.equal(keyRows(db, "u").length, 1);
+  db.close();
+});
+
+test("saving a library with a book whose fields aren't text succeeds, and keys the book by what is", () => {
+  const { db, service } = setup();
+  const books = [{ Title: "Dune", Attribution: { toString: 5 }, ISBN: "9780441013593", ReadStatus: 2 }, { Title: "Emma", Attribution: "Jane Austen", ReadStatus: 2 }];
+  service.saveLibrary("u1", { books });
+  assert.deepEqual(service.getLibrary("u1")?.data, { books });
+  assert.deepEqual(keyRows(db, "u1").map((row) => [row.book_ref, row.key]), [[0, "isbn:9780441013593"], [1, "ta:emma|jane austen"]]);
+  db.close();
+});
+
+test("sharedBookCounts counts each of the viewer's books once, however many keys match", () => {
+  fileService.saveLibrary("counts-viewer", { books: [dune(), emma] });
+  fileService.saveLibrary("counts-reader", { books: [dune()] });
+  assert.deepEqual(sharedBookCounts("counts-viewer", ["counts-reader"]), new Map([["counts-reader", 1]]));
+});
+
+test("sharedBookCounts counts a reader holding two copies of the viewer's book once", () => {
+  fileService.saveLibrary("copies-viewer", { books: [dune()] });
+  fileService.saveLibrary("copies-reader", { books: [dune({ ContentID: "kobo" }), { Title: "Dune", Attribution: "Frank Herbert" }] });
+  assert.deepEqual(sharedBookCounts("copies-viewer", ["copies-reader"]), new Map([["copies-reader", 1]]));
+});
+
+test("sharedBookCounts gives readers who each hold thousands of copies of a book a count of 1, in under a second", () => {
+  const library = { books: Array.from({ length: 5000 }, () => dune()) };
+  fileService.saveLibrary("many-viewer", library);
+  fileService.saveLibrary("many-reader", library);
+  const started = performance.now();
+  const counts = sharedBookCounts("many-viewer", ["many-reader"]);
+  assert.ok(performance.now() - started < 1000);
+  assert.deepEqual(counts, new Map([["many-reader", 1]]));
+  assert.deepEqual(sharedBooks("many-viewer", "many-reader", 3), [{ title: "Dune", author: "Frank Herbert", coverUrl: null }]);
+});
+
+test("sharedBookCounts leaves out readers outside the list and readers who share nothing", () => {
+  fileService.saveLibrary("scope-viewer", { books: [dune(), emma] });
+  fileService.saveLibrary("scope-listed", { books: [dune(), emma] });
+  fileService.saveLibrary("scope-strange", { books: [{ Title: "Other", Attribution: "Writer" }] });
+  fileService.saveLibrary("scope-unlisted", { books: [dune()] });
+  assert.deepEqual(sharedBookCounts("scope-viewer", ["scope-listed", "scope-strange", "scope-nobody"]), new Map([["scope-listed", 2]]));
+  assert.deepEqual(sharedBookCounts("scope-viewer", []), new Map());
+  assert.deepEqual(sharedBookCounts("scope-nobody", ["scope-listed"]), new Map());
+});
+
+test("sharedBookCounts matches an ISBN across editions, and a title to a copy that has no ISBN", () => {
+  fileService.saveLibrary("match-viewer", { books: [dune({ ISBN: "9780441172719" }), emma] });
+  fileService.saveLibrary("match-isbn", { books: [{ Title: "Dune (Deluxe Edition)", Attribution: "F. Herbert", ISBN: "978-0-441-17271-9" }] });
+  fileService.saveLibrary("match-title", { books: [{ Title: " EMMA ", Attribution: "Jane  Austen", ISBN: "9780141439587" }] });
+  fileService.saveLibrary("match-neither", { books: [{ Title: "Emma", Attribution: "Someone Else", ISBN: "9780000000002" }] });
+  assert.deepEqual(sharedBookCounts("match-viewer", ["match-isbn", "match-title", "match-neither"]), new Map([["match-isbn", 1], ["match-title", 1]]));
+});
+
+test("sharedBooks lists the viewer's own matched books in library order, one per book, up to the limit", () => {
+  const stoner = { Title: "Stoner", Attribution: "John Williams", ISBN: "9780394729685" };
+  fileService.saveLibrary("list-viewer", { books: [dune(), emma, { Title: "Unshared", Attribution: "Nobody" }, stoner] });
+  fileService.saveLibrary("list-reader", { books: [stoner, emma, dune()] });
+  const entry = (book: Book) => ({ title: book.Title, author: book.Attribution, coverUrl: null });
+  assert.deepEqual(sharedBooks("list-viewer", "list-reader", 10), [entry(dune()), entry(emma), entry(stoner)]);
+  assert.deepEqual(sharedBooks("list-viewer", "list-reader", 2), [entry(dune()), entry(emma)]);
+  assert.deepEqual(sharedBooks("list-viewer", "list-nobody", 10), []);
+});
+
+test("sharedBooks shows the viewer's cover and never one planted in the other reader's library", () => {
+  fileService.saveLibrary("cover-viewer", { books: [dune({ _coverUrl: "https://own.example/cover.jpg" })] });
+  fileService.saveLibrary("cover-spy", { books: [dune({ _coverUrl: "https://attacker.example/pixel" })] });
+  assert.deepEqual(sharedBooks("cover-viewer", "cover-spy", 3), [{ title: "Dune", author: "Frank Herbert", coverUrl: "https://own.example/cover.jpg" }]);
+});
+
+test("sharedBooks falls back to the cached cover for a book with none of its own, never the other reader's", () => {
+  fileService.saveLibrary("cache-viewer", { books: [{ Title: "Emma", Attribution: "Jane Austen", ISBN: "9780141439587" }] });
+  fileService.saveLibrary("cache-spy", { books: [{ Title: "Emma", Attribution: "Jane Austen", ISBN: "9780141439587", _coverUrl: "https://attacker.example/pixel" }] });
+  assert.equal(sharedBooks("cache-viewer", "cache-spy", 3)[0]?.coverUrl, null);
+
+  const covers = new DatabaseSync(process.env.COVERS_DB_PATH!);
+  covers.prepare(`INSERT INTO books (id, title, author, isbn, cover_image_id, cover_status, created_at) VALUES ('emma-book', '', '', '9780141439587', '0f2b6c3e-5d1a-4b7e-9c40-1a2b3c4d5e6f', 'good', ?)`).run(new Date().toISOString());
+  covers.prepare(`INSERT INTO book_keys (key, book_id) VALUES ('isbn:9780141439587', 'emma-book')`).run();
+  covers.close();
+
+  const cached = peekCachedCoverUrl({ isbn: "9780141439587" });
+  assert.ok(cached);
+  assert.deepEqual(sharedBooks("cache-viewer", "cache-spy", 3), [{ title: "Emma", author: "Jane Austen", coverUrl: cached }]);
 });

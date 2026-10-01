@@ -20,11 +20,11 @@
 //      refresh token is real, correctly hashed, and stays valid for
 //      whatever backend/src/config/env.ts's ACCESS/REFRESH_TOKEN_TTL says.
 //   4. writes the fixture library (scripts/fixtures/library.json) straight
-//      into library_documents — a raw row, not a request: that table is an
-//      opaque per-user blob (see its own schema.sql), so there's no
-//      service logic worth going through for it. Only on first creation,
-//      or with --reset: a plain re-run leaves an existing account's
-//      library alone so testing progress survives.
+//      into library_documents — a raw row, not a request, so no service
+//      logic runs; the next boot's backfill sees its new updated_at and
+//      re-derives that user's library_derived and library_match_keys rows.
+//      Only on first creation, or with --reset: a plain re-run leaves an
+//      existing account's library alone so testing progress survives.
 //   5. writes the refresh token into mobile/.env.local as
 //      EXPO_PUBLIC_DEV_REFRESH_TOKEN, which mobile/src/core/devSession.ts
 //      picks up on next boot (dev builds only — see that file's own

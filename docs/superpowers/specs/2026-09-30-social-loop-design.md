@@ -13,7 +13,8 @@ the app broadcasts but never answers back:
 - **You can't answer anyone.** A feed row's only action is "Follow back".
   There are no replies, reactions or reports anywhere in the schema.
 - **Hard to become visible.** Since #74 every username is findable, but an
-  unpublished user can't be followed. Publishing needs a mural, and reading
+  unpublished user shows as Private, with no Follow button, and their page
+  says only "This profile is private". Publishing needs a mural, and reading
   activity is off by default (`DEFAULT_FEED_SETTINGS`).
 - **No reason to follow anyone.** People search stays empty until you type,
   and nothing suggests readers.
@@ -250,7 +251,8 @@ new events at vote time was considered and rejected:
 `{ kind: "participation", id: "<kind>:<gameId>", game, actors, count, createdAt: latestAt }`
 rows into the existing keyset stream on `(createdAt, id)`.
 
-**Page 1 carries three new fields** in place of `newCount`:
+**Page 1 carries three new fields** next to `newCount`, which stays for
+installed builds:
 - `seenAt`, the viewer's marker before this visit;
 - `personalNewCount`, participation and follow rows newer than `seenAt`
   (replies and picks join in steps 4 and 5);
@@ -286,7 +288,8 @@ Clients display at most "99+".
   does for profiles.
 - `DashboardFeedPage` becomes
   `{ items, nextCursor, seenAt, personalNewCount, followingNewCount }`, and
-  every consumer is updated in the same step.
+  current clients read only these fields. `newCount` stays in the response
+  for installed builds and counts only the kinds they asked for.
 
 ### Mobile
 
@@ -350,15 +353,17 @@ Clients display at most "99+".
   three shared covers. If fewer than five suggestions have any overlap, the
   list fills with recently active published readers.
 - **Matching:** two books match when their ISBN key *or* their
-  title-and-author key match, using `bookKey`'s normalization. A small shared
-  `bookMatchKeys(book)` returns both keys, because `bookKey` returns only
-  one.
+  title-and-author key match. A shared `bookMatchKeys(book)` builds both from
+  `matchFacts`, the de-duplication rule in `bookMatch.ts`: the ISBN is
+  canonicalised (ISBN-10 to 13), and the title-and-author key uses the whole
+  normalized title and the first author, and exists only when both are
+  present.
 - **Privacy:** only data already public on a published profile is used (its
   Library tab shows titles and statuses). Private users never appear.
-- **Endpoint:** `GET /community/people/suggested?limit=` (authed). It is
-  computed per request over the 500 most recently updated published profiles
-  through the existing `resolveLibrary` dep, which is enough at current
-  scale.
+- **Endpoint:** `GET /community/people/suggested?limit=` (authed). It ranks
+  the 500 most recently updated published profiles by match keys the library
+  module stores whenever a library is saved, so a request never parses a
+  library document.
 
 ### A profile without a mural
 
@@ -373,11 +378,65 @@ Clients display at most "99+".
 ### A clear choice about reading visibility
 
 - **Publishing asks one question with nothing preselected:** "Share what you
-  read and finish with followers?" The answers are **Share my reading** or
-  **Keep my reading private**. It sets `feedSettings.reading`, and Feed
-  settings still changes it later.
+  add and finish on your page and with followers?" The answers are **Share
+  my reading** or **Don't share my reading**, with equal visual weight. It
+  sets `feedSettings.reading`, and Feed settings still changes it later.
+- **The dialog says what becomes public:** "It becomes a public page at
+  /u/<username> with your library, and readers can find and follow you."
+  The library and its statuses are public either way. The answer only
+  decides whether added and finished books also show in the page's
+  Activity and in followers' feeds. So the answer can't promise "private".
 - **Existing published users** keep their current setting and are not asked
   again.
+
+### Decided while planning step 3
+
+- **The publish body** is `{ muralId?: string, shareReading?: boolean }`.
+  - Both fields are optional, so old clients keep working.
+  - `shareReading` sets `feedSettings.reading` in the same request.
+  - Publishing without a mural emits no `mural_published` event.
+- **Suggestion rows reuse `PersonResult`**, plus `sharedCount` and up to three
+  `sharedBooks: { title, author, coverUrl }`.
+  - The shared books are the viewer's own copies: their title, author and
+    cover, never the other reader's. A cover URL from someone else's library
+    could be a tracking pixel that reveals which books the viewer owns.
+  - The reason text comes from a shared `suggestionReason`: "You share 6
+    books", "You share 1 book", or "Recently active" for fill rows.
+- **Ranking** is by books in common, then by profile recency (`updated_at`).
+  The scan covers up to 500 published profiles, and the default limit is 20.
+- **Both clients' People tabs** show the suggestions whenever the search box
+  is empty.
+
+### Decided while finishing step 3
+
+- **Clients publish with `{ shareReading }` only.** The server keeps the
+  current shelf mural itself, computed exactly as the own-profile `muralId`
+  is. Sending a cached id could undo a shelf switch made on another device.
+  `muralId` stays accepted for old clients.
+- **`GET /community/people/suggested` has its own 30/min limit.**
+- **Libraries are read when saved, not on every request.** The library module
+  stores each user's match keys, the display fields of their own books and
+  their reader glyph in the same transaction as the document. Each book
+  contributes at most one row per key, long keys are skipped, and display
+  fields are truncated. A startup backfill derives any library whose rows are
+  missing or older than its document. Bumping `LIBRARY_DERIVED_VERSION`
+  rebuilds them all. Suggestions count shared books in SQL, and glyph lookups
+  read the stored value. Before this, each request parsed up to 500
+  libraries of up to 25 MB, so a few large ones could stall the server.
+- **Following needs a published profile, or a follower.** The API used to
+  accept any username, which let anyone follow a private user and read their
+  activity in a dashboard. Following back someone who follows you still
+  works.
+- **Rows show one caption from a shared `personCaption`:** the reason on a
+  suggestion, otherwise "Private" or the follower count.
+- **People search failures say so.** Mobile used to show "No people found";
+  both clients now show "Couldn't search." with Retry, and a failed follow
+  shows "Couldn't update who you follow."
+- **Read-only murals on mobile fit their content.** Only the editor and an
+  empty mural keep the 520-point minimum, so a profile without a mural no
+  longer pushes Follow below an empty canvas.
+- **"Recently active"** means the profile's `updated_at`: publishing, a
+  shelf switch or a feed-settings save. It is not reading activity.
 
 ### Testing
 
@@ -500,8 +559,10 @@ quiz names), with no report path yet.
 
 - **Account deletion:** community's `deleteUserData` also removes replies,
   reports, blocks, polls and votes.
-- **Rate limits:** the new routes fall under community's existing 30/min
-  module scope.
+- **Rate limits:** community's 30/min limiter covers only its public routes;
+  its authed routes have none. Each new authed route that writes user content
+  (replies, reports, polls, votes) or is expensive registers its own 30/min
+  limit, as `GET /community/people/suggested` does.
 - **Parity:** every step ships on web and mobile.
 - **Notifications stay in-app.** Push is out of scope.
 - **Installed builds keep working.** Clients send `kinds`, the digest kinds

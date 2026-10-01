@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import type { DiscoverType } from "@scripta/shared/community";
 import { ApiError } from "../api/client";
-import { fetchActivity, fetchCommunityProfile, fetchDiscover, fetchPeople, fetchProfileLibrary } from "../api/community";
+import { fetchActivity, fetchCommunityProfile, fetchDiscover, fetchPeople, fetchProfileLibrary, fetchSuggestedPeople } from "../api/community";
 
 export function useCommunityActivity(username: string) {
   const query = useInfiniteQuery({
@@ -45,8 +45,13 @@ export function useCommunityDiscover(type: DiscoverType, q: string) {
 }
 
 export function useCommunityPeople(q: string) {
-  const query = useQuery({ queryKey: ["community", "people", q], queryFn: () => fetchPeople(q), enabled: q.trim().length > 0, retry: false });
+  const query = useQuery({ queryKey: ["community", "people", "search", q], queryFn: () => fetchPeople(q), enabled: q.trim().length > 0, retry: false });
   return { people: query.data ?? [], isLoading: query.isPending, error: query.error, refetch: query.refetch };
+}
+
+export function useSuggestedPeople(enabled: boolean) {
+  const query = useQuery({ queryKey: ["community", "people", "suggested"], queryFn: fetchSuggestedPeople, enabled, retry: false, staleTime: 30_000 });
+  return { people: query.data ?? [], error: query.error, refetch: query.refetch };
 }
 
 export function useCommunityProfile(username: string) {
