@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
-import { SourcePausedError } from "../../domain/errors.js";
+import { SourcePausedError, SourceUnavailableError } from "../../domain/errors.js";
 import { createThrottle, type Throttle } from "../http/http.js";
 import { appleArtworkUrl, createAppleSource, parseAppleResults, storefrontsFor } from "./apple.js";
 import { createIsbndbGate } from "../isbndb/isbndbGate.js";
@@ -129,5 +129,16 @@ test("a call queued behind the one that exhausts the quota never reaches ISBNdb"
   const results = await Promise.allSettled([get("https://api2.isbndb.com/book/1"), get("https://api2.isbndb.com/book/2")]);
   assert.deepEqual(results.map((result) => result.status === "rejected" && result.reason instanceof SourcePausedError), [true, true]);
   assert.equal(urls.length, 1);
+  assert.equal(pauses.length, 1);
+});
+
+test("a 429 that lifts in a second is retried per book, one that lifts in an hour pauses ISBNdb", async () => {
+  const pauses: number[] = [];
+  const get = createIsbndbGet("k", direct, createIsbndbGate({ onPause: ({ until }) => pauses.push(until) }));
+  stub(() => new Response("", { status: 429, headers: { "retry-after": "1" } }));
+  await assert.rejects(get("https://api2.isbndb.com/book/1"), (error: unknown) => error instanceof SourceUnavailableError && !(error instanceof SourcePausedError) && error.status === 429);
+  assert.deepEqual(pauses, []);
+  stub(() => new Response("", { status: 429, headers: { "retry-after": "3600" } }));
+  await assert.rejects(get("https://api2.isbndb.com/book/1"), SourcePausedError);
   assert.equal(pauses.length, 1);
 });

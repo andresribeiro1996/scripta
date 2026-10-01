@@ -58,15 +58,44 @@ test("a rejected key pauses until midnight with reason key", async () => {
   }
 });
 
-test("a burst of failures starts one pause", async () => {
+test("a burst of failures of one kind starts one pause", async () => {
   const h = harness();
   const burst = await Promise.allSettled([
     h.gate.run(h.fail("Daily quota exceeded", { status: 429 })),
     h.gate.run(h.fail("Daily quota exceeded", { status: 429 })),
-    h.gate.run(h.fail("HTTP 403", { status: 403 }))
+    h.gate.run(h.fail("HTTP 429", { status: 429, quota: true }))
   ]);
   assert.ok(burst.every((result) => result.status === "rejected" && result.reason instanceof SourcePausedError));
   assert.equal(h.pauses.length, 1);
+});
+
+test("a rejected key that was already in flight during a quota pause starts a key pause once", async () => {
+  const h = harness();
+  const until = NOON + 3_600_000;
+  const results = await Promise.allSettled([
+    h.gate.run(h.fail("HTTP 429", { status: 429, retryAt: until })),
+    h.gate.run(h.fail("HTTP 403", { status: 403 })),
+    h.gate.run(h.fail("HTTP 401", { status: 401 }))
+  ]);
+  assert.ok(results.every((result) => result.status === "rejected" && result.reason instanceof SourcePausedError));
+  assert.equal((results[1] as PromiseRejectedResult).reason.retryAt, MIDNIGHT);
+  assert.deepEqual(h.pauses, [{ reason: "quota", until }, { reason: "key", until: MIDNIGHT }]);
+});
+
+test("a quota failure during a key pause stays silent", async () => {
+  const h = harness();
+  await Promise.allSettled([
+    h.gate.run(h.fail("HTTP 401", { status: 401 })),
+    h.gate.run(h.fail("Daily quota exceeded", { status: 429 }))
+  ]);
+  assert.deepEqual(h.pauses, [{ reason: "key", until: MIDNIGHT }]);
+});
+
+test("a 429 that lifts within a minute is the per-second limit: no pause, rethrown as is", async () => {
+  const h = harness();
+  const error = new SourceUnavailableError("isbndb", "HTTP 429", { status: 429, retryAt: NOON + 1000 });
+  await assert.rejects(h.gate.run(async () => { throw error; }), (caught: unknown) => caught === error);
+  assert.deepEqual(h.pauses, []);
 });
 
 test("while paused the call is not made, and after the pause it is", async () => {
