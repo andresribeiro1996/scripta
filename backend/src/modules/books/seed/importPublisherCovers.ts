@@ -3,6 +3,7 @@ import { MIN_GOOD_WIDTH } from "../domain/constants.js";
 import { SourceUnavailableError } from "../domain/errors.js";
 import { encodeCover, isAcceptableCover } from "../domain/images.js";
 import type { BooksRepository, CoverBlobStore } from "../domain/ports.js";
+import type { BookRow } from "../domain/types.js";
 import { feedProducts, feedUrl, isDisallowed, parseRobots, parseShopifyProducts, parseWooProducts, type PublisherBook } from "./publisherFeed.js";
 import type { PublisherSite } from "./publishers.js";
 import { seedBook } from "./seedCatalog.js";
@@ -27,7 +28,7 @@ export interface ImportDeps {
   fetchText(url: string): Promise<{ status: number; text: string }>;
   fetchBytes(url: string): Promise<Buffer | null>;
   lookupOpenLibrary(isbn: string): Promise<{ title: string; author: string } | null>;
-  repo: Pick<BooksRepository, "findBookByKey" | "createBook" | "getImage" | "insertImage" | "setCover" | "listRejectedUrls" | "setUpgradeWanted">;
+  repo: Pick<BooksRepository, "findBookByKey" | "getBook" | "createBook" | "getImage" | "insertImage" | "setCover" | "listRejectedUrls" | "setUpgradeWanted">;
   blobs: CoverBlobStore;
   now: () => Date;
   sleep: (ms: number) => Promise<void>;
@@ -61,9 +62,10 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
   const books: PublisherBook[] = [];
   try {
     const robots = await request(() => deps.fetchText(`${site.origin}/robots.txt`));
-    if (robots.status !== 200) throw new SiteSkipped(`robots.txt answered HTTP ${robots.status}`);
-    const rules = parseRobots(robots.text);
-    if (isDisallowed(new URL(feedUrl(site, 1)).pathname, rules.disallow)) throw new SiteSkipped("robots.txt disallows the feed");
+    if (robots.status !== 200 && robots.status !== 404) throw new SiteSkipped(`robots.txt answered HTTP ${robots.status}`);
+    const rules = robots.status === 200 ? parseRobots(robots.text) : { disallow: [], crawlDelayMs: null };
+    const feed = new URL(feedUrl(site, 1));
+    if (isDisallowed(feed.pathname + feed.search, rules.disallow)) throw new SiteSkipped("robots.txt disallows the feed");
     waitMs = Math.max(MIN_WAIT_MS, rules.crawlDelayMs ?? 0);
     for (let page = 1; ; page++) {
       if (page > MAX_PAGES) throw new SiteSkipped("feed has no end");
@@ -88,10 +90,21 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
     throw error;
   }
 
-  const seen = new Set<string>();
-  const unique = books.filter((book) => !seen.has(book.isbn) && seen.add(book.isbn));
+  const strongest = new Map<string, PublisherBook>();
+  for (const book of books) {
+    const kept = strongest.get(book.isbn);
+    if (!kept || book.rank < kept.rank) strongest.set(book.isbn, book);
+  }
+  const unique = [...strongest.values()];
   report.books = unique.length;
   if (unique.length > 0) report.imageUrlPrefix = commonPrefix(unique.map((book) => book.imageUrl));
+
+  const settle = (row: BookRow, imageUrl: string, width: number | null): "unchanged" | "rejectedImage" | null => {
+    const current = row.cover_image_id ? deps.repo.getImage(row.cover_image_id) : undefined;
+    if (current && (current.source === "upload" || current.source === "publisher" || current.source_url === imageUrl)) return "unchanged";
+    if (deps.repo.listRejectedUrls(row.id).has(imageUrl)) return "rejectedImage";
+    return width !== null && width < MIN_GOOD_WIDTH && row.cover_image_id ? "unchanged" : null;
+  };
 
   for (const book of unique) {
     let row = deps.repo.findBookByKey(`isbn:${book.isbn}`);
@@ -106,11 +119,12 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
           report.failed++;
           continue;
         }
-        if (!found) {
+        if (found) ({ title, author } = found);
+        else {
           report.noAuthor++;
-          continue;
+          title = "";
+          author = "";
         }
-        ({ title, author } = found);
       }
       report.created++;
       if (options.dryRun) {
@@ -120,13 +134,9 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
       row = seedBook({ isbn: book.isbn, title, author }, deps.repo, deps.now).book!;
     }
 
-    const current = row.cover_image_id ? deps.repo.getImage(row.cover_image_id) : undefined;
-    if (current?.source === "upload" || current?.source_url === book.imageUrl) {
-      report.unchanged++;
-      continue;
-    }
-    if (deps.repo.listRejectedUrls(row.id).has(book.imageUrl)) {
-      report.rejectedImage++;
+    const before = settle(row, book.imageUrl, null);
+    if (before) {
+      report[before]++;
       continue;
     }
     if (options.dryRun) {
@@ -146,8 +156,10 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
       report.rejectedImage++;
       continue;
     }
-    if (image.width < MIN_GOOD_WIDTH && row.cover_image_id) {
-      report.unchanged++;
+    const fresh = deps.repo.getBook(row.id)!;
+    const after = settle(fresh, book.imageUrl, image.width);
+    if (after) {
+      report[after]++;
       continue;
     }
     const at = deps.now().toISOString();

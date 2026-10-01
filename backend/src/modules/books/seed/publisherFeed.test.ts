@@ -56,11 +56,26 @@ test("Shopify parsing builds the product URL and takes the author from the vendo
 
 test("WooCommerce parsing finds the ISBN in the image file name, decodes entities and drops the rest", () => {
   const books = parseWooProducts(woo, relogio);
-  assert.deepEqual(books.map((book) => book.isbn), ["9789897837579", "9789897837821", "9789897837142", "9789899061330", "9789726085003"]);
+  assert.deepEqual(books.map((book) => book.isbn), ["9789897837579", "9789897837821", "9789897837142", "9789899061330", "9789726085003", "9789899061354"]);
   assert.equal(books[0]?.productUrl, "https://www.relogiodagua.pt/produto/guerra-branca-na-frente-artica-do-conflito-mundial/");
   assert.equal(books[3]?.title, "Livro com SKU – Edição & Notas");
-  assert.ok(books.every((book) => book.author === null));
-  assert.equal(feedProducts(woo, relogio)?.length, 7);
+  assert.deepEqual(books.map((book) => book.author), [null, null, null, null, null, "Raquel Serejo Martins"]);
+  assert.equal(feedProducts(woo, relogio)?.length, 8);
+});
+
+test("WooCommerce author joins the terms of an attribute named Autor and ignores other attributes", () => {
+  const product = (attributes: object[]) => [{ name: "Livro", permalink: "https://x.example/livro/", sku: "9789726084679", images: [{ src: "https://x.example/a.jpg" }], attributes }];
+  const terms = (...names: string[]) => names.map((name) => ({ name }));
+  assert.equal(parseWooProducts(product([{ name: "Autores", terms: terms("A B", "C D") }]), relogio)[0]?.author, "A B, C D");
+  assert.equal(parseWooProducts(product([{ name: "Tradutor", terms: terms("E F") }]), relogio)[0]?.author, null);
+  assert.equal(parseWooProducts(product([{ name: "Autor", terms: [] }]), relogio)[0]?.author, null);
+});
+
+test("each book records the lookup step that found its ISBN", () => {
+  const shop = parseShopifyProducts(shopify, antigona);
+  assert.deepEqual(shop.map((book) => book.rank), [2, 2, 2, 0]);
+  const shelf = parseWooProducts(woo, relogio);
+  assert.deepEqual(shelf.map((book) => book.rank), [1, 1, 1, 0, 1, 1]);
 });
 
 test("parsers return nothing for a body of the wrong shape", () => {
@@ -102,4 +117,6 @@ test("isDisallowed matches prefixes, wildcards and end anchors", () => {
   assert.equal(isDisallowed("/products.json", ["/cart", "/*.json$"]), true);
   assert.equal(isDisallowed("/products.json", ["/*.xml$", "/cart"]), false);
   assert.equal(isDisallowed("/wp-json/wc/store/v1/products", ["/wp-admin/"]), false);
+  assert.equal(isDisallowed("/products.json?limit=250&page=1", ["/*page="]), true);
+  assert.equal(isDisallowed("/products.json?limit=250&page=1", ["/*sort="]), false);
 });

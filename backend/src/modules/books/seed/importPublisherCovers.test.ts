@@ -49,7 +49,7 @@ function product(isbn: string, title: string, image: string) {
   };
 }
 
-async function harness(options: { feeds?: Record<string, { status?: number; text?: string } | Error>; images?: Record<string, Buffer | null | Error>; lookup?: Deps["lookupOpenLibrary"] } = {}) {
+async function harness(options: { feeds?: Record<string, { status?: number; text?: string } | Error>; images?: Record<string, Buffer | null | Error>; lookup?: Deps["lookupOpenLibrary"]; beforeImage?: (url: string) => void } = {}) {
   const db = new DatabaseSync(":memory:");
   applyBooksMigrations(db);
   const repo = createSqliteBooksRepository(db);
@@ -68,11 +68,12 @@ async function harness(options: { feeds?: Record<string, { status?: number; text
       if (feed) return { status: feed.status ?? 200, text: feed.text ?? "" };
       if (url.endsWith("/robots.txt")) return { status: 200, text: "User-agent: *\nDisallow: /cart\n" };
       if (url.endsWith("&page=1")) return { status: 200, text: url.startsWith("https://antigona.pt") ? shopifyFeed : wooFeed };
-      return { status: 200, text: url.startsWith("https://antigona.pt") ? shopifyPage([]) : "[]" };
+      return { status: 200, text: url.includes("/products.json") ? shopifyPage([]) : "[]" };
     },
     fetchBytes: async (url) => {
       requests.push(url);
       imageRequests.push(url);
+      options.beforeImage?.(url);
       const image = options.images?.[url];
       if (image instanceof Error) throw image;
       return image === undefined ? good : image;
@@ -218,19 +219,34 @@ test("a new book without a vendor takes Open Library's title and author", async 
   const row = h.repo.findBookByKey(`isbn:${GUERRA}`)!;
   assert.equal(row.title, "Guerra Branca");
   assert.equal(row.author, "Bruno Maçães");
-  assert.equal(reports["Relógio d'Água"]!.created, 5);
+  assert.equal(reports["Relógio d'Água"]!.created, 6);
   assert.equal(h.lookups.length, 5);
 });
 
-test("a book with no author anywhere is counted and not created", async () => {
+test("a book with no author anywhere is still created, blank, and gets its cover", async () => {
   const h = await harness();
 
   const reports = await importPublisherCovers(h.deps, [relogio], { dryRun: false });
 
   assert.equal(reports["Relógio d'Água"]!.noAuthor, 5);
-  assert.equal(reports["Relógio d'Água"]!.created, 0);
-  assert.equal(h.bookCount(), 0);
-  assert.deepEqual(h.imageRequests, []);
+  assert.equal(reports["Relógio d'Água"]!.created, 6);
+  assert.equal(reports["Relógio d'Água"]!.coversSet, 6);
+  const row = h.repo.findBookByKey(`isbn:${GUERRA}`)!;
+  assert.equal(row.title, "");
+  assert.equal(row.author, "");
+  assert.equal(row.cover_status, "manual");
+  assert.equal(h.repo.getImage(row.cover_image_id!)!.source, "publisher");
+});
+
+test("a WooCommerce book with an Autor attribute needs no Open Library lookup", async () => {
+  const h = await harness();
+
+  await importPublisherCovers(h.deps, [relogio], { dryRun: false });
+
+  const row = h.repo.findBookByKey("isbn:9789899061354")!;
+  assert.equal(row.title, "Livro com Autor");
+  assert.equal(row.author, "Raquel Serejo Martins");
+  assert.ok(!h.lookups.includes("9789899061354"));
 });
 
 test("an Open Library outage counts the book as failed", async () => {
@@ -239,7 +255,7 @@ test("an Open Library outage counts the book as failed", async () => {
   const reports = await importPublisherCovers(h.deps, [relogio], { dryRun: false });
 
   assert.equal(reports["Relógio d'Água"]!.failed, 5);
-  assert.equal(h.bookCount(), 0);
+  assert.equal(h.bookCount(), 1);
 });
 
 test("a robots rule against the feed skips the site without asking for the feed", async () => {
@@ -251,12 +267,30 @@ test("a robots rule against the feed skips the site without asking for the feed"
   assert.deepEqual(h.requests, ["https://antigona.pt/robots.txt"]);
 });
 
-test("a robots.txt that is not served skips the site", async () => {
+test("a robots rule matching the feed query skips the site", async () => {
+  const h = await harness({ feeds: { "https://antigona.pt/robots.txt": { text: "User-agent: *\nDisallow: /*page=\n" } } });
+
+  const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  assert.match(reports["Antígona"]!.skipped!, /robots/);
+  assert.deepEqual(h.requests, ["https://antigona.pt/robots.txt"]);
+});
+
+test("a missing robots.txt means no restrictions", async () => {
   const h = await harness({ feeds: { "https://antigona.pt/robots.txt": { status: 404, text: "" } } });
 
   const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
 
-  assert.match(reports["Antígona"]!.skipped!, /404/);
+  assert.equal(reports["Antígona"]!.skipped, undefined);
+  assert.equal(reports["Antígona"]!.books, 4);
+});
+
+test("a robots.txt that answers another error skips the site", async () => {
+  const h = await harness({ feeds: { "https://antigona.pt/robots.txt": { status: 403, text: "" } } });
+
+  const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  assert.match(reports["Antígona"]!.skipped!, /403/);
 });
 
 test("a feed that is not JSON skips the site", async () => {
@@ -283,7 +317,7 @@ test("a timeout skips that site and the next site still imports", async () => {
 
   assert.match(reports["Antígona"]!.skipped!, /timeout/);
   assert.equal(reports["Relógio d'Água"]!.skipped, undefined);
-  assert.equal(reports["Relógio d'Água"]!.books, 5);
+  assert.equal(reports["Relógio d'Água"]!.books, 6);
 });
 
 test("a 400 past the last page ends the feed", async () => {
@@ -316,7 +350,7 @@ test("a dry run writes nothing and fetches no image", async () => {
   assert.equal(h.files.size, 0);
   assert.equal(reports["Antígona"]!.created, 3);
   assert.equal(reports["Antígona"]!.coversSet, 4);
-  assert.equal(reports["Relógio d'Água"]!.created, 5);
+  assert.equal(reports["Relógio d'Água"]!.created, 6);
 });
 
 test("an image fetch that is unavailable counts as failed and the run goes on", async () => {
@@ -353,4 +387,60 @@ test("requests to one site wait three seconds, or the longer crawl delay", async
   const fast = await harness({ feeds: { "https://antigona.pt/robots.txt": { text: "User-agent: *\nCrawl-delay: 1\n" } } });
   await importPublisherCovers(fast.deps, [antigona], { dryRun: false });
   assert.ok(fast.sleeps.every((ms) => ms === 3000));
+});
+
+test("a cover set by any publisher is left alone, so a second site's run changes nothing", async () => {
+  const first = await harness();
+  await importPublisherCovers(first.deps, [antigona], { dryRun: false });
+  const images = first.imageCount();
+  const other: Site = { name: "Outra", origin: "https://outra.example", platform: "shopify", authorFromVendor: true };
+  const feed = shopifyPage([product(MUSEU, "Museu", "https://cdn.example/outra/museu.jpg")]);
+  const second = { ...first.deps, fetchText: async (url: string) => (url.endsWith("&page=1") ? { status: 200, text: feed } : first.deps.fetchText(url)) };
+  first.imageRequests.length = 0;
+
+  const reports = await importPublisherCovers(second, [other], { dryRun: false });
+
+  assert.equal(reports["Outra"]!.unchanged, 1);
+  assert.equal(reports["Outra"]!.coversSet, 0);
+  assert.equal(first.imageCount(), images);
+  assert.deepEqual(first.imageRequests, []);
+});
+
+test("a book that gained an upload cover while its image downloaded is not written", async () => {
+  let bookId = "";
+  const h = await harness({ beforeImage: (url) => { if (url === MUSEU_IMAGE) addCover(h.repo, bookId, "upload", 900, null); } });
+  bookId = addBook(h.repo, MUSEU).id;
+
+  const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  const row = h.repo.getBook(bookId)!;
+  assert.equal(h.repo.getImage(row.cover_image_id!)!.source, "upload");
+  assert.equal(reports["Antígona"]!.unchanged, 1);
+  assert.equal(h.imageCount(), 1 + 3);
+});
+
+test("a sub-400 image is dropped when the book gained a cover while it downloaded", async () => {
+  let bookId = "";
+  const h = await harness({ images: { [MUSEU_IMAGE]: await png(300, 450) }, beforeImage: (url) => { if (url === MUSEU_IMAGE) addCover(h.repo, bookId, "apple", 800, "https://apple.example/c.jpg", "good"); } });
+  bookId = addBook(h.repo, MUSEU).id;
+
+  await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  assert.equal(h.repo.getImage(h.repo.getBook(bookId)!.cover_image_id!)!.source, "apple");
+});
+
+test("when two products give one ISBN, the one that matched on the strongest step supplies the image", async () => {
+  const weak = { ...product("9789726084000", "Fraco", "https://cdn.example/weak.jpg"), variants: [{}], body_html: `<p>ISBN ${MUSEU}</p>` };
+  const strong = { ...product(MUSEU, "Forte", "https://cdn.example/strong.jpg") };
+  const h = await harness({
+    feeds: {
+      "https://antigona.pt/products.json?limit=250&page=1": { text: shopifyPage([weak]) },
+      "https://antigona.pt/products.json?limit=250&page=2": { text: shopifyPage([strong]) }
+    }
+  });
+
+  const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  assert.equal(reports["Antígona"]!.books, 1);
+  assert.deepEqual(h.imageRequests, ["https://cdn.example/strong.jpg"]);
 });

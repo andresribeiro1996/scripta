@@ -126,6 +126,52 @@
     "attributes": []
   },
   {
+    "id": 9104,
+    "name": "Livro com Autor",
+    "slug": "livro-com-autor",
+    "permalink": "https://www.relogiodagua.pt/produto/livro-com-autor/",
+    "sku": "",
+    "short_description": "",
+    "description": "",
+    "images": [
+      {
+        "id": 91041,
+        "src": "https://www.relogiodagua.pt/wp-content/uploads/2026/09/9789899061354.jpg",
+        "name": "capa",
+        "alt": ""
+      }
+    ],
+    "categories": [],
+    "attributes": [
+      {
+        "id": 3,
+        "name": "Autor",
+        "taxonomy": "pa_autor",
+        "has_variations": false,
+        "terms": [
+          {
+            "id": 41,
+            "name": "Raquel Serejo Martins",
+            "slug": "raquel-serejo-martins"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "name": "Tradutor",
+        "taxonomy": "pa_tradutor",
+        "has_variations": false,
+        "terms": [
+          {
+            "id": 42,
+            "name": "Outra Pessoa",
+            "slug": "outra-pessoa"
+          }
+        ]
+      }
+    ]
+  },
+  {
     "id": 14527,
     "name": "Marcador Alquimia (2)",
     "slug": "marcador-alquimia-2",

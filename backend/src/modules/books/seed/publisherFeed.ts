@@ -7,6 +7,7 @@ export interface PublisherBook {
   author: string | null;
   imageUrl: string;
   productUrl: string;
+  rank: number;
 }
 
 const ISBN_CANDIDATE = /(?<!\d)97[89](?:[\p{Pd}\s.]?\d){10}(?!\d)/gu;
@@ -46,10 +47,12 @@ function fileName(url: string): string {
   return url.split("?")[0]!.split("/").pop() ?? "";
 }
 
-function firstIsbn(candidates: string[]): string | null {
-  for (const candidate of candidates) {
-    const isbn = findPortugalIsbn(candidate);
-    if (isbn) return isbn;
+function firstIsbn(steps: string[][]): { isbn: string; rank: number } | null {
+  for (const [rank, candidates] of steps.entries()) {
+    for (const candidate of candidates) {
+      const isbn = findPortugalIsbn(candidate);
+      if (isbn) return { isbn, rank };
+    }
   }
   return null;
 }
@@ -76,17 +79,25 @@ export function parseShopifyProducts(json: unknown, site: PublisherSite): Publis
     const title = text(product.title).trim();
     if (!imageUrl || !handle || !title) return [];
     const variants = (Array.isArray(product.variants) ? product.variants : []).map(record).filter((variant) => variant !== null);
-    const isbn = firstIsbn([
-      ...variants.map((variant) => text(variant.barcode)),
-      ...variants.map((variant) => text(variant.sku)),
-      fileName(imageUrl),
-      JSON.stringify(product)
+    const found = firstIsbn([
+      [...variants.map((variant) => text(variant.barcode)), ...variants.map((variant) => text(variant.sku))],
+      [fileName(imageUrl)],
+      [JSON.stringify(product)]
     ]);
-    if (!isbn) return [];
+    if (!found) return [];
     const vendor = text(product.vendor).trim();
     const author = site.authorFromVendor && vendor && normalizeWords(vendor) !== normalizeWords(site.name) ? vendor : null;
-    return [{ isbn, title, author, imageUrl, productUrl: `${site.origin}/products/${handle}` }];
+    return [{ ...found, title, author, imageUrl, productUrl: `${site.origin}/products/${handle}` }];
   });
+}
+
+function wooAuthor(product: Record<string, unknown>): string | null {
+  const names = (Array.isArray(product.attributes) ? product.attributes : []).flatMap((item) => {
+    const attribute = record(item);
+    if (!attribute || !/^autor/i.test(text(attribute.name))) return [];
+    return (Array.isArray(attribute.terms) ? attribute.terms : []).map((term) => text(record(term)?.name).trim()).filter(Boolean);
+  });
+  return names.length > 0 ? names.join(", ") : null;
 }
 
 export function parseWooProducts(json: unknown, site: PublisherSite): PublisherBook[] {
@@ -97,8 +108,8 @@ export function parseWooProducts(json: unknown, site: PublisherSite): PublisherB
     const productUrl = text(product.permalink);
     const title = decodeEntities(text(product.name)).trim();
     if (!imageUrl || !productUrl || !title) return [];
-    const isbn = firstIsbn([text(product.sku), fileName(imageUrl), JSON.stringify(product)]);
-    return isbn ? [{ isbn, title, author: null, imageUrl, productUrl }] : [];
+    const found = firstIsbn([[text(product.sku)], [fileName(imageUrl)], [JSON.stringify(product)]]);
+    return found ? [{ ...found, title, author: wooAuthor(product), imageUrl, productUrl }] : [];
   });
 }
 
