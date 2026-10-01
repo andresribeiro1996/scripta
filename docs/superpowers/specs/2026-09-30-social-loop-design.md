@@ -251,7 +251,8 @@ new events at vote time was considered and rejected:
 `{ kind: "participation", id: "<kind>:<gameId>", game, actors, count, createdAt: latestAt }`
 rows into the existing keyset stream on `(createdAt, id)`.
 
-**Page 1 carries three new fields** in place of `newCount`:
+**Page 1 carries three new fields** next to `newCount`, which stays for
+installed builds:
 - `seenAt`, the viewer's marker before this visit;
 - `personalNewCount`, participation and follow rows newer than `seenAt`
   (replies and picks join in steps 4 and 5);
@@ -287,7 +288,8 @@ Clients display at most "99+".
   does for profiles.
 - `DashboardFeedPage` becomes
   `{ items, nextCursor, seenAt, personalNewCount, followingNewCount }`, and
-  every consumer is updated in the same step.
+  current clients read only these fields. `newCount` stays in the response
+  for installed builds and counts only the kinds they asked for.
 
 ### Mobile
 

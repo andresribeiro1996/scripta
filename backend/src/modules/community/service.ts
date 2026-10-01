@@ -102,7 +102,7 @@ export interface CommunityService {
   getOwnProfile(userId: string): OwnProfile;
   setShelfMural(userId: string, muralId: string): void;
   getProfileByUsername(username: string, viewerId?: string): PublicProfileView;
-  getDashboard(viewerId: string, cursor: string | undefined, limit: number, kinds?: ReadonlySet<string>): DashboardFeedPage;
+  getDashboard(viewerId: string, cursor: string | undefined, limit: number, kinds?: ReadonlySet<string>): DashboardFeedPage & { newCount: number };
   markDashboardSeen(viewerId: string): void;
   getDiscover(type: DiscoverType, q: string, limit: number, offset: number, viewerId?: string): { items: DiscoverItem[]; nextOffset: number | null };
   searchPeople(viewerId: string, q: string, limit: number): PersonResult[];
@@ -368,12 +368,12 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
         if (last) pageBound = { keyset: last };
       }
       const nextCursor = more && last ? encodeCursor({ createdAt: last.createdAt, id: last.id }) : null;
-      if (keyset) return { items, nextCursor, seenAt: null, personalNewCount: 0, followingNewCount: 0 };
+      if (keyset) return { items, nextCursor, seenAt: null, personalNewCount: 0, followingNewCount: 0, newCount: 0 };
       const seenAt = deps.getDashboardSeenAt(viewerId);
       const countBound: Bound = seenAt ? { since: seenAt } : {};
       const personalNewCount = countItems([...followers(countBound, DASHBOARD_COUNT_CAP), ...participationRows(participation, countBound)], followees);
       const followingNewCount = countItems(followingWindows(followees, countBound, DASHBOARD_COUNT_CAP, kinds).flat(), followees);
-      return { items, nextCursor, seenAt, personalNewCount, followingNewCount };
+      return { items, nextCursor, seenAt, personalNewCount, followingNewCount, newCount: seenAt ? personalNewCount + followingNewCount : 0 };
     },
     markDashboardSeen(viewerId) {
       deps.setDashboardSeenAt(viewerId, new Date().toISOString());

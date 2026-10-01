@@ -1041,9 +1041,10 @@ test("only the participants that get named have a glyph looked up", () => {
   assert.deepEqual(readerGlyphCalls, ["p2", "p3", "p4"]);
 });
 
-function serviceWithEveryKindOfRow(): CommunityService {
+function serviceWithEveryKindOfRow(seen: string | null = null): CommunityService {
   const { repo } = createRepoFake();
-  const { deps, readerProfiles, tierlistRefs, tierlistParticipation, tournamentParticipation, quizParticipation } = createDeps(repo);
+  const { deps, readerProfiles, seenAt, tierlistRefs, tierlistParticipation, tournamentParticipation, quizParticipation } = createDeps(repo);
+  seenAt.value = seen;
   const service = createCommunityService(deps);
   for (const id of ["alice", "bob"]) readerProfiles.set(id, reader(id));
   repo.upsertProfile(profileRow("alice"));
@@ -1067,6 +1068,34 @@ test("a dashboard without kinds gets only the four kinds builds before step 2 ca
   assert.deepEqual(page.items.map((item) => item.kind), ["follow", "reading", "vote", "publication"]);
   assert.equal(page.personalNewCount, 1);
   assert.equal(page.followingNewCount, 3);
+});
+
+test("a dashboard without kinds also returns newCount, the two counts together, for builds that predate them", () => {
+  const page = serviceWithEveryKindOfRow(at(2)).getDashboard("viewer", undefined, 20);
+  assert.equal(page.personalNewCount, 1);
+  assert.equal(page.followingNewCount, 3);
+  assert.equal(page.newCount, 4);
+});
+
+test("newCount counts only the kinds the client lists", () => {
+  const page = serviceWithEveryKindOfRow(at(2)).getDashboard("viewer", undefined, 20, new Set(["publication", "follow"]));
+  assert.equal(page.personalNewCount, 1);
+  assert.equal(page.followingNewCount, 1);
+  assert.equal(page.newCount, 2);
+});
+
+test("a cursor page returns a newCount of 0", () => {
+  const service = serviceWithEveryKindOfRow(at(2));
+  const first = service.getDashboard("viewer", undefined, 1);
+  assert.equal(first.newCount, 4);
+  assert.ok(first.nextCursor);
+  assert.equal(service.getDashboard("viewer", first.nextCursor, 1).newCount, 0);
+});
+
+test("with no seen marker newCount is 0, though every row counts toward the two newer counts", () => {
+  const page = serviceWithEveryKindOfRow().getDashboard("viewer", undefined, 20);
+  assert.equal(page.personalNewCount + page.followingNewCount, 4);
+  assert.equal(page.newCount, 0);
 });
 
 test("the kinds a client lists come back, and are counted", () => {

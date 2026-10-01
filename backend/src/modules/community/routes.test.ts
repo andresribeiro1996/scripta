@@ -34,7 +34,7 @@ function fakeService(overrides: Partial<CommunityService> = {}): CommunityServic
     getProfileByUsername: () => {
       throw new ProfileNotFoundError();
     },
-    getDashboard: () => ({ items: [], nextCursor: null, seenAt: null, personalNewCount: 0, followingNewCount: 0 }),
+    getDashboard: () => ({ items: [], nextCursor: null, seenAt: null, personalNewCount: 0, followingNewCount: 0, newCount: 0 }),
     markDashboardSeen: () => {},
     getDiscover: () => ({ items: [], nextOffset: null }),
     searchPeople: () => [],
@@ -402,7 +402,7 @@ test("dashboard routes pass cursor/limit through and mark seen", async () => {
       fakeService({
         getDashboard: (_viewerId, cursor, limit) => {
           seen.push({ cursor, limit });
-          return { items: [], nextCursor: null, seenAt: null, personalNewCount: 0, followingNewCount: 0 };
+          return { items: [], nextCursor: null, seenAt: null, personalNewCount: 0, followingNewCount: 0, newCount: 3 };
         },
         markDashboardSeen: () => {
           marked += 1;
@@ -413,6 +413,7 @@ test("dashboard routes pass cursor/limit through and mark seen", async () => {
   const auth = { authorization: "Bearer x" };
   const res = await app.inject({ method: "GET", url: "/community/dashboard?cursor=abc&limit=5", headers: auth });
   assert.equal(res.statusCode, 200);
+  assert.equal(res.json().newCount, 3);
   assert.deepEqual(seen, [{ cursor: "abc", limit: 5 }]);
   const seenRes = await app.inject({ method: "POST", url: "/community/dashboard/seen", headers: auth });
   assert.equal(seenRes.statusCode, 204);
@@ -429,7 +430,7 @@ test("dashboard forwards the kinds the client lists, and nothing when it lists n
       fakeService({
         getDashboard: (_viewerId, _cursor, _limit, kinds) => {
           seen.push(kinds);
-          return { items: [], nextCursor: null, seenAt: null, personalNewCount: 0, followingNewCount: 0 };
+          return { items: [], nextCursor: null, seenAt: null, personalNewCount: 0, followingNewCount: 0, newCount: 0 };
         }
       })
     )
