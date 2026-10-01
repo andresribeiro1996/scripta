@@ -13,7 +13,8 @@ the app broadcasts but never answers back:
 - **You can't answer anyone.** A feed row's only action is "Follow back".
   There are no replies, reactions or reports anywhere in the schema.
 - **Hard to become visible.** Since #74 every username is findable, but an
-  unpublished user can't be followed. Publishing needs a mural, and reading
+  unpublished user shows as Private, with no Follow button and no profile,
+  Activity or Library to open. Publishing needs a mural, and reading
   activity is off by default (`DEFAULT_FEED_SETTINGS`).
 - **No reason to follow anyone.** People search stays empty until you type,
   and nothing suggests readers.

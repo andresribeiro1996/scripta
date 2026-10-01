@@ -4,7 +4,7 @@ import { FlatList, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { readerGlyphLabel } from "@scripta/shared";
 import { Button, EmptyState, ErrorState, Input, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
-import { suggestionReason, type PersonResult, type SuggestedReader } from "@scripta/shared/community";
+import { personCaption, type PersonResult, type SuggestedReader } from "@scripta/shared/community";
 import { BookCover } from "../arena/BookCover";
 import { fetchSuggestedPeople, followUser, searchPeople, unfollowUser } from "./api";
 import { AuthorAvatar, openProfile } from "./AuthorAvatar";
@@ -79,6 +79,8 @@ export function PeoplePane() {
           ListEmptyComponent={
             needle.length === 0 && suggested.isError ? (
               <ErrorState title="Couldn't load suggestions." actionLabel="Retry" onAction={() => void suggested.refetch()} />
+            ) : needle.length > 0 && people.isError ? (
+              <ErrorState title="Couldn't search." actionLabel="Retry" onAction={() => void people.refetch()} />
             ) : needle.length > 0 && !people.isPending ? (
               <EmptyState title="No people found" body="Try another username." />
             ) : (
@@ -88,16 +90,12 @@ export function PeoplePane() {
           renderItem={({ item }) => {
             const glyphLabel = readerGlyphLabel(item.user.readerGlyph);
             const suggestion = "sharedCount" in item ? item : null;
-            const caption = suggestion
-              ? suggestionReason(suggestion)
-              : item.private
-                ? "Private"
-                : `${item.followerCount} ${item.followerCount === 1 ? "follower" : "followers"}`;
+            const caption = personCaption(item);
             return (
               <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={glyphLabel ? `Open ${item.user.username}'s profile, ${glyphLabel}` : `Open ${item.user.username}'s profile`}
+                  accessibilityLabel={[`Open ${item.user.username}'s profile`, glyphLabel, caption].filter(Boolean).join(", ")}
                   onPress={() => openProfile(item.user.username)}
                   style={[styles.actorRow, styles.grow]}
                 >

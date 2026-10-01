@@ -50,7 +50,7 @@ export function useCommunityPeople(q: string) {
 }
 
 export function useSuggestedPeople(enabled: boolean) {
-  const query = useQuery({ queryKey: ["community", "people", "suggested"], queryFn: fetchSuggestedPeople, enabled, retry: false });
+  const query = useQuery({ queryKey: ["community", "people", "suggested"], queryFn: fetchSuggestedPeople, enabled, retry: false, staleTime: 30_000 });
   return { people: query.data ?? [], error: query.error, refetch: query.refetch };
 }
 

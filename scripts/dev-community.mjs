@@ -4,10 +4,10 @@
 // of each kind the feed can render.
 //
 // Seeding the accounts is not enough on its own. A dashboard feed is built
-// from the events of people the viewer FOLLOWS, and following someone
-// requires that someone to have published a profile, which in turn requires
-// a mural — so a fixture that stops at "three users exist" leaves the tab
-// permanently empty and looks like a broken feature.
+// from the events of people the viewer FOLLOWS, and a profile page, People's
+// Follow button and the suggestions only exist for a published profile — so
+// a fixture that stops at "three users exist" leaves the tab permanently
+// empty and looks like a broken feature.
 //
 // Runs after dev-account.mjs and three-users.mjs (see devFixtureSetup.mjs),
 // against whatever backend/data/dev/ the *_DB_PATH vars point at. Idempotent:
@@ -47,9 +47,10 @@ async function signIn(identifier, password) {
   return { id: session.user.id, username: session.user.username, token: session.accessToken };
 }
 
-/** A profile is a published mural, so an account with no mural cannot be
- *  followed at all — including the dev account, which dev-account.mjs
- *  deliberately seeds with a library and nothing else. */
+/** Publishing doesn't need a mural, but the shelf is what a visitor sees, so
+ *  each account gets its first mural (created if it has none) as that shelf —
+ *  including the dev account, which dev-account.mjs deliberately seeds with a
+ *  library and nothing else. */
 async function ensurePublishedProfile(user) {
   const existing = await app.inject({ method: "GET", url: `/community/profiles/${user.username}`, headers: { authorization: `Bearer ${user.token}` } });
   if (existing.statusCode === 200) return;
@@ -68,6 +69,15 @@ async function ensureFollows(follower, followee) {
 }
 
 const FINISHED_BOOK = { title: "Piranesi", author: "Susanna Clarke", isbn: "9781635575637" };
+const SHARED_BOOKS = [
+  { title: "The Fellowship of the Ring", author: "J.R.R. Tolkien", isbn: "9780544003415" },
+  { title: "The Two Towers", author: "J.R.R. Tolkien", isbn: "9780544003423" }
+];
+
+async function resolveCoverUrl(user, isbn) {
+  const resolved = await app.inject({ method: "GET", url: `/covers/resolve?isbn=${isbn}`, headers: { authorization: `Bearer ${user.token}` } });
+  return resolved.statusCode === 200 ? resolved.json().url : null;
+}
 
 /** Reading is the one category that is off by default, so a book_finished
  *  event from someone who never turned it on would be seeded and then
@@ -85,12 +95,21 @@ async function ensureReadingEvent(user) {
   const existing = books.find((book) => book.Title === FINISHED_BOOK.title);
   if (existing?.ReadStatus === 2) return;
   if (!existing) {
-    const resolved = await app.inject({ method: "GET", url: `/covers/resolve?isbn=${FINISHED_BOOK.isbn}`, headers: { authorization: `Bearer ${user.token}` } });
-    const coverUrl = resolved.statusCode === 200 ? resolved.json().url : null;
+    const coverUrl = await resolveCoverUrl(user, FINISHED_BOOK.isbn);
     await call("POST", "/library/books", { ...FINISHED_BOOK, readStatus: 0, ...(coverUrl ? { coverUrl } : {}) }, user.token);
   }
   await call("POST", "/library/books", { ...FINISHED_BOOK, readStatus: 2 }, user.token);
   log(`${user.username} finished "${FINISHED_BOOK.title}".`);
+}
+
+async function ensureSharedBooks(user) {
+  const owned = new Set(((await call("GET", "/library", undefined, user.token)).data?.books ?? []).map((book) => book.Title));
+  const missing = SHARED_BOOKS.filter((book) => !owned.has(book.title));
+  for (const book of missing) {
+    const coverUrl = await resolveCoverUrl(user, book.isbn);
+    await call("POST", "/library/books", { ...book, readStatus: 2, ...(coverUrl ? { coverUrl } : {}) }, user.token);
+  }
+  if (missing.length) log(`${user.username} added ${missing.map((book) => `"${book.title}"`).join(" and ")}.`);
 }
 
 try {
@@ -113,6 +132,7 @@ try {
   await ensureFollows(charlie, dev);
 
   await ensureReadingEvent(alice);
+  await ensureSharedBooks(charlie);
 
   log(`${DEV_USERNAME} follows fixture_alice and fixture_bob, and fixture_alice follows back.`);
   await app.close();

@@ -162,7 +162,7 @@ export function MyShelfScreen() {
   async function publish(shareReading: boolean) {
     setAnswer(shareReading);
     await run(async () => {
-      await publishProfile({ ...(ownData.muralId ? { muralId: ownData.muralId } : {}), shareReading });
+      await publishProfile({ shareReading });
       setConfirmingPublish(false);
     });
     setAnswer(null);
@@ -251,14 +251,14 @@ export function MyShelfScreen() {
       <Dialog visible={confirmingPublish} title="Publish your shelf?" onClose={() => setConfirmingPublish(false)}>
         <View style={styles.dialogGap}>
           <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>
-            {`It becomes a public page at /u/${username}, and people can follow you.`}
+            {`It becomes a public page at /u/${username} with your library, and readers can find and follow you.`}
           </Text>
           <Text {...dynamicType} style={[typography.body, { color: colors.text }]}>
-            Share what you read and finish with followers?
+            Share what you add and finish on your page and with followers?
           </Text>
           {error ? <Toast visible message={error} tone="error" /> : null}
-          <Button label="Share my reading" loading={answer === true} disabled={busy} onPress={() => void publish(true)} />
-          <Button label="Keep my reading private" variant="secondary" loading={answer === false} disabled={busy} onPress={() => void publish(false)} />
+          <Button label="Share my reading" variant="secondary" loading={answer === true} disabled={busy} onPress={() => void publish(true)} />
+          <Button label="Don't share my reading" variant="secondary" loading={answer === false} disabled={busy} onPress={() => void publish(false)} />
         </View>
       </Dialog>
       <Dialog visible={confirmingUnpublish} title="Unpublish your profile?" onClose={() => setConfirmingUnpublish(false)}>

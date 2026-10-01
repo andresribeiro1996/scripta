@@ -75,9 +75,8 @@ export function OwnShelfView({ username }: { username: string }) {
   }
 
   function publish(shareReading: boolean) {
-    const muralId = own.data?.muralId;
     setPublishing(false);
-    void run(() => publishProfile({ ...(muralId ? { muralId } : {}), shareReading }));
+    void run(() => publishProfile({ shareReading }));
   }
 
   async function shelfTargetId() {
@@ -243,6 +242,8 @@ export function OwnShelfView({ username }: { username: string }) {
   );
 }
 
+const answerButton = "rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2.5 text-sm font-semibold hover:bg-(--color-surface-hover)";
+
 function PublishDialog({ username, onAnswer, onCancel }: { username: string; onAnswer: (shareReading: boolean) => void; onCancel: () => void }) {
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
   useScrollLock();
@@ -264,21 +265,19 @@ function PublishDialog({ username, onAnswer, onCancel }: { username: string; onA
         role="dialog"
         aria-modal="true"
         aria-labelledby="publish-dialog-title"
+        aria-describedby="publish-dialog-body publish-dialog-question"
       >
         <h3 id="publish-dialog-title" className="text-sm font-semibold">
           Publish your shelf?
         </h3>
-        <p className="mt-1.5 text-xs text-(--color-text-dim)">{`It becomes a public page at /u/${username}, and people can follow you.`}</p>
-        <p className="mt-3 text-sm">Share what you read and finish with followers?</p>
+        <p id="publish-dialog-body" className="mt-1.5 text-xs text-(--color-text-dim)">{`It becomes a public page at /u/${username} with your library, and readers can find and follow you.`}</p>
+        <p id="publish-dialog-question" className="mt-3 text-sm">Share what you add and finish on your page and with followers?</p>
         <div className="mt-5 flex flex-col gap-2">
-          <button onClick={() => onAnswer(true)} className="rounded-lg bg-(--color-accent) px-3 py-2.5 text-sm font-semibold text-(--color-on-accent) hover:opacity-90">
+          <button onClick={() => onAnswer(true)} className={answerButton}>
             Share my reading
           </button>
-          <button
-            onClick={() => onAnswer(false)}
-            className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2.5 text-sm font-semibold hover:bg-(--color-surface-hover)"
-          >
-            Keep my reading private
+          <button onClick={() => onAnswer(false)} className={answerButton}>
+            Don't share my reading
           </button>
           <button ref={cancelButtonRef} onClick={onCancel} className="rounded-lg px-3 py-2.5 text-sm font-semibold text-(--color-text-dim) hover:text-(--color-text)">
             Cancel

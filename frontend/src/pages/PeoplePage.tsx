@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { suggestionReason, type PersonResult, type SuggestedReader } from "@scripta/shared/community";
+import { personCaption, type PersonResult, type SuggestedReader } from "@scripta/shared/community";
 import { AuthorAvatar } from "../components/CommunityAuthorAvatar";
 import { EmptyState } from "../components/EmptyState";
 import { CommunityIcon } from "../components/NavIcons";
@@ -107,9 +107,7 @@ function PersonList({
                   <span className="truncate">{person.user.username}</span>
                   <ReaderGlyph identity={person.user.readerGlyph} />
                 </span>
-                <span className="block text-xs text-(--color-text-dim)">
-                  {suggestion ? suggestionReason(suggestion) : person.private ? "Private" : `${person.followerCount} ${person.followerCount === 1 ? "follower" : "followers"}`}
-                </span>
+                <span className="block text-xs text-(--color-text-dim)">{personCaption(person)}</span>
               </span>
               {suggestion && suggestion.sharedBooks.length > 0 && (
                 <span className="ml-auto flex shrink-0 -space-x-1.5">
