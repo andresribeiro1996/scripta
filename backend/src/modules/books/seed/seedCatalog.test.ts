@@ -14,7 +14,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
 const { openBooksDb } = await import("../adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("../adapters/sqlite/sqliteBooksRepository.js");
-const { seedCatalog } = await import("./seedCatalog.js");
+const { seedBook, seedCatalog } = await import("./seedCatalog.js");
 
 const NOW = new Date("2026-10-01T00:00:00.000Z");
 
@@ -54,4 +54,18 @@ test("entries that share a key create one row", () => {
   const entries = [entry("9780141184272", "One"), entry("978-0-14-118427-2", "One again")];
   assert.deepEqual(seedCatalog(entries, repo, () => NOW), { created: 1, existing: 1, invalid: 0 });
   assert.equal(repo.listUncheckedCoverIds().length, 1);
+});
+
+test("seedBook returns the created row, then the existing one", () => {
+  const { repo } = setup();
+  const input = { isbn: "9780141184272", title: "One", author: "Author" };
+
+  const created = seedBook(input, repo, () => NOW);
+  assert.equal(created.outcome, "created");
+  assert.equal(created.book?.isbn, "9780141184272");
+
+  const existing = seedBook(input, repo, () => NOW);
+  assert.equal(existing.outcome, "existing");
+  assert.equal(existing.book?.id, created.book?.id);
+  assert.deepEqual(seedBook({ isbn: "", title: "", author: "" }, repo, () => NOW), { outcome: "invalid" });
 });

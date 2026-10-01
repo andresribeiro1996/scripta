@@ -1,0 +1,188 @@
+{
+  "products": [
+    {
+      "id": 15695109128518,
+      "title": "O Museu dos Esforços Inúteis",
+      "handle": "o-museu-dos-esforcos-inuteis",
+      "body_html": "<p>O museu fecha às oito. A própria Virginia roda a simples chave de metal na fechadura, sem mais precauções, uma vez que</p>\n<ul>\n<li>\n<strong>ISBN</strong><span> 978‑972‑608‑494-5</span>\n</li>\n</ul>",
+      "vendor": "Cristina Peri Rossi",
+      "product_type": "Livro",
+      "tags": [
+        "américa latina",
+        "Contos"
+      ],
+      "variants": [
+        {
+          "id": 57187864412486,
+          "title": "Default Title",
+          "sku": null,
+          "price": "15.30"
+        }
+      ],
+      "images": [
+        {
+          "id": 88322069201222,
+          "position": 1,
+          "src": "https://cdn.shopify.com/s/files/1/1828/7185/files/2026_OMuseudosEsforcosInuteis_CristinaPeriRossi_Antigona.jpg?v=1787562626",
+          "width": 1618,
+          "height": 2480
+        }
+      ]
+    },
+    {
+      "id": 15741366960454,
+      "title": "O Meio é a Massagem",
+      "handle": "o-meio-e-a-massagem",
+      "body_html": "<p>nãoháabsolutamentenenhumainevitabilidadeenquantohouvervontade de contemplar o que está a acontecer\n\nInédito em Portugal</p>\n<ul>\n<li>\n<strong>ISBN</strong><span> 978‑972‑608‑493-8</span>\n</li>\n</ul>",
+      "vendor": "Marshall McLuhan",
+      "product_type": "Livro",
+      "tags": [
+        "Ensaio",
+        "Estudos da Comunicação"
+      ],
+      "variants": [
+        {
+          "id": 57424674881862,
+          "title": "Default Title",
+          "sku": "Um Inventário dos Efeitos",
+          "price": "15.30"
+        }
+      ],
+      "images": [
+        {
+          "id": 89081467044166,
+          "position": 1,
+          "src": "https://cdn.shopify.com/s/files/1/1828/7185/files/2026_OMeioeaMassagem_MarshallMcLuhan_Antigona.jpg?v=1790076012",
+          "width": 1476,
+          "height": 2480
+        }
+      ]
+    },
+    {
+      "id": 15650179318086,
+      "title": "Caminhos da Insubmissão",
+      "handle": "caminhos-da-insubmissao",
+      "body_html": "<p>«Desobedecer é o nosso primeiro dever de liberdade.»\n\nCrónica da formação de um rebelde e de uma vida moldada pela esco</p>\n<ul>\n<li>\n<strong>ISBN</strong><span> 978‑972‑608‑499-0</span>\n</li>\n</ul>",
+      "vendor": "Jorge Valadas / Charles Reeve",
+      "product_type": "Livro",
+      "tags": [
+        "autobiografia",
+        "Biografia"
+      ],
+      "variants": [
+        {
+          "id": 56976863265094,
+          "title": "Default Title",
+          "sku": null,
+          "price": "14.40"
+        }
+      ],
+      "images": [
+        {
+          "id": 87374842822982,
+          "position": 1,
+          "src": "https://cdn.shopify.com/s/files/1/1828/7185/files/2026_CaminhosdaInsubmissao_JorgeValadas.jpg?v=1784539602",
+          "width": 1618,
+          "height": 2480
+        }
+      ]
+    },
+    {
+      "id": 9001,
+      "title": "Livro com Código de Barras",
+      "handle": "livro-com-codigo-de-barras",
+      "body_html": "<p>Ver também o título anterior, ISBN 978-972-608-494-5.</p>",
+      "vendor": "Autor Exemplo",
+      "product_type": "Livro",
+      "tags": [],
+      "variants": [
+        {
+          "id": 90011,
+          "title": "Default Title",
+          "sku": "LCB-1",
+          "barcode": "9789726084679",
+          "price": "12.00"
+        }
+      ],
+      "images": [
+        {
+          "id": 90012,
+          "position": 1,
+          "src": "https://cdn.shopify.com/s/files/1/0000/0000/files/livro-codigo-de-barras.jpg?v=1",
+          "width": 1200,
+          "height": 1800
+        }
+      ]
+    },
+    {
+      "id": 9002,
+      "title": "Um Romance Brasileiro",
+      "handle": "um-romance-brasileiro",
+      "body_html": "<p>ISBN 978-85-3520-623-4</p>",
+      "vendor": "Autora Brasileira",
+      "product_type": "Livro",
+      "tags": [],
+      "variants": [
+        {
+          "id": 90021,
+          "title": "Default Title",
+          "sku": null,
+          "price": "20.00"
+        }
+      ],
+      "images": [
+        {
+          "id": 90022,
+          "position": 1,
+          "src": "https://cdn.shopify.com/s/files/1/0000/0000/files/romance-brasileiro.jpg?v=1",
+          "width": 1200,
+          "height": 1800
+        }
+      ]
+    },
+    {
+      "id": 9003,
+      "title": "Cartaz Sem ISBN",
+      "handle": "cartaz-sem-isbn",
+      "body_html": "<p>Impressão 50x70.</p>",
+      "vendor": "Antígona",
+      "product_type": "Cartazes",
+      "tags": [],
+      "variants": [
+        {
+          "id": 90031,
+          "title": "Default Title",
+          "sku": "CARTAZ-1",
+          "price": "9.00"
+        }
+      ],
+      "images": [
+        {
+          "id": 90032,
+          "position": 1,
+          "src": "https://cdn.shopify.com/s/files/1/0000/0000/files/cartaz.jpg?v=1",
+          "width": 1060,
+          "height": 1500
+        }
+      ]
+    },
+    {
+      "id": 9004,
+      "title": "Livro Sem Imagem",
+      "handle": "livro-sem-imagem",
+      "body_html": "<p>ISBN 978.989.9061.31.6</p>",
+      "vendor": "Autor Exemplo",
+      "product_type": "Livro",
+      "tags": [],
+      "variants": [
+        {
+          "id": 90041,
+          "title": "Default Title",
+          "sku": null,
+          "price": "10.00"
+        }
+      ],
+      "images": []
+    }
+  ]
+}

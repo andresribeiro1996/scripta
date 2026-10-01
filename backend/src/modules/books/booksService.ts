@@ -53,6 +53,21 @@ export interface BooksService {
   uploadCover(lookup: BookLookup, bytes: Buffer): Promise<ResolvedCover>;
 }
 
+export async function storeCoverImage(
+  deps: { repo: Pick<BooksRepository, "insertImage">; blobs: CoverBlobStore },
+  bookId: string,
+  source: CoverSourceName,
+  sourceUrl: string | null,
+  image: EncodedCover,
+  at: string
+): Promise<string> {
+  const id = randomUUID();
+  await deps.blobs.save(id, COVER_EXTENSION, image.full);
+  await deps.blobs.save(`${id}-thumb`, COVER_EXTENSION, image.thumb);
+  deps.repo.insertImage({ id, book_id: bookId, source, source_url: sourceUrl, width: image.width, height: image.height, byte_size: image.full.byteLength, created_at: at });
+  return id;
+}
+
 export function createBooksService(deps: BooksServiceDeps): BooksService {
   const now = deps.now ?? (() => new Date());
   const backoffUntil = new Map<string, number>();
@@ -107,14 +122,6 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
   function schedule(bookId: string, priority: CoverPriority = "normal") {
     if ((backoffUntil.get(bookId) ?? 0) > now().getTime()) return;
     deps.enqueue(bookId, priority);
-  }
-
-  async function storeImage(bookId: string, source: CoverSourceName, sourceUrl: string | null, image: EncodedCover, at: string): Promise<string> {
-    const id = randomUUID();
-    await deps.blobs.save(id, COVER_EXTENSION, image.full);
-    await deps.blobs.save(`${id}-thumb`, COVER_EXTENSION, image.thumb);
-    deps.repo.insertImage({ id, book_id: bookId, source, source_url: sourceUrl, width: image.width, height: image.height, byte_size: image.full.byteLength, created_at: at });
-    return id;
   }
 
   function openLibraryThumb(coverId: number | null): string | null {
@@ -199,7 +206,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
         const found = outcome.found;
         const replacesWatermark = lane === "upgrade" && found !== null && found.image.width >= MIN_GOOD_WIDTH && source === "isbndb" && portuguese;
         if (found && (found.image.width > width || replacesWatermark)) {
-          imageId = await storeImage(bookId, found.candidate.source, found.candidate.url, found.image, at);
+          imageId = await storeCoverImage(deps, bookId, found.candidate.source, found.candidate.url, found.image, at);
           width = found.image.width;
           source = found.candidate.source;
         }
@@ -280,7 +287,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       const book = findOrCreate(lookup);
       if (!book) throw new BookNotFoundError();
       const at = now().toISOString();
-      const imageId = await storeImage(book.id, "upload", null, image, at);
+      const imageId = await storeCoverImage(deps, book.id, "upload", null, image, at);
       deps.repo.setCover(book.id, { imageId, status: "manual", checkedAt: at });
       deps.repo.setUpgradeWanted(book.id, null);
       backoffUntil.delete(book.id);
