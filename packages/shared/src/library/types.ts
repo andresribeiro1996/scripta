@@ -26,5 +26,6 @@ export interface LibraryData {
    *  Absent until the user visits /dashboard/style and changes something;
    *  resolveLibraryStyle() fills in defaults wherever this is read. */
   style?: LibraryStyleSettings;
+  distinctBooks?: string[][];
   [key: string]: unknown;
 }

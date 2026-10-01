@@ -41,7 +41,7 @@ export async function findBestCover(
   fetchImage: FetchCoverImage
 ): Promise<CoverOutcome> {
   const accept = (candidate: TitledCandidate) => titleMatches(book.title, candidate.title) && authorMatches(book.author, candidate.authors);
-  const exactOrder = [sources.isbndb, sources.apple, sources.openlibrary].filter((source): source is CoverSource => source !== null);
+  const exactOrder = [sources.apple, sources.isbndb, sources.openlibrary].filter((source): source is CoverSource => source !== null);
   const titleOrder = [sources.apple, sources.isbndb, sources.openlibrary].filter((source): source is CoverSource => source !== null);
   const steps: Array<() => Promise<CoverCandidate[]>> = [];
   const isbn = book.isbn;

@@ -1,7 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { ReaderProfile } from "@scripta/shared";
 import { parseThemePreference, type ThemeId } from "@scripta/shared/themes";
-import { env } from "../../config/env.js";
 import { openAuthDb } from "./adapters/sqlite/connection.js";
 
 interface CachedStatements {
@@ -15,6 +14,11 @@ interface CachedStatements {
 }
 
 let cached: CachedStatements | null = null;
+let avatarUrlFor: ((avatarId: string) => string) | undefined;
+
+export function setAvatarUrlFor(fn: (avatarId: string) => string): void {
+  avatarUrlFor = fn;
+}
 
 function statements(): CachedStatements {
   if (!cached) {
@@ -34,7 +38,9 @@ function statements(): CachedStatements {
 
 function toReaderProfile(row: { username: string | null; avatar_id: string | null } | undefined): ReaderProfile | undefined {
   if (!row?.username) return undefined;
-  return { username: row.username, avatarUrl: row.avatar_id ? `${env.PUBLIC_API_URL}/auth/avatar/${row.avatar_id}/file` : null };
+  if (!row.avatar_id) return { username: row.username, avatarUrl: null };
+  if (!avatarUrlFor) throw new Error("toReaderProfile: no avatarUrlFor configured; the auth module must be registered first.");
+  return { username: row.username, avatarUrl: avatarUrlFor(row.avatar_id) };
 }
 
 export function resolvePublicReaderProfile(userId: string): ReaderProfile | undefined {

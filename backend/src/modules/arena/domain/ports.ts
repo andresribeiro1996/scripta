@@ -8,6 +8,7 @@ import type { DuelRow, SeedPreview, TournamentRow, TournamentSlotRow, VoteRow } 
 
 export interface ArenaRepository {
   deleteUserData(userId: string): void;
+  rekeyBooks(userId: string, fromKeys: string[], toKey: string): void;
   insertTournament(row: TournamentRow): void;
   getTournament(id: string): TournamentRow | undefined;
   /** Ownership-checked lookup — for anything that mutates a tournament

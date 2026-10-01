@@ -62,6 +62,12 @@ export function getMuralsPublicApi(getTierlistData?: (ownerUserId: string, tierl
   return cachedPublicApi;
 }
 
+let rekeyingMurals: ReturnType<typeof createSqliteMuralsRepository> | undefined;
+
+export function rekeyMuralsBooks(userId: string, fromKeys: string[], toKey: string) {
+  (rekeyingMurals ??= createSqliteMuralsRepository(openMuralsDb())).rekeyBooks(userId, fromKeys, toKey);
+}
+
 let erasingMurals: ReturnType<typeof createSqliteMuralsRepository> | undefined;
 
 export function deleteMuralsUserData(userId: string) {

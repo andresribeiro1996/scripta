@@ -30,6 +30,7 @@ function createInMemoryArenaRepository(): ArenaRepository {
 
   return {
     deleteUserData() {},
+    rekeyBooks() {},
     insertTournament(row) {
       tournaments.set(row.id, { ...row });
     },

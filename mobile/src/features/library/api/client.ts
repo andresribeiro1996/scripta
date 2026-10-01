@@ -47,3 +47,7 @@ export async function shareLibrary(): Promise<LibraryDocument> {
 export async function unshareLibrary(): Promise<LibraryDocument> {
   return apiClient.request<LibraryDocument>("/library/unshare", { method: "POST", auth: true });
 }
+
+export async function mergeLibraryBooks(keep: string, merge: string[], updatedAt: string): Promise<LibraryDocument> {
+  return apiClient.request<LibraryDocument>("/library/books/merge", { method: "POST", auth: true, body: { keep, merge, updatedAt } });
+}

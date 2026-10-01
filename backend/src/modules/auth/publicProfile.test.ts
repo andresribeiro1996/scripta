@@ -10,7 +10,6 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 process.env.AUTH_DB_PATH = join(tempRoot, "auth.sqlite");
 process.env.LIBRARY_DB_PATH = join(tempRoot, "library.sqlite");
 process.env.GALLERY_DB_PATH = join(tempRoot, "gallery.sqlite");
-process.env.GALLERY_STORAGE_PATH = join(tempRoot, "gallery-files");
 
 const { openAuthDb } = await import("./adapters/sqlite/connection.js");
 const db = openAuthDb();
@@ -22,7 +21,7 @@ insertUser.run("u2", "noname@test.dev", null);
 insertUser.run("u3", "bob@test.dev", "bobby");
 insertUser.run("u4", "alina@test.dev", "alina");
 
-const { getUserTheme, resolvePublicReaderProfile, resolvePublicReaderProfiles, userHasUsername, findUserIdByUsername, searchUsernameOwners } = await import("./publicProfile.js");
+const { setAvatarUrlFor, getUserTheme, resolvePublicReaderProfile, resolvePublicReaderProfiles, userHasUsername, findUserIdByUsername, searchUsernameOwners } = await import("./publicProfile.js");
 
 test("resolvePublicReaderProfile keeps its existing shape", () => {
   assert.deepEqual(resolvePublicReaderProfile("u1"), { username: "alice", avatarUrl: null });
@@ -68,4 +67,11 @@ test("getUserTheme resolves a concrete theme and treats system or unset as light
   assert.equal(getUserTheme("u3"), "light");
   assert.equal(getUserTheme("u2"), "light");
   assert.equal(getUserTheme("missing"), "light");
+});
+
+test("avatarUrl comes from the injected avatarUrlFor", () => {
+  db.prepare("UPDATE users SET avatar_id = ? WHERE id = ?").run("av-1", "u3");
+  setAvatarUrlFor((id) => `https://images.test/avatars/${id}.webp`);
+  assert.equal(resolvePublicReaderProfile("u3")?.avatarUrl, "https://images.test/avatars/av-1.webp");
+  assert.equal(resolvePublicReaderProfiles(["u3"]).get("u3")?.avatarUrl, "https://images.test/avatars/av-1.webp");
 });

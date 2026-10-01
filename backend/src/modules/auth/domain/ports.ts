@@ -36,12 +36,6 @@ export interface AuthRepository {
   setUsername(userId: string, username: string): void;
   setAvatarId(userId: string, avatarId: string | null): void;
   setAppearance(userId: string, fields: { theme?: string; display_font?: string; text_font?: string }): void;
-  /** No ownership filter — needed by the public, unauthenticated
-   *  GET /auth/avatar/:id/file route to find which account's blob to
-   *  read, keyed only by the unguessable avatar id (same trust model as
-   *  gallery's getImageById). */
-  findUserIdByAvatarId(avatarId: string): string | undefined;
-
   insertRefreshToken(input: { userId: string; tokenHash: string; expiresAt: Date; grantedViaGrace?: boolean }): string;
   findRefreshTokenByHash(tokenHash: string): RefreshTokenRow | undefined;
   /** Needed by the refresh-rotation grace window (service.ts) to follow a
@@ -62,12 +56,9 @@ export interface AuthRepository {
   revokeAllRefreshTokensForUser(userId: string): void;
 }
 
-/** Raw avatar image bytes on disk. Always exactly one per user (or none),
- *  addressed by a server-generated id — see types.ts's AuthenticatedUser.
- *  Output format is fixed (webp) by the service, so no extension parameter. */
+/** Avatar image bytes, addressed by a server-generated id — see types.ts's
+ *  AuthenticatedUser. Output format is fixed (webp) by the service. */
 export interface AvatarBlobStore {
-  deleteAll(userId: string): void;
-  save(userId: string, avatarId: string, bytes: Buffer): void;
-  read(userId: string, avatarId: string): Buffer | null;
-  delete(userId: string, avatarId: string): void;
+  save(avatarId: string, bytes: Buffer): Promise<void>;
+  delete(avatarId: string): Promise<void>;
 }

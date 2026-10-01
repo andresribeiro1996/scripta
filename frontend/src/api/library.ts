@@ -48,3 +48,7 @@ export async function shareLibrary(): Promise<LibraryDocument> {
 export async function unshareLibrary(): Promise<LibraryDocument> {
   return (await apiFetch("/library/unshare", { method: "POST" })) as LibraryDocument;
 }
+
+export async function mergeLibraryBooks(keep: string, merge: string[], updatedAt: string): Promise<LibraryDocument> {
+  return (await apiFetch("/library/books/merge", { method: "POST", body: JSON.stringify({ keep, merge, updatedAt }) })) as LibraryDocument;
+}

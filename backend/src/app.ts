@@ -15,6 +15,9 @@ import { STATUS_CODES } from "node:http";
 import { isAllowedOrigin } from "./config/corsOrigin.js";
 import { env } from "./config/env.js";
 import { devHttps } from "./config/devCerts.js";
+import { assertObjectKey } from "./storage/objectStore.js";
+import { createObjectStore } from "./storage/createObjectStore.js";
+import { IMMUTABLE_CACHE_CONTROL } from "./storage/r2ObjectStore.js";
 import { runStartupMigrations } from "./migrations/runStartupMigrations.js";
 import {
   emailEnabled,
@@ -29,15 +32,15 @@ import {
   setDashboardSeenAt,
   userHasUsername
 } from "./modules/auth/index.js";
-import { deleteArenaUserData, getArenaPublicApi, registerArenaModule } from "./modules/arena/index.js";
+import { deleteArenaUserData, getArenaPublicApi, registerArenaModule, rekeyArenaBooks } from "./modules/arena/index.js";
 import { deleteCommunityUserData, getCommunityPublicApi, registerCommunityModule } from "./modules/community/index.js";
 import { enqueueBookCovers, registerBooksModule } from "./modules/books/index.js";
 import { deleteGalleryUserData, registerGalleryModule } from "./modules/gallery/index.js";
 import { deleteLibraryUserData, registerLibraryModule, resolvePublicLibrary, readerGlyphFor, type BookEvent } from "./modules/library/index.js";
-import { deleteMuralsUserData, getMuralsPublicApi, registerMuralsModule } from "./modules/murals/index.js";
-import { deleteQuizzesUserData, getQuizzesPublicApi, registerQuizzesModule } from "./modules/quizzes/index.js";
+import { deleteMuralsUserData, getMuralsPublicApi, registerMuralsModule, rekeyMuralsBooks } from "./modules/murals/index.js";
+import { deleteQuizzesUserData, getQuizzesPublicApi, registerQuizzesModule, rekeyQuizzesBooks } from "./modules/quizzes/index.js";
 import { deleteSocialsUserData, registerSocialsModule } from "./modules/socials/index.js";
-import { deleteTierlistsUserData, registerTierlistsModule, getTierlistsPublicApi } from "./modules/tierlists/index.js";
+import { deleteTierlistsUserData, registerTierlistsModule, getTierlistsPublicApi, rekeyTierlistsBooks } from "./modules/tierlists/index.js";
 import { registerWaitlistModule } from "./modules/waitlist/index.js";
 
 export function buildApp() {
@@ -85,6 +88,19 @@ export function buildApp() {
   });
 
   app.get("/health", async () => ({ status: "ok" }));
+  if ("root" in createObjectStore()) {
+    app.get<{ Params: { "*": string } }>("/files/*", async (request, reply) => {
+      const key = request.params["*"];
+      try {
+        assertObjectKey(key);
+      } catch {
+        return reply.code(400).send({ error: "Invalid object key" });
+      }
+      const bytes = await createObjectStore().get(key);
+      if (!bytes) return reply.code(404).send({ error: "Not found" });
+      return reply.header("Content-Type", "image/webp").header("Cache-Control", IMMUTABLE_CACHE_CONTROL).send(bytes);
+    });
+  }
   app.get("/public-config", async () => ({ frontendUrl: env.FRONTEND_URL }));
 
   // Fastify's default 500 serializer forwards the raw error message to
@@ -105,8 +121,8 @@ export function buildApp() {
 
   app.register(registerAuthModule, {
     authRoot: app,
-    deleteUserData: (userId: string) => {
-      for (const erase of [deleteLibraryUserData, deleteGalleryUserData, deleteSocialsUserData, deleteMuralsUserData, deleteArenaUserData, deleteTierlistsUserData, deleteQuizzesUserData, deleteCommunityUserData]) erase(userId);
+    deleteUserData: async (userId: string) => {
+      for (const erase of [deleteGalleryUserData, deleteLibraryUserData, deleteSocialsUserData, deleteMuralsUserData, deleteArenaUserData, deleteTierlistsUserData, deleteQuizzesUserData, deleteCommunityUserData]) await erase(userId);
     }
   });
   app.register(registerArenaModule, {
@@ -135,6 +151,9 @@ export function buildApp() {
       } catch (error) {
         app.log.error(error, "failed to queue covers for imported library");
       }
+    },
+    rekeyBooks: (userId: string, fromKeys: string[], toKey: string) => {
+      for (const rekey of [rekeyMuralsBooks, rekeyTierlistsBooks, rekeyArenaBooks, rekeyQuizzesBooks]) rekey(userId, fromKeys, toKey);
     }
   });
   app.register(registerGalleryModule);

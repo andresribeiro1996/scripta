@@ -40,8 +40,7 @@ export interface MuralsService {
   /** `theme` omitted (older clients) falls back to the owner's account theme. */
   createMural(userId: string, name: string, folderId?: string | null, theme?: ThemeId): Mural;
   /** undefined if no mural with that id is owned by userId — a
-   *  caller-facing 404, not a server error. Same convention as
-   *  modules/gallery/service.ts's getImageFile. */
+   *  caller-facing 404, not a server error. */
   getMural(userId: string, id: string): Mural | undefined;
   /** Partial merge onto the existing row — only the keys present in
    *  `patch` change. undefined if not owned. */

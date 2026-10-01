@@ -6,6 +6,7 @@ import {
   COVER_POLL_GIVE_UP_MS,
   COVER_POLL_MAX_FAILED_TICKS,
   COVER_POLL_INTERVAL_MS,
+  COVER_UPGRADE_TTL_MS,
   coverQueryKey,
   createCoverResolver,
   type CoverCacheEntry,
@@ -185,6 +186,22 @@ test("misses stay in memory; only found covers are persisted", async () => {
   await resolver.resolve(params);
   const last = persisted.at(-1)!;
   assert.deepEqual(Object.keys(last), [coverQueryKey(params)]);
+});
+
+test("an upgrading answer is not persisted and is re-fetched after ten minutes", async () => {
+  const upgrading: ResolvedCoverResponse = { ...found, upgrading: true };
+  const better: ResolvedCoverResponse = { url: "https://api.test/covers/cached/b/thumb", fullUrl: "https://api.test/covers/cached/b/file", pending: false };
+  const { resolver, queries, persisted, advance } = setup([upgrading, better]);
+  assert.equal(await resolver.resolve(params), found.url);
+  assert.equal(resolver.peek(params), found.url);
+  assert.deepEqual(persisted.at(-1), {});
+  advance(COVER_UPGRADE_TTL_MS - 1);
+  assert.equal(resolver.peek(params), found.url);
+  advance(1);
+  assert.equal(resolver.peek(params), undefined);
+  assert.equal(await resolver.resolve(params), better.url);
+  assert.equal(queries.length, 2);
+  assert.deepEqual(Object.keys(persisted.at(-1)!), [coverQueryKey(params)]);
 });
 
 test("hydrate keeps fresh found entries and ignores stale or empty ones", () => {
