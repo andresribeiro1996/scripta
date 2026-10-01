@@ -42,7 +42,7 @@ export interface ImportDeps {
   fetchText(url: string): Promise<{ status: number; text: string }>;
   fetchBytes(url: string): Promise<Buffer | null>;
   lookupOpenLibrary(isbn: string): Promise<OpenLibraryEdition | null>;
-  repo: Pick<BooksRepository, "findBookByKey" | "getBook" | "createBook" | "addKey" | "fillIdentity" | "setWorkKey" | "getImage" | "insertImage" | "setCover" | "listRejectedUrls" | "setUpgradeWanted">;
+  repo: Pick<BooksRepository, "findBookByKey" | "getBook" | "createBook" | "addKey" | "fillIdentity" | "setWorkKey" | "setPublisherUrl" | "getImage" | "insertImage" | "setCover" | "listRejectedUrls" | "setUpgradeWanted">;
   blobs: CoverBlobStore;
   now: () => Date;
   sleep: (ms: number) => Promise<void>;
@@ -56,6 +56,10 @@ const emptyReport = (): SiteReport => ({ products: 0, books: 0, fromPage: 0, pag
 function sameTitle(known: string, productTitle: string): boolean {
   const [short, long] = [normalizeTitle(known), normalizeTitle(productTitle)].sort((a, b) => a.length - b.length) as [string, string];
   return short !== "" && (short === long || (short.includes(" ") && long.startsWith(`${short} `)));
+}
+
+function isWebUrl(url: string): boolean {
+  return URL.canParse(url) && /^https?:$/.test(new URL(url).protocol);
 }
 
 function commonPrefix(urls: string[]): string {
@@ -207,9 +211,12 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
         report.coversSet++;
         continue;
       }
-      row = seedBook({ isbn: book.isbn, title, author }, deps.repo, deps.now).book!;
+      row = seedBook({ isbn: book.isbn, title, author }, deps.repo, deps.now, "publisher").book!;
     }
-    if (!options.dryRun) deps.repo.setWorkKey(row.id, memo.looked?.edition?.workKey);
+    if (!options.dryRun) {
+      deps.repo.setWorkKey(row.id, memo.looked?.edition?.workKey);
+      if (isWebUrl(book.productUrl)) deps.repo.setPublisherUrl(row.id, book.productUrl);
+    }
 
     const before = settle(row, book.imageUrl, null);
     if (before) {
@@ -240,7 +247,7 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
       continue;
     }
     const at = deps.now().toISOString();
-    const imageId = await storeCoverImage(deps, row.id, "publisher", book.imageUrl, image, at);
+    const imageId = await storeCoverImage(deps, row.id, "publisher", book.imageUrl, image, at, site.origin);
     deps.repo.setCover(row.id, { imageId, status: "manual", checkedAt: at });
     deps.repo.setUpgradeWanted(row.id, null);
     report.coversSet++;

@@ -256,3 +256,47 @@ test("setWorkKey fills a null key, never overwrites one, and ignores a malformed
   repo.setWorkKey(book.id, "OL2W");
   assert.equal(repo.getBook(book.id)!.ol_work_key, "OL1W");
 });
+
+test("an existing database gains publisher_url, created_by and cover_images.origin on boot, idempotently", () => {
+  const db = new DatabaseSync(":memory:");
+  db.exec(`CREATE TABLE books (
+    id TEXT PRIMARY KEY, title TEXT NOT NULL, author TEXT NOT NULL, year INTEGER, publisher TEXT, isbn TEXT, ol_cover_id INTEGER,
+    summary TEXT, rating REAL, rating_count INTEGER NOT NULL DEFAULT 0, genres TEXT NOT NULL DEFAULT '[]', source_url TEXT,
+    details_status TEXT, details_checked_at TEXT, cover_image_id TEXT, cover_status TEXT, cover_checked_at TEXT, created_at TEXT NOT NULL
+  )`);
+  db.exec(`CREATE TABLE cover_images (
+    id TEXT PRIMARY KEY, book_id TEXT NOT NULL, source TEXT NOT NULL, source_url TEXT, width INTEGER NOT NULL, height INTEGER NOT NULL,
+    byte_size INTEGER NOT NULL, created_at TEXT NOT NULL
+  )`);
+  db.prepare(`INSERT INTO books (id, title, author, created_at) VALUES ('old', 'Dune', 'Frank Herbert', ?)`).run(NOW);
+  db.prepare(`INSERT INTO cover_images VALUES ('img', 'old', 'publisher', 'https://x.test/a.jpg', 900, 1400, 10, ?)`).run(NOW);
+  applyBooksMigrations(db);
+  applyBooksMigrations(db);
+  const repo = createSqliteBooksRepository(db);
+  const book = repo.getBook("old")!;
+  assert.equal(book.publisher_url, null);
+  assert.equal(book.created_by, null);
+  assert.equal(repo.getImage("img")!.origin, null);
+});
+
+test("insertImage stores the origin and createBook stores its creator", () => {
+  const { repo } = freshRepo();
+  const book = repo.createBook({ title: "A", author: "A", isbn: null, createdBy: "publisher" }, ["ta:a|a|"], NOW);
+  const plain = repo.createBook({ title: "B", author: "B", isbn: null }, ["ta:b|b|"], NOW);
+  assert.equal(book.created_by, "publisher");
+  assert.equal(plain.created_by, null);
+  repo.insertImage({ id: "with", book_id: book.id, source: "publisher", source_url: "https://antigona.pt/a.jpg", origin: "https://antigona.pt", width: 900, height: 1400, byte_size: 10, created_at: NOW });
+  repo.insertImage({ id: "without", book_id: book.id, source: "apple", source_url: null, width: 900, height: 1400, byte_size: 10, created_at: NOW });
+  assert.equal(repo.getImage("with")!.origin, "https://antigona.pt");
+  assert.equal(repo.getImage("without")!.origin, null);
+});
+
+test("setPublisherUrl fills a null value and never overwrites it", () => {
+  const { repo } = freshRepo();
+  const book = repo.createBook({ title: "A", author: "A", isbn: null }, ["ta:a|a|"], NOW);
+  assert.equal(book.publisher_url, null);
+  repo.setPublisherUrl(book.id, "https://antigona.pt/products/a");
+  assert.equal(repo.getBook(book.id)!.publisher_url, "https://antigona.pt/products/a");
+  repo.setPublisherUrl(book.id, "https://other.pt/products/a");
+  assert.equal(repo.getBook(book.id)!.publisher_url, "https://antigona.pt/products/a");
+});

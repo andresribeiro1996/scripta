@@ -765,3 +765,70 @@ test("a work key with no author still lands on the blank row", async () => {
   assert.equal(row.title, "");
   assert.equal(row.ol_work_key, "OL7W");
 });
+
+const MUSEU_URL = "https://antigona.pt/products/o-museu-dos-esforcos-inuteis";
+
+test("a stored publisher cover records the site origin and a created book records its creator and product page", async () => {
+  const h = await harness();
+
+  await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  const row = h.repo.findBookByKey(`isbn:${MUSEU}`)!;
+  assert.equal(row.created_by, "publisher");
+  assert.equal(row.publisher_url, MUSEU_URL);
+  assert.equal(h.repo.getImage(row.cover_image_id!)!.origin, "https://antigona.pt");
+});
+
+test("an existing book gets its product page filled but keeps its creator", async () => {
+  const h = await harness();
+  const book = addBook(h.repo, MUSEU);
+
+  await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  const row = h.repo.getBook(book.id)!;
+  assert.equal(row.created_by, null);
+  assert.equal(row.publisher_url, MUSEU_URL);
+});
+
+test("an unchanged book still gets its product page", async () => {
+  const h = await harness();
+  const book = addBook(h.repo, MUSEU);
+  addCover(h.repo, book.id, "upload", 900, null);
+
+  const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  assert.ok(reports["Antígona"]!.unchanged >= 1);
+  assert.equal(h.repo.getBook(book.id)!.publisher_url, MUSEU_URL);
+});
+
+test("a second site with the same ISBN does not overwrite the product page", async () => {
+  const h = await harness();
+  await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+  const other: Site = { name: "Outra", origin: "https://outra.example", platform: "shopify", authorFromVendor: true };
+  const feed = shopifyPage([product(MUSEU, "Museu", "https://cdn.example/outra/museu.jpg")]);
+  const second = { ...h.deps, fetchText: async (url: string) => (url.endsWith("&page=1") ? { status: 200, text: feed } : h.deps.fetchText(url)) };
+
+  await importPublisherCovers(second, [other], { dryRun: false });
+
+  assert.equal(h.repo.findBookByKey(`isbn:${MUSEU}`)!.publisher_url, MUSEU_URL);
+});
+
+test("a product URL that is not an absolute web address is not recorded", async () => {
+  const feed = JSON.stringify([{ name: "Com ISBN", permalink: "/produto/com-isbn/", sku: MUSEU, images: [{ src: "https://x.example/b.jpg" }] }]);
+  const h = await harness({ feeds: { "https://www.relogiodagua.pt/wp-json/wc/store/v1/products?per_page=100&page=1": { text: feed } } });
+
+  await importPublisherCovers(h.deps, [relogio], { dryRun: false });
+
+  assert.equal(h.repo.findBookByKey(`isbn:${MUSEU}`)!.publisher_url, null);
+});
+
+test("a dry run records no product page, creator or origin", async () => {
+  const h = await harness();
+  const book = addBook(h.repo, MUSEU);
+
+  await importPublisherCovers(h.deps, [antigona], { dryRun: true });
+
+  assert.equal(h.repo.getBook(book.id)!.publisher_url, null);
+  assert.equal((h.db.prepare("SELECT COUNT(*) AS n FROM books WHERE created_by IS NOT NULL OR publisher_url IS NOT NULL").get() as { n: number }).n, 0);
+  assert.equal(h.imageCount(), 0);
+});

@@ -30,6 +30,10 @@ export function applyBooksMigrations(db: DatabaseSync): void {
   if (!columns.some((column) => column.name === "data_sources")) db.exec("ALTER TABLE books ADD COLUMN data_sources TEXT NOT NULL DEFAULT '[]'");
   if (!columns.some((column) => column.name === "cover_upgrade_wanted_at")) db.exec("ALTER TABLE books ADD COLUMN cover_upgrade_wanted_at TEXT");
   if (!columns.some((column) => column.name === "ol_work_key")) db.exec("ALTER TABLE books ADD COLUMN ol_work_key TEXT");
+  if (!columns.some((column) => column.name === "publisher_url")) db.exec("ALTER TABLE books ADD COLUMN publisher_url TEXT");
+  if (!columns.some((column) => column.name === "created_by")) db.exec("ALTER TABLE books ADD COLUMN created_by TEXT");
+  const imageColumns = db.prepare("PRAGMA table_info(cover_images)").all() as Array<{ name: string }>;
+  if (!imageColumns.some((column) => column.name === "origin")) db.exec("ALTER TABLE cover_images ADD COLUMN origin TEXT");
   const legacy = db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'cover_cache'`).get();
   if (legacy) {
     const rows = db.prepare(`SELECT id, cache_key, source, width, height, byte_size, created_at FROM cover_cache`).all() as unknown as LegacyCoverRow[];

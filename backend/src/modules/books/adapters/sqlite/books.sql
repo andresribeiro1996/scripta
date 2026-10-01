@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS books (
   cover_checked_at    TEXT,
   cover_upgrade_wanted_at TEXT,
   ol_work_key         TEXT,
+  publisher_url       TEXT,
+  created_by          TEXT,
   created_at          TEXT NOT NULL
 );
 
@@ -32,6 +34,7 @@ CREATE TABLE IF NOT EXISTS cover_images (
   book_id     TEXT NOT NULL REFERENCES books(id),
   source      TEXT NOT NULL,
   source_url  TEXT,
+  origin      TEXT,
   width       INTEGER NOT NULL,
   height      INTEGER NOT NULL,
   byte_size   INTEGER NOT NULL,

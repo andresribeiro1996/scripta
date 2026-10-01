@@ -2,7 +2,7 @@
 
 Every source the catalog reads books or covers from, and how each one behaves. Surveyed 2026-10-01 with one request at a time, at least 3 s apart, user agent `Atmyshelf/1.0 (+https://atmyshelf.com)`. The background research behind these choices is in [`portuguese-book-sources.md`](portuguese-book-sources.md). How the importer and the seed run is in [`backend/README.md`](../backend/README.md), section Seeding.
 
-**Portugal edition** means an ISBN starting `978-972` or `978-989`. The importer only keeps books with a Portugal ISBN. Covers it stores are `cover_images.source = 'publisher'`, `books.cover_status = 'manual'`, and are never replaced automatically.
+**Portugal edition** means an ISBN starting `978-972` or `978-989`. The importer only keeps books with a Portugal ISBN. Covers it stores are `cover_images.source = 'publisher'`, `books.cover_status = 'manual'`, and are never replaced automatically. Each cover records its shop's origin (`cover_images.origin`) and each book the product page (`books.publisher_url`).
 
 ## Automatic sources
 
