@@ -175,6 +175,15 @@ test("listUncheckedDetailIds returns never-checked books, oldest first, up to th
   assert.deepEqual(repo.listUncheckedDetailIds(2), [oldest.id, middle.id]);
 });
 
+test("books users brought in come before the seed and publisher backlog, whatever their age", () => {
+  const { repo } = freshRepo();
+  const seeded = Array.from({ length: 60 }, (_, index) => repo.createBook({ title: `Seed ${index}`, author: "Author", isbn: null, createdBy: index % 2 === 0 ? "seed" : "publisher" }, [`ta:seed ${index}|author|`], `2026-09-01T00:00:${String(index).padStart(2, "0")}.000Z`));
+  const user = repo.createBook({ title: "Mine", author: "Reader", isbn: null }, ["ta:mine|reader|"], "2026-10-01T00:00:00.000Z");
+  const batch = repo.listUncheckedDetailIds(50);
+  assert.equal(batch[0], user.id);
+  assert.deepEqual(batch.slice(1), seeded.slice(0, 49).map((book) => book.id));
+});
+
 test("a book whose lookup failed moves behind the untried ones without being marked checked", () => {
   const { repo } = freshRepo();
   const failed = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: null }, ["ta:dune|frank herbert|"], "2026-10-01T00:00:00.000Z");
