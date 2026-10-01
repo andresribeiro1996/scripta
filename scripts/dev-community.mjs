@@ -4,10 +4,11 @@
 // of each kind the feed can render.
 //
 // Seeding the accounts is not enough on its own. A dashboard feed is built
-// from the events of people the viewer FOLLOWS, and a profile page, People's
-// Follow button and the suggestions only exist for a published profile — so
-// a fixture that stops at "three users exist" leaves the tab permanently
-// empty and looks like a broken feature.
+// from the events of people the viewer FOLLOWS, and an unpublished profile
+// opens only as a "This profile is private" page, with no Follow button,
+// Activity or Library, and no place in People's suggestions — so a fixture
+// that stops at "three users exist" leaves the tab permanently empty and
+// looks like a broken feature.
 //
 // Runs after dev-account.mjs and three-users.mjs (see devFixtureSetup.mjs),
 // against whatever backend/data/dev/ the *_DB_PATH vars point at. Idempotent:

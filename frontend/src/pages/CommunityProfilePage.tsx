@@ -48,6 +48,7 @@ export function CommunityProfilePage() {
     try {
       await action();
       await queryClient.invalidateQueries({ queryKey: ["community", "profile", username] });
+      await queryClient.invalidateQueries({ queryKey: ["community", "people"] });
     } catch {
       setError("Something went wrong. Try again.");
     } finally {
