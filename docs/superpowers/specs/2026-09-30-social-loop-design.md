@@ -416,9 +416,12 @@ Clients display at most "99+".
 - **`GET /community/people/suggested` has its own 30/min limit.**
 - **Libraries are read when saved, not on every request.** The library module
   stores each user's match keys, the display fields of their own books and
-  their reader glyph in the same transaction as the document, with a one-time
-  backfill at startup. Suggestions count shared books in SQL, and glyph
-  lookups read the stored value. Before this, each request parsed up to 500
+  their reader glyph in the same transaction as the document. Each book
+  contributes at most one row per key, long keys are skipped, and display
+  fields are truncated. A startup backfill derives any library whose rows are
+  missing or older than its document. Bumping `LIBRARY_DERIVED_VERSION`
+  rebuilds them all. Suggestions count shared books in SQL, and glyph lookups
+  read the stored value. Before this, each request parsed up to 500
   libraries of up to 25 MB, so a few large ones could stall the server.
 - **Following needs a published profile, or a follower.** The API used to
   accept any username, which let anyone follow a private user and read their
