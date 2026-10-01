@@ -5,7 +5,7 @@ import { encodeCover, isAcceptableCover } from "../domain/images.js";
 import { normalizeTitle } from "../domain/normalize.js";
 import type { BooksRepository, CoverBlobStore } from "../domain/ports.js";
 import type { BookRow } from "../domain/types.js";
-import { PAGE_RANK, feedProducts, feedUrl, findPageIsbn, isDisallowed, parseRobots, parseShopifyProducts, parseWooProducts, type PublisherBook, type ResolvedBook } from "./publisherFeed.js";
+import { PAGE_RANK, feedProducts, feedUrl, findPageIsbn, isDisallowed, parseRobots, parseShopifyProducts, parseWooProducts, withPageText, type PublisherBook, type ResolvedBook } from "./publisherFeed.js";
 import type { PublisherSite } from "./publishers.js";
 import { seedBook } from "./seedCatalog.js";
 
@@ -42,7 +42,7 @@ export interface ImportDeps {
   fetchText(url: string): Promise<{ status: number; text: string }>;
   fetchBytes(url: string): Promise<Buffer | null>;
   lookupOpenLibrary(isbn: string): Promise<OpenLibraryEdition | null>;
-  repo: Pick<BooksRepository, "findBookByKey" | "getBook" | "createBook" | "addKey" | "fillIdentity" | "setWorkKey" | "setPublisherUrl" | "getImage" | "insertImage" | "setCover" | "listRejectedUrls" | "setUpgradeWanted">;
+  repo: Pick<BooksRepository, "findBookByKey" | "getBook" | "createBook" | "addKey" | "fillIdentity" | "mergeDetails" | "setWorkKey" | "setPublisherUrl" | "getImage" | "insertImage" | "setCover" | "listRejectedUrls" | "setUpgradeWanted">;
   blobs: CoverBlobStore;
   now: () => Date;
   sleep: (ms: number) => Promise<void>;
@@ -143,7 +143,7 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
       continue;
     }
     const isbn = findPageIsbn(response.text);
-    if (isbn) resolved.push({ ...book, isbn });
+    if (isbn) resolved.push({ ...book, isbn, details: withPageText(book.details, response.text) });
     else report.pagesNoIsbn++;
   }
 
@@ -215,6 +215,7 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
     }
     if (!options.dryRun) {
       deps.repo.setWorkKey(row.id, memo.looked?.edition?.workKey);
+      deps.repo.mergeDetails(row.id, { ...book.details, publisher: site.name }, "publisher");
       if (isWebUrl(book.productUrl)) deps.repo.setPublisherUrl(row.id, book.productUrl);
     }
 

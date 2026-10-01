@@ -9,6 +9,14 @@ export interface PublisherBook {
   imageUrl: string;
   productUrl: string;
   rank: number;
+  details: ProductDetails;
+}
+
+export interface ProductDetails {
+  summary: string | null;
+  pages: number | null;
+  year: number | null;
+  translator: string | null;
 }
 
 export type ResolvedBook = PublisherBook & { isbn: string };
@@ -19,6 +27,19 @@ const LABEL_REACH = 40;
 const ISBN_CANDIDATE = /(?<!\d)97[89](?:[\p{Pd}\s.]?\d){10}(?!\d)/gu;
 const ISBN10_CANDIDATE = /(?<!\d)\d(?:[\p{Pd}\s.]?\d){8}[\p{Pd}\s.]?[\dXx](?![\dXx])/gu;
 const PORTUGAL_PREFIX = /^978(?:972|989)/;
+const BLOCK_TAG = /<\/?(?:p|div|br|li|ul|ol|h[1-6]|tr|table|blockquote)\b[^>]*>/gi;
+const SHOP_NOTICE = /pr[ée]-venda|envios|portes|stock|esgotado/i;
+const NOTICE_REACH = 200;
+const MIN_SYNOPSIS = 80;
+const MIN_PAGES = 8;
+const MAX_PAGES = 5000;
+const FIRST_YEAR = 1900;
+const PAGES_ATTRIBUTE = /p[áa]ginas|n[úu]m\.? ?p[áa]g/i;
+const PAGES_TEXT = /(?<!\d)(\d{2,4})\s*(?:p[áa]g(?:inas|s)?\.?)(?![a-z])/i;
+const TRANSLATOR_ATTRIBUTE = /^tradu/i;
+const TRANSLATOR_TEXT = /Tradu(?:ção|zido)(?: de| por)?:?\s*([^\n.;|]{3,60})/i;
+const YEAR_ATTRIBUTE = /^(ano|data|edi[cç][aã]o)/i;
+const YEAR_VALUE = /(?<!\d)(?:19|20)\d{2}(?!\d)/;
 const NAMED_ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
 
 function checksumOk(digits: string): boolean {
@@ -57,6 +78,38 @@ function decodeEntities(text: string): string {
     if (hex) return String.fromCodePoint(parseInt(hex, 16));
     return NAMED_ENTITIES[name.toLowerCase()] ?? whole;
   });
+}
+
+function plainText(html: string): string {
+  return decodeEntities(html.replace(/<(script|style)\b[\s\S]*?<\/\1\s*>/gi, " ").replace(BLOCK_TAG, "\n").replace(/<[^>]*>/g, " "));
+}
+
+function synopsis(html: string): string | null {
+  const lines = plainText(html)
+    .split("\n")
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter((line) => line !== "" && !SHOP_NOTICE.test(line.slice(0, NOTICE_REACH)));
+  const joined = lines.join("\n\n");
+  return joined.length >= MIN_SYNOPSIS ? joined : null;
+}
+
+function pageCount(value: string | null | undefined): number | null {
+  const count = Number(value?.match(/\d+/)?.[0]);
+  return count >= MIN_PAGES && count <= MAX_PAGES ? count : null;
+}
+
+function publicationYear(value: string | null): number | null {
+  const year = Number(value?.match(YEAR_VALUE)?.[0]);
+  return year >= FIRST_YEAR && year <= new Date().getFullYear() ? year : null;
+}
+
+function textDetails(text: string): Pick<ProductDetails, "pages" | "translator"> {
+  return { pages: pageCount(PAGES_TEXT.exec(text)?.[1]), translator: TRANSLATOR_TEXT.exec(text)?.[1]?.trim() || null };
+}
+
+export function withPageText(details: ProductDetails, html: string): ProductDetails {
+  const page = textDetails(plainText(html));
+  return { ...details, pages: details.pages ?? page.pages, translator: details.translator ?? page.translator };
 }
 
 export function findPageIsbn(html: string): string | null {
@@ -121,17 +174,31 @@ export function parseShopifyProducts(json: unknown, site: PublisherSite): Publis
     if (!found && !URL.canParse(productUrl)) return [];
     const vendor = text(product.vendor).trim();
     const author = site.authorFromVendor && vendor && normalizeWords(vendor) !== normalizeWords(site.name) ? vendor : null;
-    return [{ isbn: found?.isbn ?? null, rank: found?.rank ?? PAGE_RANK, title, author, imageUrl, productUrl }];
+    const body = text(product.body_html);
+    const details = { summary: synopsis(body), year: null, ...textDetails(plainText(body)) };
+    return [{ isbn: found?.isbn ?? null, rank: found?.rank ?? PAGE_RANK, title, author, imageUrl, productUrl, details }];
   });
 }
 
-function wooAuthor(product: Record<string, unknown>): string | null {
+function wooAttribute(product: Record<string, unknown>, name: RegExp): string | null {
   const names = (Array.isArray(product.attributes) ? product.attributes : []).flatMap((item) => {
     const attribute = record(item);
-    if (!attribute || !/^autor/i.test(text(attribute.name))) return [];
+    if (!attribute || !name.test(text(attribute.name))) return [];
     return (Array.isArray(attribute.terms) ? attribute.terms : []).map((term) => decodeEntities(text(record(term)?.name)).trim()).filter(Boolean);
   });
   return names.length > 0 ? names.join(", ") : null;
+}
+
+function wooDetails(product: Record<string, unknown>): ProductDetails {
+  const description = text(product.description);
+  const shortDescription = text(product.short_description);
+  const fromText = textDetails(plainText(`${description}\n${shortDescription}`));
+  return {
+    summary: synopsis(description) ?? synopsis(shortDescription),
+    pages: pageCount(wooAttribute(product, PAGES_ATTRIBUTE)) ?? fromText.pages,
+    year: publicationYear(wooAttribute(product, YEAR_ATTRIBUTE)),
+    translator: wooAttribute(product, TRANSLATOR_ATTRIBUTE) ?? fromText.translator
+  };
 }
 
 export function parseWooProducts(json: unknown, site: PublisherSite): PublisherBook[] {
@@ -144,7 +211,7 @@ export function parseWooProducts(json: unknown, site: PublisherSite): PublisherB
     if (!imageUrl || !productUrl || !title) return [];
     const found = firstIsbn([[text(product.sku)], [fileName(imageUrl)], [JSON.stringify(product)]]);
     if (!found && !URL.canParse(productUrl)) return [];
-    return [{ isbn: found?.isbn ?? null, rank: found?.rank ?? PAGE_RANK, title, author: wooAuthor(product), imageUrl, productUrl }];
+    return [{ isbn: found?.isbn ?? null, rank: found?.rank ?? PAGE_RANK, title, author: wooAttribute(product, /^autor/i), imageUrl, productUrl, details: wooDetails(product) }];
   });
 }
 

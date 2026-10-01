@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { feedProducts, feedUrl, findPageIsbn, findPortugalIsbn, isDisallowed, parseRobots, parseShopifyProducts, parseWooProducts } from "./publisherFeed.js";
+import { feedProducts, feedUrl, findPageIsbn, findPortugalIsbn, isDisallowed, parseRobots, parseShopifyProducts, parseWooProducts, withPageText } from "./publisherFeed.js";
 import type { PublisherSite } from "./publishers.js";
 
 const shopify = JSON.parse(readFileSync(new URL("./fixtures/shopify-products.json", import.meta.url), "utf8"));
@@ -181,4 +181,80 @@ test("a feed product whose product page URL cannot be built has no page fallback
   assert.deepEqual(parseWooProducts(product("/produto/livro/", ""), relogio), []);
   assert.equal(parseWooProducts(product("/produto/livro/", "9789726084679"), relogio)[0]?.isbn, "9789726084679");
   assert.equal(parseWooProducts(product("https://x.example/livro/", ""), relogio)[0]?.isbn, null);
+});
+
+const SYNOPSIS = "Paris, 1785. Um jovem e ambicioso engenheiro, Jean-Baptiste Baratte, recebe a missão de limpar o maior cemitério da cidade.";
+
+function wooProduct(fields: Record<string, unknown>) {
+  return { name: "Um Livro", permalink: "https://www.relogiodagua.pt/produto/um-livro/", sku: "9789897837579", description: "", short_description: "", images: [{ src: "https://x.example/b.jpg" }], attributes: [], ...fields };
+}
+
+const attribute = (name: string, value: string) => ({ name, terms: [{ name: value }] });
+const wooDetails = (fields: Record<string, unknown>) => parseWooProducts([wooProduct(fields)], relogio)[0]!.details;
+const shopifyDetails = (bodyHtml: string) => parseShopifyProducts({ products: [{ title: "Um Livro", handle: "um-livro", variants: [{ barcode: "9789726084945" }], images: [{ src: "https://x.example/b.jpg" }], body_html: bodyHtml }] }, antigona)[0]!.details;
+
+test("a Shopify synopsis comes out as plain text with paragraph breaks", () => {
+  const html = `<p>${SYNOPSIS}</p>\n<p>Um romance&nbsp;sobre <em>a morte</em> &amp; a cidade, escrito com uma precisão rara.</p><script>var x = 1;</script>`;
+  assert.equal(shopifyDetails(html).summary, `${SYNOPSIS}\n\nUm romance sobre a morte & a cidade, escrito com uma precisão rara.`);
+});
+
+test("a WooCommerce description drops a leading shop notice and keeps the synopsis", () => {
+  const description = `LIVRO EM PRÉ-VENDA. ENVIOS DIA 13 DE OUTUBRO.\n${SYNOPSIS}`;
+  assert.equal(wooDetails({ description }).summary, SYNOPSIS);
+});
+
+test("a synopsis under 80 characters, or one that is only a notice, is not stored", () => {
+  assert.equal(wooDetails({ description: "Um livro curto sobre o mar." }).summary, null);
+  assert.equal(wooDetails({ description: "LIVRO EM PRÉ-VENDA. ENVIOS DIA 13 DE OUTUBRO. Reserve já o seu exemplar e receba-o em casa no dia do lançamento." }).summary, null);
+  assert.equal(shopifyDetails("<p>Impressão 50x70.</p>").summary, null);
+});
+
+test("the short description stands in when the description gives no synopsis", () => {
+  assert.equal(wooDetails({ description: "", short_description: `<p>${SYNOPSIS}</p>` }).summary, SYNOPSIS);
+});
+
+test("pages come from a page-count attribute, with the Abysmo and Kathartika names", () => {
+  assert.equal(wooDetails({ attributes: [attribute("Núm. páginas", "240")] }).pages, 240);
+  assert.equal(wooDetails({ attributes: [attribute("Páginas", "312 páginas")] }).pages, 312);
+});
+
+test("pages come from the text when there is no attribute", () => {
+  assert.equal(wooDetails({ description: "Brochado, 240 págs, 14x21 cm." }).pages, 240);
+  assert.equal(wooDetails({ description: "<p>Edição de 1.ª tiragem. 96 páginas.</p>" }).pages, 96);
+  assert.equal(shopifyDetails("<p>Formato 15x23. 180 pág.</p>").pages, 180);
+});
+
+test("a year, an ISBN digit run, a price or an out-of-range count is not taken as pages", () => {
+  assert.equal(wooDetails({ description: "Lisboa, 2024. ISBN 978-972-608-494-5. 15,90 €. Pagamento seguro." }).pages, null);
+  assert.equal(wooDetails({ description: "9789726084945 págs" }).pages, null);
+  assert.equal(wooDetails({ description: "7 págs" }).pages, null);
+  assert.equal(wooDetails({ attributes: [attribute("Páginas", "4")] }).pages, null);
+  assert.equal(wooDetails({ attributes: [attribute("Páginas", "9999")] }).pages, null);
+});
+
+test("the translator comes from an attribute or from a Tradução line", () => {
+  assert.equal(wooDetails({ attributes: [attribute("Tradutor", "Ana Lima")] }).translator, "Ana Lima");
+  assert.equal(wooDetails({ description: "Um romance.\nTradução de Ana Lima. Capa de Rui." }).translator, "Ana Lima");
+  assert.equal(wooDetails({ description: "Tradução: Maria Gomes | 240 págs" }).translator, "Maria Gomes");
+  assert.equal(shopifyDetails("<p>Traduzido por João Matos</p>").translator, "João Matos");
+});
+
+test("the year comes from a year attribute, between 1900 and this year", () => {
+  assert.equal(wooDetails({ attributes: [attribute("Ano", "2019")] }).year, 2019);
+  assert.equal(wooDetails({ attributes: [attribute("Data de edição", "03/2021")] }).year, 2021);
+  assert.equal(wooDetails({ attributes: [attribute("Ano", "1850")] }).year, null);
+  assert.equal(wooDetails({ attributes: [attribute("Ano", "9999")] }).year, null);
+  assert.equal(wooDetails({ description: "Edição de 2019." }).year, null);
+  assert.equal(shopifyDetails("<p>Edição de 2019.</p>").year, null);
+});
+
+test("a product with nothing to extract has all-null details", () => {
+  assert.deepEqual(wooDetails({}), { summary: null, pages: null, year: null, translator: null });
+});
+
+test("withPageText fills pages and translator the feed lacked, and keeps what the feed gave", () => {
+  const page = "<html><body><p>Tradução de Ana Lima</p><p>240 págs</p></body></html>";
+  const empty = { summary: SYNOPSIS, pages: null, year: 2019, translator: null };
+  assert.deepEqual(withPageText(empty, page), { summary: SYNOPSIS, pages: 240, year: 2019, translator: "Ana Lima" });
+  assert.deepEqual(withPageText({ ...empty, pages: 100, translator: "Rui" }, page), { summary: SYNOPSIS, pages: 100, year: 2019, translator: "Rui" });
 });

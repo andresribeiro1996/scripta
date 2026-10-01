@@ -832,3 +832,91 @@ test("a dry run records no product page, creator or origin", async () => {
   assert.equal((h.db.prepare("SELECT COUNT(*) AS n FROM books WHERE created_by IS NOT NULL OR publisher_url IS NOT NULL").get() as { n: number }).n, 0);
   assert.equal(h.imageCount(), 0);
 });
+
+const WOO_FEED = "https://www.relogiodagua.pt/wp-json/wc/store/v1/products?per_page=100&page=1";
+const SYNOPSIS = "Paris, 1785. Um jovem e ambicioso engenheiro, Jean-Baptiste Baratte, recebe a missão de limpar o maior cemitério da cidade.";
+
+const richFeed = JSON.stringify([
+  {
+    name: "Puro",
+    permalink: "https://www.relogiodagua.pt/produto/puro/",
+    sku: MUSEU,
+    description: `LIVRO EM PRÉ-VENDA. ENVIOS DIA 13 DE OUTUBRO.\n${SYNOPSIS}`,
+    short_description: "",
+    images: [{ src: "https://x.example/puro.jpg" }],
+    attributes: [{ name: "Núm. páginas", terms: [{ name: "240" }] }, { name: "Ano", terms: [{ name: "2019" }] }, { name: "Tradutor", terms: [{ name: "Ana Lima" }] }]
+  }
+]);
+
+function detailsOf(h: Awaited<ReturnType<typeof harness>>, isbn: string) {
+  const row = h.repo.findBookByKey(`isbn:${isbn}`)!;
+  return { summary: row.summary, summary_source: row.summary_source, pages: row.pages, year: row.year, publisher: row.publisher, translator: row.translator, details_status: row.details_status };
+}
+
+test("a created book gets the publisher's synopsis, pages, year, translator and the site name", async () => {
+  const h = await harness({ lookup: async () => ({ title: "Puro", author: "Jim Crace" }), feeds: { [WOO_FEED]: { text: richFeed } } });
+
+  await importPublisherCovers(h.deps, [relogio], { dryRun: false });
+
+  assert.deepEqual(detailsOf(h, MUSEU), { summary: SYNOPSIS, summary_source: "publisher", pages: 240, year: 2019, publisher: "Relógio d'Água", translator: "Ana Lima", details_status: null });
+});
+
+test("an existing book gets the details on a re-run, and its own values are kept", async () => {
+  const h = await harness({ feeds: { [WOO_FEED]: { text: richFeed } } });
+  const book = addBook(h.repo, MUSEU);
+  h.repo.mergeDetails(book.id, { summary: null, pages: 300, year: null, publisher: null, translator: null }, null);
+  addCover(h.repo, book.id, "upload", 900, null);
+
+  const reports = await importPublisherCovers(h.deps, [relogio], { dryRun: false });
+
+  assert.equal(reports["Relógio d'Água"]!.unchanged, 1);
+  assert.deepEqual(detailsOf(h, MUSEU), { summary: SYNOPSIS, summary_source: "publisher", pages: 300, year: 2019, publisher: "Relógio d'Água", translator: "Ana Lima", details_status: null });
+});
+
+test("a re-run replaces a non-publisher summary but never a publisher one", async () => {
+  const h = await harness({ feeds: { [WOO_FEED]: { text: richFeed } } });
+  const book = addBook(h.repo, MUSEU);
+  h.repo.mergeDetails(book.id, { summary: "Open Library synopsis.", pages: null, year: null, publisher: null, translator: null }, "openlibrary");
+
+  await importPublisherCovers(h.deps, [relogio], { dryRun: false });
+  assert.equal(detailsOf(h, MUSEU).summary, SYNOPSIS);
+
+  const other = JSON.stringify([{ ...JSON.parse(richFeed)[0], description: `${SYNOPSIS} Outra edição, outro texto.` }]);
+  await importPublisherCovers({ ...h.deps, fetchText: async (url) => (url === WOO_FEED ? { status: 200, text: other } : h.deps.fetchText(url)) }, [relogio], { dryRun: false });
+  assert.equal(detailsOf(h, MUSEU).summary, SYNOPSIS);
+});
+
+test("a page-sourced book gets pages and translator from its product page text", async () => {
+  const feed = JSON.stringify([{ name: "Sem Codigo", permalink: "https://www.relogiodagua.pt/produto/sem-codigo/", sku: "", description: "", short_description: "", images: [{ src: "https://x.example/sem.jpg" }], attributes: [] }]);
+  const page = { text: `<html><body><p>ISBN ${MUSEU}</p><p>Tradução de Ana Lima</p><p>240 págs</p></body></html>` };
+  const h = await harness({ lookup: async () => ({ title: "Sem Codigo", author: "Alguem" }), feeds: { [WOO_FEED]: { text: feed }, "https://www.relogiodagua.pt/produto/sem-codigo/": page } });
+
+  await importPublisherCovers(h.deps, [relogio], { dryRun: false });
+
+  const details = detailsOf(h, MUSEU);
+  assert.equal(details.pages, 240);
+  assert.equal(details.translator, "Ana Lima");
+  assert.equal(details.publisher, "Relógio d'Água");
+});
+
+test("a skipped book gets no details", async () => {
+  const feed = JSON.stringify([{ ...JSON.parse(richFeed)[0], sku: "", images: [{ src: "https://x.example/puro.jpg" }] }]);
+  const h = await harness({ feeds: { [WOO_FEED]: { text: feed }, "https://www.relogiodagua.pt/produto/puro/": isbnPage(MUSEU) } });
+  const book = addBook(h.repo, MUSEU, "Outro Titulo");
+
+  const reports = await importPublisherCovers(h.deps, [relogio], { dryRun: false });
+
+  assert.equal(reports["Relógio d'Água"]!.pageTitleMismatch, 1);
+  assert.deepEqual(detailsOf(h, MUSEU), { summary: null, summary_source: null, pages: null, year: null, publisher: null, translator: null, details_status: null });
+  assert.equal(h.repo.getBook(book.id)!.pages, null);
+});
+
+test("a dry run saves no details", async () => {
+  const h = await harness({ lookup: async () => ({ title: "Puro", author: "Jim Crace" }), feeds: { [WOO_FEED]: { text: richFeed } } });
+  const book = addBook(h.repo, MUSEU);
+
+  await importPublisherCovers(h.deps, [relogio], { dryRun: true });
+
+  assert.equal((h.db.prepare("SELECT COUNT(*) AS n FROM books WHERE summary_source IS NOT NULL OR pages IS NOT NULL OR year IS NOT NULL OR publisher IS NOT NULL OR translator IS NOT NULL").get() as { n: number }).n, 0);
+  assert.equal(h.repo.getBook(book.id)!.pages, null);
+});
