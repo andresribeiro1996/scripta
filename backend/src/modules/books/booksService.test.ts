@@ -17,6 +17,7 @@ const { applyBooksMigrations } = await import("./adapters/sqlite/connection.js")
 const { createSqliteBooksRepository } = await import("./adapters/sqlite/sqliteBooksRepository.js");
 const { createBooksService } = await import("./booksService.js");
 const { SourceUnavailableError } = await import("./domain/errors.js");
+const { createCoverWorker } = await import("./worker.js");
 
 type Deps = Parameters<typeof createBooksService>[0];
 type CoverSource = Deps["sources"]["apple"];
@@ -672,6 +673,7 @@ test("a good ISBNdb cover on an English ISBN finishes without an upgrade", async
   assert.equal(h.repo.getBook(id)!.cover_status, "good");
   assert.deepEqual(calls, ["isbndb"]);
   assert.deepEqual(h.enqueued, []);
+  assert.equal(h.repo.getBook(id)!.cover_upgrade_wanted_at, null);
 });
 
 test("a good ISBNdb cover on a Portuguese ISBN queues an Apple upgrade", async () => {
@@ -811,4 +813,61 @@ test("an upgrade whose Apple lookup is unavailable backs off and queues nothing"
   assert.deepEqual(h.enqueued, []);
   h.service.enqueueCovers([orlando]);
   assert.deepEqual(h.enqueued, []);
+});
+
+test("a fast lookup that ends low_res leads the real worker to a second, Apple-only lookup on the upgrade lane", async () => {
+  const calls: string[] = [];
+  const lanes: string[] = [];
+  const h = harness({
+    sources: { isbndb: recording("isbndb", calls, "https://i/1"), apple: recording("apple", calls, "https://a/1"), openlibrary: emptySource },
+    enqueue: (bookId, priority) => worker.enqueue(bookId, priority)
+  });
+  const worker = createCoverWorker((bookId, lane) => { lanes.push(lane); return h.service.processBook(bookId, lane); }, (error) => { throw error; });
+  h.sizes.set("https://i/1", [300, 450]);
+  h.sizes.set("https://a/1", [900, 1350]);
+  h.service.resolveCover(orlando);
+  await worker.idle();
+  assert.deepEqual(lanes, ["normal", "upgrade"]);
+  assert.deepEqual(calls, ["isbndb", "apple"]);
+  const book = h.repo.getBook(h.bookId("isbn:9780141184272"))!;
+  assert.equal(book.cover_status, "good");
+  assert.equal(h.repo.getImage(book.cover_image_id!)!.source, "apple");
+  assert.equal(book.cover_upgrade_wanted_at, null);
+});
+
+test("a fast lookup that wants an upgrade records it", async () => {
+  const { h, id } = prepare(orlando, { isbndb: recording("isbndb", [], "https://i/1"), apple: emptySource, openlibrary: emptySource }, [["https://i/1", 300]]);
+  await h.service.processBook(id, "normal");
+  assert.equal(h.repo.getBook(id)!.cover_upgrade_wanted_at, "2026-10-01T00:00:00.000Z");
+});
+
+test("a completed upgrade clears the wanted mark whether or not it replaced the cover", async () => {
+  const { h, id } = prepare(orlando, { isbndb: null, apple: emptySource, openlibrary: emptySource });
+  withCover(h, id, "openlibrary", 300, "low_res");
+  h.repo.setUpgradeWanted(id, "2026-10-01T00:00:00.000Z");
+  await h.service.processBook(id, "upgrade");
+  assert.equal(h.repo.getBook(id)!.cover_upgrade_wanted_at, null);
+});
+
+test("an unavailable upgrade keeps the wanted mark", async () => {
+  const { h, id } = prepare(orlando, { isbndb: null, apple: unavailable("apple", []), openlibrary: emptySource });
+  withCover(h, id, "openlibrary", 300, "low_res");
+  h.repo.setUpgradeWanted(id, "2026-10-01T00:00:00.000Z");
+  await h.service.processBook(id, "upgrade");
+  assert.equal(h.repo.getBook(id)!.cover_upgrade_wanted_at, "2026-10-01T00:00:00.000Z");
+});
+
+test("enqueueUnchecked queues books that still want an upgrade on the upgrade lane and respects backoff", async () => {
+  const { h, id } = prepare(orlando, { isbndb: null, apple: unavailable("apple", []), openlibrary: emptySource });
+  withCover(h, id, "openlibrary", 300, "low_res");
+  h.repo.setUpgradeWanted(id, "2026-10-01T00:00:00.000Z");
+  h.service.enqueueUnchecked();
+  assert.deepEqual(h.enqueued, [{ bookId: id, priority: "upgrade" }]);
+  h.enqueued.length = 0;
+  await h.service.processBook(id, "upgrade");
+  h.service.enqueueUnchecked();
+  assert.deepEqual(h.enqueued, []);
+  h.advance(10 * 60 * 1000);
+  h.service.enqueueUnchecked();
+  assert.deepEqual(h.enqueued, [{ bookId: id, priority: "upgrade" }]);
 });

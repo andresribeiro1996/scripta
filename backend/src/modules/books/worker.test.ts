@@ -360,18 +360,54 @@ test("a front request for a book queued as upgrade promotes it and it runs once"
   assert.equal(gate.lanes.get("up1"), "upgrade");
 });
 
-test("upgrade is a no-op for a book already queued fast, queued as background or active", async () => {
+test("upgrade is a no-op for a book already queued fast or queued as background", async () => {
   const gate = gated();
   const worker = createCoverWorker(gate.processBook, () => {});
   await holdSlots(worker, gate);
   worker.enqueue("n1");
   worker.enqueue("bg1", "background");
   worker.enqueue("n1", "upgrade");
-  worker.enqueue("h1", "upgrade");
   worker.enqueue("bg1", "upgrade");
   await drainAll(worker, gate);
   assert.deepEqual(gate.started.slice(3), ["n1", "bg1"]);
   assert.equal(gate.lanes.get("bg1"), "background");
+});
+
+test("an upgrade request for an active book is remembered and runs on the upgrade lane afterwards", async () => {
+  const gate = gated();
+  const worker = createCoverWorker(gate.processBook, () => {});
+  await holdSlots(worker, gate);
+  worker.enqueue("h1", "upgrade");
+  worker.enqueue("h1", "upgrade");
+  gate.release("h1");
+  await drainAll(worker, gate);
+  assert.deepEqual(gate.started.slice(3), ["h1"]);
+  assert.equal(gate.lanes.get("h1"), "upgrade");
+});
+
+test("a front request for an active book beats a remembered upgrade", async () => {
+  const gate = gated();
+  const worker = createCoverWorker(gate.processBook, () => {});
+  await holdSlots(worker, gate);
+  worker.enqueue("h1", "upgrade");
+  worker.enqueue("h1", "front");
+  worker.enqueue("h1", "upgrade");
+  gate.release("h1");
+  await tick();
+  assert.deepEqual(gate.started.slice(3), ["h1"]);
+  assert.equal(gate.lanes.get("h1"), "front");
+  gate.release("h1");
+  await drainAll(worker, gate);
+  assert.deepEqual(gate.started.slice(3), ["h1"]);
+});
+
+test("a background request for an active book is ignored", async () => {
+  const gate = gated();
+  const worker = createCoverWorker(gate.processBook, () => {});
+  await holdSlots(worker, gate);
+  worker.enqueue("h1", "background");
+  await drainAll(worker, gate);
+  assert.deepEqual(gate.started.slice(3), []);
 });
 
 test("processBook receives the lane each book was taken from", async () => {

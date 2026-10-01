@@ -21,6 +21,8 @@ export interface BooksRepository {
   markDetailsMissing(bookId: string, checkedAt: string): void;
   searchBooks(tokens: string[], limit: number): BookRow[];
   listUncheckedCoverIds(): string[];
+  setUpgradeWanted(bookId: string, at: string | null): void;
+  listUpgradeWantedIds(): string[];
 }
 
 export interface CoverCandidate {

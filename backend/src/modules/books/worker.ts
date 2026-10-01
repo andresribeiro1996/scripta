@@ -16,7 +16,7 @@ export function createCoverWorker(
   const upgrade: string[] = [];
   const background: string[] = [];
   const queued = new Map<string, CoverPriority>();
-  const requeue = new Set<string>();
+  const requeue = new Map<string, CoverPriority>();
   const active = new Set<string>();
   const idleWaiters: Array<() => void> = [];
   let running = 0;
@@ -56,9 +56,12 @@ export function createCoverWorker(
           active.delete(bookId);
           if (apple) appleRunning--;
         }
-        if (requeue.delete(bookId) && !queued.has(bookId)) {
-          queued.set(bookId, "front");
-          queue.unshift(bookId);
+        const remembered = requeue.get(bookId);
+        requeue.delete(bookId);
+        if (remembered && !queued.has(bookId)) {
+          queued.set(bookId, remembered);
+          if (remembered === "front") queue.unshift(bookId);
+          else upgrade.push(bookId);
         }
       }
     } finally {
@@ -73,7 +76,8 @@ export function createCoverWorker(
       const front = priority === "front";
       const fast = front || priority === "normal";
       if (active.has(bookId)) {
-        if (front) requeue.add(bookId);
+        if (front) requeue.set(bookId, "front");
+        else if (priority === "upgrade" && requeue.get(bookId) !== "front") requeue.set(bookId, "upgrade");
         return;
       }
       const current = queued.get(bookId);

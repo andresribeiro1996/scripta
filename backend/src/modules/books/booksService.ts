@@ -176,6 +176,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
 
     enqueueUnchecked() {
       for (const id of deps.repo.listUncheckedCoverIds()) schedule(id, "background");
+      for (const id of deps.repo.listUpgradeWantedIds()) schedule(id, "upgrade");
     },
 
     async processBook(bookId, lane) {
@@ -205,8 +206,13 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
         if (outcome.complete) {
           backoffUntil.delete(bookId);
           deps.repo.setCover(bookId, { imageId, status, checkedAt: at });
-          const fast = lane === "front" || lane === "normal";
-          if (fast && (status !== "good" || (source === "isbndb" && portuguese))) schedule(bookId, "upgrade");
+          if (lane === "upgrade") {
+            deps.repo.setUpgradeWanted(bookId, null);
+          } else if (lane !== "background") {
+            const wanted = status !== "good" || (source === "isbndb" && portuguese);
+            deps.repo.setUpgradeWanted(bookId, wanted ? at : null);
+            if (wanted) schedule(bookId, "upgrade");
+          }
           return;
         }
         backoffUntil.set(bookId, now().getTime() + UNAVAILABLE_BACKOFF_MS);
