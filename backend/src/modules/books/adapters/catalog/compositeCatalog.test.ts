@@ -3,6 +3,7 @@ import { test } from "node:test";
 import type { BookMetadata } from "@scripta/shared";
 import { SourcePausedError, SourceUnavailableError } from "../../domain/errors.js";
 import type { BookCatalog, CatalogDetails, CatalogSearchHit } from "../../domain/ports.js";
+import { capDailyCalls } from "../isbndb/isbndbDailyCap.js";
 import { createCompositeCatalog } from "./compositeCatalog.js";
 
 const lookup = { isbn: "9780441013593", title: "Dune", author: "Frank Herbert" };
@@ -184,4 +185,24 @@ test("a strict catalog behaves as usual when ISBNdb answers or is not asked", as
   const bnFake = fake(down());
   assert.deepEqual(await createCompositeCatalog(fake(openLibrary).catalog, bnFake.catalog, true).fetchDetails(lookup), openLibrary);
   assert.deepEqual(bnFake.calls, []);
+});
+
+test("a strict catalog does not ask ISBNdb when Open Library is unavailable, a normal one still does", async () => {
+  const strictFake = fake(isbndb);
+  await assert.rejects(createCompositeCatalog(fake(down()).catalog, strictFake.catalog, true).fetchDetails(lookup), SourceUnavailableError);
+  assert.deepEqual(strictFake.calls, []);
+  const normalFake = fake(isbndb);
+  assert.deepEqual(await createCompositeCatalog(fake(down()).catalog, normalFake.catalog).fetchDetails(lookup), isbndb);
+  assert.deepEqual(normalFake.calls, ["details"]);
+});
+
+test("a strict catalog over a capped ISBNdb catalog leaves the cap counter alone when Open Library is unavailable", async () => {
+  let calls = 0;
+  const inner: BookCatalog = { fetchDetails: async () => { calls++; return isbndb; }, search: async () => [] };
+  const capped = capDailyCalls(inner, 1);
+  const strict = createCompositeCatalog(fake(down()).catalog, capped, true);
+  await assert.rejects(strict.fetchDetails(lookup), SourceUnavailableError);
+  assert.equal(calls, 0);
+  assert.deepEqual(await createCompositeCatalog(fake(ol({ summary: null })).catalog, capped, true).fetchDetails(lookup), { ...isbndb, metadata: { ...olMetadata, summary: "ISBNdb summary." }, sources: ["openlibrary", "isbndb"], summarySource: "isbndb" });
+  assert.equal(calls, 1);
 });

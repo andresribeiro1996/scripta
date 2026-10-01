@@ -43,6 +43,7 @@ export function createCompositeCatalog(primary: BookCatalog, secondary: BookCata
         if (!first.ok) throw first.error;
         return found;
       }
+      if (strict && !first.ok) throw first.error;
       const second = await attempt(secondary.fetchDetails(lookup));
       if (!second.ok) {
         if (found && !strict) return found;
