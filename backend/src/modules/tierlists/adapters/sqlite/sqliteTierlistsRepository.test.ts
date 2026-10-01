@@ -281,3 +281,56 @@ test("rekeyBooks rewrites the owner's unpublished tier lists only", async () => 
   assert.equal(read("published").data, data);
   assert.equal(read("other").data, data);
 });
+
+function nameKey(db: DatabaseSync, id: string): string | null {
+  return (db.prepare(`SELECT name_key FROM tierlists WHERE id = ?`).get(id) as { name_key: string | null }).name_key;
+}
+
+test("creating and renaming a tier list keep name_key in step with the name", () => {
+  const db = freshDb();
+  const repo = createSqliteTierlistsRepository(db);
+  repo.insert(row({ id: "c1", name: "Hábitos Atómicos!" }));
+  assert.equal(nameKey(db, "c1"), "habitos atomicos");
+
+  repo.update("c1", "u1", { name: "Sci-Fi: Ñandú" });
+  assert.equal(nameKey(db, "c1"), "sci fi nandu");
+  assert.equal(repo.getOwned("c1", "u1")?.name, "Sci-Fi: Ñandú");
+
+  repo.update("c1", "u1", { data: "{}" });
+  assert.equal(nameKey(db, "c1"), "sci fi nandu");
+});
+
+test("publishing and promoting leave name_key matching the name", () => {
+  const db = freshDb();
+  const repo = createSqliteTierlistsRepository(db);
+  repo.insert(row({ id: "c1", name: "Hábitos Atómicos" }));
+  repo.publish("c1", "u1", "{}", "anonymous", "code1", "[]", ballot({ id: "own", tierlist_id: "c1", voter_user_id: "u1" }), []);
+  assert.equal(nameKey(db, "c1"), "habitos atomicos");
+  repo.promote("c1", "2026-02-01T00:00:00.000Z");
+  assert.equal(nameKey(db, "c1"), "habitos atomicos");
+});
+
+test("opening a database fills name_key on rows that have none", () => {
+  const db = freshDb();
+  db.prepare(`INSERT INTO tierlists (id, owner_user_id, origin_user_id, name) VALUES ('old1', 'u1', 'u1', 'Hábitos Atómicos'), ('old2', 'u1', 'u1', '!!!')`).run();
+  db.prepare(`INSERT INTO tierlists (id, owner_user_id, origin_user_id, name, name_key) VALUES ('kept', 'u1', 'u1', 'Kept', 'custom')`).run();
+  assert.equal(nameKey(db, "old1"), null);
+
+  applyTierlistsMigrations(db);
+
+  assert.equal(nameKey(db, "old1"), "habitos atomicos");
+  assert.equal(nameKey(db, "old2"), "");
+  assert.equal(nameKey(db, "kept"), "custom");
+});
+
+test("a database from before name_key gets the column and fills it for existing rows", () => {
+  const db = freshDb();
+  db.prepare(`INSERT INTO tierlists (id, owner_user_id, origin_user_id, name, name_key) VALUES ('old', 'u1', 'u1', 'Hábitos Atómicos', 'stale')`).run();
+  db.exec(`ALTER TABLE tierlists DROP COLUMN name_key`);
+  assert.ok(!columnNames(db, "tierlists").includes("name_key"));
+
+  applyTierlistsMigrations(db);
+
+  assert.ok(columnNames(db, "tierlists").includes("name_key"));
+  assert.equal(nameKey(db, "old"), "habitos atomicos");
+});

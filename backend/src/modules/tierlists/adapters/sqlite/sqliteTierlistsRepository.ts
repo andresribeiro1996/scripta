@@ -2,15 +2,15 @@
 // this module that knows SQL — service.ts only ever sees the
 // TierlistsRepository interface this fulfills.
 
-import { rekeyTierBoard } from "@scripta/shared";
+import { normalizeWords, rekeyTierBoard } from "@scripta/shared";
 import type { DatabaseSync } from "node:sqlite";
 import type { TierlistsRepository } from "../../domain/ports.js";
 import type { TierlistRow, BallotRow, Placement } from "../../domain/types.js";
 
 export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepository {
   const insertStmt = db.prepare(`
-    INSERT INTO tierlists (id, owner_user_id, origin_user_id, name, data, vote_code, vote_access, voting_open, source_tierlist_id, promoted_at, public_books, created_at, updated_at)
-    VALUES ($id, $owner_user_id, $origin_user_id, $name, $data, $vote_code, $vote_access, $voting_open, $source_tierlist_id, $promoted_at, $public_books, $created_at, $updated_at)
+    INSERT INTO tierlists (id, owner_user_id, origin_user_id, name, name_key, data, vote_code, vote_access, voting_open, source_tierlist_id, promoted_at, public_books, created_at, updated_at)
+    VALUES ($id, $owner_user_id, $origin_user_id, $name, $name_key, $data, $vote_code, $vote_access, $voting_open, $source_tierlist_id, $promoted_at, $public_books, $created_at, $updated_at)
   `);
   const listStmt = db.prepare(`SELECT * FROM tierlists WHERE owner_user_id = ? AND promoted_at IS NULL ORDER BY created_at DESC`);
   const getOwnedStmt = db.prepare(`SELECT * FROM tierlists WHERE id = ? AND owner_user_id = ? AND promoted_at IS NULL`);
@@ -19,7 +19,7 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
   // column already has its final value by the time this runs.
   const updateStmt = db.prepare(`
     UPDATE tierlists
-    SET name = $name, data = $data, updated_at = $updated_at
+    SET name = $name, name_key = $name_key, data = $data, updated_at = $updated_at
     WHERE id = $id AND owner_user_id = $owner_user_id
   `);
   const deleteStmt = db.prepare(`DELETE FROM tierlists WHERE id = ? AND owner_user_id = ? AND promoted_at IS NULL`);
@@ -153,6 +153,7 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
         $owner_user_id: row.owner_user_id,
         $origin_user_id: row.origin_user_id,
         $name: row.name,
+        $name_key: normalizeWords(row.name),
         $data: row.data,
         $vote_code: row.vote_code,
         $vote_access: row.vote_access,
@@ -175,6 +176,7 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
         $id: id,
         $owner_user_id: userId,
         $name: merged.name,
+        $name_key: normalizeWords(merged.name),
         $data: merged.data,
         $updated_at: updatedAt
       });

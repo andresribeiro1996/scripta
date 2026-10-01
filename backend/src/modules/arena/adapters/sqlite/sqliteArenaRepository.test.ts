@@ -274,3 +274,63 @@ test("rekeyBooks rewrites seeding slots only and drops a slot that would duplica
   assert.deepEqual(keys("both"), ["new"]);
   assert.deepEqual(keys("active"), ["old"]);
 });
+
+function tournament(overrides: Partial<TournamentRow> & { id: string }): TournamentRow {
+  return {
+    owner_user_id: "u1",
+    name: "Bracket",
+    bracket_size: 8,
+    round_duration_minutes: 60,
+    status: "seeding",
+    current_round: 0,
+    created_at: "2026-01-01T00:00:00.000Z",
+    updated_at: "2026-01-01T00:00:00.000Z",
+    ...overrides
+  };
+}
+
+function nameKey(db: DatabaseSync, id: string): string | null {
+  return (db.prepare(`SELECT name_key FROM tournaments WHERE id = ?`).get(id) as { name_key: string | null }).name_key;
+}
+
+test("creating and renaming a tournament keep name_key in step, and starting leaves it alone", () => {
+  const db = freshDb();
+  const repo = createSqliteArenaRepository(db);
+  repo.insertTournament(tournament({ id: "t1", name: "Melhores Livros: Ficção!" }));
+  assert.equal(nameKey(db, "t1"), "melhores livros ficcao");
+
+  repo.updateTournamentStatus("t1", "active", 1);
+  assert.equal(nameKey(db, "t1"), "melhores livros ficcao");
+
+  repo.renameTournament("t1", "Hábitos Atómicos");
+  assert.equal(nameKey(db, "t1"), "habitos atomicos");
+  assert.equal(repo.getTournament("t1")?.name, "Hábitos Atómicos");
+});
+
+test("opening a database fills name_key on rows that have none", () => {
+  const db = freshDb();
+  db.prepare(`INSERT INTO tournaments (id, owner_user_id, name, bracket_size, round_duration_minutes) VALUES ('old1', 'u1', 'Hábitos Atómicos', 4, 60), ('old2', 'u1', '!!!', 4, 60)`).run();
+  db.prepare(`INSERT INTO tournaments (id, owner_user_id, name, name_key, bracket_size, round_duration_minutes) VALUES ('kept', 'u1', 'Kept', 'custom', 4, 60)`).run();
+  assert.equal(nameKey(db, "old1"), null);
+
+  applyArenaMigrations(db);
+
+  assert.equal(nameKey(db, "old1"), "habitos atomicos");
+  assert.equal(nameKey(db, "old2"), "");
+  assert.equal(nameKey(db, "kept"), "custom");
+});
+
+test("a database from before name_key gets the column, the public index and filled keys", () => {
+  const db = freshDb();
+  db.prepare(`INSERT INTO tournaments (id, owner_user_id, name, name_key, bracket_size, round_duration_minutes) VALUES ('old', 'u1', 'Hábitos Atómicos', 'stale', 4, 60)`).run();
+  db.exec(`ALTER TABLE tournaments DROP COLUMN name_key`);
+  db.exec(`DROP INDEX idx_tournaments_public`);
+  assert.ok(!columnNames(db, "tournaments").includes("name_key"));
+
+  applyArenaMigrations(db);
+
+  assert.ok(columnNames(db, "tournaments").includes("name_key"));
+  assert.equal(nameKey(db, "old"), "habitos atomicos");
+  const index = db.prepare(`SELECT name FROM sqlite_master WHERE type='index' AND name='idx_tournaments_public'`).get();
+  assert.ok(index, "the public listing index exists after migrating");
+});

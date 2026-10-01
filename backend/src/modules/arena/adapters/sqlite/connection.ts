@@ -1,6 +1,7 @@
 // Opens (and migrates) this module's own SQLite database — mirrors
 // modules/books/adapters/sqlite/connection.ts exactly.
 
+import { normalizeWords } from "@scripta/shared";
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
@@ -27,6 +28,11 @@ export function openArenaDb(): DatabaseSync {
  *  must run BEFORE the schema: schema.sql's partial index on the column
  *  would fail to create against a pre-existing votes table that lacks it. */
 export function applyArenaMigrations(db: DatabaseSync): void {
+  const tournamentsColumns = db.prepare(`PRAGMA table_info(tournaments)`).all() as { name: string }[];
+  if (tournamentsColumns.length > 0 && !tournamentsColumns.some((column) => column.name === "name_key")) {
+    db.exec(`ALTER TABLE tournaments ADD COLUMN name_key TEXT`);
+  }
+
   const votesExists = db
     .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='votes'`)
     .get() as { name: string } | undefined;
@@ -54,4 +60,20 @@ export function applyArenaMigrations(db: DatabaseSync): void {
 
   const schema = readFileSync(`${adapterDir}/schema.sql`, "utf8");
   db.exec(schema);
+
+  fillNameKeys(db);
+}
+
+function fillNameKeys(db: DatabaseSync): void {
+  const stale = db.prepare(`SELECT id, name FROM tournaments WHERE name_key IS NULL`).all() as { id: string; name: string }[];
+  if (stale.length === 0) return;
+  const update = db.prepare(`UPDATE tournaments SET name_key = ? WHERE id = ?`);
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    for (const row of stale) update.run(normalizeWords(row.name), row.id);
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
 }

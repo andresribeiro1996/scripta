@@ -2,14 +2,15 @@
 // this module that knows SQL — service.ts only ever sees the
 // ArenaRepository interface this fulfills.
 
+import { normalizeWords } from "@scripta/shared";
 import type { DatabaseSync } from "node:sqlite";
 import type { ArenaRepository } from "../../domain/ports.js";
 import type { DuelRow, SeedPreview, TournamentRow, TournamentSlotRow, VoteRow } from "../../domain/types.js";
 
 export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
   const insertTournamentStmt = db.prepare(`
-    INSERT INTO tournaments (id, owner_user_id, name, bracket_size, round_duration_minutes, status, current_round, created_at, updated_at)
-    VALUES ($id, $owner_user_id, $name, $bracket_size, $round_duration_minutes, $status, $current_round, $created_at, $updated_at)
+    INSERT INTO tournaments (id, owner_user_id, name, name_key, bracket_size, round_duration_minutes, status, current_round, created_at, updated_at)
+    VALUES ($id, $owner_user_id, $name, $name_key, $bracket_size, $round_duration_minutes, $status, $current_round, $created_at, $updated_at)
   `);
   const getTournamentStmt = db.prepare(`SELECT * FROM tournaments WHERE id = ?`);
   const getOwnedTournamentStmt = db.prepare(`SELECT * FROM tournaments WHERE id = ? AND owner_user_id = ?`);
@@ -19,7 +20,7 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
     UPDATE tournaments SET status = $status, current_round = $current_round, updated_at = $updated_at WHERE id = $id
   `);
   const renameTournamentStmt = db.prepare(`
-    UPDATE tournaments SET name = $name, updated_at = $updated_at WHERE id = $id
+    UPDATE tournaments SET name = $name, name_key = $name_key, updated_at = $updated_at WHERE id = $id
   `);
   const deleteTournamentStmt = db.prepare(`DELETE FROM tournaments WHERE id = ?`);
 
@@ -164,6 +165,7 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
         $id: row.id,
         $owner_user_id: row.owner_user_id,
         $name: row.name,
+        $name_key: normalizeWords(row.name),
         $bracket_size: row.bracket_size,
         $round_duration_minutes: row.round_duration_minutes,
         $status: row.status,
@@ -188,7 +190,7 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
       updateStatusStmt.run({ $id: id, $status: status, $current_round: currentRound, $updated_at: new Date().toISOString() });
     },
     renameTournament(id, name) {
-      renameTournamentStmt.run({ $id: id, $name: name, $updated_at: new Date().toISOString() });
+      renameTournamentStmt.run({ $id: id, $name: name, $name_key: normalizeWords(name), $updated_at: new Date().toISOString() });
     },
     deleteTournament(id) {
       deleteTournamentStmt.run(id); // ON DELETE CASCADE removes its slots/duels/votes too
