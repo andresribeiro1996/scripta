@@ -9,11 +9,8 @@
 // Two separate builder functions, not one — plugin.ts registers each in
 // its OWN Fastify encapsulation scope, same split (and same reasoning) as
 // modules/murals/routes.ts's buildMuralRoutes/buildPublicLibraryRoutes:
-// the authenticated CRUD routes below get no rate limit at all (ordinary
-// library editing/saving shouldn't be throttled), while the public
-// GET /library/shared/:token route gets its own tight limit — previously
-// this module had NO rate limit anywhere, leaving that public,
-// unauthenticated, DB-querying route wide open.
+// the public GET /library/shared/:token route is unauthenticated and hits
+// the DB on every request, so it gets its own tight limit.
 
 import fastifyMultipart from "@fastify/multipart";
 import fastifyRateLimit from "@fastify/rate-limit";
@@ -25,7 +22,7 @@ import { join } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { z } from "zod";
 import { env } from "../../config/env.js";
-import { authGuard } from "../auth/index.js";
+import { authGuard, rateLimitKey } from "../auth/index.js";
 import { LibraryConflictError, NoLibraryDocumentError } from "./domain/errors.js";
 import { ImportBusyError, InvalidImportError, parseImport } from "./import/parseImport.js";
 import type { LibraryService } from "./service.js";
@@ -83,79 +80,109 @@ const mergeBooksSchema = z.object({
 });
 
 /** The authenticated surface — get/save/share/unshare, all behind
- *  authGuard. Registered in plugin.ts with no rate limit, same as before. */
+ *  authGuard. Reads and writes are separate scopes, each with its own
+ *  per-account rate limit. */
 export function buildLibraryRoutes(service: LibraryService) {
   return async function libraryRoutes(app: FastifyInstance) {
     await sweepStaleImportDirs().catch((error) => app.log.warn({ err: error }, "stale import cleanup failed"));
 
-    app.get("/library", { preHandler: authGuard }, async (request, reply) => {
-      const library = service.getLibrary(request.user.id);
-      if (!library) {
-        return reply.code(404).send({ error: "No library saved yet." });
-      }
-      return reply.send(library);
+    await app.register(async (reads) => {
+      await reads.register(fastifyRateLimit, { max: 60, timeWindow: "1 minute", keyGenerator: rateLimitKey });
+
+      reads.get("/library", { preHandler: authGuard }, async (request, reply) => {
+        const library = service.getLibrary(request.user.id);
+        if (!library) {
+          return reply.code(404).send({ error: "No library saved yet." });
+        }
+        return reply.send(library);
+      });
     });
 
-    app.put("/library", {
-      onRequest: authGuard,
-      bodyLimit: env.LIBRARY_BODY_LIMIT_BYTES,
-      errorHandler(error, _request, reply) {
-        if (error.statusCode === 413) {
-          return reply.code(413).send({
-            error: "Library document is too large.",
-            code: "LIBRARY_BODY_TOO_LARGE",
-            maxBytes: env.LIBRARY_BODY_LIMIT_BYTES
+    await app.register(async (writes) => {
+      await writes.register(fastifyRateLimit, { max: 30, timeWindow: "1 minute", keyGenerator: rateLimitKey });
+
+      writes.put("/library", {
+        onRequest: authGuard,
+        bodyLimit: env.LIBRARY_BODY_LIMIT_BYTES,
+        errorHandler(error, _request, reply) {
+          if (error.statusCode === 413) {
+            return reply.code(413).send({
+              error: "Library document is too large.",
+              code: "LIBRARY_BODY_TOO_LARGE",
+              maxBytes: env.LIBRARY_BODY_LIMIT_BYTES
+            });
+          }
+          throw error;
+        }
+      }, async (request, reply) => {
+        const parsed = saveLibrarySchema.safeParse(request.body);
+        if (!parsed.success) {
+          return reply.code(400).send({
+            error: 'Expected {"data": {"books": [...], ...}} — see the exporter\'s library.json shape.'
           });
         }
-        throw error;
-      }
-    }, async (request, reply) => {
-      const parsed = saveLibrarySchema.safeParse(request.body);
-      if (!parsed.success) {
-        return reply.code(400).send({
-          error: 'Expected {"data": {"books": [...], ...}} — see the exporter\'s library.json shape.'
-        });
-      }
-      try {
-        const library = service.saveLibrary(request.user.id, parsed.data.data, parsed.data.updatedAt, parsed.data.source);
+        try {
+          const library = service.saveLibrary(request.user.id, parsed.data.data, parsed.data.updatedAt, parsed.data.source);
+          return reply.send(library);
+        } catch (error) {
+          if (error instanceof LibraryConflictError) {
+            return reply.code(409).send({ error: error.message, current: service.getLibrary(request.user.id) });
+          }
+          throw error;
+        }
+      });
+
+      writes.post("/library/books", { preHandler: authGuard }, async (request, reply) => {
+        const parsed = addBookSchema.safeParse(request.body);
+        if (!parsed.success) {
+          return reply.code(400).send({ error: "Expected { title, author, readStatus } — isbn/coverUrl optional." });
+        }
+        try {
+          return reply.send(service.addBook(request.user.id, parsed.data));
+        } catch (error) {
+          if (error instanceof LibraryConflictError) {
+            return reply.code(409).send({ error: error.message });
+          }
+          throw error;
+        }
+      });
+
+      writes.post("/library/books/merge", { preHandler: authGuard }, async (request, reply) => {
+        const parsed = mergeBooksSchema.safeParse(request.body);
+        if (!parsed.success) {
+          return reply.code(400).send({ error: "Expected { keep, merge: [...], updatedAt }." });
+        }
+        try {
+          return reply.send(service.mergeBooks(request.user.id, parsed.data.keep, parsed.data.merge, parsed.data.updatedAt));
+        } catch (error) {
+          if (error instanceof NoLibraryDocumentError) return reply.code(404).send({ error: "No library saved yet." });
+          if (error instanceof LibraryConflictError) {
+            return reply.code(409).send({ error: error.message, current: service.getLibrary(request.user.id) });
+          }
+          throw error;
+        }
+      });
+
+      writes.post("/library/share", { preHandler: authGuard }, async (request, reply) => {
+        try {
+          const library = service.share(request.user.id);
+          return reply.send(library);
+        } catch (err) {
+          if (err instanceof NoLibraryDocumentError) {
+            return reply.code(404).send({ error: err.message });
+          }
+          throw err;
+        }
+      });
+
+      writes.post("/library/unshare", { preHandler: authGuard }, async (request, reply) => {
+        service.unshare(request.user.id);
+        const library = service.getLibrary(request.user.id);
+        if (!library) {
+          return reply.code(404).send({ error: "No library saved yet." });
+        }
         return reply.send(library);
-      } catch (error) {
-        if (error instanceof LibraryConflictError) {
-          return reply.code(409).send({ error: error.message, current: service.getLibrary(request.user.id) });
-        }
-        throw error;
-      }
-    });
-
-    app.post("/library/books", { preHandler: authGuard }, async (request, reply) => {
-      const parsed = addBookSchema.safeParse(request.body);
-      if (!parsed.success) {
-        return reply.code(400).send({ error: "Expected { title, author, readStatus } — isbn/coverUrl optional." });
-      }
-      try {
-        return reply.send(service.addBook(request.user.id, parsed.data));
-      } catch (error) {
-        if (error instanceof LibraryConflictError) {
-          return reply.code(409).send({ error: error.message });
-        }
-        throw error;
-      }
-    });
-
-    app.post("/library/books/merge", { preHandler: authGuard }, async (request, reply) => {
-      const parsed = mergeBooksSchema.safeParse(request.body);
-      if (!parsed.success) {
-        return reply.code(400).send({ error: "Expected { keep, merge: [...], updatedAt }." });
-      }
-      try {
-        return reply.send(service.mergeBooks(request.user.id, parsed.data.keep, parsed.data.merge, parsed.data.updatedAt));
-      } catch (error) {
-        if (error instanceof NoLibraryDocumentError) return reply.code(404).send({ error: "No library saved yet." });
-        if (error instanceof LibraryConflictError) {
-          return reply.code(409).send({ error: error.message, current: service.getLibrary(request.user.id) });
-        }
-        throw error;
-      }
+      });
     });
 
     await app.register(async (imports) => {
@@ -193,27 +220,6 @@ export function buildLibraryRoutes(service: LibraryService) {
         if (reply.sent) return;
         return reply.code(outcome.status).send(outcome.body);
       });
-    });
-
-    app.post("/library/share", { preHandler: authGuard }, async (request, reply) => {
-      try {
-        const library = service.share(request.user.id);
-        return reply.send(library);
-      } catch (err) {
-        if (err instanceof NoLibraryDocumentError) {
-          return reply.code(404).send({ error: err.message });
-        }
-        throw err;
-      }
-    });
-
-    app.post("/library/unshare", { preHandler: authGuard }, async (request, reply) => {
-      service.unshare(request.user.id);
-      const library = service.getLibrary(request.user.id);
-      if (!library) {
-        return reply.code(404).send({ error: "No library saved yet." });
-      }
-      return reply.send(library);
     });
   };
 }

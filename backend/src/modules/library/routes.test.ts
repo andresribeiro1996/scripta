@@ -54,6 +54,33 @@ test("PUT /library rejects an anonymous caller before the body is read", async (
   await app.close();
 });
 
+test("library writes share one bucket of 30 a minute per account, apart from reads and other accounts", async () => {
+  const { app } = await setup();
+  const writes = [
+    { method: "PUT", url: "/library" },
+    { method: "POST", url: "/library/books" },
+    { method: "POST", url: "/library/books/merge" },
+    { method: "POST", url: "/library/share" },
+    { method: "POST", url: "/library/unshare" }
+  ] as const;
+  const write = (token: string, index: number) =>
+    app.inject({ ...writes[index % writes.length]!, headers: { authorization: `Bearer ${token}` }, payload: {} });
+  for (let request = 0; request < 30; request++) assert.notEqual((await write("u1", request)).statusCode, 429);
+  for (let route = 0; route < writes.length; route++) assert.equal((await write("u1", route)).statusCode, 429);
+  assert.notEqual((await write("u2", 0)).statusCode, 429);
+  assert.equal((await app.inject({ method: "GET", url: "/library", headers: { authorization: "Bearer u1" } })).statusCode, 404);
+  await app.close();
+});
+
+test("GET /library allows 60 requests a minute per account", async () => {
+  const { app } = await setup();
+  const read = (token: string) => app.inject({ method: "GET", url: "/library", headers: { authorization: `Bearer ${token}` } });
+  for (let request = 1; request <= 60; request++) assert.equal((await read("u1")).statusCode, 404);
+  assert.equal((await read("u1")).statusCode, 429);
+  assert.equal((await read("u2")).statusCode, 404);
+  await app.close();
+});
+
 test("POST /library/books/merge requires a signed-in user", async () => {
   const { app, merge } = await setup();
   const res = await merge({ keep: "a", merge: ["b"], updatedAt: "2026-01-01T00:00:00.000Z" }, null);
