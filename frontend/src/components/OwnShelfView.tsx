@@ -329,6 +329,7 @@ function OwnerControls({
         onClick={() => {
           setMuralId(currentMuralId ?? murals?.[0]?.id ?? "");
           setNext(feedSettings ?? DEFAULT_FEED_SETTINGS);
+          setConfirming(false);
           setOpen(true);
         }}
         className="shrink-0 rounded-full border border-(--color-border) bg-(--color-surface) px-4 py-1.5 text-sm font-semibold hover:border-(--color-accent)"
