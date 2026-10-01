@@ -211,7 +211,7 @@ test("a new book takes the vendor as its author", async () => {
   assert.deepEqual(h.lookups, []);
 });
 
-test("a new book without a vendor takes Open Library's title and author", async () => {
+test("a new book without a vendor takes Open Library's edition title and author", async () => {
   const h = await harness({ lookup: async () => ({ title: "Guerra Branca", author: "Bruno Maçães" }) });
 
   const reports = await importPublisherCovers(h.deps, [relogio], { dryRun: false });
@@ -221,6 +221,16 @@ test("a new book without a vendor takes Open Library's title and author", async 
   assert.equal(row.author, "Bruno Maçães");
   assert.equal(reports["Relógio d'Água"]!.created, 6);
   assert.equal(h.lookups.length, 5);
+});
+
+test("a new book keeps the shop's title when Open Library has no edition title", async () => {
+  const h = await harness({ lookup: async () => ({ title: null, author: "Bruno Maçães" }) });
+
+  await importPublisherCovers(h.deps, [relogio], { dryRun: false });
+
+  const row = h.repo.findBookByKey(`isbn:${GUERRA}`)!;
+  assert.equal(row.title, "GUERRA BRANCA — NA FRENTE ÁRTICA DO CONFLITO MUNDIAL");
+  assert.equal(row.author, "Bruno Maçães");
 });
 
 test("a book with no author anywhere is still created, blank, and gets its cover", async () => {

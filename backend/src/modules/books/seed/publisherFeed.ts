@@ -95,7 +95,7 @@ function wooAuthor(product: Record<string, unknown>): string | null {
   const names = (Array.isArray(product.attributes) ? product.attributes : []).flatMap((item) => {
     const attribute = record(item);
     if (!attribute || !/^autor/i.test(text(attribute.name))) return [];
-    return (Array.isArray(attribute.terms) ? attribute.terms : []).map((term) => text(record(term)?.name).trim()).filter(Boolean);
+    return (Array.isArray(attribute.terms) ? attribute.terms : []).map((term) => decodeEntities(text(record(term)?.name)).trim()).filter(Boolean);
   });
   return names.length > 0 ? names.join(", ") : null;
 }

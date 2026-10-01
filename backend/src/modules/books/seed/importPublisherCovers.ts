@@ -27,8 +27,8 @@ export interface SiteReport {
 export interface ImportDeps {
   fetchText(url: string): Promise<{ status: number; text: string }>;
   fetchBytes(url: string): Promise<Buffer | null>;
-  lookupOpenLibrary(isbn: string): Promise<{ title: string; author: string } | null>;
-  repo: Pick<BooksRepository, "findBookByKey" | "getBook" | "createBook" | "getImage" | "insertImage" | "setCover" | "listRejectedUrls" | "setUpgradeWanted">;
+  lookupOpenLibrary(isbn: string): Promise<{ title: string | null; author: string } | null>;
+  repo: Pick<BooksRepository, "findBookByKey" | "getBook" | "createBook" | "addKey" | "fillIdentity" | "getImage" | "insertImage" | "setCover" | "listRejectedUrls" | "setUpgradeWanted">;
   blobs: CoverBlobStore;
   now: () => Date;
   sleep: (ms: number) => Promise<void>;
@@ -111,7 +111,7 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
     if (!row) {
       let { title, author } = book;
       if (!author) {
-        let found: { title: string; author: string } | null;
+        let found: { title: string | null; author: string } | null;
         try {
           found = await deps.lookupOpenLibrary(book.isbn);
         } catch (error) {
@@ -119,7 +119,10 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
           report.failed++;
           continue;
         }
-        if (found) ({ title, author } = found);
+        if (found) {
+          title = found.title ?? title;
+          author = found.author;
+        }
         else {
           report.noAuthor++;
           title = "";

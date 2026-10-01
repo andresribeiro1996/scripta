@@ -1,5 +1,4 @@
 import { parseArgs } from "node:util";
-import { mapOpenLibraryDoc } from "@scripta/shared";
 
 const { values } = parseArgs({ options: { "dry-run": { type: "boolean", default: false } } });
 
@@ -32,11 +31,12 @@ const fetchBytes = (url) => guarded(url, async (res) => (res.ok ? Buffer.from(aw
 const openLibraryThrottle = createThrottle(OPEN_LIBRARY_GAP_MS);
 
 async function lookupOpenLibrary(isbn) {
-  const query = new URLSearchParams({ q: `isbn:${isbn}`, fields: "title,author_name", limit: "1" });
+  const query = new URLSearchParams({ q: `isbn:${isbn}`, fields: "author_name,editions,editions.title", limit: "1" });
   const data = await openLibraryThrottle(() => fetchJson("openlibrary", `https://openlibrary.org/search.json?${query}`));
   const doc = data?.docs?.[0];
-  const hit = doc && mapOpenLibraryDoc(doc);
-  return hit && hit.authors.length > 0 ? { title: hit.title, author: hit.authors.join(", ") } : null;
+  const authors = Array.isArray(doc?.author_name) ? doc.author_name.filter((name) => typeof name === "string") : [];
+  const edition = doc?.editions?.docs?.[0]?.title;
+  return authors.length > 0 ? { title: typeof edition === "string" && edition.trim() ? edition.trim() : null, author: authors.join(", ") } : null;
 }
 
 const store = createObjectStore();

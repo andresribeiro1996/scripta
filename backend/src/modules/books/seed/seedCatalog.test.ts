@@ -12,6 +12,7 @@ process.env.COVERS_DB_PATH = join(scratch, "covers.sqlite");
 process.env.JWT_ACCESS_SECRET = "a".repeat(64);
 process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
+const { catalogTitleKey } = await import("../domain/normalize.js");
 const { openBooksDb } = await import("../adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("../adapters/sqlite/sqliteBooksRepository.js");
 const { seedBook, seedCatalog } = await import("./seedCatalog.js");
@@ -68,4 +69,32 @@ test("seedBook returns the created row, then the existing one", () => {
   assert.equal(existing.outcome, "existing");
   assert.equal(existing.book?.id, created.book?.id);
   assert.deepEqual(seedBook({ isbn: "", title: "", author: "" }, repo, () => NOW), { outcome: "invalid" });
+});
+
+test("seedBook fills an untitled existing row and gives it its title key", () => {
+  const { repo } = setup();
+  const blank = seedBook({ isbn: "9780141184272", title: "", author: "" }, repo, () => NOW).book!;
+  assert.equal(blank.title, "");
+  assert.equal(repo.findBookByKey(catalogTitleKey("One", "Author")!), undefined);
+
+  const result = seedBook({ isbn: "9780141184272", title: "One", author: "Author" }, repo, () => NOW);
+
+  assert.equal(result.outcome, "existing");
+  const filled = repo.getBook(blank.id)!;
+  assert.equal(filled.title, "One");
+  assert.equal(filled.author, "Author");
+  assert.equal(repo.findBookByKey(catalogTitleKey("One", "Author")!)?.id, blank.id);
+});
+
+test("seedBook leaves a titled row alone and does not steal a taken title key", () => {
+  const { repo } = setup();
+  const titled = seedBook({ isbn: "9780374520731", title: "Two", author: "Author" }, repo, () => NOW).book!;
+  const blank = seedBook({ isbn: "9780062315007", title: "", author: "" }, repo, () => NOW).book!;
+
+  seedBook({ isbn: "9780374520731", title: "Other", author: "Someone" }, repo, () => NOW);
+  assert.equal(repo.getBook(titled.id)!.title, "Two");
+
+  seedBook({ isbn: "9780062315007", title: "Two", author: "Author" }, repo, () => NOW);
+  assert.equal(repo.getBook(blank.id)!.title, "Two");
+  assert.equal(repo.findBookByKey(catalogTitleKey("Two", "Author")!)?.id, titled.id);
 });

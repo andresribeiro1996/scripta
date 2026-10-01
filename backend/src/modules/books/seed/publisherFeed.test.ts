@@ -67,6 +67,7 @@ test("WooCommerce author joins the terms of an attribute named Autor and ignores
   const product = (attributes: object[]) => [{ name: "Livro", permalink: "https://x.example/livro/", sku: "9789726084679", images: [{ src: "https://x.example/a.jpg" }], attributes }];
   const terms = (...names: string[]) => names.map((name) => ({ name }));
   assert.equal(parseWooProducts(product([{ name: "Autores", terms: terms("A B", "C D") }]), relogio)[0]?.author, "A B, C D");
+  assert.equal(parseWooProducts(product([{ name: "Autor", terms: terms("Eugene O&#8217;Neill") }]), relogio)[0]?.author, "Eugene O’Neill");
   assert.equal(parseWooProducts(product([{ name: "Tradutor", terms: terms("E F") }]), relogio)[0]?.author, null);
   assert.equal(parseWooProducts(product([{ name: "Autor", terms: [] }]), relogio)[0]?.author, null);
 });

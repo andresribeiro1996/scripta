@@ -9,13 +9,19 @@ export interface SeedResult {
   invalid: number;
 }
 
-type SeedRepo = Pick<BooksRepository, "findBookByKey" | "createBook">;
+type SeedRepo = Pick<BooksRepository, "findBookByKey" | "createBook" | "addKey" | "fillIdentity">;
 
 export function seedBook(input: { isbn: string; title: string; author: string }, repo: SeedRepo, now: () => Date): { outcome: "created" | "existing" | "invalid"; book?: BookRow } {
   const identity = lookupIdentity(input);
   if (!identity) return { outcome: "invalid" };
   const existing = repo.findBookByKey(identity.key);
-  if (existing) return { outcome: "existing", book: existing };
+  if (existing) {
+    if (!existing.title && identity.title) {
+      if (identity.titleKey && !repo.findBookByKey(identity.titleKey)) repo.addKey(identity.titleKey, existing.id);
+      repo.fillIdentity(existing.id, identity.title, identity.author);
+    }
+    return { outcome: "existing", book: existing };
+  }
   const { titleKey } = identity;
   const keys = titleKey && titleKey !== identity.key && !repo.findBookByKey(titleKey) ? [identity.key, titleKey] : [identity.key];
   return { outcome: "created", book: repo.createBook({ title: identity.title, author: identity.author, isbn: identity.isbn }, keys, now().toISOString()) };
