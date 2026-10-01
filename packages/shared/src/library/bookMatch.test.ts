@@ -78,3 +78,18 @@ test("bookMatchKeys keys the exact title and the first author, so a bracketed se
   assert.deepEqual(bookMatchKeys({ Title: "Dune", Attribution: "Frank Herbert, Brian Herbert" }), ["ta:dune|frank herbert"]);
   assert.deepEqual(bookMatchKeys({ Title: "Dune (Dune Chronicles #1)", Attribution: "Frank Herbert" }), ["ta:dune dune chronicles 1|frank herbert"]);
 });
+
+test("a bracketed part ends at the first closing bracket, and an unclosed bracket stays in the title", () => {
+  assert.equal(normalizeTitle("Dune (Chronicles (Book 1)) Extra"), "dune extra");
+  assert.equal(normalizeTitle("Dune (Chronicles"), "dune chronicles");
+  assert.equal(normalizeTitle("Dune [Deluxe] (Edition)"), "dune");
+  assert.equal(titleNumbers("Vol 2 [3] (4"), "2 4");
+  assert.equal(titleNumbers("Vol 2 (a (3) 4) 5"), "2 4 5");
+});
+
+test("a title made of unclosed brackets is normalized in linear time", () => {
+  const started = performance.now();
+  normalizeTitle("(".repeat(300000));
+  titleNumbers("[".repeat(300000));
+  assert.ok(performance.now() - started < 1000);
+});
