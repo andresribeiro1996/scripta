@@ -358,10 +358,10 @@ Clients display at most "99+".
   present.
 - **Privacy:** only data already public on a published profile is used (its
   Library tab shows titles and statuses). Private users never appear.
-- **Endpoint:** `GET /community/people/suggested?limit=` (authed). It is
-  computed per request over the 500 most recently updated published profiles
-  through the existing `resolveLibrary` dep, which is enough at current
-  scale.
+- **Endpoint:** `GET /community/people/suggested?limit=` (authed). It ranks
+  the 500 most recently updated published profiles by match keys the library
+  module stores whenever a library is saved, so a request never parses a
+  library document.
 
 ### A profile without a mural
 
@@ -395,7 +395,9 @@ Clients display at most "99+".
   - Publishing without a mural emits no `mural_published` event.
 - **Suggestion rows reuse `PersonResult`**, plus `sharedCount` and up to three
   `sharedBooks: { title, author, coverUrl }`.
-  - `coverUrl` comes from the public library's `_coverUrl`.
+  - The shared books are the viewer's own copies: their title, author and
+    cover, never the other reader's. A cover URL from someone else's library
+    could be a tracking pixel that reveals which books the viewer owns.
   - The reason text comes from a shared `suggestionReason`: "You share 6
     books", "You share 1 book", or "Recently active" for fill rows.
 - **Ranking** is by books in common, then by profile recency (`updated_at`).
@@ -409,9 +411,17 @@ Clients display at most "99+".
   current shelf mural itself, computed exactly as the own-profile `muralId`
   is. Sending a cached id could undo a shelf switch made on another device.
   `muralId` stays accepted for old clients.
-- **`GET /community/people/suggested` has its own 30/min limit.** It is the
-  module's most expensive route: it reads up to 500 public libraries per
-  request.
+- **`GET /community/people/suggested` has its own 30/min limit.**
+- **Libraries are read when saved, not on every request.** The library module
+  stores each user's match keys, the display fields of their own books and
+  their reader glyph in the same transaction as the document, with a one-time
+  backfill at startup. Suggestions count shared books in SQL, and glyph
+  lookups read the stored value. Before this, each request parsed up to 500
+  libraries of up to 25 MB, so a few large ones could stall the server.
+- **Following needs a published profile, or a follower.** The API used to
+  accept any username, which let anyone follow a private user and read their
+  activity in a dashboard. Following back someone who follows you still
+  works.
 - **Rows show one caption from a shared `personCaption`:** the reason on a
   suggestion, otherwise "Private" or the follower count.
 - **People search failures say so.** Mobile used to show "No people found";
