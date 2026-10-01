@@ -329,3 +329,52 @@ test("a year attribute name must be a whole word", () => {
   assert.equal(wooDetails({ attributes: [attribute("Anotações", "2019")] }).year, null);
   assert.equal(wooDetails({ attributes: [attribute("Ano", "2019")] }).year, 2019);
 });
+
+test("a synopsis paragraph that merely starts with a label word is kept, a labelled fact line is dropped", () => {
+  const prose = [
+    "Autor de vários romances premiados, Jorge Amado nasceu na Bahia e fez da sua terra o centro de uma obra imensa.",
+    "Edição especial de um clássico que esteve décadas fora das livrarias portuguesas, agora com novo prefácio.",
+    "Data de 1785 é o ano em que tudo começa, quando um jovem engenheiro chega a Paris para limpar um cemitério."
+  ];
+  const facts = ["Autor: Jorge Amado", "ISBN - 978-972-608-494-5", "Páginas", "Ano – 2019", "Tradução de Ana Lima"];
+  const html = [...prose, ...facts].map((line) => `<p>${line}</p>`).join("");
+  assert.equal(shopifyDetails(html).summary, prose.join("\n\n"));
+});
+
+test("a name that is too long or ambiguous gives no translator", () => {
+  const translator = (line: string) => wooDetails({ description: `<p>${line}</p>` }).translator;
+  assert.equal(translator("Tradução de José Saramago e Pilar del Río"), null);
+  assert.equal(translator("Tradução de Ana Maria Pereira Lopes Costa Silva Ramos"), null);
+  assert.equal(translator("Tradução de Ana Maria Pereira Lopes Costa Silva"), "Ana Maria Pereira Lopes Costa Silva");
+  assert.equal(translator("Tradução de Ana Lima e revisão de Rui Costa"), "Ana Lima");
+  assert.equal(translator("Tradução de Ana Lima e Rui Costa"), "Ana Lima e Rui Costa");
+  assert.equal(translator("Tradução de Ana Lima de revisão"), null);
+});
+
+test("a dot or space is a thousands separator only before exactly three digits", () => {
+  assert.equal(wooDetails({ attributes: [attribute("Páginas", "1.200")] }).pages, 1200);
+  assert.equal(wooDetails({ attributes: [attribute("Páginas", "1 200")] }).pages, 1200);
+  assert.equal(wooDetails({ attributes: [attribute("Páginas", "24.5")] }).pages, null);
+  assert.equal(wooDetails({ attributes: [attribute("Páginas", "1.2345")] }).pages, null);
+  assert.equal(wooDetails({ description: "<p>Versão 3.9 240 págs</p>" }).pages, 240);
+  assert.equal(wooDetails({ description: "<p>Brochado, 1 200 páginas.</p>" }).pages, 1200);
+  assert.equal(withPageText({ summary: null, pages: null, year: null, translator: null }, "<p>Páginas: 24.5</p>").pages, null);
+});
+
+test("a numeric entity for NUL or a surrogate is left as text", () => {
+  const html = `<p>${SYNOPSIS} &#0; &#xD800; &#55357; ok</p>`;
+  assert.equal(shopifyDetails(html).summary, `${SYNOPSIS} &#0; &#xD800; &#55357; ok`);
+});
+
+test("section, figure and definition-list tags break lines like paragraphs", () => {
+  const html = `<section>${SYNOPSIS}</section><article>Segundo bloco de texto com mais de oitenta caracteres para passar o limite.</article><dl><dt>Um</dt><dd>dois</dd></dl><hr>`;
+  assert.equal(shopifyDetails(html).summary, `${SYNOPSIS}\n\nSegundo bloco de texto com mais de oitenta caracteres para passar o limite.\n\nUm\n\ndois`);
+});
+
+test("the fixture descriptions are live-shaped paragraphs: the notice goes, the synopsis stays", () => {
+  const details = parseWooProducts(woo, relogio).map((book) => book.details);
+  assert.equal(details[0]?.summary, "“Creio que a vamos conseguir. De uma maneira ou de outra, a guerra no Árctico há-de acabar.” Uma reportagem sobre o conflito mais frio do mundo.");
+  assert.ok(details[1]?.summary?.startsWith("Nomeado pela The Atlantic"));
+  assert.ok(details[2]?.summary?.startsWith("VENCEDOR DO COSTA BOOK AWARD DE LIVRO DO ANO\n\nParis, 1785."));
+  assert.equal(details[3]?.summary, null);
+});
