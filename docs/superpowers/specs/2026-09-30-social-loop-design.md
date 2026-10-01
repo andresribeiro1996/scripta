@@ -351,9 +351,11 @@ Clients display at most "99+".
   three shared covers. If fewer than five suggestions have any overlap, the
   list fills with recently active published readers.
 - **Matching:** two books match when their ISBN key *or* their
-  title-and-author key match, using `bookKey`'s normalization. A small shared
-  `bookMatchKeys(book)` returns both keys, because `bookKey` returns only
-  one.
+  title-and-author key match. A shared `bookMatchKeys(book)` builds both from
+  `matchFacts`, the de-duplication rule in `bookMatch.ts`: the ISBN is
+  canonicalised (ISBN-10 to 13), and the title-and-author key uses the whole
+  normalized title and the first author, and exists only when both are
+  present.
 - **Privacy:** only data already public on a published profile is used (its
   Library tab shows titles and statuses). Private users never appear.
 - **Endpoint:** `GET /community/people/suggested?limit=` (authed). It is
