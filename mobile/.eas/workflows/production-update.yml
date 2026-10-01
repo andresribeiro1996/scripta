@@ -43,6 +43,10 @@ jobs:
     params:
       platform: android
       channel: production
+    hooks:
+      after_install_node_modules:
+        - name: Build shared package
+          run: npm run build --workspace @scripta/shared
 
   native_release_needed:
     name: Native release needed
