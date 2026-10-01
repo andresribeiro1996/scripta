@@ -2,6 +2,7 @@ import { storeCoverImage } from "../booksService.js";
 import { MIN_GOOD_WIDTH } from "../domain/constants.js";
 import { SourceUnavailableError } from "../domain/errors.js";
 import { encodeCover, isAcceptableCover } from "../domain/images.js";
+import { normalizeTitle } from "../domain/normalize.js";
 import type { BooksRepository, CoverBlobStore } from "../domain/ports.js";
 import type { BookRow } from "../domain/types.js";
 import { PAGE_RANK, feedProducts, feedUrl, findPageIsbn, isDisallowed, parseRobots, parseShopifyProducts, parseWooProducts, type PublisherBook, type ResolvedBook } from "./publisherFeed.js";
@@ -20,6 +21,7 @@ export interface SiteReport {
   fromPage: number;
   pagesNoIsbn: number;
   pagesBlocked: number;
+  pageTitleMismatch: number;
   coversSet: number;
   created: number;
   noAuthor: number;
@@ -41,7 +43,12 @@ export interface ImportDeps {
 
 class SiteSkipped extends Error {}
 
-const emptyReport = (): SiteReport => ({ products: 0, books: 0, fromPage: 0, pagesNoIsbn: 0, pagesBlocked: 0, coversSet: 0, created: 0, noAuthor: 0, unchanged: 0, rejectedImage: 0, failed: 0 });
+const emptyReport = (): SiteReport => ({ products: 0, books: 0, fromPage: 0, pagesNoIsbn: 0, pagesBlocked: 0, pageTitleMismatch: 0, coversSet: 0, created: 0, noAuthor: 0, unchanged: 0, rejectedImage: 0, failed: 0 });
+
+function sameTitle(known: string, productTitle: string): boolean {
+  const [short, long] = [normalizeTitle(known), normalizeTitle(productTitle)].sort((a, b) => a.length - b.length) as [string, string];
+  return short !== "" && (short === long || (short.includes(" ") && long.startsWith(`${short} `)));
+}
 
 function commonPrefix(urls: string[]): string {
   let prefix = urls[0] ?? "";
@@ -144,22 +151,38 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
 
   for (const book of unique) {
     let row = deps.repo.findBookByKey(`isbn:${book.isbn}`);
+    let looked: { edition: { title: string | null; author: string } | null } | null = null;
+    const lookup = async () => {
+      if (looked) return looked;
+      try {
+        looked = { edition: await deps.lookupOpenLibrary(book.isbn) };
+      } catch (error) {
+        if (!(error instanceof SourceUnavailableError)) throw error;
+        report.failed++;
+      }
+      return looked;
+    };
+    if (book.rank === PAGE_RANK) {
+      let known = row?.title ?? "";
+      if (!known) {
+        const result = await lookup();
+        if (!result) continue;
+        known = result.edition?.title ?? "";
+      }
+      if (!sameTitle(known, book.title)) {
+        report.pageTitleMismatch++;
+        continue;
+      }
+    }
     if (!row) {
       let { title, author } = book;
       if (!author) {
-        let found: { title: string | null; author: string } | null;
-        try {
-          found = await deps.lookupOpenLibrary(book.isbn);
-        } catch (error) {
-          if (!(error instanceof SourceUnavailableError)) throw error;
-          report.failed++;
-          continue;
-        }
-        if (found) {
-          title = found.title ?? title;
-          author = found.author;
-        }
-        else {
+        const result = await lookup();
+        if (!result) continue;
+        if (result.edition) {
+          title = result.edition.title ?? title;
+          author = result.edition.author;
+        } else {
           report.noAuthor++;
           title = "";
           author = "";

@@ -124,6 +124,7 @@ test("an existing book gets the publisher cover as a manual cover and loses its 
     fromPage: 0,
     pagesNoIsbn: 2,
     pagesBlocked: 0,
+    pageTitleMismatch: 0,
     imageUrlPrefix: "https://cdn.shopify.com/s/files/1/",
     coversSet: 4,
     created: 3,
@@ -464,7 +465,7 @@ const pageUrl = (title: string) => `https://antigona.pt/products/${title.toLower
 const isbnPage = (isbn: string) => ({ text: `<html><body><p>ISBN ${isbn}</p></body></html>` });
 
 test("a product without a feed ISBN is resolved from its page and gets its cover", async () => {
-  const h = await harness({ feeds: { [FEED_1]: { text: shopifyPage([unlabelled("Sem Codigo", "https://cdn.example/sem.jpg")]) }, [pageUrl("Sem Codigo")]: isbnPage(MUSEU) } });
+  const h = await harness({ lookup: async () => ({ title: "Sem Codigo", author: "Alguem" }), feeds: { [FEED_1]: { text: shopifyPage([unlabelled("Sem Codigo", "https://cdn.example/sem.jpg")]) }, [pageUrl("Sem Codigo")]: isbnPage(MUSEU) } });
 
   const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
 
@@ -528,7 +529,7 @@ test("a page match loses to a feed match for the same ISBN", async () => {
 });
 
 test("a dry run fetches product pages but no images and writes nothing", async () => {
-  const h = await harness({ feeds: { [FEED_1]: { text: shopifyPage([unlabelled("Sem Codigo", "https://cdn.example/sem.jpg")]) }, [pageUrl("Sem Codigo")]: isbnPage(MUSEU) } });
+  const h = await harness({ lookup: async () => ({ title: "Sem Codigo", author: "Alguem" }), feeds: { [FEED_1]: { text: shopifyPage([unlabelled("Sem Codigo", "https://cdn.example/sem.jpg")]) }, [pageUrl("Sem Codigo")]: isbnPage(MUSEU) } });
 
   const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: true });
 
@@ -596,4 +597,101 @@ test("the importer logs page progress every 100 page requests", async () => {
   await importPublisherCovers(h.deps, [antigona], { dryRun: true });
 
   assert.deepEqual(h.logs.filter((line) => line.includes(": pages ")), ["Antígona: pages 100/150"]);
+});
+
+function pageHarness(options: { lookup?: Deps["lookupOpenLibrary"]; title?: string } = {}) {
+  const title = options.title ?? "Moeda Dourada";
+  return harness({ lookup: options.lookup, feeds: { [FEED_1]: { text: shopifyPage([unlabelled(title, "https://cdn.example/p.jpg")]) }, [pageUrl(title)]: isbnPage(MUSEU) } });
+}
+
+test("a page ISBN that belongs to an existing book with another title is skipped", async () => {
+  const h = await pageHarness();
+  const book = addBook(h.repo, MUSEU, "O Museu dos Esforços Inúteis");
+
+  const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  assert.equal(reports["Antígona"]!.pageTitleMismatch, 1);
+  assert.equal(reports["Antígona"]!.coversSet, 0);
+  assert.equal(h.repo.getBook(book.id)!.cover_image_id, null);
+  assert.deepEqual(h.imageRequests, []);
+  assert.deepEqual(h.lookups, []);
+});
+
+test("a page ISBN that belongs to an existing book with the same title sets its cover", async () => {
+  const h = await pageHarness({ title: "O Museu dos Esforços Inúteis" });
+  const book = addBook(h.repo, MUSEU, "O Museu dos Esforços Inúteis");
+
+  const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  assert.equal(reports["Antígona"]!.pageTitleMismatch, 0);
+  assert.equal(reports["Antígona"]!.coversSet, 1);
+  assert.equal(h.repo.getBook(book.id)!.cover_status, "manual");
+  assert.deepEqual(h.lookups, []);
+});
+
+test("a page title may add words after the known title, but only after two or more", async () => {
+  const subtitle = await pageHarness({ title: "Museu dos Esforços Inúteis – Edição Especial" });
+  addBook(subtitle.repo, MUSEU, "Museu dos Esforços Inúteis");
+  assert.equal((await importPublisherCovers(subtitle.deps, [antigona], { dryRun: false }))["Antígona"]!.coversSet, 1);
+
+  const single = await pageHarness({ title: "Mar Morto" });
+  addBook(single.repo, MUSEU, "Mar");
+  assert.equal((await importPublisherCovers(single.deps, [antigona], { dryRun: false }))["Antígona"]!.pageTitleMismatch, 1);
+
+  const reverse = await pageHarness({ title: "Museu dos Esforços" });
+  addBook(reverse.repo, MUSEU, "Museu dos Esforços Inúteis");
+  assert.equal((await importPublisherCovers(reverse.deps, [antigona], { dryRun: false }))["Antígona"]!.coversSet, 1);
+});
+
+test("a new book from a page is created when Open Library's edition title matches the product", async () => {
+  const h = await pageHarness({ title: "Moeda Dourada", lookup: async () => ({ title: "Moeda Dourada", author: "Alguem" }) });
+
+  const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  assert.equal(reports["Antígona"]!.created, 1);
+  assert.equal(reports["Antígona"]!.coversSet, 1);
+  assert.equal(h.repo.findBookByKey(`isbn:${MUSEU}`)!.cover_status, "manual");
+});
+
+test("a new book from a page is skipped when Open Library's edition title differs or is missing", async () => {
+  for (const lookup of [async () => ({ title: "O Museu dos Esforços Inúteis", author: "A" }), async () => ({ title: null, author: "A" }), async () => null]) {
+    const h = await pageHarness({ lookup });
+
+    const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+    assert.equal(reports["Antígona"]!.pageTitleMismatch, 1);
+    assert.equal(reports["Antígona"]!.created, 0);
+    assert.equal(h.bookCount(), 0);
+    assert.deepEqual(h.imageRequests, []);
+  }
+});
+
+test("a page book whose Open Library lookup is unavailable counts as failed", async () => {
+  const h = await pageHarness({ lookup: async () => { throw new SourceUnavailableError("openlibrary", "timeout"); } });
+
+  const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  assert.equal(reports["Antígona"]!.failed, 1);
+  assert.equal(reports["Antígona"]!.pageTitleMismatch, 0);
+  assert.equal(h.bookCount(), 0);
+});
+
+test("a dry run applies the page title check too", async () => {
+  const h = await pageHarness({ lookup: async () => ({ title: "O Museu dos Esforços Inúteis", author: "A" }) });
+
+  const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: true });
+
+  assert.equal(reports["Antígona"]!.pageTitleMismatch, 1);
+  assert.equal(reports["Antígona"]!.created, 0);
+  assert.equal(reports["Antígona"]!.coversSet, 0);
+});
+
+test("a feed ISBN is not title-checked", async () => {
+  const h = await harness({ feeds: { [FEED_1]: { text: shopifyPage([product(MUSEU, "Outro Titulo", "https://cdn.example/f.jpg")]) } } });
+  addBook(h.repo, MUSEU, "O Museu dos Esforços Inúteis");
+
+  const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  assert.equal(reports["Antígona"]!.coversSet, 1);
+  assert.equal(reports["Antígona"]!.pageTitleMismatch, 0);
 });

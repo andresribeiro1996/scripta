@@ -1,3 +1,4 @@
+import { canonicalIsbn } from "@scripta/shared";
 import { normalizeWords } from "../domain/normalize.js";
 import type { PublisherSite } from "./publishers.js";
 
@@ -30,12 +31,6 @@ function isbn10Ok(digits: string): boolean {
   return sum % 11 === 0;
 }
 
-function isbn10To13(isbn10: string): string {
-  const body = `978${isbn10.slice(0, 9)}`;
-  const sum = [...body].reduce((total, digit, index) => total + Number(digit) * (index % 2 === 0 ? 1 : 3), 0);
-  return `${body}${(10 - (sum % 10)) % 10}`;
-}
-
 function isbn13s(text: string): { isbn: string; index: number }[] {
   return [...text.matchAll(ISBN_CANDIDATE)].flatMap((match) => {
     const digits = match[0].replace(/\D/g, "");
@@ -47,7 +42,7 @@ function pageIsbns(text: string): { isbn: string; index: number }[] {
   const masked = text.replace(ISBN_CANDIDATE, (match) => "#".repeat(match.length));
   const tens = [...masked.matchAll(ISBN10_CANDIDATE)].flatMap((match) => {
     const digits = match[0].replace(/[^\dXx]/g, "").toUpperCase();
-    return isbn10Ok(digits) ? [{ isbn: isbn10To13(digits), index: match.index }] : [];
+    return isbn10Ok(digits) ? [{ isbn: canonicalIsbn(digits), index: match.index }] : [];
   });
   return [...isbn13s(text), ...tens].sort((a, b) => a.index - b.index);
 }
