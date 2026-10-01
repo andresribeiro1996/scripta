@@ -4,7 +4,7 @@ import { SourceUnavailableError } from "../domain/errors.js";
 import { encodeCover, isAcceptableCover } from "../domain/images.js";
 import type { BooksRepository, CoverBlobStore } from "../domain/ports.js";
 import type { BookRow } from "../domain/types.js";
-import { feedProducts, feedUrl, isDisallowed, parseRobots, parseShopifyProducts, parseWooProducts, type PublisherBook } from "./publisherFeed.js";
+import { PAGE_RANK, feedProducts, feedUrl, findPageIsbn, isDisallowed, parseRobots, parseShopifyProducts, parseWooProducts, type PublisherBook, type ResolvedBook } from "./publisherFeed.js";
 import type { PublisherSite } from "./publishers.js";
 import { seedBook } from "./seedCatalog.js";
 
@@ -16,6 +16,7 @@ export interface SiteReport {
   imageUrlPrefix?: string;
   products: number;
   books: number;
+  fromPage: number;
   coversSet: number;
   created: number;
   noAuthor: number;
@@ -37,7 +38,7 @@ export interface ImportDeps {
 
 class SiteSkipped extends Error {}
 
-const emptyReport = (): SiteReport => ({ products: 0, books: 0, coversSet: 0, created: 0, noAuthor: 0, unchanged: 0, rejectedImage: 0, failed: 0 });
+const emptyReport = (): SiteReport => ({ products: 0, books: 0, fromPage: 0, coversSet: 0, created: 0, noAuthor: 0, unchanged: 0, rejectedImage: 0, failed: 0 });
 
 function commonPrefix(urls: string[]): string {
   let prefix = urls[0] ?? "";
@@ -60,12 +61,14 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
   };
 
   const books: PublisherBook[] = [];
+  let disallow: string[] = [];
   try {
     const robots = await request(() => deps.fetchText(`${site.origin}/robots.txt`));
     if (robots.status !== 200 && robots.status !== 404) throw new SiteSkipped(`robots.txt answered HTTP ${robots.status}`);
     const rules = robots.status === 200 ? parseRobots(robots.text) : { disallow: [], crawlDelayMs: null };
     const feed = new URL(feedUrl(site, 1));
-    if (isDisallowed(feed.pathname + feed.search, rules.disallow)) throw new SiteSkipped("robots.txt disallows the feed");
+    disallow = rules.disallow;
+    if (isDisallowed(feed.pathname + feed.search, disallow)) throw new SiteSkipped("robots.txt disallows the feed");
     waitMs = Math.max(MIN_WAIT_MS, rules.crawlDelayMs ?? 0);
     for (let page = 1; ; page++) {
       if (page > MAX_PAGES) throw new SiteSkipped("feed has no end");
@@ -90,13 +93,34 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
     throw error;
   }
 
-  const strongest = new Map<string, PublisherBook>();
+  const resolved: ResolvedBook[] = [];
   for (const book of books) {
+    if (book.isbn) {
+      resolved.push({ ...book, isbn: book.isbn });
+      continue;
+    }
+    const page = new URL(book.productUrl);
+    if (isDisallowed(page.pathname + page.search, disallow)) continue;
+    let response: { status: number; text: string };
+    try {
+      response = await request(() => deps.fetchText(book.productUrl));
+    } catch (error) {
+      if (!(error instanceof SourceUnavailableError)) throw error;
+      report.failed++;
+      continue;
+    }
+    const isbn = response.status === 200 ? findPageIsbn(response.text) : null;
+    if (isbn) resolved.push({ ...book, isbn });
+  }
+
+  const strongest = new Map<string, ResolvedBook>();
+  for (const book of resolved) {
     const kept = strongest.get(book.isbn);
     if (!kept || book.rank < kept.rank) strongest.set(book.isbn, book);
   }
   const unique = [...strongest.values()];
   report.books = unique.length;
+  report.fromPage = unique.filter((book) => book.rank === PAGE_RANK).length;
   if (unique.length > 0) report.imageUrlPrefix = commonPrefix(unique.map((book) => book.imageUrl));
 
   const settle = (row: BookRow, imageUrl: string, width: number | null): "unchanged" | "rejectedImage" | null => {

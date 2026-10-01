@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { feedProducts, feedUrl, findPortugalIsbn, isDisallowed, parseRobots, parseShopifyProducts, parseWooProducts } from "./publisherFeed.js";
+import { feedProducts, feedUrl, findPageIsbn, findPortugalIsbn, isDisallowed, parseRobots, parseShopifyProducts, parseWooProducts } from "./publisherFeed.js";
 import type { PublisherSite } from "./publishers.js";
 
 const shopify = JSON.parse(readFileSync(new URL("./fixtures/shopify-products.json", import.meta.url), "utf8"));
@@ -39,9 +39,9 @@ test("a WooCommerce product keeps its own ISBN when the description cites anothe
   assert.equal(books.find((book) => book.title === "Capa Citando Outro")?.isbn, "9789726085003");
 });
 
-test("Shopify parsing drops products without an image or a Portugal ISBN", () => {
+test("Shopify parsing drops products without an image and leaves the ISBN of the rest to the product page", () => {
   const books = parseShopifyProducts(shopify, antigona);
-  assert.deepEqual(books.map((book) => book.isbn), ["9789726084945", "9789726084938", "9789726084990", "9789726084679"]);
+  assert.deepEqual(books.map((book) => book.isbn), ["9789726084945", "9789726084938", "9789726084990", "9789726084679", null, null]);
   assert.equal(feedProducts(shopify, antigona)?.length, 7);
 });
 
@@ -54,12 +54,12 @@ test("Shopify parsing builds the product URL and takes the author from the vendo
   assert.ok(parseShopifyProducts(shopify, { ...antigona, name: "Cristina Peri Rossi" }).every((book) => book.title !== "O Museu dos Esforços Inúteis" || book.author === null));
 });
 
-test("WooCommerce parsing finds the ISBN in the image file name, decodes entities and drops the rest", () => {
+test("WooCommerce parsing finds the ISBN in the image file name, decodes entities and leaves the rest to the product page", () => {
   const books = parseWooProducts(woo, relogio);
-  assert.deepEqual(books.map((book) => book.isbn), ["9789897837579", "9789897837821", "9789897837142", "9789899061330", "9789726085003", "9789899061354"]);
+  assert.deepEqual(books.map((book) => book.isbn), ["9789897837579", "9789897837821", "9789897837142", "9789899061330", "9789726085003", null, "9789899061354", null]);
   assert.equal(books[0]?.productUrl, "https://www.relogiodagua.pt/produto/guerra-branca-na-frente-artica-do-conflito-mundial/");
   assert.equal(books[3]?.title, "Livro com SKU – Edição & Notas");
-  assert.deepEqual(books.map((book) => book.author), [null, null, null, null, null, "Raquel Serejo Martins"]);
+  assert.deepEqual(books.map((book) => book.author), [null, null, null, null, null, null, "Raquel Serejo Martins", null]);
   assert.equal(feedProducts(woo, relogio)?.length, 8);
 });
 
@@ -74,9 +74,9 @@ test("WooCommerce author joins the terms of an attribute named Autor and ignores
 
 test("each book records the lookup step that found its ISBN", () => {
   const shop = parseShopifyProducts(shopify, antigona);
-  assert.deepEqual(shop.map((book) => book.rank), [2, 2, 2, 0]);
+  assert.deepEqual(shop.map((book) => book.rank), [2, 2, 2, 0, 3, 3]);
   const shelf = parseWooProducts(woo, relogio);
-  assert.deepEqual(shelf.map((book) => book.rank), [1, 1, 1, 0, 1, 1]);
+  assert.deepEqual(shelf.map((book) => book.rank), [1, 1, 1, 0, 1, 3, 1, 3]);
 });
 
 test("parsers return nothing for a body of the wrong shape", () => {
@@ -120,4 +120,31 @@ test("isDisallowed matches prefixes, wildcards and end anchors", () => {
   assert.equal(isDisallowed("/wp-json/wc/store/v1/products", ["/wp-admin/"]), false);
   assert.equal(isDisallowed("/products.json?limit=250&page=1", ["/*page="]), true);
   assert.equal(isDisallowed("/products.json?limit=250&page=1", ["/*sort="]), false);
+});
+
+const page = (body: string) => `<html><head><style>.a{content:"9789726084679"}</style><script>var isbn = "9789726084679";</script></head><body>${body}</body></html>`;
+
+test("findPageIsbn prefers a labelled ISBN over another Portugal ISBN on the page", () => {
+  assert.equal(findPageIsbn(page("<p>Relacionado 9789726084945</p><p>ISBN: <b>978-972-608-467-9</b></p>")), "9789726084679");
+  assert.equal(findPageIsbn(page("<li>ISBN&nbsp;978&#8209;972&#8209;608&#8209;467&#8209;9</li><li>9789726084945</li>")), "9789726084679");
+});
+
+test("findPageIsbn takes a single unlabelled Portugal ISBN", () => {
+  assert.equal(findPageIsbn(page("<p>Código 9789726084945</p><p>Outro 9789726084945</p>")), "9789726084945");
+});
+
+test("findPageIsbn gives nothing for two distinct unlabelled Portugal ISBNs", () => {
+  assert.equal(findPageIsbn(page("<p>9789726084945</p><p>9789726084679</p>")), null);
+});
+
+test("findPageIsbn ignores an ISBN more than 40 characters after its label", () => {
+  assert.equal(findPageIsbn(page(`<p>ISBN ${"x".repeat(41)} 9789726084945</p><p>9789726084679</p>`)), null);
+});
+
+test("findPageIsbn ignores scripts and styles", () => {
+  assert.equal(findPageIsbn(page("<p>9789726084945</p>")), "9789726084945");
+});
+
+test("findPageIsbn gives nothing for a Brazilian-only page", () => {
+  assert.equal(findPageIsbn(page("<p>ISBN 978-85-3520-623-4</p>")), null);
 });

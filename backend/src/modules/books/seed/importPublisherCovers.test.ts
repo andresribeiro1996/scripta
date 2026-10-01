@@ -121,6 +121,7 @@ test("an existing book gets the publisher cover as a manual cover and loses its 
   assert.deepEqual(reports["Antígona"], {
     products: 7,
     books: 4,
+    fromPage: 0,
     imageUrlPrefix: "https://cdn.shopify.com/s/files/1/",
     coversSet: 4,
     created: 3,
@@ -453,4 +454,102 @@ test("when two products give one ISBN, the one that matched on the strongest ste
 
   assert.equal(reports["Antígona"]!.books, 1);
   assert.deepEqual(h.imageRequests, ["https://cdn.example/strong.jpg"]);
+});
+
+const FEED_1 = "https://antigona.pt/products.json?limit=250&page=1";
+const unlabelled = (title: string, image: string) => ({ ...product("", title, image), variants: [{}] });
+const pageUrl = (title: string) => `https://antigona.pt/products/${title.toLowerCase().replace(/\W+/g, "-")}`;
+const isbnPage = (isbn: string) => ({ text: `<html><body><p>ISBN ${isbn}</p></body></html>` });
+
+test("a product without a feed ISBN is resolved from its page and gets its cover", async () => {
+  const h = await harness({ feeds: { [FEED_1]: { text: shopifyPage([unlabelled("Sem Codigo", "https://cdn.example/sem.jpg")]) }, [pageUrl("Sem Codigo")]: isbnPage(MUSEU) } });
+
+  const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  const row = h.repo.findBookByKey(`isbn:${MUSEU}`)!;
+  assert.equal(h.repo.getImage(row.cover_image_id!)!.source_url, "https://cdn.example/sem.jpg");
+  assert.equal(row.cover_status, "manual");
+  assert.equal(reports["Antígona"]!.fromPage, 1);
+  assert.equal(reports["Antígona"]!.books, 1);
+  assert.equal(reports["Antígona"]!.coversSet, 1);
+});
+
+test("a product with a feed ISBN fetches no page", async () => {
+  const h = await harness();
+
+  await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  assert.ok(!h.requests.includes("https://antigona.pt/products/o-museu-dos-esforcos-inuteis"));
+  assert.ok(h.requests.includes("https://antigona.pt/products/cartaz-sem-isbn"));
+});
+
+test("a page that is unavailable counts as failed and the rest of the site imports", async () => {
+  const feed = shopifyPage([unlabelled("Sem Codigo", "https://cdn.example/sem.jpg"), product(MUSEU, "Com Codigo", "https://cdn.example/com.jpg")]);
+  const h = await harness({ feeds: { [FEED_1]: { text: feed }, [pageUrl("Sem Codigo")]: new SourceUnavailableError("fetch", "HTTP 503") } });
+
+  const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  assert.equal(reports["Antígona"]!.skipped, undefined);
+  assert.equal(reports["Antígona"]!.failed, 1);
+  assert.equal(reports["Antígona"]!.books, 1);
+  assert.equal(reports["Antígona"]!.fromPage, 0);
+  assert.equal(h.repo.getBook(h.repo.findBookByKey(`isbn:${MUSEU}`)!.id)!.cover_status, "manual");
+});
+
+test("a page that answers 404 skips the product silently", async () => {
+  const h = await harness({ feeds: { [FEED_1]: { text: shopifyPage([unlabelled("Sem Codigo", "https://cdn.example/sem.jpg")]) }, [pageUrl("Sem Codigo")]: { status: 404, text: "" } } });
+
+  const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  assert.equal(reports["Antígona"]!.failed, 0);
+  assert.equal(reports["Antígona"]!.books, 0);
+});
+
+test("a product path robots disallows is not fetched", async () => {
+  const h = await harness({ feeds: { [FEED_1]: { text: shopifyPage([unlabelled("Sem Codigo", "https://cdn.example/sem.jpg")]) }, "https://antigona.pt/robots.txt": { text: "User-agent: *\nDisallow: /products/sem\n" } } });
+
+  const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  assert.ok(!h.requests.includes(pageUrl("Sem Codigo")));
+  assert.equal(reports["Antígona"]!.books, 0);
+});
+
+test("a page match loses to a feed match for the same ISBN", async () => {
+  const feed = shopifyPage([unlabelled("Pagina", "https://cdn.example/page.jpg"), product(MUSEU, "Feed", "https://cdn.example/feed.jpg")]);
+  const h = await harness({ feeds: { [FEED_1]: { text: feed }, [pageUrl("Pagina")]: isbnPage(MUSEU) } });
+
+  const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  assert.equal(reports["Antígona"]!.books, 1);
+  assert.equal(reports["Antígona"]!.fromPage, 0);
+  assert.deepEqual(h.imageRequests, ["https://cdn.example/feed.jpg"]);
+});
+
+test("a dry run fetches product pages but no images and writes nothing", async () => {
+  const h = await harness({ feeds: { [FEED_1]: { text: shopifyPage([unlabelled("Sem Codigo", "https://cdn.example/sem.jpg")]) }, [pageUrl("Sem Codigo")]: isbnPage(MUSEU) } });
+
+  const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: true });
+
+  assert.ok(h.requests.includes(pageUrl("Sem Codigo")));
+  assert.deepEqual(h.imageRequests, []);
+  assert.equal(h.bookCount(), 0);
+  assert.equal(h.imageCount(), 0);
+  assert.equal(reports["Antígona"]!.fromPage, 1);
+  assert.equal(reports["Antígona"]!.coversSet, 1);
+});
+
+test("product page requests wait the same time as feed requests", async () => {
+  const h = await harness({
+    feeds: {
+      [FEED_1]: { text: shopifyPage([unlabelled("Sem Codigo", "https://cdn.example/sem.jpg")]) },
+      [pageUrl("Sem Codigo")]: isbnPage(MUSEU),
+      "https://antigona.pt/robots.txt": { text: "User-agent: *\nCrawl-delay: 5\n" }
+    }
+  });
+
+  await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  assert.ok(h.requests.includes(pageUrl("Sem Codigo")));
+  assert.equal(h.sleeps.length, h.requests.length - 1);
+  assert.ok(h.sleeps.every((ms) => ms === 5000));
 });

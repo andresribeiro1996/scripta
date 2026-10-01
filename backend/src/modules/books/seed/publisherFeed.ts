@@ -2,13 +2,18 @@ import { normalizeWords } from "../domain/normalize.js";
 import type { PublisherSite } from "./publishers.js";
 
 export interface PublisherBook {
-  isbn: string;
+  isbn: string | null;
   title: string;
   author: string | null;
   imageUrl: string;
   productUrl: string;
   rank: number;
 }
+
+export type ResolvedBook = PublisherBook & { isbn: string };
+
+export const PAGE_RANK = 3;
+const LABEL_REACH = 40;
 
 const ISBN_CANDIDATE = /(?<!\d)97[89](?:[\p{Pd}\s.]?\d){10}(?!\d)/gu;
 const PORTUGAL_PREFIX = /^978(?:972|989)/;
@@ -19,12 +24,15 @@ function checksumOk(digits: string): boolean {
   return sum % 10 === 0;
 }
 
-export function findPortugalIsbn(text: string): string | null {
-  for (const match of text.matchAll(ISBN_CANDIDATE)) {
+function portugalIsbns(text: string): { isbn: string; index: number }[] {
+  return [...text.matchAll(ISBN_CANDIDATE)].flatMap((match) => {
     const digits = match[0].replace(/\D/g, "");
-    if (PORTUGAL_PREFIX.test(digits) && checksumOk(digits)) return digits;
-  }
-  return null;
+    return PORTUGAL_PREFIX.test(digits) && checksumOk(digits) ? [{ isbn: digits, index: match.index }] : [];
+  });
+}
+
+export function findPortugalIsbn(text: string): string | null {
+  return portugalIsbns(text)[0]?.isbn ?? null;
 }
 
 function decodeEntities(text: string): string {
@@ -33,6 +41,16 @@ function decodeEntities(text: string): string {
     if (hex) return String.fromCodePoint(parseInt(hex, 16));
     return NAMED_ENTITIES[name.toLowerCase()] ?? whole;
   });
+}
+
+export function findPageIsbn(html: string): string | null {
+  const content = decodeEntities(html.replace(/<(script|style)\b[\s\S]*?<\/\1\s*>/gi, " ").replace(/<[^>]*>/g, " "));
+  const found = portugalIsbns(content);
+  const labelEnds = [...content.matchAll(/ISBN/gi)].map((label) => label.index + label[0].length);
+  const labelled = found.find(({ index }) => labelEnds.some((end) => index >= end && index - end <= LABEL_REACH));
+  if (labelled) return labelled.isbn;
+  const distinct = new Set(found.map(({ isbn }) => isbn));
+  return distinct.size === 1 ? [...distinct][0]! : null;
 }
 
 function record(value: unknown): Record<string, unknown> | null {
@@ -84,10 +102,9 @@ export function parseShopifyProducts(json: unknown, site: PublisherSite): Publis
       [fileName(imageUrl)],
       [JSON.stringify(product)]
     ]);
-    if (!found) return [];
     const vendor = text(product.vendor).trim();
     const author = site.authorFromVendor && vendor && normalizeWords(vendor) !== normalizeWords(site.name) ? vendor : null;
-    return [{ ...found, title, author, imageUrl, productUrl: `${site.origin}/products/${handle}` }];
+    return [{ isbn: found?.isbn ?? null, rank: found?.rank ?? PAGE_RANK, title, author, imageUrl, productUrl: `${site.origin}/products/${handle}` }];
   });
 }
 
@@ -109,7 +126,7 @@ export function parseWooProducts(json: unknown, site: PublisherSite): PublisherB
     const title = decodeEntities(text(product.name)).trim();
     if (!imageUrl || !productUrl || !title) return [];
     const found = firstIsbn([[text(product.sku)], [fileName(imageUrl)], [JSON.stringify(product)]]);
-    return found ? [{ ...found, title, author: wooAuthor(product), imageUrl, productUrl }] : [];
+    return [{ isbn: found?.isbn ?? null, rank: found?.rank ?? PAGE_RANK, title, author: wooAuthor(product), imageUrl, productUrl }];
   });
 }
 
