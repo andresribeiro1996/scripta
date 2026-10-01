@@ -1,4 +1,4 @@
-import type { DatabaseSync } from "node:sqlite";
+import type { DatabaseSync, StatementSync } from "node:sqlite";
 import { normalizeFeedSettings, type FeedSettings } from "@scripta/shared/community";
 import type { CommunityRepository, CursorKeyset } from "../../domain/ports.js";
 import type { EventRow, FollowRow, ProfileRow } from "../../domain/types.js";
@@ -15,6 +15,10 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
   const listFollowersBeforeStmt = db.prepare(`
     SELECT * FROM follows
     WHERE followee_id = ? AND (created_at < ? OR (created_at = ? AND follower_id < ?))
+    ORDER BY created_at DESC, follower_id DESC LIMIT ?
+  `);
+  const listFollowersSinceStmt = db.prepare(`
+    SELECT * FROM follows WHERE followee_id = ? AND created_at > ?
     ORDER BY created_at DESC, follower_id DESC LIMIT ?
   `);
   const countFollowersStmt = db.prepare(`SELECT COUNT(*) AS n FROM follows WHERE followee_id = ?`);
@@ -50,6 +54,16 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
     WHERE user_id = ? AND (created_at < ? OR (created_at = ? AND id < ?))
     ORDER BY created_at DESC, id DESC LIMIT ?
   `);
+  const typedEventStmts = new Map<string, StatementSync>();
+  const listEventsOfTypes = (userId: string, types: readonly string[], bound: string, boundArgs: string[], limit: number): EventRow[] => {
+    const sql = `SELECT * FROM events WHERE user_id = ? AND type IN (${types.map(() => "?").join(",")})${bound} ORDER BY created_at DESC, id DESC LIMIT ?`;
+    let stmt = typedEventStmts.get(sql);
+    if (!stmt) {
+      stmt = db.prepare(sql);
+      typedEventStmts.set(sql, stmt);
+    }
+    return stmt.all(userId, ...types, ...boundArgs, limit) as unknown as EventRow[];
+  };
 
   return {
     deleteUserData(userId) {
@@ -82,20 +96,14 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
       }
       return listFollowersStmt.all(followeeId, limit) as unknown as FollowRow[];
     },
+    listFollowersSince(followeeId, since, limit) {
+      return listFollowersSinceStmt.all(followeeId, since, limit) as unknown as FollowRow[];
+    },
     countFollowers(userId) {
       return (countFollowersStmt.get(userId) as { n: number }).n;
     },
     countFollowing(userId) {
       return (countFollowingStmt.get(userId) as { n: number }).n;
-    },
-    countEventsByUsersSince(userIds, since) {
-      if (userIds.length === 0) return 0;
-      const placeholders = userIds.map(() => "?").join(",");
-      const row = db.prepare(`SELECT COUNT(*) AS n FROM events WHERE user_id IN (${placeholders}) AND created_at > ?`).get(...userIds, since) as { n: number };
-      return row.n;
-    },
-    countFollowersSince(followeeId, since) {
-      return (db.prepare(`SELECT COUNT(*) AS n FROM follows WHERE followee_id = ? AND created_at > ?`).get(followeeId, since) as { n: number }).n;
     },
     getProfileRow(userId) {
       return getProfileStmt.get(userId) as ProfileRow | undefined;
@@ -132,11 +140,21 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
         $created_at: row.created_at
       });
     },
-    listEventsByUser(userId, keyset, limit) {
+    listEventsByUser(userId, keyset, limit, types) {
+      if (types) {
+        if (types.length === 0) return [];
+        return keyset
+          ? listEventsOfTypes(userId, types, " AND (created_at < ? OR (created_at = ? AND id < ?))", [keyset.createdAt, keyset.createdAt, keyset.id], limit)
+          : listEventsOfTypes(userId, types, "", [], limit);
+      }
       if (keyset) {
         return listEventsBeforeStmt.all(userId, keyset.createdAt, keyset.createdAt, keyset.id, limit) as unknown as EventRow[];
       }
       return listEventsStmt.all(userId, limit) as unknown as EventRow[];
+    },
+    listEventsByUserSince(userId, since, limit, types) {
+      if (types.length === 0) return [];
+      return listEventsOfTypes(userId, types, " AND created_at > ?", [since], limit);
     }
   };
 }

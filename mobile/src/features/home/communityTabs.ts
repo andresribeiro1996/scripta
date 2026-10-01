@@ -1,3 +1,5 @@
+import { newCountLabel } from "@scripta/shared";
+
 const COMMUNITY_TABS = [
   { value: "activity", label: "Activity" },
   { value: "discover", label: "Discover" },
@@ -6,10 +8,11 @@ const COMMUNITY_TABS = [
 
 export type CommunityTab = (typeof COMMUNITY_TABS)[number]["value"];
 
-export function communityTabOptions(newCount: number): Array<{ value: CommunityTab; label: string; badge?: number; accessibilityLabel?: string }> {
+export function communityTabOptions(newCount: number): Array<{ value: CommunityTab; label: string; badge?: string; accessibilityLabel?: string }> {
+  const badge = newCountLabel(newCount) ?? undefined;
   return COMMUNITY_TABS.map((tab) =>
-    tab.value === "activity" && newCount > 0
-      ? { ...tab, badge: newCount, accessibilityLabel: `${tab.label}, ${newCount} new` }
+    tab.value === "activity" && badge
+      ? { ...tab, badge, accessibilityLabel: `${tab.label}, ${badge} new` }
       : { ...tab },
   );
 }
@@ -24,6 +27,6 @@ export function parseCommunityTab(value: string | undefined): CommunityTab | und
   return COMMUNITY_TABS.find((tab) => tab.value === value)?.value;
 }
 
-export function shouldMarkSeen(tab: CommunityTab, loaded: boolean, loadFailed: boolean): boolean {
-  return tab === "activity" && loaded && !loadFailed;
+export function shouldMarkSeen(tab: CommunityTab, loaded: boolean, loadFailed: boolean, fetching: boolean): boolean {
+  return tab === "activity" && loaded && !loadFailed && !fetching;
 }

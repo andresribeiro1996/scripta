@@ -39,6 +39,17 @@ export function createSqliteQuizzesRepository(db: DatabaseSync): QuizzesReposito
     FROM quiz_play_answers WHERE quiz_id = ?
     GROUP BY question_id, choice_index ORDER BY question_id ASC, choice_index ASC
   `);
+  const participationStmt = db.prepare(`
+    SELECT q.id, q.name, COUNT(p.id) AS participants, MAX(p.created_at) AS latest_at
+    FROM quizzes q JOIN quiz_plays p ON p.quiz_id = q.id
+    WHERE q.owner_user_id = ? AND (p.voter_user_id IS NULL OR p.voter_user_id != q.owner_user_id)
+    GROUP BY q.id
+  `);
+  const recentPlayersStmt = db.prepare(`
+    SELECT voter_user_id AS user_id, created_at AS at FROM quiz_plays
+    WHERE quiz_id = ? AND voter_user_id IS NOT NULL AND voter_user_id != ?
+    ORDER BY created_at DESC LIMIT ?
+  `);
 
   const now = (): string => new Date().toISOString();
 
@@ -216,6 +227,15 @@ export function createSqliteQuizzesRepository(db: DatabaseSync): QuizzesReposito
         stat.picks.push({ choiceIndex: Number(row.choice_index), count: Number(row.picks) });
       }
       return [...byQuestion.values()];
+    },
+
+    listParticipation(ownerUserId) {
+      const rows = participationStmt.all(ownerUserId) as unknown as Array<{ id: string; name: string; participants: number; latest_at: string }>;
+      return rows.map((r) => ({ ...r, participants: Number(r.participants) }));
+    },
+
+    listRecentPlayers(quizId, ownerUserId, limit) {
+      return recentPlayersStmt.all(quizId, ownerUserId, limit) as unknown as Array<{ user_id: string; at: string }>;
     }
   };
 }

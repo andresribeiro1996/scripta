@@ -137,6 +137,27 @@ test("deleteUserData erases the account's quizzes and unlinks their plays elsewh
   assert.equal(repo.getPlayByVoter("theirs", "u9")?.id, "other");
 });
 
+test("participation counts other people's plays on the owner's quizzes", () => {
+  const repo = makeRepo();
+  repo.insert(quizRow({ id: "quiz-1", name: "Mine" }));
+  repo.insert(quizRow({ id: "quiz-2", name: "Theirs", owner_user_id: "u9" }));
+  const play = (id: string, quizId: string, voter: string | null, createdAt: string) => ({ ...playRow(id, quizId, voter), created_at: createdAt });
+  repo.savePlay(play("own", "quiz-1", "u1", "2026-01-01T00:00:00Z"), []);
+  repo.savePlay(play("p2", "quiz-1", "u2", "2026-01-02T00:00:00Z"), []);
+  repo.savePlay(play("p3", "quiz-1", null, "2026-01-03T00:00:00Z"), []);
+  repo.savePlay(play("p4", "quiz-1", "u3", "2026-01-04T00:00:00Z"), []);
+  repo.savePlay(play("p5", "quiz-2", "u2", "2026-01-05T00:00:00Z"), []);
+
+  assert.deepEqual(repo.listParticipation("u1").map((r) => ({ ...r })), [
+    { id: "quiz-1", name: "Mine", participants: 3, latest_at: "2026-01-04T00:00:00Z" }
+  ]);
+  assert.deepEqual(repo.listRecentPlayers("quiz-1", "u1", 10).map((r) => ({ ...r })), [
+    { user_id: "u3", at: "2026-01-04T00:00:00Z" },
+    { user_id: "u2", at: "2026-01-02T00:00:00Z" }
+  ]);
+  assert.deepEqual(repo.listRecentPlayers("quiz-1", "u1", 1).map((r) => r.user_id), ["u3"]);
+});
+
 test("rekeyBooks rewrites the owner's unpublished quiz books and de-duplicates by key", () => {
   const db = new DatabaseSync(":memory:");
   applyQuizzesMigrations(db);

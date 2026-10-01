@@ -161,6 +161,12 @@ function createInMemoryArenaRepository(): ArenaRepository {
         .filter(({ tournament }) => tournament.owner_user_id !== voterUserId)
         .sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))
         .map(({ tournament }) => tournament);
+    },
+    listParticipation() {
+      return [];
+    },
+    listRecentVoters() {
+      return [];
     }
   };
 }

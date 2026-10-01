@@ -111,3 +111,14 @@ export interface BookRecommendationInput {
   readStatus: 0 | 1 | 2;
   day?: string;
 }
+
+export type ParticipationGameKind = "tierlist" | "tournament" | "quiz";
+
+export interface GameParticipation {
+  id: string;
+  name: string;
+  covers: string[];
+  participantCount: number;
+  latestAt: string;
+  recent: Array<{ userId: string; at: string }>;
+}

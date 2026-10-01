@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { digestTarget, type DigestItem } from "@scripta/shared";
+import type { DigestItem } from "@scripta/shared";
 import { ApiError } from "../../core/api";
 import { Icon, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { AuthorAvatar } from "../community/AuthorAvatar";
@@ -11,20 +11,22 @@ import { ReaderGlyph } from "../community/ReaderGlyph";
 import { fetchDashboard, followUser } from "../community/api";
 import { feedRowAccessibilityLabel, feedRowModel, relativeTime } from "./feedRowModel";
 
-// Mobile's profile route is /u/<name>; the shared target is the web app's
-// /community/u/<name>, so the two kinds that point at a person are remapped.
-export function digestRoute(item: DigestItem): string {
-  return item.kind === "follow" || item.kind === "reading" ? `/u/${item.actor.username}` : digestTarget(item);
-}
+export const DASHBOARD_QUERY_KEY = ["community", "dashboard"] as const;
 
 export function useDashboardFeed() {
   return useInfiniteQuery({
-    queryKey: ["community", "dashboard"],
+    queryKey: DASHBOARD_QUERY_KEY,
     queryFn: ({ pageParam }) => fetchDashboard(pageParam),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     refetchOnMount: "always",
   });
+}
+
+export function useSkipEmptyPages({ hasNextPage, isFetchingNextPage, isFetchNextPageError, fetchNextPage }: ReturnType<typeof useDashboardFeed>, rows: number) {
+  useEffect(() => {
+    if (rows === 0 && hasNextPage && !isFetchingNextPage && !isFetchNextPageError) void fetchNextPage();
+  }, [rows, hasNextPage, isFetchingNextPage, isFetchNextPageError, fetchNextPage]);
 }
 
 export function useFollowBack(refetch: () => Promise<unknown>) {
@@ -50,28 +52,45 @@ export function useFollowBack(refetch: () => Promise<unknown>) {
 /** One activity row. The leading slot is always the same width and always
  *  starts at the same edge, so names line up down the feed; what fills it
  *  says how much the event is worth — a fan of covers for a publication, one
- *  for a book, the actor's avatar for anything that is only about them. */
-export function FeedRow({ item, onOpen, onFollowBack, following }: { item: DigestItem; onOpen: () => void; onFollowBack: () => void; following: boolean }) {
+ *  for a book, the actor's avatar for anything that is only about them. A
+ *  participation row gets its game's covers with the first participant on
+ *  them, else up to three participants' avatars stacked, else a group icon. */
+export function FeedRow({ item, onOpen, onFollowBack, following, isNew = false }: { item: DigestItem; onOpen: () => void; onFollowBack: () => void; following: boolean; isNew?: boolean }) {
   const { colors } = useTheme();
   const row = feedRowModel(item);
   const labelColor = row.tone === "accent" ? colors.accent : row.tone === "success" ? colors.success : colors.textDim;
+  const actor = item.kind === "participation" ? null : item.actor;
+  const faces = item.kind === "participation" ? item.actors : [item.actor];
+  const face = faces.at(0);
 
   return (
-    <Pressable accessibilityRole="link" accessibilityLabel={feedRowAccessibilityLabel(item)} onPress={onOpen}>
+    <Pressable accessibilityRole="link" accessibilityLabel={isNew ? `${feedRowAccessibilityLabel(item)}, new` : feedRowAccessibilityLabel(item)} onPress={onOpen}>
       {({ pressed }) => (
         <View style={[styles.feedRow, { backgroundColor: pressed ? colors.surfacePressed : "transparent", borderBottomColor: colors.border }]}>
           <View style={styles.slot}>
             {row.covers.length ? (
               <>
                 <CoverFan covers={row.covers} />
-                <View style={[styles.slotAvatar, { borderColor: colors.background }]}>
-                  <AuthorAvatar username={item.actor.username} avatarUrl={item.actor.avatarUrl} />
-                </View>
+                {face ? (
+                  <View style={[styles.slotAvatar, { borderColor: colors.background }]}>
+                    <AuthorAvatar username={face.username} avatarUrl={face.avatarUrl} />
+                  </View>
+                ) : null}
               </>
-            ) : (
+            ) : faces.length > 1 ? (
+              <View style={styles.stack}>
+                {faces.map((person, index) => (
+                  <View key={person.userId} style={[styles.stackAvatar, { borderColor: colors.background }, index > 0 && styles.stackOverlap]}>
+                    <AuthorAvatar username={person.username} avatarUrl={person.avatarUrl} size={STACK_SIZE - 4} />
+                  </View>
+                ))}
+              </View>
+            ) : face ? (
               // Nothing to preview, so the actor stands in for the covers —
               // at avatar size, not the fan-sized slot, which dwarfed a face.
-              <AuthorAvatar username={item.actor.username} avatarUrl={item.actor.avatarUrl} size={AVATAR_SIZE} />
+              <AuthorAvatar username={face.username} avatarUrl={face.avatarUrl} size={AVATAR_SIZE} />
+            ) : (
+              <Icon name="community" size={AVATAR_SIZE / 2} color={colors.textDim} />
             )}
           </View>
           <View style={styles.grow}>
@@ -80,9 +99,12 @@ export function FeedRow({ item, onOpen, onFollowBack, following }: { item: Diges
               <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.heading, { color: labelColor }]}>
                 {row.label}
               </Text>
-              <Text {...dynamicType} style={[typography.caption, styles.timestamp, { color: colors.textDim }]}>
-                {relativeTime(item.createdAt)}
-              </Text>
+              <View style={styles.stamp}>
+                {isNew ? <View style={[styles.newDot, { backgroundColor: colors.accent }]} /> : null}
+                <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
+                  {relativeTime(item.createdAt)}
+                </Text>
+              </View>
             </View>
             {row.title ? (
               <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.heading, { color: colors.text }]}>
@@ -90,20 +112,24 @@ export function FeedRow({ item, onOpen, onFollowBack, following }: { item: Diges
               </Text>
             ) : null}
             <View style={styles.nameRow}>
-              <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.metaName, { color: colors.textDim }]}>
-                {item.actor.username}
-              </Text>
-              <ReaderGlyph identity={item.actor.readerGlyph} />
+              {actor ? (
+                <>
+                  <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.metaName, { color: colors.textDim }]}>
+                    {actor.username}
+                  </Text>
+                  <ReaderGlyph identity={actor.readerGlyph} />
+                </>
+              ) : null}
               {row.detail ? (
                 <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.metaDetail, { color: colors.textDim }]}>
-                  {` · ${row.detail}`}
+                  {actor ? ` · ${row.detail}` : row.detail}
                 </Text>
               ) : null}
             </View>
-            {row.action === "followBack" ? (
+            {actor && row.action === "followBack" ? (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={`Follow ${item.actor.username} back`}
+                accessibilityLabel={`Follow ${actor.username} back`}
                 accessibilityState={{ busy: following }}
                 disabled={following}
                 hitSlop={spacing.sm}
@@ -124,6 +150,8 @@ export function FeedRow({ item, onOpen, onFollowBack, following }: { item: Diges
 
 const BADGE_SIZE = 32;
 const AVATAR_SIZE = 44;
+const STACK_SIZE = 36;
+const STACK_OVERLAP = 12;
 
 const styles = StyleSheet.create({
   grow: { flex: 1 },
@@ -133,6 +161,9 @@ const styles = StyleSheet.create({
   // takes its height from its child sits flush against the slot's bottom
   // edge, where the ring reads as a flattened circle.
   slotAvatar: { position: "absolute", left: 0, bottom: 4, width: BADGE_SIZE, height: BADGE_SIZE, alignItems: "center", justifyContent: "center", borderRadius: radii.full, borderWidth: 2, overflow: "hidden", zIndex: 10 },
+  stack: { flexDirection: "row" },
+  stackAvatar: { width: STACK_SIZE, height: STACK_SIZE, alignItems: "center", justifyContent: "center", borderRadius: radii.full, borderWidth: 2, overflow: "hidden" },
+  stackOverlap: { marginLeft: -STACK_OVERLAP },
   heading: { fontWeight: "700" },
   // Centred, not baseline-aligned: a native symbol view has no text
   // baseline, and aligning to one collapses it to nothing.
@@ -140,7 +171,8 @@ const styles = StyleSheet.create({
   nameRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   metaName: { flexShrink: 1 },
   metaDetail: { flex: 1 },
-  timestamp: { flexShrink: 0, marginLeft: "auto" },
+  stamp: { flexDirection: "row", alignItems: "center", gap: spacing.xs, flexShrink: 0, marginLeft: "auto" },
+  newDot: { width: 8, height: 8, borderRadius: radii.full },
   // Padded to clear the 44px floor: the label alone is a 16px-tall target.
   rowAction: { minHeight: minimumTouchTarget - spacing.lg, justifyContent: "center", paddingVertical: spacing.xs },
 });

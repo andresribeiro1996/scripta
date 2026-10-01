@@ -225,6 +225,38 @@ test("deleteUserData removes the user's tournaments and unlinks their votes on a
   assert.deepEqual(db.prepare(`SELECT id, voter_user_id FROM votes`).all().map((r) => ({ ...r })), [{ id: "v2", voter_user_id: null }]);
 });
 
+test("participation counts each voter once per started tournament, at their first vote", () => {
+  const db = freshDb();
+  seedTournament(db, "t1", "u1", "Bracket");
+  seedTournament(db, "t2", "u1", "Draft");
+  seedTournament(db, "t3", "u9", "Theirs");
+  const repo = createSqliteArenaRepository(db);
+  repo.updateTournamentStatus("t2", "seeding", 0);
+  db.prepare(
+    `INSERT INTO duels (id, tournament_id, round_number, duel_index, book_a_key, book_a_title, book_a_author, book_b_key, book_b_title, book_b_author, opens_at, closes_at)
+     VALUES ('duel-t1-b', 't1', 1, 1, 'c', 'C', 'x', 'd', 'D', 'y', '2026-01-01', '2026-01-02')`
+  ).run();
+
+  repo.insertVote(vote("v1", "duel-t1", "tok-2a", "u2", "2026-01-02T00:00:00.000Z"));
+  repo.insertVote(vote("v2", "duel-t1", "tok-3", "u3", "2026-01-03T00:00:00.000Z"));
+  repo.insertVote(vote("v3", "duel-t1", "tok-anon", null, "2026-01-04T00:00:00.000Z"));
+  repo.insertVote(vote("v4", "duel-t1-b", "tok-anon-2", null, "2026-01-05T00:00:00.000Z"));
+  repo.insertVote(vote("v5", "duel-t1-b", "tok-2b", "u2", "2026-01-06T00:00:00.000Z"));
+  repo.insertVote(vote("v6", "duel-t1-b", "tok-anon", null, "2026-01-07T00:00:00.000Z"));
+  repo.insertVote(vote("v7", "duel-t1", "tok-1", "u1", "2026-01-08T00:00:00.000Z"));
+  repo.insertVote(vote("v8", "duel-t2", "tok-2a", "u2", "2026-01-09T00:00:00.000Z"));
+  repo.insertVote(vote("v9", "duel-t3", "tok-2a", "u2", "2026-01-10T00:00:00.000Z"));
+
+  assert.deepEqual(repo.listParticipation("u1").map((r) => ({ ...r })), [
+    { id: "t1", name: "Bracket", participants: 4, latest_at: "2026-01-05T00:00:00.000Z" }
+  ]);
+  assert.deepEqual(repo.listRecentVoters("t1", "u1", 10).map((r) => ({ ...r })), [
+    { user_id: "u3", at: "2026-01-03T00:00:00.000Z" },
+    { user_id: "u2", at: "2026-01-02T00:00:00.000Z" }
+  ]);
+  assert.deepEqual(repo.listRecentVoters("t1", "u1", 1).map((r) => r.user_id), ["u3"]);
+});
+
 test("rekeyBooks rewrites seeding slots only and drops a slot that would duplicate the survivor", () => {
   const db = freshDb();
   const tournament = db.prepare("INSERT INTO tournaments (id, owner_user_id, name, bracket_size, round_duration_minutes, status) VALUES (?, ?, 'n', 8, 60, ?)");

@@ -38,7 +38,7 @@ import { enqueueBookCovers, registerBooksModule } from "./modules/books/index.js
 import { deleteGalleryUserData, registerGalleryModule } from "./modules/gallery/index.js";
 import { deleteLibraryUserData, registerLibraryModule, resolvePublicLibrary, readerGlyphFor, type BookEvent } from "./modules/library/index.js";
 import { deleteMuralsUserData, getMuralsPublicApi, registerMuralsModule, rekeyMuralsBooks } from "./modules/murals/index.js";
-import { deleteQuizzesUserData, registerQuizzesModule, rekeyQuizzesBooks } from "./modules/quizzes/index.js";
+import { deleteQuizzesUserData, getQuizzesPublicApi, registerQuizzesModule, rekeyQuizzesBooks } from "./modules/quizzes/index.js";
 import { deleteSocialsUserData, registerSocialsModule } from "./modules/socials/index.js";
 import { deleteTierlistsUserData, registerTierlistsModule, getTierlistsPublicApi, rekeyTierlistsBooks } from "./modules/tierlists/index.js";
 import { registerWaitlistModule } from "./modules/waitlist/index.js";
@@ -190,6 +190,11 @@ export function buildApp() {
       get: getArenaPublicApi().getPublished,
       listByOwner: getArenaPublicApi().listPublishedByOwner,
       listVotedByUser: getArenaPublicApi().listVotedByUser
+    },
+    participation: {
+      tierlists: getTierlistsPublicApi().participationByOwner,
+      tournaments: getArenaPublicApi().participationByOwner,
+      quizzes: getQuizzesPublicApi().participationByOwner
     }
   });
   app.register(registerTierlistsModule, {

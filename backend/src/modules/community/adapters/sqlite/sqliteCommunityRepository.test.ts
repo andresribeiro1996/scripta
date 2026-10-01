@@ -55,6 +55,44 @@ test("events ignore duplicate (ref_type, ref_id) and paginate by keyset", () => 
   assert.deepEqual(r.listEventsByUser("bob", undefined, 10), []);
 });
 
+test("events narrow to the requested types, with or without a keyset, and newer than a marker", () => {
+  const r = repo();
+  const at = (day: number) => `2026-09-0${day}T00:00:00.000Z`;
+  r.insertEvent({ id: "typed-1", user_id: "typed", type: "tierlist_published", ref_type: "tierlist", ref_id: "typed-t1", payload: null, created_at: at(1) });
+  r.insertEvent({ id: "typed-2", user_id: "typed", type: "book_added", ref_type: "book", ref_id: "typed-b2", payload: null, created_at: at(2) });
+  r.insertEvent({ id: "typed-3", user_id: "typed", type: "tierlist_published", ref_type: "tierlist", ref_id: "typed-t3", payload: null, created_at: at(3) });
+  r.insertEvent({ id: "typed-4", user_id: "typed", type: "voted_on", ref_type: "tierlist", ref_id: "typed-t4", payload: null, created_at: at(4) });
+  r.insertEvent({ id: "typed-5", user_id: "typed", type: "book_finished", ref_type: "book", ref_id: "typed-b5", payload: null, created_at: at(5) });
+  const ids = (rows: Array<{ id: string }>) => rows.map((row) => row.id);
+
+  assert.deepEqual(ids(r.listEventsByUser("typed", undefined, 10)), ["typed-5", "typed-4", "typed-3", "typed-2", "typed-1"]);
+  assert.deepEqual(ids(r.listEventsByUser("typed", undefined, 10, ["tierlist_published"])), ["typed-3", "typed-1"]);
+  assert.deepEqual(ids(r.listEventsByUser("typed", undefined, 1, ["tierlist_published", "book_added"])), ["typed-3"]);
+  assert.deepEqual(ids(r.listEventsByUser("typed", { createdAt: at(3), id: "typed-3" }, 10, ["tierlist_published", "book_added"])), ["typed-2", "typed-1"]);
+  assert.deepEqual(r.listEventsByUser("typed", undefined, 10, []), []);
+
+  assert.deepEqual(ids(r.listEventsByUserSince("typed", at(2), 10, ["tierlist_published", "book_added", "book_finished"])), ["typed-5", "typed-3"]);
+  assert.deepEqual(ids(r.listEventsByUserSince("typed", at(2), 1, ["tierlist_published", "book_finished"])), ["typed-5"]);
+  assert.deepEqual(r.listEventsByUserSince("typed", at(2), 10, []), []);
+  assert.deepEqual(r.listEventsByUserSince("typed", at(5), 10, ["book_finished"]), []);
+});
+
+test("listFollowersSince returns only follows after the marker, newest first", () => {
+  const r = repo();
+  const at = (day: number) => `2026-09-0${day}T00:00:00.000Z`;
+  r.insertFollow({ follower_id: "since-a", followee_id: "since-host", created_at: at(1) });
+  r.insertFollow({ follower_id: "since-b", followee_id: "since-host", created_at: at(3) });
+  r.insertFollow({ follower_id: "since-c", followee_id: "since-host", created_at: at(5) });
+  r.insertFollow({ follower_id: "since-d", followee_id: "since-host", created_at: at(5) });
+  r.insertFollow({ follower_id: "since-a", followee_id: "since-other", created_at: at(6) });
+  const ids = (rows: Array<{ follower_id: string }>) => rows.map((row) => row.follower_id);
+
+  assert.deepEqual(ids(r.listFollowersSince("since-host", at(3), 10)), ["since-d", "since-c"]);
+  assert.deepEqual(ids(r.listFollowersSince("since-host", at(1), 2)), ["since-d", "since-c"]);
+  assert.deepEqual(r.listFollowersSince("since-host", at(5), 10), []);
+  assert.deepEqual(ids(r.listFollowersSince("since-other", at(1), 10)), ["since-a"]);
+});
+
 test("followers order newest first per (created_at, follower_id), paginate by keyset, and drop unfollowed rows", () => {
   const r = repo();
   r.insertFollow({ follower_id: "bob", followee_id: "alice", created_at: "2026-09-02T00:00:00.000Z" });

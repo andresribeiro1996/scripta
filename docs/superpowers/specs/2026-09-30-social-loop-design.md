@@ -131,7 +131,8 @@ The fix:
   `/community`. Home's "All activity" and "Find readers" links point there
   (the Activity and People tabs).
 - **Seen marker:** `markDashboardSeen` runs only once the Activity tab is
-  showing with data loaded, and not after a failed load. It doesn't run on
+  showing with data loaded, not after a failed load, and not while a refetch
+  is still in flight (a late response would restore the cleared counts). It doesn't run on
   Discover or People. An empty Activity still counts as seen once shown.
   The opening tab is chosen before the first render with data, so an empty
   feed opens straight on Discover without marking or sliding. This fix moves up from
@@ -164,6 +165,9 @@ The fix:
 ## Step 2: your creations talk back
 
 ### Carried over from step 1
+
+Done in step 2: the first two bullets. Still deferred: Discover's repeated
+rows, your own profile inside Games, and the untested paths.
 
 - **Keep what's already loaded.** Community keeps its cached rows, and its
   Discover and People tabs, when a dashboard refetch or next page fails.
@@ -243,7 +247,7 @@ new events at vote time was considered and rejected:
 | Quiz | a play | the play's `created_at` |
 
 **The dashboard** merges these as
-`{ kind: "participation", id: "<kind>:<gameId>", content, actors, count, createdAt: latestAt }`
+`{ kind: "participation", id: "<kind>:<gameId>", game, actors, count, createdAt: latestAt }`
 rows into the existing keyset stream on `(createdAt, id)`.
 
 **Page 1 carries three new fields** in place of `newCount`:
@@ -256,6 +260,25 @@ Both counts come from the same row-building code as the list, so hidden and
 unrendered events no longer count. This replaces `countEventsByUsersSince`.
 Clients display at most "99+".
 
+**Decided while planning step 2:**
+- **The window fix.** Each followee's events are fetched already filtered to
+  the types their feed settings broadcast and the digest renders:
+  - publications: `tierlist_published`, `tournament_published`;
+  - votes: `voted_on`;
+  - reading: `book_added`, `book_finished`.
+
+  `following` and `mural_published` stay profile-only. So hidden events can
+  no longer fill a page and push visible ones out of reach.
+- **Counting caps.** Each count is capped at 100 and computed on its own
+  (personal rows, followee rows), so one can't crowd out the other.
+- **No marker yet.** With no seen marker (`seenAt` null), every row counts
+  as new, so existing participation surfaces on the first visit.
+- **Where the shape lives.** `GameParticipation` lives in
+  `@scripta/shared/community`, the neutral place the three game modules and
+  community all import.
+- **Quizzes carry no covers** in v1, so their rows show a stack of up to
+  three players' avatars.
+
 ### Shared
 
 - `DigestItem` gains `participation`. `digestAction`, `digestHeading` and
@@ -267,9 +290,12 @@ Clients display at most "99+".
 
 ### Mobile
 
-- **`FeedRow`** renders participation rows: a cover fan, up to three
-  avatars, the label "Ranked", "Voted" or "Played", and "Ana, Rui and 10
-  others".
+- **`FeedRow`** renders participation rows with the label "Ranked",
+  "Voted" or "Played", and "Ana, Rui and 10 others". The leading slot shows:
+  - with covers, the cover fan with the first participant's avatar badge;
+  - without covers, an overlapping stack of up to three participants'
+    avatars;
+  - with no named participants, a group icon.
 - **The personal badge** (`personalNewCount`) appears in three places:
   - on the Home tab (`tabBarBadge`, reading the same dashboard query);
   - on the Community header button (`IconButton` gains an optional badge
@@ -282,7 +308,7 @@ Clients display at most "99+".
 ### Web
 
 - Home's "Following" section becomes "Activity" and renders participation
-  rows.
+  rows, led by an overlapping stack of up to three participants' avatars.
 - The Home nav item shows the personal badge.
 - Seen is marked when the Activity section scrolls into view
   (IntersectionObserver), not on page load.
@@ -290,10 +316,12 @@ Clients display at most "99+".
 ### Edge cases
 
 - **Deleted game:** the module returns nothing for it, so there is no row.
-- **Deleted participant account:** their ballots, votes and plays go with it,
-  and the counts drop.
-- **Promoted tier list:** ownership stays `origin_user_id`, matching
-  `listPublishedByOwner`.
+- **Deleted participant account:** their ballots, votes and plays are
+  unlinked from them, not deleted (each module's `deleteUserData`). The counts
+  stay, and the name drops into "others".
+- **Promoted tier list:** excluded from participation. A promoted list
+  belongs to the app (`owner_user_id = '__app__'`), and its creator's owner
+  page can't open it, so a row would lead to "not found".
 - **Unpublished owner:** still sees their own participation rows.
 
 ### Testing
@@ -476,6 +504,11 @@ quiz names), with no report path yet.
   module scope.
 - **Parity:** every step ships on web and mobile.
 - **Notifications stay in-app.** Push is out of scope.
+- **Installed builds keep working.** Clients send `kinds`, the digest kinds
+  they can draw, with every dashboard request. A request without it (build 9,
+  old web tabs) gets only `publication`, `vote`, `reading` and `follow`, and
+  counts only those. A kind added in steps 4–5 is therefore invisible to
+  builds that predate it, and their badges count only rows they show.
 
 ## Out of scope
 

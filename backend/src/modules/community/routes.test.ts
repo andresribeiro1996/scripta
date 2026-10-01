@@ -34,7 +34,7 @@ function fakeService(overrides: Partial<CommunityService> = {}): CommunityServic
     getProfileByUsername: () => {
       throw new ProfileNotFoundError();
     },
-    getDashboard: () => ({ items: [], nextCursor: null, newCount: 0 }),
+    getDashboard: () => ({ items: [], nextCursor: null, seenAt: null, personalNewCount: 0, followingNewCount: 0 }),
     markDashboardSeen: () => {},
     getDiscover: () => ({ items: [], nextOffset: null }),
     searchPeople: () => [],
@@ -262,7 +262,7 @@ test("dashboard routes pass cursor/limit through and mark seen", async () => {
       fakeService({
         getDashboard: (_viewerId, cursor, limit) => {
           seen.push({ cursor, limit });
-          return { items: [], nextCursor: null, newCount: 0 };
+          return { items: [], nextCursor: null, seenAt: null, personalNewCount: 0, followingNewCount: 0 };
         },
         markDashboardSeen: () => {
           marked += 1;
@@ -277,6 +277,42 @@ test("dashboard routes pass cursor/limit through and mark seen", async () => {
   const seenRes = await app.inject({ method: "POST", url: "/community/dashboard/seen", headers: auth });
   assert.equal(seenRes.statusCode, 204);
   assert.equal(marked, 1);
+  await app.close();
+});
+
+test("dashboard forwards the kinds the client lists, and nothing when it lists none", async () => {
+  const seen: Array<ReadonlySet<string> | undefined> = [];
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", () => ({ id: "viewer", email: "v@example.test", username: "v", avatarId: null }));
+  await app.register(
+    buildCommunityRoutes(
+      fakeService({
+        getDashboard: (_viewerId, _cursor, _limit, kinds) => {
+          seen.push(kinds);
+          return { items: [], nextCursor: null, seenAt: null, personalNewCount: 0, followingNewCount: 0 };
+        }
+      })
+    )
+  );
+  const auth = { authorization: "Bearer x" };
+  const listed = await app.inject({ method: "GET", url: "/community/dashboard?kinds=publication,participation", headers: auth });
+  assert.equal(listed.statusCode, 200);
+  const unlisted = await app.inject({ method: "GET", url: "/community/dashboard", headers: auth });
+  assert.equal(unlisted.statusCode, 200);
+  assert.deepEqual(seen, [new Set(["publication", "participation"]), undefined]);
+  await app.close();
+});
+
+test("dashboard rejects an empty, malformed or oversized kinds, and an oversized cursor, with 400", async () => {
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", () => ({ id: "viewer", email: "v@example.test", username: "v", avatarId: null }));
+  await app.register(buildCommunityRoutes(fakeService()));
+  const auth = { authorization: "Bearer x" };
+  for (const query of ["kinds=", "kinds=Pub!", `kinds=${"a".repeat(201)}`, `cursor=${"a".repeat(201)}`]) {
+    const res = await app.inject({ method: "GET", url: `/community/dashboard?${query}`, headers: auth });
+    assert.equal(res.statusCode, 400, query);
+    assert.equal(res.json().error, "Invalid cursor/limit/kinds.");
+  }
   await app.close();
 });
 
