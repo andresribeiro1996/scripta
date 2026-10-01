@@ -19,5 +19,6 @@ export const PUBLISHERS: PublisherSite[] = [
   { name: "Presença", origin: "https://www.presenca.pt", platform: "shopify", authorFromVendor: false },
   { name: "Edições Afrontamento", origin: "https://www.edicoesafrontamento.pt", platform: "shopify", authorFromVendor: false },
   { name: "Saída de Emergência", origin: "https://www.saidadeemergencia.com", platform: "woocommerce", authorFromVendor: false },
-  { name: "Divergência", origin: "https://divergencia.pt", platform: "woocommerce", authorFromVendor: false }
+  { name: "Divergência", origin: "https://divergencia.pt", platform: "woocommerce", authorFromVendor: false },
+  { name: "Penguin Livros", origin: "https://penguinlivros.pt", platform: "woocommerce", authorFromVendor: false }
 ];

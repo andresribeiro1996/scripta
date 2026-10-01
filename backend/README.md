@@ -185,6 +185,7 @@ npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --
 | Edições Afrontamento | Shopify | fill in after the first run |
 | Saída de Emergência | WooCommerce | fill in after the first run |
 | Divergência | WooCommerce | fill in after the first run |
+| Penguin Livros | WooCommerce | fill in after the first run |
 
 The list is `PUBLISHERS` in `seed/publishers.ts`; each shop's quirks, the candidates not yet added and the contact-first list are in [`docs/publisher-catalog.md`](../docs/publisher-catalog.md). The prefixes come from the local dry run, and the importer prints each site's `imageUrlPrefix` in its report (the longest common folder of its cover URLs), so check the table against the real run. Left out after probing: Flâneur (not Shopify, its feed 404s), Bruaá (no Store API), Planeta Tangerina (feed answers 500), Tinta-da-China (a Cloudflare bot challenge answers every page, `robots.txt` included: contact them, never bypass it). The research is in `docs/portuguese-book-sources.md`.
 

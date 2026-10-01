@@ -33,6 +33,7 @@ Feed URLs, Shopify: `{origin}/products.json?limit=250&page=N`. WooCommerce: `{or
 | Edições Afrontamento | www.edicoesafrontamento.pt | Shopify | ~2–3k | the page (unverified) | Open Library | up to 2048 | **Vendor:** the publisher's name. **Feed:** SKU, barcode and body are empty, so it depends entirely on the page step and the title check. |
 | Saída de Emergência | www.saidadeemergencia.com | WooCommerce | 1,073 | image file name (some), else the page | Open Library; the page has an `/autor/` link | about 400 wide | **Cloudflare:** sits in front, and the owner mentions aggressive bot traffic, so keep the wait and watch `pagesBlocked`. **Size:** covers are near the 400 px floor. |
 | Divergência | divergencia.pt | WooCommerce | 218 | `sku` = ISBN, image file name | Open Library | 814 wide | Small SF/fantasy press. |
+| Penguin Livros (Alfaguara, Companhia das Letras, Elsinore, Cavalo de Ferro, Topseller, Booksmile, Nascente, Vogais) | penguinlivros.pt | WooCommerce | 5,821 | the page (`ISBN` row); `sku` is internal (`PA99555`) | Open Library; the page has `Autor(a)` links to `/autores/` | up to 1692 wide | Group-owned (Penguin Random House), added on 2026-10-01 by the owner's decision. elsinore.pt, topseller.pt and booksmile.pt redirect here. Page-only ISBNs, so the title check decides every book. |
 
 `imageUrlPrefix` for each site (needed for a takedown) is in the README table after the first real run.
 
@@ -40,7 +41,6 @@ Feed URLs, Shopify: `{origin}/products.json?limit=250&page=N`. WooCommerce: `{or
 
 | Publisher | Origin | Why not yet | What it would take |
 |---|---|---|---|
-| Penguin Livros (Alfaguara, Companhia das Letras, Elsinore, Cavalo de Ferro, Topseller, Booksmile, Nascente, Vogais) | penguinlivros.pt | **Group-owned (Penguin Random House). Your decision.** Apple likely has most of these covers already. | Nothing technical: WooCommerce, 5,821 products, ISBN on the page, `Autor(a)` links, covers up to 1692 wide, no relevant `Disallow`. One line in `publishers.ts`. |
 | Edições do Saguão | www.edicoesdosaguao.pt | Shopkit, a Portuguese platform: `/products.json` returns `{data, paging, total_count}`, not Shopify's shape. | A third parser. `Crawl-delay: 10`, enforced with a 429. 73 products, ISBN and `Autor:` in the description. |
 | Letras Lavadas | www.letraslavadas.pt | It also sells other publishers' books (an `Editora` attribute), which is the retailer case. | A per-site filter on `Editora` = Letras Lavadas. 622 products, `ISBN` attribute. |
 | Sistema Solar (Documenta) | sistemasolar.pt | A custom PHP shop with no feed. ISBNs appear only in image file names. | A crawler for its product listing pages. `robots.txt` allows it. |
@@ -78,7 +78,7 @@ These can't, or shouldn't, be read automatically. Ask for permission to show the
 | Leya | Dom Quixote, Caminho, Lua de Papel, ASA, Casa das Letras, Oficina do Livro, Texto. Custom platform, no feed, `Crawl-delay: 15`. | comunicacao@leya.com |
 | Almedina | Almedina, Edições 70 | geral@almedina.net, editora@grupoalmedina.net |
 | Planeta | Planeta. Custom platform, no feed. | info@planeta.pt |
-| Penguin Random House | see Candidates | correio@penguinrandomhouse.com |
+| Penguin Random House | in the importer (penguinlivros.pt); contact only if they object | correio@penguinrandomhouse.com |
 
 ### Email draft (Portuguese)
 
