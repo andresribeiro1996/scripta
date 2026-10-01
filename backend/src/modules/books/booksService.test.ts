@@ -432,6 +432,22 @@ test("a facts-only answer stores its facts and leaves the book missing, so a lat
   assert.equal(h.repo.getBook(row.id)!.details_status, "found");
 });
 
+test("an Open Library answer with only a rating is stored as found with its rating and work key", async () => {
+  const metadata = { summary: null, rating: 3.8, ratingCount: 42, sourceUrl: "https://openlibrary.org/works/OL5W", genres: [], pages: null, publisher: null, year: null, translator: null };
+  const h = harness({ catalog: recordingCatalog({ fetchDetails: async () => ({ metadata, sources: ["openlibrary"], summarySource: null, workKey: "/works/OL5W" }) }).catalog });
+  assert.deepEqual(await h.service.getDetails(dune), metadata);
+  const row = h.repo.findBookByKey("isbn:9780441013593")!;
+  assert.deepEqual([row.details_status, row.rating, row.rating_count, row.source_url, row.ol_work_key, row.data_sources], ["found", 3.8, 42, "https://openlibrary.org/works/OL5W", "OL5W", '["openlibrary"]']);
+});
+
+test("a facts-only answer still stores the work key it carries", async () => {
+  const metadata = { summary: null, rating: null, ratingCount: 0, sourceUrl: "https://openlibrary.org/works/OL6W", genres: [], pages: 300, publisher: null, year: null, translator: null };
+  const h = harness({ catalog: recordingCatalog({ fetchDetails: async () => ({ metadata, sources: ["openlibrary"], summarySource: null, workKey: "/works/OL6W" }) }).catalog });
+  assert.equal(await h.service.getDetails(dune), null);
+  const row = h.repo.findBookByKey("isbn:9780441013593")!;
+  assert.deepEqual([row.details_status, row.pages, row.ol_work_key, row.source_url], ["missing", 300, "OL6W", null]);
+});
+
 test("a stored synopsis is returned when every source is unavailable, other rows still throw", async () => {
   const h = harness({ catalog: recordingCatalog({ fetchDetails: async () => { throw new SourceUnavailableError("openlibrary", "HTTP 503"); } }).catalog });
   h.service.resolveCover(dune);

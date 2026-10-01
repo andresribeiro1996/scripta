@@ -251,11 +251,14 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
         throw error;
       }
       const at = now().toISOString();
-      if (details && (details.metadata.summary || details.metadata.genres.length > 0)) {
+      if (details && (details.metadata.summary || details.metadata.genres.length > 0 || details.metadata.rating !== null)) {
         deps.repo.saveDetails(book.id, details.metadata, details.sources, details.summarySource, at);
         deps.repo.setWorkKey(book.id, details.workKey);
       } else {
-        if (details) deps.repo.mergeDetails(book.id, { ...details.metadata, summary: null }, null);
+        if (details) {
+          deps.repo.mergeDetails(book.id, { ...details.metadata, summary: null }, null);
+          deps.repo.setWorkKey(book.id, details.workKey);
+        }
         deps.repo.markDetailsMissing(book.id, at);
       }
       const latest = deps.repo.getBook(book.id) ?? book;
