@@ -2,10 +2,10 @@ import { randomUUID } from "node:crypto";
 import { looksLikeIsbnQuery, normalizeIsbn, type BookGenre, type BookMetadata, type BookSearchResult } from "@scripta/shared";
 import { findBestCover, type CoverSources, type FetchCoverImage } from "./coverResolver.js";
 import { MIN_GOOD_WIDTH } from "./domain/constants.js";
-import { BookNotFoundError, FileTooLargeError, InvalidImageError, SourcePausedError } from "./domain/errors.js";
+import { BookNotFoundError, FileTooLargeError, InvalidImageError, SourcePausedError, SourceUnavailableError } from "./domain/errors.js";
 import { encodeCover, type EncodedCover } from "./domain/images.js";
 import { findByIdentity, isPortugueseIsbn, lookupIdentity, SEARCH_LIMIT, searchTokens, type BookIdentity, type BookLookup } from "./domain/normalize.js";
-import type { BookCatalog, BooksRepository, CatalogSearchHit, CoverBlobStore, CoverSource } from "./domain/ports.js";
+import type { BookCatalog, BooksRepository, CatalogDetails, CatalogSearchHit, CoverBlobStore, CoverSource } from "./domain/ports.js";
 import type { BookRow, CoverSourceName, CoverStatus } from "./domain/types.js";
 import type { CoverPriority } from "./worker.js";
 
@@ -243,15 +243,23 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       if (!book) return null;
       if (book.details_status === "found") return detailsOf(book);
       if (book.details_status === "missing" && !olderThan(book.details_checked_at, RETRY_AFTER_MS)) return book.summary ? detailsOf(book) : null;
-      const details = await deps.catalog.fetchDetails({ isbn: book.isbn, title: book.title, author: book.author });
+      let details: CatalogDetails | null;
+      try {
+        details = await deps.catalog.fetchDetails({ isbn: book.isbn, title: book.title, author: book.author });
+      } catch (error) {
+        if (error instanceof SourceUnavailableError && book.summary) return detailsOf(book);
+        throw error;
+      }
       const at = now().toISOString();
-      if (details) {
+      if (details && (details.metadata.summary || details.metadata.genres.length > 0)) {
         deps.repo.saveDetails(book.id, details.metadata, details.sources, details.summarySource, at);
         deps.repo.setWorkKey(book.id, details.workKey);
       } else {
+        if (details) deps.repo.mergeDetails(book.id, { ...details.metadata, summary: null }, null);
         deps.repo.markDetailsMissing(book.id, at);
       }
-      return details || book.summary ? detailsOf(deps.repo.getBook(book.id) ?? book) : null;
+      const latest = deps.repo.getBook(book.id) ?? book;
+      return latest.details_status === "found" || latest.summary ? detailsOf(latest) : null;
     },
 
     search(query) {

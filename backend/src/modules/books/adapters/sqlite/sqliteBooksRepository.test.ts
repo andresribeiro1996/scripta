@@ -17,6 +17,7 @@ const { applyBooksMigrations } = await import("./connection.js");
 const { createSqliteBooksRepository } = await import("./sqliteBooksRepository.js");
 
 const NOW = "2026-10-01T00:00:00.000Z";
+const richDetails = { summary: "Open Library synopsis.", rating: 4, ratingCount: 3, sourceUrl: "https://openlibrary.org/works/OL1W", genres: ["Fantasy" as const], pages: 300, publisher: "Bantam", year: 1975, translator: null };
 
 function freshRepo() {
   const db = new DatabaseSync(":memory:");
@@ -204,20 +205,40 @@ test("the migration adds data_sources to a books table that predates it", () => 
   assert.equal(repo.getBook("old")!.data_sources, '["isbndb"]');
 });
 
-test("the ISBNdb lapse cleanup clears only rows tagged with it", () => {
+const LAPSE_CLEANUP = `UPDATE books SET summary = CASE WHEN summary_source IS NULL OR summary_source = 'isbndb' THEN NULL ELSE summary END, summary_source = CASE WHEN summary_source = 'isbndb' THEN NULL ELSE summary_source END, genres = '[]', details_status = NULL, details_checked_at = NULL, source_url = NULL, data_sources = '[]' WHERE EXISTS (SELECT 1 FROM json_each(books.data_sources) WHERE value = 'isbndb')`;
+
+test("the ISBNdb lapse cleanup clears only rows tagged with it, and only an ISBNdb synopsis", () => {
   const { db, repo } = freshRepo();
   const details = { summary: "Spice.", rating: 4, ratingCount: 1, sourceUrl: "https://example.test/", genres: ["Fantasy" as const], pages: null, publisher: null, year: null, translator: null };
   const both = repo.createBook({ title: "A", author: "A", isbn: null }, ["ta:a|a|"], NOW);
   const only = repo.createBook({ title: "B", author: "B", isbn: null, sources: ["isbndb"], genres: ["Fantasy"] }, ["ta:b|b|"], NOW);
   const open = repo.createBook({ title: "C", author: "C", isbn: null }, ["ta:c|c|"], NOW);
-  repo.saveDetails(both.id, details, ["openlibrary", "isbndb"], "openlibrary", NOW);
+  const publisher = repo.createBook({ title: "D", author: "D", isbn: null, sources: ["isbndb"] }, ["ta:d|d|"], NOW);
+  const legacy = repo.createBook({ title: "E", author: "E", isbn: null, sources: ["isbndb"] }, ["ta:e|e|"], NOW);
+  repo.saveDetails(both.id, details, ["isbndb"], "isbndb", NOW);
   repo.saveDetails(open.id, details, ["openlibrary"], "openlibrary", NOW);
-  db.exec(`UPDATE books SET summary = NULL, genres = '[]', details_status = NULL, details_checked_at = NULL, source_url = NULL, data_sources = '[]' WHERE EXISTS (SELECT 1 FROM json_each(books.data_sources) WHERE value = 'isbndb')`);
-  for (const id of [both.id, only.id]) {
+  repo.mergeDetails(publisher.id, { ...details, summary: "Sinopse." }, "publisher");
+  repo.saveDetails(only.id, { ...details, summary: null }, ["openlibrary"], null, NOW);
+  db.exec(`UPDATE books SET summary = 'Old.', summary_source = NULL WHERE id = '${legacy.id}'`);
+  db.exec(LAPSE_CLEANUP);
+  for (const id of [both.id, only.id, legacy.id]) {
     const row = repo.getBook(id)!;
-    assert.deepEqual([row.summary, row.genres, row.details_status, row.source_url, row.data_sources], [null, "[]", null, null, "[]"]);
+    assert.deepEqual([row.summary, row.summary_source, row.genres, row.details_status, row.source_url, row.data_sources], [null, null, "[]", null, null, "[]"]);
   }
+  const kept = repo.getBook(publisher.id)!;
+  assert.deepEqual([kept.summary, kept.summary_source, kept.data_sources], ["Sinopse.", "publisher", "[]"]);
   assert.deepEqual([repo.getBook(open.id)!.summary, repo.getBook(open.id)!.data_sources], ["Spice.", '["openlibrary"]']);
+});
+
+test("saving details keeps the sources already recorded, in order and without repeats", () => {
+  const { repo } = freshRepo();
+  const book = repo.createBook({ title: "A", author: "A", isbn: null, sources: ["isbndb"], genres: ["Romance"] }, ["ta:a|a|"], NOW);
+  repo.saveDetails(book.id, richDetails, ["openlibrary"], "openlibrary", NOW);
+  assert.equal(repo.getBook(book.id)!.data_sources, '["isbndb","openlibrary"]');
+  assert.equal(repo.getBook(book.id)!.genres, '["Romance"]');
+  repo.markDetailsMissing(book.id, NOW);
+  repo.saveDetails(book.id, richDetails, ["isbndb", "openlibrary"], "openlibrary", NOW);
+  assert.equal(repo.getBook(book.id)!.data_sources, '["isbndb","openlibrary"]');
 });
 
 test("an existing database gains ol_work_key on boot, empty", () => {
@@ -304,7 +325,6 @@ test("setPublisherUrl fills a null value and never overwrites it", () => {
   assert.equal(repo.getBook(book.id)!.publisher_url, "https://antigona.pt/products/a");
 });
 
-const richDetails = { summary: "Open Library synopsis.", rating: 4, ratingCount: 3, sourceUrl: "https://openlibrary.org/works/OL1W", genres: ["Fantasy" as const], pages: 300, publisher: "Bantam", year: 1975, translator: null };
 const noDetails = { summary: null, pages: null, year: null, publisher: null, translator: null };
 
 test("a publisher synopsis replaces an Open Library one, and never the other way round", () => {

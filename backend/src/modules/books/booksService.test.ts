@@ -417,6 +417,30 @@ test("a book with a publisher synopsis still returns it when the catalog finds n
   assert.deepEqual(await h.service.getDetails(dune), expected);
 });
 
+test("a facts-only answer stores its facts and leaves the book missing, so a later answer still lands", async () => {
+  let answer: Awaited<ReturnType<Catalog["fetchDetails"]>> = { metadata: { summary: null, rating: null, ratingCount: 0, sourceUrl: "https://isbndb.com/book/9780441013593", genres: [], pages: null, publisher: "Ace", year: 2005, translator: null }, sources: ["isbndb"], summarySource: null };
+  const { catalog } = recordingCatalog({ fetchDetails: async () => answer });
+  const h = harness({ catalog });
+  assert.equal(await h.service.getDetails(dune), null);
+  const row = h.repo.findBookByKey("isbn:9780441013593")!;
+  assert.deepEqual([row.publisher, row.year, row.details_status, row.data_sources, row.summary], ["Ace", 2005, "missing", "[]", null]);
+
+  h.advance(30 * DAY);
+  answer = { metadata: { summary: "Spice.", rating: 4.2, ratingCount: 10, sourceUrl: "https://openlibrary.org/works/OL1W", genres: ["Science Fiction"], pages: 544, publisher: "Other", year: 1965, translator: null }, sources: ["openlibrary"], summarySource: "openlibrary" };
+  const details = await h.service.getDetails(dune);
+  assert.deepEqual([details?.summary, details?.pages, details?.publisher, details?.year], ["Spice.", 544, "Ace", 2005]);
+  assert.equal(h.repo.getBook(row.id)!.details_status, "found");
+});
+
+test("a stored synopsis is returned when every source is unavailable, other rows still throw", async () => {
+  const h = harness({ catalog: recordingCatalog({ fetchDetails: async () => { throw new SourceUnavailableError("openlibrary", "HTTP 503"); } }).catalog });
+  h.service.resolveCover(dune);
+  await assert.rejects(h.service.getDetails(dune), SourceUnavailableError);
+  h.repo.mergeDetails(h.bookId("isbn:9780441013593"), { summary: "Sinopse da editora.", pages: null, year: null, publisher: null, translator: null }, "publisher");
+  assert.equal((await h.service.getDetails(dune))?.summary, "Sinopse da editora.");
+  assert.equal(h.repo.findBookByKey("isbn:9780441013593")!.details_status, null);
+});
+
 test("a details failure propagates and records nothing", async () => {
   const h = harness({ catalog: recordingCatalog({ fetchDetails: async () => { throw new SourceUnavailableError("openlibrary", "HTTP 503"); } }).catalog });
   await assert.rejects(h.service.getDetails(dune), SourceUnavailableError);

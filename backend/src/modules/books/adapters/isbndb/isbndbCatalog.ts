@@ -1,4 +1,4 @@
-import { normalizeBookGenres, normalizeIsbn, type BookSearchResult } from "@scripta/shared";
+import { normalizeBookGenres, normalizeIsbn, positiveInteger, type BookSearchResult } from "@scripta/shared";
 import type { BookCatalog } from "../../domain/ports.js";
 import type { Throttle } from "../http/http.js";
 import { createIsbndbGet, isbndbRecords } from "../sources/isbndb.js";
@@ -51,7 +51,7 @@ export function createIsbndbCatalog(apiKey: string, throttle: Throttle, gate: Is
       if (!record) return null;
       const summary = plainText(record.synopsis) ?? plainText(record.overview);
       const genres = normalizeBookGenres(record.subjects);
-      const pages = typeof record.pages === "number" && Number.isInteger(record.pages) && record.pages > 0 ? record.pages : null;
+      const pages = positiveInteger(record.pages);
       const year = yearOf(record.date_published);
       const publisher = plainText(record.publisher);
       if (!summary && genres.length === 0 && pages === null && year === null && !publisher) return null;

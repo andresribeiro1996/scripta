@@ -42,7 +42,7 @@ export function findOpenLibraryMatch(data: unknown, isbn: string, title: string,
   }) ?? null;
 }
 
-function positiveInteger(value: unknown): number | null {
+export function positiveInteger(value: unknown): number | null {
   return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : null;
 }
 

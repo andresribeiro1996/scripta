@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { normalizeWorkKey } from "../../domain/normalize.js";
 import type { BooksRepository, MergeableDetails } from "../../domain/ports.js";
-import type { BookRow, CoverImageRow, SummarySource } from "../../domain/types.js";
+import type { BookRow, CoverImageRow, DataSource, SummarySource } from "../../domain/types.js";
 
 export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const byKeyStmt = db.prepare(`SELECT books.* FROM book_keys JOIN books ON books.id = book_keys.book_id WHERE book_keys.key = ?`);
@@ -145,7 +145,8 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       db.exec("BEGIN");
       try {
         mergeDetails(bookId, details, summarySource);
-        saveDetailsStmt.run(details.rating, details.ratingCount, JSON.stringify(details.genres), JSON.stringify(sources), details.sourceUrl, checkedAt, bookId);
+        const stored = JSON.parse((byIdStmt.get(bookId) as BookRow | undefined)?.data_sources ?? "[]") as DataSource[];
+        saveDetailsStmt.run(details.rating, details.ratingCount, JSON.stringify(details.genres), JSON.stringify([...new Set([...stored, ...sources])]), details.sourceUrl, checkedAt, bookId);
         db.exec("COMMIT");
       } catch (error) {
         db.exec("ROLLBACK");
