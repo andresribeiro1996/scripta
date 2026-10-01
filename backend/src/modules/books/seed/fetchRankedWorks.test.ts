@@ -37,13 +37,22 @@ test("asks for each Portugal ISBN prefix and merges the lists by readers", async
   assert.deepEqual(entries.map((entry) => entry.isbn), ["9789721111111", "9789892222222", "9789723333333"]);
 });
 
-test("keeps a book found under both prefixes once", async () => {
+test("keeps a work found under both prefixes once, with the higher readers", async () => {
   fakeOpenLibrary({
-    "isbn:978972*": [work("OL1W", 50, "9789721111111")],
-    "isbn:978989*": [work("OL1W", 50, "9789721111111")]
+    "isbn:978972*": [work("OL1W", 40, "9789722365598")],
+    "isbn:978989*": [work("OL1W", 50, "9789898765432")]
   });
   const entries = await collectRanked("por", 1, () => {});
-  assert.equal(entries.length, 1);
+  assert.deepEqual(entries.map((entry) => [entry.workKey, entry.isbn, entry.readers]), [["/works/OL1W", "9789898765432", 50]]);
+});
+
+test("on equal readers a work keeps its 978972 edition", async () => {
+  fakeOpenLibrary({
+    "isbn:978972*": [work("OL1W", 40, "9789722365598")],
+    "isbn:978989*": [work("OL1W", 40, "9789898765432")]
+  });
+  const entries = await collectRanked("por", 1, () => {});
+  assert.deepEqual(entries.map((entry) => entry.isbn), ["9789722365598"]);
 });
 
 test("keeps the language query for English", async () => {

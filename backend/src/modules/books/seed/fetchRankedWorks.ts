@@ -42,9 +42,12 @@ async function collectPrefix(lang: SeedLanguage, wanted: number, isbnPrefix: str
 
 export async function collectRanked(lang: SeedLanguage, wanted: number, log: (line: string) => void): Promise<SeedEntry[]> {
   if (lang !== "por") return collectPrefix(lang, wanted, undefined, log);
-  const byIsbn = new Map<string, SeedEntry>();
+  const byWork = new Map<string, SeedEntry>();
   for (const prefix of PORTUGAL_ISBN_PREFIXES) {
-    for (const entry of await collectPrefix(lang, wanted, prefix, log)) byIsbn.set(entry.isbn, entry);
+    for (const entry of await collectPrefix(lang, wanted, prefix, log)) {
+      const kept = byWork.get(entry.workKey);
+      if (!kept || entry.readers > kept.readers) byWork.set(entry.workKey, entry);
+    }
   }
-  return [...byIsbn.values()].sort((a, b) => b.readers - a.readers);
+  return [...byWork.values()].sort((a, b) => b.readers - a.readers);
 }
