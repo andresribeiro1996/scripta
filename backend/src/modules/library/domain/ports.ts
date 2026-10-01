@@ -12,8 +12,9 @@ export interface LibraryRepository {
    *  (with its server-assigned updatedAt) so the service doesn't need to
    *  compute or guess it. */
   upsertDocument(userId: string, dataJson: string, derived: LibraryDerived, expectedUpdatedAt?: string): LibraryDocumentRow | undefined;
-  listUnderivedUserIds(): string[];
-  setDerived(userId: string, derived: LibraryDerived): void;
+  listStaleUserIds(): string[];
+  setDerived(userId: string, derived: LibraryDerived, sourceUpdatedAt: string): void;
+  deleteOrphanedDerived(): void;
   /** Sets (or, with `token: null`, clears) the share token on this user's
    *  existing library document. Returns undefined if this user has no
    *  library document yet — service.ts turns that into a clear "nothing

@@ -5,12 +5,11 @@
 import { randomUUID } from "node:crypto";
 import { bookKey, bookMatchKeys, buildManualBook, isCertainMatch, localDay, mergeDuplicateBooks, readerIdentity, seedCoverLookup, setReadStatus, type CoverLookupParams, type LibraryData } from "@scripta/shared";
 import type { BookRecommendationInput } from "@scripta/shared/community";
+import { COVER_URL_MAX_LENGTH, DISPLAY_TEXT_MAX_LENGTH, LIBRARY_MATCH_BOOK_CAP, MATCH_KEY_MAX_LENGTH } from "./domain/constants.js";
 import { LibraryConflictError, NoLibraryDocumentError } from "./domain/errors.js";
 import type { LibraryRepository } from "./domain/ports.js";
-import type { LibraryDerived, LibraryDocument, LibraryDocumentRow } from "./domain/types.js";
+import type { LibraryDerived, LibraryDocument, LibraryDocumentRow, LibraryMatchKeyRow } from "./domain/types.js";
 import { libraryParts, normalizeIsbn, toPublicLibraryData, toReaderGroups } from "./publicResolver.js";
-
-export const LIBRARY_MATCH_BOOK_CAP = 20000;
 
 export type BookEvent = { type: "book_added" | "book_finished"; refId: string; payload: Record<string, unknown> };
 
@@ -46,16 +45,22 @@ export function deriveLibraryData(data: unknown): LibraryDerived {
   if (!parts) return { glyph: null, keys: [] };
   const books = parts.allBooks.map(textFields);
   const identity = readerIdentity(books, toReaderGroups(parts.groupRecords));
-  const keys = books.slice(0, LIBRARY_MATCH_BOOK_CAP).flatMap((book, bookRef) =>
-    bookMatchKeys(book).map((key) => ({
-      key,
-      book_ref: bookRef,
-      title: String(book.Title ?? ""),
-      author: String(book.Attribution ?? ""),
-      isbn: normalizeIsbn(book.ISBN) || null,
-      cover: typeof book._coverUrl === "string" ? book._coverUrl : null
-    }))
-  );
+  const emitted = new Set<string>();
+  const keys: LibraryMatchKeyRow[] = [];
+  books.slice(0, LIBRARY_MATCH_BOOK_CAP).forEach((book, bookRef) => {
+    for (const key of bookMatchKeys(book)) {
+      if (key.length > MATCH_KEY_MAX_LENGTH || emitted.has(key)) continue;
+      emitted.add(key);
+      keys.push({
+        key,
+        book_ref: bookRef,
+        title: String(book.Title ?? "").slice(0, DISPLAY_TEXT_MAX_LENGTH),
+        author: String(book.Attribution ?? "").slice(0, DISPLAY_TEXT_MAX_LENGTH),
+        isbn: normalizeIsbn(book.ISBN) || null,
+        cover: typeof book._coverUrl === "string" && book._coverUrl.length <= COVER_URL_MAX_LENGTH && /^https?:\/\//.test(book._coverUrl) ? book._coverUrl : null
+      });
+    }
+  });
   return { glyph: identity.state === "settled" ? identity.identity : null, keys };
 }
 

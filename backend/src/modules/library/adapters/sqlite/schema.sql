@@ -12,8 +12,9 @@ CREATE TABLE IF NOT EXISTS library_documents (
 );
 
 CREATE TABLE IF NOT EXISTS library_derived (
-  user_id TEXT PRIMARY KEY,
-  glyph   TEXT
+  user_id           TEXT PRIMARY KEY,
+  glyph             TEXT,
+  source_updated_at TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS library_match_keys (
@@ -24,6 +25,6 @@ CREATE TABLE IF NOT EXISTS library_match_keys (
   author   TEXT NOT NULL,
   isbn     TEXT,
   cover    TEXT,
-  PRIMARY KEY (user_id, key, book_ref)
+  PRIMARY KEY (user_id, key)
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS idx_library_match_keys_key ON library_match_keys (key, user_id);

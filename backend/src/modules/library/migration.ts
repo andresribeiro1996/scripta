@@ -116,9 +116,10 @@ export function backfillLibraryDerived(): void {
   const db = openLibraryDb();
   try {
     const repo = createSqliteLibraryRepository(db);
-    for (const userId of repo.listUnderivedUserIds()) {
+    repo.deleteOrphanedDerived();
+    for (const userId of repo.listStaleUserIds()) {
       const row = repo.getDocument(userId);
-      if (row) repo.setDerived(userId, deriveStoredDocument(userId, row.data));
+      if (row) repo.setDerived(userId, deriveStoredDocument(userId, row.data), row.updated_at);
     }
   } finally {
     db.close();

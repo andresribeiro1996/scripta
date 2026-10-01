@@ -21,11 +21,10 @@
 //      whatever backend/src/config/env.ts's ACCESS/REFRESH_TOKEN_TTL says.
 //   4. writes the fixture library (scripts/fixtures/library.json) straight
 //      into library_documents — a raw row, not a request, so no service
-//      logic runs — and deletes that user's library_derived and
-//      library_match_keys rows in the same transaction, which the next
-//      boot's backfill recomputes from the new document. Only on first
-//      creation, or with --reset: a plain re-run leaves an existing
-//      account's library alone so testing progress survives.
+//      logic runs; the next boot's backfill sees its new updated_at and
+//      re-derives that user's library_derived and library_match_keys rows.
+//      Only on first creation, or with --reset: a plain re-run leaves an
+//      existing account's library alone so testing progress survives.
 //   5. writes the refresh token into mobile/.env.local as
 //      EXPO_PUBLIC_DEV_REFRESH_TOKEN, which mobile/src/core/devSession.ts
 //      picks up on next boot (dev builds only — see that file's own
@@ -143,16 +142,12 @@ async function main() {
     const fixturePath = join(repoRoot, "scripts", "fixtures", "library.json");
     const fixture = JSON.parse(readFileSync(fixturePath, "utf8"));
     const libraryDb = openLibraryDb();
-    libraryDb.exec("BEGIN IMMEDIATE");
     libraryDb
       .prepare(
         `INSERT INTO library_documents (user_id, data, updated_at) VALUES (?, ?, ?)
          ON CONFLICT(user_id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at`,
       )
       .run(user.id, JSON.stringify(fixture), new Date().toISOString());
-    libraryDb.prepare("DELETE FROM library_derived WHERE user_id = ?").run(user.id);
-    libraryDb.prepare("DELETE FROM library_match_keys WHERE user_id = ?").run(user.id);
-    libraryDb.exec("COMMIT");
     libraryDb.close();
     bookCount = fixture.books.length;
   }

@@ -26,19 +26,20 @@ export function createSqliteLibraryRepository(db: DatabaseSync): LibraryReposito
     INSERT INTO library_match_keys (user_id, key, book_ref, title, author, isbn, cover)
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `);
-  const setGlyphStmt = db.prepare(`
-    INSERT INTO library_derived (user_id, glyph) VALUES (?, ?)
-    ON CONFLICT(user_id) DO UPDATE SET glyph = excluded.glyph
+  const setDerivedStmt = db.prepare(`
+    INSERT INTO library_derived (user_id, glyph, source_updated_at) VALUES (?, ?, ?)
+    ON CONFLICT(user_id) DO UPDATE SET glyph = excluded.glyph, source_updated_at = excluded.source_updated_at
   `);
-  const listUnderivedStmt = db.prepare(`
-    SELECT user_id FROM library_documents
-    WHERE NOT EXISTS (SELECT 1 FROM library_derived WHERE library_derived.user_id = library_documents.user_id)
+  const listStaleStmt = db.prepare(`
+    SELECT library_documents.user_id FROM library_documents
+    LEFT JOIN library_derived ON library_derived.user_id = library_documents.user_id
+    WHERE library_derived.user_id IS NULL OR library_derived.source_updated_at != library_documents.updated_at
   `);
 
-  function writeDerived(userId: string, derived: LibraryDerived) {
+  function writeDerived(userId: string, derived: LibraryDerived, sourceUpdatedAt: string) {
     deleteKeysStmt.run(userId);
     for (const row of derived.keys) insertKeyStmt.run(userId, row.key, row.book_ref, row.title, row.author, row.isbn, row.cover);
-    setGlyphStmt.run(userId, derived.glyph);
+    setDerivedStmt.run(userId, derived.glyph, sourceUpdatedAt);
   }
 
   function inTransaction<T>(write: () => T): T {
@@ -76,17 +77,25 @@ export function createSqliteLibraryRepository(db: DatabaseSync): LibraryReposito
           $expected_updated_at: expectedUpdatedAt ?? null
         });
         if (result.changes === 0) return undefined;
-        writeDerived(userId, derived);
+        writeDerived(userId, derived, updatedAt);
         return getStmt.get(userId) as unknown as LibraryDocumentRow;
       });
     },
 
-    listUnderivedUserIds() {
-      return (listUnderivedStmt.all() as Array<{ user_id: string }>).map((row) => row.user_id);
+    listStaleUserIds() {
+      return (listStaleStmt.all() as Array<{ user_id: string }>).map((row) => row.user_id);
     },
 
-    setDerived(userId, derived) {
-      inTransaction(() => writeDerived(userId, derived));
+    setDerived(userId, derived, sourceUpdatedAt) {
+      inTransaction(() => writeDerived(userId, derived, sourceUpdatedAt));
+    },
+
+    deleteOrphanedDerived() {
+      const orphaned = `NOT EXISTS (SELECT 1 FROM library_documents WHERE library_documents.user_id = library_derived.user_id)`;
+      inTransaction(() => {
+        db.exec(`DELETE FROM library_match_keys WHERE user_id IN (SELECT user_id FROM library_derived WHERE ${orphaned})`);
+        db.exec(`DELETE FROM library_derived WHERE ${orphaned}`);
+      });
     },
 
     setShareToken(userId, token) {
