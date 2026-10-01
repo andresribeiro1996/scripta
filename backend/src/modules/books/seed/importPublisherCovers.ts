@@ -21,6 +21,7 @@ export interface SiteReport {
   fromPage: number;
   pagesNoIsbn: number;
   pagesBlocked: number;
+  pageAmbiguous: number;
   pageTitleMismatch: number;
   coversSet: number;
   created: number;
@@ -49,7 +50,7 @@ export interface ImportDeps {
 
 class SiteSkipped extends Error {}
 
-const emptyReport = (): SiteReport => ({ products: 0, books: 0, fromPage: 0, pagesNoIsbn: 0, pagesBlocked: 0, pageTitleMismatch: 0, coversSet: 0, created: 0, noAuthor: 0, unchanged: 0, rejectedImage: 0, failed: 0 });
+const emptyReport = (): SiteReport => ({ products: 0, books: 0, fromPage: 0, pagesNoIsbn: 0, pagesBlocked: 0, pageAmbiguous: 0, pageTitleMismatch: 0, coversSet: 0, created: 0, noAuthor: 0, unchanged: 0, rejectedImage: 0, failed: 0 });
 
 function sameTitle(known: string, productTitle: string): boolean {
   const [short, long] = [normalizeTitle(known), normalizeTitle(productTitle)].sort((a, b) => a.length - b.length) as [string, string];
@@ -138,8 +139,14 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
     else report.pagesNoIsbn++;
   }
 
+  const pageClaims = new Map<string, number>();
+  for (const book of resolved) if (book.rank === PAGE_RANK) pageClaims.set(book.isbn, (pageClaims.get(book.isbn) ?? 0) + 1);
   const strongest = new Map<string, ResolvedBook>();
   for (const book of resolved) {
+    if (book.rank === PAGE_RANK && pageClaims.get(book.isbn)! > 1) {
+      report.pageAmbiguous++;
+      continue;
+    }
     const kept = strongest.get(book.isbn);
     if (!kept || book.rank < kept.rank) strongest.set(book.isbn, book);
   }
@@ -168,17 +175,9 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
       }
       return memo.looked;
     };
-    if (book.rank === PAGE_RANK) {
-      let known = row?.title ?? "";
-      if (!known) {
-        const result = await lookup();
-        if (!result) continue;
-        known = result.edition?.title ?? "";
-      }
-      if (!sameTitle(known, book.title)) {
-        report.pageTitleMismatch++;
-        continue;
-      }
+    if (book.rank === PAGE_RANK && row?.title && !sameTitle(row.title, book.title)) {
+      report.pageTitleMismatch++;
+      continue;
     }
     if (!row) {
       let { title, author } = book;

@@ -124,6 +124,7 @@ test("an existing book gets the publisher cover as a manual cover and loses its 
     fromPage: 0,
     pagesNoIsbn: 2,
     pagesBlocked: 0,
+    pageAmbiguous: 0,
     pageTitleMismatch: 0,
     imageUrlPrefix: "https://cdn.shopify.com/s/files/1/",
     coversSet: 4,
@@ -643,47 +644,67 @@ test("a page title may add words after the known title, but only after two or mo
   assert.equal((await importPublisherCovers(reverse.deps, [antigona], { dryRun: false }))["Antígona"]!.coversSet, 1);
 });
 
-test("a new book from a page is created when Open Library's edition title matches the product", async () => {
-  const h = await pageHarness({ title: "Moeda Dourada", lookup: async () => ({ title: "Moeda Dourada", author: "Alguem" }) });
+test("a unique page ISBN with no catalog row creates the book and asks Open Library nothing", async () => {
+  const h = await pageHarness();
 
   const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
 
   assert.equal(reports["Antígona"]!.created, 1);
   assert.equal(reports["Antígona"]!.coversSet, 1);
+  assert.equal(reports["Antígona"]!.pageTitleMismatch, 0);
   assert.equal(h.repo.findBookByKey(`isbn:${MUSEU}`)!.cover_status, "manual");
+  assert.deepEqual(h.lookups, []);
 });
 
-test("a new book from a page is skipped when Open Library's edition title differs or is missing", async () => {
-  for (const lookup of [async () => ({ title: "O Museu dos Esforços Inúteis", author: "A" }), async () => ({ title: null, author: "A" }), async () => null]) {
-    const h = await pageHarness({ lookup });
-
-    const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
-
-    assert.equal(reports["Antígona"]!.pageTitleMismatch, 1);
-    assert.equal(reports["Antígona"]!.created, 0);
-    assert.equal(h.bookCount(), 0);
-    assert.deepEqual(h.imageRequests, []);
-  }
-});
-
-test("a page book whose Open Library lookup is unavailable counts as failed", async () => {
-  const h = await pageHarness({ lookup: async () => { throw new SourceUnavailableError("openlibrary", "timeout"); } });
+test("a unique page ISBN on an untitled catalog row sets its cover", async () => {
+  const h = await pageHarness();
+  const book = h.repo.createBook({ title: "", author: "", isbn: MUSEU }, [`isbn:${MUSEU}`], NOW.toISOString());
 
   const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
 
-  assert.equal(reports["Antígona"]!.failed, 1);
   assert.equal(reports["Antígona"]!.pageTitleMismatch, 0);
-  assert.equal(h.bookCount(), 0);
+  assert.equal(reports["Antígona"]!.coversSet, 1);
+  assert.equal(h.repo.getBook(book.id)!.cover_status, "manual");
+  assert.deepEqual(h.lookups, []);
 });
 
-test("a dry run applies the page title check too", async () => {
-  const h = await pageHarness({ lookup: async () => ({ title: "O Museu dos Esforços Inúteis", author: "A" }) });
+test("two products whose pages carry the same ISBN are both dropped", async () => {
+  const feed = shopifyPage([unlabelled("Moeda Dourada", "https://cdn.example/a.jpg"), unlabelled("Moeda Prateada", "https://cdn.example/b.jpg")]);
+  const h = await harness({ feeds: { [FEED_1]: { text: feed }, [pageUrl("Moeda Dourada")]: isbnPage(MUSEU), [pageUrl("Moeda Prateada")]: isbnPage(MUSEU) } });
+  const book = addBook(h.repo, MUSEU, "Moeda Dourada");
 
-  const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: true });
+  const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
 
-  assert.equal(reports["Antígona"]!.pageTitleMismatch, 1);
-  assert.equal(reports["Antígona"]!.created, 0);
+  assert.equal(reports["Antígona"]!.pageAmbiguous, 2);
+  assert.equal(reports["Antígona"]!.books, 0);
+  assert.equal(reports["Antígona"]!.fromPage, 0);
   assert.equal(reports["Antígona"]!.coversSet, 0);
+  assert.equal(h.repo.getBook(book.id)!.cover_image_id, null);
+  assert.deepEqual(h.imageRequests, []);
+  assert.equal(h.bookCount(), 1);
+});
+
+test("a feed ISBN wins over ambiguous page claims for it", async () => {
+  const feed = shopifyPage([unlabelled("Moeda Dourada", "https://cdn.example/a.jpg"), unlabelled("Moeda Prateada", "https://cdn.example/b.jpg"), product(MUSEU, "Feed", "https://cdn.example/feed.jpg")]);
+  const h = await harness({ feeds: { [FEED_1]: { text: feed }, [pageUrl("Moeda Dourada")]: isbnPage(MUSEU), [pageUrl("Moeda Prateada")]: isbnPage(MUSEU) } });
+
+  const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  assert.equal(reports["Antígona"]!.books, 1);
+  assert.equal(reports["Antígona"]!.fromPage, 0);
+  assert.deepEqual(h.imageRequests, ["https://cdn.example/feed.jpg"]);
+});
+
+test("a page book with no author anywhere still gets Open Library's author, title and work key", async () => {
+  const noVendor = { ...unlabelled("Moeda Dourada", "https://cdn.example/p.jpg"), vendor: "" };
+  const h = await harness({ lookup: async () => ({ title: "Moeda Dourada", author: "Alguem", workKey: "/works/OL3W" }), feeds: { [FEED_1]: { text: shopifyPage([noVendor]) }, [pageUrl("Moeda Dourada")]: isbnPage(MUSEU) } });
+
+  await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  const row = h.repo.findBookByKey(`isbn:${MUSEU}`)!;
+  assert.equal(row.author, "Alguem");
+  assert.equal(row.ol_work_key, "OL3W");
+  assert.deepEqual(h.lookups, [MUSEU]);
 });
 
 test("a feed ISBN is not title-checked", async () => {
@@ -714,18 +735,4 @@ test("a work key with no author still lands on the blank row", async () => {
   const row = h.repo.findBookByKey(`isbn:${GUERRA}`)!;
   assert.equal(row.title, "");
   assert.equal(row.ol_work_key, "OL7W");
-});
-
-test("a looked-up work key fills an existing row without one and a dry run writes none", async () => {
-  const lookup = async () => ({ title: "Moeda Dourada", author: "Alguem", workKey: "/works/OL3W" });
-  const dry = await pageHarness({ title: "Moeda Dourada", lookup });
-  const book = dry.repo.createBook({ title: "", author: "", isbn: MUSEU }, [`isbn:${MUSEU}`], NOW.toISOString());
-  await importPublisherCovers(dry.deps, [antigona], { dryRun: true });
-  assert.deepEqual(dry.lookups, [MUSEU]);
-  assert.equal(dry.repo.getBook(book.id)!.ol_work_key, null);
-
-  const h = await pageHarness({ title: "Moeda Dourada", lookup });
-  const existing = h.repo.createBook({ title: "", author: "", isbn: MUSEU }, [`isbn:${MUSEU}`], NOW.toISOString());
-  await importPublisherCovers(h.deps, [antigona], { dryRun: false });
-  assert.equal(h.repo.getBook(existing.id)!.ol_work_key, "OL3W");
 });
