@@ -157,7 +157,9 @@ export function buildApp() {
     }
   });
   app.register(registerGalleryModule);
-  app.register(registerBooksModule);
+  app.register(registerBooksModule, {
+    alert: emailEnabled && env.ALERT_EMAIL ? (subject: string, text: string) => sendAccountEmail(env.ALERT_EMAIL, subject, text) : undefined
+  });
   app.register(registerSocialsModule);
   app.register(registerWaitlistModule, { sendEmail: emailEnabled ? sendAccountEmail : undefined });
   app.register(registerMuralsModule, {

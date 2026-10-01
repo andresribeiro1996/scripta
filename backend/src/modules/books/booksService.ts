@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { looksLikeIsbnQuery, normalizeIsbn, type BookGenre, type BookMetadata, type BookSearchResult } from "@scripta/shared";
 import { findBestCover, type CoverSources, type FetchCoverImage } from "./coverResolver.js";
 import { MIN_GOOD_WIDTH } from "./domain/constants.js";
-import { BookNotFoundError, FileTooLargeError, InvalidImageError } from "./domain/errors.js";
+import { BookNotFoundError, FileTooLargeError, InvalidImageError, SourcePausedError } from "./domain/errors.js";
 import { encodeCover, type EncodedCover } from "./domain/images.js";
 import { findByIdentity, isPortugueseIsbn, lookupIdentity, SEARCH_LIMIT, searchTokens, type BookIdentity, type BookLookup } from "./domain/normalize.js";
 import type { BookCatalog, BooksRepository, CatalogSearchHit, CoverBlobStore, CoverSource } from "./domain/ports.js";
@@ -186,7 +186,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       if (!book || book.cover_status === "manual") return;
       try {
         const outcome = await findBestCover({ isbn: book.isbn, title: book.title, author: book.author }, deps.repo.listRejectedUrls(bookId), sourcesFor(lane), deps.fetchImage);
-        for (const failure of outcome.failures) deps.warn({ bookId, source: failure.source, error: failure.message }, "cover source unavailable");
+        for (const failure of outcome.failures.filter((failure) => !(failure instanceof SourcePausedError))) deps.warn({ bookId, source: failure.source, error: failure.message }, "cover source unavailable");
 
         const latest = deps.repo.getBook(bookId);
         if (!latest || latest.cover_image_id !== book.cover_image_id || latest.cover_status !== book.cover_status) return;
@@ -217,7 +217,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
           }
           return;
         }
-        backoffUntil.set(bookId, now().getTime() + UNAVAILABLE_BACKOFF_MS);
+        backoffUntil.set(bookId, Math.max(now().getTime() + UNAVAILABLE_BACKOFF_MS, ...outcome.failures.map((failure) => failure.retryAt ?? 0)));
         if (imageId !== latest.cover_image_id) deps.repo.setCover(bookId, { imageId, status, checkedAt: latest.cover_checked_at });
       } catch (error) {
         backoffUntil.set(bookId, now().getTime() + UNAVAILABLE_BACKOFF_MS);

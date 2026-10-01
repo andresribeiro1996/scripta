@@ -3,6 +3,7 @@ import { parseArgs } from "node:util";
 import type { CoverSources, FetchCoverImage } from "../src/modules/books/coverResolver.js";
 import { createThrottle, fetchBytes } from "../src/modules/books/adapters/http/http.js";
 import { createAppleSource } from "../src/modules/books/adapters/sources/apple.js";
+import { createIsbndbGate } from "../src/modules/books/adapters/isbndb/isbndbGate.js";
 import { createIsbndbSource } from "../src/modules/books/adapters/sources/isbndb.js";
 import { createOpenLibraryCoverSource } from "../src/modules/books/adapters/sources/openLibrary.js";
 import { encodeCover } from "../src/modules/books/domain/images.js";
@@ -37,7 +38,7 @@ const fetchImage: FetchCoverImage = async (candidate) => {
 };
 const none: CoverSource = { byIsbn: async () => [], byTitle: async () => [] };
 const freeSources: CoverSources = { isbndb: null, apple: createAppleSource(createThrottle(3200)), openlibrary: createOpenLibraryCoverSource(createThrottle(1000)) };
-const isbndbOnly: CoverSources = { isbndb: createIsbndbSource(apiKey, createThrottle(1100)), apple: none, openlibrary: none };
+const isbndbOnly: CoverSources = { isbndb: createIsbndbSource(apiKey, createThrottle(1100), createIsbndbGate({ onPause: () => {} })), apple: none, openlibrary: none };
 
 console.error(`${sample.length} sampled, ${recorded.size} already recorded, ${todo.length} to go`);
 const IN_FLIGHT = 4;

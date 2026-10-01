@@ -6,6 +6,7 @@ import { createObjectStore } from "../../storage/createObjectStore.js";
 import { createCompositeCatalog } from "./adapters/catalog/compositeCatalog.js";
 import { createThrottle, fetchBytes } from "./adapters/http/http.js";
 import { createIsbndbCatalog } from "./adapters/isbndb/isbndbCatalog.js";
+import { createIsbndbGate } from "./adapters/isbndb/isbndbGate.js";
 import { createOpenLibraryCatalog } from "./adapters/openlibrary/openLibraryCatalog.js";
 import { createAppleSource } from "./adapters/sources/apple.js";
 import { createIsbndbSource } from "./adapters/sources/isbndb.js";
@@ -33,7 +34,19 @@ export function enqueueBookCovers(lookups: BookLookup[]) {
   activeService.enqueueCovers(lookups);
 }
 
-export async function booksPlugin(app: FastifyInstance) {
+export interface BooksPluginOptions {
+  alert?: (subject: string, text: string) => Promise<void>;
+}
+
+export async function booksPlugin(app: FastifyInstance, options: BooksPluginOptions = {}) {
+  const isbndbGate = createIsbndbGate({
+    onPause: ({ reason, until }) => {
+      app.log.warn({ reason, until }, "ISBNdb paused");
+      if (reason !== "key") return;
+      options.alert?.("ISBNdb rejected the API key", `ISBNdb answered 401/403, so lookups are paused until ${new Date(until).toISOString()}. Check ISBNDB_API_KEY and the plan.`)
+        .catch((error: unknown) => app.log.error({ err: error }, "ISBNdb key alert failed"));
+    }
+  });
   const repo = createSqliteBooksRepository(openBooksDb());
   const isbndbThrottle = createThrottle(ISBNDB_GAP_MS);
   const openLibraryThrottle = createThrottle(OPEN_LIBRARY_GAP_MS);
@@ -48,13 +61,13 @@ export async function booksPlugin(app: FastifyInstance) {
     repo,
     blobs: { save: (id, extension, bytes) => createObjectStore().put(`covers/${id}.${extension}`, bytes, "image/webp") },
     sources: {
-      isbndb: isbndbConfigured ? createIsbndbSource(env.ISBNDB_API_KEY, isbndbThrottle) : null,
+      isbndb: isbndbConfigured ? createIsbndbSource(env.ISBNDB_API_KEY, isbndbThrottle, isbndbGate) : null,
       apple: createAppleSource(createThrottle(APPLE_GAP_MS)),
       openlibrary: createOpenLibraryCoverSource(openLibraryThrottle)
     },
     catalog: createCompositeCatalog(
       createOpenLibraryCatalog(openLibraryThrottle),
-      isbndbConfigured ? createIsbndbCatalog(env.ISBNDB_API_KEY, isbndbThrottle) : null
+      isbndbConfigured ? createIsbndbCatalog(env.ISBNDB_API_KEY, isbndbThrottle, isbndbGate) : null
     ),
     fetchImage,
     enqueue: (bookId, priority) => worker.enqueue(bookId, priority),

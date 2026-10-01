@@ -20,10 +20,33 @@ async function request(source: string, url: string, headers: Record<string, stri
   return readBody(source, () => fetch(url, { headers: { "User-Agent": USER_AGENT, ...headers }, signal: AbortSignal.timeout(TIMEOUT_MS) }));
 }
 
+function rateLimitField(header: string | null, field: string): number | undefined {
+  const value = header?.match(new RegExp(`${field}=(\\d+)`))?.[1];
+  return value === undefined ? undefined : Number(value);
+}
+
+async function failure(source: string, res: Response): Promise<SourceUnavailableError> {
+  if (res.status !== 429) return new SourceUnavailableError(source, `HTTP ${res.status}`, { status: res.status });
+  const ratelimit = res.headers.get("ratelimit");
+  const retryAfter = Number(res.headers.get("retry-after"));
+  const seconds = retryAfter > 0 ? retryAfter : rateLimitField(ratelimit, "reset");
+  let body = "";
+  try {
+    body = await readBody(source, () => res.text());
+  } catch (error) {
+    if (!(error instanceof SourceUnavailableError)) throw error;
+  }
+  return new SourceUnavailableError(source, `HTTP 429 ${body.slice(0, 200)}`.trim(), {
+    status: 429,
+    retryAt: seconds === undefined ? undefined : Date.now() + seconds * 1000,
+    quota: rateLimitField(ratelimit, "remaining") === 0 ? true : undefined
+  });
+}
+
 export async function fetchJson(source: string, url: string, headers?: Record<string, string>): Promise<unknown> {
   const res = await request(source, url, headers);
   if (res.status === 404) return null;
-  if (!res.ok) throw new SourceUnavailableError(source, `HTTP ${res.status}`);
+  if (!res.ok) throw await failure(source, res);
   try {
     return await readBody(source, () => res.json());
   } catch (error) {
