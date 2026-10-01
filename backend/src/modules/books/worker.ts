@@ -78,8 +78,8 @@ export function createCoverWorker(
       }
       const current = queued.get(bookId);
       if (current) {
-        if (!fast || current === "upgrade") return;
-        if (current !== "background") {
+        if (!fast || (current === "upgrade" && !front)) return;
+        if (current === "front" || current === "normal") {
           if (!front) return;
           queue.splice(queue.indexOf(bookId), 1);
         }

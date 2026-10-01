@@ -328,22 +328,36 @@ test("normal books still use all three slots while an upgrade runs", async () =>
   assert.deepEqual(gate.started.slice(4), ["up2"]);
 });
 
-test("a normal or front request for a book queued as upgrade leaves it there and runs it once", async () => {
+test("a normal request for a book queued as upgrade leaves it there and runs it once", async () => {
+  const gate = gated();
+  const worker = createCoverWorker(gate.processBook, () => {});
+  await holdSlots(worker, gate);
+  worker.enqueue("up1", "upgrade");
+  worker.enqueue("n1");
+  worker.enqueue("up1");
+  gate.release("h1");
+  await tick();
+  assert.deepEqual(gate.started.slice(3), ["n1"]);
+  await drainAll(worker, gate);
+  assert.deepEqual(gate.started.slice(3), ["n1", "up1"]);
+  assert.equal(gate.lanes.get("up1"), "upgrade");
+});
+
+test("a front request for a book queued as upgrade promotes it and it runs once", async () => {
   const gate = gated();
   const worker = createCoverWorker(gate.processBook, () => {});
   await holdSlots(worker, gate);
   worker.enqueue("up1", "upgrade");
   worker.enqueue("up2", "upgrade");
   worker.enqueue("n1");
-  worker.enqueue("up1");
   worker.enqueue("up2", "front");
   gate.release("h1");
   await tick();
-  assert.deepEqual(gate.started.slice(3), ["n1"]);
+  assert.deepEqual(gate.started.slice(3), ["up2"]);
+  assert.equal(gate.lanes.get("up2"), "front");
   await drainAll(worker, gate);
-  assert.deepEqual(gate.started.slice(3), ["n1", "up1", "up2"]);
+  assert.deepEqual(gate.started.slice(3), ["up2", "n1", "up1"]);
   assert.equal(gate.lanes.get("up1"), "upgrade");
-  assert.equal(gate.lanes.get("up2"), "upgrade");
 });
 
 test("upgrade is a no-op for a book already queued fast, queued as background or active", async () => {
