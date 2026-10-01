@@ -10,13 +10,7 @@ import { env } from "../../../../config/env.js";
 
 const adapterDir = dirname(fileURLToPath(import.meta.url));
 
-export function openLibraryDb(): DatabaseSync {
-  mkdirSync(dirname(env.LIBRARY_DB_PATH), { recursive: true });
-
-  const db = new DatabaseSync(env.LIBRARY_DB_PATH);
-  db.exec("PRAGMA journal_mode = WAL");
-  db.exec("PRAGMA busy_timeout = 5000");
-
+export function applyLibrarySchema(db: DatabaseSync): void {
   const schema = readFileSync(`${adapterDir}/schema.sql`, "utf8");
   db.exec(schema);
 
@@ -35,6 +29,15 @@ export function openLibraryDb(): DatabaseSync {
   // among non-null tokens, doesn't choke on every unshared row being NULL.
   db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_library_documents_share_token
            ON library_documents(share_token) WHERE share_token IS NOT NULL`);
+}
+
+export function openLibraryDb(): DatabaseSync {
+  mkdirSync(dirname(env.LIBRARY_DB_PATH), { recursive: true });
+
+  const db = new DatabaseSync(env.LIBRARY_DB_PATH);
+  db.exec("PRAGMA journal_mode = WAL");
+  db.exec("PRAGMA busy_timeout = 5000");
+  applyLibrarySchema(db);
 
   return db;
 }

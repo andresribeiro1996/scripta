@@ -28,6 +28,7 @@
 
 import type { DatabaseSync } from "node:sqlite";
 import { calculateShelfTheme, publicReaderCard, readerIdentity, type Group, type IdentityKey, type PublicReaderCard, type ShelfTheme } from "@scripta/shared";
+import type { SharedBook } from "@scripta/shared/community";
 // Cross-module dependency, same discipline as murals/routes.ts importing
 // this very file only from library/index.ts: peekCachedCoverUrl is
 // covers' own public surface for a synchronous, cache-only cover lookup —
@@ -265,19 +266,38 @@ export function toPublicLibraryData(doc: Record<string, unknown>): Record<string
   };
 }
 
-// Lazily opened, module-scoped — one extra connection (and its one
-// prepared statement, prepared once rather than on every call, matching
+// Lazily opened, module-scoped — one extra connection (and its
+// prepared statements, prepared once rather than on every call, matching
 // the prepared-statement-per-adapter convention every other module's
 // SQLite adapter already follows, e.g.
 // murals/adapters/sqlite/sqliteMuralsRepository.ts) for the lifetime of
 // the process, opened on first actual use rather than at import time —
 // lazy avoids paying for it in any process that imports this module
 // without ever serving a public mural request.
-let cached: { db: DatabaseSync; getDocumentStmt: ReturnType<DatabaseSync["prepare"]> } | null = null;
+type Statement = ReturnType<DatabaseSync["prepare"]>;
+let cached: { db: DatabaseSync; getDocumentStmt: Statement; getGlyphStmt: Statement; sharedCountsStmt: Statement; sharedBooksStmt: Statement } | null = null;
 function getStatements() {
   if (!cached) {
     const db = openLibraryDb();
-    cached = { db, getDocumentStmt: db.prepare(`SELECT data FROM library_documents WHERE user_id = ?`) };
+    cached = {
+      db,
+      getDocumentStmt: db.prepare(`SELECT data FROM library_documents WHERE user_id = ?`),
+      getGlyphStmt: db.prepare(`SELECT glyph FROM library_derived WHERE user_id = ?`),
+      sharedCountsStmt: db.prepare(`
+        SELECT o.user_id AS user_id, COUNT(DISTINCT m.book_ref) AS shared
+        FROM library_match_keys m
+        JOIN library_match_keys o ON o.key = m.key
+        WHERE m.user_id = ? AND +o.user_id IN (SELECT value FROM json_each(?))
+        GROUP BY o.user_id
+      `),
+      sharedBooksStmt: db.prepare(`
+        SELECT DISTINCT m.book_ref, m.title, m.author, m.isbn, m.cover
+        FROM library_match_keys m
+        WHERE m.user_id = ? AND m.key IN (SELECT o.key FROM library_match_keys o WHERE o.user_id = ?)
+        ORDER BY m.book_ref
+        LIMIT ?
+      `)
+    };
   }
   return cached;
 }
@@ -293,6 +313,14 @@ interface ParsedLibraryDocument {
   groupRecords: Record<string, unknown>[];
 }
 
+export function libraryParts(parsed: unknown): ParsedLibraryDocument | null {
+  if (!isRecord(parsed) || !Array.isArray(parsed.books)) return null;
+  return {
+    allBooks: parsed.books.filter(isRecord),
+    groupRecords: Array.isArray(parsed.groups) ? parsed.groups.filter(isRecord) : []
+  };
+}
+
 function parseLibraryDocument(userId: string): ParsedLibraryDocument | null {
   const row = getStatements().getDocumentStmt.get(userId) as { data: string } | undefined;
   if (!row) return null;
@@ -302,25 +330,29 @@ function parseLibraryDocument(userId: string): ParsedLibraryDocument | null {
   } catch {
     return null;
   }
-  if (!isRecord(parsed) || !Array.isArray(parsed.books)) return null;
-  return {
-    allBooks: parsed.books.filter(isRecord),
-    groupRecords: Array.isArray(parsed.groups) ? parsed.groups.filter(isRecord) : []
-  };
+  return libraryParts(parsed);
 }
 
 // Tolerant filtering, same convention as this file's byKey/collection
 // lookups: a malformed group (missing bookKeys, non-string name) is
 // dropped rather than crashing readerIdentity's own iteration over it.
-function toReaderGroups(groupRecords: Record<string, unknown>[]): Group[] {
+export function toReaderGroups(groupRecords: Record<string, unknown>[]): Group[] {
   return groupRecords.filter((group) => Array.isArray(group.bookKeys) && typeof group.name === "string") as unknown as Group[];
 }
 
 export function readerGlyphFor(userId: string): IdentityKey | null {
-  const parsedDoc = parseLibraryDocument(userId);
-  if (!parsedDoc) return null;
-  const identity = readerIdentity(parsedDoc.allBooks, toReaderGroups(parsedDoc.groupRecords));
-  return identity.state === "settled" ? identity.identity : null;
+  const row = getStatements().getGlyphStmt.get(userId) as { glyph: IdentityKey | null } | undefined;
+  return row?.glyph ?? null;
+}
+
+export function sharedBookCounts(viewerId: string, candidateIds: string[]): Map<string, number> {
+  const rows = getStatements().sharedCountsStmt.all(viewerId, JSON.stringify(candidateIds)) as Array<{ user_id: string; shared: number }>;
+  return new Map(rows.map((row) => [row.user_id, row.shared]));
+}
+
+export function sharedBooks(viewerId: string, candidateId: string, limit: number): SharedBook[] {
+  const rows = getStatements().sharedBooksStmt.all(viewerId, candidateId, limit) as Array<{ title: string; author: string; isbn: string | null; cover: string | null }>;
+  return rows.map((row) => ({ title: row.title, author: row.author, coverUrl: row.cover ?? peekCachedCoverUrl({ isbn: row.isbn, title: row.title, author: row.author }) }));
 }
 
 export function resolvePublicLibraryData(userId: string, req: PublicDataRequest): ResolvedPublicData {

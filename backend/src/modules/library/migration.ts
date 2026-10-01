@@ -10,6 +10,9 @@
 // the raw JSON, not a normal document read/write.
 
 import { openLibraryDb } from "./adapters/sqlite/connection.js";
+import { createSqliteLibraryRepository } from "./adapters/sqlite/sqliteLibraryRepository.js";
+import type { LibraryDerived } from "./domain/types.js";
+import { deriveLibraryData } from "./service.js";
 
 /** One embedded mural pulled out of one user's library JSON, still in its
  *  original (frontend `Mural`-shaped, see frontend/src/lib/murals.ts) raw
@@ -91,6 +94,29 @@ export function clearEmbeddedMuralsField(userIds: string[]): void {
 
       delete parsed.murals;
       updateStmt.run(JSON.stringify(parsed), new Date().toISOString(), userId);
+    }
+  } finally {
+    db.close();
+  }
+}
+
+function deriveStoredDocument(userId: string, dataJson: string): LibraryDerived {
+  try {
+    return deriveLibraryData(JSON.parse(dataJson));
+  } catch (error) {
+    if (!(error instanceof SyntaxError || error instanceof TypeError)) throw error;
+    console.error(`library backfill: storing ${userId}'s library without derived data`, error);
+    return { glyph: null, keys: [] };
+  }
+}
+
+export function backfillLibraryDerived(): void {
+  const db = openLibraryDb();
+  try {
+    const repo = createSqliteLibraryRepository(db);
+    for (const userId of repo.listUnderivedUserIds()) {
+      const row = repo.getDocument(userId);
+      if (row) repo.setDerived(userId, deriveStoredDocument(userId, row.data));
     }
   } finally {
     db.close();
