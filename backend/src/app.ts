@@ -184,16 +184,18 @@ export function buildApp() {
     setDashboardSeenAt,
     murals: getMuralsPublicApi(getTierlistsPublicApi().getTierlistData),
     tierlists: {
-      list: getTierlistsPublicApi().listPublished,
+      discoverWindow: getTierlistsPublicApi().discoverWindow,
+      getPublishedMany: getTierlistsPublicApi().getPublishedMany,
+      votedAmong: getTierlistsPublicApi().votedAmong,
       get: getTierlistsPublicApi().getPublished,
-      listByOwner: getTierlistsPublicApi().listPublishedByOwner,
-      listVotedByUser: getTierlistsPublicApi().listVotedByUser
+      listByOwner: getTierlistsPublicApi().listPublishedByOwner
     },
     tournaments: {
-      list: getArenaPublicApi().listPublished,
+      discoverWindow: getArenaPublicApi().discoverWindow,
+      getPublishedMany: getArenaPublicApi().getPublishedMany,
+      votedAmong: getArenaPublicApi().votedAmong,
       get: getArenaPublicApi().getPublished,
-      listByOwner: getArenaPublicApi().listPublishedByOwner,
-      listVotedByUser: getArenaPublicApi().listVotedByUser
+      listByOwner: getArenaPublicApi().listPublishedByOwner
     },
     participation: {
       tierlists: getTierlistsPublicApi().participationByOwner,

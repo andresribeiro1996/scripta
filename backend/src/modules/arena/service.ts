@@ -493,13 +493,11 @@ export interface PublishedTournamentRef {
 }
 
 export interface ArenaPublicApi {
-  listPublished(limit: number, offset: number): PublishedTournamentRef[];
   discoverWindow(needle: string, limit: number): TournamentDiscoverRef[];
   getPublishedMany(ids: string[]): PublishedTournamentRef[];
   votedAmong(voterUserId: string, ids: string[]): string[];
   getPublished(id: string): PublishedTournamentRef | undefined;
   listPublishedByOwner(ownerUserId: string): PublishedTournamentRef[];
-  listVotedByUser(voterUserId: string): PublishedTournamentRef[];
   participationByOwner(ownerUserId: string): GameParticipation[];
 }
 
@@ -517,7 +515,6 @@ function toPublishedRef(summary: TournamentSummary): PublishedTournamentRef {
 
 export function createArenaPublicApi(service: ArenaService): ArenaPublicApi {
   return {
-    listPublished: (limit, offset) => service.listPublic(limit, offset).map(toPublishedRef),
     discoverWindow: (needle, limit) => service.discoverWindow(needle, limit),
     getPublishedMany: (ids) => service.listPublicByIds(ids).map(toPublishedRef),
     votedAmong: (voterUserId, ids) => service.votedAmong(voterUserId, ids),
@@ -527,7 +524,6 @@ export function createArenaPublicApi(service: ArenaService): ArenaPublicApi {
     },
     listPublishedByOwner: (ownerUserId) =>
       service.listMine(ownerUserId).filter((s) => s.status !== "seeding").map(toPublishedRef),
-    listVotedByUser: (voterUserId) => service.listVoted(voterUserId).map(toPublishedRef),
     participationByOwner: (ownerUserId) => service.participationByOwner(ownerUserId)
   };
 }

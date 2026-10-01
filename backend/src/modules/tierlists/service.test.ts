@@ -640,11 +640,10 @@ test("published refs carry origin creator and timestamps", () => {
   const ordinary = service.createTierlist("u1", "Private list");
   const copy = service.openVoting("u1", ordinary.id, "anonymous")!;
 
-  const refs = service.listPublishedRefs(20, 0);
+  const ref = service.getPublishedRef(copy.id);
 
-  assert.deepEqual(refs.map((r) => r.id), [copy.id]);
-  assert.equal(refs[0]?.ownerUserId, "u1");
-  assert.equal(refs[0]?.createdAt, copy.createdAt);
+  assert.equal(ref?.ownerUserId, "u1");
+  assert.equal(ref?.createdAt, copy.createdAt);
   assert.equal(service.getPublishedRef(ordinary.id)?.id, ordinary.id);
   assert.equal(service.getPublishedRef(copy.id)?.name, "Private list");
   assert.deepEqual(service.listPublishedRefsByOwner("u1").map((r) => r.id), [copy.id]);

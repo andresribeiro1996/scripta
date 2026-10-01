@@ -1,12 +1,12 @@
 import { randomUUID } from "node:crypto";
-import type { IdentityKey, ReaderProfile } from "@scripta/shared";
+import { normalizeWords, type IdentityKey, type ReaderProfile } from "@scripta/shared";
 import { categoryFor, contentDetail, decodeCursor, encodeCursor, DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
 import type { ActivityEventType, ActivityItem, CommunityAuthor, CommunityEventType, DiscoverItem, DiscoverType, FeedSettings, FollowState, GameParticipation, OwnProfile, Page, ParticipationGameKind, PersonResult, PublishProfileInput, PublishedContent, PublishedProfile, SharedBook, SuggestedReader, TierlistSummary, TournamentSummary } from "@scripta/shared/community";
 import type { DashboardFeedPage, DigestItem, DigestKind, ParticipationItem } from "@scripta/shared/dashboard";
-import type { PublishedTournamentRef } from "../arena/service.js";
+import type { PublishedTournamentRef, TournamentDiscoverRef } from "../arena/service.js";
 import type { MuralsPublicApi } from "../murals/publicApi.js";
 import type { MuralPublicPayload } from "../murals/index.js";
-import type { PublishedTierlistRef } from "../tierlists/service.js";
+import type { PublishedTierlistRef, TierlistDiscoverRef } from "../tierlists/service.js";
 import { InvalidCursorError, MuralNotOwnedError, NotFollowingError, ProfileNotFoundError, SelfFollowError, UsernameRequiredError } from "./domain/errors.js";
 import type { CommunityRepository, CursorKeyset } from "./domain/ports.js";
 import type { EventRow, FollowRow } from "./domain/types.js";
@@ -59,6 +59,10 @@ function toTournamentSummary(ref: PublishedTournamentRef): TournamentSummary {
   return { kind: "tournament", id: ref.id, name: ref.name, bracketSize: ref.bracketSize, status: ref.status, bookCount: ref.bracketSize, covers: ref.covers.slice(0, FEED_COVER_LIMIT) };
 }
 
+function withVoted(content: PublishedContent, voted: Set<string> | null): PublishedContent {
+  return voted ? { ...content, viewerVoted: voted.has(content.id) } : content;
+}
+
 export interface CommunityDeps {
   repo: CommunityRepository;
   getDashboardSeenAt(userId: string): string | null;
@@ -74,16 +78,18 @@ export interface CommunityDeps {
   searchUsernameOwners(query: string, limit: number): string[];
   murals: Pick<MuralsPublicApi, "ownsMural" | "getMuralPublicPayload">;
   tierlists: {
-    list(limit: number, offset: number): PublishedTierlistRef[];
+    discoverWindow(needle: string, limit: number): TierlistDiscoverRef[];
+    getPublishedMany(ids: string[]): PublishedTierlistRef[];
+    votedAmong(viewerId: string, ids: string[]): string[];
     get(id: string): PublishedTierlistRef | undefined;
     listByOwner(ownerUserId: string): PublishedTierlistRef[];
-    listVotedByUser(voterUserId: string): PublishedTierlistRef[];
   };
   tournaments: {
-    list(limit: number, offset: number): PublishedTournamentRef[];
+    discoverWindow(needle: string, limit: number): TournamentDiscoverRef[];
+    getPublishedMany(ids: string[]): PublishedTournamentRef[];
+    votedAmong(viewerId: string, ids: string[]): string[];
     get(id: string): PublishedTournamentRef | undefined;
     listByOwner(ownerUserId: string): PublishedTournamentRef[];
-    listVotedByUser(voterUserId: string): PublishedTournamentRef[];
   };
   participation: {
     tierlists(userId: string): GameParticipation[];
@@ -379,35 +385,37 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
       deps.setDashboardSeenAt(viewerId, new Date().toISOString());
     },
     getDiscover(type, q, limit, offset, viewerId) {
-      const needle = q.trim().toLowerCase();
+      const needle = normalizeWords(q);
       const window = needle ? DISCOVER_SCAN_CAP : Math.min(offset + limit + 1, DISCOVER_SCAN_CAP);
-      const entries: Array<{ userId: string; content: PublishedContent; createdAt: string }> = [];
+      const entries: Array<{ kind: "tierlist" | "tournament"; id: string; userId: string; createdAt: string; promoted: boolean }> = [];
       if (type !== "tournament") {
-        const voted = viewerId ? new Set(deps.tierlists.listVotedByUser(viewerId).map((ref) => ref.id)) : null;
-        for (const ref of deps.tierlists.list(window, 0)) {
-          const content = voted ? { ...toTierlistSummary(ref), viewerVoted: voted.has(ref.id) } : toTierlistSummary(ref);
-          entries.push({ userId: ref.ownerUserId, content, createdAt: ref.createdAt });
-        }
+        for (const ref of deps.tierlists.discoverWindow(needle, window)) entries.push({ kind: "tierlist", id: ref.id, userId: ref.ownerUserId, createdAt: ref.createdAt, promoted: ref.promotedAt !== null });
       }
       if (type !== "tierlist") {
-        const voted = viewerId ? new Set(deps.tournaments.listVotedByUser(viewerId).map((ref) => ref.id)) : null;
-        for (const ref of deps.tournaments.list(window, 0)) {
-          const content = voted ? { ...toTournamentSummary(ref), viewerVoted: voted.has(ref.id) } : toTournamentSummary(ref);
-          entries.push({ userId: ref.ownerUserId, content, createdAt: ref.createdAt });
-        }
+        for (const ref of deps.tournaments.discoverWindow(needle, window)) entries.push({ kind: "tournament", id: ref.id, userId: ref.ownerUserId, createdAt: ref.createdAt, promoted: false });
       }
       const authors = deps.resolveProfiles([...new Set(entries.map((e) => e.userId))]);
-      const glyphOf = glyphLookup();
       const visible = entries
         .flatMap((entry) => {
-          const author = authors.get(entry.userId) ?? (entry.content.kind === "tierlist" && entry.content.promotedAt ? { username: "Original creator unavailable", avatarUrl: null, unavailable: true } : undefined);
-          if (!author) return [];
-          if (needle && !entry.content.name.toLowerCase().includes(needle)) return [];
-          return [{ userId: entry.userId, author, content: entry.content, createdAt: entry.createdAt }];
+          const author = authors.get(entry.userId) ?? (entry.promoted ? { username: "Original creator unavailable", avatarUrl: null, unavailable: true } : undefined);
+          return author ? [{ ...entry, author }] : [];
         })
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      const page = visible.slice(offset, offset + limit);
+      const tierlistIds = page.filter((entry) => entry.kind === "tierlist").map((entry) => entry.id);
+      const tournamentIds = page.filter((entry) => entry.kind === "tournament").map((entry) => entry.id);
+      const votedTierlists = viewerId ? new Set(deps.tierlists.votedAmong(viewerId, tierlistIds)) : null;
+      const votedTournaments = viewerId ? new Set(deps.tournaments.votedAmong(viewerId, tournamentIds)) : null;
+      const contents = new Map<string, PublishedContent>([
+        ...deps.tierlists.getPublishedMany(tierlistIds).map((ref) => [`tierlist:${ref.id}`, withVoted(toTierlistSummary(ref), votedTierlists)] as const),
+        ...deps.tournaments.getPublishedMany(tournamentIds).map((ref) => [`tournament:${ref.id}`, withVoted(toTournamentSummary(ref), votedTournaments)] as const)
+      ]);
+      const glyphOf = glyphLookup();
       return {
-        items: visible.slice(offset, offset + limit).map(({ userId, author, content }) => ({ author: withGlyph(author, userId, glyphOf), content })),
+        items: page.flatMap((entry) => {
+          const content = contents.get(`${entry.kind}:${entry.id}`);
+          return content ? [{ author: withGlyph(entry.author, entry.userId, glyphOf), content }] : [];
+        }),
         nextOffset: offset + limit < visible.length ? offset + limit : null
       };
     },
