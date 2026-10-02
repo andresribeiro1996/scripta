@@ -34,7 +34,7 @@ interface WorkRow {
   created_at: string;
 }
 
-const countOf = (db: DatabaseSync, table: string) => (db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n;
+const countOf = (db: DatabaseSync, table: string, where = "1") => (db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE ${where}`).get() as { n: number }).n;
 const workById = (db: DatabaseSync, id: string | null) => db.prepare("SELECT * FROM works WHERE id = ?").get(id) as unknown as WorkRow;
 const workOf = (db: DatabaseSync, bookId: string) => db.prepare("SELECT works.* FROM books JOIN works ON works.id = books.work_id WHERE books.id = ?").get(bookId) as unknown as WorkRow;
 
@@ -628,6 +628,54 @@ test("createBook holds the write lock from its first read, so another connection
   assert.match(refused, /database is locked/);
   insertOther();
   assert.equal(countOf(mine, "books"), 2);
+});
+
+test("assignMissingWorks gives editions without a work their works, grouping the keyed ones across batches", () => {
+  const { db, repo } = freshRepo();
+  const create = (title: string, author: string, isbn: string, workKey?: string) => repo.createBook({ title, author, isbn, workKey }, [`isbn:${isbn}`], NOW);
+  const kept = create("Dune", "Frank Herbert", "9780441013593", "OL1W");
+  const duna = create("Duna", "Frank Herbert", "9789722046114", "OL1W");
+  const emma = create("Emma", "Jane Austen", "9780141439587", "OL2W");
+  const emmaToo = create("Emma", "Jane Austen", "9780141439588", "OL2W");
+  const orlando = create("Orlando", "Virginia Woolf", "9780141184272");
+  const orlandoToo = create("Orlando", "Virginia Woolf", "9780374520731");
+  const blankKeyed = create("", "", "9780062315007", "OL3W");
+  const kim = create("Kim", "Rudyard Kipling", "9780141324906", "OL3W");
+  const blank = create("", "", "9780140449136");
+  db.prepare("UPDATE books SET work_id = NULL WHERE id != ?").run(kept.id);
+  db.exec("DELETE FROM works WHERE id NOT IN (SELECT work_id FROM books WHERE work_id IS NOT NULL)");
+
+  const batches = [repo.assignMissingWorks(3), repo.assignMissingWorks(3), repo.assignMissingWorks(3), repo.assignMissingWorks(3)];
+
+  assert.deepEqual(batches, [3, 3, 2, 0]);
+  assert.equal(countOf(db, "books", "work_id IS NULL"), 0);
+  const workIdOf = (book: { id: string }) => repo.getBook(book.id)!.work_id;
+  assert.equal(workIdOf(kept), kept.work_id);
+  assert.equal(workIdOf(duna), kept.work_id);
+  assert.equal(workIdOf(emmaToo), workIdOf(emma));
+  assert.notEqual(workIdOf(orlandoToo), workIdOf(orlando));
+  assert.equal(workIdOf(kim), workIdOf(blankKeyed));
+  assert.deepEqual([workOf(db, kim.id).title, workOf(db, kim.id).author], ["Kim", "Rudyard Kipling"]);
+  assert.deepEqual([workOf(db, blank.id).title, workOf(db, orlando.id).ol_work_key], ["", null]);
+  assert.equal(countOf(db, "works"), 6);
+  assert.equal(countOf(db, "books b JOIN works w ON w.id = b.work_id", "b.ol_work_key IS NOT w.ol_work_key"), 0);
+  assert.equal(countOf(db, "works", "merged_into IS NOT NULL"), 0);
+});
+
+test("a failed assignMissingWorks batch assigns nothing, and the next one picks the same editions up", () => {
+  const { db, repo } = freshRepo();
+  repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593", workKey: "OL1W" }, ["isbn:9780441013593"], NOW);
+  repo.createBook({ title: "Kim", author: "Rudyard Kipling", isbn: "9780141324906" }, ["isbn:9780141324906"], NOW);
+  db.exec("UPDATE books SET work_id = NULL; DELETE FROM works");
+  db.exec("CREATE TRIGGER refuse_kim BEFORE INSERT ON works WHEN NEW.title = 'Kim' BEGIN SELECT RAISE(ABORT, 'refused'); END");
+
+  assert.throws(() => repo.assignMissingWorks(250), /refused/);
+  assert.equal(countOf(db, "works"), 0);
+  assert.equal(countOf(db, "books", "work_id IS NULL"), 2);
+
+  db.exec("DROP TRIGGER refuse_kim");
+  assert.equal(repo.assignMissingWorks(250), 2);
+  assert.equal(countOf(db, "books", "work_id IS NULL"), 0);
 });
 
 test("insertImage stores the origin and createBook stores its creator", () => {

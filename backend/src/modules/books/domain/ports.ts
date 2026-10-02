@@ -29,6 +29,7 @@ export interface BooksRepository {
   listUncheckedDetailIds(limit: number): string[];
   setUpgradeWanted(bookId: string, at: string | null): void;
   setWorkKey(id: string, key: string | null | undefined): void;
+  assignMissingWorks(limit: number): number;
   setPublisherUrl(id: string, url: string): void;
   listUpgradeWantedIds(): string[];
 }

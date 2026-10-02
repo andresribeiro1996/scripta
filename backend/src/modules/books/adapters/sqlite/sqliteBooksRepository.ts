@@ -24,6 +24,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     UPDATE works SET ol_work_key = ?
     WHERE id = ? AND ol_work_key IS NULL AND NOT EXISTS (SELECT 1 FROM books WHERE work_id = works.id AND id != ?)
   `);
+  const unassignedStmt = db.prepare(`SELECT id, ol_work_key, title, author, created_at FROM books WHERE work_id IS NULL LIMIT ?`);
   const moveBookStmt = db.prepare(`UPDATE books SET work_id = ? WHERE id = ?`);
   const mergeEmptyWorkStmt = db.prepare(`UPDATE works SET merged_into = ? WHERE id = ? AND NOT EXISTS (SELECT 1 FROM books WHERE work_id = works.id)`);
   const makeSearchableStmt = db.prepare(`
@@ -236,6 +237,19 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         moveBookStmt.run(target, id);
         if (book.work_id) mergeEmptyWorkStmt.run(target, book.work_id);
         fillWorkIdentityStmt.run(id);
+      });
+    },
+
+    assignMissingWorks(limit) {
+      return inTransaction(() => {
+        const rows = unassignedStmt.all(limit) as unknown as Array<{ id: string; ol_work_key: string | null; title: string; author: string; created_at: string }>;
+        for (const row of rows) {
+          const held = row.ol_work_key ? (workByKeyStmt.get(row.ol_work_key) as { id: string } | undefined) : undefined;
+          const workId = held?.id ?? insertWork(row.ol_work_key, row.title, row.author, row.created_at);
+          moveBookStmt.run(workId, row.id);
+          if (held) fillWorkIdentityStmt.run(row.id);
+        }
+        return rows.length;
       });
     },
 
