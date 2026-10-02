@@ -17,7 +17,7 @@ const { createAuthService } = await import("./service.js");
 const { createAccountSecurity } = await import("./accountSecurity.js");
 const { getAuthenticatedUserFromAccessToken, hashRefreshToken } = await import("./tokens.js");
 const { buildAuthRoutes } = await import("./routes.js");
-const { authGuard, getOptionalAuthenticatedUser } = await import("./guard.js");
+const { authGuard, getOptionalAuthenticatedUser, rateLimitKey } = await import("./guard.js");
 
 function setup(enabled = true) {
   const db = new DatabaseSync(":memory:");
@@ -63,6 +63,26 @@ test("reset revokes required and optional access, refresh rotation grace, and re
     assert.equal((await app.inject({ url: "/private", headers: { authorization: `Bearer ${fresh.tokens.accessToken}` } })).statusCode, 200);
     await app.close();
   } finally { db.close(); }
+});
+
+test("rateLimitKey is the account for a valid token and the normalized address for a missing or invalid one", async () => {
+  const { db, repo, auth } = setup();
+  const app = Fastify();
+  try {
+    const session = await auth.signup("reader@example.com", "reader", "a password");
+    app.decorate("authenticateAccessToken", (value: string) => getAuthenticatedUserFromAccessToken(value, repo.findUserById));
+    app.get("/key", async (request) => ({ key: rateLimitKey(request) }));
+    const keyFor = async (headers: Record<string, string>, remoteAddress = "203.0.113.7") => (await app.inject({ url: "/key", headers, remoteAddress })).json().key;
+    assert.equal(await keyFor({ authorization: `Bearer ${session.tokens.accessToken}` }), `user:${session.user.id}`);
+    assert.equal(await keyFor({}), "203.0.113.7");
+    assert.equal(await keyFor({ authorization: "Bearer not-a-token" }), "203.0.113.7");
+    assert.equal(await keyFor({}, "::ffff:203.0.113.7"), "203.0.113.7");
+    assert.equal(await keyFor({}, "2001:db8:0:1::5"), await keyFor({}, "2001:db8:0:1:ffff::9"));
+    assert.notEqual(await keyFor({}, "2001:db8:0:1::5"), await keyFor({}, "2001:db8:0:2::5"));
+  } finally {
+    await app.close();
+    db.close();
+  }
 });
 
 test("expired, replaced and concurrently consumed reset tokens cannot change the password", async () => {

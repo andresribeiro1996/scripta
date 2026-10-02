@@ -1,7 +1,7 @@
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { authGuard, getOptionalAuthenticatedUser } from "../auth/index.js";
+import { authGuard, getOptionalAuthenticatedUser, rateLimitKey } from "../auth/index.js";
 import { CommunityError, InvalidCursorError, ProfileNotFoundError } from "./domain/errors.js";
 import type { CommunityService } from "./service.js";
 
@@ -104,15 +104,18 @@ export function buildCommunityRoutes(service: CommunityService) {
       return reply.code(204).send();
     });
 
-    app.get("/community/dashboard", { preHandler: authGuard }, async (request, reply) => {
-      const parsed = dashboardQuerySchema.safeParse(request.query);
-      if (!parsed.success) return reply.code(400).send({ error: "Invalid cursor/limit/kinds." });
-      try {
-        return reply.send(service.getDashboard(request.user.id, parsed.data.cursor, parsed.data.limit, parsed.data.kinds ? new Set(parsed.data.kinds.split(",")) : undefined));
-      } catch (err) {
-        if (err instanceof CommunityError) return reply.code(statusForCommunityError(err)).send({ error: err.message });
-        throw err;
-      }
+    await app.register(async (scoped) => {
+      await scoped.register(fastifyRateLimit, { max: 60, timeWindow: "1 minute", keyGenerator: rateLimitKey });
+      scoped.get("/community/dashboard", { preHandler: authGuard }, async (request, reply) => {
+        const parsed = dashboardQuerySchema.safeParse(request.query);
+        if (!parsed.success) return reply.code(400).send({ error: "Invalid cursor/limit/kinds." });
+        try {
+          return reply.send(service.getDashboard(request.user.id, parsed.data.cursor, parsed.data.limit, parsed.data.kinds ? new Set(parsed.data.kinds.split(",")) : undefined));
+        } catch (err) {
+          if (err instanceof CommunityError) return reply.code(statusForCommunityError(err)).send({ error: err.message });
+          throw err;
+        }
+      });
     });
 
     app.post("/community/dashboard/seen", { preHandler: authGuard }, async (request, reply) => {
@@ -120,10 +123,13 @@ export function buildCommunityRoutes(service: CommunityService) {
       return reply.code(204).send();
     });
 
-    app.get("/community/people", { preHandler: authGuard }, async (request, reply) => {
-      const parsed = peopleQuerySchema.safeParse(request.query);
-      if (!parsed.success) return reply.code(400).send({ error: "Expected ?q= and optional ?limit=." });
-      return reply.send({ people: service.searchPeople(request.user.id, parsed.data.q, parsed.data.limit) });
+    await app.register(async (scoped) => {
+      await scoped.register(fastifyRateLimit, { max: 60, timeWindow: "1 minute", keyGenerator: rateLimitKey });
+      scoped.get("/community/people", { preHandler: authGuard }, async (request, reply) => {
+        const parsed = peopleQuerySchema.safeParse(request.query);
+        if (!parsed.success) return reply.code(400).send({ error: "Expected ?q= and optional ?limit=." });
+        return reply.send({ people: service.searchPeople(request.user.id, parsed.data.q, parsed.data.limit) });
+      });
     });
 
     await app.register(async (scoped) => {

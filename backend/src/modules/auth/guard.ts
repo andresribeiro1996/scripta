@@ -5,6 +5,7 @@
 //   import { authGuard } from "../../modules/auth/index.js";
 //   app.get("/my-library", { preHandler: authGuard }, handler);
 
+import { normalizeIP } from "@fastify/rate-limit";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type { AuthenticatedUser } from "./domain/types.js";
 
@@ -46,4 +47,9 @@ export function getOptionalAuthenticatedUser(request: FastifyRequest): Authentic
   const token = header?.startsWith("Bearer ") ? header.slice("Bearer ".length) : null;
   if (!token) return null;
   return request.server.authenticateAccessToken?.(token) ?? null;
+}
+
+export function rateLimitKey(request: FastifyRequest): string {
+  const user = getOptionalAuthenticatedUser(request);
+  return user ? `user:${user.id}` : normalizeIP(request.ip);
 }

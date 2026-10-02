@@ -15,6 +15,7 @@ import { STATUS_CODES } from "node:http";
 import { isAllowedOrigin } from "./config/corsOrigin.js";
 import { env } from "./config/env.js";
 import { devHttps } from "./config/devCerts.js";
+import { TRUSTED_PROXIES } from "./config/trustedProxies.js";
 import { assertObjectKey } from "./storage/objectStore.js";
 import { createObjectStore } from "./storage/createObjectStore.js";
 import { IMMUTABLE_CACHE_CONTROL } from "./storage/r2ObjectStore.js";
@@ -64,8 +65,8 @@ export function buildApp() {
   // only APIs that would actually differ between an http.Server and an
   // https.Server), so nothing downstream needs the more specific type.
   const app: FastifyInstance = devHttps
-    ? (Fastify({ logger: true, https: devHttps, trustProxy: true }) as FastifyInstance)
-    : Fastify({ logger: true, trustProxy: true });
+    ? (Fastify({ logger: true, https: devHttps, trustProxy: TRUSTED_PROXIES }) as FastifyInstance)
+    : Fastify({ logger: true, trustProxy: TRUSTED_PROXIES });
 
   registerStallLog(app);
 
