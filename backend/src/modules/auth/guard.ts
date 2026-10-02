@@ -51,5 +51,5 @@ export function getOptionalAuthenticatedUser(request: FastifyRequest): Authentic
 
 export function rateLimitKey(request: FastifyRequest): string {
   const user = getOptionalAuthenticatedUser(request);
-  return user ? `user:${user.id}` : normalizeIP(request.ip);
+  return user ? `user:${user.id}` : `ip:${normalizeIP(request.ip)}`;
 }
