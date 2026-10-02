@@ -2,7 +2,7 @@ import { useState } from "react";
 import { router, useGlobalSearchParams, usePathname } from "expo-router";
 import { StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
-import { localDay } from "@scripta/shared";
+import { localDay, saveFailureMessage } from "@scripta/shared";
 import { useAuth } from "../../core/auth";
 import { Button, Sheet, Toast, dynamicType, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "../arena/BookCover";
@@ -48,8 +48,8 @@ export function AddBookSheet({
       const { updated } = await addBookToLibrary({ ...toRecommendation(book, readStatus), day: localDay() });
       setToast({ message: updated ? "Updated in your library." : "Added to your library.", tone: "success" });
       setTimeout(onClose, 1600);
-    } catch {
-      setToast({ message: "Could not add the book.", tone: "error" });
+    } catch (error) {
+      setToast({ message: saveFailureMessage(error, "Could not add the book."), tone: "error" });
     } finally {
       setBusyStatus(null);
     }
