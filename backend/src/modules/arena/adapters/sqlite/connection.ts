@@ -67,7 +67,7 @@ export function applyArenaMigrations(db: DatabaseSync): void {
 function fillNameKeys(db: DatabaseSync): void {
   const stale = db.prepare(`SELECT id, name FROM tournaments WHERE name_key IS NULL`).all() as { id: string; name: string }[];
   if (stale.length === 0) return;
-  const update = db.prepare(`UPDATE tournaments SET name_key = ? WHERE id = ?`);
+  const update = db.prepare(`UPDATE tournaments SET name_key = ? WHERE id = ? AND name_key IS NULL`);
   db.exec("BEGIN IMMEDIATE");
   try {
     for (const row of stale) update.run(normalizeWords(row.name), row.id);
