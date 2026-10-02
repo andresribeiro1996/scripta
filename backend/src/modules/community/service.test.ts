@@ -10,7 +10,7 @@ import type { PublishedTournamentRef } from "../arena/service.js";
 import type { MuralPublicPayload } from "../murals/index.js";
 import type { CommunityRepository, CursorKeyset } from "./domain/ports.js";
 import type { EventRow, FollowRow, ProfileRow } from "./domain/types.js";
-import { InvalidCursorError, MuralNotOwnedError, NotFollowingError, ProfileNotFoundError, SelfFollowError, UsernameRequiredError } from "./domain/errors.js";
+import { FollowLimitError, InvalidCursorError, MuralNotOwnedError, NotFollowingError, ProfileNotFoundError, SelfFollowError, UsernameRequiredError } from "./domain/errors.js";
 import { registerTrace } from "../../trace.js";
 import { createCommunityPublicApi, createCommunityService, type CommunityDeps, type CommunityPublicApi, type CommunityService } from "./service.js";
 
@@ -143,6 +143,7 @@ function createDeps(repo: CommunityRepository) {
   const votedAmongCalls: Array<{ kind: "tierlist" | "tournament"; viewerId: string; ids: string[] }> = [];
   const deps: CommunityDeps = {
     repo,
+    now: () => NOW,
     getDashboardSeenAt: () => seenAt.value,
     setDashboardSeenAt: (_userId, value) => {
       seenAt.value = value;
@@ -249,6 +250,8 @@ function reader(userId: string): ReaderProfile {
 }
 
 const at = (day: number) => `2026-09-${String(day).padStart(2, "0")}T00:00:00.000Z`;
+
+const NOW = Date.parse("2026-09-30T00:00:00.000Z");
 
 const ALL_KINDS: ReadonlySet<string> = new Set(["publication", "vote", "reading", "follow", "participation"]);
 
@@ -373,6 +376,44 @@ test("follow state reports direction-specific counts", () => {
   service.follow("alice", "dave");
   assert.deepEqual(service.getFollowState("bob", "alice"), { following: true, followerCount: 2, followingCount: 1 });
   assert.deepEqual(service.getFollowState("dave", "alice"), { following: false, followerCount: 2, followingCount: 1 });
+});
+
+test("a reader can follow up to 1,000 accounts, and the next one is refused and not added", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles } = createDeps(repo);
+  const service = createCommunityService(deps);
+  for (const id of ["r0", "r1", "one-more"]) {
+    readerProfiles.set(id, reader(id));
+    repo.upsertProfile(profileRow(id));
+  }
+  for (let i = 0; i < 1000; i++) repo.insertFollow({ follower_id: "viewer", followee_id: `r${i}`, created_at: at(1) });
+
+  assert.throws(() => service.follow("viewer", "one-more"), (error) => error instanceof FollowLimitError && error.message === "You can follow up to 1,000 readers.");
+  assert.equal(repo.getFollow("viewer", "one-more"), undefined);
+  assert.equal(repo.countFollowing("viewer"), 1000);
+
+  service.follow("viewer", "r0");
+  assert.equal(repo.countFollowing("viewer"), 1000);
+
+  service.unfollow("viewer", "r1");
+  service.follow("viewer", "one-more");
+  assert.notEqual(repo.getFollow("viewer", "one-more"), undefined);
+  assert.equal(repo.countFollowing("viewer"), 1000);
+  assert.equal(repo.countFollowing("someone-else"), 0);
+  service.follow("someone-else", "r0");
+  assert.equal(repo.countFollowing("someone-else"), 1);
+});
+
+test("a reader at the limit still hears that an unknown or private reader can't be followed", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("hidden", reader("hidden"));
+  repo.upsertProfile(profileRow("hidden", { published: 0 }));
+  for (let i = 0; i < 1000; i++) repo.insertFollow({ follower_id: "viewer", followee_id: `r${i}`, created_at: at(1) });
+
+  assert.throws(() => service.follow("viewer", "ghost"), ProfileNotFoundError);
+  assert.throws(() => service.follow("viewer", "hidden"), ProfileNotFoundError);
 });
 
 test("emitEvent is idempotent per (ref_type, ref_id)", () => {
@@ -1026,7 +1067,7 @@ test("a run of unrenderable rows longer than a page's refills doesn't strand wha
   assert.deepEqual(pageThrough(service, 2), ["x1", "x2"]);
 });
 
-test("a page gives up refilling after five fetches and hands back a cursor", () => {
+test("a page gives up refilling after three fetches and hands back a cursor", () => {
   const { repo } = createRepoFake();
   const { deps, readerProfiles } = createDeps(repo);
   const service = createCommunityService(deps);
@@ -1037,16 +1078,16 @@ test("a page gives up refilling after five fetches and hands back a cursor", () 
     const n = String(i).padStart(2, "0");
     repo.insertEvent({ id: `d${n}`, user_id: "alice", type: "voted_on", ref_type: "tierlist", ref_id: `t-d${n}`, payload: null, created_at: `2026-09-10T00:00:${n}.000Z` });
   }
-  const listEventsByUser = repo.listEventsByUser;
+  const listInbox = repo.listInbox;
   let fetches = 0;
-  repo.listEventsByUser = (...args) => {
+  repo.listInbox = (...args) => {
     fetches++;
-    return listEventsByUser(...args);
+    return listInbox(...args);
   };
   const page = service.getDashboard("viewer", encodeCursor({ createdAt: at(11), id: "z" }), 2);
   assert.deepEqual(page.items, []);
   assert.ok(page.nextCursor);
-  assert.equal(fetches, 5);
+  assert.equal(fetches, 3);
 });
 
 test("a page that finds too few rows in its first fetch tops up from the next", () => {
@@ -1214,6 +1255,67 @@ test("kind names this server doesn't know are ignored", () => {
   assert.deepEqual(page.items.map((item) => item.kind), ["publication"]);
   assert.equal(page.personalNewCount, 0);
   assert.equal(page.followingNewCount, 1);
+});
+
+test("a viewer following 1,000 silent accounts gets an empty page from one inbox read, not one read per account", () => {
+  const { repo } = createRepoFake();
+  const { deps } = createDeps(repo);
+  const service = createCommunityService(deps);
+  for (let i = 0; i < 1000; i++) repo.insertFollow({ follower_id: "viewer", followee_id: `silent${i}`, created_at: at(1) });
+  const reads = { inbox: 0, perAccount: 0 };
+  const listInbox = repo.listInbox;
+  repo.listInbox = (...args) => {
+    reads.inbox++;
+    return listInbox(...args);
+  };
+  repo.listEventsByUser = () => {
+    reads.perAccount++;
+    return [];
+  };
+  repo.listEventsByUserSince = () => {
+    reads.perAccount++;
+    return [];
+  };
+
+  assert.deepEqual(service.getDashboard("viewer", undefined, 20, ALL_KINDS), { items: [], nextCursor: null, seenAt: null, personalNewCount: 0, followingNewCount: 0, newCount: 0 });
+  assert.deepEqual(reads, { inbox: 1, perAccount: 0 });
+});
+
+test("participation is asked for only the last 30 days, and only when the client lists it", () => {
+  const { repo } = createRepoFake();
+  const { deps } = createDeps(repo);
+  const asked: string[][] = [];
+  for (const source of ["tierlists", "tournaments", "quizzes"] as const) {
+    const original = deps.participation[source];
+    deps.participation[source] = (userId, since) => {
+      asked.push([source, userId, since]);
+      return original(userId, since);
+    };
+  }
+  const service = createCommunityService(deps);
+
+  service.getDashboard("viewer", undefined, 20, ALL_KINDS);
+  assert.deepEqual(asked, ["tierlists", "tournaments", "quizzes"].map((source) => [source, "viewer", "2026-08-31T00:00:00.000Z"]));
+
+  asked.length = 0;
+  service.getDashboard("viewer", undefined, 20);
+  assert.deepEqual(asked, []);
+});
+
+test("followers from before the last 30 days are neither listed nor counted", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, seenAt } = createDeps(repo);
+  const service = createCommunityService(deps);
+  seenAt.value = "2026-08-01T00:00:00.000Z";
+  for (const [id, createdAt] of [["fan-old", "2026-08-30T23:59:59.999Z"], ["fan-edge", "2026-08-31T00:00:00.000Z"], ["fan-new", "2026-09-20T00:00:00.000Z"]] as const) {
+    readerProfiles.set(id, reader(id));
+    repo.insertFollow({ follower_id: id, followee_id: "viewer", created_at: createdAt });
+  }
+
+  assert.deepEqual(pageThrough(service, 1), ["fan-new", "fan-edge"]);
+  assert.equal(service.getDashboard("viewer", undefined, 20).personalNewCount, 2);
+  seenAt.value = null;
+  assert.equal(service.getDashboard("viewer", undefined, 20).personalNewCount, 2);
 });
 
 test("discover merges both content kinds newest first", () => {

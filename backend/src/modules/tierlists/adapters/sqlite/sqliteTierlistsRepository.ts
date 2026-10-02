@@ -101,6 +101,7 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
     WHERE t.origin_user_id = ? AND t.vote_code IS NOT NULL AND t.promoted_at IS NULL
       AND (b.voter_user_id IS NULL OR b.voter_user_id != t.origin_user_id)
     GROUP BY t.id
+    HAVING MAX(b.created_at) >= ?
   `);
   const recentVotersStmt = db.prepare(`
     SELECT voter_user_id AS user_id, created_at AS at FROM tierlist_ballots
@@ -323,8 +324,8 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
       return new Map(rows.map((r) => [r.tierlist_id, Number(r.n)]));
     },
 
-    listParticipation(ownerUserId) {
-      const rows = participationStmt.all(ownerUserId) as unknown as { id: string; name: string; public_books: string | null; participants: number; latest_at: string }[];
+    listParticipation(ownerUserId, since) {
+      const rows = participationStmt.all(ownerUserId, since) as unknown as { id: string; name: string; public_books: string | null; participants: number; latest_at: string }[];
       return rows.map((r) => ({ ...r, participants: Number(r.participants) }));
     },
 

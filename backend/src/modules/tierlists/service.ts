@@ -109,7 +109,7 @@ export interface TierlistsService {
    *  own polls excluded (openVoting seeds the owner's ballot, which is
    *  not participation). Feeds the "Voted on" section of the games list. */
   listVotedByUser(voterUserId: string): PublishedTierlistRef[];
-  participationByOwner(ownerUserId: string): GameParticipation[];
+  participationByOwner(ownerUserId: string, since: string): GameParticipation[];
 }
 
 /** Where a new tier list starts — the familiar S–D ladder, matching the
@@ -417,8 +417,8 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
       return repo.listVotedByUser(voterUserId).map((row) => ({ ...toPublishedRef(row, counts.get(row.id) ?? 0), eligibleVoteCount: repo.eligibleVoteCount(row.id, row.origin_user_id) }));
     },
 
-    participationByOwner(ownerUserId) {
-      return repo.listParticipation(ownerUserId).map((row) => ({
+    participationByOwner(ownerUserId, since) {
+      return repo.listParticipation(ownerUserId, since).map((row) => ({
         id: row.id,
         name: row.name,
         covers: publishedCovers(row.public_books),
@@ -454,7 +454,7 @@ export interface TierlistsPublicApi {
   votedAmong(voterUserId: string, ids: string[]): string[];
   getPublished(id: string): PublishedTierlistRef | undefined;
   listPublishedByOwner(ownerUserId: string): PublishedTierlistRef[];
-  participationByOwner(ownerUserId: string): GameParticipation[];
+  participationByOwner(ownerUserId: string, since: string): GameParticipation[];
 }
 
 /** Factory over the service. app.ts can't call this directly — it has no
@@ -473,6 +473,6 @@ export function createTierlistsPublicApi(service: TierlistsService): TierlistsPu
     votedAmong: (voterUserId, ids) => service.votedAmong(voterUserId, ids),
     getPublished: (id) => service.getPublishedRef(id),
     listPublishedByOwner: (ownerUserId) => service.listPublishedRefsByOwner(ownerUserId),
-    participationByOwner: (ownerUserId) => service.participationByOwner(ownerUserId)
+    participationByOwner: (ownerUserId, since) => service.participationByOwner(ownerUserId, since)
   };
 }

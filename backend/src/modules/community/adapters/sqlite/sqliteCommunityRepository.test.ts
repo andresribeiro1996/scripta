@@ -7,6 +7,7 @@ import Fastify from "fastify";
 import { categoryFor, DEFAULT_FEED_SETTINGS, type FeedCategory } from "@scripta/shared/community";
 import { registerTrace } from "../../../../trace.js";
 import { FEED_EVENT_TYPES } from "../../domain/feed.js";
+import type { PublishedTierlistRef } from "../../../tierlists/service.js";
 
 const tempRoot = mkdtempSync(join(tmpdir(), "community-repo-"));
 process.env.JWT_ACCESS_SECRET = "a".repeat(64);
@@ -18,7 +19,7 @@ process.env.COMMUNITY_DB_PATH = join(tempRoot, "community.sqlite");
 
 const { openCommunityDb } = await import("./connection.js");
 const { createSqliteCommunityRepository } = await import("./sqliteCommunityRepository.js");
-const { createCommunityPublicApi } = await import("../../service.js");
+const { createCommunityPublicApi, createCommunityService } = await import("../../service.js");
 
 function repo() {
   return createSqliteCommunityRepository(openCommunityDb());
@@ -378,4 +379,71 @@ test("deleting a user's data clears their inbox as viewer and as author, and the
   assert.deepEqual(inboxEventIds(db, "kept-fan"), ["kept-own"]);
   assert.deepEqual(db.prepare("SELECT id FROM events_history WHERE id LIKE 'history-%'").all().map((row) => row.id), ["history-kept"]);
   assert.deepEqual(db.prepare("SELECT id FROM events WHERE id IN ('gone-own', 'kept-own')").all().map((row) => row.id), ["kept-own"]);
+});
+
+test("the dashboard service pages through a real inbox newest first, narrowed to the kinds listed, with the authors' switches and the new count applied", () => {
+  const { r } = openRepo();
+  const unused = () => {
+    throw new Error("the dashboard does not read this");
+  };
+  const refs = new Map<string, PublishedTierlistRef>();
+  for (const [id, owner] of [["dash-t-a1", "dash-a"], ["dash-t-b1", "dash-b"], ["dash-t-b2", "dash-b"]]) {
+    refs.set(id!, { id: id!, ownerUserId: owner!, createdAt: "2026-09-01T00:00:00.000Z", voteCode: `code-${id}`, name: id!, poolSize: 3, ballotCount: 0, eligibleVoteCount: 0, promotedAt: null, votingOpen: true, covers: [] });
+  }
+  const seen: { at: string | null } = { at: null };
+  const service = createCommunityService({
+    repo: r,
+    getDashboardSeenAt: () => seen.at,
+    setDashboardSeenAt: unused,
+    resolveProfile: unused,
+    resolveProfiles: (ids) => new Map(ids.map((id) => [id, { username: id, avatarUrl: null }])),
+    resolveLibrary: unused,
+    readerGlyphFor: () => null,
+    sharedBookCounts: unused,
+    sharedBooks: unused,
+    userHasUsername: unused,
+    findUserIdByUsername: unused,
+    searchUsernameOwners: unused,
+    murals: { ownsMural: unused, getMuralPublicPayload: unused },
+    tierlists: { discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: (id) => refs.get(id), listByOwner: unused },
+    tournaments: { discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: () => undefined, listByOwner: unused },
+    participation: { tierlists: () => [], tournaments: () => [], quizzes: () => [] }
+  });
+  const at = (day: number) => `2026-09-0${day}T00:00:00.000Z`;
+  const event = (id: string, user: string, type: "tierlist_published" | "voted_on" | "book_added", refId: string, day: number) =>
+    r.insertEvent({ id, user_id: user, type, ref_type: type === "book_added" ? "book" : "tierlist", ref_id: refId, payload: type === "book_added" ? '{"title":"Dune","author":"Herbert"}' : null, created_at: at(day) });
+  r.insertFollow({ follower_id: "dash-viewer", followee_id: "dash-a", created_at: at(1) });
+  r.insertFollow({ follower_id: "dash-viewer", followee_id: "dash-b", created_at: at(1) });
+  event("dash-pub-a1", "dash-a", "tierlist_published", "dash-t-a1", 5);
+  event("dash-pub-b1", "dash-b", "tierlist_published", "dash-t-b1", 4);
+  event("dash-vote-a", "dash-a", "voted_on", "dash-t-b1", 3);
+  event("dash-pub-b2", "dash-b", "tierlist_published", "dash-t-b2", 2);
+  event("dash-read-a", "dash-a", "book_added", "dash-book", 6);
+  const ids = (kinds?: ReadonlySet<string>) => {
+    const found: string[] = [];
+    let cursor: string | undefined;
+    do {
+      const page = service.getDashboard("dash-viewer", cursor, 2, kinds);
+      assert.ok(page.items.length <= 2);
+      found.push(...page.items.map((item) => item.id));
+      cursor = page.nextCursor ?? undefined;
+    } while (cursor !== undefined);
+    return found;
+  };
+
+  assert.deepEqual(ids(), ["dash-pub-a1", "dash-pub-b1", "dash-vote-a", "dash-pub-b2"]);
+  assert.deepEqual(ids(new Set(["vote"])), ["dash-vote-a"]);
+  assert.deepEqual(ids(new Set(["publication", "follow"])), ["dash-pub-a1", "dash-pub-b1", "dash-pub-b2"]);
+  assert.equal(service.getDashboard("dash-viewer", undefined, 20).followingNewCount, 4);
+  seen.at = at(4);
+  assert.equal(service.getDashboard("dash-viewer", undefined, 20).followingNewCount, 1);
+  seen.at = null;
+
+  r.updateFeedSettings("dash-b", { ...DEFAULT_FEED_SETTINGS, publications: false });
+  r.updateFeedSettings("dash-a", { ...DEFAULT_FEED_SETTINGS, reading: true });
+  assert.deepEqual(ids(), ["dash-read-a", "dash-pub-a1", "dash-vote-a"]);
+  assert.equal(service.getDashboard("dash-viewer", undefined, 20).followingNewCount, 3);
+
+  r.deleteFollow("dash-viewer", "dash-a");
+  assert.deepEqual(ids(), []);
 });

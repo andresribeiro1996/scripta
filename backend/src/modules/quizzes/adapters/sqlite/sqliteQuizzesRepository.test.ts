@@ -148,7 +148,7 @@ test("participation counts other people's plays on the owner's quizzes", () => {
   repo.savePlay(play("p4", "quiz-1", "u3", "2026-01-04T00:00:00Z"), []);
   repo.savePlay(play("p5", "quiz-2", "u2", "2026-01-05T00:00:00Z"), []);
 
-  assert.deepEqual(repo.listParticipation("u1").map((r) => ({ ...r })), [
+  assert.deepEqual(repo.listParticipation("u1", "2026-01-01T00:00:00Z").map((r) => ({ ...r })), [
     { id: "quiz-1", name: "Mine", participants: 3, latest_at: "2026-01-04T00:00:00Z" }
   ]);
   assert.deepEqual(repo.listRecentPlayers("quiz-1", "u1", 10).map((r) => ({ ...r })), [
@@ -156,6 +156,22 @@ test("participation counts other people's plays on the owner's quizzes", () => {
     { user_id: "u2", at: "2026-01-02T00:00:00Z" }
   ]);
   assert.deepEqual(repo.listRecentPlayers("quiz-1", "u1", 1).map((r) => r.user_id), ["u3"]);
+});
+
+test("participation lists only the quizzes played since the marker, and their counts still cover every play", () => {
+  const repo = makeRepo();
+  repo.insert(quizRow({ id: "quiet", name: "Quiet" }));
+  repo.insert(quizRow({ id: "busy", name: "Busy" }));
+  const play = (id: string, quizId: string, voter: string | null, createdAt: string) => ({ ...playRow(id, quizId, voter), created_at: createdAt });
+  repo.savePlay(play("q1", "quiet", "u2", "2026-01-02T00:00:00.000Z"), []);
+  repo.savePlay(play("b1", "busy", "u2", "2026-01-02T00:00:00.000Z"), []);
+  repo.savePlay(play("b2", "busy", "u3", "2026-02-10T00:00:00.000Z"), []);
+  const listed = (since: string) => repo.listParticipation("u1", since).map((r) => [r.id, r.participants, r.latest_at]).sort();
+
+  assert.deepEqual(listed("2026-01-01T00:00:00.000Z"), [["busy", 2, "2026-02-10T00:00:00.000Z"], ["quiet", 1, "2026-01-02T00:00:00.000Z"]]);
+  assert.deepEqual(listed("2026-02-01T00:00:00.000Z"), [["busy", 2, "2026-02-10T00:00:00.000Z"]]);
+  assert.deepEqual(listed("2026-02-10T00:00:00.000Z"), [["busy", 2, "2026-02-10T00:00:00.000Z"]]);
+  assert.deepEqual(listed("2026-02-10T00:00:00.001Z"), []);
 });
 
 test("rekeyBooks rewrites the owner's unpublished quiz books and de-duplicates by key", () => {

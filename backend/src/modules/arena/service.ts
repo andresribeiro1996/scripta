@@ -97,7 +97,7 @@ export interface ArenaService {
   /** Tournaments the account has voted in, most recent vote first —
    *  own tournaments excluded (listMine already shows those). */
   listVoted(voterUserId: string): TournamentSummary[];
-  participationByOwner(ownerUserId: string): GameParticipation[];
+  participationByOwner(ownerUserId: string, since: string): GameParticipation[];
   settleEarly(tournamentId: string, ownerUserId: string, duelId: string): void;
   tiebreak(tournamentId: string, ownerUserId: string, duelId: string, winnerBookKey: string): void;
   /** Renames a tournament. Allowed at ANY status, unlike seeding or
@@ -304,8 +304,8 @@ export function createArenaService(repo: ArenaRepository, emitPublished?: EmitPu
       return summariesWithPreviews(repo, repo.listVotedByUser(voterUserId));
     },
 
-    participationByOwner(ownerUserId) {
-      return repo.listParticipation(ownerUserId).map((row) => ({
+    participationByOwner(ownerUserId, since) {
+      return repo.listParticipation(ownerUserId, since).map((row) => ({
         id: row.id,
         name: row.name,
         covers: previewFromSlots(repo.getSlots(row.id)).covers,
@@ -498,7 +498,7 @@ export interface ArenaPublicApi {
   votedAmong(voterUserId: string, ids: string[]): string[];
   getPublished(id: string): PublishedTournamentRef | undefined;
   listPublishedByOwner(ownerUserId: string): PublishedTournamentRef[];
-  participationByOwner(ownerUserId: string): GameParticipation[];
+  participationByOwner(ownerUserId: string, since: string): GameParticipation[];
 }
 
 function toPublishedRef(summary: TournamentSummary): PublishedTournamentRef {
@@ -524,6 +524,6 @@ export function createArenaPublicApi(service: ArenaService): ArenaPublicApi {
     },
     listPublishedByOwner: (ownerUserId) =>
       service.listMine(ownerUserId).filter((s) => s.status !== "seeding").map(toPublishedRef),
-    participationByOwner: (ownerUserId) => service.participationByOwner(ownerUserId)
+    participationByOwner: (ownerUserId, since) => service.participationByOwner(ownerUserId, since)
   };
 }

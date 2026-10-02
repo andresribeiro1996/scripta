@@ -44,6 +44,7 @@ export function createSqliteQuizzesRepository(db: DatabaseSync): QuizzesReposito
     FROM quizzes q JOIN quiz_plays p ON p.quiz_id = q.id
     WHERE q.owner_user_id = ? AND (p.voter_user_id IS NULL OR p.voter_user_id != q.owner_user_id)
     GROUP BY q.id
+    HAVING MAX(p.created_at) >= ?
   `);
   const recentPlayersStmt = db.prepare(`
     SELECT voter_user_id AS user_id, created_at AS at FROM quiz_plays
@@ -229,8 +230,8 @@ export function createSqliteQuizzesRepository(db: DatabaseSync): QuizzesReposito
       return [...byQuestion.values()];
     },
 
-    listParticipation(ownerUserId) {
-      const rows = participationStmt.all(ownerUserId) as unknown as Array<{ id: string; name: string; participants: number; latest_at: string }>;
+    listParticipation(ownerUserId, since) {
+      const rows = participationStmt.all(ownerUserId, since) as unknown as Array<{ id: string; name: string; participants: number; latest_at: string }>;
       return rows.map((r) => ({ ...r, participants: Number(r.participants) }));
     },
 

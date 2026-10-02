@@ -255,7 +255,7 @@ test("participation counts other people's ballots on the creator's published lis
   repo.saveBallot(ballot({ id: "d1", tierlist_id: "draft", voter_user_id: "u2" }), []);
   insertPublished(repo, row({ id: "theirs", owner_user_id: "u9", origin_user_id: "u9", vote_code: "code9", voting_open: 1 }), ballot({ id: "t1", tierlist_id: "theirs", voter_user_id: "u2" }), []);
 
-  const rows = repo.listParticipation("u1").map((r) => ({ ...r })).sort((a, b) => a.id.localeCompare(b.id));
+  const rows = repo.listParticipation("u1", "2026-01-01T00:00:00.000Z").map((r) => ({ ...r })).sort((a, b) => a.id.localeCompare(b.id));
   assert.deepEqual(rows, [
     { id: "c1", name: "Fantasy", public_books: publicBooks, participants: 3, latest_at: "2026-01-04T00:00:00.000Z" }
   ]);
@@ -264,6 +264,21 @@ test("participation counts other people's ballots on the creator's published lis
     { user_id: "u2", at: "2026-01-02T00:00:00.000Z" }
   ]);
   assert.deepEqual(repo.listRecentVoters("c1", "u1", 1).map((r) => r.user_id), ["u3"]);
+});
+
+test("participation lists only the lists with a ballot created since the marker, and their counts still cover every ballot", () => {
+  const repo = createSqliteTierlistsRepository(freshDb());
+  insertPublished(repo, row({ id: "quiet", name: "Quiet", vote_code: "code-q", voting_open: 1 }), ballot({ id: "own-q", tierlist_id: "quiet", voter_user_id: "u1" }), []);
+  repo.saveBallot(ballot({ id: "q2", tierlist_id: "quiet", voter_user_id: "u2", created_at: "2026-01-02T00:00:00.000Z", updated_at: "2026-03-01T00:00:00.000Z" }), []);
+  insertPublished(repo, row({ id: "busy", name: "Busy", vote_code: "code-b", voting_open: 1 }), ballot({ id: "own-b", tierlist_id: "busy", voter_user_id: "u1" }), []);
+  repo.saveBallot(ballot({ id: "b2", tierlist_id: "busy", voter_user_id: "u2", created_at: "2026-01-02T00:00:00.000Z" }), []);
+  repo.saveBallot(ballot({ id: "b3", tierlist_id: "busy", voter_user_id: "u3", created_at: "2026-02-10T00:00:00.000Z" }), []);
+  const listed = (since: string) => repo.listParticipation("u1", since).map((r) => [r.id, r.participants, r.latest_at]).sort();
+
+  assert.deepEqual(listed("2026-01-01T00:00:00.000Z"), [["busy", 2, "2026-02-10T00:00:00.000Z"], ["quiet", 1, "2026-01-02T00:00:00.000Z"]]);
+  assert.deepEqual(listed("2026-02-01T00:00:00.000Z"), [["busy", 2, "2026-02-10T00:00:00.000Z"]]);
+  assert.deepEqual(listed("2026-02-10T00:00:00.000Z"), [["busy", 2, "2026-02-10T00:00:00.000Z"]]);
+  assert.deepEqual(listed("2026-02-10T00:00:00.001Z"), []);
 });
 
 test("rekeyBooks rewrites the owner's unpublished tier lists only", async () => {
