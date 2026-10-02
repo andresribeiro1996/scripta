@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Alert, View } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
-import { bookKey, markDistinct, statusLabel } from "@scripta/shared";
+import { bookKey, markDistinct, saveFailureMessage, statusLabel } from "@scripta/shared";
 import { Text } from "../../../ui/Text";
 import { Button, ModalBody } from "../../../ui/components";
 import { radii, spacing, typography, useTheme } from "../../../ui/theme";
@@ -25,7 +25,7 @@ export function DuplicatesSheetBody({ groups, library }: { groups: string[][]; l
     } catch (error) {
       console.error(error);
       void queryClient.invalidateQueries({ queryKey: LIBRARY_QUERY_KEY });
-      Alert.alert(failure);
+      Alert.alert(saveFailureMessage(error, failure));
     } finally {
       setBusy(false);
     }

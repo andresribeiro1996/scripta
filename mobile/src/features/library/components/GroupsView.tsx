@@ -20,7 +20,7 @@ import { forwardRef, useImperativeHandle, useMemo, useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../../ui/Text";
 import { router } from "expo-router";
-import { makeGroup, orderedGroupBooks, type GroupType } from "@scripta/shared";
+import { makeGroup, orderedGroupBooks, saveFailureMessage, type GroupType } from "@scripta/shared";
 import { EmptyState, Input, Segmented } from "../../../ui/components";
 import { Icon } from "../../../ui/icon";
 import { spacing, typography, useTheme } from "../../../ui/theme";
@@ -95,7 +95,7 @@ export const GroupsView = forwardRef<GroupsViewHandle, { search: string; onSearc
     const group = makeGroup(draftType, name);
     await attemptUpdate(
       () => updateLibrary((data) => ({ ...data, groups: [...(data.groups ?? []), group] })),
-      () => Alert.alert("Couldn't save — check your connection."),
+      (error) => Alert.alert(saveFailureMessage(error, "Couldn't save — check your connection.")),
       () => router.push(`/collection/${group.id}` as never),
     );
     setCreating(false);

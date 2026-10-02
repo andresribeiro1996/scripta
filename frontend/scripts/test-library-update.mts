@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { saveFailureMessage } from "@scripta/shared";
 import type { LibraryData, LibraryDocument } from "../src/api/library";
 import { saveLibraryUpdate } from "../src/lib/saveLibraryUpdate";
 import { restoreDeletedBooks } from "../src/lib/restoreDeletedBooks";
@@ -44,6 +45,25 @@ test("non-conflict errors are not retried", async () => {
       },
     ),
   );
+  assert.equal(fetched, false);
+});
+
+test("an oversized library reaches the caller with the server's message and is not retried", async () => {
+  const message = "Your library is over 10 MB, the most Scripta can store. Remove some books or highlights and try again.";
+  let fetched = false;
+  const error = await saveLibraryUpdate(
+    document({ books: [] }, "v1"),
+    (data) => ({ ...data, name: "Local" }),
+    async () => {
+      fetched = true;
+      return null;
+    },
+    async () => {
+      throw Object.assign(new Error(message), { status: 413 });
+    },
+  ).catch((reason: unknown) => reason);
+
+  assert.equal(saveFailureMessage(error, "Couldn't save the new name."), message);
   assert.equal(fetched, false);
 });
 

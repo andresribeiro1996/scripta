@@ -27,6 +27,7 @@ import { z } from "zod";
 import { env } from "../../config/env.js";
 import { authGuard } from "../auth/index.js";
 import { LibraryConflictError, NoLibraryDocumentError } from "./domain/errors.js";
+import { libraryTooLargeMessage } from "./domain/sizeLimit.js";
 import { ImportBusyError, InvalidImportError, parseImport } from "./import/parseImport.js";
 import type { LibraryService } from "./service.js";
 
@@ -102,7 +103,7 @@ export function buildLibraryRoutes(service: LibraryService) {
       errorHandler(error, _request, reply) {
         if (error.statusCode === 413) {
           return reply.code(413).send({
-            error: "Library document is too large.",
+            error: libraryTooLargeMessage(env.LIBRARY_BODY_LIMIT_BYTES),
             code: "LIBRARY_BODY_TOO_LARGE",
             maxBytes: env.LIBRARY_BODY_LIMIT_BYTES
           });
