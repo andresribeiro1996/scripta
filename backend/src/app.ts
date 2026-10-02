@@ -19,6 +19,7 @@ import { assertObjectKey } from "./storage/objectStore.js";
 import { createObjectStore } from "./storage/createObjectStore.js";
 import { IMMUTABLE_CACHE_CONTROL } from "./storage/r2ObjectStore.js";
 import { runStartupMigrations } from "./migrations/runStartupMigrations.js";
+import { registerStallLog } from "./stallLog.js";
 import {
   emailEnabled,
   findUserIdByUsername,
@@ -65,6 +66,8 @@ export function buildApp() {
   const app: FastifyInstance = devHttps
     ? (Fastify({ logger: true, https: devHttps, trustProxy: true }) as FastifyInstance)
     : Fastify({ logger: true, trustProxy: true });
+
+  registerStallLog(app);
 
   // Genuinely app-wide (unlike each module's own rate limiter) — the
   // frontend is a separate origin from this API in dev (Vite on 5173,
