@@ -62,23 +62,6 @@ test("events ignore duplicate (ref_type, ref_id) and paginate by keyset", () => 
   assert.deepEqual(r.listEventsByUser("bob", undefined, 10), []);
 });
 
-test("events narrow to the requested types, with or without a keyset", () => {
-  const r = repo();
-  const at = (day: number) => `2026-09-0${day}T00:00:00.000Z`;
-  r.insertEvent({ id: "typed-1", user_id: "typed", type: "tierlist_published", ref_type: "tierlist", ref_id: "typed-t1", payload: null, created_at: at(1) });
-  r.insertEvent({ id: "typed-2", user_id: "typed", type: "book_added", ref_type: "book", ref_id: "typed-b2", payload: null, created_at: at(2) });
-  r.insertEvent({ id: "typed-3", user_id: "typed", type: "tierlist_published", ref_type: "tierlist", ref_id: "typed-t3", payload: null, created_at: at(3) });
-  r.insertEvent({ id: "typed-4", user_id: "typed", type: "voted_on", ref_type: "tierlist", ref_id: "typed-t4", payload: null, created_at: at(4) });
-  r.insertEvent({ id: "typed-5", user_id: "typed", type: "book_finished", ref_type: "book", ref_id: "typed-b5", payload: null, created_at: at(5) });
-  const ids = (rows: Array<{ id: string }>) => rows.map((row) => row.id);
-
-  assert.deepEqual(ids(r.listEventsByUser("typed", undefined, 10)), ["typed-5", "typed-4", "typed-3", "typed-2", "typed-1"]);
-  assert.deepEqual(ids(r.listEventsByUser("typed", undefined, 10, ["tierlist_published"])), ["typed-3", "typed-1"]);
-  assert.deepEqual(ids(r.listEventsByUser("typed", undefined, 1, ["tierlist_published", "book_added"])), ["typed-3"]);
-  assert.deepEqual(ids(r.listEventsByUser("typed", { createdAt: at(3), id: "typed-3" }, 10, ["tierlist_published", "book_added"])), ["typed-2", "typed-1"]);
-  assert.deepEqual(r.listEventsByUser("typed", undefined, 10, []), []);
-});
-
 test("an event keeps the trace that caused it, or nulls when it was given none", () => {
   const r = repo();
   r.insertEvent({ id: "trace-e1", user_id: "traced", type: "tierlist_published", ref_type: "tierlist", ref_id: "trace-t1", payload: null, created_at: "2026-09-02T00:00:00.000Z", trace_id: "req-1", source: "POST /tierlists/:id/open-voting" });
@@ -501,4 +484,40 @@ test("the dashboard service pages through a real inbox newest first, narrowed to
 
   r.deleteFollow("dash-viewer", "dash-a");
   assert.deepEqual(ids(), []);
+});
+
+test("an event, a follow and an unfollow are each written together with their inbox rows or not at all", (t) => {
+  const { db, r } = openRepo();
+  t.after(() => db.exec("DROP TRIGGER IF EXISTS atomic_block"));
+  const at = "2026-09-10T00:00:00.000Z";
+  const event = { id: "atomic-e1", user_id: "atomic-author", type: "book_added" as const, ref_type: "book" as const, ref_id: "atomic-b1", payload: null, created_at: at };
+  r.insertFollow({ follower_id: "atomic-fan", followee_id: "atomic-author", created_at: at });
+
+  db.exec("CREATE TRIGGER atomic_block BEFORE INSERT ON feed_inbox WHEN NEW.event_id = 'atomic-e1' BEGIN SELECT RAISE(ABORT, 'blocked'); END");
+  assert.throws(() => r.insertEvent(event), /blocked/);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM events WHERE id = 'atomic-e1'").get()?.n, 0);
+
+  db.exec("DROP TRIGGER atomic_block");
+  r.insertEvent(event);
+  db.exec("CREATE TRIGGER atomic_block BEFORE INSERT ON feed_inbox WHEN NEW.viewer_id = 'atomic-late' BEGIN SELECT RAISE(ABORT, 'blocked'); END");
+  assert.throws(() => r.insertFollow({ follower_id: "atomic-late", followee_id: "atomic-author", created_at: at }), /blocked/);
+  assert.equal(r.getFollow("atomic-late", "atomic-author"), undefined);
+
+  db.exec("DROP TRIGGER atomic_block");
+  db.exec("CREATE TRIGGER atomic_block BEFORE DELETE ON feed_inbox BEGIN SELECT RAISE(ABORT, 'blocked'); END");
+  assert.throws(() => r.deleteFollow("atomic-fan", "atomic-author"), /blocked/);
+  assert.notEqual(r.getFollow("atomic-fan", "atomic-author"), undefined);
+});
+
+test("unfollowing removes only the unfollower's inbox rows of that author", () => {
+  const { db, r } = openRepo();
+  const at = "2026-09-10T00:00:00.000Z";
+  r.insertFollow({ follower_id: "un-a", followee_id: "un-author", created_at: at });
+  r.insertFollow({ follower_id: "un-b", followee_id: "un-author", created_at: at });
+  r.insertEvent({ id: "un-e1", user_id: "un-author", type: "book_added", ref_type: "book", ref_id: "un-b1", payload: null, created_at: at });
+
+  r.deleteFollow("un-a", "un-author");
+
+  assert.deepEqual(inboxEventIds(db, "un-a"), []);
+  assert.deepEqual(inboxEventIds(db, "un-b"), ["un-e1"]);
 });

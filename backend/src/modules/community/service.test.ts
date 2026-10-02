@@ -77,10 +77,9 @@ function createRepoFake() {
       if (events.some((e) => e.ref_type === row.ref_type && e.ref_id === row.ref_id)) return;
       events.push({ ...row });
     },
-    listEventsByUser(userId, keyset: CursorKeyset | undefined, limit, types) {
+    listEventsByUser(userId, keyset: CursorKeyset | undefined, limit) {
       return events
         .filter((e) => e.user_id === userId)
-        .filter((e) => !types || types.includes(e.type))
         .filter((e) => !keyset || e.created_at < keyset.createdAt || (e.created_at === keyset.createdAt && e.id < keyset.id))
         .sort(newestEvent)
         .slice(0, limit);
@@ -714,6 +713,21 @@ test("dashboard merges followees' publications and incoming follows newest first
   assert.equal((page.items[0] as { actor: { userId: string } }).actor.userId, "alice");
   assert.ok(page.items.some((item) => item.kind === "follow" && item.id === "bob"));
   assert.ok(!page.items.some((item) => item.kind === "follow" && item.id === "carol"));
+});
+
+test("a new follower in the dashboard says whether the viewer follows them back", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles } = createDeps(repo);
+  const service = createCommunityService(deps);
+  for (const id of ["bob", "carol"]) {
+    readerProfiles.set(id, reader(id));
+    repo.insertFollow({ follower_id: id, followee_id: "viewer", created_at: at(5) });
+  }
+  repo.insertFollow({ follower_id: "viewer", followee_id: "bob", created_at: at(4) });
+
+  const page = service.getDashboard("viewer", undefined, 20, ALL_KINDS);
+
+  assert.deepEqual(page.items.flatMap((item) => (item.kind === "follow" ? [[item.id, item.viewerFollows]] : [])), [["carol", false], ["bob", true]]);
 });
 
 test("dashboard actors carry a reader glyph only when published and switched on, and the lookup runs once per author", () => {

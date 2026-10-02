@@ -115,6 +115,17 @@ test("events_history takes rows that repeat a user, type and ref, refuses a repe
   db.close();
 });
 
+test("erasing an account finds its history by author and by what is about it through indexes, not a scan", () => {
+  removeDatabase();
+  const db = openCommunityDb();
+
+  const plan = queryPlan(db, "DELETE FROM events_history WHERE user_id = 'u1' OR (ref_type = 'user' AND ref_id = 'u1')");
+  assert.match(plan, /idx_events_history_user_time/);
+  assert.match(plan, /idx_events_history_user_ref/);
+  assert.doesNotMatch(plan, /SCAN/);
+  db.close();
+});
+
 test("an events table from before trace ids gains the columns and keeps its rows, and opening again changes nothing", () => {
   const path = removeDatabase();
   const existing = new DatabaseSync(path);

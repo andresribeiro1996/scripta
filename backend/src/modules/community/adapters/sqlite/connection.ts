@@ -32,9 +32,20 @@ function tableColumns(db: DatabaseSync, table: string): string[] {
   return (db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).map((c) => c.name);
 }
 
-function applySchemaAndFillInbox(db: DatabaseSync, schema: string): void {
+export function inTransaction<T>(db: DatabaseSync, work: () => T): T {
   db.exec("BEGIN IMMEDIATE");
   try {
+    const result = work();
+    db.exec("COMMIT");
+    return result;
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+}
+
+function applySchemaAndFillInbox(db: DatabaseSync, schema: string): void {
+  inTransaction(db, () => {
     db.exec(schema);
     db.prepare(`
       INSERT INTO feed_inbox (viewer_id, created_at, event_id, author_id)
@@ -42,11 +53,7 @@ function applySchemaAndFillInbox(db: DatabaseSync, schema: string): void {
       FROM events e JOIN follows f ON f.followee_id = e.user_id
       WHERE e.type IN (SELECT value FROM json_each(?)) AND e.created_at >= ?
     `).run(JSON.stringify(FEED_EVENT_TYPES), new Date(Date.now() - FEED_WINDOW_MS).toISOString());
-    db.exec("COMMIT");
-  } catch (error) {
-    db.exec("ROLLBACK");
-    throw error;
-  }
+  });
 }
 
 const ALL_OFF: FeedSettings = { publications: false, reading: false, votes: false, follows: false, readerGlyph: false };
@@ -71,8 +78,7 @@ function parseFeedSettings(raw: string): FeedSettings | null {
 }
 
 function syncFeedSettingColumns(db: DatabaseSync): void {
-  db.exec("BEGIN IMMEDIATE");
-  try {
+  inTransaction(db, () => {
     if (!tableColumns(db, "profiles").includes("show_publications")) {
       db.exec(`
         ALTER TABLE profiles ADD COLUMN show_publications INTEGER NOT NULL DEFAULT 1;
@@ -98,11 +104,7 @@ function syncFeedSettingColumns(db: DatabaseSync): void {
       const changed = reconcile.run({ $user_id: row.user_id, ...feedSettingColumns(parsed ?? ALL_OFF) }).changes > 0;
       if (changed && !parsed) console.warn(`[community] feed settings of user ${row.user_id} are unreadable; all of its feed categories are switched off`);
     }
-    db.exec("COMMIT");
-  } catch (error) {
-    db.exec("ROLLBACK");
-    throw error;
-  }
+  });
 }
 
 function migrateSchema(db: DatabaseSync, schema: string): void {
