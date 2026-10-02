@@ -9,7 +9,7 @@ import type { MuralPublicPayload } from "../murals/index.js";
 import type { PublishedTierlistRef, TierlistDiscoverRef } from "../tierlists/service.js";
 import { currentTrace } from "../../trace.js";
 import { FollowLimitError, InvalidCursorError, MuralNotOwnedError, NotFollowingError, ProfileNotFoundError, SelfFollowError, UsernameRequiredError } from "./domain/errors.js";
-import { ACTIVITY_EVENT_TYPES, ARCHIVE_BATCH, BOOK_EVENTS_PER_DAY, BOOK_EVENTS_WINDOW_MS, DIGEST_EVENT_TYPES, FEED_WINDOW_MS, FOLLOW_LIMIT, READING_EVENT_TYPES } from "./domain/feed.js";
+import { ACTIVITY_EVENT_TYPES, ARCHIVE_BATCH, BACKFILL_BATCH, BOOK_EVENTS_PER_DAY, BOOK_EVENTS_WINDOW_MS, DIGEST_EVENT_TYPES, FEED_EVENT_TYPES, FEED_WINDOW_MS, FOLLOW_LIMIT, READING_EVENT_TYPES } from "./domain/feed.js";
 import type { CommunityRepository, CursorKeyset } from "./domain/ports.js";
 import type { EventRow, FollowRow } from "./domain/types.js";
 
@@ -76,6 +76,7 @@ function withVoted(content: PublishedContent, voted: Set<string> | null): Publis
 export interface CommunityDeps {
   repo: CommunityRepository;
   now?: () => number;
+  background?: (task: () => Promise<void>) => void;
   getDashboardSeenAt(userId: string): string | null;
   setDashboardSeenAt(userId: string, seenAt: string): void;
   resolveProfile(userId: string): ReaderProfile | undefined;
@@ -138,6 +139,20 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
     repo.insertEvent(newEvent(userId, type, refType, refId, payload));
   };
   const settingsFor = (userId: string): FeedSettings => repo.getFeedSettings(userId) ?? DEFAULT_FEED_SETTINGS;
+  const background = deps.background ?? ((task: () => Promise<void>): void => void task());
+  const backfillInboxes = async (authorId: string, types: readonly ActivityEventType[]): Promise<void> => {
+    const since = new Date(now() - FEED_WINDOW_MS).toISOString();
+    await new Promise(setImmediate);
+    const followerIds = repo.listFollowerIds(authorId);
+    for (let from = 0; from < followerIds.length; from += BACKFILL_BATCH) {
+      repo.backfillInbox(authorId, followerIds.slice(from, from + BACKFILL_BATCH), types, since);
+      await new Promise(setImmediate);
+    }
+  };
+  const backfillTurnedOn = (userId: string, before: FeedSettings, after: FeedSettings): void => {
+    const types = FEED_EVENT_TYPES.filter((type) => !before[categoryFor(type)] && after[categoryFor(type)]);
+    if (types.length > 0) background(() => backfillInboxes(userId, types));
+  };
   const glyphLookup = (): ((userId: string) => IdentityKey | null) => {
     const cache = new Map<string, IdentityKey | null>();
     return (userId) => {
@@ -304,7 +319,12 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
         updated_at: savedAt,
         feed_settings: existing?.feed_settings ?? null
       });
-      if (input.shareReading !== undefined) repo.updateFeedSettings(userId, { ...settingsFor(userId), reading: input.shareReading });
+      if (input.shareReading !== undefined) {
+        const before = settingsFor(userId);
+        const after = { ...before, reading: input.shareReading };
+        repo.updateFeedSettings(userId, after);
+        backfillTurnedOn(userId, before, after);
+      }
       if (muralId && (!existing?.published_at || existing.mural_id !== muralId)) emit(userId, "mural_published", "mural", muralId);
     },
     unpublishProfile(userId) {
@@ -532,7 +552,9 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
       return settingsFor(userId);
     },
     updateFeedSettings(userId, settings) {
+      const before = settingsFor(userId);
       repo.updateFeedSettings(userId, settings);
+      backfillTurnedOn(userId, before, settings);
     },
     async archiveOldEvents() {
       const cutoff = new Date(now() - FEED_WINDOW_MS).toISOString();

@@ -12,6 +12,7 @@ export interface CommunityRepository {
   deleteFollow(followerId: string, followeeId: string): boolean;
   getFollow(followerId: string, followeeId: string): FollowRow | undefined;
   listFollowees(followerId: string): string[];
+  listFollowerIds(followeeId: string): string[];
   listFollowersByFollowee(followeeId: string, keyset: CursorKeyset | undefined, limit: number): FollowRow[];
   listFollowersSince(followeeId: string, since: string, limit: number): FollowRow[];
   countFollowers(userId: string): number;
@@ -31,4 +32,5 @@ export interface CommunityRepository {
   countInboxSince(viewerId: string, since: string, types: readonly ActivityEventType[], limit: number): number;
   moveEventsBefore(cutoff: string, batch: number): number;
   purgeInboxBefore(cutoff: string, batch: number): number;
+  backfillInbox(authorId: string, followerIds: readonly string[], types: readonly ActivityEventType[], since: string): void;
 }

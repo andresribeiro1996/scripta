@@ -187,8 +187,22 @@ shows:**
   filter, using the same SQL fragment as the write so they cannot disagree, so
   a category switched off after rows were written is hidden at once; those rows
   stay until they age out, and switching the category back on shows them again.
-- Switching a category on does not backfill the inboxes: only later events
-  reach them. The profile activity page still shows the past ones.
+- Switching a category on brings the author's last 30 days of it into every
+  follower's inbox, the newest 100 per follower (`FOLLOW_COPY_LIMIT`), with
+  the events' own dates. Saving feed settings, or publishing with
+  `shareReading`, compares the switches before and after, and for the feed
+  types of the categories that came on starts a background task after the
+  request has answered. It lists the author's followers and fills 50 at a time
+  (`BACKFILL_BATCH`): one `INSERT OR IGNORE … SELECT` per batch in its own
+  transaction, with a turn of the event loop before it, selecting the events
+  once and joining them to the batch's followers in `follows`, so a reader who
+  unfollows before their batch gets nothing. It applies the same `authorShows`
+  fragment as the other writes. A failure is logged
+  (`community feed backfill failed`); a restart in the middle leaves the
+  followers not yet reached without the rows until the author switches the
+  category off and on again. A batch of 50 followers and 100 events is 5,000
+  rows and 15–35 ms; 1,000 followers take about 0.5 s and 10,000 about 7 s,
+  in turns of at most 76 ms.
 - Following someone copies their events of the last 30 days into your inbox,
   only the categories they show now, newest first, at most 100
   (`FOLLOW_COPY_LIMIT`); unfollowing deletes theirs. Rows older than 30 days

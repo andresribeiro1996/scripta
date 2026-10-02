@@ -11,7 +11,7 @@ import type { MuralPublicPayload } from "../murals/index.js";
 import type { CommunityRepository, CursorKeyset } from "./domain/ports.js";
 import type { EventRow, FollowRow, ProfileRow } from "./domain/types.js";
 import { FollowLimitError, InvalidCursorError, MuralNotOwnedError, NotFollowingError, ProfileNotFoundError, SelfFollowError, UsernameRequiredError } from "./domain/errors.js";
-import { ACTIVITY_EVENT_TYPES } from "./domain/feed.js";
+import { ACTIVITY_EVENT_TYPES, FEED_EVENT_TYPES } from "./domain/feed.js";
 import { registerTrace } from "../../trace.js";
 import { createCommunityPublicApi, createCommunityService, type CommunityDeps, type CommunityPublicApi, type CommunityService } from "./service.js";
 
@@ -20,6 +20,7 @@ function createRepoFake() {
   const profiles = new Map<string, ProfileRow>();
   const events: EventRow[] = [];
   const history: EventRow[] = [];
+  const backfills: Array<{ authorId: string; followerIds: readonly string[]; types: readonly ActivityEventType[]; since: string }> = [];
   const key = (a: string, b: string) => `${a}:${b}`;
   const newestEvent = (a: EventRow, b: EventRow) => (a.created_at === b.created_at ? (a.id > b.id ? -1 : 1) : b.created_at.localeCompare(a.created_at));
   const newestFollow = (a: FollowRow, b: FollowRow) => (a.created_at === b.created_at ? (a.follower_id > b.follower_id ? -1 : 1) : b.created_at.localeCompare(a.created_at));
@@ -41,6 +42,9 @@ function createRepoFake() {
     },
     listFollowees(followerId) {
       return [...follows.values()].filter((row) => row.follower_id === followerId).map((row) => row.followee_id);
+    },
+    listFollowerIds(followeeId) {
+      return [...follows.values()].filter((row) => row.followee_id === followeeId).map((row) => row.follower_id);
     },
     countFollowers(userId) {
       return [...follows.values()].filter((row) => row.followee_id === userId).length;
@@ -106,6 +110,9 @@ function createRepoFake() {
     },
     moveEventsBefore: () => 0,
     purgeInboxBefore: () => 0,
+    backfillInbox(authorId, followerIds, types, since) {
+      backfills.push({ authorId, followerIds, types, since });
+    },
     listFollowersByFollowee(followeeId, keyset, limit) {
       return [...follows.values()]
         .filter((row) => row.followee_id === followeeId)
@@ -120,7 +127,7 @@ function createRepoFake() {
         .slice(0, limit);
     }
   };
-  return { repo, follows, profiles, events, history };
+  return { repo, follows, profiles, events, history, backfills };
 }
 
 function createDeps(repo: CommunityRepository) {
@@ -2052,6 +2059,131 @@ test("feed settings round-trip and reach only the owner's profile view", () => {
   assert.deepEqual(service.getFeedSettings("alice"), settings);
   assert.deepEqual(service.getProfileByUsername("alice", "alice").feedSettings, settings);
   assert.equal(service.getProfileByUsername("alice", "bob").feedSettings, undefined);
+});
+
+function withBackgroundTasks(deps: CommunityDeps): Promise<void>[] {
+  const tasks: Promise<void>[] = [];
+  deps.background = (task) => {
+    tasks.push(task());
+  };
+  return tasks;
+}
+
+const READING_TYPES: ActivityEventType[] = ["book_added", "book_finished"];
+const ALL_OFF = { publications: false, reading: false, votes: false, follows: false };
+
+test("turning a category on backfills the feed types of that category from the 30 days before now, and none of it runs inside the request", async () => {
+  const { repo, backfills } = createRepoFake();
+  const { deps } = createDeps(repo);
+  const tasks = withBackgroundTasks(deps);
+  const service = createCommunityService(deps);
+  repo.upsertProfile(profileRow("alice"));
+  repo.insertFollow({ follower_id: "bob", followee_id: "alice", created_at: at(1) });
+
+  service.updateFeedSettings("alice", { ...DEFAULT_FEED_SETTINGS, reading: true });
+
+  assert.equal(tasks.length, 1);
+  assert.deepEqual(backfills, []);
+  await Promise.all(tasks);
+  assert.deepEqual(backfills, [{ authorId: "alice", followerIds: ["bob"], types: READING_TYPES, since: new Date(NOW - 30 * DAY_MS).toISOString() }]);
+});
+
+test("only the categories that came on are backfilled, each turn-on in its own task, and several coming on together share one", async () => {
+  const { repo, backfills } = createRepoFake();
+  const { deps } = createDeps(repo);
+  const tasks = withBackgroundTasks(deps);
+  const service = createCommunityService(deps);
+  repo.upsertProfile(profileRow("alice"));
+  repo.insertFollow({ follower_id: "bob", followee_id: "alice", created_at: at(1) });
+
+  service.updateFeedSettings("alice", ALL_OFF);
+  assert.equal(tasks.length, 0);
+  service.updateFeedSettings("alice", { ...ALL_OFF, publications: true, votes: true });
+  service.updateFeedSettings("alice", { ...ALL_OFF, publications: true, votes: true, reading: true });
+  await Promise.all(tasks);
+  assert.deepEqual(backfills.map((backfill) => backfill.types), [["tierlist_published", "tournament_published", "voted_on"], READING_TYPES]);
+
+  service.updateFeedSettings("alice", ALL_OFF);
+  service.updateFeedSettings("alice", { publications: true, reading: true, votes: true, follows: true });
+  await Promise.all(tasks);
+  assert.equal(tasks.length, 3);
+  assert.deepEqual(backfills[2]?.types, FEED_EVENT_TYPES);
+});
+
+test("saving settings that turn nothing on starts no backfill: a category already on, one turned off, one with no feed events, and an author who never chose", async () => {
+  const { repo, backfills } = createRepoFake();
+  const { deps, usernames } = createDeps(repo);
+  const tasks = withBackgroundTasks(deps);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  repo.upsertProfile(profileRow("alice", { published: 0 }));
+  repo.insertFollow({ follower_id: "bob", followee_id: "alice", created_at: at(1) });
+  const withoutPublications = { ...DEFAULT_FEED_SETTINGS, publications: false, votes: false };
+  const readingOnly = { ...withoutPublications, reading: true };
+
+  service.updateFeedSettings("zed", DEFAULT_FEED_SETTINGS);
+  service.updateFeedSettings("alice", DEFAULT_FEED_SETTINGS);
+  service.updateFeedSettings("alice", { ...DEFAULT_FEED_SETTINGS, follows: false, readerGlyph: true });
+  service.updateFeedSettings("alice", { ...DEFAULT_FEED_SETTINGS, follows: true, readerGlyph: true });
+  service.publishProfile("alice", {});
+  service.publishProfile("alice", { shareReading: false });
+  service.updateFeedSettings("alice", withoutPublications);
+  service.updateFeedSettings("alice", withoutPublications);
+  repo.updateFeedSettings("alice", readingOnly);
+  service.updateFeedSettings("alice", readingOnly);
+  service.publishProfile("alice", { shareReading: true });
+  service.updateFeedSettings("alice", withoutPublications);
+
+  assert.equal(tasks.length, 0);
+  assert.deepEqual(backfills, []);
+});
+
+test("publishing with shareReading backfills reading when it turns reading on, from a first publish too, and only then", async () => {
+  const { repo, backfills } = createRepoFake();
+  const { deps, usernames } = createDeps(repo);
+  const tasks = withBackgroundTasks(deps);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  repo.insertFollow({ follower_id: "bob", followee_id: "alice", created_at: at(1) });
+
+  service.publishProfile("alice", { shareReading: true });
+  assert.equal(tasks.length, 1);
+  await Promise.all(tasks);
+  assert.deepEqual(backfills.map((backfill) => [backfill.authorId, backfill.types]), [["alice", READING_TYPES]]);
+
+  service.publishProfile("alice", { shareReading: true });
+  service.publishProfile("alice", { shareReading: false });
+  assert.equal(tasks.length, 1);
+  service.publishProfile("alice", { shareReading: true });
+  assert.equal(tasks.length, 2);
+});
+
+test("a failing backfill rejects its task for the runner to log, and the settings it was started by stay saved", async () => {
+  const { repo } = createRepoFake();
+  const { deps } = createDeps(repo);
+  const tasks = withBackgroundTasks(deps);
+  const failing = { ...repo, backfillInbox: () => { throw new Error("inbox is full"); } };
+  const service = createCommunityService({ ...deps, repo: failing });
+  repo.upsertProfile(profileRow("alice"));
+  repo.insertFollow({ follower_id: "bob", followee_id: "alice", created_at: at(1) });
+
+  service.updateFeedSettings("alice", { ...DEFAULT_FEED_SETTINGS, reading: true });
+
+  await assert.rejects(Promise.all(tasks), /inbox is full/);
+  assert.equal(service.getFeedSettings("alice").reading, true);
+});
+
+test("a service built without a background runner still runs the backfill", async () => {
+  const { repo, backfills } = createRepoFake();
+  const { deps } = createDeps(repo);
+  const service = createCommunityService(deps);
+  repo.upsertProfile(profileRow("alice"));
+  repo.insertFollow({ follower_id: "bob", followee_id: "alice", created_at: at(1) });
+
+  service.updateFeedSettings("alice", { ...DEFAULT_FEED_SETTINGS, reading: true });
+
+  for (let turns = 0; turns < 20 && backfills.length === 0; turns++) await new Promise(setImmediate);
+  assert.deepEqual(backfills.map((backfill) => backfill.followerIds), [["bob"]]);
 });
 
 test("getLibrary serves a published owner's library and 404s otherwise", () => {
