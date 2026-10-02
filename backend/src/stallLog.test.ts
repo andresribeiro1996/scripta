@@ -4,7 +4,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import Fastify from "fastify";
 import { STALL_MS, checkEventLoop, registerStallLog } from "./stallLog.js";
 
-type LogLine = { level: number; msg: string; method?: string; route?: string; blockedMs?: number; maxMs?: number };
+type LogLine = { level: number; msg: string; reqId?: string; method?: string; route?: string; blockedMs?: number; maxMs?: number };
 
 function busyWait(ms: number) {
   const end = performance.now() + ms;
@@ -28,8 +28,8 @@ function build(t: TestContext) {
   return { app, lines, stalls: () => lines.filter((line) => line.msg === "handler blocked the event loop") };
 }
 
-test("a handler that computes for longer than STALL_MS is logged with its method, route and time", async (t) => {
-  const { app, lines } = build(t);
+test("a handler that computes for longer than STALL_MS is logged with its request id, method, route and time", async (t) => {
+  const { app, stalls } = build(t);
   app.get("/slow", () => {
     busyWait(250);
     return { ok: true };
@@ -39,11 +39,11 @@ test("a handler that computes for longer than STALL_MS is logged with its method
 
   assert.equal(res.statusCode, 200);
   assert.deepEqual(res.json(), { ok: true });
-  assert.equal(lines.length, 1);
-  const [line] = lines;
+  assert.equal(stalls().length, 1);
+  const [line] = stalls();
   assert.ok(line);
   assert.equal(line.level, 40);
-  assert.equal(line.msg, "handler blocked the event loop");
+  assert.ok(line.reqId);
   assert.equal(line.method, "GET");
   assert.equal(line.route, "/slow");
   assert.ok(line.blockedMs !== undefined && line.blockedMs >= STALL_MS);
@@ -51,17 +51,17 @@ test("a handler that computes for longer than STALL_MS is logged with its method
 });
 
 test("a fast handler logs nothing", async (t) => {
-  const { app, lines } = build(t);
+  const { app, stalls } = build(t);
   app.get("/fast", () => ({ ok: true }));
 
   const res = await app.inject("/fast");
 
   assert.equal(res.statusCode, 200);
-  assert.deepEqual(lines, []);
+  assert.deepEqual(stalls(), []);
 });
 
 test("an async handler that only waits logs nothing", async (t) => {
-  const { app, lines } = build(t);
+  const { app, stalls } = build(t);
   app.get("/waits", async () => {
     await sleep(300);
     return { ok: true };
@@ -71,7 +71,7 @@ test("an async handler that only waits logs nothing", async (t) => {
 
   assert.equal(res.statusCode, 200);
   assert.deepEqual(res.json(), { ok: true });
-  assert.deepEqual(lines, []);
+  assert.deepEqual(stalls(), []);
 });
 
 test("an async handler that computes before its first await is logged and still resolves", async (t) => {
@@ -150,6 +150,19 @@ test("a plugin route at its prefix root logs one route name for both of its path
   assert.deepEqual(stalls().map((line) => line.route), ["/mod", "/mod"]);
 });
 
+test("the logged route is the route pattern, not the requested URL with its parameters and query", async (t) => {
+  const { app, stalls } = build(t);
+  app.get("/items/:id", () => {
+    busyWait(250);
+    return { ok: true };
+  });
+
+  const res = await app.inject("/items/42?code=secret");
+
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(stalls().map((line) => line.route), ["/items/:id"]);
+});
+
 test("checkEventLoop logs a max delay over STALL_MS once, in milliseconds, and resets the histogram", () => {
   const histogram = { max: 250.4e6, reset: mock.fn() };
   const warn = mock.fn();
@@ -195,4 +208,12 @@ test("registerStallLog checks the real event loop every 10 s until the app close
   await app.close();
   t.mock.timers.tick(10_000);
   assert.equal(lines.length, 1);
+});
+
+test("registerStallLog's interval does not keep the process alive", (t) => {
+  const setIntervalSpy = t.mock.method(globalThis, "setInterval");
+
+  build(t);
+
+  assert.equal((setIntervalSpy.mock.calls[0]?.result as NodeJS.Timeout).hasRef(), false);
 });
