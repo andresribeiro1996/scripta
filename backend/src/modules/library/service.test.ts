@@ -26,7 +26,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 const { createSqliteLibraryRepository } = await import("./adapters/sqlite/sqliteLibraryRepository.js");
 const { applyLibrarySchema, openLibraryDb } = await import("./adapters/sqlite/connection.js");
 const { LibraryConflictError } = await import("./domain/errors.js");
-const { backfillLibraryDerived } = await import("./migration.js");
+const { backfillLibraryDerived, readEmbeddedMurals } = await import("./migration.js");
 const { LIBRARY_DERIVED_VERSION, LIBRARY_MATCH_BOOK_CAP } = await import("./domain/constants.js");
 const { createLibraryService, deriveLibraryData } = await import("./service.js");
 const { readerGlyphFor, sharedBookCounts, sharedBooks } = await import("./publicResolver.js");
@@ -620,6 +620,25 @@ test("deleting a user's data clears the document and its derived rows, and only 
   assert.equal(keyRows(db, "kept").length, 1);
   assert.equal(storedGlyph(db, "kept"), null);
   db.close();
+});
+
+test("the embedded-murals scan returns only documents that still hold murals, and parses no other", () => {
+  const withMurals = JSON.stringify({ books: [{ Title: "Dune" }], murals: [{ id: "m1", name: "One" }, { id: "m2", name: "Two" }] });
+  const withoutMurals = JSON.stringify({ books: [{ Title: "Emma" }] });
+  rawDocument("scan-with", withMurals);
+  rawDocument("scan-without", withoutMurals);
+  const parse = mock.method(JSON, "parse");
+  try {
+    assert.deepEqual(readEmbeddedMurals(), [
+      { userId: "scan-with", rawMural: { id: "m1", name: "One" } },
+      { userId: "scan-with", rawMural: { id: "m2", name: "Two" } }
+    ]);
+    const parsed = parse.mock.calls.map((call) => call.arguments[0]);
+    assert.ok(parsed.includes(withMurals));
+    assert.ok(!parsed.includes(withoutMurals));
+  } finally {
+    parse.mock.restore();
+  }
 });
 
 const dune = (extra: Book = {}): Book => ({ Title: "Dune", Attribution: "Frank Herbert", ISBN: "9780441013593", ...extra });
