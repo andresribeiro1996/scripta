@@ -1,5 +1,4 @@
 import type { DatabaseSync, StatementSync } from "node:sqlite";
-import { normalizeFeedSettings, type FeedSettings } from "@scripta/shared/community";
 import type { CommunityRepository, CursorKeyset } from "../../domain/ports.js";
 import type { EventRow, FollowRow, ProfileRow } from "../../domain/types.js";
 
@@ -41,11 +40,18 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
     INSERT OR IGNORE INTO events (id, user_id, type, ref_type, ref_id, payload, created_at, trace_id, source)
     VALUES ($id, $user_id, $type, $ref_type, $ref_id, $payload, $created_at, $trace_id, $source)
   `);
-  const getFeedSettingsStmt = db.prepare(`SELECT feed_settings FROM profiles WHERE user_id = ?`);
+  const getFeedSettingsStmt = db.prepare(`SELECT show_publications, show_reading, show_votes, show_follows, show_reader_glyph FROM profiles WHERE user_id = ?`);
   const updateFeedSettingsStmt = db.prepare(`
-    INSERT INTO profiles (user_id, published, mural_id, published_at, updated_at, feed_settings)
-    VALUES ($user_id, 0, NULL, NULL, $updated_at, $feed_settings)
-    ON CONFLICT(user_id) DO UPDATE SET feed_settings = excluded.feed_settings, updated_at = excluded.updated_at
+    INSERT INTO profiles (user_id, published, mural_id, published_at, updated_at, feed_settings, show_publications, show_reading, show_votes, show_follows, show_reader_glyph)
+    VALUES ($user_id, 0, NULL, NULL, $updated_at, $feed_settings, $show_publications, $show_reading, $show_votes, $show_follows, $show_reader_glyph)
+    ON CONFLICT(user_id) DO UPDATE SET
+      feed_settings = excluded.feed_settings,
+      show_publications = excluded.show_publications,
+      show_reading = excluded.show_reading,
+      show_votes = excluded.show_votes,
+      show_follows = excluded.show_follows,
+      show_reader_glyph = excluded.show_reader_glyph,
+      updated_at = excluded.updated_at
   `);
 
   const listEventsStmt = db.prepare(`
@@ -123,16 +129,27 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
       return listPublishedProfilesStmt.all(limit) as unknown as ProfileRow[];
     },
     getFeedSettings(userId) {
-      const row = getFeedSettingsStmt.get(userId) as { feed_settings: string | null } | undefined;
-      if (!row || row.feed_settings === null) return null;
-      try {
-        return normalizeFeedSettings(JSON.parse(row.feed_settings));
-      } catch {
-        return null;
-      }
+      const row = getFeedSettingsStmt.get(userId) as { show_publications: number; show_reading: number; show_votes: number; show_follows: number; show_reader_glyph: number } | undefined;
+      if (!row) return null;
+      return {
+        publications: row.show_publications === 1,
+        reading: row.show_reading === 1,
+        votes: row.show_votes === 1,
+        follows: row.show_follows === 1,
+        readerGlyph: row.show_reader_glyph === 1
+      };
     },
     updateFeedSettings(userId, settings) {
-      updateFeedSettingsStmt.run({ $user_id: userId, $updated_at: new Date().toISOString(), $feed_settings: JSON.stringify(settings) });
+      updateFeedSettingsStmt.run({
+        $user_id: userId,
+        $updated_at: new Date().toISOString(),
+        $feed_settings: JSON.stringify(settings),
+        $show_publications: Number(settings.publications),
+        $show_reading: Number(settings.reading),
+        $show_votes: Number(settings.votes),
+        $show_follows: Number(settings.follows),
+        $show_reader_glyph: Number(settings.readerGlyph ?? false)
+      });
     },
     insertEvent(row) {
       insertEventStmt.run({

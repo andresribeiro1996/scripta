@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { test } from "node:test";
+import { mock, test } from "node:test";
 
 const tempRoot = mkdtempSync(join(tmpdir(), "community-schema-"));
 process.env.JWT_ACCESS_SECRET = "a".repeat(64);
@@ -141,4 +141,73 @@ test("an events table from before trace ids gains the columns and keeps its rows
     assert.deepEqual(tableInfo(db, "events_history"), tableInfo(db, "events"));
     db.close();
   }
+});
+
+const LEGACY_PROFILES = "CREATE TABLE profiles (user_id TEXT PRIMARY KEY, published INTEGER NOT NULL DEFAULT 0, mural_id TEXT, published_at TEXT, updated_at TEXT NOT NULL, feed_settings TEXT)";
+
+function feedColumns(db: DatabaseSync) {
+  return db
+    .prepare("SELECT user_id, show_publications AS publications, show_reading AS reading, show_votes AS votes, show_follows AS follows, show_reader_glyph AS glyph FROM profiles ORDER BY user_id")
+    .all()
+    .map((row) => ({ ...row }));
+}
+
+test("the feed settings JSON is copied into the new profile columns once, and what can't be read switches every category off and names the user", () => {
+  const path = removeDatabase();
+  const existing = new DatabaseSync(path);
+  existing.exec(LEGACY_PROFILES);
+  const insert = existing.prepare("INSERT INTO profiles (user_id, updated_at, feed_settings) VALUES (?, '2026-09-01T00:00:00.000Z', ?)");
+  insert.run("all-chosen", JSON.stringify({ publications: false, reading: true, votes: false, follows: true, readerGlyph: true }));
+  insert.run("no-glyph", JSON.stringify({ publications: true, reading: true, votes: true, follows: false }));
+  insert.run("unparsable", "{not json");
+  insert.run("partial", JSON.stringify({ publications: true, reading: true }));
+  insert.run("wrong-type", JSON.stringify({ publications: "yes", reading: true, votes: true, follows: true }));
+  insert.run("null-json", "null");
+  insert.run("never-chose", null);
+  existing.close();
+
+  const warn = mock.method(console, "warn", () => {});
+  const db = openCommunityDb();
+  const warned = warn.mock.calls.map((call) => String(call.arguments[0]));
+  warn.mock.restore();
+
+  assert.deepEqual(feedColumns(db), [
+    { user_id: "all-chosen", publications: 0, reading: 1, votes: 0, follows: 1, glyph: 1 },
+    { user_id: "never-chose", publications: 1, reading: 0, votes: 1, follows: 1, glyph: 0 },
+    { user_id: "no-glyph", publications: 1, reading: 1, votes: 1, follows: 0, glyph: 0 },
+    { user_id: "null-json", publications: 0, reading: 0, votes: 0, follows: 0, glyph: 0 },
+    { user_id: "partial", publications: 0, reading: 0, votes: 0, follows: 0, glyph: 0 },
+    { user_id: "unparsable", publications: 0, reading: 0, votes: 0, follows: 0, glyph: 0 },
+    { user_id: "wrong-type", publications: 0, reading: 0, votes: 0, follows: 0, glyph: 0 }
+  ]);
+  assert.equal(warned.length, 4);
+  for (const userId of ["unparsable", "partial", "wrong-type", "null-json"]) assert.ok(warned.some((message) => message.includes(userId)), userId);
+
+  db.exec("UPDATE profiles SET show_votes = 0 WHERE user_id = 'no-glyph'");
+  db.close();
+  const again = mock.method(console, "warn", () => {});
+  const reopened = openCommunityDb();
+  again.mock.restore();
+  assert.equal(again.mock.callCount(), 0);
+  assert.equal(feedColumns(reopened).find((row) => row.user_id === "no-glyph")?.votes, 0);
+  reopened.close();
+});
+
+test("a feed settings copy that fails leaves the profiles table as it was, so the next open starts over", () => {
+  const path = removeDatabase();
+  const existing = new DatabaseSync(path);
+  existing.exec(`
+    ${LEGACY_PROFILES};
+    INSERT INTO profiles (user_id, updated_at, feed_settings) VALUES ('u1', '2026-09-01T00:00:00.000Z', '{"publications":true,"reading":false,"votes":false,"follows":true}');
+    CREATE TRIGGER refuse_update BEFORE UPDATE ON profiles BEGIN SELECT RAISE(ABORT, 'refused'); END;
+  `);
+
+  assert.throws(() => openCommunityDb(), /refused/);
+  assert.equal((existing.prepare("PRAGMA table_info(profiles)").all() as Array<{ name: string }>).some((column) => column.name === "show_votes"), false);
+
+  existing.exec("DROP TRIGGER refuse_update");
+  existing.close();
+  const db = openCommunityDb();
+  assert.deepEqual(feedColumns(db), [{ user_id: "u1", publications: 1, reading: 0, votes: 0, follows: 1, glyph: 0 }]);
+  db.close();
 });

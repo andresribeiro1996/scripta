@@ -4,6 +4,7 @@ import { join } from "node:path";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import Fastify from "fastify";
+import { DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
 import { registerTrace } from "../../../../trace.js";
 
 const tempRoot = mkdtempSync(join(tmpdir(), "community-repo-"));
@@ -161,6 +162,33 @@ test("deleteUserData removes follows both ways, the profile, and events by or ab
   assert.equal(r.getProfileRow("leaver"), undefined);
   const left = openCommunityDb().prepare(`SELECT id FROM events WHERE id IN ('erase-e1', 'erase-e2', 'erase-e3')`).all().map((e) => e.id);
   assert.deepEqual(left, ["erase-e3"]);
+});
+
+test("feed settings are absent without a profile, default for a profile that never chose, and read back as written", () => {
+  const r = repo();
+  const at = "2026-09-01T00:00:00.000Z";
+  assert.equal(r.getFeedSettings("chooser"), null);
+
+  r.upsertProfile({ user_id: "chooser", published: 1, mural_id: "m1", published_at: at, updated_at: at, feed_settings: null });
+  assert.deepEqual(r.getFeedSettings("chooser"), DEFAULT_FEED_SETTINGS);
+
+  const chosen = { publications: false, reading: true, votes: false, follows: true, readerGlyph: true };
+  r.updateFeedSettings("chooser", chosen);
+  assert.deepEqual(r.getFeedSettings("chooser"), chosen);
+  assert.equal(r.getProfileRow("chooser")?.feed_settings, JSON.stringify(chosen));
+  assert.equal(r.getProfileRow("chooser")?.published, 1);
+  assert.equal(r.getProfileRow("chooser")?.mural_id, "m1");
+
+  r.updateFeedSettings("chooser", { publications: true, reading: false, votes: true, follows: false });
+  assert.deepEqual(r.getFeedSettings("chooser"), { publications: true, reading: false, votes: true, follows: false, readerGlyph: false });
+});
+
+test("choosing feed settings before publishing creates a private profile that keeps them", () => {
+  const r = repo();
+  const chosen = { publications: false, reading: true, votes: false, follows: false, readerGlyph: true };
+  r.updateFeedSettings("private-chooser", chosen);
+  assert.deepEqual(r.getFeedSettings("private-chooser"), chosen);
+  assert.equal(r.getProfileRow("private-chooser")?.published, 0);
 });
 
 test("listPublishedProfiles returns published rows newest update first and skips unpublished ones", () => {
