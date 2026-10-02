@@ -58,9 +58,12 @@ Railway deploys separately (and can be paused).
   - Use a `Map` from normalized name to the first matching group index,
     updated whenever a group is pushed.
   - Use a `Set` of keys per group it touches.
-  - Pin it with the existing tests plus a 20,000-book case: one series per
-    book, and 2,000 series. Output must match a frozen copy of the old
-    implementation run in the test, with ids and dates normalized.
+  - Pin it with the existing tests. Also compare old and new output on
+    inputs of up to about 2,000 books, in both shapes: one series per book,
+    and many books per series. The old version is a frozen copy run in the
+    test, with ids and dates normalized. It is quadratic, about 100 s at
+    20,000 books, so it never runs bigger than that.
+  - The 20,000-book cases only time the new version, under 500 ms.
   - Measured today: 3.2 s at 20,000 books and 2,000 series, and 15.8 s at
     8,000 books with one series each.
 - [ ] **Move the add pipeline into shared** as
@@ -90,8 +93,19 @@ new `librarySaver.ts`, their tests, and the exports.
   - `add` is `buildMergedLibrary(data, { books: [book] })`.
   - `changed` is `next !== data` for `membership` and `book`. `add` is always
     `true`.
-- [ ] **`createLibrarySaver({ send, fetch, write })`.** Implement the spec's
-  "Apps: one saver" section exactly.
+- [ ] **`createLibrarySaver({ send, put, fetch, write })`.** Implement the
+  spec's "Apps: one saver" section exactly. In particular:
+  - `receive` applies at once and is not queued. Jobs call `fetch` directly.
+  - A document at an equal version is ignored.
+  - An add is never folded into `confirmed`.
+  - `saveWhole` runs its updater on `confirmed`, keeps the same-data skip,
+    and keeps one 409 replay.
+  - Merges are queue jobs.
+  - A reorder updater shows through `pending`.
+  - Timeouts are 30 s for a change and 60 s for a whole save.
+  - `dispose()` also stops the running job at its next await.
+  - A new tap is applied to the current view; recompute from `confirmed`
+    only when it is replaced or a change fails.
   - `confirmed` and `pending`.
   - `write(view)` after every change of either.
   - One FIFO queue for:
@@ -109,7 +123,13 @@ new `librarySaver.ts`, their tests, and the exports.
 
   Model the tests on `frontend/scripts/test-library-update.mts`, with fake
   `send`, `fetch` and `write`.
-- [ ] **Tests**, all from the spec's verification list:
+- [ ] **Tests**, all from the spec's verification list, plus:
+  - an add that seeds a series is replaced by the fetched document, so the
+    server's group id is the one that ticks use;
+  - a replay inside a whole save doesn't deadlock;
+  - a hung request times out and later jobs run;
+  - `dispose()` during a 409 replay sends nothing more;
+  - a stale share token can't come back at an equal version.
   - copy behind (two devices, a stale service-worker fetch, a rename racing
     a tick): the next whole save gets a 409;
   - on-off-on never shows off after the last tap, and ends on when the first
@@ -135,14 +155,23 @@ glyph-only helper fits.
   - status to 2, with glyph and event;
   - add, with the full derive.
 
-  Put the numbers in the commit message, along with both buckets' combined
-  per-account budget (120/min of changes plus 30/min of writes). If a 10 MiB
-  membership or book change costs more than 100 ms, stop and report back.
+  The 10 MiB fixture is 20,000 bare books in 2,000 series, which is the
+  worst shape: parse about 30 ms, `readerIdentity` about 88 ms, stringify
+  about 39 ms.
+
+  Put the numbers in the commit message, with both buckets' combined
+  per-account budget (changes plus 30/min of writes). If a 10 MiB membership
+  or book change costs more than 100 ms, which is likely for this fixture,
+  set the changes bucket to 60/min instead of 120. Record that in the commit
+  message and carry on; don't stop for a decision.
 - [ ] **`updateDocumentData(userId, json, expectedUpdatedAt, glyph | "keep")`.**
   - Precondition and `updated_at` rule as in `upsertDocument`
     (`sqliteLibraryRepository.ts:69-83`). If the precondition fails, return
     `undefined` and let the service throw `LibraryConflictError`.
-  - With a glyph, write `library_derived` with the new version.
+  - With a glyph, write `library_derived` with the new version, only where
+    the derived row was current for the previous version, since that version
+    also vouches for the match keys. A stale row stays stale for the boot
+    backfill.
   - With `"keep"`, update `source_updated_at` only where it equals the
     previous `updated_at`.
   - Never touch `library_match_keys`.
@@ -232,15 +261,18 @@ Wait for the Railway deploy, then check the gate.
   `["library"]`.
 
 - [ ] **One saver per signed-in user**, next to the QueryClient
-  (`main.tsx:14`). `dispose()` it when the user changes.
+  (`main.tsx:14`), provided through a context beside `QueryClientProvider`.
+  `dispose()` it when the user changes.
+  - `beforeunload` asks the reader to stay while `pending` is not empty.
   - `write` is `setQueryData(["library"], view)`.
   - The query function of `["library"]` is the saver's fetch.
 - [ ] **Route every writer of `["library"]` through the saver**:
   - `updateLibrary` becomes `saveWhole`;
   - merge responses;
   - share and unshare;
-  - drag-reorder's optimistic write. That write becomes the saver's job:
-    a reorder is a `saveWhole`.
+  - drag-reorder's optimistic write. A reorder becomes a `saveWhole` whose
+    updater shows through `pending`, so the card still moves at once.
+  - Duplicate merges become queue jobs.
 - [ ] **Switch the callers to `submit`.**
   - Group checkbox: `handleToggleBook`.
   - Status and rating: `LibraryPage.tsx:243-275`, `PickNextSheet.tsx:27`.
@@ -267,9 +299,12 @@ Wait for the Railway deploy, then check the gate.
   `TierlistCreateScreen.tsx:28`, `TierlistEditorScreen.tsx:46`,
   `ArenaSeedScreen.tsx:25`.
 
-- [ ] **Same as Task 3**, with the saver created next to the QueryClient
-  (`_layout.tsx:19`). The four screens use the saver's fetch as their query
-  function.
+- [ ] **Same as Task 3**, minus `beforeunload`. The saver is created next to
+  the QueryClient (`_layout.tsx:19`) and provided through a context.
+  - The four screens use the saver's fetch, which resolves to the view, as
+    their query function.
+  - With no library (404) they now show an empty shelf instead of "couldn't
+    be loaded"; that is accepted.
 - [ ] **Callers.**
   - Group row: `GroupDetail.tsx:79-85`.
   - Status and rating: `useLibraryActions.ts:67-76`.

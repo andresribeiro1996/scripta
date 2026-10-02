@@ -66,13 +66,14 @@ and for every other action.
   (or already out). `setReadStatus` and `setRating` already return the same
   book. A membership or book change that alters nothing therefore returns the
   same `data`, the server skips the write, and `updatedAt` does not move.
+  A book change that alters no matched book also returns the same `data`.
   `add` always writes. Re-adding a book you already have replaces its
   ContentID with a new `manual:` id, so it emits `book_added` again, as it
   does today.
 - **Answers.**
   - Success: 200 `{ updatedAt, baseUpdatedAt }`. `baseUpdatedAt` is the
-    stored `updated_at` the change was applied to; it equals `updatedAt` on
-    a no-op.
+    stored `updated_at` the change was applied to (`null` when there was no
+    stored document); it equals `updatedAt` on a no-op.
   - 400 for an invalid body: `day` missing with `readStatus: 2`, a rating
     outside 1–5, or a `bookKey` outside 1–2000 characters.
   - 404 for an unknown group, or for no book with that key on membership-in
@@ -114,56 +115,101 @@ and for every other action.
 
 ## Apps: one saver, shared
 
-The hard part is keeping the apps' copy right while changes are in flight. It
-lives once, in `@scripta/shared`, as a saver with injected `send`, `fetch` and
-`write`, tested without React. Each app's hook is a thin adapter.
+The hard part is keeping the app's copy right while changes are in flight. It
+lives once, in `@scripta/shared`, as a saver with injected `send`, `put`,
+`fetch` and `write`, tested without React. Each app's hook is a thin adapter.
 
-- **Confirmed and pending.** The saver keeps:
-  - `confirmed`, the last document from the server, with its `updatedAt`;
-  - `pending`, the changes not yet confirmed, in order.
+**What it keeps**
+- `confirmed`: the last document from the server, with its `updatedAt`.
+- `pending`: the changes not yet confirmed, in order.
 
-  What the app shows (the `["library"]` cache) is always `confirmed` with
-  `pending` applied. A tap adds to `pending`, so the screen changes at once.
-- **One queue for every write.** Changes and whole-library saves go through
-  one queue, one at a time, in order. A rename waits behind ticks already
-  sent. No two writes from the same app are ever in flight together.
-- **A change succeeds.**
-  - If `baseUpdatedAt` equals `confirmed.updatedAt`, the server applied the
-    change to exactly the app's copy. `confirmed` becomes `confirmed` plus the
-    change, with the new `updatedAt`, and the change leaves `pending`.
-  - Otherwise the app's copy was behind: a stale-first service-worker
-    response, or another device. The app keeps its old `updatedAt`, marks the
-    change as saved at the new one, and fetches. The change stays applied
-    until a document at least that new arrives.
+What the app shows (the `["library"]` cache) is always `confirmed` with
+`pending` applied. A tap adds to `pending` and is applied to the current view
+at once. The view is recomputed from `confirmed` only when `confirmed` is
+replaced or a change fails; at 20,000 books one change costs about 9 ms to
+apply.
 
-  Taking the new `updatedAt` without the base check would let the next
-  whole-library save pass the precondition and silently undo changes the
-  copy never had.
-- **Every server document goes through the saver.** Fetches, `PUT` echoes,
-  merge responses and the refetch after a failure all go through it.
-  - A document older than `confirmed` (by `updatedAt`; an empty copy counts
-    as older) is ignored.
-  - A newer one replaces `confirmed` and drops the pending changes it
-    already contains.
-  - Share and unshare don't move `updatedAt`; their `shareToken` and
-    `shareUrl` are always applied.
-  - The query function of `["library"]` is the saver's fetch. That includes
-    mobile's four screens with their own raw `GET`: `QuizCreateScreen.tsx:49`,
-    `TierlistCreateScreen.tsx:28`, `TierlistEditorScreen.tsx:46` and
-    `ArenaSeedScreen.tsx:25`.
-- **A change fails.** It leaves `pending`, the view is recomputed, the app
+**One queue for the app's library writes.** Changes, whole-library saves and
+merges go through one queue, one at a time, in order. A rename waits behind
+ticks already sent. Share, unshare and the public-page add
+(`POST /library/books`) stay outside it. They don't send the copy's
+`updatedAt` as a precondition, and the public-page add doesn't touch the
+cache.
+
+**A change succeeds**
+- If `baseUpdatedAt` equals `confirmed.updatedAt`, the server applied the
+  change to exactly the app's copy. `confirmed` becomes `confirmed` plus the
+  change, with the new `updatedAt`, and the change leaves `pending`. This
+  does not apply to an add (below).
+- Otherwise the app's copy was behind: a stale-first service-worker response,
+  or another device. The app keeps its old `updatedAt`, marks the change as
+  saved at the new one, and fetches. The change stays applied until a
+  document at least that new arrives. If `confirmed` is already at least that
+  new, the change leaves `pending` at once.
+- **An add is never folded into `confirmed`.** `deriveSeriesGroups` creates
+  groups with random ids and the current time, so the app's copy and the
+  server's differ after an add that seeds a series. The add stays in
+  `pending`, marked as saved at its `updatedAt`, and the app fetches. The
+  fetched document is newer than `confirmed`, so it replaces it and the add
+  leaves `pending`. With no stored document, `baseUpdatedAt` is `null`.
+
+Taking a new `updatedAt` without the base check would let the next
+whole-library save pass the precondition and silently undo changes the copy
+never had.
+
+**Every server document goes through `receive`.** That means fetches, `PUT`
+echoes and merge responses.
+- It applies at once and is not a queue job. A job that needs a document,
+  such as the 409 replay, calls the injected `fetch` directly and passes the
+  result to `receive`.
+- A document older than `confirmed`, or at the same version, is ignored.
+  When there is no `confirmed` yet, any document is accepted.
+- A newer one replaces `confirmed` and drops the pending changes it already
+  contains.
+- Share and unshare don't move `updatedAt`; their `shareToken` and `shareUrl`
+  are always applied. Because an equal version is ignored, a stale
+  service-worker copy can't bring an old token back.
+- The query function of `["library"]` is the saver's fetch, and it resolves to
+  the saver's view after `receive`, never to the fetched document. That
+  includes mobile's four screens with their own raw `GET`:
+  `QuizCreateScreen.tsx:49`, `TierlistCreateScreen.tsx:28`,
+  `TierlistEditorScreen.tsx:46` and `ArenaSeedScreen.tsx:25`. A 404 means no
+  library, and those screens then show an empty shelf instead of "couldn't be
+  loaded".
+
+**Whole-library saves.** `saveWhole(updater)` replaces each app's
+`updateLibrary`.
+- When its turn comes, it runs the updater on `confirmed`, not on the view,
+  so taps queued after it aren't uploaded early.
+- It keeps today's single 409 replay: fetch, `receive`, then run the updater
+  on that document and resend once. It also keeps web's skip when the updater
+  returns the same data (`saveLibraryUpdate.ts:13`), in both apps.
+- A reorder (`reorderOnDrop`, a pure updater) also joins `pending` so the
+  card moves at once, as drag-reorder does today. Other whole saves don't,
+  because some updaters create ids each time they run (`makeGroup` at
+  `GroupsPage.tsx:134`).
+
+**Failures and timeouts**
+- A change that fails leaves `pending`, the view is recomputed, the app
   fetches, and the caller shows `saveFailureMessage`. Rollback doesn't depend
   on the fetch, which may return an older copy.
-- **Callers learn the outcome.** A submitted change resolves `true` or
-  `false` when the server answers. The finish sheet opens on the status
-  change's result (`LibraryPage.tsx:763`, `book/[key]/index.tsx:28-29`).
-- **After an add, fetch.** `deriveSeriesGroups` creates groups with random
-  ids and the current time, so the app's copy and the server's differ after
-  an add that seeds a series.
-- **One saver per signed-in user.** Each app already makes its query client
-  per user (`frontend/src/main.tsx:14`, `mobile/src/app/_layout.tsx:19`). The
-  saver lives beside it, and unsent jobs are dropped when the user changes.
-  A module-level queue could send a tick under the next account.
+- Every queued request is aborted after a timeout and treated as a failure:
+  30 s for a change, 60 s for a whole save. A hung request can't hold later
+  edits behind it.
+- On the web, `beforeunload` asks the reader to stay while `pending` is not
+  empty.
+
+**Callers learn the outcome.** A submitted change resolves `true` or `false`
+when the server answers. The finish sheet opens on the status change's
+result (`LibraryPage.tsx:763`, `book/[key]/index.tsx:28-29`).
+
+**One saver per signed-in user.** Each app already makes its query client per
+user (`frontend/src/main.tsx:14`, `mobile/src/app/_layout.tsx:19`). The saver
+lives beside it, provided through a context next to `QueryClientProvider`.
+`dispose()` drops unsent jobs and stops the running one at its next await:
+no fetch, replay, resend or `write` after it. Both apps read the token on
+every request, so an old account's job could otherwise send under the new
+one.
 
 ## Release order
 
@@ -172,9 +218,10 @@ Mobile's JavaScript ships over the air on any push to `main` that touches
 The web ships from the same push. Railway deploys the backend separately, and
 deploys can be paused. So there are two PRs:
 
-1. **Shared helpers and the server routes.** The apps' only change is the
-   shared add pipeline, which gives identical output, so the over-the-air
-   update it triggers is harmless.
+1. **Shared helpers and the server routes.** The apps' only changes are the
+   shared add pipeline, which gives identical output, and the membership
+   helpers no longer stamping a group on a no-op. The over-the-air update it
+   triggers is harmless.
 2. **Both apps' saver adapters and callers.** This merges only after the
    routes answer in production:
    `curl -s -o /dev/null -w '%{http_code}' -X PATCH https://api.atmyshelf.com/library/books`
