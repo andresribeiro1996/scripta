@@ -118,3 +118,17 @@ test("seedCatalog passes each entry's work key through", () => {
   seedCatalog([{ ...entry("9780141184272", "One"), workKey: "/works/OL5W" }], repo, () => NOW);
   assert.equal(repo.findBookByKey("isbn:9780141184272")!.ol_work_key, "OL5W");
 });
+
+test("seedCatalog marks created rows as seeded and an existing row keeps its creator", () => {
+  const { repo } = setup();
+  seedCatalog([entry("9780141184272", "One")], repo, () => NOW);
+  assert.equal(repo.findBookByKey("isbn:9780141184272")!.created_by, "seed");
+
+  const bare = repo.createBook({ title: "Two", author: "Author", isbn: "9780374520731" }, ["isbn:9780374520731"], NOW.toISOString());
+  seedCatalog([entry("9780374520731", "Two")], repo, () => NOW);
+  assert.equal(repo.getBook(bare.id)!.created_by, null);
+
+  const byPublisher = seedBook({ isbn: "9780062315007", title: "Three", author: "Author" }, repo, () => NOW, "publisher").book!;
+  seedCatalog([entry("9780062315007", "Three")], repo, () => NOW);
+  assert.equal(repo.getBook(byPublisher.id)!.created_by, "publisher");
+});

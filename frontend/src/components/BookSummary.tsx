@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { bookMetadataOptions, validBookRating } from "../lib/bookMetadata";
+import { bookMetadataOptions, summarySourceName, validBookRating } from "../lib/bookMetadata";
 
 export function BookSummary({ book }: { book: Record<string, unknown> }) {
   const personalRating = validBookRating(book.Rating);
@@ -52,14 +52,14 @@ export function BookSummary({ book }: { book: Record<string, unknown> }) {
             <p className="text-sm leading-6 whitespace-pre-wrap break-words">
               {data?.summary || "No summary available for this book yet."}
             </p>
-            {data && (
+            {data?.sourceUrl && (
               <a
                 href={data.sourceUrl}
                 target="_blank"
                 rel="noreferrer"
                 className="mt-2 inline-flex min-h-11 items-center text-xs text-(--color-text-dim) hover:text-(--color-accent)"
               >
-                Source: Open Library ↗
+                Source: {summarySourceName(data)} ↗
               </a>
             )}
           </>

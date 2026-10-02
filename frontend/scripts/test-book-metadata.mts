@@ -35,7 +35,7 @@ test("opening details reuses completed and in-flight preloads", async (t) => {
   let requests = 0;
   globalThis.fetch = async () => {
     requests++;
-    return Response.json({ metadata: { summary: "Ready before tapping.", rating: null, ratingCount: 0, sourceUrl: "https://openlibrary.org/works/OL1W", genres: [] } });
+    return Response.json({ metadata: { summary: "Ready before tapping.", rating: null, ratingCount: 0, sourceUrl: "https://openlibrary.org/works/OL1W", genres: [], pages: null, publisher: null, year: null, translator: null, summarySource: "openlibrary" } });
   };
   t.after(() => { globalThis.fetch = originalFetch; client.clear(); });
   const book = { ISBN: "9780553348477", Title: "Ecotopia", Attribution: "Ernest Callenbach" };
@@ -46,4 +46,13 @@ test("opening details reuses completed and in-flight preloads", async (t) => {
   assert.equal(requests, 1);
   await client.fetchQuery(bookMetadataOptions(book));
   assert.equal(requests, 1);
+});
+
+test("the source line names where the summary came from", async () => {
+  const { summarySourceName } = await import("../src/lib/bookMetadata.ts");
+  const base = { summary: "S", rating: null, ratingCount: 0, sourceUrl: "", genres: [], pages: null, publisher: "Antígona", year: null, translator: null };
+  assert.equal(summarySourceName({ ...base, summarySource: "openlibrary" }), "Open Library");
+  assert.equal(summarySourceName({ ...base, summarySource: "isbndb" }), "ISBNdb");
+  assert.equal(summarySourceName({ ...base, summarySource: "publisher" }), "Antígona");
+  assert.equal(summarySourceName({ ...base, summarySource: "publisher", publisher: null }), "Publisher");
 });

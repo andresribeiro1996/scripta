@@ -1,6 +1,6 @@
 import type { BooksRepository } from "../domain/ports.js";
 import { lookupIdentity } from "../domain/normalize.js";
-import type { BookRow } from "../domain/types.js";
+import type { BookCreator, BookRow } from "../domain/types.js";
 import type { SeedEntry } from "./rankedWorks.js";
 
 export interface SeedResult {
@@ -11,7 +11,7 @@ export interface SeedResult {
 
 type SeedRepo = Pick<BooksRepository, "findBookByKey" | "createBook" | "addKey" | "fillIdentity" | "setWorkKey">;
 
-export function seedBook(input: { isbn: string; title: string; author: string; workKey?: string }, repo: SeedRepo, now: () => Date): { outcome: "created" | "existing" | "invalid"; book?: BookRow } {
+export function seedBook(input: { isbn: string; title: string; author: string; workKey?: string }, repo: SeedRepo, now: () => Date, createdBy?: BookCreator): { outcome: "created" | "existing" | "invalid"; book?: BookRow } {
   const identity = lookupIdentity(input);
   if (!identity) return { outcome: "invalid" };
   const existing = repo.findBookByKey(identity.key);
@@ -25,11 +25,11 @@ export function seedBook(input: { isbn: string; title: string; author: string; w
   }
   const { titleKey } = identity;
   const keys = titleKey && titleKey !== identity.key && !repo.findBookByKey(titleKey) ? [identity.key, titleKey] : [identity.key];
-  return { outcome: "created", book: repo.createBook({ title: identity.title, author: identity.author, isbn: identity.isbn, workKey: input.workKey }, keys, now().toISOString()) };
+  return { outcome: "created", book: repo.createBook({ title: identity.title, author: identity.author, isbn: identity.isbn, workKey: input.workKey, createdBy }, keys, now().toISOString()) };
 }
 
 export function seedCatalog(entries: SeedEntry[], repo: SeedRepo, now: () => Date): SeedResult {
   const result: SeedResult = { created: 0, existing: 0, invalid: 0 };
-  for (const entry of entries) result[seedBook(entry, repo, now).outcome]++;
+  for (const entry of entries) result[seedBook(entry, repo, now, "seed").outcome]++;
   return result;
 }

@@ -1,7 +1,10 @@
 export type CoverStatus = "good" | "low_res" | "missing" | "manual";
 export type DetailsStatus = "found" | "missing";
 export type DataSource = "openlibrary" | "isbndb";
+export type SummarySource = DataSource | "publisher";
 export type CoverSourceName = "isbndb" | "apple" | "openlibrary" | "upload" | "publisher";
+
+export type BookCreator = "seed" | "publisher";
 
 export interface BookRow {
   id: string;
@@ -16,6 +19,9 @@ export interface BookRow {
   rating_count: number;
   genres: string;
   data_sources: string;
+  summary_source: SummarySource | null;
+  pages: number | null;
+  translator: string | null;
   source_url: string | null;
   details_status: DetailsStatus | null;
   details_checked_at: string | null;
@@ -24,6 +30,8 @@ export interface BookRow {
   cover_checked_at: string | null;
   cover_upgrade_wanted_at: string | null;
   ol_work_key: string | null;
+  publisher_url: string | null;
+  created_by: BookCreator | null;
   created_at: string;
 }
 
@@ -32,6 +40,7 @@ export interface CoverImageRow {
   book_id: string;
   source: CoverSourceName;
   source_url: string | null;
+  origin?: string | null;
   width: number;
   height: number;
   byte_size: number;
@@ -48,4 +57,5 @@ export interface NewBook {
   workKey?: string | null;
   genres?: string[];
   sources?: DataSource[];
+  createdBy?: BookCreator;
 }
