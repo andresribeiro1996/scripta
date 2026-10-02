@@ -313,15 +313,17 @@ test("PUT library returns a distinct oversized-body error", async () => {
 
 test("import error sanitization: only allowlisted messages pass through", async () => {
   const { sanitizeImportError } = await import("./parseImport.js");
-  assert.equal(sanitizeImportError("/var/private/secret-path is not a table"), "Couldn't parse that import file.");
-  assert.equal(sanitizeImportError("Unexpected token < at position 0 of /tmp/upload"), "Couldn't parse that import file.");
-  assert.equal(sanitizeImportError(undefined), "Couldn't parse that import file.");
-  assert.equal(sanitizeImportError("The import contains too many rows."), "The import contains too many rows.");
-  assert.equal(sanitizeImportError("`Bookmark` must be a real SQLite table."), "`Bookmark` must be a real SQLite table.");
-  assert.equal(sanitizeImportError("`content` must be a real SQLite table."), "`content` must be a real SQLite table.");
+  const limit = 10 * 1024 * 1024;
+  assert.equal(sanitizeImportError("/var/private/secret-path is not a table", limit), "Couldn't parse that import file.");
+  assert.equal(sanitizeImportError("Unexpected token < at position 0 of /tmp/upload", limit), "Couldn't parse that import file.");
+  assert.equal(sanitizeImportError(undefined, limit), "Couldn't parse that import file.");
+  assert.equal(sanitizeImportError("The import contains too many rows.", limit), "The import contains too many rows.");
+  assert.equal(sanitizeImportError("`Bookmark` must be a real SQLite table.", limit), "`Bookmark` must be a real SQLite table.");
+  assert.equal(sanitizeImportError("`content` must be a real SQLite table.", limit), "`content` must be a real SQLite table.");
   const tooLarge = "This import is over 10 MB, the most Scripta can store. Import fewer books or highlights.";
-  assert.equal(sanitizeImportError(tooLarge), tooLarge);
-  assert.equal(sanitizeImportError(tooLarge.replace("10", "/var/private/secret-path")), "Couldn't parse that import file.");
+  assert.equal(sanitizeImportError(tooLarge, limit), tooLarge);
+  assert.equal(sanitizeImportError(tooLarge, 5 * 1024 * 1024), "Couldn't parse that import file.");
+  assert.equal(sanitizeImportError(tooLarge.replace("10", "/var/private/secret-path"), limit), "Couldn't parse that import file.");
 });
 
 test("concurrent imports beyond the cap are rejected busy, and the slot frees after", async () => {

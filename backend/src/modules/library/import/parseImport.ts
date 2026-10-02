@@ -1,6 +1,7 @@
 import type { LibraryData } from "@scripta/shared";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { importTooLargeMessage } from "../domain/sizeLimit.js";
 
 const MAX_IMPORT_ROWS = 100_000;
 const CHILD_MEMORY_MB = 64;
@@ -29,13 +30,12 @@ const SAFE_IMPORT_ERRORS = new Set([
 ]);
 
 const SAFE_TABLE_ERROR = /^`(content|Bookmark)` must be a real SQLite table\.$/;
-const SAFE_TOO_LARGE_ERROR = /^This import is over \d+ MB, the most Scripta can store\. Import fewer books or highlights\.$/;
 
-export function sanitizeImportError(raw: string | undefined): string {
+export function sanitizeImportError(raw: string | undefined, maxResultBytes: number): string {
   if (!raw) return "Couldn't parse that import file.";
   if (SAFE_IMPORT_ERRORS.has(raw)) return raw;
   if (SAFE_TABLE_ERROR.test(raw)) return raw;
-  if (SAFE_TOO_LARGE_ERROR.test(raw)) return raw;
+  if (raw === importTooLargeMessage(maxResultBytes)) return raw;
   return "Couldn't parse that import file.";
 }
 
@@ -93,7 +93,7 @@ export function parseImport(path: string, timeoutMs: number, maxResultBytes: num
       if (timedOut) return;
       finish(() => message.data
         ? resolve({ data: message.data, warnings: [] })
-        : reject(new InvalidImportError(sanitizeImportError(message.error))));
+        : reject(new InvalidImportError(sanitizeImportError(message.error, maxResultBytes))));
     });
     child.once("error", (error) => {
       if (!settled) logger.warn({ err: error }, "import parser child failed to spawn");

@@ -2,6 +2,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { saveFailureMessage } from "@scripta/shared";
 import { createApiClient } from "./apiClient.js";
 
 function deferred<T>() {
@@ -174,6 +175,21 @@ test("non-JSON responses become ApiError messages", async () => {
   );
 
   await assert.rejects(session.apiClient.request("/gallery", { auth: true }), /Request failed \(502\)/);
+});
+
+test("a 413 reaches saveFailureMessage with the server's message", async () => {
+  const message = "Your library is over 10 MB, the most Scripta can store. Remove some books or highlights and try again.";
+  const session = createApiClient(
+    "http://api.test",
+    { async getRefreshToken() { return null; }, async setRefreshToken() {}, async clearRefreshToken() {} },
+    () => "access",
+    () => {},
+    async () => jsonResponse(413, { error: message }),
+  );
+
+  const caught = await session.apiClient.request("/library", { method: "PUT", auth: true }).catch((error: unknown) => error);
+
+  assert.equal(saveFailureMessage(caught, "generic"), message);
 });
 
 function store(initial: string | null) {
