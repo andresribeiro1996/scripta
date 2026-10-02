@@ -1,7 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import { categoryFor, DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
 import { FEED_EVENT_TYPES, FEED_WINDOW_MS } from "../../domain/feed.js";
-import type { CommunityRepository, CursorKeyset } from "../../domain/ports.js";
+import type { CommunityRepository } from "../../domain/ports.js";
 import type { EventRow, FollowRow, ProfileRow } from "../../domain/types.js";
 import { feedSettingColumns, inTransaction } from "./connection.js";
 
