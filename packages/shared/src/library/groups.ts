@@ -7,11 +7,6 @@
 // hand, same as a collection. See deriveSeriesGroups below for the
 // auto-seed step, and frontend's DashboardPage/LibraryPage for where it's
 // called.
-//
-// Lives entirely on the client, same reasoning as merge.ts: the backend's
-// `library` module treats the whole document as an opaque blob
-// (hexagonal design, see backend/README.md) — `groups` is just another
-// field on that blob, no backend change needed at all.
 
 import type { PerCardStyle } from "./libraryStyle.js";
 import { bookKey } from "./merge.js";
@@ -74,16 +69,26 @@ export function deleteGroup(groups: Group[], id: string): Group[] {
   return groups.filter((g) => g.id !== id);
 }
 
-export function addBookToGroup(groups: Group[], id: string, book: Record<string, unknown>): Group[] {
-  const key = bookKey(book);
+export function addKeyToGroup(groups: Group[], id: string, key: string): Group[] {
+  const group = groups.find((g) => g.id === id);
+  if (!group || group.bookKeys.includes(key)) return groups;
   const now = new Date().toISOString();
-  return groups.map((g) => (g.id === id && !g.bookKeys.includes(key) ? { ...g, bookKeys: [...g.bookKeys, key], updatedAt: now } : g));
+  return groups.map((g) => (g === group ? { ...g, bookKeys: [...g.bookKeys, key], updatedAt: now } : g));
+}
+
+export function removeKeyFromGroup(groups: Group[], id: string, key: string): Group[] {
+  const group = groups.find((g) => g.id === id);
+  if (!group || !group.bookKeys.includes(key)) return groups;
+  const now = new Date().toISOString();
+  return groups.map((g) => (g === group ? { ...g, bookKeys: g.bookKeys.filter((k) => k !== key), updatedAt: now } : g));
+}
+
+export function addBookToGroup(groups: Group[], id: string, book: Record<string, unknown>): Group[] {
+  return addKeyToGroup(groups, id, bookKey(book));
 }
 
 export function removeBookFromGroup(groups: Group[], id: string, book: Record<string, unknown>): Group[] {
-  const key = bookKey(book);
-  const now = new Date().toISOString();
-  return groups.map((g) => (g.id === id ? { ...g, bookKeys: g.bookKeys.filter((k) => k !== key), updatedAt: now } : g));
+  return removeKeyFromGroup(groups, id, bookKey(book));
 }
 
 /** Sets (or clears, passing `undefined`) a series' own card style — see
@@ -154,17 +159,35 @@ export function orderedGroupBooks(group: Group, books: Array<Record<string, unkn
  *  saving. */
 export function deriveSeriesGroups(books: Array<Record<string, unknown>>, groups: Group[]): Group[] {
   const result = [...groups];
+  const indexByName = new Map<string, number>();
+  result.forEach((g, i) => {
+    if (g.type !== "series") return;
+    const name = normalizeGroupName(g.name);
+    if (!indexByName.has(name)) indexByName.set(name, i);
+  });
+  const keysByIndex = new Map<number, Set<string>>();
+  const now = new Date().toISOString();
   for (const book of books) {
     const seriesName = typeof book.Series === "string" ? book.Series.trim() : "";
     if (!seriesName) continue;
     const key = bookKey(book);
-    const idx = result.findIndex((g) => g.type === "series" && normalizeGroupName(g.name) === normalizeGroupName(seriesName));
-    if (idx === -1) {
-      const now = new Date().toISOString();
+    const name = normalizeGroupName(seriesName);
+    const idx = indexByName.get(name);
+    if (idx === undefined) {
+      indexByName.set(name, result.length);
       result.push({ id: newGroupId(), type: "series", name: seriesName, bookKeys: [key], createdAt: now, updatedAt: now });
-    } else if (!result[idx].bookKeys.includes(key)) {
-      result[idx] = { ...result[idx], bookKeys: [...result[idx].bookKeys, key], updatedAt: new Date().toISOString() };
+      continue;
     }
+    let keys = keysByIndex.get(idx);
+    if (!keys) {
+      keys = new Set(result[idx].bookKeys);
+      keysByIndex.set(idx, keys);
+    }
+    if (keys.has(key)) continue;
+    keys.add(key);
+    if (result[idx] === groups[idx]) result[idx] = { ...groups[idx], bookKeys: [...groups[idx].bookKeys] };
+    result[idx].bookKeys.push(key);
+    result[idx].updatedAt = now;
   }
   return result;
 }

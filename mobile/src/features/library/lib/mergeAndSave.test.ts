@@ -1,11 +1,11 @@
 /// <reference types="node" />
 
 // Characterization test for buildMergedLibrary's pipeline order (merge,
-// then assign _order to new books, then additive series auto-seed) — see
-// this file's own top comment for why each step exists.
+// then assign _order to new books, then additive series auto-seed).
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { assignBookOrder, deriveSeriesGroups, mergeLibraryData, type LibraryData } from "@scripta/shared";
 import { buildMergedLibrary } from "./mergeAndSave.js";
 
 test("first import (no existing library) is saved as-is, with _order assigned", () => {
@@ -33,4 +33,29 @@ test("auto-seeds a series group from the merged books' Series field", () => {
   assert.equal(result.groups?.length, 1);
   assert.equal(result.groups?.[0].type, "series");
   assert.equal(result.groups?.[0].name, "Dune Saga");
+});
+
+function stable(data: LibraryData): LibraryData {
+  return { ...data, groups: data.groups?.map((group) => ({ ...group, id: "id", createdAt: "t", updatedAt: "t" })) };
+}
+
+test("gives the same library as merging, ordering and seeding series step by step", () => {
+  const existing: LibraryData = {
+    name: "Mine",
+    books: [{ Title: "Dune", Attribution: "Frank Herbert", Series: "Dune Saga", ReadStatus: 0, _order: 0 }],
+    groups: [{ id: "g", type: "series", name: "dune saga", bookKeys: ["ta:dune|frank herbert"], createdAt: "t", updatedAt: "t" }],
+  };
+  const incoming: LibraryData = {
+    books: [
+      { Title: "Dune", Attribution: "Frank Herbert", Series: "Dune Saga", ReadStatus: 2 },
+      { Title: "Dune Messiah", Attribution: "Frank Herbert", Series: " Dune  Saga " },
+      { Title: "Neuromancer", Attribution: "William Gibson", Series: "Sprawl" },
+    ],
+  };
+  const merged = mergeLibraryData(existing, incoming);
+  const ordered = { ...merged, books: assignBookOrder(merged.books) };
+  const before = { ...ordered, groups: deriveSeriesGroups(ordered.books, ordered.groups ?? []) };
+  const result = buildMergedLibrary(existing, incoming);
+  assert.deepEqual(stable(result), stable(before));
+  assert.equal(result.groups?.length, 2);
 });
