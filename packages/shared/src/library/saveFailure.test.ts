@@ -15,6 +15,10 @@ test("a 413 shows the server's own message", () => {
   assert.equal(saveFailureMessage(new StatusError(413, message), generic), message);
 });
 
+test("a 413 with no message of its own keeps the generic text", () => {
+  assert.equal(saveFailureMessage(new StatusError(413, ""), generic), generic);
+});
+
 test("any other failure keeps the generic text", () => {
   assert.equal(saveFailureMessage(new StatusError(500, "Request failed (500)"), generic), generic);
   assert.equal(saveFailureMessage(new StatusError(409, "The library changed elsewhere."), generic), generic);

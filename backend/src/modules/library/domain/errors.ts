@@ -15,3 +15,9 @@ export class LibraryConflictError extends LibraryError {
     super("The library changed elsewhere since it was loaded.");
   }
 }
+
+export class LibraryTooLargeError extends LibraryError {
+  constructor() {
+    super("The library would be over the size limit.");
+  }
+}

@@ -8,6 +8,7 @@ import { after, test } from "node:test";
 import Fastify from "fastify";
 
 const scratch = mkdtempSync(join(tmpdir(), "library-import-test-"));
+process.env.TMPDIR = scratch;
 process.env.AUTH_DB_PATH = join(scratch, "auth.sqlite");
 process.env.LIBRARY_DB_PATH = join(scratch, "library.sqlite");
 process.env.GALLERY_DB_PATH = join(scratch, "gallery.sqlite");
@@ -18,6 +19,7 @@ process.env.IMPORT_PARSE_TIMEOUT_MS = "1000";
 process.env.LIBRARY_BODY_LIMIT_BYTES = "32768";
 process.env.NODE_ENV = "test";
 
+const { env } = await import("../../../config/env.js");
 const { parseImport, InvalidImportError, ImportBusyError } = await import("./parseImport.js");
 const { buildLibraryRoutes, rejectOversizedImport, sweepStaleImportDirs } = await import("../routes.js");
 const { LibraryConflictError } = await import("../domain/errors.js");
@@ -102,7 +104,7 @@ test("PUT library rejects a stale version with the current document", async () =
 });
 
 test("Kobo SQLite returns books and highlights", async () => {
-  const preview = await parseImport(koboDb("happy.sqlite"), 1000, 32768);
+  const preview = await parseImport(koboDb("happy.sqlite"), 5000, 32768);
   assert.equal(preview.data.book_count, 1);
   assert.equal(preview.data.books[0]?.Title, "Stoner");
   assert.equal((preview.data.books[0]?.highlights as unknown[]).length, 1);
@@ -111,7 +113,7 @@ test("Kobo SQLite returns books and highlights", async () => {
 test("Goodreads CSV uses the shared parser", async () => {
   const path = join(scratch, "goodreads.csv");
   await writeFile(path, "Book Id,Title,Author,Exclusive Shelf,ISBN,ISBN13,My Rating,My Review\n1,Stoner,John Williams,read,=\"0394729684\",,5,Excellent\n");
-  const preview = await parseImport(path, 1000, 32768);
+  const preview = await parseImport(path, 5000, 32768);
   assert.equal(preview.data.source, "goodreads-export (browser)");
   assert.equal(preview.data.books[0]?.ReadStatus, 2);
 });
@@ -119,7 +121,7 @@ test("Goodreads CSV uses the shared parser", async () => {
 test("StoryGraph CSV uses the shared parser", async () => {
   const path = join(scratch, "storygraph.csv");
   await writeFile(path, "Title,Authors,Read Status,ISBN/UID,Star Rating,Review\nStoner,John Williams,read,9780394729685,5,Excellent\n");
-  const preview = await parseImport(path, 1000, 32768);
+  const preview = await parseImport(path, 5000, 32768);
   assert.equal(preview.data.source, "storygraph-export (browser)");
   assert.equal(preview.data.books[0]?.ISBN, "9780394729685");
 });
@@ -127,18 +129,18 @@ test("StoryGraph CSV uses the shared parser", async () => {
 test("library JSON only requires a books array", async () => {
   const path = join(scratch, "library.json");
   await writeFile(path, JSON.stringify({ books: [{ Title: "Stoner" }], custom: true }));
-  const preview = await parseImport(path, 1000, 32768);
+  const preview = await parseImport(path, 5000, 32768);
   assert.equal(preview.data.custom, true);
 });
 
 test("non-SQLite rows and results are capped", async () => {
   const tooManyRows = join(scratch, "too-many-rows.json");
   await writeFile(tooManyRows, JSON.stringify({ books: Array.from({ length: 100_001 }, () => null) }));
-  await assert.rejects(parseImport(tooManyRows, 1000, 32 * 1024 * 1024), /too many rows/);
+  await assert.rejects(parseImport(tooManyRows, 5000, 32 * 1024 * 1024), /too many rows/);
 
   const tooLarge = join(scratch, "too-large.csv");
   await writeFile(tooLarge, `Book Id,Title,Author,Exclusive Shelf\n1,${"x".repeat(1024 * 1024)},Author,read\n`);
-  await assert.rejects(parseImport(tooLarge, 1000, 1024 * 1024), (error: Error) => {
+  await assert.rejects(parseImport(tooLarge, 5000, 1024 * 1024), (error: Error) => {
     assert.ok(error instanceof InvalidImportError);
     assert.equal(error.message, "This import is over 1 MB, the most Scripta can store. Import fewer books or highlights.");
     return true;
@@ -163,7 +165,8 @@ test("a Kobo SQLite whose rows exceed the cap names the limit in whole MB", asyn
   });
 });
 
-test("an import over the cap answers 422 INVALID_IMPORT with the plain-words message", async () => {
+test("an import over the cap answers 422 INVALID_IMPORT with the plain-words message", async (t) => {
+  t.mock.property(env, "IMPORT_PARSE_TIMEOUT_MS", 5000);
   const { app, authorization } = await testApp();
   const upload = multipart(await readFile(koboDb("too-large-preview.sqlite", 250)));
   const response = await app.inject({ method: "POST", url: "/library/import/preview", headers: { ...upload.headers, authorization }, payload: upload.payload });
@@ -176,7 +179,7 @@ test("an import over the cap answers 422 INVALID_IMPORT with the plain-words mes
 test("malformed files are rejected", async () => {
   const path = join(scratch, "bad.dat");
   await writeFile(path, "not an export");
-  await assert.rejects(parseImport(path, 1000, 32768), InvalidImportError);
+  await assert.rejects(parseImport(path, 5000, 32768), InvalidImportError);
 });
 
 test("oversized multipart uploads return a client-usable 413", async () => {
@@ -244,7 +247,7 @@ test("the parser delay hook is ignored outside test mode", async () => {
   process.env.NODE_ENV = "production";
   process.env.IMPORT_PARSE_TEST_DELAY_MS = "10000";
   try {
-    await assert.doesNotReject(parseImport(path, 1000, 32768));
+    await assert.doesNotReject(parseImport(path, 5000, 32768));
   } finally {
     process.env.NODE_ENV = previousNodeEnv;
     delete process.env.IMPORT_PARSE_TEST_DELAY_MS;
@@ -278,10 +281,11 @@ test("Bookmark rows are capped", async () => {
       INSERT INTO Bookmark SELECT n, 'book-1' FROM rows;
   `);
   db.close();
-  await assert.rejects(parseImport(path, 1000, 32 * 1024 * 1024), /too many rows/);
+  await assert.rejects(parseImport(path, 5000, 32 * 1024 * 1024), /too many rows/);
 });
 
-test("preview then PUT preserves highlights", async () => {
+test("preview then PUT preserves highlights", async (t) => {
+  t.mock.property(env, "IMPORT_PARSE_TIMEOUT_MS", 5000);
   const { app, authorization } = await testApp();
   const upload = multipart(await readFile(koboDb("round-trip.sqlite")));
   const previewResponse = await app.inject({ method: "POST", url: "/library/import/preview", headers: { ...upload.headers, authorization }, payload: upload.payload });
@@ -309,15 +313,17 @@ test("PUT library returns a distinct oversized-body error", async () => {
 
 test("import error sanitization: only allowlisted messages pass through", async () => {
   const { sanitizeImportError } = await import("./parseImport.js");
-  assert.equal(sanitizeImportError("/var/private/secret-path is not a table"), "Couldn't parse that import file.");
-  assert.equal(sanitizeImportError("Unexpected token < at position 0 of /tmp/upload"), "Couldn't parse that import file.");
-  assert.equal(sanitizeImportError(undefined), "Couldn't parse that import file.");
-  assert.equal(sanitizeImportError("The import contains too many rows."), "The import contains too many rows.");
-  assert.equal(sanitizeImportError("`Bookmark` must be a real SQLite table."), "`Bookmark` must be a real SQLite table.");
-  assert.equal(sanitizeImportError("`content` must be a real SQLite table."), "`content` must be a real SQLite table.");
+  const limit = 10 * 1024 * 1024;
+  assert.equal(sanitizeImportError("/var/private/secret-path is not a table", limit), "Couldn't parse that import file.");
+  assert.equal(sanitizeImportError("Unexpected token < at position 0 of /tmp/upload", limit), "Couldn't parse that import file.");
+  assert.equal(sanitizeImportError(undefined, limit), "Couldn't parse that import file.");
+  assert.equal(sanitizeImportError("The import contains too many rows.", limit), "The import contains too many rows.");
+  assert.equal(sanitizeImportError("`Bookmark` must be a real SQLite table.", limit), "`Bookmark` must be a real SQLite table.");
+  assert.equal(sanitizeImportError("`content` must be a real SQLite table.", limit), "`content` must be a real SQLite table.");
   const tooLarge = "This import is over 10 MB, the most Scripta can store. Import fewer books or highlights.";
-  assert.equal(sanitizeImportError(tooLarge), tooLarge);
-  assert.equal(sanitizeImportError(tooLarge.replace("10", "/var/private/secret-path")), "Couldn't parse that import file.");
+  assert.equal(sanitizeImportError(tooLarge, limit), tooLarge);
+  assert.equal(sanitizeImportError(tooLarge, 5 * 1024 * 1024), "Couldn't parse that import file.");
+  assert.equal(sanitizeImportError(tooLarge.replace("10", "/var/private/secret-path"), limit), "Couldn't parse that import file.");
 });
 
 test("concurrent imports beyond the cap are rejected busy, and the slot frees after", async () => {

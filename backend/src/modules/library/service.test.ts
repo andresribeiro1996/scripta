@@ -25,9 +25,9 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
 const { createSqliteLibraryRepository } = await import("./adapters/sqlite/sqliteLibraryRepository.js");
 const { applyLibrarySchema, openLibraryDb } = await import("./adapters/sqlite/connection.js");
-const { LibraryConflictError } = await import("./domain/errors.js");
+const { LibraryConflictError, LibraryTooLargeError } = await import("./domain/errors.js");
 const { backfillLibraryDerived, readEmbeddedMurals } = await import("./migration.js");
-const { LIBRARY_DERIVED_VERSION, LIBRARY_MATCH_BOOK_CAP } = await import("./domain/constants.js");
+const { LIBRARY_DERIVED_VERSION, LIBRARY_MATCH_BOOK_CAP, LIBRARY_PUT_HEADROOM_BYTES } = await import("./domain/constants.js");
 const { createLibraryService, deriveLibraryData } = await import("./service.js");
 const { readerGlyphFor, sharedBookCounts, sharedBooks } = await import("./publicResolver.js");
 const { peekCachedCoverUrl } = await import("../books/index.js");
@@ -40,11 +40,13 @@ function memoryDb(): DatabaseSync {
 
 type RecordedEvent = { userId: string; type: "book_added" | "book_finished"; refId: string; payload: Record<string, unknown> };
 
-function setup() {
+const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;
+
+function setup(maxDocumentBytes = MAX_DOCUMENT_BYTES) {
   const db = memoryDb();
   const repo = createSqliteLibraryRepository(db);
   const events: RecordedEvent[] = [];
-  const service = createLibraryService(repo, () => "", (userId, batch) => {
+  const service = createLibraryService(repo, () => "", maxDocumentBytes, (userId, batch) => {
     events.push(...batch.map((event) => ({ userId, ...event })));
   });
   return { db, repo, service, events };
@@ -53,7 +55,7 @@ function setup() {
 function setupCovers() {
   const db = memoryDb();
   const batches: unknown[][] = [];
-  const service = createLibraryService(createSqliteLibraryRepository(db), () => "", undefined, (lookups) => { batches.push(lookups); });
+  const service = createLibraryService(createSqliteLibraryRepository(db), () => "", MAX_DOCUMENT_BYTES, undefined, (lookups) => { batches.push(lookups); });
   return { service, batches };
 }
 
@@ -264,12 +266,55 @@ test("addBook with the same status on a match writes nothing and emits nothing",
   db.close();
 });
 
+const rawBytes = (db: DatabaseSync, userId: string) =>
+  Buffer.byteLength((db.prepare(`SELECT data FROM library_documents WHERE user_id = ?`).get(userId) as { data: string }).data);
+
+const lusiadas = { title: "Os Lusíadas", author: "Luís de Camões", readStatus: 0 } as const;
+
+test("addBook stores a document of exactly the limit minus the PUT headroom and refuses one byte more", () => {
+  const base = { books: [{ ContentID: "k1", Title: "Stoner", Attribution: "John Williams", ReadStatus: 1 }] };
+  const probe = setup();
+  probe.service.saveLibrary("user-1", base);
+  probe.service.addBook("user-1", lusiadas);
+  const grown = rawBytes(probe.db, "user-1");
+  probe.db.close();
+
+  const exact = setup(grown + LIBRARY_PUT_HEADROOM_BYTES);
+  exact.service.saveLibrary("user-1", base);
+  exact.service.addBook("user-1", lusiadas);
+  assert.equal(booksOf(exact.service, "user-1").length, 2);
+  exact.db.close();
+
+  const over = setup(grown + LIBRARY_PUT_HEADROOM_BYTES - 1);
+  const saved = over.service.saveLibrary("user-1", base);
+  assert.throws(() => over.service.addBook("user-1", lusiadas), LibraryTooLargeError);
+  assert.deepEqual(over.service.getLibrary("user-1")?.data, base);
+  assert.equal(over.service.getLibrary("user-1")?.updatedAt, saved.updatedAt);
+  assert.deepEqual(over.events, []);
+  over.db.close();
+});
+
+test("addBook refuses a re-shelve that grows the document past the limit minus the PUT headroom, and allows one that does not", () => {
+  const base = { books: [{ ContentID: "k1", Title: "Stoner", Attribution: "John Williams", ReadStatus: 0 }] };
+  const { db, service, events } = setup(Buffer.byteLength(JSON.stringify(base)) + LIBRARY_PUT_HEADROOM_BYTES);
+  const saved = service.saveLibrary("user-1", base);
+
+  assert.throws(() => service.addBook("user-1", { title: "Stoner", author: "John Williams", readStatus: 2, day: "2024-03-02" }), LibraryTooLargeError);
+  assert.deepEqual(service.getLibrary("user-1")?.data, base);
+  assert.equal(service.getLibrary("user-1")?.updatedAt, saved.updatedAt);
+  assert.deepEqual(events, []);
+
+  assert.deepEqual(service.addBook("user-1", { title: "Stoner", author: "John Williams", readStatus: 1 }), { key: "k1", updated: true });
+  assert.equal(booksOf(service, "user-1")[0]?.ReadStatus, 1);
+  db.close();
+});
+
 type Book = Record<string, unknown>;
 const shelf = (count: number): Book[] => Array.from({ length: count }, (_, i) => ({ Title: `Book ${i}`, Attribution: `Author ${i}`, ReadStatus: 2 }));
 const seriesGroup = (books: Book[]) => ({ id: "g1", type: "series", name: "Discworld", bookKeys: books.map(bookKey) });
 
 const fileDb = openLibraryDb();
-const fileService = createLibraryService(createSqliteLibraryRepository(fileDb), () => "");
+const fileService = createLibraryService(createSqliteLibraryRepository(fileDb), () => "", MAX_DOCUMENT_BYTES);
 
 function rawDocument(userId: string, data: string, updatedAt = new Date().toISOString()) {
   fileDb.prepare(`INSERT OR REPLACE INTO library_documents (user_id, data, updated_at) VALUES (?, ?, ?)`).run(userId, data, updatedAt);
@@ -331,10 +376,10 @@ test("an import save queues covers for every book once; other saves queue nothin
   assert.equal(batches.length, 1);
 });
 
-function setupMerge() {
+function setupMerge(maxDocumentBytes = MAX_DOCUMENT_BYTES) {
   const db = memoryDb();
   const rekeys: Array<[string, string[], string]> = [];
-  const service = createLibraryService(createSqliteLibraryRepository(db), () => "", undefined, undefined, (userId, fromKeys, toKey) => {
+  const service = createLibraryService(createSqliteLibraryRepository(db), () => "", maxDocumentBytes, undefined, undefined, (userId, fromKeys, toKey) => {
     rekeys.push([userId, fromKeys, toKey]);
   });
   return { db, service, rekeys };
@@ -386,12 +431,34 @@ test("mergeBooks without a library throws NoLibraryDocumentError", async () => {
 
 test("mergeBooks does not save the library when a reference rewrite fails", () => {
   const db = memoryDb();
-  const service = createLibraryService(createSqliteLibraryRepository(db), () => "", undefined, undefined, () => {
+  const service = createLibraryService(createSqliteLibraryRepository(db), () => "", MAX_DOCUMENT_BYTES, undefined, undefined, () => {
     throw new Error("murals db locked");
   });
   const saved = service.saveLibrary("u1", { books: [koboDune, goodreadsDune] });
   assert.throws(() => service.mergeBooks("u1", bookKey(koboDune), [bookKey(goodreadsDune)], saved.updatedAt), /murals db locked/);
   assert.equal((service.getLibrary("u1")!.data as { books: unknown[] }).books.length, 2);
+});
+
+test("mergeBooks refuses a merge that grows the document past the limit minus the PUT headroom, before rewriting any reference", () => {
+  const short = { ContentID: "k1", Title: "a", Attribution: "b" };
+  const isbn = { ContentID: "g1", Title: "a", Attribution: "b", ISBN: "9780441013593" };
+  const stamp = "2026-01-01T00:00:00.000Z";
+  const shelves = Array.from({ length: 20 }, (_, i) => ({ id: `s${i}`, type: "collection", name: `Shelf ${i}`, bookKeys: [bookKey(short)], createdAt: stamp, updatedAt: stamp }));
+  const base = { books: [isbn, short], groups: shelves };
+  const merge = (service: ReturnType<typeof createLibraryService>, updatedAt: string) => service.mergeBooks("u1", bookKey(isbn), [bookKey(short)], updatedAt);
+
+  const probe = setupMerge();
+  merge(probe.service, probe.service.saveLibrary("u1", base).updatedAt);
+  assert.ok(rawBytes(probe.db, "u1") > Buffer.byteLength(JSON.stringify(base)));
+  probe.db.close();
+
+  const { db, service, rekeys } = setupMerge(Buffer.byteLength(JSON.stringify(base)) + LIBRARY_PUT_HEADROOM_BYTES);
+  const saved = service.saveLibrary("u1", base);
+  assert.throws(() => merge(service, saved.updatedAt), LibraryTooLargeError);
+  assert.deepEqual(rekeys, []);
+  assert.deepEqual(service.getLibrary("u1")?.data, base);
+  assert.equal(service.getLibrary("u1")?.updatedAt, saved.updatedAt);
+  db.close();
 });
 
 test("addBook matches an ISBN-less copy by title and author", () => {

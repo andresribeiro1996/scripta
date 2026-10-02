@@ -1370,6 +1370,41 @@ test("a discover search returns the right page of matches and the next offset", 
   assert.equal(page(6).nextOffset, null);
 });
 
+test("discover lists content created at the same moment in one order, tier lists first, whatever the page size", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs, tournamentRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  for (const id of ["t1", "t2", "t3"]) tierlistRefs.set(id, tierRef(id, "alice", { createdAt: at(5) }));
+  for (const id of ["g1", "g2", "g3"]) tournamentRefs.set(id, tournRef(id, "alice", { createdAt: at(5) }));
+
+  for (const limit of [1, 2, 4, 6]) {
+    const ids: string[] = [];
+    let offset: number | null = 0;
+    for (let pages = 0; offset !== null && pages < 10; pages++) {
+      const page = service.getDiscover("all", "", limit, offset);
+      ids.push(...page.items.map((item) => item.content.id));
+      offset = page.nextOffset;
+    }
+    assert.deepEqual(ids, ["t1", "t2", "t3", "g1", "g2", "g3"], `limit ${limit}`);
+  }
+});
+
+test("a discover search of punctuation alone lists everything, as an empty search does", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs, tournamentRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  tierlistRefs.set("t1", tierRef("t1", "alice", { name: "Hábitos Atómicos", createdAt: at(1) }));
+  tierlistRefs.set("t2", tierRef("t2", "alice", { name: "Fantasy", createdAt: at(2) }));
+  tournamentRefs.set("g1", tournRef("g1", "alice", { name: "Sci-Fi: Ñandú Cup", createdAt: at(3) }));
+
+  const everything = service.getDiscover("all", "", 10, 0);
+
+  assert.equal(everything.items.length, 3);
+  assert.deepEqual(service.getDiscover("all", "???", 10, 0), everything);
+});
+
 test("discover builds summaries and voted flags only for the page it returns", () => {
   const { repo } = createRepoFake();
   const { deps, readerProfiles, tierlistRefs, tournamentRefs, votes, publishedManyCalls, votedAmongCalls } = createDeps(repo);
