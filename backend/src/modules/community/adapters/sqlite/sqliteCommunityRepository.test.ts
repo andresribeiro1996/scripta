@@ -26,6 +26,18 @@ function repo() {
   return createSqliteCommunityRepository(openCommunityDb());
 }
 
+function shippedPlan(pattern: RegExp) {
+  const db = openCommunityDb();
+  const prepare = mock.method(db, "prepare");
+  createSqliteCommunityRepository(db);
+  const statements = prepare.mock.calls.map((call) => String(call.arguments[0])).filter((sql) => pattern.test(sql));
+  prepare.mock.restore();
+
+  assert.equal(statements.length, 1);
+  const rows = db.prepare(`EXPLAIN QUERY PLAN ${statements[0]}`).all() as Array<{ detail: string }>;
+  return { sql: statements[0]!, plan: rows.map((row) => row.detail).join(" ") };
+}
+
 test("follows are idempotent and counted per side", () => {
   const r = repo();
   r.insertFollow({ follower_id: "bob", followee_id: "alice", created_at: "2026-09-10T00:00:00.000Z" });
@@ -117,17 +129,40 @@ test("countEventsSince counts an author's events of the given types from the mar
 });
 
 test("the count behind the book event cap searches the author's events by time through idx_events_user_time and stops at its limit", () => {
-  const db = openCommunityDb();
-  const prepare = mock.method(db, "prepare");
-  createSqliteCommunityRepository(db);
-  const statements = prepare.mock.calls.map((call) => String(call.arguments[0])).filter((sql) => /COUNT\(\*\)[\s\S]*FROM events/.test(sql));
-  prepare.mock.restore();
+  const { sql, plan } = shippedPlan(/COUNT\(\*\)[\s\S]*FROM events/);
 
-  assert.equal(statements.length, 1);
-  const plan = (db.prepare(`EXPLAIN QUERY PLAN ${statements[0]}`).all("u1", "2026-10-01T00:00:00.000Z", '["book_added"]', 100) as Array<{ detail: string }>).map((row) => row.detail).join(" ");
   assert.match(plan, /SEARCH events USING INDEX idx_events_user_time \(user_id=\? AND created_at>\?\)/);
   assert.doesNotMatch(plan, /SCAN events/);
-  assert.match(statements[0]!, /LIMIT \?\)\s*$/);
+  assert.match(sql, /LIMIT \?\)\s*$/);
+});
+
+test("the statement for a user's events after a keyset seeks into idx_events_user_time at the keyset instead of walking from the user's newest event", () => {
+  const { plan } = shippedPlan(/FROM events\s+WHERE[\s\S]*\(created_at = \? AND id < \?\)/);
+
+  assert.match(plan, /SEARCH events USING INDEX idx_events_user_time \(user_id=\? AND created_at<\?\)/);
+});
+
+test("the statement for a user's history after a keyset seeks into idx_events_history_user_time at the keyset and reads it in order without a sort", () => {
+  const { plan } = shippedPlan(/FROM events_history\s+WHERE[\s\S]*\(created_at, id\) < \(\?, \?\)/);
+
+  assert.match(plan, /idx_events_history_user_time \(user_id=\? AND \(created_at,id\)<\(\?,\?\)\)/);
+  assert.doesNotMatch(plan, /TEMP B-TREE/);
+});
+
+test("the copy made when someone follows searches the author's events from the window's start through idx_events_user_time and sorts only within equal times", () => {
+  const { plan } = shippedPlan(/INSERT OR IGNORE INTO feed_inbox[\s\S]*LIMIT \$limit/);
+
+  assert.match(plan, /SEARCH e USING INDEX idx_events_user_time \(user_id=\? AND created_at>\?\)/);
+  assert.match(plan, /USE TEMP B-TREE FOR LAST TERM OF ORDER BY/);
+  assert.doesNotMatch(plan, /TEMP B-TREE FOR ORDER BY/);
+});
+
+test("the fan-out of a new event finds the event by its id and its author's followers through idx_follows_followee, with no scan", () => {
+  const { plan } = shippedPlan(/INSERT OR IGNORE INTO feed_inbox[\s\S]*e\.id = \$id/);
+
+  assert.match(plan, /SEARCH e USING INDEX sqlite_autoindex_events_1 \(id=\?\)/);
+  assert.match(plan, /SEARCH f USING INDEX idx_follows_followee \(followee_id=\?\)/);
+  assert.doesNotMatch(plan, /SCAN/);
 });
 
 test("the public API caps an author's book events at 100 in any rolling 24 hours on the real database, with the edge of the window counted", () => {
@@ -465,6 +500,16 @@ test("an author's switches are applied again when the inbox is read, so rows hid
   r.updateFeedSettings("shown-chooser", { publications: true, reading: true, votes: true, follows: false });
   assert.deepEqual(seen("shown-chooser"), [...FEED_EVENT_TYPES].sort());
   assert.equal(r.countInboxSince("shown-viewer", "", FEED_EVENT_TYPES, 100), plainRows + FEED_EVENT_TYPES.length);
+});
+
+test("rows already in an inbox for a category its author never chose to show stay hidden, with no profile row and with a published profile that never chose", () => {
+  const { db, r } = openRepo();
+  r.upsertProfile({ user_id: "hid-never-chose", published: 1, mural_id: null, published_at: "2026-09-01T00:00:00.000Z", updated_at: "2026-09-01T00:00:00.000Z", feed_settings: null });
+  const copyAll = db.prepare("INSERT INTO feed_inbox (viewer_id, created_at, event_id, author_id) SELECT 'hid-fan', created_at, id, user_id FROM events WHERE user_id = ?");
+  for (const author of ["hid-no-profile", "hid-never-chose"]) { insertOneOfEachFeedType(r, author); copyAll.run(author); }
+  const shownTypes = FEED_EVENT_TYPES.filter((type) => DEFAULT_FEED_SETTINGS[categoryFor(type)]);
+  assert.deepEqual(r.listInbox("hid-fan", undefined, 50, FEED_EVENT_TYPES).map((event) => event.type).sort(), [...shownTypes, ...shownTypes].sort());
+  assert.equal(r.countInboxSince("hid-fan", "", FEED_EVENT_TYPES, 100), 2 * shownTypes.length);
 });
 
 test("rows written while an author showed a category stay when they switch it off, hidden from the page and the count", () => {
