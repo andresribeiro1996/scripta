@@ -192,8 +192,10 @@ shows:**
   follower's inbox, the newest 100 per follower (`FOLLOW_COPY_LIMIT`), with
   the events' own dates. Saving feed settings, or publishing with
   `shareReading`, compares the switches before and after, and for the feed
-  types of the categories that came on starts a background task after the
-  request has answered. It lists the author's followers and fills 50 at a time
+  types of the categories that came on starts a background task in the
+  handler. The task yields to the event loop before its first batch, so its
+  batches run on later turns, after the request has answered. It lists the
+  author's followers and fills 50 at a time
   (`BACKFILL_BATCH`): one `INSERT OR IGNORE … SELECT` per batch in its own
   transaction, with a turn of the event loop before it, selecting the events
   once and joining them to the batch's followers in `follows`, so a reader who

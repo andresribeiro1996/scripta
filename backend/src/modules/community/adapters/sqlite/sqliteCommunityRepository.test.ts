@@ -771,6 +771,9 @@ test("the dashboard service pages through a real inbox newest first, narrowed to
   const seen: { at: string | null } = { at: null };
   const service = createCommunityService({
     repo: r,
+    background: (task) => {
+      void task();
+    },
     getDashboardSeenAt: () => seen.at,
     setDashboardSeenAt: unused,
     resolveProfile: unused,

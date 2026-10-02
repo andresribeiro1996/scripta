@@ -158,6 +158,9 @@ function createDeps(repo: CommunityRepository) {
   const deps: CommunityDeps = {
     repo,
     now: () => NOW,
+    background: (task) => {
+      void task();
+    },
     getDashboardSeenAt: () => seenAt.value,
     setDashboardSeenAt: (_userId, value) => {
       seenAt.value = value;
@@ -2158,32 +2161,24 @@ test("publishing with shareReading backfills reading when it turns reading on, f
   assert.equal(tasks.length, 2);
 });
 
-test("a failing backfill rejects its task for the runner to log, and the settings it was started by stay saved", async () => {
+test("a failing backfill rejects its task naming the author and carrying the failure, for the runner to log, and the settings it was started by stay saved", async () => {
   const { repo } = createRepoFake();
   const { deps } = createDeps(repo);
   const tasks = withBackgroundTasks(deps);
-  const failing = { ...repo, backfillInbox: () => { throw new Error("inbox is full"); } };
+  const full = new Error("inbox is full");
+  const failing = { ...repo, backfillInbox: () => { throw full; } };
   const service = createCommunityService({ ...deps, repo: failing });
   repo.upsertProfile(profileRow("alice"));
   repo.insertFollow({ follower_id: "bob", followee_id: "alice", created_at: at(1) });
 
   service.updateFeedSettings("alice", { ...DEFAULT_FEED_SETTINGS, reading: true });
 
-  await assert.rejects(Promise.all(tasks), /inbox is full/);
+  await assert.rejects(Promise.all(tasks), (error: Error) => {
+    assert.equal(error.message, "feed backfill for alice failed");
+    assert.equal(error.cause, full);
+    return true;
+  });
   assert.equal(service.getFeedSettings("alice").reading, true);
-});
-
-test("a service built without a background runner still runs the backfill", async () => {
-  const { repo, backfills } = createRepoFake();
-  const { deps } = createDeps(repo);
-  const service = createCommunityService(deps);
-  repo.upsertProfile(profileRow("alice"));
-  repo.insertFollow({ follower_id: "bob", followee_id: "alice", created_at: at(1) });
-
-  service.updateFeedSettings("alice", { ...DEFAULT_FEED_SETTINGS, reading: true });
-
-  for (let turns = 0; turns < 20 && backfills.length === 0; turns++) await new Promise(setImmediate);
-  assert.deepEqual(backfills.map((backfill) => backfill.followerIds), [["bob"]]);
 });
 
 test("getLibrary serves a published owner's library and 404s otherwise", () => {

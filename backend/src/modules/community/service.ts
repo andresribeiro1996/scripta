@@ -34,12 +34,16 @@ function parseEventPayload(raw: string | null): Record<string, unknown> | undefi
   }
 }
 
+function turn(): Promise<void> {
+  return new Promise(setImmediate);
+}
+
 async function inBatches(step: (batch: number) => number): Promise<number> {
   let total = 0;
   for (;;) {
     const done = step(ARCHIVE_BATCH);
     total += done;
-    await new Promise(setImmediate);
+    await turn();
     if (done < ARCHIVE_BATCH) return total;
   }
 }
@@ -76,7 +80,7 @@ function withVoted(content: PublishedContent, voted: Set<string> | null): Publis
 export interface CommunityDeps {
   repo: CommunityRepository;
   now?: () => number;
-  background?: (task: () => Promise<void>) => void;
+  background: (task: () => Promise<void>) => void;
   getDashboardSeenAt(userId: string): string | null;
   setDashboardSeenAt(userId: string, seenAt: string): void;
   resolveProfile(userId: string): ReaderProfile | undefined;
@@ -133,20 +137,24 @@ export interface CommunityService {
 }
 
 export function createCommunityService(deps: CommunityDeps): CommunityService {
-  const { repo } = deps;
+  const { repo, background } = deps;
   const now = deps.now ?? Date.now;
+  const windowStart = (): string => new Date(now() - FEED_WINDOW_MS).toISOString();
   const emit = (userId: string, type: ActivityEventType, refType: CommunityRefType, refId: string, payload?: Record<string, unknown>): void => {
     repo.insertEvent(newEvent(userId, type, refType, refId, payload));
   };
   const settingsFor = (userId: string): FeedSettings => repo.getFeedSettings(userId) ?? DEFAULT_FEED_SETTINGS;
-  const background = deps.background ?? ((task: () => Promise<void>): void => void task());
   const backfillInboxes = async (authorId: string, types: readonly ActivityEventType[]): Promise<void> => {
-    const since = new Date(now() - FEED_WINDOW_MS).toISOString();
-    await new Promise(setImmediate);
-    const followerIds = repo.listFollowerIds(authorId);
-    for (let from = 0; from < followerIds.length; from += BACKFILL_BATCH) {
-      repo.backfillInbox(authorId, followerIds.slice(from, from + BACKFILL_BATCH), types, since);
-      await new Promise(setImmediate);
+    try {
+      const since = windowStart();
+      await turn();
+      const followerIds = repo.listFollowerIds(authorId);
+      for (let from = 0; from < followerIds.length; from += BACKFILL_BATCH) {
+        repo.backfillInbox(authorId, followerIds.slice(from, from + BACKFILL_BATCH), types, since);
+        await turn();
+      }
+    } catch (error) {
+      throw new Error(`feed backfill for ${authorId} failed`, { cause: error });
     }
   };
   const backfillTurnedOn = (userId: string, before: FeedSettings, after: FeedSettings): void => {
@@ -207,9 +215,9 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
   const inboxRows = (viewerId: string, keyset: CursorKeyset | undefined, limit: number, types: ActivityEventType[]): DigestRow[] =>
     repo.listInbox(viewerId, keyset, limit, types).map((event) => ({ id: event.id, createdAt: event.created_at, event }));
 
-  const followerRows = (viewerId: string, bound: Bound, limit: number, windowStart: string): DigestRow[] =>
+  const followerRows = (viewerId: string, bound: Bound, limit: number, start: string): DigestRow[] =>
     (bound.since !== undefined ? repo.listFollowersSince(viewerId, bound.since, limit) : repo.listFollowersByFollowee(viewerId, bound.keyset, limit))
-      .filter((follow) => follow.created_at >= windowStart)
+      .filter((follow) => follow.created_at >= start)
       .map((follow) => ({ id: follow.follower_id, createdAt: follow.created_at, follow }));
 
   const participationRows = (participation: ParticipationItem[], bound: Bound): DigestRow[] =>
@@ -381,9 +389,9 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
     getDashboard(viewerId, cursor, limit, kinds = LEGACY_DIGEST_KINDS) {
       const keyset = cursor ? decodeCursor(cursor) : undefined;
       if (cursor && !keyset) throw new InvalidCursorError();
-      const windowStart = new Date(now() - FEED_WINDOW_MS).toISOString();
-      const participation = kinds.has("participation") ? participationItems(viewerId, windowStart) : [];
-      const followers = (bound: Bound, count: number): DigestRow[] => (kinds.has("follow") ? followerRows(viewerId, bound, count, windowStart) : []);
+      const start = windowStart();
+      const participation = kinds.has("participation") ? participationItems(viewerId, start) : [];
+      const followers = (bound: Bound, count: number): DigestRow[] => (kinds.has("follow") ? followerRows(viewerId, bound, count, start) : []);
       const types = DIGEST_EVENT_TYPES.filter(([, kind]) => kinds.has(kind)).map(([type]) => type);
       const glyphOf = glyphLookup();
       const items: DigestItem[] = [];
@@ -557,7 +565,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
       backfillTurnedOn(userId, before, settings);
     },
     async archiveOldEvents() {
-      const cutoff = new Date(now() - FEED_WINDOW_MS).toISOString();
+      const cutoff = windowStart();
       const moved = await inBatches((batch) => repo.moveEventsBefore(cutoff, batch));
       const purged = await inBatches((batch) => repo.purgeInboxBefore(cutoff, batch));
       return { moved, purged };

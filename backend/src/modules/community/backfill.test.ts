@@ -31,7 +31,7 @@ const FAILED = "community feed backfill failed";
 const unused = () => {
   throw new Error("the backfill does not read this");
 };
-const baseDeps: Omit<CommunityDeps, "repo"> = {
+const baseDeps: Omit<CommunityDeps, "repo" | "background"> = {
   now: () => NOW,
   getDashboardSeenAt: () => null,
   setDashboardSeenAt: unused,
@@ -83,6 +83,10 @@ function inboxRows(db: Db, viewer: string) {
 
 function inboxEventIds(db: Db, viewer: string) {
   return inboxRows(db, viewer).map((row) => row.event_id);
+}
+
+function authoredRows(db: Db, author: string) {
+  return (db.prepare("SELECT COUNT(*) AS n FROM feed_inbox WHERE author_id = ?").get(author) as { n: number }).n;
 }
 
 const dashboardIds = (service: CommunityService, viewer: string) => service.getDashboard(viewer, undefined, 50).items.map((item) => item.id);
@@ -264,7 +268,49 @@ test("about 120 followers are backfilled in batches of 50, the first not inside 
   });
   for (const victim of victims) assert.deepEqual(inboxEventIds(db, victim), [], victim);
   assert.equal(order.filter((follower) => inboxEventIds(db, follower).length === 3).length, 118);
-  assert.equal((db.prepare("SELECT COUNT(*) AS n FROM feed_inbox WHERE author_id = ?").get(author) as { n: number }).n, 118 * 3);
+  assert.equal(authoredRows(db, author), 118 * 3);
+});
+
+test("an author erased between two batches is left with no inbox row, the first batch's included, and no profile", async () => {
+  const author = "erase-author";
+  let batches = 0;
+  const { db, repo, service, settled } = world((real) => ({
+    ...real,
+    backfillInbox: (authorId, followerIds, types, since) => {
+      if (++batches === 2) real.deleteUserData(author);
+      real.backfillInbox(authorId, followerIds, types, since);
+    }
+  }));
+  bookEvent(repo, author, "erase-1", daysAgo(1));
+  for (let i = 0; i < 120; i++) follow(repo, `erase-fan-${String(i).padStart(3, "0")}`, author);
+
+  service.updateFeedSettings(author, READING_ON);
+  await settled();
+
+  assert.equal(authoredRows(db, author), 0);
+  assert.equal(db.prepare("SELECT 1 FROM profiles WHERE user_id = ?").get(author), undefined);
+});
+
+test("a follower erased before their batch gets no row, and the other followers still get theirs", async () => {
+  const author = "gone-author";
+  let erased = "";
+  let batches = 0;
+  const { db, repo, service, settled } = world((real) => ({
+    ...real,
+    backfillInbox: (authorId, followerIds, types, since) => {
+      if (++batches === 2) real.deleteUserData(erased);
+      real.backfillInbox(authorId, followerIds, types, since);
+    }
+  }));
+  bookEvent(repo, author, "gone-1", daysAgo(1));
+  for (let i = 0; i < 120; i++) follow(repo, `gone-fan-${String(i).padStart(3, "0")}`, author);
+  erased = repo.listFollowerIds(author)[60]!;
+
+  service.updateFeedSettings(author, READING_ON);
+  await settled();
+
+  assert.deepEqual(inboxEventIds(db, erased), []);
+  assert.equal(authoredRows(db, author), 119);
 });
 
 test("a backfill that fails is logged as an error by the plugin, after the settings route has answered 204", async (t) => {
@@ -283,6 +329,7 @@ test("a backfill that fails is logged as an error by the plugin, after the setti
   assert.equal(res.statusCode, 204);
   await until(() => logged(FAILED).length === 1);
   assert.equal(logged(FAILED)[0]?.level, 50);
+  assert.match(logged(FAILED)[0]?.err?.message ?? "", /feed backfill for log-author failed/);
   assert.match(logged(FAILED)[0]?.err?.message ?? "", /inbox refuses/);
   assert.equal(repo.getFeedSettings(author)?.reading, true);
   assert.deepEqual(inboxEventIds(db, "log-fan"), []);
