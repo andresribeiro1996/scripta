@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { IdentityKey, ReaderProfile } from "@scripta/shared";
+import { normalizeWords, type IdentityKey, type ReaderProfile } from "@scripta/shared";
 import type { DiscoverItem, GameParticipation, SharedBook, SuggestedReader } from "@scripta/shared/community";
 import { DEFAULT_FEED_SETTINGS, encodeCursor, normalizeFeedSettings } from "@scripta/shared/community";
 import type { ParticipationItem } from "@scripta/shared/dashboard";
@@ -125,6 +125,9 @@ function createDeps(repo: CommunityRepository) {
   const tierlistParticipation: GameParticipation[] = [];
   const tournamentParticipation: GameParticipation[] = [];
   const quizParticipation: GameParticipation[] = [];
+  const windowCalls: Array<{ kind: "tierlist" | "tournament"; needle: string; limit: number }> = [];
+  const publishedManyCalls: Array<{ kind: "tierlist" | "tournament"; ids: string[] }> = [];
+  const votedAmongCalls: Array<{ kind: "tierlist" | "tournament"; viewerId: string; ids: string[] }> = [];
   const deps: CommunityDeps = {
     repo,
     getDashboardSeenAt: () => seenAt.value,
@@ -168,16 +171,44 @@ function createDeps(repo: CommunityRepository) {
       getMuralPublicPayload: (userId, muralId) => muralPayloads.get(`${userId}:${muralId}`) ?? null
     },
     tierlists: {
-      list: (limit, offset) => [...tierlistRefs.values()].sort(byNewest).slice(offset, offset + limit),
+      discoverWindow: (needle, limit) => {
+        windowCalls.push({ kind: "tierlist", needle, limit });
+        return [...tierlistRefs.values()]
+          .filter((r) => normalizeWords(r.name).includes(needle))
+          .sort(byNewest)
+          .slice(0, limit)
+          .map((r) => ({ id: r.id, createdAt: r.createdAt, ownerUserId: r.ownerUserId, promotedAt: r.promotedAt }));
+      },
+      getPublishedMany: (ids) => {
+        publishedManyCalls.push({ kind: "tierlist", ids: [...ids] });
+        return ids.flatMap((id) => tierlistRefs.get(id) ?? []);
+      },
+      votedAmong: (viewerId, ids) => {
+        votedAmongCalls.push({ kind: "tierlist", viewerId, ids: [...ids] });
+        return ids.filter((id) => votes.has(`${viewerId}:${id}`));
+      },
       get: (id) => tierlistRefs.get(id),
-      listByOwner: (owner) => [...tierlistRefs.values()].filter((r) => r.ownerUserId === owner).sort(byNewest),
-      listVotedByUser: (voter) => [...tierlistRefs.values()].filter((r) => votes.has(`${voter}:${r.id}`))
+      listByOwner: (owner) => [...tierlistRefs.values()].filter((r) => r.ownerUserId === owner).sort(byNewest)
     },
     tournaments: {
-      list: (limit, offset) => [...tournamentRefs.values()].sort(byNewest).slice(offset, offset + limit),
+      discoverWindow: (needle, limit) => {
+        windowCalls.push({ kind: "tournament", needle, limit });
+        return [...tournamentRefs.values()]
+          .filter((r) => normalizeWords(r.name).includes(needle))
+          .sort(byNewest)
+          .slice(0, limit)
+          .map((r) => ({ id: r.id, createdAt: r.createdAt, ownerUserId: r.ownerUserId }));
+      },
+      getPublishedMany: (ids) => {
+        publishedManyCalls.push({ kind: "tournament", ids: [...ids] });
+        return ids.flatMap((id) => tournamentRefs.get(id) ?? []);
+      },
+      votedAmong: (viewerId, ids) => {
+        votedAmongCalls.push({ kind: "tournament", viewerId, ids: [...ids] });
+        return ids.filter((id) => tournamentVotes.has(`${viewerId}:${id}`));
+      },
       get: (id) => tournamentRefs.get(id),
-      listByOwner: (owner) => [...tournamentRefs.values()].filter((r) => r.ownerUserId === owner).sort(byNewest),
-      listVotedByUser: (voter) => [...tournamentRefs.values()].filter((r) => tournamentVotes.has(`${voter}:${r.id}`)).sort(byNewest)
+      listByOwner: (owner) => [...tournamentRefs.values()].filter((r) => r.ownerUserId === owner).sort(byNewest)
     },
     participation: {
       tierlists: () => tierlistParticipation,
@@ -185,7 +216,7 @@ function createDeps(repo: CommunityRepository) {
       quizzes: () => quizParticipation
     }
   };
-  return { deps, readerProfiles, usernames, ownedMurals, muralPayloads, libraries, libraryCalls, sharedCounts, sharedShelves, sharedBookCountsCalls, sharedBooksCalls, tierlistRefs, tournamentRefs, seenAt, votes, tournamentVotes, readerGlyphs, readerGlyphCalls, tierlistParticipation, tournamentParticipation, quizParticipation };
+  return { deps, readerProfiles, usernames, ownedMurals, muralPayloads, libraries, libraryCalls, sharedCounts, sharedShelves, sharedBookCountsCalls, sharedBooksCalls, tierlistRefs, tournamentRefs, seenAt, votes, tournamentVotes, readerGlyphs, readerGlyphCalls, tierlistParticipation, tournamentParticipation, quizParticipation, windowCalls, publishedManyCalls, votedAmongCalls };
 }
 
 function profileRow(userId: string, overrides: Partial<ProfileRow> = {}): ProfileRow {
@@ -1302,6 +1333,114 @@ test("discover only looks up glyphs for authors on the returned page, not the wh
   const page = service.getDiscover("all", "", 2, 0);
   assert.equal(page.items.length, 2);
   assert.deepEqual(readerGlyphCalls.sort(), ["d", "e"]);
+});
+
+test("discover search ignores accents, case and punctuation", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs, tournamentRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  tierlistRefs.set("t1", tierRef("t1", "alice", { name: "Hábitos Atómicos" }));
+  tierlistRefs.set("t2", tierRef("t2", "alice", { name: "Fantasy" }));
+  tournamentRefs.set("g1", tournRef("g1", "alice", { name: "Sci-Fi: Ñandú Cup" }));
+  const ids = (q: string) => service.getDiscover("all", q, 10, 0).items.map((item) => item.content.id);
+
+  assert.deepEqual(ids("habitos"), ["t1"]);
+  assert.deepEqual(ids("  HÁBITOS, atómicos! "), ["t1"]);
+  assert.deepEqual(ids("sci fi nandu"), ["g1"]);
+  assert.deepEqual(ids("Sci-Fi"), ["g1"]);
+  assert.deepEqual(ids("nothing like it"), []);
+});
+
+test("a discover search returns the right page of matches and the next offset", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs, tournamentRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  for (let day = 1; day <= 6; day++) tierlistRefs.set(`f${day}`, tierRef(`f${day}`, "alice", { name: `Fantasy ${day}`, createdAt: at(day) }));
+  tournamentRefs.set("g", tournRef("g", "alice", { name: "Fantasy Cup", createdAt: "2026-09-03T12:00:00.000Z" }));
+  for (let day = 20; day <= 23; day++) tierlistRefs.set(`o${day}`, tierRef(`o${day}`, "alice", { name: `Other ${day}`, createdAt: at(day) }));
+  const page = (offset: number) => service.getDiscover("all", "fantasy", 3, offset);
+
+  assert.deepEqual(page(0).items.map((item) => item.content.id), ["f6", "f5", "f4"]);
+  assert.equal(page(0).nextOffset, 3);
+  assert.deepEqual(page(3).items.map((item) => item.content.id), ["g", "f3", "f2"]);
+  assert.equal(page(3).nextOffset, 6);
+  assert.deepEqual(page(6).items.map((item) => item.content.id), ["f1"]);
+  assert.equal(page(6).nextOffset, null);
+});
+
+test("discover lists content created at the same moment in one order, tier lists first, whatever the page size", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs, tournamentRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  for (const id of ["t1", "t2", "t3"]) tierlistRefs.set(id, tierRef(id, "alice", { createdAt: at(5) }));
+  for (const id of ["g1", "g2", "g3"]) tournamentRefs.set(id, tournRef(id, "alice", { createdAt: at(5) }));
+
+  for (const limit of [1, 2, 4, 6]) {
+    const ids: string[] = [];
+    let offset: number | null = 0;
+    for (let pages = 0; offset !== null && pages < 10; pages++) {
+      const page = service.getDiscover("all", "", limit, offset);
+      ids.push(...page.items.map((item) => item.content.id));
+      offset = page.nextOffset;
+    }
+    assert.deepEqual(ids, ["t1", "t2", "t3", "g1", "g2", "g3"], `limit ${limit}`);
+  }
+});
+
+test("a discover search of punctuation alone lists everything, as an empty search does", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs, tournamentRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  tierlistRefs.set("t1", tierRef("t1", "alice", { name: "Hábitos Atómicos", createdAt: at(1) }));
+  tierlistRefs.set("t2", tierRef("t2", "alice", { name: "Fantasy", createdAt: at(2) }));
+  tournamentRefs.set("g1", tournRef("g1", "alice", { name: "Sci-Fi: Ñandú Cup", createdAt: at(3) }));
+
+  const everything = service.getDiscover("all", "", 10, 0);
+
+  assert.equal(everything.items.length, 3);
+  assert.deepEqual(service.getDiscover("all", "???", 10, 0), everything);
+});
+
+test("discover builds summaries and voted flags only for the page it returns", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs, tournamentRefs, votes, publishedManyCalls, votedAmongCalls } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  for (let day = 1; day <= 4; day++) tierlistRefs.set(`t${day}`, tierRef(`t${day}`, "alice", { createdAt: at(day) }));
+  tournamentRefs.set("g1", tournRef("g1", "alice", { createdAt: at(5) }));
+  tournamentRefs.set("g2", tournRef("g2", "alice", { createdAt: at(6) }));
+  votes.add("viewer:t4");
+
+  const page = service.getDiscover("all", "", 3, 1, "viewer");
+
+  assert.deepEqual(page.items.map((item) => [item.content.id, item.content.viewerVoted]), [["g1", false], ["t4", true], ["t3", false]]);
+  assert.deepEqual(publishedManyCalls, [{ kind: "tierlist", ids: ["t4", "t3"] }, { kind: "tournament", ids: ["g1"] }]);
+  assert.deepEqual(votedAmongCalls, [{ kind: "tierlist", viewerId: "viewer", ids: ["t4", "t3"] }, { kind: "tournament", viewerId: "viewer", ids: ["g1"] }]);
+
+  votedAmongCalls.length = 0;
+  service.getDiscover("all", "", 3, 1);
+  assert.deepEqual(votedAmongCalls, []);
+});
+
+test("discover reads each window only as far as the page needs, up to the cap, and the cap for a search", () => {
+  const { repo } = createRepoFake();
+  const { deps, windowCalls } = createDeps(repo);
+  const service = createCommunityService(deps);
+
+  service.getDiscover("tierlist", "", 20, 40);
+  service.getDiscover("all", "fantasy", 20, 40);
+  service.getDiscover("tournament", "", 50, 480);
+
+  assert.deepEqual(windowCalls, [
+    { kind: "tierlist", needle: "", limit: 61 },
+    { kind: "tierlist", needle: "fantasy", limit: 500 },
+    { kind: "tournament", needle: "fantasy", limit: 500 },
+    { kind: "tournament", needle: "", limit: 500 }
+  ]);
 });
 
 test("people search finds unpublished users as private and excludes self", () => {

@@ -361,6 +361,32 @@ test("suggested people GET allows 30 requests a minute, and no other authed rout
   await app.close();
 });
 
+async function appWithAccounts() {
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", (token: string) => ({ id: token, email: `${token}@example.test`, username: token, avatarId: null }));
+  await app.register(buildCommunityRoutes(fakeService()));
+  const get = (url: string, token: string) => app.inject({ method: "GET", url, headers: { authorization: `Bearer ${token}` } });
+  return { app, get };
+}
+
+test("dashboard allows 60 requests a minute per account, and no other authed route shares that limit", async () => {
+  const { app, get } = await appWithAccounts();
+  for (let request = 1; request <= 60; request++) assert.equal((await get("/community/dashboard", "alice")).statusCode, 200);
+  assert.equal((await get("/community/dashboard", "alice")).statusCode, 429);
+  assert.equal((await get("/community/dashboard", "bob")).statusCode, 200);
+  assert.equal((await get("/community/people?q=reader", "alice")).statusCode, 200);
+  await app.close();
+});
+
+test("people search allows 60 requests a minute per account, and no other authed route shares that limit", async () => {
+  const { app, get } = await appWithAccounts();
+  for (let request = 1; request <= 60; request++) assert.equal((await get("/community/people?q=reader", "alice")).statusCode, 200);
+  assert.equal((await get("/community/people?q=reader", "alice")).statusCode, 429);
+  assert.equal((await get("/community/people?q=reader", "bob")).statusCode, 200);
+  assert.equal((await get("/community/dashboard", "alice")).statusCode, 200);
+  await app.close();
+});
+
 test("own profile GET and shelf mural PUT are authed and validate the body", async () => {
   const calls: Array<Record<string, unknown>> = [];
   const app = Fastify();

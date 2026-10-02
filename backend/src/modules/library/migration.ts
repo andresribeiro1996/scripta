@@ -24,8 +24,9 @@ export interface EmbeddedMuralRow {
   rawMural: unknown;
 }
 
-/** Pure read — scans every row's JSON for a `murals` array and collects
- *  each element paired with the owning user id. Never writes anything
+/** Pure read — scans the JSON of every row that still contains a
+ *  `"murals"` key for a `murals` array and collects each element paired
+ *  with the owning user id. Never writes anything
  *  back (see clearEmbeddedMuralsField below for the write half, which is
  *  only ever called once the extracted rows have actually been inserted
  *  elsewhere). Safe against a fresh empty database (returns []) and safe
@@ -35,7 +36,7 @@ export interface EmbeddedMuralRow {
 export function readEmbeddedMurals(): EmbeddedMuralRow[] {
   const db = openLibraryDb();
   try {
-    const rows = db.prepare(`SELECT user_id, data FROM library_documents`).all() as Array<{ user_id: string; data: string }>;
+    const rows = db.prepare(`SELECT user_id, data FROM library_documents WHERE instr(data, '"murals"') > 0`).iterate() as Iterable<{ user_id: string; data: string }>;
     const extracted: EmbeddedMuralRow[] = [];
     for (const row of rows) {
       let parsed: unknown;

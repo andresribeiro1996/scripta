@@ -1,9 +1,10 @@
 // HTTP layer for the arena module: request validation and mapping
 // service results to responses. No business logic here — see service.ts.
 
+import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { authGuard, getOptionalAuthenticatedUser } from "../auth/index.js";
+import { authGuard, getOptionalAuthenticatedUser, rateLimitKey } from "../auth/index.js";
 import {
   AlreadyVotedError,
   ArenaError,
@@ -81,10 +82,13 @@ export function buildArenaRoutes(service: ArenaService) {
       return reply.send({ tournaments: service.listVoted(request.user.id) });
     });
 
-    app.get("/arenas/public", async (request, reply) => {
-      const parsed = listPublicQuerySchema.safeParse(request.query);
-      if (!parsed.success) return reply.code(400).send({ error: "Invalid limit/offset." });
-      return reply.send({ tournaments: service.listPublic(parsed.data.limit, parsed.data.offset) });
+    await app.register(async (scoped) => {
+      await scoped.register(fastifyRateLimit, { max: 30, timeWindow: "1 minute", keyGenerator: rateLimitKey });
+      scoped.get("/arenas/public", async (request, reply) => {
+        const parsed = listPublicQuerySchema.safeParse(request.query);
+        if (!parsed.success) return reply.code(400).send({ error: "Invalid limit/offset." });
+        return reply.send({ tournaments: service.listPublic(parsed.data.limit, parsed.data.offset) });
+      });
     });
 
     // Deliberately NOT behind authGuard — the whole point of BookArena is

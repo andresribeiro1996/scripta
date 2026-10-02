@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { bookKey, markDistinct, statusLabel } from "@scripta/shared";
+import { bookKey, markDistinct, saveFailureMessage, statusLabel } from "@scripta/shared";
 import { mergeLibraryBooks, type LibraryDocument } from "../api/library";
 import { useLibrary } from "../hooks/useLibrary";
 import { CoverImage } from "./BookCard";
@@ -22,7 +22,7 @@ export function DuplicatesSheet({ groups, library, onClose }: { groups: string[]
     } catch (error) {
       console.error(error);
       void queryClient.invalidateQueries({ queryKey: ["library"] });
-      toast({ message: failure, kind: "error" });
+      toast({ message: saveFailureMessage(error, failure), kind: "error" });
     } finally {
       setBusy(false);
     }

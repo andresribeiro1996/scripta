@@ -19,21 +19,31 @@ const { applyLibrarySchema } = await import("./adapters/sqlite/connection.js");
 const { createSqliteLibraryRepository } = await import("./adapters/sqlite/sqliteLibraryRepository.js");
 const { createLibraryService } = await import("./service.js");
 const { buildLibraryRoutes } = await import("./routes.js");
+const { LIBRARY_PUT_HEADROOM_BYTES } = await import("./domain/constants.js");
+const { env } = await import("../../config/env.js");
 
 const kobo = { ContentID: "k1", Title: "Dune", Attribution: "Frank Herbert", ReadStatus: 1 };
 const goodreads = { ContentID: "g1", Title: "Dune", Attribution: "Frank Herbert", ISBN: "9780441013593", ReadStatus: 2 };
 
+const tooLargeBody = {
+  error: "Your library is over 10 MB, the most Scripta can store. Remove some books or highlights and try again.",
+  code: "LIBRARY_BODY_TOO_LARGE",
+  maxBytes: 10485760
+};
+
 async function setup() {
   const db = new DatabaseSync(":memory:");
   applyLibrarySchema(db);
-  const service = createLibraryService(createSqliteLibraryRepository(db), () => "", undefined, undefined, () => undefined);
+  const service = createLibraryService(createSqliteLibraryRepository(db), () => "", env.LIBRARY_BODY_LIMIT_BYTES, undefined, undefined, () => undefined);
   const app = Fastify();
   app.decorate("authenticateAccessToken", (token: string) => ({ id: token, email: `${token}@example.test`, username: token, avatarId: null }));
   await app.register(buildLibraryRoutes(service));
   await app.ready();
   const merge = (payload: unknown, token: string | null = "u1") =>
     app.inject({ method: "POST", url: "/library/books/merge", headers: token ? { authorization: `Bearer ${token}` } : {}, payload: payload as object });
-  return { app, service, merge };
+  const addBook = (payload: unknown, token = "u1") =>
+    app.inject({ method: "POST", url: "/library/books", headers: { authorization: `Bearer ${token}` }, payload: payload as object });
+  return { app, service, merge, addBook };
 }
 
 test("PUT /library saves a book whose fields aren't text", async () => {
@@ -42,6 +52,42 @@ test("PUT /library saves a book whose fields aren't text", async () => {
   const res = await app.inject({ method: "PUT", url: "/library", headers: { authorization: "Bearer u1" }, payload: { data: { books: [book] } } });
   assert.equal(res.statusCode, 200);
   assert.deepEqual((res.json() as { data: { books: unknown[] } }).data.books, [book]);
+  await app.close();
+});
+
+test("PUT /library rejects an anonymous caller before the body is read", async () => {
+  const { app } = await setup();
+  const send = (headers: Record<string, string>) =>
+    app.inject({ method: "PUT", url: "/library", headers: { "content-type": "application/json", ...headers }, payload: "{not json" });
+  assert.equal((await send({})).statusCode, 401);
+  assert.equal((await send({ authorization: "Bearer u1" })).statusCode, 400);
+  await app.close();
+});
+
+test("library writes share one bucket of 30 a minute per account, apart from reads and other accounts", async () => {
+  const { app } = await setup();
+  const writes = [
+    { method: "PUT", url: "/library" },
+    { method: "POST", url: "/library/books" },
+    { method: "POST", url: "/library/books/merge" },
+    { method: "POST", url: "/library/share" },
+    { method: "POST", url: "/library/unshare" }
+  ] as const;
+  const write = (token: string, index: number) =>
+    app.inject({ ...writes[index % writes.length]!, headers: { authorization: `Bearer ${token}` }, payload: {} });
+  for (let request = 0; request < 30; request++) assert.notEqual((await write("u1", request)).statusCode, 429);
+  for (let route = 0; route < writes.length; route++) assert.equal((await write("u1", route)).statusCode, 429);
+  assert.notEqual((await write("u2", 0)).statusCode, 429);
+  assert.equal((await app.inject({ method: "GET", url: "/library", headers: { authorization: "Bearer u1" } })).statusCode, 404);
+  await app.close();
+});
+
+test("GET /library allows 60 requests a minute per account", async () => {
+  const { app } = await setup();
+  const read = (token: string) => app.inject({ method: "GET", url: "/library", headers: { authorization: `Bearer ${token}` } });
+  for (let request = 1; request <= 60; request++) assert.equal((await read("u1")).statusCode, 404);
+  assert.equal((await read("u1")).statusCode, 429);
+  assert.equal((await read("u2")).statusCode, 404);
   await app.close();
 });
 
@@ -85,5 +131,59 @@ test("POST /library/books/merge merges the books and returns the saved document"
   const body = res.json() as { data: { books: Array<Record<string, unknown>> } };
   assert.equal(body.data.books.length, 1);
   assert.equal(bookKey(body.data.books[0]!), bookKey(goodreads));
+  await app.close();
+});
+
+test("PUT /library over the default cap tells the reader it is 10 MB", async () => {
+  const { app } = await setup();
+  const res = await app.inject({
+    method: "PUT",
+    url: "/library",
+    headers: { authorization: "Bearer u1", "content-type": "application/json" },
+    payload: JSON.stringify({ data: { books: [], padding: "x".repeat(10 * 1024 * 1024) } })
+  });
+  assert.equal(res.statusCode, 413);
+  assert.deepEqual(res.json(), tooLargeBody);
+  await app.close();
+});
+
+const nearTheLine = (room: number) => ({ books: [], padding: "x".repeat(env.LIBRARY_BODY_LIMIT_BYTES - LIBRARY_PUT_HEADROOM_BYTES - room) });
+
+test("POST /library/books that would take the library past the cap answers 413 like PUT /library and leaves it alone", async () => {
+  const { app, service, addBook } = await setup();
+  const saved = service.saveLibrary("u1", nearTheLine(100));
+  const res = await addBook({ title: "Dune", author: "Frank Herbert", readStatus: 0 });
+  assert.equal(res.statusCode, 413);
+  assert.deepEqual(res.json(), tooLargeBody);
+  const after = service.getLibrary("u1");
+  assert.equal(after?.updatedAt, saved.updatedAt);
+  assert.deepEqual(after?.data, saved.data);
+  await app.close();
+});
+
+test("POST /library/books under the cap still adds the book", async () => {
+  const { app, service, addBook } = await setup();
+  service.saveLibrary("u1", nearTheLine(2000));
+  const res = await addBook({ title: "Dune", author: "Frank Herbert", readStatus: 0 });
+  assert.equal(res.statusCode, 200);
+  assert.equal((res.json() as { updated: boolean }).updated, false);
+  assert.equal((service.getLibrary("u1")!.data as { books: unknown[] }).books.length, 1);
+  await app.close();
+});
+
+test("POST /library/books/merge that would take the library past the cap answers 413 like PUT /library and leaves it alone", async () => {
+  const { app, service, merge } = await setup();
+  const short = { ContentID: "k1", Title: "a", Attribution: "b" };
+  const isbn = { ContentID: "g1", Title: "a", Attribution: "b", ISBN: "9780441013593" };
+  const stamp = "2026-01-01T00:00:00.000Z";
+  const shelves = Array.from({ length: 20 }, (_, i) => ({ id: `s${i}`, type: "collection", name: `Shelf ${i}`, bookKeys: [bookKey(short)], createdAt: stamp, updatedAt: stamp }));
+  const bare = { books: [isbn, short], groups: shelves, padding: "" };
+  const saved = service.saveLibrary("u1", { ...bare, padding: "x".repeat(env.LIBRARY_BODY_LIMIT_BYTES - LIBRARY_PUT_HEADROOM_BYTES - Buffer.byteLength(JSON.stringify(bare))) });
+  const res = await merge({ keep: bookKey(isbn), merge: [bookKey(short)], updatedAt: saved.updatedAt });
+  assert.equal(res.statusCode, 413);
+  assert.deepEqual(res.json(), tooLargeBody);
+  const after = service.getLibrary("u1");
+  assert.equal(after?.updatedAt, saved.updatedAt);
+  assert.deepEqual(after?.data, saved.data);
   await app.close();
 });

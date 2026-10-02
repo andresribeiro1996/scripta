@@ -6,6 +6,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { normalizeWords } from "@scripta/shared";
 import {
   AlreadyVotedError,
   DuelNotTiedError,
@@ -46,6 +47,16 @@ function createInMemoryArenaRepository(): ArenaRepository {
     },
     listPublicTournaments(limit, offset) {
       return [...tournaments.values()].slice(offset, offset + limit);
+    },
+    discoverWindow(needle, limit) {
+      return [...tournaments.values()]
+        .filter((t) => t.status !== "seeding" && normalizeWords(t.name).includes(needle))
+        .sort((a, b) => b.created_at.localeCompare(a.created_at))
+        .slice(0, limit)
+        .map((t) => ({ id: t.id, created_at: t.created_at, owner_user_id: t.owner_user_id }));
+    },
+    listPublicByIds(ids) {
+      return [...tournaments.values()].filter((t) => t.status !== "seeding" && ids.includes(t.id));
     },
     updateTournamentStatus(id, status, currentRound) {
       const t = tournaments.get(id);
@@ -161,6 +172,12 @@ function createInMemoryArenaRepository(): ArenaRepository {
         .filter(({ tournament }) => tournament.owner_user_id !== voterUserId)
         .sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))
         .map(({ tournament }) => tournament);
+    },
+    votedAmong(voterUserId, ids) {
+      return ids.filter((id) => {
+        const tournament = tournaments.get(id);
+        return tournament !== undefined && tournament.owner_user_id !== voterUserId && votes.some((v) => v.voter_user_id === voterUserId && duels.get(v.duel_id)?.tournament_id === id);
+      });
     },
     listParticipation() {
       return [];
@@ -593,4 +610,58 @@ test("an anonymous vote leaves no participation trail, and own tournaments stay 
   );
   service.vote(other.id, otherDuel.id, "token-b", "book-12");
   assert.equal(service.listVoted("voter-2").length, 0);
+});
+
+test("discoverWindow lists only started tournaments, matching the normalized needle", () => {
+  const service = createArenaService(createInMemoryArenaRepository());
+  const habits = startedTournament(service, "owner-1", "Hábitos Atómicos", 0);
+  const fantasy = startedTournament(service, "owner-2", "Fantasy Cup", 2);
+  service.createTournament("owner-1", { name: "Hábitos rascunho", bracketSize: 2, roundDurationMinutes: 60 });
+
+  assert.deepEqual(service.discoverWindow("habitos", 10).map((ref) => ref.id), [habits.id]);
+  assert.deepEqual(service.discoverWindow("", 10).map((ref) => ref.id).sort(), [habits.id, fantasy.id].sort());
+  assert.equal(service.discoverWindow("", 1).length, 1);
+  assert.deepEqual(service.discoverWindow("fantasy", 10), [{ id: fantasy.id, createdAt: fantasy.createdAt, ownerUserId: "owner-2" }]);
+});
+
+test("listPublicByIds builds covers and winners for the requested started tournaments only", () => {
+  const service = createArenaService(createInMemoryArenaRepository());
+  const first = service.createTournament("owner-1", { name: "First", bracketSize: 2, roundDurationMinutes: 60 });
+  service.setSlotsManual(first.id, "owner-1", [
+    { slotIndex: 0, book: makeBookWithCover(1) },
+    { slotIndex: 1, book: makeBookWithCover(2) }
+  ]);
+  service.start(first.id, "owner-1");
+  const second = startedTournament(service, "owner-1", "Second", 2);
+  startedTournament(service, "owner-1", "Third", 4);
+  const draft = service.createTournament("owner-1", { name: "Draft", bracketSize: 2, roundDurationMinutes: 60 });
+  const duel = service.getTournamentView(first.id)!.duels[0]!;
+  service.vote(first.id, duel.id, "voter-1", "book-1");
+  service.settleEarly(first.id, "owner-1", duel.id);
+
+  const summaries = service.listPublicByIds([first.id, second.id, draft.id, "ghost"]);
+
+  assert.deepEqual(summaries.map((summary) => summary.id).sort(), [first.id, second.id].sort());
+  const ofFirst = summaries.find((summary) => summary.id === first.id)!;
+  assert.deepEqual(ofFirst, service.getPublicSummary(first.id));
+  assert.equal(ofFirst.status, "completed");
+  assert.deepEqual(ofFirst.winner, makeBookWithCover(1));
+  assert.deepEqual(ofFirst.covers, ["https://covers.test/1.jpg", "https://covers.test/2.jpg"]);
+  assert.equal(summaries.find((summary) => summary.id === second.id)?.winner, null);
+  assert.deepEqual(service.listPublicByIds([]), []);
+});
+
+test("votedAmong returns only the requested tournaments the account voted in, never its own", () => {
+  const service = createArenaService(createInMemoryArenaRepository());
+  const first = startedTournament(service, "owner-1", "First", 0);
+  const second = startedTournament(service, "owner-1", "Second", 2);
+  const mine = startedTournament(service, "voter-1", "Mine", 4);
+  for (const tournament of [first, second, mine]) {
+    const duel = service.getTournamentView(tournament.id)!.duels[0]!;
+    service.vote(tournament.id, duel.id, `token-${tournament.id}`, duel.bookA.key, tournament === second ? null : "voter-1");
+  }
+
+  assert.deepEqual(service.votedAmong("voter-1", [first.id, second.id, mine.id]), [first.id]);
+  assert.deepEqual(service.votedAmong("voter-1", []), []);
+  assert.deepEqual(service.votedAmong("nobody", [first.id]), []);
 });

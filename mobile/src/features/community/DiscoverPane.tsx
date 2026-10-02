@@ -12,6 +12,7 @@ import { ArenaBooksSheet } from "../arena/ArenaBooksSheet";
 import { fetchDiscover } from "./api";
 import { DISCOVER_FILTERS, contentKindLabel, contentStats, contentStatus, contentTarget, type DiscoverFilter } from "./communityHome";
 import { AddBookSheet } from "./AddBookSheet";
+import { useDebouncedValue } from "../library/lib/debounce";
 import { openProfile } from "./AuthorAvatar";
 import { ReaderGlyph } from "./ReaderGlyph";
 
@@ -21,7 +22,7 @@ export function DiscoverPane({ linkAuthors = true }: { linkAuthors?: boolean }) 
   const { colors } = useTheme();
   const [filter, setFilter] = useState<DiscoverFilter>("all");
   const [search, setSearch] = useState("");
-  const needle = search.trim();
+  const needle = useDebouncedValue(search.trim(), 300);
   const { user } = useAuth();
   const discover = useInfiniteQuery({
     queryKey: ["community", "discover", filter, needle],

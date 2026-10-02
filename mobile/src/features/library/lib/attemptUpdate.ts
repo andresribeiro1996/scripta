@@ -1,8 +1,8 @@
-export async function attemptUpdate(update: () => Promise<unknown>, onError: () => void, onSuccess?: () => void): Promise<boolean> {
+export async function attemptUpdate(update: () => Promise<unknown>, onError: (error: unknown) => void, onSuccess?: () => void): Promise<boolean> {
   try {
     await update();
-  } catch {
-    onError();
+  } catch (error) {
+    onError(error);
     return false;
   }
   onSuccess?.();

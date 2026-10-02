@@ -9,6 +9,7 @@ import { CommunityIcon } from "../components/NavIcons";
 import { ReaderGlyph } from "../components/ReaderGlyph";
 import { SkeletonCardGrid } from "../components/Skeleton";
 import { useCommunityDiscover } from "../hooks/useCommunity";
+import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { discoverDestination } from "../lib/landing";
 
 const DISCOVER_FILTERS: Array<{ value: DiscoverType; label: string }> = [
@@ -85,7 +86,8 @@ export function PublicDiscoverPage() {
 function DiscoverPane() {
   const [type, setType] = useState<DiscoverType>("all");
   const [search, setSearch] = useState("");
-  const { items, isLoading, error, refetch, hasNextPage, isFetchingNextPage, fetchNextPage, isFetchNextPageError, isRefetchError, isRefetching } = useCommunityDiscover(type, search.trim());
+  const needle = useDebouncedValue(search.trim(), 300);
+  const { items, isLoading, error, refetch, hasNextPage, isFetchingNextPage, fetchNextPage, isFetchNextPageError, isRefetchError, isRefetching } = useCommunityDiscover(type, needle);
 
   return (
     <div>
