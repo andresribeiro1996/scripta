@@ -12,6 +12,7 @@ import { seedBook } from "./seedCatalog.js";
 const MIN_WAIT_MS = 3000;
 const MAX_PAGES = 200;
 const PAGE_PROGRESS_EVERY = 100;
+const MAX_CONCURRENT_SITES = 4;
 
 export interface SiteReport {
   skipped?: string;
@@ -72,7 +73,16 @@ function commonPrefix(urls: string[]): string {
   return prefix.slice(0, prefix.lastIndexOf("/") + 1);
 }
 
-async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryRun: boolean }): Promise<SiteReport> {
+function createExclusive(): <T>(task: () => Promise<T>) => Promise<T> {
+  let tail: Promise<unknown> = Promise.resolve();
+  return (task) => {
+    const run = tail.then(task);
+    tail = run.catch(() => undefined);
+    return run;
+  };
+}
+
+async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryRun: boolean }, exclusive: ReturnType<typeof createExclusive>): Promise<SiteReport> {
   const report = emptyReport();
   let waitMs = MIN_WAIT_MS;
   let requested = false;
@@ -243,15 +253,19 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
       report.coversSet++;
       continue;
     }
-    let bytes: Buffer | null;
+    let image: Awaited<ReturnType<typeof encodeCover>>;
     try {
-      bytes = await request(() => deps.fetchBytes(book.imageUrl));
+      image = await request(() =>
+        exclusive(async () => {
+          const bytes = await deps.fetchBytes(book.imageUrl);
+          return bytes && (await encodeCover(bytes));
+        })
+      );
     } catch (error) {
       if (!(error instanceof SourceUnavailableError)) throw error;
       report.failed++;
       continue;
     }
-    const image = bytes && (await encodeCover(bytes));
     if (!image || !isAcceptableCover("publisher", image.width, image.height)) {
       report.rejectedImage++;
       continue;
@@ -272,12 +286,18 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
 }
 
 export async function importPublisherCovers(deps: ImportDeps, sites: PublisherSite[], options: { dryRun: boolean }): Promise<Record<string, SiteReport>> {
-  const reports = await Promise.all(
-    sites.map(async (site) => {
-      const report = await importSite(site, deps, options);
+  const exclusive = createExclusive();
+  const reports: Array<readonly [string, SiteReport]> = new Array(sites.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < sites.length) {
+      const index = next++;
+      const site = sites[index]!;
+      const report = await importSite(site, deps, options, exclusive);
       deps.log(`${site.name} ${JSON.stringify(report)}`);
-      return [site.name, report] as const;
-    })
-  );
+      reports[index] = [site.name, report];
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(MAX_CONCURRENT_SITES, sites.length) }, worker));
   return Object.fromEntries(reports);
 }

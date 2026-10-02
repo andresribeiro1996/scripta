@@ -20,6 +20,17 @@ test("a large cover is encoded as a 1600px full image and a 600x900 thumbnail", 
   assert.equal(thumb.height, 900);
 });
 
+test("the thumbnail of a rotated cover keeps its orientation", async () => {
+  const rotated = await sharp({ create: { width: 3000, height: 2000, channels: 3, background: "#886644" } }).withMetadata({ orientation: 6 }).jpeg().toBuffer();
+  const encoded = await encodeCover(rotated);
+  assert.ok(encoded);
+  assert.equal(encoded.width, 1067);
+  assert.equal(encoded.height, 1600);
+  const thumb = await sharp(encoded.thumb).metadata();
+  assert.equal(thumb.width, 600);
+  assert.equal(thumb.height, 900);
+});
+
 test("a small cover is never enlarged", async () => {
   const encoded = await encodeCover(await jpeg(300, 460));
   assert.ok(encoded);
