@@ -240,10 +240,9 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
         report.coversSet++;
         continue;
       }
-      row = seedBook({ isbn: book.isbn, title, author }, deps.repo, deps.now, "publisher").book!;
+      row = seedBook({ isbn: book.isbn, title, author, workKey: memo.looked?.edition?.workKey ?? undefined }, deps.repo, deps.now, "publisher").book!;
     }
     if (!options.dryRun) {
-      deps.repo.setWorkKey(row.id, memo.looked?.edition?.workKey);
       deps.repo.mergeDetails(row.id, { ...book.details, publisher: site.name }, "publisher");
       if (isWebUrl(book.productUrl)) deps.repo.setPublisherUrl(row.id, book.productUrl);
     }

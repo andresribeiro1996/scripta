@@ -170,7 +170,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       const identity = lookupIdentity({ isbn: result.isbn, title: result.title, author });
       if (!identity) return result;
       const book = findExisting(identity) ?? deps.repo.createBook(
-        { title: result.title, author, isbn: identity.isbn, year: result.year, publisher: result.publisher, olCoverId, genres: result.genres, sources: [source] },
+        { title: result.title, author, isbn: identity.isbn, year: result.year, publisher: result.publisher, olCoverId, workKey, genres: result.genres, sources: [source] },
         keysOf(identity),
         now().toISOString()
       );

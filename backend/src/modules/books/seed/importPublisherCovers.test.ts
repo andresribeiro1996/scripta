@@ -823,6 +823,8 @@ test("a work key with no author still lands on the blank row", async () => {
   const row = h.repo.findBookByKey(`isbn:${GUERRA}`)!;
   assert.equal(row.title, "");
   assert.equal(row.ol_work_key, "OL7W");
+  assert.equal((h.db.prepare("SELECT COUNT(DISTINCT work_id) AS n FROM books WHERE ol_work_key = 'OL7W'").get() as { n: number }).n, 1);
+  assert.equal((h.db.prepare("SELECT COUNT(*) AS n FROM works WHERE merged_into IS NOT NULL").get() as { n: number }).n, 0);
 });
 
 const MUSEU_URL = "https://antigona.pt/products/o-museu-dos-esforcos-inuteis";

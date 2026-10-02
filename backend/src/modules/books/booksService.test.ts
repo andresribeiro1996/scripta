@@ -1084,6 +1084,16 @@ test("an outside search stores the work key on created and existing rows", async
   assert.equal(none.repo.findBookByKey("isbn:9780441013593")!.ol_work_key, null);
 });
 
+test("an outside search puts new hits with one work key in one work, leaving no throwaway work behind", async () => {
+  const hit = (isbn: string, title: string) => ({ result: { title, authors: ["Frank Herbert"], year: null, isbn, publisher: null, coverUrl: null, genres: [] }, olCoverId: null, workKey: "/works/OL1W", source: "openlibrary" as const });
+  const h = harness({ catalog: recordingCatalog({ search: async () => [hit("9780441013593", "Dune"), hit("9789722046114", "Duna")] }).catalog });
+  await h.service.searchExternal("dune");
+  const english = h.repo.findBookByKey("isbn:9780441013593")!;
+  const portuguese = h.repo.findBookByKey("isbn:9789722046114")!;
+  assert.equal(portuguese.work_id, english.work_id);
+  assert.deepEqual(h.db.prepare("SELECT ol_work_key, title, merged_into FROM works").all().map((work) => ({ ...work })), [{ ol_work_key: "OL1W", title: "Dune", merged_into: null }]);
+});
+
 function backfillBooks(h: ReturnType<typeof harness>, count: number) {
   for (let index = 0; index < count; index++) {
     h.service.resolveCover({ isbn: null, title: `Book ${index}`, author: "Author" });

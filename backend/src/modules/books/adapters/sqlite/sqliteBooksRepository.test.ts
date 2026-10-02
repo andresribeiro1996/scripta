@@ -13,7 +13,7 @@ process.env.COVERS_DB_PATH = join(scratch, "covers.sqlite");
 process.env.JWT_ACCESS_SECRET = "a".repeat(64);
 process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
-const { applyBooksMigrations } = await import("./connection.js");
+const { applyBooksMigrations, openBooksDb } = await import("./connection.js");
 const { createSqliteBooksRepository } = await import("./sqliteBooksRepository.js");
 
 const NOW = "2026-10-01T00:00:00.000Z";
@@ -24,6 +24,19 @@ function freshRepo() {
   applyBooksMigrations(db);
   return { db, repo: createSqliteBooksRepository(db) };
 }
+
+interface WorkRow {
+  id: string;
+  ol_work_key: string | null;
+  title: string;
+  author: string;
+  merged_into: string | null;
+  created_at: string;
+}
+
+const countOf = (db: DatabaseSync, table: string) => (db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n;
+const workById = (db: DatabaseSync, id: string | null) => db.prepare("SELECT * FROM works WHERE id = ?").get(id) as unknown as WorkRow;
+const workOf = (db: DatabaseSync, bookId: string) => db.prepare("SELECT works.* FROM books JOIN works ON works.id = books.work_id WHERE books.id = ?").get(bookId) as unknown as WorkRow;
 
 function legacyDb() {
   const db = new DatabaseSync(":memory:");
@@ -59,15 +72,16 @@ test("migration turns legacy ISBN cache rows into books and drops cover_cache", 
   assert.equal((db.prepare(`SELECT COUNT(*) AS n FROM books`).get() as { n: number }).n, 2);
 });
 
-test("createBook returns the existing row for a key that is already taken", () => {
+test("createBook returns the existing row for a key that is already taken, and creates no work", () => {
   const { db, repo } = freshRepo();
   const first = repo.createBook({ title: "Orlando", author: "Virginia Woolf", isbn: "9780141184272" }, ["isbn:9780141184272"], NOW);
-  const second = repo.createBook({ title: "Other", author: "Other", isbn: "9780141184272" }, ["isbn:9780141184272"], NOW);
+  const second = repo.createBook({ title: "Other", author: "Other", isbn: "9780141184272", workKey: "OL1W" }, ["isbn:9780141184272"], NOW);
   assert.equal(second.id, first.id);
   assert.equal(second.title, "Orlando");
   assert.equal(repo.getBook(first.id)!.genres, "[]");
   assert.equal(db.isTransaction, false);
   assert.equal((db.prepare(`SELECT COUNT(*) AS n FROM books`).get() as { n: number }).n, 1);
+  assert.equal(countOf(db, "works"), 1);
 });
 
 test("setCoverIf writes only while the book still has the expected cover", () => {
@@ -438,6 +452,182 @@ test("works allow any number of keyless rows but one row per Open Library key, a
   insert.run("w3", null, "w1", NOW);
   assert.throws(() => insert.run("w4", "OL1W", null, NOW), /UNIQUE constraint failed: works\.ol_work_key/);
   assert.throws(() => insert.run("w5", null, "missing", NOW), /FOREIGN KEY constraint failed/);
+});
+
+test("editions created with one work key share a work, titled by the first of them", () => {
+  const { db, repo } = freshRepo();
+  const english = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593", workKey: "/works/OL893415W" }, ["isbn:9780441013593"], NOW);
+  const portuguese = repo.createBook({ title: "Duna", author: "Frank Herbert", isbn: "9789722046114", workKey: "OL893415W" }, ["isbn:9789722046114"], "2026-10-02T00:00:00.000Z");
+  assert.equal(portuguese.work_id, english.work_id);
+  assert.equal(countOf(db, "works"), 1);
+  const work = workOf(db, english.id);
+  assert.deepEqual([work.ol_work_key, work.title, work.author, work.merged_into, work.created_at], ["OL893415W", "Dune", "Frank Herbert", null, NOW]);
+});
+
+test("a keyless edition gets a work of its own, even beside another edition with the same title and author", () => {
+  const { db, repo } = freshRepo();
+  const first = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593" }, ["isbn:9780441013593"], NOW);
+  const second = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780593099322" }, ["isbn:9780593099322"], NOW);
+  assert.notEqual(second.work_id, first.work_id);
+  assert.equal(countOf(db, "works"), 2);
+  const work = workOf(db, first.id);
+  assert.deepEqual([work.ol_work_key, work.title, work.author, work.merged_into], [null, "Dune", "Frank Herbert", null]);
+});
+
+test("a late key lands on the edition's own work when no work holds it", () => {
+  const { db, repo } = freshRepo();
+  const book = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: null }, ["ta:dune|frank herbert|"], NOW);
+  repo.setWorkKey(book.id, "/works/OL1W");
+  assert.equal(repo.getBook(book.id)!.work_id, book.work_id);
+  assert.equal(workOf(db, book.id).ol_work_key, "OL1W");
+  assert.equal(countOf(db, "works"), 1);
+});
+
+test("a late key whose work already holds other editions moves the edition there and leaves merged_into on its old work", () => {
+  const { db, repo } = freshRepo();
+  const keyed = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593", workKey: "OL1W" }, ["isbn:9780441013593"], NOW);
+  const late = repo.createBook({ title: "Duna", author: "Frank Herbert", isbn: "9789722046114" }, ["isbn:9789722046114"], NOW);
+  repo.setWorkKey(late.id, "/works/OL1W");
+  const moved = repo.getBook(late.id)!;
+  assert.deepEqual([moved.ol_work_key, moved.work_id], ["OL1W", keyed.work_id]);
+  const old = workById(db, late.work_id);
+  assert.deepEqual([old.merged_into, old.ol_work_key], [keyed.work_id, null]);
+  assert.equal(workById(db, keyed.work_id).merged_into, null);
+  assert.equal(repo.getBook(keyed.id)!.work_id, keyed.work_id);
+  assert.equal(countOf(db, "works"), 2);
+});
+
+test("setWorkKey changes nothing on an edition that already has a key", () => {
+  const { db, repo } = freshRepo();
+  const first = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593", workKey: "OL1W" }, ["isbn:9780441013593"], NOW);
+  repo.createBook({ title: "Emma", author: "Jane Austen", isbn: "9780141439587", workKey: "OL2W" }, ["isbn:9780141439587"], NOW);
+  const snapshot = () => ({
+    works: db.prepare("SELECT * FROM works ORDER BY id").all(),
+    books: db.prepare("SELECT id, ol_work_key, work_id FROM books ORDER BY id").all()
+  });
+  const before = snapshot();
+  repo.setWorkKey(first.id, "OL2W");
+  repo.setWorkKey(first.id, "OL3W");
+  assert.deepEqual(snapshot(), before);
+});
+
+test("a late key never replaces the key a work already holds", () => {
+  const { db, repo } = freshRepo();
+  const book = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: null }, ["ta:dune|frank herbert|"], NOW);
+  db.prepare("UPDATE works SET ol_work_key = 'OL1W' WHERE id = ?").run(book.work_id);
+  repo.setWorkKey(book.id, "OL2W");
+  assert.equal(workById(db, book.work_id).ol_work_key, "OL1W");
+});
+
+test("a late key on an edition with no work yet joins or creates the keyed work", () => {
+  const { db, repo } = freshRepo();
+  const first = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593" }, ["isbn:9780441013593"], NOW);
+  const second = repo.createBook({ title: "Duna", author: "Frank Herbert", isbn: "9789722046114" }, ["isbn:9789722046114"], "2026-10-02T00:00:00.000Z");
+  db.exec("UPDATE books SET work_id = NULL; DELETE FROM works");
+  repo.setWorkKey(first.id, "OL1W");
+  repo.setWorkKey(second.id, "OL1W");
+  assert.equal(countOf(db, "works"), 1);
+  const work = workOf(db, first.id);
+  assert.deepEqual([work.ol_work_key, work.title, work.author, work.merged_into, work.created_at], ["OL1W", "Dune", "Frank Herbert", null, NOW]);
+  assert.equal(repo.getBook(second.id)!.work_id, work.id);
+});
+
+test("a late key leaves a work that still holds other editions alone, and merges it only once it is empty", () => {
+  const { db, repo } = freshRepo();
+  const first = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593" }, ["isbn:9780441013593"], NOW);
+  const second = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780593099322" }, ["isbn:9780593099322"], NOW);
+  db.prepare("UPDATE books SET work_id = ? WHERE id = ?").run(first.work_id, second.id);
+
+  repo.setWorkKey(first.id, "OL1W");
+  const keyedId = repo.getBook(first.id)!.work_id;
+  assert.notEqual(keyedId, first.work_id);
+  assert.deepEqual([workById(db, keyedId).ol_work_key, workById(db, keyedId).title], ["OL1W", "Dune"]);
+  assert.deepEqual([workById(db, first.work_id).ol_work_key, workById(db, first.work_id).merged_into], [null, null]);
+  assert.equal(repo.getBook(second.id)!.work_id, first.work_id);
+
+  repo.setWorkKey(second.id, "OL1W");
+  assert.equal(repo.getBook(second.id)!.work_id, keyedId);
+  assert.equal(workById(db, first.work_id).merged_into, keyedId);
+});
+
+test("fillIdentity titles the empty work of an importer-style edition, once", () => {
+  const { db, repo } = freshRepo();
+  const blank = repo.createBook({ title: "", author: "", isbn: "9780141184272" }, ["isbn:9780141184272"], NOW);
+  assert.deepEqual([workOf(db, blank.id).title, workOf(db, blank.id).author], ["", ""]);
+  repo.fillIdentity(blank.id, "Orlando", "Virginia Woolf");
+  repo.fillIdentity(blank.id, "Changed", "Nobody");
+  assert.deepEqual([workOf(db, blank.id).title, workOf(db, blank.id).author], ["Orlando", "Virginia Woolf"]);
+});
+
+test("a titled edition that joins an empty keyed work titles it, whether it arrives with the key or gets it late", () => {
+  const { db, repo } = freshRepo();
+  const blank = repo.createBook({ title: "", author: "", isbn: "9780141184272", workKey: "OL1W" }, ["isbn:9780141184272"], NOW);
+  repo.createBook({ title: "Orlando", author: "Virginia Woolf", isbn: "9780374520731", workKey: "OL1W" }, ["isbn:9780374520731"], NOW);
+  assert.deepEqual([workOf(db, blank.id).title, workOf(db, blank.id).author], ["Orlando", "Virginia Woolf"]);
+
+  const blankToo = repo.createBook({ title: "", author: "", isbn: "9780062315007", workKey: "OL2W" }, ["isbn:9780062315007"], NOW);
+  const late = repo.createBook({ title: "Emma", author: "Jane Austen", isbn: "9780141439587" }, ["isbn:9780141439587"], NOW);
+  repo.setWorkKey(late.id, "OL2W");
+  assert.deepEqual([workOf(db, blankToo.id).title, workOf(db, blankToo.id).author], ["Emma", "Jane Austen"]);
+});
+
+test("createBook leaves no work behind when the edition cannot be inserted", () => {
+  const { db, repo } = freshRepo();
+  db.exec("CREATE TRIGGER refuse_books BEFORE INSERT ON books BEGIN SELECT RAISE(ABORT, 'refused'); END");
+  assert.throws(() => repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: null, workKey: "OL1W" }, ["ta:dune|frank herbert|"], NOW), /refused/);
+  assert.equal(countOf(db, "works"), 0);
+  db.exec("DROP TRIGGER refuse_books");
+  assert.ok(repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: null, workKey: "OL1W" }, ["ta:dune|frank herbert|"], NOW).work_id);
+});
+
+test("setWorkKey leaves the edition without its key when the keyed work cannot be created", () => {
+  const { db, repo } = freshRepo();
+  const book = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: null }, ["ta:dune|frank herbert|"], NOW);
+  db.exec("UPDATE books SET work_id = NULL; DELETE FROM works");
+  db.exec("CREATE TRIGGER refuse_works BEFORE INSERT ON works BEGIN SELECT RAISE(ABORT, 'refused'); END");
+  assert.throws(() => repo.setWorkKey(book.id, "OL1W"), /refused/);
+  const row = repo.getBook(book.id)!;
+  assert.deepEqual([row.ol_work_key, row.work_id], [null, null]);
+});
+
+function afterFirstRead(db: DatabaseSync, other: () => void) {
+  const prepare = db.prepare.bind(db);
+  let done = false;
+  db.prepare = (sql) => {
+    const statement = prepare(sql);
+    const get = statement.get.bind(statement) as (...args: unknown[]) => unknown;
+    statement.get = ((...args: unknown[]) => {
+      const row = get(...args);
+      if (!done) {
+        done = true;
+        other();
+      }
+      return row;
+    }) as typeof statement.get;
+    return statement;
+  };
+}
+
+test("createBook holds the write lock from its first read, so another connection cannot commit between its read and its write", () => {
+  const mine = openBooksDb();
+  const other = openBooksDb();
+  other.exec("PRAGMA busy_timeout = 0");
+  const insertOther = () => other.prepare("INSERT INTO books (id, title, author, created_at) VALUES ('other', 'Other', 'Author', ?)").run(NOW);
+  let refused = "";
+  afterFirstRead(mine, () => {
+    try {
+      insertOther();
+    } catch (error) {
+      refused = (error as Error).message;
+    }
+  });
+
+  const book = createSqliteBooksRepository(mine).createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593", workKey: "OL1W" }, ["isbn:9780441013593"], NOW);
+
+  assert.equal(book.title, "Dune");
+  assert.match(refused, /database is locked/);
+  insertOther();
+  assert.equal(countOf(mine, "books"), 2);
 });
 
 test("insertImage stores the origin and createBook stores its creator", () => {
