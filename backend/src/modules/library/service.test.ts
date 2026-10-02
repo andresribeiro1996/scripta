@@ -97,6 +97,28 @@ test("saveLibrary emits book_added for books new since the previous save", () =>
   db.close();
 });
 
+test("saveLibrary emits at most 10 events for one save, the first ones in document order", () => {
+  const { db, service, events } = setup();
+  const first = service.saveLibrary("user-1", { books: [] });
+  const added = Array.from({ length: 25 }, (_, i) => ({ ContentID: `k${i}`, Title: `Book ${i}`, Attribution: "A", ReadStatus: 0 }));
+
+  service.saveLibrary("user-1", { books: added }, first.updatedAt);
+
+  assert.deepEqual(events.map((event) => event.refId), added.slice(0, 10).map((book) => book.ContentID));
+  db.close();
+});
+
+test("saveLibrary emits every event of a save that changes fewer books than the cap", () => {
+  const { db, service, events } = setup();
+  const first = service.saveLibrary("user-1", { books: [] });
+  const added = Array.from({ length: 3 }, (_, i) => ({ ContentID: `k${i}`, Title: `Book ${i}`, Attribution: "A", ReadStatus: 0 }));
+
+  service.saveLibrary("user-1", { books: added }, first.updatedAt);
+
+  assert.deepEqual(events.map((event) => event.refId), ["k0", "k1", "k2"]);
+  db.close();
+});
+
 test("saveLibrary emits book_finished when ReadStatus crosses into 2", () => {
   const { db, service, events } = setup();
   const first = service.saveLibrary("user-1", { books: [{ ContentID: "k1", Title: "T", Attribution: "A", ReadStatus: 1 }] });

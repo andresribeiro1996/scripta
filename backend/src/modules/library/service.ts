@@ -5,7 +5,7 @@
 import { randomUUID } from "node:crypto";
 import { bookKey, bookMatchKeys, buildManualBook, isCertainMatch, localDay, mergeDuplicateBooks, readerIdentity, seedCoverLookup, setReadStatus, type CoverLookupParams, type LibraryData } from "@scripta/shared";
 import type { BookRecommendationInput } from "@scripta/shared/community";
-import { COVER_URL_MAX_LENGTH, DISPLAY_TEXT_MAX_LENGTH, LIBRARY_MATCH_BOOK_CAP, MATCH_KEY_MAX_LENGTH } from "./domain/constants.js";
+import { BOOK_EVENTS_PER_SAVE, COVER_URL_MAX_LENGTH, DISPLAY_TEXT_MAX_LENGTH, LIBRARY_MATCH_BOOK_CAP, MATCH_KEY_MAX_LENGTH } from "./domain/constants.js";
 import { LibraryConflictError, NoLibraryDocumentError } from "./domain/errors.js";
 import type { LibraryRepository } from "./domain/ports.js";
 import type { LibraryDerived, LibraryDocument, LibraryDocumentRow, LibraryMatchKeyRow } from "./domain/types.js";
@@ -160,7 +160,7 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
       if (!row) throw new LibraryConflictError();
       if (previous !== undefined && emitBookEvents) {
         try {
-          const events = diffBookEvents(previous.data, data);
+          const events = diffBookEvents(previous.data, data).slice(0, BOOK_EVENTS_PER_SAVE);
           if (events.length > 0) emitBookEvents(userId, events);
         } catch {
           // Activity is best-effort: a diff must never fail an otherwise
