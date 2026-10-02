@@ -1,8 +1,26 @@
 import type { DatabaseSync, StatementSync } from "node:sqlite";
+import { categoryFor, DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
+import { FEED_EVENT_TYPES, FEED_WINDOW_MS } from "../../domain/feed.js";
 import type { CommunityRepository, CursorKeyset } from "../../domain/ports.js";
 import type { EventRow, FollowRow, ProfileRow } from "../../domain/types.js";
 
+const authorShows = `CASE e.type ${FEED_EVENT_TYPES.map((type) => `WHEN '${type}' THEN COALESCE(p.show_${categoryFor(type)}, ${Number(DEFAULT_FEED_SETTINGS[categoryFor(type)])})`).join(" ")} END = 1`;
+const inboxFrom = "FROM feed_inbox i JOIN events e ON e.id = i.event_id LEFT JOIN profiles p ON p.user_id = i.author_id";
+const inboxWhere = `i.viewer_id = ? AND e.type IN (SELECT value FROM json_each(?)) AND ${authorShows}`;
+
 export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepository {
+  const inTransaction = <T>(work: () => T): T => {
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      const result = work();
+      db.exec("COMMIT");
+      return result;
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
+  };
+
   const insertFollowStmt = db.prepare(`
     INSERT OR IGNORE INTO follows (follower_id, followee_id, created_at)
     VALUES ($follower_id, $followee_id, $created_at)
@@ -40,6 +58,19 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
     INSERT OR IGNORE INTO events (id, user_id, type, ref_type, ref_id, payload, created_at, trace_id, source)
     VALUES ($id, $user_id, $type, $ref_type, $ref_id, $payload, $created_at, $trace_id, $source)
   `);
+  const fanOutStmt = db.prepare(`
+    INSERT OR IGNORE INTO feed_inbox (viewer_id, created_at, event_id, author_id)
+    SELECT follower_id, $created_at, $id, $user_id FROM follows WHERE followee_id = $user_id
+  `);
+  const copyToInboxStmt = db.prepare(`
+    INSERT OR IGNORE INTO feed_inbox (viewer_id, created_at, event_id, author_id)
+    SELECT $follower_id, created_at, id, user_id FROM events
+    WHERE user_id = $followee_id AND type IN (SELECT value FROM json_each($types)) AND created_at >= $since
+  `);
+  const deleteInboxFromAuthorStmt = db.prepare(`DELETE FROM feed_inbox WHERE viewer_id = ? AND author_id = ?`);
+  const listInboxStmt = db.prepare(`SELECT e.* ${inboxFrom} WHERE ${inboxWhere} ORDER BY i.created_at DESC, i.event_id DESC LIMIT ?`);
+  const listInboxBeforeStmt = db.prepare(`SELECT e.* ${inboxFrom} WHERE ${inboxWhere} AND (i.created_at, i.event_id) < (?, ?) ORDER BY i.created_at DESC, i.event_id DESC LIMIT ?`);
+  const countInboxSinceStmt = db.prepare(`SELECT COUNT(*) AS n FROM (SELECT 1 ${inboxFrom} WHERE ${inboxWhere} AND i.created_at > ? LIMIT ?)`);
   const getFeedSettingsStmt = db.prepare(`SELECT show_publications, show_reading, show_votes, show_follows, show_reader_glyph FROM profiles WHERE user_id = ?`);
   const updateFeedSettingsStmt = db.prepare(`
     INSERT INTO profiles (user_id, published, mural_id, published_at, updated_at, feed_settings, show_publications, show_reading, show_votes, show_follows, show_reader_glyph)
@@ -75,22 +106,34 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
 
   return {
     deleteUserData(userId) {
-      db.exec("BEGIN IMMEDIATE");
-      try {
+      inTransaction(() => {
         db.prepare("DELETE FROM follows WHERE follower_id = ? OR followee_id = ?").run(userId, userId);
+        db.prepare("DELETE FROM feed_inbox WHERE viewer_id = ? OR author_id = ?").run(userId, userId);
         db.prepare("DELETE FROM profiles WHERE user_id = ?").run(userId);
         db.prepare("DELETE FROM events WHERE user_id = ? OR (ref_type = 'user' AND ref_id = ?)").run(userId, userId);
-        db.exec("COMMIT");
-      } catch (error) {
-        db.exec("ROLLBACK");
-        throw error;
-      }
+        db.prepare("DELETE FROM events_history WHERE user_id = ? OR (ref_type = 'user' AND ref_id = ?)").run(userId, userId);
+      });
     },
     insertFollow(row) {
-      return insertFollowStmt.run({ $follower_id: row.follower_id, $followee_id: row.followee_id, $created_at: row.created_at }).changes > 0;
+      return inTransaction(() => {
+        const inserted = insertFollowStmt.run({ $follower_id: row.follower_id, $followee_id: row.followee_id, $created_at: row.created_at }).changes > 0;
+        if (inserted) {
+          copyToInboxStmt.run({
+            $follower_id: row.follower_id,
+            $followee_id: row.followee_id,
+            $types: JSON.stringify(FEED_EVENT_TYPES),
+            $since: new Date(Date.parse(row.created_at) - FEED_WINDOW_MS).toISOString()
+          });
+        }
+        return inserted;
+      });
     },
     deleteFollow(followerId, followeeId) {
-      return deleteFollowStmt.run(followerId, followeeId).changes > 0;
+      return inTransaction(() => {
+        const deleted = deleteFollowStmt.run(followerId, followeeId).changes > 0;
+        if (deleted) deleteInboxFromAuthorStmt.run(followerId, followeeId);
+        return deleted;
+      });
     },
     getFollow(followerId, followeeId) {
       return getFollowStmt.get(followerId, followeeId) as FollowRow | undefined;
@@ -152,16 +195,19 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
       });
     },
     insertEvent(row) {
-      insertEventStmt.run({
-        $id: row.id,
-        $user_id: row.user_id,
-        $type: row.type,
-        $ref_type: row.ref_type,
-        $ref_id: row.ref_id,
-        $payload: row.payload,
-        $created_at: row.created_at,
-        $trace_id: row.trace_id ?? null,
-        $source: row.source ?? null
+      inTransaction(() => {
+        const inserted = insertEventStmt.run({
+          $id: row.id,
+          $user_id: row.user_id,
+          $type: row.type,
+          $ref_type: row.ref_type,
+          $ref_id: row.ref_id,
+          $payload: row.payload,
+          $created_at: row.created_at,
+          $trace_id: row.trace_id ?? null,
+          $source: row.source ?? null
+        }).changes > 0;
+        if (inserted && FEED_EVENT_TYPES.includes(row.type)) fanOutStmt.run({ $id: row.id, $user_id: row.user_id, $created_at: row.created_at });
       });
     },
     listEventsByUser(userId, keyset, limit, types) {
@@ -179,6 +225,16 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
     listEventsByUserSince(userId, since, limit, types) {
       if (types.length === 0) return [];
       return listEventsOfTypes(userId, types, " AND created_at > ?", [since], limit);
+    },
+    listInbox(viewerId, keyset, limit, types) {
+      if (types.length === 0) return [];
+      const kinds = JSON.stringify(types);
+      const rows = keyset ? listInboxBeforeStmt.all(viewerId, kinds, keyset.createdAt, keyset.id, limit) : listInboxStmt.all(viewerId, kinds, limit);
+      return rows as unknown as EventRow[];
+    },
+    countInboxSince(viewerId, since, types, limit) {
+      if (types.length === 0) return 0;
+      return (countInboxSinceStmt.get(viewerId, JSON.stringify(types), since, limit) as { n: number }).n;
     }
   };
 }

@@ -48,3 +48,13 @@ CREATE TABLE IF NOT EXISTS events_history (
 );
 CREATE INDEX IF NOT EXISTS idx_events_history_user_time ON events_history(user_id, created_at DESC, id DESC);
 CREATE INDEX IF NOT EXISTS idx_events_history_time ON events_history(created_at);
+
+CREATE TABLE IF NOT EXISTS feed_inbox (
+  viewer_id  TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  event_id   TEXT NOT NULL,
+  author_id  TEXT NOT NULL,
+  PRIMARY KEY (viewer_id, created_at, event_id)
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS idx_feed_inbox_author ON feed_inbox(author_id, viewer_id);
+CREATE INDEX IF NOT EXISTS idx_feed_inbox_time ON feed_inbox(created_at);

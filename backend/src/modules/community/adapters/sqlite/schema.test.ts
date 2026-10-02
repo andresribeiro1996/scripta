@@ -211,3 +211,76 @@ test("a feed settings copy that fails leaves the profiles table as it was, so th
   assert.deepEqual(feedColumns(db), [{ user_id: "u1", publications: 1, reading: 0, votes: 0, follows: 1, glyph: 0 }]);
   db.close();
 });
+
+test("the inbox is keyed to read a viewer's newest rows without a sort, and indexed for removing an author's rows and for expiring by age", () => {
+  removeDatabase();
+  const db = openCommunityDb();
+
+  assert.deepEqual((tableInfo(db, "feed_inbox") as Array<{ name: string }>).map((column) => column.name), ["viewer_id", "created_at", "event_id", "author_id"]);
+  const newest = queryPlan(db, "SELECT event_id FROM feed_inbox WHERE viewer_id = 'v' AND (created_at, event_id) < ('x', 'y') ORDER BY created_at DESC, event_id DESC LIMIT 21");
+  assert.match(newest, /PRIMARY KEY \(viewer_id=\? AND \(created_at,event_id\)<\(\?,\?\)\)/);
+  assert.doesNotMatch(newest, /TEMP B-TREE/);
+  assert.match(queryPlan(db, "DELETE FROM feed_inbox WHERE viewer_id = 'v' AND author_id = 'a'"), /idx_feed_inbox_author/);
+  assert.match(queryPlan(db, "DELETE FROM feed_inbox WHERE author_id = 'a'"), /idx_feed_inbox_author/);
+  assert.match(queryPlan(db, "SELECT viewer_id FROM feed_inbox WHERE created_at < 'x' LIMIT 1000"), /idx_feed_inbox_time/);
+  db.close();
+});
+
+const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
+
+function databaseWithoutInbox() {
+  removeDatabase();
+  const db = openCommunityDb();
+  const follow = db.prepare("INSERT INTO follows (follower_id, followee_id, created_at) VALUES (?, ?, ?)");
+  follow.run("f1", "a", daysAgo(90));
+  follow.run("f2", "a", daysAgo(90));
+  follow.run("f1", "b", daysAgo(90));
+  follow.run("f3", "c", daysAgo(90));
+  const event = db.prepare("INSERT INTO events (id, user_id, type, ref_type, ref_id, payload, created_at) VALUES (?, ?, ?, 'book', ?, NULL, ?)");
+  event.run("a-published", "a", "tierlist_published", "r1", daysAgo(5));
+  event.run("a-added", "a", "book_added", "r2", daysAgo(29));
+  event.run("a-old", "a", "voted_on", "r3", daysAgo(31));
+  event.run("a-following", "a", "following", "r4", daysAgo(1));
+  event.run("b-voted", "b", "voted_on", "r5", daysAgo(1));
+  event.run("c-old", "c", "book_finished", "r6", daysAgo(60));
+  event.run("nobody-published", "nobody", "tournament_published", "r7", daysAgo(1));
+  db.exec("DROP TABLE feed_inbox");
+  db.close();
+}
+
+function inboxPairs(db: DatabaseSync) {
+  return db.prepare("SELECT viewer_id, event_id FROM feed_inbox ORDER BY viewer_id, event_id").all().map((row) => [row.viewer_id, row.event_id]);
+}
+
+test("a database that predates the inbox gets it filled once, from the feed events of the last 30 days and their authors' followers", () => {
+  databaseWithoutInbox();
+
+  const db = openCommunityDb();
+  assert.deepEqual(inboxPairs(db), [["f1", "a-added"], ["f1", "a-published"], ["f1", "b-voted"], ["f2", "a-added"], ["f2", "a-published"]]);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM feed_inbox i JOIN events e ON e.id = i.event_id WHERE i.created_at = e.created_at AND i.author_id = e.user_id").get()?.n, 5);
+
+  db.exec("DELETE FROM feed_inbox WHERE viewer_id = 'f2'");
+  db.close();
+  const reopened = openCommunityDb();
+  assert.deepEqual(inboxPairs(reopened), [["f1", "a-added"], ["f1", "a-published"], ["f1", "b-voted"]]);
+  reopened.close();
+});
+
+test("a fill that fails leaves no inbox behind, so the next open starts over", () => {
+  databaseWithoutInbox();
+  const existing = new DatabaseSync(process.env.COMMUNITY_DB_PATH!);
+  existing.exec("DROP TABLE follows; CREATE TABLE follows (viewer_id TEXT NOT NULL, followee_id TEXT NOT NULL, created_at TEXT NOT NULL)");
+
+  assert.throws(() => openCommunityDb(), /follower_id/);
+  assert.equal(existing.prepare("SELECT 1 FROM sqlite_master WHERE name = 'feed_inbox'").get(), undefined);
+
+  existing.exec(`
+    DROP TABLE follows;
+    CREATE TABLE follows (follower_id TEXT NOT NULL, followee_id TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY (follower_id, followee_id));
+    INSERT INTO follows VALUES ('f1', 'a', '2026-01-01T00:00:00.000Z');
+  `);
+  existing.close();
+  const db = openCommunityDb();
+  assert.deepEqual(inboxPairs(db), [["f1", "a-added"], ["f1", "a-published"]]);
+  db.close();
+});

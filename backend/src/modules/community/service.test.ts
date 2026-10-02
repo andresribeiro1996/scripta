@@ -3,7 +3,7 @@ import { test } from "node:test";
 import Fastify from "fastify";
 import { normalizeWords, type IdentityKey, type ReaderProfile } from "@scripta/shared";
 import type { DiscoverItem, GameParticipation, SharedBook, SuggestedReader } from "@scripta/shared/community";
-import { DEFAULT_FEED_SETTINGS, encodeCursor, normalizeFeedSettings } from "@scripta/shared/community";
+import { categoryFor, DEFAULT_FEED_SETTINGS, encodeCursor, normalizeFeedSettings } from "@scripta/shared/community";
 import type { ParticipationItem } from "@scripta/shared/dashboard";
 import type { PublishedTierlistRef } from "../tierlists/service.js";
 import type { PublishedTournamentRef } from "../arena/service.js";
@@ -21,6 +21,8 @@ function createRepoFake() {
   const key = (a: string, b: string) => `${a}:${b}`;
   const newestEvent = (a: EventRow, b: EventRow) => (a.created_at === b.created_at ? (a.id > b.id ? -1 : 1) : b.created_at.localeCompare(a.created_at));
   const newestFollow = (a: FollowRow, b: FollowRow) => (a.created_at === b.created_at ? (a.follower_id > b.follower_id ? -1 : 1) : b.created_at.localeCompare(a.created_at));
+  const inboxOf = (viewerId: string, types: readonly string[]) =>
+    events.filter((e) => follows.has(key(viewerId, e.user_id)) && types.includes(e.type) && (repo.getFeedSettings(e.user_id) ?? DEFAULT_FEED_SETTINGS)[categoryFor(e.type)]);
   const repo: CommunityRepository = {
     deleteUserData() {},
     insertFollow(row) {
@@ -87,6 +89,15 @@ function createRepoFake() {
         .filter((e) => e.user_id === userId && types.includes(e.type) && e.created_at > since)
         .sort(newestEvent)
         .slice(0, limit);
+    },
+    listInbox(viewerId, keyset, limit, types) {
+      return inboxOf(viewerId, types)
+        .filter((e) => !keyset || e.created_at < keyset.createdAt || (e.created_at === keyset.createdAt && e.id < keyset.id))
+        .sort(newestEvent)
+        .slice(0, limit);
+    },
+    countInboxSince(viewerId, since, types, limit) {
+      return Math.min(inboxOf(viewerId, types).filter((e) => e.created_at > since).length, limit);
     },
     listFollowersByFollowee(followeeId, keyset, limit) {
       return [...follows.values()]

@@ -2,13 +2,14 @@ import { randomUUID } from "node:crypto";
 import { normalizeWords, type IdentityKey, type ReaderProfile } from "@scripta/shared";
 import { categoryFor, contentDetail, decodeCursor, encodeCursor, DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
 import type { ActivityEventType, ActivityItem, CommunityAuthor, CommunityEventType, DiscoverItem, DiscoverType, FeedSettings, FollowState, GameParticipation, OwnProfile, Page, ParticipationGameKind, PersonResult, PublishProfileInput, PublishedContent, PublishedProfile, SharedBook, SuggestedReader, TierlistSummary, TournamentSummary } from "@scripta/shared/community";
-import type { DashboardFeedPage, DigestItem, DigestKind, ParticipationItem } from "@scripta/shared/dashboard";
+import type { DashboardFeedPage, DigestItem, ParticipationItem } from "@scripta/shared/dashboard";
 import type { PublishedTournamentRef, TournamentDiscoverRef } from "../arena/service.js";
 import type { MuralsPublicApi } from "../murals/publicApi.js";
 import type { MuralPublicPayload } from "../murals/index.js";
 import type { PublishedTierlistRef, TierlistDiscoverRef } from "../tierlists/service.js";
 import { currentTrace } from "../../trace.js";
 import { InvalidCursorError, MuralNotOwnedError, NotFollowingError, ProfileNotFoundError, SelfFollowError, UsernameRequiredError } from "./domain/errors.js";
+import { DIGEST_EVENT_TYPES } from "./domain/feed.js";
 import type { CommunityRepository, CursorKeyset } from "./domain/ports.js";
 import type { EventRow, FollowRow } from "./domain/types.js";
 
@@ -19,13 +20,6 @@ const SHARED_BOOKS_SHOWN = 3;
 const DASHBOARD_COUNT_CAP = 100;
 const DASHBOARD_REFILL_ROUNDS = 5;
 const NAMED_PARTICIPANTS = 3;
-const DIGEST_EVENT_TYPES: Array<[ActivityEventType, DigestKind]> = [
-  ["tierlist_published", "publication"],
-  ["tournament_published", "publication"],
-  ["voted_on", "vote"],
-  ["book_added", "reading"],
-  ["book_finished", "reading"]
-];
 const LEGACY_DIGEST_KINDS: ReadonlySet<string> = new Set(["publication", "vote", "reading", "follow"]);
 
 export type CommunityRefType = "tierlist" | "tournament" | "book" | "user" | "mural";

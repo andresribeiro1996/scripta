@@ -4,6 +4,7 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { normalizeFeedSettings, type FeedSettings } from "@scripta/shared/community";
 import { env } from "../../../../config/env.js";
+import { FEED_EVENT_TYPES, FEED_WINDOW_MS } from "../../domain/feed.js";
 
 const adapterDir = dirname(fileURLToPath(import.meta.url));
 
@@ -16,14 +17,36 @@ export function openCommunityDb(): DatabaseSync {
   db.exec("PRAGMA foreign_keys = ON");
 
   const schema = readFileSync(`${adapterDir}/schema.sql`, "utf8");
-  db.exec(schema);
+  if (tableExists(db, "feed_inbox")) db.exec(schema);
+  else applySchemaAndFillInbox(db, schema);
   migrateSchema(db, schema);
 
   return db;
 }
 
+function tableExists(db: DatabaseSync, table: string): boolean {
+  return db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(table) !== undefined;
+}
+
 function tableColumns(db: DatabaseSync, table: string): string[] {
   return (db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).map((c) => c.name);
+}
+
+function applySchemaAndFillInbox(db: DatabaseSync, schema: string): void {
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    db.exec(schema);
+    db.prepare(`
+      INSERT INTO feed_inbox (viewer_id, created_at, event_id, author_id)
+      SELECT f.follower_id, e.created_at, e.id, e.user_id
+      FROM events e JOIN follows f ON f.followee_id = e.user_id
+      WHERE e.type IN (SELECT value FROM json_each(?)) AND e.created_at >= ?
+    `).run(JSON.stringify(FEED_EVENT_TYPES), new Date(Date.now() - FEED_WINDOW_MS).toISOString());
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
 }
 
 const ALL_OFF: FeedSettings = { publications: false, reading: false, votes: false, follows: false, readerGlyph: false };
