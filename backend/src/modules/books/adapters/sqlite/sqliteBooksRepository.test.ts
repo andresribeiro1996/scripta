@@ -393,6 +393,53 @@ test("an existing database gains publisher_url, created_by and cover_images.orig
   assert.equal(repo.getImage("img")!.origin, null);
 });
 
+const WORK_COLUMNS = ["work_id", "language", "work_checked_at"];
+
+function assertWorkSchema(db: DatabaseSync) {
+  const names = (sql: string) => (db.prepare(sql).all() as Array<{ name: string }>).map((row) => row.name);
+  assert.deepEqual(names("PRAGMA table_info(works)"), ["id", "ol_work_key", "title", "author", "merged_into", "created_at"]);
+  assert.deepEqual(names("PRAGMA table_info(books)").filter((name) => WORK_COLUMNS.includes(name)), WORK_COLUMNS);
+  assert.deepEqual(names("PRAGMA index_info(idx_books_work)"), ["work_id"]);
+  assert.throws(() => db.prepare("INSERT INTO books (id, title, author, work_id, created_at) VALUES ('orphan', 'A', 'A', 'missing', ?)").run(NOW), /FOREIGN KEY constraint failed/);
+}
+
+test("an existing database gains works, work_id, language, work_checked_at and the work index on boot, and a second boot changes nothing", () => {
+  const db = new DatabaseSync(":memory:");
+  db.exec(`CREATE TABLE books (
+    id TEXT PRIMARY KEY, title TEXT NOT NULL, author TEXT NOT NULL, year INTEGER, publisher TEXT, isbn TEXT, ol_cover_id INTEGER,
+    summary TEXT, rating REAL, rating_count INTEGER NOT NULL DEFAULT 0, genres TEXT NOT NULL DEFAULT '[]', source_url TEXT,
+    details_status TEXT, details_checked_at TEXT, cover_image_id TEXT, cover_status TEXT, cover_checked_at TEXT, created_at TEXT NOT NULL
+  )`);
+  db.prepare(`INSERT INTO books (id, title, author, created_at) VALUES ('old', 'Dune', 'Frank Herbert', ?)`).run(NOW);
+  const snapshot = () => ({
+    schema: db.prepare("SELECT type, name, tbl_name, sql FROM sqlite_master ORDER BY type, name").all(),
+    books: db.prepare("SELECT * FROM books").all()
+  });
+
+  applyBooksMigrations(db);
+  const booted = snapshot();
+  assertWorkSchema(db);
+  applyBooksMigrations(db);
+  assert.deepEqual(snapshot(), booted);
+
+  const old = createSqliteBooksRepository(db).getBook("old")!;
+  assert.deepEqual([old.work_id, old.language, old.work_checked_at], [null, null, null]);
+});
+
+test("a new database has works, work_id, language, work_checked_at and the work index", () => {
+  assertWorkSchema(freshRepo().db);
+});
+
+test("works allow any number of keyless rows but one row per Open Library key, and merged_into must name a work", () => {
+  const { db } = freshRepo();
+  const insert = db.prepare("INSERT INTO works (id, ol_work_key, title, author, merged_into, created_at) VALUES (?, ?, 'Dune', 'Frank Herbert', ?, ?)");
+  insert.run("w1", "OL1W", null, NOW);
+  insert.run("w2", null, null, NOW);
+  insert.run("w3", null, "w1", NOW);
+  assert.throws(() => insert.run("w4", "OL1W", null, NOW), /UNIQUE constraint failed: works\.ol_work_key/);
+  assert.throws(() => insert.run("w5", null, "missing", NOW), /FOREIGN KEY constraint failed/);
+});
+
 test("insertImage stores the origin and createBook stores its creator", () => {
   const { repo } = freshRepo();
   const book = repo.createBook({ title: "A", author: "A", isbn: null, createdBy: "publisher" }, ["ta:a|a|"], NOW);

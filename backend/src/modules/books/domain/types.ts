@@ -32,6 +32,9 @@ export interface BookRow {
   ol_work_key: string | null;
   publisher_url: string | null;
   created_by: BookCreator | null;
+  work_id: string | null;
+  language: string | null;
+  work_checked_at: string | null;
   created_at: string;
 }
 

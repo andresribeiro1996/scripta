@@ -35,6 +35,10 @@ export function applyBooksMigrations(db: DatabaseSync): void {
   if (!columns.some((column) => column.name === "pages")) db.exec("ALTER TABLE books ADD COLUMN pages INTEGER");
   if (!columns.some((column) => column.name === "translator")) db.exec("ALTER TABLE books ADD COLUMN translator TEXT");
   if (!columns.some((column) => column.name === "summary_source")) db.exec("ALTER TABLE books ADD COLUMN summary_source TEXT");
+  if (!columns.some((column) => column.name === "work_id")) db.exec("ALTER TABLE books ADD COLUMN work_id TEXT REFERENCES works(id)");
+  if (!columns.some((column) => column.name === "language")) db.exec("ALTER TABLE books ADD COLUMN language TEXT");
+  if (!columns.some((column) => column.name === "work_checked_at")) db.exec("ALTER TABLE books ADD COLUMN work_checked_at TEXT");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_books_work ON books(work_id)");
   const imageColumns = db.prepare("PRAGMA table_info(cover_images)").all() as Array<{ name: string }>;
   if (!imageColumns.some((column) => column.name === "origin")) db.exec("ALTER TABLE cover_images ADD COLUMN origin TEXT");
   const legacy = db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'cover_cache'`).get();

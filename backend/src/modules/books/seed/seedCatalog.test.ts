@@ -25,7 +25,7 @@ function entry(isbn: string, title: string, author = "Author") {
 
 function setup() {
   const db = openBooksDb();
-  db.exec("DELETE FROM book_keys; DELETE FROM books");
+  db.exec("DELETE FROM book_keys; DELETE FROM books; DELETE FROM works");
   return { db, repo: createSqliteBooksRepository(db) };
 }
 
