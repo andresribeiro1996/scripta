@@ -23,7 +23,7 @@ import { pipeline } from "node:stream/promises";
 import { z } from "zod";
 import { env } from "../../config/env.js";
 import { authGuard, rateLimitKey } from "../auth/index.js";
-import { LibraryConflictError, NoLibraryDocumentError } from "./domain/errors.js";
+import { LibraryConflictError, LibraryTooLargeError, NoLibraryDocumentError } from "./domain/errors.js";
 import { libraryTooLargeMessage } from "./domain/sizeLimit.js";
 import { ImportBusyError, InvalidImportError, parseImport } from "./import/parseImport.js";
 import type { LibraryService } from "./service.js";
@@ -40,6 +40,14 @@ export async function sweepStaleImportDirs(now = Date.now()) {
       await rm(path, { recursive: true, force: true });
     }
   }
+}
+
+function libraryTooLargeBody() {
+  return {
+    error: libraryTooLargeMessage(env.LIBRARY_BODY_LIMIT_BYTES),
+    code: "LIBRARY_BODY_TOO_LARGE",
+    maxBytes: env.LIBRARY_BODY_LIMIT_BYTES
+  };
 }
 
 export function rejectOversizedImport(
@@ -106,13 +114,7 @@ export function buildLibraryRoutes(service: LibraryService) {
         onRequest: authGuard,
         bodyLimit: env.LIBRARY_BODY_LIMIT_BYTES,
         errorHandler(error, _request, reply) {
-          if (error.statusCode === 413) {
-            return reply.code(413).send({
-              error: libraryTooLargeMessage(env.LIBRARY_BODY_LIMIT_BYTES),
-              code: "LIBRARY_BODY_TOO_LARGE",
-              maxBytes: env.LIBRARY_BODY_LIMIT_BYTES
-            });
-          }
+          if (error.statusCode === 413) return reply.code(413).send(libraryTooLargeBody());
           throw error;
         }
       }, async (request, reply) => {
@@ -144,6 +146,7 @@ export function buildLibraryRoutes(service: LibraryService) {
           if (error instanceof LibraryConflictError) {
             return reply.code(409).send({ error: error.message });
           }
+          if (error instanceof LibraryTooLargeError) return reply.code(413).send(libraryTooLargeBody());
           throw error;
         }
       });
@@ -160,6 +163,7 @@ export function buildLibraryRoutes(service: LibraryService) {
           if (error instanceof LibraryConflictError) {
             return reply.code(409).send({ error: error.message, current: service.getLibrary(request.user.id) });
           }
+          if (error instanceof LibraryTooLargeError) return reply.code(413).send(libraryTooLargeBody());
           throw error;
         }
       });

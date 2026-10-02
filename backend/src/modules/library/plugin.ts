@@ -25,7 +25,7 @@ export async function libraryPlugin(app: FastifyInstance, opts: LibraryPluginOpt
   // the FRONTEND's own share-viewer page (not this API) — the token lands
   // in a link a person opens in their browser, not an <img src>.
   const publicUrlFor = (token: string) => `${env.FRONTEND_URL}/shared/library/${token}`;
-  const libraryService = createLibraryService(libraryRepository, publicUrlFor, opts.emitBookEvents, opts.enqueueCovers, opts.rekeyBooks);
+  const libraryService = createLibraryService(libraryRepository, publicUrlFor, env.LIBRARY_BODY_LIMIT_BYTES, opts.emitBookEvents, opts.enqueueCovers, opts.rekeyBooks);
   // -----------------------------------------------------------------------
 
   await app.register(buildLibraryRoutes(libraryService));
