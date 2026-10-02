@@ -19,10 +19,17 @@ test("a 413 with no message of its own keeps the generic text", () => {
   assert.equal(saveFailureMessage(new StatusError(413, ""), generic), generic);
 });
 
+test("a 429 shows the fixed text, not the rate-limit plugin's", () => {
+  const fixed = "Too many changes in a row — wait a minute and try again.";
+  assert.equal(saveFailureMessage(new StatusError(429, "Too Many Requests"), generic), fixed);
+  assert.equal(saveFailureMessage(new StatusError(429, ""), generic), fixed);
+});
+
 test("any other failure keeps the generic text", () => {
   assert.equal(saveFailureMessage(new StatusError(500, "Request failed (500)"), generic), generic);
   assert.equal(saveFailureMessage(new StatusError(409, "The library changed elsewhere."), generic), generic);
   assert.equal(saveFailureMessage(new Error("Network request failed"), generic), generic);
   assert.equal(saveFailureMessage({ status: 413, message: "not an Error" }, generic), generic);
+  assert.equal(saveFailureMessage({ status: 429, message: "not an Error" }, generic), generic);
   assert.equal(saveFailureMessage(undefined, generic), generic);
 });

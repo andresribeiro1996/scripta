@@ -64,7 +64,7 @@ test("PUT /library rejects an anonymous caller before the body is read", async (
   await app.close();
 });
 
-test("library writes share one bucket of 30 a minute per account, apart from reads and other accounts", async () => {
+test("library writes share one bucket of 120 a minute per account, apart from reads and other accounts", async () => {
   const { app } = await setup();
   const writes = [
     { method: "PUT", url: "/library" },
@@ -75,7 +75,7 @@ test("library writes share one bucket of 30 a minute per account, apart from rea
   ] as const;
   const write = (token: string, index: number) =>
     app.inject({ ...writes[index % writes.length]!, headers: { authorization: `Bearer ${token}` }, payload: {} });
-  for (let request = 0; request < 30; request++) assert.notEqual((await write("u1", request)).statusCode, 429);
+  for (let request = 0; request < 120; request++) assert.notEqual((await write("u1", request)).statusCode, 429);
   for (let route = 0; route < writes.length; route++) assert.equal((await write("u1", route)).statusCode, 429);
   assert.notEqual((await write("u2", 0)).statusCode, 429);
   assert.equal((await app.inject({ method: "GET", url: "/library", headers: { authorization: "Bearer u1" } })).statusCode, 404);

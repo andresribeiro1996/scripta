@@ -91,7 +91,7 @@ export function buildLibraryRoutes(service: LibraryService) {
     });
 
     await app.register(async (writes) => {
-      await writes.register(fastifyRateLimit, { max: 30, timeWindow: "1 minute", keyGenerator: rateLimitKey });
+      await writes.register(fastifyRateLimit, { max: 120, timeWindow: "1 minute", keyGenerator: rateLimitKey });
 
       writes.put("/library", {
         onRequest: authGuard,
