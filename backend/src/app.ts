@@ -11,6 +11,7 @@
 import fastifyCors from "@fastify/cors";
 import type { CoverLookupParams } from "@scripta/shared";
 import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
+import { randomUUID } from "node:crypto";
 import { STATUS_CODES } from "node:http";
 import { isAllowedOrigin } from "./config/corsOrigin.js";
 import { env } from "./config/env.js";
@@ -21,6 +22,7 @@ import { createObjectStore } from "./storage/createObjectStore.js";
 import { IMMUTABLE_CACHE_CONTROL } from "./storage/r2ObjectStore.js";
 import { runStartupMigrations } from "./migrations/runStartupMigrations.js";
 import { registerStallLog } from "./stallLog.js";
+import { registerTrace } from "./trace.js";
 import {
   emailEnabled,
   findUserIdByUsername,
@@ -65,10 +67,11 @@ export function buildApp() {
   // only APIs that would actually differ between an http.Server and an
   // https.Server), so nothing downstream needs the more specific type.
   const app: FastifyInstance = devHttps
-    ? (Fastify({ logger: true, https: devHttps, trustProxy: TRUSTED_PROXIES }) as FastifyInstance)
-    : Fastify({ logger: true, trustProxy: TRUSTED_PROXIES });
+    ? (Fastify({ logger: true, https: devHttps, trustProxy: TRUSTED_PROXIES, genReqId: () => randomUUID() }) as FastifyInstance)
+    : Fastify({ logger: true, trustProxy: TRUSTED_PROXIES, genReqId: () => randomUUID() });
 
   registerStallLog(app);
+  registerTrace(app);
 
   // Genuinely app-wide (unlike each module's own rate limiter) — the
   // frontend is a separate origin from this API in dev (Vite on 5173,
