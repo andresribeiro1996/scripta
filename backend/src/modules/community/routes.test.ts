@@ -424,6 +424,24 @@ test("following and unfollowing share one bucket of 30 a minute per account, apa
   await app.close();
 });
 
+test("saving feed settings and publishing share one bucket of 30 a minute per account, apart from other accounts and every other community route", async () => {
+  const { app, get } = await appWithAccounts();
+  const bearer = (token: string) => ({ authorization: `Bearer ${token}` });
+  const settings = { publications: true, reading: true, votes: true, follows: true };
+  const saveSettings = (token: string) => app.inject({ method: "PUT", url: "/community/profile/feed-settings", headers: bearer(token), payload: settings });
+  const publish = (token: string) => app.inject({ method: "PUT", url: "/community/profile/publish", headers: bearer(token), payload: { shareReading: true } });
+  for (let request = 0; request < 30; request++) assert.equal((await (request % 2 === 0 ? saveSettings : publish)("alice")).statusCode, request % 2 === 0 ? 204 : 200);
+  assert.equal((await saveSettings("alice")).statusCode, 429);
+  assert.equal((await publish("alice")).statusCode, 429);
+  assert.equal((await saveSettings("bob")).statusCode, 204);
+  assert.equal((await publish("bob")).statusCode, 200);
+  assert.equal((await app.inject({ method: "DELETE", url: "/community/profile/publish", headers: bearer("alice") })).statusCode, 204);
+  assert.equal((await app.inject({ method: "POST", url: "/community/follows", headers: bearer("alice"), payload: { userId: "carol" } })).statusCode, 204);
+  assert.equal((await get("/community/dashboard", "alice")).statusCode, 200);
+  assert.equal((await get("/community/people?q=reader", "alice")).statusCode, 200);
+  await app.close();
+});
+
 test("own profile GET and shelf mural PUT are authed and validate the body", async () => {
   const calls: Array<Record<string, unknown>> = [];
   const app = Fastify();

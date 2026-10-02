@@ -67,16 +67,26 @@ export function buildCommunityRoutes(service: CommunityService) {
       });
     });
 
-    app.put("/community/profile/publish", { preHandler: authGuard }, async (request, reply) => {
-      const parsed = publishSchema.safeParse(request.body);
-      if (!parsed.success) return reply.code(400).send({ error: "Expected {muralId?, shareReading?}." });
-      try {
-        service.publishProfile(request.user.id, parsed.data);
-        return reply.send({ ok: true });
-      } catch (err) {
-        if (err instanceof CommunityError) return reply.code(statusForCommunityError(err)).send({ error: err.message });
-        throw err;
-      }
+    await app.register(async (scoped) => {
+      await scoped.register(fastifyRateLimit, { max: 30, timeWindow: "1 minute", keyGenerator: rateLimitKey });
+      scoped.put("/community/profile/publish", { preHandler: authGuard }, async (request, reply) => {
+        const parsed = publishSchema.safeParse(request.body);
+        if (!parsed.success) return reply.code(400).send({ error: "Expected {muralId?, shareReading?}." });
+        try {
+          service.publishProfile(request.user.id, parsed.data);
+          return reply.send({ ok: true });
+        } catch (err) {
+          if (err instanceof CommunityError) return reply.code(statusForCommunityError(err)).send({ error: err.message });
+          throw err;
+        }
+      });
+
+      scoped.put("/community/profile/feed-settings", { preHandler: authGuard }, async (request, reply) => {
+        const parsed = feedSettingsSchema.safeParse(request.body);
+        if (!parsed.success) return reply.code(400).send({ error: "Expected { publications, reading, votes, follows } booleans." });
+        service.updateFeedSettings(request.user.id, parsed.data);
+        return reply.code(204).send();
+      });
     });
 
     app.delete("/community/profile/publish", { preHandler: authGuard }, async (request, reply) => {
@@ -99,13 +109,6 @@ export function buildCommunityRoutes(service: CommunityService) {
         if (err instanceof CommunityError) return reply.code(statusForCommunityError(err)).send({ error: err.message });
         throw err;
       }
-    });
-
-    app.put("/community/profile/feed-settings", { preHandler: authGuard }, async (request, reply) => {
-      const parsed = feedSettingsSchema.safeParse(request.body);
-      if (!parsed.success) return reply.code(400).send({ error: "Expected { publications, reading, votes, follows } booleans." });
-      service.updateFeedSettings(request.user.id, parsed.data);
-      return reply.code(204).send();
     });
 
     await app.register(async (scoped) => {
