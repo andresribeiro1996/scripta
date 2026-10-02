@@ -1,17 +1,3 @@
-// HTTP layer for the library module: request validation and mapping
-// service results to responses. No business logic here — see service.ts.
-//
-// Cross-module dependency in action: authGuard is imported from auth's
-// PUBLIC interface (modules/auth/index.js), never from anything inside
-// modules/auth/domain, /adapters, or /service.ts. This module has no path
-// to auth's database or token secrets — only to this one preHandler.
-//
-// Two separate builder functions, not one — plugin.ts registers each in
-// its OWN Fastify encapsulation scope, same split (and same reasoning) as
-// modules/murals/routes.ts's buildMuralRoutes/buildPublicLibraryRoutes:
-// the public GET /library/shared/:token route is unauthenticated and hits
-// the DB on every request, so it gets its own tight limit.
-
 import fastifyMultipart from "@fastify/multipart";
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
@@ -88,9 +74,6 @@ const mergeBooksSchema = z.object({
   updatedAt: z.string().datetime()
 });
 
-/** The authenticated surface — get/save/share/unshare, all behind
- *  authGuard. Reads and writes are separate scopes, each with its own
- *  per-account rate limit. */
 export function buildLibraryRoutes(service: LibraryService) {
   return async function libraryRoutes(app: FastifyInstance) {
     await sweepStaleImportDirs().catch((error) => app.log.warn({ err: error }, "stale import cleanup failed"));
@@ -229,9 +212,6 @@ export function buildLibraryRoutes(service: LibraryService) {
   };
 }
 
-/** The public, unauthenticated surface — just GET /library/shared/:token.
- *  Registered in plugin.ts in its OWN scope, carrying its own rate limit —
- *  see this module's own top comment and plugin.ts. */
 export function buildPublicLibraryRoutes(service: LibraryService) {
   return async function publicLibraryRoutes(app: FastifyInstance) {
     // Deliberately NOT behind authGuard — same trust model as
