@@ -33,3 +33,14 @@ test("display fonts use their heading weight and scale size and line height", ()
   assert.deepEqual(fontStyleFor("orbitron", "display", {}), { fontFamily: "orbitron-700", fontWeight: "normal", fontSize: 12 });
   assert.deepEqual(fontStyleFor("cormorant", "display", { fontSize: 24 }), { fontFamily: "cormorant-600", fontWeight: "normal", fontSize: 27 });
 });
+
+test("card and mural fonts stay independent of the theme and use their bundled weights", () => {
+  for (const themeFont of ["system", "literata", "playfair"] as const) {
+    for (const family of ["playfair", "jetbrainsMono"]) {
+      assert.deepEqual(fontStyleFor(themeFont, "text", { fontFamily: `${family}-400` }), { fontFamily: `${family}-400`, fontWeight: "normal" });
+      assert.deepEqual(fontStyleFor(themeFont, "display", { fontFamily: `${family}-400`, fontWeight: "700" }), { fontFamily: `${family}-700`, fontWeight: "normal" });
+    }
+    assert.deepEqual(fontStyleFor(themeFont, "text", { fontFamily: "inter-400" }), { fontFamily: "inter-400", fontWeight: "normal" });
+    assert.deepEqual(fontStyleFor(themeFont, "text", { fontFamily: "inter-400", fontWeight: "bold" }), { fontFamily: "inter-400", fontWeight: "700" });
+  }
+});

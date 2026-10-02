@@ -4,6 +4,7 @@ import type {
   CardFontFamily,
 } from "@scripta/shared";
 import { Platform, type ViewStyle } from "react-native";
+import { STYLE_FONT_FAMILIES } from "./fontStyle";
 
 export type { BlockFontFamily, BlockStyle, CardBorderStyle, CardFontFamily, LibraryStyleSettings, PerCardStyle } from "@scripta/shared";
 
@@ -15,9 +16,7 @@ const fontFamilies: Record<CardFontFamily | BlockFontFamily, string> = {
   sans,
   serif,
   mono,
-  playfairDisplay: serif,
-  inter: sans,
-  jetbrainsMono: mono,
+  ...STYLE_FONT_FAMILIES,
 };
 
 export function cardFontFamily(value: CardFontFamily): string {

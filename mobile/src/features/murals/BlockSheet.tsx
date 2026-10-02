@@ -41,7 +41,7 @@ export function BlockSheet({ block, visible, tab, onTabChange, onClose, preview,
   const current = tabs.find((item) => item.value === wanted)?.value ?? "layout";
   return (
     <Sheet visible={visible} title={block ? BLOCK_TYPE_LABELS[block.type] : ""} onClose={onClose}>
-      <View style={[styles.frame, { height: Math.round(height * 0.7) }]}>
+      <View style={[styles.frame, { height: Math.round(height * 0.8), flexShrink: 1 }]}>
         {keyboardShown ? null : preview}
         <Segmented options={tabs} value={current} onChange={onTabChange} accessibilityLabel="Block settings" />
         <FormScroll contentContainerStyle={styles.body}>{current === "content" ? content : current === "style" ? style : layout}</FormScroll>
