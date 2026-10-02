@@ -16,9 +16,11 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const workByKeyStmt = db.prepare(`SELECT id FROM works WHERE ol_work_key = ?`);
   const insertWorkStmt = db.prepare(`INSERT INTO works (id, ol_work_key, title, author, created_at) VALUES (?, ?, ?, ?, ?)`);
   const fillWorkIdentityStmt = db.prepare(`
-    UPDATE works SET title = books.title, author = books.author
+    UPDATE works
+    SET title = CASE WHEN works.title = '' THEN books.title ELSE works.title END,
+        author = CASE WHEN works.author = '' THEN books.author ELSE works.author END
     FROM books
-    WHERE books.id = ? AND works.id = books.work_id AND works.title = ''
+    WHERE books.id = ? AND works.id = books.work_id AND (works.title = '' OR works.author = '')
   `);
   const keyOwnWorkStmt = db.prepare(`
     UPDATE works SET ol_work_key = ?
@@ -186,16 +188,11 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     },
 
     saveDetails(bookId, details, sources, summarySource, checkedAt) {
-      db.exec("BEGIN IMMEDIATE");
-      try {
+      inTransaction(() => {
         mergeDetails(bookId, details, summarySource);
         const stored = JSON.parse((byIdStmt.get(bookId) as BookRow | undefined)?.data_sources ?? "[]") as DataSource[];
         saveDetailsStmt.run(details.rating, details.ratingCount, JSON.stringify(details.genres), JSON.stringify([...new Set([...stored, ...sources])]), details.sourceUrl, checkedAt, bookId);
-        db.exec("COMMIT");
-      } catch (error) {
-        if (db.isTransaction) db.exec("ROLLBACK");
-        throw error;
-      }
+      });
     },
 
     mergeDetails,

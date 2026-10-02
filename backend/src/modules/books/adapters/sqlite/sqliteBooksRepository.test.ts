@@ -571,6 +571,13 @@ test("a titled edition that joins an empty keyed work titles it, whether it arri
   assert.deepEqual([workOf(db, blankToo.id).title, workOf(db, blankToo.id).author], ["Emma", "Jane Austen"]);
 });
 
+test("a work takes the author of a later edition when its first edition had none, and keeps its title", () => {
+  const { db, repo } = freshRepo();
+  const first = repo.createBook({ title: "Dune", author: "", isbn: "9780441013593", workKey: "OL2W" }, ["isbn:9780441013593"], NOW);
+  repo.createBook({ title: "Duna", author: "Frank Herbert", isbn: "9789722046114", workKey: "OL2W" }, ["isbn:9789722046114"], NOW);
+  assert.deepEqual([workOf(db, first.id).title, workOf(db, first.id).author], ["Dune", "Frank Herbert"]);
+});
+
 test("createBook leaves no work behind when the edition cannot be inserted", () => {
   const { db, repo } = freshRepo();
   db.exec("CREATE TRIGGER refuse_books BEFORE INSERT ON books BEGIN SELECT RAISE(ABORT, 'refused'); END");
@@ -676,6 +683,36 @@ test("a failed assignMissingWorks batch assigns nothing, and the next one picks 
   db.exec("DROP TRIGGER refuse_kim");
   assert.equal(repo.assignMissingWorks(250), 2);
   assert.equal(countOf(db, "books", "work_id IS NULL"), 0);
+});
+
+test("assignMissingWorks puts a legacy edition whose key a work already holds into that work, without a second one", () => {
+  const { db, repo } = freshRepo();
+  const held = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593", workKey: "OL1W" }, ["isbn:9780441013593"], NOW);
+  const legacy = repo.createBook({ title: "Duna", author: "Frank Herbert", isbn: "9789722046114", workKey: "OL1W" }, ["isbn:9789722046114"], NOW);
+  db.prepare("UPDATE books SET work_id = NULL WHERE id = ?").run(legacy.id);
+
+  assert.equal(repo.assignMissingWorks(250), 1);
+
+  assert.equal(repo.getBook(legacy.id)!.work_id, held.work_id);
+  assert.equal(countOf(db, "works"), 1);
+});
+
+test("assignMissingWorks gives a legacy edition with no key a keyless work of its own, never a keyed work with the same title", () => {
+  const { db, repo } = freshRepo();
+  const keyed = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593", workKey: "OL1W" }, ["isbn:9780441013593"], NOW);
+  const legacy = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780593099322" }, ["isbn:9780593099322"], NOW);
+  const legacyToo = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780593099323" }, ["isbn:9780593099323"], NOW);
+  db.prepare("UPDATE books SET work_id = NULL WHERE id IN (?, ?)").run(legacy.id, legacyToo.id);
+  db.exec("DELETE FROM works WHERE id NOT IN (SELECT work_id FROM books WHERE work_id IS NOT NULL)");
+
+  assert.equal(repo.assignMissingWorks(250), 2);
+
+  const own = workOf(db, legacy.id);
+  assert.equal(own.ol_work_key, null);
+  assert.notEqual(own.id, keyed.work_id);
+  assert.notEqual(workOf(db, legacyToo.id).id, own.id);
+  assert.deepEqual((db.prepare("SELECT id FROM books WHERE work_id = ?").all(keyed.work_id) as Array<{ id: string }>).map((row) => row.id), [keyed.id]);
+  assert.equal(countOf(db, "works"), 3);
 });
 
 test("insertImage stores the origin and createBook stores its creator", () => {
