@@ -1,229 +1,293 @@
-# Small saves: implementation plan
+# Small saves (library changes): implementation plan
 
 > **For agentic workers:** implement task by task, verify each, and commit
 > each task separately. Steps use checkbox (`- [ ]`) syntax. After each task,
-> run a spec review and then a quality review (`.claude/agents/`). Run the
-> branch review and the `security-review` skill once before merge.
+> run a spec review, then a quality review (`.claude/agents/`). Before each
+> PR, run the branch review and the `security-review` skill.
 
-**Goal:** ticking a book in a group, setting a book's status or rating, and
-adding a book send only the change. The apps show it at once. The server does
-a fraction of a whole-library save. `PUT /library` keeps working for installed
-builds.
+**Goal.** Ticking a book in a group, setting a book's status or rating, and
+adding a book send only the change. The apps show it at once and never lose
+an edit. `PUT /library` keeps working for installed builds.
 
-**Spec:** `docs/superpowers/specs/2026-10-02-small-saves-design.md`.
+**Spec:** `docs/superpowers/specs/2026-10-02-small-saves-design.md`. Read it
+first. The saver's rules in particular (confirmed and pending, the
+`baseUpdatedAt` check, one queue) are the point of the design.
 
-**Base:** `main` after PR #102 (rate-limit scopes, `rateLimitKey`, the
-10 MiB cap and `saveFailureMessage` are there).
+**Base.** `main` after PR #102. That PR added the rate-limit scopes,
+`rateLimitKey`, `libraryWriteLimit`, the 10 MiB cap and `saveFailureMessage`.
 
-**Rules:**
-- Root `AGENTS.md` and each package's `AGENTS.md` apply. No code comments.
-- API changes are additive: new routes only, and no response shape of an
-  existing route changes.
+**Rules.**
+- Root `AGENTS.md` and each package's `AGENTS.md` apply.
+- No code comments.
+- Additive API only: new routes, and no response shape of an existing route
+  changes.
 - New `*.test.ts` files go into `backend/package.json`'s `test` list.
 - Rebuild `@scripta/shared` before testing a package that uses it.
+- In code the feature is **library changes**. "Small save" already names a
+  `PUT` under 1 MiB (`LIBRARY_SMALL_SAVE_MAX_BYTES`).
 
-**Order:**
-1. Task 1.
-2. Task 2.
-3. Tasks 3 and 4, in parallel worktrees.
-4. Task 5.
+**Two PRs.**
+- **PR 1** is Tasks 1a, 1b, 2a and 2b: shared code and the server routes.
+- **PR 2** is Tasks 3 and 4: the apps. It merges only after PR 1 is live on
+  Railway. The gate is
+  `curl -s -o /dev/null -w '%{http_code}' -X PATCH https://api.atmyshelf.com/library/books`
+  printing 401, not 404.
+
+The web and mobile's over-the-air update ship on the push to `main`, and
+Railway deploys separately (and can be paused).
 
 ---
 
-## Task 1: One shared function for a change, and a save queue
+## Task 1a: Shared helpers
 
-**Files:**
-- `packages/shared/src/library/`: `groups.ts`, a new `libraryChange.ts`, a
-  new `saveQueue.ts`, and the `index.ts` exports, with their tests.
-- `frontend/src/pages/LibraryPage.tsx` (`mergeAndSave`).
-- `mobile/src/features/library/lib/mergeAndSave.ts` and its test.
+**Files.** In `packages/shared/src/library/`: `groups.ts` and `merge.ts`
+(or a new `addPipeline.ts`), their tests, and the `index.ts` exports. Also
+`frontend/src/pages/LibraryPage.tsx` (`mergeAndSave`) and
+`mobile/src/features/library/lib/mergeAndSave.ts` with its test.
 
-**Steps:**
-- [ ] **Key-based group helpers.** Add `addKeyToGroup(groups, id, key)` and
-  `removeKeyFromGroup(groups, id, key)` to `groups.ts`. Make
-  `addBookToGroup` and `removeBookFromGroup` call them with `bookKey(book)`,
-  so their behaviour doesn't change.
-- [ ] **The add pipeline moves into shared.** Move mobile's
-  `buildMergedLibrary(existing, incoming)` there as is:
+- [ ] **Key-based membership.** Add `addKeyToGroup(groups, id, key)` and
+  `removeKeyFromGroup(groups, id, key)`.
+  - On a no-op they return the **same array** and stamp no `updatedAt`: the
+    key is already in, or already out, or the group is unknown.
+  - `addBookToGroup` and `removeBookFromGroup` call them with
+    `bookKey(book)`.
+  - `removeBookFromGroup` therefore stops stamping a group the key wasn't
+    in. Check that no caller depends on that stamp.
+- [ ] **Make `deriveSeriesGroups` linear** (`groups.ts:155-170`) with
+  identical output.
+  - Use a `Map` from normalized name to the first matching group index,
+    updated whenever a group is pushed.
+  - Use a `Set` of keys per group it touches.
+  - Pin it with the existing tests plus a 20,000-book case: one series per
+    book, and 2,000 series. Output must match a frozen copy of the old
+    implementation run in the test, with ids and dates normalized.
+  - Measured today: 3.2 s at 20,000 books and 2,000 series, and 15.8 s at
+    8,000 books with one series each.
+- [ ] **Move the add pipeline into shared** as
+  `buildMergedLibrary(existing, incoming)`. It is mobile's function, as is:
   `mergeLibraryData`, then `assignBookOrder`, then `deriveSeriesGroups`.
-  Web's `mergeAndSave` updater and mobile's `mergeAndSave.ts` both call it.
-  Their output must stay identical: keep the existing tests passing and add
-  one per client that pins it.
-- [ ] **`applyLibraryChange`.** Add `applyLibraryChange(data, change, day)`
-  in `libraryChange.ts`. `day` is the reader's local `YYYY-MM-DD` for
-  `setReadStatus`. The change kinds:
-  - `membership`: `member: true` adds the key if some book has that key, and
-    otherwise reports `"no-book"`. `member: false` removes the key, even a
-    dangling one. An unknown group reports `"no-group"`.
-  - `book`: applies `setReadStatus` and then `setRating` to every book whose
-    `bookKey()` matches. No book reports `"no-book"`. Rating must be 1–5.
-  - `add`: `buildMergedLibrary(data, { books: [book] })`.
+  Web's `mergeAndSave` updater and mobile's `mergeAndSave.ts` call it.
+- [ ] **Delete stale comment paragraphs.** The ones saying this logic
+  "lives entirely on the client" (`merge.ts:6-12`, `groups.ts:11-14`) are no
+  longer true.
+- [ ] **Verify.** Shared, web and mobile tests all pass. The apps' output
+  is unchanged.
 
-  Return `{ data, changed }`, or the error. A change that changes nothing
-  returns the same `data` object, as the helpers already do.
-- [ ] **`createSaveQueue()`.** It runs async jobs one after another, in call
-  order. A failed job rejects its own promise and doesn't stop the queue.
-  `createShelfSession` (`packages/shared/src/murals/finish.ts:64-130`) is the
-  precedent.
-- [ ] **Tests:**
-  - For each kind, the result equals what today's client code produces from
-    the same input. Freeze `Date` so group `updatedAt` stamps match.
-  - Applying the same change twice equals applying it once.
-  - A dangling key is removed.
-  - The errors are reported.
-  - The queue keeps order with a failure in the middle.
+## Task 1b: `applyLibraryChange` and the saver
 
-## Task 2: The three endpoints
+**Files.** In `packages/shared/src/library/`: a new `libraryChange.ts` and a
+new `librarySaver.ts`, their tests, and the exports.
 
-**Files:**
-- `backend/src/modules/library/`: `routes.ts`, `service.ts`,
-  `domain/ports.ts`, `adapters/sqlite/sqliteLibraryRepository.ts`, and their
-  tests.
-- `backend/README.md`, the library section.
+- [ ] **`applyLibraryChange(data, change)`.** It returns
+  `{ data, changed } | { error: "no-group" | "no-book" }`.
+  - `membership` uses the key helpers. `member: true` needs some book with
+    that `bookKey()`, otherwise `"no-book"`. An unknown group gives
+    `"no-group"`.
+  - `book` applies `setReadStatus(book, readStatus, day)` and then
+    `setRating` to every book whose `bookKey()` matches. No book gives
+    `"no-book"`. `day` is part of the change. Rating range is validated by
+    the route, not here.
+  - `add` is `buildMergedLibrary(data, { books: [book] })`.
+  - `changed` is `next !== data` for `membership` and `book`. `add` is always
+    `true`.
+- [ ] **`createLibrarySaver({ send, fetch, write })`.** Implement the spec's
+  "Apps: one saver" section exactly.
+  - `confirmed` and `pending`.
+  - `write(view)` after every change of either.
+  - One FIFO queue for:
+    - `submit(change)`, which resolves `true` or `false` when the server
+      answers;
+    - `saveWhole(updater)`, which replaces each app's `updateLibrary` and
+      keeps today's single 409 replay (fetch, re-run the updater, resend
+      once);
+    - `receive(document)`.
+  - The `baseUpdatedAt` rule on success.
+  - Drop the change and fetch on failure.
+  - Always fetch after an add.
+  - A `dispose()` that drops unsent jobs.
+  - Share tokens are always applied.
 
-**Steps:**
-- [ ] **Measure first, without committing the script.** Time a whole
-  `PUT /library` and the small-save path at 1 MiB and 10 MiB: read, parse,
-  `applyLibraryChange`, stringify, and the data-only write.
-  - Put the numbers in the commit message.
-  - Keep the 120/min bucket unless a 10 MiB small save costs more than
-    100 ms. In that case stop and report back.
-- [ ] **Repository: write data without the derived rows.** Add
-  `updateDocumentData(userId, json, expectedUpdatedAt, glyph | "keep")`.
-  - It writes `data` and `updated_at` under the same precondition and
-    `updated_at` rule as `upsertDocument` (`sqliteLibraryRepository.ts:69-83`).
-  - With a glyph, it also writes `library_derived` with the new version. With
-    `"keep"`, it only moves `library_derived.source_updated_at` to the new
-    version, so the startup re-derive skips it.
-  - It never touches `library_match_keys`.
-- [ ] **Service: `applyChange(userId, change, day)`.** In one synchronous
-  step:
-  1. Read the stored document. If there is none, `membership` and `book`
-     are 404 and `add` starts from `{ books: [] }`, as `addBook` does.
+  Model the tests on `frontend/scripts/test-library-update.mts`, with fake
+  `send`, `fetch` and `write`.
+- [ ] **Tests**, all from the spec's verification list:
+  - copy behind (two devices, a stale service-worker fetch, a rename racing
+    a tick): the next whole save gets a 409;
+  - on-off-on never shows off after the last tap, and ends on when the first
+    save fails;
+  - pending survives a document landing mid-queue;
+  - rollback without the fetch's help;
+  - an older document is ignored;
+  - `dispose` drops jobs.
+
+  Mutation-check the base rule, the older-document guard and the queue
+  ordering.
+
+## Task 2a: Repository and service
+
+**Files.** In `backend/src/modules/library/`: `domain/ports.ts`,
+`adapters/sqlite/sqliteLibraryRepository.ts`, `service.ts`, and their tests.
+Also `packages/shared/src/library/readerIdentity.ts`, or wherever the
+glyph-only helper fits.
+
+- [ ] **Measure first, without committing the script.** At 1 MiB and
+  10 MiB, time the worst path of each kind:
+  - membership in a series group, with the glyph recomputed;
+  - status to 2, with glyph and event;
+  - add, with the full derive.
+
+  Put the numbers in the commit message, along with both buckets' combined
+  per-account budget (120/min of changes plus 30/min of writes). If a 10 MiB
+  membership or book change costs more than 100 ms, stop and report back.
+- [ ] **`updateDocumentData(userId, json, expectedUpdatedAt, glyph | "keep")`.**
+  - Precondition and `updated_at` rule as in `upsertDocument`
+    (`sqliteLibraryRepository.ts:69-83`). If the precondition fails, return
+    `undefined` and let the service throw `LibraryConflictError`.
+  - With a glyph, write `library_derived` with the new version.
+  - With `"keep"`, update `source_updated_at` only where it equals the
+    previous `updated_at`.
+  - Never touch `library_match_keys`.
+  - Mutation-check the precondition at this level, since the service can't
+    make it fail.
+- [ ] **Glyph-only helper.** A function that computes the glyph
+  (`readerIdentity` over the fields `textFields` keeps, `service.ts:30-41`)
+  without building match keys. `deriveLibraryData` uses it too.
+- [ ] **`applyChange(userId, change)`**, in one synchronous step:
+  1. Read the stored document. Unreadable throws, as in `addBook`. If there
+     is none: `membership` and `book` give 404, and `add` starts from
+     `{ books: [] }`.
   2. Parse it and run `applyLibraryChange`.
-  3. Check the size with `serializeWithinLimit`.
-  4. Write: `add` through `upsertDocument` with full derive; the others
-     through `updateDocumentData` with the current `updated_at` as the
-     precondition.
-  5. Return `{ updatedAt }`.
-
-  If nothing changed, return the stored `updatedAt` without writing.
-
-  Recompute the glyph only when its inputs can change: a membership change in
-  a `series` group, or a status moving to or from 2. Otherwise pass
-  `"keep"`.
-
-  Events, through the existing `emitBookEvents`: `book_finished` when a
-  `book` change moves a book to 2; `book_added` when `add` creates a book.
-  Use the ContentID-keyed `diffBookEvents` (`service.ts:81-106`) on the
-  before and after documents, as `saveLibrary` does.
-- [ ] **Routes.** Add the three routes in their own scope:
-  `fastifyRateLimit` `{ max: 120, timeWindow: "1 minute", keyGenerator: rateLimitKey }`,
-  `preHandler: authGuard` on each, and `bodyLimit: 64 * 1024`.
-  - `POST /library/groups/:groupId/books`: `{ bookKey: string 1–2000, member: boolean }`.
-  - `PATCH /library/books`: `{ bookKey, readStatus?: 0|1|2, rating?: 1–5, day?: YYYY-MM-DD }`.
-    At least one of `readStatus` and `rating` is required.
-  - `POST /library/books/add`: `{ book: object with a non-empty string Title }`.
-
-  Answers:
-  - success: 200 `{ updatedAt }`;
-  - bad body: 400;
-  - `no-group` or `no-book`: 404 with `{ error }`;
-  - over the cap: 413 with `libraryTooLargeBody()`;
-  - no session: 401.
-- [ ] **Tests:**
+  3. If nothing changed, return `{ updatedAt: stored, baseUpdatedAt: stored }`.
+  4. `serializeWithinLimit` (413).
+  5. Write:
+     - `add` goes through `upsertDocument` with `deriveLibraryData`.
+     - The others go through `updateDocumentData` with the glyph only for a
+       membership change in a `series` group or a status moving to or from
+       2, and `"keep"` otherwise.
+  6. Emit events through `emitBookEvents` from the already-parsed books.
+     There are events only for a status reaching 2 and for an add, with no
+     second parse of the stored string. Diff an add against `{ books: [] }`
+     when there was no document, and keep the cap of 10 per save.
+  7. Return `{ updatedAt, baseUpdatedAt }`.
+- [ ] **Tests.**
   - For each kind, the stored document equals `applyLibraryChange` on the
-    previous document.
-  - The same body twice gives one change.
+    previous one. Normalize the random ids an add's series seeding creates.
+  - No-op membership and book changes don't write.
   - Match keys are untouched except on add.
-  - The glyph is recomputed for series membership and finish changes, and
-    `"keep"` otherwise. Check with the startup backfill that nothing is
-    re-derived.
-  - The events.
-  - 400, 401, 404 and 413.
-  - The 121st small save in a minute gets 429, and it doesn't use up the
-    whole-library bucket, nor the other way round.
-  - Mutation-check the glyph condition, the precondition and the bucket.
+  - Glyph against `"keep"`, and the boot backfill re-deriving nothing
+    afterwards.
+  - Events, including a first add.
+  - 404, 409 (repository) and 413.
 
-## Task 3: Web uses small saves
+## Task 2b: Routes, buckets and docs
 
-**Files:**
-- `frontend/src/api/library.ts`.
-- `frontend/src/hooks/useLibrary.ts`.
-- `frontend/src/pages/GroupsPage.tsx`, `LibraryPage.tsx`.
-- `frontend/src/components/PickNextSheet.tsx`.
-- A `frontend/scripts/test-*.mts` for the cache logic.
+**Files.** `backend/src/modules/library/routes.ts` and `routes.test.ts`.
+This task owns `backend/README.md` and the load-safety spec's rate-limit
+table; no other task edits them.
 
-**Steps:**
-- [ ] **API functions.** Add `saveGroupMembership`, `patchBook` and
-  `addLibraryBook`, each returning `{ updatedAt }`.
-- [ ] **`useLibrary().applyChange(change)`.** It works like this:
-  1. Run `applyLibraryChange` on the cached document now, with
-     `setQueryData`.
-  2. Queue the request on one module-level `createSaveQueue()`.
-  3. On success, re-apply the change to whatever the cache holds and keep
-     the later `updatedAt`.
-  4. On failure, `invalidateQueries(["library"])` and rethrow, so the caller
-     toasts `saveFailureMessage`.
-- [ ] **Latest-wins cache.** `updateLibrary` (the `PUT` path) no longer
-  overwrites a cache whose `updatedAt` is newer than the response's.
-- [ ] **Switch the callers.**
-  - The group checkbox: `handleToggleBook`.
-  - Read status and rating: `LibraryPage.tsx:243-275`, `PickNextSheet.tsx:27`.
-  - Add a book: `handleAddBook`.
+- [ ] **A new `changes` scope:** `fastifyRateLimit`
+  `{ max: 120, timeWindow: "1 minute", keyGenerator: rateLimitKey }`, with
+  `preHandler: authGuard` and `bodyLimit: 64 * 1024` on each route.
+  - `POST /library/groups/:groupId/books`:
+    `{ bookKey: string 1–2000, member: boolean }`.
+  - `PATCH /library/books`:
+    `{ bookKey: string 1–2000, readStatus?: 0|1|2, rating?: 1–5, day?: YYYY-MM-DD }`.
+    At least one of `readStatus` and `rating` must be present. `day` is
+    required when `readStatus` is 2. Otherwise 400.
+- [ ] **`POST /library/books/add`** goes in the existing `writes` scope.
+  `libraryWriteLimit` gives POSTs 30. The body is
+  `{ book: object with a non-empty string Title }`, with
+  `bodyLimit: 64 * 1024`.
+- [ ] **Answers.**
+  - 200 `{ updatedAt, baseUpdatedAt }`.
+  - 400.
+  - 401.
+  - 404 `{ error }`.
+  - 409 `{ error }`.
+  - 413 with `libraryTooLargeBody()`.
+- [ ] **Tests.**
+  - Each route's success and error answers.
+  - The 121st change in a minute gets 429.
+  - Changes and whole-library saves don't share a bucket.
+  - Add shares the writes bucket.
+  - An old build's flow: a `PUT` with the `updatedAt` it held before a
+    change gets 409 and its replay succeeds.
+- [ ] **Docs.**
+  - `backend/README.md`, library section: the three routes, bodies,
+    answers, buckets, what they skip, and that `PUT /library` is unchanged.
+    Correct `:14` and `:83` (the document as an "opaque blob"), and `:317`
+    ("always saved whole").
+  - Load-safety spec: a rate-limit row for the changes bucket.
 
-  Import and Goodreads sync stay on `mergeAndSave` and `PUT`.
-- [ ] **Tests:**
-  - The optimistic change survives a `PUT` response landing in between.
-  - on-off-on ends on.
-  - A failure rolls back through the refetch.
-  - A stale `PUT` response doesn't overwrite a newer cache.
-- [ ] **Browser pass.** Tick ten boxes quickly, then set status and rating,
-  then add a book. Each change shows at once and is still there after a
-  reload.
+**PR 1 ends here.** Run the branch review and security review, then merge.
+Wait for the Railway deploy, then check the gate.
 
-## Task 4: Mobile uses small saves
+## Task 3: Web adapter and callers
 
-**Files:**
-- `mobile/src/features/library/api/client.ts`.
-- `hooks/useLibrary.ts`, `hooks/useLibraryActions.ts`.
-- `components/GroupDetail.tsx`.
-- `features/home/PickNextSheet.tsx`, `app/(app)/(library)/add-book.tsx`.
-- Their tests.
+**Files.**
+- `frontend/src/api/library.ts`, `frontend/src/hooks/useLibrary.ts`,
+  `frontend/src/main.tsx`.
+- `frontend/src/pages/GroupsPage.tsx`, `frontend/src/pages/LibraryPage.tsx`.
+- `frontend/src/components/PickNextSheet.tsx`,
+  `frontend/src/components/DuplicatesSheet.tsx`, and every other writer of
+  `["library"]`.
 
-**Steps:**
-- [ ] **Same design as Task 3.** Mobile's `updateLibrary` also replays on a
-  409 and has no same-reference short-circuit. Leave both as they are.
-- [ ] **Switch the callers.**
-  - The group row toggle: `GroupDetail.tsx:79-85`.
+- [ ] **One saver per signed-in user**, next to the QueryClient
+  (`main.tsx:14`). `dispose()` it when the user changes.
+  - `write` is `setQueryData(["library"], view)`.
+  - The query function of `["library"]` is the saver's fetch.
+- [ ] **Route every writer of `["library"]` through the saver**:
+  - `updateLibrary` becomes `saveWhole`;
+  - merge responses;
+  - share and unshare;
+  - drag-reorder's optimistic write. That write becomes the saver's job:
+    a reorder is a `saveWhole`.
+- [ ] **Switch the callers to `submit`.**
+  - Group checkbox: `handleToggleBook`.
+  - Status and rating: `LibraryPage.tsx:243-275`, `PickNextSheet.tsx:27`.
+    The finish sheet opens on `submit`'s `true`.
+  - Add: `handleAddBook`.
+
+  Import and Goodreads sync stay on `mergeAndSave` through `saveWhole`.
+- [ ] **Browser pass.** Use Playwright against `npm run dev`; see
+  `docs/dev-workflow.md`.
+  - Tick ten boxes quickly.
+  - Set status and rating.
+  - Add a book.
+  - Reload: everything is still there.
+  - Repeat while a second tab edits the library.
+
+## Task 4: Mobile adapter and callers
+
+**Files.**
+- `mobile/src/features/library/api/client.ts`, `hooks/useLibrary.ts`,
+  `hooks/useLibraryActions.ts`, `components/GroupDetail.tsx`,
+  `components/DuplicatesSheet.tsx`.
+- `mobile/src/app/_layout.tsx`.
+- The four raw-`GET` screens: `QuizCreateScreen.tsx:49`,
+  `TierlistCreateScreen.tsx:28`, `TierlistEditorScreen.tsx:46`,
+  `ArenaSeedScreen.tsx:25`.
+
+- [ ] **Same as Task 3**, with the saver created next to the QueryClient
+  (`_layout.tsx:19`). The four screens use the saver's fetch as their query
+  function.
+- [ ] **Callers.**
+  - Group row: `GroupDetail.tsx:79-85`.
   - Status and rating: `useLibraryActions.ts:67-76`.
-  - Add a book: `useLibraryActions.ts:57-59`.
+  - Add: `useLibraryActions.ts:57-59`.
 
-  Errors keep going through `attemptUpdate` and `saveFailureMessage`.
-- [ ] **Tests:** the same four as Task 3, against the mobile hook.
+  `PickNextSheet` and `add-book.tsx` need no edits. Add errors keep going to
+  `AddBookForm`'s inline message, and the others to `attemptUpdate` with
+  `saveFailureMessage`.
 - [ ] **Device pass with the `emulator-verify` skill.** Same script as the
-  web pass.
+  browser pass.
 
-## Task 5: Docs
-
-**Steps:**
-- [ ] **`backend/README.md`, library section.** Describe:
-  - the three routes, their bodies and answers;
-  - the 120/min bucket;
-  - that they skip match keys and recompute the glyph only when needed;
-  - that `PUT /library` is unchanged.
-- [ ] **`docs/superpowers/specs/2026-10-01-library-rows-design.md`.**
-  - The phase C row points to this spec.
-  - Phase B's writing section lists the small-save paths among the paths
-    that keep rows in step.
-- [ ] **`docs/superpowers/specs/2026-10-01-load-safety-design.md`.** Add a
-  rate-limit table row for the small saves.
+**PR 2** goes after the gate. Run the branch review and security review
+before merge.
 
 ## Done when
 
-- Every package's verify commands pass. CI's full sequence passes on Node 26.
-- Both apps pass their browser and device runs.
-- The branch review and the security review find nothing blocking.
-- An installed build saving with `PUT /library` behaves as before. A route
-  test sends today's mobile `PUT` after a small save and expects the existing
-  409 and replay.
+- Every package's verify commands pass, and CI's full sequence passes on
+  Node 26.
+- The browser and device passes pass, including the second-device run.
+- Both PRs had their branch and security reviews with nothing blocking.
+- Installed builds behave as before. The `PUT` replay test in Task 2b passes.

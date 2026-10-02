@@ -2,170 +2,239 @@
 
 Date: 2026-10-02
 Status: scope approved in conversation (group checkboxes, read status and
-rating, adding a book); design awaiting review
+rating, adding a book); revised after the plan review of the same day
+
+"Small saves" is the conversation's name for this. In code it is **library
+changes** (`applyLibraryChange`, the change routes), because "small save"
+already names a `PUT /library` under 1 MiB (`LIBRARY_SMALL_SAVE_MAX_BYTES`).
 
 ## Problem
 
-Every library change in both apps uploads the whole library: `PUT /library`
-with the full document. Some actions fire once per tap, so a burst of taps is
-a burst of whole-library uploads:
+Every library edit in both apps uploads the whole library: `PUT /library`
+with the full document. Four common actions do it once per tap or submit:
 
 | Action | Web | Mobile | Cadence |
 |---|---|---|---|
 | Tick a book in a group | `GroupsPage.tsx:186-195` | `GroupDetail.tsx:79-85` | every tap |
 | Set read status | `LibraryPage.tsx:243-258`, `PickNextSheet.tsx:27` | `useLibraryActions.ts:67-71` | every tap |
 | Rate a book | `LibraryPage.tsx:260-275` | `useLibraryActions.ts:73-76` | every tap |
-| Add a book (form or search) | `LibraryPage.tsx:152-164` (`mergeAndSave`) | `lib/mergeAndSave.ts:14-18` | every submit |
+| Add a book (form or search) | `LibraryPage.tsx:152-164` (`mergeAndSave`) | `lib/mergeAndSave.ts`, `useLibraryActions.ts:57-59` | every submit |
 
 What that costs:
 
-- **The user waits.** Each tap uploads the library and the server answers
-  with all of it again, and the checkbox only changes when that round trip
-  ends. Neither app is optimistic, except web drag-reorder.
-- **Taps collide.** The apps don't queue saves, so a second tap while the
-  first is in flight sends the same `updatedAt` and gets a 409. The apps then
-  re-download the library and upload it again. Eighteen quick ticks made 30
-  uploads and 12 downloads in the branch review.
+- **The user waits.** A tap uploads the library and gets all of it back.
+  The checkbox changes only when the round trip ends; neither app is
+  optimistic, except web drag-reorder.
+- **Taps collide.** Neither app queues saves. A second tap while the first
+  is in flight sends the same `updatedAt`, gets a 409, then downloads and
+  uploads the library again. Eighteen quick ticks made 30 uploads and 12
+  downloads in the branch review.
 - **The server pays for the whole library every time.** At the 10 MiB cap a
-  save costs 0.3–0.65 s of the single thread: parse, derive, rewriting up to
-  20,000 match-key rows, and the echo. That is why big saves are limited to
-  30 a minute (load-safety spec, workstream 1).
+  save costs 0.3–0.65 s of the single thread: parse, derive, up to 20,000
+  match-key rows, and the echo.
 
-Today's libraries are small: the largest in production is 67 KB. This is
-about making the common actions cheap before libraries grow, and making taps
-feel instant now.
+Today the largest library in production is 67 KB. The point is that taps feel
+instant now, and stay cheap when libraries grow.
 
-## What changes
+## Server: three change routes
 
-Three new endpoints. Each takes only the change and answers
-`{ updatedAt }`. They are additive: `PUT /library` stays as it is for
-installed builds and for every other action.
+All three are additive. `PUT /library` stays as it is, for installed builds
+and for every other action.
 
-| Endpoint | Body | Effect |
-|---|---|---|
-| `POST /library/groups/:groupId/books` | `{ bookKey, member: boolean }` | Puts the book in the group, or takes it out. The body carries the state the checkbox shows, not a toggle, so a retry is harmless |
-| `PATCH /library/books` | `{ bookKey, readStatus?, rating?, day? }` | Sets fields on every book with that `bookKey()`, as the apps do today |
-| `POST /library/books/add` | `{ book }` | Merges one book into the library through the same pipeline the apps run before their `PUT`: `mergeLibraryData`, `assignBookOrder`, `deriveSeriesGroups` |
+| Route | Body | Effect | Rate-limit bucket |
+|---|---|---|---|
+| `POST /library/groups/:groupId/books` | `{ bookKey, member }` | Puts the book in the group or takes it out. `member` is the state the checkbox now shows, so a retry is harmless | new **changes** bucket, 120/min |
+| `PATCH /library/books` | `{ bookKey, readStatus?, rating?, day? }` | Sets the fields on every book whose `bookKey()` matches, as the apps do today. `day` is the reader's local `YYYY-MM-DD` and is required when `readStatus` is 2 | changes, 120/min |
+| `POST /library/books/add` | `{ book }` | Merges one book in through the add pipeline (`mergeLibraryData`, `assignBookOrder`, `deriveSeriesGroups`) | the existing **writes** bucket: 30/min, like add-book and merge |
 
-- **`bookKey` travels in the body.** Keys can be long titles with `|` and
-  spaces, and Fastify's default `maxParamLength` is 100.
-- **One function applies a change, everywhere.** `@scripta/shared` gains
+- **`bookKey` travels in the body.** Fastify's default `maxParamLength` is
+  100 characters, and keys can be long titles with `|` and spaces.
+- **One function applies a change.** `@scripta/shared` gains
   `applyLibraryChange(data, change)`, where `change` is one of:
   - `{ kind: "membership", groupId, bookKey, member }`
   - `{ kind: "book", bookKey, readStatus?, rating?, day? }`
   - `{ kind: "add", book }`
 
-  It is built from the helpers the apps use today: `addBookToGroup` and
-  `removeBookFromGroup` (`groups.ts:77,83`), with key-based variants so a
-  dangling key can be removed; `setReadStatus` (`libraryView.ts:63`);
-  `setRating` (`finish.ts:13`); and the add pipeline. The server runs it on the
-  stored document and the apps run it on their cache, so both hold the same
-  library. The add pipeline exists twice today, as web's `mergeAndSave` in
-  `LibraryPage.tsx:152-164` and mobile's `buildMergedLibrary` in
-  `lib/mergeAndSave.ts`. It moves into `@scripta/shared` once, and both apps
-  and the server use that copy.
-- **Last write wins per change.** A small save reads the stored document,
-  applies the change and writes it back in one synchronous step. Two apps
-  ticking different boxes no longer conflict.
-- **`updatedAt` still moves.** An old build holding the previous `updatedAt`
-  gets a 409 on its next `PUT` and replays, as it does today.
-- **Answers:**
-  - Unknown group: 404.
-  - No book with that key, when adding to a group or patching: 404. Removing
-    a key that isn't there succeeds, so a dangling key can be cleaned up.
-  - Body invalid: 400.
-  - The added book would take the library over the cap: 413, with the same
-    body as today.
-- **Book events** follow today's rules. `book_finished` is emitted when a
-  patch moves a book to finished, and `book_added` when an add creates a new
-  book. The per-save and per-day caps apply.
-- **The existing `POST /library/books`**, the public-page add with
-  `{key, updated}`, is unchanged.
+  The server runs it on the stored document, and the apps run it on their
+  copy. It is built from the helpers the apps use today: key-based variants
+  of `addBookToGroup` and `removeBookFromGroup`, `setReadStatus`, `setRating`,
+  and the add pipeline. The add pipeline exists twice today (web
+  `mergeAndSave`, mobile `buildMergedLibrary`); it moves into
+  `@scripta/shared` and all three callers use that copy.
+- **A change that changes nothing writes nothing.** The membership helpers
+  return the same array and stamp no `updatedAt` when the key is already in
+  (or already out). `setReadStatus` and `setRating` already return the same
+  book. A membership or book change that alters nothing therefore returns the
+  same `data`, the server skips the write, and `updatedAt` does not move.
+  `add` always writes. Re-adding a book you already have replaces its
+  ContentID with a new `manual:` id, so it emits `book_added` again, as it
+  does today.
+- **Answers.**
+  - Success: 200 `{ updatedAt, baseUpdatedAt }`. `baseUpdatedAt` is the
+    stored `updated_at` the change was applied to; it equals `updatedAt` on
+    a no-op.
+  - 400 for an invalid body: `day` missing with `readStatus: 2`, a rating
+    outside 1–5, or a `bookKey` outside 1–2000 characters.
+  - 404 for an unknown group, or for no book with that key on membership-in
+    and book changes. Taking out a key that has no book succeeds, so a
+    dangling key can be cleaned up.
+  - 413 with today's `LIBRARY_BODY_TOO_LARGE` body if the result would pass
+    the cap.
+  - A body over the routes' 64 KiB limit gets Fastify's own 413.
+  - An unreadable stored document throws (500), as `addBook` does.
+  - 409 if the stored document changed under the write. Everything runs in
+    one synchronous step, so only another process can cause this. The app
+    treats it as a failure.
+- **Server cost.**
+  - Membership and book changes parse and re-serialise the document and
+    write only `data` and `updated_at`.
+  - Match keys depend on ISBN, title, author, cover and position, so these
+    changes leave them alone.
+  - The reader glyph reads only series groups and `ReadStatus === 2`
+    (`readerIdentity.ts:78`, `bookGenres.ts:84-86`). It is recomputed, with
+    a glyph-only helper that builds no match keys, only for a membership
+    change in a series group or a status moving to or from 2.
+  - Otherwise the derived row's version moves with the document, so the
+    startup re-derive skips it. That holds only where the derived row was
+    current for the previous version; a row that was already stale stays
+    stale for the backfill.
+  - Book events come from the already-parsed books, and only for a change
+    to status 2 or an add. With no stored document, the add is diffed
+    against `{ books: [] }`, so the first add emits `book_added`, as
+    `addBook` does.
+  - `add` runs the full derive. It sits in the 30/min bucket for the same
+    reason add-book and merge do. Its `deriveSeriesGroups` is quadratic today
+    (3.2 s for 20,000 books in 2,000 series), so it is made linear first,
+    with identical output.
 
-### Server cost
+  The plan measures the worst path of each kind at 1 MiB and 10 MiB and
+  records the per-account budget of both buckets together. The O(library)
+  JSON work goes when library rows become the source of truth (library-rows
+  phase D); these routes keep their contract then.
 
-A small save still parses and re-serialises the stored document, so it costs
-O(library) in JSON work. It skips everything else a `PUT` does:
+## Apps: one saver, shared
 
-- **Match keys** depend only on ISBN, title and author. A group change, a
-  status or a rating leaves them as they are. Only `add` rewrites them.
-- **The reader glyph** is recomputed only when its inputs can change:
-  membership of a series group, and a status moving to or from finished.
-  Otherwise the derived row's version moves with the document, so the
-  startup re-derive doesn't redo it.
-- **No upload, no echo.** The response is `{ updatedAt }`.
+The hard part is keeping the apps' copy right while changes are in flight. It
+lives once, in `@scripta/shared`, as a saver with injected `send`, `fetch` and
+`write`, tested without React. Each app's hook is a thin adapter.
 
-The expected cost is a fraction of a `PUT` at the same size. Task 1 of the
-plan measures it at 1 MiB and 10 MiB before the limits below are fixed.
+- **Confirmed and pending.** The saver keeps:
+  - `confirmed`, the last document from the server, with its `updatedAt`;
+  - `pending`, the changes not yet confirmed, in order.
 
-The O(library) part goes when library rows become the source of truth (the
-library-rows spec, phase D). These endpoints keep their contract then; only
-their inside changes.
+  What the app shows (the `["library"]` cache) is always `confirmed` with
+  `pending` applied. A tap adds to `pending`, so the screen changes at once.
+- **One queue for every write.** Changes and whole-library saves go through
+  one queue, one at a time, in order. A rename waits behind ticks already
+  sent. No two writes from the same app are ever in flight together.
+- **A change succeeds.**
+  - If `baseUpdatedAt` equals `confirmed.updatedAt`, the server applied the
+    change to exactly the app's copy. `confirmed` becomes `confirmed` plus the
+    change, with the new `updatedAt`, and the change leaves `pending`.
+  - Otherwise the app's copy was behind: a stale-first service-worker
+    response, or another device. The app keeps its old `updatedAt`, marks the
+    change as saved at the new one, and fetches. The change stays applied
+    until a document at least that new arrives.
 
-### Rate limits
+  Taking the new `updatedAt` without the base check would let the next
+  whole-library save pass the precondition and silently undo changes the
+  copy never had.
+- **Every server document goes through the saver.** Fetches, `PUT` echoes,
+  merge responses and the refetch after a failure all go through it.
+  - A document older than `confirmed` (by `updatedAt`; an empty copy counts
+    as older) is ignored.
+  - A newer one replaces `confirmed` and drops the pending changes it
+    already contains.
+  - Share and unshare don't move `updatedAt`; their `shareToken` and
+    `shareUrl` are always applied.
+  - The query function of `["library"]` is the saver's fetch. That includes
+    mobile's four screens with their own raw `GET`: `QuizCreateScreen.tsx:49`,
+    `TierlistCreateScreen.tsx:28`, `TierlistEditorScreen.tsx:46` and
+    `ArenaSeedScreen.tsx:25`.
+- **A change fails.** It leaves `pending`, the view is recomputed, the app
+  fetches, and the caller shows `saveFailureMessage`. Rollback doesn't depend
+  on the fetch, which may return an older copy.
+- **Callers learn the outcome.** A submitted change resolves `true` or
+  `false` when the server answers. The finish sheet opens on the status
+  change's result (`LibraryPage.tsx:763`, `book/[key]/index.tsx:28-29`).
+- **After an add, fetch.** `deriveSeriesGroups` creates groups with random
+  ids and the current time, so the app's copy and the server's differ after
+  an add that seeds a series.
+- **One saver per signed-in user.** Each app already makes its query client
+  per user (`frontend/src/main.tsx:14`, `mobile/src/app/_layout.tsx:19`). The
+  saver lives beside it, and unsent jobs are dropped when the user changes.
+  A module-level queue could send a tick under the next account.
 
-The small saves share their own bucket per account: **120 a minute**. A tap
-there costs a fraction of a whole-library save, so the 30-a-minute tier for
-big saves does not apply. Task 1's measurement confirms the number.
+## Release order
 
-## The apps
+Mobile's JavaScript ships over the air on any push to `main` that touches
+`mobile/**` or `packages/shared/**` (`mobile/.eas/workflows/production-update.yml`).
+The web ships from the same push. Railway deploys the backend separately, and
+deploys can be paused. So there are two PRs:
 
-Both apps send these three actions as small saves. Everything else still uses
-`PUT /library`.
+1. **Shared helpers and the server routes.** The apps' only change is the
+   shared add pipeline, which gives identical output, so the over-the-air
+   update it triggers is harmless.
+2. **Both apps' saver adapters and callers.** This merges only after the
+   routes answer in production:
+   `curl -s -o /dev/null -w '%{http_code}' -X PATCH https://api.atmyshelf.com/library/books`
+   returns 401, not 404.
 
-- **Optimistic.** The app applies the same shared helper to its cached
-  library at once, so the checkbox, status or rating changes on tap. Then it
-  sends the small save.
-- **One at a time, in order.** Small saves go through a queue: the next is
-  sent when the previous one has answered. A fast on-off-on stays on.
-  `createShelfSession` (`packages/shared/src/murals/finish.ts:64-130`) is the
-  precedent for a serialised chain. The queue itself lives in
-  `@scripta/shared`, and each app's cache glue stays in its own hook.
-- **On success** the app re-applies the change to whatever the cache holds
-  now, and takes the newer `updatedAt`. The helpers are idempotent, so
-  re-applying is safe, and a whole-library response that landed in between
-  can't undo the tick.
-- **Cache writes are latest-wins by `updatedAt`.** A `PUT` response older than
-  what the cache holds no longer replaces it. Today every response overwrites
-  the cache unconditionally.
-- **On failure** the app refetches the library, which undoes the optimistic
-  change, and shows `saveFailureMessage`.
-- **Order of release.** The backend deploys first. Web ships from `main` with
-  it. Mobile uses the endpoints from its next build. Installed builds keep
-  uploading the whole library, which the server keeps accepting.
+Installed builds keep uploading whole libraries, which the server keeps
+accepting. A build that has the saver but meets a 404 rolls back every change
+and says so, so the gate matters.
 
 ## Not in this phase
 
-Group create, rename, delete and style; book and library style; renaming the
-library; notes and undo-finish; reorder; covers; deleting books; import;
-duplicates; the gallery scrub; genre enrichment. They stay on `PUT /library`.
+These stay on `PUT /library`:
+- group create, rename, delete and style;
+- book and library style;
+- renaming the library;
+- notes and undo-finish;
+- reorder and covers;
+- deleting books;
+- import and duplicates;
+- the gallery scrub and genre enrichment.
+
 Style edits are already debounced, and none of the rest fires once per tap.
-Candidates for later small saves, in order of how often they fire.
+They now go through the same queue, so they no longer collide with ticks.
 
 ## Fit with the other specs
 
-- **Library rows** (phase B). Rows are kept in step on every path that writes
-  the document. These endpoints are such paths, so whichever of the two ships
-  second covers the other.
-- The library-rows spec's phase table lists per-book writes as phase C. This
-  spec is that phase, and it doesn't wait for phase B.
+- **Library rows, phase B.** Rows are kept in step on every path that writes
+  the document, and these routes are such paths. Whichever ships second
+  covers the other. B's `library_summary` counts change on any status
+  change, so "the derived row's version moves with the document" holds only
+  for today's glyph-only derived row. Once B lands, a status change updates
+  the summary counts too.
+- **Phase C.** The library-rows spec lists this as phase C. It doesn't wait
+  for B.
 
 ## Verification
 
-- **Server.** For every endpoint and every change, the stored document must
-  equal what the app would have uploaded: apply the same helper to the same
-  document and compare. Also test:
-  - idempotency (the same body twice);
-  - 404 and 400 cases, and 413 at the cap;
-  - book events and their caps;
-  - match keys untouched except on add;
-  - the glyph recomputed only when its inputs change;
-  - the rate limit.
-- **Apps.**
-  - The queue keeps order: on-off-on ends on, also when an earlier save fails.
-  - The optimistic change survives a whole-library response landing in between.
-  - A failure rolls back and shows the message.
-  - A stale `PUT` response no longer overwrites a newer cache.
-- **Device pass on both apps.** Tick a run of boxes quickly in a group, set
-  status and rating, and add a book. Each change shows at once and is still
-  there after a reload.
+- **Server.**
+  - For each kind, the stored document equals `applyLibraryChange` on the
+    previous one.
+  - A membership or book change sent twice writes once.
+  - Match keys are untouched except on add.
+  - The glyph is recomputed only when its inputs change, and the boot
+    backfill then re-derives nothing.
+  - Events.
+  - 400, 404, 409 (at the repository) and 413.
+  - Both buckets.
+  - `deriveSeriesGroups` gives the same output as before on the existing
+    tests and on a 20,000-book case, and runs in linear time.
+- **Saver.**
+  - A copy that is behind doesn't take the new `updatedAt`, and the next
+    whole save gets a 409. Cover the two-device case, the
+    stale-service-worker case, and a rename racing a tick.
+  - on-off-on never shows off after the last tap, and still ends on when
+    the first save fails.
+  - Pending ticks survive a document landing mid-queue.
+  - Failure rolls back without the fetch's help.
+  - Jobs are dropped on a user change.
+- **Apps.** In a browser and on a device:
+  - tick a run of boxes quickly, then set status and rating, then add a
+    book;
+  - each change shows at once and is still there after a reload;
+  - the same while another device edits the library.
