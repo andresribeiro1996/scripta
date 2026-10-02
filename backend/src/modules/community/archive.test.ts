@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test, type TestContext } from "node:test";
 import Fastify from "fastify";
+import { DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
 import { ARCHIVE_BATCH } from "./domain/feed.js";
 import type { CommunityDeps } from "./service.js";
 
@@ -26,6 +27,7 @@ const END_OF_2001 = "2002-01-01T00:00:00.000Z";
 const DAY_MS = 24 * 60 * 60 * 1000;
 const ARCHIVED = "moved old community events to history";
 const FAILED = "community event archive failed";
+const SHOWS_READING = { ...DEFAULT_FEED_SETTINGS, reading: true };
 
 const unused = () => {
   throw new Error("the archive does not read this");
@@ -106,6 +108,7 @@ test("a profile's activity pages through recent events and then history with no 
 
 test("registering the plugin moves events older than 30 days to history, purges their inbox rows, and logs the totals once", async (t) => {
   const { db, repo } = openRepo();
+  repo.updateFeedSettings("job-author", SHOWS_READING);
   repo.insertFollow({ follower_id: "job-fan", followee_id: "job-author", created_at: "2026-09-10T00:00:00.000Z" });
   const event = (id: string, createdAt: string) => repo.insertEvent({ id, user_id: "job-author", type: "book_added", ref_type: "book", ref_id: id, payload: null, created_at: createdAt, trace_id: `req-${id}`, source: "PUT /library" });
   for (let i = 0; i < 2500; i++) event(`job-old-${i}`, new Date(Date.parse("2026-08-01T00:00:00.000Z") + i * 60_000).toISOString());
@@ -175,6 +178,7 @@ test("the archive gives the event loop a turn after every batch, so no two batch
   const { repo } = openRepo();
   repo.moveEventsBefore(CUTOFF, 100_000);
   repo.purgeInboxBefore(CUTOFF, 100_000);
+  repo.updateFeedSettings("yield-author", SHOWS_READING);
   repo.insertFollow({ follower_id: "yield-fan", followee_id: "yield-author", created_at: "2026-09-10T00:00:00.000Z" });
   const rows = ARCHIVE_BATCH * 10 + ARCHIVE_BATCH / 2;
   for (let i = 0; i < rows; i++) {

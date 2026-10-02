@@ -43,7 +43,7 @@ Dashboard feed, 100 viewers who each follow 1,000 accounts, page of 21:
 | Today (one query per followee, up to 5 rounds) | 14.6 ms per round | 147 ms per round | grows with follows × rounds |
 | One join query | 4.6 ms | 52.5 ms | grows with followees' activity |
 | Scan newest events, probe follows | — | 0.8 ms | 880 ms when followees are silent |
-| **Inbox, written when the event happens** | — | **0.13 ms** | ~0 ms |
+| **Inbox, written when the event happens** | — | **0.13 ms** | grows only with rows an author hid after writing them, 30 days at most (about 45 ms a page at 30k) |
 
 With 100 people opening the dashboard at the same moment, requests run one
 after another: at 52 ms a page the last person waits ~5 s; with the inbox,
@@ -157,20 +157,42 @@ Decided in conversation (the inbox follows standard social-feed practice,
   request; a future background job that emits events sets `source` to
   `job:<name>`.
 
-**An inbox written when an event happens:**
+**An inbox written when an event happens, holding only what its author
+shows:**
 
 - `feed_inbox (viewer_id, created_at, event_id, author_id)`, primary key
   `(viewer_id, created_at, event_id)`, plus indexes on
   `(viewer_id, author_id)` and `(created_at)`.
 - Writing an event also runs one `INSERT … SELECT` from `follows` into the
-  inbox of every follower. Measured 25–60 ms for an account with 10,000
-  followers (3–6 µs each), so no batching until someone has far more.
-- Following someone copies their last 30 days of events into your inbox;
-  unfollowing deletes theirs. Rows older than 30 days are deleted with the
-  event move.
+  inbox of every follower, but only if the author's switch for the event's
+  category is on (the `show_*` columns; the defaults when there is no profile
+  row, so reading is off). Measured 25–60 ms for an account with 10,000
+  followers (3–6 µs each), so no batching until someone has far more; a hidden
+  event at the same size writes nothing and takes about 2 ms.
+- **Why the filter is on the write too.** The first version wrote a row for
+  every feed event and filtered on read. Reading is off by default, so every
+  book event of every followee became a hidden row the reader walks past: the
+  whole-branch review measured 45 ms for a first page plus 41 ms for the new
+  count, on every dashboard open, for a viewer following 1,000 authors with
+  30k such rows in 30 days, and about 980 ms a page at 300k. The read keeps its
+  filter, using the same SQL fragment as the write so they cannot disagree, so
+  a category switched off after rows were written is hidden at once; those rows
+  stay until they age out, and switching the category back on shows them again.
+- Switching a category on does not backfill the inboxes: only later events
+  reach them. The profile activity page still shows the past ones.
+- Following someone copies their events of the last 30 days into your inbox,
+  only the categories they show now, newest first, at most 100
+  (`FOLLOW_COPY_LIMIT`); unfollowing deletes theirs. Rows older than 30 days
+  are deleted with the event move.
 - A feed page is one indexed range read of the viewer's inbox, joined to
-  `events` and the author's settings columns. Cost stays flat however many
-  people you follow or how active they are.
+  `events` and the author's settings columns. It reads only rows the author
+  showed, so its cost does not grow with hidden activity or with how many
+  people you follow. The only rows it walks past are those hidden after they
+  were written.
+- The one-time inbox fill at first boot is the exception and ignores the
+  switches: on an existing database it runs before the `show_*` columns
+  exist. Its rows from hidden categories are filtered at read and age out
+  within 30 days.
 - Account deletion also clears the user's inbox rows (as viewer and as
   author) and their `events_history` rows.
 

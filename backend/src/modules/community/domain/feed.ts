@@ -28,3 +28,5 @@ export const FEED_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 export const ARCHIVE_BATCH = 250;
 
 export const FOLLOW_LIMIT = 1000;
+
+export const FOLLOW_COPY_LIMIT = 100;

@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import { categoryFor, DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
-import { FEED_EVENT_TYPES, FEED_WINDOW_MS } from "../../domain/feed.js";
+import { FEED_EVENT_TYPES, FEED_WINDOW_MS, FOLLOW_COPY_LIMIT } from "../../domain/feed.js";
 import type { CommunityRepository } from "../../domain/ports.js";
 import type { EventRow, FollowRow, ProfileRow } from "../../domain/types.js";
 import { feedSettingColumns, inTransaction } from "./connection.js";
@@ -50,12 +50,16 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
   `);
   const fanOutStmt = db.prepare(`
     INSERT OR IGNORE INTO feed_inbox (viewer_id, created_at, event_id, author_id)
-    SELECT follower_id, $created_at, $id, $user_id FROM follows WHERE followee_id = $user_id
+    SELECT f.follower_id, e.created_at, e.id, e.user_id
+    FROM events e JOIN follows f ON f.followee_id = e.user_id LEFT JOIN profiles p ON p.user_id = e.user_id
+    WHERE e.id = $id AND ${authorShows}
   `);
   const copyToInboxStmt = db.prepare(`
     INSERT OR IGNORE INTO feed_inbox (viewer_id, created_at, event_id, author_id)
-    SELECT $follower_id, created_at, id, user_id FROM events
-    WHERE user_id = $followee_id AND type IN (SELECT value FROM json_each($types)) AND created_at >= $since
+    SELECT $follower_id, e.created_at, e.id, e.user_id
+    FROM events e LEFT JOIN profiles p ON p.user_id = e.user_id
+    WHERE e.user_id = $followee_id AND e.created_at >= $since AND ${authorShows}
+    ORDER BY e.created_at DESC, e.id DESC LIMIT $limit
   `);
   const deleteInboxFromAuthorStmt = db.prepare(`DELETE FROM feed_inbox WHERE viewer_id = ? AND author_id = ?`);
   const listInboxStmt = db.prepare(`SELECT e.* ${inboxFrom} WHERE ${inboxWhere} ORDER BY i.created_at DESC, i.event_id DESC LIMIT ?`);
@@ -120,8 +124,8 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
           copyToInboxStmt.run({
             $follower_id: row.follower_id,
             $followee_id: row.followee_id,
-            $types: JSON.stringify(FEED_EVENT_TYPES),
-            $since: new Date(Date.parse(row.created_at) - FEED_WINDOW_MS).toISOString()
+            $since: new Date(Date.parse(row.created_at) - FEED_WINDOW_MS).toISOString(),
+            $limit: FOLLOW_COPY_LIMIT
           });
         }
         return inserted;
@@ -202,7 +206,7 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
           $trace_id: row.trace_id ?? null,
           $source: row.source ?? null
         }).changes > 0;
-        if (inserted && FEED_EVENT_TYPES.includes(row.type)) fanOutStmt.run({ $id: row.id, $user_id: row.user_id, $created_at: row.created_at });
+        if (inserted && FEED_EVENT_TYPES.includes(row.type)) fanOutStmt.run({ $id: row.id });
       });
     },
     listEventsByUser(userId, keyset, limit, hiddenTypes) {

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import Fastify from "fastify";
-import { categoryFor, DEFAULT_FEED_SETTINGS, type ActivityEventType, type FeedCategory } from "@scripta/shared/community";
+import { categoryFor, DEFAULT_FEED_SETTINGS, type ActivityEventType, type FeedCategory, type FeedSettings } from "@scripta/shared/community";
 import { registerTrace } from "../../../../trace.js";
 import { ACTIVITY_EVENT_TYPES, FEED_EVENT_TYPES } from "../../domain/feed.js";
 import type { EventRow } from "../../domain/types.js";
@@ -186,6 +186,7 @@ test("listPublishedProfiles returns published rows newest update first and skips
 
 const CATEGORIES: FeedCategory[] = ["publications", "reading", "votes", "follows"];
 const ALL_OFF = { publications: false, reading: false, votes: false, follows: false };
+const ALL_ON = { publications: true, reading: true, votes: true, follows: true };
 
 function openRepo() {
   const db = openCommunityDb();
@@ -198,6 +199,10 @@ function inboxRows(db: ReturnType<typeof openCommunityDb>, viewerId: string) {
 
 function inboxEventIds(db: ReturnType<typeof openCommunityDb>, viewerId: string) {
   return inboxRows(db, viewerId).map((row) => row.event_id);
+}
+
+function insertOneOfEachFeedType(r: ReturnType<typeof createSqliteCommunityRepository>, author: string) {
+  FEED_EVENT_TYPES.forEach((type, i) => r.insertEvent({ id: `${author}-${type}`, user_id: author, type, ref_type: "book", ref_id: `${author}-${type}`, payload: null, created_at: `2026-09-1${i}T00:00:00.000Z` }));
 }
 
 test("an event is written to the inbox of each follower of its author, and of no one else", () => {
@@ -215,8 +220,9 @@ test("an event is written to the inbox of each follower of its author, and of no
   assert.deepEqual(inboxRows(db, "fan-author"), []);
 });
 
-test("only the five feed types reach an inbox", () => {
+test("only the five feed types reach an inbox, even from an author who shows every category", () => {
   const { db, r } = openRepo();
+  r.updateFeedSettings("types-author", ALL_ON);
   r.insertFollow({ follower_id: "types-fan", followee_id: "types-author", created_at: "2026-09-10T00:00:00.000Z" });
   const types = [...FEED_EVENT_TYPES, "following", "mural_published"] as const;
   types.forEach((type, i) => {
@@ -224,6 +230,51 @@ test("only the five feed types reach an inbox", () => {
   });
 
   assert.deepEqual(inboxEventIds(db, "types-fan").sort(), FEED_EVENT_TYPES.map((type) => `types-${type}`).sort());
+});
+
+test("an event is written to the inbox of each follower only if its author shows its category, and an author who never chose gets the defaults", () => {
+  const { db, r } = openRepo();
+  r.upsertProfile({ user_id: "write-published", published: 1, mural_id: null, published_at: "2026-09-01T00:00:00.000Z", updated_at: "2026-09-01T00:00:00.000Z", feed_settings: null });
+  const authors: Array<[string, FeedSettings | undefined]> = [
+    ["write-no-profile", undefined],
+    ["write-published", undefined],
+    ["write-all-on", ALL_ON],
+    ["write-all-off", ALL_OFF],
+    ...CATEGORIES.map((category): [string, FeedSettings] => [`write-only-${category}`, { ...ALL_OFF, [category]: true }])
+  ];
+
+  for (const [author, chosen] of authors) {
+    if (chosen) r.updateFeedSettings(author, chosen);
+    const followers = [`${author}-fan-1`, `${author}-fan-2`];
+    for (const follower_id of followers) r.insertFollow({ follower_id, followee_id: author, created_at: "2026-09-01T00:00:00.000Z" });
+    insertOneOfEachFeedType(r, author);
+    const shown = FEED_EVENT_TYPES.filter((type) => (chosen ?? DEFAULT_FEED_SETTINGS)[categoryFor(type)]).map((type) => `${author}-${type}`).sort();
+    for (const follower of followers) assert.deepEqual(inboxEventIds(db, follower).sort(), shown, `${author}: ${follower}`);
+  }
+
+  for (const author of ["write-no-profile", "write-published"]) {
+    assert.deepEqual(inboxEventIds(db, `${author}-fan-1`).sort(), [`${author}-tierlist_published`, `${author}-tournament_published`, `${author}-voted_on`]);
+  }
+  assert.equal(inboxEventIds(db, "write-all-on-fan-1").length, FEED_EVENT_TYPES.length);
+  assert.deepEqual(inboxEventIds(db, "write-all-off-fan-1"), []);
+});
+
+test("a book event reaches every follower's inbox once its author shows reading, and no one's while reading is off, its default, though the event is stored either way", () => {
+  const { db, r } = openRepo();
+  const authors = ["book-quiet", "book-open"];
+  const fans = ["fan-1", "fan-2", "fan-3"];
+  r.updateFeedSettings("book-open", { ...DEFAULT_FEED_SETTINGS, reading: true });
+  for (const author of authors) {
+    for (const fan of fans) r.insertFollow({ follower_id: `${author}-${fan}`, followee_id: author, created_at: "2026-09-01T00:00:00.000Z" });
+    r.insertEvent({ id: `${author}-added`, user_id: author, type: "book_added", ref_type: "book", ref_id: `${author}-b1`, payload: null, created_at: "2026-09-10T00:00:00.000Z" });
+    r.insertEvent({ id: `${author}-finished`, user_id: author, type: "book_finished", ref_type: "book", ref_id: `${author}-b1`, payload: null, created_at: "2026-09-11T00:00:00.000Z" });
+  }
+
+  for (const fan of fans) {
+    assert.deepEqual(inboxEventIds(db, `book-quiet-${fan}`), []);
+    assert.deepEqual(inboxEventIds(db, `book-open-${fan}`), ["book-open-added", "book-open-finished"]);
+  }
+  for (const author of authors) assert.deepEqual(r.listEventsByUser(author, undefined, 10, []).map((event) => event.id).sort(), [`${author}-added`, `${author}-finished`]);
 });
 
 test("an event the unique indexes ignore is not fanned out", () => {
@@ -243,6 +294,8 @@ test("following copies the author's feed events from the 30 days before the foll
   const { db, r } = openRepo();
   const event = (id: string, user: string, type: "tierlist_published" | "voted_on" | "book_added" | "following", at: string) =>
     r.insertEvent({ id, user_id: user, type, ref_type: "book", ref_id: id, payload: null, created_at: at });
+  r.updateFeedSettings("copy-author", ALL_ON);
+  r.updateFeedSettings("copy-other", ALL_ON);
   event("copy-old", "copy-author", "book_added", "2026-08-10T00:00:00.000Z");
   event("copy-edge", "copy-author", "voted_on", "2026-08-11T00:00:00.000Z");
   event("copy-recent", "copy-author", "book_added", "2026-09-05T00:00:00.000Z");
@@ -262,6 +315,25 @@ test("following copies the author's feed events from the 30 days before the foll
   assert.equal(r.deleteFollow("copier", "copy-author"), false);
   assert.deepEqual(inboxEventIds(db, "copier"), ["copy-other-author"]);
   assert.deepEqual(inboxEventIds(db, "someone-else"), []);
+});
+
+test("following copies only the events whose category the author shows, the newest 100 of them, and events it hides do not use up the limit", () => {
+  const { db, r } = openRepo();
+  const minute = (n: number) => new Date(Date.parse("2026-09-01T00:00:00.000Z") + n * 60_000).toISOString();
+  const event = (id: string, author: string, type: "tierlist_published" | "book_added", n: number) =>
+    r.insertEvent({ id, user_id: author, type, ref_type: "book", ref_id: id, payload: null, created_at: minute(n) });
+  for (let i = 0; i < 130; i++) event(`cap-pub-${i}`, "cap-author", "tierlist_published", i);
+  for (let i = 0; i < 40; i++) event(`cap-book-${i}`, "cap-author", "book_added", 1000 + i);
+  for (let i = 0; i <= 100; i++) event(`cap-tie-${String(i).padStart(3, "0")}`, "cap-tie-author", "tierlist_published", 0);
+
+  r.insertFollow({ follower_id: "cap-fan", followee_id: "cap-author", created_at: minute(5000) });
+  r.insertFollow({ follower_id: "cap-tie-fan", followee_id: "cap-tie-author", created_at: minute(5000) });
+
+  assert.deepEqual(inboxEventIds(db, "cap-fan").sort(), Array.from({ length: 100 }, (_, i) => `cap-pub-${30 + i}`).sort());
+  const tied = inboxEventIds(db, "cap-tie-fan");
+  assert.equal(tied.length, 100);
+  assert.ok(!tied.includes("cap-tie-000"));
+  assert.ok(tied.includes("cap-tie-100"));
 });
 
 test("the inbox reads newest first with ties split by id, continues after a keyset, and narrows to the requested types", () => {
@@ -305,8 +377,9 @@ test("countInboxSince counts the visible rows after the marker, stops at the lim
   assert.equal(r.countInboxSince("count-nobody", "", FEED_EVENT_TYPES, 100), 0);
 });
 
-test("an author's switches are applied when the inbox is read, so hidden rows come back when shown again, and an author with no profile gets the defaults", () => {
+test("an author's switches are applied again when the inbox is read, so rows hidden later come back when shown again, and an author with no profile gets the defaults", () => {
   const { r } = openRepo();
+  r.updateFeedSettings("shown-chooser", ALL_ON);
   r.insertFollow({ follower_id: "shown-viewer", followee_id: "shown-chooser", created_at: "2026-09-01T00:00:00.000Z" });
   r.insertFollow({ follower_id: "shown-viewer", followee_id: "shown-plain", created_at: "2026-09-01T00:00:00.000Z" });
   for (const author of ["shown-chooser", "shown-plain"]) {
@@ -320,7 +393,7 @@ test("an author's switches are applied when the inbox is read, so hidden rows co
   const plainRows = seen("shown-plain").length;
   assert.ok(plainRows > 0 && plainRows < FEED_EVENT_TYPES.length);
 
-  assert.deepEqual(seen("shown-chooser"), FEED_EVENT_TYPES.filter((type) => DEFAULT_FEED_SETTINGS[categoryFor(type)]).sort());
+  assert.deepEqual(seen("shown-chooser"), [...FEED_EVENT_TYPES].sort());
   r.updateFeedSettings("shown-chooser", ALL_OFF);
   assert.deepEqual(seen("shown-chooser"), []);
   assert.equal(r.countInboxSince("shown-viewer", "", FEED_EVENT_TYPES, 100), plainRows);
@@ -337,14 +410,50 @@ test("an author's switches are applied when the inbox is read, so hidden rows co
   assert.equal(r.countInboxSince("shown-viewer", "", FEED_EVENT_TYPES, 100), plainRows + FEED_EVENT_TYPES.length);
 });
 
+test("rows written while an author showed a category stay when they switch it off, hidden from the page and the count", () => {
+  const { db, r } = openRepo();
+  r.updateFeedSettings("off-author", ALL_ON);
+  r.insertFollow({ follower_id: "off-fan", followee_id: "off-author", created_at: "2026-09-01T00:00:00.000Z" });
+  r.insertEvent({ id: "off-book", user_id: "off-author", type: "book_added", ref_type: "book", ref_id: "off-b1", payload: null, created_at: "2026-09-10T00:00:00.000Z" });
+  r.insertEvent({ id: "off-pub", user_id: "off-author", type: "tierlist_published", ref_type: "tierlist", ref_id: "off-t1", payload: null, created_at: "2026-09-11T00:00:00.000Z" });
+  const page = () => r.listInbox("off-fan", undefined, 10, FEED_EVENT_TYPES).map((event) => event.id);
+  assert.deepEqual(page(), ["off-pub", "off-book"]);
+
+  r.updateFeedSettings("off-author", { ...ALL_ON, reading: false });
+  assert.deepEqual(inboxEventIds(db, "off-fan"), ["off-book", "off-pub"]);
+  assert.deepEqual(page(), ["off-pub"]);
+  assert.equal(r.countInboxSince("off-fan", "", FEED_EVENT_TYPES, 100), 1);
+
+  r.updateFeedSettings("off-author", ALL_ON);
+  assert.deepEqual(page(), ["off-pub", "off-book"]);
+});
+
+test("switching a category on brings no earlier event into the inboxes, the events after it arrive, and a later follower is copied the shown ones", () => {
+  const { db, r } = openRepo();
+  const book = (id: string, day: number) => r.insertEvent({ id, user_id: "later-author", type: "book_added", ref_type: "book", ref_id: id, payload: null, created_at: `2026-09-0${day}T00:00:00.000Z` });
+  r.insertFollow({ follower_id: "later-fan", followee_id: "later-author", created_at: "2026-09-01T00:00:00.000Z" });
+  book("later-before", 2);
+
+  r.updateFeedSettings("later-author", { ...DEFAULT_FEED_SETTINGS, reading: true });
+  assert.deepEqual(inboxEventIds(db, "later-fan"), []);
+  assert.deepEqual(r.listInbox("later-fan", undefined, 10, FEED_EVENT_TYPES), []);
+  book("later-after", 3);
+
+  assert.deepEqual(inboxEventIds(db, "later-fan"), ["later-after"]);
+  assert.deepEqual(r.listInbox("later-fan", undefined, 10, FEED_EVENT_TYPES).map((event) => event.id), ["later-after"]);
+  assert.deepEqual(r.listEventsByUser("later-author", undefined, 10, []).map((event) => event.id), ["later-after", "later-before"]);
+  r.insertFollow({ follower_id: "later-newcomer", followee_id: "later-author", created_at: "2026-09-04T00:00:00.000Z" });
+  assert.deepEqual(inboxEventIds(db, "later-newcomer").sort(), ["later-after", "later-before"]);
+});
+
 test("deleting a user's data clears their inbox as viewer and as author, and their history, and leaves everyone else's", () => {
   const { db, r } = openRepo();
   const at = "2026-09-10T00:00:00.000Z";
   r.insertFollow({ follower_id: "gone", followee_id: "kept-author", created_at: at });
   r.insertFollow({ follower_id: "kept-fan", followee_id: "gone", created_at: at });
   r.insertFollow({ follower_id: "kept-fan", followee_id: "kept-author", created_at: at });
-  r.insertEvent({ id: "gone-own", user_id: "gone", type: "book_added", ref_type: "book", ref_id: "gone-b", payload: null, created_at: at });
-  r.insertEvent({ id: "kept-own", user_id: "kept-author", type: "book_added", ref_type: "book", ref_id: "kept-b", payload: null, created_at: at });
+  r.insertEvent({ id: "gone-own", user_id: "gone", type: "tierlist_published", ref_type: "tierlist", ref_id: "gone-b", payload: null, created_at: at });
+  r.insertEvent({ id: "kept-own", user_id: "kept-author", type: "tierlist_published", ref_type: "tierlist", ref_id: "kept-b", payload: null, created_at: at });
   const history = db.prepare("INSERT INTO events_history (id, user_id, type, ref_type, ref_id, payload, created_at, trace_id, source) VALUES (?, ?, ?, ?, ?, NULL, ?, NULL, NULL)");
   history.run("history-gone", "gone", "book_added", "book", "gone-old", at);
   history.run("history-about-gone", "kept-fan", "following", "user", "gone", at);
@@ -472,7 +581,7 @@ test("purgeInboxBefore deletes the oldest inbox rows of every viewer up to the b
   assert.equal(r.moveEventsBefore(at(10), 10), 4);
 });
 
-test("the dashboard service pages through a real inbox newest first, narrowed to the kinds listed, with the authors' switches and the new count applied", () => {
+test("the dashboard service pages through a real inbox newest first, narrowed to the kinds listed, with the authors' switches at the time of each event and the new count applied", () => {
   const { r } = openRepo();
   const unused = () => {
     throw new Error("the dashboard does not read this");
@@ -532,7 +641,10 @@ test("the dashboard service pages through a real inbox newest first, narrowed to
 
   r.updateFeedSettings("dash-b", { ...DEFAULT_FEED_SETTINGS, publications: false });
   r.updateFeedSettings("dash-a", { ...DEFAULT_FEED_SETTINGS, reading: true });
-  assert.deepEqual(ids(), ["dash-read-a", "dash-pub-a1", "dash-vote-a"]);
+  assert.deepEqual(ids(), ["dash-pub-a1", "dash-vote-a"]);
+  assert.equal(service.getDashboard("dash-viewer", undefined, 20).followingNewCount, 2);
+  event("dash-read-a2", "dash-a", "book_added", "dash-book-2", 7);
+  assert.deepEqual(ids(), ["dash-read-a2", "dash-pub-a1", "dash-vote-a"]);
   assert.equal(service.getDashboard("dash-viewer", undefined, 20).followingNewCount, 3);
 
   r.deleteFollow("dash-viewer", "dash-a");
@@ -543,7 +655,7 @@ test("an event, a follow and an unfollow are each written together with their in
   const { db, r } = openRepo();
   t.after(() => db.exec("DROP TRIGGER IF EXISTS atomic_block"));
   const at = "2026-09-10T00:00:00.000Z";
-  const event = { id: "atomic-e1", user_id: "atomic-author", type: "book_added" as const, ref_type: "book" as const, ref_id: "atomic-b1", payload: null, created_at: at };
+  const event = { id: "atomic-e1", user_id: "atomic-author", type: "tierlist_published" as const, ref_type: "tierlist" as const, ref_id: "atomic-b1", payload: null, created_at: at };
   r.insertFollow({ follower_id: "atomic-fan", followee_id: "atomic-author", created_at: at });
 
   db.exec("CREATE TRIGGER atomic_block BEFORE INSERT ON feed_inbox WHEN NEW.event_id = 'atomic-e1' BEGIN SELECT RAISE(ABORT, 'blocked'); END");
@@ -567,7 +679,7 @@ test("unfollowing removes only the unfollower's inbox rows of that author", () =
   const at = "2026-09-10T00:00:00.000Z";
   r.insertFollow({ follower_id: "un-a", followee_id: "un-author", created_at: at });
   r.insertFollow({ follower_id: "un-b", followee_id: "un-author", created_at: at });
-  r.insertEvent({ id: "un-e1", user_id: "un-author", type: "book_added", ref_type: "book", ref_id: "un-b1", payload: null, created_at: at });
+  r.insertEvent({ id: "un-e1", user_id: "un-author", type: "tierlist_published", ref_type: "tierlist", ref_id: "un-b1", payload: null, created_at: at });
 
   r.deleteFollow("un-a", "un-author");
 
