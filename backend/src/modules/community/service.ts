@@ -9,7 +9,7 @@ import type { MuralPublicPayload } from "../murals/index.js";
 import type { PublishedTierlistRef, TierlistDiscoverRef } from "../tierlists/service.js";
 import { currentTrace } from "../../trace.js";
 import { FollowLimitError, InvalidCursorError, MuralNotOwnedError, NotFollowingError, ProfileNotFoundError, SelfFollowError, UsernameRequiredError } from "./domain/errors.js";
-import { DIGEST_EVENT_TYPES, FEED_WINDOW_MS, FOLLOW_LIMIT } from "./domain/feed.js";
+import { ACTIVITY_EVENT_TYPES, DIGEST_EVENT_TYPES, FEED_WINDOW_MS, FOLLOW_LIMIT } from "./domain/feed.js";
 import type { CommunityRepository, CursorKeyset } from "./domain/ports.js";
 import type { EventRow, FollowRow } from "./domain/types.js";
 
@@ -459,6 +459,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
       if (cursor && !keyset) throw new InvalidCursorError();
       const owner = viewerId === userId;
       const settings = settingsFor(userId);
+      const hiddenTypes = owner ? [] : ACTIVITY_EVENT_TYPES.filter((type) => !settings[categoryFor(type)]);
       const toActivityItem = (event: EventRow): ActivityItem | undefined => {
         if (!owner && !settings[categoryFor(event.type)]) return undefined;
         if (event.type === "tierlist_published") {
@@ -488,8 +489,8 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
         return payload === undefined ? undefined : { id: event.id, type: event.type, payload, createdAt: event.created_at };
       };
       const eventsAfter = (after: CursorKeyset | undefined, count: number): EventRow[] => {
-        const recent = repo.listEventsByUser(userId, after, count);
-        return recent.length < count ? [...recent, ...repo.listHistoryEventsByUser(userId, after, count - recent.length)] : recent;
+        const recent = repo.listEventsByUser(userId, after, count, hiddenTypes);
+        return recent.length < count ? [...recent, ...repo.listHistoryEventsByUser(userId, after, count - recent.length, hiddenTypes)] : recent;
       };
       const items: ActivityItem[] = [];
       let nextCursor: string | null = null;

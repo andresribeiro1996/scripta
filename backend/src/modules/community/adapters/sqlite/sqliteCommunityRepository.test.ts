@@ -4,9 +4,9 @@ import { join } from "node:path";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import Fastify from "fastify";
-import { categoryFor, DEFAULT_FEED_SETTINGS, type FeedCategory } from "@scripta/shared/community";
+import { categoryFor, DEFAULT_FEED_SETTINGS, type ActivityEventType, type FeedCategory } from "@scripta/shared/community";
 import { registerTrace } from "../../../../trace.js";
-import { FEED_EVENT_TYPES } from "../../domain/feed.js";
+import { ACTIVITY_EVENT_TYPES, FEED_EVENT_TYPES } from "../../domain/feed.js";
 import type { EventRow } from "../../domain/types.js";
 import type { PublishedTierlistRef } from "../../../tierlists/service.js";
 
@@ -55,11 +55,11 @@ test("events ignore duplicate (ref_type, ref_id) and paginate by keyset", () => 
   r.insertEvent({ id: "e1", user_id: "alice", type: "tierlist_published", ref_type: "tierlist", ref_id: "t1", payload: null, created_at: "2026-09-02T00:00:00.000Z" });
   r.insertEvent({ id: "e2", user_id: "alice", type: "tierlist_published", ref_type: "tierlist", ref_id: "t1", payload: null, created_at: "2026-09-03T00:00:00.000Z" });
   r.insertEvent({ id: "e3", user_id: "alice", type: "tournament_published", ref_type: "tournament", ref_id: "g1", payload: null, created_at: "2026-09-01T00:00:00.000Z" });
-  assert.equal(r.listEventsByUser("alice", undefined, 10).length, 2);
+  assert.equal(r.listEventsByUser("alice", undefined, 10, []).length, 2);
 
-  const page = r.listEventsByUser("alice", { createdAt: "2026-09-02T00:00:00.000Z", id: "e1" }, 10);
+  const page = r.listEventsByUser("alice", { createdAt: "2026-09-02T00:00:00.000Z", id: "e1" }, 10, []);
   assert.deepEqual(page.map((e) => e.id), ["e3"]);
-  assert.deepEqual(r.listEventsByUser("bob", undefined, 10), []);
+  assert.deepEqual(r.listEventsByUser("bob", undefined, 10, []), []);
 });
 
 test("an event keeps the trace that caused it, or nulls when it was given none", () => {
@@ -67,7 +67,7 @@ test("an event keeps the trace that caused it, or nulls when it was given none",
   r.insertEvent({ id: "trace-e1", user_id: "traced", type: "tierlist_published", ref_type: "tierlist", ref_id: "trace-t1", payload: null, created_at: "2026-09-02T00:00:00.000Z", trace_id: "req-1", source: "POST /tierlists/:id/open-voting" });
   r.insertEvent({ id: "trace-e2", user_id: "traced", type: "tournament_published", ref_type: "tournament", ref_id: "trace-g1", payload: null, created_at: "2026-09-01T00:00:00.000Z" });
 
-  assert.deepEqual(r.listEventsByUser("traced", undefined, 10).map((e) => [e.id, e.trace_id, e.source]), [
+  assert.deepEqual(r.listEventsByUser("traced", undefined, 10, []).map((e) => [e.id, e.trace_id, e.source]), [
     ["trace-e1", "req-1", "POST /tierlists/:id/open-voting"],
     ["trace-e2", null, null]
   ]);
@@ -392,14 +392,55 @@ test("moveEventsBefore moves the oldest events first, up to the batch, with ever
   assert.equal(r.moveEventsBefore(at(9), 2), 0);
 
   const ids = (rows: Array<{ id: string }>) => rows.map((row) => row.id);
-  assert.deepEqual(ids(r.listHistoryEventsByUser("move-author", undefined, 10)), ["move-d", "move-b2", "move-b1", "move-a"]);
-  assert.deepEqual(ids(r.listHistoryEventsByUser("move-author", { createdAt: at(2), id: "move-b2" }, 1)), ["move-b1"]);
-  assert.deepEqual(ids(r.listHistoryEventsByUser("move-author", { createdAt: at(2), id: "move-b1" }, 10)), ["move-a"]);
-  assert.deepEqual(r.listHistoryEventsByUser("move-nobody", undefined, 10), []);
-  assert.deepEqual(ids(r.listEventsByUser("move-author", undefined, 10)), ["move-e"]);
+  assert.deepEqual(ids(r.listHistoryEventsByUser("move-author", undefined, 10, [])), ["move-d", "move-b2", "move-b1", "move-a"]);
+  assert.deepEqual(ids(r.listHistoryEventsByUser("move-author", { createdAt: at(2), id: "move-b2" }, 1, [])), ["move-b1"]);
+  assert.deepEqual(ids(r.listHistoryEventsByUser("move-author", { createdAt: at(2), id: "move-b1" }, 10, [])), ["move-a"]);
+  assert.deepEqual(r.listHistoryEventsByUser("move-nobody", undefined, 10, []), []);
+  assert.deepEqual(ids(r.listEventsByUser("move-author", undefined, 10, [])), ["move-e"]);
 
   assert.equal(r.moveEventsBefore(at(10), 2), 1);
   assert.deepEqual(stored("events"), []);
+});
+
+test("hiddenTypes leaves its types out of a user's events and of their history, on the first page and after a keyset, and an empty list leaves nothing out", () => {
+  const { db, r } = openRepo();
+  const insertHistory = db.prepare("INSERT INTO events_history (id, user_id, type, ref_type, ref_id, payload, created_at, trace_id, source) VALUES (?, ?, ?, 'book', ?, NULL, ?, NULL, NULL)");
+  const at = (day: number) => `2026-08-${String(day).padStart(2, "0")}T00:00:00.000Z`;
+  const hiddenBooks: ActivityEventType[] = ["book_added", "book_finished"];
+  const rows = [["9b", "voted_on", 9], ["9a", "following", 9], ["8b", "book_added", 8], ["8a", "mural_published", 8], ["7", "book_finished", 7], ["6b", "tierlist_published", 6], ["6a", "book_added", 6], ["5", "book_added", 5], ["4", "voted_on", 4]] as const;
+  const stores = [
+    { user: "hide-hot", insert: (id: string, type: ActivityEventType, day: number) => r.insertEvent({ id, user_id: "hide-hot", type, ref_type: "book", ref_id: id, payload: null, created_at: at(day) }), list: r.listEventsByUser },
+    { user: "hide-old", insert: (id: string, type: ActivityEventType, day: number) => void insertHistory.run(id, "hide-old", type, id, at(day)), list: r.listHistoryEventsByUser }
+  ];
+
+  for (const { user, insert, list } of stores) {
+    for (const [id, type, day] of rows) insert(`${user}-${id}`, type, day);
+    const ids = (page: EventRow[]) => page.map((row) => row.id.slice(user.length + 1));
+    const after = (day: number, id: string) => ({ createdAt: at(day), id: `${user}-${id}` });
+    const pagesOf = (limit: number) => {
+      const found: string[] = [];
+      let keyset: { createdAt: string; id: string } | undefined;
+      for (let pages = 0; pages < 20; pages++) {
+        const page = list(user, keyset, limit, hiddenBooks);
+        const last = page[page.length - 1];
+        if (!last) break;
+        found.push(...ids(page));
+        keyset = { createdAt: last.created_at, id: last.id };
+      }
+      return found;
+    };
+
+    assert.deepEqual(ids(list(user, undefined, 20, [])), ["9b", "9a", "8b", "8a", "7", "6b", "6a", "5", "4"], `${user}: nothing hidden`);
+    assert.deepEqual(ids(list(user, after(8, "8b"), 20, [])), ["8a", "7", "6b", "6a", "5", "4"], `${user}: nothing hidden, after a keyset`);
+    assert.deepEqual(ids(list(user, undefined, 20, hiddenBooks)), ["9b", "9a", "8a", "6b", "4"], `${user}: books hidden`);
+    assert.deepEqual(ids(list(user, undefined, 3, hiddenBooks)), ["9b", "9a", "8a"], `${user}: hidden rows do not use up the limit`);
+    assert.deepEqual(ids(list(user, after(8, "8b"), 20, hiddenBooks)), ["8a", "6b", "4"], `${user}: books hidden, after a hidden row`);
+    assert.deepEqual(ids(list(user, after(6, "6b"), 20, hiddenBooks)), ["4"], `${user}: books hidden, after a visible row`);
+    assert.deepEqual(ids(list(user, undefined, 20, ["voted_on"])), ["9a", "8b", "8a", "7", "6b", "6a", "5"], `${user}: votes hidden`);
+    assert.deepEqual(list(user, undefined, 20, ACTIVITY_EVENT_TYPES), [], `${user}: every type hidden`);
+    assert.deepEqual(list(user, after(9, "9b"), 20, ACTIVITY_EVENT_TYPES), [], `${user}: every type hidden, after a keyset`);
+    for (const limit of [1, 2, 3]) assert.deepEqual(pagesOf(limit), ["9b", "9a", "8a", "6b", "4"], `${user}: limit ${limit}`);
+  }
 });
 
 test("purgeInboxBefore deletes the oldest inbox rows of every viewer up to the batch, keeps newer ones, and leaves the events alone", () => {

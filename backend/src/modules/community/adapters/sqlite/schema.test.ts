@@ -27,6 +27,8 @@ function tableInfo(db: DatabaseSync, table: string) {
   return db.prepare(`PRAGMA table_info(${table})`).all();
 }
 
+const NOT_HIDDEN = "type NOT IN (SELECT value FROM json_each('[]'))";
+
 function queryPlan(db: DatabaseSync, sql: string) {
   return (db.prepare(`EXPLAIN QUERY PLAN ${sql}`).all() as Array<{ detail: string }>).map((row) => row.detail).join(" ");
 }
@@ -108,10 +110,21 @@ test("events_history takes rows that repeat a user, type and ref, refuses a repe
   insert.run("h1");
   insert.run("h2");
   assert.throws(() => insert.run("h1"), /constraint/);
-  const byUser = queryPlan(db, "SELECT * FROM events_history WHERE user_id = 'u1' AND (created_at < 'x' OR (created_at = 'x' AND id < 'y')) ORDER BY created_at DESC, id DESC LIMIT 20");
-  assert.match(byUser, /idx_events_history_user_time/);
+  const byUser = queryPlan(db, `SELECT * FROM events_history WHERE user_id = 'u1' AND (created_at, id) < ('x', 'y') AND ${NOT_HIDDEN} ORDER BY created_at DESC, id DESC LIMIT 20`);
+  assert.match(byUser, /idx_events_history_user_time \(user_id=\? AND \(created_at,id\)<\(\?,\?\)\)/);
   assert.doesNotMatch(byUser, /TEMP B-TREE/);
   assert.match(queryPlan(db, "SELECT id FROM events_history WHERE created_at < 'x' LIMIT 1000"), /idx_events_history_time/);
+  db.close();
+});
+
+test("a profile's recent events after a keyset are found by seeking into the user's index at the keyset, not by walking from the user's newest event", () => {
+  removeDatabase();
+  const db = openCommunityDb();
+
+  const first = queryPlan(db, `SELECT * FROM events WHERE user_id = 'u1' AND ${NOT_HIDDEN} ORDER BY created_at DESC, id DESC LIMIT 20`);
+  assert.match(first, /idx_events_user_time \(user_id=\?\)/);
+  const after = queryPlan(db, `SELECT * FROM events WHERE user_id = 'u1' AND created_at <= 'x' AND (created_at < 'x' OR (created_at = 'x' AND id < 'y')) AND ${NOT_HIDDEN} ORDER BY created_at DESC, id DESC LIMIT 20`);
+  assert.match(after, /idx_events_user_time \(user_id=\? AND created_at<\?\)/);
   db.close();
 });
 

@@ -8,6 +8,7 @@ import { feedSettingColumns, inTransaction } from "./connection.js";
 const authorShows = `CASE e.type ${FEED_EVENT_TYPES.map((type) => `WHEN '${type}' THEN COALESCE(p.show_${categoryFor(type)}, ${Number(DEFAULT_FEED_SETTINGS[categoryFor(type)])})`).join(" ")} END = 1`;
 const inboxFrom = "FROM feed_inbox i JOIN events e ON e.id = i.event_id LEFT JOIN profiles p ON p.user_id = i.author_id";
 const inboxWhere = `i.viewer_id = ? AND e.type IN (SELECT value FROM json_each(?)) AND ${authorShows}`;
+const notHidden = "type NOT IN (SELECT value FROM json_each(?))";
 
 export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepository {
   const insertFollowStmt = db.prepare(`
@@ -75,19 +76,19 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
   `);
 
   const listEventsStmt = db.prepare(`
-    SELECT * FROM events WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT ?
+    SELECT * FROM events WHERE user_id = ? AND ${notHidden} ORDER BY created_at DESC, id DESC LIMIT ?
   `);
   const listEventsBeforeStmt = db.prepare(`
     SELECT * FROM events
-    WHERE user_id = ? AND (created_at < ? OR (created_at = ? AND id < ?))
+    WHERE user_id = ? AND created_at <= ? AND (created_at < ? OR (created_at = ? AND id < ?)) AND ${notHidden}
     ORDER BY created_at DESC, id DESC LIMIT ?
   `);
   const listHistoryStmt = db.prepare(`
-    SELECT * FROM events_history WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT ?
+    SELECT * FROM events_history WHERE user_id = ? AND ${notHidden} ORDER BY created_at DESC, id DESC LIMIT ?
   `);
   const listHistoryBeforeStmt = db.prepare(`
     SELECT * FROM events_history
-    WHERE user_id = ? AND (created_at, id) < (?, ?)
+    WHERE user_id = ? AND (created_at, id) < (?, ?) AND ${notHidden}
     ORDER BY created_at DESC, id DESC LIMIT ?
   `);
   const oldestEvents = `FROM events WHERE created_at < $cutoff ORDER BY created_at, id LIMIT $batch`;
@@ -204,14 +205,16 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
         if (inserted && FEED_EVENT_TYPES.includes(row.type)) fanOutStmt.run({ $id: row.id, $user_id: row.user_id, $created_at: row.created_at });
       });
     },
-    listEventsByUser(userId, keyset, limit) {
+    listEventsByUser(userId, keyset, limit, hiddenTypes) {
+      const hidden = JSON.stringify(hiddenTypes);
       if (keyset) {
-        return listEventsBeforeStmt.all(userId, keyset.createdAt, keyset.createdAt, keyset.id, limit) as unknown as EventRow[];
+        return listEventsBeforeStmt.all(userId, keyset.createdAt, keyset.createdAt, keyset.createdAt, keyset.id, hidden, limit) as unknown as EventRow[];
       }
-      return listEventsStmt.all(userId, limit) as unknown as EventRow[];
+      return listEventsStmt.all(userId, hidden, limit) as unknown as EventRow[];
     },
-    listHistoryEventsByUser(userId, keyset, limit) {
-      const rows = keyset ? listHistoryBeforeStmt.all(userId, keyset.createdAt, keyset.id, limit) : listHistoryStmt.all(userId, limit);
+    listHistoryEventsByUser(userId, keyset, limit, hiddenTypes) {
+      const hidden = JSON.stringify(hiddenTypes);
+      const rows = keyset ? listHistoryBeforeStmt.all(userId, keyset.createdAt, keyset.id, hidden, limit) : listHistoryStmt.all(userId, hidden, limit);
       return rows as unknown as EventRow[];
     },
     listInbox(viewerId, keyset, limit, types) {

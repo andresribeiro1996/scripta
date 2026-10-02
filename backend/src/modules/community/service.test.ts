@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import Fastify from "fastify";
 import { normalizeWords, type IdentityKey, type ReaderProfile } from "@scripta/shared";
-import type { DiscoverItem, GameParticipation, SharedBook, SuggestedReader } from "@scripta/shared/community";
+import type { ActivityEventType, DiscoverItem, FeedSettings, GameParticipation, SharedBook, SuggestedReader } from "@scripta/shared/community";
 import { categoryFor, DEFAULT_FEED_SETTINGS, encodeCursor, normalizeFeedSettings } from "@scripta/shared/community";
 import type { ParticipationItem } from "@scripta/shared/dashboard";
 import type { PublishedTierlistRef } from "../tierlists/service.js";
@@ -77,16 +77,16 @@ function createRepoFake() {
       if (events.some((e) => e.ref_type === row.ref_type && e.ref_id === row.ref_id)) return;
       events.push({ ...row });
     },
-    listEventsByUser(userId, keyset: CursorKeyset | undefined, limit) {
+    listEventsByUser(userId, keyset: CursorKeyset | undefined, limit, hiddenTypes) {
       return events
-        .filter((e) => e.user_id === userId)
+        .filter((e) => e.user_id === userId && !hiddenTypes.includes(e.type))
         .filter((e) => !keyset || e.created_at < keyset.createdAt || (e.created_at === keyset.createdAt && e.id < keyset.id))
         .sort(newestEvent)
         .slice(0, limit);
     },
-    listHistoryEventsByUser(userId, keyset, limit) {
+    listHistoryEventsByUser(userId, keyset, limit, hiddenTypes) {
       return history
-        .filter((e) => e.user_id === userId)
+        .filter((e) => e.user_id === userId && !hiddenTypes.includes(e.type))
         .filter((e) => !keyset || e.created_at < keyset.createdAt || (e.created_at === keyset.createdAt && e.id < keyset.id))
         .sort(newestEvent)
         .slice(0, limit);
@@ -1799,6 +1799,102 @@ test("getActivity keeps fetching past rows hidden from the viewer", () => {
   assert.ok(ownerPage.nextCursor);
 });
 
+function recordActivityReads(repo: CommunityRepository) {
+  const reads: Array<{ table: "events" | "history"; limit: number; hiddenTypes: string[] }> = [];
+  const listEvents = repo.listEventsByUser;
+  const listHistory = repo.listHistoryEventsByUser;
+  repo.listEventsByUser = (userId, keyset, limit, hiddenTypes) => {
+    reads.push({ table: "events", limit, hiddenTypes: [...hiddenTypes].sort() });
+    return listEvents(userId, keyset, limit, hiddenTypes);
+  };
+  repo.listHistoryEventsByUser = (userId, keyset, limit, hiddenTypes) => {
+    reads.push({ table: "history", limit, hiddenTypes: [...hiddenTypes].sort() });
+    return listHistory(userId, keyset, limit, hiddenTypes);
+  };
+  return reads;
+}
+
+test("a visitor's activity page asks the repository to leave out the types the owner switched off, so a profile full of hidden events costs one read, and the owner's page leaves out none", () => {
+  const { repo } = createRepoFake();
+  const { deps, usernames } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  repo.upsertProfile(profileRow("alice"));
+  const minute = (n: number) => new Date(Date.parse("2026-09-01T00:00:00.000Z") + n * 60_000).toISOString();
+  const event = (id: string, type: ActivityEventType, n: number): EventRow => ({ id, user_id: "alice", type, ref_type: "book", ref_id: id, payload: JSON.stringify({ title: id, username: id }), created_at: minute(n) });
+  for (let i = 1; i <= 60; i++) repo.insertEvent(event(`book-${i}`, i % 2 ? "book_added" : "book_finished", i));
+  repo.insertEvent(event("follow-1", "following", 10.5));
+  repo.insertEvent(event("follow-2", "following", 31.5));
+  repo.insertEvent(event("follow-3", "following", 50.5));
+  const reads = recordActivityReads(repo);
+  const books = ["book_added", "book_finished"];
+
+  const first = service.getActivity("alice", undefined, undefined, 2);
+  assert.deepEqual(first.items.map((item) => item.id), ["follow-3", "follow-2"]);
+  assert.ok(first.nextCursor);
+  const second = service.getActivity("alice", undefined, first.nextCursor, 2);
+  assert.deepEqual(second.items.map((item) => item.id), ["follow-1"]);
+  assert.equal(second.nextCursor, null);
+  assert.deepEqual(reads, [
+    { table: "events", limit: 3, hiddenTypes: books },
+    { table: "events", limit: 3, hiddenTypes: books },
+    { table: "history", limit: 2, hiddenTypes: books }
+  ]);
+
+  reads.length = 0;
+  const owner = service.getActivity("alice", "alice", undefined, 100);
+  assert.equal(owner.items.length, 63);
+  assert.equal(owner.items.filter((item) => item.type === "book_added" || item.type === "book_finished").length, 60);
+  assert.deepEqual(reads, [
+    { table: "events", limit: 101, hiddenTypes: [] },
+    { table: "history", limit: 38, hiddenTypes: [] }
+  ]);
+});
+
+test("a visitor's read leaves out exactly the types of the categories the owner switched off", () => {
+  const { repo } = createRepoFake();
+  const { deps, usernames } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  repo.upsertProfile(profileRow("alice"));
+  const reads = recordActivityReads(repo);
+  const hiddenWith = (settings: FeedSettings) => {
+    repo.updateFeedSettings("alice", settings);
+    reads.length = 0;
+    service.getActivity("alice", undefined, undefined, 5);
+    return reads[0]?.hiddenTypes;
+  };
+
+  assert.deepEqual(hiddenWith({ publications: true, reading: true, votes: true, follows: true }), []);
+  assert.deepEqual(hiddenWith(DEFAULT_FEED_SETTINGS), ["book_added", "book_finished"]);
+  assert.deepEqual(hiddenWith({ publications: false, reading: true, votes: true, follows: false }), ["following", "mural_published", "tierlist_published", "tournament_published"]);
+  assert.deepEqual(hiddenWith({ publications: false, reading: false, votes: false, follows: false }), ["book_added", "book_finished", "following", "mural_published", "tierlist_published", "tournament_published", "voted_on"]);
+});
+
+test("a row the repository returns although its category is switched off is still left out of a visitor's page, and the page reads on past it", () => {
+  const { repo } = createRepoFake();
+  const { deps, usernames } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  repo.upsertProfile(profileRow("alice"));
+  repo.updateFeedSettings("alice", { publications: true, reading: false, votes: false, follows: true });
+  const book = (id: string, day: number): EventRow => ({ id, user_id: "alice", type: "book_added", ref_type: "book", ref_id: id, payload: JSON.stringify({ title: id, status: 0 }), created_at: at(day) });
+  for (const [id, day] of [["e1", 5], ["e2", 4], ["e3", 3], ["e4", 2]] as const) repo.insertEvent(book(id, day));
+  repo.insertEvent({ id: "e5", user_id: "alice", type: "following", ref_type: "user", ref_id: "bob", payload: JSON.stringify({ username: "mia" }), created_at: at(1) });
+  const listEvents = repo.listEventsByUser;
+  let reads = 0;
+  repo.listEventsByUser = (userId, keyset, limit) => {
+    reads++;
+    return listEvents(userId, keyset, limit, []);
+  };
+
+  const page = service.getActivity("alice", undefined, undefined, 2);
+
+  assert.deepEqual(page.items.map((item) => item.id), ["e5"]);
+  assert.equal(page.nextCursor, null);
+  assert.equal(reads, 2);
+});
+
 test("getActivity continues into history once the recent events run out, with no gap or repeat, and asks history only for what a page lacks", () => {
   const { repo, history } = createRepoFake();
   const { deps, usernames } = createDeps(repo);
@@ -1811,9 +1907,9 @@ test("getActivity continues into history once the recent events run out, with no
   history.push(book("e3", 3), book("e2", 2), book("e1", 1));
   const historyReads: number[] = [];
   const listHistory = repo.listHistoryEventsByUser;
-  repo.listHistoryEventsByUser = (userId, keyset, limit) => {
+  repo.listHistoryEventsByUser = (userId, keyset, limit, hiddenTypes) => {
     historyReads.push(limit);
-    return listHistory(userId, keyset, limit);
+    return listHistory(userId, keyset, limit, hiddenTypes);
   };
   const activityIds = (limit: number): string[] => {
     const ids: string[] = [];

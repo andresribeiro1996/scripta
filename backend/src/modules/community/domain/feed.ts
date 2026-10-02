@@ -11,6 +11,18 @@ export const DIGEST_EVENT_TYPES: ReadonlyArray<readonly [ActivityEventType, Dige
 
 export const FEED_EVENT_TYPES: readonly ActivityEventType[] = DIGEST_EVENT_TYPES.map(([type]) => type);
 
+const EVERY_ACTIVITY_EVENT_TYPE = {
+  tierlist_published: true,
+  tournament_published: true,
+  book_added: true,
+  book_finished: true,
+  following: true,
+  mural_published: true,
+  voted_on: true
+} satisfies Record<ActivityEventType, true>;
+
+export const ACTIVITY_EVENT_TYPES = Object.keys(EVERY_ACTIVITY_EVENT_TYPE) as readonly ActivityEventType[];
+
 export const FEED_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
 export const FOLLOW_LIMIT = 1000;
