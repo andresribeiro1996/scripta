@@ -23,6 +23,22 @@ function eventIndexNames(db: DatabaseSync) {
   return (db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'events'").all() as Array<{ name: string }>).map((r) => r.name);
 }
 
+function tableInfo(db: DatabaseSync, table: string) {
+  return db.prepare(`PRAGMA table_info(${table})`).all();
+}
+
+function queryPlan(db: DatabaseSync, sql: string) {
+  return (db.prepare(`EXPLAIN QUERY PLAN ${sql}`).all() as Array<{ detail: string }>).map((row) => row.detail).join(" ");
+}
+
+function removeDatabase() {
+  const path = process.env.COMMUNITY_DB_PATH!;
+  rmSync(path, { force: true });
+  rmSync(`${path}-wal`, { force: true });
+  rmSync(`${path}-shm`, { force: true });
+  return path;
+}
+
 test("fresh database gets events payload column, partial unique indexes, and profiles.feed_settings", () => {
   const db = openCommunityDb();
   assert.ok(eventTableColumns(db).includes("payload"));
@@ -58,6 +74,7 @@ test("legacy events table is rebuilt preserving rows", () => {
   assert.ok(rows[0]);
   assert.equal(rows[0].payload, null);
   assert.ok(eventTableColumns(db).includes("payload"));
+  assert.ok(eventTableColumns(db).includes("trace_id"));
   assert.ok(eventIndexNames(db).includes("idx_events_publication_ref"));
   db.close();
 });
@@ -76,6 +93,52 @@ test("published profiles are indexed by recency, on a new database and on an exi
     const plan = (db.prepare("EXPLAIN QUERY PLAN SELECT * FROM profiles WHERE published = 1 ORDER BY updated_at DESC LIMIT 500").all() as Array<{ detail: string }>).map((row) => row.detail).join(" ");
     assert.match(plan, /idx_profiles_published_updated/);
     assert.doesNotMatch(plan, /TEMP B-TREE/);
+    db.close();
+  }
+});
+
+test("a new database records the trace on events and keeps an events_history of the same shape", () => {
+  removeDatabase();
+  const db = openCommunityDb();
+
+  assert.deepEqual(eventTableColumns(db).slice(-2), ["trace_id", "source"]);
+  assert.deepEqual(tableInfo(db, "events_history"), tableInfo(db, "events"));
+  db.close();
+});
+
+test("events_history takes rows that repeat a user, type and ref, refuses a repeated id, and is indexed for its reads", () => {
+  removeDatabase();
+  const db = openCommunityDb();
+  const insert = db.prepare("INSERT INTO events_history (id, user_id, type, ref_type, ref_id, payload, created_at, trace_id, source) VALUES (?, 'u1', 'voted_on', 'tierlist', 't1', NULL, '2026-01-01T00:00:00.000Z', NULL, NULL)");
+
+  insert.run("h1");
+  insert.run("h2");
+  assert.throws(() => insert.run("h1"), /constraint/);
+  const byUser = queryPlan(db, "SELECT * FROM events_history WHERE user_id = 'u1' AND (created_at < 'x' OR (created_at = 'x' AND id < 'y')) ORDER BY created_at DESC, id DESC LIMIT 20");
+  assert.match(byUser, /idx_events_history_user_time/);
+  assert.doesNotMatch(byUser, /TEMP B-TREE/);
+  assert.match(queryPlan(db, "SELECT id FROM events_history WHERE created_at < 'x' LIMIT 1000"), /idx_events_history_time/);
+  db.close();
+});
+
+test("an events table from before trace ids gains the columns and keeps its rows, and opening again changes nothing", () => {
+  const path = removeDatabase();
+  const existing = new DatabaseSync(path);
+  existing.exec(`
+    CREATE TABLE events (
+      id TEXT PRIMARY KEY, user_id TEXT NOT NULL, type TEXT NOT NULL,
+      ref_type TEXT NOT NULL, ref_id TEXT NOT NULL, payload TEXT, created_at TEXT NOT NULL
+    );
+    INSERT INTO events VALUES ('e1', 'u1', 'voted_on', 'tierlist', 't1', '{"game":"tierlist"}', '2026-01-01T00:00:00.000Z');
+  `);
+  existing.close();
+
+  for (const _ of [1, 2]) {
+    const db = openCommunityDb();
+    const rows = db.prepare("SELECT id, payload, trace_id, source FROM events").all().map((row) => ({ ...row }));
+    assert.deepEqual(rows, [{ id: "e1", payload: '{"game":"tierlist"}', trace_id: null, source: null }]);
+    assert.deepEqual(eventTableColumns(db).slice(-2), ["trace_id", "source"]);
+    assert.deepEqual(tableInfo(db, "events_history"), tableInfo(db, "events"));
     db.close();
   }
 });

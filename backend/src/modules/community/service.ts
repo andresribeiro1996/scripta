@@ -7,6 +7,7 @@ import type { PublishedTournamentRef, TournamentDiscoverRef } from "../arena/ser
 import type { MuralsPublicApi } from "../murals/publicApi.js";
 import type { MuralPublicPayload } from "../murals/index.js";
 import type { PublishedTierlistRef, TierlistDiscoverRef } from "../tierlists/service.js";
+import { currentTrace } from "../../trace.js";
 import { InvalidCursorError, MuralNotOwnedError, NotFollowingError, ProfileNotFoundError, SelfFollowError, UsernameRequiredError } from "./domain/errors.js";
 import type { CommunityRepository, CursorKeyset } from "./domain/ports.js";
 import type { EventRow, FollowRow } from "./domain/types.js";
@@ -37,6 +38,11 @@ function parseEventPayload(raw: string | null): Record<string, unknown> | undefi
   } catch {
     return undefined;
   }
+}
+
+function newEvent(userId: string, type: ActivityEventType, refType: CommunityRefType, refId: string, payload?: Record<string, unknown>): EventRow {
+  const trace = currentTrace();
+  return { id: randomUUID(), user_id: userId, type, ref_type: refType, ref_id: refId, payload: payload ? JSON.stringify(payload) : null, created_at: new Date().toISOString(), trace_id: trace?.traceId ?? null, source: trace?.source ?? null };
 }
 
 export interface PublicProfileView {
@@ -122,7 +128,7 @@ export interface CommunityService {
 export function createCommunityService(deps: CommunityDeps): CommunityService {
   const { repo } = deps;
   const emit = (userId: string, type: ActivityEventType, refType: CommunityRefType, refId: string, payload?: Record<string, unknown>): void => {
-    repo.insertEvent({ id: randomUUID(), user_id: userId, type, ref_type: refType, ref_id: refId, payload: payload ? JSON.stringify(payload) : null, created_at: new Date().toISOString() });
+    repo.insertEvent(newEvent(userId, type, refType, refId, payload));
   };
   const settingsFor = (userId: string): FeedSettings => repo.getFeedSettings(userId) ?? DEFAULT_FEED_SETTINGS;
   const glyphLookup = (): ((userId: string) => IdentityKey | null) => {
@@ -533,7 +539,7 @@ export interface CommunityPublicApi {
 export function createCommunityPublicApi(repo: CommunityRepository): CommunityPublicApi {
   return {
     emitEvent(userId, type, refType, refId, payload) {
-      repo.insertEvent({ id: randomUUID(), user_id: userId, type, ref_type: refType, ref_id: refId, payload: payload ? JSON.stringify(payload) : null, created_at: new Date().toISOString() });
+      repo.insertEvent(newEvent(userId, type, refType, refId, payload));
     }
   };
 }

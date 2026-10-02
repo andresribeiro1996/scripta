@@ -42,4 +42,7 @@ function migrateSchema(db: DatabaseSync, schema: string): void {
   if (!tableColumns(db, "profiles").includes("feed_settings")) {
     db.exec("ALTER TABLE profiles ADD COLUMN feed_settings TEXT");
   }
+  const eventColumns = tableColumns(db, "events");
+  if (!eventColumns.includes("trace_id")) db.exec("ALTER TABLE events ADD COLUMN trace_id TEXT");
+  if (!eventColumns.includes("source")) db.exec("ALTER TABLE events ADD COLUMN source TEXT");
 }

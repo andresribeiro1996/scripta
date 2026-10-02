@@ -22,7 +22,9 @@ CREATE TABLE IF NOT EXISTS events (
   ref_type   TEXT NOT NULL,
   ref_id     TEXT NOT NULL,
   payload    TEXT,
-  created_at TEXT NOT NULL
+  created_at TEXT NOT NULL,
+  trace_id   TEXT,
+  source     TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_events_user_time ON events(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_events_time ON events(created_at DESC);
@@ -32,3 +34,17 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_events_publication_ref
 CREATE UNIQUE INDEX IF NOT EXISTS idx_events_user_type_ref
   ON events(user_id, type, ref_id)
   WHERE type IN ('voted_on', 'following', 'mural_published');
+
+CREATE TABLE IF NOT EXISTS events_history (
+  id         TEXT PRIMARY KEY,
+  user_id    TEXT NOT NULL,
+  type       TEXT NOT NULL,
+  ref_type   TEXT NOT NULL,
+  ref_id     TEXT NOT NULL,
+  payload    TEXT,
+  created_at TEXT NOT NULL,
+  trace_id   TEXT,
+  source     TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_events_history_user_time ON events_history(user_id, created_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_events_history_time ON events_history(created_at);

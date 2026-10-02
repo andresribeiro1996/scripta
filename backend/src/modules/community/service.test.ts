@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import Fastify from "fastify";
 import { normalizeWords, type IdentityKey, type ReaderProfile } from "@scripta/shared";
 import type { DiscoverItem, GameParticipation, SharedBook, SuggestedReader } from "@scripta/shared/community";
 import { DEFAULT_FEED_SETTINGS, encodeCursor, normalizeFeedSettings } from "@scripta/shared/community";
@@ -10,7 +11,8 @@ import type { MuralPublicPayload } from "../murals/index.js";
 import type { CommunityRepository, CursorKeyset } from "./domain/ports.js";
 import type { EventRow, FollowRow, ProfileRow } from "./domain/types.js";
 import { InvalidCursorError, MuralNotOwnedError, NotFollowingError, ProfileNotFoundError, SelfFollowError, UsernameRequiredError } from "./domain/errors.js";
-import { createCommunityService, type CommunityDeps, type CommunityService } from "./service.js";
+import { registerTrace } from "../../trace.js";
+import { createCommunityPublicApi, createCommunityService, type CommunityDeps, type CommunityPublicApi, type CommunityService } from "./service.js";
 
 function createRepoFake() {
   const follows = new Map<string, FollowRow>();
@@ -370,6 +372,35 @@ test("emitEvent is idempotent per (ref_type, ref_id)", () => {
   service.emitEvent("alice", "tierlist_published", "tierlist", "t1");
   service.emitEvent("alice", "tournament_published", "tournament", "g1");
   assert.equal(events.length, 2);
+});
+
+async function emitInsideAndOutsideARequest(emit: CommunityPublicApi["emitEvent"], events: EventRow[]) {
+  const app = Fastify();
+  registerTrace(app);
+  app.post("/things/:id", (request) => {
+    emit("alice", "tierlist_published", "tierlist", "inside");
+    return { requestId: request.id };
+  });
+
+  const { requestId } = (await app.inject({ method: "POST", url: "/things/1" })).json();
+  await app.close();
+  emit("alice", "tournament_published", "tournament", "outside");
+
+  assert.deepEqual(events.map((event) => [event.ref_id, event.trace_id, event.source]), [
+    ["inside", requestId, "POST /things/:id"],
+    ["outside", null, null]
+  ]);
+}
+
+test("an event the service emits records the request that caused it, and nothing outside a request", async () => {
+  const { repo, events } = createRepoFake();
+  const { deps } = createDeps(repo);
+  await emitInsideAndOutsideARequest(createCommunityService(deps).emitEvent, events);
+});
+
+test("an event emitted through the public API other modules call records the request that caused it, and nothing outside a request", async () => {
+  const { repo, events } = createRepoFake();
+  await emitInsideAndOutsideARequest(createCommunityPublicApi(repo).emitEvent, events);
 });
 
 const fakePayload = {} as MuralPublicPayload;

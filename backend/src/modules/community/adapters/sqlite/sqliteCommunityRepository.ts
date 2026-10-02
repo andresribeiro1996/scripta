@@ -38,8 +38,8 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
   const listPublishedProfilesStmt = db.prepare(`SELECT * FROM profiles WHERE published = 1 ORDER BY updated_at DESC LIMIT ?`);
 
   const insertEventStmt = db.prepare(`
-    INSERT OR IGNORE INTO events (id, user_id, type, ref_type, ref_id, payload, created_at)
-    VALUES ($id, $user_id, $type, $ref_type, $ref_id, $payload, $created_at)
+    INSERT OR IGNORE INTO events (id, user_id, type, ref_type, ref_id, payload, created_at, trace_id, source)
+    VALUES ($id, $user_id, $type, $ref_type, $ref_id, $payload, $created_at, $trace_id, $source)
   `);
   const getFeedSettingsStmt = db.prepare(`SELECT feed_settings FROM profiles WHERE user_id = ?`);
   const updateFeedSettingsStmt = db.prepare(`
@@ -142,7 +142,9 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
         $ref_type: row.ref_type,
         $ref_id: row.ref_id,
         $payload: row.payload,
-        $created_at: row.created_at
+        $created_at: row.created_at,
+        $trace_id: row.trace_id ?? null,
+        $source: row.source ?? null
       });
     },
     listEventsByUser(userId, keyset, limit, types) {

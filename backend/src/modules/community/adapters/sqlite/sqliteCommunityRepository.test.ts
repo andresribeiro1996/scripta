@@ -3,6 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import Fastify from "fastify";
+import { registerTrace } from "../../../../trace.js";
 
 const tempRoot = mkdtempSync(join(tmpdir(), "community-repo-"));
 process.env.JWT_ACCESS_SECRET = "a".repeat(64);
@@ -14,6 +16,7 @@ process.env.COMMUNITY_DB_PATH = join(tempRoot, "community.sqlite");
 
 const { openCommunityDb } = await import("./connection.js");
 const { createSqliteCommunityRepository } = await import("./sqliteCommunityRepository.js");
+const { createCommunityPublicApi } = await import("../../service.js");
 
 function repo() {
   return createSqliteCommunityRepository(openCommunityDb());
@@ -75,6 +78,38 @@ test("events narrow to the requested types, with or without a keyset, and newer 
   assert.deepEqual(ids(r.listEventsByUserSince("typed", at(2), 1, ["tierlist_published", "book_finished"])), ["typed-5"]);
   assert.deepEqual(r.listEventsByUserSince("typed", at(2), 10, []), []);
   assert.deepEqual(r.listEventsByUserSince("typed", at(5), 10, ["book_finished"]), []);
+});
+
+test("an event keeps the trace that caused it, or nulls when it was given none", () => {
+  const r = repo();
+  r.insertEvent({ id: "trace-e1", user_id: "traced", type: "tierlist_published", ref_type: "tierlist", ref_id: "trace-t1", payload: null, created_at: "2026-09-02T00:00:00.000Z", trace_id: "req-1", source: "POST /tierlists/:id/open-voting" });
+  r.insertEvent({ id: "trace-e2", user_id: "traced", type: "tournament_published", ref_type: "tournament", ref_id: "trace-g1", payload: null, created_at: "2026-09-01T00:00:00.000Z" });
+
+  assert.deepEqual(r.listEventsByUser("traced", undefined, 10).map((e) => [e.id, e.trace_id, e.source]), [
+    ["trace-e1", "req-1", "POST /tierlists/:id/open-voting"],
+    ["trace-e2", null, null]
+  ]);
+});
+
+test("an event emitted while a request is handled is stored with that request's id and route, and one emitted outside a request with neither", async () => {
+  const db = openCommunityDb();
+  const publicApi = createCommunityPublicApi(createSqliteCommunityRepository(db));
+  const app = Fastify();
+  registerTrace(app);
+  app.post("/tierlists/:id/open-voting", (request) => {
+    publicApi.emitEvent("emitter", "tierlist_published", "tierlist", "emit-t1");
+    return { requestId: request.id };
+  });
+
+  const { requestId } = (await app.inject({ method: "POST", url: "/tierlists/9/open-voting" })).json();
+  publicApi.emitEvent("emitter", "tournament_published", "tournament", "emit-g1");
+  await app.close();
+
+  const rows = db.prepare("SELECT ref_id, trace_id, source FROM events WHERE user_id = 'emitter' ORDER BY ref_id").all().map((row) => ({ ...row }));
+  assert.deepEqual(rows, [
+    { ref_id: "emit-g1", trace_id: null, source: null },
+    { ref_id: "emit-t1", trace_id: requestId, source: "POST /tierlists/:id/open-voting" }
+  ]);
 });
 
 test("listFollowersSince returns only follows after the marker, newest first", () => {
