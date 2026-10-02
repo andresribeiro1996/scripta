@@ -16,12 +16,12 @@ import {
   DEFAULT_LIBRARY_STYLE,
   resolveLibraryStyle,
   type LibraryStyleSettings,
-  type PerCardStyle,
 } from "@scripta/shared";
 import { Button } from "../../../ui/components";
 import { spacing, typography, useTheme } from "../../../ui/theme";
 import { useDebouncedCallback } from "../lib/debounce";
 import { BookCard } from "./BookCard";
+import { useLibraryGridColumns } from "./LibraryGrid";
 import { PerCardStyleFields } from "./PerCardStyleFields";
 import { ColorSwatchRow, Section, StepperRow } from "./StyleControls";
 
@@ -48,6 +48,7 @@ export function LibraryStyleView({
 }) {
   const { colors } = useTheme();
   const [draft, setDraft] = useState<LibraryStyleSettings>(() => resolveLibraryStyle(savedStyle));
+  const { columns, contentWidth } = useLibraryGridColumns(draft);
   const syncedRef = useRef(false);
   const debounced = useDebouncedCallback((next: LibraryStyleSettings) => onSave(next), 400);
 
@@ -139,11 +140,11 @@ export function LibraryStyleView({
       <View
         style={[
           styles.previewFrame,
-          { borderColor: colors.border, backgroundColor: draft.backgroundColor ?? undefined, gap: draft.rowGap, padding: draft.contentPaddingX },
+          { borderColor: colors.border, backgroundColor: draft.backgroundColor ?? undefined, gap: draft.cardGap, rowGap: draft.rowGap, padding: draft.contentPaddingX },
         ]}
       >
         {shownPreview.map((book, i) => (
-          <View key={String(book.ContentID ?? i)} style={{ width: `${100 / Math.min(shownPreview.length, 2) - 4}%` }}>
+          <View key={String(book.ContentID ?? i)} style={{ width: (contentWidth - 2 - draft.cardGap * (columns - 1)) / columns }}>
             <BookCard book={book} onPress={() => {}} style={draft} />
           </View>
         ))}
