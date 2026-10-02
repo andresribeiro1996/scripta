@@ -41,27 +41,30 @@ function statusForCommunityError(err: CommunityError): number {
 
 export function buildCommunityRoutes(service: CommunityService) {
   return async function communityRoutes(app: FastifyInstance) {
-    app.post("/community/follows", { preHandler: authGuard }, async (request, reply) => {
-      const parsed = followSchema.safeParse(request.body);
-      if (!parsed.success) return reply.code(400).send({ error: "Expected {userId}." });
-      try {
-        service.follow(request.user.id, parsed.data.userId);
-        return reply.code(204).send();
-      } catch (err) {
-        if (err instanceof CommunityError) return reply.code(statusForCommunityError(err)).send({ error: err.message });
-        throw err;
-      }
-    });
+    await app.register(async (scoped) => {
+      await scoped.register(fastifyRateLimit, { max: 30, timeWindow: "1 minute", keyGenerator: rateLimitKey });
+      scoped.post("/community/follows", { preHandler: authGuard }, async (request, reply) => {
+        const parsed = followSchema.safeParse(request.body);
+        if (!parsed.success) return reply.code(400).send({ error: "Expected {userId}." });
+        try {
+          service.follow(request.user.id, parsed.data.userId);
+          return reply.code(204).send();
+        } catch (err) {
+          if (err instanceof CommunityError) return reply.code(statusForCommunityError(err)).send({ error: err.message });
+          throw err;
+        }
+      });
 
-    app.delete("/community/follows/:userId", { preHandler: authGuard }, async (request, reply) => {
-      const { userId } = request.params as { userId: string };
-      try {
-        service.unfollow(request.user.id, userId);
-        return reply.code(204).send();
-      } catch (err) {
-        if (err instanceof CommunityError) return reply.code(statusForCommunityError(err)).send({ error: err.message });
-        throw err;
-      }
+      scoped.delete("/community/follows/:userId", { preHandler: authGuard }, async (request, reply) => {
+        const { userId } = request.params as { userId: string };
+        try {
+          service.unfollow(request.user.id, userId);
+          return reply.code(204).send();
+        } catch (err) {
+          if (err instanceof CommunityError) return reply.code(statusForCommunityError(err)).send({ error: err.message });
+          throw err;
+        }
+      });
     });
 
     app.put("/community/profile/publish", { preHandler: authGuard }, async (request, reply) => {

@@ -79,6 +79,7 @@ that PR's branch.
   | `GET /library` | 60/min |
   | `GET /community/dashboard` | 60/min |
   | `GET /community/people` | 60/min |
+  | `POST /community/follows`, `DELETE /community/follows/:userId` (one shared bucket; a follow copies the followee's recent events into the follower's inbox and an unfollow deletes them) | 30/min |
   | `GET /arenas/public` | 30/min |
 
 - `backend/README.md`: the auth limit of 20/min covers every `/auth` route,

@@ -406,6 +406,24 @@ test("people search allows 60 requests a minute per account, and no other authed
   await app.close();
 });
 
+test("following and unfollowing share one bucket of 30 a minute per account, apart from other accounts and every other community route", async () => {
+  const { app, get } = await appWithAccounts();
+  const bearer = (token: string) => ({ authorization: `Bearer ${token}` });
+  const follow = (token: string) => app.inject({ method: "POST", url: "/community/follows", headers: bearer(token), payload: { userId: "carol" } });
+  const unfollow = (token: string) => app.inject({ method: "DELETE", url: "/community/follows/carol", headers: bearer(token) });
+  for (let request = 0; request < 30; request++) assert.equal((await (request % 2 === 0 ? follow : unfollow)("alice")).statusCode, 204);
+  assert.equal((await follow("alice")).statusCode, 429);
+  assert.equal((await unfollow("alice")).statusCode, 429);
+  assert.equal((await follow("bob")).statusCode, 204);
+  assert.equal((await unfollow("bob")).statusCode, 204);
+  assert.equal((await get("/community/dashboard", "alice")).statusCode, 200);
+  assert.equal((await get("/community/people?q=reader", "alice")).statusCode, 200);
+  assert.equal((await get("/community/people/suggested", "alice")).statusCode, 200);
+  const settings = { publications: true, reading: false, votes: true, follows: true };
+  assert.equal((await app.inject({ method: "PUT", url: "/community/profile/feed-settings", headers: bearer("alice"), payload: settings })).statusCode, 204);
+  await app.close();
+});
+
 test("own profile GET and shelf mural PUT are authed and validate the body", async () => {
   const calls: Array<Record<string, unknown>> = [];
   const app = Fastify();
