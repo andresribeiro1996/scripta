@@ -1,4 +1,4 @@
-import type { ActivityEventType } from "@scripta/shared/community";
+import { categoryFor, type ActivityEventType } from "@scripta/shared/community";
 import type { DigestKind } from "@scripta/shared/dashboard";
 
 export const DIGEST_EVENT_TYPES: ReadonlyArray<readonly [ActivityEventType, DigestKind]> = [
@@ -23,6 +23,8 @@ const EVERY_ACTIVITY_EVENT_TYPE = {
 
 export const ACTIVITY_EVENT_TYPES = Object.keys(EVERY_ACTIVITY_EVENT_TYPE) as readonly ActivityEventType[];
 
+export const READING_EVENT_TYPES = ACTIVITY_EVENT_TYPES.filter((type) => categoryFor(type) === "reading");
+
 export const FEED_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
 export const ARCHIVE_BATCH = 250;
@@ -30,3 +32,7 @@ export const ARCHIVE_BATCH = 250;
 export const FOLLOW_LIMIT = 1000;
 
 export const FOLLOW_COPY_LIMIT = 100;
+
+export const BOOK_EVENTS_PER_DAY = 100;
+
+export const BOOK_EVENTS_WINDOW_MS = 24 * 60 * 60 * 1000;

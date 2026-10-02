@@ -140,6 +140,14 @@ Decided in conversation (the inbox follows standard social-feed practice,
 - **Profile activity pages read through to history**, so an inactive
   reader's profile doesn't look empty after 30 days.
 - **Follow cap: 1,000** accounts per follower.
+- **Book events: 100 per author in any rolling 24 hours.** A save already
+  emits at most 10, but alternating between two sets of 10 books makes 10 new
+  events on every save, and at the library write limit of 120 a minute that is
+  1,200 events a minute. Everything that reads an author's events grows with
+  that: the activity page, copy-on-follow, and the inboxes when reading is on.
+  Past 100 events of the reading category in 24 hours an event is not recorded
+  at all. The check is in the community public API's `emitEvent`, the path the
+  library uses, and counts with a bounded query on `idx_events_user_time`.
 - **Participation cards** ("N people voted on your tier list") only for games
   with votes in the last 30 days.
 - **"New" badge** is one count capped at 100, shown as 99+.

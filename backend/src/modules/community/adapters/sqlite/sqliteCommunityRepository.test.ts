@@ -2,7 +2,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { mock, test } from "node:test";
 import Fastify from "fastify";
 import { categoryFor, DEFAULT_FEED_SETTINGS, type ActivityEventType, type FeedCategory, type FeedSettings } from "@scripta/shared/community";
 import { registerTrace } from "../../../../trace.js";
@@ -92,6 +92,63 @@ test("an event emitted while a request is handled is stored with that request's 
     { ref_id: "emit-g1", trace_id: null, source: null },
     { ref_id: "emit-t1", trace_id: requestId, source: "POST /tierlists/:id/open-voting" }
   ]);
+});
+
+test("countEventsSince counts an author's events of the given types from the marker on, stops at the limit, and counts no one else's", () => {
+  const { r } = openRepo();
+  const at = (day: number) => `2026-09-0${day}T00:00:00.000Z`;
+  const books = ["book_added", "book_finished"] as const;
+  const event = (id: string, author: string, type: ActivityEventType, day: number) => r.insertEvent({ id, user_id: author, type, ref_type: "book", ref_id: id, payload: null, created_at: at(day) });
+  event("since-1", "since-author", "book_added", 1);
+  event("since-2", "since-author", "book_finished", 2);
+  event("since-3", "since-author", "book_added", 3);
+  event("since-4", "since-author", "voted_on", 3);
+  event("since-5", "since-author", "following", 3);
+  event("since-6", "since-other", "book_added", 3);
+
+  assert.equal(r.countEventsSince("since-author", at(1), books, 100), 3);
+  assert.equal(r.countEventsSince("since-author", at(2), books, 100), 2);
+  assert.equal(r.countEventsSince("since-author", at(3), books, 100), 1);
+  assert.equal(r.countEventsSince("since-author", at(4), books, 100), 0);
+  assert.equal(r.countEventsSince("since-author", at(1), books, 2), 2);
+  assert.equal(r.countEventsSince("since-author", at(1), ["voted_on"], 100), 1);
+  assert.equal(r.countEventsSince("since-author", at(1), [], 100), 0);
+  assert.equal(r.countEventsSince("since-nobody", at(1), books, 100), 0);
+});
+
+test("the count behind the book event cap searches the author's events by time through idx_events_user_time and stops at its limit", () => {
+  const db = openCommunityDb();
+  const prepare = mock.method(db, "prepare");
+  createSqliteCommunityRepository(db);
+  const statements = prepare.mock.calls.map((call) => String(call.arguments[0])).filter((sql) => /COUNT\(\*\)[\s\S]*FROM events/.test(sql));
+  prepare.mock.restore();
+
+  assert.equal(statements.length, 1);
+  const plan = (db.prepare(`EXPLAIN QUERY PLAN ${statements[0]}`).all("u1", "2026-10-01T00:00:00.000Z", '["book_added"]', 100) as Array<{ detail: string }>).map((row) => row.detail).join(" ");
+  assert.match(plan, /SEARCH events USING INDEX idx_events_user_time \(user_id=\? AND created_at>\?\)/);
+  assert.doesNotMatch(plan, /SCAN events/);
+  assert.match(statements[0]!, /LIMIT \?\)\s*$/);
+});
+
+test("the public API caps an author's book events at 100 in any rolling 24 hours on the real database, with the edge of the window counted", () => {
+  const { db, r } = openRepo();
+  let clock = Date.parse("2026-09-20T12:00:00.000Z");
+  const api = createCommunityPublicApi(r, () => clock);
+  const recorded = (author: string, type: string) => (db.prepare("SELECT COUNT(*) AS n FROM events WHERE user_id = ? AND type LIKE ?").get(author, type) as { n: number }).n;
+  for (let i = 0; i < 100; i++) api.emitEvent("capped", i % 2 ? "book_finished" : "book_added", "book", `capped-b${i}`);
+  api.emitEvent("capped", "book_added", "book", "capped-b100");
+  api.emitEvent("capped", "tierlist_published", "tierlist", "capped-t1");
+  assert.equal(recorded("capped", "book_%"), 100);
+  assert.equal(recorded("capped", "tierlist_published"), 1);
+
+  clock += 24 * 60 * 60 * 1000;
+  api.emitEvent("capped", "book_added", "book", "capped-edge");
+  assert.equal(recorded("capped", "book_%"), 100);
+
+  clock += 1;
+  api.emitEvent("capped", "book_added", "book", "capped-after");
+  assert.equal(recorded("capped", "book_%"), 101);
+  assert.equal(recorded("someone-else", "%"), 0);
 });
 
 test("listFollowersSince returns only follows after the marker, newest first", () => {

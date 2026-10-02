@@ -48,6 +48,7 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
     INSERT OR IGNORE INTO events (id, user_id, type, ref_type, ref_id, payload, created_at, trace_id, source)
     VALUES ($id, $user_id, $type, $ref_type, $ref_id, $payload, $created_at, $trace_id, $source)
   `);
+  const countEventsSinceStmt = db.prepare(`SELECT COUNT(*) AS n FROM (SELECT 1 FROM events WHERE user_id = ? AND created_at >= ? AND type IN (SELECT value FROM json_each(?)) LIMIT ?)`);
   const fanOutStmt = db.prepare(`
     INSERT OR IGNORE INTO feed_inbox (viewer_id, created_at, event_id, author_id)
     SELECT f.follower_id, e.created_at, e.id, e.user_id
@@ -208,6 +209,9 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
         }).changes > 0;
         if (inserted && FEED_EVENT_TYPES.includes(row.type)) fanOutStmt.run({ $id: row.id });
       });
+    },
+    countEventsSince(userId, since, types, limit) {
+      return (countEventsSinceStmt.get(userId, since, JSON.stringify(types), limit) as { n: number }).n;
     },
     listEventsByUser(userId, keyset, limit, hiddenTypes) {
       const hidden = JSON.stringify(hiddenTypes);

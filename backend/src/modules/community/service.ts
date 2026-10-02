@@ -9,7 +9,7 @@ import type { MuralPublicPayload } from "../murals/index.js";
 import type { PublishedTierlistRef, TierlistDiscoverRef } from "../tierlists/service.js";
 import { currentTrace } from "../../trace.js";
 import { FollowLimitError, InvalidCursorError, MuralNotOwnedError, NotFollowingError, ProfileNotFoundError, SelfFollowError, UsernameRequiredError } from "./domain/errors.js";
-import { ACTIVITY_EVENT_TYPES, ARCHIVE_BATCH, DIGEST_EVENT_TYPES, FEED_WINDOW_MS, FOLLOW_LIMIT } from "./domain/feed.js";
+import { ACTIVITY_EVENT_TYPES, ARCHIVE_BATCH, BOOK_EVENTS_PER_DAY, BOOK_EVENTS_WINDOW_MS, DIGEST_EVENT_TYPES, FEED_WINDOW_MS, FOLLOW_LIMIT, READING_EVENT_TYPES } from "./domain/feed.js";
 import type { CommunityRepository, CursorKeyset } from "./domain/ports.js";
 import type { EventRow, FollowRow } from "./domain/types.js";
 
@@ -44,9 +44,9 @@ async function inBatches(step: (batch: number) => number): Promise<number> {
   }
 }
 
-function newEvent(userId: string, type: ActivityEventType, refType: CommunityRefType, refId: string, payload?: Record<string, unknown>): EventRow {
+function newEvent(userId: string, type: ActivityEventType, refType: CommunityRefType, refId: string, payload?: Record<string, unknown>, now: () => number = Date.now): EventRow {
   const trace = currentTrace();
-  return { id: randomUUID(), user_id: userId, type, ref_type: refType, ref_id: refId, payload: payload ? JSON.stringify(payload) : null, created_at: new Date().toISOString(), trace_id: trace?.traceId ?? null, source: trace?.source ?? null };
+  return { id: randomUUID(), user_id: userId, type, ref_type: refType, ref_id: refId, payload: payload ? JSON.stringify(payload) : null, created_at: new Date(now()).toISOString(), trace_id: trace?.traceId ?? null, source: trace?.source ?? null };
 }
 
 export interface PublicProfileView {
@@ -547,10 +547,13 @@ export interface CommunityPublicApi {
   emitEvent(userId: string, type: ActivityEventType, refType: CommunityRefType, refId: string, payload?: Record<string, unknown>): void;
 }
 
-export function createCommunityPublicApi(repo: CommunityRepository): CommunityPublicApi {
+export function createCommunityPublicApi(repo: CommunityRepository, now: () => number = Date.now): CommunityPublicApi {
+  const atBookCap = (userId: string): boolean =>
+    repo.countEventsSince(userId, new Date(now() - BOOK_EVENTS_WINDOW_MS).toISOString(), READING_EVENT_TYPES, BOOK_EVENTS_PER_DAY) >= BOOK_EVENTS_PER_DAY;
   return {
     emitEvent(userId, type, refType, refId, payload) {
-      repo.insertEvent(newEvent(userId, type, refType, refId, payload));
+      if (READING_EVENT_TYPES.includes(type) && atBookCap(userId)) return;
+      repo.insertEvent(newEvent(userId, type, refType, refId, payload, now));
     }
   };
 }

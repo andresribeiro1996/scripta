@@ -24,6 +24,7 @@ export interface CommunityRepository {
   updateFeedSettings(userId: string, settings: FeedSettings): void;
 
   insertEvent(row: EventRow): void;
+  countEventsSince(userId: string, since: string, types: readonly ActivityEventType[], limit: number): number;
   listEventsByUser(userId: string, keyset: CursorKeyset | undefined, limit: number, hiddenTypes: readonly ActivityEventType[]): EventRow[];
   listHistoryEventsByUser(userId: string, keyset: CursorKeyset | undefined, limit: number, hiddenTypes: readonly ActivityEventType[]): EventRow[];
   listInbox(viewerId: string, keyset: CursorKeyset | undefined, limit: number, types: readonly ActivityEventType[]): EventRow[];

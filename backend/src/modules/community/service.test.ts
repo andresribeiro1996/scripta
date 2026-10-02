@@ -11,6 +11,7 @@ import type { MuralPublicPayload } from "../murals/index.js";
 import type { CommunityRepository, CursorKeyset } from "./domain/ports.js";
 import type { EventRow, FollowRow, ProfileRow } from "./domain/types.js";
 import { FollowLimitError, InvalidCursorError, MuralNotOwnedError, NotFollowingError, ProfileNotFoundError, SelfFollowError, UsernameRequiredError } from "./domain/errors.js";
+import { ACTIVITY_EVENT_TYPES } from "./domain/feed.js";
 import { registerTrace } from "../../trace.js";
 import { createCommunityPublicApi, createCommunityService, type CommunityDeps, type CommunityPublicApi, type CommunityService } from "./service.js";
 
@@ -76,6 +77,9 @@ function createRepoFake() {
     insertEvent(row) {
       if (events.some((e) => e.ref_type === row.ref_type && e.ref_id === row.ref_id)) return;
       events.push({ ...row });
+    },
+    countEventsSince(userId, since, types, limit) {
+      return Math.min(events.filter((e) => e.user_id === userId && e.created_at >= since && types.includes(e.type)).length, limit);
     },
     listEventsByUser(userId, keyset: CursorKeyset | undefined, limit, hiddenTypes) {
       return events
@@ -456,6 +460,61 @@ test("an event the service emits records the request that caused it, and nothing
 test("an event emitted through the public API other modules call records the request that caused it, and nothing outside a request", async () => {
   const { repo, events } = createRepoFake();
   await emitInsideAndOutsideARequest(createCommunityPublicApi(repo).emitEvent, events);
+});
+
+const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * HOUR_MS;
+
+function emitBookEvents(api: CommunityPublicApi, userId: string, prefix: string, count: number) {
+  for (let i = 0; i < count; i++) api.emitEvent(userId, i % 2 ? "book_finished" : "book_added", "book", `${prefix}-${i}`);
+}
+
+test("the public API records an author's first 100 book events and drops the 101st, whichever of the two types it is", () => {
+  const { repo, events } = createRepoFake();
+  const api = createCommunityPublicApi(repo, () => NOW);
+  emitBookEvents(api, "alice", "book", 100);
+  assert.equal(events.length, 100);
+
+  api.emitEvent("alice", "book_added", "book", "book-100");
+  api.emitEvent("alice", "book_finished", "book", "book-101");
+  assert.equal(events.length, 100);
+  assert.deepEqual(events.filter((event) => event.ref_id === "book-100" || event.ref_id === "book-101"), []);
+});
+
+test("the cap is each author's own, and counts the reading category only: every other type is recorded past it and none of them uses it up", () => {
+  const { repo, events } = createRepoFake();
+  const api = createCommunityPublicApi(repo, () => NOW);
+  for (let i = 0; i < 150; i++) api.emitEvent("alice", "voted_on", "tierlist", `vote-${i}`);
+  emitBookEvents(api, "alice", "book", 100);
+  assert.equal(events.filter((event) => event.user_id === "alice" && event.type !== "voted_on").length, 100);
+
+  for (const type of ACTIVITY_EVENT_TYPES) {
+    const before = events.length;
+    api.emitEvent("alice", type, "book", `probe-${type}`);
+    assert.equal(events.length - before, categoryFor(type) === "reading" ? 0 : 1, type);
+  }
+  emitBookEvents(api, "bob", "bob-book", 100);
+  assert.equal(events.filter((event) => event.user_id === "bob").length, 100);
+});
+
+test("recording resumes as an author's book events leave the rolling 24 hours, and an event exactly 24 hours old still counts", () => {
+  const { repo, events } = createRepoFake();
+  let clock = NOW;
+  const api = createCommunityPublicApi(repo, () => clock);
+  emitBookEvents(api, "alice", "first", 50);
+  clock = NOW + HOUR_MS;
+  emitBookEvents(api, "alice", "second", 50);
+  assert.equal(events.length, 100);
+
+  clock = NOW + DAY_MS;
+  emitBookEvents(api, "alice", "at-the-edge", 1);
+  assert.equal(events.length, 100);
+
+  clock = NOW + DAY_MS + 1;
+  emitBookEvents(api, "alice", "third", 60);
+  assert.equal(events.length, 150);
+  assert.equal(events.filter((event) => event.created_at === new Date(clock).toISOString()).length, 50);
+  assert.ok(!events.some((event) => event.ref_id === "third-50"));
 });
 
 const fakePayload = {} as MuralPublicPayload;
