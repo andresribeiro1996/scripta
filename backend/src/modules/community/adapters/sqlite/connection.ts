@@ -51,6 +51,16 @@ function applySchemaAndFillInbox(db: DatabaseSync, schema: string): void {
 
 const ALL_OFF: FeedSettings = { publications: false, reading: false, votes: false, follows: false, readerGlyph: false };
 
+export function feedSettingColumns(settings: FeedSettings) {
+  return {
+    $show_publications: Number(settings.publications),
+    $show_reading: Number(settings.reading),
+    $show_votes: Number(settings.votes),
+    $show_follows: Number(settings.follows),
+    $show_reader_glyph: Number(settings.readerGlyph ?? false)
+  };
+}
+
 function parseFeedSettings(raw: string): FeedSettings | null {
   try {
     return normalizeFeedSettings(JSON.parse(raw));
@@ -60,17 +70,19 @@ function parseFeedSettings(raw: string): FeedSettings | null {
   }
 }
 
-function addFeedSettingColumns(db: DatabaseSync): void {
+function syncFeedSettingColumns(db: DatabaseSync): void {
   db.exec("BEGIN IMMEDIATE");
   try {
-    db.exec(`
-      ALTER TABLE profiles ADD COLUMN show_publications INTEGER NOT NULL DEFAULT 1;
-      ALTER TABLE profiles ADD COLUMN show_reading INTEGER NOT NULL DEFAULT 0;
-      ALTER TABLE profiles ADD COLUMN show_votes INTEGER NOT NULL DEFAULT 1;
-      ALTER TABLE profiles ADD COLUMN show_follows INTEGER NOT NULL DEFAULT 1;
-      ALTER TABLE profiles ADD COLUMN show_reader_glyph INTEGER NOT NULL DEFAULT 0;
-    `);
-    const copy = db.prepare(`
+    if (!tableColumns(db, "profiles").includes("show_publications")) {
+      db.exec(`
+        ALTER TABLE profiles ADD COLUMN show_publications INTEGER NOT NULL DEFAULT 1;
+        ALTER TABLE profiles ADD COLUMN show_reading INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE profiles ADD COLUMN show_votes INTEGER NOT NULL DEFAULT 1;
+        ALTER TABLE profiles ADD COLUMN show_follows INTEGER NOT NULL DEFAULT 1;
+        ALTER TABLE profiles ADD COLUMN show_reader_glyph INTEGER NOT NULL DEFAULT 0;
+      `);
+    }
+    const reconcile = db.prepare(`
       UPDATE profiles SET
         show_publications = $show_publications,
         show_reading = $show_reading,
@@ -78,19 +90,13 @@ function addFeedSettingColumns(db: DatabaseSync): void {
         show_follows = $show_follows,
         show_reader_glyph = $show_reader_glyph
       WHERE user_id = $user_id
+        AND (show_publications, show_reading, show_votes, show_follows, show_reader_glyph)
+          IS NOT ($show_publications, $show_reading, $show_votes, $show_follows, $show_reader_glyph)
     `);
     for (const row of db.prepare("SELECT user_id, feed_settings FROM profiles WHERE feed_settings IS NOT NULL").all() as Array<{ user_id: string; feed_settings: string }>) {
       const parsed = parseFeedSettings(row.feed_settings);
-      if (!parsed) console.warn(`[community] feed settings of user ${row.user_id} are unreadable; all of its feed categories are switched off`);
-      const settings = parsed ?? ALL_OFF;
-      copy.run({
-        $user_id: row.user_id,
-        $show_publications: Number(settings.publications),
-        $show_reading: Number(settings.reading),
-        $show_votes: Number(settings.votes),
-        $show_follows: Number(settings.follows),
-        $show_reader_glyph: Number(settings.readerGlyph ?? false)
-      });
+      const changed = reconcile.run({ $user_id: row.user_id, ...feedSettingColumns(parsed ?? ALL_OFF) }).changes > 0;
+      if (changed && !parsed) console.warn(`[community] feed settings of user ${row.user_id} are unreadable; all of its feed categories are switched off`);
     }
     db.exec("COMMIT");
   } catch (error) {
@@ -116,7 +122,7 @@ function migrateSchema(db: DatabaseSync, schema: string): void {
   if (!tableColumns(db, "profiles").includes("feed_settings")) {
     db.exec("ALTER TABLE profiles ADD COLUMN feed_settings TEXT");
   }
-  if (!tableColumns(db, "profiles").includes("show_publications")) addFeedSettingColumns(db);
+  syncFeedSettingColumns(db);
   const eventColumns = tableColumns(db, "events");
   if (!eventColumns.includes("trace_id")) db.exec("ALTER TABLE events ADD COLUMN trace_id TEXT");
   if (!eventColumns.includes("source")) db.exec("ALTER TABLE events ADD COLUMN source TEXT");

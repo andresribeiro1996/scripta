@@ -85,12 +85,6 @@ function createRepoFake() {
         .sort(newestEvent)
         .slice(0, limit);
     },
-    listEventsByUserSince(userId, since, limit, types) {
-      return events
-        .filter((e) => e.user_id === userId && types.includes(e.type) && e.created_at > since)
-        .sort(newestEvent)
-        .slice(0, limit);
-    },
     listHistoryEventsByUser(userId, keyset, limit) {
       return history
         .filter((e) => e.user_id === userId)
@@ -1279,10 +1273,6 @@ test("a viewer following 1,000 silent accounts gets an empty page from one inbox
     return listInbox(...args);
   };
   repo.listEventsByUser = () => {
-    reads.perAccount++;
-    return [];
-  };
-  repo.listEventsByUserSince = () => {
     reads.perAccount++;
     return [];
   };

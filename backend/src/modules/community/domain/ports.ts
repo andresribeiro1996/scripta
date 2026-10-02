@@ -25,7 +25,6 @@ export interface CommunityRepository {
 
   insertEvent(row: EventRow): void;
   listEventsByUser(userId: string, keyset: CursorKeyset | undefined, limit: number, types?: readonly ActivityEventType[]): EventRow[];
-  listEventsByUserSince(userId: string, since: string, limit: number, types: readonly ActivityEventType[]): EventRow[];
   listHistoryEventsByUser(userId: string, keyset: CursorKeyset | undefined, limit: number): EventRow[];
   listInbox(viewerId: string, keyset: CursorKeyset | undefined, limit: number, types: readonly ActivityEventType[]): EventRow[];
   countInboxSince(viewerId: string, since: string, types: readonly ActivityEventType[], limit: number): number;

@@ -87,7 +87,6 @@ test("every stage of a request with a body runs inside its trace", async (t) => 
   });
 
   const res = await app.inject({ method: "POST", url: "/things", payload: { title: "Dune" } });
-  await sleep(20);
 
   assert.equal(res.statusCode, 200);
   assert.deepEqual(seen, { onRequest: true, preParsing: true, preValidation: true, preHandler: true, handler: true, "after await": true, preSerialization: true, onSend: true, onResponse: true });

@@ -62,7 +62,7 @@ test("events ignore duplicate (ref_type, ref_id) and paginate by keyset", () => 
   assert.deepEqual(r.listEventsByUser("bob", undefined, 10), []);
 });
 
-test("events narrow to the requested types, with or without a keyset, and newer than a marker", () => {
+test("events narrow to the requested types, with or without a keyset", () => {
   const r = repo();
   const at = (day: number) => `2026-09-0${day}T00:00:00.000Z`;
   r.insertEvent({ id: "typed-1", user_id: "typed", type: "tierlist_published", ref_type: "tierlist", ref_id: "typed-t1", payload: null, created_at: at(1) });
@@ -77,11 +77,6 @@ test("events narrow to the requested types, with or without a keyset, and newer 
   assert.deepEqual(ids(r.listEventsByUser("typed", undefined, 1, ["tierlist_published", "book_added"])), ["typed-3"]);
   assert.deepEqual(ids(r.listEventsByUser("typed", { createdAt: at(3), id: "typed-3" }, 10, ["tierlist_published", "book_added"])), ["typed-2", "typed-1"]);
   assert.deepEqual(r.listEventsByUser("typed", undefined, 10, []), []);
-
-  assert.deepEqual(ids(r.listEventsByUserSince("typed", at(2), 10, ["tierlist_published", "book_added", "book_finished"])), ["typed-5", "typed-3"]);
-  assert.deepEqual(ids(r.listEventsByUserSince("typed", at(2), 1, ["tierlist_published", "book_finished"])), ["typed-5"]);
-  assert.deepEqual(r.listEventsByUserSince("typed", at(2), 10, []), []);
-  assert.deepEqual(r.listEventsByUserSince("typed", at(5), 10, ["book_finished"]), []);
 });
 
 test("an event keeps the trace that caused it, or nulls when it was given none", () => {

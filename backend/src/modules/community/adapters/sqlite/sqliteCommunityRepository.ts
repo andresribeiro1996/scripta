@@ -3,6 +3,7 @@ import { categoryFor, DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
 import { FEED_EVENT_TYPES, FEED_WINDOW_MS } from "../../domain/feed.js";
 import type { CommunityRepository, CursorKeyset } from "../../domain/ports.js";
 import type { EventRow, FollowRow, ProfileRow } from "../../domain/types.js";
+import { feedSettingColumns } from "./connection.js";
 
 const authorShows = `CASE e.type ${FEED_EVENT_TYPES.map((type) => `WHEN '${type}' THEN COALESCE(p.show_${categoryFor(type)}, ${Number(DEFAULT_FEED_SETTINGS[categoryFor(type)])})`).join(" ")} END = 1`;
 const inboxFrom = "FROM feed_inbox i JOIN events e ON e.id = i.event_id LEFT JOIN profiles p ON p.user_id = i.author_id";
@@ -206,11 +207,7 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
         $user_id: userId,
         $updated_at: new Date().toISOString(),
         $feed_settings: JSON.stringify(settings),
-        $show_publications: Number(settings.publications),
-        $show_reading: Number(settings.reading),
-        $show_votes: Number(settings.votes),
-        $show_follows: Number(settings.follows),
-        $show_reader_glyph: Number(settings.readerGlyph ?? false)
+        ...feedSettingColumns(settings)
       });
     },
     insertEvent(row) {
@@ -240,10 +237,6 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
         return listEventsBeforeStmt.all(userId, keyset.createdAt, keyset.createdAt, keyset.id, limit) as unknown as EventRow[];
       }
       return listEventsStmt.all(userId, limit) as unknown as EventRow[];
-    },
-    listEventsByUserSince(userId, since, limit, types) {
-      if (types.length === 0) return [];
-      return listEventsOfTypes(userId, types, " AND created_at > ?", [since], limit);
     },
     listHistoryEventsByUser(userId, keyset, limit) {
       const rows = keyset ? listHistoryBeforeStmt.all(userId, keyset.createdAt, keyset.id, limit) : listHistoryStmt.all(userId, limit);

@@ -51,10 +51,7 @@ test("fresh database gets events payload column, partial unique indexes, and pro
 });
 
 test("legacy events table is rebuilt preserving rows", () => {
-  const path = process.env.COMMUNITY_DB_PATH!;
-  rmSync(path, { force: true });
-  rmSync(`${path}-wal`, { force: true });
-  rmSync(`${path}-shm`, { force: true });
+  const path = removeDatabase();
   const legacy = new DatabaseSync(path);
   legacy.exec(`
     CREATE TABLE events (
@@ -80,10 +77,7 @@ test("legacy events table is rebuilt preserving rows", () => {
 });
 
 test("published profiles are indexed by recency, on a new database and on an existing one", () => {
-  const path = process.env.COMMUNITY_DB_PATH!;
-  rmSync(path, { force: true });
-  rmSync(`${path}-wal`, { force: true });
-  rmSync(`${path}-shm`, { force: true });
+  const path = removeDatabase();
   const existing = new DatabaseSync(path);
   existing.exec("CREATE TABLE profiles (user_id TEXT PRIMARY KEY, published INTEGER NOT NULL DEFAULT 0, mural_id TEXT, published_at TEXT, updated_at TEXT NOT NULL, feed_settings TEXT)");
   existing.close();
@@ -152,7 +146,7 @@ function feedColumns(db: DatabaseSync) {
     .map((row) => ({ ...row }));
 }
 
-test("the feed settings JSON is copied into the new profile columns once, and what can't be read switches every category off and names the user", () => {
+test("the feed settings JSON is copied into the new profile columns, and what can't be read switches every category off and names the user once", () => {
   const path = removeDatabase();
   const existing = new DatabaseSync(path);
   existing.exec(LEGACY_PROFILES);
@@ -189,8 +183,61 @@ test("the feed settings JSON is copied into the new profile columns once, and wh
   const reopened = openCommunityDb();
   again.mock.restore();
   assert.equal(again.mock.callCount(), 0);
-  assert.equal(feedColumns(reopened).find((row) => row.user_id === "no-glyph")?.votes, 0);
+  assert.equal(feedColumns(reopened).find((row) => row.user_id === "no-glyph")?.votes, 1);
   reopened.close();
+});
+
+test("settings an older build changed in the JSON alone are applied to the columns at the next open, and only the rows that differ are written", () => {
+  removeDatabase();
+  const db = openCommunityDb();
+  const chosen = (publications: boolean) => JSON.stringify({ publications, reading: true, votes: true, follows: true, readerGlyph: false });
+  const insert = db.prepare("INSERT INTO profiles (user_id, updated_at, feed_settings, show_publications, show_reading, show_votes, show_follows, show_reader_glyph) VALUES (?, '2026-09-01T00:00:00.000Z', ?, ?, ?, ?, ?, ?)");
+  insert.run("turned-off", chosen(true), 1, 1, 1, 1, 0);
+  insert.run("unchanged", chosen(false), 0, 1, 1, 1, 0);
+  insert.run("no-json", null, 1, 0, 1, 1, 0);
+  db.exec(`UPDATE profiles SET feed_settings = '{"publications":false,"reading":false,"votes":false,"follows":false}' WHERE user_id = 'turned-off'`);
+  db.exec("CREATE TABLE written (user_id TEXT); CREATE TRIGGER log_write AFTER UPDATE ON profiles BEGIN INSERT INTO written VALUES (NEW.user_id); END");
+  db.close();
+
+  const reopened = openCommunityDb();
+
+  assert.deepEqual(feedColumns(reopened), [
+    { user_id: "no-json", publications: 1, reading: 0, votes: 1, follows: 1, glyph: 0 },
+    { user_id: "turned-off", publications: 0, reading: 0, votes: 0, follows: 0, glyph: 0 },
+    { user_id: "unchanged", publications: 0, reading: 1, votes: 1, follows: 1, glyph: 0 }
+  ]);
+  assert.deepEqual(reopened.prepare("SELECT user_id FROM written").all().map((row) => row.user_id), ["turned-off"]);
+  reopened.close();
+});
+
+test("a second opener that migrates the profile columns while this one waits for its transaction does not make the open fail", () => {
+  removeDatabase();
+  const legacy = openCommunityDb();
+  legacy.exec(`INSERT INTO profiles (user_id, updated_at, feed_settings) VALUES ('u1', '2026-09-01T00:00:00.000Z', '{"publications":false,"reading":true,"votes":false,"follows":true}')`);
+  for (const column of ["show_publications", "show_reading", "show_votes", "show_follows", "show_reader_glyph"]) legacy.exec(`ALTER TABLE profiles DROP COLUMN ${column}`);
+  legacy.close();
+  const originalExec = DatabaseSync.prototype.exec;
+  let concurrent: DatabaseSync | undefined;
+  let racing = false;
+  const exec = mock.method(DatabaseSync.prototype, "exec", function (this: DatabaseSync, sql: string) {
+    if (!racing && sql === "BEGIN IMMEDIATE") {
+      racing = true;
+      concurrent = openCommunityDb();
+    }
+    return originalExec.call(this, sql);
+  });
+
+  let db: DatabaseSync;
+  try {
+    db = openCommunityDb();
+  } finally {
+    exec.mock.restore();
+  }
+
+  assert.ok(concurrent);
+  assert.deepEqual(feedColumns(db), [{ user_id: "u1", publications: 0, reading: 1, votes: 0, follows: 1, glyph: 0 }]);
+  concurrent.close();
+  db.close();
 });
 
 test("a feed settings copy that fails leaves the profiles table as it was, so the next open starts over", () => {

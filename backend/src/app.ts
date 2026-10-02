@@ -47,6 +47,8 @@ import { deleteSocialsUserData, registerSocialsModule } from "./modules/socials/
 import { deleteTierlistsUserData, registerTierlistsModule, getTierlistsPublicApi, rekeyTierlistsBooks } from "./modules/tierlists/index.js";
 import { registerWaitlistModule } from "./modules/waitlist/index.js";
 
+const genReqId = () => randomUUID();
+
 export function buildApp() {
   // Moves any still-embedded library.murals[] into the new murals table
   // before any module's routes come online — see
@@ -67,8 +69,8 @@ export function buildApp() {
   // only APIs that would actually differ between an http.Server and an
   // https.Server), so nothing downstream needs the more specific type.
   const app: FastifyInstance = devHttps
-    ? (Fastify({ logger: true, https: devHttps, trustProxy: TRUSTED_PROXIES, genReqId: () => randomUUID() }) as FastifyInstance)
-    : Fastify({ logger: true, trustProxy: TRUSTED_PROXIES, genReqId: () => randomUUID() });
+    ? (Fastify({ logger: true, https: devHttps, trustProxy: TRUSTED_PROXIES, genReqId }) as FastifyInstance)
+    : Fastify({ logger: true, trustProxy: TRUSTED_PROXIES, genReqId });
 
   registerStallLog(app);
   registerTrace(app);
