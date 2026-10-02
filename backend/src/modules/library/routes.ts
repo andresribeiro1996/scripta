@@ -1,6 +1,6 @@
 import fastifyMultipart from "@fastify/multipart";
 import fastifyRateLimit from "@fastify/rate-limit";
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyRequest } from "fastify";
 import { createWriteStream } from "node:fs";
 import { mkdtemp, readdir, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -9,6 +9,7 @@ import { pipeline } from "node:stream/promises";
 import { z } from "zod";
 import { env } from "../../config/env.js";
 import { authGuard, rateLimitKey } from "../auth/index.js";
+import { LIBRARY_SMALL_SAVE_MAX_BYTES } from "./domain/constants.js";
 import { LibraryConflictError, LibraryTooLargeError, NoLibraryDocumentError } from "./domain/errors.js";
 import { libraryTooLargeMessage } from "./domain/sizeLimit.js";
 import { ImportBusyError, InvalidImportError, parseImport } from "./import/parseImport.js";
@@ -34,6 +35,12 @@ function libraryTooLargeBody() {
     code: "LIBRARY_BODY_TOO_LARGE",
     maxBytes: env.LIBRARY_BODY_LIMIT_BYTES
   };
+}
+
+export function libraryWriteLimit(request: Pick<FastifyRequest, "method" | "headers">) {
+  const declared = request.headers["content-length"] ?? "";
+  const small = /^\d+$/.test(declared) && Number(declared) <= LIBRARY_SMALL_SAVE_MAX_BYTES;
+  return request.method === "PUT" && small ? 120 : 30;
 }
 
 export function rejectOversizedImport(
@@ -91,7 +98,7 @@ export function buildLibraryRoutes(service: LibraryService) {
     });
 
     await app.register(async (writes) => {
-      await writes.register(fastifyRateLimit, { max: 120, timeWindow: "1 minute", keyGenerator: rateLimitKey });
+      await writes.register(fastifyRateLimit, { max: libraryWriteLimit, timeWindow: "1 minute", keyGenerator: rateLimitKey });
 
       writes.put("/library", {
         onRequest: authGuard,

@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { test } from "node:test";
+import { Readable } from "node:stream";
 import { bookKey } from "@scripta/shared";
 
 const scratch = mkdtempSync(join(tmpdir(), "library-routes-test-"));
@@ -18,8 +19,8 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 const { applyLibrarySchema } = await import("./adapters/sqlite/connection.js");
 const { createSqliteLibraryRepository } = await import("./adapters/sqlite/sqliteLibraryRepository.js");
 const { createLibraryService } = await import("./service.js");
-const { buildLibraryRoutes } = await import("./routes.js");
-const { LIBRARY_PUT_HEADROOM_BYTES } = await import("./domain/constants.js");
+const { buildLibraryRoutes, libraryWriteLimit } = await import("./routes.js");
+const { LIBRARY_PUT_HEADROOM_BYTES, LIBRARY_SMALL_SAVE_MAX_BYTES } = await import("./domain/constants.js");
 const { env } = await import("../../config/env.js");
 
 const kobo = { ContentID: "k1", Title: "Dune", Attribution: "Frank Herbert", ReadStatus: 1 };
@@ -30,6 +31,20 @@ const tooLargeBody = {
   code: "LIBRARY_BODY_TOO_LARGE",
   maxBytes: 10485760
 };
+
+const smallSave = JSON.stringify({ data: { books: [] } });
+
+function saveOfBytes(bytes: number) {
+  const bare = JSON.stringify({ data: { books: [], padding: "" } });
+  return JSON.stringify({ data: { books: [], padding: "x".repeat(bytes - Buffer.byteLength(bare)) } });
+}
+
+const otherWrites = [
+  { method: "POST", url: "/library/books" },
+  { method: "POST", url: "/library/books/merge" },
+  { method: "POST", url: "/library/share" },
+  { method: "POST", url: "/library/unshare" }
+] as const;
 
 async function setup() {
   const db = new DatabaseSync(":memory:");
@@ -43,7 +58,11 @@ async function setup() {
     app.inject({ method: "POST", url: "/library/books/merge", headers: token ? { authorization: `Bearer ${token}` } : {}, payload: payload as object });
   const addBook = (payload: unknown, token = "u1") =>
     app.inject({ method: "POST", url: "/library/books", headers: { authorization: `Bearer ${token}` }, payload: payload as object });
-  return { app, service, merge, addBook };
+  const put = (payload: string, token = "u1") =>
+    app.inject({ method: "PUT", url: "/library", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, payload });
+  const otherWrite = (index: number, token = "u1") =>
+    app.inject({ ...otherWrites[index % otherWrites.length]!, headers: { authorization: `Bearer ${token}` }, payload: {} });
+  return { app, service, merge, addBook, put, otherWrite };
 }
 
 test("PUT /library saves a book whose fields aren't text", async () => {
@@ -64,22 +83,75 @@ test("PUT /library rejects an anonymous caller before the body is read", async (
   await app.close();
 });
 
-test("library writes share one bucket of 120 a minute per account, apart from reads and other accounts", async () => {
-  const { app } = await setup();
-  const writes = [
-    { method: "PUT", url: "/library" },
-    { method: "POST", url: "/library/books" },
-    { method: "POST", url: "/library/books/merge" },
-    { method: "POST", url: "/library/share" },
-    { method: "POST", url: "/library/unshare" }
-  ] as const;
-  const write = (token: string, index: number) =>
-    app.inject({ ...writes[index % writes.length]!, headers: { authorization: `Bearer ${token}` }, payload: {} });
-  for (let request = 0; request < 120; request++) assert.notEqual((await write("u1", request)).statusCode, 429);
-  for (let route = 0; route < writes.length; route++) assert.equal((await write("u1", route)).statusCode, 429);
-  assert.notEqual((await write("u2", 0)).statusCode, 429);
-  assert.equal((await app.inject({ method: "GET", url: "/library", headers: { authorization: "Bearer u1" } })).statusCode, 404);
+test("small saves get 120 a minute per account, apart from reads and other accounts", async () => {
+  const { app, put } = await setup();
+  for (let request = 1; request <= 120; request++) assert.notEqual((await put(smallSave)).statusCode, 429);
+  assert.equal((await put(smallSave)).statusCode, 429);
+  assert.notEqual((await put(smallSave, "u2")).statusCode, 429);
+  assert.equal((await app.inject({ method: "GET", url: "/library", headers: { authorization: "Bearer u1" } })).statusCode, 200);
   await app.close();
+});
+
+test("saves over 1 MiB get 30 a minute per account", async () => {
+  const { app, put } = await setup();
+  const big = saveOfBytes(LIBRARY_SMALL_SAVE_MAX_BYTES + 1);
+  assert.equal(Buffer.byteLength(big), LIBRARY_SMALL_SAVE_MAX_BYTES + 1);
+  for (let request = 1; request <= 30; request++) assert.notEqual((await put(big)).statusCode, 429);
+  assert.equal((await put(big)).statusCode, 429);
+  assert.notEqual((await put(big, "u2")).statusCode, 429);
+  await app.close();
+});
+
+test("a save of exactly 1 MiB still counts as small", async () => {
+  const { app, put } = await setup();
+  const edge = saveOfBytes(LIBRARY_SMALL_SAVE_MAX_BYTES);
+  assert.equal(Buffer.byteLength(edge), LIBRARY_SMALL_SAVE_MAX_BYTES);
+  for (let request = 1; request <= 31; request++) assert.notEqual((await put(edge)).statusCode, 429);
+  await app.close();
+});
+
+test("a save with no Content-Length counts as big", async () => {
+  const { app } = await setup();
+  const chunked = () =>
+    app.inject({
+      method: "PUT",
+      url: "/library",
+      headers: { authorization: "Bearer u1", "content-type": "application/json", "transfer-encoding": "chunked" },
+      payload: Readable.from([Buffer.from(smallSave)])
+    });
+  for (let request = 1; request <= 30; request++) assert.notEqual((await chunked()).statusCode, 429);
+  assert.equal((await chunked()).statusCode, 429);
+  await app.close();
+});
+
+test("after 30 small saves, add-book, merge, share and unshare are refused while another small save still passes", async () => {
+  const { app, put, otherWrite } = await setup();
+  for (let request = 1; request <= 30; request++) assert.notEqual((await put(smallSave)).statusCode, 429);
+  for (let route = 0; route < otherWrites.length; route++) assert.equal((await otherWrite(route)).statusCode, 429);
+  assert.notEqual((await put(smallSave)).statusCode, 429);
+  assert.notEqual((await otherWrite(0, "u2")).statusCode, 429);
+  await app.close();
+});
+
+test("add-book, merge, share and unshare get 30 a minute per account", async () => {
+  const { app, put, otherWrite } = await setup();
+  for (let request = 0; request < 30; request++) assert.notEqual((await otherWrite(request)).statusCode, 429);
+  for (let route = 0; route < otherWrites.length; route++) assert.equal((await otherWrite(route)).statusCode, 429);
+  assert.notEqual((await put(smallSave)).statusCode, 429);
+  assert.notEqual((await otherWrite(0, "u2")).statusCode, 429);
+  await app.close();
+});
+
+test("libraryWriteLimit gives 120 only to a PUT that declares at most 1 MiB and 30 to everything else", () => {
+  const limit = (method: string, length?: string) =>
+    libraryWriteLimit({ method, headers: length === undefined ? {} : { "content-length": length } });
+  assert.equal(limit("PUT", "2"), 120);
+  assert.equal(limit("PUT", String(LIBRARY_SMALL_SAVE_MAX_BYTES)), 120);
+  assert.equal(limit("PUT", String(LIBRARY_SMALL_SAVE_MAX_BYTES + 1)), 30);
+  assert.equal(limit("POST", "2"), 30);
+  for (const invalid of [undefined, "", "abc", "-1", "1e3", "1.5", "0x10", "9".repeat(400)]) {
+    assert.equal(limit("PUT", invalid), 30, `Content-Length ${JSON.stringify(invalid)}`);
+  }
 });
 
 test("GET /library allows 60 requests a minute per account", async () => {

@@ -75,7 +75,8 @@ that PR's branch.
 
   | Routes | Limit |
   |---|---|
-  | `PUT /library`, `POST /library/books`, `POST /library/books/merge`, `POST /library/share`, `POST /library/unshare` (one shared bucket; all five parse the stored document; 120 because group curation sends a save per checkbox) | 120/min |
+  | `PUT /library` that declares a `Content-Length` of at most 1 MiB (one bucket per account, shared with the next row; 120 because group curation sends a save per checkbox, and a save of a library that small costs about 65 ms, so 120/min is at most 13% of the event loop) | 120/min |
+  | `PUT /library` over 1 MiB or with no or an invalid `Content-Length`, `POST /library/books`, `POST /library/books/merge`, `POST /library/share`, `POST /library/unshare` (same bucket; measured at the 10 MiB cap through the real route, a save costs 0.3–0.65 s and a share or unshare 148–164 ms, so 30/min is about a third of the event loop where 120/min would be 65–130%; add-book and merge process the whole stored document, so their cost grows with the stored library, not with their tiny bodies) | 30/min |
   | `GET /library` | 60/min |
   | `GET /community/dashboard` | 60/min |
   | `GET /community/people` | 60/min |

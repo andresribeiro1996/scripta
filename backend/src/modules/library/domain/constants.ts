@@ -4,4 +4,5 @@ export const MATCH_KEY_MAX_LENGTH = 300;
 export const DISPLAY_TEXT_MAX_LENGTH = 200;
 export const COVER_URL_MAX_LENGTH = 2048;
 export const LIBRARY_PUT_HEADROOM_BYTES = 1024;
+export const LIBRARY_SMALL_SAVE_MAX_BYTES = 1024 * 1024;
 export const BOOK_EVENTS_PER_SAVE = 10;
