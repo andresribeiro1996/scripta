@@ -28,3 +28,8 @@ export function bookMetadataOptions(book: Record<string, unknown>) {
     retry: false
   });
 }
+
+export function summarySourceName(data: BookMetadata): string {
+  if (data.summarySource === "publisher") return data.publisher ?? "Publisher";
+  return data.summarySource === "isbndb" ? "ISBNdb" : "Open Library";
+}

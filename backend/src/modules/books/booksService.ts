@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { looksLikeIsbnQuery, normalizeIsbn, type BookGenre, type BookMetadata, type BookSearchResult } from "@scripta/shared";
 import { findBestCover, type CoverSources, type FetchCoverImage } from "./coverResolver.js";
 import { MIN_GOOD_WIDTH } from "./domain/constants.js";
-import { BookNotFoundError, FileTooLargeError, InvalidImageError, SourcePausedError } from "./domain/errors.js";
+import { BookNotFoundError, FileTooLargeError, InvalidImageError, SourcePausedError, SourceUnavailableError } from "./domain/errors.js";
 import { encodeCover, type EncodedCover } from "./domain/images.js";
 import { findByIdentity, isPortugueseIsbn, lookupIdentity, SEARCH_LIMIT, searchTokens, type BookIdentity, type BookLookup } from "./domain/normalize.js";
 import type { BookCatalog, BooksRepository, CatalogSearchHit, CoverBlobStore, CoverSource } from "./domain/ports.js";
@@ -32,6 +32,7 @@ export interface BooksServiceDeps {
   blobs: CoverBlobStore;
   sources: CoverSources;
   catalog: BookCatalog;
+  backgroundCatalog: BookCatalog;
   fetchImage: FetchCoverImage;
   enqueue: (bookId: string, priority?: CoverPriority) => void;
   publicUrlFor: (imageId: string, size: CoverFileSize) => string;
@@ -46,6 +47,7 @@ export interface BooksService {
   enqueueUnchecked(): void;
   processBook(bookId: string, lane: CoverPriority): Promise<void>;
   getDetails(lookup: BookLookup): Promise<BookMetadata | null>;
+  backfillDetails(limit: number, signal?: AbortSignal): Promise<number | null>;
   search(query: string): BookSearchResult[];
   searchExternal(query: string): Promise<BookSearchResult[]>;
   isAdmin(userId: string): boolean;
@@ -59,12 +61,13 @@ export async function storeCoverImage(
   source: CoverSourceName,
   sourceUrl: string | null,
   image: EncodedCover,
-  at: string
+  at: string,
+  origin?: string
 ): Promise<string> {
   const id = randomUUID();
   await deps.blobs.save(id, COVER_EXTENSION, image.full);
   await deps.blobs.save(`${id}-thumb`, COVER_EXTENSION, image.thumb);
-  deps.repo.insertImage({ id, book_id: bookId, source, source_url: sourceUrl, width: image.width, height: image.height, byte_size: image.full.byteLength, created_at: at });
+  deps.repo.insertImage({ id, book_id: bookId, source, source_url: sourceUrl, origin, width: image.width, height: image.height, byte_size: image.full.byteLength, created_at: at });
   return id;
 }
 
@@ -128,13 +131,24 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
     return coverId === null ? null : `https://covers.openlibrary.org/b/id/${coverId}-M.jpg`;
   }
 
+  function summaryLink(book: BookRow): string {
+    if (book.summary_source === "publisher") return book.publisher_url ?? "";
+    if (book.summary_source === "isbndb") return book.isbn ? `https://isbndb.com/book/${book.isbn}` : "";
+    return book.source_url ?? "";
+  }
+
   function detailsOf(book: BookRow): BookMetadata {
     return {
       summary: book.summary,
       rating: book.rating,
       ratingCount: book.rating_count,
-      sourceUrl: book.source_url ?? "",
-      genres: JSON.parse(book.genres) as BookGenre[]
+      sourceUrl: summaryLink(book),
+      genres: JSON.parse(book.genres) as BookGenre[],
+      pages: book.pages,
+      publisher: book.publisher,
+      year: book.year,
+      translator: book.translator,
+      summarySource: book.summary_source
     };
   }
 
@@ -165,6 +179,21 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       deps.repo.makeSearchable(book.id);
       return book.cover_image_id ? { ...result, coverUrl: deps.publicUrlFor(book.cover_image_id, "thumb") } : result;
     });
+  }
+
+  async function lookupDetails(book: BookRow, catalog: BookCatalog) {
+    const details = await catalog.fetchDetails({ isbn: book.isbn, title: book.title, author: book.author });
+    const at = now().toISOString();
+    if (details && (details.metadata.summary || details.metadata.genres.length > 0 || details.metadata.rating !== null)) {
+      deps.repo.saveDetails(book.id, details.metadata, details.sources, details.summarySource, at);
+      deps.repo.setWorkKey(book.id, details.workKey);
+      return;
+    }
+    if (details) {
+      deps.repo.mergeDetails(book.id, { ...details.metadata, summary: null }, null);
+      deps.repo.setWorkKey(book.id, details.workKey);
+    }
+    deps.repo.markDetailsMissing(book.id, at);
   }
 
   return {
@@ -237,16 +266,32 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       const book = findOrCreate(lookup);
       if (!book) return null;
       if (book.details_status === "found") return detailsOf(book);
-      if (book.details_status === "missing" && !olderThan(book.details_checked_at, RETRY_AFTER_MS)) return null;
-      const details = await deps.catalog.fetchDetails({ isbn: book.isbn, title: book.title, author: book.author });
-      const at = now().toISOString();
-      if (details) {
-        deps.repo.saveDetails(book.id, details.metadata, details.sources, at);
-        deps.repo.setWorkKey(book.id, details.workKey);
-      } else {
-        deps.repo.markDetailsMissing(book.id, at);
+      if (book.details_status === "missing" && !olderThan(book.details_checked_at, RETRY_AFTER_MS)) return book.summary ? detailsOf(book) : null;
+      try {
+        await lookupDetails(book, deps.catalog);
+      } catch (error) {
+        if (error instanceof SourceUnavailableError && book.summary) return detailsOf(book);
+        throw error;
       }
-      return details?.metadata ?? null;
+      const latest = deps.repo.getBook(book.id) ?? book;
+      return latest.details_status === "found" || latest.summary ? detailsOf(latest) : null;
+    },
+
+    async backfillDetails(limit, signal) {
+      for (const id of deps.repo.listUncheckedDetailIds(limit)) {
+        if (signal?.aborted) return null;
+        const book = deps.repo.getBook(id);
+        if (!book || book.details_status !== null) continue;
+        try {
+          await lookupDetails(book, deps.backgroundCatalog);
+        } catch (error) {
+          if (error instanceof SourcePausedError) return error.retryAt;
+          if (!(error instanceof SourceUnavailableError)) throw error;
+          deps.repo.markDetailsAttempted(id, now().toISOString());
+          deps.warn({ bookId: id, source: error.source, error: error.message }, "details source unavailable");
+        }
+      }
+      return null;
     },
 
     search(query) {

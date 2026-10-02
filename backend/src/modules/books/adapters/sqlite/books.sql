@@ -11,6 +11,9 @@ CREATE TABLE IF NOT EXISTS books (
   rating_count        INTEGER NOT NULL DEFAULT 0,
   genres              TEXT NOT NULL DEFAULT '[]',
   data_sources        TEXT NOT NULL DEFAULT '[]',
+  summary_source      TEXT,
+  pages               INTEGER,
+  translator          TEXT,
   source_url          TEXT,
   details_status      TEXT,
   details_checked_at  TEXT,
@@ -19,6 +22,8 @@ CREATE TABLE IF NOT EXISTS books (
   cover_checked_at    TEXT,
   cover_upgrade_wanted_at TEXT,
   ol_work_key         TEXT,
+  publisher_url       TEXT,
+  created_by          TEXT,
   created_at          TEXT NOT NULL
 );
 
@@ -32,6 +37,7 @@ CREATE TABLE IF NOT EXISTS cover_images (
   book_id     TEXT NOT NULL REFERENCES books(id),
   source      TEXT NOT NULL,
   source_url  TEXT,
+  origin      TEXT,
   width       INTEGER NOT NULL,
   height      INTEGER NOT NULL,
   byte_size   INTEGER NOT NULL,

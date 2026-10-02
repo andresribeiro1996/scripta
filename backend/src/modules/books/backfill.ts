@@ -1,4 +1,5 @@
 export const BACKFILL_INTERVAL_MS = 10 * 60 * 1000;
+export const DETAILS_BATCH_SIZE = 50;
 
 interface Timers {
   setInterval: (callback: () => void, delay: number) => NodeJS.Timeout;
@@ -12,4 +13,30 @@ export function startBackfill(
 ): () => void {
   const timer = timers.setInterval(enqueueUnchecked, intervalMs).unref();
   return () => timers.clearInterval(timer);
+}
+
+export function startDetailsBackfill(
+  runBatch: (signal: AbortSignal) => Promise<number | null | void>,
+  onError: (error: unknown) => void,
+  intervalMs: number = BACKFILL_INTERVAL_MS,
+  timers?: Timers,
+  now: () => number = Date.now
+): () => void {
+  const controller = new AbortController();
+  let running = false;
+  let pausedUntil = 0;
+  const tick = () => {
+    if (running || now() < pausedUntil) return;
+    running = true;
+    runBatch(controller.signal)
+      .then((retryAt) => { pausedUntil = retryAt ?? 0; })
+      .catch(onError)
+      .finally(() => { running = false; });
+  };
+  tick();
+  const stopTimer = startBackfill(tick, intervalMs, timers);
+  return () => {
+    controller.abort();
+    stopTimer();
+  };
 }

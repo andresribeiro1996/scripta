@@ -5,7 +5,7 @@ import { encodeCover, isAcceptableCover } from "../domain/images.js";
 import { normalizeTitle } from "../domain/normalize.js";
 import type { BooksRepository, CoverBlobStore } from "../domain/ports.js";
 import type { BookRow } from "../domain/types.js";
-import { PAGE_RANK, feedProducts, feedUrl, findPageIsbn, isDisallowed, parseRobots, parseShopifyProducts, parseWooProducts, type PublisherBook, type ResolvedBook } from "./publisherFeed.js";
+import { PAGE_RANK, feedProducts, feedUrl, findPageIsbn, isDisallowed, parseRobots, parseShopifyProducts, parseWooProducts, withPageText, type PublisherBook, type ResolvedBook } from "./publisherFeed.js";
 import type { PublisherSite } from "./publishers.js";
 import { seedBook } from "./seedCatalog.js";
 
@@ -21,6 +21,8 @@ export interface SiteReport {
   fromPage: number;
   pagesNoIsbn: number;
   pagesBlocked: number;
+  pagesDeferred: number;
+  pageAmbiguous: number;
   pageTitleMismatch: number;
   coversSet: number;
   created: number;
@@ -40,7 +42,7 @@ export interface ImportDeps {
   fetchText(url: string): Promise<{ status: number; text: string }>;
   fetchBytes(url: string): Promise<Buffer | null>;
   lookupOpenLibrary(isbn: string): Promise<OpenLibraryEdition | null>;
-  repo: Pick<BooksRepository, "findBookByKey" | "getBook" | "createBook" | "addKey" | "fillIdentity" | "setWorkKey" | "getImage" | "insertImage" | "setCover" | "listRejectedUrls" | "setUpgradeWanted">;
+  repo: Pick<BooksRepository, "findBookByKey" | "getBook" | "createBook" | "addKey" | "fillIdentity" | "mergeDetails" | "setWorkKey" | "setPublisherUrl" | "getImage" | "insertImage" | "setCover" | "listRejectedUrls" | "setUpgradeWanted">;
   blobs: CoverBlobStore;
   now: () => Date;
   sleep: (ms: number) => Promise<void>;
@@ -49,11 +51,15 @@ export interface ImportDeps {
 
 class SiteSkipped extends Error {}
 
-const emptyReport = (): SiteReport => ({ products: 0, books: 0, fromPage: 0, pagesNoIsbn: 0, pagesBlocked: 0, pageTitleMismatch: 0, coversSet: 0, created: 0, noAuthor: 0, unchanged: 0, rejectedImage: 0, failed: 0 });
+const emptyReport = (): SiteReport => ({ products: 0, books: 0, fromPage: 0, pagesNoIsbn: 0, pagesBlocked: 0, pagesDeferred: 0, pageAmbiguous: 0, pageTitleMismatch: 0, coversSet: 0, created: 0, noAuthor: 0, unchanged: 0, rejectedImage: 0, failed: 0 });
 
 function sameTitle(known: string, productTitle: string): boolean {
   const [short, long] = [normalizeTitle(known), normalizeTitle(productTitle)].sort((a, b) => a.length - b.length) as [string, string];
   return short !== "" && (short === long || (short.includes(" ") && long.startsWith(`${short} `)));
+}
+
+function isWebUrl(url: string): boolean {
+  return URL.canParse(url) && /^https?:$/.test(new URL(url).protocol);
 }
 
 function commonPrefix(urls: string[]): string {
@@ -112,6 +118,38 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
   const resolved: ResolvedBook[] = [];
   const pagesTotal = books.filter((book) => !book.isbn).length;
   let pagesRequested = 0;
+  let pageFailed = false;
+  const readPage = async (book: PublisherBook, retryLater: PublisherBook[] | null) => {
+    let response: { status: number; text: string };
+    try {
+      response = await request(() => deps.fetchText(book.productUrl));
+    } catch (error) {
+      if (!(error instanceof SourceUnavailableError)) throw error;
+      if (retryLater) retryLater.push(book);
+      else {
+        report.failed++;
+        pageFailed = true;
+      }
+      return;
+    }
+    if (response.status === 404) return;
+    if (response.status === 429 || response.status >= 500) {
+      if (retryLater) retryLater.push(book);
+      else {
+        report.pagesBlocked++;
+        pageFailed = true;
+      }
+      return;
+    }
+    if (response.status !== 200) {
+      report.pagesBlocked++;
+      return;
+    }
+    const isbn = findPageIsbn(response.text);
+    if (isbn) resolved.push({ ...book, isbn, details: withPageText(book.details, response.text) });
+    else report.pagesNoIsbn++;
+  };
+  const retry: PublisherBook[] = [];
   for (const book of books) {
     if (book.isbn) {
       resolved.push({ ...book, isbn: book.isbn });
@@ -120,26 +158,23 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
     const page = new URL(book.productUrl);
     if (isDisallowed(page.pathname + page.search, disallow)) continue;
     if (++pagesRequested % PAGE_PROGRESS_EVERY === 0) deps.log(`${site.name}: pages ${pagesRequested}/${pagesTotal}`);
-    let response: { status: number; text: string };
-    try {
-      response = await request(() => deps.fetchText(book.productUrl));
-    } catch (error) {
-      if (!(error instanceof SourceUnavailableError)) throw error;
-      report.failed++;
-      continue;
-    }
-    if (response.status === 404) continue;
-    if (response.status !== 200) {
-      report.pagesBlocked++;
-      continue;
-    }
-    const isbn = findPageIsbn(response.text);
-    if (isbn) resolved.push({ ...book, isbn });
-    else report.pagesNoIsbn++;
+    await readPage(book, retry);
   }
+  for (const book of retry) await readPage(book, null);
 
+  const pageClaims = new Map<string, number>();
+  for (const book of resolved) if (book.rank === PAGE_RANK) pageClaims.set(book.isbn, (pageClaims.get(book.isbn) ?? 0) + 1);
+  const feedIsbns = new Set(resolved.filter((book) => book.rank !== PAGE_RANK).map((book) => book.isbn));
   const strongest = new Map<string, ResolvedBook>();
   for (const book of resolved) {
+    if (book.rank === PAGE_RANK && pageFailed) {
+      report.pagesDeferred++;
+      continue;
+    }
+    if (book.rank === PAGE_RANK && pageClaims.get(book.isbn)! > 1) {
+      if (!feedIsbns.has(book.isbn)) report.pageAmbiguous++;
+      continue;
+    }
     const kept = strongest.get(book.isbn);
     if (!kept || book.rank < kept.rank) strongest.set(book.isbn, book);
   }
@@ -168,17 +203,9 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
       }
       return memo.looked;
     };
-    if (book.rank === PAGE_RANK) {
-      let known = row?.title ?? "";
-      if (!known) {
-        const result = await lookup();
-        if (!result) continue;
-        known = result.edition?.title ?? "";
-      }
-      if (!sameTitle(known, book.title)) {
-        report.pageTitleMismatch++;
-        continue;
-      }
+    if (book.rank === PAGE_RANK && row?.title && !sameTitle(row.title, book.title)) {
+      report.pageTitleMismatch++;
+      continue;
     }
     if (!row) {
       let { title, author } = book;
@@ -199,9 +226,13 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
         report.coversSet++;
         continue;
       }
-      row = seedBook({ isbn: book.isbn, title, author }, deps.repo, deps.now).book!;
+      row = seedBook({ isbn: book.isbn, title, author }, deps.repo, deps.now, "publisher").book!;
     }
-    if (!options.dryRun) deps.repo.setWorkKey(row.id, memo.looked?.edition?.workKey);
+    if (!options.dryRun) {
+      deps.repo.setWorkKey(row.id, memo.looked?.edition?.workKey);
+      deps.repo.mergeDetails(row.id, { ...book.details, publisher: site.name }, "publisher");
+      if (isWebUrl(book.productUrl)) deps.repo.setPublisherUrl(row.id, book.productUrl);
+    }
 
     const before = settle(row, book.imageUrl, null);
     if (before) {
@@ -232,7 +263,7 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
       continue;
     }
     const at = deps.now().toISOString();
-    const imageId = await storeCoverImage(deps, row.id, "publisher", book.imageUrl, image, at);
+    const imageId = await storeCoverImage(deps, row.id, "publisher", book.imageUrl, image, at, site.origin);
     deps.repo.setCover(row.id, { imageId, status: "manual", checkedAt: at });
     deps.repo.setUpgradeWanted(row.id, null);
     report.coversSet++;
