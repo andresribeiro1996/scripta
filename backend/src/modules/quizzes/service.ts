@@ -111,7 +111,7 @@ export interface QuizzesService {
   getPlay(code: string, player: Player): PlayOutcome;
   getResults(userId: string, id: string): QuizResults | undefined;
   getPublicResults(code: string): { plays: Array<Omit<ResultPlay, "playId">>; questionCount: number } | undefined;
-  participationByOwner(ownerUserId: string): GameParticipation[];
+  participationByOwner(ownerUserId: string, since: string): GameParticipation[];
 }
 
 const RECENT_PARTICIPANT_LIMIT = 10;
@@ -287,8 +287,8 @@ export function createQuizzesService(repo: QuizzesRepository): QuizzesService {
       };
     },
 
-    participationByOwner(ownerUserId) {
-      return repo.listParticipation(ownerUserId).map((row) => ({
+    participationByOwner(ownerUserId, since) {
+      return repo.listParticipation(ownerUserId, since).map((row) => ({
         id: row.id,
         name: row.name,
         covers: [],
@@ -301,9 +301,9 @@ export function createQuizzesService(repo: QuizzesRepository): QuizzesService {
 }
 
 export interface QuizzesPublicApi {
-  participationByOwner(ownerUserId: string): GameParticipation[];
+  participationByOwner(ownerUserId: string, since: string): GameParticipation[];
 }
 
 export function createQuizzesPublicApi(service: QuizzesService): QuizzesPublicApi {
-  return { participationByOwner: (ownerUserId) => service.participationByOwner(ownerUserId) };
+  return { participationByOwner: (ownerUserId, since) => service.participationByOwner(ownerUserId, since) };
 }

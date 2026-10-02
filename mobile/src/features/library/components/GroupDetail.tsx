@@ -19,6 +19,7 @@ import {
   removeBooksFromAllGroups,
   renameGroup,
   resolveLibraryStyle,
+  saveFailureMessage,
   seriesGroupByBookKey,
   setGroupStyle,
   type Group,
@@ -53,7 +54,7 @@ export function GroupDetail({ groupId }: { groupId: string }) {
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
 
   async function runUpdate(mutate: (data: LibraryData) => LibraryData, onSuccess?: () => void) {
-    return attemptUpdate(() => updateLibrary(mutate), () => Alert.alert("Couldn't save — check your connection."), onSuccess);
+    return attemptUpdate(() => updateLibrary(mutate), (error) => Alert.alert(saveFailureMessage(error, "Couldn't save — check your connection.")), onSuccess);
   }
 
   function handleCommitRename() {

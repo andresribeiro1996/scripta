@@ -4,7 +4,7 @@
 // covers, arena has no separate blob store, so there's nothing to split
 // a second port out for.
 
-import type { DuelRow, SeedPreview, TournamentRow, TournamentSlotRow, VoteRow } from "./types.js";
+import type { DuelRow, SeedPreview, TournamentDiscoverRow, TournamentRow, TournamentSlotRow, VoteRow } from "./types.js";
 
 export interface ArenaRepository {
   deleteUserData(userId: string): void;
@@ -16,6 +16,9 @@ export interface ArenaRepository {
   getOwnedTournament(id: string, ownerUserId: string): TournamentRow | undefined;
   listTournamentsByOwner(ownerUserId: string): TournamentRow[];
   listPublicTournaments(limit: number, offset: number): TournamentRow[];
+  discoverWindow(needle: string, limit: number): TournamentDiscoverRow[];
+  listPublicByIds(ids: string[]): TournamentRow[];
+  votedAmong(voterUserId: string, ids: string[]): string[];
   updateTournamentStatus(id: string, status: TournamentRow["status"], currentRound: number): void;
   /** Renames only — nothing else about a tournament is editable after
    *  creation. `bracket_size` in particular is structural: slots and
@@ -75,6 +78,6 @@ export interface ArenaRepository {
    *  under listTournamentsByOwner, and "Voting in" means other people's
    *  content. */
   listVotedByUser(voterUserId: string): TournamentRow[];
-  listParticipation(ownerUserId: string): Array<{ id: string; name: string; participants: number; latest_at: string }>;
+  listParticipation(ownerUserId: string, since: string): Array<{ id: string; name: string; participants: number; latest_at: string }>;
   listRecentVoters(tournamentId: string, ownerUserId: string, limit: number): Array<{ user_id: string; at: string }>;
 }

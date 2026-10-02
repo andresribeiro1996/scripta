@@ -120,7 +120,7 @@ const envSchema = z.object({
   IMPORT_MAX_UPLOAD_BYTES: z.coerce.number().int().positive().default(104857600),
   // Task 5A/4B — explicit bodyLimit for PUT /library (Fastify's default
   // 1 MiB is far below a real Kobo export carrying per-book highlights).
-  LIBRARY_BODY_LIMIT_BYTES: z.coerce.number().int().positive().default(26214400),
+  LIBRARY_BODY_LIMIT_BYTES: z.coerce.number().int().positive().default(10485760),
 
   RESEND_API_KEY: z.string().default(""),
   AUTH_EMAIL_FROM: z.string().default(""),

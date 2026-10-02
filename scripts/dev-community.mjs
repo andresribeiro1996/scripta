@@ -81,8 +81,8 @@ async function resolveCoverUrl(user, isbn) {
 }
 
 /** Reading is the one category that is off by default, so a book_finished
- *  event from someone who never turned it on would be seeded and then
- *  filtered straight back out — the fixture would look broken twice over.
+ *  event from someone who never turned it on is stored but never reaches a
+ *  follower's inbox — the fixture would look broken twice over.
  *
  *  Adding the book and finishing it are two calls because POST
  *  /library/books emits book_added for a book it has never seen and

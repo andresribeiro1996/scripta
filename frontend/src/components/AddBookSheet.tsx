@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { saveFailureMessage } from "@scripta/shared";
 import { addBookToLibrary } from "../api/library";
 import { useAuth } from "../auth/AuthContext";
 import { CoverImage } from "./BookCard";
@@ -67,8 +68,8 @@ export function AddBookSheet({
       });
       toast({ message: updated ? "Updated in your library." : "Added to your library." });
       onClose();
-    } catch {
-      toast({ message: "Could not add the book.", kind: "error" });
+    } catch (error) {
+      toast({ message: saveFailureMessage(error, "Could not add the book."), kind: "error" });
     } finally {
       setBusyStatus(null);
     }

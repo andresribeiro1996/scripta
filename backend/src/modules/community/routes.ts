@@ -1,8 +1,8 @@
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { authGuard, getOptionalAuthenticatedUser } from "../auth/index.js";
-import { CommunityError, InvalidCursorError, ProfileNotFoundError } from "./domain/errors.js";
+import { authGuard, getOptionalAuthenticatedUser, rateLimitKey } from "../auth/index.js";
+import { CommunityError, FollowLimitError, InvalidCursorError, ProfileNotFoundError } from "./domain/errors.js";
 import type { CommunityService } from "./service.js";
 
 const followSchema = z.object({ userId: z.string().min(1) });
@@ -35,32 +35,36 @@ const activityQuerySchema = z.object({
 function statusForCommunityError(err: CommunityError): number {
   if (err instanceof ProfileNotFoundError) return 404;
   if (err instanceof InvalidCursorError) return 400;
+  if (err instanceof FollowLimitError) return 409;
   return 400;
 }
 
 export function buildCommunityRoutes(service: CommunityService) {
   return async function communityRoutes(app: FastifyInstance) {
-    app.post("/community/follows", { preHandler: authGuard }, async (request, reply) => {
-      const parsed = followSchema.safeParse(request.body);
-      if (!parsed.success) return reply.code(400).send({ error: "Expected {userId}." });
-      try {
-        service.follow(request.user.id, parsed.data.userId);
-        return reply.code(204).send();
-      } catch (err) {
-        if (err instanceof CommunityError) return reply.code(statusForCommunityError(err)).send({ error: err.message });
-        throw err;
-      }
-    });
+    await app.register(async (scoped) => {
+      await scoped.register(fastifyRateLimit, { max: 30, timeWindow: "1 minute", keyGenerator: rateLimitKey });
+      scoped.post("/community/follows", { preHandler: authGuard }, async (request, reply) => {
+        const parsed = followSchema.safeParse(request.body);
+        if (!parsed.success) return reply.code(400).send({ error: "Expected {userId}." });
+        try {
+          service.follow(request.user.id, parsed.data.userId);
+          return reply.code(204).send();
+        } catch (err) {
+          if (err instanceof CommunityError) return reply.code(statusForCommunityError(err)).send({ error: err.message });
+          throw err;
+        }
+      });
 
-    app.delete("/community/follows/:userId", { preHandler: authGuard }, async (request, reply) => {
-      const { userId } = request.params as { userId: string };
-      try {
-        service.unfollow(request.user.id, userId);
-        return reply.code(204).send();
-      } catch (err) {
-        if (err instanceof CommunityError) return reply.code(statusForCommunityError(err)).send({ error: err.message });
-        throw err;
-      }
+      scoped.delete("/community/follows/:userId", { preHandler: authGuard }, async (request, reply) => {
+        const { userId } = request.params as { userId: string };
+        try {
+          service.unfollow(request.user.id, userId);
+          return reply.code(204).send();
+        } catch (err) {
+          if (err instanceof CommunityError) return reply.code(statusForCommunityError(err)).send({ error: err.message });
+          throw err;
+        }
+      });
     });
 
     app.put("/community/profile/publish", { preHandler: authGuard }, async (request, reply) => {
@@ -104,15 +108,18 @@ export function buildCommunityRoutes(service: CommunityService) {
       return reply.code(204).send();
     });
 
-    app.get("/community/dashboard", { preHandler: authGuard }, async (request, reply) => {
-      const parsed = dashboardQuerySchema.safeParse(request.query);
-      if (!parsed.success) return reply.code(400).send({ error: "Invalid cursor/limit/kinds." });
-      try {
-        return reply.send(service.getDashboard(request.user.id, parsed.data.cursor, parsed.data.limit, parsed.data.kinds ? new Set(parsed.data.kinds.split(",")) : undefined));
-      } catch (err) {
-        if (err instanceof CommunityError) return reply.code(statusForCommunityError(err)).send({ error: err.message });
-        throw err;
-      }
+    await app.register(async (scoped) => {
+      await scoped.register(fastifyRateLimit, { max: 60, timeWindow: "1 minute", keyGenerator: rateLimitKey });
+      scoped.get("/community/dashboard", { preHandler: authGuard }, async (request, reply) => {
+        const parsed = dashboardQuerySchema.safeParse(request.query);
+        if (!parsed.success) return reply.code(400).send({ error: "Invalid cursor/limit/kinds." });
+        try {
+          return reply.send(service.getDashboard(request.user.id, parsed.data.cursor, parsed.data.limit, parsed.data.kinds ? new Set(parsed.data.kinds.split(",")) : undefined));
+        } catch (err) {
+          if (err instanceof CommunityError) return reply.code(statusForCommunityError(err)).send({ error: err.message });
+          throw err;
+        }
+      });
     });
 
     app.post("/community/dashboard/seen", { preHandler: authGuard }, async (request, reply) => {
@@ -120,10 +127,13 @@ export function buildCommunityRoutes(service: CommunityService) {
       return reply.code(204).send();
     });
 
-    app.get("/community/people", { preHandler: authGuard }, async (request, reply) => {
-      const parsed = peopleQuerySchema.safeParse(request.query);
-      if (!parsed.success) return reply.code(400).send({ error: "Expected ?q= and optional ?limit=." });
-      return reply.send({ people: service.searchPeople(request.user.id, parsed.data.q, parsed.data.limit) });
+    await app.register(async (scoped) => {
+      await scoped.register(fastifyRateLimit, { max: 60, timeWindow: "1 minute", keyGenerator: rateLimitKey });
+      scoped.get("/community/people", { preHandler: authGuard }, async (request, reply) => {
+        const parsed = peopleQuerySchema.safeParse(request.query);
+        if (!parsed.success) return reply.code(400).send({ error: "Expected ?q= and optional ?limit=." });
+        return reply.send({ people: service.searchPeople(request.user.id, parsed.data.q, parsed.data.limit) });
+      });
     });
 
     await app.register(async (scoped) => {

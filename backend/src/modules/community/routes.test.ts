@@ -15,7 +15,7 @@ process.env.JWT_ACCESS_SECRET = "a".repeat(64);
 process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 process.env.NODE_ENV = "test";
 
-const { MuralNotOwnedError, ProfileNotFoundError } = await import("./domain/errors.js");
+const { FollowLimitError, MuralNotOwnedError, ProfileNotFoundError } = await import("./domain/errors.js");
 const { buildCommunityRoutes, buildPublicCommunityRoutes } = await import("./routes.js");
 
 function fakeService(overrides: Partial<CommunityService> = {}): CommunityService {
@@ -46,6 +46,7 @@ function fakeService(overrides: Partial<CommunityService> = {}): CommunityServic
     },
     getFeedSettings: () => DEFAULT_FEED_SETTINGS,
     updateFeedSettings: () => {},
+    archiveOldEvents: async () => ({ moved: 0, purged: 0 }),
     ...overrides
   };
 }
@@ -321,6 +322,24 @@ test("follow POST passes both ids through, and answers 404 for a reader who can'
   await app.close();
 });
 
+test("follow POST answers 409 with the limit in plain words when the reader already follows 1,000 accounts", async () => {
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", () => ({ id: "viewer", email: "v@example.test", username: "v", avatarId: null }));
+  await app.register(
+    buildCommunityRoutes(
+      fakeService({
+        follow: () => {
+          throw new FollowLimitError();
+        }
+      })
+    )
+  );
+  const res = await app.inject({ method: "POST", url: "/community/follows", headers: { authorization: "Bearer x" }, payload: { userId: "alice" } });
+  assert.equal(res.statusCode, 409);
+  assert.deepEqual(res.json(), { error: "You can follow up to 1,000 readers." });
+  await app.close();
+});
+
 test("suggested people GET is authed, defaults the limit to 20, and validates it", async () => {
   const seen: Array<Record<string, unknown>> = [];
   const suggestion = { user: { username: "reader", avatarUrl: null, userId: "u1" }, followerCount: 0, viewerFollows: false, private: false, sharedCount: 1, sharedBooks: [{ title: "Dune", author: "Frank Herbert", coverUrl: null }] };
@@ -358,6 +377,50 @@ test("suggested people GET allows 30 requests a minute, and no other authed rout
   for (let request = 1; request <= 30; request++) assert.equal((await suggested()).statusCode, 200);
   assert.equal((await suggested()).statusCode, 429);
   assert.equal((await app.inject({ method: "GET", url: "/community/people?q=reader", headers: auth })).statusCode, 200);
+  await app.close();
+});
+
+async function appWithAccounts() {
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", (token: string) => ({ id: token, email: `${token}@example.test`, username: token, avatarId: null }));
+  await app.register(buildCommunityRoutes(fakeService()));
+  const get = (url: string, token: string) => app.inject({ method: "GET", url, headers: { authorization: `Bearer ${token}` } });
+  return { app, get };
+}
+
+test("dashboard allows 60 requests a minute per account, and no other authed route shares that limit", async () => {
+  const { app, get } = await appWithAccounts();
+  for (let request = 1; request <= 60; request++) assert.equal((await get("/community/dashboard", "alice")).statusCode, 200);
+  assert.equal((await get("/community/dashboard", "alice")).statusCode, 429);
+  assert.equal((await get("/community/dashboard", "bob")).statusCode, 200);
+  assert.equal((await get("/community/people?q=reader", "alice")).statusCode, 200);
+  await app.close();
+});
+
+test("people search allows 60 requests a minute per account, and no other authed route shares that limit", async () => {
+  const { app, get } = await appWithAccounts();
+  for (let request = 1; request <= 60; request++) assert.equal((await get("/community/people?q=reader", "alice")).statusCode, 200);
+  assert.equal((await get("/community/people?q=reader", "alice")).statusCode, 429);
+  assert.equal((await get("/community/people?q=reader", "bob")).statusCode, 200);
+  assert.equal((await get("/community/dashboard", "alice")).statusCode, 200);
+  await app.close();
+});
+
+test("following and unfollowing share one bucket of 30 a minute per account, apart from other accounts and every other community route", async () => {
+  const { app, get } = await appWithAccounts();
+  const bearer = (token: string) => ({ authorization: `Bearer ${token}` });
+  const follow = (token: string) => app.inject({ method: "POST", url: "/community/follows", headers: bearer(token), payload: { userId: "carol" } });
+  const unfollow = (token: string) => app.inject({ method: "DELETE", url: "/community/follows/carol", headers: bearer(token) });
+  for (let request = 0; request < 30; request++) assert.equal((await (request % 2 === 0 ? follow : unfollow)("alice")).statusCode, 204);
+  assert.equal((await follow("alice")).statusCode, 429);
+  assert.equal((await unfollow("alice")).statusCode, 429);
+  assert.equal((await follow("bob")).statusCode, 204);
+  assert.equal((await unfollow("bob")).statusCode, 204);
+  assert.equal((await get("/community/dashboard", "alice")).statusCode, 200);
+  assert.equal((await get("/community/people?q=reader", "alice")).statusCode, 200);
+  assert.equal((await get("/community/people/suggested", "alice")).statusCode, 200);
+  const settings = { publications: true, reading: false, votes: true, follows: true };
+  assert.equal((await app.inject({ method: "PUT", url: "/community/profile/feed-settings", headers: bearer("alice"), payload: settings })).statusCode, 204);
   await app.close();
 });
 

@@ -2,15 +2,15 @@
 // this module that knows SQL — service.ts only ever sees the
 // TierlistsRepository interface this fulfills.
 
-import { rekeyTierBoard } from "@scripta/shared";
+import { normalizeWords, rekeyTierBoard } from "@scripta/shared";
 import type { DatabaseSync } from "node:sqlite";
 import type { TierlistsRepository } from "../../domain/ports.js";
-import type { TierlistRow, BallotRow, Placement } from "../../domain/types.js";
+import type { TierlistRow, BallotRow, BallotTotals, Placement, TierlistDiscoverRow } from "../../domain/types.js";
 
 export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepository {
   const insertStmt = db.prepare(`
-    INSERT INTO tierlists (id, owner_user_id, origin_user_id, name, data, vote_code, vote_access, voting_open, source_tierlist_id, promoted_at, public_books, created_at, updated_at)
-    VALUES ($id, $owner_user_id, $origin_user_id, $name, $data, $vote_code, $vote_access, $voting_open, $source_tierlist_id, $promoted_at, $public_books, $created_at, $updated_at)
+    INSERT INTO tierlists (id, owner_user_id, origin_user_id, name, name_key, data, vote_code, vote_access, voting_open, source_tierlist_id, promoted_at, public_books, created_at, updated_at)
+    VALUES ($id, $owner_user_id, $origin_user_id, $name, $name_key, $data, $vote_code, $vote_access, $voting_open, $source_tierlist_id, $promoted_at, $public_books, $created_at, $updated_at)
   `);
   const listStmt = db.prepare(`SELECT * FROM tierlists WHERE owner_user_id = ? AND promoted_at IS NULL ORDER BY created_at DESC`);
   const getOwnedStmt = db.prepare(`SELECT * FROM tierlists WHERE id = ? AND owner_user_id = ? AND promoted_at IS NULL`);
@@ -19,7 +19,7 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
   // column already has its final value by the time this runs.
   const updateStmt = db.prepare(`
     UPDATE tierlists
-    SET name = $name, data = $data, updated_at = $updated_at
+    SET name = $name, name_key = $name_key, data = $data, updated_at = $updated_at
     WHERE id = $id AND owner_user_id = $owner_user_id
   `);
   const deleteStmt = db.prepare(`DELETE FROM tierlists WHERE id = ? AND owner_user_id = ? AND promoted_at IS NULL`);
@@ -30,6 +30,27 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
     `SELECT * FROM tierlists WHERE vote_code IS NOT NULL ORDER BY created_at DESC LIMIT ? OFFSET ?`
   );
   const getPublicByIdStmt = db.prepare(`SELECT * FROM tierlists WHERE id = ? AND vote_code IS NOT NULL`);
+  const discoverWindowStmt = db.prepare(
+    `SELECT id, created_at, origin_user_id, promoted_at FROM tierlists WHERE vote_code IS NOT NULL ORDER BY created_at DESC LIMIT ?`
+  );
+  const discoverSearchStmt = db.prepare(
+    `SELECT id, created_at, origin_user_id, promoted_at FROM tierlists WHERE vote_code IS NOT NULL AND name_key LIKE '%' || ? || '%' ORDER BY created_at DESC LIMIT ?`
+  );
+  const listPublicByIdsStmt = db.prepare(`SELECT * FROM tierlists WHERE vote_code IS NOT NULL AND id IN (SELECT value FROM json_each(?))`);
+  const ballotTotalsForStmt = db.prepare(`
+    SELECT b.tierlist_id,
+      COUNT(*) AS ballots,
+      SUM(CASE WHEN b.voter_user_id IS NOT NULL AND b.voter_user_id != t.origin_user_id AND EXISTS (SELECT 1 FROM tierlist_ballot_placements WHERE ballot_id = b.id) THEN 1 ELSE 0 END) AS eligible
+    FROM tierlist_ballots b
+    JOIN tierlists t ON t.id = b.tierlist_id
+    WHERE b.tierlist_id IN (SELECT value FROM json_each(?))
+    GROUP BY b.tierlist_id
+  `);
+  const votedAmongStmt = db.prepare(`
+    SELECT t.id FROM tierlists t
+    WHERE t.id IN (SELECT value FROM json_each(?)) AND t.origin_user_id != ?
+      AND EXISTS (SELECT 1 FROM tierlist_ballots b WHERE b.tierlist_id = t.id AND b.voter_user_id = ?)
+  `);
   const listPublicByUserStmt = db.prepare(
     `SELECT * FROM tierlists WHERE origin_user_id = ? AND vote_code IS NOT NULL ORDER BY created_at DESC`
   );
@@ -80,6 +101,7 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
     WHERE t.origin_user_id = ? AND t.vote_code IS NOT NULL AND t.promoted_at IS NULL
       AND (b.voter_user_id IS NULL OR b.voter_user_id != t.origin_user_id)
     GROUP BY t.id
+    HAVING MAX(b.created_at) >= ?
   `);
   const recentVotersStmt = db.prepare(`
     SELECT voter_user_id AS user_id, created_at AS at FROM tierlist_ballots
@@ -153,6 +175,7 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
         $owner_user_id: row.owner_user_id,
         $origin_user_id: row.origin_user_id,
         $name: row.name,
+        $name_key: normalizeWords(row.name),
         $data: row.data,
         $vote_code: row.vote_code,
         $vote_access: row.vote_access,
@@ -175,6 +198,7 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
         $id: id,
         $owner_user_id: userId,
         $name: merged.name,
+        $name_key: normalizeWords(merged.name),
         $data: merged.data,
         $updated_at: updatedAt
       });
@@ -253,6 +277,24 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
       return listVotedByUserStmt.all(voterUserId, voterUserId) as unknown as TierlistRow[];
     },
 
+    discoverWindow(needle, limit) {
+      const rows = needle ? discoverSearchStmt.all(needle, limit) : discoverWindowStmt.all(limit);
+      return rows as unknown as TierlistDiscoverRow[];
+    },
+
+    listPublicByIds(ids) {
+      return listPublicByIdsStmt.all(JSON.stringify(ids)) as unknown as TierlistRow[];
+    },
+
+    ballotTotalsFor(ids) {
+      const rows = ballotTotalsForStmt.all(JSON.stringify(ids)) as unknown as { tierlist_id: string; ballots: number; eligible: number }[];
+      return new Map<string, BallotTotals>(rows.map((r) => [r.tierlist_id, { ballots: Number(r.ballots), eligible: Number(r.eligible) }]));
+    },
+
+    votedAmong(voterUserId, ids) {
+      return (votedAmongStmt.all(JSON.stringify(ids), voterUserId, voterUserId) as unknown as { id: string }[]).map((r) => r.id);
+    },
+
     getBallotById(tierlistId, ballotId) {
       return getBallotByIdStmt.get(tierlistId, ballotId) as BallotRow | undefined;
     },
@@ -282,8 +324,8 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
       return new Map(rows.map((r) => [r.tierlist_id, Number(r.n)]));
     },
 
-    listParticipation(ownerUserId) {
-      const rows = participationStmt.all(ownerUserId) as unknown as { id: string; name: string; public_books: string | null; participants: number; latest_at: string }[];
+    listParticipation(ownerUserId, since) {
+      const rows = participationStmt.all(ownerUserId, since) as unknown as { id: string; name: string; public_books: string | null; participants: number; latest_at: string }[];
       return rows.map((r) => ({ ...r, participants: Number(r.participants) }));
     },
 

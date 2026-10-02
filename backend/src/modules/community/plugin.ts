@@ -6,10 +6,27 @@ import { buildCommunityRoutes, buildPublicCommunityRoutes } from "./routes.js";
 import type { CommunityDeps, CommunityPublicApi } from "./service.js";
 import { createCommunityPublicApi, createCommunityService } from "./service.js";
 
+const ARCHIVE_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
 export async function communityPlugin(app: FastifyInstance, opts: Omit<CommunityDeps, "repo">) {
   const db = openCommunityDb();
   const repo = createSqliteCommunityRepository(db);
   const service = createCommunityService({ ...opts, repo });
+
+  const archive = async () => {
+    try {
+      app.log.info(await service.archiveOldEvents(), "moved old community events to history");
+    } catch (err) {
+      app.log.error(err, "community event archive failed");
+    }
+  };
+  void archive();
+  const archiveTimer = setInterval(archive, ARCHIVE_INTERVAL_MS);
+  archiveTimer.unref();
+  app.addHook("onClose", (_instance, done) => {
+    clearInterval(archiveTimer);
+    done();
+  });
 
   await app.register(buildCommunityRoutes(service));
 

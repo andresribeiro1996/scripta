@@ -6,6 +6,7 @@ import { readerGlyphLabel } from "@scripta/shared";
 import { Button, EmptyState, ErrorState, Input, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { personCaption, type PersonResult, type SuggestedReader } from "@scripta/shared/community";
 import { BookCover } from "../arena/BookCover";
+import { useDebouncedValue } from "../library/lib/debounce";
 import { fetchSuggestedPeople, followUser, searchPeople, unfollowUser } from "./api";
 import { AuthorAvatar, openProfile } from "./AuthorAvatar";
 import { ReaderGlyph } from "./ReaderGlyph";
@@ -16,7 +17,7 @@ export function PeoplePane() {
   const [query, setQuery] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const needle = query.trim();
+  const needle = useDebouncedValue(query.trim(), 300);
   const people = useQuery({
     queryKey: ["community", "people", "search", needle],
     queryFn: () => searchPeople(needle),

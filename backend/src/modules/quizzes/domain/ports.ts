@@ -40,6 +40,6 @@ export interface QuizzesRepository {
   listPlays(quizId: string): PlayRow[];
   playCount(quizId: string): number;
   questionStats(quizId: string): QuestionStat[];
-  listParticipation(ownerUserId: string): Array<{ id: string; name: string; participants: number; latest_at: string }>;
+  listParticipation(ownerUserId: string, since: string): Array<{ id: string; name: string; participants: number; latest_at: string }>;
   listRecentPlayers(quizId: string, ownerUserId: string, limit: number): Array<{ user_id: string; at: string }>;
 }

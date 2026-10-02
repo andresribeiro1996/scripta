@@ -7,6 +7,7 @@ import {
   storygraphCsvToLibraryJson,
   type LibraryData
 } from "@scripta/shared";
+import { importTooLargeMessage } from "../domain/sizeLimit.js";
 
 const SQLITE_MAGIC = Buffer.from("SQLite format 3\0");
 const BOOK_COLUMNS = [
@@ -58,7 +59,7 @@ function checkedRows(statement: ReturnType<DatabaseSync["prepare"]>, limit: numb
   if (rows.length > limit) fail("The import contains too many rows.");
   for (const row of rows) {
     byteState.value += Buffer.byteLength(JSON.stringify(row));
-    if (byteState.value > maxResultBytes) fail("The import result is too large.");
+    if (byteState.value > maxResultBytes) fail(importTooLargeMessage(maxResultBytes));
   }
   return rows.map((row) => ({ ...row }));
 }
@@ -144,7 +145,7 @@ async function parse(input: Input): Promise<LibraryData> {
   if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
   const data = await isSqlite(input.path) ? parseKobo(input) : await parseText(input);
   if (data.books.length > input.maxRows) fail("The import contains too many rows.");
-  if (Buffer.byteLength(JSON.stringify(data)) > input.maxResultBytes) fail("The import result is too large.");
+  if (Buffer.byteLength(JSON.stringify(data)) > input.maxResultBytes) fail(importTooLargeMessage(input.maxResultBytes));
   return data;
 }
 

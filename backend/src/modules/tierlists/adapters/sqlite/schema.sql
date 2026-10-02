@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS tierlists (
   owner_user_id      TEXT NOT NULL,
   origin_user_id     TEXT NOT NULL,
   name               TEXT NOT NULL,
+  name_key           TEXT,
   data               TEXT NOT NULL DEFAULT '{}',
   -- NULL on a private tier list; set once when published and never rotated.
   -- Deliberately NOT declared UNIQUE

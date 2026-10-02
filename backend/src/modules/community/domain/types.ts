@@ -25,4 +25,6 @@ export interface EventRow {
   ref_id: string;
   payload: string | null;
   created_at: string;
+  trace_id?: string | null;
+  source?: string | null;
 }

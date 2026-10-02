@@ -16,6 +16,7 @@ import {
   removeReaderNote,
   reorderOnDrop,
   restoreReadState,
+  saveFailureMessage,
   setBookCover,
   setReadStatus,
   setRating as rateBook,
@@ -34,7 +35,7 @@ export function useLibraryActions() {
   const { updateLibrary } = useLibrary();
 
   function run(mutate: (data: LibraryData) => LibraryData, failureMessage: string, onSuccess?: () => void) {
-    return attemptUpdate(() => updateLibrary(mutate), () => Alert.alert(failureMessage), onSuccess);
+    return attemptUpdate(() => updateLibrary(mutate), (error) => Alert.alert(saveFailureMessage(error, failureMessage)), onSuccess);
   }
 
   function mapBook(key: string, change: (book: Record<string, unknown>) => Record<string, unknown>) {

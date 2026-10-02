@@ -19,3 +19,16 @@ test("failed updates are reported and never treated as successful", async () => 
   assert.equal(errors, 1);
   assert.equal(successes, 1);
 });
+
+test("the failure reaches the error callback so it can say why", async () => {
+  const failure = new Error("Your library is over 10 MB, the most Scripta can store.");
+  let received: unknown;
+  assert.equal(
+    await attemptUpdate(
+      async () => { throw failure; },
+      (error) => { received = error; },
+    ),
+    false,
+  );
+  assert.equal(received, failure);
+});

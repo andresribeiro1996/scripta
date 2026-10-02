@@ -11,14 +11,18 @@
 import fastifyCors from "@fastify/cors";
 import type { CoverLookupParams } from "@scripta/shared";
 import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
+import { randomUUID } from "node:crypto";
 import { STATUS_CODES } from "node:http";
 import { isAllowedOrigin } from "./config/corsOrigin.js";
 import { env } from "./config/env.js";
 import { devHttps } from "./config/devCerts.js";
+import { TRUSTED_PROXIES } from "./config/trustedProxies.js";
 import { assertObjectKey } from "./storage/objectStore.js";
 import { createObjectStore } from "./storage/createObjectStore.js";
 import { IMMUTABLE_CACHE_CONTROL } from "./storage/r2ObjectStore.js";
 import { runStartupMigrations } from "./migrations/runStartupMigrations.js";
+import { registerStallLog } from "./stallLog.js";
+import { registerTrace } from "./trace.js";
 import {
   emailEnabled,
   findUserIdByUsername,
@@ -43,6 +47,8 @@ import { deleteSocialsUserData, registerSocialsModule } from "./modules/socials/
 import { deleteTierlistsUserData, registerTierlistsModule, getTierlistsPublicApi, rekeyTierlistsBooks } from "./modules/tierlists/index.js";
 import { registerWaitlistModule } from "./modules/waitlist/index.js";
 
+const genReqId = () => randomUUID();
+
 export function buildApp() {
   // Moves any still-embedded library.murals[] into the new murals table
   // before any module's routes come online — see
@@ -63,8 +69,11 @@ export function buildApp() {
   // only APIs that would actually differ between an http.Server and an
   // https.Server), so nothing downstream needs the more specific type.
   const app: FastifyInstance = devHttps
-    ? (Fastify({ logger: true, https: devHttps, trustProxy: true }) as FastifyInstance)
-    : Fastify({ logger: true, trustProxy: true });
+    ? (Fastify({ logger: true, https: devHttps, trustProxy: TRUSTED_PROXIES, genReqId }) as FastifyInstance)
+    : Fastify({ logger: true, trustProxy: TRUSTED_PROXIES, genReqId });
+
+  registerStallLog(app);
+  registerTrace(app);
 
   // Genuinely app-wide (unlike each module's own rate limiter) — the
   // frontend is a separate origin from this API in dev (Vite on 5173,
@@ -184,16 +193,18 @@ export function buildApp() {
     setDashboardSeenAt,
     murals: getMuralsPublicApi(getTierlistsPublicApi().getTierlistData),
     tierlists: {
-      list: getTierlistsPublicApi().listPublished,
+      discoverWindow: getTierlistsPublicApi().discoverWindow,
+      getPublishedMany: getTierlistsPublicApi().getPublishedMany,
+      votedAmong: getTierlistsPublicApi().votedAmong,
       get: getTierlistsPublicApi().getPublished,
-      listByOwner: getTierlistsPublicApi().listPublishedByOwner,
-      listVotedByUser: getTierlistsPublicApi().listVotedByUser
+      listByOwner: getTierlistsPublicApi().listPublishedByOwner
     },
     tournaments: {
-      list: getArenaPublicApi().listPublished,
+      discoverWindow: getArenaPublicApi().discoverWindow,
+      getPublishedMany: getArenaPublicApi().getPublishedMany,
+      votedAmong: getArenaPublicApi().votedAmong,
       get: getArenaPublicApi().getPublished,
-      listByOwner: getArenaPublicApi().listPublishedByOwner,
-      listVotedByUser: getArenaPublicApi().listVotedByUser
+      listByOwner: getArenaPublicApi().listPublishedByOwner
     },
     participation: {
       tierlists: getTierlistsPublicApi().participationByOwner,

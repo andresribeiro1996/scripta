@@ -5,8 +5,8 @@
 import { randomUUID } from "node:crypto";
 import { bookKey, bookMatchKeys, buildManualBook, isCertainMatch, localDay, mergeDuplicateBooks, readerIdentity, seedCoverLookup, setReadStatus, type CoverLookupParams, type LibraryData } from "@scripta/shared";
 import type { BookRecommendationInput } from "@scripta/shared/community";
-import { COVER_URL_MAX_LENGTH, DISPLAY_TEXT_MAX_LENGTH, LIBRARY_MATCH_BOOK_CAP, MATCH_KEY_MAX_LENGTH } from "./domain/constants.js";
-import { LibraryConflictError, NoLibraryDocumentError } from "./domain/errors.js";
+import { BOOK_EVENTS_PER_SAVE, COVER_URL_MAX_LENGTH, DISPLAY_TEXT_MAX_LENGTH, LIBRARY_MATCH_BOOK_CAP, LIBRARY_PUT_HEADROOM_BYTES, MATCH_KEY_MAX_LENGTH } from "./domain/constants.js";
+import { LibraryConflictError, LibraryTooLargeError, NoLibraryDocumentError } from "./domain/errors.js";
 import type { LibraryRepository } from "./domain/ports.js";
 import type { LibraryDerived, LibraryDocument, LibraryDocumentRow, LibraryMatchKeyRow } from "./domain/types.js";
 import { libraryParts, normalizeIsbn, toPublicLibraryData, toReaderGroups } from "./publicResolver.js";
@@ -146,7 +146,13 @@ function coverLookupsOf(data: unknown): CoverLookupParams[] {
   return books.filter(isRecord).flatMap((book) => seedCoverLookup(book) ?? []);
 }
 
-export function createLibraryService(repo: LibraryRepository, publicUrlFor: (token: string) => string, emitBookEvents?: EmitBookEvents, enqueueCovers?: EnqueueCovers, rekeyBooks?: RekeyBooks): LibraryService {
+export function createLibraryService(repo: LibraryRepository, publicUrlFor: (token: string) => string, maxDocumentBytes: number, emitBookEvents?: EmitBookEvents, enqueueCovers?: EnqueueCovers, rekeyBooks?: RekeyBooks): LibraryService {
+  function serializeWithinLimit(document: unknown): string {
+    const json = JSON.stringify(document);
+    if (Buffer.byteLength(json) > maxDocumentBytes - LIBRARY_PUT_HEADROOM_BYTES) throw new LibraryTooLargeError();
+    return json;
+  }
+
   return {
     getLibrary(userId) {
       const row = repo.getDocument(userId);
@@ -160,7 +166,7 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
       if (!row) throw new LibraryConflictError();
       if (previous !== undefined && emitBookEvents) {
         try {
-          const events = diffBookEvents(previous.data, data);
+          const events = diffBookEvents(previous.data, data).slice(0, BOOK_EVENTS_PER_SAVE);
           if (events.length > 0) emitBookEvents(userId, events);
         } catch {
           // Activity is best-effort: a diff must never fail an otherwise
@@ -194,7 +200,7 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
         if (Number(match.ReadStatus ?? 0) === input.readStatus) return { key, updated: false };
         const updatedBook = setReadStatus(match, input.readStatus, input.day ?? localDay());
         const reshelved = { ...doc, books: books.map((b) => (b === match ? updatedBook : b)) };
-        const saved = repo.upsertDocument(userId, JSON.stringify(reshelved), deriveLibraryData(reshelved), row?.updated_at);
+        const saved = repo.upsertDocument(userId, serializeWithinLimit(reshelved), deriveLibraryData(reshelved), row?.updated_at);
         if (!saved) throw new LibraryConflictError();
         if (input.readStatus === 2 && emitBookEvents) {
           try {
@@ -221,7 +227,7 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
       );
       const book = input.coverUrl ? { ...built, _coverUrl: input.coverUrl } : built;
       const appended = { ...doc, books: [...books, book] };
-      const saved = repo.upsertDocument(userId, JSON.stringify(appended), deriveLibraryData(appended), row?.updated_at);
+      const saved = repo.upsertDocument(userId, serializeWithinLimit(appended), deriveLibraryData(appended), row?.updated_at);
       if (!saved) throw new LibraryConflictError();
       if (emitBookEvents) {
         try {
@@ -242,10 +248,11 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
       const next = mergeDuplicateBooks(library, keep, merge);
       if (next === library) return toLibraryDocument(row, publicUrlFor);
       if (row.updated_at !== expectedUpdatedAt) throw new LibraryConflictError();
+      const json = serializeWithinLimit(next);
       const present = new Set(library.books.filter(isRecord).map(bookKey));
       const fromKeys = merge.filter((key) => key !== keep && present.has(key));
       if (fromKeys.length > 0 && rekeyBooks) rekeyBooks(userId, fromKeys, keep);
-      const saved = repo.upsertDocument(userId, JSON.stringify(next), deriveLibraryData(next), row.updated_at);
+      const saved = repo.upsertDocument(userId, json, deriveLibraryData(next), row.updated_at);
       if (!saved) throw new LibraryConflictError();
       return toLibraryDocument(saved, publicUrlFor);
     },
