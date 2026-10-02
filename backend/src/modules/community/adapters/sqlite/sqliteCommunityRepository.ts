@@ -93,6 +93,25 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
     WHERE user_id = ? AND (created_at < ? OR (created_at = ? AND id < ?))
     ORDER BY created_at DESC, id DESC LIMIT ?
   `);
+  const listHistoryStmt = db.prepare(`
+    SELECT * FROM events_history WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT ?
+  `);
+  const listHistoryBeforeStmt = db.prepare(`
+    SELECT * FROM events_history
+    WHERE user_id = ? AND (created_at, id) < (?, ?)
+    ORDER BY created_at DESC, id DESC LIMIT ?
+  `);
+  const oldestEvents = `FROM events WHERE created_at < $cutoff ORDER BY created_at, id LIMIT $batch`;
+  const copyOldEventsStmt = db.prepare(`
+    INSERT INTO events_history (id, user_id, type, ref_type, ref_id, payload, created_at, trace_id, source)
+    SELECT id, user_id, type, ref_type, ref_id, payload, created_at, trace_id, source ${oldestEvents}
+  `);
+  const deleteOldEventsStmt = db.prepare(`DELETE FROM events WHERE id IN (SELECT id ${oldestEvents})`);
+  const purgeInboxStmt = db.prepare(`
+    DELETE FROM feed_inbox WHERE (viewer_id, created_at, event_id) IN (
+      SELECT viewer_id, created_at, event_id FROM feed_inbox WHERE created_at < $cutoff LIMIT $batch
+    )
+  `);
   const typedEventStmts = new Map<string, StatementSync>();
   const listEventsOfTypes = (userId: string, types: readonly string[], bound: string, boundArgs: string[], limit: number): EventRow[] => {
     const sql = `SELECT * FROM events WHERE user_id = ? AND type IN (${types.map(() => "?").join(",")})${bound} ORDER BY created_at DESC, id DESC LIMIT ?`;
@@ -226,6 +245,10 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
       if (types.length === 0) return [];
       return listEventsOfTypes(userId, types, " AND created_at > ?", [since], limit);
     },
+    listHistoryEventsByUser(userId, keyset, limit) {
+      const rows = keyset ? listHistoryBeforeStmt.all(userId, keyset.createdAt, keyset.id, limit) : listHistoryStmt.all(userId, limit);
+      return rows as unknown as EventRow[];
+    },
     listInbox(viewerId, keyset, limit, types) {
       if (types.length === 0) return [];
       const kinds = JSON.stringify(types);
@@ -235,6 +258,15 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
     countInboxSince(viewerId, since, types, limit) {
       if (types.length === 0) return 0;
       return (countInboxSinceStmt.get(viewerId, JSON.stringify(types), since, limit) as { n: number }).n;
+    },
+    moveEventsBefore(cutoff, batch) {
+      return inTransaction(() => {
+        copyOldEventsStmt.run({ $cutoff: cutoff, $batch: batch });
+        return Number(deleteOldEventsStmt.run({ $cutoff: cutoff, $batch: batch }).changes);
+      });
+    },
+    purgeInboxBefore(cutoff, batch) {
+      return Number(purgeInboxStmt.run({ $cutoff: cutoff, $batch: batch }).changes);
     }
   };
 }

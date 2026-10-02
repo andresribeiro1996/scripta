@@ -18,6 +18,7 @@ function createRepoFake() {
   const follows = new Map<string, FollowRow>();
   const profiles = new Map<string, ProfileRow>();
   const events: EventRow[] = [];
+  const history: EventRow[] = [];
   const key = (a: string, b: string) => `${a}:${b}`;
   const newestEvent = (a: EventRow, b: EventRow) => (a.created_at === b.created_at ? (a.id > b.id ? -1 : 1) : b.created_at.localeCompare(a.created_at));
   const newestFollow = (a: FollowRow, b: FollowRow) => (a.created_at === b.created_at ? (a.follower_id > b.follower_id ? -1 : 1) : b.created_at.localeCompare(a.created_at));
@@ -90,6 +91,13 @@ function createRepoFake() {
         .sort(newestEvent)
         .slice(0, limit);
     },
+    listHistoryEventsByUser(userId, keyset, limit) {
+      return history
+        .filter((e) => e.user_id === userId)
+        .filter((e) => !keyset || e.created_at < keyset.createdAt || (e.created_at === keyset.createdAt && e.id < keyset.id))
+        .sort(newestEvent)
+        .slice(0, limit);
+    },
     listInbox(viewerId, keyset, limit, types) {
       return inboxOf(viewerId, types)
         .filter((e) => !keyset || e.created_at < keyset.createdAt || (e.created_at === keyset.createdAt && e.id < keyset.id))
@@ -99,6 +107,8 @@ function createRepoFake() {
     countInboxSince(viewerId, since, types, limit) {
       return Math.min(inboxOf(viewerId, types).filter((e) => e.created_at > since).length, limit);
     },
+    moveEventsBefore: () => 0,
+    purgeInboxBefore: () => 0,
     listFollowersByFollowee(followeeId, keyset, limit) {
       return [...follows.values()]
         .filter((row) => row.followee_id === followeeId)
@@ -113,7 +123,7 @@ function createRepoFake() {
         .slice(0, limit);
     }
   };
-  return { repo, follows, profiles, events };
+  return { repo, follows, profiles, events, history };
 }
 
 function createDeps(repo: CommunityRepository) {
@@ -1748,6 +1758,40 @@ test("getActivity keeps fetching past rows hidden from the viewer", () => {
   const ownerPage = service.getActivity("alice", "alice", undefined, 2);
   assert.deepEqual(ownerPage.items.map((i) => i.id), ["e1", "e2"]);
   assert.ok(ownerPage.nextCursor);
+});
+
+test("getActivity continues into history once the recent events run out, with no gap or repeat, and asks history only for what a page lacks", () => {
+  const { repo, history } = createRepoFake();
+  const { deps, usernames } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  repo.upsertProfile(profileRow("alice"));
+  const book = (id: string, day: number): EventRow => ({ id, user_id: "alice", type: "book_added", ref_type: "book", ref_id: id, payload: "{}", created_at: at(day) });
+  repo.insertEvent(book("e5", 5));
+  repo.insertEvent(book("e4", 4));
+  history.push(book("e3", 3), book("e2", 2), book("e1", 1));
+  const historyReads: number[] = [];
+  const listHistory = repo.listHistoryEventsByUser;
+  repo.listHistoryEventsByUser = (userId, keyset, limit) => {
+    historyReads.push(limit);
+    return listHistory(userId, keyset, limit);
+  };
+  const activityIds = (limit: number): string[] => {
+    const ids: string[] = [];
+    let cursor: string | null | undefined;
+    for (let pages = 0; cursor !== null && pages < 20; pages++) {
+      const page = service.getActivity("alice", "alice", cursor ?? undefined, limit);
+      ids.push(...page.items.map((item) => item.id));
+      cursor = page.nextCursor;
+    }
+    return ids;
+  };
+
+  assert.deepEqual(service.getActivity("alice", "alice", undefined, 1).items.map((item) => item.id), ["e5"]);
+  assert.deepEqual(historyReads, []);
+  assert.deepEqual(service.getActivity("alice", "alice", undefined, 2).items.map((item) => item.id), ["e5", "e4"]);
+  assert.deepEqual(historyReads, [1]);
+  for (const limit of [1, 2, 3, 4, 5, 6]) assert.deepEqual(activityIds(limit), ["e5", "e4", "e3", "e2", "e1"], `limit ${limit}`);
 });
 
 test("dashboard omits publications from actors who disabled them but keeps follow rows", () => {

@@ -7,6 +7,7 @@ import Fastify from "fastify";
 import { categoryFor, DEFAULT_FEED_SETTINGS, type FeedCategory } from "@scripta/shared/community";
 import { registerTrace } from "../../../../trace.js";
 import { FEED_EVENT_TYPES } from "../../domain/feed.js";
+import type { EventRow } from "../../domain/types.js";
 import type { PublishedTierlistRef } from "../../../tierlists/service.js";
 
 const tempRoot = mkdtempSync(join(tmpdir(), "community-repo-"));
@@ -379,6 +380,65 @@ test("deleting a user's data clears their inbox as viewer and as author, and the
   assert.deepEqual(inboxEventIds(db, "kept-fan"), ["kept-own"]);
   assert.deepEqual(db.prepare("SELECT id FROM events_history WHERE id LIKE 'history-%'").all().map((row) => row.id), ["history-kept"]);
   assert.deepEqual(db.prepare("SELECT id FROM events WHERE id IN ('gone-own', 'kept-own')").all().map((row) => row.id), ["kept-own"]);
+});
+
+test("moveEventsBefore moves the oldest events first, up to the batch, with every column, and keeps newer ones until the cutoff passes them", () => {
+  const { db, r } = openRepo();
+  const at = (day: number) => `1999-03-${String(day).padStart(2, "0")}T00:00:00.000Z`;
+  const event = (id: string, day: number, trace?: { traceId: string; source: string }): EventRow => ({
+    id,
+    user_id: "move-author",
+    type: "book_added",
+    ref_type: "book",
+    ref_id: id,
+    payload: `{"title":"${id}"}`,
+    created_at: at(day),
+    trace_id: trace?.traceId ?? null,
+    source: trace?.source ?? null
+  });
+  const first = event("move-a", 1, { traceId: "req-a", source: "POST /library/books" });
+  const tiedLow = event("move-b1", 2, { traceId: "req-b1", source: "PUT /library" });
+  const tiedHigh = event("move-b2", 2);
+  const third = event("move-d", 4, { traceId: "req-d", source: "PUT /library" });
+  const newest = event("move-e", 9);
+  for (const row of [third, tiedLow, first, newest, tiedHigh]) r.insertEvent(row);
+  const stored = (table: "events" | "events_history") => db.prepare(`SELECT * FROM ${table} WHERE user_id = 'move-author' ORDER BY created_at, id`).all().map((row) => ({ ...row }));
+
+  assert.equal(r.moveEventsBefore(at(5), 2), 2);
+  assert.deepEqual(stored("events_history"), [first, tiedLow]);
+  assert.deepEqual(stored("events"), [tiedHigh, third, newest]);
+  assert.equal(r.moveEventsBefore(at(5), 2), 2);
+  assert.equal(r.moveEventsBefore(at(5), 2), 0);
+  assert.deepEqual(stored("events_history"), [first, tiedLow, tiedHigh, third]);
+  assert.deepEqual(stored("events"), [newest]);
+  assert.equal(r.moveEventsBefore(at(9), 2), 0);
+
+  const ids = (rows: Array<{ id: string }>) => rows.map((row) => row.id);
+  assert.deepEqual(ids(r.listHistoryEventsByUser("move-author", undefined, 10)), ["move-d", "move-b2", "move-b1", "move-a"]);
+  assert.deepEqual(ids(r.listHistoryEventsByUser("move-author", { createdAt: at(2), id: "move-b2" }, 1)), ["move-b1"]);
+  assert.deepEqual(ids(r.listHistoryEventsByUser("move-author", { createdAt: at(2), id: "move-b1" }, 10)), ["move-a"]);
+  assert.deepEqual(r.listHistoryEventsByUser("move-nobody", undefined, 10), []);
+  assert.deepEqual(ids(r.listEventsByUser("move-author", undefined, 10)), ["move-e"]);
+
+  assert.equal(r.moveEventsBefore(at(10), 2), 1);
+  assert.deepEqual(stored("events"), []);
+});
+
+test("purgeInboxBefore deletes the oldest inbox rows of every viewer up to the batch, keeps newer ones, and leaves the events alone", () => {
+  const { db, r } = openRepo();
+  const at = (day: number) => `1998-03-${String(day).padStart(2, "0")}T00:00:00.000Z`;
+  for (const fan of ["purge-fan-1", "purge-fan-2"]) r.insertFollow({ follower_id: fan, followee_id: "purge-author", created_at: "2026-09-10T00:00:00.000Z" });
+  for (const day of [1, 2, 3, 9]) r.insertEvent({ id: `purge-${day}`, user_id: "purge-author", type: "tierlist_published", ref_type: "tierlist", ref_id: `purge-t${day}`, payload: null, created_at: at(day) });
+
+  assert.equal(r.purgeInboxBefore(at(5), 4), 4);
+  assert.equal(r.purgeInboxBefore(at(5), 4), 2);
+  assert.equal(r.purgeInboxBefore(at(5), 4), 0);
+  assert.deepEqual(inboxEventIds(db, "purge-fan-1"), ["purge-9"]);
+  assert.deepEqual(inboxEventIds(db, "purge-fan-2"), ["purge-9"]);
+  assert.deepEqual(db.prepare("SELECT id FROM events WHERE user_id = 'purge-author' ORDER BY id").all().map((row) => row.id), ["purge-1", "purge-2", "purge-3", "purge-9"]);
+
+  assert.equal(r.purgeInboxBefore(at(10), 4), 2);
+  assert.equal(r.moveEventsBefore(at(10), 10), 4);
 });
 
 test("the dashboard service pages through a real inbox newest first, narrowed to the kinds listed, with the authors' switches and the new count applied", () => {

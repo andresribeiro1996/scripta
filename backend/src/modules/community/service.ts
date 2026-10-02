@@ -490,12 +490,16 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
         }
         return payload === undefined ? undefined : { id: event.id, type: event.type, payload, createdAt: event.created_at };
       };
+      const eventsAfter = (after: CursorKeyset | undefined, count: number): EventRow[] => {
+        const recent = repo.listEventsByUser(userId, after, count);
+        return recent.length < count ? [...recent, ...repo.listHistoryEventsByUser(userId, after, count - recent.length)] : recent;
+      };
       const items: ActivityItem[] = [];
       let nextCursor: string | null = null;
       let lastIncluded: EventRow | undefined;
       let fetchAfter: CursorKeyset | undefined = keyset;
       for (;;) {
-        const batch = repo.listEventsByUser(userId, fetchAfter, limit + 1);
+        const batch = eventsAfter(fetchAfter, limit + 1);
         if (batch.length === 0) break;
         let exhausted = false;
         for (const event of batch) {
