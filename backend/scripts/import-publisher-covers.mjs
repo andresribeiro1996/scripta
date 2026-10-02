@@ -1,4 +1,8 @@
 import { parseArgs } from "node:util";
+import sharp from "sharp";
+
+sharp.cache(false);
+sharp.concurrency(1);
 
 const { values } = parseArgs({ options: { "dry-run": { type: "boolean", default: false } } });
 
@@ -52,7 +56,7 @@ const reports = await importPublisherCovers(
     blobs: { save: (id, extension, bytes) => store.put(`covers/${id}.${extension}`, bytes, "image/webp") },
     now: () => new Date(),
     sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
-    log: (line) => console.error(line)
+    log: (line) => console.error(`${line} rss=${Math.round(process.memoryUsage.rss() / 1048576)}MB`)
   },
   PUBLISHERS,
   { dryRun: values["dry-run"] }

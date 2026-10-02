@@ -953,3 +953,69 @@ test("a dry run saves no details", async () => {
   assert.equal((h.db.prepare("SELECT COUNT(*) AS n FROM books WHERE summary_source IS NOT NULL OR pages IS NOT NULL OR year IS NOT NULL OR publisher IS NOT NULL OR translator IS NOT NULL").get() as { n: number }).n, 0);
   assert.equal(h.repo.getBook(book.id)!.pages, null);
 });
+
+test("two sites never download and encode an image at the same time", async () => {
+  const h = await harness();
+  const good = await png(500, 750);
+  const pending: Array<() => void> = [];
+  let active = 0;
+  let maxActive = 0;
+  let fetched = 0;
+  const deps: Deps = {
+    ...h.deps,
+    fetchBytes: async () => {
+      active++;
+      fetched++;
+      maxActive = Math.max(maxActive, active);
+      await new Promise<void>((resolve) => pending.push(resolve));
+      active--;
+      return good;
+    }
+  };
+  let done = false;
+  const run = importPublisherCovers(deps, [antigona, relogio], { dryRun: false }).then((reports) => {
+    done = true;
+    return reports;
+  });
+  while (!done) {
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.ok(pending.length <= 1);
+    pending.shift()?.();
+  }
+  const reports = await run;
+
+  assert.equal(maxActive, 1);
+  assert.ok(fetched > 1);
+  assert.ok(reports["Antígona"]!.coversSet > 0);
+  assert.ok(reports["Relógio d'Água"]!.coversSet > 0);
+});
+
+test("at most four sites are imported at once, and every report keeps its site's place", async () => {
+  const h = await harness();
+  const sites: Site[] = Array.from({ length: 6 }, (_, i) => ({ name: `Loja ${i}`, origin: `https://loja${i}.example`, platform: "shopify", authorFromVendor: true }));
+  const started: string[] = [];
+  const release: Array<() => void> = [];
+  const deps: Deps = {
+    ...h.deps,
+    fetchText: async (url) => {
+      if (url.endsWith("/robots.txt")) {
+        started.push(url);
+        await new Promise<void>((resolve) => release.push(resolve));
+        return { status: 500, text: "" };
+      }
+      return h.deps.fetchText(url);
+    }
+  };
+  const run = importPublisherCovers(deps, sites, { dryRun: false });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(started.length, 4);
+
+  release.splice(0).forEach((resolve) => resolve());
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(started.length, 6);
+  release.splice(0).forEach((resolve) => resolve());
+
+  const reports = await run;
+  assert.deepEqual(Object.keys(reports), sites.map((site) => site.name));
+  assert.ok(Object.values(reports).every((report) => report.skipped !== undefined));
+});
