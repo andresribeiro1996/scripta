@@ -5,7 +5,7 @@
 // each panel rolling its own timer ref. See Task 5A's "coalesce whole-
 // document saves" requirement.
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export function useDebouncedCallback<Args extends unknown[]>(
   callback: (...args: Args) => void,
@@ -55,4 +55,15 @@ export function useDebouncedCallback<Args extends unknown[]>(
   }
 
   return { schedule, flush, cancel };
+}
+
+export function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(timer);
+  }, [value, delayMs]);
+
+  return debounced;
 }

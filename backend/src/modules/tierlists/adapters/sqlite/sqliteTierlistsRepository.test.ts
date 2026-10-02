@@ -281,3 +281,140 @@ test("rekeyBooks rewrites the owner's unpublished tier lists only", async () => 
   assert.equal(read("published").data, data);
   assert.equal(read("other").data, data);
 });
+
+function nameKey(db: DatabaseSync, id: string): string | null {
+  return (db.prepare(`SELECT name_key FROM tierlists WHERE id = ?`).get(id) as { name_key: string | null }).name_key;
+}
+
+test("creating and renaming a tier list keep name_key in step with the name", () => {
+  const db = freshDb();
+  const repo = createSqliteTierlistsRepository(db);
+  repo.insert(row({ id: "c1", name: "Hábitos Atómicos!" }));
+  assert.equal(nameKey(db, "c1"), "habitos atomicos");
+
+  repo.update("c1", "u1", { name: "Sci-Fi: Ñandú" });
+  assert.equal(nameKey(db, "c1"), "sci fi nandu");
+  assert.equal(repo.getOwned("c1", "u1")?.name, "Sci-Fi: Ñandú");
+
+  repo.update("c1", "u1", { data: "{}" });
+  assert.equal(nameKey(db, "c1"), "sci fi nandu");
+});
+
+test("publishing and promoting leave name_key matching the name", () => {
+  const db = freshDb();
+  const repo = createSqliteTierlistsRepository(db);
+  repo.insert(row({ id: "c1", name: "Hábitos Atómicos" }));
+  repo.publish("c1", "u1", "{}", "anonymous", "code1", "[]", ballot({ id: "own", tierlist_id: "c1", voter_user_id: "u1" }), []);
+  assert.equal(nameKey(db, "c1"), "habitos atomicos");
+  repo.promote("c1", "2026-02-01T00:00:00.000Z");
+  assert.equal(nameKey(db, "c1"), "habitos atomicos");
+});
+
+test("opening a database fills name_key on rows that have none", () => {
+  const db = freshDb();
+  db.prepare(`INSERT INTO tierlists (id, owner_user_id, origin_user_id, name) VALUES ('old1', 'u1', 'u1', 'Hábitos Atómicos'), ('old2', 'u1', 'u1', '!!!')`).run();
+  db.prepare(`INSERT INTO tierlists (id, owner_user_id, origin_user_id, name, name_key) VALUES ('kept', 'u1', 'u1', 'Kept', 'custom')`).run();
+  assert.equal(nameKey(db, "old1"), null);
+
+  applyTierlistsMigrations(db);
+
+  assert.equal(nameKey(db, "old1"), "habitos atomicos");
+  assert.equal(nameKey(db, "old2"), "");
+  assert.equal(nameKey(db, "kept"), "custom");
+});
+
+test("a database from before name_key gets the column and fills it for existing rows", () => {
+  const db = freshDb();
+  db.prepare(`INSERT INTO tierlists (id, owner_user_id, origin_user_id, name, name_key) VALUES ('old', 'u1', 'u1', 'Hábitos Atómicos', 'stale')`).run();
+  db.exec(`ALTER TABLE tierlists DROP COLUMN name_key`);
+  assert.ok(!columnNames(db, "tierlists").includes("name_key"));
+
+  applyTierlistsMigrations(db);
+
+  assert.ok(columnNames(db, "tierlists").includes("name_key"));
+  assert.equal(nameKey(db, "old"), "habitos atomicos");
+});
+
+function publishedList(repo: ReturnType<typeof createSqliteTierlistsRepository>, id: string, name: string, createdAt: string, overrides: Partial<TierlistRow> = {}) {
+  insertPublished(repo, row({ id, name, vote_code: `code-${id}`, voting_open: 1, created_at: createdAt, ...overrides }), ballot({ id: `seed-${id}`, tierlist_id: id, voter_user_id: overrides.origin_user_id ?? "u1" }), []);
+}
+
+test("discoverWindow returns published tier lists whose name_key contains the needle, newest first, up to the limit", () => {
+  const repo = createSqliteTierlistsRepository(freshDb());
+  publishedList(repo, "habits", "Hábitos Atómicos", "2026-01-01T00:00:00.000Z");
+  publishedList(repo, "fantasy", "Fantasy ranked", "2026-02-01T00:00:00.000Z");
+  publishedList(repo, "habits-2", "Atomic Habits: Hábitos", "2026-03-01T00:00:00.000Z");
+  publishedList(repo, "promoted", "Hábitos promovidos", "2026-04-01T00:00:00.000Z", { owner_user_id: "u2", origin_user_id: "u2" });
+  repo.promote("promoted", "2026-04-02T00:00:00.000Z");
+  repo.insert(row({ id: "draft", name: "Hábitos privados", created_at: "2026-05-01T00:00:00.000Z" }));
+  const ids = (needle: string, limit = 10) => repo.discoverWindow(needle, limit).map((r) => r.id);
+
+  assert.deepEqual(ids("habitos"), ["promoted", "habits-2", "habits"]);
+  assert.deepEqual(ids("habitos", 2), ["promoted", "habits-2"]);
+  assert.deepEqual(ids("habitos atom"), ["habits"]);
+  assert.deepEqual(ids("fantasy"), ["fantasy"]);
+  assert.deepEqual(ids("nothing like it"), []);
+  assert.deepEqual(ids(""), ["promoted", "habits-2", "fantasy", "habits"]);
+  assert.deepEqual(ids("", 3), ["promoted", "habits-2", "fantasy"]);
+  assert.deepEqual(repo.discoverWindow("promovidos", 10).map((r) => ({ ...r })), [
+    { id: "promoted", created_at: "2026-04-01T00:00:00.000Z", origin_user_id: "u2", promoted_at: "2026-04-02T00:00:00.000Z" }
+  ]);
+});
+
+test("listPublicByIds returns the published tier lists among the ids and nothing else", () => {
+  const repo = createSqliteTierlistsRepository(freshDb());
+  publishedList(repo, "c1", "One", "2026-01-01T00:00:00.000Z");
+  publishedList(repo, "c2", "Two", "2026-02-01T00:00:00.000Z");
+  publishedList(repo, "c3", "Three", "2026-03-01T00:00:00.000Z");
+  repo.insert(row({ id: "draft", name: "Draft" }));
+
+  assert.deepEqual(repo.listPublicByIds(["c1", "draft", "ghost", "c3"]).map((r) => r.id).sort(), ["c1", "c3"]);
+  assert.deepEqual(repo.listPublicByIds([]), []);
+});
+
+test("ballotTotalsFor counts ballots and eligible ballots for the requested tier lists only", () => {
+  const repo = createSqliteTierlistsRepository(freshDb());
+  publishedList(repo, "c1", "One", "2026-01-01T00:00:00.000Z");
+  publishedList(repo, "c2", "Two", "2026-02-01T00:00:00.000Z", { owner_user_id: "u9", origin_user_id: "u9" });
+  publishedList(repo, "c3", "Three", "2026-03-01T00:00:00.000Z");
+  repo.insert(row({ id: "empty", name: "Empty", vote_code: "code-empty", voting_open: 1 }));
+  const placed = [{ bookKey: "b1", tierId: "s" }];
+  repo.saveBallot(ballot({ id: "c1-u2", tierlist_id: "c1", voter_user_id: "u2" }), placed);
+  repo.saveBallot(ballot({ id: "c1-u3", tierlist_id: "c1", voter_user_id: "u3" }), []);
+  repo.saveBallot(ballot({ id: "c1-anon", tierlist_id: "c1", voter_user_id: null }), placed);
+  repo.saveBallot(ballot({ id: "c2-u1", tierlist_id: "c2", voter_user_id: "u1" }), placed);
+  repo.saveBallot(ballot({ id: "c3-u2", tierlist_id: "c3", voter_user_id: "u2" }), placed);
+  repo.saveBallot(ballot({ id: "c3-u4", tierlist_id: "c3", voter_user_id: "u4" }), placed);
+
+  const totals = repo.ballotTotalsFor(["c1", "c2", "empty", "ghost"]);
+
+  assert.deepEqual([...totals.keys()].sort(), ["c1", "c2"]);
+  assert.deepEqual(totals.get("c1"), { ballots: 4, eligible: 1 });
+  assert.deepEqual(totals.get("c2"), { ballots: 2, eligible: 1 });
+  for (const [id, origin] of [["c1", "u1"], ["c2", "u9"]] as const) {
+    assert.equal(totals.get(id)?.ballots, repo.ballotCount(id));
+    assert.equal(totals.get(id)?.eligible, repo.eligibleVoteCount(id, origin));
+  }
+  assert.deepEqual(repo.ballotTotalsFor([]), new Map());
+});
+
+test("votedAmong returns the requested tier lists the account has a ballot on, never its own", () => {
+  const repo = createSqliteTierlistsRepository(freshDb());
+  publishedList(repo, "c1", "One", "2026-01-01T00:00:00.000Z");
+  publishedList(repo, "c2", "Two", "2026-02-01T00:00:00.000Z", { owner_user_id: "u3", origin_user_id: "u3" });
+  publishedList(repo, "c3", "Three", "2026-03-01T00:00:00.000Z", { owner_user_id: "u3", origin_user_id: "u3" });
+  publishedList(repo, "own", "Mine", "2026-04-01T00:00:00.000Z", { owner_user_id: "u2", origin_user_id: "u2" });
+  repo.saveBallot(ballot({ id: "c1-u2", tierlist_id: "c1", voter_user_id: "u2" }), []);
+  repo.saveBallot(ballot({ id: "c2-u2", tierlist_id: "c2", voter_user_id: "u2" }), []);
+  repo.saveBallot(ballot({ id: "c3-anon", tierlist_id: "c3", voter_user_id: null }), []);
+  repo.saveBallot(ballot({ id: "c3-u4", tierlist_id: "c3", voter_user_id: "u4" }), []);
+  const sorted = (ids: string[]) => [...ids].sort();
+
+  assert.deepEqual(sorted(repo.votedAmong("u2", ["c1", "c3", "own", "ghost"])), ["c1"]);
+  assert.deepEqual(sorted(repo.votedAmong("u2", ["c1", "c2"])), ["c1", "c2"]);
+  assert.deepEqual(repo.votedAmong("u2", []), []);
+  assert.deepEqual(repo.votedAmong("nobody", ["c1", "c2", "c3", "own"]), []);
+  assert.deepEqual(sorted(repo.votedAmong("u2", ["c1", "c2", "c3", "own"])), sorted(repo.listVotedByUser("u2").map((r) => r.id)));
+  repo.promote("own", "2026-05-01T00:00:00.000Z");
+  assert.deepEqual(repo.votedAmong("u2", ["own"]), []);
+});

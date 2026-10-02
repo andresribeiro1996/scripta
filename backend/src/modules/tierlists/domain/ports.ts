@@ -3,7 +3,7 @@
 // service.ts is written against this interface only, with no idea whether
 // SQLite, Postgres, or an in-memory fake is on the other side.
 
-import type { TierlistRow, BallotRow, HistogramCell, Placement, VoteAccess } from "./types.js";
+import type { TierlistRow, BallotRow, BallotTotals, HistogramCell, Placement, TierlistDiscoverRow, VoteAccess } from "./types.js";
 
 export interface TierlistsRepository {
   deleteUserData(userId: string): void;
@@ -40,6 +40,10 @@ export interface TierlistsRepository {
    *  "Voted on" means other people's content (the owner's seeded ballot
    *  on their own poll must not count as participation). */
   listVotedByUser(voterUserId: string): TierlistRow[];
+  discoverWindow(needle: string, limit: number): TierlistDiscoverRow[];
+  listPublicByIds(ids: string[]): TierlistRow[];
+  ballotTotalsFor(ids: string[]): Map<string, BallotTotals>;
+  votedAmong(voterUserId: string, ids: string[]): string[];
   getBallotById(tierlistId: string, ballotId: string): BallotRow | undefined;
   getBallotByVoter(tierlistId: string, voterUserId: string): BallotRow | undefined;
   /** Insert-or-replace a ballot and REPLACE its placements wholesale (a
