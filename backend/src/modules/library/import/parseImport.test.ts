@@ -8,6 +8,7 @@ import { after, test } from "node:test";
 import Fastify from "fastify";
 
 const scratch = mkdtempSync(join(tmpdir(), "library-import-test-"));
+process.env.TMPDIR = scratch;
 process.env.AUTH_DB_PATH = join(scratch, "auth.sqlite");
 process.env.LIBRARY_DB_PATH = join(scratch, "library.sqlite");
 process.env.GALLERY_DB_PATH = join(scratch, "gallery.sqlite");
