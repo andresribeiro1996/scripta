@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test, type TestContext } from "node:test";
 import Fastify from "fastify";
+import { ARCHIVE_BATCH } from "./domain/feed.js";
 import type { CommunityDeps } from "./service.js";
 
 const tempRoot = mkdtempSync(join(tmpdir(), "community-archive-"));
@@ -168,4 +169,47 @@ test("a failed run is logged as an error, leaves the events where they were, thr
   await until(() => logged(ARCHIVED).length === 2);
   assert.equal(logged(ARCHIVED)[1]?.moved, 1);
   assert.equal(countRows(db, "events_history", "id = 'fail-1'"), 1);
+});
+
+test("the archive gives the event loop a turn after every batch, so no two batches run back to back, the last move batch and the first purge batch included", async () => {
+  const { repo } = openRepo();
+  repo.moveEventsBefore(CUTOFF, 100_000);
+  repo.purgeInboxBefore(CUTOFF, 100_000);
+  repo.insertFollow({ follower_id: "yield-fan", followee_id: "yield-author", created_at: "2026-09-10T00:00:00.000Z" });
+  const rows = ARCHIVE_BATCH * 10 + ARCHIVE_BATCH / 2;
+  for (let i = 0; i < rows; i++) {
+    repo.insertEvent({ id: `yield-${i}`, user_id: "yield-author", type: "book_added", ref_type: "book", ref_id: `yield-${i}`, payload: null, created_at: new Date(Date.parse("2026-08-01T00:00:00.000Z") + i * 60_000).toISOString() });
+  }
+  let turns = 0;
+  let running = true;
+  const probe = () => {
+    turns++;
+    if (running) setImmediate(probe);
+  };
+  setImmediate(probe);
+  const turnAtBatch: number[] = [];
+  const service = createCommunityService({
+    ...inertDeps,
+    repo: {
+      ...repo,
+      moveEventsBefore: (cutoff, batch) => {
+        turnAtBatch.push(turns);
+        return repo.moveEventsBefore(cutoff, batch);
+      },
+      purgeInboxBefore: (cutoff, batch) => {
+        turnAtBatch.push(turns);
+        return repo.purgeInboxBefore(cutoff, batch);
+      }
+    }
+  });
+
+  const result = await service.archiveOldEvents().finally(() => {
+    running = false;
+  });
+
+  assert.deepEqual(result, { moved: rows, purged: rows });
+  assert.equal(turnAtBatch.length, 2 * (Math.floor(rows / ARCHIVE_BATCH) + 1));
+  turnAtBatch.forEach((turn, i) => {
+    if (i > 0) assert.ok(turn > turnAtBatch[i - 1]!, `batch ${i} ran in the same turn as the batch before it`);
+  });
 });

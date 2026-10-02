@@ -134,7 +134,7 @@ Decided in conversation (the inbox follows standard social-feed practice,
 
 - **Events are hot for 30 days.** A job moves older rows from `events` to a
   new `events_history` table (same columns), kept for metrics; when to clean
-  it is decided later. Batches of 1,000, yielding between batches, at boot
+  it is decided later. Batches of 250, yielding between batches, at boot
   and daily.
 - **Profile activity pages read through to history**, so an inactive
   reader's profile doesn't look empty after 30 days.

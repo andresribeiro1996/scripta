@@ -25,4 +25,6 @@ export const ACTIVITY_EVENT_TYPES = Object.keys(EVERY_ACTIVITY_EVENT_TYPE) as re
 
 export const FEED_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
+export const ARCHIVE_BATCH = 250;
+
 export const FOLLOW_LIMIT = 1000;

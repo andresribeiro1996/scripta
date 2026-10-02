@@ -402,6 +402,18 @@ test("moveEventsBefore moves the oldest events first, up to the batch, with ever
   assert.deepEqual(stored("events"), []);
 });
 
+test("a move whose delete fails leaves no copy in history", (t) => {
+  const { db, r } = openRepo();
+  t.after(() => db.exec("DROP TRIGGER IF EXISTS move_refuses"));
+  r.insertEvent({ id: "half-e1", user_id: "half-author", type: "book_added", ref_type: "book", ref_id: "half-b1", payload: null, created_at: "1997-03-01T00:00:00.000Z" });
+  db.exec("CREATE TRIGGER move_refuses BEFORE DELETE ON events BEGIN SELECT RAISE(ABORT, 'refused'); END");
+  assert.throws(() => r.moveEventsBefore("1997-04-01T00:00:00.000Z", 10), /refused/);
+  assert.deepEqual(db.prepare("SELECT id FROM events_history WHERE user_id = 'half-author'").all(), []);
+  assert.deepEqual(db.prepare("SELECT id FROM events WHERE user_id = 'half-author'").all().map((row) => row.id), ["half-e1"]);
+  db.exec("DROP TRIGGER move_refuses");
+  r.moveEventsBefore("1997-04-01T00:00:00.000Z", 10);
+});
+
 test("hiddenTypes leaves its types out of a user's events and of their history, on the first page and after a keyset, and an empty list leaves nothing out", () => {
   const { db, r } = openRepo();
   const insertHistory = db.prepare("INSERT INTO events_history (id, user_id, type, ref_type, ref_id, payload, created_at, trace_id, source) VALUES (?, ?, ?, 'book', ?, NULL, ?, NULL, NULL)");

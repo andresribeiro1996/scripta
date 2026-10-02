@@ -46,6 +46,7 @@ function fakeService(overrides: Partial<CommunityService> = {}): CommunityServic
     },
     getFeedSettings: () => DEFAULT_FEED_SETTINGS,
     updateFeedSettings: () => {},
+    archiveOldEvents: async () => ({ moved: 0, purged: 0 }),
     ...overrides
   };
 }

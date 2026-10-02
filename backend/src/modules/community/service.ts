@@ -9,7 +9,7 @@ import type { MuralPublicPayload } from "../murals/index.js";
 import type { PublishedTierlistRef, TierlistDiscoverRef } from "../tierlists/service.js";
 import { currentTrace } from "../../trace.js";
 import { FollowLimitError, InvalidCursorError, MuralNotOwnedError, NotFollowingError, ProfileNotFoundError, SelfFollowError, UsernameRequiredError } from "./domain/errors.js";
-import { ACTIVITY_EVENT_TYPES, DIGEST_EVENT_TYPES, FEED_WINDOW_MS, FOLLOW_LIMIT } from "./domain/feed.js";
+import { ACTIVITY_EVENT_TYPES, ARCHIVE_BATCH, DIGEST_EVENT_TYPES, FEED_WINDOW_MS, FOLLOW_LIMIT } from "./domain/feed.js";
 import type { CommunityRepository, CursorKeyset } from "./domain/ports.js";
 import type { EventRow, FollowRow } from "./domain/types.js";
 
@@ -31,6 +31,16 @@ function parseEventPayload(raw: string | null): Record<string, unknown> | undefi
     return typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>) : undefined;
   } catch {
     return undefined;
+  }
+}
+
+async function inBatches(step: (batch: number) => number): Promise<number> {
+  let total = 0;
+  for (;;) {
+    const done = step(ARCHIVE_BATCH);
+    total += done;
+    await new Promise(setImmediate);
+    if (done < ARCHIVE_BATCH) return total;
   }
 }
 
@@ -118,6 +128,7 @@ export interface CommunityService {
   getLibrary(username: string): { data: Record<string, unknown> | null };
   getFeedSettings(userId: string): FeedSettings;
   updateFeedSettings(userId: string, settings: FeedSettings): void;
+  archiveOldEvents(): Promise<{ moved: number; purged: number }>;
 }
 
 export function createCommunityService(deps: CommunityDeps): CommunityService {
@@ -522,6 +533,12 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
     },
     updateFeedSettings(userId, settings) {
       repo.updateFeedSettings(userId, settings);
+    },
+    async archiveOldEvents() {
+      const cutoff = new Date(now() - FEED_WINDOW_MS).toISOString();
+      const moved = await inBatches((batch) => repo.moveEventsBefore(cutoff, batch));
+      const purged = await inBatches((batch) => repo.purgeInboxBefore(cutoff, batch));
+      return { moved, purged };
     }
   };
 }
