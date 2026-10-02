@@ -2,7 +2,7 @@ import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { authGuard, getOptionalAuthenticatedUser, rateLimitKey } from "../auth/index.js";
-import { CommunityError, InvalidCursorError, ProfileNotFoundError } from "./domain/errors.js";
+import { CommunityError, FollowLimitError, InvalidCursorError, ProfileNotFoundError } from "./domain/errors.js";
 import type { CommunityService } from "./service.js";
 
 const followSchema = z.object({ userId: z.string().min(1) });
@@ -35,6 +35,7 @@ const activityQuerySchema = z.object({
 function statusForCommunityError(err: CommunityError): number {
   if (err instanceof ProfileNotFoundError) return 404;
   if (err instanceof InvalidCursorError) return 400;
+  if (err instanceof FollowLimitError) return 409;
   return 400;
 }
 

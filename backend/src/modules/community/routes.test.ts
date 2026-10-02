@@ -15,7 +15,7 @@ process.env.JWT_ACCESS_SECRET = "a".repeat(64);
 process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 process.env.NODE_ENV = "test";
 
-const { MuralNotOwnedError, ProfileNotFoundError } = await import("./domain/errors.js");
+const { FollowLimitError, MuralNotOwnedError, ProfileNotFoundError } = await import("./domain/errors.js");
 const { buildCommunityRoutes, buildPublicCommunityRoutes } = await import("./routes.js");
 
 function fakeService(overrides: Partial<CommunityService> = {}): CommunityService {
@@ -318,6 +318,24 @@ test("follow POST passes both ids through, and answers 404 for a reader who can'
   assert.equal(refused.statusCode, 404);
   assert.equal(refused.json().error, "No published profile at that address.");
   assert.deepEqual(followed, [["viewer", "alice"]]);
+  await app.close();
+});
+
+test("follow POST answers 409 with the limit in plain words when the reader already follows 1,000 accounts", async () => {
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", () => ({ id: "viewer", email: "v@example.test", username: "v", avatarId: null }));
+  await app.register(
+    buildCommunityRoutes(
+      fakeService({
+        follow: () => {
+          throw new FollowLimitError();
+        }
+      })
+    )
+  );
+  const res = await app.inject({ method: "POST", url: "/community/follows", headers: { authorization: "Bearer x" }, payload: { userId: "alice" } });
+  assert.equal(res.statusCode, 409);
+  assert.deepEqual(res.json(), { error: "You can follow up to 1,000 readers." });
   await app.close();
 });
 

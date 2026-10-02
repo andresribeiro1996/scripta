@@ -247,7 +247,7 @@ test("participation counts each voter once per started tournament, at their firs
   repo.insertVote(vote("v8", "duel-t2", "tok-2a", "u2", "2026-01-09T00:00:00.000Z"));
   repo.insertVote(vote("v9", "duel-t3", "tok-2a", "u2", "2026-01-10T00:00:00.000Z"));
 
-  assert.deepEqual(repo.listParticipation("u1").map((r) => ({ ...r })), [
+  assert.deepEqual(repo.listParticipation("u1", "2026-01-01T00:00:00.000Z").map((r) => ({ ...r })), [
     { id: "t1", name: "Bracket", participants: 4, latest_at: "2026-01-05T00:00:00.000Z" }
   ]);
   assert.deepEqual(repo.listRecentVoters("t1", "u1", 10).map((r) => ({ ...r })), [
@@ -255,6 +255,29 @@ test("participation counts each voter once per started tournament, at their firs
     { user_id: "u2", at: "2026-01-02T00:00:00.000Z" }
   ]);
   assert.deepEqual(repo.listRecentVoters("t1", "u1", 1).map((r) => r.user_id), ["u3"]);
+});
+
+test("participation lists only the tournaments with a vote since the marker, counts every participant, and keeps one listed by a repeat vote", () => {
+  const db = freshDb();
+  seedTournament(db, "quiet", "u1", "Quiet");
+  seedTournament(db, "busy", "u1", "Busy");
+  seedTournament(db, "revisited", "u1", "Revisited");
+  db.prepare(
+    `INSERT INTO duels (id, tournament_id, round_number, duel_index, book_a_key, book_a_title, book_a_author, book_b_key, book_b_title, book_b_author, opens_at, closes_at)
+     VALUES ('duel-revisited-b', 'revisited', 2, 0, 'c', 'C', 'x', 'd', 'D', 'y', '2026-01-01', '2026-01-02')`
+  ).run();
+  const repo = createSqliteArenaRepository(db);
+  repo.insertVote(vote("v1", "duel-quiet", "tok-1", "u2", "2026-01-02T00:00:00.000Z"));
+  repo.insertVote(vote("v2", "duel-busy", "tok-1", "u2", "2026-01-02T00:00:00.000Z"));
+  repo.insertVote(vote("v3", "duel-busy", "tok-3", "u3", "2026-02-10T00:00:00.000Z"));
+  repo.insertVote(vote("v4", "duel-revisited", "tok-1", "u2", "2026-01-03T00:00:00.000Z"));
+  repo.insertVote(vote("v5", "duel-revisited-b", "tok-1", "u2", "2026-02-12T00:00:00.000Z"));
+  const listed = (since: string) => repo.listParticipation("u1", since).map((r) => [r.id, r.participants, r.latest_at]).sort();
+
+  assert.deepEqual(listed("2026-01-01T00:00:00.000Z"), [["busy", 2, "2026-02-10T00:00:00.000Z"], ["quiet", 1, "2026-01-02T00:00:00.000Z"], ["revisited", 1, "2026-01-03T00:00:00.000Z"]]);
+  assert.deepEqual(listed("2026-02-01T00:00:00.000Z"), [["busy", 2, "2026-02-10T00:00:00.000Z"], ["revisited", 1, "2026-01-03T00:00:00.000Z"]]);
+  assert.deepEqual(listed("2026-02-12T00:00:00.000Z"), [["revisited", 1, "2026-01-03T00:00:00.000Z"]]);
+  assert.deepEqual(listed("2026-02-12T00:00:00.001Z"), []);
 });
 
 test("rekeyBooks rewrites seeding slots only and drops a slot that would duplicate the survivor", () => {

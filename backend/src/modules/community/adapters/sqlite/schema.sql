@@ -22,7 +22,9 @@ CREATE TABLE IF NOT EXISTS events (
   ref_type   TEXT NOT NULL,
   ref_id     TEXT NOT NULL,
   payload    TEXT,
-  created_at TEXT NOT NULL
+  created_at TEXT NOT NULL,
+  trace_id   TEXT,
+  source     TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_events_user_time ON events(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_events_time ON events(created_at DESC);
@@ -32,3 +34,28 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_events_publication_ref
 CREATE UNIQUE INDEX IF NOT EXISTS idx_events_user_type_ref
   ON events(user_id, type, ref_id)
   WHERE type IN ('voted_on', 'following', 'mural_published');
+
+CREATE TABLE IF NOT EXISTS events_history (
+  id         TEXT PRIMARY KEY,
+  user_id    TEXT NOT NULL,
+  type       TEXT NOT NULL,
+  ref_type   TEXT NOT NULL,
+  ref_id     TEXT NOT NULL,
+  payload    TEXT,
+  created_at TEXT NOT NULL,
+  trace_id   TEXT,
+  source     TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_events_history_user_time ON events_history(user_id, created_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_events_history_time ON events_history(created_at);
+CREATE INDEX IF NOT EXISTS idx_events_history_user_ref ON events_history(ref_id) WHERE ref_type = 'user';
+
+CREATE TABLE IF NOT EXISTS feed_inbox (
+  viewer_id  TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  event_id   TEXT NOT NULL,
+  author_id  TEXT NOT NULL,
+  PRIMARY KEY (viewer_id, created_at, event_id)
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS idx_feed_inbox_author ON feed_inbox(author_id, viewer_id);
+CREATE INDEX IF NOT EXISTS idx_feed_inbox_time ON feed_inbox(created_at);

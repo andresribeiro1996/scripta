@@ -1,24 +1,29 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import Fastify from "fastify";
 import { normalizeWords, type IdentityKey, type ReaderProfile } from "@scripta/shared";
 import type { DiscoverItem, GameParticipation, SharedBook, SuggestedReader } from "@scripta/shared/community";
-import { DEFAULT_FEED_SETTINGS, encodeCursor, normalizeFeedSettings } from "@scripta/shared/community";
+import { categoryFor, DEFAULT_FEED_SETTINGS, encodeCursor, normalizeFeedSettings } from "@scripta/shared/community";
 import type { ParticipationItem } from "@scripta/shared/dashboard";
 import type { PublishedTierlistRef } from "../tierlists/service.js";
 import type { PublishedTournamentRef } from "../arena/service.js";
 import type { MuralPublicPayload } from "../murals/index.js";
 import type { CommunityRepository, CursorKeyset } from "./domain/ports.js";
 import type { EventRow, FollowRow, ProfileRow } from "./domain/types.js";
-import { InvalidCursorError, MuralNotOwnedError, NotFollowingError, ProfileNotFoundError, SelfFollowError, UsernameRequiredError } from "./domain/errors.js";
-import { createCommunityService, type CommunityDeps, type CommunityService } from "./service.js";
+import { FollowLimitError, InvalidCursorError, MuralNotOwnedError, NotFollowingError, ProfileNotFoundError, SelfFollowError, UsernameRequiredError } from "./domain/errors.js";
+import { registerTrace } from "../../trace.js";
+import { createCommunityPublicApi, createCommunityService, type CommunityDeps, type CommunityPublicApi, type CommunityService } from "./service.js";
 
 function createRepoFake() {
   const follows = new Map<string, FollowRow>();
   const profiles = new Map<string, ProfileRow>();
   const events: EventRow[] = [];
+  const history: EventRow[] = [];
   const key = (a: string, b: string) => `${a}:${b}`;
   const newestEvent = (a: EventRow, b: EventRow) => (a.created_at === b.created_at ? (a.id > b.id ? -1 : 1) : b.created_at.localeCompare(a.created_at));
   const newestFollow = (a: FollowRow, b: FollowRow) => (a.created_at === b.created_at ? (a.follower_id > b.follower_id ? -1 : 1) : b.created_at.localeCompare(a.created_at));
+  const inboxOf = (viewerId: string, types: readonly string[]) =>
+    events.filter((e) => follows.has(key(viewerId, e.user_id)) && types.includes(e.type) && (repo.getFeedSettings(e.user_id) ?? DEFAULT_FEED_SETTINGS)[categoryFor(e.type)]);
   const repo: CommunityRepository = {
     deleteUserData() {},
     insertFollow(row) {
@@ -72,20 +77,31 @@ function createRepoFake() {
       if (events.some((e) => e.ref_type === row.ref_type && e.ref_id === row.ref_id)) return;
       events.push({ ...row });
     },
-    listEventsByUser(userId, keyset: CursorKeyset | undefined, limit, types) {
+    listEventsByUser(userId, keyset: CursorKeyset | undefined, limit) {
       return events
         .filter((e) => e.user_id === userId)
-        .filter((e) => !types || types.includes(e.type))
         .filter((e) => !keyset || e.created_at < keyset.createdAt || (e.created_at === keyset.createdAt && e.id < keyset.id))
         .sort(newestEvent)
         .slice(0, limit);
     },
-    listEventsByUserSince(userId, since, limit, types) {
-      return events
-        .filter((e) => e.user_id === userId && types.includes(e.type) && e.created_at > since)
+    listHistoryEventsByUser(userId, keyset, limit) {
+      return history
+        .filter((e) => e.user_id === userId)
+        .filter((e) => !keyset || e.created_at < keyset.createdAt || (e.created_at === keyset.createdAt && e.id < keyset.id))
         .sort(newestEvent)
         .slice(0, limit);
     },
+    listInbox(viewerId, keyset, limit, types) {
+      return inboxOf(viewerId, types)
+        .filter((e) => !keyset || e.created_at < keyset.createdAt || (e.created_at === keyset.createdAt && e.id < keyset.id))
+        .sort(newestEvent)
+        .slice(0, limit);
+    },
+    countInboxSince(viewerId, since, types, limit) {
+      return Math.min(inboxOf(viewerId, types).filter((e) => e.created_at > since).length, limit);
+    },
+    moveEventsBefore: () => 0,
+    purgeInboxBefore: () => 0,
     listFollowersByFollowee(followeeId, keyset, limit) {
       return [...follows.values()]
         .filter((row) => row.followee_id === followeeId)
@@ -100,7 +116,7 @@ function createRepoFake() {
         .slice(0, limit);
     }
   };
-  return { repo, follows, profiles, events };
+  return { repo, follows, profiles, events, history };
 }
 
 function createDeps(repo: CommunityRepository) {
@@ -130,6 +146,7 @@ function createDeps(repo: CommunityRepository) {
   const votedAmongCalls: Array<{ kind: "tierlist" | "tournament"; viewerId: string; ids: string[] }> = [];
   const deps: CommunityDeps = {
     repo,
+    now: () => NOW,
     getDashboardSeenAt: () => seenAt.value,
     setDashboardSeenAt: (_userId, value) => {
       seenAt.value = value;
@@ -236,6 +253,8 @@ function reader(userId: string): ReaderProfile {
 }
 
 const at = (day: number) => `2026-09-${String(day).padStart(2, "0")}T00:00:00.000Z`;
+
+const NOW = Date.parse("2026-09-30T00:00:00.000Z");
 
 const ALL_KINDS: ReadonlySet<string> = new Set(["publication", "vote", "reading", "follow", "participation"]);
 
@@ -362,6 +381,44 @@ test("follow state reports direction-specific counts", () => {
   assert.deepEqual(service.getFollowState("dave", "alice"), { following: false, followerCount: 2, followingCount: 1 });
 });
 
+test("a reader can follow up to 1,000 accounts, and the next one is refused and not added", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles } = createDeps(repo);
+  const service = createCommunityService(deps);
+  for (const id of ["r0", "r1", "one-more"]) {
+    readerProfiles.set(id, reader(id));
+    repo.upsertProfile(profileRow(id));
+  }
+  for (let i = 0; i < 1000; i++) repo.insertFollow({ follower_id: "viewer", followee_id: `r${i}`, created_at: at(1) });
+
+  assert.throws(() => service.follow("viewer", "one-more"), (error) => error instanceof FollowLimitError && error.message === "You can follow up to 1,000 readers.");
+  assert.equal(repo.getFollow("viewer", "one-more"), undefined);
+  assert.equal(repo.countFollowing("viewer"), 1000);
+
+  service.follow("viewer", "r0");
+  assert.equal(repo.countFollowing("viewer"), 1000);
+
+  service.unfollow("viewer", "r1");
+  service.follow("viewer", "one-more");
+  assert.notEqual(repo.getFollow("viewer", "one-more"), undefined);
+  assert.equal(repo.countFollowing("viewer"), 1000);
+  assert.equal(repo.countFollowing("someone-else"), 0);
+  service.follow("someone-else", "r0");
+  assert.equal(repo.countFollowing("someone-else"), 1);
+});
+
+test("a reader at the limit still hears that an unknown or private reader can't be followed", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("hidden", reader("hidden"));
+  repo.upsertProfile(profileRow("hidden", { published: 0 }));
+  for (let i = 0; i < 1000; i++) repo.insertFollow({ follower_id: "viewer", followee_id: `r${i}`, created_at: at(1) });
+
+  assert.throws(() => service.follow("viewer", "ghost"), ProfileNotFoundError);
+  assert.throws(() => service.follow("viewer", "hidden"), ProfileNotFoundError);
+});
+
 test("emitEvent is idempotent per (ref_type, ref_id)", () => {
   const { repo, events } = createRepoFake();
   const { deps } = createDeps(repo);
@@ -370,6 +427,35 @@ test("emitEvent is idempotent per (ref_type, ref_id)", () => {
   service.emitEvent("alice", "tierlist_published", "tierlist", "t1");
   service.emitEvent("alice", "tournament_published", "tournament", "g1");
   assert.equal(events.length, 2);
+});
+
+async function emitInsideAndOutsideARequest(emit: CommunityPublicApi["emitEvent"], events: EventRow[]) {
+  const app = Fastify();
+  registerTrace(app);
+  app.post("/things/:id", (request) => {
+    emit("alice", "tierlist_published", "tierlist", "inside");
+    return { requestId: request.id };
+  });
+
+  const { requestId } = (await app.inject({ method: "POST", url: "/things/1" })).json();
+  await app.close();
+  emit("alice", "tournament_published", "tournament", "outside");
+
+  assert.deepEqual(events.map((event) => [event.ref_id, event.trace_id, event.source]), [
+    ["inside", requestId, "POST /things/:id"],
+    ["outside", null, null]
+  ]);
+}
+
+test("an event the service emits records the request that caused it, and nothing outside a request", async () => {
+  const { repo, events } = createRepoFake();
+  const { deps } = createDeps(repo);
+  await emitInsideAndOutsideARequest(createCommunityService(deps).emitEvent, events);
+});
+
+test("an event emitted through the public API other modules call records the request that caused it, and nothing outside a request", async () => {
+  const { repo, events } = createRepoFake();
+  await emitInsideAndOutsideARequest(createCommunityPublicApi(repo).emitEvent, events);
 });
 
 const fakePayload = {} as MuralPublicPayload;
@@ -627,6 +713,21 @@ test("dashboard merges followees' publications and incoming follows newest first
   assert.equal((page.items[0] as { actor: { userId: string } }).actor.userId, "alice");
   assert.ok(page.items.some((item) => item.kind === "follow" && item.id === "bob"));
   assert.ok(!page.items.some((item) => item.kind === "follow" && item.id === "carol"));
+});
+
+test("a new follower in the dashboard says whether the viewer follows them back", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles } = createDeps(repo);
+  const service = createCommunityService(deps);
+  for (const id of ["bob", "carol"]) {
+    readerProfiles.set(id, reader(id));
+    repo.insertFollow({ follower_id: id, followee_id: "viewer", created_at: at(5) });
+  }
+  repo.insertFollow({ follower_id: "viewer", followee_id: "bob", created_at: at(4) });
+
+  const page = service.getDashboard("viewer", undefined, 20, ALL_KINDS);
+
+  assert.deepEqual(page.items.flatMap((item) => (item.kind === "follow" ? [[item.id, item.viewerFollows]] : [])), [["carol", false], ["bob", true]]);
 });
 
 test("dashboard actors carry a reader glyph only when published and switched on, and the lookup runs once per author", () => {
@@ -984,7 +1085,7 @@ test("a run of unrenderable rows longer than a page's refills doesn't strand wha
   assert.deepEqual(pageThrough(service, 2), ["x1", "x2"]);
 });
 
-test("a page gives up refilling after five fetches and hands back a cursor", () => {
+test("a page gives up refilling after three fetches and hands back a cursor", () => {
   const { repo } = createRepoFake();
   const { deps, readerProfiles } = createDeps(repo);
   const service = createCommunityService(deps);
@@ -995,16 +1096,16 @@ test("a page gives up refilling after five fetches and hands back a cursor", () 
     const n = String(i).padStart(2, "0");
     repo.insertEvent({ id: `d${n}`, user_id: "alice", type: "voted_on", ref_type: "tierlist", ref_id: `t-d${n}`, payload: null, created_at: `2026-09-10T00:00:${n}.000Z` });
   }
-  const listEventsByUser = repo.listEventsByUser;
+  const listInbox = repo.listInbox;
   let fetches = 0;
-  repo.listEventsByUser = (...args) => {
+  repo.listInbox = (...args) => {
     fetches++;
-    return listEventsByUser(...args);
+    return listInbox(...args);
   };
   const page = service.getDashboard("viewer", encodeCursor({ createdAt: at(11), id: "z" }), 2);
   assert.deepEqual(page.items, []);
   assert.ok(page.nextCursor);
-  assert.equal(fetches, 5);
+  assert.equal(fetches, 3);
 });
 
 test("a page that finds too few rows in its first fetch tops up from the next", () => {
@@ -1172,6 +1273,63 @@ test("kind names this server doesn't know are ignored", () => {
   assert.deepEqual(page.items.map((item) => item.kind), ["publication"]);
   assert.equal(page.personalNewCount, 0);
   assert.equal(page.followingNewCount, 1);
+});
+
+test("a viewer following 1,000 silent accounts gets an empty page from one inbox read, not one read per account", () => {
+  const { repo } = createRepoFake();
+  const { deps } = createDeps(repo);
+  const service = createCommunityService(deps);
+  for (let i = 0; i < 1000; i++) repo.insertFollow({ follower_id: "viewer", followee_id: `silent${i}`, created_at: at(1) });
+  const reads = { inbox: 0, perAccount: 0 };
+  const listInbox = repo.listInbox;
+  repo.listInbox = (...args) => {
+    reads.inbox++;
+    return listInbox(...args);
+  };
+  repo.listEventsByUser = () => {
+    reads.perAccount++;
+    return [];
+  };
+
+  assert.deepEqual(service.getDashboard("viewer", undefined, 20, ALL_KINDS), { items: [], nextCursor: null, seenAt: null, personalNewCount: 0, followingNewCount: 0, newCount: 0 });
+  assert.deepEqual(reads, { inbox: 1, perAccount: 0 });
+});
+
+test("participation is asked for only the last 30 days, and only when the client lists it", () => {
+  const { repo } = createRepoFake();
+  const { deps } = createDeps(repo);
+  const asked: string[][] = [];
+  for (const source of ["tierlists", "tournaments", "quizzes"] as const) {
+    const original = deps.participation[source];
+    deps.participation[source] = (userId, since) => {
+      asked.push([source, userId, since]);
+      return original(userId, since);
+    };
+  }
+  const service = createCommunityService(deps);
+
+  service.getDashboard("viewer", undefined, 20, ALL_KINDS);
+  assert.deepEqual(asked, ["tierlists", "tournaments", "quizzes"].map((source) => [source, "viewer", "2026-08-31T00:00:00.000Z"]));
+
+  asked.length = 0;
+  service.getDashboard("viewer", undefined, 20);
+  assert.deepEqual(asked, []);
+});
+
+test("followers from before the last 30 days are neither listed nor counted", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, seenAt } = createDeps(repo);
+  const service = createCommunityService(deps);
+  seenAt.value = "2026-08-01T00:00:00.000Z";
+  for (const [id, createdAt] of [["fan-old", "2026-08-30T23:59:59.999Z"], ["fan-edge", "2026-08-31T00:00:00.000Z"], ["fan-new", "2026-09-20T00:00:00.000Z"]] as const) {
+    readerProfiles.set(id, reader(id));
+    repo.insertFollow({ follower_id: id, followee_id: "viewer", created_at: createdAt });
+  }
+
+  assert.deepEqual(pageThrough(service, 1), ["fan-new", "fan-edge"]);
+  assert.equal(service.getDashboard("viewer", undefined, 20).personalNewCount, 2);
+  seenAt.value = null;
+  assert.equal(service.getDashboard("viewer", undefined, 20).personalNewCount, 2);
 });
 
 test("discover merges both content kinds newest first", () => {
@@ -1639,6 +1797,40 @@ test("getActivity keeps fetching past rows hidden from the viewer", () => {
   const ownerPage = service.getActivity("alice", "alice", undefined, 2);
   assert.deepEqual(ownerPage.items.map((i) => i.id), ["e1", "e2"]);
   assert.ok(ownerPage.nextCursor);
+});
+
+test("getActivity continues into history once the recent events run out, with no gap or repeat, and asks history only for what a page lacks", () => {
+  const { repo, history } = createRepoFake();
+  const { deps, usernames } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  repo.upsertProfile(profileRow("alice"));
+  const book = (id: string, day: number): EventRow => ({ id, user_id: "alice", type: "book_added", ref_type: "book", ref_id: id, payload: "{}", created_at: at(day) });
+  repo.insertEvent(book("e5", 5));
+  repo.insertEvent(book("e4", 4));
+  history.push(book("e3", 3), book("e2", 2), book("e1", 1));
+  const historyReads: number[] = [];
+  const listHistory = repo.listHistoryEventsByUser;
+  repo.listHistoryEventsByUser = (userId, keyset, limit) => {
+    historyReads.push(limit);
+    return listHistory(userId, keyset, limit);
+  };
+  const activityIds = (limit: number): string[] => {
+    const ids: string[] = [];
+    let cursor: string | null | undefined;
+    for (let pages = 0; cursor !== null && pages < 20; pages++) {
+      const page = service.getActivity("alice", "alice", cursor ?? undefined, limit);
+      ids.push(...page.items.map((item) => item.id));
+      cursor = page.nextCursor;
+    }
+    return ids;
+  };
+
+  assert.deepEqual(service.getActivity("alice", "alice", undefined, 1).items.map((item) => item.id), ["e5"]);
+  assert.deepEqual(historyReads, []);
+  assert.deepEqual(service.getActivity("alice", "alice", undefined, 2).items.map((item) => item.id), ["e5", "e4"]);
+  assert.deepEqual(historyReads, [1]);
+  for (const limit of [1, 2, 3, 4, 5, 6]) assert.deepEqual(activityIds(limit), ["e5", "e4", "e3", "e2", "e1"], `limit ${limit}`);
 });
 
 test("dashboard omits publications from actors who disabled them but keeps follow rows", () => {

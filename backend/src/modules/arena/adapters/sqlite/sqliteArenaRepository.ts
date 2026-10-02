@@ -116,7 +116,7 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
   const participationStmt = db.prepare(`
     SELECT t.id, t.name, COUNT(*) AS participants, MAX(p.first_at) AS latest_at
     FROM (
-      SELECT d.tournament_id, COALESCE(v.voter_user_id, v.voter_token) AS voter, MIN(v.created_at) AS first_at
+      SELECT d.tournament_id, COALESCE(v.voter_user_id, v.voter_token) AS voter, MIN(v.created_at) AS first_at, MAX(v.created_at) AS last_at
       FROM votes v
       JOIN duels d ON d.id = v.duel_id
       JOIN tournaments o ON o.id = d.tournament_id
@@ -126,6 +126,7 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
     JOIN tournaments t ON t.id = p.tournament_id
     WHERE t.status != 'seeding'
     GROUP BY t.id
+    HAVING MAX(p.last_at) >= ?
   `);
   const recentVotersStmt = db.prepare(`
     SELECT v.voter_user_id AS user_id, MIN(v.created_at) AS at
@@ -317,8 +318,8 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
     votedAmong(voterUserId, ids) {
       return (votedAmongStmt.all(JSON.stringify(ids), voterUserId, voterUserId) as unknown as Array<{ id: string }>).map((row) => row.id);
     },
-    listParticipation(ownerUserId) {
-      const rows = participationStmt.all(ownerUserId) as unknown as Array<{ id: string; name: string; participants: number; latest_at: string }>;
+    listParticipation(ownerUserId, since) {
+      const rows = participationStmt.all(ownerUserId, since) as unknown as Array<{ id: string; name: string; participants: number; latest_at: string }>;
       return rows.map((r) => ({ ...r, participants: Number(r.participants) }));
     },
     listRecentVoters(tournamentId, ownerUserId, limit) {

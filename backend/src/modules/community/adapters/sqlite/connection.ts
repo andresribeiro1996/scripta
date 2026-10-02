@@ -2,7 +2,9 @@ import { DatabaseSync } from "node:sqlite";
 import { mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { normalizeFeedSettings, type FeedSettings } from "@scripta/shared/community";
 import { env } from "../../../../config/env.js";
+import { FEED_EVENT_TYPES, FEED_WINDOW_MS } from "../../domain/feed.js";
 
 const adapterDir = dirname(fileURLToPath(import.meta.url));
 
@@ -15,14 +17,94 @@ export function openCommunityDb(): DatabaseSync {
   db.exec("PRAGMA foreign_keys = ON");
 
   const schema = readFileSync(`${adapterDir}/schema.sql`, "utf8");
-  db.exec(schema);
+  if (tableExists(db, "feed_inbox")) db.exec(schema);
+  else applySchemaAndFillInbox(db, schema);
   migrateSchema(db, schema);
 
   return db;
 }
 
+function tableExists(db: DatabaseSync, table: string): boolean {
+  return db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(table) !== undefined;
+}
+
 function tableColumns(db: DatabaseSync, table: string): string[] {
   return (db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).map((c) => c.name);
+}
+
+export function inTransaction<T>(db: DatabaseSync, work: () => T): T {
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const result = work();
+    db.exec("COMMIT");
+    return result;
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+}
+
+function applySchemaAndFillInbox(db: DatabaseSync, schema: string): void {
+  inTransaction(db, () => {
+    db.exec(schema);
+    db.prepare(`
+      INSERT INTO feed_inbox (viewer_id, created_at, event_id, author_id)
+      SELECT f.follower_id, e.created_at, e.id, e.user_id
+      FROM events e JOIN follows f ON f.followee_id = e.user_id
+      WHERE e.type IN (SELECT value FROM json_each(?)) AND e.created_at >= ?
+    `).run(JSON.stringify(FEED_EVENT_TYPES), new Date(Date.now() - FEED_WINDOW_MS).toISOString());
+  });
+}
+
+const ALL_OFF: FeedSettings = { publications: false, reading: false, votes: false, follows: false, readerGlyph: false };
+
+export function feedSettingColumns(settings: FeedSettings) {
+  return {
+    $show_publications: Number(settings.publications),
+    $show_reading: Number(settings.reading),
+    $show_votes: Number(settings.votes),
+    $show_follows: Number(settings.follows),
+    $show_reader_glyph: Number(settings.readerGlyph ?? false)
+  };
+}
+
+function parseFeedSettings(raw: string): FeedSettings | null {
+  try {
+    return normalizeFeedSettings(JSON.parse(raw));
+  } catch (error) {
+    if (error instanceof SyntaxError) return null;
+    throw error;
+  }
+}
+
+function syncFeedSettingColumns(db: DatabaseSync): void {
+  inTransaction(db, () => {
+    if (!tableColumns(db, "profiles").includes("show_publications")) {
+      db.exec(`
+        ALTER TABLE profiles ADD COLUMN show_publications INTEGER NOT NULL DEFAULT 1;
+        ALTER TABLE profiles ADD COLUMN show_reading INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE profiles ADD COLUMN show_votes INTEGER NOT NULL DEFAULT 1;
+        ALTER TABLE profiles ADD COLUMN show_follows INTEGER NOT NULL DEFAULT 1;
+        ALTER TABLE profiles ADD COLUMN show_reader_glyph INTEGER NOT NULL DEFAULT 0;
+      `);
+    }
+    const reconcile = db.prepare(`
+      UPDATE profiles SET
+        show_publications = $show_publications,
+        show_reading = $show_reading,
+        show_votes = $show_votes,
+        show_follows = $show_follows,
+        show_reader_glyph = $show_reader_glyph
+      WHERE user_id = $user_id
+        AND (show_publications, show_reading, show_votes, show_follows, show_reader_glyph)
+          IS NOT ($show_publications, $show_reading, $show_votes, $show_follows, $show_reader_glyph)
+    `);
+    for (const row of db.prepare("SELECT user_id, feed_settings FROM profiles WHERE feed_settings IS NOT NULL").all() as Array<{ user_id: string; feed_settings: string }>) {
+      const parsed = parseFeedSettings(row.feed_settings);
+      const changed = reconcile.run({ $user_id: row.user_id, ...feedSettingColumns(parsed ?? ALL_OFF) }).changes > 0;
+      if (changed && !parsed) console.warn(`[community] feed settings of user ${row.user_id} are unreadable; all of its feed categories are switched off`);
+    }
+  });
 }
 
 function migrateSchema(db: DatabaseSync, schema: string): void {
@@ -42,4 +124,8 @@ function migrateSchema(db: DatabaseSync, schema: string): void {
   if (!tableColumns(db, "profiles").includes("feed_settings")) {
     db.exec("ALTER TABLE profiles ADD COLUMN feed_settings TEXT");
   }
+  syncFeedSettingColumns(db);
+  const eventColumns = tableColumns(db, "events");
+  if (!eventColumns.includes("trace_id")) db.exec("ALTER TABLE events ADD COLUMN trace_id TEXT");
+  if (!eventColumns.includes("source")) db.exec("ALTER TABLE events ADD COLUMN source TEXT");
 }
