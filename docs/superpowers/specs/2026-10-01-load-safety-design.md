@@ -75,11 +75,11 @@ that PR's branch.
 
   | Routes | Limit |
   |---|---|
-  | `PUT /library`, `POST /library/books`, `POST /library/books/merge` (one shared bucket) | 30/min |
+  | `PUT /library`, `POST /library/books`, `POST /library/books/merge`, `POST /library/share`, `POST /library/unshare` (one shared bucket; all five parse the stored document) | 30/min |
   | `GET /library` | 60/min |
   | `GET /community/dashboard` | 60/min |
   | `GET /community/people` | 60/min |
-  | `GET /arenas/public` | 30/min per IP |
+  | `GET /arenas/public` | 30/min |
 
 - `backend/README.md`: the auth limit of 20/min covers every `/auth` route,
   not only signup/login/refresh/logout as it says.
