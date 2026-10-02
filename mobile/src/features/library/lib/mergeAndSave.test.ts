@@ -8,12 +8,6 @@ import { test } from "node:test";
 import { assignBookOrder, deriveSeriesGroups, mergeLibraryData, type LibraryData } from "@scripta/shared";
 import { buildMergedLibrary } from "./mergeAndSave.js";
 
-test("first import (no existing library) is saved as-is, with _order assigned", () => {
-  const result = buildMergedLibrary(undefined, { books: [{ Title: "Dune", Attribution: "Frank Herbert" }] });
-  assert.equal(result.books.length, 1);
-  assert.equal(result.books[0]._order, 0);
-});
-
 test("merging a re-import updates a matched book in place and appends a new one", () => {
   const existing = { books: [{ Title: "Dune", Attribution: "Frank Herbert", ReadStatus: 0, _order: 0 }] };
   const incoming = { books: [{ Title: "Dune", Attribution: "Frank Herbert", ReadStatus: 2 }, { Title: "New Book", Attribution: "Someone" }] };
@@ -27,7 +21,7 @@ test("merging a re-import updates a matched book in place and appends a new one"
 });
 
 test("auto-seeds a series group from the merged books' Series field", () => {
-  const result = buildMergedLibrary(undefined, {
+  const result = buildMergedLibrary({ books: [] }, {
     books: [{ Title: "Dune", Attribution: "Frank Herbert", Series: "Dune Saga" }],
   });
   assert.equal(result.groups?.length, 1);

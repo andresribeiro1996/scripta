@@ -1,8 +1,7 @@
 // Lists Series and Collections together — they're the same underlying
 // resource (@scripta/shared's Group / groups.ts), differing only in that
-// series also get auto-seeded from book metadata (deriveSeriesGroups,
-// called from lib/mergeAndSave.ts after every import/add). The type filter
-// below narrows the list; it doesn't gate which resource is loaded.
+// series also get auto-seeded from book metadata. The type filter below
+// narrows the list; it doesn't gate which resource is loaded.
 //
 // Rows only navigate — renaming, Style, Manage books, Select/Delete, and
 // deleting the group itself all live on the detail screen

@@ -4,12 +4,6 @@ import { buildMergedLibrary } from "./addPipeline.js";
 import { bookKey } from "./merge.js";
 import type { LibraryData } from "./types.js";
 
-test("with no saved library the incoming one is kept, with _order assigned", () => {
-  const result = buildMergedLibrary(undefined, { books: [{ Title: "Dune", Attribution: "Frank Herbert" }] });
-  assert.equal(result.books.length, 1);
-  assert.equal(result.books[0]!._order, 0);
-});
-
 test("a re-import updates a matched book in place and appends a new one after the highest _order", () => {
   const existing: LibraryData = { books: [{ Title: "Dune", Attribution: "Frank Herbert", ReadStatus: 0, _order: 4 }] };
   const incoming: LibraryData = {

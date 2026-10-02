@@ -5,8 +5,7 @@
 // user explicitly creating one. Once a series exists as a Group, though,
 // it's an ordinary resource: rename it, delete it, add or remove books by
 // hand, same as a collection. See deriveSeriesGroups below for the
-// auto-seed step, and frontend's DashboardPage/LibraryPage for where it's
-// called.
+// auto-seed step.
 
 import type { PerCardStyle } from "./libraryStyle.js";
 import { bookKey } from "./merge.js";
@@ -70,17 +69,15 @@ export function deleteGroup(groups: Group[], id: string): Group[] {
 }
 
 export function addKeyToGroup(groups: Group[], id: string, key: string): Group[] {
-  const group = groups.find((g) => g.id === id);
-  if (!group || group.bookKeys.includes(key)) return groups;
   const now = new Date().toISOString();
-  return groups.map((g) => (g === group ? { ...g, bookKeys: [...g.bookKeys, key], updatedAt: now } : g));
+  const next = groups.map((g) => (g.id === id && !g.bookKeys.includes(key) ? { ...g, bookKeys: [...g.bookKeys, key], updatedAt: now } : g));
+  return next.some((g, i) => g !== groups[i]) ? next : groups;
 }
 
 export function removeKeyFromGroup(groups: Group[], id: string, key: string): Group[] {
-  const group = groups.find((g) => g.id === id);
-  if (!group || !group.bookKeys.includes(key)) return groups;
   const now = new Date().toISOString();
-  return groups.map((g) => (g === group ? { ...g, bookKeys: g.bookKeys.filter((k) => k !== key), updatedAt: now } : g));
+  const next = groups.map((g) => (g.id === id && g.bookKeys.includes(key) ? { ...g, bookKeys: g.bookKeys.filter((k) => k !== key), updatedAt: now } : g));
+  return next.some((g, i) => g !== groups[i]) ? next : groups;
 }
 
 export function addBookToGroup(groups: Group[], id: string, book: Record<string, unknown>): Group[] {
