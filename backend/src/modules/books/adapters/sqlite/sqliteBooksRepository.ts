@@ -80,7 +80,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       const existing = keys.map((key) => byKeyStmt.get(key) as BookRow | undefined).find(Boolean);
       if (existing) return existing;
       const id = randomUUID();
-      db.exec("BEGIN");
+      db.exec("BEGIN IMMEDIATE");
       try {
         insertBookStmt.run({
           $id: id,
@@ -99,7 +99,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         for (const key of keys) insertKeyIfMissingStmt.run(key, id);
         db.exec("COMMIT");
       } catch (error) {
-        db.exec("ROLLBACK");
+        if (db.isTransaction) db.exec("ROLLBACK");
         throw error;
       }
       return byIdStmt.get(id) as unknown as BookRow;
@@ -146,14 +146,14 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     },
 
     saveDetails(bookId, details, sources, summarySource, checkedAt) {
-      db.exec("BEGIN");
+      db.exec("BEGIN IMMEDIATE");
       try {
         mergeDetails(bookId, details, summarySource);
         const stored = JSON.parse((byIdStmt.get(bookId) as BookRow | undefined)?.data_sources ?? "[]") as DataSource[];
         saveDetailsStmt.run(details.rating, details.ratingCount, JSON.stringify(details.genres), JSON.stringify([...new Set([...stored, ...sources])]), details.sourceUrl, checkedAt, bookId);
         db.exec("COMMIT");
       } catch (error) {
-        db.exec("ROLLBACK");
+        if (db.isTransaction) db.exec("ROLLBACK");
         throw error;
       }
     },

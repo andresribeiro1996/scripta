@@ -132,6 +132,41 @@ test("covers, rejections and details round-trip", () => {
   assert.equal(repo.getBook(book.id)!.details_status, "missing");
 });
 
+test("createBook surfaces the insert's own error and leaves nothing behind when the key insert aborts", () => {
+  const { db, repo } = freshRepo();
+  db.exec(`CREATE TRIGGER fail_key BEFORE INSERT ON book_keys BEGIN SELECT RAISE(ABORT, 'key insert refused'); END`);
+  assert.throws(
+    () => repo.createBook({ title: "Orlando", author: "Virginia Woolf", isbn: "9780141184272" }, ["isbn:9780141184272"], NOW),
+    /key insert refused/
+  );
+  assert.equal(db.isTransaction, false);
+  assert.equal((db.prepare(`SELECT COUNT(*) AS n FROM books`).get() as { n: number }).n, 0);
+  assert.equal((db.prepare(`SELECT COUNT(*) AS n FROM book_keys`).get() as { n: number }).n, 0);
+});
+
+test("createBook surfaces the insert's own error when SQLite already rolled the transaction back", () => {
+  const { db, repo } = freshRepo();
+  db.exec(`CREATE TRIGGER fail_key BEFORE INSERT ON book_keys BEGIN SELECT RAISE(ROLLBACK, 'key insert rolled back'); END`);
+  assert.throws(
+    () => repo.createBook({ title: "Orlando", author: "Virginia Woolf", isbn: "9780141184272" }, ["isbn:9780141184272"], NOW),
+    /key insert rolled back/
+  );
+  assert.equal(db.isTransaction, false);
+  assert.equal((db.prepare(`SELECT COUNT(*) AS n FROM books`).get() as { n: number }).n, 0);
+});
+
+test("createBook starts its transaction as a write", () => {
+  const { db, repo } = freshRepo();
+  const seen: boolean[] = [];
+  const exec = db.exec.bind(db);
+  db.exec = (sql: string) => {
+    seen.push(sql === "BEGIN IMMEDIATE");
+    return exec(sql);
+  };
+  repo.createBook({ title: "Orlando", author: "Virginia Woolf", isbn: "9780141184272" }, ["isbn:9780141184272"], NOW);
+  assert.equal(seen[0], true);
+});
+
 test("createBook registers every key and addKey aliases an existing book", () => {
   const { repo } = freshRepo();
   const book = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593" }, ["isbn:9780441013593", "ta:dune|frank herbert|"], "2026-09-30T00:00:00.000Z");
