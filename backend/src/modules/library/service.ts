@@ -3,13 +3,13 @@
 // modules/auth/service.ts.
 
 import { createHash, randomUUID } from "node:crypto";
-import { applyLibraryChange, bookKey, bookMatchKeys, buildManualBook, calculateShelfTheme, isCertainMatch, isFinishedBook, isGroup, localDay, mergeDuplicateBooks, publicReaderCard, readerIdentity, seedCoverLookup, setReadStatus, type CoverLookupParams, type IdentityKey, type LibraryChange, type LibraryChangeAnswer, type LibraryData } from "@scripta/shared";
+import { applyLibraryChange, bookKey, bookMatchKeys, buildManualBook, calculateShelfTheme, isCertainMatch, isFinishedBook, isGroup, localDay, mergeDuplicateBooks, normalizeIsbn, publicReaderCard, readerIdentity, seedCoverLookup, setReadStatus, type CoverLookupParams, type IdentityKey, type LibraryChange, type LibraryChangeAnswer, type LibraryData } from "@scripta/shared";
 import type { BookRecommendationInput } from "@scripta/shared/community";
 import { BOOK_EVENTS_PER_SAVE, COVER_URL_MAX_LENGTH, DISPLAY_TEXT_MAX_LENGTH, LIBRARY_MATCH_BOOK_CAP, LIBRARY_PUT_HEADROOM_BYTES, MATCH_KEY_MAX_LENGTH } from "./domain/constants.js";
 import { LibraryChangeNotFoundError, LibraryConflictError, LibraryTooLargeError, NoLibraryDocumentError } from "./domain/errors.js";
 import type { LibraryRepository } from "./domain/ports.js";
 import type { LibraryBookRow, LibraryBookRows, LibraryDerived, LibraryDocument, LibraryDocumentRow, LibraryHighlightRow, LibraryMatchKeyRow, LibraryRows, LibrarySmallSave } from "./domain/types.js";
-import { libraryParts, normalizeIsbn, toPublicLibraryData, toReaderGroups } from "./publicResolver.js";
+import { libraryParts, resolvePublicLibrary, toReaderGroups } from "./publicResolver.js";
 
 export type BookEvent = { type: "book_added" | "book_finished"; refId: string; payload: Record<string, unknown> };
 
@@ -260,10 +260,10 @@ export interface LibraryService {
   /** Backs the public GET /library/shared/:token route. Returns null for
    *  an unknown OR no-longer-shared token — routes.ts turns that into a
    *  404 either way, so an unshared link and a never-valid one look
-   *  identical from the outside. The returned `data` is ALREADY redacted
-   *  via toPublicLibraryData — see that function's own comment for the
-   *  privacy boundary it enforces; this is the one place a stranger can
-   *  reach a user's library data with no session at all. */
+   *  identical from the outside. The returned `data` is ALREADY redacted:
+   *  it is built from the public columns of the library rows only; this is
+   *  the one place a stranger can reach a user's library data with no
+   *  session at all. */
   getPublicByToken(token: string): { data: unknown } | null;
 }
 
@@ -449,19 +449,10 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
     },
 
     getPublicByToken(token) {
-      const row = repo.getByShareToken(token);
-      if (!row) return null;
-      // Corrupt JSON in a stored row reads as "no such share" (murals'
-      // shared route treats it the same way) — this is a public,
-      // unauthenticated read path, not a place to 500 with parser details.
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(row.data);
-      } catch {
-        return null;
-      }
-      if (!isRecord(parsed)) return { data: parsed };
-      return { data: toPublicLibraryData(parsed) };
+      const owner = repo.getShareOwner(token);
+      if (!owner) return null;
+      const data = resolvePublicLibrary(owner);
+      return data ? { data } : null;
     }
   };
 }

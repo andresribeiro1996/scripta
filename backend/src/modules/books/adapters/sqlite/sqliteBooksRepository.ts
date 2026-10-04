@@ -6,6 +6,7 @@ import type { BookRow, CoverImageRow, DataSource, SummarySource } from "../../do
 
 export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const byKeyStmt = db.prepare(`SELECT books.* FROM book_keys JOIN books ON books.id = book_keys.book_id WHERE book_keys.key = ?`);
+  const byKeysStmt = db.prepare(`SELECT book_keys.key AS key, books.* FROM book_keys JOIN books ON books.id = book_keys.book_id WHERE book_keys.key IN (SELECT value FROM json_each(?))`);
   const byIdStmt = db.prepare(`SELECT * FROM books WHERE id = ?`);
   const insertBookStmt = db.prepare(`
     INSERT INTO books (id, title, author, year, publisher, isbn, ol_cover_id, ol_work_key, genres, data_sources, created_by, created_at)
@@ -75,6 +76,11 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
 
   return {
     findBookByKey: (key) => byKeyStmt.get(key) as BookRow | undefined,
+
+    findBooksByKeys(keys) {
+      const rows = byKeysStmt.all(JSON.stringify(keys)) as unknown as Array<BookRow & { key: string }>;
+      return new Map(rows.map(({ key, ...book }) => [key, book as BookRow]));
+    },
 
     getBook: (id) => byIdStmt.get(id) as BookRow | undefined,
 

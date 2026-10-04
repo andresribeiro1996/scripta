@@ -29,7 +29,7 @@ const { LibraryChangeNotFoundError, LibraryConflictError, LibraryTooLargeError, 
 const { backfillLibraryDerived, readEmbeddedMurals } = await import("./migration.js");
 const { LIBRARY_DERIVED_VERSION, LIBRARY_MATCH_BOOK_CAP, LIBRARY_PUT_HEADROOM_BYTES } = await import("./domain/constants.js");
 const { createLibraryService, deriveGlyph, deriveLibraryData, deriveLibraryRows } = await import("./service.js");
-const { readerGlyphFor, sharedBookCounts, sharedBooks } = await import("./publicResolver.js");
+const { readerGlyphFor, resolvePublicLibrary, sharedBookCounts, sharedBooks } = await import("./publicResolver.js");
 const { peekCachedCoverUrl } = await import("../books/index.js");
 
 const emptyRows = deriveLibraryRows({ books: [] }, () => undefined);
@@ -44,6 +44,7 @@ function memoryDb(): DatabaseSync {
 type RecordedEvent = { userId: string; type: "book_added" | "book_finished"; refId: string; payload: Record<string, unknown> };
 
 const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;
+const PUBLIC_VIEW_BUDGET_MS = 300;
 
 function setup(maxDocumentBytes = MAX_DOCUMENT_BYTES) {
   const db = memoryDb();
@@ -1669,7 +1670,7 @@ test("a document with a value that cannot be turned into text saves, and boot re
   }
 });
 
-test("rebuilding the 10 MiB fixture rewrites every row and logs the rebuild", () => {
+function tenMiBFixture(): string {
   const filler = "x".repeat(140);
   const books = Array.from({ length: 5000 }, (_, i) => ({
     Title: `Book ${i} ${filler}`,
@@ -1677,8 +1678,11 @@ test("rebuilding the 10 MiB fixture rewrites every row and logs the rebuild", ()
     ReadStatus: i % 3,
     highlights: Array.from({ length: 10 }, (_, j) => ({ BookmarkID: `${i}-${j}`, Text: `Quote ${j}`, Annotation: j % 2 ? "note" : "" }))
   }));
-  const json = JSON.stringify({ books });
-  rawDocument("fixture", json.padEnd(10 * 1024 * 1024 - 1024, " "));
+  return JSON.stringify({ books }).padEnd(10 * 1024 * 1024 - 1024, " ");
+}
+
+test("rebuilding the 10 MiB fixture rewrites every row and logs the rebuild", () => {
+  rawDocument("fixture", tenMiBFixture());
   const log = mock.method(console, "log");
   try {
     backfillLibraryDerived();
@@ -1688,6 +1692,26 @@ test("rebuilding the 10 MiB fixture rewrites every row and logs the rebuild", ()
   } finally {
     log.mock.restore();
     createSqliteLibraryRepository(fileDb).deleteUserData("fixture");
+  }
+});
+
+test("a public library view of the 10 MiB fixture never parses the document and stays under its budget", () => {
+  rawDocument("fixture-public", tenMiBFixture());
+  backfillLibraryDerived();
+  const token = fileService.share("fixture-public").shareToken!;
+  const parsed = mock.method(JSON, "parse");
+  try {
+    const started = performance.now();
+    const shared = fileService.getPublicByToken(token);
+    const profile = resolvePublicLibrary("fixture-public");
+    const elapsed = performance.now() - started;
+    assert.equal((shared!.data as { books: unknown[] }).books.length, 5000);
+    assert.equal((profile!.books as unknown[]).length, 5000);
+    assert.ok(parsed.mock.calls.every((call) => String(call.arguments[0]).length < 100_000), "no call parses the document");
+    assert.ok(elapsed < PUBLIC_VIEW_BUDGET_MS, `both views took ${Math.round(elapsed)} ms`);
+  } finally {
+    parsed.mock.restore();
+    createSqliteLibraryRepository(fileDb).deleteUserData("fixture-public");
   }
 });
 

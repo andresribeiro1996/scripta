@@ -32,7 +32,7 @@ export function createSqliteLibraryRepository(db: DatabaseSync): LibraryReposito
   // library document (a normal, frequent PUT /library) must never disturb
   // an existing share link.
   const setShareTokenStmt = db.prepare(`UPDATE library_documents SET share_token = ? WHERE user_id = ?`);
-  const getByShareTokenStmt = db.prepare(`SELECT * FROM library_documents WHERE share_token = ?`);
+  const getShareOwnerStmt = db.prepare(`SELECT user_id, share_token FROM library_documents WHERE share_token = ?`);
   const deleteKeysStmt = db.prepare(`DELETE FROM library_match_keys WHERE user_id = ?`);
   const insertKeyStmt = db.prepare(`
     INSERT INTO library_match_keys (user_id, key, book_ref, title, author, isbn, cover)
@@ -200,8 +200,8 @@ export function createSqliteLibraryRepository(db: DatabaseSync): LibraryReposito
       return getStmt.get(userId) as LibraryDocumentRow | undefined;
     },
 
-    getByShareToken(token) {
-      return getByShareTokenStmt.get(token) as LibraryDocumentRow | undefined;
+    getShareOwner(token) {
+      return (getShareOwnerStmt.get(token) as { user_id: string } | undefined)?.user_id;
     }
   };
 }
