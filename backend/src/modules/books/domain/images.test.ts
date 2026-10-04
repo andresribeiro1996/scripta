@@ -141,3 +141,67 @@ test("a landscape image is refused", async () => {
 test("a corrupt buffer is refused", async () => {
   assert.equal(await classifyPublisherImage(Buffer.from("<html>not an image</html>")), null);
 });
+
+async function ratioOf(image: Buffer) {
+  const { width, height } = await sharp(image).metadata();
+  return height! / width!;
+}
+
+test("a transparent canvas around an opaque book is cropped", async () => {
+  const book = await sharp({ create: { width: 1100, height: 1600, channels: 4, background: { r: 42, g: 111, b: 151, alpha: 1 } } }).png().toBuffer();
+  const image = await sharp({ create: { width: 2048, height: 2048, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+    .composite([{ input: book, left: 474, top: 224 }])
+    .png()
+    .toBuffer();
+  const result = await classifyPublisherImage(image);
+  assert.equal(result?.kind, "cropped");
+  assert.ok(Math.abs((await ratioOf(result!.input)) - 1600 / 1100) < 0.01);
+});
+
+test("corners that differ by 15 are uniform and corners that differ by 40 are not", async () => {
+  const book = await rectangle(1100, 1600, "#2a6f97", 474, 224);
+  const slightly = await canvas(2048, 2048, "#ffffff", [await rectangle(60, 60, "#f0f0f0", 0, 0), book]);
+  assert.equal((await classifyPublisherImage(slightly))?.kind, "cropped");
+  const strongly = await canvas(2048, 2048, "#ffffff", [await rectangle(60, 60, "#d7d7d7", 0, 0), book]);
+  assert.equal((await classifyPublisherImage(strongly))?.kind, "flat");
+});
+
+test("a saturated uniform canvas is a cover, not a photo canvas", async () => {
+  const image = await canvas(2560, 2522, "rgb(228,6,19)", [await rectangle(1500, 2100, "#ffffff", 530, 211)]);
+  assert.equal((await classifyPublisherImage(image))?.kind, "flat");
+});
+
+test("a shadow band stays outside the crop and a pale cover edge stays inside it", async () => {
+  const shadowed = await canvas(2048, 2048, "#ffffff", [
+    await rectangle(1400, 1300, "#d7d7d7", 324, 374),
+    await rectangle(1000, 1300, "#2a6f97", 524, 374),
+  ]);
+  const shadowedResult = await classifyPublisherImage(shadowed);
+  assert.equal(shadowedResult?.kind, "cropped");
+  assert.ok(Math.abs((await ratioOf(shadowedResult!.input)) - 1.3) < 0.01);
+
+  const pale = await canvas(2048, 2048, "#ffffff", [
+    await rectangle(1000, 1500, "#bebebe", 524, 274),
+    await rectangle(800, 900, "#222222", 624, 574),
+  ]);
+  const paleResult = await classifyPublisherImage(pale);
+  assert.equal(paleResult?.kind, "cropped");
+  assert.ok(Math.abs((await ratioOf(paleResult!.input)) - 1.5) < 0.01);
+});
+
+test("a crop that keeps too little of the canvas is refused even when its ratio is right", async () => {
+  assert.equal(await classifyPublisherImage(await canvas(2048, 2048, "#ffffff", [await rectangle(100, 150, "#222222", 974, 949)])), null);
+  assert.equal(await classifyPublisherImage(await canvas(1000, 1000, "#ffffff", [await rectangle(432, 648, "#2a6f97", 284, 176)])), null);
+  assert.equal((await classifyPublisherImage(await canvas(1000, 1000, "#ffffff", [await rectangle(462, 693, "#2a6f97", 269, 153)])))?.kind, "cropped");
+});
+
+test("the crop is measured after the image is rotated upright", async () => {
+  const stored = await sharp({ create: { width: 2048, height: 2048, channels: 3, background: "#ffffff" } })
+    .composite([await rectangle(1600, 1100, "#2a6f97", 224, 474)])
+    .withMetadata({ orientation: 6 })
+    .jpeg()
+    .toBuffer();
+  const result = await classifyPublisherImage(stored);
+  assert.equal(result?.kind, "cropped");
+  assert.ok(Math.abs((await ratioOf(result!.input)) - 1600 / 1100) < 0.01);
+});
