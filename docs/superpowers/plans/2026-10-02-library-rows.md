@@ -8,8 +8,9 @@ pages stop parsing whole libraries. Clients don't change.
 
 **Spec:** `docs/superpowers/specs/2026-10-01-library-rows-design.md`.
 
-**Base:** `claude/exciting-brown-ccq1ct` after workstreams 1–4 are integrated
-(the library routes were restructured into rate-limit scopes there).
+**Base:** `main` after small saves PR 1 (#111): the library routes are in
+rate-limit scopes, and `applyChange` writes a change through
+`updateDocumentData` without re-deriving the whole document.
 
 **Rules:** root `AGENTS.md`, `backend/AGENTS.md`. No code comments. Response
 shapes of every route below stay byte-for-byte the same JSON values (key order
@@ -86,10 +87,33 @@ prove nothing changed.
 - [ ] `deriveLibraryRows(data)` in `service.ts`, next to `deriveLibraryData`:
   pure, returns the rows and the summary, with each book's `row_hash` taken
   from its JSON text.
-- [ ] `writeDerived` (same transaction as the document, every write path) only
-  rewrites books whose `(position, row_hash)` changed, deletes positions that
-  no longer exist, rewrites highlights only for changed books, and replaces
-  the summary.
+- [ ] `writeDerived` (same transaction as the document, every whole-document
+  write path: `saveLibrary`, `addBook`, `mergeBooks`, and `applyChange` for an
+  add, which goes through `upsertDocument`) only rewrites books whose
+  `(position, row_hash)` changed, deletes positions that no longer exist,
+  rewrites highlights only for changed books, and replaces the summary.
+- [ ] **Small saves keep the rows in step too.** `applyChange` for a membership
+  or book change writes through `updateDocumentData`, which today takes a
+  glyph or `"keep"` and moves `library_derived` only where it was current for
+  the previous version. Extend that, keeping the same "current for the
+  previous version" rule for every derived table (a stale account stays
+  stale for the startup step to rebuild):
+  - **Book change** (status, rating): rewrite only the rows of the books
+    `applyLibraryChange` replaced. They are the entries whose object identity
+    changed (it returns the same objects for the rest), so finding them needs
+    no hashing or `bookKey` scan. Their `row_hash` comes from their own JSON.
+    Highlights are untouched.
+  - **Membership change:** no book rows change; replace `meta.groups`.
+  - **Summary:** recount `finished_count` and `in_progress_count` from the
+    parsed books (one loop, no stringify). `reader_card` is recomputed on
+    exactly the glyph's rule (both are `readerIdentity`: a status to or from
+    Finished, or a tick in a series group), else kept. `shelf_theme` reads
+    only genres, which no membership or book change alters, so it is kept.
+  - Measure a book change and a membership change on the 10 MiB fixture
+    before and after; put both in the commit message. The goal is no more
+    than about 10 ms added to 2a's 140–200 ms.
+  - `applyChange` hands the repository the changed positions and the new
+    summary; it does not call `deriveLibraryRows` over the whole document.
 - [ ] `LIBRARY_DERIVED_VERSION` 1 → 2 and the gate in `connection.ts` becomes
   `storedVersion !== derivedVersion` (a rolled-back build rebuilds too); the
   tables it drops include the new ones, so the startup step rebuilds every
@@ -98,6 +122,13 @@ prove nothing changed.
 - [ ] Tests: rows match the document after a save, an edit of one book (only
   that row rewritten, verified by its rowid or a write counter), a reorder, a
   deletion and a merge; deleting the account clears everything.
+- [ ] Tests for small saves: after each kind of change (a tick in a series
+  group, a tick in a collection, a status to and from Finished, a rating, an
+  add), the stored rows and summary equal `deriveLibraryRows` of the stored
+  document. A book change rewrites only that book's row. A change on an
+  account whose derived rows were already stale leaves them stale, and the
+  startup step then rebuilds them. A startup run straight after a change
+  rebuilds nothing.
 
 ## Task 4: Reads use rows
 
