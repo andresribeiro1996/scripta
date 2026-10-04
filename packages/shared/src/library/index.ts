@@ -14,6 +14,8 @@ export * from "./libraryView.js";
 export * from "./groups.js";
 export * from "./libraryOrder.js";
 export * from "./addPipeline.js";
+export * from "./libraryChange.js";
+export * from "./librarySaver.js";
 export * from "./libraryStyle.js";
 export * from "./csv.js";
 export * from "./goodreads.js";
