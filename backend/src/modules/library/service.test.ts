@@ -1444,8 +1444,32 @@ test("updateDocumentData never touches the match keys or the share token", () =>
   db.close();
 });
 
+test("a row rewrite with no work id keeps the stored one for the same book", () => {
+  const { db, service } = setup();
+  const saved = service.saveLibrary("u1", { books: [{ Title: "Dune", Attribution: "Frank Herbert", ISBN: "9780441013593" }] });
+  db.prepare("UPDATE library_books SET work_id = 'w-dune' WHERE user_id = 'u1'").run();
+  service.saveLibrary("u1", { books: [{ Title: "Dune", Attribution: "Frank Herbert", ISBN: "9780441013593", ReadStatus: 2 }] }, saved.updatedAt);
+  assert.equal((db.prepare("SELECT work_id FROM library_books WHERE user_id = 'u1'").get() as { work_id: string | null }).work_id, "w-dune");
+});
+
+test("a different book at the same position does not inherit the work id", () => {
+  const { db, service } = setup();
+  const saved = service.saveLibrary("u1", { books: [{ Title: "Dune", Attribution: "Frank Herbert", ISBN: "9780441013593" }] });
+  db.prepare("UPDATE library_books SET work_id = 'w-dune' WHERE user_id = 'u1'").run();
+  service.saveLibrary("u1", { books: [{ Title: "Orlando", Attribution: "Virginia Woolf" }] }, saved.updatedAt);
+  assert.equal((db.prepare("SELECT work_id FROM library_books WHERE user_id = 'u1'").get() as { work_id: string | null }).work_id, null);
+});
+
+test("an existing database gains library_books.work_id", () => {
+  const db = new DatabaseSync(":memory:");
+  db.exec("CREATE TABLE library_books (user_id TEXT NOT NULL, position INTEGER NOT NULL, book_key TEXT NOT NULL, title TEXT, author TEXT, isbn TEXT, image_id TEXT, read_status REAL, series_number REAL, sort_order REAL, cover_url TEXT, finished_year INTEGER, row_hash TEXT NOT NULL, PRIMARY KEY (user_id, position))");
+  applyLibrarySchema(db);
+  const columns = (db.prepare("PRAGMA table_info(library_books)").all() as Array<{ name: string }>).map((column) => column.name);
+  assert.ok(columns.includes("work_id"));
+});
+
 const rowsInDb = (db: DatabaseSync, userId: string) => ({
-  books: (db.prepare(`SELECT position, book_key, title, author, isbn, image_id, read_status, series_number, sort_order, cover_url, finished_year, row_hash FROM library_books WHERE user_id = ? ORDER BY position`).all(userId) as Array<Record<string, unknown>>).map((row) => ({ ...row })),
+  books: (db.prepare(`SELECT position, book_key, title, author, isbn, image_id, read_status, series_number, sort_order, cover_url, finished_year, work_id, row_hash FROM library_books WHERE user_id = ? ORDER BY position`).all(userId) as Array<Record<string, unknown>>).map((row) => ({ ...row })),
   highlights: (db.prepare(`SELECT position, highlight_id, text, annotation FROM library_highlights WHERE user_id = ? ORDER BY position, highlight_id`).all(userId) as Array<Record<string, unknown>>).map((row) => ({ ...row })),
   summary: { ...(db.prepare(`SELECT meta, reader_card, shelf_theme, total_books, finished_count, in_progress_count, total_highlights, source_updated_at FROM library_summary WHERE user_id = ?`).get(userId) as Record<string, unknown> | undefined) }
 });
@@ -1464,6 +1488,7 @@ function trackRowWrites(db: DatabaseSync) {
   db.exec(`
     CREATE TABLE row_writes (kind TEXT, position INTEGER);
     CREATE TRIGGER track_books AFTER INSERT ON library_books BEGIN INSERT INTO row_writes VALUES ('book', NEW.position); END;
+    CREATE TRIGGER track_book_updates AFTER UPDATE ON library_books BEGIN INSERT INTO row_writes VALUES ('book', NEW.position); END;
     CREATE TRIGGER track_highlights AFTER INSERT ON library_highlights BEGIN INSERT INTO row_writes VALUES ('highlight', NEW.position); END;
   `);
   return () => {
@@ -1798,6 +1823,21 @@ test("a small save on an account whose rows are at an older version leaves it st
   assert.ok(!createSqliteLibraryRepository(fileDb).listStaleUserIds().includes(userId));
   assert.ok(hashes().every((hash, position) => hash !== old[position]));
   assert.deepEqual(rowsInDb(fileDb, userId), rowsOfStored(fileDb, userId));
+});
+
+test("the startup row rebuild keeps the work ids of books whose key is unchanged", () => {
+  const userId = "rv-work";
+  fileService.saveLibrary(userId, { books: [marked("Alpha", ["a1"]), marked("Beta", ["b1"])] });
+  const row = fileDb.prepare(`SELECT data, updated_at FROM library_documents WHERE user_id = ?`).get(userId) as { data: string; updated_at: string };
+  createSqliteLibraryRepository(fileDb, 0).setRows(userId, deriveLibraryRows(JSON.parse(row.data), () => undefined, 0), row.updated_at);
+  fileDb.prepare(`UPDATE library_books SET work_id = 'w-' || position WHERE user_id = ?`).run(userId);
+  const workIds = () => (fileDb.prepare(`SELECT work_id FROM library_books WHERE user_id = ? ORDER BY position`).all(userId) as Array<{ work_id: string | null }>).map((book) => book.work_id);
+  assert.deepEqual(workIds(), ["w-0", "w-1"]);
+
+  backfillLibraryDerived();
+
+  assert.ok(!createSqliteLibraryRepository(fileDb).listStaleUserIds().includes(userId));
+  assert.deepEqual(workIds(), ["w-0", "w-1"]);
 });
 
 test("raising the rows version rebuilds every account and rewrites every book row, and the same version rebuilds nothing", () => {

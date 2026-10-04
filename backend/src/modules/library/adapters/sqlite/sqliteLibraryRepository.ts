@@ -53,8 +53,14 @@ export function createSqliteLibraryRepository(db: DatabaseSync, rowsVersion = LI
   `);
   const listRowHashesStmt = db.prepare(`SELECT position, row_hash FROM library_books WHERE user_id = ?`);
   const upsertBookStmt = db.prepare(`
-    INSERT OR REPLACE INTO library_books (user_id, position, book_key, title, author, isbn, image_id, read_status, series_number, sort_order, cover_url, finished_year, row_hash)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO library_books (user_id, position, book_key, title, author, isbn, image_id, read_status, series_number, sort_order, cover_url, finished_year, row_hash, work_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT (user_id, position) DO UPDATE SET
+      book_key = excluded.book_key, title = excluded.title, author = excluded.author, isbn = excluded.isbn,
+      image_id = excluded.image_id, read_status = excluded.read_status, series_number = excluded.series_number,
+      sort_order = excluded.sort_order, cover_url = excluded.cover_url, finished_year = excluded.finished_year,
+      row_hash = excluded.row_hash,
+      work_id = COALESCE(excluded.work_id, CASE WHEN library_books.book_key = excluded.book_key THEN library_books.work_id END)
   `);
   const deleteBookStmt = db.prepare(`DELETE FROM library_books WHERE user_id = ? AND position = ?`);
   const deletePositionHighlightsStmt = db.prepare(`DELETE FROM library_highlights WHERE user_id = ? AND position = ?`);
@@ -81,13 +87,17 @@ export function createSqliteLibraryRepository(db: DatabaseSync, rowsVersion = LI
     setDerivedStmt.run(userId, derived.glyph, sourceUpdatedAt);
   }
 
+  function rowHashes(userId: string) {
+    return new Map((listRowHashesStmt.all(userId) as Array<{ position: number; row_hash: string }>).map((row) => [row.position, row.row_hash]));
+  }
+
   function writeRows(userId: string, rows: LibraryRows, sourceUpdatedAt: string) {
-    const stored = new Map((listRowHashesStmt.all(userId) as Array<{ position: number; row_hash: string }>).map((row) => [row.position, row.row_hash]));
+    const stored = rowHashes(userId);
     for (const { book, highlights } of rows.books) {
       const unchanged = stored.get(book.position) === book.row_hash;
       stored.delete(book.position);
       if (unchanged) continue;
-      upsertBookStmt.run(userId, book.position, book.book_key, book.title, book.author, book.isbn, book.image_id, book.read_status, book.series_number, book.sort_order, book.cover_url, book.finished_year, book.row_hash);
+      upsertBookStmt.run(userId, book.position, book.book_key, book.title, book.author, book.isbn, book.image_id, book.read_status, book.series_number, book.sort_order, book.cover_url, book.finished_year, book.row_hash, book.work_id);
       deletePositionHighlightsStmt.run(userId, book.position);
       for (const highlight of highlights) insertHighlightStmt.run(userId, book.position, highlight.highlight_id, highlight.text, highlight.annotation);
     }
@@ -114,7 +124,7 @@ export function createSqliteLibraryRepository(db: DatabaseSync, rowsVersion = LI
     });
     if (result.changes === 0) return;
     for (const book of rows.books) {
-      upsertBookStmt.run(userId, book.position, book.book_key, book.title, book.author, book.isbn, book.image_id, book.read_status, book.series_number, book.sort_order, book.cover_url, book.finished_year, book.row_hash);
+      upsertBookStmt.run(userId, book.position, book.book_key, book.title, book.author, book.isbn, book.image_id, book.read_status, book.series_number, book.sort_order, book.cover_url, book.finished_year, book.row_hash, book.work_id);
     }
   }
 
@@ -178,6 +188,8 @@ export function createSqliteLibraryRepository(db: DatabaseSync, rowsVersion = LI
     listStaleUserIds() {
       return (listStaleStmt.all(rowsVersion) as Array<{ user_id: string }>).map((row) => row.user_id);
     },
+
+    rowHashes,
 
     setDerived(userId, derived, sourceUpdatedAt) {
       inTransaction(() => writeDerived(userId, derived, sourceUpdatedAt));
