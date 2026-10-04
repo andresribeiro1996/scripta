@@ -211,6 +211,19 @@ test("listUncheckedCoverIds returns only never-checked books, oldest first", () 
   assert.deepEqual(repo.listUncheckedCoverIds(), [older.id, newer.id]);
 });
 
+test("listUncheckedCoverIds includes a low-res cover stored without a check time, never a manual one", () => {
+  const { repo } = freshRepo();
+  const low = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: null }, ["ta:dune|frank herbert|"], NOW);
+  const manual = repo.createBook({ title: "Emma", author: "Jane Austen", isbn: null }, ["ta:emma|jane austen|"], NOW);
+  repo.insertImage({ id: "img-low", book_id: low.id, source: "apple", source_url: null, width: 300, height: 460, byte_size: 10, created_at: NOW });
+  repo.setCover(low.id, { imageId: "img-low", status: "low_res", checkedAt: null });
+  repo.insertImage({ id: "img-manual", book_id: manual.id, source: "upload", source_url: null, width: 300, height: 460, byte_size: 10, created_at: NOW });
+  repo.setCover(manual.id, { imageId: "img-manual", status: "manual", checkedAt: null });
+  assert.deepEqual(repo.listUncheckedCoverIds(), [low.id]);
+  repo.setCover(low.id, { imageId: "img-low", status: "low_res", checkedAt: NOW });
+  assert.deepEqual(repo.listUncheckedCoverIds(), []);
+});
+
 test("listUncheckedDetailIds returns never-checked books, oldest first, up to the limit", () => {
   const { repo } = freshRepo();
   const newest = repo.createBook({ title: "Emma", author: "Jane Austen", isbn: null }, ["ta:emma|jane austen|"], "2026-10-03T00:00:00.000Z");
@@ -390,7 +403,17 @@ test("an existing database gains publisher_url, created_by and cover_images.orig
   assert.equal(book.pages, null);
   assert.equal(book.translator, null);
   assert.equal(book.summary_source, null);
+  assert.equal(book.apple_checked_at, null);
   assert.equal(repo.getImage("img")!.origin, null);
+});
+
+test("setAppleChecked stamps the book and survives a repeated migration", () => {
+  const { db, repo } = freshRepo();
+  const book = repo.createBook({ title: "A", author: "A", isbn: null }, ["ta:a|a|"], NOW);
+  assert.equal(book.apple_checked_at, null);
+  repo.setAppleChecked(book.id, NOW);
+  applyBooksMigrations(db);
+  assert.equal(repo.getBook(book.id)!.apple_checked_at, NOW);
 });
 
 test("insertImage stores the origin and createBook stores its creator", () => {

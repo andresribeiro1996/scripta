@@ -116,9 +116,10 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
     };
   }
 
-  function sourcesFor(lane: CoverPriority): CoverSources {
+  function sourcesFor(lane: CoverPriority, book: BookRow): CoverSources {
     if (lane === "front" || lane === "normal") return { apple: NO_SOURCE, isbndb: deps.sources.isbndb, openlibrary: deps.sources.openlibrary };
     if (lane === "upgrade") return { apple: deps.sources.apple, isbndb: null, openlibrary: NO_SOURCE };
+    if (!olderThan(book.apple_checked_at, RETRY_AFTER_MS)) return { ...deps.sources, apple: NO_SOURCE };
     return deps.sources;
   }
 
@@ -222,7 +223,9 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       const book = deps.repo.getBook(bookId);
       if (!book || book.cover_status === "manual") return;
       try {
-        const outcome = await findBestCover({ isbn: book.isbn, title: book.title, author: book.author }, deps.repo.listRejectedUrls(bookId), sourcesFor(lane), deps.fetchImage);
+        const sources = sourcesFor(lane, book);
+        const outcome = await findBestCover({ isbn: book.isbn, title: book.title, author: book.author }, deps.repo.listRejectedUrls(bookId), sources, deps.fetchImage);
+        if (sources.apple !== NO_SOURCE && !outcome.failures.some((failure) => failure.source === "apple")) deps.repo.setAppleChecked(bookId, now().toISOString());
         for (const failure of outcome.failures.filter((failure) => !(failure instanceof SourcePausedError))) deps.warn({ bookId, source: failure.source, error: failure.message }, "cover source unavailable");
 
         const latest = deps.repo.getBook(bookId);
