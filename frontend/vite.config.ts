@@ -3,14 +3,15 @@ import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig, loadEnv } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import { escapeRegExp, libraryCacheKey, libraryCachePattern, libraryFreshPattern } from './swLibraryPattern.ts'
 import { CERT_PATH, KEY_PATH, mobileCertsExist } from '../scripts/mobileCertPaths.mjs'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const apiBase = env.VITE_API_URL ?? 'http://localhost:3000'
-  const escapedApiBase = apiBase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const escapedImagesBase = (env.VITE_IMAGES_URL ?? 'https://images.atmyshelf.com').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const escapedApiBase = escapeRegExp(apiBase)
+  const escapedImagesBase = escapeRegExp(env.VITE_IMAGES_URL ?? 'https://images.atmyshelf.com')
   // Once `node scripts/gen-mobile-certs.mjs` (repo root) has been run,
   // serve https here too — the backend does the same (see
   // backend/src/config/devCerts.ts) reading the exact same pair. Needed
@@ -51,11 +52,20 @@ export default defineConfig(({ mode }) => {
         workbox: {
           runtimeCaching: [
             {
-              urlPattern: new RegExp(`^${escapedApiBase}/library$`),
+              urlPattern: libraryCachePattern(apiBase),
               handler: 'StaleWhileRevalidate',
               options: {
                 cacheName: 'api-library',
                 expiration: { maxEntries: 1 }
+              }
+            },
+            {
+              urlPattern: libraryFreshPattern(apiBase),
+              handler: 'NetworkFirst',
+              options: {
+                cacheName: 'api-library',
+                expiration: { maxEntries: 1 },
+                plugins: [{ cacheKeyWillBeUsed: async ({ request }) => libraryCacheKey(request.url) }]
               }
             },
             {

@@ -74,6 +74,19 @@ test("PUT /library saves a book whose fields aren't text", async () => {
   await app.close();
 });
 
+test("GET /library?fresh=1 answers like GET /library", async () => {
+  const { app } = await setup();
+  const book = { Title: "Dune", ISBN: "9780441013593" };
+  await app.inject({ method: "PUT", url: "/library", headers: { authorization: "Bearer u1" }, payload: { data: { books: [book] } } });
+  const get = (url: string) => app.inject({ method: "GET", url, headers: { authorization: "Bearer u1" } });
+  const plain = await get("/library");
+  const fresh = await get("/library?fresh=1");
+  assert.equal(fresh.statusCode, 200);
+  assert.equal(fresh.statusCode, plain.statusCode);
+  assert.deepEqual(fresh.json(), plain.json());
+  await app.close();
+});
+
 test("PUT /library rejects an anonymous caller before the body is read", async () => {
   const { app } = await setup();
   const send = (headers: Record<string, string>) =>

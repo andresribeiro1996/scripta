@@ -5,10 +5,8 @@ import { Text } from "../../ui/Text";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { filterBooks, seedCoverLookup, toSeedBook, type SeedBook } from "@scripta/shared";
 import { Button, EmptyState, ErrorState, Input, Screen, Sheet, Skeleton, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
-import { apiClient } from "../../core/api";
+import { useLibrary } from "../library";
 import { createTournament, fetchTournament, randomFillTournament, resolveCover, setTournamentSlots, startTournament, type TournamentSummary } from "./api";
-
-interface LibraryResponse { data: { books?: Array<Record<string, unknown>> } | null }
 
 export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: TournamentSummary; onStarted: (id: string) => void }) {
   const { colors } = useTheme();
@@ -22,7 +20,7 @@ export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: Tourna
   const [bookSearch, setBookSearch] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const library = useQuery({ queryKey: ["library"], queryFn: () => apiClient.request<LibraryResponse>("/library", { auth: true }), retry: false });
+  const library = useLibrary();
   const saved = useQuery({
     queryKey: ["arena", current?.id, "seed"],
     queryFn: () => fetchTournament(current!.id, "owner-seed"),

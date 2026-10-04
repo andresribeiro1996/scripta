@@ -1,13 +1,13 @@
 import { useState } from "react";
-import { bookKey, localDay, saveFailureMessage, setReadStatus, upNextPair } from "@scripta/shared";
-import { useLibrary } from "../hooks/useLibrary";
+import { bookKey, saveFailureMessage, upNextPair } from "@scripta/shared";
+import { useLibrarySaver } from "../hooks/useLibrarySaver";
 import { CoverImage } from "./BookCard";
 import { DuelButton } from "./DuelButton";
 import { Sheet } from "./Sheet";
 import { useToast } from "./Toaster";
 
 export function PickNextSheet({ keys, books, onClose }: { keys: string[]; books: Array<Record<string, unknown>>; onClose: () => void }) {
-  const { updateLibrary } = useLibrary();
+  const saver = useLibrarySaver();
   const toast = useToast();
   const [offset, setOffset] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -21,16 +21,10 @@ export function PickNextSheet({ keys, books, onClose }: { keys: string[]; books:
   async function choose(book: Record<string, unknown>) {
     if (saving) return;
     setSaving(true);
-    const key = bookKey(book);
-    const day = localDay();
-    try {
-      await updateLibrary((data) => ({ ...data, books: data.books.map((b) => (bookKey(b) === key ? setReadStatus(b, 1, day) : b)) }));
-      onClose();
-    } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't save the status change."), kind: "error" });
-    } finally {
-      setSaving(false);
-    }
+    const result = await saver.submit({ kind: "book", bookKey: bookKey(book), readStatus: 1 });
+    if (result.ok) onClose();
+    else toast({ message: saveFailureMessage(result.error, "Couldn't save the status change."), kind: "error" });
+    setSaving(false);
   }
 
   return (
