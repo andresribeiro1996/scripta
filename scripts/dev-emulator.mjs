@@ -52,7 +52,6 @@ import { androidEnv } from "./androidSdk.mjs";
 import { devDataDirEnv } from "./devDataDir.mjs";
 import { DEV_USERNAME } from "./dev-account.mjs";
 import { assertAdoptedBackendMatches, ensureSharedBuilt, resetDevDataIfRequested, seedCommunityGraph, seedDevAccount, seedFixtureUsers } from "./devFixtureSetup.mjs";
-import { upsertEnvLine } from "./devEnvFile.mjs";
 import { claimThisWorktreeSlot } from "./devClaim.mjs";
 import { assertHoldsDevice, recordDeviceSerial, registryPath, takeDevice } from "./devRegistry.mjs";
 import { isReachableOn, worktreeIdentity } from "./devHost.mjs";
@@ -215,11 +214,6 @@ export function metroNodeOptions(existing) {
 }
 
 async function ensureMetroRunning() {
-  // adb reverse (below) makes the emulator's own 127.0.0.1 resolve to
-  // this machine, exactly like a real device over USB — so unlike
-  // dev-mobile.mjs's LAN-IP dance for a physical phone, the emulator can
-  // just use loopback.
-  upsertEnvLine(join(mobileDir, ".env.local"), "EXPO_PUBLIC_API_URL", `http://127.0.0.1:${BACKEND_PORT}`);
   if (await isPortOpen(METRO_PORT)) {
     log(`Metro already listening on ${METRO_PORT}.`);
     return join(runtimeDir, "metro.log");
