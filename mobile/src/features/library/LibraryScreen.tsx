@@ -170,7 +170,8 @@ export function LibraryScreen() {
                 <IconButton framed
                   accessibilityLabel={`Delete ${selectedKeys.size} selected`}
                   name="delete"
-                  onPress={selectedKeys.size === 0 ? undefined : handleDeleteSelected}
+                  disabled={selectedKeys.size === 0}
+                  onPress={handleDeleteSelected}
                   tone="danger"
                 />
               ),
@@ -178,6 +179,8 @@ export function LibraryScreen() {
           : {
               headerShown: true,
               title: library?.data.name || "Library",
+              headerBackVisible: undefined,
+              headerLeft: undefined,
               headerRight: () => (
                 <HeaderActions>
                   {onCollectionsTab

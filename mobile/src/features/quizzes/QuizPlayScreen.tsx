@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { PublicQuizQuestion } from "@scripta/shared";
 import { useQuery } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { router, Stack } from "expo-router";
+import { isPermanentError } from "../../core/apiClient";
 import { Image } from "expo-image";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
@@ -90,7 +91,7 @@ export function QuizPlayScreen({ code }: { code: string }) {
     <Stack.Screen options={{ headerShown: true, title: board.data?.board.name ?? "Quiz" }} />
     {error ? <Toast visible message={error} tone="error" /> : null}
     {stage === "loading" || board.isPending ? <Screen bottom style={styles.screen}><Skeleton height={180} /></Screen>
-    : stage === "unavailable" ? <ErrorState title="No quiz at that link" body="Check the code and try again." actionLabel="Retry" onAction={() => void board.refetch()} />
+    : stage === "unavailable" ? <ErrorState title="No quiz at that link" body="Check the code and try again." actionLabel={isPermanentError(board.error) ? "Go to Atmyshelf" : "Retry"} onAction={isPermanentError(board.error) ? () => router.replace("/") : () => void board.refetch()} />
     : recoverError ? <ErrorState title="Couldn't check your previous plays" body={recoverError} actionLabel="Retry" onAction={() => { setRecoverError(null); loadOwnPlay(); }} />
     : stage === "closed" ? <ErrorState title="This quiz isn't open for play" body="Its owner closed it for now." />
     : stage === "played" && board.data ? <EndScreen code={code} board={board.data.board} result={result!} returning={submitted === null} tab={tab} setTab={setTab} />
