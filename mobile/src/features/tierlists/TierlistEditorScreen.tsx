@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { FlatList, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { apiClient, ApiError } from "../../core/api";
+import { useLibrary } from "../library";
 import { Button, Dialog, EmptyState, ErrorState, Fab, HeaderActions, IconButton, Input, Menu, type MenuItem, Screen, Sheet, Skeleton, SwipeableTabs, Toast, dynamicType, spacing, typography, useTheme } from "../../ui";
 import { fetchMyBallot, fetchTierlistResults, fetchVotingBoard, openVoting, renderTierlistShareVideo, setVotingState, updateTierlist, type Tierlist } from "./api";
 import { moveBookTo } from "./tierBoardData";
@@ -16,7 +17,6 @@ import { TierlistShareImage } from "./TierlistShareImage";
 import { ContentShareSheet } from "../sharing/ContentShareSheet";
 import { publicContentUrl } from "../sharing/links";
 
-interface LibraryResponse { data: { books?: Array<Record<string, unknown>> } | null }
 
 type EditorView = "sort" | "board" | "results";
 
@@ -43,7 +43,7 @@ export function TierlistEditorScreen({ tierlist, onUpdated, startInRank = false 
   const [imageReady, setImageReady] = useState(false);
   const [shareView, setShareView] = useState<"board" | "results">("board");
   const [resultMode, setResultMode] = useState<AggregationMode>("average");
-  const library = useQuery({ queryKey: ["library"], queryFn: () => apiClient.request<LibraryResponse>("/library", { auth: true }), retry: false });
+  const library = useLibrary();
   const board = useQuery({ queryKey: ["tierlists", "voting", current.voteCode], queryFn: () => fetchVotingBoard(current.voteCode!), enabled: Boolean(current.voteCode), retry: false });
   const results = useQuery({ queryKey: ["tierlists", "results", current.id], queryFn: () => fetchTierlistResults(current.id), enabled: Boolean(current.voteCode), retry: false });
   // Opening voting blanks the tier list document and keeps the owner's own

@@ -4,11 +4,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { bookKey, createTier, DEFAULT_TIER_PRESET, filterBooks, type TierlistData } from "@scripta/shared";
 import { FlatList, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
-import { apiClient } from "../../core/api";
+import { useLibrary } from "../library";
 import { Button, ErrorState, Input, Screen, Segmented, Skeleton, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { createTierlist, type Tierlist } from "./api";
 
-interface LibraryResponse { data: { books?: Array<Record<string, unknown>> } | null }
 
 const VISIBILITY = [{ value: "private", label: "Private" }, { value: "public", label: "Public" }] as const;
 const ACCESS = [{ value: "anonymous", label: "Anyone" }, { value: "members", label: "Members" }] as const;
@@ -25,7 +24,7 @@ export function TierlistCreateScreen() {
   const [access, setAccess] = useState<"anonymous" | "members">("anonymous");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const library = useQuery({ queryKey: ["library"], queryFn: () => apiClient.request<LibraryResponse>("/library", { auth: true }), retry: false });
+  const library = useLibrary();
   const books = library.data?.data?.books ?? [];
   const selected = new Set(pool);
   const filtered = filterBooks(books, search, "all");

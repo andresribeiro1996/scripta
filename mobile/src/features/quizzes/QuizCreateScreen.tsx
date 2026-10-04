@@ -4,12 +4,11 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { QUIZ_POOL, QUIZ_QUESTION_TYPES, bookKey, booksInGroup, eligibleTypes, normalizeImageId, normalizeIsbn, type Group, type QuizBook, type QuizData, type QuizQuestionType } from "@scripta/shared";
 import { FlatList, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
-import { apiClient } from "../../core/api";
+import { useLibrary } from "../library";
 import { Button, Input, Screen, Segmented, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { resolveCover } from "../library/api/covers";
 import { createQuiz, type Quiz } from "./api";
 
-interface LibraryResponse { data: { books?: Array<Record<string, unknown>>; groups?: Group[] } | null }
 
 const SOURCES = [{ value: "shelf", label: "Shelf" }, { value: "collection", label: "Collection" }, { value: "pool", label: "Famous books" }] as const;
 type Source = (typeof SOURCES)[number]["value"];
@@ -46,7 +45,7 @@ export function QuizCreateScreen() {
   const [allowedTypes, setAllowedTypes] = useState<QuizQuestionType[]>([...QUIZ_QUESTION_TYPES]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const library = useQuery({ queryKey: ["library"], queryFn: () => apiClient.request<LibraryResponse>("/library", { auth: true }), retry: false });
+  const library = useLibrary();
   const libraryBooks = library.data?.data?.books ?? [];
   const collections = (library.data?.data?.groups ?? []).filter((group) => group.type === "collection");
   const collection = collections.find((group) => group.id === collectionId);

@@ -12,7 +12,7 @@ import { CoverImage } from "./CoverImage";
 
 export function DuplicatesSheetBody({ groups, library }: { groups: string[][]; library: LibraryDocument }) {
   const { colors } = useTheme();
-  const { updateLibrary } = useLibrary();
+  const { updateLibrary, saver } = useLibrary();
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
   const byKey = new Map(library.data.books.map((book) => [bookKey(book), book] as const));
@@ -33,8 +33,7 @@ export function DuplicatesSheetBody({ groups, library }: { groups: string[][]; l
 
   const merge = (group: string[]) =>
     run(async () => {
-      const current = queryClient.getQueryData<LibraryDocument | null>(LIBRARY_QUERY_KEY) ?? library;
-      queryClient.setQueryData(LIBRARY_QUERY_KEY, await mergeLibraryBooks(group[0]!, group.slice(1), current.updatedAt));
+      await saver.merge((expectedUpdatedAt, signal) => mergeLibraryBooks(group[0]!, group.slice(1), expectedUpdatedAt ?? library.updatedAt, signal));
     }, "Couldn't merge these books.");
 
   const keepApart = (group: string[]) => run(() => updateLibrary((data) => markDistinct(data, group)), "Couldn't save that.");
