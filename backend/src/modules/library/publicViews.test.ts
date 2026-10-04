@@ -824,6 +824,17 @@ test("the mural data view of an empty library, a sparse one and a missing one", 
   assert.deepEqual(json(resolvePublicLibraryData("pv-ghost", fullRequest)), expectedDataGhost);
 });
 
+test("the mural data view fails loudly when the reader card or shelf theme is missing", () => {
+  service.saveLibrary("pv-no-card", { books: [{ Title: "Dune", Attribution: "Frank Herbert" }] });
+  const db = openLibraryDb();
+  const base = { bookKeys: [], highlightRefs: [], needsCurrentlyReading: false, statsMetrics: [] };
+  db.prepare("UPDATE library_summary SET reader_card = NULL WHERE user_id = ?").run("pv-no-card");
+  assert.throws(() => resolvePublicLibraryData("pv-no-card", { ...base, needsReaderCard: true }), /Reader card of pv-no-card is unavailable/);
+  assert.doesNotThrow(() => resolvePublicLibraryData("pv-no-card", base));
+  db.prepare("UPDATE library_summary SET shelf_theme = NULL WHERE user_id = ?").run("pv-no-card");
+  assert.throws(() => resolvePublicLibraryData("pv-no-card", { ...base, needsShelfTheme: true }), /Shelf theme of pv-no-card is unavailable/);
+});
+
 async function ownerApp() {
   const app = Fastify();
   app.decorate("authenticateAccessToken", (token: string) => ({ id: token, email: `${token}@example.test`, username: token, avatarId: null }));

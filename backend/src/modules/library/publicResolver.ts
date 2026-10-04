@@ -1,40 +1,6 @@
-// library's cross-module public-data resolver — the ONLY way another
-// module (murals, for its public GET /murals/shared/:token route) may
-// reach into a user's private library data. Exported from library/
-// index.ts; murals/routes.ts imports this file only through that public
-// interface, never library's own internals (service.ts, adapters/,
-// domain/) — same module-boundary discipline every cross-module import
-// in this codebase already follows (e.g. authGuard from modules/auth/
-// index.ts).
-//
-// A mural's blocks reference books/highlights by bookKey/highlightId and
-// gallery images by id (see murals/domain/blockRefs.ts, which extracts
-// exactly which ones a given mural needs) — all private data belonging
-// to the mural's owner. This resolver takes those references and returns
-// ONLY the matching data, redacted to a public-safe shape
-// (toPublicBookData below). currentlyReading and stats reflect the
-// ENTIRE library, not just referenced books, so they read the whole
-// library's rows; only already-redacted rows/numbers ever leave here.
-//
-// Opens its OWN second connection to LIBRARY_DB_PATH (via the same
-// openLibraryDb() library/plugin.ts uses) rather than reaching into the
-// live LibraryRepository/LibraryService instances plugin.ts closes over.
-// SQLite in WAL mode supports multiple connections to one file just
-// fine, and this keeps a read-only cross-module concern decoupled from
-// library's own composition root and service lifecycle — this module's
-// plugin can be reworked without this file needing to change at all.
-
 import type { DatabaseSync } from "node:sqlite";
 import { isGroup, normalizeImageId, publicReaderCard, readerIdentity, type Group, type IdentityKey, type PublicReaderCard, type ShelfTheme } from "@scripta/shared";
 import type { SharedBook } from "@scripta/shared/community";
-// Cross-module dependency, same discipline as murals/routes.ts importing
-// this very file only from library/index.ts: peekCachedCoverUrl is
-// covers' own public surface for a synchronous, cache-only cover lookup —
-// never covers' internals (service.ts, adapters/, domain/). See that
-// file's own top comment for why a public, unauthenticated resolver may
-// use this but not the authGuard'd, network-calling GET /covers/resolve
-// path. The module registration order in backend/src/app.ts (library
-// before covers) doesn't matter here — see that file's own note.
 import { peekCachedCoverUrl, peekCachedCoverUrls } from "../books/index.js";
 import { openLibraryDb } from "./adapters/sqlite/connection.js";
 
@@ -137,23 +103,14 @@ function toPublicLibraryBooks(rows: BookRowRecord[]): Record<string, unknown>[] 
   }));
 }
 
-// Lazily opened, module-scoped — one extra connection (and its
-// prepared statements, prepared once rather than on every call, matching
-// the prepared-statement-per-adapter convention every other module's
-// SQLite adapter already follows, e.g.
-// murals/adapters/sqlite/sqliteMuralsRepository.ts) for the lifetime of
-// the process, opened on first actual use rather than at import time —
-// lazy avoids paying for it in any process that imports this module
-// without ever serving a public mural request.
 const BOOK_COLUMNS = `SELECT position, book_key, title, author, isbn, image_id, read_status, series_number, sort_order, cover_url FROM library_books`;
 
 type Statement = ReturnType<DatabaseSync["prepare"]>;
-let cached: { db: DatabaseSync; summaryStmt: Statement; booksStmt: Statement; booksByKeyStmt: Statement; currentlyReadingStmt: Statement; highlightStmt: Statement; finishedInYearStmt: Statement; getGlyphStmt: Statement; sharedCountsStmt: Statement; sharedBooksStmt: Statement } | null = null;
+let cached: { summaryStmt: Statement; booksStmt: Statement; booksByKeyStmt: Statement; currentlyReadingStmt: Statement; highlightStmt: Statement; finishedInYearStmt: Statement; getGlyphStmt: Statement; sharedCountsStmt: Statement; sharedBooksStmt: Statement } | null = null;
 function getStatements() {
   if (!cached) {
     const db = openLibraryDb();
     cached = {
-      db,
       summaryStmt: db.prepare(`SELECT meta, reader_card, shelf_theme, total_books, finished_count, in_progress_count, total_highlights FROM library_summary WHERE user_id = ?`),
       booksStmt: db.prepare(`${BOOK_COLUMNS} WHERE user_id = ? ORDER BY position`),
       booksByKeyStmt: db.prepare(`${BOOK_COLUMNS} WHERE user_id = ? AND book_key IN (SELECT value FROM json_each(?)) ORDER BY position`),
@@ -284,13 +241,14 @@ export function resolvePublicLibraryData(userId: string, req: PublicDataRequest)
   }
 
   if (req.needsReaderCard && summary.reader_card === null) throw new Error(`Reader card of ${userId} is unavailable.`);
+  if (req.needsShelfTheme && summary.shelf_theme === null) throw new Error(`Shelf theme of ${userId} is unavailable.`);
   return {
     books: toPublicBooks(referenced),
     highlights,
     currentlyReading,
     stats,
-    ...(req.needsShelfTheme ? { shelfTheme: JSON.parse(summary.shelf_theme!) as ShelfTheme } : {}),
-    ...(req.needsReaderCard ? { readerCard: JSON.parse(summary.reader_card!) as PublicReaderCard } : {}),
+    ...(req.needsShelfTheme ? { shelfTheme: JSON.parse(summary.shelf_theme as string) as ShelfTheme } : {}),
+    ...(req.needsReaderCard ? { readerCard: JSON.parse(summary.reader_card as string) as PublicReaderCard } : {}),
     ...(req.collectionIds ? { collectionBooks } : {})
   };
 }

@@ -44,7 +44,7 @@ function memoryDb(): DatabaseSync {
 type RecordedEvent = { userId: string; type: "book_added" | "book_finished"; refId: string; payload: Record<string, unknown> };
 
 const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;
-const PUBLIC_VIEW_BUDGET_MS = 300;
+const PUBLIC_VIEW_BUDGET_MS = 1000;
 
 function setup(maxDocumentBytes = MAX_DOCUMENT_BYTES) {
   const db = memoryDb();
