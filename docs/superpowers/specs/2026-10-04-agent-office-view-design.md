@@ -8,7 +8,7 @@ breaker); spec awaiting review
 
 Subagent spend is invisible while it happens. The two-week replay behind the
 shelved breaker (`2026-10-04-agent-circuit-breaker-design.md`) found device
-passes costing 2–8M weighted tokens each, and nobody saw it until a transcript
+passes costing $2–26 of API-equivalent spend each, and nobody saw it until a transcript
 was read afterwards. We want a live view of each session's agents, what each
 is doing, and what each has cost, drawn as a pixel office like Munder Difflin's.
 
@@ -28,8 +28,11 @@ is doing, and what each has cost, drawn as a pixel office like Munder Difflin's.
    kept): its recipe composer and drawing primitives, with our own 9 recipes.
    No Office cast names or likenesses. Floor, desks and props are drawn by us;
    LimeZu tiles are not used (their licence forbids redistribution).
-6. **"Heavy" is a display mark, not an action.** A dispatch past 1.3M weighted
-   tokens (the p95 of the replay) is marked heavy.
+6. **Spend is shown in API-equivalent dollars**, from current API prices.
+   Subscription limits are not exposed; dollars are the stand-in.
+7. **"Heavy" is a display mark, not an action.** A dispatch past $4 (the p95
+   of 550 dispatches, 2026-09-20 → 10-04; median $0.45, max $26.50) is
+   marked heavy.
 
 ## Verified facts (spike, 2026-10-04, Claude Code 2.1.286, desktop app)
 
@@ -49,11 +52,22 @@ is doing, and what each has cost, drawn as a pixel office like Munder Difflin's.
   `sceneFrameBufs()` returns 18×32 front and back frames (stand, step-L,
   step-R). Only `paintPortrait` touches a canvas; we drop it.
 
-To confirm first in the plan: that a plugin under `.claude/skills/<name>/`
-loads without a `SKILL.md`, that the desktop surface has `Svg`, and the
-`turn.complete` input for a subagent (`agentId`, how an error ends it), that
-`$.fs` may write and list under `~/.claude/office/`, and what
-`$.session.root()` returns in a worktree session.
+Probed 2026-10-04 with throwaway mods:
+
+- A plugin in the project's `.claude/skills/<name>/` loads in a fresh session
+  without a `SKILL.md`.
+- The desktop Pane's `Svg` element draws, and with `isInteractive` its SMIL
+  `<animate>` runs, so the typing animation needs no timer or redraw. `Svg`
+  `source` is capped at 131072 characters.
+- `turn.complete` input: `answer`, `durationMs`, `isAborted`, `turnId`,
+  `agentId` (set for a subagent), `reason` (`answer` | `aborted` | `refusal`
+  | `error`), `usage`.
+- `$.fs.write` and `$.fs.list` work under `$HOME/.claude/office/`. A path
+  starting with `~` is **not** expanded: it creates a literal `~` folder in
+  the session's cwd. The home path comes from `$.env.get("HOME")`.
+- `$.session.root()` returns the worktree path in a worktree session;
+  `$.session.id()` returns the session id.
+- `$.fs` has `write`, `list`, `exists`, `stat` and no delete.
 
 ## What it tracks
 
@@ -64,7 +78,7 @@ One record per agent: `main`, plus each subagent from its `agent.spawn`.
 | description, type, model | `agent.spawn` input and result |
 | last call | latest `tool.call`: tool name plus command or file, cut to 40 chars |
 | state | below |
-| weighted tokens | sum over its `turn.step` usage |
+| cost | sum over its `turn.step` usage, priced below |
 | started, finished | `agent.spawn`, `turn.complete` |
 
 **States**
@@ -77,36 +91,44 @@ One record per agent: `main`, plus each subagent from its `agent.spawn`.
 - `done`: its `turn.complete` arrived. Done agents dim and leave the floor 10
   minutes later.
 
-**Weighting**: `(input + 1.25·cache_creation + 0.1·cache_read + R·output) × M`,
-with `R` the output/input price ratio and `M` the model's input price over
-Opus's, from current API pricing at plan time. The same formula as the replay,
-so the heavy mark means the same thing.
+**Pricing** (USD per million tokens, API list prices cached 2026-09-25):
+
+| Model family | input | output | cache write | cache read |
+|---|---|---|---|---|
+| opus | 4.00 | 20.00 | 5.00 | 0.20 |
+| sonnet | 2.00 | 10.00 | 2.50 | 0.20 |
+| haiku | 1.00 | 5.00 | 1.25 | 0.10 |
+
+The family is the first of `opus`, `haiku` found in the model id; anything
+else prices as sonnet. The same table produced the $4 heavy mark.
 
 ## UI
 
 **Desktop pane**, opened by `/office`:
 
-- Header: the session's weighted tokens so far and per minute over the last 5
+- Header: the session's spend so far and per minute over the last 5
   minutes.
 - Floor: the main session at a boss desk on top; one desk per subagent
   dispatch below, in spawn order, wrapping to the pane's `bodyColumns`.
 - Each desk shows the agent's sprite, a text state label, the description,
-  `type · model`, the last call, and a token bar that fills to the heavy mark
-  (1.3M) and shows **heavy** past it.
-- Poses: working = typing (front frames alternating on a timer), retrying =
+  `type · model`, the last call, and a spend bar that fills to the heavy mark
+  ($4) and shows **heavy** past it.
+- Poses: working = typing (two front frames alternated by SMIL), retrying =
   ↻ bubble, idle = seated still, done = empty chair with ✓. Every pose has a
   text label, so nothing relies on colour.
 
 **Sprites**: 9 recipes, one each for the boss (main), `implementer`,
 `spec-reviewer`, `quality-reviewer`, `branch-reviewer`, `ci-fixer`,
 `deploy-ops`, `device-checker`, and a generic one for every other type. Each
-18×32 frame becomes SVG `rect`s with horizontal runs of one colour merged, and
-frames are built once and cached.
+18×32 frame becomes one SVG `path` per colour, made of horizontal runs. Each
+sprite frame is a `<symbol>` in `<defs>`, defined once and placed with
+`<use>`, so the scene stays well under the 131072-character `Svg` cap.
+Frames are built once and cached.
 
 **Other floors**, below the session's own: one strip per other live session,
 newest activity first. Each strip shows the worktree name, the main session's
-state, and one small sprite per subagent with its state label and weighted
-tokens, plus **heavy** where it applies. Strips are read-only.
+state, and one small sprite per subagent with its state label and spend,
+plus **heavy** where it applies. Strips are read-only.
 
 **Terminal**: the same rows as a text tree, no sprites; other sessions are
 indented groups under their worktree name.
@@ -121,7 +143,7 @@ file with no change notification, and its behaviour under concurrent writers
 from several processes is not documented. One file per session has a single
 writer, so nothing can be overwritten.
 
-- **Write**: each session writes `~/.claude/office/<sessionId>.json`, holding
+- **Write**: each session writes `$HOME/.claude/office/<sessionId>.json`, holding
   `{ sessionId, worktree, updatedAt, ended, agents }`, where `worktree` is the
   basename of `$.session.root()` and `agents` holds the rows from "What it
   tracks". Written on change, at most once a second, and once a minute
@@ -146,9 +168,9 @@ writer, so nothing can be overwritten.
   .claude-plugin/plugin.json   name, version, "types": "./types/index.d.ts"
   hooks/hooks.json             { "modules": ["./register.tsx"] }
   hooks/register.tsx           events → model; pane, status line, /office
-  hooks/model.ts               pure: event in, agent records out; weighting
+  hooks/model.ts               pure: event in, agent records out; pricing
   hooks/sprites.ts             adapted composer, our recipes, floor/desk/props
-  hooks/svg.ts                 pure: RGBA frame → merged rect list
+  hooks/svg.ts                 pure: RGBA frame → paths; scene → SVG string
   hooks/floors.ts              pure: snapshot out; listed files → live floors
   types/index.d.ts             $.state contract
   LICENSE-portraitArt          Munder Difflin's MIT notice
@@ -159,7 +181,7 @@ writer, so nothing can be overwritten.
 
 - **`model.ts`** (`claude plugin test`): spawn creates a record; tool calls
   update the last call; two identical failures set retrying and a success
-  clears it; usage adds weighted tokens per agent; turn.complete sets done;
+  clears it; usage adds cost per agent at the table's prices; turn.complete sets done;
   done agents drop after 10 minutes on the mocked clock; main never gets a
   spawn record and is `idle` between turns.
 - **`floors.ts`**: a snapshot round-trips; files older than 3 minutes,
@@ -168,15 +190,16 @@ writer, so nothing can be overwritten.
 - **Snapshot writes** (mocked clock): at most one write a second while
   changing, a refresh every minute while quiet, and `ended: true` on
   `session.end`.
-- **`svg.ts`**: a known buffer gives the expected merged rects; transparent
-  pixels produce none.
+- **`svg.ts`**: a known buffer gives the expected runs per colour;
+  transparent pixels produce none; a scene of 12 desks plus 6 other floors of
+  4 agents stays under 131072 characters.
 - **Sprites**: every recipe composes without throwing at 18×32, and the
   generic recipe covers an unknown type.
 - **UI**: mount the pane on `desktop` and `terminal`; each state's label is
   present, heavy appears past the mark, and the done agent is gone after 10
   minutes.
 - **Live check**: open `/office`, dispatch two subagents (one runs a failing
-  command twice); see two desks, retrying, then done, with token bars moving.
+  command twice); see two desks, retrying, then done, with spend bars moving.
   Then start a second session in another worktree, dispatch one subagent
   there, and see its floor appear in the first session's pane and disappear
   within 3 minutes of quitting it.
