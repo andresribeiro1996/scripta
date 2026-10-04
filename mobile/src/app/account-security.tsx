@@ -61,7 +61,7 @@ export default function AccountSecurityPage() {
         {account.isPending ? <Text style={{ color: colors.text }}>Loading account…</Text> : account.isError ? <Button label="Couldn’t load account. Try again" onPress={() => void account.refetch()} /> : <>
           <Text selectable style={[typography.body, { color: colors.text }]}>{account.data.email} · {account.data.emailVerified ? "Verified" : "Not verified"}</Text>
           {!account.data.emailEnabled && <Text style={{ color: colors.textDim }}>Email delivery is temporarily unavailable.</Text>}
-          {!account.data.emailVerified && <Button label="Send verification email" variant="secondary" disabled={busy || !account.data.emailEnabled} onPress={() => void run("verify")} />}
+          {!mode && !account.data.emailVerified && <Button label="Send verification email" variant="secondary" disabled={busy || !account.data.emailEnabled} onPress={() => void run("verify")} />}
           {account.data.hasPassword ? <Button label="Change password" variant="secondary" disabled={busy} onPress={() => { setMode("password"); setError(""); setConfirmError(""); }} /> : <Text style={{ color: colors.textDim }}>Your password is managed by Google.</Text>}
           {account.data.canChangeEmail && <Button label="Correct email" variant="secondary" disabled={busy || !account.data.emailEnabled} onPress={() => { setEmail(account.data.email); setMode("email"); setError(""); setConfirmError(""); }} />}
         </>}
