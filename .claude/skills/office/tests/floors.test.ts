@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { freshFiles, parseFloors, REFRESH_MS, shouldWrite, snapshotOf, STALE_MS, WRITE_MIN_MS } from '../hooks/floors.ts'
+import { freshFiles, parseFloors, REFRESH_MS, sameFloors, shouldWrite, snapshotOf, STALE_MS, WRITE_MIN_MS } from '../hooks/floors.ts'
 import { emptyOffice } from '../hooks/model.ts'
 
 test('a snapshot names its worktree and round-trips', () => {
@@ -69,4 +69,14 @@ test('a snapshot drops the failed call input and leaves the office alone', () =>
   assert.ok(snap.agents.every(a => a.failKey === null))
   assert.ok(JSON.stringify(snap).length < 2000)
   assert.equal(input.agents[0].failKey, 'x'.repeat(1000))
+})
+
+test('floors compare by content, not identity', () => {
+  const a = snapshotOf('a', '/r/one', emptyOffice(0), 1, false)
+  const b = snapshotOf('b', '/r/two', emptyOffice(0), 2, false)
+  const parse = () => parseFloors([a, b].map(s => ({ name: `${s.sessionId}.json`, text: JSON.stringify(s) }))).floors
+  assert.equal(sameFloors(parse(), parse()), true)
+  const changed = parse()
+  changed[1].agents[0].state = 'working' as any
+  assert.equal(sameFloors(parse(), changed), false)
 })

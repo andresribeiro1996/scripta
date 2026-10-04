@@ -50,3 +50,7 @@ export function parseFloors(files: { name: string; text: string }[]): { floors: 
   }
   return { floors: floors.sort((a, b) => b.updatedAt - a.updatedAt), bad }
 }
+
+export function sameFloors(a: Snapshot[], b: Snapshot[]): boolean {
+  return JSON.stringify(a) === JSON.stringify(b)
+}

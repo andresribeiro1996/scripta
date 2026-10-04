@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { Register } from 'claude-code'
 import type { Snapshot } from '../types'
 import { emptyOffice, reduce, statusText, type OfficeEvent } from './model.ts'
-import { freshFiles, parseFloors, shouldWrite, snapshotOf } from './floors.ts'
+import { freshFiles, parseFloors, sameFloors, shouldWrite, snapshotOf } from './floors.ts'
 import { officeSvg, terminalRows } from './svg.ts'
 
 const PANE = 'office'
@@ -63,7 +63,7 @@ async function readFloors($: any) {
     reported.add(name)
     $.ui.log(`office: skipped unreadable snapshot ${name}`, { to: 'debug' })
   }
-  await update($, floorsAtom, () => floors)
+  await update($, floorsAtom, prev => (sameFloors(prev, floors) ? prev : floors))
 }
 
 export const register: Register = on => {
