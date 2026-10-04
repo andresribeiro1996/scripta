@@ -737,7 +737,7 @@ test("setPublisherUrl fills a null value and never overwrites it", () => {
   assert.equal(repo.getBook(book.id)!.publisher_url, "https://antigona.pt/products/a");
 });
 
-test("setLanguage fills an empty language and never overwrites one, and replaceLanguage replaces it", () => {
+test("setLanguage fills an empty language and never overwrites one", () => {
   const { repo } = freshRepo();
   const book = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: null }, ["ta:dune|frank herbert|"], NOW);
   assert.equal(book.language, null);
@@ -746,10 +746,6 @@ test("setLanguage fills an empty language and never overwrites one, and replaceL
   repo.setLanguage(book.id, "pt");
   repo.setLanguage(book.id, "pt-BR");
   assert.equal(repo.getBook(book.id)!.language, "pt");
-  repo.replaceLanguage(book.id, null);
-  assert.equal(repo.getBook(book.id)!.language, "pt");
-  repo.replaceLanguage(book.id, "pt-BR");
-  assert.equal(repo.getBook(book.id)!.language, "pt-BR");
 });
 
 const noDetails = { summary: null, pages: null, year: null, publisher: null, translator: null };

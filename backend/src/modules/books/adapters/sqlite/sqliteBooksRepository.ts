@@ -74,7 +74,6 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const setUpgradeWantedStmt = db.prepare(`UPDATE books SET cover_upgrade_wanted_at = ? WHERE id = ?`);
   const setWorkKeyStmt = db.prepare(`UPDATE books SET ol_work_key = ? WHERE id = ? AND ol_work_key IS NULL`);
   const setLanguageStmt = db.prepare(`UPDATE books SET language = ? WHERE id = ? AND language IS NULL`);
-  const replaceLanguageStmt = db.prepare(`UPDATE books SET language = ? WHERE id = ?`);
   const setPublisherUrlStmt = db.prepare(`UPDATE books SET publisher_url = ? WHERE id = ? AND publisher_url IS NULL`);
   const upgradeWantedStmt = db.prepare(`SELECT id FROM books WHERE cover_upgrade_wanted_at IS NOT NULL ORDER BY cover_upgrade_wanted_at, rowid`);
 
@@ -254,10 +253,6 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
 
     setLanguage(id, tag) {
       if (tag) setLanguageStmt.run(tag, id);
-    },
-
-    replaceLanguage(id, tag) {
-      if (tag) replaceLanguageStmt.run(tag, id);
     },
 
     setPublisherUrl(id, url) {
