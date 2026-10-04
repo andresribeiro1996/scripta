@@ -48,7 +48,9 @@ async function writeSnapshot($: any, ended: boolean) {
 
 async function beat($: any) {
   const at = await $.clock.now()
-  await update($, officeAtom, o => reduce(o, { kind: 'tick', at }))
+  const o = await read($, officeAtom)
+  const n = reduce(o, { kind: 'tick', at })
+  if (n !== o) await update($, officeAtom, () => n)
   if (shouldWrite(lastWriteAt, dirty, at)) await writeSnapshot($, false)
 }
 
@@ -63,7 +65,7 @@ async function readFloors($: any) {
     reported.add(name)
     $.ui.log(`office: skipped unreadable snapshot ${name}`, { to: 'debug' })
   }
-  await update($, floorsAtom, prev => (sameFloors(prev, floors) ? prev : floors))
+  if (!sameFloors(await read($, floorsAtom), floors)) await update($, floorsAtom, () => floors)
 }
 
 export const register: Register = on => {
@@ -154,7 +156,7 @@ export const register: Register = on => {
     const rows = terminalRows(view)
     if (e.surface === 'desktop') {
       const { Svg } = $.ui.resolve(e)
-      return <Svg source={officeSvg(view)} alt={rows.join('\n')} isInteractive={true} />
+      return <Svg source={officeSvg(view)} alt={rows.join('\n')} isInteractive={false} />
     }
     const { Box, Text } = $.ui.resolve(e)
     return <Box flexDirection="column">{rows.map(line => <Text>{line}</Text>)}</Box>

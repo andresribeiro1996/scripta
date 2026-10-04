@@ -113,7 +113,7 @@ else prices as sonnet. The same table produced the $4 heavy mark.
 - Each desk shows the agent's sprite, a text state label, the description,
   `type · model`, the last call, and a spend bar that fills to the heavy mark
   ($4) and shows **heavy** past it.
-- Poses: working = typing (the standing frame bobs 1px by SMIL), retrying =
+- Poses: working = typing (screen lit; the pane draws the SVG as a still image, because the animated frame flashed on every redraw), retrying =
   ↻ bubble, idle = seated still, done = empty chair with ✓. Every pose has a
   text label, so nothing relies on colour.
 
