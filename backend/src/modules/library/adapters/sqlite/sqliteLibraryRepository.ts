@@ -4,7 +4,7 @@
 
 import type { DatabaseSync } from "node:sqlite";
 import type { LibraryRepository } from "../../domain/ports.js";
-import type { LibraryDerived, LibraryDocumentRow, LibraryRows } from "../../domain/types.js";
+import type { LibraryDerived, LibraryDocumentRow, LibraryRows, LibrarySmallSave } from "../../domain/types.js";
 
 export function createSqliteLibraryRepository(db: DatabaseSync): LibraryRepository {
   const getStmt = db.prepare(`SELECT * FROM library_documents WHERE user_id = ?`);
@@ -57,6 +57,13 @@ export function createSqliteLibraryRepository(db: DatabaseSync): LibraryReposito
   const deleteBookStmt = db.prepare(`DELETE FROM library_books WHERE user_id = ? AND position = ?`);
   const deletePositionHighlightsStmt = db.prepare(`DELETE FROM library_highlights WHERE user_id = ? AND position = ?`);
   const insertHighlightStmt = db.prepare(`INSERT OR IGNORE INTO library_highlights (user_id, position, highlight_id, text, annotation) VALUES (?, ?, ?, ?, ?)`);
+  const touchSummaryStmt = db.prepare(`
+    UPDATE library_summary SET
+      meta = CASE WHEN $set_meta THEN $meta ELSE meta END,
+      reader_card = CASE WHEN $set_reader_card THEN $reader_card ELSE reader_card END,
+      finished_count = $finished, in_progress_count = $in_progress, source_updated_at = $updated_at
+    WHERE user_id = $user_id AND source_updated_at = $expected_updated_at
+  `);
   const upsertSummaryStmt = db.prepare(`
     INSERT INTO library_summary (user_id, meta, reader_card, shelf_theme, total_books, finished_count, in_progress_count, total_highlights, source_updated_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -87,6 +94,24 @@ export function createSqliteLibraryRepository(db: DatabaseSync): LibraryReposito
     }
     const { summary } = rows;
     upsertSummaryStmt.run(userId, summary.meta, summary.reader_card, summary.shelf_theme, summary.total_books, summary.finished_count, summary.in_progress_count, summary.total_highlights, sourceUpdatedAt);
+  }
+
+  function writeSmallSave(userId: string, rows: LibrarySmallSave, updatedAt: string, expectedUpdatedAt: string) {
+    const result = touchSummaryStmt.run({
+      $user_id: userId,
+      $set_meta: rows.meta === "keep" ? 0 : 1,
+      $meta: rows.meta === "keep" ? null : rows.meta,
+      $set_reader_card: rows.readerCard === "keep" ? 0 : 1,
+      $reader_card: rows.readerCard === "keep" ? null : rows.readerCard,
+      $finished: rows.counts.finished,
+      $in_progress: rows.counts.inProgress,
+      $updated_at: updatedAt,
+      $expected_updated_at: expectedUpdatedAt
+    });
+    if (result.changes === 0) return;
+    for (const book of rows.books) {
+      upsertBookStmt.run(userId, book.position, book.book_key, book.title, book.author, book.isbn, book.image_id, book.read_status, book.series_number, book.sort_order, book.cover_url, book.finished_year, book.row_hash);
+    }
   }
 
   function inTransaction<T>(write: () => T): T {
@@ -133,7 +158,7 @@ export function createSqliteLibraryRepository(db: DatabaseSync): LibraryReposito
       });
     },
 
-    updateDocumentData(userId, dataJson, expectedUpdatedAt, glyph) {
+    updateDocumentData(userId, dataJson, expectedUpdatedAt, glyph, rows) {
       return inTransaction(() => {
         const updatedAt = new Date(Math.max(Date.now(), Date.parse(expectedUpdatedAt) + 1)).toISOString();
         const result = updateDataStmt.run({ $user_id: userId, $data: dataJson, $updated_at: updatedAt, $expected_updated_at: expectedUpdatedAt });
@@ -141,6 +166,7 @@ export function createSqliteLibraryRepository(db: DatabaseSync): LibraryReposito
         const derived = { $user_id: userId, $updated_at: updatedAt, $expected_updated_at: expectedUpdatedAt };
         if (glyph === "keep") keepDerivedStmt.run(derived);
         else setGlyphStmt.run({ ...derived, $glyph: glyph });
+        writeSmallSave(userId, rows, updatedAt, expectedUpdatedAt);
         return updatedAt;
       });
     },

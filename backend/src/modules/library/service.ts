@@ -8,7 +8,7 @@ import type { BookRecommendationInput } from "@scripta/shared/community";
 import { BOOK_EVENTS_PER_SAVE, COVER_URL_MAX_LENGTH, DISPLAY_TEXT_MAX_LENGTH, LIBRARY_MATCH_BOOK_CAP, LIBRARY_PUT_HEADROOM_BYTES, MATCH_KEY_MAX_LENGTH } from "./domain/constants.js";
 import { LibraryChangeNotFoundError, LibraryConflictError, LibraryTooLargeError, NoLibraryDocumentError } from "./domain/errors.js";
 import type { LibraryRepository } from "./domain/ports.js";
-import type { LibraryBookRows, LibraryDerived, LibraryDocument, LibraryDocumentRow, LibraryHighlightRow, LibraryMatchKeyRow, LibraryRows } from "./domain/types.js";
+import type { LibraryBookRow, LibraryBookRows, LibraryDerived, LibraryDocument, LibraryDocumentRow, LibraryHighlightRow, LibraryMatchKeyRow, LibraryRows, LibrarySmallSave } from "./domain/types.js";
 import { libraryParts, normalizeIsbn, toPublicLibraryData, toReaderGroups } from "./publicResolver.js";
 
 export type BookEvent = { type: "book_added" | "book_finished"; refId: string; payload: Record<string, unknown> };
@@ -132,6 +132,16 @@ export function libraryMeta(data: Record<string, unknown>): string {
   return JSON.stringify({ source: data.source, schema_version: data.schema_version, book_count: data.book_count, name: data.name, groups: data.groups, style: data.style });
 }
 
+export function readerCardOf(parts: { allBooks: Record<string, unknown>[]; groupRecords: Record<string, unknown>[] }, report: ReportSkippedRow): string | null {
+  try {
+    return JSON.stringify(publicReaderCard(readerIdentity(parts.allBooks, toReaderGroups(parts.groupRecords))));
+  } catch (error) {
+    if (!(error instanceof TypeError)) throw error;
+    report(error, "no reader card");
+    return null;
+  }
+}
+
 export function deriveLibraryRows(data: unknown, report: ReportSkippedRow): LibraryRows {
   const parts = libraryParts(data);
   if (!parts) return { books: [], summary: { meta: null, reader_card: null, shelf_theme: null, total_books: 0, finished_count: 0, in_progress_count: 0, total_highlights: 0 } };
@@ -146,13 +156,7 @@ export function deriveLibraryRows(data: unknown, report: ReportSkippedRow): Libr
       report(error, `no row for book ${position}`);
     }
   });
-  let readerCard: string | null = null;
-  try {
-    readerCard = JSON.stringify(publicReaderCard(readerIdentity(parts.allBooks, toReaderGroups(parts.groupRecords))));
-  } catch (error) {
-    if (!(error instanceof TypeError)) throw error;
-    report(error, "no reader card");
-  }
+  const readerCard = readerCardOf(parts, report);
   return {
     books,
     summary: {
@@ -275,6 +279,24 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
     return deriveLibraryRows(data, (error, what) => logSkipped(error, `library rows of ${userId}: ${what}`));
   }
 
+  function smallSave(userId: string, previous: LibraryData, next: LibraryData, change: LibraryChange, recomputeCard: boolean): LibrarySmallSave {
+    const report: ReportSkippedRow = (error, what) => logSkipped(error, `library rows of ${userId}: ${what}`);
+    const books: LibraryBookRow[] = [];
+    const counts = { finished: 0, inProgress: 0 };
+    next.books.forEach((book, position) => {
+      if (!isRecord(book)) return;
+      if (isFinishedBook(book)) counts.finished++;
+      if (book.ReadStatus === 1) counts.inProgress++;
+      if (change.kind === "book" && book !== previous.books[position]) books.push(bookRow(book, position, report).book);
+    });
+    return {
+      books,
+      counts,
+      meta: change.kind === "membership" ? libraryMeta(next as Record<string, unknown>) : "keep",
+      readerCard: recomputeCard ? readerCardOf(libraryParts(next)!, report) : "keep"
+    };
+  }
+
   function serializeWithinLimit(document: unknown): string {
     const json = JSON.stringify(document);
     if (Buffer.byteLength(json) > maxDocumentBytes - LIBRARY_PUT_HEADROOM_BYTES) throw new LibraryTooLargeError();
@@ -394,7 +416,7 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
       const glyph = flipped.length > 0 || (change.kind === "membership" && seriesGroupChanged(previous, result.data)) ? deriveGlyph(result.data) : "keep";
       const updatedAt =
         row && change.kind !== "add"
-          ? repo.updateDocumentData(userId, json, row.updated_at, glyph)
+          ? repo.updateDocumentData(userId, json, row.updated_at, glyph, smallSave(userId, previous, result.data, change, glyph !== "keep"))
           : repo.upsertDocument(userId, json, deriveLibraryData(result.data), rowsOf(userId, result.data), row?.updated_at)?.updated_at;
       if (!updatedAt) throw new LibraryConflictError();
       if (emitBookEvents && (change.kind === "add" || flipped.some(isFinishedBook))) {

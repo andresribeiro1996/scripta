@@ -84,3 +84,10 @@ export interface LibraryRows {
   books: LibraryBookRows[];
   summary: LibrarySummaryRow;
 }
+
+export interface LibrarySmallSave {
+  books: LibraryBookRow[];
+  counts: { finished: number; inProgress: number };
+  meta: string | "keep";
+  readerCard: string | null | "keep";
+}

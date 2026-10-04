@@ -33,6 +33,7 @@ const { readerGlyphFor, sharedBookCounts, sharedBooks } = await import("./public
 const { peekCachedCoverUrl } = await import("../books/index.js");
 
 const emptyRows = deriveLibraryRows({ books: [] }, () => undefined);
+const keepRows = { books: [], counts: { finished: 0, inProgress: 0 }, meta: "keep" as const, readerCard: "keep" as const };
 
 function memoryDb(): DatabaseSync {
   const db = new DatabaseSync(":memory:");
@@ -1075,8 +1076,7 @@ test("after a change the boot backfill re-derives nothing", () => {
   fileService.applyChange("change-fresh", { kind: "membership", groupId: "shelf", bookKey: keyOf(3), member: true });
   fileService.applyChange("change-fresh", { kind: "membership", groupId: "saga", bookKey: keyOf(0), member: false });
   fileService.applyChange("change-fresh", { kind: "book", bookKey: keyOf(3), rating: 5 });
-  const changed = fileService.getLibrary("change-fresh")!;
-  createSqliteLibraryRepository(fileDb).setRows("change-fresh", deriveLibraryRows(changed.data, () => undefined), changed.updatedAt);
+  assert.ok(!createSqliteLibraryRepository(fileDb).listStaleUserIds().includes("change-fresh"));
   fileDb.prepare(`UPDATE library_derived SET glyph = 'star' WHERE user_id = 'change-fresh'`).run();
   fileDb.prepare(`DELETE FROM library_match_keys WHERE user_id = 'change-fresh' AND key LIKE 'ta:book 1|%'`).run();
   const keys = keyRows(fileDb, "change-fresh");
@@ -1365,13 +1365,13 @@ test("updateDocumentData stores the data under a new version after the one it wa
   const { db, repo } = setup();
   const first = repo.upsertDocument("u1", JSON.stringify({ books: [] }), { glyph: null, keys: [] }, emptyRows)!;
 
-  const second = repo.updateDocumentData("u1", JSON.stringify({ books: ["next"] }), first.updated_at, "keep")!;
+  const second = repo.updateDocumentData("u1", JSON.stringify({ books: ["next"] }), first.updated_at, "keep", keepRows)!;
   assert.ok(second > first.updated_at);
   assert.deepEqual({ ...repo.getDocument("u1") }, { user_id: "u1", data: JSON.stringify({ books: ["next"] }), updated_at: second, share_token: null });
 
   const future = "2099-01-01T00:00:00.000Z";
   db.prepare(`UPDATE library_documents SET updated_at = ? WHERE user_id = 'u1'`).run(future);
-  assert.equal(repo.updateDocumentData("u1", JSON.stringify({ books: [] }), future, "keep"), "2099-01-01T00:00:00.001Z");
+  assert.equal(repo.updateDocumentData("u1", JSON.stringify({ books: [] }), future, "keep", keepRows), "2099-01-01T00:00:00.001Z");
   db.close();
 });
 
@@ -1379,11 +1379,11 @@ test("updateDocumentData with the wrong version, or no document, changes nothing
   const { db, repo } = setup();
   const row = { key: "ta:a|b", book_ref: 0, title: "A", author: "B", isbn: null, cover: null };
   const first = repo.upsertDocument("u1", JSON.stringify({ books: [] }), { glyph: "star", keys: [row] }, emptyRows)!;
-  const second = repo.updateDocumentData("u1", JSON.stringify({ books: ["second"] }), first.updated_at, "keep")!;
+  const second = repo.updateDocumentData("u1", JSON.stringify({ books: ["second"] }), first.updated_at, "keep", keepRows)!;
 
-  assert.equal(repo.updateDocumentData("u1", JSON.stringify({ books: ["stale"] }), first.updated_at, null), undefined);
-  assert.equal(repo.updateDocumentData("u1", JSON.stringify({ books: ["none"] }), "2000-01-01T00:00:00.000Z", "keep"), undefined);
-  assert.equal(repo.updateDocumentData("nobody", JSON.stringify({ books: [] }), second, null), undefined);
+  assert.equal(repo.updateDocumentData("u1", JSON.stringify({ books: ["stale"] }), first.updated_at, null, keepRows), undefined);
+  assert.equal(repo.updateDocumentData("u1", JSON.stringify({ books: ["none"] }), "2000-01-01T00:00:00.000Z", "keep", keepRows), undefined);
+  assert.equal(repo.updateDocumentData("nobody", JSON.stringify({ books: [] }), second, null, keepRows), undefined);
 
   assert.equal(repo.getDocument("u1")?.data, JSON.stringify({ books: ["second"] }));
   assert.equal(repo.getDocument("u1")?.updated_at, second);
@@ -1397,17 +1397,17 @@ test("updateDocumentData with a glyph writes it where the derived row was curren
   const { db, repo } = setup();
   const first = repo.upsertDocument("u1", JSON.stringify({ books: [] }), { glyph: "star", keys: [] }, emptyRows)!;
 
-  const second = repo.updateDocumentData("u1", JSON.stringify({ books: [1] }), first.updated_at, "carto")!;
+  const second = repo.updateDocumentData("u1", JSON.stringify({ books: [1] }), first.updated_at, "carto", keepRows)!;
   assert.deepEqual(derivedRow(db, "u1"), { glyph: "carto", source_updated_at: second });
-  const third = repo.updateDocumentData("u1", JSON.stringify({ books: [2] }), second, null)!;
+  const third = repo.updateDocumentData("u1", JSON.stringify({ books: [2] }), second, null, keepRows)!;
   assert.deepEqual(derivedRow(db, "u1"), { glyph: null, source_updated_at: third });
 
   db.prepare(`UPDATE library_derived SET glyph = 'star', source_updated_at = '2000-01-01T00:00:00.000Z' WHERE user_id = 'u1'`).run();
-  repo.updateDocumentData("u1", JSON.stringify({ books: [3] }), third, "carto");
+  repo.updateDocumentData("u1", JSON.stringify({ books: [3] }), third, "carto", keepRows);
   assert.deepEqual(derivedRow(db, "u1"), { glyph: "star", source_updated_at: "2000-01-01T00:00:00.000Z" });
 
   db.prepare(`DELETE FROM library_derived WHERE user_id = 'u1'`).run();
-  repo.updateDocumentData("u1", JSON.stringify({ books: [4] }), repo.getDocument("u1")!.updated_at, "carto");
+  repo.updateDocumentData("u1", JSON.stringify({ books: [4] }), repo.getDocument("u1")!.updated_at, "carto", keepRows);
   assert.equal(derivedRow(db, "u1"), undefined);
   db.close();
 });
@@ -1416,11 +1416,11 @@ test("updateDocumentData with keep moves the derived version only where it was c
   const { db, repo } = setup();
   const first = repo.upsertDocument("u1", JSON.stringify({ books: [] }), { glyph: "star", keys: [] }, emptyRows)!;
 
-  const second = repo.updateDocumentData("u1", JSON.stringify({ books: [1] }), first.updated_at, "keep")!;
+  const second = repo.updateDocumentData("u1", JSON.stringify({ books: [1] }), first.updated_at, "keep", keepRows)!;
   assert.deepEqual(derivedRow(db, "u1"), { glyph: "star", source_updated_at: second });
 
   db.prepare(`UPDATE library_derived SET source_updated_at = '2000-01-01T00:00:00.000Z' WHERE user_id = 'u1'`).run();
-  repo.updateDocumentData("u1", JSON.stringify({ books: [2] }), second, "keep");
+  repo.updateDocumentData("u1", JSON.stringify({ books: [2] }), second, "keep", keepRows);
   assert.deepEqual(derivedRow(db, "u1"), { glyph: "star", source_updated_at: "2000-01-01T00:00:00.000Z" });
   db.close();
 });
@@ -1435,8 +1435,8 @@ test("updateDocumentData never touches the match keys or the share token", () =>
   repo.setShareToken("u1", "token-1");
   const before = keyRows(db, "u1");
 
-  const second = repo.updateDocumentData("u1", JSON.stringify({ books: ["changed"] }), first.updated_at, "carto")!;
-  repo.updateDocumentData("u1", JSON.stringify({ books: ["again"] }), second, "keep");
+  const second = repo.updateDocumentData("u1", JSON.stringify({ books: ["changed"] }), first.updated_at, "carto", keepRows)!;
+  repo.updateDocumentData("u1", JSON.stringify({ books: ["again"] }), second, "keep", keepRows);
 
   assert.deepEqual(keyRows(db, "u1"), before);
   assert.equal(repo.getDocument("u1")?.share_token, "token-1");
@@ -1691,3 +1691,50 @@ test("rebuilding the 10 MiB timing fixture rewrites every row and logs how long 
   }
 });
 
+
+test("after each kind of small save the rows equal those derived from the stored document", () => {
+  const settled = shelf(10);
+  const cases: Array<{ doc: unknown; change: LibraryChange }> = [
+    { doc: { books: settled, groups: [seriesGroup(settled.slice(0, 3))] }, change: { kind: "membership", groupId: "g1", bookKey: bookKey(settled[5]!), member: true } },
+    { doc: changeLibrary(), change: { kind: "membership", groupId: "shelf", bookKey: keyOf(3), member: true } },
+    { doc: changeLibrary(), change: { kind: "book", bookKey: keyOf(10), readStatus: 2, day: "2026-10-02" } },
+    { doc: changeLibrary(), change: { kind: "book", bookKey: keyOf(5), readStatus: 1 } },
+    { doc: changeLibrary(), change: { kind: "book", bookKey: keyOf(3), rating: 4 } },
+    { doc: changeLibrary(), change: { kind: "add", book: neuromancer } }
+  ];
+  for (const { doc, change } of cases) {
+    const { db, service } = setup();
+    service.saveLibrary("u1", doc);
+    service.applyChange("u1", change);
+    assert.deepEqual(rowsInDb(db, "u1"), rowsOfStored(db, "u1"), JSON.stringify(change));
+    db.close();
+  }
+});
+
+test("a book change rewrites only that book's row and none of its highlights", () => {
+  const { db, service } = setup();
+  const takeWrites = trackRowWrites(db);
+  service.saveLibrary("u1", { books: [marked("Alpha", ["a1"]), marked("Beta", ["b1"]), marked("Gamma", ["g1"])] });
+  takeWrites();
+  service.applyChange("u1", { kind: "book", bookKey: bookKey(marked("Beta", [])), readStatus: 2, day: "2026-10-02" });
+  assert.deepEqual(takeWrites(), ["book:1"]);
+  assert.deepEqual(rowsInDb(db, "u1"), rowsOfStored(db, "u1"));
+  db.close();
+});
+
+test("a small save on an account whose summary was stale leaves it stale, and the startup step rebuilds it", () => {
+  fileService.saveLibrary("small-stale", changeLibrary());
+  fileDb.prepare(`UPDATE library_summary SET source_updated_at = '2000-01-01T00:00:00.000Z' WHERE user_id = 'small-stale'`).run();
+  const before = rowsInDb(fileDb, "small-stale");
+
+  fileService.applyChange("small-stale", { kind: "book", bookKey: keyOf(3), rating: 4 });
+  fileService.applyChange("small-stale", { kind: "membership", groupId: "shelf", bookKey: keyOf(3), member: true });
+
+  assert.deepEqual(rowsInDb(fileDb, "small-stale"), before);
+  assert.ok(createSqliteLibraryRepository(fileDb).listStaleUserIds().includes("small-stale"));
+
+  backfillLibraryDerived();
+
+  assert.deepEqual(rowsInDb(fileDb, "small-stale"), rowsOfStored(fileDb, "small-stale"));
+  assert.ok(!createSqliteLibraryRepository(fileDb).listStaleUserIds().includes("small-stale"));
+});
