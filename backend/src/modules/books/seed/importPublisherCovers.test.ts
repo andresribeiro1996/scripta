@@ -124,6 +124,10 @@ function addCover(repo: ReturnType<typeof createSqliteBooksRepository>, bookId: 
   return id;
 }
 
+function markMissing(repo: ReturnType<typeof createSqliteBooksRepository>, bookId: string) {
+  repo.setCover(bookId, { imageId: null, status: "missing", checkedAt: NOW.toISOString() });
+}
+
 test("an existing book gets the publisher cover as a manual cover and loses its upgrade mark", async () => {
   const h = await harness();
   const book = addBook(h.repo, MUSEU);
@@ -155,6 +159,7 @@ test("an existing book gets the publisher cover as a manual cover and loses its 
     rejectedImage: 0,
     cropped: 0,
     squareAccepted: 0,
+    awaitingCheck: 0,
     failed: 0
   });
   assert.equal(h.logs.length, 1);
@@ -1041,9 +1046,10 @@ test("at most four sites are imported at once, and every report keeps its site's
   assert.ok(Object.values(reports).every((report) => report.skipped !== undefined));
 });
 
-test("a mock-up photo for a book with no cover is cropped and stored", async () => {
+test("a mock-up photo for a book the backfill found no cover for is cropped and stored", async () => {
   const h = await harness({ images: { [MUSEU_IMAGE]: await mockUp() } });
   const book = addBook(h.repo, MUSEU);
+  markMissing(h.repo, book.id);
 
   const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
 
@@ -1060,6 +1066,7 @@ test("a mock-up photo for a book with no cover is cropped and stored", async () 
 test("a square picture-book cover is stored as it is", async () => {
   const h = await harness({ images: { [MUSEU_IMAGE]: await squareCover() } });
   const book = addBook(h.repo, MUSEU);
+  markMissing(h.repo, book.id);
 
   const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
 
@@ -1067,6 +1074,49 @@ test("a square picture-book cover is stored as it is", async () => {
   assert.equal(image.width, image.height);
   assert.equal(reports["Antígona"]!.squareAccepted, 1);
   assert.equal(reports["Antígona"]!.cropped, 0);
+});
+
+test("a mock-up for a book the backfill has not checked yet is left for a later run", async () => {
+  const h = await harness({ images: { [MUSEU_IMAGE]: await mockUp() } });
+  const book = addBook(h.repo, MUSEU);
+
+  const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  const row = h.repo.getBook(book.id)!;
+  assert.equal(row.cover_image_id, null);
+  assert.equal(row.cover_status, null);
+  assert.equal(reports["Antígona"]!.awaitingCheck, 1);
+  assert.equal(reports["Antígona"]!.cropped, 0);
+  assert.equal(reports["Antígona"]!.coversSet, 3);
+});
+
+test("a square cover for a book the importer just created is left for a later run", async () => {
+  const h = await harness({ images: { [MUSEU_IMAGE]: await squareCover() } });
+
+  const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  const row = h.repo.findBookByKey(`isbn:${MUSEU}`)!;
+  assert.equal(row.cover_image_id, null);
+  assert.equal(reports["Antígona"]!.awaitingCheck, 1);
+  assert.equal(reports["Antígona"]!.squareAccepted, 0);
+});
+
+test("a publisher cover that finishes uploading after another writer set a cover is not written", async () => {
+  const h = await harness();
+  const book = addBook(h.repo, MUSEU);
+  const save = h.deps.blobs.save;
+  let rival: string | null = null;
+  h.deps.blobs.save = async (id, extension, bytes) => {
+    rival ??= addCover(h.repo, book.id, "apple", 800, "https://apple.example/c.jpg", "good");
+    await save(id, extension, bytes);
+  };
+
+  const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  assert.equal(h.repo.getBook(book.id)!.cover_image_id, rival);
+  assert.equal(h.repo.getBook(book.id)!.cover_status, "good");
+  assert.equal(reports["Antígona"]!.unchanged, 1);
+  assert.equal(reports["Antígona"]!.coversSet, 3);
 });
 
 test("a mock-up never replaces a good cover", async () => {

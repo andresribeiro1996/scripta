@@ -95,7 +95,8 @@ export async function classifyPublisherImage(input: Buffer): Promise<PublisherIm
       .toBuffer({ resolveWithObject: true });
     const keptWidth = trimmed.info.width / width;
     const keptHeight = trimmed.info.height / height;
-    if (uniform && cornerMean >= LIGHT_CANVAS_MEAN && (keptWidth < PHOTO_KEPT || keptHeight < PHOTO_KEPT)) {
+    const photoOnCanvas = uniform && (keptWidth < PHOTO_KEPT || keptHeight < PHOTO_KEPT);
+    if (photoOnCanvas && cornerMean >= LIGHT_CANVAS_MEAN) {
       const ratio = trimmed.info.height / trimmed.info.width;
       if (ratio < MIN_ASPECT_RATIO || ratio > MAX_ASPECT_RATIO || keptWidth * keptHeight < MIN_CROP_AREA) return null;
       const cropped = await sharp(trimmed.data, { raw: { width: trimmed.info.width, height: trimmed.info.height, channels: trimmed.info.channels } })
@@ -103,6 +104,7 @@ export async function classifyPublisherImage(input: Buffer): Promise<PublisherIm
         .toBuffer();
       return { kind: "cropped", input: cropped };
     }
+    if (photoOnCanvas && cornerMean < LIGHT_CANVAS_MEAN) return null;
     const ratio = height / width;
     if (ratio < FLAT_MIN_RATIO || ratio > MAX_ASPECT_RATIO) return null;
     if (uniform && cornerMean >= WHITE_CANVAS_MEAN && (keptWidth < CANVAS_KEPT || keptHeight < CANVAS_KEPT)) return null;

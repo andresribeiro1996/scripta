@@ -176,9 +176,15 @@ test("corners that differ by 15 are uniform and corners that differ by 40 are no
   assert.equal((await classifyPublisherImage(strongly))?.kind, "flat");
 });
 
-test("a saturated uniform canvas is a cover, not a photo canvas", async () => {
+test("a book mock-up on a saturated uniform canvas is refused", async () => {
   const image = await canvas(2560, 2522, "rgb(228,6,19)", [await rectangle(1500, 2100, "#ffffff", 530, 211)]);
-  assert.equal((await classifyPublisherImage(image))?.kind, "flat");
+  assert.equal(await classifyPublisherImage(image), null);
+});
+
+test("a book mock-up on a dark or mid-tone canvas is refused, not kept as a square", async () => {
+  for (const colour of ["#4a6fa5", "#9a7f60"]) {
+    assert.equal(await classifyPublisherImage(await canvas(2048, 2048, colour, [await rectangle(1100, 1600, "#e8e0d0", 474, 224)])), null);
+  }
 });
 
 test("a shadow band stays outside the crop and a pale cover edge stays inside it", async () => {

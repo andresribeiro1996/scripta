@@ -60,12 +60,26 @@ test("migration turns legacy ISBN cache rows into books and drops cover_cache", 
 });
 
 test("createBook returns the existing row for a key that is already taken", () => {
-  const { repo } = freshRepo();
+  const { db, repo } = freshRepo();
   const first = repo.createBook({ title: "Orlando", author: "Virginia Woolf", isbn: "9780141184272" }, ["isbn:9780141184272"], NOW);
   const second = repo.createBook({ title: "Other", author: "Other", isbn: "9780141184272" }, ["isbn:9780141184272"], NOW);
   assert.equal(second.id, first.id);
   assert.equal(second.title, "Orlando");
   assert.equal(repo.getBook(first.id)!.genres, "[]");
+  assert.equal(db.isTransaction, false);
+  assert.equal((db.prepare(`SELECT COUNT(*) AS n FROM books`).get() as { n: number }).n, 1);
+});
+
+test("setCoverIf writes only while the book still has the expected cover", () => {
+  const { repo } = freshRepo();
+  const book = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: null }, ["ta:dune|frank herbert|"], NOW);
+  assert.equal(repo.setCoverIf(book.id, "img-0", { imageId: "img-1", status: "manual", checkedAt: NOW }), false);
+  assert.equal(repo.getBook(book.id)!.cover_image_id, null);
+  assert.equal(repo.setCoverIf(book.id, null, { imageId: "img-1", status: "manual", checkedAt: NOW }), true);
+  assert.equal(repo.getBook(book.id)!.cover_image_id, "img-1");
+  assert.equal(repo.setCoverIf(book.id, null, { imageId: "img-2", status: "manual", checkedAt: NOW }), false);
+  assert.equal(repo.setCoverIf(book.id, "img-1", { imageId: "img-2", status: "good", checkedAt: NOW }), true);
+  assert.equal(repo.getBook(book.id)!.cover_image_id, "img-2");
 });
 
 test("fillIdentity only fills an empty title and does not make the book searchable", () => {
