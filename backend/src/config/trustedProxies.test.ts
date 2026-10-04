@@ -22,7 +22,7 @@ test("any peer in 100.64.0.0/10 is a trusted proxy, not only the observed addres
 });
 
 test("a client hitting Railway directly cannot claim a Cloudflare hop to pick its own address", async () => {
-  assert.equal(await clientIp("100.64.0.7", "6.6.6.6, 172.64.1.1"), "6.6.6.6");
+  assert.equal(await clientIp("100.64.0.7", "6.6.6.6, 172.64.1.1, 198.51.100.4"), "198.51.100.4");
   assert.equal(await clientIp("203.0.113.50", "6.6.6.6, 172.64.1.1"), "203.0.113.50");
 });
 

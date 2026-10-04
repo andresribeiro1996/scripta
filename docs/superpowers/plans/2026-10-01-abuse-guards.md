@@ -113,19 +113,19 @@ number (`lib/request.js`, "Fail closed").
 - [ ] `app.ts`: both `Fastify(...)` calls use `trustProxy: TRUSTED_PROXIES`.
 - [ ] Tests, building a bare `Fastify({ trustProxy: TRUSTED_PROXIES })` with
   one route returning `request.ip`, using `inject`'s `remoteAddress`:
-  1. peer `10.0.0.5`, `X-Forwarded-For: 6.6.6.6, 203.0.113.9, 172.64.1.1`
+  1. peer `100.64.0.5`, `X-Forwarded-For: 6.6.6.6, 203.0.113.9, 172.64.1.1`
      → `203.0.113.9` (spoofed entry ignored, Cloudflare hop skipped);
   2. peer `100.64.3.4`, `X-Forwarded-For: 203.0.113.9` → `203.0.113.9`;
   3. peer `203.0.113.50` (public, untrusted), `X-Forwarded-For: 6.6.6.6`
      → `203.0.113.50`;
-  4. peer `::ffff:10.0.0.5` with a forwarded client → the client (IPv4-mapped
+  4. peer `::ffff:100.64.0.5` with a forwarded client → the client (IPv4-mapped
      peers must count as trusted). If this fails, add the mapped forms
      explicitly and say so in the report.
 
 **Gate, do not merge without it:** Railway's edge must connect from inside
 these ranges, or every client shares one rate-limit bucket. The user runs the
 production peer check from the spec's conversation (`/proc/net/tcp*` peers on
-the app's port) and the peers must all be private, CGNAT or loopback. The
+the app's port) and the peers must all be CGNAT (100.64.0.0/10) or loopback. The
 implementer stops after committing this task and reports; the merge waits.
 
 ## Task 5: Correct the README
