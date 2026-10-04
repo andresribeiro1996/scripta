@@ -5,10 +5,34 @@ import type { BookRow } from "./types.js";
 export { normalizeTitle, normalizeWords } from "@scripta/shared";
 
 const MAX_SEARCH_TOKENS = 8;
-const PORTUGUESE_ISBN13_PREFIXES = ["97885", "97865", "978972", "978989"];
-const PORTUGUESE_ISBN10_PREFIXES = ["85", "65", "972", "989"];
+export const PORTUGAL_ISBN13_PREFIXES = ["978972", "978989"];
+export const PORTUGAL_ISBN10_PREFIXES = ["972", "989"];
+export const BRAZIL_ISBN13_PREFIXES = ["97885", "97865"];
+export const BRAZIL_ISBN10_PREFIXES = ["85", "65"];
+const PORTUGUESE_ISBN13_PREFIXES = [...BRAZIL_ISBN13_PREFIXES, ...PORTUGAL_ISBN13_PREFIXES];
+const PORTUGUESE_ISBN10_PREFIXES = [...BRAZIL_ISBN10_PREFIXES, ...PORTUGAL_ISBN10_PREFIXES];
+
+const MARC_LANGUAGES = new Map([
+  ["eng", "en"],
+  ["por", "pt"],
+  ["spa", "es"],
+  ["fre", "fr"],
+  ["ger", "de"],
+  ["ita", "it"],
+  ["dut", "nl"],
+  ["cat", "ca"],
+  ["glg", "gl"],
+  ["jpn", "ja"],
+  ["chi", "zh"],
+  ["rus", "ru"]
+]);
 
 export const SEARCH_LIMIT = 12;
+
+export function normalizeWorkKey(raw: string | null | undefined): string | null {
+  const key = raw?.replace(/^\/works\//, "") ?? "";
+  return /^OL\d+W$/.test(key) ? key : null;
+}
 
 export interface BookLookup {
   isbn?: string | null;
@@ -29,10 +53,25 @@ export function titleMatches(wanted: string, candidate: string): boolean {
   return normalized !== "" && normalized === normalizeTitle(candidate);
 }
 
-export function isPortugueseIsbn(isbn: string | null): boolean {
+function hasIsbnPrefix(isbn: string | null, prefixes13: string[], prefixes10: string[]): boolean {
   const normalized = normalizeIsbn(isbn ?? "");
-  const prefixes = normalized.length === 13 ? PORTUGUESE_ISBN13_PREFIXES : PORTUGUESE_ISBN10_PREFIXES;
+  const prefixes = normalized.length === 13 ? prefixes13 : prefixes10;
   return normalized !== "" && prefixes.some((prefix) => normalized.startsWith(prefix));
+}
+
+export function isPortugueseIsbn(isbn: string | null): boolean {
+  return hasIsbnPrefix(isbn, PORTUGUESE_ISBN13_PREFIXES, PORTUGUESE_ISBN10_PREFIXES);
+}
+
+export function isPortugalIsbn(isbn: string | null): boolean {
+  return hasIsbnPrefix(isbn, PORTUGAL_ISBN13_PREFIXES, PORTUGAL_ISBN10_PREFIXES);
+}
+
+export function editionLanguage(marcCodes: string[], isbn: string | null): string | null {
+  const tag = marcCodes.map((code) => MARC_LANGUAGES.get(code.replace(/^\/languages\//, ""))).find(Boolean) ?? null;
+  if (tag !== "pt") return tag;
+  if (isPortugalIsbn(isbn)) return "pt-PT";
+  return hasIsbnPrefix(isbn, BRAZIL_ISBN13_PREFIXES, BRAZIL_ISBN10_PREFIXES) ? "pt-BR" : "pt";
 }
 
 export function authorMatches(wantedAttribution: string, candidateAuthors: string[]): boolean {

@@ -1,10 +1,11 @@
 import { MuralBlockDetail } from "./MuralBlockDetail";
-import { blockTextColors, resolveBlockColor, resolveHomeBlock, type Group, type PublicReaderCard } from "@scripta/shared";
+import { blockEffects, blockTextColors, resolveBlockColor, resolveHomeBlock, type Group, type PublicReaderCard } from "@scripta/shared";
 import { themes } from "@scripta/shared/themes";
 import GridLayout from "react-grid-layout";
+import { DndContext } from "@dnd-kit/core";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
 import { BLOCK_PAD_SCALE, blockFinishImage, blockFontFamilyCss, resolveBlockStyle, resolveBorderColor } from "../../lib/libraryStyle";
@@ -14,6 +15,8 @@ import { muralThemeStyle } from "../../lib/theme";
 import { OptionsMenu } from "../OptionsMenu";
 import { BlockRenderer } from "./BlockRenderer";
 import { MobileMuralCanvas, type MobileMuralDraft } from "./MobileMuralCanvas";
+import { DraggableMuralBlock, useMuralDrag } from "./useMuralDrag";
+import { MuralExpandButtons } from "./MuralExpandButtons";
 
 const ResponsiveGridLayout = GridLayout.WidthProvider(GridLayout);
 const ROW_HEIGHT = 28;
@@ -30,6 +33,8 @@ export function MuralCanvas({
   shelfThemeOverride,
   readerCardOverride,
   onLayoutChange,
+  onDragChange,
+  onToggleExpansion,
   onConfigureBlock,
   onStyleBlock,
   onDuplicateBlock,
@@ -55,7 +60,9 @@ export function MuralCanvas({
   profile?: ReaderProfile;
   shelfThemeOverride?: ShelfTheme;
   readerCardOverride?: PublicReaderCard;
+  onDragChange?: (dragging: boolean) => void;
   onLayoutChange?: (blockId: string, layout: BlockLayout) => void;
+  onToggleExpansion?: (blockId: string, axis: "w" | "h", bottom: number, top: number) => void;
   onConfigureBlock?: (block: MuralBlock) => void;
   onStyleBlock?: (block: MuralBlock) => void;
   onDuplicateBlock?: (blockId: string) => void;
@@ -73,6 +80,8 @@ export function MuralCanvas({
   onCancelMobileDraft?: () => void;
 }) {
   const [focusedId, setFocusedId] = useState<string | null>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const drag = useMuralDrag(originalMural.blocks, canvasRef, onLayoutChange, 1, onDragChange);
   const [day] = useState(() => new Date().toISOString().slice(0, 10));
   const mural = { ...originalMural, theme: muralThemeId(originalMural.theme), blocks: originalMural.blocks.map((block) => resolveHomeBlock(block, books, groups, day)) };
   const originalBlock = (block: MuralBlock) => originalMural.blocks.find((item) => item.id === block.id) ?? block;
@@ -115,6 +124,8 @@ export function MuralCanvas({
         onDeleteBlock={onDeleteBlock}
         onStartResize={onStartResize}
         onLayoutChange={onLayoutChange}
+        onDragChange={onDragChange}
+        onToggleExpansion={onToggleExpansion}
         onDraftChange={onMobileDraftChange}
         onApplyDraft={onApplyMobileDraft}
         onCancelDraft={onCancelMobileDraft}
@@ -125,38 +136,47 @@ export function MuralCanvas({
     );
   }
 
-  const layout = mural.blocks.map((block) => ({ i: block.id, ...block.layout }));
+  const layout = drag.blocks.map((block) => ({ i: block.id, ...block.layout }));
   function handleGestureEnd(_layout: unknown, _oldItem: unknown, item: { i: string; x: number; y: number; w: number; h: number }) {
     onLayoutChange?.(item.i, { x: item.x, y: item.y, w: item.w, h: item.h });
   }
 
   return (
     <>
-    <div style={muralThemeStyle(mural.theme)}>
+    <DndContext {...drag.context}>
+    <div ref={canvasRef} className="relative overflow-hidden" onClick={(event) => { if (editMode && !(event.target as Element).closest(".react-grid-item")) onSelectBlock?.(null); }} style={{ ...muralThemeStyle(mural.theme), minHeight: editMode ? Math.max(0, ...drag.blocks.map((block) => block.layout.y + block.layout.h), drag.drop ? drag.drop.layout.y + drag.drop.layout.h : 0) * 38 + 160 : undefined }}>
     <ResponsiveGridLayout
       key={revertNonce}
       layout={layout}
       cols={GRID_COLUMNS}
       rowHeight={ROW_HEIGHT}
-      isDraggable={editMode}
-      isResizable={editMode}
+      isDraggable={false}
+      isResizable={editMode && !busy && !drag.drop}
       compactType={null}
-      preventCollision
+      allowOverlap={Boolean(drag.drop)}
       draggableCancel=".mural-block-controls"
-      onDragStop={handleGestureEnd}
       onResizeStop={handleGestureEnd}
     >
       {mural.blocks.map((block) => {
         const style = resolveBlockStyle(block.style);
+        const effects = blockEffects(style, themeColors);
         const overridden = style.backgroundColor || style.textColor ? blockTextColors(style, themeColors) : null;
         return (
           <div
             key={block.id}
+            style={{ zIndex: drag.drop?.id === block.id ? 10 : selectedBlockId === block.id ? 1 : undefined }}
+            onClick={() => { if (editMode) onSelectBlock?.(block.id); }}
+            onFocus={() => { if (editMode) onSelectBlock?.(block.id); }}
+          >
+          <DraggableMuralBlock id={block.id} disabled={!editMode || Boolean(busy)}>
+          <div
             data-own-font=""
-            className={`group relative overflow-hidden ${style.cardShadow ? "shadow-sm" : ""} ${style.cardHoverEffect ? "transition-transform hover:-translate-y-0.5 hover:scale-[1.01] hover:shadow-lg" : ""}`}
+            className={`group relative h-full w-full overflow-hidden [box-shadow:var(--block-shadow)] ${!editMode && style.cardHoverEffect ? "transition-transform hover:-translate-y-0.5 hover:scale-[1.01] hover:[box-shadow:var(--block-hover-shadow)]" : ""}`}
             style={{
               borderRadius: `${style.cardRadius}px`,
-              opacity: style.cardOpacity / 100,
+              opacity: effects.opacity,
+              "--block-shadow": effects.boxShadow,
+              "--block-hover-shadow": effects.hoverShadow,
               backgroundColor: resolveBlockColor(style.backgroundColor, themeColors) ?? "var(--color-surface)",
               backgroundImage: blockFinishImage(style, themeColors),
               borderTopWidth: `${style.cardBorderSides.top ? style.cardBorderWidth : 0}px`,
@@ -177,8 +197,9 @@ export function MuralCanvas({
           >
             {!editMode ? <button className="absolute inset-0 z-10 rounded-[inherit] focus-visible:outline-2 focus-visible:outline-[var(--block-accent,var(--color-accent))]" aria-label={`Open ${block.type} block`} onClick={() => onOpenBlock ? onOpenBlock(block) : setFocusedId(block.id)} /> : null}
             <BlockRenderer block={block} books={books} images={images} profile={profile} groups={groups} shelfThemeOverride={shelfThemeOverride} readerCardOverride={readerCardOverride} statsOverride={statsOverride} tierlistData={tierlistData} />
-            {editMode && (
-              <div className="mural-block-controls absolute top-1.5 right-1.5 opacity-0 transition-opacity group-hover:opacity-100">
+            {effects.fadeColor && effects.fadeOpacity > 0 ? <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-[1] rounded-[inherit]" style={{ backgroundColor: effects.fadeColor, opacity: effects.fadeOpacity }} /> : null}
+            {editMode && !drag.drop && (
+              <div className="mural-block-controls absolute top-1.5 right-1.5 z-20 opacity-0 transition-opacity group-hover:opacity-100">
                 <OptionsMenu
                   title="Block settings"
                   items={[
@@ -191,10 +212,14 @@ export function MuralCanvas({
               </div>
             )}
           </div>
+          </DraggableMuralBlock>
+          {editMode && selectedBlockId === block.id && !drag.drop ? <div className="mural-block-controls absolute top-1 left-1 z-20 flex gap-1 rounded-xl border border-(--color-accent) bg-(--color-surface) p-1"><MuralExpandButtons block={originalBlock(block)} canvas={canvasRef} busy={busy} compact onToggle={onToggleExpansion} /></div> : null}
+          </div>
         );
       })}
     </ResponsiveGridLayout>
     </div>
+    </DndContext>
     {focusedId && mural.blocks.some((block) => block.id === focusedId) ? <MuralBlockDetail theme={mural.theme} block={mural.blocks.find((block) => block.id === focusedId)!} books={books} images={images} profile={profile} groups={groups} shelfThemeOverride={shelfThemeOverride} readerCardOverride={readerCardOverride} statsOverride={statsOverride} tierlistData={tierlistData} onClose={() => setFocusedId(null)} /> : null}
     </>
   );

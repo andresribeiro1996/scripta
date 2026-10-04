@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import {
   BLOCK_TYPE_LABELS,
-  DEFAULT_BORDER_SIDES,
   FINISH_TILE_SIZE,
   blockFinish,
+  blockEffects,
+  blockGradient,
   blockTextColors,
   calculateShelfTheme,
   finishTileMarkup,
@@ -14,6 +15,8 @@ import {
   computeStat,
   libraryBreakdown,
   muralThemeId,
+  moveMuralBlock,
+  muralDragScrollSpeed,
   readingPercent,
   resolveBlockColor,
   resolveBlockStyle,
@@ -36,29 +39,27 @@ import { ReaderCardBlock } from "./ReaderCardBlock";
 import { Image } from "expo-image";
 import { SvgXml } from "react-native-svg";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
+import Animated, { measure, scrollTo, useAnimatedReaction, useAnimatedStyle, useFrameCallback, useReducedMotion, useSharedValue, withSpring, type AnimatedRef, type SharedValue } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { commitHaptic, liftHaptic } from "../../ui/haptics";
-import { PixelRatio, Platform, Pressable, ScrollView, StyleSheet, View, type StyleProp, type TextStyle } from "react-native";
+import { PixelRatio, Pressable, ScrollView, StyleSheet, View, type StyleProp, type TextStyle } from "react-native";
 import { Text } from "../../ui/Text";
 import { blockFontFamily, resolveBorderColor, resolveBorderStyle } from "../../ui/libraryStyle";
 import { minimumTouchTarget, MuralThemeScope, radii, spacing, useTheme, type ThemeColors } from "../../ui/theme";
 import type { GalleryImage } from "../gallery/api";
 import type { Tierlist } from "../tierlists/api";
 import { selectionBorderColor } from "./blockStyleOptions";
-import { muralCanvasHeight } from "./layout";
+import { MURAL_ROW_HEIGHT, muralCanvasHeight, muralDragCell, muralDragPosition, muralPreviewScale } from "./layout";
 
 const LIFT_SPRING = { duration: 300, dampingRatio: 0.8 } as const;
-const ROW_HEIGHT = 36;
+const MOVE_SPRING = { duration: 220, dampingRatio: 1, overshootClamping: true } as const;
+const ROW_HEIGHT = MURAL_ROW_HEIGHT;
 const GAP = 8;
+const ROW_GAP = GAP;
 const gridColumnWidth = (width: number) => (width + GAP) / GRID_COLUMNS;
+type DragState = { id: string; layout: BlockLayout; dx: number; dy: number; pointerY: number; startScroll: number; drop?: BlockLayout };
+export type MuralDragScroll = { ref: AnimatedRef<ScrollView>; offset: SharedValue<number>; contentHeight: SharedValue<number>; bottomInset: SharedValue<number> };
 const PROGRESS_TRACK = 4;
-
-const blockShadow = Platform.select({
-  ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 4 },
-  android: { elevation: 2 },
-  default: {},
-});
 
 const BLOCK_PADDING = { tight: spacing.sm, normal: spacing.md, roomy: spacing.xl } as const;
 
@@ -76,13 +77,16 @@ function blockPadding(style: BlockStyle) {
 }
 
 function blockFrameStyle(style: BlockStyle, colors: ThemeColors) {
+  const effects = blockEffects(style, colors);
   return {
     backgroundColor: resolveBlockColor(style.backgroundColor, colors) ?? colors.surface,
+    experimental_backgroundImage: blockGradient(style, colors)?.image,
     borderColor: resolveBorderColor(resolveBlockColor(style.cardBorderColor, colors), style.cardBorderOpacity, colors.border),
     ...sideWidths(style.cardBorderWidth, style.cardBorderSides),
     borderStyle: resolveBorderStyle(style.cardBorderStyle),
     borderRadius: style.cardRadius,
-    opacity: style.cardOpacity / 100,
+    opacity: effects.opacity,
+    boxShadow: effects.boxShadow,
   };
 }
 
@@ -93,8 +97,9 @@ function FinishOverlay({ id, style, colors }: { id: string; style: BlockStyle; c
   return <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={StyleSheet.absoluteFill}><SvgXml xml={xml} width="100%" height="100%" /></View>;
 }
 
-function frameShadow(style: BlockStyle) {
-  return style.cardShadow && style.backgroundColor !== "transparent" ? blockShadow : null;
+function FadeOverlay({ style, colors }: { style: BlockStyle; colors: ThemeColors }) {
+  const effects = blockEffects(style, colors);
+  return effects.fadeColor && effects.fadeOpacity > 0 ? <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[StyleSheet.absoluteFill, { backgroundColor: effects.fadeColor, opacity: effects.fadeOpacity, borderRadius: style.cardRadius }]} /> : null;
 }
 
 /** Every size inside a block is an `em` of the block's own font size on the
@@ -236,7 +241,7 @@ const MOVE_ACTIONS = [
   { name: "moveDown", label: "Move down" },
 ];
 
-function CanvasBlock({ block, columnWidth, editable, selected, books, images, tierlists, profile, groups, shelfThemeOverride, readerCardOverride, statsOverride, onSelect, onMove, onAssetReady }: {
+const CanvasBlock = memo(function CanvasBlock({ block, columnWidth, editable, selected, books, images, tierlists, profile, groups, shelfThemeOverride, readerCardOverride, statsOverride, onSelect, onMove, onAssetReady, drag, preview, drop, scroll }: {
   block: MuralBlock;
   columnWidth: number;
   editable: boolean;
@@ -252,50 +257,94 @@ function CanvasBlock({ block, columnWidth, editable, selected, books, images, ti
   onSelect: () => void;
   onMove: (dx: number, dy: number) => void;
   onAssetReady?: (key: string) => void;
+  drag: SharedValue<DragState | null>;
+  preview: SharedValue<Record<string, BlockLayout>>;
+  drop: SharedValue<BlockLayout | null>;
+  scroll?: MuralDragScroll;
 }) {
   const { colors } = useTheme();
-  const x = useSharedValue(0);
-  const y = useSharedValue(0);
   const lifted = useSharedValue(0);
-  // A block gave no sign at all that the long press had armed it — the haptic
-  // arrives with a visible lift, never on its own.
-  const gesture = Gesture.Pan()
+  const pointerOrigin = useSharedValue({ x: 0, y: 0, scroll: 0 });
+  const reducedMotion = useReducedMotion();
+  const callbacks = useRef({ onSelect, onMove });
+  useLayoutEffect(() => { callbacks.current = { onSelect, onMove }; }, [onSelect, onMove]);
+  const select = useCallback(() => callbacks.current.onSelect(), []);
+  const move = useCallback((dx: number, dy: number) => callbacks.current.onMove(dx, dy), []);
+  const x = useSharedValue(block.layout.x * columnWidth);
+  const y = useSharedValue(block.layout.y * ROW_HEIGHT);
+  const scrollOffset = scroll?.offset;
+  const gesture = useMemo(() => Gesture.Pan()
     .enabled(editable)
     .activateAfterLongPress(220)
-    .onStart(() => { lifted.value = withSpring(1, LIFT_SPRING); scheduleOnRN(liftHaptic); })
-    .onUpdate((event) => { x.value = event.translationX; y.value = event.translationY; })
-    .onEnd((event) => {
-      const dx = Math.round(event.translationX / columnWidth);
-      const dy = Math.round(event.translationY / ROW_HEIGHT);
-      scheduleOnRN(onMove, dx, dy);
-      if (dx !== 0 || dy !== 0) scheduleOnRN(commitHaptic);
+    .onBegin((event) => { pointerOrigin.set({ x: event.absoluteX, y: event.absoluteY, scroll: scrollOffset?.get() ?? 0 }); })
+    .onStart((event) => {
+      const pointer = pointerOrigin.get();
+      const origin = { ...pointer, x: pointer.x - (x.get() - block.layout.x * columnWidth), y: pointer.y - (y.get() - block.layout.y * ROW_HEIGHT) };
+      pointerOrigin.set(origin);
+      drag.set({ id: block.id, layout: block.layout, dx: event.absoluteX - origin.x, dy: event.absoluteY - origin.y, pointerY: event.absoluteY, startScroll: origin.scroll });
+      lifted.set(withSpring(1, LIFT_SPRING));
+      scheduleOnRN(select);
+      scheduleOnRN(liftHaptic);
     })
-    .onFinalize(() => { x.value = withSpring(0); y.value = withSpring(0); lifted.value = withSpring(0, LIFT_SPRING); });
+    .onUpdate((event) => {
+      const current = drag.get();
+      const origin = pointerOrigin.get();
+      if (current?.id === block.id) drag.set({ ...current, dx: event.absoluteX - origin.x, dy: event.absoluteY - origin.y, pointerY: event.absoluteY });
+    })
+    .onEnd((event) => {
+      const current = drag.get();
+      if (current?.id !== block.id) return;
+      const origin = pointerOrigin.get();
+      const target = drop.get() ?? current.layout;
+      const dx = Math.max(0, Math.min(GRID_COLUMNS - current.layout.w, muralDragCell(current.layout.x + (event.absoluteX - origin.x) / columnWidth, target.x))) - current.layout.x;
+      const dy = Math.max(0, muralDragCell(current.layout.y + (event.absoluteY - origin.y + (scrollOffset?.get() ?? 0) - current.startScroll) / ROW_HEIGHT, target.y)) - current.layout.y;
+      if (dx !== 0 || dy !== 0) {
+        drag.set({ ...current, drop: { ...current.layout, x: current.layout.x + dx, y: current.layout.y + dy } });
+        scheduleOnRN(move, dx, dy);
+        scheduleOnRN(commitHaptic);
+      } else drag.set(null);
+    })
+    .onFinalize((_event, success) => { if (!success && drag.get()?.id === block.id) drag.set(null); lifted.set(withSpring(0, LIFT_SPRING)); }), [editable, block.id, block.layout, columnWidth, drag, drop, lifted, pointerOrigin, scrollOffset, select, move, x, y]);
+  useAnimatedReaction(() => {
+    const current = drag.get();
+    const active = current?.id === block.id && !current.drop;
+    const layout = preview.get()[block.id] ?? block.layout;
+    const position = active ? muralDragPosition(current.layout, current.dx, current.dy + (scrollOffset?.get() ?? 0) - current.startScroll, columnWidth) : { x: layout.x * columnWidth, y: layout.y * ROW_HEIGHT };
+    return { active, ...position };
+  }, (next, previous) => {
+    if (next.x !== previous?.x || next.active !== previous?.active) x.set(next.active || reducedMotion ? next.x : withSpring(next.x, MOVE_SPRING));
+    if (next.y !== previous?.y || next.active !== previous?.active) y.set(next.active || reducedMotion ? next.y : withSpring(next.y, MOVE_SPRING));
+  });
   const style = resolveBlockStyle(block.style);
-  const restOpacity = style.cardOpacity / 100;
-  const animated = useAnimatedStyle(() => ({
-    opacity: restOpacity * (1 - lifted.value * 0.15),
-    transform: [{ translateX: x.value }, { translateY: y.value }, { scale: 1 + lifted.value * 0.03 }],
-  }));
-  const body = <View style={styles.blockBody}><BlockContent block={block} books={books} images={images} tierlists={tierlists} profile={profile} groups={groups} shelfThemeOverride={shelfThemeOverride} readerCardOverride={readerCardOverride} statsOverride={statsOverride} editable={editable} onAssetReady={onAssetReady} /></View>;
-  const content = <Animated.View style={[
+  const restOpacity = blockEffects(style, colors).opacity;
+  const animated = useAnimatedStyle(() => {
+    const current = drag.get();
+    const active = current?.id === block.id;
+    return {
+      zIndex: active ? 10 : 0,
+      opacity: restOpacity * (1 - lifted.get() * 0.25),
+      transform: [{ translateX: x.get() }, { translateY: y.get() }],
+    };
+  });
+  const body = <View pointerEvents={editable ? "none" : "auto"} style={styles.blockBody}><BlockContent block={block} books={books} images={images} tierlists={tierlists} profile={profile} groups={groups} shelfThemeOverride={shelfThemeOverride} readerCardOverride={readerCardOverride} statsOverride={statsOverride} editable={editable} onAssetReady={onAssetReady} /></View>;
+  const content = <Animated.View renderToHardwareTextureAndroid={editable && selected} shouldRasterizeIOS={editable && selected} style={[
         styles.block,
-        frameShadow(style),
         blockFrameStyle(style, colors),
-        selected ? { borderColor: selectionBorderColor(style, colors), ...sideWidths(Math.max(2, style.cardBorderWidth), DEFAULT_BORDER_SIDES) } : null,
         {
-          left: block.layout.x * columnWidth,
-          top: block.layout.y * ROW_HEIGHT,
+          left: 0,
+          top: 0,
           width: block.layout.w * columnWidth - GAP,
-          height: block.layout.h * ROW_HEIGHT - GAP,
+          height: block.layout.h * ROW_HEIGHT - ROW_GAP,
         },
         animated,
       ]}>
         <FinishOverlay id={block.id} style={style} colors={colors} />
         {editable ? <Pressable accessibilityRole="button" accessibilityLabel={`${BLOCK_TYPE_LABELS[block.type]} block. Long press and drag to move`} accessibilityActions={MOVE_ACTIONS} onAccessibilityAction={(event) => { const move = MOVES[event.nativeEvent.actionName]; if (move) onMove(move[0], move[1]); }} onPress={onSelect} style={[styles.blockPress, blockPadding(style)]}>{body}</Pressable> : <View style={[styles.blockPress, blockPadding(style)]}>{body}</View>}
+        <FadeOverlay style={style} colors={colors} />
+        {selected ? <View pointerEvents="none" style={{ position: "absolute", inset: 0, borderWidth: 2, borderRadius: style.cardRadius, borderColor: selectionBorderColor(style, colors) }} /> : null}
       </Animated.View>;
   return editable ? <GestureDetector gesture={gesture}>{content}</GestureDetector> : content;
-}
+});
 
 export function BlockPreview({ theme, block, canvasWidth, maxHeight, books, images, tierlists, profile, groups = [] }: {
   theme: ThemeId;
@@ -314,7 +363,7 @@ export function BlockPreview({ theme, block, canvasWidth, maxHeight, books, imag
   const resolved = useMemo(() => resolveHomeBlock(block, books, groups, day), [block, books, groups, day]);
   const style = resolveBlockStyle(resolved.style);
   const width = block.layout.w * gridColumnWidth(canvasWidth) - GAP;
-  const height = block.layout.h * ROW_HEIGHT - GAP;
+  const height = block.layout.h * ROW_HEIGHT - ROW_GAP;
   const room = boxWidth - spacing.md * 2;
   const scale = room > 0 && canvasWidth > 0 ? Math.min(1, room / width, maxHeight / height) : 0;
   return (
@@ -325,13 +374,14 @@ export function BlockPreview({ theme, block, canvasWidth, maxHeight, books, imag
       style={[styles.previewBox, { height: (scale ? height * scale : maxHeight) + spacing.md * 2, backgroundColor: colors.background }]}
     >
       {scale ? (
-        <View style={[styles.previewBlock, frameShadow(style), blockFrameStyle(style, colors), { width, height, transform: [{ scale }] }]}>
+        <View style={[styles.previewBlock, blockFrameStyle(style, colors), { width, height, transform: [{ scale }] }]}>
           <FinishOverlay id={block.id} style={style} colors={colors} />
           <View style={[styles.blockPress, blockPadding(style)]}>
             <View style={styles.blockBody}>
               <BlockContent block={resolved} books={books} images={images} tierlists={tierlists} profile={profile} groups={groups} editable />
             </View>
           </View>
+          <FadeOverlay style={style} colors={colors} />
         </View>
       ) : null}
     </View>
@@ -339,7 +389,7 @@ export function BlockPreview({ theme, block, canvasWidth, maxHeight, books, imag
   );
 }
 
-export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThemeOverride, readerCardOverride, statsOverride, editable = false, selectedBlockId, onSelectBlock, onLayoutChange, onImageReadyChange, groups = [] }: {
+export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThemeOverride, readerCardOverride, statsOverride, editable = false, selectedBlockId, onSelectBlock, onLayoutChange, onImageReadyChange, onDragChange, groups = [], dragScroll }: {
   mural: Mural;
   groups?: Group[];
   books: Array<Record<string, unknown>>;
@@ -354,10 +404,62 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThe
   onSelectBlock?: (id: string | null) => void;
   onLayoutChange?: (id: string, layout: BlockLayout) => void;
   onImageReadyChange?: (ready: boolean) => void;
+  onDragChange?: (dragging: boolean) => void;
+  dragScroll?: MuralDragScroll;
 }) {
   const theme = muralThemeId(mural.theme);
   const colors = themes[theme].colors;
   const [width, setWidth] = useState(0);
+  const drag = useSharedValue<DragState | null>(null);
+  const preview = useSharedValue<Record<string, BlockLayout>>({});
+  const drop = useSharedValue<BlockLayout | null>(null);
+  const scrollSpeed = useSharedValue(0);
+  const columnWidth = gridColumnWidth(width);
+  useAnimatedReaction(() => {
+    const current = drag.get();
+    return Boolean(current && !current.drop);
+  }, (active, previous) => {
+    if (active !== previous && onDragChange) scheduleOnRN(onDragChange, active);
+  });
+  useAnimatedReaction(() => {
+    const current = drag.get();
+    if (!current || width <= 0) return null;
+    const x = current.layout.x + current.dx / columnWidth;
+    const y = current.layout.y + (current.dy + (dragScroll?.offset.get() ?? 0) - current.startScroll) / ROW_HEIGHT;
+    return { id: current.id, layout: current.drop ?? { ...current.layout, x, y } };
+  }, (candidate, previous) => {
+    const last = candidate?.id === previous?.id ? drop.get() : null;
+    const next = candidate ? { ...candidate, layout: { ...candidate.layout,
+      x: Math.max(0, Math.min(GRID_COLUMNS - candidate.layout.w, muralDragCell(candidate.layout.x, last?.x ?? Math.round(candidate.layout.x)))),
+      y: Math.max(0, muralDragCell(candidate.layout.y, last?.y ?? Math.round(candidate.layout.y))),
+    } } : null;
+    if (next?.id === previous?.id && next?.layout.x === last?.x && next?.layout.y === last?.y) return;
+    const blocks = next ? moveMuralBlock(mural.blocks, next.id, next.layout) : mural.blocks;
+    preview.set(next ? Object.fromEntries(blocks.map((block) => [block.id, block.layout])) : {});
+    drop.set(next?.layout ?? null);
+  });
+  useAnimatedReaction(() => {
+    const current = drag.get();
+    const saved = current?.drop ? mural.blocks.find((block) => block.id === current.id)?.layout : null;
+    const target = current ? preview.get()[current.id] : null;
+    return Boolean(saved && current?.drop && target && saved.x === target.x && saved.y === target.y && saved.w === target.w && saved.h === target.h);
+  }, (settled) => {
+    if (settled) drag.set(null);
+  });
+  useFrameCallback((frame) => {
+    const current = drag.get();
+    if (!current || current.drop || !dragScroll) { scrollSpeed.set(0); return; }
+    const viewport = measure(dragScroll.ref);
+    if (!viewport) return;
+    const targetSpeed = muralDragScrollSpeed(current.pointerY, viewport.pageY, viewport.pageY + viewport.height - dragScroll.bottomInset.get());
+    const elapsed = Math.min(frame.timeSincePreviousFrame ?? 16, 32);
+    const speed = scrollSpeed.get() + (targetSpeed - scrollSpeed.get()) * Math.min(1, elapsed / 100);
+    scrollSpeed.set(speed);
+    if (Math.abs(speed) < 1) return;
+    const offset = dragScroll.offset.get();
+    const next = Math.max(0, Math.min(dragScroll.contentHeight.get() - viewport.height, offset + speed * elapsed / 1000));
+    if (next !== offset) scrollTo(dragScroll.ref, 0, next, false);
+  }, editable);
   const [day] = useState(() => new Date().toISOString().slice(0, 10));
   const [readyAssets, setReadyAssets] = useState<Set<string>>(() => new Set());
   const onAssetReady = useCallback((key: string) => setReadyAssets((current) => current.has(key) ? current : new Set(current).add(key)), []);
@@ -371,10 +473,14 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThe
   });
   const imageReady = width > 0 && assetKeys.every((key) => readyAssets.has(key));
   useEffect(() => { onImageReadyChange?.(imageReady); }, [imageReady, onImageReadyChange]);
-  const columnWidth = gridColumnWidth(width);
-  const height = muralCanvasHeight(mural.blocks, ROW_HEIGHT, !editable && mural.blocks.length ? 0 : undefined);
+  const height = muralCanvasHeight(mural.blocks, ROW_HEIGHT, !editable && mural.blocks.length ? 0 : undefined) + (editable ? ROW_HEIGHT * 6 : 0);
+  const canvasStyle = useAnimatedStyle(() => {
+    const current = drag.get();
+    const movingBottom = current && !current.drop ? (current.layout.y + current.layout.h + 6) * ROW_HEIGHT + current.dy + (dragScroll?.offset.get() ?? 0) - current.startScroll : 0;
+    return { height: Math.max(height, Math.ceil(movingBottom / ROW_HEIGHT) * ROW_HEIGHT, ...Object.values(preview.get()).map((layout) => (layout.y + layout.h + 6) * ROW_HEIGHT)) };
+  });
   const canvas = (
-    <View onLayout={(event) => setWidth(event.nativeEvent.layout.width)} style={[styles.canvas, { height, backgroundColor: colors.background }]}>
+    <Animated.View onLayout={(event) => setWidth(event.nativeEvent.layout.width)} style={[styles.canvas, { backgroundColor: colors.background }, canvasStyle]}>
       {width > 0 ? resolvedBlocks.map((block) => <CanvasBlock
         key={block.id}
         block={block}
@@ -390,16 +496,32 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThe
         readerCardOverride={readerCardOverride}
         statsOverride={statsOverride}
         onSelect={() => onSelectBlock?.(block.id)}
-        onMove={(dx, dy) => onLayoutChange?.(block.id, { ...block.layout, x: block.layout.x + dx, y: block.layout.y + dy })}
+        onMove={(dx, dy) => {
+          const original = mural.blocks.find((item) => item.id === block.id)!;
+          onLayoutChange?.(block.id, { ...original.layout, x: original.layout.x + dx, y: original.layout.y + dy });
+        }}
         onAssetReady={onImageReadyChange ? onAssetReady : undefined}
+        drag={drag}
+        preview={preview}
+        drop={drop}
+        scroll={dragScroll}
       />) : null}
-    </View>
+    </Animated.View>
   );
   return <MuralThemeScope theme={theme}>{editable ? <Pressable accessible={false} onPress={() => onSelectBlock?.(null)}>{canvas}</Pressable> : canvas}</MuralThemeScope>;
 }
 
+export function MuralThumbnail({ canvasWidth, ...props }: ComponentProps<typeof MuralCanvas> & { canvasWidth: number }) {
+  const [width, setWidth] = useState(0);
+  const scale = muralPreviewScale(width, canvasWidth);
+  return <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" onLayout={({ nativeEvent }) => setWidth(nativeEvent.layout.width)} style={styles.thumbnail}>
+    {scale > 0 ? <View style={{ position: "absolute", width: canvasWidth, left: 0, top: 0, transformOrigin: "top left", transform: [{ scale }] }}><MuralCanvas {...props} /></View> : null}
+  </View>;
+}
+
 const styles = StyleSheet.create({
-  canvas: { position: "relative", width: "100%" },
+  thumbnail: { width: "100%", height: "100%", overflow: "hidden" },
+  canvas: { position: "relative", width: "100%", overflow: "hidden" },
   block: { position: "absolute", overflow: "hidden" },
   blockPress: { flex: 1, minHeight: minimumTouchTarget },
   blockBody: { flex: 1, gap: spacing.sm },

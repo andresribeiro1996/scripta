@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { personCaption, type PersonResult, type SuggestedReader } from "@scripta/shared/community";
+import { followFailureMessage, personCaption, type PersonResult, type SuggestedReader } from "@scripta/shared/community";
 import { AuthorAvatar } from "../components/CommunityAuthorAvatar";
 import { EmptyState } from "../components/EmptyState";
 import { CommunityIcon } from "../components/NavIcons";
@@ -9,6 +9,7 @@ import { ReaderGlyph } from "../components/ReaderGlyph";
 import { SkeletonCardGrid } from "../components/Skeleton";
 import { followUser, unfollowUser } from "../api/community";
 import { useCommunityPeople, useSuggestedPeople } from "../hooks/useCommunity";
+import { useDebouncedValue } from "../hooks/useDebouncedValue";
 
 const searchInput =
   "mb-3 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm outline-none focus:border-(--color-accent)";
@@ -32,7 +33,7 @@ export function PeoplePage() {
 
 function PeoplePane() {
   const [search, setSearch] = useState("");
-  const needle = search.trim();
+  const needle = useDebouncedValue(search.trim(), 300);
   const { people, isLoading, error, refetch } = useCommunityPeople(needle);
   const suggested = useSuggestedPeople(needle.length === 0);
   const queryClient = useQueryClient();
@@ -46,8 +47,8 @@ function PeoplePane() {
       if (person.viewerFollows) await unfollowUser(person.user.userId);
       else await followUser(person.user.userId);
       await queryClient.invalidateQueries({ queryKey: ["community", "people"] });
-    } catch {
-      setFollowError("Couldn't update who you follow.");
+    } catch (error) {
+      setFollowError(followFailureMessage(error, "Couldn't update who you follow."));
     } finally {
       setBusyId(null);
     }

@@ -4,7 +4,7 @@ import { parseArgs } from "node:util";
 const { values } = parseArgs({
   options: {
     eng: { type: "string", default: "35000" },
-    por: { type: "string", default: "5000" },
+    por: { type: "string", default: "15000" },
     status: { type: "boolean", default: false }
   }
 });

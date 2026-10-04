@@ -11,8 +11,8 @@
 
 import { openLibraryDb } from "./adapters/sqlite/connection.js";
 import { createSqliteLibraryRepository } from "./adapters/sqlite/sqliteLibraryRepository.js";
-import type { LibraryDerived } from "./domain/types.js";
-import { deriveLibraryData } from "./service.js";
+import { LIBRARY_ROWS_VERSION } from "./domain/constants.js";
+import { deriveLibraryData, deriveLibraryRows } from "./service.js";
 
 /** One embedded mural pulled out of one user's library JSON, still in its
  *  original (frontend `Mural`-shaped, see frontend/src/lib/murals.ts) raw
@@ -24,8 +24,9 @@ export interface EmbeddedMuralRow {
   rawMural: unknown;
 }
 
-/** Pure read — scans every row's JSON for a `murals` array and collects
- *  each element paired with the owning user id. Never writes anything
+/** Pure read — scans the JSON of every row that still contains a
+ *  `"murals"` key for a `murals` array and collects each element paired
+ *  with the owning user id. Never writes anything
  *  back (see clearEmbeddedMuralsField below for the write half, which is
  *  only ever called once the extracted rows have actually been inserted
  *  elsewhere). Safe against a fresh empty database (returns []) and safe
@@ -35,7 +36,7 @@ export interface EmbeddedMuralRow {
 export function readEmbeddedMurals(): EmbeddedMuralRow[] {
   const db = openLibraryDb();
   try {
-    const rows = db.prepare(`SELECT user_id, data FROM library_documents`).all() as Array<{ user_id: string; data: string }>;
+    const rows = db.prepare(`SELECT user_id, data FROM library_documents WHERE instr(data, '"murals"') > 0`).iterate() as Iterable<{ user_id: string; data: string }>;
     const extracted: EmbeddedMuralRow[] = [];
     for (const row of rows) {
       let parsed: unknown;
@@ -100,27 +101,31 @@ export function clearEmbeddedMuralsField(userIds: string[]): void {
   }
 }
 
-function deriveStoredDocument(userId: string, dataJson: string): LibraryDerived {
-  let parsed: unknown;
+function parseStoredDocument(userId: string, dataJson: string): unknown {
   try {
-    parsed = JSON.parse(dataJson);
+    return JSON.parse(dataJson);
   } catch (error) {
     if (!(error instanceof SyntaxError)) throw error;
     console.error(`library backfill: storing ${userId}'s library without derived data`, error);
-    return { glyph: null, keys: [] };
+    return undefined;
   }
-  return deriveLibraryData(parsed);
 }
 
-export function backfillLibraryDerived(): void {
+export function backfillLibraryDerived(rowsVersion = LIBRARY_ROWS_VERSION): void {
   const db = openLibraryDb();
   try {
-    const repo = createSqliteLibraryRepository(db);
+    const repo = createSqliteLibraryRepository(db, rowsVersion);
     repo.deleteOrphanedDerived();
-    for (const userId of repo.listStaleUserIds()) {
+    const stale = repo.listStaleUserIds();
+    const started = performance.now();
+    for (const userId of stale) {
       const row = repo.getDocument(userId);
-      if (row) repo.setDerived(userId, deriveStoredDocument(userId, row.data), row.updated_at);
+      if (!row) continue;
+      const parsed = parseStoredDocument(userId, row.data);
+      repo.setDerived(userId, deriveLibraryData(parsed), row.updated_at);
+      repo.setRows(userId, deriveLibraryRows(parsed, (error, what) => console.error(`library backfill: ${userId}: ${what}`, error), rowsVersion), row.updated_at);
     }
+    if (stale.length > 0) console.log(`library backfill: rebuilt ${stale.length} accounts in ${Math.round(performance.now() - started)} ms`);
   } finally {
     db.close();
   }

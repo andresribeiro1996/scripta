@@ -19,6 +19,8 @@ export interface TournamentRow {
   updated_at: string;
 }
 
+export type TournamentDiscoverRow = Pick<TournamentRow, "id" | "created_at" | "owner_user_id">;
+
 /** The seeded pool, one row per bracket slot. title/author/cover_url are
  *  a SNAPSHOT copied in at seed time — there's no shared Book table
  *  anywhere in this app to reference instead (modules/library's own

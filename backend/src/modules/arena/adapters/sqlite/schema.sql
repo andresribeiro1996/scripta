@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS tournaments (
   id                       TEXT PRIMARY KEY,
   owner_user_id            TEXT NOT NULL,
   name                     TEXT NOT NULL,
+  name_key                 TEXT,
   bracket_size             INTEGER NOT NULL,
   round_duration_minutes   INTEGER NOT NULL,
   status                   TEXT NOT NULL DEFAULT 'seeding', -- 'seeding' | 'active' | 'completed'
@@ -23,6 +24,7 @@ CREATE TABLE IF NOT EXISTS tournaments (
 
 CREATE INDEX IF NOT EXISTS idx_tournaments_owner ON tournaments(owner_user_id);
 CREATE INDEX IF NOT EXISTS idx_tournaments_status ON tournaments(status);
+CREATE INDEX IF NOT EXISTS idx_tournaments_public ON tournaments(created_at DESC) WHERE status != 'seeding';
 
 -- The seeded pool, one row per bracket slot — title/author/cover are a
 -- SNAPSHOT copied in at seed time (see domain/types.ts's own comment).

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Alert, View } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
-import { bookKey, markDistinct, statusLabel } from "@scripta/shared";
+import { bookKey, markDistinct, saveFailureMessage, statusLabel } from "@scripta/shared";
 import { Text } from "../../../ui/Text";
 import { Button, ModalBody } from "../../../ui/components";
 import { radii, spacing, typography, useTheme } from "../../../ui/theme";
@@ -12,7 +12,7 @@ import { CoverImage } from "./CoverImage";
 
 export function DuplicatesSheetBody({ groups, library }: { groups: string[][]; library: LibraryDocument }) {
   const { colors } = useTheme();
-  const { updateLibrary } = useLibrary();
+  const { updateLibrary, saver } = useLibrary();
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
   const byKey = new Map(library.data.books.map((book) => [bookKey(book), book] as const));
@@ -25,7 +25,7 @@ export function DuplicatesSheetBody({ groups, library }: { groups: string[][]; l
     } catch (error) {
       console.error(error);
       void queryClient.invalidateQueries({ queryKey: LIBRARY_QUERY_KEY });
-      Alert.alert(failure);
+      Alert.alert(saveFailureMessage(error, failure));
     } finally {
       setBusy(false);
     }
@@ -33,8 +33,7 @@ export function DuplicatesSheetBody({ groups, library }: { groups: string[][]; l
 
   const merge = (group: string[]) =>
     run(async () => {
-      const current = queryClient.getQueryData<LibraryDocument | null>(LIBRARY_QUERY_KEY) ?? library;
-      queryClient.setQueryData(LIBRARY_QUERY_KEY, await mergeLibraryBooks(group[0]!, group.slice(1), current.updatedAt));
+      await saver.merge((expectedUpdatedAt, signal) => mergeLibraryBooks(group[0]!, group.slice(1), expectedUpdatedAt ?? library.updatedAt, signal));
     }, "Couldn't merge these books.");
 
   const keepApart = (group: string[]) => run(() => updateLibrary((data) => markDistinct(data, group)), "Couldn't save that.");

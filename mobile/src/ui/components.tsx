@@ -220,6 +220,7 @@ export function IconButton({
   tone = "default",
   framed = false,
   badge,
+  disabled = false,
 }: {
   name: IconName;
   accessibilityLabel: string;
@@ -234,6 +235,7 @@ export function IconButton({
    *  off unless asked for. */
   framed?: boolean;
   badge?: string | null;
+  disabled?: boolean;
 }) {
   const { colors } = useTheme();
   const color = tone === "danger" ? colors.danger : tone === "accent" ? colors.onAccent : colors.textDim;
@@ -241,6 +243,8 @@ export function IconButton({
     <Pressable
       accessibilityLabel={badge ? `${accessibilityLabel}, ${badge} new` : accessibilityLabel}
       accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      disabled={disabled}
       hitSlop={8}
       onPress={onPress}
       style={({ pressed }) => {
@@ -248,7 +252,7 @@ export function IconButton({
         return [
           label ? styles.labelledIconButton : styles.iconButton,
           framed ? { borderWidth: 1, borderColor: tone === "accent" ? background : colors.border } : null,
-          { backgroundColor: background },
+          { backgroundColor: background, opacity: disabled ? 0.55 : 1 },
         ];
       }}
     >

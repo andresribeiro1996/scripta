@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
+import { saveFailureMessage } from "@scripta/shared";
 import { BookCard } from "../components/BookCard";
 import { BookGrid } from "../components/BookGrid";
 import { LibraryCanvas } from "../components/LibraryCanvas";
 import { PageContainer } from "../components/PageContainer";
 import { CardAppearanceSection, CardBorderSection, CardContentSection, CardTextSection, Section, SliderRow } from "../components/StyleControls";
+import { useToast } from "../components/Toaster";
 import { useLibrary } from "../hooks/useLibrary";
 import {
   CARD_GAP_RANGE,
@@ -38,6 +40,7 @@ const PREVIEW_BOOKS: Array<Record<string, unknown>> = [
 
 export function LibraryStylePage() {
   const { data: library, updateLibrary } = useLibrary();
+  const toast = useToast();
 
   const [draft, setDraft] = useState<LibraryStyleSettings>(DEFAULT_LIBRARY_STYLE);
   const syncedRef = useRef(false);
@@ -56,20 +59,24 @@ export function LibraryStylePage() {
 
   const saveTimerRef = useRef<number | undefined>(undefined);
 
+  function saveStyle(next: LibraryStyleSettings) {
+    updateLibrary((data) => ({ ...data, style: next })).catch((error) => {
+      toast({ message: saveFailureMessage(error, "Couldn't save the style change."), kind: "error" });
+    });
+  }
+
   function applyDraft(next: LibraryStyleSettings) {
     setDraft(next);
     // Sliders fire on every drag tick — debounce so dragging doesn't spam
     // PUT /library, same pattern as LibraryPage's cover-confirmation flush.
     window.clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = window.setTimeout(() => {
-      void updateLibrary((data) => ({ ...data, style: next }));
-    }, 400);
+    saveTimerRef.current = window.setTimeout(() => saveStyle(next), 400);
   }
 
   function saveNow(next: LibraryStyleSettings) {
     setDraft(next);
     window.clearTimeout(saveTimerRef.current);
-    void updateLibrary((data) => ({ ...data, style: next }));
+    saveStyle(next);
   }
 
   // The shared per-card sections (Card appearance/border/content) only

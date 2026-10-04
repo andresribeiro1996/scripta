@@ -15,3 +15,15 @@ export class LibraryConflictError extends LibraryError {
     super("The library changed elsewhere since it was loaded.");
   }
 }
+
+export class LibraryTooLargeError extends LibraryError {
+  constructor() {
+    super("The library would be over the size limit.");
+  }
+}
+
+export class LibraryChangeNotFoundError extends LibraryError {
+  constructor(readonly reason: "no-group" | "no-book") {
+    super(reason === "no-group" ? "That group isn't in your library." : "That book isn't in your library.");
+  }
+}

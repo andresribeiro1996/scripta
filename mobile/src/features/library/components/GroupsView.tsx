@@ -1,8 +1,7 @@
 // Lists Series and Collections together — they're the same underlying
 // resource (@scripta/shared's Group / groups.ts), differing only in that
-// series also get auto-seeded from book metadata (deriveSeriesGroups,
-// called from lib/mergeAndSave.ts after every import/add). The type filter
-// below narrows the list; it doesn't gate which resource is loaded.
+// series also get auto-seeded from book metadata. The type filter below
+// narrows the list; it doesn't gate which resource is loaded.
 //
 // Rows only navigate — renaming, Style, Manage books, Select/Delete, and
 // deleting the group itself all live on the detail screen
@@ -20,7 +19,7 @@ import { forwardRef, useImperativeHandle, useMemo, useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../../ui/Text";
 import { router } from "expo-router";
-import { makeGroup, orderedGroupBooks, type GroupType } from "@scripta/shared";
+import { makeGroup, orderedGroupBooks, saveFailureMessage, type GroupType } from "@scripta/shared";
 import { EmptyState, Input, Segmented } from "../../../ui/components";
 import { Icon } from "../../../ui/icon";
 import { spacing, typography, useTheme } from "../../../ui/theme";
@@ -95,7 +94,7 @@ export const GroupsView = forwardRef<GroupsViewHandle, { search: string; onSearc
     const group = makeGroup(draftType, name);
     await attemptUpdate(
       () => updateLibrary((data) => ({ ...data, groups: [...(data.groups ?? []), group] })),
-      () => Alert.alert("Couldn't save — check your connection."),
+      (error) => Alert.alert(saveFailureMessage(error, "Couldn't save — check your connection.")),
       () => router.push(`/collection/${group.id}` as never),
     );
     setCreating(false);

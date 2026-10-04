@@ -35,6 +35,7 @@ const GLYPHS = {
   more: { ios: "ellipsis", android: "more_vert" },
   search: { ios: "magnifyingglass", android: "search" },
   filter: { ios: "line.3.horizontal.decrease", android: "filter_list" },
+  folder: { ios: "folder", android: "folder" },
   public: { ios: "globe", android: "public" },
   lock: { ios: "lock", android: "lock" },
   image: { ios: "photo", android: "image" },
@@ -55,6 +56,9 @@ const GLYPHS = {
   style: { ios: "paintbrush", android: "brush" },
   theme: { ios: "circle.lefthalf.filled", android: "contrast" },
   resize: { ios: "arrow.up.left.and.arrow.down.right", android: "open_in_full" },
+  expandHorizontal: { ios: "arrow.left.and.right", android: "swap_horiz" },
+  expandVertical: { ios: "arrow.up.and.down", android: "swap_vert" },
+  moveToTop: { ios: "arrow.up.to.line", android: "vertical_align_top" },
   duplicate: { ios: "plus.square.on.square", android: "content_copy" },
 } as const satisfies Record<string, Glyph>;
 

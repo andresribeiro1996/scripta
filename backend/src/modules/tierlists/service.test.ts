@@ -6,8 +6,9 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { normalizeWords } from "@scripta/shared";
 import type { TierlistsRepository } from "./domain/ports.js";
-import type { TierlistRow, BallotRow, HistogramCell, Placement } from "./domain/types.js";
+import type { TierlistRow, BallotRow, BallotTotals, HistogramCell, Placement } from "./domain/types.js";
 import { createTierlistsPublicApi, createTierlistsService } from "./service.js";
 
 function createInMemoryRepo(): TierlistsRepository {
@@ -103,6 +104,37 @@ function createInMemoryRepo(): TierlistsRepository {
         .filter(({ row }) => row.origin_user_id !== voterUserId)
         .sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))
         .map(({ row }) => row);
+    },
+
+    discoverWindow(needle, limit) {
+      return [...tierlists.values()]
+        .filter((t) => t.vote_code !== null && normalizeWords(t.name).includes(needle))
+        .sort((a, b) => b.created_at.localeCompare(a.created_at))
+        .slice(0, limit)
+        .map((t) => ({ id: t.id, created_at: t.created_at, origin_user_id: t.origin_user_id, promoted_at: t.promoted_at }));
+    },
+
+    listPublicByIds(ids) {
+      return [...tierlists.values()].filter((t) => t.vote_code !== null && ids.includes(t.id));
+    },
+
+    ballotTotalsFor(ids) {
+      const totals = new Map<string, BallotTotals>();
+      for (const id of ids) {
+        const origin = tierlists.get(id)?.origin_user_id;
+        const own = [...ballots.values()].filter((b) => b.tierlist_id === id);
+        if (origin === undefined || own.length === 0) continue;
+        const eligible = own.filter((b) => b.voter_user_id && b.voter_user_id !== origin && (placements.get(b.id)?.length ?? 0) > 0);
+        totals.set(id, { ballots: own.length, eligible: eligible.length });
+      }
+      return totals;
+    },
+
+    votedAmong(voterUserId, ids) {
+      return ids.filter((id) => {
+        const row = tierlists.get(id);
+        return row !== undefined && row.origin_user_id !== voterUserId && [...ballots.values()].some((b) => b.tierlist_id === id && b.voter_user_id === voterUserId);
+      });
     },
 
     getBallotById(tierlistId, ballotId) {
@@ -608,11 +640,10 @@ test("published refs carry origin creator and timestamps", () => {
   const ordinary = service.createTierlist("u1", "Private list");
   const copy = service.openVoting("u1", ordinary.id, "anonymous")!;
 
-  const refs = service.listPublishedRefs(20, 0);
+  const ref = service.getPublishedRef(copy.id);
 
-  assert.deepEqual(refs.map((r) => r.id), [copy.id]);
-  assert.equal(refs[0]?.ownerUserId, "u1");
-  assert.equal(refs[0]?.createdAt, copy.createdAt);
+  assert.equal(ref?.ownerUserId, "u1");
+  assert.equal(ref?.createdAt, copy.createdAt);
   assert.equal(service.getPublishedRef(ordinary.id)?.id, ordinary.id);
   assert.equal(service.getPublishedRef(copy.id)?.name, "Private list");
   assert.deepEqual(service.listPublishedRefsByOwner("u1").map((r) => r.id), [copy.id]);
@@ -673,4 +704,64 @@ test("listVotedByUser never lists the account's own polls", () => {
   service.submitBallot(own.code, [], { kind: "user", userId: "u2" });
   assert.deepEqual(service.listVotedByUser("u2").map((r) => r.voteCode), [own.code]);
   assert.deepEqual(service.listVotedByUser("u1").map((r) => r.voteCode), []);
+});
+
+const publishedPool = { tiers: [{ id: "s", label: "S", color: "#c9482f", bookKeys: [] }], pool: ["b1", "b2", "b3"] };
+
+test("discoverWindow lists only published tier lists, matching the normalized needle, with their origin creator", () => {
+  const repo = createInMemoryRepo();
+  const service = createTierlistsService(repo);
+  service.createTierlist("u1", "Hábitos privados");
+  const habits = service.createTierlist("u1", "Hábitos Atómicos", publishedPool, "anonymous", []);
+  const fantasy = service.createTierlist("u2", "Fantasy", publishedPool, "members", []);
+
+  assert.deepEqual(service.discoverWindow("habitos", 10).map((ref) => ref.id), [habits.id]);
+  assert.deepEqual(service.discoverWindow("", 10).map((ref) => ref.id).sort(), [habits.id, fantasy.id].sort());
+  assert.equal(service.discoverWindow("", 1).length, 1);
+  assert.deepEqual(service.discoverWindow("fantasy", 10), [{ id: fantasy.id, createdAt: fantasy.createdAt, ownerUserId: "u2", promotedAt: null }]);
+
+  repo.promote(fantasy.id, "2026-02-01T00:00:00.000Z");
+  assert.deepEqual(service.discoverWindow("fantasy", 10), [{ id: fantasy.id, createdAt: fantasy.createdAt, ownerUserId: "u2", promotedAt: "2026-02-01T00:00:00.000Z" }]);
+});
+
+test("getPublishedRefs builds the refs getPublishedRef does, for the requested ids only", () => {
+  const service = makeService();
+  const first = openPoll(service);
+  const second = openPoll(service);
+  const third = openPoll(service);
+  service.submitBallot(first.code, [{ bookKey: "b1", tierId: first.tierIds[0]! }], { kind: "user", userId: "u7" });
+  service.submitBallot(first.code, [], { kind: "anonymous", ballotId: null });
+  service.submitBallot(first.code, [], { kind: "user", userId: "u8" });
+  service.submitBallot(second.code, [{ bookKey: "b1", tierId: second.tierIds[0]! }], { kind: "user", userId: "u7" });
+  service.submitBallot(third.code, [{ bookKey: "b1", tierId: third.tierIds[0]! }], { kind: "user", userId: "u7" });
+
+  const refs = service.getPublishedRefs([first.copy.id, second.copy.id, "ghost"]);
+
+  assert.deepEqual(refs.map((ref) => ref.id).sort(), [first.copy.id, second.copy.id].sort());
+  const ofFirst = refs.find((ref) => ref.id === first.copy.id)!;
+  assert.deepEqual(ofFirst, service.getPublishedRef(first.copy.id));
+  assert.equal(ofFirst.ballotCount, 4);
+  assert.equal(ofFirst.eligibleVoteCount, 1);
+  assert.deepEqual(refs.find((ref) => ref.id === second.copy.id), service.getPublishedRef(second.copy.id));
+  assert.deepEqual(service.getPublishedRefs([]), []);
+});
+
+test("getPublishedRefs leaves out an unpublished tier list", () => {
+  const service = makeService();
+  const draft = service.createTierlist("u1", "Draft");
+  assert.deepEqual(service.getPublishedRefs([draft.id]), []);
+});
+
+test("votedAmong returns only the requested polls the account balloted on, never its own", () => {
+  const service = makeService();
+  const first = openPoll(service);
+  const second = openPoll(service);
+  const third = openPoll(service);
+  service.submitBallot(first.code, [], { kind: "user", userId: "u9" });
+  service.submitBallot(third.code, [], { kind: "user", userId: "u9" });
+  service.submitBallot(second.code, [], { kind: "anonymous", ballotId: null });
+
+  assert.deepEqual(service.votedAmong("u9", [first.copy.id, second.copy.id]), [first.copy.id]);
+  assert.deepEqual(service.votedAmong("u9", []), []);
+  assert.deepEqual(service.votedAmong("u1", [first.copy.id, second.copy.id, third.copy.id]), []);
 });

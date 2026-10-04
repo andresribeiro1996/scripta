@@ -1,3 +1,5 @@
+import { FOLLOW_LIMIT } from "./feed.js";
+
 export class CommunityError extends Error {}
 
 export class ProfileNotFoundError extends CommunityError {
@@ -9,6 +11,12 @@ export class ProfileNotFoundError extends CommunityError {
 export class SelfFollowError extends CommunityError {
   constructor() {
     super("You can't follow yourself.");
+  }
+}
+
+export class FollowLimitError extends CommunityError {
+  constructor() {
+    super(`You can follow up to ${FOLLOW_LIMIT.toLocaleString("en-US")} readers.`);
   }
 }
 

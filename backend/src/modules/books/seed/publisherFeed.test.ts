@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { feedProducts, feedUrl, findPortugalIsbn, isDisallowed, parseRobots, parseShopifyProducts, parseWooProducts } from "./publisherFeed.js";
+import { feedProducts, feedUrl, findPageIsbn, findPortugalIsbn, isDisallowed, parseRobots, parseShopifyProducts, parseWooProducts, withPageText } from "./publisherFeed.js";
 import type { PublisherSite } from "./publishers.js";
 
 const shopify = JSON.parse(readFileSync(new URL("./fixtures/shopify-products.json", import.meta.url), "utf8"));
@@ -39,9 +39,9 @@ test("a WooCommerce product keeps its own ISBN when the description cites anothe
   assert.equal(books.find((book) => book.title === "Capa Citando Outro")?.isbn, "9789726085003");
 });
 
-test("Shopify parsing drops products without an image or a Portugal ISBN", () => {
+test("Shopify parsing drops products without an image and leaves the ISBN of the rest to the product page", () => {
   const books = parseShopifyProducts(shopify, antigona);
-  assert.deepEqual(books.map((book) => book.isbn), ["9789726084945", "9789726084938", "9789726084990", "9789726084679"]);
+  assert.deepEqual(books.map((book) => book.isbn), ["9789726084945", "9789726084938", "9789726084990", "9789726084679", null, null]);
   assert.equal(feedProducts(shopify, antigona)?.length, 7);
 });
 
@@ -54,12 +54,12 @@ test("Shopify parsing builds the product URL and takes the author from the vendo
   assert.ok(parseShopifyProducts(shopify, { ...antigona, name: "Cristina Peri Rossi" }).every((book) => book.title !== "O Museu dos Esforços Inúteis" || book.author === null));
 });
 
-test("WooCommerce parsing finds the ISBN in the image file name, decodes entities and drops the rest", () => {
+test("WooCommerce parsing finds the ISBN in the image file name, decodes entities and leaves the rest to the product page", () => {
   const books = parseWooProducts(woo, relogio);
-  assert.deepEqual(books.map((book) => book.isbn), ["9789897837579", "9789897837821", "9789897837142", "9789899061330", "9789726085003", "9789899061354"]);
+  assert.deepEqual(books.map((book) => book.isbn), ["9789897837579", "9789897837821", "9789897837142", "9789899061330", "9789726085003", null, "9789899061354", null]);
   assert.equal(books[0]?.productUrl, "https://www.relogiodagua.pt/produto/guerra-branca-na-frente-artica-do-conflito-mundial/");
   assert.equal(books[3]?.title, "Livro com SKU – Edição & Notas");
-  assert.deepEqual(books.map((book) => book.author), [null, null, null, null, null, "Raquel Serejo Martins"]);
+  assert.deepEqual(books.map((book) => book.author), [null, null, null, null, null, null, "Raquel Serejo Martins", null]);
   assert.equal(feedProducts(woo, relogio)?.length, 8);
 });
 
@@ -74,9 +74,9 @@ test("WooCommerce author joins the terms of an attribute named Autor and ignores
 
 test("each book records the lookup step that found its ISBN", () => {
   const shop = parseShopifyProducts(shopify, antigona);
-  assert.deepEqual(shop.map((book) => book.rank), [2, 2, 2, 0]);
+  assert.deepEqual(shop.map((book) => book.rank), [2, 2, 2, 0, 3, 3]);
   const shelf = parseWooProducts(woo, relogio);
-  assert.deepEqual(shelf.map((book) => book.rank), [1, 1, 1, 0, 1, 1]);
+  assert.deepEqual(shelf.map((book) => book.rank), [1, 1, 1, 0, 1, 3, 1, 3]);
 });
 
 test("parsers return nothing for a body of the wrong shape", () => {
@@ -120,4 +120,261 @@ test("isDisallowed matches prefixes, wildcards and end anchors", () => {
   assert.equal(isDisallowed("/wp-json/wc/store/v1/products", ["/wp-admin/"]), false);
   assert.equal(isDisallowed("/products.json?limit=250&page=1", ["/*page="]), true);
   assert.equal(isDisallowed("/products.json?limit=250&page=1", ["/*sort="]), false);
+});
+
+const page = (body: string) => `<html><head><style>.a{content:"9789726084679"}</style><script>var isbn = "9780306406157";</script></head><body>${body}</body></html>`;
+const OWN = "9789726084679";
+const RELATED = "9789726084945";
+const FAR = `<p>${"texto ".repeat(10)}</p>`;
+
+test("findPageIsbn takes the single labelled Portugal ISBN over unlabelled ones", () => {
+  assert.equal(findPageIsbn(page(`<p>Relacionado ${RELATED}</p>${FAR}<p>ISBN: <b>978-972-608-467-9</b></p>`)), OWN);
+  assert.equal(findPageIsbn(page(`<li>ISBN&nbsp;978&#8209;972&#8209;608&#8209;467&#8209;9</li>${FAR}<li>${RELATED}</li>`)), OWN);
+});
+
+test("findPageIsbn takes a single unlabelled Portugal ISBN", () => {
+  assert.equal(findPageIsbn(page(`<p>Código ${RELATED}</p><p>Outro ${RELATED}</p>`)), RELATED);
+});
+
+test("findPageIsbn gives nothing for two distinct unlabelled Portugal ISBNs", () => {
+  assert.equal(findPageIsbn(page(`<p>${RELATED}</p><p>${OWN}</p>`)), null);
+});
+
+test("findPageIsbn gives nothing for one Portugal and one Brazilian unlabelled ISBN", () => {
+  assert.equal(findPageIsbn(page(`<p>${OWN}</p><p>9788535206234</p>`)), null);
+  assert.equal(findPageIsbn(page(`<p>${OWN}</p><p>0-306-40615-2</p>`)), null);
+});
+
+test("findPageIsbn gives nothing when the labelled ISBN is foreign, even with a Portugal one elsewhere", () => {
+  assert.equal(findPageIsbn(page(`<p>ISBN: 978-84-376-0494-7</p>${FAR}<div class="related">Outro ${RELATED}</div>`)), null);
+  assert.equal(findPageIsbn(page(`<p>ISBN 0-306-40615-2</p>${FAR}<div class="related">Outro ${RELATED}</div>`)), null);
+  assert.equal(findPageIsbn(page("<p>ISBN 978-85-3520-623-4</p>")), null);
+});
+
+test("findPageIsbn reads a labelled ISBN-10 and converts it to ISBN-13", () => {
+  assert.equal(findPageIsbn(page(`<p>ISBN 972-608-467-9</p>${FAR}<div>${RELATED}</div>`)), OWN);
+});
+
+test("findPageIsbn gives nothing for two distinct labelled ISBNs", () => {
+  assert.equal(findPageIsbn(page(`<p>ISBN ${RELATED}</p><p>ISBN: 978-972-608-467-9</p>`)), null);
+});
+
+test("findPageIsbn counts an ISBN-10 and its ISBN-13 as the same book", () => {
+  assert.equal(findPageIsbn(page("<p>ISBN 972-608-467-9</p><p>ISBN 978-972-608-467-9</p>")), OWN);
+});
+
+test("findPageIsbn pins what it returns for a page whose only ISBN is a labelled related book", () => {
+  assert.equal(findPageIsbn(page(`<h1>Moeda</h1><div class="related"><p>ISBN: ${RELATED}</p></div>`)), RELATED);
+});
+
+test("findPageIsbn reaches an ISBN exactly 40 characters after its label and not 41", () => {
+  assert.equal(findPageIsbn(page(`<p>ISBN${"x".repeat(40)}${RELATED}</p><p>${OWN}</p>`)), RELATED);
+  assert.equal(findPageIsbn(page(`<p>ISBN${"x".repeat(41)}${RELATED}</p><p>${OWN}</p>`)), null);
+});
+
+test("findPageIsbn ignores scripts and styles", () => {
+  assert.equal(findPageIsbn(page(`<p>${RELATED}</p>`)), RELATED);
+});
+
+test("a feed product whose product page URL cannot be built has no page fallback", () => {
+  const product = (permalink: string, sku: string) => [{ name: "Livro", permalink, sku, images: [{ src: "https://x.example/a.jpg" }] }];
+  assert.deepEqual(parseWooProducts(product("/produto/livro/", ""), relogio), []);
+  assert.equal(parseWooProducts(product("/produto/livro/", "9789726084679"), relogio)[0]?.isbn, "9789726084679");
+  assert.equal(parseWooProducts(product("https://x.example/livro/", ""), relogio)[0]?.isbn, null);
+});
+
+const SYNOPSIS = "Paris, 1785. Um jovem e ambicioso engenheiro, Jean-Baptiste Baratte, recebe a missão de limpar o maior cemitério da cidade.";
+
+function wooProduct(fields: Record<string, unknown>) {
+  return { name: "Um Livro", permalink: "https://www.relogiodagua.pt/produto/um-livro/", sku: "9789897837579", description: "", short_description: "", images: [{ src: "https://x.example/b.jpg" }], attributes: [], ...fields };
+}
+
+const attribute = (name: string, value: string) => ({ name, terms: [{ name: value }] });
+const wooDetails = (fields: Record<string, unknown>) => parseWooProducts([wooProduct(fields)], relogio)[0]!.details;
+const shopifyDetails = (bodyHtml: string) => parseShopifyProducts({ products: [{ title: "Um Livro", handle: "um-livro", variants: [{ barcode: "9789726084945" }], images: [{ src: "https://x.example/b.jpg" }], body_html: bodyHtml }] }, antigona)[0]!.details;
+
+test("a Shopify synopsis comes out as plain text with paragraph breaks", () => {
+  const html = `<p>${SYNOPSIS}</p>\n<p>Um romance&nbsp;sobre <em>a morte</em> &amp; a cidade, escrito com uma precisão rara.</p><script>var x = 1;</script>`;
+  assert.equal(shopifyDetails(html).summary, `${SYNOPSIS}\n\nUm romance sobre a morte & a cidade, escrito com uma precisão rara.`);
+});
+
+test("a WooCommerce description drops a leading shop notice and keeps the synopsis", () => {
+  const description = `<p>LIVRO EM PRÉ-VENDA. ENVIOS DIA 13 DE OUTUBRO.</p><p>${SYNOPSIS}</p>`;
+  assert.equal(wooDetails({ description }).summary, SYNOPSIS);
+});
+
+test("a notice is matched on whole words, so a paragraph about transportes is kept", () => {
+  const description = `<p>LIVRO EM PRÉ-VENDA. ENVIOS DIA 13 DE OUTUBRO.</p><p>Os transportes públicos de Lisboa param, e uma cidade inteira descobre o que é esperar, durante um verão sem fim.</p>`;
+  assert.equal(wooDetails({ description }).summary, "Os transportes públicos de Lisboa param, e uma cidade inteira descobre o que é esperar, durante um verão sem fim.");
+});
+
+test("metadata lines are left out of the synopsis while the translator is still captured", () => {
+  const html = `<p>${SYNOPSIS}</p>\n<ul>\n<li>\n<strong>ISBN</strong><span> 978‑972‑608‑494‑5</span>\n</li>\n<li>Tradução de Ana Lima</li>\n<li>Núm. páginas: 240</li>\n</ul>`;
+  const details = shopifyDetails(html);
+  assert.equal(details.summary, SYNOPSIS);
+  assert.equal(details.translator, "Ana Lima");
+});
+
+test("a synopsis under 80 characters, or one that is only a notice, is not stored", () => {
+  assert.equal(wooDetails({ description: "Um livro curto sobre o mar." }).summary, null);
+  assert.equal(wooDetails({ description: "LIVRO EM PRÉ-VENDA. ENVIOS DIA 13 DE OUTUBRO. Reserve já o seu exemplar e receba-o em casa no dia do lançamento." }).summary, null);
+  assert.equal(shopifyDetails("<p>Impressão 50x70.</p>").summary, null);
+});
+
+test("the short description stands in when the description gives no synopsis", () => {
+  assert.equal(wooDetails({ description: "", short_description: `<p>${SYNOPSIS}</p>` }).summary, SYNOPSIS);
+});
+
+test("pages come from a page-count attribute, with the Abysmo and Kathartika names", () => {
+  assert.equal(wooDetails({ attributes: [attribute("Núm. páginas", "240")] }).pages, 240);
+  assert.equal(wooDetails({ attributes: [attribute("Páginas", "312 páginas")] }).pages, 312);
+});
+
+test("pages come from the text when there is no attribute", () => {
+  assert.equal(wooDetails({ description: "Brochado, 240 págs, 14x21 cm." }).pages, 240);
+  assert.equal(wooDetails({ description: "<p>Edição de 1.ª tiragem. 96 páginas.</p>" }).pages, 96);
+  assert.equal(shopifyDetails("<p>Formato 15x23. 180 pág.</p>").pages, 180);
+});
+
+test("a year, an ISBN digit run, a price or an out-of-range count is not taken as pages", () => {
+  assert.equal(wooDetails({ description: "Lisboa, 2024. ISBN 978-972-608-494-5. 15,90 €. Pagamento seguro." }).pages, null);
+  assert.equal(wooDetails({ description: "9789726084945 págs" }).pages, null);
+  assert.equal(wooDetails({ description: "7 págs" }).pages, null);
+  assert.equal(wooDetails({ attributes: [attribute("Páginas", "4")] }).pages, null);
+  assert.equal(wooDetails({ attributes: [attribute("Páginas", "9999")] }).pages, null);
+});
+
+test("the translator comes from an attribute or from a Tradução line", () => {
+  assert.equal(wooDetails({ attributes: [attribute("Tradutor", "Ana Lima")] }).translator, "Ana Lima");
+  assert.equal(wooDetails({ description: "<p>Um romance.</p><p>Tradução de Ana Lima. Capa de Rui.</p>" }).translator, "Ana Lima");
+  assert.equal(wooDetails({ description: "<p>Tradução: Maria Gomes | 240 págs</p>" }).translator, "Maria Gomes");
+  assert.equal(shopifyDetails("<p>Traduzido por João Matos</p>").translator, "João Matos");
+  assert.equal(wooDetails({ description: "<p>Tradução: Ana Lima</p>" }).translator, "Ana Lima");
+  assert.equal(wooDetails({ description: "Um romance em que a tradução portuguesa mantém o ritmo do original." }).translator, null);
+});
+
+test("the year comes from a year attribute, between 1900 and this year", () => {
+  assert.equal(wooDetails({ attributes: [attribute("Ano", "2019")] }).year, 2019);
+  assert.equal(wooDetails({ attributes: [attribute("Data de edição", "03/2021")] }).year, 2021);
+  assert.equal(wooDetails({ attributes: [attribute("Ano", "1850")] }).year, null);
+  assert.equal(wooDetails({ attributes: [attribute("Ano", "9999")] }).year, null);
+  assert.equal(wooDetails({ description: "Edição de 2019." }).year, null);
+  assert.equal(shopifyDetails("<p>Edição de 2019.</p>").year, null);
+});
+
+test("a product with nothing to extract has all-null details", () => {
+  assert.deepEqual(wooDetails({}), { summary: null, pages: null, year: null, translator: null });
+});
+
+test("withPageText fills pages and translator the feed lacked, and keeps what the feed gave", () => {
+  const page = "<html><body><p>Tradução de Ana Lima</p><p>Páginas: 240</p></body></html>";
+  const empty = { summary: SYNOPSIS, pages: null, year: 2019, translator: null };
+  assert.deepEqual(withPageText(empty, page), { summary: SYNOPSIS, pages: 240, year: 2019, translator: "Ana Lima" });
+  assert.deepEqual(withPageText({ ...empty, pages: 100, translator: "Rui" }, page), { summary: SYNOPSIS, pages: 100, year: 2019, translator: "Rui" });
+});
+
+test("the translator comes only from a line that starts with the label, and only as a name", () => {
+  assert.equal(wooDetails({ description: "<p>Esta tradução de Camilo Pessanha para francês mantém o ritmo do original.</p>" }).translator, null);
+  assert.equal(wooDetails({ description: "<p>Tradução de Ana Lima e revisão de Rui Costa</p>" }).translator, "Ana Lima");
+  assert.equal(wooDetails({ description: "<p>Tradução de Ana Lima, revisão de Rui Costa, capa de Joana</p>" }).translator, "Ana Lima");
+  assert.equal(wooDetails({ description: "<p>Tradução: Maria do Carmo Abreu</p>" }).translator, "Maria do Carmo Abreu");
+  assert.equal(wooDetails({ description: "<ul><li>- Tradutora: Ana Lima</li></ul>" }).translator, "Ana Lima");
+  assert.equal(wooDetails({ description: "<p>Tradução de poesia portuguesa</p>" }).translator, null);
+});
+
+test("a product page gives only line-anchored labelled pages and a translator, never loose text", () => {
+  const empty = { summary: null, pages: null, year: null, translator: null };
+  const related = "<html><body><ul><li>Tradução de Poesia</li></ul><div>Outro livro 320 págs</div><p>Edição brochada, 410 págs.</p></body></html>";
+  assert.deepEqual(withPageText(empty, related), empty);
+  assert.equal(withPageText(empty, "<p>Páginas: 180</p>").pages, 180);
+  assert.equal(withPageText(empty, "<ul><li>N.º de páginas 240</li></ul>").pages, 240);
+  assert.equal(withPageText(empty, "<ul><li>Nº págs.: 240</li></ul>").pages, 240);
+  assert.equal(withPageText(empty, "<table><tr><td>Páginas</td><td>192</td></tr></table>").pages, 192);
+});
+
+test("metadata, bullets and lines of only figures are kept out of the synopsis", () => {
+  const html = `<p>${SYNOPSIS}</p><p>- ISBN: 978-972-608-494-5</p><p>• Páginas: 240</p><p>9789726084945</p><p>15 x 23 cm</p><p>€ 16,50</p><p>Título original: Les Misérables</p>`;
+  assert.equal(shopifyDetails(html).summary, SYNOPSIS);
+});
+
+test("common named entities decode and an out-of-range numeric entity is left as text", () => {
+  const html = `<p>${SYNOPSIS} &Eacute;&ccedil;a &ndash; &laquo;fim&raquo;&hellip; &#99999999; &#x110000; &agrave; &otilde;</p>`;
+  assert.equal(shopifyDetails(html).summary, `${SYNOPSIS} Éça – «fim»… &#99999999; &#x110000; à õ`);
+});
+
+test("inline tags add no space and table cells do", () => {
+  const html = `<p><em>Os Maias</em>, de Eça de Queirós, é um romance sobre três gerações de uma família lisboeta do século XIX.</p><table><tr><td>Um</td><td>dois</td></tr></table>`;
+  assert.equal(shopifyDetails(html).summary, "Os Maias, de Eça de Queirós, é um romance sobre três gerações de uma família lisboeta do século XIX.\n\nUm dois");
+});
+
+test("a newline inside a paragraph is a space, not a paragraph break", () => {
+  const html = `<p>Paris, 1785. Um jovem e ambicioso engenheiro, Jean-Baptiste Baratte,\nrecebe a missão de limpar o maior\ncemitério da cidade.</p>`;
+  assert.equal(shopifyDetails(html).summary, "Paris, 1785. Um jovem e ambicioso engenheiro, Jean-Baptiste Baratte, recebe a missão de limpar o maior cemitério da cidade.");
+});
+
+test("a notice needs the plural envios, and tolerates a spaced pré venda", () => {
+  const kept = "O envio de uma carta anónima muda a vida de uma família inteira, numa aldeia onde ninguém escreve a ninguém.";
+  assert.equal(wooDetails({ description: `<p>${kept}</p>` }).summary, kept);
+  assert.equal(wooDetails({ description: `<p>Livro em pré venda.</p><p>${SYNOPSIS}</p>` }).summary, SYNOPSIS);
+});
+
+test("pages with a thousands separator are read whole, and a decimal tail is not a count", () => {
+  assert.equal(wooDetails({ description: "<p>Brochado, 1.200 páginas.</p>" }).pages, 1200);
+  assert.equal(wooDetails({ attributes: [attribute("Páginas", "1.024")] }).pages, 1024);
+  assert.equal(wooDetails({ description: "<p>Preço 12.240 págs</p>" }).pages, null);
+  assert.equal(wooDetails({ description: "<p>Versão 3.9 240 págs</p>" }).pages, 240);
+});
+
+test("a year attribute name must be a whole word", () => {
+  assert.equal(wooDetails({ attributes: [attribute("Anotações", "2019")] }).year, null);
+  assert.equal(wooDetails({ attributes: [attribute("Ano", "2019")] }).year, 2019);
+});
+
+test("a synopsis paragraph that merely starts with a label word is kept, a labelled fact line is dropped", () => {
+  const prose = [
+    "Autor de vários romances premiados, Jorge Amado nasceu na Bahia e fez da sua terra o centro de uma obra imensa.",
+    "Edição especial de um clássico que esteve décadas fora das livrarias portuguesas, agora com novo prefácio.",
+    "Data de 1785 é o ano em que tudo começa, quando um jovem engenheiro chega a Paris para limpar um cemitério."
+  ];
+  const facts = ["Autor: Jorge Amado", "ISBN - 978-972-608-494-5", "Páginas", "Ano – 2019", "Tradução de Ana Lima"];
+  const html = [...prose, ...facts].map((line) => `<p>${line}</p>`).join("");
+  assert.equal(shopifyDetails(html).summary, prose.join("\n\n"));
+});
+
+test("a name that is too long or ambiguous gives no translator", () => {
+  const translator = (line: string) => wooDetails({ description: `<p>${line}</p>` }).translator;
+  assert.equal(translator("Tradução de José Saramago e Pilar del Río"), null);
+  assert.equal(translator("Tradução de Ana Maria Pereira Lopes Costa Silva Ramos"), null);
+  assert.equal(translator("Tradução de Ana Maria Pereira Lopes Costa Silva"), "Ana Maria Pereira Lopes Costa Silva");
+  assert.equal(translator("Tradução de Ana Lima e revisão de Rui Costa"), "Ana Lima");
+  assert.equal(translator("Tradução de Ana Lima e Rui Costa"), "Ana Lima e Rui Costa");
+  assert.equal(translator("Tradução de Ana Lima de revisão"), null);
+});
+
+test("a dot or space is a thousands separator only before exactly three digits", () => {
+  assert.equal(wooDetails({ attributes: [attribute("Páginas", "1.200")] }).pages, 1200);
+  assert.equal(wooDetails({ attributes: [attribute("Páginas", "1 200")] }).pages, 1200);
+  assert.equal(wooDetails({ attributes: [attribute("Páginas", "24.5")] }).pages, null);
+  assert.equal(wooDetails({ attributes: [attribute("Páginas", "1.2345")] }).pages, null);
+  assert.equal(wooDetails({ description: "<p>Versão 3.9 240 págs</p>" }).pages, 240);
+  assert.equal(wooDetails({ description: "<p>Brochado, 1 200 páginas.</p>" }).pages, 1200);
+  assert.equal(withPageText({ summary: null, pages: null, year: null, translator: null }, "<p>Páginas: 24.5</p>").pages, null);
+});
+
+test("a numeric entity for NUL or a surrogate is left as text", () => {
+  const html = `<p>${SYNOPSIS} &#0; &#xD800; &#55357; ok</p>`;
+  assert.equal(shopifyDetails(html).summary, `${SYNOPSIS} &#0; &#xD800; &#55357; ok`);
+});
+
+test("section, figure and definition-list tags break lines like paragraphs", () => {
+  const html = `<section>${SYNOPSIS}</section><article>Segundo bloco de texto com mais de oitenta caracteres para passar o limite.</article><dl><dt>Um</dt><dd>dois</dd></dl><hr>`;
+  assert.equal(shopifyDetails(html).summary, `${SYNOPSIS}\n\nSegundo bloco de texto com mais de oitenta caracteres para passar o limite.\n\nUm\n\ndois`);
+});
+
+test("the fixture descriptions are live-shaped paragraphs: the notice goes, the synopsis stays", () => {
+  const details = parseWooProducts(woo, relogio).map((book) => book.details);
+  assert.equal(details[0]?.summary, "“Creio que a vamos conseguir. De uma maneira ou de outra, a guerra no Árctico há-de acabar.” Uma reportagem sobre o conflito mais frio do mundo.");
+  assert.ok(details[1]?.summary?.startsWith("Nomeado pela The Atlantic"));
+  assert.ok(details[2]?.summary?.startsWith("VENCEDOR DO COSTA BOOK AWARD DE LIVRO DO ANO\n\nParis, 1785."));
+  assert.equal(details[3]?.summary, null);
 });

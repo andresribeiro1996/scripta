@@ -1,5 +1,7 @@
-import type { BookMetadata, BookSearchResult } from "@scripta/shared";
-import type { BookRow, CoverImageRow, CoverSourceName, CoverStatus, DataSource, NewBook } from "./types.js";
+import type { BookMetadata, BookSearchResult, CatalogBookMetadata } from "@scripta/shared";
+import type { BookRow, CoverImageRow, CoverSourceName, CoverStatus, DataSource, NewBook, SummarySource } from "./types.js";
+
+export type MergeableDetails = Pick<BookMetadata, "summary" | "pages" | "year" | "publisher" | "translator">;
 
 export interface CoverBlobStore {
   save(id: string, extension: string, bytes: Buffer): Promise<void>;
@@ -7,6 +9,7 @@ export interface CoverBlobStore {
 
 export interface BooksRepository {
   findBookByKey(key: string): BookRow | undefined;
+  findBooksByKeys(keys: string[]): Map<string, BookRow>;
   getBook(id: string): BookRow | undefined;
   createBook(input: NewBook, keys: string[], createdAt: string): BookRow;
   addKey(key: string, bookId: string): void;
@@ -15,13 +18,22 @@ export interface BooksRepository {
   getImage(id: string): CoverImageRow | undefined;
   insertImage(row: CoverImageRow): void;
   setCover(bookId: string, cover: { imageId: string | null; status: CoverStatus | null; checkedAt: string | null }): void;
+  setCoverIf(bookId: string, expectedImageId: string | null, cover: { imageId: string | null; status: CoverStatus | null; checkedAt: string | null }): boolean;
   addRejection(bookId: string, sourceUrl: string, createdAt: string): void;
   listRejectedUrls(bookId: string): Set<string>;
-  saveDetails(bookId: string, details: BookMetadata, sources: DataSource[], checkedAt: string): void;
+  saveDetails(bookId: string, details: CatalogBookMetadata, sources: DataSource[], summarySource: DataSource | null, checkedAt: string): void;
+  mergeDetails(bookId: string, details: MergeableDetails, summarySource: SummarySource | null): void;
   markDetailsMissing(bookId: string, checkedAt: string): void;
+  markDetailsAttempted(bookId: string, checkedAt: string): void;
   searchBooks(tokens: string[], limit: number): BookRow[];
   listUncheckedCoverIds(): string[];
+  listUncheckedDetailIds(limit: number): string[];
   setUpgradeWanted(bookId: string, at: string | null): void;
+  setAppleChecked(bookId: string, at: string): void;
+  setWorkKey(id: string, key: string | null | undefined): void;
+  assignMissingWorks(limit: number): number;
+  setLanguage(id: string, tag: string | null): void;
+  setPublisherUrl(id: string, url: string): void;
   listUpgradeWantedIds(): string[];
 }
 
@@ -37,18 +49,21 @@ export interface TitledCandidate extends CoverCandidate {
 
 export interface CoverSource {
   byIsbn(isbn: string): Promise<CoverCandidate[]>;
-  byTitle(title: string, author: string, accept: (candidate: TitledCandidate) => boolean): Promise<CoverCandidate[]>;
+  byTitle(title: string, author: string, accept: (candidate: TitledCandidate) => boolean, isbn?: string | null): Promise<CoverCandidate[]>;
 }
 
 export interface CatalogSearchHit {
   result: BookSearchResult;
   olCoverId: number | null;
+  workKey?: string | null;
   source: DataSource;
 }
 
 export interface CatalogDetails {
-  metadata: BookMetadata;
+  metadata: CatalogBookMetadata;
   sources: DataSource[];
+  summarySource: DataSource | null;
+  workKey?: string | null;
 }
 
 export interface BookCatalog {

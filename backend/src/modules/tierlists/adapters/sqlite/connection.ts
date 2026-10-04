@@ -2,6 +2,7 @@
 // modules/arena/adapters/sqlite/connection.ts exactly. A separate file
 // from every other module's, per the module-isolation convention.
 
+import { normalizeWords } from "@scripta/shared";
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
@@ -34,6 +35,7 @@ export function applyTierlistsMigrations(db: DatabaseSync): void {
     if (!has("source_tierlist_id")) db.exec(`ALTER TABLE tierlists ADD COLUMN source_tierlist_id TEXT`);
     if (!has("promoted_at")) db.exec(`ALTER TABLE tierlists ADD COLUMN promoted_at TEXT`);
     if (!has("public_books")) db.exec(`ALTER TABLE tierlists ADD COLUMN public_books TEXT`);
+    if (!has("name_key")) db.exec(`ALTER TABLE tierlists ADD COLUMN name_key TEXT`);
     if (!has("origin_user_id")) {
       db.exec(`ALTER TABLE tierlists ADD COLUMN origin_user_id TEXT`);
       db.exec(`UPDATE tierlists SET origin_user_id = owner_user_id WHERE origin_user_id IS NULL`);
@@ -41,6 +43,22 @@ export function applyTierlistsMigrations(db: DatabaseSync): void {
 
     // Re-run schema to create any missing tables and indexes
     db.exec(schema);
+  }
+
+  fillNameKeys(db);
+}
+
+function fillNameKeys(db: DatabaseSync): void {
+  const stale = db.prepare(`SELECT id, name FROM tierlists WHERE name_key IS NULL`).all() as { id: string; name: string }[];
+  if (stale.length === 0) return;
+  const update = db.prepare(`UPDATE tierlists SET name_key = ? WHERE id = ? AND name_key IS NULL`);
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    for (const row of stale) update.run(normalizeWords(row.name), row.id);
+    db.exec("COMMIT");
+  } catch (error) {
+    if (db.isTransaction) db.exec("ROLLBACK");
+    throw error;
   }
 }
 

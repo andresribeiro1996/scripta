@@ -31,6 +31,13 @@ export interface TierlistRow {
   updated_at: string;
 }
 
+export type TierlistDiscoverRow = Pick<TierlistRow, "id" | "created_at" | "origin_user_id" | "promoted_at">;
+
+export interface BallotTotals {
+  ballots: number;
+  eligible: number;
+}
+
 /** What the service hands back to routes.ts — `data` here is the parsed
  *  JSON value, not the raw text. */
 export interface Tierlist {

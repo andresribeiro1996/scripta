@@ -1,5 +1,6 @@
 import { useSearchParams } from "react-router-dom";
 import { useMemo, useState, type ComponentType } from "react";
+import { saveFailureMessage } from "@scripta/shared";
 import type { GalleryImage } from "../api/gallery";
 import { BookCard } from "../components/BookCard";
 import { BookGrid } from "../components/BookGrid";
@@ -17,16 +18,15 @@ import { GearIcon, PlusIcon, TOOLBAR_CONTROL_CLASS, ToolbarRow, toolbarIconClass
 import { useDelayedShow } from "../hooks/useDelayedShow";
 import { useDismissible } from "../hooks/useDismissible";
 import { useLibrary } from "../hooks/useLibrary";
+import { useLibrarySaver } from "../hooks/useLibrarySaver";
 import { useMurals } from "../hooks/useMurals";
 import { clearBookCover, setBookCover } from "../lib/bookCovers";
 import {
-  addBookToGroup,
   deleteGroup,
   makeGroup,
   normalizeGroupName,
   orderedGroupBooks,
   removeBooksFromAllGroups,
-  removeBookFromGroup,
   renameGroup,
   setGroupStyle,
   type Group,
@@ -61,6 +61,7 @@ const COPY: Record<GroupType, { title: string; noun: string; emptyTitle: string;
  *  the same underlying resource (see lib/groups.ts), differing only in
  *  copy and in that series also get auto-seeded from book metadata. */
 export function GroupsPage({ type }: { type: GroupType }) {
+  const saver = useLibrarySaver();
   const { data: library, isLoading, updateLibrary } = useLibrary();
   const { scrubBooks } = useMurals();
   const copy = COPY[type];
@@ -131,8 +132,8 @@ export function GroupsPage({ type }: { type: GroupType }) {
     setCreating(true);
     try {
       await updateLibrary((data) => ({ ...data, groups: [...(data.groups ?? []), makeGroup(type, name)] }));
-    } catch {
-      toast({ message: "Couldn't save — check your connection.", kind: "error" });
+    } catch (error) {
+      toast({ message: saveFailureMessage(error, "Couldn't save — check your connection."), kind: "error" });
     } finally {
       setCreating(false);
     }
@@ -144,16 +145,16 @@ export function GroupsPage({ type }: { type: GroupType }) {
     if (!name) return;
     try {
       await updateLibrary((data) => ({ ...data, groups: renameGroup(data.groups ?? [], id, name) }));
-    } catch {
-      toast({ message: "Couldn't save — check your connection.", kind: "error" });
+    } catch (error) {
+      toast({ message: saveFailureMessage(error, "Couldn't save — check your connection."), kind: "error" });
     }
   }
 
   async function handleDelete(group: Group) {
     try {
       await updateLibrary((data) => ({ ...data, groups: deleteGroup(data.groups ?? [], group.id) }));
-    } catch {
-      toast({ message: "Couldn't delete — nothing was changed.", kind: "error" });
+    } catch (error) {
+      toast({ message: saveFailureMessage(error, "Couldn't delete — nothing was changed."), kind: "error" });
       return;
     }
     toast({
@@ -172,8 +173,8 @@ export function GroupsPage({ type }: { type: GroupType }) {
                 return { ...data, groups: [...(data.groups ?? []), group] };
               });
               toast({ message: "Restored." });
-            } catch {
-              toast({ message: "Couldn't restore — check your connection.", kind: "error" });
+            } catch (error) {
+              toast({ message: saveFailureMessage(error, "Couldn't restore — check your connection."), kind: "error" });
             }
           })();
         }
@@ -183,21 +184,15 @@ export function GroupsPage({ type }: { type: GroupType }) {
   }
 
   async function handleToggleBook(groupId: string, book: Record<string, unknown>, inGroup: boolean) {
-    try {
-      await updateLibrary((data) => ({
-        ...data,
-        groups: inGroup ? removeBookFromGroup(data.groups ?? [], groupId, book) : addBookToGroup(data.groups ?? [], groupId, book)
-      }));
-    } catch {
-      toast({ message: "Couldn't save — check your connection.", kind: "error" });
-    }
+    const result = await saver.submit({ kind: "membership", groupId, bookKey: bookKey(book), member: !inGroup });
+    if (!result.ok) toast({ message: saveFailureMessage(result.error, "Couldn't save — check your connection."), kind: "error" });
   }
 
   async function handleSaveGroupStyle(groupId: string, groupStyle: PerCardStyle | undefined) {
     try {
       await updateLibrary((data) => ({ ...data, groups: setGroupStyle(data.groups ?? [], groupId, groupStyle) }));
-    } catch {
-      toast({ message: "Couldn't save — check your connection.", kind: "error" });
+    } catch (error) {
+      toast({ message: saveFailureMessage(error, "Couldn't save — check your connection."), kind: "error" });
     }
   }
 
@@ -212,8 +207,8 @@ export function GroupsPage({ type }: { type: GroupType }) {
         ...data,
         books: data.books.map((b) => (bookKey(b) === key ? { ...b, _style: bookStyle } : b))
       }));
-    } catch {
-      toast({ message: "Couldn't save — check your connection.", kind: "error" });
+    } catch (error) {
+      toast({ message: saveFailureMessage(error, "Couldn't save — check your connection."), kind: "error" });
     }
   }
 
@@ -227,8 +222,8 @@ export function GroupsPage({ type }: { type: GroupType }) {
         ...data,
         books: data.books.map((b) => (bookKey(b) === key ? setBookCover(b, image.id, image.url) : b))
       }));
-    } catch {
-      toast({ message: "Couldn't save — check your connection.", kind: "error" });
+    } catch (error) {
+      toast({ message: saveFailureMessage(error, "Couldn't save — check your connection."), kind: "error" });
     }
   }
 
@@ -239,8 +234,8 @@ export function GroupsPage({ type }: { type: GroupType }) {
         ...data,
         books: data.books.map((b) => (bookKey(b) === key ? clearBookCover(b) : b))
       }));
-    } catch {
-      toast({ message: "Couldn't save — check your connection.", kind: "error" });
+    } catch (error) {
+      toast({ message: saveFailureMessage(error, "Couldn't save — check your connection."), kind: "error" });
     }
   }
 
@@ -282,8 +277,8 @@ export function GroupsPage({ type }: { type: GroupType }) {
           groups: removeBooksFromAllGroups(data.groups ?? [], keys)
         };
       });
-    } catch {
-      toast({ message: "Couldn't delete — nothing was changed.", kind: "error" });
+    } catch (error) {
+      toast({ message: saveFailureMessage(error, "Couldn't delete — nothing was changed."), kind: "error" });
       return;
     }
     setSelectedKeys(new Set());
@@ -302,8 +297,8 @@ export function GroupsPage({ type }: { type: GroupType }) {
             try {
               await updateLibrary((data) => restoreDeletedBooks(data, snapshot, keys));
               toast({ message: "Restored." });
-            } catch {
-              toast({ message: "Couldn't restore — check your connection.", kind: "error" });
+            } catch (error) {
+              toast({ message: saveFailureMessage(error, "Couldn't restore — check your connection."), kind: "error" });
             }
           })();
         }

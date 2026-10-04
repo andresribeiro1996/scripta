@@ -2,24 +2,30 @@
 // this module that knows SQL — service.ts only ever sees the
 // ArenaRepository interface this fulfills.
 
+import { normalizeWords } from "@scripta/shared";
 import type { DatabaseSync } from "node:sqlite";
 import type { ArenaRepository } from "../../domain/ports.js";
-import type { DuelRow, SeedPreview, TournamentRow, TournamentSlotRow, VoteRow } from "../../domain/types.js";
+import type { DuelRow, SeedPreview, TournamentDiscoverRow, TournamentRow, TournamentSlotRow, VoteRow } from "../../domain/types.js";
 
 export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
   const insertTournamentStmt = db.prepare(`
-    INSERT INTO tournaments (id, owner_user_id, name, bracket_size, round_duration_minutes, status, current_round, created_at, updated_at)
-    VALUES ($id, $owner_user_id, $name, $bracket_size, $round_duration_minutes, $status, $current_round, $created_at, $updated_at)
+    INSERT INTO tournaments (id, owner_user_id, name, name_key, bracket_size, round_duration_minutes, status, current_round, created_at, updated_at)
+    VALUES ($id, $owner_user_id, $name, $name_key, $bracket_size, $round_duration_minutes, $status, $current_round, $created_at, $updated_at)
   `);
   const getTournamentStmt = db.prepare(`SELECT * FROM tournaments WHERE id = ?`);
   const getOwnedTournamentStmt = db.prepare(`SELECT * FROM tournaments WHERE id = ? AND owner_user_id = ?`);
   const listByOwnerStmt = db.prepare(`SELECT * FROM tournaments WHERE owner_user_id = ? ORDER BY created_at DESC`);
   const listPublicStmt = db.prepare(`SELECT * FROM tournaments WHERE status != 'seeding' ORDER BY created_at DESC LIMIT ? OFFSET ?`);
+  const discoverWindowStmt = db.prepare(`SELECT id, created_at, owner_user_id FROM tournaments WHERE status != 'seeding' ORDER BY created_at DESC LIMIT ?`);
+  const discoverSearchStmt = db.prepare(
+    `SELECT id, created_at, owner_user_id FROM tournaments WHERE status != 'seeding' AND name_key LIKE '%' || ? || '%' ORDER BY created_at DESC LIMIT ?`
+  );
+  const listPublicByIdsStmt = db.prepare(`SELECT * FROM tournaments WHERE status != 'seeding' AND id IN (SELECT value FROM json_each(?))`);
   const updateStatusStmt = db.prepare(`
     UPDATE tournaments SET status = $status, current_round = $current_round, updated_at = $updated_at WHERE id = $id
   `);
   const renameTournamentStmt = db.prepare(`
-    UPDATE tournaments SET name = $name, updated_at = $updated_at WHERE id = $id
+    UPDATE tournaments SET name = $name, name_key = $name_key, updated_at = $updated_at WHERE id = $id
   `);
   const deleteTournamentStmt = db.prepare(`DELETE FROM tournaments WHERE id = ?`);
 
@@ -102,10 +108,15 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
     GROUP BY t.id
     ORDER BY last_vote_at DESC
   `);
+  const votedAmongStmt = db.prepare(`
+    SELECT t.id FROM tournaments t
+    WHERE t.id IN (SELECT value FROM json_each(?)) AND t.owner_user_id != ?
+      AND EXISTS (SELECT 1 FROM duels d JOIN votes v ON v.duel_id = d.id WHERE d.tournament_id = t.id AND v.voter_user_id = ?)
+  `);
   const participationStmt = db.prepare(`
     SELECT t.id, t.name, COUNT(*) AS participants, MAX(p.first_at) AS latest_at
     FROM (
-      SELECT d.tournament_id, COALESCE(v.voter_user_id, v.voter_token) AS voter, MIN(v.created_at) AS first_at
+      SELECT d.tournament_id, COALESCE(v.voter_user_id, v.voter_token) AS voter, MIN(v.created_at) AS first_at, MAX(v.created_at) AS last_at
       FROM votes v
       JOIN duels d ON d.id = v.duel_id
       JOIN tournaments o ON o.id = d.tournament_id
@@ -115,6 +126,7 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
     JOIN tournaments t ON t.id = p.tournament_id
     WHERE t.status != 'seeding'
     GROUP BY t.id
+    HAVING MAX(p.last_at) >= ?
   `);
   const recentVotersStmt = db.prepare(`
     SELECT v.voter_user_id AS user_id, MIN(v.created_at) AS at
@@ -144,7 +156,7 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
         }
         db.exec("COMMIT");
       } catch (error) {
-        db.exec("ROLLBACK");
+        if (db.isTransaction) db.exec("ROLLBACK");
         throw error;
       }
     },
@@ -155,7 +167,7 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
         db.prepare("UPDATE votes SET voter_user_id = NULL WHERE voter_user_id = ?").run(userId);
         db.exec("COMMIT");
       } catch (error) {
-        db.exec("ROLLBACK");
+        if (db.isTransaction) db.exec("ROLLBACK");
         throw error;
       }
     },
@@ -164,6 +176,7 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
         $id: row.id,
         $owner_user_id: row.owner_user_id,
         $name: row.name,
+        $name_key: normalizeWords(row.name),
         $bracket_size: row.bracket_size,
         $round_duration_minutes: row.round_duration_minutes,
         $status: row.status,
@@ -184,11 +197,18 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
     listPublicTournaments(limit, offset) {
       return listPublicStmt.all(limit, offset) as unknown as TournamentRow[];
     },
+    discoverWindow(needle, limit) {
+      const rows = needle ? discoverSearchStmt.all(needle, limit) : discoverWindowStmt.all(limit);
+      return rows as unknown as TournamentDiscoverRow[];
+    },
+    listPublicByIds(ids) {
+      return listPublicByIdsStmt.all(JSON.stringify(ids)) as unknown as TournamentRow[];
+    },
     updateTournamentStatus(id, status, currentRound) {
       updateStatusStmt.run({ $id: id, $status: status, $current_round: currentRound, $updated_at: new Date().toISOString() });
     },
     renameTournament(id, name) {
-      renameTournamentStmt.run({ $id: id, $name: name, $updated_at: new Date().toISOString() });
+      renameTournamentStmt.run({ $id: id, $name: name, $name_key: normalizeWords(name), $updated_at: new Date().toISOString() });
     },
     deleteTournament(id) {
       deleteTournamentStmt.run(id); // ON DELETE CASCADE removes its slots/duels/votes too
@@ -295,8 +315,11 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
     listVotedByUser(voterUserId) {
       return listVotedByUserStmt.all(voterUserId, voterUserId) as unknown as TournamentRow[];
     },
-    listParticipation(ownerUserId) {
-      const rows = participationStmt.all(ownerUserId) as unknown as Array<{ id: string; name: string; participants: number; latest_at: string }>;
+    votedAmong(voterUserId, ids) {
+      return (votedAmongStmt.all(JSON.stringify(ids), voterUserId, voterUserId) as unknown as Array<{ id: string }>).map((row) => row.id);
+    },
+    listParticipation(ownerUserId, since) {
+      const rows = participationStmt.all(ownerUserId, since) as unknown as Array<{ id: string; name: string; participants: number; latest_at: string }>;
       return rows.map((r) => ({ ...r, participants: Number(r.participants) }));
     },
     listRecentVoters(tournamentId, ownerUserId, limit) {

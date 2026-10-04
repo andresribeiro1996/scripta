@@ -1,13 +1,15 @@
 import { randomUUID } from "node:crypto";
-import type { IdentityKey, ReaderProfile } from "@scripta/shared";
+import { normalizeWords, type IdentityKey, type ReaderProfile } from "@scripta/shared";
 import { categoryFor, contentDetail, decodeCursor, encodeCursor, DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
 import type { ActivityEventType, ActivityItem, CommunityAuthor, CommunityEventType, DiscoverItem, DiscoverType, FeedSettings, FollowState, GameParticipation, OwnProfile, Page, ParticipationGameKind, PersonResult, PublishProfileInput, PublishedContent, PublishedProfile, SharedBook, SuggestedReader, TierlistSummary, TournamentSummary } from "@scripta/shared/community";
-import type { DashboardFeedPage, DigestItem, DigestKind, ParticipationItem } from "@scripta/shared/dashboard";
-import type { PublishedTournamentRef } from "../arena/service.js";
+import type { DashboardFeedPage, DigestItem, ParticipationItem } from "@scripta/shared/dashboard";
+import type { PublishedTournamentRef, TournamentDiscoverRef } from "../arena/service.js";
 import type { MuralsPublicApi } from "../murals/publicApi.js";
 import type { MuralPublicPayload } from "../murals/index.js";
-import type { PublishedTierlistRef } from "../tierlists/service.js";
-import { InvalidCursorError, MuralNotOwnedError, NotFollowingError, ProfileNotFoundError, SelfFollowError, UsernameRequiredError } from "./domain/errors.js";
+import type { PublishedTierlistRef, TierlistDiscoverRef } from "../tierlists/service.js";
+import { currentTrace } from "../../trace.js";
+import { FollowLimitError, InvalidCursorError, MuralNotOwnedError, NotFollowingError, ProfileNotFoundError, SelfFollowError, UsernameRequiredError } from "./domain/errors.js";
+import { ACTIVITY_EVENT_TYPES, ARCHIVE_BATCH, BACKFILL_BATCH, BOOK_EVENTS_PER_DAY, BOOK_EVENTS_WINDOW_MS, DIGEST_EVENT_TYPES, FEED_EVENT_TYPES, FEED_WINDOW_MS, FOLLOW_LIMIT, READING_EVENT_TYPES } from "./domain/feed.js";
 import type { CommunityRepository, CursorKeyset } from "./domain/ports.js";
 import type { EventRow, FollowRow } from "./domain/types.js";
 
@@ -16,15 +18,8 @@ const SUGGESTION_SCAN_CAP = 500;
 const SUGGESTION_OVERLAP_FLOOR = 5;
 const SHARED_BOOKS_SHOWN = 3;
 const DASHBOARD_COUNT_CAP = 100;
-const DASHBOARD_REFILL_ROUNDS = 5;
+const DASHBOARD_REFILL_ROUNDS = 3;
 const NAMED_PARTICIPANTS = 3;
-const DIGEST_EVENT_TYPES: Array<[ActivityEventType, DigestKind]> = [
-  ["tierlist_published", "publication"],
-  ["tournament_published", "publication"],
-  ["voted_on", "vote"],
-  ["book_added", "reading"],
-  ["book_finished", "reading"]
-];
 const LEGACY_DIGEST_KINDS: ReadonlySet<string> = new Set(["publication", "vote", "reading", "follow"]);
 
 export type CommunityRefType = "tierlist" | "tournament" | "book" | "user" | "mural";
@@ -37,6 +32,25 @@ function parseEventPayload(raw: string | null): Record<string, unknown> | undefi
   } catch {
     return undefined;
   }
+}
+
+function turn(): Promise<void> {
+  return new Promise(setImmediate);
+}
+
+async function inBatches(step: (batch: number) => number): Promise<number> {
+  let total = 0;
+  for (;;) {
+    const done = step(ARCHIVE_BATCH);
+    total += done;
+    await turn();
+    if (done < ARCHIVE_BATCH) return total;
+  }
+}
+
+function newEvent(userId: string, type: ActivityEventType, refType: CommunityRefType, refId: string, payload?: Record<string, unknown>, now: () => number = Date.now): EventRow {
+  const trace = currentTrace();
+  return { id: randomUUID(), user_id: userId, type, ref_type: refType, ref_id: refId, payload: payload ? JSON.stringify(payload) : null, created_at: new Date(now()).toISOString(), trace_id: trace?.traceId ?? null, source: trace?.source ?? null };
 }
 
 export interface PublicProfileView {
@@ -59,8 +73,14 @@ function toTournamentSummary(ref: PublishedTournamentRef): TournamentSummary {
   return { kind: "tournament", id: ref.id, name: ref.name, bracketSize: ref.bracketSize, status: ref.status, bookCount: ref.bracketSize, covers: ref.covers.slice(0, FEED_COVER_LIMIT) };
 }
 
+function withVoted(content: PublishedContent, voted: Set<string> | null): PublishedContent {
+  return voted ? { ...content, viewerVoted: voted.has(content.id) } : content;
+}
+
 export interface CommunityDeps {
   repo: CommunityRepository;
+  now?: () => number;
+  background: (task: () => Promise<void>) => void;
   getDashboardSeenAt(userId: string): string | null;
   setDashboardSeenAt(userId: string, seenAt: string): void;
   resolveProfile(userId: string): ReaderProfile | undefined;
@@ -74,21 +94,23 @@ export interface CommunityDeps {
   searchUsernameOwners(query: string, limit: number): string[];
   murals: Pick<MuralsPublicApi, "ownsMural" | "getMuralPublicPayload">;
   tierlists: {
-    list(limit: number, offset: number): PublishedTierlistRef[];
+    discoverWindow(needle: string, limit: number): TierlistDiscoverRef[];
+    getPublishedMany(ids: string[]): PublishedTierlistRef[];
+    votedAmong(viewerId: string, ids: string[]): string[];
     get(id: string): PublishedTierlistRef | undefined;
     listByOwner(ownerUserId: string): PublishedTierlistRef[];
-    listVotedByUser(voterUserId: string): PublishedTierlistRef[];
   };
   tournaments: {
-    list(limit: number, offset: number): PublishedTournamentRef[];
+    discoverWindow(needle: string, limit: number): TournamentDiscoverRef[];
+    getPublishedMany(ids: string[]): PublishedTournamentRef[];
+    votedAmong(viewerId: string, ids: string[]): string[];
     get(id: string): PublishedTournamentRef | undefined;
     listByOwner(ownerUserId: string): PublishedTournamentRef[];
-    listVotedByUser(voterUserId: string): PublishedTournamentRef[];
   };
   participation: {
-    tierlists(userId: string): GameParticipation[];
-    tournaments(userId: string): GameParticipation[];
-    quizzes(userId: string): GameParticipation[];
+    tierlists(userId: string, since: string): GameParticipation[];
+    tournaments(userId: string, since: string): GameParticipation[];
+    quizzes(userId: string, since: string): GameParticipation[];
   };
 }
 
@@ -111,14 +133,34 @@ export interface CommunityService {
   getLibrary(username: string): { data: Record<string, unknown> | null };
   getFeedSettings(userId: string): FeedSettings;
   updateFeedSettings(userId: string, settings: FeedSettings): void;
+  archiveOldEvents(): Promise<{ moved: number; purged: number }>;
 }
 
 export function createCommunityService(deps: CommunityDeps): CommunityService {
-  const { repo } = deps;
+  const { repo, background } = deps;
+  const now = deps.now ?? Date.now;
+  const windowStart = (): string => new Date(now() - FEED_WINDOW_MS).toISOString();
   const emit = (userId: string, type: ActivityEventType, refType: CommunityRefType, refId: string, payload?: Record<string, unknown>): void => {
-    repo.insertEvent({ id: randomUUID(), user_id: userId, type, ref_type: refType, ref_id: refId, payload: payload ? JSON.stringify(payload) : null, created_at: new Date().toISOString() });
+    repo.insertEvent(newEvent(userId, type, refType, refId, payload));
   };
   const settingsFor = (userId: string): FeedSettings => repo.getFeedSettings(userId) ?? DEFAULT_FEED_SETTINGS;
+  const backfillInboxes = async (authorId: string, types: readonly ActivityEventType[]): Promise<void> => {
+    try {
+      const since = windowStart();
+      await turn();
+      const followerIds = repo.listFollowerIds(authorId);
+      for (let from = 0; from < followerIds.length; from += BACKFILL_BATCH) {
+        repo.backfillInbox(authorId, followerIds.slice(from, from + BACKFILL_BATCH), types, since);
+        await turn();
+      }
+    } catch (error) {
+      throw new Error(`feed backfill for ${authorId} failed`, { cause: error });
+    }
+  };
+  const backfillTurnedOn = (userId: string, before: FeedSettings, after: FeedSettings): void => {
+    const types = FEED_EVENT_TYPES.filter((type) => !before[categoryFor(type)] && after[categoryFor(type)]);
+    if (types.length > 0) background(() => backfillInboxes(userId, types));
+  };
   const glyphLookup = (): ((userId: string) => IdentityKey | null) => {
     const cache = new Map<string, IdentityKey | null>();
     return (userId) => {
@@ -146,20 +188,16 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
   type DigestRow = { id: string; createdAt: string; event?: EventRow; follow?: FollowRow; participation?: ParticipationItem };
   type Bound = { keyset?: CursorKeyset; since?: string };
 
-  const digestTypesFor = (userId: string, kinds: ReadonlySet<string>): ActivityEventType[] => {
-    const settings = settingsFor(userId);
-    return DIGEST_EVENT_TYPES.filter(([type, kind]) => kinds.has(kind) && settings[categoryFor(type)]).map(([type]) => type);
-  };
   const withinBound = (bound: Bound, createdAt: string, id: string): boolean =>
     bound.since !== undefined ? createdAt > bound.since : !bound.keyset || createdAt < bound.keyset.createdAt || (createdAt === bound.keyset.createdAt && id < bound.keyset.id);
   const newestFirst = (a: DigestRow, b: DigestRow): number => (a.createdAt !== b.createdAt ? b.createdAt.localeCompare(a.createdAt) : a.id < b.id ? 1 : -1);
 
-  const participationItems = (viewerId: string): ParticipationItem[] => {
+  const participationItems = (viewerId: string, since: string): ParticipationItem[] => {
     const glyphOf = glyphLookup();
     const games: Array<[ParticipationGameKind, GameParticipation[]]> = [
-      ["tierlist", deps.participation.tierlists(viewerId)],
-      ["tournament", deps.participation.tournaments(viewerId)],
-      ["quiz", deps.participation.quizzes(viewerId)]
+      ["tierlist", deps.participation.tierlists(viewerId, since)],
+      ["tournament", deps.participation.tournaments(viewerId, since)],
+      ["quiz", deps.participation.quizzes(viewerId, since)]
     ];
     return games.flatMap(([kind, list]) =>
       list.map((game) => {
@@ -174,21 +212,18 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
     );
   };
 
-  const followingWindows = (followees: string[], bound: Bound, limit: number, kinds: ReadonlySet<string>): DigestRow[][] =>
-    followees.map((followeeId) => {
-      const types = digestTypesFor(followeeId, kinds);
-      if (types.length === 0) return [];
-      const events = bound.since !== undefined ? repo.listEventsByUserSince(followeeId, bound.since, limit, types) : repo.listEventsByUser(followeeId, bound.keyset, limit, types);
-      return events.map((event) => ({ id: event.id, createdAt: event.created_at, event }));
-    });
+  const inboxRows = (viewerId: string, keyset: CursorKeyset | undefined, limit: number, types: ActivityEventType[]): DigestRow[] =>
+    repo.listInbox(viewerId, keyset, limit, types).map((event) => ({ id: event.id, createdAt: event.created_at, event }));
 
-  const followerRows = (viewerId: string, bound: Bound, limit: number): DigestRow[] =>
-    (bound.since !== undefined ? repo.listFollowersSince(viewerId, bound.since, limit) : repo.listFollowersByFollowee(viewerId, bound.keyset, limit)).map((follow) => ({ id: follow.follower_id, createdAt: follow.created_at, follow }));
+  const followerRows = (viewerId: string, bound: Bound, limit: number, start: string): DigestRow[] =>
+    (bound.since !== undefined ? repo.listFollowersSince(viewerId, bound.since, limit) : repo.listFollowersByFollowee(viewerId, bound.keyset, limit))
+      .filter((follow) => follow.created_at >= start)
+      .map((follow) => ({ id: follow.follower_id, createdAt: follow.created_at, follow }));
 
   const participationRows = (participation: ParticipationItem[], bound: Bound): DigestRow[] =>
     participation.filter((item) => withinBound(bound, item.createdAt, item.id)).map((item) => ({ id: item.id, createdAt: item.createdAt, participation: item }));
 
-  const toDigestItem = (row: DigestRow, profiles: Map<string, ReaderProfile>, glyphOf: (userId: string) => IdentityKey | null, followees: string[]): DigestItem | undefined => {
+  const toDigestItem = (row: DigestRow, profiles: Map<string, ReaderProfile>, glyphOf: (userId: string) => IdentityKey | null, viewerId: string): DigestItem | undefined => {
     if (row.event) {
       const event = row.event;
       const actor = profiles.get(event.user_id);
@@ -227,15 +262,13 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
     } else if (row.follow) {
       const author = profiles.get(row.follow.follower_id);
       if (author) {
-        // followees is already loaded for the event half of this feed, so
-        // knowing whether this is mutual costs nothing extra.
-        return { kind: "follow", id: row.follow.follower_id, actor: withGlyph(author, row.follow.follower_id, glyphOf), createdAt: row.follow.created_at, viewerFollows: followees.includes(row.follow.follower_id) };
+        return { kind: "follow", id: row.follow.follower_id, actor: withGlyph(author, row.follow.follower_id, glyphOf), createdAt: row.follow.created_at, viewerFollows: repo.getFollow(viewerId, row.follow.follower_id) !== undefined };
       }
     }
     return undefined;
   };
 
-  const buildItems = (rows: DigestRow[], followees: string[], limit: number, glyphOf: (userId: string) => IdentityKey | null, horizon?: CursorKeyset): { items: DigestItem[]; last?: DigestRow; more: boolean } => {
+  const buildItems = (rows: DigestRow[], viewerId: string, limit: number, glyphOf: (userId: string) => IdentityKey | null, horizon?: CursorKeyset): { items: DigestItem[]; last?: DigestRow; more: boolean } => {
     rows.sort(newestFirst);
     const actorIds = new Set<string>();
     for (const row of rows) {
@@ -247,13 +280,13 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
     let last: DigestRow | undefined;
     for (const row of rows) {
       if (items.length === limit || (horizon && withinBound({ keyset: horizon }, row.createdAt, row.id))) return { items, last, more: true };
-      const item = row.participation ?? toDigestItem(row, profiles, glyphOf, followees);
+      const item = row.participation ?? toDigestItem(row, profiles, glyphOf, viewerId);
       if (item) items.push(item);
       last = row;
     }
     return { items, last, more: false };
   };
-  const countItems = (rows: DigestRow[], followees: string[]): number => buildItems(rows, followees, DASHBOARD_COUNT_CAP, () => null).items.length;
+  const countItems = (rows: DigestRow[], viewerId: string): number => buildItems(rows, viewerId, DASHBOARD_COUNT_CAP, () => null).items.length;
 
   return {
     follow(followerId, followeeId) {
@@ -261,6 +294,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
       if (!deps.resolveProfiles([followeeId]).has(followeeId)) throw new ProfileNotFoundError();
       if (repo.getFollow(followerId, followeeId)) return;
       if (repo.getProfileRow(followeeId)?.published !== 1 && !repo.getFollow(followeeId, followerId)) throw new ProfileNotFoundError();
+      if (repo.countFollowing(followerId) >= FOLLOW_LIMIT) throw new FollowLimitError();
       const inserted = repo.insertFollow({ follower_id: followerId, followee_id: followeeId, created_at: new Date().toISOString() });
       if (inserted) {
         const author = deps.resolveProfiles([followeeId]).get(followeeId);
@@ -284,16 +318,21 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
       const existing = repo.getProfileRow(userId);
       const keptMural = existing?.mural_id && deps.murals.ownsMural(userId, existing.mural_id) ? existing.mural_id : null;
       const muralId = input.muralId ?? keptMural;
-      const now = new Date().toISOString();
+      const savedAt = new Date().toISOString();
       repo.upsertProfile({
         user_id: userId,
         published: 1,
         mural_id: muralId,
-        published_at: existing?.published_at ?? now,
-        updated_at: now,
+        published_at: existing?.published_at ?? savedAt,
+        updated_at: savedAt,
         feed_settings: existing?.feed_settings ?? null
       });
-      if (input.shareReading !== undefined) repo.updateFeedSettings(userId, { ...settingsFor(userId), reading: input.shareReading });
+      if (input.shareReading !== undefined) {
+        const before = settingsFor(userId);
+        const after = { ...before, reading: input.shareReading };
+        repo.updateFeedSettings(userId, after);
+        backfillTurnedOn(userId, before, after);
+      }
       if (muralId && (!existing?.published_at || existing.mural_id !== muralId)) emit(userId, "mural_published", "mural", muralId);
     },
     unpublishProfile(userId) {
@@ -350,18 +389,19 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
     getDashboard(viewerId, cursor, limit, kinds = LEGACY_DIGEST_KINDS) {
       const keyset = cursor ? decodeCursor(cursor) : undefined;
       if (cursor && !keyset) throw new InvalidCursorError();
-      const followees = repo.listFollowees(viewerId);
-      const participation = kinds.has("participation") ? participationItems(viewerId) : [];
-      const followers = (bound: Bound, count: number): DigestRow[] => (kinds.has("follow") ? followerRows(viewerId, bound, count) : []);
+      const start = windowStart();
+      const participation = kinds.has("participation") ? participationItems(viewerId, start) : [];
+      const followers = (bound: Bound, count: number): DigestRow[] => (kinds.has("follow") ? followerRows(viewerId, bound, count, start) : []);
+      const types = DIGEST_EVENT_TYPES.filter(([, kind]) => kinds.has(kind)).map(([type]) => type);
       const glyphOf = glyphLookup();
       const items: DigestItem[] = [];
       let pageBound: Bound = { keyset };
       let last: DigestRow | undefined;
       let more = true;
       for (let round = 0; more && items.length < limit && round < DASHBOARD_REFILL_ROUNDS; round++) {
-        const windows = [...followingWindows(followees, pageBound, limit + 1, kinds), followers(pageBound, limit + 1)];
+        const windows = [inboxRows(viewerId, pageBound.keyset, limit + 1, types), followers(pageBound, limit + 1)];
         const horizon = windows.filter((rows) => rows.length === limit + 1).map((rows) => rows[rows.length - 1]!).sort(newestFirst)[0];
-        const page = buildItems([...windows.flat(), ...participationRows(participation, pageBound)], followees, limit - items.length, glyphOf, horizon);
+        const page = buildItems([...windows.flat(), ...participationRows(participation, pageBound)], viewerId, limit - items.length, glyphOf, horizon);
         items.push(...page.items);
         last = page.last ?? last;
         more = page.more || horizon !== undefined;
@@ -371,43 +411,45 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
       if (keyset) return { items, nextCursor, seenAt: null, personalNewCount: 0, followingNewCount: 0, newCount: 0 };
       const seenAt = deps.getDashboardSeenAt(viewerId);
       const countBound: Bound = seenAt ? { since: seenAt } : {};
-      const personalNewCount = countItems([...followers(countBound, DASHBOARD_COUNT_CAP), ...participationRows(participation, countBound)], followees);
-      const followingNewCount = countItems(followingWindows(followees, countBound, DASHBOARD_COUNT_CAP, kinds).flat(), followees);
+      const personalNewCount = countItems([...followers(countBound, DASHBOARD_COUNT_CAP), ...participationRows(participation, countBound)], viewerId);
+      const followingNewCount = repo.countInboxSince(viewerId, seenAt ?? "", types, DASHBOARD_COUNT_CAP);
       return { items, nextCursor, seenAt, personalNewCount, followingNewCount, newCount: seenAt ? personalNewCount + followingNewCount : 0 };
     },
     markDashboardSeen(viewerId) {
       deps.setDashboardSeenAt(viewerId, new Date().toISOString());
     },
     getDiscover(type, q, limit, offset, viewerId) {
-      const needle = q.trim().toLowerCase();
+      const needle = normalizeWords(q);
       const window = needle ? DISCOVER_SCAN_CAP : Math.min(offset + limit + 1, DISCOVER_SCAN_CAP);
-      const entries: Array<{ userId: string; content: PublishedContent; createdAt: string }> = [];
+      const entries: Array<{ kind: "tierlist" | "tournament"; id: string; userId: string; createdAt: string; promoted: boolean }> = [];
       if (type !== "tournament") {
-        const voted = viewerId ? new Set(deps.tierlists.listVotedByUser(viewerId).map((ref) => ref.id)) : null;
-        for (const ref of deps.tierlists.list(window, 0)) {
-          const content = voted ? { ...toTierlistSummary(ref), viewerVoted: voted.has(ref.id) } : toTierlistSummary(ref);
-          entries.push({ userId: ref.ownerUserId, content, createdAt: ref.createdAt });
-        }
+        for (const ref of deps.tierlists.discoverWindow(needle, window)) entries.push({ kind: "tierlist", id: ref.id, userId: ref.ownerUserId, createdAt: ref.createdAt, promoted: ref.promotedAt !== null });
       }
       if (type !== "tierlist") {
-        const voted = viewerId ? new Set(deps.tournaments.listVotedByUser(viewerId).map((ref) => ref.id)) : null;
-        for (const ref of deps.tournaments.list(window, 0)) {
-          const content = voted ? { ...toTournamentSummary(ref), viewerVoted: voted.has(ref.id) } : toTournamentSummary(ref);
-          entries.push({ userId: ref.ownerUserId, content, createdAt: ref.createdAt });
-        }
+        for (const ref of deps.tournaments.discoverWindow(needle, window)) entries.push({ kind: "tournament", id: ref.id, userId: ref.ownerUserId, createdAt: ref.createdAt, promoted: false });
       }
       const authors = deps.resolveProfiles([...new Set(entries.map((e) => e.userId))]);
-      const glyphOf = glyphLookup();
       const visible = entries
         .flatMap((entry) => {
-          const author = authors.get(entry.userId) ?? (entry.content.kind === "tierlist" && entry.content.promotedAt ? { username: "Original creator unavailable", avatarUrl: null, unavailable: true } : undefined);
-          if (!author) return [];
-          if (needle && !entry.content.name.toLowerCase().includes(needle)) return [];
-          return [{ userId: entry.userId, author, content: entry.content, createdAt: entry.createdAt }];
+          const author = authors.get(entry.userId) ?? (entry.promoted ? { username: "Original creator unavailable", avatarUrl: null, unavailable: true } : undefined);
+          return author ? [{ ...entry, author }] : [];
         })
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      const page = visible.slice(offset, offset + limit);
+      const tierlistIds = page.filter((entry) => entry.kind === "tierlist").map((entry) => entry.id);
+      const tournamentIds = page.filter((entry) => entry.kind === "tournament").map((entry) => entry.id);
+      const votedTierlists = viewerId ? new Set(deps.tierlists.votedAmong(viewerId, tierlistIds)) : null;
+      const votedTournaments = viewerId ? new Set(deps.tournaments.votedAmong(viewerId, tournamentIds)) : null;
+      const contents = new Map<string, PublishedContent>([
+        ...deps.tierlists.getPublishedMany(tierlistIds).map((ref) => [`tierlist:${ref.id}`, withVoted(toTierlistSummary(ref), votedTierlists)] as const),
+        ...deps.tournaments.getPublishedMany(tournamentIds).map((ref) => [`tournament:${ref.id}`, withVoted(toTournamentSummary(ref), votedTournaments)] as const)
+      ]);
+      const glyphOf = glyphLookup();
       return {
-        items: visible.slice(offset, offset + limit).map(({ userId, author, content }) => ({ author: withGlyph(author, userId, glyphOf), content })),
+        items: page.flatMap((entry) => {
+          const content = contents.get(`${entry.kind}:${entry.id}`);
+          return content ? [{ author: withGlyph(entry.author, entry.userId, glyphOf), content }] : [];
+        }),
         nextOffset: offset + limit < visible.length ? offset + limit : null
       };
     },
@@ -456,6 +498,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
       if (cursor && !keyset) throw new InvalidCursorError();
       const owner = viewerId === userId;
       const settings = settingsFor(userId);
+      const hiddenTypes = owner ? [] : ACTIVITY_EVENT_TYPES.filter((type) => !settings[categoryFor(type)]);
       const toActivityItem = (event: EventRow): ActivityItem | undefined => {
         if (!owner && !settings[categoryFor(event.type)]) return undefined;
         if (event.type === "tierlist_published") {
@@ -484,12 +527,16 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
         }
         return payload === undefined ? undefined : { id: event.id, type: event.type, payload, createdAt: event.created_at };
       };
+      const eventsAfter = (after: CursorKeyset | undefined, count: number): EventRow[] => {
+        const recent = repo.listEventsByUser(userId, after, count, hiddenTypes);
+        return recent.length < count ? [...recent, ...repo.listHistoryEventsByUser(userId, after, count - recent.length, hiddenTypes)] : recent;
+      };
       const items: ActivityItem[] = [];
       let nextCursor: string | null = null;
       let lastIncluded: EventRow | undefined;
       let fetchAfter: CursorKeyset | undefined = keyset;
       for (;;) {
-        const batch = repo.listEventsByUser(userId, fetchAfter, limit + 1);
+        const batch = eventsAfter(fetchAfter, limit + 1);
         if (batch.length === 0) break;
         let exhausted = false;
         for (const event of batch) {
@@ -513,7 +560,15 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
       return settingsFor(userId);
     },
     updateFeedSettings(userId, settings) {
+      const before = settingsFor(userId);
       repo.updateFeedSettings(userId, settings);
+      backfillTurnedOn(userId, before, settings);
+    },
+    async archiveOldEvents() {
+      const cutoff = windowStart();
+      const moved = await inBatches((batch) => repo.moveEventsBefore(cutoff, batch));
+      const purged = await inBatches((batch) => repo.purgeInboxBefore(cutoff, batch));
+      return { moved, purged };
     }
   };
 }
@@ -522,10 +577,13 @@ export interface CommunityPublicApi {
   emitEvent(userId: string, type: ActivityEventType, refType: CommunityRefType, refId: string, payload?: Record<string, unknown>): void;
 }
 
-export function createCommunityPublicApi(repo: CommunityRepository): CommunityPublicApi {
+export function createCommunityPublicApi(repo: CommunityRepository, now: () => number = Date.now): CommunityPublicApi {
+  const atBookCap = (userId: string): boolean =>
+    repo.countEventsSince(userId, new Date(now() - BOOK_EVENTS_WINDOW_MS).toISOString(), READING_EVENT_TYPES, BOOK_EVENTS_PER_DAY) >= BOOK_EVENTS_PER_DAY;
   return {
     emitEvent(userId, type, refType, refId, payload) {
-      repo.insertEvent({ id: randomUUID(), user_id: userId, type, ref_type: refType, ref_id: refId, payload: payload ? JSON.stringify(payload) : null, created_at: new Date().toISOString() });
+      if (READING_EVENT_TYPES.includes(type) && atBookCap(userId)) return;
+      repo.insertEvent(newEvent(userId, type, refType, refId, payload, now));
     }
   };
 }

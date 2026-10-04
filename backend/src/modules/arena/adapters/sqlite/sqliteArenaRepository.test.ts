@@ -247,7 +247,7 @@ test("participation counts each voter once per started tournament, at their firs
   repo.insertVote(vote("v8", "duel-t2", "tok-2a", "u2", "2026-01-09T00:00:00.000Z"));
   repo.insertVote(vote("v9", "duel-t3", "tok-2a", "u2", "2026-01-10T00:00:00.000Z"));
 
-  assert.deepEqual(repo.listParticipation("u1").map((r) => ({ ...r })), [
+  assert.deepEqual(repo.listParticipation("u1", "2026-01-01T00:00:00.000Z").map((r) => ({ ...r })), [
     { id: "t1", name: "Bracket", participants: 4, latest_at: "2026-01-05T00:00:00.000Z" }
   ]);
   assert.deepEqual(repo.listRecentVoters("t1", "u1", 10).map((r) => ({ ...r })), [
@@ -255,6 +255,29 @@ test("participation counts each voter once per started tournament, at their firs
     { user_id: "u2", at: "2026-01-02T00:00:00.000Z" }
   ]);
   assert.deepEqual(repo.listRecentVoters("t1", "u1", 1).map((r) => r.user_id), ["u3"]);
+});
+
+test("participation lists only the tournaments with a vote since the marker, counts every participant, and keeps one listed by a repeat vote", () => {
+  const db = freshDb();
+  seedTournament(db, "quiet", "u1", "Quiet");
+  seedTournament(db, "busy", "u1", "Busy");
+  seedTournament(db, "revisited", "u1", "Revisited");
+  db.prepare(
+    `INSERT INTO duels (id, tournament_id, round_number, duel_index, book_a_key, book_a_title, book_a_author, book_b_key, book_b_title, book_b_author, opens_at, closes_at)
+     VALUES ('duel-revisited-b', 'revisited', 2, 0, 'c', 'C', 'x', 'd', 'D', 'y', '2026-01-01', '2026-01-02')`
+  ).run();
+  const repo = createSqliteArenaRepository(db);
+  repo.insertVote(vote("v1", "duel-quiet", "tok-1", "u2", "2026-01-02T00:00:00.000Z"));
+  repo.insertVote(vote("v2", "duel-busy", "tok-1", "u2", "2026-01-02T00:00:00.000Z"));
+  repo.insertVote(vote("v3", "duel-busy", "tok-3", "u3", "2026-02-10T00:00:00.000Z"));
+  repo.insertVote(vote("v4", "duel-revisited", "tok-1", "u2", "2026-01-03T00:00:00.000Z"));
+  repo.insertVote(vote("v5", "duel-revisited-b", "tok-1", "u2", "2026-02-12T00:00:00.000Z"));
+  const listed = (since: string) => repo.listParticipation("u1", since).map((r) => [r.id, r.participants, r.latest_at]).sort();
+
+  assert.deepEqual(listed("2026-01-01T00:00:00.000Z"), [["busy", 2, "2026-02-10T00:00:00.000Z"], ["quiet", 1, "2026-01-02T00:00:00.000Z"], ["revisited", 1, "2026-01-03T00:00:00.000Z"]]);
+  assert.deepEqual(listed("2026-02-01T00:00:00.000Z"), [["busy", 2, "2026-02-10T00:00:00.000Z"], ["revisited", 1, "2026-01-03T00:00:00.000Z"]]);
+  assert.deepEqual(listed("2026-02-12T00:00:00.000Z"), [["revisited", 1, "2026-01-03T00:00:00.000Z"]]);
+  assert.deepEqual(listed("2026-02-12T00:00:00.001Z"), []);
 });
 
 test("rekeyBooks rewrites seeding slots only and drops a slot that would duplicate the survivor", () => {
@@ -273,4 +296,136 @@ test("rekeyBooks rewrites seeding slots only and drops a slot that would duplica
   assert.deepEqual(keys("seeding"), ["new"]);
   assert.deepEqual(keys("both"), ["new"]);
   assert.deepEqual(keys("active"), ["old"]);
+});
+
+function tournament(overrides: Partial<TournamentRow> & { id: string }): TournamentRow {
+  return {
+    owner_user_id: "u1",
+    name: "Bracket",
+    bracket_size: 8,
+    round_duration_minutes: 60,
+    status: "seeding",
+    current_round: 0,
+    created_at: "2026-01-01T00:00:00.000Z",
+    updated_at: "2026-01-01T00:00:00.000Z",
+    ...overrides
+  };
+}
+
+function nameKey(db: DatabaseSync, id: string): string | null {
+  return (db.prepare(`SELECT name_key FROM tournaments WHERE id = ?`).get(id) as { name_key: string | null }).name_key;
+}
+
+test("creating and renaming a tournament keep name_key in step, and starting leaves it alone", () => {
+  const db = freshDb();
+  const repo = createSqliteArenaRepository(db);
+  repo.insertTournament(tournament({ id: "t1", name: "Melhores Livros: Ficção!" }));
+  assert.equal(nameKey(db, "t1"), "melhores livros ficcao");
+
+  repo.updateTournamentStatus("t1", "active", 1);
+  assert.equal(nameKey(db, "t1"), "melhores livros ficcao");
+
+  repo.renameTournament("t1", "Hábitos Atómicos");
+  assert.equal(nameKey(db, "t1"), "habitos atomicos");
+  assert.equal(repo.getTournament("t1")?.name, "Hábitos Atómicos");
+});
+
+test("opening a database fills name_key on rows that have none", () => {
+  const db = freshDb();
+  db.prepare(`INSERT INTO tournaments (id, owner_user_id, name, bracket_size, round_duration_minutes) VALUES ('old1', 'u1', 'Hábitos Atómicos', 4, 60), ('old2', 'u1', '!!!', 4, 60)`).run();
+  db.prepare(`INSERT INTO tournaments (id, owner_user_id, name, name_key, bracket_size, round_duration_minutes) VALUES ('kept', 'u1', 'Kept', 'custom', 4, 60)`).run();
+  assert.equal(nameKey(db, "old1"), null);
+
+  applyArenaMigrations(db);
+
+  assert.equal(nameKey(db, "old1"), "habitos atomicos");
+  assert.equal(nameKey(db, "old2"), "");
+  assert.equal(nameKey(db, "kept"), "custom");
+});
+
+test("a database from before name_key gets the column, the public index and filled keys", () => {
+  const db = freshDb();
+  db.prepare(`INSERT INTO tournaments (id, owner_user_id, name, name_key, bracket_size, round_duration_minutes) VALUES ('old', 'u1', 'Hábitos Atómicos', 'stale', 4, 60)`).run();
+  db.exec(`ALTER TABLE tournaments DROP COLUMN name_key`);
+  db.exec(`DROP INDEX idx_tournaments_public`);
+  assert.ok(!columnNames(db, "tournaments").includes("name_key"));
+
+  applyArenaMigrations(db);
+
+  assert.ok(columnNames(db, "tournaments").includes("name_key"));
+  assert.equal(nameKey(db, "old"), "habitos atomicos");
+  const index = db.prepare(`SELECT name FROM sqlite_master WHERE type='index' AND name='idx_tournaments_public'`).get();
+  assert.ok(index, "the public listing index exists after migrating");
+});
+
+test("discoverWindow returns started tournaments whose name_key contains the needle, newest first, up to the limit", () => {
+  const repo = createSqliteArenaRepository(freshDb());
+  repo.insertTournament(tournament({ id: "habits", name: "Hábitos Atómicos", status: "active", created_at: "2026-01-01T00:00:00.000Z" }));
+  repo.insertTournament(tournament({ id: "fantasy", name: "Fantasy Cup", status: "active", owner_user_id: "u2", created_at: "2026-02-01T00:00:00.000Z" }));
+  repo.insertTournament(tournament({ id: "done", name: "Hábitos Concluídos", status: "completed", created_at: "2026-03-01T00:00:00.000Z" }));
+  repo.insertTournament(tournament({ id: "draft", name: "Hábitos rascunho", status: "seeding", created_at: "2026-04-01T00:00:00.000Z" }));
+  const ids = (needle: string, limit = 10) => repo.discoverWindow(needle, limit).map((r) => r.id);
+
+  assert.deepEqual(ids("habitos"), ["done", "habits"]);
+  assert.deepEqual(ids("habitos", 1), ["done"]);
+  assert.deepEqual(ids("habitos atom"), ["habits"]);
+  assert.deepEqual(ids("fantasy"), ["fantasy"]);
+  assert.deepEqual(ids("nothing like it"), []);
+  assert.deepEqual(ids(""), ["done", "fantasy", "habits"]);
+  assert.deepEqual(ids("", 2), ["done", "fantasy"]);
+  assert.deepEqual(repo.discoverWindow("fantasy", 10).map((r) => ({ ...r })), [{ id: "fantasy", created_at: "2026-02-01T00:00:00.000Z", owner_user_id: "u2" }]);
+});
+
+test("a renamed tournament is found by its new name and no longer by the old one", () => {
+  const repo = createSqliteArenaRepository(freshDb());
+  repo.insertTournament(tournament({ id: "t1", name: "Old name", status: "active" }));
+  repo.renameTournament("t1", "Novo Título");
+
+  assert.deepEqual(repo.discoverWindow("novo titulo", 10).map((r) => r.id), ["t1"]);
+  assert.deepEqual(repo.discoverWindow("old name", 10), []);
+});
+
+test("listPublicByIds returns the started tournaments among the ids and nothing else", () => {
+  const repo = createSqliteArenaRepository(freshDb());
+  repo.insertTournament(tournament({ id: "t1", status: "active" }));
+  repo.insertTournament(tournament({ id: "t2", status: "completed" }));
+  repo.insertTournament(tournament({ id: "t3", status: "active" }));
+  repo.insertTournament(tournament({ id: "draft", status: "seeding" }));
+
+  assert.deepEqual(repo.listPublicByIds(["t1", "draft", "ghost", "t3"]).map((r) => r.id).sort(), ["t1", "t3"]);
+  assert.deepEqual(repo.listPublicByIds([]), []);
+});
+
+test("votedAmong returns the requested tournaments the account has voted in, never its own", () => {
+  const db = freshDb();
+  seedTournament(db, "t1", "u1", "One");
+  seedTournament(db, "t2", "u1", "Two");
+  seedTournament(db, "t3", "voter-1", "Own");
+  seedTournament(db, "t4", "u1", "Anonymous only");
+  seedTournament(db, "t5", "u1", "Other voter");
+  const repo = createSqliteArenaRepository(db);
+  repo.insertVote(vote("v1", "duel-t1", "tok-1", "voter-1", "2026-01-01T00:00:00.000Z"));
+  repo.insertVote(vote("v2", "duel-t2", "tok-1", "voter-1", "2026-01-02T00:00:00.000Z"));
+  repo.insertVote(vote("v3", "duel-t3", "tok-1", "voter-1", "2026-01-03T00:00:00.000Z"));
+  repo.insertVote(vote("v4", "duel-t4", "tok-2", null, "2026-01-04T00:00:00.000Z"));
+  repo.insertVote(vote("v5", "duel-t5", "tok-3", "voter-2", "2026-01-05T00:00:00.000Z"));
+  const sorted = (ids: string[]) => [...ids].sort();
+
+  assert.deepEqual(sorted(repo.votedAmong("voter-1", ["t1", "t3", "t4", "t5", "ghost"])), ["t1"]);
+  assert.deepEqual(sorted(repo.votedAmong("voter-1", ["t1", "t2"])), ["t1", "t2"]);
+  assert.deepEqual(repo.votedAmong("voter-1", []), []);
+  assert.deepEqual(repo.votedAmong("nobody", ["t1", "t2", "t3", "t4", "t5"]), []);
+  assert.deepEqual(sorted(repo.votedAmong("voter-1", ["t1", "t2", "t3", "t4", "t5"])), sorted(repo.listVotedByUser("voter-1").map((t) => t.id)));
+});
+
+test("a trigger that rolls the transaction back surfaces its own error and keeps every row", () => {
+  const db = freshDb();
+  seedTournament(db, "t1", "u1", "Mine");
+  seedTournament(db, "t2", "u2", "Theirs");
+  const repo = createSqliteArenaRepository(db);
+  repo.insertVote(vote("v1", "duel-t2", "tok-1", "u1", "2026-01-01T00:00:00.000Z"));
+  db.exec("CREATE TRIGGER boom BEFORE UPDATE ON votes BEGIN SELECT RAISE(ROLLBACK, 'trigger boom'); END");
+  assert.throws(() => repo.deleteUserData("u1"), /trigger boom/);
+  assert.equal((db.prepare("SELECT COUNT(*) AS n FROM tournaments WHERE owner_user_id = 'u1'").get() as { n: number }).n, 1);
+  assert.equal(db.isTransaction, false);
 });

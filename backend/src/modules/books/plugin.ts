@@ -6,6 +6,7 @@ import { createObjectStore } from "../../storage/createObjectStore.js";
 import { createCompositeCatalog } from "./adapters/catalog/compositeCatalog.js";
 import { createThrottle, fetchBytes } from "./adapters/http/http.js";
 import { createIsbndbCatalog } from "./adapters/isbndb/isbndbCatalog.js";
+import { capDailyCalls } from "./adapters/isbndb/isbndbDailyCap.js";
 import { createIsbndbGate } from "./adapters/isbndb/isbndbGate.js";
 import { createOpenLibraryCatalog } from "./adapters/openlibrary/openLibraryCatalog.js";
 import { createAppleSource } from "./adapters/sources/apple.js";
@@ -13,7 +14,7 @@ import { createIsbndbSource } from "./adapters/sources/isbndb.js";
 import { createOpenLibraryCoverSource } from "./adapters/sources/openLibrary.js";
 import { openBooksDb } from "./adapters/sqlite/connection.js";
 import { createSqliteBooksRepository } from "./adapters/sqlite/sqliteBooksRepository.js";
-import { startBackfill } from "./backfill.js";
+import { DETAILS_BATCH_SIZE, startBackfill, startDetailsBackfill, startWorksBackfill } from "./backfill.js";
 import { createBooksService, MAX_UPLOAD_BYTES, type BooksService } from "./booksService.js";
 import type { FetchCoverImage } from "./coverResolver.js";
 import { encodeCover } from "./domain/images.js";
@@ -26,6 +27,7 @@ const ISBNDB_GAP_MS = 1100;
 const APPLE_GAP_MS = 3200;
 const OPEN_LIBRARY_GAP_MS = 1000;
 const OPEN_LIBRARY_COVER_GAP_MS = 3100;
+const BACKGROUND_ISBNDB_DAILY_CAP = 1500;
 
 let activeService: BooksService | null = null;
 
@@ -69,6 +71,11 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
       createOpenLibraryCatalog(openLibraryThrottle),
       isbndbConfigured ? createIsbndbCatalog(env.ISBNDB_API_KEY, isbndbThrottle, isbndbGate) : null
     ),
+    backgroundCatalog: createCompositeCatalog(
+      createOpenLibraryCatalog(openLibraryThrottle, false),
+      isbndbConfigured ? capDailyCalls(createIsbndbCatalog(env.ISBNDB_API_KEY, isbndbThrottle, isbndbGate, false), BACKGROUND_ISBNDB_DAILY_CAP) : null,
+      true
+    ),
     fetchImage,
     enqueue: (bookId, priority) => worker.enqueue(bookId, priority),
     publicUrlFor: coverUrlFor,
@@ -81,10 +88,17 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
   );
   service.enqueueUnchecked();
   const stopBackfill = startBackfill(() => service.enqueueUnchecked());
+  const stopDetailsBackfill = startDetailsBackfill(
+    (signal) => service.backfillDetails(DETAILS_BATCH_SIZE, signal),
+    (error) => app.log.error({ err: error }, "details backfill failed")
+  );
+  const stopWorksBackfill = startWorksBackfill(repo.assignMissingWorks, app.log);
   activeService = service;
   app.addHook("onClose", async () => {
     activeService = null;
     stopBackfill();
+    stopDetailsBackfill();
+    stopWorksBackfill();
     worker.stop();
   });
 

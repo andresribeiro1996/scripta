@@ -1,4 +1,4 @@
-import { DEFAULT_BORDER_SIDES, contrastRatio, effectiveBlockColors, normalizeHexColor, resolveBlockColor, themeColorRef, type BlockStyle, type BlockThemeColorKey, type BorderSides, type CardBorderStyle } from "@scripta/shared";
+import { DEFAULT_BORDER_SIDES, blockGradient, contrastRatio, effectiveBlockColors, normalizeHexColor, resolveBlockColor, themeColorRef, type BlockStyle, type BlockThemeColorKey, type BorderSides, type CardBorderStyle } from "@scripta/shared";
 import type { ThemeColors } from "@scripta/shared/themes";
 
 export type Preset<T> = { key: string; label: string; value: T };
@@ -33,6 +33,37 @@ export const FADE_PRESETS: Preset<number>[] = [
   { key: "none", label: "None", value: 100 },
   { key: "light", label: "Light", value: 72 },
   { key: "strong", label: "Strong", value: 40 },
+];
+
+export const SHADOW_STRENGTH_PRESETS: Preset<number>[] = [
+  { key: "soft", label: "Soft", value: 12 },
+  { key: "medium", label: "Medium", value: 24 },
+  { key: "strong", label: "Strong", value: 40 },
+];
+
+export const SHADOW_BLUR_PRESETS: Preset<number>[] = [
+  { key: "sharp", label: "Sharp", value: 0 },
+  { key: "soft", label: "Soft", value: 4 },
+  { key: "diffuse", label: "Diffuse", value: 12 },
+];
+
+export const SHADOW_DISTANCE_PRESETS: Preset<number>[] = [
+  { key: "none", label: "None", value: 0 },
+  { key: "near", label: "Near", value: 2 },
+  { key: "far", label: "Far", value: 8 },
+];
+
+export const GRADIENT_DIRECTION_PRESETS: Preset<number>[] = [
+  { key: "up", label: "Up", value: 0 },
+  { key: "right", label: "Right", value: 90 },
+  { key: "down", label: "Down", value: 180 },
+  { key: "diagonal", label: "Diagonal", value: 135 },
+];
+
+export const GRADIENT_STRENGTH_PRESETS: Preset<number>[] = [
+  { key: "subtle", label: "Subtle", value: 25 },
+  { key: "medium", label: "Medium", value: 50 },
+  { key: "full", label: "Full", value: 100 },
 ];
 
 export const BORDER_SIDE_PRESETS: Preset<BorderSides>[] = [
@@ -104,10 +135,12 @@ export function applyLook(style: BlockStyle, look: Look): BlockStyle {
   return { ...style, ...look.style };
 }
 
-export function isHardToRead(style: Pick<BlockStyle, "backgroundColor" | "textColor">, colors: Pick<ThemeColors, BlockThemeColorKey>): boolean {
+export function isHardToRead(style: Pick<BlockStyle, "backgroundColor" | "textColor"> & Partial<Pick<BlockStyle, "gradientColor" | "gradientAngle" | "gradientStrength">>, colors: Pick<ThemeColors, BlockThemeColorKey>): boolean {
   const { text, background } = effectiveBlockColors(style, colors);
   const ratio = contrastRatio(text, background);
-  return ratio !== null && ratio < 4.5;
+  const gradient = blockGradient({ backgroundColor: style.backgroundColor, gradientColor: style.gradientColor ?? null, gradientAngle: style.gradientAngle ?? 135, gradientStrength: style.gradientStrength ?? 100 }, colors);
+  const endRatio = gradient ? contrastRatio(text, gradient.endColor) : null;
+  return ratio !== null && ratio < 4.5 || endRatio !== null && endRatio < 4.5;
 }
 
 export function selectionBorderColor(style: Pick<BlockStyle, "backgroundColor" | "cardBorderColor">, colors: Pick<ThemeColors, BlockThemeColorKey>): string {
@@ -115,10 +148,11 @@ export function selectionBorderColor(style: Pick<BlockStyle, "backgroundColor" |
   return isAccent(style.backgroundColor) || isAccent(style.cardBorderColor) ? colors.text : colors.accent;
 }
 
-export type CustomColorTarget = "backgroundColor" | "textColor" | "cardBorderColor";
+export type CustomColorTarget = "backgroundColor" | "textColor" | "cardBorderColor" | "shadowColor" | "fadeColor" | "gradientColor";
 
-export function customColorStart(target: CustomColorTarget, style: Pick<BlockStyle, CustomColorTarget>, palette: Pick<ThemeColors, BlockThemeColorKey | "border">): string {
+export function customColorStart(target: CustomColorTarget, style: Pick<BlockStyle, "backgroundColor" | "textColor" | "cardBorderColor"> & Partial<Pick<BlockStyle, "shadowColor" | "fadeColor" | "gradientColor">>, palette: Pick<ThemeColors, BlockThemeColorKey | "border">): string {
   const { text, background } = effectiveBlockColors(style, palette);
-  const start = target === "backgroundColor" ? background : target === "textColor" ? text : resolveBlockColor(style.cardBorderColor, palette) ?? palette.border;
+  const fallback = target === "shadowColor" ? "#000000" : target === "fadeColor" ? palette.background : target === "gradientColor" ? palette.accent : palette.border;
+  const start = target === "backgroundColor" ? background : target === "textColor" ? text : resolveBlockColor(style[target] ?? null, palette) ?? fallback;
   return normalizeHexColor(start) ?? palette.text;
 }

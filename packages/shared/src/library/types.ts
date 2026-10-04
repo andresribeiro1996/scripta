@@ -29,3 +29,10 @@ export interface LibraryData {
   distinctBooks?: string[][];
   [key: string]: unknown;
 }
+
+export interface LibraryDocument {
+  data: LibraryData;
+  updatedAt: string;
+  shareToken: string | null;
+  shareUrl: string | null;
+}

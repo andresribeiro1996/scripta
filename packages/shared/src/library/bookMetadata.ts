@@ -14,7 +14,14 @@ export interface BookMetadata {
   ratingCount: number;
   sourceUrl: string;
   genres: BookGenre[];
+  pages: number | null;
+  publisher: string | null;
+  year: number | null;
+  translator: string | null;
+  summarySource: "publisher" | "openlibrary" | "isbndb" | null;
 }
+
+export type CatalogBookMetadata = Omit<BookMetadata, "summarySource">;
 
 export function validBookRating(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) && value > 0 && value <= 5 ? value : null;
@@ -38,7 +45,11 @@ export function findOpenLibraryMatch(data: unknown, isbn: string, title: string,
   }) ?? null;
 }
 
-export function buildBookMetadata(match: Record<string, unknown>, work: unknown): BookMetadata {
+export function positiveInteger(value: unknown): number | null {
+  return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : null;
+}
+
+export function buildBookMetadata(match: Record<string, unknown>, work: unknown): CatalogBookMetadata {
   const sourceUrl = `https://openlibrary.org${String(match.key)}`;
   const record = work && typeof work === "object" ? work as Record<string, unknown> : {};
   const rawDescription = record.description;
@@ -48,6 +59,10 @@ export function buildBookMetadata(match: Record<string, unknown>, work: unknown)
     rating: validBookRating(match.ratings_average),
     ratingCount: typeof match.ratings_count === "number" && Number.isFinite(match.ratings_count) && match.ratings_count > 0 ? Math.floor(match.ratings_count) : 0,
     sourceUrl,
-    genres: normalizeBookGenres(record.subjects ?? match.subject)
+    genres: normalizeBookGenres(record.subjects ?? match.subject),
+    pages: null,
+    publisher: null,
+    year: null,
+    translator: null
   };
 }

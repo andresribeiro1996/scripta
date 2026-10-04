@@ -51,6 +51,7 @@ interface MuralBlockBase {
   id: string;
   layout: BlockLayout;
   style?: BlockStyle;
+  expandedFrom?: Partial<BlockLayout>;
 }
 
 /** Discriminated union, one variant per block type. `layout`/`style` are
@@ -199,7 +200,7 @@ export function ensureBookBlockHeights(blocks: MuralBlock[]): MuralBlock[] {
   return blocks.map((block) => {
     const minimum = minimumHeight(block);
     const shift = [...boundaries].reduce((total, [boundary, amount]) => total + (block.layout.y >= boundary ? amount : 0), 0);
-    return { ...block, layout: { ...block.layout, y: block.layout.y + shift, h: Math.max(block.layout.h, minimum) } };
+    return withMuralBlockLayout(block, { ...block.layout, y: block.layout.y + shift, h: Math.max(block.layout.h, minimum) });
   });
 }
 
@@ -221,12 +222,132 @@ function nextBlockLayout(existing: MuralBlock[], type: BlockType): BlockLayout {
 }
 
 export function layoutsOverlap(a: BlockLayout, b: BlockLayout): boolean {
+  "worklet";
   return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 }
 
 export function isValidBlockLayout(layout: BlockLayout, blocks: MuralBlock[], ignoreBlockId?: string): boolean {
+  "worklet";
   if (layout.x < 0 || layout.y < 0 || layout.w < 1 || layout.h < 1 || layout.x + layout.w > GRID_COLUMNS) return false;
   return !blocks.some((block) => block.id !== ignoreBlockId && layoutsOverlap(layout, block.layout));
+}
+
+export function withMuralBlockLayout(block: MuralBlock, layout: BlockLayout): MuralBlock {
+  "worklet";
+  const { expandedFrom, ...rest } = block;
+  const remaining = { ...expandedFrom };
+  if (layout.w !== block.layout.w) { delete remaining.w; delete remaining.x; }
+  else if (remaining.x !== undefined) remaining.x += layout.x - block.layout.x;
+  if (layout.h !== block.layout.h) { delete remaining.h; delete remaining.y; }
+  else if (remaining.y !== undefined) remaining.y += layout.y - block.layout.y;
+  return { ...rest, layout, ...(Object.keys(remaining).length ? { expandedFrom: remaining } : {}) };
+}
+
+export function compactMuralBlocks(blocks: MuralBlock[]): MuralBlock[] {
+  "worklet";
+  if (blocks.some((block) => !Object.values(block.layout).every(Number.isSafeInteger) || !isValidBlockLayout(block.layout, []))) return blocks;
+  const placed = new Map<string, BlockLayout>();
+  for (const block of [...blocks].sort((a, b) => a.layout.y - b.layout.y || a.layout.x - b.layout.x)) {
+    let y = 0;
+    for (const other of placed.values()) {
+      if (block.layout.x < other.x + other.w && other.x < block.layout.x + block.layout.w) y = Math.max(y, other.y + other.h);
+    }
+    placed.set(block.id, y === block.layout.y ? block.layout : { ...block.layout, y });
+  }
+  if (blocks.every((block) => placed.get(block.id) === block.layout)) return blocks;
+  return blocks.map((block) => placed.get(block.id) === block.layout ? block : withMuralBlockLayout(block, placed.get(block.id)!));
+}
+
+export function toggleMuralBlockExpansion(blocks: MuralBlock[], blockId: string, axis: "w" | "h", bottom: number, top = 0): MuralBlock[] {
+  const block = blocks.find((item) => item.id === blockId);
+  if (!block || !Object.values(block.layout).every(Number.isSafeInteger) || !isValidBlockLayout(block.layout, blocks, blockId)) return blocks;
+  const { layout, expandedFrom, ...rest } = block;
+  const previous = expandedFrom?.[axis];
+  const restore = Number.isSafeInteger(previous) && previous! > 0 && previous! <= layout[axis];
+  const position = axis === "w" ? "x" : "y";
+  let start = axis === "w" ? 0 : Math.min(layout.y, Math.max(0, Math.ceil(top)));
+  let end = axis === "w" ? GRID_COLUMNS : Math.max(layout.y + layout.h, Math.floor(bottom));
+  if (restore) {
+    const original = expandedFrom?.[position] ?? layout[position];
+    if (!Number.isSafeInteger(original) || original < layout[position] || original + previous! > layout[position] + layout[axis]) return blocks;
+    start = original;
+    end = original + previous!;
+  }
+  if (!restore) {
+    for (const other of blocks) {
+      if (other.id === blockId) continue;
+      const candidate = other.layout;
+      const overlaps = axis === "w" ? layout.y < candidate.y + candidate.h && candidate.y < layout.y + layout.h : layout.x < candidate.x + candidate.w && candidate.x < layout.x + layout.w;
+      if (!overlaps) continue;
+      if (candidate[position] + candidate[axis] <= layout[position]) start = Math.max(start, candidate[position] + candidate[axis]);
+      if (candidate[position] >= layout[position] + layout[axis]) end = Math.min(end, candidate[position]);
+    }
+  }
+  const next = { ...layout, [position]: start, [axis]: end - start };
+  if (!Number.isSafeInteger(start) || !Number.isSafeInteger(next[axis]) || !isValidBlockLayout(next, blocks, blockId) || (!restore && next[axis] === layout[axis])) return blocks;
+  const remembered = { ...expandedFrom };
+  if (restore) { delete remembered[axis]; delete remembered[position]; }
+  else { remembered[axis] = layout[axis]; remembered[position] = layout[position]; }
+  const updated: MuralBlock = { ...rest, layout: next, ...(Object.keys(remembered).length ? { expandedFrom: remembered } : {}) };
+  return blocks.map((item) => item.id === blockId ? updated : item);
+}
+
+export function moveMuralBlock(blocks: MuralBlock[], blockId: string, layout: BlockLayout): MuralBlock[] {
+  "worklet";
+  const moving = blocks.find((block) => block.id === blockId);
+  if (!moving || !Object.values(layout).every(Number.isSafeInteger) || !isValidBlockLayout(layout, [])) return blocks;
+  if (Object.keys(layout).every((key) => layout[key as keyof BlockLayout] === moving.layout[key as keyof BlockLayout]) && isValidBlockLayout(layout, blocks, blockId)) return compactMuralBlocks(blocks);
+  if (Math.abs(layout.x - moving.layout.x) > Math.abs(layout.y - moving.layout.y) && layout.w === moving.layout.w && layout.h === moving.layout.h && isValidBlockLayout(moving.layout, blocks, blockId)) {
+    const swap = blocks.find((block) => block.id !== blockId && block.layout.y === moving.layout.y
+      && (layout.x - moving.layout.x) * (block.layout.x - moving.layout.x) > 0
+      && layout.x < block.layout.x + block.layout.w && block.layout.x < layout.x + layout.w
+      && isValidBlockLayout(block.layout, blocks, block.id));
+    if (swap) {
+      const right = swap.layout.x > moving.layout.x;
+      const moved = { ...moving.layout, x: right ? swap.layout.x + swap.layout.w - layout.w : swap.layout.x };
+      const swapped = { ...swap.layout, x: right ? moving.layout.x : moving.layout.x + moving.layout.w - swap.layout.w };
+      const next = blocks.map((block) => {
+        if (block.id === blockId) return withMuralBlockLayout(block, moved);
+        if (block.id === swap.id) return withMuralBlockLayout(block, swapped);
+        if (moving.layout.w !== swap.layout.w && block.layout.y === moving.layout.y && block.layout.x > Math.min(moving.layout.x, swap.layout.x) && block.layout.x < Math.max(moving.layout.x, swap.layout.x)) {
+          return withMuralBlockLayout(block, { ...block.layout, x: block.layout.x + (right ? swap.layout.w - moving.layout.w : moving.layout.w - swap.layout.w) });
+        }
+        return block;
+      });
+      if (next.every((block) => isValidBlockLayout(block.layout, next, block.id))) {
+        const overlap = Math.min(layout.x + layout.w, swap.layout.x + swap.layout.w) - Math.max(layout.x, swap.layout.x);
+        if (overlap < Math.min(layout.w, swap.layout.w) / 2) return blocks;
+        return compactMuralBlocks(next);
+      }
+    }
+  }
+  if (layout.y > moving.layout.y && layout.w === moving.layout.w && layout.h === moving.layout.h) {
+    const crossed = blocks.filter((block) => block.id !== blockId && block.layout.y >= moving.layout.y + moving.layout.h
+      && layout.x < block.layout.x + block.layout.w && block.layout.x < layout.x + layout.w
+      && layout.y + layout.h > block.layout.y);
+    if (crossed.length) layout = { ...layout, y: Math.max(layout.y, ...crossed.map((block) => block.layout.y + block.layout.h)) };
+  }
+  const placed = new Map<string, BlockLayout>([[blockId, layout]]);
+  const others = blocks.filter((block) => block.id !== blockId).sort((a, b) => a.layout.y - b.layout.y || a.layout.x - b.layout.x);
+  for (const block of others) {
+    let next = block.layout;
+    let collisions = [...placed.values()].filter((item) => layoutsOverlap(next, item));
+    while (collisions.length) {
+      next = { ...next, y: Math.max(...collisions.map((item) => item.y + item.h)) };
+      collisions = [...placed.values()].filter((item) => layoutsOverlap(next, item));
+    }
+    placed.set(block.id, next);
+  }
+  return compactMuralBlocks(blocks.map((block) => placed.get(block.id) === block.layout ? block : withMuralBlockLayout(block, placed.get(block.id)!)));
+}
+
+export function muralDragScrollSpeed(pointerY: number, top: number, bottom: number): number {
+  "worklet";
+  const edge = Math.min(64, (bottom - top) / 3);
+  if (edge <= 0) return 0;
+  if (pointerY < top + edge) return -420 * Math.min(1, (top + edge - pointerY) / edge) ** 2;
+  if (pointerY > bottom - edge) return 420 * Math.min(1, (pointerY - bottom + edge) / edge) ** 2;
+  return 0;
 }
 
 export function findAvailableLayout(blocks: MuralBlock[], w: number, h: number, startY = 0): BlockLayout {
@@ -286,7 +407,7 @@ export function duplicateBlock(murals: Mural[], muralId: string, blockId: string
     if (!original) return m;
     changed = true;
     const layout = nextLayoutBelow(m.blocks, original.layout.w, original.layout.h);
-    const duplicate: MuralBlock = { ...original, id: newId(), layout };
+    const duplicate: MuralBlock = { ...withMuralBlockLayout(original, layout), id: newId() };
     return { ...m, blocks: [...m.blocks, duplicate], updatedAt: now };
   });
   return changed ? result : murals;
@@ -336,7 +457,7 @@ export function profileOnlyMural(theme: ThemeId): Mural {
 }
 
 export function createDuplicateCandidate(block: MuralBlock, blocks: MuralBlock[]): MuralBlock {
-  return { ...block, id: newId(), layout: findAvailableLayout(blocks, block.layout.w, block.layout.h) };
+  return { ...withMuralBlockLayout(block, findAvailableLayout(blocks, block.layout.w, block.layout.h)), id: newId() };
 }
 
 /** Whole-object patch (like lib/groups.ts's setGroupStyle) — the caller

@@ -1,19 +1,20 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { BookMetadata } from "@scripta/shared";
-import { SourceUnavailableError } from "../../domain/errors.js";
+import type { CatalogBookMetadata } from "@scripta/shared";
+import { SourcePausedError, SourceUnavailableError } from "../../domain/errors.js";
 import type { BookCatalog, CatalogDetails, CatalogSearchHit } from "../../domain/ports.js";
+import { capDailyCalls } from "../isbndb/isbndbDailyCap.js";
 import { createCompositeCatalog } from "./compositeCatalog.js";
 
 const lookup = { isbn: "9780441013593", title: "Dune", author: "Frank Herbert" };
 const down = () => new SourceUnavailableError("test", "HTTP 503");
 
-const olMetadata: BookMetadata = { summary: "OL summary.", rating: 4.2, ratingCount: 10, sourceUrl: "https://openlibrary.org/works/OL1W", genres: ["Science Fiction"] };
-const bnMetadata: BookMetadata = { summary: "ISBNdb summary.", rating: null, ratingCount: 0, sourceUrl: "https://isbndb.com/book/9780441013593", genres: ["Fantasy"] };
-const openLibrary: CatalogDetails = { metadata: olMetadata, sources: ["openlibrary"] };
-const isbndb: CatalogDetails = { metadata: bnMetadata, sources: ["isbndb"] };
-const ol = (changes: Partial<BookMetadata>): CatalogDetails => ({ ...openLibrary, metadata: { ...olMetadata, ...changes } });
-const bn = (changes: Partial<BookMetadata>): CatalogDetails => ({ ...isbndb, metadata: { ...bnMetadata, ...changes } });
+const olMetadata: CatalogBookMetadata = { summary: "OL summary.", rating: 4.2, ratingCount: 10, sourceUrl: "https://openlibrary.org/works/OL1W", genres: ["Science Fiction"], pages: 412, publisher: "Ace", year: 1965, translator: "Ana" };
+const bnMetadata: CatalogBookMetadata = { summary: "ISBNdb summary.", rating: null, ratingCount: 0, sourceUrl: "https://isbndb.com/book/9780441013593", genres: ["Fantasy"], pages: 544, publisher: "Penguin", year: 2005, translator: "Bob" };
+const openLibrary: CatalogDetails = { metadata: olMetadata, sources: ["openlibrary"], summarySource: "openlibrary" };
+const isbndb: CatalogDetails = { metadata: bnMetadata, sources: ["isbndb"], summarySource: "isbndb" };
+const ol = (changes: Partial<CatalogBookMetadata>): CatalogDetails => ({ ...openLibrary, metadata: { ...olMetadata, ...changes } });
+const bn = (changes: Partial<CatalogBookMetadata>): CatalogDetails => ({ ...isbndb, metadata: { ...bnMetadata, ...changes } });
 
 function hit(title: string, isbn: string | null, author = "Frank Herbert", source: CatalogSearchHit["source"] = "openlibrary"): CatalogSearchHit {
   return { result: { title, authors: [author], year: null, isbn, publisher: null, coverUrl: null, genres: [] }, olCoverId: null, source };
@@ -48,12 +49,34 @@ test("details fill what Open Library lacks, keep its rating and source URL, and 
   const bnFake = fake(isbndb);
   assert.deepEqual(await createCompositeCatalog(fake(ol({ summary: null })).catalog, bnFake.catalog).fetchDetails(lookup), {
     metadata: { ...olMetadata, summary: "ISBNdb summary." },
-    sources: ["openlibrary", "isbndb"]
+    sources: ["openlibrary", "isbndb"],
+    summarySource: "isbndb"
   });
   assert.deepEqual(await createCompositeCatalog(fake(ol({ genres: [] })).catalog, bnFake.catalog).fetchDetails(lookup), {
     metadata: { ...olMetadata, genres: ["Fantasy"] },
-    sources: ["openlibrary", "isbndb"]
+    sources: ["openlibrary", "isbndb"],
+    summarySource: "openlibrary"
   });
+});
+
+test("when ISBNdb is asked anyway, its pages, year and publisher fill what Open Library left empty", async () => {
+  assert.deepEqual(await createCompositeCatalog(fake(ol({ genres: [], pages: null, year: null, publisher: null })).catalog, fake(isbndb).catalog).fetchDetails(lookup), {
+    metadata: { ...olMetadata, genres: ["Fantasy"], pages: 544, year: 2005, publisher: "Penguin" },
+    sources: ["openlibrary", "isbndb"],
+    summarySource: "openlibrary"
+  });
+  assert.deepEqual(await createCompositeCatalog(fake(ol({ summary: null, pages: 300 })).catalog, fake(isbndb).catalog).fetchDetails(lookup), {
+    metadata: { ...olMetadata, summary: "ISBNdb summary.", pages: 300 },
+    sources: ["openlibrary", "isbndb"],
+    summarySource: "isbndb"
+  });
+});
+
+test("missing pages, year or publisher alone never ask ISBNdb", async () => {
+  const bnFake = fake(isbndb);
+  const partial = ol({ pages: null, year: null, publisher: null });
+  assert.deepEqual(await createCompositeCatalog(fake(partial).catalog, bnFake.catalog).fetchDetails(lookup), partial);
+  assert.deepEqual(bnFake.calls, []);
 });
 
 test("details name only Open Library when ISBNdb adds nothing", async () => {
@@ -141,4 +164,45 @@ test("a text search survives one source being unavailable, but not both", async 
 test("without ISBNdb the Open Library catalog is used as is", () => {
   const ol = fake(openLibrary);
   assert.equal(createCompositeCatalog(ol.catalog, null), ol.catalog);
+});
+
+test("a merged details record keeps Open Library's work key", async () => {
+  const merged = await createCompositeCatalog(fake({ ...ol({ summary: null }), workKey: "/works/OL1W" }).catalog, fake(isbndb).catalog).fetchDetails(lookup);
+  assert.equal(merged?.workKey, "/works/OL1W");
+  assert.deepEqual(merged?.sources, ["openlibrary", "isbndb"]);
+});
+
+test("a strict catalog refuses a partial Open Library answer when ISBNdb is unavailable, a normal one returns it", async () => {
+  const partial = ol({ summary: null });
+  for (const failure of [down(), new SourcePausedError("isbndb", "paused", { retryAt: 1 })]) {
+    await assert.rejects(createCompositeCatalog(fake(partial).catalog, fake(failure).catalog, true).fetchDetails(lookup), failure.constructor as typeof SourceUnavailableError);
+    assert.deepEqual(await createCompositeCatalog(fake(partial).catalog, fake(failure).catalog).fetchDetails(lookup), partial);
+  }
+});
+
+test("a strict catalog behaves as usual when ISBNdb answers or is not asked", async () => {
+  assert.deepEqual((await createCompositeCatalog(fake(ol({ summary: null })).catalog, fake(isbndb).catalog, true).fetchDetails(lookup))?.metadata.summary, "ISBNdb summary.");
+  const bnFake = fake(down());
+  assert.deepEqual(await createCompositeCatalog(fake(openLibrary).catalog, bnFake.catalog, true).fetchDetails(lookup), openLibrary);
+  assert.deepEqual(bnFake.calls, []);
+});
+
+test("a strict catalog does not ask ISBNdb when Open Library is unavailable, a normal one still does", async () => {
+  const strictFake = fake(isbndb);
+  await assert.rejects(createCompositeCatalog(fake(down()).catalog, strictFake.catalog, true).fetchDetails(lookup), SourceUnavailableError);
+  assert.deepEqual(strictFake.calls, []);
+  const normalFake = fake(isbndb);
+  assert.deepEqual(await createCompositeCatalog(fake(down()).catalog, normalFake.catalog).fetchDetails(lookup), isbndb);
+  assert.deepEqual(normalFake.calls, ["details"]);
+});
+
+test("a strict catalog over a capped ISBNdb catalog leaves the cap counter alone when Open Library is unavailable", async () => {
+  let calls = 0;
+  const inner: BookCatalog = { fetchDetails: async () => { calls++; return isbndb; }, search: async () => [] };
+  const capped = capDailyCalls(inner, 1);
+  const strict = createCompositeCatalog(fake(down()).catalog, capped, true);
+  await assert.rejects(strict.fetchDetails(lookup), SourceUnavailableError);
+  assert.equal(calls, 0);
+  assert.deepEqual(await createCompositeCatalog(fake(ol({ summary: null })).catalog, capped, true).fetchDetails(lookup), { ...isbndb, metadata: { ...olMetadata, summary: "ISBNdb summary." }, sources: ["openlibrary", "isbndb"], summarySource: "isbndb" });
+  assert.equal(calls, 1);
 });

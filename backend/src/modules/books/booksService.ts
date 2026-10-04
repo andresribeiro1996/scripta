@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { looksLikeIsbnQuery, normalizeIsbn, type BookGenre, type BookMetadata, type BookSearchResult } from "@scripta/shared";
 import { findBestCover, type CoverSources, type FetchCoverImage } from "./coverResolver.js";
 import { MIN_GOOD_WIDTH } from "./domain/constants.js";
-import { BookNotFoundError, FileTooLargeError, InvalidImageError, SourcePausedError } from "./domain/errors.js";
+import { BookNotFoundError, FileTooLargeError, InvalidImageError, SourcePausedError, SourceUnavailableError } from "./domain/errors.js";
 import { encodeCover, type EncodedCover } from "./domain/images.js";
 import { findByIdentity, isPortugueseIsbn, lookupIdentity, SEARCH_LIMIT, searchTokens, type BookIdentity, type BookLookup } from "./domain/normalize.js";
 import type { BookCatalog, BooksRepository, CatalogSearchHit, CoverBlobStore, CoverSource } from "./domain/ports.js";
@@ -32,6 +32,7 @@ export interface BooksServiceDeps {
   blobs: CoverBlobStore;
   sources: CoverSources;
   catalog: BookCatalog;
+  backgroundCatalog: BookCatalog;
   fetchImage: FetchCoverImage;
   enqueue: (bookId: string, priority?: CoverPriority) => void;
   publicUrlFor: (imageId: string, size: CoverFileSize) => string;
@@ -46,6 +47,7 @@ export interface BooksService {
   enqueueUnchecked(): void;
   processBook(bookId: string, lane: CoverPriority): Promise<void>;
   getDetails(lookup: BookLookup): Promise<BookMetadata | null>;
+  backfillDetails(limit: number, signal?: AbortSignal): Promise<number | null>;
   search(query: string): BookSearchResult[];
   searchExternal(query: string): Promise<BookSearchResult[]>;
   isAdmin(userId: string): boolean;
@@ -59,12 +61,13 @@ export async function storeCoverImage(
   source: CoverSourceName,
   sourceUrl: string | null,
   image: EncodedCover,
-  at: string
+  at: string,
+  origin?: string
 ): Promise<string> {
   const id = randomUUID();
   await deps.blobs.save(id, COVER_EXTENSION, image.full);
   await deps.blobs.save(`${id}-thumb`, COVER_EXTENSION, image.thumb);
-  deps.repo.insertImage({ id, book_id: bookId, source, source_url: sourceUrl, width: image.width, height: image.height, byte_size: image.full.byteLength, created_at: at });
+  deps.repo.insertImage({ id, book_id: bookId, source, source_url: sourceUrl, origin, width: image.width, height: image.height, byte_size: image.full.byteLength, created_at: at });
   return id;
 }
 
@@ -113,9 +116,10 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
     };
   }
 
-  function sourcesFor(lane: CoverPriority): CoverSources {
+  function sourcesFor(lane: CoverPriority, book: BookRow): CoverSources {
     if (lane === "front" || lane === "normal") return { apple: NO_SOURCE, isbndb: deps.sources.isbndb, openlibrary: deps.sources.openlibrary };
     if (lane === "upgrade") return { apple: deps.sources.apple, isbndb: null, openlibrary: NO_SOURCE };
+    if (!olderThan(book.apple_checked_at, RETRY_AFTER_MS)) return { ...deps.sources, apple: NO_SOURCE };
     return deps.sources;
   }
 
@@ -128,13 +132,24 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
     return coverId === null ? null : `https://covers.openlibrary.org/b/id/${coverId}-M.jpg`;
   }
 
+  function summaryLink(book: BookRow): string {
+    if (book.summary_source === "publisher") return book.publisher_url ?? "";
+    if (book.summary_source === "isbndb") return book.isbn ? `https://isbndb.com/book/${book.isbn}` : "";
+    return book.source_url ?? "";
+  }
+
   function detailsOf(book: BookRow): BookMetadata {
     return {
       summary: book.summary,
       rating: book.rating,
       ratingCount: book.rating_count,
-      sourceUrl: book.source_url ?? "",
-      genres: JSON.parse(book.genres) as BookGenre[]
+      sourceUrl: summaryLink(book),
+      genres: JSON.parse(book.genres) as BookGenre[],
+      pages: book.pages,
+      publisher: book.publisher,
+      year: book.year,
+      translator: book.translator,
+      summarySource: book.summary_source
     };
   }
 
@@ -151,19 +166,35 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
   }
 
   function saveHits(hits: CatalogSearchHit[]): BookSearchResult[] {
-    return hits.map(({ result, olCoverId, source }) => {
+    return hits.map(({ result, olCoverId, workKey, source }) => {
       const author = result.authors.join(", ");
       const identity = lookupIdentity({ isbn: result.isbn, title: result.title, author });
       if (!identity) return result;
       const book = findExisting(identity) ?? deps.repo.createBook(
-        { title: result.title, author, isbn: identity.isbn, year: result.year, publisher: result.publisher, olCoverId, genres: result.genres, sources: [source] },
+        { title: result.title, author, isbn: identity.isbn, year: result.year, publisher: result.publisher, olCoverId, workKey, genres: result.genres, sources: [source] },
         keysOf(identity),
         now().toISOString()
       );
       if (!book.title) deps.repo.fillIdentity(book.id, result.title, author);
+      deps.repo.setWorkKey(book.id, workKey);
       deps.repo.makeSearchable(book.id);
       return book.cover_image_id ? { ...result, coverUrl: deps.publicUrlFor(book.cover_image_id, "thumb") } : result;
     });
+  }
+
+  async function lookupDetails(book: BookRow, catalog: BookCatalog) {
+    const details = await catalog.fetchDetails({ isbn: book.isbn, title: book.title, author: book.author });
+    const at = now().toISOString();
+    if (details && (details.metadata.summary || details.metadata.genres.length > 0 || details.metadata.rating !== null)) {
+      deps.repo.saveDetails(book.id, details.metadata, details.sources, details.summarySource, at);
+      deps.repo.setWorkKey(book.id, details.workKey);
+      return;
+    }
+    if (details) {
+      deps.repo.mergeDetails(book.id, { ...details.metadata, summary: null }, null);
+      deps.repo.setWorkKey(book.id, details.workKey);
+    }
+    deps.repo.markDetailsMissing(book.id, at);
   }
 
   return {
@@ -192,7 +223,9 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       const book = deps.repo.getBook(bookId);
       if (!book || book.cover_status === "manual") return;
       try {
-        const outcome = await findBestCover({ isbn: book.isbn, title: book.title, author: book.author }, deps.repo.listRejectedUrls(bookId), sourcesFor(lane), deps.fetchImage);
+        const sources = sourcesFor(lane, book);
+        const outcome = await findBestCover({ isbn: book.isbn, title: book.title, author: book.author }, deps.repo.listRejectedUrls(bookId), sources, deps.fetchImage);
+        if (sources.apple !== NO_SOURCE && !outcome.failures.some((failure) => failure.source === "apple")) deps.repo.setAppleChecked(bookId, now().toISOString());
         for (const failure of outcome.failures.filter((failure) => !(failure instanceof SourcePausedError))) deps.warn({ bookId, source: failure.source, error: failure.message }, "cover source unavailable");
 
         const latest = deps.repo.getBook(bookId);
@@ -214,7 +247,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
 
         if (outcome.complete) {
           backoffUntil.delete(bookId);
-          deps.repo.setCover(bookId, { imageId, status, checkedAt: at });
+          if (!deps.repo.setCoverIf(bookId, latest.cover_image_id, { imageId, status, checkedAt: at })) return;
           if (lane === "upgrade") {
             deps.repo.setUpgradeWanted(bookId, null);
           } else if (lane !== "background") {
@@ -225,7 +258,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
           return;
         }
         backoffUntil.set(bookId, Math.max(now().getTime() + UNAVAILABLE_BACKOFF_MS, ...outcome.failures.map((failure) => failure.retryAt ?? 0)));
-        if (imageId !== latest.cover_image_id) deps.repo.setCover(bookId, { imageId, status, checkedAt: latest.cover_checked_at });
+        if (imageId !== latest.cover_image_id) deps.repo.setCoverIf(bookId, latest.cover_image_id, { imageId, status, checkedAt: latest.cover_checked_at });
       } catch (error) {
         backoffUntil.set(bookId, now().getTime() + UNAVAILABLE_BACKOFF_MS);
         throw error;
@@ -236,12 +269,32 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       const book = findOrCreate(lookup);
       if (!book) return null;
       if (book.details_status === "found") return detailsOf(book);
-      if (book.details_status === "missing" && !olderThan(book.details_checked_at, RETRY_AFTER_MS)) return null;
-      const details = await deps.catalog.fetchDetails({ isbn: book.isbn, title: book.title, author: book.author });
-      const at = now().toISOString();
-      if (details) deps.repo.saveDetails(book.id, details.metadata, details.sources, at);
-      else deps.repo.markDetailsMissing(book.id, at);
-      return details?.metadata ?? null;
+      if (book.details_status === "missing" && !olderThan(book.details_checked_at, RETRY_AFTER_MS)) return book.summary ? detailsOf(book) : null;
+      try {
+        await lookupDetails(book, deps.catalog);
+      } catch (error) {
+        if (error instanceof SourceUnavailableError && book.summary) return detailsOf(book);
+        throw error;
+      }
+      const latest = deps.repo.getBook(book.id) ?? book;
+      return latest.details_status === "found" || latest.summary ? detailsOf(latest) : null;
+    },
+
+    async backfillDetails(limit, signal) {
+      for (const id of deps.repo.listUncheckedDetailIds(limit)) {
+        if (signal?.aborted) return null;
+        const book = deps.repo.getBook(id);
+        if (!book || book.details_status !== null) continue;
+        try {
+          await lookupDetails(book, deps.backgroundCatalog);
+        } catch (error) {
+          if (error instanceof SourcePausedError) return error.retryAt;
+          if (!(error instanceof SourceUnavailableError)) throw error;
+          deps.repo.markDetailsAttempted(id, now().toISOString());
+          deps.warn({ bookId: id, source: error.source, error: error.message }, "details source unavailable");
+        }
+      }
+      return null;
     },
 
     search(query) {

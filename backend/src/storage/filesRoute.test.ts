@@ -28,6 +28,7 @@ const { createObjectStore } = await import("./createObjectStore.js");
 
 const id = "0b6f9c1e-3a4d-4e5f-8a7b-1c2d3e4f5a6b";
 const app = buildApp();
+app.get("/probe/ip", async (request) => request.ip);
 after(() => app.close());
 
 test("a path-traversal key is rejected with 400", async () => {
@@ -52,4 +53,9 @@ test("a stored key answers 200 with the image and the immutable cache header", a
   assert.equal(res.headers["content-type"], "image/webp");
   assert.equal(res.headers["cache-control"], "public, max-age=31536000, immutable");
   assert.deepEqual(res.rawPayload, Buffer.from("img"));
+});
+
+test("the app trusts only known proxies, so a forwarded address the client wrote is ignored", async () => {
+  const res = await app.inject({ url: "/probe/ip", remoteAddress: "100.64.0.7", headers: { "x-forwarded-for": "6.6.6.6, 203.0.113.9" } });
+  assert.equal(res.payload, "203.0.113.9");
 });

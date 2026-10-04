@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import Fastify from "fastify";
 import rateLimit from "@fastify/rate-limit";
+import { TRUSTED_PROXIES } from "../../config/trustedProxies.js";
 
 const scratch = mkdtempSync(join(tmpdir(), "scripta-account-test-"));
 process.env.JWT_ACCESS_SECRET ??= "a".repeat(64);
@@ -17,7 +18,7 @@ const { createAuthService } = await import("./service.js");
 const { createAccountSecurity } = await import("./accountSecurity.js");
 const { getAuthenticatedUserFromAccessToken, hashRefreshToken } = await import("./tokens.js");
 const { buildAuthRoutes } = await import("./routes.js");
-const { authGuard, getOptionalAuthenticatedUser } = await import("./guard.js");
+const { authGuard, getOptionalAuthenticatedUser, rateLimitKey } = await import("./guard.js");
 
 function setup(enabled = true) {
   const db = new DatabaseSync(":memory:");
@@ -63,6 +64,46 @@ test("reset revokes required and optional access, refresh rotation grace, and re
     assert.equal((await app.inject({ url: "/private", headers: { authorization: `Bearer ${fresh.tokens.accessToken}` } })).statusCode, 200);
     await app.close();
   } finally { db.close(); }
+});
+
+test("rateLimitKey is the account for a valid token and the prefixed, normalized address for a missing or invalid one", async () => {
+  const { db, repo, auth } = setup();
+  const app = Fastify();
+  try {
+    const session = await auth.signup("reader@example.com", "reader", "a password");
+    app.decorate("authenticateAccessToken", (value: string) => getAuthenticatedUserFromAccessToken(value, repo.findUserById));
+    app.get("/key", async (request) => ({ key: rateLimitKey(request) }));
+    const keyFor = async (headers: Record<string, string>, remoteAddress = "203.0.113.7") => (await app.inject({ url: "/key", headers, remoteAddress })).json().key;
+    assert.equal(await keyFor({ authorization: `Bearer ${session.tokens.accessToken}` }), `user:${session.user.id}`);
+    assert.equal(await keyFor({}), "ip:203.0.113.7");
+    assert.equal(await keyFor({ authorization: "Bearer not-a-token" }), "ip:203.0.113.7");
+    assert.equal(await keyFor({}, "::ffff:203.0.113.7"), "ip:203.0.113.7");
+    assert.equal(await keyFor({}, "2001:db8:0:1::5"), await keyFor({}, "2001:db8:0:1:ffff::9"));
+    assert.notEqual(await keyFor({}, "2001:db8:0:1::5"), await keyFor({}, "2001:db8:0:2::5"));
+  } finally {
+    await app.close();
+    db.close();
+  }
+});
+
+test("an anonymous caller forging X-Forwarded-For as another account's key cannot spend that account's rate limit", async () => {
+  const { db, repo, auth } = setup();
+  const app = Fastify({ trustProxy: TRUSTED_PROXIES });
+  try {
+    const session = await auth.signup("reader@example.com", "reader", "a password");
+    app.decorate("authenticateAccessToken", (value: string) => getAuthenticatedUserFromAccessToken(value, repo.findUserById));
+    await app.register(rateLimit, { max: 3, timeWindow: "1 minute", keyGenerator: rateLimitKey });
+    app.get("/limited", { preHandler: authGuard }, async () => ({}));
+    const forged = { "x-forwarded-for": `user:${session.user.id}, 172.64.9.9` };
+    const anonymous = () => app.inject({ url: "/limited", headers: forged, remoteAddress: "100.64.0.9" });
+    for (let sent = 0; sent < 3; sent++) assert.equal((await anonymous()).statusCode, 401);
+    assert.equal((await anonymous()).statusCode, 429);
+    const owner = await app.inject({ url: "/limited", headers: { authorization: `Bearer ${session.tokens.accessToken}` }, remoteAddress: "100.64.0.9" });
+    assert.equal(owner.statusCode, 200);
+  } finally {
+    await app.close();
+    db.close();
+  }
 });
 
 test("expired, replaced and concurrently consumed reset tokens cannot change the password", async () => {
