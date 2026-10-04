@@ -182,8 +182,9 @@ keep its own copy of a work id.
 
 In `buildAdminRoutes`, behind `authGuard` and `service.isAdmin`, like
 `POST /books/cover/reject`. Edition lookups use the existing `lookupSchema`
-(`{isbn?, title?, author?}`) and resolve with `findByIdentity`, without
-creating anything.
+(`{isbn?, title?, author?}`) and never create anything. A lookup with an ISBN
+matches by ISBN only, so an unknown ISBN is a 404 rather than a fallback to
+another edition's title alias; one without an ISBN uses `findByIdentity`.
 
 | Route | Body | Does |
 |---|---|---|
