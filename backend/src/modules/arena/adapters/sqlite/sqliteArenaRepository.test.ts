@@ -417,3 +417,15 @@ test("votedAmong returns the requested tournaments the account has voted in, nev
   assert.deepEqual(repo.votedAmong("nobody", ["t1", "t2", "t3", "t4", "t5"]), []);
   assert.deepEqual(sorted(repo.votedAmong("voter-1", ["t1", "t2", "t3", "t4", "t5"])), sorted(repo.listVotedByUser("voter-1").map((t) => t.id)));
 });
+
+test("a trigger that rolls the transaction back surfaces its own error and keeps every row", () => {
+  const db = freshDb();
+  seedTournament(db, "t1", "u1", "Mine");
+  seedTournament(db, "t2", "u2", "Theirs");
+  const repo = createSqliteArenaRepository(db);
+  repo.insertVote(vote("v1", "duel-t2", "tok-1", "u1", "2026-01-01T00:00:00.000Z"));
+  db.exec("CREATE TRIGGER boom BEFORE UPDATE ON votes BEGIN SELECT RAISE(ROLLBACK, 'trigger boom'); END");
+  assert.throws(() => repo.deleteUserData("u1"), /trigger boom/);
+  assert.equal((db.prepare("SELECT COUNT(*) AS n FROM tournaments WHERE owner_user_id = 'u1'").get() as { n: number }).n, 1);
+  assert.equal(db.isTransaction, false);
+});

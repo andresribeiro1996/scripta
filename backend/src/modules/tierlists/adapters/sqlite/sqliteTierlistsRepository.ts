@@ -144,7 +144,7 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
         }
         db.exec("COMMIT");
       } catch (error) {
-        db.exec("ROLLBACK");
+        if (db.isTransaction) db.exec("ROLLBACK");
         throw error;
       }
     },
@@ -157,7 +157,7 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
         db.prepare("UPDATE tierlist_ballots SET voter_user_id = NULL WHERE voter_user_id = ?").run(userId);
         db.exec("COMMIT");
       } catch (error) {
-        db.exec("ROLLBACK");
+        if (db.isTransaction) db.exec("ROLLBACK");
         throw error;
       }
     },
@@ -207,7 +207,7 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
 
     delete(id, userId) {
       if (!getOwnedStmt.get(id, userId)) return false;
-      db.exec("BEGIN");
+      db.exec("BEGIN IMMEDIATE");
       try {
         deletePlacementsForTierlistStmt.run(id);
         deleteBallotsStmt.run(id);
@@ -215,7 +215,7 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
         db.exec("COMMIT");
         return result.changes > 0;
       } catch (error) {
-        db.exec("ROLLBACK");
+        if (db.isTransaction) db.exec("ROLLBACK");
         throw error;
       }
     },
@@ -225,15 +225,15 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
     },
 
     publish(id, userId, data, access, code, publicBooks, ballot, placements) {
-      db.exec("BEGIN");
+      db.exec("BEGIN IMMEDIATE");
       try {
         const changed = publishStmt.run(data, access, code, publicBooks, new Date().toISOString(), id, userId);
-        if (!changed.changes) { db.exec("ROLLBACK"); return undefined; }
+        if (!changed.changes) { if (db.isTransaction) db.exec("ROLLBACK"); return undefined; }
         saveBallotRow(ballot, placements);
         db.exec("COMMIT");
         return getOwnedStmt.get(id, userId) as unknown as TierlistRow;
       } catch (error) {
-        db.exec("ROLLBACK");
+        if (db.isTransaction) db.exec("ROLLBACK");
         throw error;
       }
     },

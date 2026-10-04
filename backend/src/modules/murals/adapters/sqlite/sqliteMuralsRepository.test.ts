@@ -23,3 +23,13 @@ test("rekeyBooks rewrites only the owner's murals and bumps updated_at only wher
   assert.equal(row("untouched").updated_at, "t0");
   assert.deepEqual(JSON.parse(row("theirs").blocks), [{ id: "b", type: "spotlight", bookKey: "old" }]);
 });
+
+test("a trigger that rolls the transaction back surfaces its own error and keeps every row", () => {
+  const db = freshDb();
+  db.prepare("INSERT INTO murals (id, user_id, name) VALUES ('m1', 'u1', 'm')").run();
+  db.prepare("INSERT INTO mural_folders (id, user_id, name) VALUES ('f1', 'u1', 'f')").run();
+  db.exec("CREATE TRIGGER boom BEFORE DELETE ON mural_folders BEGIN SELECT RAISE(ROLLBACK, 'trigger boom'); END");
+  assert.throws(() => createSqliteMuralsRepository(db).deleteUserData("u1"), /trigger boom/);
+  assert.equal((db.prepare("SELECT COUNT(*) AS n FROM murals").get() as { n: number }).n, 1);
+  assert.equal(db.isTransaction, false);
+});

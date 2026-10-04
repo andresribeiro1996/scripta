@@ -180,3 +180,13 @@ test("migrating a database without the appearance columns adds them, NULL for ex
   repo.setAppearance("u1", {});
   assert.deepEqual([row()?.theme, row()?.display_font, row()?.text_font], ["midnight", "vt323", "atkinson"]);
 });
+
+test("a trigger that rolls the transaction back surfaces its own error and keeps every row", () => {
+  const db = freshDb();
+  const repo = createSqliteAuthRepository(db);
+  const user = repo.createUser({ email: "a@b.c", username: "andre", passwordHash: "old", googleId: null });
+  db.exec("CREATE TRIGGER boom BEFORE UPDATE OF auth_version ON users BEGIN SELECT RAISE(ROLLBACK, 'trigger boom'); END");
+  assert.throws(() => repo.changePassword(user.id, "old", "new"), /trigger boom/);
+  assert.equal(repo.findUserById(user.id)?.password_hash, "old");
+  assert.equal(db.isTransaction, false);
+});
