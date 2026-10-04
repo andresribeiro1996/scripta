@@ -2,7 +2,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { attemptUpdate } from "./attemptUpdate.js";
+import { assertSaved, attemptUpdate } from "./attemptUpdate.js";
 
 test("failed updates are reported and never treated as successful", async () => {
   let errors = 0;
@@ -31,4 +31,10 @@ test("the failure reaches the error callback so it can say why", async () => {
     false,
   );
   assert.equal(received, failure);
+});
+
+test("assertSaved returns on success and throws the result's error on failure", () => {
+  assertSaved({ ok: true } as never);
+  const failure = new Error("nope");
+  assert.throws(() => assertSaved({ ok: false, error: failure } as never), (error) => error === failure);
 });

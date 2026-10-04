@@ -21,21 +21,26 @@ import {
   setReadStatus,
   setRating as rateBook,
   type FinishRating,
+  type LibraryChange,
   type LibraryData,
   type PerCardStyle,
   type ReadSnapshot,
   type ReadStatus,
 } from "@scripta/shared";
 import type { GalleryImage } from "../../gallery/api";
-import { attemptUpdate } from "../lib/attemptUpdate";
+import { assertSaved, attemptUpdate } from "../lib/attemptUpdate";
 import { buildMergedLibrary } from "../lib/mergeAndSave";
 import { useLibrary } from "./useLibrary";
 
 export function useLibraryActions() {
-  const { updateLibrary } = useLibrary();
+  const { updateLibrary, submit } = useLibrary();
 
   function run(mutate: (data: LibraryData) => LibraryData, failureMessage: string, onSuccess?: () => void) {
     return attemptUpdate(() => updateLibrary(mutate), (error) => Alert.alert(saveFailureMessage(error, failureMessage)), onSuccess);
+  }
+
+  function runChange(change: LibraryChange, failureMessage: string) {
+    return attemptUpdate(async () => assertSaved(await submit(change)), (error) => Alert.alert(saveFailureMessage(error, failureMessage)));
   }
 
   function mapBook(key: string, change: (book: Record<string, unknown>) => Record<string, unknown>) {
@@ -55,7 +60,7 @@ export function useLibraryActions() {
     },
 
     addBook: async (book: Record<string, unknown>) => {
-      await updateLibrary((data) => buildMergedLibrary(data, { books: [book] }));
+      assertSaved(await submit({ kind: "add", book }));
     },
 
     reorder: (draggedKey: string, targetKey: string) =>
@@ -67,12 +72,12 @@ export function useLibraryActions() {
     setStatus: (book: Record<string, unknown>, status: ReadStatus) => {
       const day = localDay();
       if (setReadStatus(book, status, day) === book) return;
-      return run(mapBook(bookKey(book), (b) => setReadStatus(b, status, day)), "Couldn't save the status change.");
+      return runChange({ kind: "book", bookKey: bookKey(book), readStatus: status, day }, "Couldn't save the status change.");
     },
 
     setRating: (book: Record<string, unknown>, rating: FinishRating) => {
       if (rateBook(book, rating) === book) return Promise.resolve(true);
-      return run(mapBook(bookKey(book), (b) => rateBook(b, rating)), "Couldn't save the rating.");
+      return runChange({ kind: "book", bookKey: bookKey(book), rating }, "Couldn't save the rating.");
     },
 
     addNote: (book: Record<string, unknown>, text: string) =>
