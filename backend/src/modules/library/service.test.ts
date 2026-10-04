@@ -52,7 +52,7 @@ function setup(maxDocumentBytes = MAX_DOCUMENT_BYTES) {
   const events: RecordedEvent[] = [];
   const service = createLibraryService(repo, () => "", maxDocumentBytes, (userId, batch) => {
     events.push(...batch.map((event) => ({ userId, ...event })));
-  });
+  }, undefined, undefined, undefined, () => []);
   return { db, repo, service, events };
 }
 
@@ -340,7 +340,7 @@ const shelf = (count: number): Book[] => Array.from({ length: count }, (_, i) =>
 const seriesGroup = (books: Book[]) => ({ id: "g1", type: "series", name: "Discworld", bookKeys: books.map(bookKey) });
 
 const fileDb = openLibraryDb();
-const fileService = createLibraryService(createSqliteLibraryRepository(fileDb), () => "", MAX_DOCUMENT_BYTES);
+const fileService = createLibraryService(createSqliteLibraryRepository(fileDb), () => "", MAX_DOCUMENT_BYTES, undefined, undefined, undefined, undefined, () => []);
 
 function rawDocument(userId: string, data: string, updatedAt = new Date().toISOString()) {
   fileDb.prepare(`INSERT OR REPLACE INTO library_documents (user_id, data, updated_at) VALUES (?, ?, ?)`).run(userId, data, updatedAt);
@@ -410,6 +410,74 @@ function setupMerge(maxDocumentBytes = MAX_DOCUMENT_BYTES) {
   });
   return { db, service, rekeys };
 }
+
+type WorkLookup = { isbn: string | null; title: string | null; author: string | null };
+
+function setupWorks(resolve: (lookups: WorkLookup[]) => Array<string | null>) {
+  const db = memoryDb();
+  const calls: number[] = [];
+  const errors: string[] = [];
+  const service = createLibraryService(createSqliteLibraryRepository(db), () => "", MAX_DOCUMENT_BYTES, undefined, undefined, undefined, (_error, message) => { errors.push(message); }, (lookups) => {
+    calls.push(lookups.length);
+    return resolve(lookups);
+  });
+  const workOf = (position: number) => (db.prepare("SELECT work_id FROM library_books WHERE user_id = 'u1' AND position = ?").get(position) as { work_id: string | null }).work_id;
+  return { db, service, calls, errors, workOf };
+}
+
+const fakeWorks = (lookups: WorkLookup[]) => lookups.map((lookup) => `w-${lookup.title}`);
+const herbertDune = { Title: "Dune", Attribution: "Frank Herbert" };
+const woolfOrlando = { Title: "Orlando", Attribution: "Virginia Woolf" };
+
+test("saving a library resolves each book's work", () => {
+  const { service, workOf } = setupWorks(fakeWorks);
+  service.saveLibrary("u1", { books: [herbertDune, woolfOrlando] });
+  assert.equal(workOf(0), "w-Dune");
+  assert.equal(workOf(1), "w-Orlando");
+});
+
+test("an unchanged save resolves nothing", () => {
+  const { service, calls } = setupWorks(fakeWorks);
+  const first = service.saveLibrary("u1", { books: [herbertDune] });
+  service.saveLibrary("u1", { books: [herbertDune] }, first.updatedAt);
+  assert.deepEqual(calls, [1]);
+});
+
+test("a single-book change resolves only that book", () => {
+  const { service, calls, workOf } = setupWorks(fakeWorks);
+  service.saveLibrary("u1", { books: [herbertDune, woolfOrlando] });
+  service.applyChange("u1", { kind: "book", bookKey: bookKey(woolfOrlando), readStatus: 1 });
+  assert.deepEqual(calls, [2, 1]);
+  assert.equal(workOf(1), "w-Orlando");
+});
+
+test("a catalog failure still saves the library and logs", () => {
+  const { service, errors, workOf } = setupWorks(() => { throw new Error("catalog down"); });
+  service.saveLibrary("u1", { books: [herbertDune] });
+  assert.equal(workOf(0), null);
+  assert.ok(errors.some((message) => message.startsWith("work resolve failed")));
+});
+
+test("adding a book resolves its work", () => {
+  const { service, workOf } = setupWorks(fakeWorks);
+  service.addBook("u1", { title: "Dune", author: "Frank Herbert", readStatus: 1 });
+  assert.equal(workOf(0), "w-Dune");
+});
+
+test("re-shelving a matched book resolves only that book", () => {
+  const { service, calls } = setupWorks(fakeWorks);
+  service.saveLibrary("u1", { books: [herbertDune, woolfOrlando] });
+  service.addBook("u1", { title: "Dune", author: "Frank Herbert", readStatus: 2 });
+  assert.deepEqual(calls, [2, 1]);
+});
+
+test("merging books resolves the merged book", () => {
+  const { service, calls, workOf } = setupWorks(fakeWorks);
+  const saved = service.saveLibrary("u1", { books: [koboDune, goodreadsDune] });
+  service.mergeBooks("u1", bookKey(koboDune), [bookKey(goodreadsDune)], saved.updatedAt);
+  assert.deepEqual(calls, [2, 1]);
+  assert.equal(workOf(0), "w-Dune");
+});
 
 const koboDune = { ContentID: "k1", Title: "Dune", Attribution: "Frank Herbert", ReadStatus: 1 };
 const goodreadsDune = { ContentID: "g1", Title: "Dune", Attribution: "Frank Herbert", ISBN: "9780441013593", ReadStatus: 2 };
