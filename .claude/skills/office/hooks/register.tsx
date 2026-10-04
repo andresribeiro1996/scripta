@@ -1,13 +1,16 @@
 import { atom, read, update } from 'claude-code'
 import type { Register } from 'claude-code'
-import type { Snapshot } from '../types'
-import { emptyOffice, reduce, statusText, type OfficeEvent } from './model.ts'
+import type { Agent, Snapshot } from '../types'
+import { emptyOffice, HEAVY_USD, newlyHeavy, reduce, statusText, type OfficeEvent } from './model.ts'
 import { freshFiles, parseFloors, sameFloors, shouldWrite, snapshotOf } from './floors.ts'
+import { buttonLabel, detailRows } from './details.ts'
 import { officeSvg, terminalRows } from './svg.ts'
 
 const PANE = 'office'
+const AGENT_KEY = 'agent:'
 const officeAtom = atom({ plugin: 'office', key: 'office' } as const, emptyOffice(0))
 const floorsAtom = atom({ plugin: 'office', key: 'floors' } as const, [] as Snapshot[])
+const openAtom = atom({ plugin: 'office', key: 'open' } as const, null as string | null)
 const reported = new Set<string>()
 let dirty = true
 const failures = new Set<string>()
@@ -33,9 +36,15 @@ async function guard($: any, label: string, fn: () => Promise<void>) {
 }
 
 async function apply($: any, ev: OfficeEvent) {
-  await update($, officeAtom, o => reduce(o, ev))
+  let crossed: Agent[] = []
+  await update($, officeAtom, o => {
+    const n = reduce(o, ev)
+    crossed = newlyHeavy(o, n)
+    return n
+  })
   dirty = true
   $.ui.status(statusText(await read($, officeAtom)))
+  for (const a of crossed) $.ui.toast(`office: ${a.type} · ${a.description} passed $${HEAVY_USD}`)
 }
 
 async function writeSnapshot($: any, ended: boolean) {
@@ -154,11 +163,18 @@ export const register: Register = on => {
       at: await $.clock.now(),
     }
     const rows = terminalRows(view)
+    const open = await read($, openAtom)
+    const { Box, Text, Button } = $.ui.resolve(e)
+    const agents = view.own.agents.map(a => (
+      <Box flexDirection="column">
+        <Button key={`${AGENT_KEY}${a.id}`} label={buttonLabel(a, a.id === open)} onPress={() => { void guard($, 'press', () => update($, openAtom, cur => (cur === a.id ? null : a.id))) }} />
+        {a.id === open && detailRows(a, view.at).map(line => <Text>{line}</Text>)}
+      </Box>
+    ))
     if (e.surface === 'desktop') {
       const { Svg } = $.ui.resolve(e)
-      return <Svg source={officeSvg(view)} alt={rows.join('\n')} isInteractive={false} />
+      return <Box flexDirection="column"><Svg source={officeSvg(view)} alt={rows.join('\n')} isInteractive={false} />{agents}</Box>
     }
-    const { Box, Text } = $.ui.resolve(e)
-    return <Box flexDirection="column">{rows.map(line => <Text>{line}</Text>)}</Box>
+    return <Box flexDirection="column">{rows.map(line => <Text>{line}</Text>)}{agents}</Box>
   })
 }

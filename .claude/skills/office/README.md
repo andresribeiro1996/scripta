@@ -5,6 +5,8 @@ office: one desk per agent, its state, its last call and its API-equivalent
 spend. It only watches; it never blocks or changes anything, and it uses no
 model tokens.
 
+A toast appears when a subagent passes $4.
+
 Open it with `/office` in any session in this repo.
 
 Sessions share state through `$HOME/.claude/office/<sessionId>.json`. Ended

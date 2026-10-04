@@ -1,5 +1,7 @@
 export type AgentState = 'working' | 'retrying' | 'idle' | 'done'
 
+export type CallRecord = { label: string; isError: boolean; at: number }
+
 export type Agent = {
   id: string
   description: string
@@ -12,6 +14,8 @@ export type Agent = {
   finishedAt: number | null
   failKey: string | null
   failCount: number
+  calls: CallRecord[]
+  costByModel: Record<string, number>
 }
 
 export type SpendSample = { at: number; usd: number }
@@ -28,6 +32,6 @@ export type Snapshot = {
 
 declare module 'claude-code' {
   interface PluginState {
-    office: { office: Office; floors: Snapshot[] }
+    office: { office: Office; floors: Snapshot[]; open: string | null }
   }
 }

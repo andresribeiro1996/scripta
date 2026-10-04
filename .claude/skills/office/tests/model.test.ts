@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
+  CALL_HISTORY,
   callKey,
   callLabel,
   costUsd,
@@ -9,6 +10,7 @@ import {
   isHeavy,
   MAIN_ID,
   modelShort,
+  newlyHeavy,
   reduce,
   spendPerMinute,
   statusText,
@@ -131,4 +133,54 @@ test('heavy, short model names and the status line', () => {
   assert.equal(statusText(o), 'office: 1 agent · 1 heavy')
   assert.equal(statusText(emptyOffice(0)), undefined)
   assert.equal(statusText(reduce(o, { kind: 'complete', agentId: 'a1', at: 2 })), undefined)
+})
+
+test('calls are recorded with their outcome and capped at the newest thirty', () => {
+  const call = (n: number, isError = false) => ({ kind: 'call' as const, agentId: 'a1', tool: 'Read', input: { file_path: `/f${n}` }, isError, at: n })
+  const two = reduce(reduce(spawned(), call(1, true)), call(2))
+  assert.deepEqual(two.agents[1].calls, [
+    { label: 'Read /f1', isError: true, at: 1 },
+    { label: 'Read /f2', isError: false, at: 2 },
+  ])
+  assert.equal(CALL_HISTORY, 30)
+  const many = Array.from({ length: CALL_HISTORY + 1 }, (_, i) => call(i)).reduce(reduce, spawned())
+  assert.equal(many.agents[1].calls.length, CALL_HISTORY)
+  assert.equal(many.agents[1].calls[0].label, 'Read /f1')
+  assert.equal(many.agents[1].calls[CALL_HISTORY - 1].label, `Read /f${CALL_HISTORY}`)
+})
+
+test('step cost is split by full model id', () => {
+  const step = (model: string, at: number) => ({ kind: 'step' as const, agentId: 'a1', model, usage: { output_tokens: 100_000 }, at })
+  const o = [step('claude-sonnet-5-5', 1), step('claude-opus-5-5', 2), step('claude-sonnet-5-5', 3)].reduce(reduce, spawned())
+  assert.deepEqual(o.agents[1].costByModel, { 'claude-sonnet-5-5': 2, 'claude-opus-5-5': 2 })
+  assert.equal(o.agents[1].costUsd, 4)
+  assert.deepEqual(spawned().agents[1].calls, [])
+  assert.deepEqual(spawned().agents[1].costByModel, {})
+})
+
+test('calls to done or unknown agents are not recorded', () => {
+  const done = reduce(spawned(), { kind: 'complete', agentId: 'a1', at: 5 })
+  const after = reduce(reduce(done, { kind: 'call', agentId: 'a1', tool: 'Read', input: {}, isError: false, at: 6 }), { kind: 'call', agentId: 'zz', tool: 'Read', input: {}, isError: false, at: 6 })
+  assert.deepEqual(after.agents[1].calls, [])
+})
+
+test('an agent record from before the details fields can still take calls and steps', () => {
+  const base = spawned()
+  const { calls: _c, costByModel: _m, ...old } = base.agents[1]
+  const o = { ...base, agents: [base.agents[0], old as typeof base.agents[1]] }
+  const next = reduce(reduce(o, { kind: 'call', agentId: 'a1', tool: 'Read', input: {}, isError: false, at: 1 }), { kind: 'step', agentId: 'a1', model: 'claude-sonnet-5-5', usage: { output_tokens: 1000 }, at: 2 })
+  assert.equal(next.agents[1].calls.length, 1)
+  assert.deepEqual(Object.keys(next.agents[1].costByModel), ['claude-sonnet-5-5'])
+})
+
+test('a toast is due once when a subagent crosses the heavy mark', () => {
+  const step = (o: ReturnType<typeof spawned>, tokens: number, agentId: string | null = 'a1') =>
+    reduce(o, { kind: 'step', agentId, model: 'claude-sonnet-5-5', usage: { output_tokens: tokens }, at: 1 })
+  const a = step(spawned(), 390_000)
+  const b = step(a, 20_000)
+  assert.deepEqual(newlyHeavy(a, b).map(x => x.id), ['a1'])
+  assert.deepEqual(newlyHeavy(b, step(b, 1000)), [])
+  const mainBefore = emptyOffice(0)
+  assert.deepEqual(newlyHeavy(mainBefore, step(mainBefore, 500_000, null)), [])
+  assert.deepEqual(newlyHeavy(emptyOffice(0), b).map(x => x.id), ['a1'])
 })

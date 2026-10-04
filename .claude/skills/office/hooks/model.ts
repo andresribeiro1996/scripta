@@ -4,6 +4,7 @@ export const HEAVY_USD = 4
 export const DONE_TTL_MS = 10 * 60 * 1000
 export const SPEND_WINDOW_MS = 5 * 60 * 1000
 export const MAIN_ID = 'main'
+export const CALL_HISTORY = 30
 
 export type Usage = {
   input_tokens?: number
@@ -43,7 +44,7 @@ export function costUsd(model: string, u: Usage): number {
 }
 
 function newAgent(id: string, description: string, type: string, model: string, state: Agent['state'], at: number): Agent {
-  return { id, description, type, model, state, lastCall: '', costUsd: 0, startedAt: at, finishedAt: null, failKey: null, failCount: 0 }
+  return { id, description, type, model, state, lastCall: '', costUsd: 0, startedAt: at, finishedAt: null, failKey: null, failCount: 0, calls: [], costByModel: {} }
 }
 
 export function emptyOffice(at: number): Office {
@@ -81,14 +82,16 @@ export function reduce(office: Office, ev: OfficeEvent): Office {
   if (!agent || agent.state === 'done') return office
   if (ev.kind === 'step') {
     const usd = costUsd(ev.model, ev.usage)
-    const next = patch(office, id, a => ({ ...a, model: ev.model, costUsd: a.costUsd + usd, state: a.state === 'idle' ? 'working' : a.state }))
+    const next = patch(office, id, a => ({ ...a, model: ev.model, costUsd: a.costUsd + usd, costByModel: { ...(a.costByModel ?? {}), [ev.model]: ((a.costByModel ?? {})[ev.model] ?? 0) + usd }, state: a.state === 'idle' ? 'working' : a.state }))
     return { ...next, spend: [...next.spend, { at: ev.at, usd }], totalUsd: office.totalUsd + usd }
   }
   if (ev.kind === 'call') {
     const key = callKey(ev.tool, ev.input)
     return patch(office, id, a => {
       const failCount = ev.isError ? (a.failKey === key ? a.failCount + 1 : 1) : 0
-      return { ...a, lastCall: callLabel(ev.tool, ev.input), failKey: ev.isError ? key : null, failCount, state: failCount >= 2 ? 'retrying' : 'working' }
+      const label = callLabel(ev.tool, ev.input)
+      const calls = [...(a.calls ?? []), { label, isError: ev.isError, at: ev.at }].slice(-CALL_HISTORY)
+      return { ...a, lastCall: label, calls, failKey: ev.isError ? key : null, failCount, state: failCount >= 2 ? 'retrying' : 'working' }
     })
   }
   return patch(office, id, a => (id === MAIN_ID ? { ...a, state: 'idle' } : { ...a, state: 'done', finishedAt: ev.at }))
@@ -101,6 +104,10 @@ export function spendPerMinute(office: Office, at: number): number {
 
 export function isHeavy(agent: Agent): boolean {
   return agent.costUsd >= HEAVY_USD
+}
+
+export function newlyHeavy(before: Office, after: Office): Agent[] {
+  return after.agents.filter(a => a.id !== MAIN_ID && isHeavy(a) && !before.agents.some(b => b.id === a.id && isHeavy(b)))
 }
 
 export function statusText(office: Office): string | undefined {
