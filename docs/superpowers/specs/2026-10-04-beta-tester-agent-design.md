@@ -50,16 +50,24 @@ npm run dev:snapshot -- <name> --out <dir>
 1. Finds this worktree's lease the way `dev-wait.mjs` does
    (`worktreeIdentity` + `deviceHolders`). No lease → exit 1 with
    "`<branch>` holds no emulator — run `node scripts/dev-emulator.mjs` first."
-2. `adb exec-out screencap -p` → `<dir>/<name>.png`. Width and height come
+2. `uiautomator dump` via the existing `readScreenText` in `devWait.mjs`
+   (dump A, retried once if empty), before the screencap: with the screencap
+   first, the PNG often showed the previous screen while the listing showed
+   the new one.
+3. `adb exec-out screencap -p` → `<dir>/<name>.png`. Width and height come
    from the PNG header; only when the long side is over 1200 does
    `sips -Z 1200 <file>` shrink it in place (a 1080×2400 capture becomes
    about 540×1200, under ~1k tokens per Read). A smaller capture is kept
    as is, since `sips -Z` would enlarge it. Bytes that are not a PNG throw
    "screencap returned `<n>` bytes, not a PNG".
-3. `uiautomator dump` via the existing `readScreenText` in `devWait.mjs`.
 4. `adb shell wm density` → dp = px × 160 / density. Read on every call; it is
    one cheap shell call and survives an AVD swap.
-5. Prints the listing to stdout in tree order:
+5. A second dump (dump B), after the screencap. The listing is built from B,
+   falling back to A when B is empty. When the visible text of A and B
+   differs (`parseScreenText`), the header line ends with
+   ` · screen was still changing — snapshot again`: the screen moved while
+   the PNG was taken, so the agent snapshots again before reading it.
+6. Prints the listing to stdout in tree order:
 
 ```
 07-murals-list · 411×914dp · saved <dir>/07-murals-list.png
@@ -98,9 +106,9 @@ npm run dev:snapshot -- <name> --out <dir>
   writes a newline inside text as `&#10;`.
 
 Errors: `readScreenText` already returns `""` on a failed dump. The helper
-retries the dump once; if it is still empty it keeps the screenshot, prints
-"dump failed — screenshot only" and exits 0, so the agent knows it has an
-image but no listing. A failed `screencap` or `sips` exits 1 with adb's
+retries dump A once; if it is still empty it keeps the screenshot, skips
+dump B, prints "dump failed — screenshot only" and exits 0, so the agent
+knows it has an image but no listing. A failed `screencap` or `sips` exits 1 with adb's
 message; nothing is caught that the caller cannot act on.
 
 ## The agent
@@ -211,7 +219,9 @@ tasks through the existing implementer flow. The tester never fixes anything.
   boundary (115px flagged, 116px not), labels from descendants, nested
   clickables, `(no label)`, `(disabled)`, zero-area skip, entity and newline
   decoding, clipping, `wm density` parsing, and `takeSnapshot` with a fake
-  adb: retry after one empty dump, "screenshot only" after two, and a failed
+  adb: the dump → screencap → density → dump order, retry after one empty
+  first dump, the "still changing" note when the two dumps differ and none
+  when they match, "screenshot only" after two empty dumps, and a failed
   `screencap` propagating. `androidEnv()` throws without an SDK (as on CI), so
   tests always inject `exec`.
 - The CLI wrapper stays thin like `dev-wait.mjs`. A `device-checker` pass

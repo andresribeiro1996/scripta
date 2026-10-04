@@ -12,7 +12,7 @@ Run every command from the worktree root: `scripts/…` and `mobile/src/app` are
 ## Setup
 
 1. Read `.claude/skills/emulator-verify/SKILL.md` in the worktree you were given. Follow it for the lease check, starting the stack, the adb driving rules and the release. A sweep is optional work: if every device is held by another worktree, stop and report "emulator occupied".
-2. Start from clean fixture data. If `node scripts/dev-status.mjs --json` shows this worktree already has a stack, run `npm run dev:release` first: `--reset` under a running stack does nothing. Then `node scripts/dev-emulator.mjs --reset`, and take the serial and Metro port from `node scripts/dev-status.mjs --json`, as the skill says. Drag Expo Go's dev FAB to the lower-left once, as the skill says. If `dev-emulator.mjs` refuses (for example "N stacks are already running (limit 4)", or the load gate), stop and report it. Never release or kill another worktree's stack.
+2. Start from clean fixture data. If `node scripts/dev-status.mjs --json` shows this worktree already has a stack, run `npm run dev:release` first: `--reset` under a running stack does nothing. Then `node scripts/dev-emulator.mjs --reset`, and take the serial and Metro port from `node scripts/dev-status.mjs --json`, as the skill says. Drag Expo Go's dev FAB to the left edge at mid-height, clear of the tab bar and the header, once, as the skill says. If `dev-emulator.mjs` refuses (for example "N stacks are already running (limit 4)", or the load gate), stop and report it. Never release or kill another worktree's stack.
 3. Clear the device log and note where Metro's log ends. Shell variables do not survive between your commands, so keep the number:
    ```bash
    adb -s <serial> logcat -c
@@ -42,9 +42,11 @@ node scripts/dev-snapshot.mjs <NN>-<screen>-<state> --out <output dir>
   tap 540,2100  "Save"  379×52dp  (disabled)
 ```
 
-A row ending `⚠ under <label>` has its centre covered by that control (often a floating button): scroll the item clear before tapping it, or tap a visible part of it. The marker covers app controls only. Expo Go's FAB (`· desc="Tools"`, dragged to the lower-left at setup) is not clickable in the listing, so it can still sit over a tap centre: avoid centres within about 40px of it, or drag it elsewhere.
+A row ending `⚠ under <label>` has its centre covered by that control (often a floating button): scroll the item clear before tapping it, or tap a visible part of it. The marker covers app controls only. Expo Go's FAB (`· desc="Tools"`, dragged to the left edge at mid-height at setup) is not clickable in the listing, so it can still sit over a tap centre: avoid centres within about 40px of it, or drag it elsewhere, never back over the tab bar or the header.
 
-Navigate from the listing: `adb -s <serial> shell input tap <x> <y>` with the printed centre. After a tap that navigates or submits, wait for the next screen before the next snapshot, so a spinner or transition is not reported as "never loads". Wait on a quoted text row from the listing, never on a `desc=` label: `dev:wait` matches visible text only.
+A header ending `· screen was still changing — snapshot again` means the screen was animating while it was captured: snapshot again before reading the PNG.
+
+Navigate from the listing: `adb -s <serial> shell input tap <x> <y>` with the printed centre. After a tap that navigates or submits, wait for the next screen before the next snapshot, so a spinner or transition is not reported as "never loads". Wait on a quoted text row from the listing, never on a `desc=` label: `dev:wait` matches visible text only. After opening a menu, sheet, dialog or deep link, `dev:wait` for a text inside it before the first tap. If a tap seems to do nothing, snapshot before tapping again: a tap lost on a surface that was still animating is harness, not a finding, unless it reproduces on a settled screen.
 
 ```bash
 npm run dev:wait -- "<text expected on the next screen>" --timeout 30
@@ -85,7 +87,7 @@ Orientation is not tested: the app is portrait-locked.
 
 On every screen, use each control once. Then try the edges that apply:
 
-- empty input, 300-character input, emoji
+- empty input, 300-character input; skip emoji, `adb shell input text` cannot type it, so list "emoji input not tested" in the harness notes
 - double-tap on anything that submits
 - Android back in the middle of an action, and right after one
 - destructive actions: is there a confirm, does it say what will be lost, is there undo
@@ -111,6 +113,7 @@ Before reporting:
 - A `⚠ <44dp` row is a candidate. Report it only after `rg -n hitSlop` on the component that renders it finds none.
 - A `(no label)` tap is an accessibility finding (TalkBack cannot name it). Confirm with `rg` that the component sets no `accessibilityLabel`.
 - One cause seen on several screens is one finding that lists every screen.
+- A finding that depends on the narrow test screen (wrapping, truncation, below the fold) says "seen at <W>dp" in Actual, with W from the snapshot header.
 
 Append each finding to `report.md` the moment it is confirmed, and update its route in the coverage table, so nothing is lost if your context is compacted. Append with a quoted heredoc, `cat >> <out>/report.md <<'EOF'` … `EOF`. To update a coverage row, Read `report.md`, then Write it whole. Number findings in the order found; rank them at the end.
 
@@ -126,7 +129,7 @@ Append each finding to `report.md` the moment it is confirmed, and update its ro
    ```
    Deduplicate and count.
 2. `npm run dev:release`, whatever happened. The emulator is not needed for the rest.
-3. Rewrite `report.md` in final form: the screen size from any snapshot header in the title line, the summary at the top, findings ranked by severity, then by how central the screen is.
+3. Rewrite `report.md` in final form: the screen size from any snapshot header in the title line, the summary at the top, findings ranked by severity, then by how central the screen is; within a severity, a finding that says "seen at <W>dp" ranks below one that does not.
 4. Reply with the report's path and its Summary section, nothing else.
 
 ## Report template
@@ -158,6 +161,7 @@ Append each finding to `report.md` the moment it is confirmed, and update its ro
 
 ## Harness notes and leftover state
 - Anything blamed on the harness, and how it was confirmed.
+- Emoji input not tested.
 - Throwaway account `beta-<unix time>@local.test` was deleted at the end of step 1; if deletion failed, say so and name the account.
 - Fixture data is dirty; the next pass that needs clean data runs `node scripts/dev-emulator.mjs --reset`.
 ```

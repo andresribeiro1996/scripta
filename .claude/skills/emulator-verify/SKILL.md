@@ -58,7 +58,7 @@ Tap with `adb -s <serial> shell input tap <x> <y>` using `bounds` from the dump.
 Rules that each cost a session once:
 
 - **Read labels from the screenshot, not uiautomator.** uiautomator reports the full string even when Android draws it clipped. Open the PNG with Read and zoom into every label you check.
-- **Move Expo Go's dev FAB first** when anything near the top-right header matters: drag it from its centre to the lower-left. It steals taps beyond its reported bounds, and a stolen tap into a text field looks focused but ignores input.
+- **Move Expo Go's dev FAB first** when anything near the top-right header matters: drag it from its centre to the left edge at mid-height, clear of the tab bar and header. It steals taps beyond its reported bounds, and a stolen tap into a text field looks focused but ignores input.
 - **Swipes:** use `input motionevent DOWN/MOVE/UP` in one `adb shell "…"` call, not `input swipe`. Move ~2px per step for the first ~24px, then larger steps, and travel past half the page. Run a control drag on an area with no nested scroller first.
 - A persistent LogBox toast can swallow taps on the bottom bar. If it names `.value` inside an inline style, that is the worklets dev warning — report it, don't chase it.
 - `adb root` drops the reverse tunnels; run `npm run dev:tunnels` after it.

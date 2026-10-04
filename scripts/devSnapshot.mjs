@@ -2,10 +2,11 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { androidEnv } from "./androidSdk.mjs";
-import { decodeEntities, readScreenText } from "./devWait.mjs";
+import { decodeEntities, parseScreenText, readScreenText } from "./devWait.mjs";
 
 const MIN_TARGET_DP = 44;
 const LABEL_LIMIT = 60;
+const STILL_CHANGING = " · screen was still changing — snapshot again";
 const MAX_SIDE = 1200;
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
@@ -57,11 +58,11 @@ function clip(value) {
 }
 
 function innerText(node) {
-  return [node.text, ...node.children.filter((child) => !child.clickable).flatMap(innerText)].filter(Boolean);
+  return [node.text, ...node.children.filter((child) => !child.clickable).flatMap(innerText)].filter((text) => text.trim());
 }
 
 function tapLabel(node) {
-  if (node.desc) return `desc="${clip(node.desc)}"`;
+  if (node.desc.trim()) return `desc="${clip(node.desc)}"`;
   const texts = innerText(node);
   return texts.length ? `"${clip(texts.join(" · "))}"` : "(no label)";
 }
@@ -117,10 +118,10 @@ function collectRows(node, density, insideTap, covers, rows) {
   for (const child of node.children) collectRows(child, density, insideTap || node.clickable, covers, rows);
 }
 
-export function formatListing({ name, pngPath, xml, density }) {
+export function formatListing({ name, pngPath, xml, density, note = "" }) {
   const roots = parseHierarchy(xml);
   const [x1, y1, x2, y2] = roots[0]?.bounds ?? [0, 0, 0, 0];
-  const header = `${name} · ${Math.round(toDp(x2 - x1, density))}×${Math.round(toDp(y2 - y1, density))}dp · saved ${pngPath}`;
+  const header = `${name} · ${Math.round(toDp(x2 - x1, density))}×${Math.round(toDp(y2 - y1, density))}dp · saved ${pngPath}${note}`;
   const covers = findCovers(roots);
   const rows = [];
   for (const root of roots) collectRows(root, density, false, covers, rows);
@@ -135,14 +136,16 @@ export function takeSnapshot(serial, name, outDir, { exec = runTool, read = read
   const adb = (args, options) => exec("adb", ["-s", serial, ...args], options);
   mkdirSync(outDir, { recursive: true });
   const pngPath = join(outDir, `${name}.png`);
+  const before = read(serial) || read(serial);
   const png = adb(["exec-out", "screencap", "-p"]);
   const longSide = Math.max(...pngSize(png));
   writeFileSync(pngPath, png);
   if (longSide > MAX_SIDE) exec("sips", ["-Z", String(MAX_SIDE), pngPath], { stdio: "ignore" });
+  if (!before) return `${name} · dump failed — screenshot only · saved ${pngPath}`;
   const density = parseDensity(adb(["shell", "wm", "density"], { encoding: "utf8" }));
-  const xml = read(serial) || read(serial);
-  if (!xml) return `${name} · dump failed — screenshot only · saved ${pngPath}`;
-  return formatListing({ name, pngPath, xml, density });
+  const after = read(serial);
+  const changing = after && JSON.stringify(parseScreenText(before)) !== JSON.stringify(parseScreenText(after));
+  return formatListing({ name, pngPath, xml: after || before, density, note: changing ? STILL_CHANGING : "" });
 }
 
 export function parseSnapshotArgs(argv) {
