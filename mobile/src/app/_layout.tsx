@@ -1,5 +1,6 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useRef } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { LibrarySaver } from "@scripta/shared";
 import { useFonts } from "expo-font";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -7,6 +8,7 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { AuthProvider, useAuth } from "../core/auth";
+import { createAccountLibrarySaver, LibrarySaverContext } from "../features/library/hooks/useLibrary";
 import { FONT_ASSETS } from "../ui/fontAssets";
 import { ThemeProvider, useTheme } from "../ui/theme";
 import { useScreenOptions } from "../ui/navigation";
@@ -16,8 +18,21 @@ void SplashScreen.preventAutoHideAsync();
 function AccountRoutes() {
   const { user } = useAuth();
   const userId = user?.id;
-  const queryClient = useMemo(() => new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 30_000 } } }), [userId]);
-  return <QueryClientProvider key={userId ?? "public"} client={queryClient}><ThemedStatusBar /><RootStack /></QueryClientProvider>;
+  const account = useRef<{ userId: string | undefined; queryClient: QueryClient; saver: LibrarySaver } | null>(null);
+  if (!account.current || account.current.userId !== userId) {
+    account.current?.saver.dispose();
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 30_000 } } });
+    account.current = { userId, queryClient, saver: createAccountLibrarySaver(queryClient) };
+  }
+  const { queryClient, saver } = account.current;
+  return (
+    <QueryClientProvider key={userId ?? "public"} client={queryClient}>
+      <LibrarySaverContext.Provider value={saver}>
+        <ThemedStatusBar />
+        <RootStack />
+      </LibrarySaverContext.Provider>
+    </QueryClientProvider>
+  );
 }
 
 // Inside ThemeProvider so the bar contrasts with whichever palette is live —
