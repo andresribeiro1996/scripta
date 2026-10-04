@@ -36,13 +36,6 @@ import { TierlistResultsView } from "../components/tierlist/TierlistResultsView"
 import { useTierlistVoting } from "../hooks/useTierlistVoting";
 import { toPlacements } from "../lib/tierlistResults";
 
-/** The exact inverse of the backend's toPublicBookData
- *  (publicResolver.ts) — same reconstruction SharedMuralPage.tsx's own
- *  toPrivateBook does, for the same reason: MiniBookTile/CoverImage only
- *  know how to read the PRIVATE book shape (Title/Attribution/ISBN/
- *  ImageId/_coverUrl/ReadStatus), because that's the only shape the
- *  authenticated editor ever hands them. No highlights field here (unlike
- *  the mural page's version) — a tier list book tile never shows one. */
 function toPrivateBook(pub: PublicBookData): Record<string, unknown> {
   return {
     Title: pub.title,
