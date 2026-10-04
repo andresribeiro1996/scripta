@@ -34,6 +34,9 @@ const unused = () => {
 };
 const inertDeps: Omit<CommunityDeps, "repo"> = {
   now: () => NOW,
+  background: (task) => {
+    void task();
+  },
   getDashboardSeenAt: unused,
   setDashboardSeenAt: unused,
   resolveProfile: unused,
