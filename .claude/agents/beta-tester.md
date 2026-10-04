@@ -42,6 +42,8 @@ node scripts/dev-snapshot.mjs <NN>-<screen>-<state> --out <output dir>
   tap 540,2100  "Save"  379×52dp  (disabled)
 ```
 
+A row ending `⚠ under <label>` has its centre covered by that control (often a floating button): scroll the item clear before tapping it, or tap a visible part of it.
+
 Navigate from the listing: `adb -s <serial> shell input tap <x> <y>` with the printed centre. After a tap that navigates or submits, wait for the next screen before the next snapshot, so a spinner or transition is not reported as "never loads":
 
 ```bash

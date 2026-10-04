@@ -6,6 +6,13 @@ import { decodeEntities, readScreenText } from "./devWait.mjs";
 
 const MIN_TARGET_DP = 44;
 const LABEL_LIMIT = 60;
+const MAX_SIDE = 1200;
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+function pngSize(png) {
+  if (png.length < 24 || !png.subarray(0, 8).equals(PNG_SIGNATURE)) throw new Error(`screencap returned ${png.length} bytes, not a PNG`);
+  return [png.readUInt32BE(16), png.readUInt32BE(20)];
+}
 
 export function parseDensity(output) {
   const match = output.match(/Override density:\s*(\d+)/) ?? output.match(/Physical density:\s*(\d+)/);
@@ -59,30 +66,64 @@ function tapLabel(node) {
   return texts.length ? `"${clip(texts.join(" · "))}"` : "(no label)";
 }
 
-function tapRow(node, density) {
+const centreOf = ([x1, y1, x2, y2]) => [Math.round((x1 + x2) / 2), Math.round((y1 + y2) / 2)];
+
+function listTaps(node, taps) {
+  const [x1, y1, x2, y2] = node.bounds;
+  if (x2 <= x1 || y2 <= y1) return;
+  const tap = node.clickable ? { node, end: 0 } : undefined;
+  if (tap) taps.push(tap);
+  for (const child of node.children) listTaps(child, taps);
+  if (tap) tap.end = taps.length;
+}
+
+function findCovers(roots) {
+  const taps = [];
+  for (const root of roots) listTaps(root, taps);
+  return new Map(
+    taps.map((tap) => {
+      const [cx, cy] = centreOf(tap.node.bounds);
+      const cover = taps.slice(tap.end).findLast(({ node: { bounds: [x1, y1, x2, y2] } }) => cx >= x1 && cx < x2 && cy >= y1 && cy < y2);
+      return [tap.node, cover?.node];
+    }),
+  );
+}
+
+function tapRow(node, density, cover) {
   const [x1, y1, x2, y2] = node.bounds;
   const width = toDp(x2 - x1, density);
   const height = toDp(y2 - y1, density);
   const small = width < MIN_TARGET_DP || height < MIN_TARGET_DP ? "  ⚠ <44dp" : "";
   const disabled = node.enabled ? "" : "  (disabled)";
-  const centre = `${Math.round((x1 + x2) / 2)},${Math.round((y1 + y2) / 2)}`;
-  return `  tap ${centre}  ${tapLabel(node)}  ${Math.floor(width)}×${Math.floor(height)}dp${small}${disabled}`;
+  const under = cover ? `  ⚠ under ${tapLabel(cover)}` : "";
+  return `  tap ${centreOf(node.bounds).join(",")}  ${tapLabel(node)}  ${Math.floor(width)}×${Math.floor(height)}dp${small}${disabled}${under}`;
 }
 
-function collectRows(node, density, insideTap, rows) {
+function textRow(node) {
+  const text = clip(node.text);
+  const desc = clip(node.desc);
+  if (text) return `  · "${text}"`;
+  return desc ? `  · desc="${desc}"` : undefined;
+}
+
+function collectRows(node, density, insideTap, covers, rows) {
   const [x1, y1, x2, y2] = node.bounds;
   if (x2 <= x1 || y2 <= y1) return;
-  if (node.clickable) rows.push(tapRow(node, density));
-  else if (!insideTap && (node.text || node.desc)) rows.push(`  · ${node.text ? `"${clip(node.text)}"` : `desc="${clip(node.desc)}"`}`);
-  for (const child of node.children) collectRows(child, density, insideTap || node.clickable, rows);
+  if (node.clickable) rows.push(tapRow(node, density, covers.get(node)));
+  else if (!insideTap) {
+    const row = textRow(node);
+    if (row) rows.push(row);
+  }
+  for (const child of node.children) collectRows(child, density, insideTap || node.clickable, covers, rows);
 }
 
 export function formatListing({ name, pngPath, xml, density }) {
   const roots = parseHierarchy(xml);
   const [x1, y1, x2, y2] = roots[0]?.bounds ?? [0, 0, 0, 0];
   const header = `${name} · ${Math.round(toDp(x2 - x1, density))}×${Math.round(toDp(y2 - y1, density))}dp · saved ${pngPath}`;
+  const covers = findCovers(roots);
   const rows = [];
-  for (const root of roots) collectRows(root, density, false, rows);
+  for (const root of roots) collectRows(root, density, false, covers, rows);
   return [header, ...rows].join("\n");
 }
 
@@ -94,8 +135,10 @@ export function takeSnapshot(serial, name, outDir, { exec = runTool, read = read
   const adb = (args, options) => exec("adb", ["-s", serial, ...args], options);
   mkdirSync(outDir, { recursive: true });
   const pngPath = join(outDir, `${name}.png`);
-  writeFileSync(pngPath, adb(["exec-out", "screencap", "-p"]));
-  exec("sips", ["-Z", "1200", pngPath], { stdio: "ignore" });
+  const png = adb(["exec-out", "screencap", "-p"]);
+  const longSide = Math.max(...pngSize(png));
+  writeFileSync(pngPath, png);
+  if (longSide > MAX_SIDE) exec("sips", ["-Z", String(MAX_SIDE), pngPath], { stdio: "ignore" });
   const density = parseDensity(adb(["shell", "wm", "density"], { encoding: "utf8" }));
   const xml = read(serial) || read(serial);
   if (!xml) return `${name} · dump failed — screenshot only · saved ${pngPath}`;

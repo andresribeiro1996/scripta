@@ -69,28 +69,89 @@ test("formatListing survives an empty dump and a stray closing tag", () => {
   assert.equal(formatListing({ name: "x", pngPath: "x.png", xml: stray, density: 160 }), 'x · 160×160dp · saved x.png\n  · "Hi"');
 });
 
+test("formatListing marks a tap whose centre lies under a later control that is not its descendant", () => {
+  const xml =
+    '<hierarchy><node text="" bounds="[0,0][400,400]">' +
+    '<node text="Card" clickable="true" bounds="[0,0][200,200]" />' +
+    '<node content-desc="Add a book" clickable="true" bounds="[50,50][150,150]" />' +
+    "</node></hierarchy>";
+  assert.equal(
+    formatListing({ name: "x", pngPath: "x.png", xml, density: 160 }),
+    ["x · 400×400dp · saved x.png", '  tap 100,100  "Card"  200×200dp  ⚠ under desc="Add a book"', '  tap 100,100  desc="Add a book"  100×100dp'].join("\n"),
+  );
+});
+
+test("formatListing does not mark a tap covered only by its own clickable child", () => {
+  const xml =
+    '<hierarchy><node text="" bounds="[0,0][160,160]">' +
+    '<node text="Card" clickable="true" bounds="[0,0][100,100]">' +
+    '<node text="" clickable="true" bounds="[40,40][60,60]" />' +
+    "</node></node></hierarchy>";
+  assert.equal(
+    formatListing({ name: "x", pngPath: "x.png", xml, density: 160 }),
+    ["x · 160×160dp · saved x.png", '  tap 50,50  "Card"  100×100dp', "  tap 50,50  (no label)  20×20dp  ⚠ <44dp"].join("\n"),
+  );
+});
+
+test("formatListing does not mark a tap that sits on top of an earlier control", () => {
+  const xml =
+    '<hierarchy><node text="" bounds="[0,0][160,160]">' +
+    '<node text="Backdrop" clickable="true" bounds="[0,0][160,160]" />' +
+    '<node text="Pin" clickable="true" bounds="[100,100][140,140]" />' +
+    "</node></hierarchy>";
+  assert.equal(
+    formatListing({ name: "x", pngPath: "x.png", xml, density: 160 }),
+    ["x · 160×160dp · saved x.png", '  tap 80,80  "Backdrop"  160×160dp', '  tap 120,120  "Pin"  40×40dp  ⚠ <44dp'].join("\n"),
+  );
+});
+
+test("formatListing names the last covering control in tree order", () => {
+  const xml =
+    '<hierarchy><node text="" bounds="[0,0][160,160]">' +
+    '<node text="Card" clickable="true" bounds="[0,0][100,100]" />' +
+    '<node content-desc="First" clickable="true" bounds="[40,40][60,60]" />' +
+    '<node content-desc="Second" clickable="true" bounds="[45,45][55,55]" />' +
+    "</node></hierarchy>";
+  const rows = formatListing({ name: "x", pngPath: "x.png", xml, density: 160 }).split("\n");
+  assert.equal(rows[1], '  tap 50,50  "Card"  100×100dp  ⚠ under desc="Second"');
+});
+
+test("formatListing skips a non-clickable node whose text is only whitespace", () => {
+  const xml = '<hierarchy><node text="" bounds="[0,0][160,160]"><node text=" " bounds="[0,0][100,100]" /></node></hierarchy>';
+  assert.equal(formatListing({ name: "x", pngPath: "x.png", xml, density: 160 }), "x · 160×160dp · saved x.png");
+});
+
 test("parseDensity prefers the override and rejects anything else", () => {
   assert.equal(parseDensity("Physical density: 420\n"), 420);
   assert.equal(parseDensity("Physical density: 420\nOverride density: 480\n"), 480);
   assert.throws(() => parseDensity("error: no devices/emulators found"), /unexpected `wm density` output/);
 });
 
-function fakeAdb(calls) {
+function pngHeader(width, height) {
+  const header = Buffer.alloc(24);
+  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(header);
+  header.write("IHDR", 12);
+  header.writeUInt32BE(width, 16);
+  header.writeUInt32BE(height, 20);
+  return header;
+}
+
+function fakeAdb(calls, screencap = pngHeader(1080, 2400)) {
   return (command, args) => {
     calls.push([command, ...args].join(" "));
-    if (args.includes("screencap")) return Buffer.from("png-bytes");
+    if (args.includes("screencap")) return screencap;
     if (args.includes("density")) return "Physical density: 160\n";
     return "";
   };
 }
 
-test("takeSnapshot saves and shrinks the screenshot, and retries one empty dump", () => {
+test("takeSnapshot saves and shrinks a large screenshot, and retries one empty dump", () => {
   const dir = mkdtempSync(join(tmpdir(), "dev-snapshot-"));
   const calls = [];
   const dumps = ["", SCREEN];
   const output = takeSnapshot("emulator-5554", "07-murals", dir, { exec: fakeAdb(calls), read: () => dumps.shift() });
   const pngPath = join(dir, "07-murals.png");
-  assert.equal(readFileSync(pngPath, "utf8"), "png-bytes");
+  assert.deepEqual(readFileSync(pngPath), pngHeader(1080, 2400));
   assert.deepEqual(calls, [
     "adb -s emulator-5554 exec-out screencap -p",
     `sips -Z 1200 ${pngPath}`,
@@ -98,6 +159,21 @@ test("takeSnapshot saves and shrinks the screenshot, and retries one empty dump"
   ]);
   assert.equal(output.split("\n")[0], `07-murals · 1080×2400dp · saved ${pngPath}`);
   assert.equal(dumps.length, 0);
+});
+
+test("takeSnapshot leaves a small screenshot at its own size", () => {
+  const dir = mkdtempSync(join(tmpdir(), "dev-snapshot-"));
+  const calls = [];
+  takeSnapshot("emulator-5554", "01-library", dir, { exec: fakeAdb(calls, pngHeader(320, 640)), read: () => SCREEN });
+  assert.deepEqual(calls, ["adb -s emulator-5554 exec-out screencap -p", "adb -s emulator-5554 shell wm density"]);
+});
+
+test("takeSnapshot rejects a screencap that is not a PNG", () => {
+  const dir = mkdtempSync(join(tmpdir(), "dev-snapshot-"));
+  assert.throws(
+    () => takeSnapshot("emulator-5554", "x", dir, { exec: fakeAdb([], Buffer.from("garbage")), read: () => SCREEN }),
+    /screencap returned 7 bytes, not a PNG/,
+  );
 });
 
 test("takeSnapshot keeps the screenshot and says so when the dump fails twice", () => {

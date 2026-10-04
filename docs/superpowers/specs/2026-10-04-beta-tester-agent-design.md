@@ -50,9 +50,12 @@ npm run dev:snapshot -- <name> --out <dir>
 1. Finds this worktree's lease the way `dev-wait.mjs` does
    (`worktreeIdentity` + `deviceHolders`). No lease → exit 1 with
    "`<branch>` holds no emulator — run `node scripts/dev-emulator.mjs` first."
-2. `adb exec-out screencap -p` → `<dir>/<name>.png`, then
-   `sips -Z 1200 <file>` to shrink it in place (about 540×1200, under ~1k
-   tokens per Read).
+2. `adb exec-out screencap -p` → `<dir>/<name>.png`. Width and height come
+   from the PNG header; only when the long side is over 1200 does
+   `sips -Z 1200 <file>` shrink it in place (a 1080×2400 capture becomes
+   about 540×1200, under ~1k tokens per Read). A smaller capture is kept
+   as is, since `sips -Z` would enlarge it. Bytes that are not a PNG throw
+   "screencap returned `<n>` bytes, not a PNG".
 3. `uiautomator dump` via the existing `readScreenText` in `devWait.mjs`.
 4. `adb shell wm density` → dp = px × 160 / density. Read on every call; it is
    one cheap shell call and survives an AVD swap.
@@ -80,6 +83,15 @@ npm run dev:snapshot -- <name> --out <dir>
   never shows 44. It is a candidate only: uiautomator bounds exclude
   `hitSlop`.
 - `(disabled)` marks `enabled="false"`.
+- `⚠ under <label>` ends a tap row whose centre lies inside the bounds of
+  another clickable that comes later in tree order and is not its
+  descendant (Android draws later views on top, so `input tap` at that
+  centre would hit the other control, typically a floating button). The
+  label is formatted as that control's own tap row formats it; with several
+  covers, the last in tree order is named. It follows `⚠ <44dp` and
+  `(disabled)`.
+- A non-clickable row whose label is empty after whitespace collapsing is
+  skipped.
 - Labels collapse whitespace to one space and clip at 60 characters with `…`.
 - Entities are decoded by `decodeEntities`, extracted from `parseScreenText`
   in `devWait.mjs` and extended with numeric entities, since uiautomator
