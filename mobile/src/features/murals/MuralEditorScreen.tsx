@@ -16,9 +16,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
 import { AccessibilityInfo, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { Text } from "../../ui/Text";
-import { Button, Dialog, EmptyState, ErrorState, Fab, HeaderActions, Icon, IconButton, Input, Screen, Sheet, Toast } from "../../ui";
+import { Button, Dialog, EmptyState, ErrorState, Fab, HeaderActions, Icon, IconButton, Input, Sheet, Toast } from "../../ui";
 import { ThemeGrid } from "../../ui/ThemeGrid";
-import { spacing, typography, useTheme } from "../../ui/theme";
+import { MuralThemeScope, spacing, typography } from "../../ui/theme";
+import { MuralScreen } from "./MuralScreen";
 import { fetchGalleryImages } from "../gallery/api";
 import { useLibrary } from "../library/hooks/useLibrary";
 import { fetchTierlists } from "../tierlists/api";
@@ -38,7 +39,6 @@ import { API_URL } from "../../core/config";
 const BLOCK_TYPES = Object.keys(BLOCK_TYPE_LABELS) as BlockType[];
 
 export function MuralEditorScreen({ id }: { id: string }) {
-  const { colors } = useTheme();
   const { user } = useAuth();
   const router = useRouter();
   const client = useQueryClient();
@@ -66,6 +66,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
   const currentBlocks = blocks ?? mural?.blocks ?? [];
   const currentName = name ?? mural?.name ?? "Mural";
   const currentTheme = theme ?? muralThemeId(mural?.theme);
+  const colors = themes[currentTheme].colors;
   const selected = currentBlocks.find((block) => block.id === selectedId) ?? null;
   const books = library?.data.books ?? [];
   const groups = library?.data.groups ?? [];
@@ -139,17 +140,17 @@ export function MuralEditorScreen({ id }: { id: string }) {
   ] : [];
 
   return (
-    <Screen top={false} style={styles.screen}>
+    <MuralScreen theme={currentTheme}>
       <Stack.Screen
         options={{
           headerShown: true,
           title: "",
           headerLargeTitleEnabled: false,
-          headerRight: () => <HeaderActions>
+          headerRight: () => <MuralThemeScope theme={currentTheme}><HeaderActions>
             <IconButton framed tone={unsaved ? "accent" : "default"} accessibilityLabel={unsaved ? "Save changes" : "All changes saved"} name="save" onPress={() => { if (unsaved && !busy) void save(); }} />
             <IconButton framed accessibilityLabel="Mural theme" name="theme" onPress={() => setThemeOpen(true)} />
             <IconButton framed accessibilityLabel="Share mural" name="share" onPress={() => setShareFor(draftMural)} />
-          </HeaderActions>,
+          </HeaderActions></MuralThemeScope>,
         }}
       />
       {error ? <Toast visible message={error} tone="error" /> : null}
@@ -219,12 +220,11 @@ export function MuralEditorScreen({ id }: { id: string }) {
           {picking && ((picking === "book" && filteredBooks.length === 0) || (picking === "image" && !gallery.data?.length) || (picking === "tierlist" && !tierlists.data?.length)) ? <EmptyState title="Nothing available" /> : null}
         </ScrollView>
       </Sheet>
-    </Screen>
+    </MuralScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {},
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   canvasScroll: { paddingHorizontal: spacing.sm, paddingTop: spacing.md, paddingBottom: 120 },
   dock: { position: "absolute", left: 0, right: 0, bottom: 0, borderTopWidth: 1, padding: spacing.sm, flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },

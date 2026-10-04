@@ -3,12 +3,19 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { MuralBlock } from "@scripta/shared";
-import { changeBlockLayout, layoutStepBlocked, muralCanvasHeight } from "./layout.js";
+import { changeBlockLayout, layoutStepBlocked, muralCanvasHeight, muralPreviewScale } from "./layout.js";
 
 const blocks: MuralBlock[] = [
   { id: "a", type: "text", heading: "A", body: "", layout: { x: 0, y: 0, w: 4, h: 2 } },
   { id: "b", type: "text", heading: "B", body: "", layout: { x: 6, y: 4, w: 3, h: 2 } },
 ];
+
+test("mural previews fill the available width so the bottom can be cropped", () => {
+  assert.equal(muralPreviewScale(160, 360), 160 / 360);
+  assert.equal(muralPreviewScale(160, 100), 1.6);
+  assert.equal(muralPreviewScale(0, 360), 0);
+  assert.equal(muralPreviewScale(160, 0), 0);
+});
 
 test("mural layout changes preserve authored whitespace and reject collisions", () => {
   const moved = changeBlockLayout(blocks, "b", { x: 8, y: 8 });

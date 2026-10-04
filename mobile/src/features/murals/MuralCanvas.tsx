@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ComponentProps } from "react";
 import {
   BLOCK_TYPE_LABELS,
   DEFAULT_BORDER_SIDES,
@@ -46,7 +46,7 @@ import { minimumTouchTarget, MuralThemeScope, radii, spacing, useTheme, type The
 import type { GalleryImage } from "../gallery/api";
 import type { Tierlist } from "../tierlists/api";
 import { selectionBorderColor } from "./blockStyleOptions";
-import { muralCanvasHeight } from "./layout";
+import { muralCanvasHeight, muralPreviewScale } from "./layout";
 
 const LIFT_SPRING = { duration: 300, dampingRatio: 0.8 } as const;
 const ROW_HEIGHT = 36;
@@ -398,7 +398,16 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThe
   return <MuralThemeScope theme={theme}>{editable ? <Pressable accessible={false} onPress={() => onSelectBlock?.(null)}>{canvas}</Pressable> : canvas}</MuralThemeScope>;
 }
 
+export function MuralThumbnail({ canvasWidth, ...props }: ComponentProps<typeof MuralCanvas> & { canvasWidth: number }) {
+  const [width, setWidth] = useState(0);
+  const scale = muralPreviewScale(width, canvasWidth);
+  return <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" onLayout={({ nativeEvent }) => setWidth(nativeEvent.layout.width)} style={styles.thumbnail}>
+    {scale > 0 ? <View style={{ position: "absolute", width: canvasWidth, left: 0, top: 0, transformOrigin: "top left", transform: [{ scale }] }}><MuralCanvas {...props} /></View> : null}
+  </View>;
+}
+
 const styles = StyleSheet.create({
+  thumbnail: { width: "100%", height: "100%", overflow: "hidden" },
   canvas: { position: "relative", width: "100%" },
   block: { position: "absolute", overflow: "hidden" },
   blockPress: { flex: 1, minHeight: minimumTouchTarget },

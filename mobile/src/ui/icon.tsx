@@ -35,6 +35,7 @@ const GLYPHS = {
   more: { ios: "ellipsis", android: "more_vert" },
   search: { ios: "magnifyingglass", android: "search" },
   filter: { ios: "line.3.horizontal.decrease", android: "filter_list" },
+  folder: { ios: "folder", android: "folder" },
   public: { ios: "globe", android: "public" },
   lock: { ios: "lock", android: "lock" },
   image: { ios: "photo", android: "image" },

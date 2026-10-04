@@ -4,6 +4,10 @@ export function muralCanvasHeight(blocks: MuralBlock[], rowHeight: number, minim
   return Math.max(minimum, ...blocks.map((block) => (block.layout.y + block.layout.h) * rowHeight));
 }
 
+export function muralPreviewScale(width: number, canvasWidth: number): number {
+  return width > 0 && canvasWidth > 0 ? width / canvasWidth : 0;
+}
+
 export function changeBlockLayout(blocks: MuralBlock[], blockId: string, patch: Partial<BlockLayout>): MuralBlock[] {
   const block = blocks.find((item) => item.id === blockId);
   if (!block) return blocks;
