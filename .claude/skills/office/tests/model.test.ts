@@ -10,6 +10,7 @@ import {
   isHeavy,
   MAIN_ID,
   modelShort,
+  newlyHeavy,
   reduce,
   spendPerMinute,
   statusText,
@@ -170,4 +171,16 @@ test('an agent record from before the details fields can still take calls and st
   const next = reduce(reduce(o, { kind: 'call', agentId: 'a1', tool: 'Read', input: {}, isError: false, at: 1 }), { kind: 'step', agentId: 'a1', model: 'claude-sonnet-5-5', usage: { output_tokens: 1000 }, at: 2 })
   assert.equal(next.agents[1].calls.length, 1)
   assert.deepEqual(Object.keys(next.agents[1].costByModel), ['claude-sonnet-5-5'])
+})
+
+test('a toast is due once when a subagent crosses the heavy mark', () => {
+  const step = (o: ReturnType<typeof spawned>, tokens: number, agentId: string | null = 'a1') =>
+    reduce(o, { kind: 'step', agentId, model: 'claude-sonnet-5-5', usage: { output_tokens: tokens }, at: 1 })
+  const a = step(spawned(), 390_000)
+  const b = step(a, 20_000)
+  assert.deepEqual(newlyHeavy(a, b).map(x => x.id), ['a1'])
+  assert.deepEqual(newlyHeavy(b, step(b, 1000)), [])
+  const mainBefore = emptyOffice(0)
+  assert.deepEqual(newlyHeavy(mainBefore, step(mainBefore, 500_000, null)), [])
+  assert.deepEqual(newlyHeavy(emptyOffice(0), { ...b, agents: b.agents }).map(x => x.id), ['a1'])
 })

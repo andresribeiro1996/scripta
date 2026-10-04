@@ -106,6 +106,10 @@ export function isHeavy(agent: Agent): boolean {
   return agent.costUsd >= HEAVY_USD
 }
 
+export function newlyHeavy(before: Office, after: Office): Agent[] {
+  return after.agents.filter(a => a.id !== MAIN_ID && isHeavy(a) && !before.agents.some(b => b.id === a.id && isHeavy(b)))
+}
+
 export function statusText(office: Office): string | undefined {
   const live = office.agents.filter(a => a.id !== MAIN_ID && a.state !== 'done')
   if (live.length === 0) return undefined
