@@ -25,7 +25,7 @@ the style. So:
 | Phase | What | Clients |
 |---|---|---|
 | **B (this spec)** | The server keeps rows in step with the document on every save, and every read except the owner's own full fetch uses rows | unchanged |
-| C | Per-book writes (status, add a book, add a note) edit rows directly; the whole-document save stays for installed builds | new endpoints, additive |
+| C | Small saves (`2026-10-02-small-saves-design.md`): ticking a book in a group, a book's status and rating, and adding a book send only the change; the whole-document save stays for installed builds. Doesn't wait for B | new endpoints, additive |
 | D | Rows are the source of truth; the document is assembled only for old clients, then retired | after old builds update |
 | E | Games reference `work_id` (see the Works spec) | — |
 
@@ -68,7 +68,8 @@ library_summary              -- replaces library_derived
 ## Writing
 
 - Rows change in the same transaction as the document, on every path that
-  writes it (`saveLibrary`, `addBook`, `mergeBooks`), exactly where
+  writes it (`saveLibrary`, `addBook`, `mergeBooks`, and the small-save
+  paths if they ship first), exactly where
   `library_match_keys` is written today.
 - **Only changed books are rewritten.** Each book's JSON is hashed; books whose
   `row_hash` and position are unchanged are skipped, so marking one book read
