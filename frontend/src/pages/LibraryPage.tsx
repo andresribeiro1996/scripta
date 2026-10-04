@@ -39,13 +39,14 @@ import { useToast } from "../components/Toaster";
 import { FilterIcon } from "../components/Toolbar";
 import { useDelayedShow } from "../hooks/useDelayedShow";
 import { useLibrary } from "../hooks/useLibrary";
+import { useLibrarySaver } from "../hooks/useLibrarySaver";
 import { useMurals } from "../hooks/useMurals";
 import { clearBookCover, setBookCover } from "../lib/bookCovers";
 import { parseImportedFile } from "../lib/fileImport";
 import { removeBooksFromAllGroups } from "../lib/groups";
 import { orderLibraryBooks, reorderOnDrop, seriesGroupByBookKey } from "../lib/libraryOrder";
 import { effectiveCardStyle, resolveLibraryStyle, type PerCardStyle } from "../lib/libraryStyle";
-import { filterBooks, localDay, setReadStatus, sortBooks, type ReadStatus, type SortKey, type StatusFilter } from "../lib/libraryView";
+import { filterBooks, localDay, sortBooks, type ReadStatus, type SortKey, type StatusFilter } from "../lib/libraryView";
 import { bookKey } from "../lib/merge";
 import { restoreDeletedBooks } from "../lib/restoreDeletedBooks";
 
@@ -87,6 +88,7 @@ export function LibraryPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { scrubBooks } = useMurals();
+  const saver = useLibrarySaver();
   const { data: library, isLoading, updateLibrary, share: shareLibraryDoc, unshare: unshareLibraryDoc } = useLibrary();
   const possibleDuplicates = useMemo(() => {
     if (!library) return [];
@@ -153,7 +155,7 @@ export function LibraryPage() {
   async function mergeAndSave(parsed: LibraryData, source?: "import") {
     // Read the freshest cached copy, not a stale closure — same
     // reasoning as handleRenameLibrary above.
-    await updateLibrary((existing) => buildMergedLibrary(existing, parsed), undefined, source);
+    await updateLibrary((existing) => buildMergedLibrary(existing, parsed), { source });
   }
 
   async function handleFileChosen(file: File) {
@@ -171,7 +173,8 @@ export function LibraryPage() {
   }
 
   async function handleAddBook(book: Record<string, unknown>) {
-    await mergeAndSave({ books: [book] });
+    const result = await saver.submit({ kind: "add", book });
+    if (!result.ok) throw result.error;
     toast({ message: `Added "${String(book.Title ?? "book")}".` });
   }
 
@@ -191,20 +194,17 @@ export function LibraryPage() {
     const reordered = reorderOnDrop(current.data.books, current.data.groups ?? [], draggedKey, targetKey);
     if (reordered === current.data.books) return; // no-op (e.g. dropped within the same series)
 
-    const optimistic: LibraryDocument = { ...current, data: { ...current.data, books: reordered } };
-    updateWithViewTransition(() =>
-      queryClient.setQueryData<LibraryDocument | null>(["library"], (latest) => latest === current ? optimistic : latest)
-    );
-    const saving = updateLibrary((data) => ({
-      ...data,
-      books: reorderOnDrop(data.books, data.groups ?? [], draggedKey, targetKey)
-    }), current);
+    let saving: Promise<LibraryDocument> | undefined;
+    updateWithViewTransition(() => {
+      saving = updateLibrary((data) => {
+        const books = reorderOnDrop(data.books, data.groups ?? [], draggedKey, targetKey);
+        return books === data.books ? data : { ...data, books };
+      }, { optimistic: true });
+    });
 
-    saving.catch((err) => {
+    saving?.catch((err) => {
       console.error("Failed to persist new book order:", err);
       toast({ message: saveFailureMessage(err, "Couldn't save the new order — moved back."), kind: "error" });
-      queryClient.setQueryData<LibraryDocument | null>(["library"], (latest) => latest === optimistic ? current : latest);
-      void queryClient.invalidateQueries({ queryKey: ["library"] });
     });
   }
 
@@ -238,16 +238,9 @@ export function LibraryPage() {
     if (!current) return false;
     const key = bookKey(book);
     const day = localDay();
-    try {
-      await updateLibrary((data) => ({
-        ...data,
-        books: data.books.map((b) => (bookKey(b) === key ? setReadStatus(b, status, day) : b))
-      }));
-      return true;
-    } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't save the status change."), kind: "error" });
-      return false;
-    }
+    const result = await saver.submit(status === 2 ? { kind: "book", bookKey: key, readStatus: 2, day } : { kind: "book", bookKey: key, readStatus: status });
+    if (!result.ok) toast({ message: saveFailureMessage(result.error, "Couldn't save the status change."), kind: "error" });
+    return result.ok;
   }
 
   async function handleSetRating(book: Record<string, unknown>, rating: FinishRating): Promise<boolean> {
@@ -255,16 +248,9 @@ export function LibraryPage() {
     if (!current) return false;
     const key = bookKey(book);
     if (setRating(book, rating) === book) return true;
-    try {
-      await updateLibrary((data) => ({
-        ...data,
-        books: data.books.map((b) => (bookKey(b) === key ? setRating(b, rating) : b))
-      }));
-      return true;
-    } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't save the rating."), kind: "error" });
-      return false;
-    }
+    const result = await saver.submit({ kind: "book", bookKey: key, rating });
+    if (!result.ok) toast({ message: saveFailureMessage(result.error, "Couldn't save the rating."), kind: "error" });
+    return result.ok;
   }
 
   async function handleAddNote(book: Record<string, unknown>, text: string): Promise<boolean> {
