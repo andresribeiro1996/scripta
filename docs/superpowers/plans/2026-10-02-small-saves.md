@@ -109,8 +109,8 @@ new `librarySaver.ts`, their tests, and the exports.
   - `confirmed` and `pending`.
   - `write(view)` after every change of either.
   - One FIFO queue for:
-    - `submit(change)`, which resolves `true` or `false` when the server
-      answers;
+    - `submit(change)`, which resolves `{ ok: true }` or
+      `{ ok: false, error }` when the server answers, and never throws;
     - `saveWhole(updater)`, which replaces each app's `updateLibrary` and
       keeps today's single 409 replay (fetch, re-run the updater, resend
       once);
@@ -216,8 +216,9 @@ This task owns `backend/README.md` and the load-safety spec's rate-limit
 table; no other task edits them.
 
 - [ ] **A new `changes` scope:** `fastifyRateLimit`
-  `{ max: 120, timeWindow: "1 minute", keyGenerator: rateLimitKey }`, with
+  `{ max: 60, timeWindow: "1 minute", keyGenerator: rateLimitKey }`, with
   `preHandler: authGuard` and `bodyLimit: 64 * 1024` on each route.
+  (60, not 120: Task 2a measured a 10 MiB change at 140–200 ms; see a6ab168.)
   - `POST /library/groups/:groupId/books`:
     `{ bookKey: string 1–2000, member: boolean }`.
   - `PATCH /library/books`:

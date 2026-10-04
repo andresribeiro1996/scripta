@@ -43,8 +43,8 @@ and for every other action.
 
 | Route | Body | Effect | Rate-limit bucket |
 |---|---|---|---|
-| `POST /library/groups/:groupId/books` | `{ bookKey, member }` | Puts the book in the group or takes it out. `member` is the state the checkbox now shows, so a retry is harmless | new **changes** bucket, 120/min |
-| `PATCH /library/books` | `{ bookKey, readStatus?, rating?, day? }` | Sets the fields on every book whose `bookKey()` matches, as the apps do today. `day` is the reader's local `YYYY-MM-DD` and is required when `readStatus` is 2 | changes, 120/min |
+| `POST /library/groups/:groupId/books` | `{ bookKey, member }` | Puts the book in the group or takes it out. `member` is the state the checkbox now shows, so a retry is harmless | new **changes** bucket, 60/min |
+| `PATCH /library/books` | `{ bookKey, readStatus?, rating?, day? }` | Sets the fields on every book whose `bookKey()` matches, as the apps do today. `day` is the reader's local `YYYY-MM-DD` and is required when `readStatus` is 2 | changes, 60/min |
 | `POST /library/books/add` | `{ book }` | Merges one book in through the add pipeline (`mergeLibraryData`, `assignBookOrder`, `deriveSeriesGroups`) | the existing **writes** bucket: 30/min, like add-book and merge |
 
 - **`bookKey` travels in the body.** Fastify's default `maxParamLength` is
@@ -199,9 +199,10 @@ echoes and merge responses.
 - On the web, `beforeunload` asks the reader to stay while `pending` is not
   empty.
 
-**Callers learn the outcome.** A submitted change resolves `true` or `false`
-when the server answers. The finish sheet opens on the status change's
-result (`LibraryPage.tsx:763`, `book/[key]/index.tsx:28-29`).
+**Callers learn the outcome.** A submitted change resolves
+`{ ok: true }` or `{ ok: false, error }` when the server answers, so a 429 or
+413 reaches `saveFailureMessage` instead of reading as a lost connection. The
+finish sheet opens on the status change's `ok` (`LibraryPage.tsx:763`, `book/[key]/index.tsx:28-29`).
 
 **One saver per signed-in user.** Each app already makes its query client per
 user (`frontend/src/main.tsx:14`, `mobile/src/app/_layout.tsx:19`). The saver
