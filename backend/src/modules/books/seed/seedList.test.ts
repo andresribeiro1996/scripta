@@ -3,7 +3,7 @@ import { test } from "node:test";
 import type { SeedEntry } from "./rankedWorks.js";
 import { mergeSeedLists } from "./seedList.js";
 
-const entry = (isbn: string, lang: "eng" | "por"): SeedEntry => ({ isbn, title: isbn, author: "A", lang, workKey: `/works/${isbn}`, readers: 1, subjects: [] });
+const entry = (isbn: string, lang: "eng" | "por"): SeedEntry => ({ isbn, title: isbn, author: "A", lang, workKey: `/works/${isbn}`, readers: 1, subjects: [], languages: [] });
 
 test("dedupes by ISBN, Portuguese first", () => {
   const merged = mergeSeedLists([entry("1", "por"), entry("2", "por")], [entry("2", "eng"), entry("3", "eng")], { por: 5, eng: 5 });

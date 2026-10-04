@@ -1,6 +1,7 @@
 import { setTimeout as sleep } from "node:timers/promises";
 import { USER_AGENT, createThrottle } from "../adapters/http/http.js";
-import { PORTUGAL_ISBN_PREFIXES, parseRankedWorks, rankedWorksUrl, type SeedEntry, type SeedLanguage } from "./rankedWorks.js";
+import { PORTUGAL_ISBN13_PREFIXES } from "../domain/normalize.js";
+import { parseRankedWorks, rankedWorksUrl, type SeedEntry, type SeedLanguage } from "./rankedWorks.js";
 
 const PAGE = 1000;
 const TIMEOUT_MS = 60_000;
@@ -43,7 +44,7 @@ async function collectPrefix(lang: SeedLanguage, wanted: number, isbnPrefix: str
 export async function collectRanked(lang: SeedLanguage, wanted: number, log: (line: string) => void): Promise<SeedEntry[]> {
   if (lang !== "por") return collectPrefix(lang, wanted, undefined, log);
   const byWork = new Map<string, SeedEntry>();
-  for (const prefix of PORTUGAL_ISBN_PREFIXES) {
+  for (const prefix of PORTUGAL_ISBN13_PREFIXES) {
     for (const entry of await collectPrefix(lang, wanted, prefix, log)) {
       const kept = byWork.get(entry.workKey);
       if (!kept || entry.readers > kept.readers) byWork.set(entry.workKey, entry);

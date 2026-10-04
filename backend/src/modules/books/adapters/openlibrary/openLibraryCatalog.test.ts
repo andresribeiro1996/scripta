@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import { SourceUnavailableError } from "../../domain/errors.js";
 import type { Throttle } from "../http/http.js";
-import { createOpenLibraryCatalog } from "./openLibraryCatalog.js";
+import { createOpenLibraryCatalog, parseEditionRecord } from "./openLibraryCatalog.js";
 
 const direct: Throttle = (task) => task();
 const originalFetch = globalThis.fetch;
@@ -117,4 +117,22 @@ test("a catalog built for the background uses the normal lane", async () => {
   respond([{ docs: [doc] }, {}]);
   await createOpenLibraryCatalog(recording, false).fetchDetails({ isbn: "9780553348477", title: "", author: "" });
   assert.deepEqual(lanes, [false, false]);
+});
+
+test("an edition record gives its title, its work and its languages as Open Library writes them", () => {
+  const record = {
+    key: "/books/OL40216430M",
+    title: "  Hábitos Atômicos ",
+    works: [{ key: "/works/OL17930368W" }],
+    languages: [{ key: "/languages/por" }, { key: "/languages/eng" }],
+    authors: [{ key: "/authors/OL7324898A" }],
+    isbn_13: ["9788550807560"]
+  };
+  assert.deepEqual(parseEditionRecord(record), { title: "Hábitos Atômicos", workKey: "/works/OL17930368W", languages: ["/languages/por", "/languages/eng"] });
+});
+
+test("an edition record with no work or language, or that is not a record at all, parses as empty", () => {
+  assert.deepEqual(parseEditionRecord({ title: "Só o título" }), { title: "Só o título", workKey: null, languages: [] });
+  assert.deepEqual(parseEditionRecord({ works: [{}], languages: [{ key: 7 }, null, "por", { key: "/languages/por" }] }), { title: "", workKey: null, languages: ["/languages/por"] });
+  for (const nothing of [null, undefined, "nonsense", 3, []]) assert.deepEqual(parseEditionRecord(nothing), { title: "", workKey: null, languages: [] }, String(nothing));
 });

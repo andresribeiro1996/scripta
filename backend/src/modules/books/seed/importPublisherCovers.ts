@@ -2,7 +2,7 @@ import { storeCoverImage } from "../booksService.js";
 import { MIN_GOOD_WIDTH } from "../domain/constants.js";
 import { SourceUnavailableError } from "../domain/errors.js";
 import { classifyPublisherImage, encodeCover, isAcceptableCover, type EncodedCover } from "../domain/images.js";
-import { normalizeTitle } from "../domain/normalize.js";
+import { editionLanguage, isPortugalIsbn, normalizeTitle } from "../domain/normalize.js";
 import type { BooksRepository, CoverBlobStore } from "../domain/ports.js";
 import type { BookRow } from "../domain/types.js";
 import { PAGE_RANK, feedProducts, feedUrl, findPageIsbn, isDisallowed, parseRobots, parseShopifyProducts, parseWooProducts, withPageText, type PublisherBook, type ResolvedBook } from "./publisherFeed.js";
@@ -40,13 +40,14 @@ export interface OpenLibraryEdition {
   title: string | null;
   author: string;
   workKey?: string | null;
+  languages?: string[];
 }
 
 export interface ImportDeps {
   fetchText(url: string): Promise<{ status: number; text: string }>;
   fetchBytes(url: string): Promise<Buffer | null>;
   lookupOpenLibrary(isbn: string): Promise<OpenLibraryEdition | null>;
-  repo: Pick<BooksRepository, "findBookByKey" | "getBook" | "createBook" | "addKey" | "fillIdentity" | "mergeDetails" | "setWorkKey" | "setPublisherUrl" | "getImage" | "insertImage" | "setCoverIf" | "listRejectedUrls" | "setUpgradeWanted">;
+  repo: Pick<BooksRepository, "findBookByKey" | "getBook" | "createBook" | "addKey" | "fillIdentity" | "mergeDetails" | "setWorkKey" | "setLanguage" | "setPublisherUrl" | "getImage" | "insertImage" | "setCoverIf" | "listRejectedUrls" | "setUpgradeWanted">;
   blobs: CoverBlobStore;
   now: () => Date;
   sleep: (ms: number) => Promise<void>;
@@ -56,6 +57,11 @@ export interface ImportDeps {
 class SiteSkipped extends Error {}
 
 const emptyReport = (): SiteReport => ({ products: 0, books: 0, fromPage: 0, pagesNoIsbn: 0, pagesBlocked: 0, pagesDeferred: 0, pageAmbiguous: 0, pageTitleMismatch: 0, coversSet: 0, created: 0, noAuthor: 0, unchanged: 0, rejectedImage: 0, cropped: 0, squareAccepted: 0, awaitingCheck: 0, failed: 0 });
+
+export function importedLanguage(stated: string[], isbn: string): string | null {
+  if (stated.length > 0) return editionLanguage(stated, isbn);
+  return isPortugalIsbn(isbn) ? editionLanguage(["por"], isbn) : null;
+}
 
 function sameTitle(known: string, productTitle: string): boolean {
   const [short, long] = [normalizeTitle(known), normalizeTitle(productTitle)].sort((a, b) => a.length - b.length) as [string, string];
@@ -240,10 +246,10 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
         report.coversSet++;
         continue;
       }
-      row = seedBook({ isbn: book.isbn, title, author }, deps.repo, deps.now, "publisher").book!;
+      row = seedBook({ isbn: book.isbn, title, author, workKey: memo.looked?.edition?.workKey ?? undefined }, deps.repo, deps.now, "publisher").book!;
     }
     if (!options.dryRun) {
-      deps.repo.setWorkKey(row.id, memo.looked?.edition?.workKey);
+      deps.repo.setLanguage(row.id, importedLanguage(memo.looked?.edition?.languages ?? [], book.isbn));
       deps.repo.mergeDetails(row.id, { ...book.details, publisher: site.name }, "publisher");
       if (isWebUrl(book.productUrl)) deps.repo.setPublisherUrl(row.id, book.productUrl);
     }
