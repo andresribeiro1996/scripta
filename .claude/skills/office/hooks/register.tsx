@@ -3,11 +3,14 @@ import type { Register } from 'claude-code'
 import type { Snapshot } from '../types'
 import { emptyOffice, reduce, statusText, type OfficeEvent } from './model.ts'
 import { freshFiles, parseFloors, sameFloors, shouldWrite, snapshotOf } from './floors.ts'
+import { buttonLabel, detailRows } from './details.ts'
 import { officeSvg, terminalRows } from './svg.ts'
 
 const PANE = 'office'
+const AGENT_KEY = 'agent:'
 const officeAtom = atom({ plugin: 'office', key: 'office' } as const, emptyOffice(0))
 const floorsAtom = atom({ plugin: 'office', key: 'floors' } as const, [] as Snapshot[])
+const openAtom = atom({ plugin: 'office', key: 'open' } as const, null as string | null)
 const reported = new Set<string>()
 let dirty = true
 const failures = new Set<string>()
@@ -146,6 +149,15 @@ export const register: Register = on => {
     return r
   })
 
+  on('ui.press', { plugin: 'office' }, async ($, e, next) => {
+    if (!e.element.startsWith(AGENT_KEY)) return next(e)
+    await guard($, 'ui.press', async () => {
+      const id = e.element.slice(AGENT_KEY.length)
+      await update($, openAtom, open => (open === id ? null : id))
+    })
+    return { element: e.element }
+  })
+
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const view = {
       own: await read($, officeAtom),
@@ -154,11 +166,18 @@ export const register: Register = on => {
       at: await $.clock.now(),
     }
     const rows = terminalRows(view)
+    const open = await read($, openAtom)
+    const { Box, Text, Button } = $.ui.resolve(e)
+    const agents = view.own.agents.map(a => (
+      <Box flexDirection="column">
+        <Button key={`${AGENT_KEY}${a.id}`} label={buttonLabel(a, a.id === open)} />
+        {a.id === open && detailRows(a, view.at).map(line => <Text>{line}</Text>)}
+      </Box>
+    ))
     if (e.surface === 'desktop') {
       const { Svg } = $.ui.resolve(e)
-      return <Svg source={officeSvg(view)} alt={rows.join('\n')} isInteractive={false} />
+      return <Box flexDirection="column"><Svg source={officeSvg(view)} alt={rows.join('\n')} isInteractive={false} />{agents}</Box>
     }
-    const { Box, Text } = $.ui.resolve(e)
-    return <Box flexDirection="column">{rows.map(line => <Text>{line}</Text>)}</Box>
+    return <Box flexDirection="column">{rows.map(line => <Text>{line}</Text>)}{agents}</Box>
   })
 }

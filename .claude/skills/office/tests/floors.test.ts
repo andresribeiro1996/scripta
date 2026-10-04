@@ -80,3 +80,15 @@ test('floors compare by content, not identity', () => {
   changed[1].agents[0].state = 'working' as any
   assert.equal(sameFloors(parse(), changed), false)
 })
+
+test('a snapshot keeps no call history and older snapshots without it still parse', () => {
+  const office = emptyOffice(0)
+  const full = { ...office, agents: [{ ...office.agents[0], calls: [{ label: 'Read /x', isError: false, at: 1 }], costByModel: { m: 1 } }] }
+  const snap = snapshotOf('s1', '/r', full, 0, false)
+  assert.deepEqual(snap.agents[0].calls, [])
+  assert.equal(snap.agents[0].failKey, null)
+  const { calls: _c, costByModel: _m, ...old } = snap.agents[0]
+  const text = JSON.stringify({ ...snap, agents: [old] })
+  assert.deepEqual(parseFloors([{ name: 'old.json', text }]).bad, [])
+  assert.equal(parseFloors([{ name: 'old.json', text }]).floors.length, 1)
+})
