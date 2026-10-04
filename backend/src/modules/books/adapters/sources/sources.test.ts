@@ -98,6 +98,18 @@ test("Apple title search sends the title alone and moves on when nothing is acce
   assert.equal(first.searchParams.get("media"), "ebook");
 });
 
+test("Apple title search asks only the storefronts the ISBN points at", async () => {
+  const countries = async (isbn?: string | null) => {
+    const urls = stub(() => Response.json({ results: [] }));
+    await createAppleSource(direct).byTitle("Orlando", "Virginia Woolf", acceptAll, isbn);
+    return urls.map((url) => new URL(url).searchParams.get("country"));
+  };
+  assert.deepEqual(await countries("9780141184272"), ["us"]);
+  assert.deepEqual(await countries("9789722115520"), ["pt", "br", "us"]);
+  assert.deepEqual(await countries(null), ["us", "pt", "br"]);
+  assert.deepEqual(await countries(), ["us", "pt", "br"]);
+});
+
 test("Open Library ISBN covers need no API call; title search maps cover ids", async () => {
   const urls = stub(() => Response.json({ docs: [
     { title: "Dune", author_name: ["Frank Herbert"], cover_i: 42 },

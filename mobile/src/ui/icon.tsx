@@ -56,6 +56,9 @@ const GLYPHS = {
   style: { ios: "paintbrush", android: "brush" },
   theme: { ios: "circle.lefthalf.filled", android: "contrast" },
   resize: { ios: "arrow.up.left.and.arrow.down.right", android: "open_in_full" },
+  expandHorizontal: { ios: "arrow.left.and.right", android: "swap_horiz" },
+  expandVertical: { ios: "arrow.up.and.down", android: "swap_vert" },
+  moveToTop: { ios: "arrow.up.to.line", android: "vertical_align_top" },
   duplicate: { ios: "plus.square.on.square", android: "content_copy" },
 } as const satisfies Record<string, Glyph>;
 

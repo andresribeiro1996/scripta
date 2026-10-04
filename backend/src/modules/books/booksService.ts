@@ -116,9 +116,10 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
     };
   }
 
-  function sourcesFor(lane: CoverPriority): CoverSources {
+  function sourcesFor(lane: CoverPriority, book: BookRow): CoverSources {
     if (lane === "front" || lane === "normal") return { apple: NO_SOURCE, isbndb: deps.sources.isbndb, openlibrary: deps.sources.openlibrary };
     if (lane === "upgrade") return { apple: deps.sources.apple, isbndb: null, openlibrary: NO_SOURCE };
+    if (!olderThan(book.apple_checked_at, RETRY_AFTER_MS)) return { ...deps.sources, apple: NO_SOURCE };
     return deps.sources;
   }
 
@@ -222,7 +223,9 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       const book = deps.repo.getBook(bookId);
       if (!book || book.cover_status === "manual") return;
       try {
-        const outcome = await findBestCover({ isbn: book.isbn, title: book.title, author: book.author }, deps.repo.listRejectedUrls(bookId), sourcesFor(lane), deps.fetchImage);
+        const sources = sourcesFor(lane, book);
+        const outcome = await findBestCover({ isbn: book.isbn, title: book.title, author: book.author }, deps.repo.listRejectedUrls(bookId), sources, deps.fetchImage);
+        if (sources.apple !== NO_SOURCE && !outcome.failures.some((failure) => failure.source === "apple")) deps.repo.setAppleChecked(bookId, now().toISOString());
         for (const failure of outcome.failures.filter((failure) => !(failure instanceof SourcePausedError))) deps.warn({ bookId, source: failure.source, error: failure.message }, "cover source unavailable");
 
         const latest = deps.repo.getBook(bookId);
@@ -244,7 +247,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
 
         if (outcome.complete) {
           backoffUntil.delete(bookId);
-          deps.repo.setCover(bookId, { imageId, status, checkedAt: at });
+          if (!deps.repo.setCoverIf(bookId, latest.cover_image_id, { imageId, status, checkedAt: at })) return;
           if (lane === "upgrade") {
             deps.repo.setUpgradeWanted(bookId, null);
           } else if (lane !== "background") {
@@ -255,7 +258,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
           return;
         }
         backoffUntil.set(bookId, Math.max(now().getTime() + UNAVAILABLE_BACKOFF_MS, ...outcome.failures.map((failure) => failure.retryAt ?? 0)));
-        if (imageId !== latest.cover_image_id) deps.repo.setCover(bookId, { imageId, status, checkedAt: latest.cover_checked_at });
+        if (imageId !== latest.cover_image_id) deps.repo.setCoverIf(bookId, latest.cover_image_id, { imageId, status, checkedAt: latest.cover_checked_at });
       } catch (error) {
         backoffUntil.set(bookId, now().getTime() + UNAVAILABLE_BACKOFF_MS);
         throw error;
