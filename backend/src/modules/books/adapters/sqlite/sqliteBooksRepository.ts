@@ -28,6 +28,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     WHERE id = ? AND ol_work_key IS NULL AND NOT EXISTS (SELECT 1 FROM books WHERE work_id = works.id AND id != ?)
   `);
   const unassignedStmt = db.prepare(`SELECT id, ol_work_key, title, author, created_at FROM books WHERE work_id IS NULL LIMIT ?`);
+  const canonicalWorksStmt = db.prepare(`SELECT id, COALESCE(merged_into, id) AS canonical FROM works WHERE id IN (SELECT value FROM json_each(?))`);
   const moveBookStmt = db.prepare(`UPDATE books SET work_id = ? WHERE id = ?`);
   const mergeEmptyWorkStmt = db.prepare(`UPDATE works SET merged_into = ? WHERE id = ? AND NOT EXISTS (SELECT 1 FROM books WHERE work_id = works.id)`);
   const makeSearchableStmt = db.prepare(`
@@ -112,6 +113,11 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
 
   return {
     transaction: inTransaction,
+
+    canonicalWorkIds(ids) {
+      const rows = canonicalWorksStmt.all(JSON.stringify(ids)) as Array<{ id: string; canonical: string }>;
+      return new Map(rows.map((row) => [row.id, row.canonical]));
+    },
 
     findBookByKey: (key) => byKeyStmt.get(key) as BookRow | undefined,
 
