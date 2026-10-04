@@ -23,7 +23,7 @@ const OK = '#3f8f5a'
 const HOT = '#c0392b'
 
 export function escapeXml(text: string): string {
-  return text.replace(/[<>&"']/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;' })[c] as string)
+  return text.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '').replace(/[<>&"']/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;' })[c] as string)
 }
 
 function hex(r: number, g: number, b: number): string {
@@ -119,7 +119,7 @@ function strip(snap: Snapshot, y: number, width: number): string {
   const subs = snap.agents.filter(a => a.id !== MAIN_ID)
   const parts = [
     `<rect x="${PAD}" y="${y}" width="${width - 2 * PAD}" height="${STRIP_H - 8}" rx="6" fill="#efe7d6" stroke="${GRID}"/>`,
-    text(PAD + 8, y + 16, `${snap.worktree} · main ${main?.state ?? 'idle'}`, `font-weight="bold" fill="${INK}"`),
+    text(PAD + 8, y + 16, `${cut(snap.worktree, 40)} · main ${main?.state ?? 'idle'}`, `font-weight="bold" fill="${INK}"`),
   ]
   subs.slice(0, Math.floor((width - 2 * PAD) / MINI_W)).forEach((a, i) => {
     const x = PAD + 8 + i * MINI_W

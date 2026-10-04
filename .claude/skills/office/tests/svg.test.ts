@@ -29,6 +29,18 @@ test('escapeXml escapes markup characters', () => {
   assert.equal(escapeXml(`a<b>&"c'`), 'a&lt;b&gt;&amp;&quot;c&apos;')
 })
 
+test('escapeXml drops control characters and lone surrogates', () => {
+  assert.equal(escapeXml('a\x1bb\x00c'), 'abc')
+  assert.equal(escapeXml('x\uD83D'), 'x')
+  assert.equal(escapeXml('\uDE00y'), 'y')
+  assert.equal(escapeXml('😀'), '😀')
+})
+
+test('control characters in a call never reach the svg', () => {
+  const svg = officeSvg({ own: office([agent('a', { lastCall: 'Bash echo -e "\x1b[31m"' })]), floors: [], cols: 4, at: 1 })
+  assert.ok(!/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(svg))
+})
+
 test('every state has a text label in the svg', () => {
   const svg = officeSvg({
     own: office([agent('a'), agent('b', { state: 'retrying' }), agent('c', { state: 'done', finishedAt: 1 })]),
