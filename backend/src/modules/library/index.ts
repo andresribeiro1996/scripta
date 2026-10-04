@@ -14,3 +14,5 @@ export type { EmbeddedMuralRow } from "./migration.js";
 // comment for the privacy boundary this enforces.
 export { resolvePublicLibrary, resolvePublicLibraryData, readerGlyphFor, sharedBookCounts, sharedBooks } from "./publicResolver.js";
 export type { PublicBookData, PublicHighlight, ResolvedPublicData, PublicDataRequest } from "./publicResolver.js";
+export { WorkResolutionError, duplicateWorkMessage, firstDuplicateWork, keepFirstPerWork, resolveEntryWorks, workIdsByKey } from "./works.js";
+export type { WorkEntry, WorkRef } from "./works.js";
