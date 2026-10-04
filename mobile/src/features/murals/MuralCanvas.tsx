@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import {
   BLOCK_TYPE_LABELS,
   FINISH_TILE_SIZE,
@@ -47,7 +47,7 @@ import { minimumTouchTarget, MuralThemeScope, radii, spacing, useTheme, type The
 import type { GalleryImage } from "../gallery/api";
 import type { Tierlist } from "../tierlists/api";
 import { selectionBorderColor } from "./blockStyleOptions";
-import { MURAL_ROW_HEIGHT, muralCanvasHeight, muralDragCell, muralDragPosition } from "./layout";
+import { MURAL_ROW_HEIGHT, muralCanvasHeight, muralDragCell, muralDragPosition, muralPreviewScale } from "./layout";
 
 const LIFT_SPRING = { duration: 300, dampingRatio: 0.8 } as const;
 const MOVE_SPRING = { duration: 220, dampingRatio: 1, overshootClamping: true } as const;
@@ -510,7 +510,16 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThe
   return <MuralThemeScope theme={theme}>{editable ? <Pressable accessible={false} onPress={() => onSelectBlock?.(null)}>{canvas}</Pressable> : canvas}</MuralThemeScope>;
 }
 
+export function MuralThumbnail({ canvasWidth, ...props }: ComponentProps<typeof MuralCanvas> & { canvasWidth: number }) {
+  const [width, setWidth] = useState(0);
+  const scale = muralPreviewScale(width, canvasWidth);
+  return <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" onLayout={({ nativeEvent }) => setWidth(nativeEvent.layout.width)} style={styles.thumbnail}>
+    {scale > 0 ? <View style={{ position: "absolute", width: canvasWidth, left: 0, top: 0, transformOrigin: "top left", transform: [{ scale }] }}><MuralCanvas {...props} /></View> : null}
+  </View>;
+}
+
 const styles = StyleSheet.create({
+  thumbnail: { width: "100%", height: "100%", overflow: "hidden" },
   canvas: { position: "relative", width: "100%", overflow: "hidden" },
   block: { position: "absolute", overflow: "hidden" },
   blockPress: { flex: 1, minHeight: minimumTouchTarget },
