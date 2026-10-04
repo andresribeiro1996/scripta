@@ -16,7 +16,8 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 const { applyBooksMigrations } = await import("./adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("./adapters/sqlite/sqliteBooksRepository.js");
 const { createBooksService } = await import("./booksService.js");
-const { SourcePausedError, SourceUnavailableError } = await import("./domain/errors.js");
+const { default: sharp } = await import("sharp");
+const { BookNotFoundError, FileTooLargeError, InvalidImageError, SourcePausedError, SourceUnavailableError } = await import("./domain/errors.js");
 const { createCoverWorker } = await import("./worker.js");
 const { createCompositeCatalog } = await import("./adapters/catalog/compositeCatalog.js");
 const { createThrottle } = await import("./adapters/http/http.js");
@@ -455,10 +456,17 @@ test("a cover whose blob save rejects stores no image row and no cover pointer",
   h.sizes.set("https://a/1", [600, 900]);
   h.service.resolveCover(orlando);
   const id = h.bookId("isbn:9780141184272");
-  await assert.rejects(h.service.processBook(id, "background"), /HTTP 403/);
+  await assert.rejects(h.service.processBook(id, "background"), (e) => {
+    assert.match(String(e), /HTTP 403/);
+    return true;
+  });
   assert.equal((h.db.prepare(`SELECT COUNT(*) AS n FROM cover_images`).get() as { n: number }).n, 0);
   assert.equal(h.repo.getBook(id)!.cover_image_id, null);
-  await assert.rejects(h.service.uploadCover(orlando, await sharp({ create: { width: 600, height: 900, channels: 3, background: "#224466" } }).jpeg().toBuffer()), /HTTP 403/);
+  const photo = await sharp({ create: { width: 600, height: 900, channels: 3, background: "#224466" } }).jpeg().toBuffer();
+  await assert.rejects(h.service.uploadCover(orlando, photo), (e) => {
+    assert.match(String(e), /HTTP 403/);
+    return true;
+  });
   assert.equal((h.db.prepare(`SELECT COUNT(*) AS n FROM cover_images`).get() as { n: number }).n, 0);
 });
 
@@ -744,9 +752,6 @@ test("search never returns a book that only came from an account's library", asy
   assert.deepEqual(h.service.search("manuscript"), []);
   assert.deepEqual(calls, ["search:manuscript"]);
 });
-
-const { default: sharp } = await import("sharp");
-const { BookNotFoundError, FileTooLargeError, InvalidImageError } = await import("./domain/errors.js");
 
 test("nobody is admin when ADMIN_USER_ID is blank", () => {
   assert.equal(harness().service.isAdmin(""), false);
@@ -1185,6 +1190,16 @@ test("an outside search stores the work key on created and existing rows", async
   const none = harness({ catalog: recordingCatalog({ search: async () => [hit(null)] }).catalog });
   await none.service.searchExternal("dune");
   assert.equal(none.repo.findBookByKey("isbn:9780441013593")!.ol_work_key, null);
+});
+
+test("an outside search puts new hits with one work key in one work, leaving no throwaway work behind", async () => {
+  const hit = (isbn: string, title: string) => ({ result: { title, authors: ["Frank Herbert"], year: null, isbn, publisher: null, coverUrl: null, genres: [] }, olCoverId: null, workKey: "/works/OL1W", source: "openlibrary" as const });
+  const h = harness({ catalog: recordingCatalog({ search: async () => [hit("9780441013593", "Dune"), hit("9789722046114", "Duna")] }).catalog });
+  await h.service.searchExternal("dune");
+  const english = h.repo.findBookByKey("isbn:9780441013593")!;
+  const portuguese = h.repo.findBookByKey("isbn:9789722046114")!;
+  assert.equal(portuguese.work_id, english.work_id);
+  assert.deepEqual(h.db.prepare("SELECT ol_work_key, title, merged_into FROM works").all().map((work) => ({ ...work })), [{ ol_work_key: "OL1W", title: "Dune", merged_into: null }]);
 });
 
 function backfillBooks(h: ReturnType<typeof harness>, count: number) {

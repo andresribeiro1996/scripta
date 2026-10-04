@@ -32,7 +32,7 @@ export function PickNextSheet({ keys, books, onClose }: { keys: string[]; books:
       <div className="grid grid-cols-2 gap-4 px-3 pb-4">
         {pair.map((book) => (
           <div key={bookKey(book)} className="flex flex-col gap-2">
-            <div className="aspect-[2/3] overflow-hidden rounded-md bg-(--color-border)"><CoverImage book={book} /></div>
+            <div className="relative aspect-[2/3] overflow-hidden rounded-md bg-(--color-border)"><CoverImage book={book} /></div>
             <p className="line-clamp-2 min-h-[2lh] text-center text-sm">{String(book.Title ?? "Untitled")}</p>
             <DuelButton onClick={() => void choose(book)} disabled={saving}>
               This one<span className="sr-only">: {String(book.Title ?? "Untitled")}</span>

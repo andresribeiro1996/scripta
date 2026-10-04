@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Stack, router } from "expo-router";
 import { FlatList, Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
 import { Text } from "../../ui/Text";
+import { followFailureMessage } from "@scripta/shared/community";
 import { ensureBookBlockHeights, profileOnlyMural, readerGlyphLabel, type IdentityKey, type Mural } from "@scripta/shared";
 import { Button, Dialog, EmptyState, ErrorState, Icon, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { MuralCanvas } from "../murals";
@@ -49,8 +50,8 @@ export function ProfileScreen({ username }: { username: string }) {
     try {
       await action();
       await queryClient.invalidateQueries({ queryKey: ["community", "profile", username] });
-    } catch {
-      setError("Something went wrong. Try again.");
+    } catch (reason) {
+      setError(followFailureMessage(reason, "Something went wrong. Try again."));
     } finally {
       setBusy(false);
     }
