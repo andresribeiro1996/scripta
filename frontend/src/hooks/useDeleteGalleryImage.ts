@@ -10,19 +10,20 @@
 // (GalleryPage.tsx / CoverPickerModal.tsx) never has to remember which
 // one applies.
 
-import { fetchLibrary } from "../api/library";
 import { scrubImageFromBooks } from "../lib/bookCovers";
 import { useGalleryImages } from "./useGalleryImages";
 import { useLibrary } from "./useLibrary";
+import { useLibrarySaver } from "./useLibrarySaver";
 import { useMurals } from "./useMurals";
 
 export function useDeleteGalleryImage() {
   const { remove } = useGalleryImages();
   const { updateLibrary } = useLibrary();
+  const saver = useLibrarySaver();
   const { scrubImage } = useMurals();
 
   return async function deleteGalleryImageAndScrub(id: string): Promise<void> {
-    const current = await fetchLibrary();
+    const current = await saver.fetch();
     await remove(id);
 
     // Independent of the library save below — see scrubImage's own
