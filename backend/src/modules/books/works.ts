@@ -11,7 +11,10 @@ export function canonicalWorksWith(books: BooksRepository, ids: string[]): Map<s
 
 export function resolveWorksWith(books: BooksRepository, lookups: WorkLookup[]): Array<string | null> {
   const createdAt = new Date().toISOString();
-  const ids = books.transaction(() => lookups.map((lookup) => findOrCreateBook(books, lookup, createdAt)?.work_id ?? null));
+  const ids = books.transaction(() => lookups.map((lookup) => {
+    const book = findOrCreateBook(books, lookup, createdAt);
+    return book ? book.work_id ?? books.assignWork(book.id) : null;
+  }));
   const canonical = canonicalWorksWith(books, ids.filter((id): id is string => id !== null));
   return ids.map((id) => (id ? canonical.get(id) ?? id : null));
 }

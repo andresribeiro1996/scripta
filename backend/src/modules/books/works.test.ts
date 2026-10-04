@@ -48,6 +48,15 @@ test("resolveWorks and canonicalWorks follow merged_into", () => {
   assert.equal(canonicalWorksWith(repo, [keyed.work_id!]).get(keyed.work_id!), keyed.work_id);
 });
 
+test("resolveWorks gives an existing edition without a work its work", () => {
+  const { repo, db } = freshRepo();
+  const book = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593" }, ["isbn:9780441013593"], "2026-10-04T00:00:00.000Z");
+  db.prepare("UPDATE books SET work_id = NULL WHERE id = ?").run(book.id);
+  const [id] = resolveWorksWith(repo, [{ isbn: "9780441013593", title: "Dune", author: "Frank Herbert" }]);
+  assert.ok(id);
+  assert.equal((db.prepare("SELECT work_id FROM books WHERE id = ?").get(book.id) as { work_id: string }).work_id, id);
+});
+
 test("resolveWorks resolves 2,000 new books in one transaction quickly", () => {
   const { repo } = freshRepo();
   const lookups = Array.from({ length: 2000 }, (_, i) => ({ title: `Book ${i}`, author: `Author ${i}` }));

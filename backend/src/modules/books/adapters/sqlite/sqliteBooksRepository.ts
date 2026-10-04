@@ -111,6 +111,16 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     return id;
   }
 
+  type UnassignedBook = { id: string; ol_work_key: string | null; title: string; author: string; created_at: string };
+
+  function giveWork(row: UnassignedBook): string {
+    const held = row.ol_work_key ? (workByKeyStmt.get(row.ol_work_key) as { id: string } | undefined) : undefined;
+    const workId = held?.id ?? insertWork(row.ol_work_key, row.title, row.author, row.created_at);
+    moveBookStmt.run(workId, row.id);
+    if (held) fillWorkIdentityStmt.run(row.id);
+    return workId;
+  }
+
   return {
     transaction: inTransaction,
 
@@ -260,14 +270,17 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
 
     assignMissingWorks(limit) {
       return inTransaction(() => {
-        const rows = unassignedStmt.all(limit) as unknown as Array<{ id: string; ol_work_key: string | null; title: string; author: string; created_at: string }>;
-        for (const row of rows) {
-          const held = row.ol_work_key ? (workByKeyStmt.get(row.ol_work_key) as { id: string } | undefined) : undefined;
-          const workId = held?.id ?? insertWork(row.ol_work_key, row.title, row.author, row.created_at);
-          moveBookStmt.run(workId, row.id);
-          if (held) fillWorkIdentityStmt.run(row.id);
-        }
+        const rows = unassignedStmt.all(limit) as unknown as UnassignedBook[];
+        for (const row of rows) giveWork(row);
         return rows.length;
+      });
+    },
+
+    assignWork(bookId) {
+      return inTransaction(() => {
+        const book = byIdStmt.get(bookId) as unknown as (UnassignedBook & { work_id: string | null }) | undefined;
+        if (!book) throw new Error(`Unknown book ${bookId}`);
+        return book.work_id ?? giveWork(book);
       });
     },
 
