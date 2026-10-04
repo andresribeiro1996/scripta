@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { contentDetail, contentKindLabel, contentTarget } from "@scripta/shared/community";
+import { contentDetail, followFailureMessage, contentKindLabel, contentTarget } from "@scripta/shared/community";
 import { followUser, unfollowUser } from "../api/community";
 import type { GalleryImage } from "../api/gallery";
 import { useAuth } from "../auth/AuthContext";
@@ -49,8 +49,8 @@ export function CommunityProfilePage() {
       await action();
       await queryClient.invalidateQueries({ queryKey: ["community", "profile", username] });
       await queryClient.invalidateQueries({ queryKey: ["community", "people"] });
-    } catch {
-      setError("Something went wrong. Try again.");
+    } catch (error) {
+      setError(followFailureMessage(error, "Something went wrong. Try again."));
     } finally {
       setBusy(false);
     }

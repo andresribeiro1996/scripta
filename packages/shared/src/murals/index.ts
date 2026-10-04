@@ -6,3 +6,6 @@ export * from "./presets.js";
 export * from "./home.js";
 export * from "./finish.js";
 export * from "./backgroundFinish.js";
+export * from "./blockEffects.js";
+export * from "./blockGradient.js";
+export * from "./savedLooks.js";

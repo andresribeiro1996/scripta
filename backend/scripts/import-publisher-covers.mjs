@@ -6,12 +6,11 @@ sharp.concurrency(1);
 
 const { values } = parseArgs({ options: { "dry-run": { type: "boolean", default: false } } });
 
-const USER_AGENT = "Atmyshelf/1.0 (+https://atmyshelf.com)";
 const TIMEOUT_MS = 30_000;
 const OPEN_LIBRARY_GAP_MS = 1000;
 
 const { SourceUnavailableError } = await import("../dist/modules/books/domain/errors.js");
-const { createThrottle, fetchJson } = await import("../dist/modules/books/adapters/http/http.js");
+const { USER_AGENT, createThrottle, fetchJson } = await import("../dist/modules/books/adapters/http/http.js");
 const { parseEditionRecord } = await import("../dist/modules/books/adapters/openlibrary/openLibraryCatalog.js");
 const { openBooksDb } = await import("../dist/modules/books/adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("../dist/modules/books/adapters/sqlite/sqliteBooksRepository.js");

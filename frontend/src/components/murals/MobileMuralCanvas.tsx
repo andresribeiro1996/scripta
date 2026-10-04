@@ -1,4 +1,4 @@
-import { blockTextColors, moveMuralBlock, resolveBlockColor, type Group, type PublicReaderCard } from "@scripta/shared";
+import { blockEffects, blockTextColors, moveMuralBlock, resolveBlockColor, type Group, type PublicReaderCard } from "@scripta/shared";
 import { themes, type ThemeColors } from "@scripta/shared/themes";
 import GridLayout from "react-grid-layout";
 import { DndContext } from "@dnd-kit/core";
@@ -90,6 +90,7 @@ function BlockFrame({
   themeColors: ThemeColors;
 }) {
   const style = resolveBlockStyle(block.style);
+  const effects = blockEffects(style, themeColors);
   const pointerStart = useRef<{ x: number; y: number } | null>(null);
   const overridden = style.backgroundColor || style.textColor ? blockTextColors(style, themeColors) : null;
   return (
@@ -112,10 +113,11 @@ function BlockFrame({
           onActivate();
         }
       }}
-      className={`relative h-full w-full overflow-hidden ${draggable ? "touch-none cursor-grab active:cursor-grabbing" : ""} ${style.cardShadow ? "shadow-sm" : ""} ${selected ? `ring-[6px] ${invalid ? "ring-(--color-danger)" : "ring-(--color-accent)"}` : ""}`}
+      className={`relative h-full w-full overflow-hidden ${draggable ? "touch-none cursor-grab active:cursor-grabbing" : ""} shadow-[var(--block-shadow)] ${selected ? `ring-[6px] ${invalid ? "ring-(--color-danger)" : "ring-(--color-accent)"}` : ""}`}
       style={{
         borderRadius: `${style.cardRadius}px`,
-        opacity: (style.cardOpacity / 100) * (draft ? 0.8 : 1),
+        opacity: effects.opacity * (draft ? 0.8 : 1),
+        "--block-shadow": effects.boxShadow,
         backgroundColor: resolveBlockColor(style.backgroundColor, themeColors) ?? "var(--color-surface)",
         backgroundImage: blockFinishImage(style, themeColors),
         borderTopWidth: `${style.cardBorderSides.top ? style.cardBorderWidth : 0}px`,
@@ -137,6 +139,7 @@ function BlockFrame({
       <div className="pointer-events-none h-full origin-top-left" style={{ width: `${scale * 100}%`, height: `${scale * 100}%`, transform: `scale(${1 / scale})`, fontSize: 14 } as CSSProperties}>
         <MobileBlockPreview block={block} books={books} images={images} profile={profile} groups={groups} shelfThemeOverride={shelfThemeOverride} readerCardOverride={readerCardOverride} statsOverride={statsOverride} tierlistData={tierlistData} width={((CANVAS_WIDTH - PADDING * 2 + MARGIN) / GRID_COLUMNS * block.layout.w - MARGIN) * scale} height={(block.layout.h * (ROW_HEIGHT + MARGIN) - MARGIN) * scale} />
       </div>
+      {effects.fadeColor && effects.fadeOpacity > 0 ? <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-[inherit]" style={{ backgroundColor: effects.fadeColor, opacity: effects.fadeOpacity }} /> : null}
     </div>
   );
 }

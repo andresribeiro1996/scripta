@@ -1,8 +1,10 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import {
   BLOCK_TYPE_LABELS,
   FINISH_TILE_SIZE,
   blockFinish,
+  blockEffects,
+  blockGradient,
   blockTextColors,
   calculateShelfTheme,
   finishTileMarkup,
@@ -40,14 +42,14 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { measure, scrollTo, useAnimatedReaction, useAnimatedStyle, useFrameCallback, useReducedMotion, useSharedValue, withSpring, type AnimatedRef, type SharedValue } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { commitHaptic, liftHaptic } from "../../ui/haptics";
-import { PixelRatio, Platform, Pressable, ScrollView, StyleSheet, View, type StyleProp, type TextStyle } from "react-native";
+import { PixelRatio, Pressable, ScrollView, StyleSheet, View, type StyleProp, type TextStyle } from "react-native";
 import { Text } from "../../ui/Text";
 import { blockFontFamily, resolveBorderColor, resolveBorderStyle } from "../../ui/libraryStyle";
 import { minimumTouchTarget, MuralThemeScope, radii, spacing, useTheme, type ThemeColors } from "../../ui/theme";
 import type { GalleryImage } from "../gallery/api";
 import type { Tierlist } from "../tierlists/api";
 import { selectionBorderColor } from "./blockStyleOptions";
-import { MURAL_ROW_HEIGHT, muralCanvasHeight, muralDragCell, muralDragPosition } from "./layout";
+import { MURAL_ROW_HEIGHT, muralCanvasHeight, muralDragCell, muralDragPosition, muralPreviewScale } from "./layout";
 
 const LIFT_SPRING = { duration: 300, dampingRatio: 0.8 } as const;
 const MOVE_SPRING = { duration: 220, dampingRatio: 1, overshootClamping: true } as const;
@@ -58,12 +60,6 @@ const gridColumnWidth = (width: number) => (width + GAP) / GRID_COLUMNS;
 type DragState = { id: string; layout: BlockLayout; dx: number; dy: number; pointerY: number; startScroll: number; drop?: BlockLayout };
 export type MuralDragScroll = { ref: AnimatedRef<ScrollView>; offset: SharedValue<number>; contentHeight: SharedValue<number>; bottomInset: SharedValue<number> };
 const PROGRESS_TRACK = 4;
-
-const blockShadow = Platform.select({
-  ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 4 },
-  android: { elevation: 2 },
-  default: {},
-});
 
 const BLOCK_PADDING = { tight: spacing.sm, normal: spacing.md, roomy: spacing.xl } as const;
 
@@ -81,13 +77,16 @@ function blockPadding(style: BlockStyle) {
 }
 
 function blockFrameStyle(style: BlockStyle, colors: ThemeColors) {
+  const effects = blockEffects(style, colors);
   return {
     backgroundColor: resolveBlockColor(style.backgroundColor, colors) ?? colors.surface,
+    experimental_backgroundImage: blockGradient(style, colors)?.image,
     borderColor: resolveBorderColor(resolveBlockColor(style.cardBorderColor, colors), style.cardBorderOpacity, colors.border),
     ...sideWidths(style.cardBorderWidth, style.cardBorderSides),
     borderStyle: resolveBorderStyle(style.cardBorderStyle),
     borderRadius: style.cardRadius,
-    opacity: style.cardOpacity / 100,
+    opacity: effects.opacity,
+    boxShadow: effects.boxShadow,
   };
 }
 
@@ -98,8 +97,9 @@ function FinishOverlay({ id, style, colors }: { id: string; style: BlockStyle; c
   return <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={StyleSheet.absoluteFill}><SvgXml xml={xml} width="100%" height="100%" /></View>;
 }
 
-function frameShadow(style: BlockStyle) {
-  return style.cardShadow && style.backgroundColor !== "transparent" ? blockShadow : null;
+function FadeOverlay({ style, colors }: { style: BlockStyle; colors: ThemeColors }) {
+  const effects = blockEffects(style, colors);
+  return effects.fadeColor && effects.fadeOpacity > 0 ? <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[StyleSheet.absoluteFill, { backgroundColor: effects.fadeColor, opacity: effects.fadeOpacity, borderRadius: style.cardRadius }]} /> : null;
 }
 
 /** Every size inside a block is an `em` of the block's own font size on the
@@ -316,7 +316,7 @@ const CanvasBlock = memo(function CanvasBlock({ block, columnWidth, editable, se
     if (next.y !== previous?.y || next.active !== previous?.active) y.set(next.active || reducedMotion ? next.y : withSpring(next.y, MOVE_SPRING));
   });
   const style = resolveBlockStyle(block.style);
-  const restOpacity = style.cardOpacity / 100;
+  const restOpacity = blockEffects(style, colors).opacity;
   const animated = useAnimatedStyle(() => {
     const current = drag.get();
     const active = current?.id === block.id;
@@ -329,7 +329,6 @@ const CanvasBlock = memo(function CanvasBlock({ block, columnWidth, editable, se
   const body = <View pointerEvents={editable ? "none" : "auto"} style={styles.blockBody}><BlockContent block={block} books={books} images={images} tierlists={tierlists} profile={profile} groups={groups} shelfThemeOverride={shelfThemeOverride} readerCardOverride={readerCardOverride} statsOverride={statsOverride} editable={editable} onAssetReady={onAssetReady} /></View>;
   const content = <Animated.View renderToHardwareTextureAndroid={editable && selected} shouldRasterizeIOS={editable && selected} style={[
         styles.block,
-        frameShadow(style),
         blockFrameStyle(style, colors),
         {
           left: 0,
@@ -341,6 +340,7 @@ const CanvasBlock = memo(function CanvasBlock({ block, columnWidth, editable, se
       ]}>
         <FinishOverlay id={block.id} style={style} colors={colors} />
         {editable ? <Pressable accessibilityRole="button" accessibilityLabel={`${BLOCK_TYPE_LABELS[block.type]} block. Long press and drag to move`} accessibilityActions={MOVE_ACTIONS} onAccessibilityAction={(event) => { const move = MOVES[event.nativeEvent.actionName]; if (move) onMove(move[0], move[1]); }} onPress={onSelect} style={[styles.blockPress, blockPadding(style)]}>{body}</Pressable> : <View style={[styles.blockPress, blockPadding(style)]}>{body}</View>}
+        <FadeOverlay style={style} colors={colors} />
         {selected ? <View pointerEvents="none" style={{ position: "absolute", inset: 0, borderWidth: 2, borderRadius: style.cardRadius, borderColor: selectionBorderColor(style, colors) }} /> : null}
       </Animated.View>;
   return editable ? <GestureDetector gesture={gesture}>{content}</GestureDetector> : content;
@@ -374,13 +374,14 @@ export function BlockPreview({ theme, block, canvasWidth, maxHeight, books, imag
       style={[styles.previewBox, { height: (scale ? height * scale : maxHeight) + spacing.md * 2, backgroundColor: colors.background }]}
     >
       {scale ? (
-        <View style={[styles.previewBlock, frameShadow(style), blockFrameStyle(style, colors), { width, height, transform: [{ scale }] }]}>
+        <View style={[styles.previewBlock, blockFrameStyle(style, colors), { width, height, transform: [{ scale }] }]}>
           <FinishOverlay id={block.id} style={style} colors={colors} />
           <View style={[styles.blockPress, blockPadding(style)]}>
             <View style={styles.blockBody}>
               <BlockContent block={resolved} books={books} images={images} tierlists={tierlists} profile={profile} groups={groups} editable />
             </View>
           </View>
+          <FadeOverlay style={style} colors={colors} />
         </View>
       ) : null}
     </View>
@@ -510,7 +511,16 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThe
   return <MuralThemeScope theme={theme}>{editable ? <Pressable accessible={false} onPress={() => onSelectBlock?.(null)}>{canvas}</Pressable> : canvas}</MuralThemeScope>;
 }
 
+export function MuralThumbnail({ canvasWidth, ...props }: ComponentProps<typeof MuralCanvas> & { canvasWidth: number }) {
+  const [width, setWidth] = useState(0);
+  const scale = muralPreviewScale(width, canvasWidth);
+  return <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" onLayout={({ nativeEvent }) => setWidth(nativeEvent.layout.width)} style={styles.thumbnail}>
+    {scale > 0 ? <View style={{ position: "absolute", width: canvasWidth, left: 0, top: 0, transformOrigin: "top left", transform: [{ scale }] }}><MuralCanvas {...props} /></View> : null}
+  </View>;
+}
+
 const styles = StyleSheet.create({
+  thumbnail: { width: "100%", height: "100%", overflow: "hidden" },
   canvas: { position: "relative", width: "100%", overflow: "hidden" },
   block: { position: "absolute", overflow: "hidden" },
   blockPress: { flex: 1, minHeight: minimumTouchTarget },

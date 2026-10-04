@@ -172,7 +172,7 @@ export function FinishSheet({
           </div>
 
           <div className="flex gap-4">
-            <div className="aspect-[2/3] w-24 shrink-0 overflow-hidden rounded-lg bg-(--color-border)">
+            <div className="relative aspect-[2/3] w-24 shrink-0 overflow-hidden rounded-lg bg-(--color-border)">
               <CoverImage book={book} />
             </div>
             <div className="min-w-0 flex flex-col justify-center">
@@ -210,13 +210,13 @@ export function FinishSheet({
               <p className="text-sm font-semibold">Against your favourite.</p>
               <div className="flex gap-4">
                 <div className="flex flex-1 flex-col gap-2">
-                  <div className="aspect-[2/3] w-full overflow-hidden rounded-lg bg-(--color-border)">
+                  <div className="relative aspect-[2/3] w-full overflow-hidden rounded-lg bg-(--color-border)">
                     <CoverImage book={book} />
                   </div>
                   <DuelButton onClick={() => void chooseThisOne()}>This one</DuelButton>
                 </div>
                 <div className="flex flex-1 flex-col gap-2">
-                  <div className="aspect-[2/3] w-full overflow-hidden rounded-lg bg-(--color-border)">
+                  <div className="relative aspect-[2/3] w-full overflow-hidden rounded-lg bg-(--color-border)">
                     <CoverImage book={opponentBook} />
                   </div>
                   <DuelButton onClick={() => setFavouriteChoiceMade(true)}>

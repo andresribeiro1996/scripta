@@ -1,5 +1,5 @@
 import { MuralBlockDetail } from "./MuralBlockDetail";
-import { blockTextColors, resolveBlockColor, resolveHomeBlock, type Group, type PublicReaderCard } from "@scripta/shared";
+import { blockEffects, blockTextColors, resolveBlockColor, resolveHomeBlock, type Group, type PublicReaderCard } from "@scripta/shared";
 import { themes } from "@scripta/shared/themes";
 import GridLayout from "react-grid-layout";
 import { DndContext } from "@dnd-kit/core";
@@ -159,6 +159,7 @@ export function MuralCanvas({
     >
       {mural.blocks.map((block) => {
         const style = resolveBlockStyle(block.style);
+        const effects = blockEffects(style, themeColors);
         const overridden = style.backgroundColor || style.textColor ? blockTextColors(style, themeColors) : null;
         return (
           <div
@@ -170,10 +171,12 @@ export function MuralCanvas({
           <DraggableMuralBlock id={block.id} disabled={!editMode || Boolean(busy)}>
           <div
             data-own-font=""
-            className={`group relative h-full w-full overflow-hidden ${style.cardShadow ? "shadow-sm" : ""} ${!editMode && style.cardHoverEffect ? "transition-transform hover:-translate-y-0.5 hover:scale-[1.01] hover:shadow-lg" : ""}`}
+            className={`group relative h-full w-full overflow-hidden [box-shadow:var(--block-shadow)] ${!editMode && style.cardHoverEffect ? "transition-transform hover:-translate-y-0.5 hover:scale-[1.01] hover:[box-shadow:var(--block-hover-shadow)]" : ""}`}
             style={{
               borderRadius: `${style.cardRadius}px`,
-              opacity: style.cardOpacity / 100,
+              opacity: effects.opacity,
+              "--block-shadow": effects.boxShadow,
+              "--block-hover-shadow": effects.hoverShadow,
               backgroundColor: resolveBlockColor(style.backgroundColor, themeColors) ?? "var(--color-surface)",
               backgroundImage: blockFinishImage(style, themeColors),
               borderTopWidth: `${style.cardBorderSides.top ? style.cardBorderWidth : 0}px`,
@@ -194,8 +197,9 @@ export function MuralCanvas({
           >
             {!editMode ? <button className="absolute inset-0 z-10 rounded-[inherit] focus-visible:outline-2 focus-visible:outline-[var(--block-accent,var(--color-accent))]" aria-label={`Open ${block.type} block`} onClick={() => onOpenBlock ? onOpenBlock(block) : setFocusedId(block.id)} /> : null}
             <BlockRenderer block={block} books={books} images={images} profile={profile} groups={groups} shelfThemeOverride={shelfThemeOverride} readerCardOverride={readerCardOverride} statsOverride={statsOverride} tierlistData={tierlistData} />
+            {effects.fadeColor && effects.fadeOpacity > 0 ? <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-[1] rounded-[inherit]" style={{ backgroundColor: effects.fadeColor, opacity: effects.fadeOpacity }} /> : null}
             {editMode && !drag.drop && (
-              <div className="mural-block-controls absolute top-1.5 right-1.5 opacity-0 transition-opacity group-hover:opacity-100">
+              <div className="mural-block-controls absolute top-1.5 right-1.5 z-20 opacity-0 transition-opacity group-hover:opacity-100">
                 <OptionsMenu
                   title="Block settings"
                   items={[

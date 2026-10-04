@@ -651,6 +651,15 @@ export function MuralEditorPage() {
       {stylingBlock && (
         <BlockStylePanel
           block={stylingBlock}
+          preview={(style) => <MuralCanvas
+            mural={{ ...view, blocks: [{ ...stylingBlock, style, layout: { ...stylingBlock.layout, x: 0, y: 0 } }] }}
+            editMode={false}
+            books={books}
+            images={images}
+            groups={library?.data.groups ?? []}
+            profile={session?.user.username ? { username: session.user.username, avatarUrl: session.user.avatarId ? avatarUrlFor(session.user.avatarId) : null } : undefined}
+            tierlistData={tierlistData}
+          />}
           onSave={(blockStyle) => void guard(handleSaveBlockStyle(stylingBlock.id, blockStyle), "Couldn't save that style.")}
           onClose={() => setStylingBlockId(null)}
         />
