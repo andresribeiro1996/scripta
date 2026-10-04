@@ -91,6 +91,18 @@ const workCounts = covers.prepare(
    FROM works`
 ).get();
 
+const after = covers.prepare(
+  `SELECT
+     SUM(books.ol_work_key IS NULL AND works.ol_work_key IS NOT NULL) AS keylessEditionsInKeyedWorks,
+     SUM(books.title_group_blocked_at IS NOT NULL) AS blockedEditions,
+     SUM(books.work_checked_at IS NOT NULL) AS lookedUp,
+     SUM(books.work_checked_at IS NOT NULL AND books.ol_work_key IS NOT NULL) AS lookedUpAndKeyed,
+     SUM(books.title_key IS NULL AND books.title <> '') AS titleKeysPending,
+     (SELECT COUNT(*) FROM works AS w WHERE w.merged_into IN (SELECT id FROM works WHERE merged_into IS NOT NULL)) AS chainsLongerThanOneHop,
+     (SELECT COUNT(*) FROM works AS w WHERE w.ol_work_key IS NULL AND w.merged_into IS NULL AND (SELECT COUNT(*) FROM books AS b WHERE b.work_id = w.id) > 1) AS keylessGroups
+   FROM books JOIN works ON works.id = books.work_id`
+).get();
+
 const keySpread = (map) => {
   const spread = { groupsWithAKeyedEdition: 0, groupsSpanningSeveralKeyedWorks: 0 };
   for (const group of map.values()) {
@@ -162,6 +174,7 @@ splits.readers = splits.readers.size;
 const report = {
   catalog,
   works: workCounts,
+  grouping: after,
   groupingAsWorkKey: { titleKey: keySpread(byGroup), loose: keySpread(byLoose) },
   library: lib,
   referenced,
