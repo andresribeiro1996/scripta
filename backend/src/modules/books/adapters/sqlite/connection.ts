@@ -29,6 +29,7 @@ export function applyBooksMigrations(db: DatabaseSync): void {
   const columns = db.prepare("PRAGMA table_info(books)").all() as Array<{ name: string }>;
   if (!columns.some((column) => column.name === "data_sources")) db.exec("ALTER TABLE books ADD COLUMN data_sources TEXT NOT NULL DEFAULT '[]'");
   if (!columns.some((column) => column.name === "cover_upgrade_wanted_at")) db.exec("ALTER TABLE books ADD COLUMN cover_upgrade_wanted_at TEXT");
+  if (!columns.some((column) => column.name === "apple_checked_at")) db.exec("ALTER TABLE books ADD COLUMN apple_checked_at TEXT");
   if (!columns.some((column) => column.name === "ol_work_key")) db.exec("ALTER TABLE books ADD COLUMN ol_work_key TEXT");
   if (!columns.some((column) => column.name === "publisher_url")) db.exec("ALTER TABLE books ADD COLUMN publisher_url TEXT");
   if (!columns.some((column) => column.name === "created_by")) db.exec("ALTER TABLE books ADD COLUMN created_by TEXT");
@@ -50,7 +51,7 @@ export function applyBooksMigrations(db: DatabaseSync): void {
       VALUES (?, ?, ?, NULL, ?, ?, ?, ?)
     `);
 
-    db.exec("BEGIN");
+    db.exec("BEGIN IMMEDIATE");
     try {
       for (const row of rows) {
         if (!row.cache_key.startsWith("isbn:")) continue;
@@ -63,7 +64,7 @@ export function applyBooksMigrations(db: DatabaseSync): void {
       db.exec("DROP TABLE cover_cache");
       db.exec("COMMIT");
     } catch (error) {
-      db.exec("ROLLBACK");
+      if (db.isTransaction) db.exec("ROLLBACK");
       throw error;
     }
   }
@@ -75,7 +76,7 @@ function backfillTitleKeys(db: DatabaseSync): void {
   if (version >= 1) return;
   const rows = db.prepare("SELECT id, title, author FROM books WHERE title != '' ORDER BY created_at ASC").all() as Array<{ id: string; title: string; author: string }>;
   const insertKey = db.prepare("INSERT OR IGNORE INTO book_keys (key, book_id) VALUES (?, ?)");
-  db.exec("BEGIN");
+  db.exec("BEGIN IMMEDIATE");
   try {
     for (const row of rows) {
       const key = catalogTitleKey(row.title, row.author);
@@ -84,7 +85,7 @@ function backfillTitleKeys(db: DatabaseSync): void {
     db.exec("PRAGMA user_version = 1");
     db.exec("COMMIT");
   } catch (error) {
-    db.exec("ROLLBACK");
+    if (db.isTransaction) db.exec("ROLLBACK");
     throw error;
   }
 }

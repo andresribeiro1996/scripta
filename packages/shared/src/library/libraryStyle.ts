@@ -397,6 +397,12 @@ export const BLOCK_BACKGROUND_FINISH_OPTIONS: Array<{ value: BlockBackgroundFini
   { value: "linen", label: "Linen" }
 ];
 
+export const BLOCK_SHADOW_OPACITY_RANGE = { min: 0, max: 100, step: 1 };
+export const BLOCK_SHADOW_BLUR_RANGE = { min: 0, max: 24, step: 1 };
+export const BLOCK_SHADOW_OFFSET_RANGE = { min: 0, max: 16, step: 1 };
+export const BLOCK_GRADIENT_ANGLE_RANGE = { min: 0, max: 360, step: 1 };
+export const BLOCK_GRADIENT_STRENGTH_RANGE = { min: 0, max: 100, step: 1 };
+
 /** A FULLY INDEPENDENT type — deliberately NOT `Omit<PerCardStyle, ...> &
  *  {...}` (an earlier version of this file did derive it that way, and it
  *  was a real bug waiting to happen: the moment PerCardStyle grew its own
@@ -419,6 +425,9 @@ export type BlockStyle = {
    *  field here. */
   backgroundColor: string | null;
   backgroundFinish: BlockBackgroundFinish;
+  gradientColor: string | null;
+  gradientAngle: number;
+  gradientStrength: number;
   /** The block's typeface — see BlockFontFamily above. */
   fontFamily: BlockFontFamily;
   /** The block's BASE text size, in px — applied to the block wrapper
@@ -463,6 +472,11 @@ export type BlockStyle = {
   cardBorderSides: BorderSides;
   cardOpacity: number;
   cardShadow: boolean;
+  shadowColor: string | null;
+  shadowOpacity: number;
+  shadowBlur: number;
+  shadowOffsetY: number;
+  fadeColor: string | null;
   cardHoverEffect: boolean;
   textAlign: BlockTextAlign;
   innerSpacing: BlockInnerSpacing;
@@ -471,6 +485,9 @@ export type BlockStyle = {
 export const DEFAULT_BLOCK_STYLE: BlockStyle = {
   backgroundColor: null,
   backgroundFinish: "none",
+  gradientColor: null,
+  gradientAngle: 135,
+  gradientStrength: 100,
   fontFamily: "sans",
   fontSize: 14, // roughly matches the block text sizes hardcoded before this setting existed
   textColor: null,
@@ -485,6 +502,11 @@ export const DEFAULT_BLOCK_STYLE: BlockStyle = {
   cardBorderSides: DEFAULT_BORDER_SIDES,
   cardOpacity: 100,
   cardShadow: true, // matches the old hardcoded `shadow-sm`
+  shadowColor: null,
+  shadowOpacity: 12,
+  shadowBlur: 4,
+  shadowOffsetY: 2,
+  fadeColor: null,
   cardHoverEffect: false, // a mural block isn't a clickable navigational element the way a BookCard is — off by default, unlike PerCardStyle's
   textAlign: "left",
   innerSpacing: "normal"
@@ -494,6 +516,12 @@ export const DEFAULT_BLOCK_STYLE: BlockStyle = {
 export function resolveBlockStyle(style: Partial<BlockStyle> | undefined): BlockStyle {
   const resolved = { ...DEFAULT_BLOCK_STYLE, ...style };
   if (!BLOCK_BACKGROUND_FINISH_OPTIONS.some((option) => option.value === resolved.backgroundFinish)) resolved.backgroundFinish = "none";
+  for (const [key, range] of [["shadowOpacity", BLOCK_SHADOW_OPACITY_RANGE], ["shadowBlur", BLOCK_SHADOW_BLUR_RANGE], ["shadowOffsetY", BLOCK_SHADOW_OFFSET_RANGE], ["gradientAngle", BLOCK_GRADIENT_ANGLE_RANGE], ["gradientStrength", BLOCK_GRADIENT_STRENGTH_RANGE]] as const) {
+    resolved[key] = typeof resolved[key] === "number" && Number.isFinite(resolved[key]) ? Math.min(range.max, Math.max(range.min, resolved[key])) : DEFAULT_BLOCK_STYLE[key];
+  }
+  for (const key of ["shadowColor", "fadeColor", "gradientColor"] as const) {
+    if (typeof resolved[key] !== "string") resolved[key] = null;
+  }
   return resolved;
 }
 

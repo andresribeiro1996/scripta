@@ -76,11 +76,13 @@ that PR's branch.
   | Routes | Limit |
   |---|---|
   | `PUT /library` that declares a `Content-Length` of at most 1 MiB (one bucket per account, shared with the next row; 120 because group curation sends a save per checkbox, and a save of a library that small costs about 65 ms, so 120/min is about 13% of the event loop; a small save that conflicts with a big stored library answers 409 with the whole stored document, about 75–150 ms, until library rows replace whole-document saves) | 120/min |
-  | `PUT /library` over 1 MiB or with no or an invalid `Content-Length`, `POST /library/books`, `POST /library/books/merge`, `POST /library/share`, `POST /library/unshare` (same bucket; measured at the 10 MiB cap through the real route, a save costs 0.3–0.65 s and a share or unshare 148–164 ms, so 30/min is about a third of the event loop where 120/min would be 65–130%; add-book and merge process the whole stored document, so their cost grows with the stored library, not with their tiny bodies) | 30/min |
+  | `PUT /library` over 1 MiB or with no or an invalid `Content-Length`, `POST /library/books`, `POST /library/books/add`, `POST /library/books/merge`, `POST /library/share`, `POST /library/unshare` (same bucket; measured at the 10 MiB cap through the real route, a save costs 0.3–0.65 s and a share or unshare 148–164 ms, so 30/min is about a third of the event loop where 120/min would be 65–130%; add-book and merge process the whole stored document, so their cost grows with the stored library, not with their tiny bodies) | 30/min |
+  | `POST /library/groups/:groupId/books`, `PATCH /library/books` (own bucket per account, apart from whole-library saves; each reads and rewrites the stored document, measured at 140–200 ms for a 10 MiB one, so 60/min is about 20% of the event loop) | 60/min |
   | `GET /library` | 60/min |
   | `GET /community/dashboard` | 60/min |
   | `GET /community/people` | 60/min |
   | `POST /community/follows`, `DELETE /community/follows/:userId` (one shared bucket; a follow copies the followee's recent events into the follower's inbox and an unfollow deletes them) | 30/min |
+  | `PUT /community/profile/feed-settings`, `PUT /community/profile/publish` (one shared bucket; turning a category on copies the author's last 30 days of it into every follower's inbox, up to 100 rows each, in the background) | 30/min |
   | `GET /arenas/public` | 30/min |
 
 - `backend/README.md`: the auth limit of 20/min covers every `/auth` route,
@@ -187,8 +189,24 @@ shows:**
   filter, using the same SQL fragment as the write so they cannot disagree, so
   a category switched off after rows were written is hidden at once; those rows
   stay until they age out, and switching the category back on shows them again.
-- Switching a category on does not backfill the inboxes: only later events
-  reach them. The profile activity page still shows the past ones.
+- Switching a category on brings the author's last 30 days of it into every
+  follower's inbox, the newest 100 per follower (`FOLLOW_COPY_LIMIT`), with
+  the events' own dates. Saving feed settings, or publishing with
+  `shareReading`, compares the switches before and after, and for the feed
+  types of the categories that came on starts a background task in the
+  handler. The task yields to the event loop before its first batch, so its
+  batches run on later turns, after the request has answered. It lists the
+  author's followers and fills 50 at a time
+  (`BACKFILL_BATCH`): one `INSERT OR IGNORE … SELECT` per batch in its own
+  transaction, with a turn of the event loop before it, selecting the events
+  once and joining them to the batch's followers in `follows`, so a reader who
+  unfollows before their batch gets nothing. It applies the same `authorShows`
+  fragment as the other writes. A failure is logged
+  (`community feed backfill failed`); a restart in the middle leaves the
+  followers not yet reached without the rows until the author switches the
+  category off and on again. A batch of 50 followers and 100 events is 5,000
+  rows and 15–35 ms; 1,000 followers take about 0.5 s and 10,000 about 7 s,
+  in turns of at most 76 ms.
 - Following someone copies their events of the last 30 days into your inbox,
   only the categories they show now, newest first, at most 100
   (`FOLLOW_COPY_LIMIT`); unfollowing deletes theirs. Rows older than 30 days

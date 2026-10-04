@@ -46,7 +46,7 @@ export function createSqliteAuthRepository(db: DatabaseSync): AuthRepository {
       db.exec("COMMIT");
       return result;
     } catch (error) {
-      db.exec("ROLLBACK");
+      if (db.isTransaction) db.exec("ROLLBACK");
       throw error;
     }
   }

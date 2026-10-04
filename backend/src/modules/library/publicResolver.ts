@@ -27,7 +27,7 @@
 // plugin can be reworked without this file needing to change at all.
 
 import type { DatabaseSync } from "node:sqlite";
-import { calculateShelfTheme, publicReaderCard, readerIdentity, type Group, type IdentityKey, type PublicReaderCard, type ShelfTheme } from "@scripta/shared";
+import { calculateShelfTheme, isGroup, publicReaderCard, readerIdentity, type Group, type IdentityKey, type PublicReaderCard, type ShelfTheme } from "@scripta/shared";
 import type { SharedBook } from "@scripta/shared/community";
 // Cross-module dependency, same discipline as murals/routes.ts importing
 // this very file only from library/index.ts: peekCachedCoverUrl is
@@ -336,8 +336,8 @@ function parseLibraryDocument(userId: string): ParsedLibraryDocument | null {
 // Tolerant filtering, same convention as this file's byKey/collection
 // lookups: a malformed group (missing bookKeys, non-string name) is
 // dropped rather than crashing readerIdentity's own iteration over it.
-export function toReaderGroups(groupRecords: Record<string, unknown>[]): Group[] {
-  return groupRecords.filter((group) => Array.isArray(group.bookKeys) && typeof group.name === "string") as unknown as Group[];
+export function toReaderGroups(groupRecords: unknown[]): Group[] {
+  return groupRecords.filter(isGroup);
 }
 
 export function readerGlyphFor(userId: string): IdentityKey | null {

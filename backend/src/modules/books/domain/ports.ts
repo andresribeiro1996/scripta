@@ -17,6 +17,7 @@ export interface BooksRepository {
   getImage(id: string): CoverImageRow | undefined;
   insertImage(row: CoverImageRow): void;
   setCover(bookId: string, cover: { imageId: string | null; status: CoverStatus | null; checkedAt: string | null }): void;
+  setCoverIf(bookId: string, expectedImageId: string | null, cover: { imageId: string | null; status: CoverStatus | null; checkedAt: string | null }): boolean;
   addRejection(bookId: string, sourceUrl: string, createdAt: string): void;
   listRejectedUrls(bookId: string): Set<string>;
   saveDetails(bookId: string, details: CatalogBookMetadata, sources: DataSource[], summarySource: DataSource | null, checkedAt: string): void;
@@ -27,6 +28,7 @@ export interface BooksRepository {
   listUncheckedCoverIds(): string[];
   listUncheckedDetailIds(limit: number): string[];
   setUpgradeWanted(bookId: string, at: string | null): void;
+  setAppleChecked(bookId: string, at: string): void;
   setWorkKey(id: string, key: string | null | undefined): void;
   setPublisherUrl(id: string, url: string): void;
   listUpgradeWantedIds(): string[];
@@ -44,7 +46,7 @@ export interface TitledCandidate extends CoverCandidate {
 
 export interface CoverSource {
   byIsbn(isbn: string): Promise<CoverCandidate[]>;
-  byTitle(title: string, author: string, accept: (candidate: TitledCandidate) => boolean): Promise<CoverCandidate[]>;
+  byTitle(title: string, author: string, accept: (candidate: TitledCandidate) => boolean, isbn?: string | null): Promise<CoverCandidate[]>;
 }
 
 export interface CatalogSearchHit {

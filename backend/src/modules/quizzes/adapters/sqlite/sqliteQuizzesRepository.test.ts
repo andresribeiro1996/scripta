@@ -187,3 +187,15 @@ test("rekeyBooks rewrites the owner's unpublished quiz books and de-duplicates b
   assert.notEqual(read("draft").updated_at, "t0");
   assert.equal(read("published").data, data);
 });
+
+test("a trigger that rolls the transaction back surfaces its own error and keeps every row", () => {
+  const db = new DatabaseSync(":memory:");
+  applyQuizzesMigrations(db);
+  const repo = createSqliteQuizzesRepository(db);
+  repo.insert(quizRow());
+  repo.savePlay(playRow("p1", "quiz-1", "u9"), []);
+  db.exec("CREATE TRIGGER boom BEFORE DELETE ON quizzes BEGIN SELECT RAISE(ROLLBACK, 'trigger boom'); END");
+  assert.throws(() => repo.deleteUserData("u1"), /trigger boom/);
+  assert.equal(repo.playCount("quiz-1"), 1);
+  assert.equal(db.isTransaction, false);
+});

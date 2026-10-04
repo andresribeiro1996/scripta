@@ -18,6 +18,7 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
   const deleteFollowStmt = db.prepare(`DELETE FROM follows WHERE follower_id = ? AND followee_id = ?`);
   const getFollowStmt = db.prepare(`SELECT * FROM follows WHERE follower_id = ? AND followee_id = ?`);
   const listFolloweesStmt = db.prepare(`SELECT followee_id FROM follows WHERE follower_id = ? ORDER BY created_at DESC`);
+  const listFollowerIdsStmt = db.prepare(`SELECT follower_id FROM follows WHERE followee_id = ?`);
   const listFollowersStmt = db.prepare(`SELECT * FROM follows WHERE followee_id = ? ORDER BY created_at DESC, follower_id DESC LIMIT ?`);
   const listFollowersBeforeStmt = db.prepare(`
     SELECT * FROM follows
@@ -61,6 +62,17 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
     FROM events e LEFT JOIN profiles p ON p.user_id = e.user_id
     WHERE e.user_id = $followee_id AND e.created_at >= $since AND ${authorShows}
     ORDER BY e.created_at DESC, e.id DESC LIMIT $limit
+  `);
+  const backfillInboxStmt = db.prepare(`
+    INSERT OR IGNORE INTO feed_inbox (viewer_id, created_at, event_id, author_id)
+    SELECT f.follower_id, e.created_at, e.id, e.user_id
+    FROM follows f CROSS JOIN (
+      SELECT e.id, e.created_at, e.user_id
+      FROM events e LEFT JOIN profiles p ON p.user_id = e.user_id
+      WHERE e.user_id = $author_id AND e.created_at >= $since AND e.type IN (SELECT value FROM json_each($types)) AND ${authorShows}
+      ORDER BY e.created_at DESC, e.id DESC LIMIT $per_follower
+    ) e
+    WHERE f.followee_id = $author_id AND f.follower_id IN (SELECT value FROM json_each($follower_ids))
   `);
   const deleteInboxFromAuthorStmt = db.prepare(`DELETE FROM feed_inbox WHERE viewer_id = ? AND author_id = ?`);
   const listInboxStmt = db.prepare(`SELECT e.* ${inboxFrom} WHERE ${inboxWhere} ORDER BY i.created_at DESC, i.event_id DESC LIMIT ?`);
@@ -144,6 +156,9 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
     },
     listFollowees(followerId) {
       return (listFolloweesStmt.all(followerId) as Array<{ followee_id: string }>).map((row) => row.followee_id);
+    },
+    listFollowerIds(followeeId) {
+      return (listFollowerIdsStmt.all(followeeId) as Array<{ follower_id: string }>).map((row) => row.follower_id);
     },
     listFollowersByFollowee(followeeId, keyset, limit) {
       if (keyset) {
@@ -243,6 +258,15 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
     },
     purgeInboxBefore(cutoff, batch) {
       return Number(purgeInboxStmt.run({ $cutoff: cutoff, $batch: batch }).changes);
+    },
+    backfillInbox(authorId, followerIds, types, since) {
+      backfillInboxStmt.run({
+        $author_id: authorId,
+        $since: since,
+        $types: JSON.stringify(types),
+        $per_follower: FOLLOW_COPY_LIMIT,
+        $follower_ids: JSON.stringify(followerIds)
+      });
     }
   };
 }

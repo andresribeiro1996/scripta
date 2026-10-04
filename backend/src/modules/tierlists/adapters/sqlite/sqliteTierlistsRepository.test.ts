@@ -433,3 +433,17 @@ test("votedAmong returns the requested tier lists the account has a ballot on, n
   repo.promote("own", "2026-05-01T00:00:00.000Z");
   assert.deepEqual(repo.votedAmong("u2", ["own"]), []);
 });
+
+test("a trigger that rolls the transaction back surfaces its own error and keeps every row", () => {
+  const db = freshDb();
+  const repo = createSqliteTierlistsRepository(db);
+  repo.insert(row({ id: "c1" }));
+  db.exec("CREATE TRIGGER boom BEFORE INSERT ON tierlist_ballots BEGIN SELECT RAISE(ROLLBACK, 'trigger boom'); END");
+  assert.throws(
+    () => repo.publish("c1", "u1", row({ id: "c1" }).data, "anonymous", "abc12345", "[]", ballot({ id: "bal1", tierlist_id: "c1", voter_user_id: "u1" }), []),
+    /trigger boom/
+  );
+  assert.equal(repo.getByVoteCode("abc12345"), undefined);
+  assert.equal(repo.listByUser("u1")[0]?.vote_code, null);
+  assert.equal(db.isTransaction, false);
+});

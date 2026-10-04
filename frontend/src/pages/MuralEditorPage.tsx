@@ -30,6 +30,9 @@ import {
   duplicateBlock,
   isValidBlockLayout,
   muralThemeId,
+  moveMuralBlock,
+  toggleMuralBlockExpansion,
+  withMuralBlockLayout,
   removeBlock,
   updateBlock,
   type BlockLayout,
@@ -134,11 +137,15 @@ export function MuralEditorPage() {
   // Bumped only when a save fails; see guard() below for why a
   // remount is what puts a block back where it was.
   const [revertNonce, setRevertNonce] = useState(0);
+  const [dragging, setDragging] = useState(false);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [mobileDraft, setMobileDraft] = useState<MobileMuralDraft | null>(null);
   const [savingDraft, setSavingDraft] = useState(false);
   const savingDraftRef = useRef(false);
   const editVersionRef = useRef(0);
+  const [layoutHistory, setLayoutHistory] = useState<{ id: string; before: MuralBlock[]; after: MuralBlock[] }[]>([]);
+  const layoutSavingRef = useRef(false);
+  const [savingLayout, setSavingLayout] = useState(false);
   const [compactMode, setCompactMode] = useState(
     () => typeof window !== "undefined" && (window.innerWidth < 768 || Boolean(window.matchMedia?.("(pointer: coarse)").matches))
   );
@@ -281,11 +288,10 @@ export function MuralEditorPage() {
     const mural = await materialize();
     if (!mural) return;
     const before = mural.blocks;
-    const removedIndex = before.findIndex((block) => block.id === blockId);
-    const removed = before[removedIndex];
+    const removed = before.find((block) => block.id === blockId);
     if (!removed) return;
     const [updated] = removeBlock([mural], mural.id, blockId);
-    await saveBlocks(mural.id, updated.blocks);
+    const saved = await saveBlocks(mural.id, updated.blocks);
     setSelectedBlockId(null);
     setMobileDraft(null);
     const version = ++editVersionRef.current;
@@ -297,10 +303,8 @@ export function MuralEditorPage() {
         onClick: () => {
           if (version !== editVersionRef.current) return;
           const latest = currentMural(mural.id);
-          if (!latest || latest.blocks.some((block) => block.id === removed.id) || !isValidBlockLayout(removed.layout, latest.blocks)) return;
-          const restoredBlocks = [...latest.blocks];
-          restoredBlocks.splice(Math.min(removedIndex, restoredBlocks.length), 0, removed);
-          void guard(saveBlocks(mural.id, restoredBlocks), "Couldn't undo that.").then((restored) => {
+          if (!latest || JSON.stringify(latest.blocks) !== JSON.stringify(saved.blocks)) return;
+          void guard(saveBlocks(mural.id, before), "Couldn't undo that.").then((restored) => {
             if (restored) editVersionRef.current++;
           });
         }
@@ -308,14 +312,41 @@ export function MuralEditorPage() {
     });
   }
 
-  async function handleLayoutChange(blockId: string, layout: BlockLayout) {
-    const mural = await materialize();
-    if (!mural) return;
-    const current = mural.blocks.find((b) => b.id === blockId);
-    if (!current) return;
-    const [updated] = updateBlock([mural], mural.id, { ...current, layout });
-    await saveBlocks(mural.id, updated.blocks);
-    editVersionRef.current++;
+  async function changeLayout(change: (blocks: MuralBlock[]) => MuralBlock[]) {
+    if (layoutSavingRef.current) return;
+    layoutSavingRef.current = true;
+    setSavingLayout(true);
+    try {
+      const target = await materialize();
+      if (!target) return;
+      const latest = currentMural(target.id) ?? target;
+      const next = change(latest.blocks);
+      if (next === latest.blocks) return;
+      const saved = await saveBlocks(latest.id, next);
+      setLayoutHistory((items) => [...items.slice(-19), { id: latest.id, before: latest.blocks, after: saved.blocks }]);
+      editVersionRef.current++;
+    } finally {
+      layoutSavingRef.current = false;
+      setSavingLayout(false);
+    }
+  }
+
+  async function undoLayout() {
+    const entry = layoutHistory.at(-1);
+    if (!entry || layoutSavingRef.current || savingDraftRef.current) return;
+    const latest = currentMural(entry.id);
+    if (!latest || JSON.stringify(latest.blocks) !== JSON.stringify(entry.after)) return;
+    layoutSavingRef.current = true;
+    setSavingLayout(true);
+    try {
+      await saveBlocks(entry.id, entry.before);
+      setLayoutHistory((items) => items.slice(0, -1));
+      editVersionRef.current++;
+      setRevertNonce((value) => value + 1);
+    } finally {
+      layoutSavingRef.current = false;
+      setSavingLayout(false);
+    }
   }
 
   function startMobileDraft(kind: "move" | "resize", block: MuralBlock) {
@@ -325,12 +356,10 @@ export function MuralEditorPage() {
   function changeMobileDraft(layout: BlockLayout) {
     setMobileDraft((draft) => {
       if (!draft) return null;
-      const blocks = mural?.blocks ?? [];
-      const ignoreBlockId = draft.kind === "move" || draft.kind === "resize" ? draft.block.id : undefined;
       return {
         ...draft,
         block: { ...draft.block, layout },
-        valid: isValidBlockLayout(layout, blocks, ignoreBlockId)
+        valid: isValidBlockLayout(layout, [])
       };
     });
   }
@@ -358,8 +387,7 @@ export function MuralEditorPage() {
         }
         return;
       }
-      const ignoreBlockId = mobileDraft.kind === "move" || mobileDraft.kind === "resize" ? mobileDraft.block.id : undefined;
-      if (!isValidBlockLayout(mobileDraft.block.layout, target.blocks, ignoreBlockId)) {
+      if (!isValidBlockLayout(mobileDraft.block.layout, [])) {
         setMobileDraft((draft) => draft ? { ...draft, valid: false } : null);
         return;
       }
@@ -368,9 +396,11 @@ export function MuralEditorPage() {
       if (mobileDraft.kind === "add" || mobileDraft.kind === "duplicate") {
         blocks = [...target.blocks, mobileDraft.block];
       } else {
-        blocks = target.blocks.map((block) => block.id === mobileDraft.block.id ? { ...block, layout: mobileDraft.block.layout } : block);
+        blocks = target.blocks.map((block) => block.id === mobileDraft.block.id ? withMuralBlockLayout(block, mobileDraft.block.layout) : block);
       }
+      blocks = moveMuralBlock(blocks, mobileDraft.block.id, mobileDraft.block.layout);
       const saved = await saveBlocks(target.id, blocks);
+      setLayoutHistory((items) => [...items.slice(-19), { id: target.id, before, after: saved.blocks }]);
       const finishedDraft = mobileDraft;
       setMobileDraft(null);
       setSelectedBlockId(finishedDraft.block.id);
@@ -384,18 +414,9 @@ export function MuralEditorPage() {
             onClick: () => {
               if (version !== editVersionRef.current) return;
               const latest = currentMural(target.id);
-              const original = before.find((block) => block.id === finishedDraft.block.id);
-              const current = latest?.blocks.find((block) => block.id === finishedDraft.block.id);
-              if (
-                !latest ||
-                !original ||
-                !current ||
-                JSON.stringify(current.layout) !== JSON.stringify(finishedDraft.block.layout) ||
-                !isValidBlockLayout(original.layout, latest.blocks, current.id)
-              ) return;
-              const restoredBlocks = latest.blocks.map((block) => block.id === current.id ? { ...block, layout: original.layout } : block);
-              void guard(saveBlocks(target.id, restoredBlocks), "Couldn't undo that.").then((restored) => {
-                if (restored) editVersionRef.current++;
+              if (!latest || JSON.stringify(latest.blocks) !== JSON.stringify(saved.blocks)) return;
+              void guard(saveBlocks(target.id, before), "Couldn't undo that.").then((restored) => {
+                if (restored) { editVersionRef.current++; setLayoutHistory((items) => items.slice(0, -1)); }
               });
             }
           }
@@ -484,7 +505,7 @@ export function MuralEditorPage() {
             Desktop below keeps the labelled buttons: there's room, and a
             word beats an icon whose meaning you'd have to long-press to
             discover. */}
-        <div className="flex items-center gap-2 sm:hidden">
+        <div style={{ visibility: dragging ? "hidden" : undefined }} className="flex items-center gap-2 sm:hidden">
           {editMode && !mobileDraft && <AddBlockMenu onAdd={(type) => void guard(handleAddBlock(type), "Couldn't add that block.")} />}
           {view.blocks.length > 0 && (
             <button onClick={() => void enterFullscreen()} aria-label="View mural fullscreen" title="View mural fullscreen" className={toolbarIconClass()}>
@@ -506,7 +527,7 @@ export function MuralEditorPage() {
             <PencilIcon />
           </button>
         </div>
-        <div className="hidden items-center gap-2 sm:flex">
+        <div style={{ visibility: dragging ? "hidden" : undefined }} className="hidden items-center gap-2 sm:flex">
           {editMode && !mobileDraft && <AddBlockMenu onAdd={(type) => void guard(handleAddBlock(type), "Couldn't add that block.")} />}
           {view.blocks.length > 0 && (
             <button
@@ -569,30 +590,38 @@ export function MuralEditorPage() {
           style={fullscreen ? muralThemeStyle(view.theme) : undefined}
           className={fullscreen ? "fixed inset-0 z-50 overflow-y-auto bg-(--color-bg) px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]" : ""}
         >
+          <div style={{ visibility: dragging ? "hidden" : undefined }} className="sticky top-0 z-40">
           {fullscreen && (
-            <div className="sticky top-0 z-40 -mx-4 -mt-4 mb-3 flex items-center justify-between bg-(--color-bg)/95 px-4 py-3 backdrop-blur">
+            <div className="-mx-4 -mt-4 mb-3 flex items-center justify-between bg-(--color-bg)/95 px-4 py-3 backdrop-blur">
               <p className="truncate font-semibold">{view.name}</p>
               <button onClick={() => void exitFullscreen()} aria-label="Exit fullscreen" className={toolbarIconClass()}>
                 <FullscreenIcon exit />
               </button>
             </div>
           )}
+          {editMode ? <div className="mb-2 flex min-h-11 items-center gap-3 bg-(--color-bg) px-2 py-1">
+            <p className="flex-1 text-xs text-(--color-text-dim)">Drag a block to place it. Move to an edge to scroll.</p>
+            <button disabled={savingLayout || savingDraft || !layoutHistory.length || layoutHistory.at(-1)?.id !== view.id || JSON.stringify(layoutHistory.at(-1)?.after) !== JSON.stringify(view.blocks)} onClick={() => void guard(undoLayout(), "Couldn't undo that move.")} className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm font-semibold disabled:opacity-40">Undo</button>
+          </div> : null}
+          </div>
           <MuralCanvas
             mural={view}
             editMode={editMode}
+            onDragChange={setDragging}
             groups={library?.data.groups ?? []}
             books={books}
             images={images}
             profile={session?.user.username ? { username: session.user.username, avatarUrl: session.user.avatarId ? avatarUrlFor(session.user.avatarId) : null } : undefined}
             revertNonce={revertNonce}
-            onLayoutChange={(blockId, layout) => void guard(handleLayoutChange(blockId, layout), "Couldn't save that move.")}
+            onLayoutChange={(blockId, layout) => void guard(changeLayout((blocks) => moveMuralBlock(blocks, blockId, layout)), "Couldn't save that move.")}
+            onToggleExpansion={(blockId, axis, bottom, top) => void guard(changeLayout((blocks) => toggleMuralBlockExpansion(blocks, blockId, axis, bottom, top)), "Couldn't resize that block.")}
             onConfigureBlock={(block) => setConfiguringBlockId(block.id)}
             onStyleBlock={(block) => setStylingBlockId(block.id)}
             onDuplicateBlock={(blockId) => void guard(handleDuplicateBlock(blockId), "Couldn't duplicate that block.")}
             onDeleteBlock={(blockId) => void guard(handleDeleteBlock(blockId), "Couldn't delete that block.")}
             selectedBlockId={selectedBlockId}
             mobileDraft={mobileDraft}
-            busy={savingDraft}
+            busy={savingDraft || savingLayout}
             onSelectBlock={setSelectedBlockId}
             onStartResize={(block) => startMobileDraft("resize", block)}
             onMobileDraftChange={changeMobileDraft}
@@ -622,6 +651,15 @@ export function MuralEditorPage() {
       {stylingBlock && (
         <BlockStylePanel
           block={stylingBlock}
+          preview={(style) => <MuralCanvas
+            mural={{ ...view, blocks: [{ ...stylingBlock, style, layout: { ...stylingBlock.layout, x: 0, y: 0 } }] }}
+            editMode={false}
+            books={books}
+            images={images}
+            groups={library?.data.groups ?? []}
+            profile={session?.user.username ? { username: session.user.username, avatarUrl: session.user.avatarId ? avatarUrlFor(session.user.avatarId) : null } : undefined}
+            tierlistData={tierlistData}
+          />}
           onSave={(blockStyle) => void guard(handleSaveBlockStyle(stylingBlock.id, blockStyle), "Couldn't save that style.")}
           onClose={() => setStylingBlockId(null)}
         />

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { BLOCK_THEME_COLOR_LABELS, parseThemeColorRef } from "@scripta/shared";
+import { BLOCK_GRADIENT_ANGLE_RANGE, BLOCK_GRADIENT_STRENGTH_RANGE, BLOCK_SHADOW_BLUR_RANGE, BLOCK_SHADOW_OFFSET_RANGE, BLOCK_SHADOW_OPACITY_RANGE, BLOCK_THEME_COLOR_LABELS, parseThemeColorRef } from "@scripta/shared";
 import {
   BLOCK_BACKGROUND_FINISH_OPTIONS,
   BLOCK_FONT_FAMILY_OPTIONS,
@@ -84,7 +84,7 @@ export function SliderRow({
   );
 }
 
-function ColorValueInput({ value, fallback, onChange }: { value: string; fallback: string; onChange: (color: string) => void }) {
+function ColorValueInput({ value, fallback, onChange, label = "Custom color" }: { value: string; fallback: string; onChange: (color: string) => void; label?: string }) {
   const themeKey = parseThemeColorRef(value);
   if (themeKey) {
     return (
@@ -96,7 +96,7 @@ function ColorValueInput({ value, fallback, onChange }: { value: string; fallbac
       </span>
     );
   }
-  return <input type="color" value={value} onChange={(e) => onChange(e.target.value)} className="h-8 w-16 rounded border border-(--color-border) bg-transparent" />;
+  return <input type="color" aria-label={label} value={value} onChange={(e) => onChange(e.target.value)} className="h-8 w-16 rounded border border-(--color-border) bg-transparent" />;
 }
 
 export function ToggleRow({
@@ -377,30 +377,25 @@ export function CardTextSection({ idPrefix, draft, onApply, onSaveNow }: { idPre
   );
 }
 
-type BlockAppearanceFields = "backgroundColor" | "backgroundFinish" | "cardRadius" | "cardOpacity" | "cardShadow" | "cardHoverEffect" | "innerSpacing";
+type BlockBackgroundFields = "cardShadow" | "backgroundColor" | "backgroundFinish" | "gradientColor" | "gradientAngle" | "gradientStrength" | "innerSpacing";
+type BlockEffectsFields = "cardOpacity" | "cardShadow" | "shadowColor" | "shadowOpacity" | "shadowBlur" | "shadowOffsetY" | "fadeColor" | "cardHoverEffect";
 
-/** BlockStyle's counterpart to CardAppearanceSection — same radius/
- *  opacity/shadow/hover controls, minus the two cover-specific ones
- *  (Cover shape, Text overlay darkness) a mural block has no use for,
- *  plus a background color control no BookCard equivalent needs (its
- *  background is always the cover art). Used only by
- *  components/murals/BlockStylePanel.tsx. */
-export function BlockAppearanceSection({
+export function BlockBackgroundSection({
   idPrefix,
   draft,
   onApply,
   onSaveNow
 }: {
   idPrefix: string;
-  draft: Pick<BlockStyle, BlockAppearanceFields>;
-  onApply: (patch: Partial<Pick<BlockStyle, BlockAppearanceFields>>) => void;
-  onSaveNow: (patch: Partial<Pick<BlockStyle, BlockAppearanceFields>>) => void;
+  draft: Pick<BlockStyle, BlockBackgroundFields>;
+  onApply: (patch: Partial<Pick<BlockStyle, BlockBackgroundFields>>) => void;
+  onSaveNow: (patch: Partial<Pick<BlockStyle, BlockBackgroundFields>>) => void;
 }) {
   const transparent = draft.backgroundColor === "transparent";
   const usingCustomBackground = draft.backgroundColor !== null && !transparent;
 
   return (
-    <Section title="Block appearance">
+    <Section title="Background">
       <label className="mb-3 flex items-center gap-2 text-sm font-semibold" htmlFor={`${idPrefix}-no-bg-toggle`}>
         <input
           id={`${idPrefix}-no-bg-toggle`}
@@ -433,6 +428,13 @@ export function BlockAppearanceSection({
         )}
       </div>
 
+      <ToggleRow id={`${idPrefix}-gradient`} label="Gradient background" checked={draft.gradientColor !== null} onChange={(enabled) => onSaveNow({ gradientColor: enabled ? "theme:accent" : null, ...(enabled && transparent ? { backgroundColor: null } : {}) })} />
+      {draft.gradientColor !== null ? <div className="mb-4 space-y-3">
+        <p className="text-xs text-(--color-text-dim)">The background is the first color.</p>
+        <div className="flex items-center justify-between text-sm font-semibold"><span>Second color</span><ColorValueInput label="Gradient second color" value={draft.gradientColor} fallback="#97532d" onChange={(gradientColor) => onApply({ gradientColor })} /></div>
+        <SliderRow id={`${idPrefix}-gradient-direction`} label="Direction" value={draft.gradientAngle} unit="°" range={BLOCK_GRADIENT_ANGLE_RANGE} onChange={(gradientAngle) => onApply({ gradientAngle })} />
+        <SliderRow id={`${idPrefix}-gradient-strength`} label="Blend strength" value={draft.gradientStrength} unit="%" range={BLOCK_GRADIENT_STRENGTH_RANGE} onChange={(gradientStrength) => onApply({ gradientStrength })} />
+      </div> : null}
       <div className="mb-4">
         <label className="mb-1 block text-sm font-semibold" htmlFor={`${idPrefix}-background-finish`}>
           Finish
@@ -452,23 +454,6 @@ export function BlockAppearanceSection({
         {transparent && <p className="mt-1 text-xs text-(--color-text-dim)">Shows when the block has a background</p>}
       </div>
 
-      <SliderRow
-        id={`${idPrefix}-block-radius`}
-        label="Corner radius"
-        value={draft.cardRadius}
-        range={CARD_RADIUS_RANGE}
-        onChange={(v) => onApply({ cardRadius: v })}
-      />
-
-      <SliderRow
-        id={`${idPrefix}-block-opacity`}
-        label="Block opacity"
-        value={draft.cardOpacity}
-        unit="%"
-        range={CARD_OPACITY_RANGE}
-        onChange={(v) => onApply({ cardOpacity: v })}
-      />
-
       <div className="mb-4">
         <label className="mb-1 block text-sm font-semibold" htmlFor={`${idPrefix}-inner-spacing`}>
           Inner spacing
@@ -487,7 +472,36 @@ export function BlockAppearanceSection({
         </select>
       </div>
 
+    </Section>
+  );
+}
+
+export function BlockEffectsSection({ idPrefix, draft, onApply, onSaveNow }: {
+  idPrefix: string;
+  draft: Pick<BlockStyle, BlockEffectsFields>;
+  onApply: (patch: Partial<Pick<BlockStyle, BlockEffectsFields>>) => void;
+  onSaveNow: (patch: Partial<Pick<BlockStyle, BlockEffectsFields>>) => void;
+}) {
+  return <Section title="Effects">
+      <SliderRow
+        id={`${idPrefix}-block-opacity`}
+        label="Block opacity"
+        value={draft.cardOpacity}
+        unit="%"
+        range={CARD_OPACITY_RANGE}
+        onChange={(v) => onApply({ cardOpacity: v })}
+      />
+
       <ToggleRow id={`${idPrefix}-block-shadow`} label="Drop shadow" checked={draft.cardShadow} onChange={(v) => onSaveNow({ cardShadow: v })} />
+      {draft.cardShadow ? <>
+        <SliderRow id={`${idPrefix}-shadow-strength`} label="Shadow strength" value={draft.shadowOpacity} unit="%" range={BLOCK_SHADOW_OPACITY_RANGE} onChange={(shadowOpacity) => onApply({ shadowOpacity })} />
+        <SliderRow id={`${idPrefix}-shadow-blur`} label="Shadow softness" value={draft.shadowBlur} range={BLOCK_SHADOW_BLUR_RANGE} onChange={(shadowBlur) => onApply({ shadowBlur })} />
+        <SliderRow id={`${idPrefix}-shadow-distance`} label="Shadow distance" value={draft.shadowOffsetY} range={BLOCK_SHADOW_OFFSET_RANGE} onChange={(shadowOffsetY) => onApply({ shadowOffsetY })} />
+        <ToggleRow id={`${idPrefix}-shadow-color`} label="Custom shadow color" checked={draft.shadowColor !== null} onChange={(enabled) => onSaveNow({ shadowColor: enabled ? "#000000" : null })} />
+        {draft.shadowColor !== null ? <ColorValueInput label="Shadow color" value={draft.shadowColor} fallback="#000000" onChange={(shadowColor) => onApply({ shadowColor })} /> : null}
+      </> : null}
+      <ToggleRow id={`${idPrefix}-fade-color`} label="Fade to a color" checked={draft.fadeColor !== null} hint="Uses the opacity level to wash a color over the block." onChange={(enabled) => onSaveNow({ fadeColor: enabled ? "#ffffff" : null })} />
+      {draft.fadeColor !== null ? <ColorValueInput label="Fade color" value={draft.fadeColor} fallback="#ffffff" onChange={(fadeColor) => onApply({ fadeColor })} /> : null}
       <ToggleRow
         id={`${idPrefix}-block-hover`}
         label="Hover animation"
@@ -495,8 +509,7 @@ export function BlockAppearanceSection({
         hint="Lift, scale up slightly, and deepen the shadow when you hover the block."
         onChange={(v) => onSaveNow({ cardHoverEffect: v })}
       />
-    </Section>
-  );
+  </Section>;
 }
 
 type BlockTextFields = "fontFamily" | "fontSize" | "textColor" | "bold" | "italic" | "codeStyle" | "textAlign";
