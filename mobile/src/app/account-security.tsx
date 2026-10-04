@@ -35,7 +35,7 @@ export default function AccountSecurityPage() {
       await apiClient.request(action === "password" ? "/auth/change-password" : "/auth/verification-email", {
         method: "POST", auth: true, body: action === "verify" ? {} : { currentPassword: current, password, email: action === "email" ? email : undefined },
       });
-      if (action === "password") { await signOut(); router.replace("/login"); }
+      if (action === "password") { await signOut(); router.replace({ pathname: "/login", params: { notice: "password-changed" } }); }
       else { setMessage(action === "email" ? "Check the new address to confirm it. Your current email stays active until then." : "Check your inbox and spam folder. You can resend in a minute."); setMode(null); }
       setCurrent(""); setPassword(""); setConfirm("");
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Please try again."); }
