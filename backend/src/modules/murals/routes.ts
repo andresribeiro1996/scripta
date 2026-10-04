@@ -24,7 +24,9 @@ import type { FastifyInstance } from "fastify";
 import { THEME_IDS } from "@scripta/shared/themes";
 import { z } from "zod";
 import { authGuard } from "../auth/index.js";
+import { resolveEntryWorks, workIdsByKey, WorkResolutionError } from "../library/index.js";
 import type { TierlistData } from "../tierlists/index.js";
+import { extractReferences } from "./domain/blockRefs.js";
 import { FolderCycleError, InvalidFolderReferenceError, MuralConflictError } from "./domain/errors.js";
 import { resolveMuralPublicPayload } from "./domain/publicPayload.js";
 import type { MuralsService } from "./service.js";
@@ -76,7 +78,7 @@ const updateFolderSchema = z
  *  volume. Registered in plugin.ts either with no rate limit at all
  *  (matching modules/library's own CRUD routes) or a generous ceiling —
  *  see plugin.ts's own comment for which. */
-export function buildMuralRoutes(service: MuralsService) {
+export function buildMuralRoutes(service: MuralsService, resolveWorks: typeof resolveEntryWorks = resolveEntryWorks) {
   return async function muralRoutes(app: FastifyInstance) {
     app.get("/murals", { preHandler: authGuard }, async (request, reply) => {
       return reply.send({ murals: service.listMurals(request.user.id) });
@@ -117,8 +119,18 @@ export function buildMuralRoutes(service: MuralsService) {
       if (!body.success) {
         return reply.code(400).send({ error: body.error.issues[0]?.message ?? "Invalid request." });
       }
+      let works: Map<string, string | null> | undefined;
+      if (body.data.blocks !== undefined && service.getMural(request.user.id, params.data.id)) {
+        const keys = [...extractReferences(body.data.blocks).bookKeys];
+        try {
+          works = workIdsByKey(keys, resolveWorks(request.user.id, keys.map((key) => ({ key }))));
+        } catch (err) {
+          if (err instanceof WorkResolutionError) return reply.code(503).send({ error: err.message });
+          throw err;
+        }
+      }
       try {
-        const mural = service.updateMural(request.user.id, params.data.id, body.data);
+        const mural = service.updateMural(request.user.id, params.data.id, body.data, works);
         if (!mural) {
           return reply.code(404).send({ error: "No mural with that id." });
         }
