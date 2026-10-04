@@ -133,8 +133,8 @@ test("a save with an unknown folder is a 400 that resolves nothing, even with th
   const failing: Resolver = () => { throw new WorkResolutionError(new Error("down")); };
   const down = await muralApp(failing);
   const other = down.service.createMural("u5", "Folder");
-  const res503 = await down.app.inject({ method: "PUT", url: `/murals/${other.id}`, headers: { authorization: "Bearer u5" }, payload });
-  assert.equal(res503.statusCode, 400);
+  const resUnknownFolder = await down.app.inject({ method: "PUT", url: `/murals/${other.id}`, headers: { authorization: "Bearer u5" }, payload });
+  assert.equal(resUnknownFolder.statusCode, 400);
   await down.app.close();
 });
 

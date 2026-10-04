@@ -80,16 +80,27 @@ export function createSqliteMuralsRepository(db: DatabaseSync): MuralsRepository
         throw error;
       }
     },
-    rekeyBooks(userId, fromKeys, toKey) {
+    rekeyBooks(userId, fromKeys, toKey, toWork) {
       const from = new Set(fromKeys);
       const now = new Date().toISOString();
       const update = db.prepare("UPDATE murals SET blocks = ?, updated_at = ? WHERE id = ?");
+      const dropWorks = db.prepare("DELETE FROM mural_works WHERE mural_id = ? AND key IN (SELECT value FROM json_each(?))");
+      const fromKeysJson = JSON.stringify(fromKeys);
+      const hasWorks = db.prepare("SELECT 1 FROM mural_works WHERE mural_id = ? LIMIT 1");
+      const keepWork = db.prepare(`
+        INSERT INTO mural_works (mural_id, key, work_id) VALUES (?, ?, ?)
+        ON CONFLICT (mural_id, key) DO UPDATE SET work_id = COALESCE(excluded.work_id, mural_works.work_id)
+      `);
       db.exec("BEGIN IMMEDIATE");
       try {
         for (const row of db.prepare("SELECT id, blocks FROM murals WHERE user_id = ?").all(userId) as Array<{ id: string; blocks: string }>) {
           const before = JSON.stringify(JSON.parse(row.blocks));
           const after = JSON.stringify(rekeyBlocks(JSON.parse(row.blocks), from, toKey));
-          if (after !== before) update.run(after, now, row.id);
+          if (after === before) continue;
+          update.run(after, now, row.id);
+          if (!hasWorks.get(row.id)) continue;
+          dropWorks.run(row.id, fromKeysJson);
+          keepWork.run(row.id, toKey, toWork);
         }
         db.exec("COMMIT");
       } catch (error) {
