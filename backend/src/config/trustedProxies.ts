@@ -1,7 +1,5 @@
 export const TRUSTED_PROXIES = [
   "loopback",
-  "linklocal",
-  "uniquelocal",
   "100.64.0.0/10",
   "173.245.48.0/20",
   "103.21.244.0/22",
