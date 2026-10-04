@@ -97,6 +97,17 @@ test("a lookup finds an edition stored only under its ISBN-10 key", () => {
   assert.equal(repo.findBookByKey("isbn:9780441013593")?.id, legacy.id);
 });
 
+test("looking up an existing edition by its canonical key writes no keys", () => {
+  const { service, repo } = harness();
+  service.resolveCover({ isbn: "0441013597", title: "Dune", author: "Frank Herbert" });
+  const addKey = repo.addKey;
+  let writes = 0;
+  repo.addKey = (...args) => { writes += 1; addKey(...args); };
+  service.resolveCover({ isbn: "9780441013593", title: "Dune", author: "Frank Herbert" });
+  service.resolveCover({ isbn: "0441013597", title: "Dune", author: "Frank Herbert" });
+  assert.equal(writes, 0);
+});
+
 test("repo.transaction nests inside an open transaction", () => {
   const { repo } = harness();
   const book = repo.transaction(() => repo.createBook({ title: "Orlando", author: "Virginia Woolf", isbn: null }, ["ta:orlando|woolf|"], "2026-01-01T00:00:00.000Z"));

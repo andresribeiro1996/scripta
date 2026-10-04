@@ -9,10 +9,12 @@ export function keysOf(repo: BooksRepository, identity: BookIdentity): string[] 
 }
 
 export function findExisting(repo: BooksRepository, identity: BookIdentity): BookRow | undefined {
-  for (const key of [identity.key, ...identity.aliasKeys]) {
-    const found = repo.findBookByKey(key);
+  const direct = repo.findBookByKey(identity.key);
+  if (direct) return direct;
+  for (const alias of identity.aliasKeys) {
+    const found = repo.findBookByKey(alias);
     if (found) {
-      for (const alias of [identity.key, ...identity.aliasKeys]) repo.addKey(alias, found.id);
+      repo.addKey(identity.key, found.id);
       return found;
     }
   }
