@@ -74,3 +74,29 @@ test("lists whose rows are all resolved are not visited again", () => {
   assert.equal(step(0, 250).visited, 1);
   assert.equal(step(0, 250).visited, 0);
 });
+
+test("a snapshot shorter than the pool is ignored, so no key gets another key's work", () => {
+  const db = freshDb();
+  const book = (title: string) => ({ title, author: "x", isbn: null, imageId: null, coverUrl: null, readStatus: null });
+  insertList(db, "t3", "__app__", "gone", ["a", "b", "c"], [book("A"), book("C")]);
+  const step = createTierlistsWorksStep(db, (_owner, entries) => new Map(entries.map((entry) => [entry.key, { workId: entry.title ? `w-${entry.title}` : null, title: entry.title ?? null }])));
+  step(0, 250);
+  assert.deepEqual(worksOf(db, "t3"), [{ key: "a", work_id: null }, { key: "b", work_id: null }, { key: "c", work_id: null }]);
+});
+
+test("a stored null snapshot does not throw", () => {
+  const db = freshDb();
+  insertList(db, "t4", "u1", "u1", ["a"], null);
+  db.prepare("UPDATE tierlists SET public_books = 'null' WHERE id = 't4'").run();
+  const step = createTierlistsWorksStep(db, (_owner, entries) => new Map(entries.map((entry) => [entry.key, { workId: null, title: null }])));
+  assert.equal(step(0, 250).visited, 1);
+});
+
+test("a re-sweep never replaces a stored work with NULL and drops keys off the board", () => {
+  const db = freshDb();
+  insertList(db, "t5", "u1", "u1", ["a", "b"], null);
+  db.prepare("INSERT INTO tierlist_works (tierlist_id, key, work_id) VALUES ('t5', 'a', 'w-a'), ('t5', 'b', NULL), ('t5', 'gone', 'w-gone')").run();
+  const step = createTierlistsWorksStep(db, (_owner, entries) => new Map(entries.map((entry) => [entry.key, { workId: null, title: null }])));
+  step(0, 250);
+  assert.deepEqual(worksOf(db, "t5"), [{ key: "a", work_id: "w-a" }, { key: "b", work_id: null }]);
+});

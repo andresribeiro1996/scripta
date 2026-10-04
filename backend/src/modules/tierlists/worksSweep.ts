@@ -9,7 +9,8 @@ type SnapshotBook = { title?: string; author?: string; isbn?: string | null };
 function entriesOf(data: string, publicBooks: string | null): WorkEntry[] {
   const board = JSON.parse(data) as { pool?: unknown };
   const pool = Array.isArray(board.pool) ? board.pool : [];
-  const snapshot = publicBooks ? (JSON.parse(publicBooks) as SnapshotBook[]) : [];
+  const parsed: unknown = publicBooks ? JSON.parse(publicBooks) : null;
+  const snapshot = Array.isArray(parsed) && parsed.length === pool.length ? (parsed as SnapshotBook[]) : [];
   return boardKeys(board).map((key) => {
     const book = snapshot[pool.indexOf(key)];
     return { key, title: book?.title ?? null, author: book?.author ?? null, isbn: book?.isbn ?? null };
@@ -26,8 +27,12 @@ export function createTierlistsWorksStep(db: DatabaseSync, resolve: Resolve): Wo
     )
     ORDER BY rowid LIMIT ?
   `);
-  const deleteWorks = db.prepare(`DELETE FROM tierlist_works WHERE tierlist_id = ?`);
-  const insertWork = db.prepare(`INSERT OR REPLACE INTO tierlist_works (tierlist_id, key, work_id) VALUES (?, ?, ?)`);
+  const deleteStaleWorks = db.prepare(`DELETE FROM tierlist_works WHERE tierlist_id = ? AND key NOT IN (SELECT value FROM json_each(?))`);
+  const setWork = db.prepare(`
+    INSERT INTO tierlist_works (tierlist_id, key, work_id) VALUES (?, ?, ?)
+    ON CONFLICT(tierlist_id, key) DO UPDATE SET work_id = excluded.work_id
+  `);
+  const keepWork = db.prepare(`INSERT OR IGNORE INTO tierlist_works (tierlist_id, key, work_id) VALUES (?, ?, NULL)`);
   const fillPlacements = db.prepare(`
     UPDATE tierlist_ballot_placements SET work_id = (SELECT w.work_id FROM tierlist_works w WHERE w.tierlist_id = tierlist_ballot_placements.tierlist_id AND w.key = tierlist_ballot_placements.book_key)
     WHERE tierlist_id = ? AND work_id IS NULL
@@ -39,10 +44,14 @@ export function createTierlistsWorksStep(db: DatabaseSync, resolve: Resolve): Wo
       const works = resolve(list.origin_user_id, entriesOf(list.data, list.public_books));
       db.exec("BEGIN IMMEDIATE");
       try {
-        deleteWorks.run(list.id);
+        deleteStaleWorks.run(list.id, JSON.stringify([...works.keys()]));
         for (const [key, ref] of works) {
-          insertWork.run(list.id, key, ref.workId);
-          if (ref.workId) resolved++;
+          if (!ref.workId) {
+            keepWork.run(list.id, key);
+            continue;
+          }
+          setWork.run(list.id, key, ref.workId);
+          resolved++;
         }
         fillPlacements.run(list.id);
         db.exec("COMMIT");
