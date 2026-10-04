@@ -332,6 +332,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
         } catch (error) {
           if (!(error instanceof SourceUnavailableError)) throw error;
           if (error.retryAt !== undefined) return error.retryAt;
+          if (error.status === 429) return now().getTime() + UNAVAILABLE_BACKOFF_MS;
           deps.warn({ bookId: id, source: error.source, error: error.message }, "work key source unavailable");
         }
         deps.repo.markWorkChecked(id, now().toISOString());

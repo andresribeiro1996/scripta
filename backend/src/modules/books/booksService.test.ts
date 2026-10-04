@@ -1456,6 +1456,16 @@ test("a rate limit ends the batch unstamped and returns when to resume", async (
   assert.deepEqual(ids.map((id) => h.repo.getBook(id)!.work_checked_at), [null, null]);
 });
 
+test("a rate limit without a retry time still ends the batch unstamped", async () => {
+  const calls: string[] = [];
+  const h = harness({ editionRecords: editionRecords(async () => { throw new SourceUnavailableError("openlibrary", "HTTP 429", { status: 429 }); }, calls) });
+  const ids = lookupBooks(h, [{ isbn: "9789720000001" }, { isbn: "9789720000002" }]);
+  assert.equal(await h.service.backfillWorkKeys(50), Date.parse("2026-10-01T00:00:00.000Z") + 10 * 60 * 1000);
+  assert.equal(calls.length, 1);
+  assert.deepEqual(ids.map((id) => h.repo.getBook(id)!.work_checked_at), [null, null]);
+  assert.deepEqual(h.warnings, []);
+});
+
 test("an outage without a retry time is warned about, stamped, and does not stop the batch", async () => {
   const h = harness({
     editionRecords: editionRecords(async (isbn) => {
