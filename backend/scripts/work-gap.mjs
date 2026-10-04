@@ -91,7 +91,10 @@ const workCounts = covers.prepare(
    FROM works`
 ).get();
 
-const after = covers.prepare(
+const bookColumns = new Set(covers.prepare("PRAGMA table_info(books)").all().map((column) => column.name));
+const migrated = ["title_key", "title_group_blocked_at", "work_checked_at"].every((name) => bookColumns.has(name));
+
+const after = !migrated ? null : covers.prepare(
   `SELECT
      SUM(books.ol_work_key IS NULL AND works.ol_work_key IS NOT NULL) AS keylessEditionsInKeyedWorks,
      SUM(books.title_group_blocked_at IS NOT NULL) AS blockedEditions,
@@ -100,7 +103,7 @@ const after = covers.prepare(
      SUM(books.title_key IS NULL AND books.title <> '') AS titleKeysPending,
      (SELECT COUNT(*) FROM works AS w WHERE w.merged_into IN (SELECT id FROM works WHERE merged_into IS NOT NULL)) AS chainsLongerThanOneHop,
      (SELECT COUNT(*) FROM works AS w WHERE w.ol_work_key IS NULL AND w.merged_into IS NULL AND (SELECT COUNT(*) FROM books AS b WHERE b.work_id = w.id) > 1) AS keylessGroups
-   FROM books JOIN works ON works.id = books.work_id`
+   FROM books LEFT JOIN works ON works.id = books.work_id`
 ).get();
 
 const keySpread = (map) => {
