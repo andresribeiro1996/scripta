@@ -16,18 +16,19 @@ export function buttonLabel(agent: Agent, open: boolean): string {
 }
 
 export function detailRows(agent: Agent, at: number): string[] {
-  const models = Object.entries(agent.costByModel).sort((a, b) => b[1] - a[1])
+  const { calls = [], costByModel = {} } = agent as Partial<Agent>
+  const models = Object.entries(costByModel).sort((a, b) => b[1] - a[1])
   const spend = [agent.type, ...models.map(([m, c]) => `${modelShort(m)} ${usd(c)}`)]
   if (models.length > 1) spend.push(`total ${usd(agent.costUsd)}`)
   const start = new Date(agent.startedAt)
   const clock = `${pad(start.getHours())}:${pad(start.getMinutes())}:${pad(start.getSeconds())}`
   const time = agent.finishedAt === null ? `running ${duration(at - agent.startedAt)}` : `took ${duration(agent.finishedAt - agent.startedAt)}`
-  const failed = agent.calls.filter(c => c.isError).length
+  const failed = calls.filter(c => c.isError).length
   return [
     agent.description,
     spend.join(' · '),
     `started ${clock} · ${time}`,
-    `${agent.calls.length} calls · ${failed} failed`,
-    ...[...agent.calls].reverse().map(c => `${c.isError ? '✗' : '·'} ${c.label}`),
+    `${calls.length} calls · ${failed} failed`,
+    ...[...calls].reverse().map(c => `${c.isError ? '✗' : '·'} ${c.label}`),
   ]
 }

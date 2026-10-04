@@ -162,3 +162,12 @@ test('calls to done or unknown agents are not recorded', () => {
   const after = reduce(reduce(done, { kind: 'call', agentId: 'a1', tool: 'Read', input: {}, isError: false, at: 6 }), { kind: 'call', agentId: 'zz', tool: 'Read', input: {}, isError: false, at: 6 })
   assert.deepEqual(after.agents[1].calls, [])
 })
+
+test('an agent record from before the details fields can still take calls and steps', () => {
+  const base = spawned()
+  const { calls: _c, costByModel: _m, ...old } = base.agents[1]
+  const o = { ...base, agents: [base.agents[0], old as typeof base.agents[1]] }
+  const next = reduce(reduce(o, { kind: 'call', agentId: 'a1', tool: 'Read', input: {}, isError: false, at: 1 }), { kind: 'step', agentId: 'a1', model: 'claude-sonnet-5-5', usage: { output_tokens: 1000 }, at: 2 })
+  assert.equal(next.agents[1].calls.length, 1)
+  assert.deepEqual(Object.keys(next.agents[1].costByModel), ['claude-sonnet-5-5'])
+})

@@ -48,3 +48,10 @@ test('the button shows a closed or open marker before the description', () => {
   assert.equal(buttonLabel(agent({ description: 'Do it' }), false), '▸ Do it')
   assert.equal(buttonLabel(agent({ description: 'Do it' }), true), '▾ Do it')
 })
+
+test('an agent record from before the details fields still renders', () => {
+  const { calls: _c, costByModel: _m, ...old } = agent()
+  const rows = detailRows(old as Agent, T0)
+  assert.equal(rows[1], 'implementer')
+  assert.equal(rows[3], '0 calls · 0 failed')
+})

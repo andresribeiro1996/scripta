@@ -82,7 +82,7 @@ export function reduce(office: Office, ev: OfficeEvent): Office {
   if (!agent || agent.state === 'done') return office
   if (ev.kind === 'step') {
     const usd = costUsd(ev.model, ev.usage)
-    const next = patch(office, id, a => ({ ...a, model: ev.model, costUsd: a.costUsd + usd, costByModel: { ...a.costByModel, [ev.model]: (a.costByModel[ev.model] ?? 0) + usd }, state: a.state === 'idle' ? 'working' : a.state }))
+    const next = patch(office, id, a => ({ ...a, model: ev.model, costUsd: a.costUsd + usd, costByModel: { ...(a.costByModel ?? {}), [ev.model]: ((a.costByModel ?? {})[ev.model] ?? 0) + usd }, state: a.state === 'idle' ? 'working' : a.state }))
     return { ...next, spend: [...next.spend, { at: ev.at, usd }], totalUsd: office.totalUsd + usd }
   }
   if (ev.kind === 'call') {
@@ -90,7 +90,7 @@ export function reduce(office: Office, ev: OfficeEvent): Office {
     return patch(office, id, a => {
       const failCount = ev.isError ? (a.failKey === key ? a.failCount + 1 : 1) : 0
       const label = callLabel(ev.tool, ev.input)
-      const calls = [...a.calls, { label, isError: ev.isError, at: ev.at }].slice(-CALL_HISTORY)
+      const calls = [...(a.calls ?? []), { label, isError: ev.isError, at: ev.at }].slice(-CALL_HISTORY)
       return { ...a, lastCall: label, calls, failKey: ev.isError ? key : null, failCount, state: failCount >= 2 ? 'retrying' : 'working' }
     })
   }
