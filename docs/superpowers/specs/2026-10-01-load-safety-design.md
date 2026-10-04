@@ -63,7 +63,7 @@ that PR's branch.
   entry, so `request.ip` (every rate limit's key) is whatever the client
   writes. A numeric hop count does not work: Fastify 5.12 ignores the header
   entirely for numbers ("fail closed"). Instead trust a fixed list of proxy
-  ranges: loopback, private, `100.64.0.0/10`, and Cloudflare's published
+  ranges: loopback, `100.64.0.0/10` (Railway's edge), and Cloudflare's published
   ranges. `request.ip` becomes the first address that isn't a trusted proxy:
   the real client, whether the request came through Cloudflare or straight
   to Railway's domain. **Gate:** before merging, confirm Railway's edge
