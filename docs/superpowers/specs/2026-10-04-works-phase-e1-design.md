@@ -62,7 +62,8 @@ A new edition created from an ISBN-10 also gets its `isbn:<10>` key as an
 alias.
 
 **One-time pass for existing editions**, gated by `PRAGMA user_version`, in
-one `BEGIN IMMEDIATE` transaction per 250 keys like the works backfill. For
+one `BEGIN IMMEDIATE` transaction at startup, like the title-key backfill
+before it. For
 each `isbn:` key of 10 characters, with X its edition and the ISBN-13 form
 computed:
 
@@ -76,8 +77,9 @@ computed:
   - The `isbn:<10>` key keeps pointing at X, so a stored edition id never
     dangles.
 
-**New public functions** (`index.ts`), injected into the library and game
-modules from `app.ts` the way `enqueueBookCovers` is:
+**New public functions** (`index.ts`). Like `peekCachedCoverUrls`, they open
+the catalog database lazily, so they work whatever order the plugins
+register in (the library registers before books):
 
 - `resolveWorks(lookups: { isbn, title, author }[]): (string | null)[]`.
   One `BEGIN IMMEDIATE` transaction; `findOrCreate` per lookup (local only,
@@ -108,10 +110,11 @@ library_books
   user id and count. Anything else propagates.
 - **Sweep.** Off the boot path and every 10 minutes, rows with `work_id IS
   NULL` and an ISBN or title are resolved, 250 per batch, yielding between
-  batches. It is also the backfill for every existing library. It starts
-  after the books module registers.
-- **Public API** for the game modules: `workIdsFor(userId, bookKeys):
-  Map<bookKey, workId>`, a read of `library_books`.
+  batches. It is also the backfill for every existing library.
+- **Public API** for the game modules: `resolveEntryWorks(ownerUserId,
+  entries)`, which applies the resolution order below and returns each key's
+  canonical `work_id` and title. A catalog error comes out as
+  `WorkResolutionError`.
 - `library_match_keys` is unchanged; reader overlap moves to works with the
   work page.
 
@@ -132,7 +135,8 @@ transaction as the JSON.
 
 1. `""`: no work and no side-table row (rediscover quotes, empty
    spotlights).
-2. The owner's `workIdsFor`.
+2. The owner's library row for that key: its `work_id`, or, while that is
+   still NULL, `resolveWorks` with the row's ISBN, title and author.
 3. `resolveWorks` with the title and author the request already carries
    (arena slots and random-fill pool, quiz `data.books[]`, including the
    curated `pool-*` books).
@@ -161,12 +165,15 @@ editions would split a vote or let a book duel itself:
 - Items already holding two editions of one work keep both. Their ballots and
   votes keep matching by key.
 
-**Backfill.** The same sweep pattern per module: real-row entries with a
-non-empty key and NULL `work_id`; JSON items that hold a non-empty key but
-have no side-table rows (an unresolvable key is stored as a row with NULL
-`work_id`, so it is visited once). Owner library first, then the stored snapshot (slot and duel titles,
-tier-list `public_books` by pool position, quiz `data.books[]`). Promoted
-tier lists (`__app__`) resolve from their snapshot only.
+**Backfill.** One sweep runner in `app.ts` runs a step per module after the
+library's, off the boot path and every 10 minutes. Each step walks its items
+by `rowid` cursor, 250 per batch, so it ends even when keys never resolve:
+items with no side-table rows or any NULL `work_id` (arena: any slot or duel
+side with a NULL `work_id`) are resolved again from the owner's library, then
+the stored snapshot (slot and duel titles, tier-list `public_books` by pool
+position, quiz `data.books[]`). A tier list's owner library is its
+`origin_user_id`'s, so a promoted list (`__app__`) still finds its creator's
+copies, and falls back to the snapshot once that account is gone.
 
 ## Merging library copies
 
@@ -175,18 +182,18 @@ tournaments, private quizzes) and still rewrites keys, because the echo key
 must name a copy the owner still has. It also rewrites the matching
 `work_id`s and side-table rows.
 
-Fixed here: `mergeBooks` rekeys before saving the document, so a 409 on the
-save leaves games rewritten (`library/service.ts:417`). The document version
-is checked before the rekey, so a stale client never rekeys. The remaining
-race between that check and the save is logged.
+`mergeBooks` keeps its order (version check, rekey, save). If the save loses
+a race after the rekey, games point at the kept copy, which is in the library
+either way, so nothing is lost. (An earlier draft called this a bug; it
+isn't.)
 
 ## Rollout
 
 One PR per layer, merged by the user, in order:
 
 1. Books: ISBN identity, the one-time pass, `resolveWorks`, `canonicalWorks`.
-2. Library: `work_id`, write paths, sweep, `workIdsFor`, the `mergeBooks`
-   ordering fix. After deploy, a read-only production check (run by the
+2. Library: `work_id`, write paths, sweep, `resolveEntryWorks`, and the
+   read-only check script. After deploy, a read-only production check (run by the
    user) shows NULL `work_id`s with an ISBN or title near 0 before step 3.
 3. Arena, tier lists, quizzes, murals: one PR each.
 
@@ -207,8 +214,8 @@ build ignores them, so a rollback needs no restore.
   returns `null` for an empty lookup; `canonicalWorks`.
 - **Library:** each write path fills `work_id`; an unchanged save resolves
   nothing; a `resolveWorks` error still saves and logs; the sweep fills
-  NULLs and skips rows with no ISBN or title; `workIdsFor`; `mergeBooks`
-  with a stale version rekeys nothing.
+  NULLs and skips rows with no ISBN or title; `resolveEntryWorks` in each
+  resolution case.
 - **Each game module:**
   - golden tests: today's requests return byte-identical responses,
     including public mural, profile and voting payloads;
