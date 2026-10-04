@@ -54,7 +54,7 @@ library_groups
   user_id, group_id          PRIMARY KEY
   type, name, position, book_keys  TEXT        -- JSON array, as stored
 
-library_summary              -- replaces library_derived
+library_summary              -- beside library_derived, which stays as it is
   user_id                    PRIMARY KEY
   name, style                -- the document's own fields, as stored
   glyph, reader_card, shelf_theme   -- computed at save, as JSON
@@ -77,10 +77,12 @@ library_summary              -- replaces library_derived
   everything once: 5,000 books with 50,000 highlights measured 0.27–0.29 s.
   That is a known stall at import, the same order as today's import save;
   the stall log will show whether it needs splitting.
-- The startup step that re-derives stale rows today covers the new tables,
-  and the version gate becomes `user_version !== LIBRARY_DERIVED_VERSION`, so
-  a rolled-back build rebuilds too.
-- Account deletion clears all four tables.
+- The startup step that re-derives stale rows today covers the new tables:
+  an account whose `library_summary.source_updated_at` differs from its
+  document's `updated_at` is rebuilt. The tables are new rather than columns
+  on `library_derived`, so a rollback to an older build ignores them, and the
+  next boot of this one rebuilds whatever that build saved.
+- Account deletion and the orphan cleanup clear the new tables too.
 
 ## Reading
 
