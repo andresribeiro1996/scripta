@@ -7,8 +7,9 @@ type Resolve = (ownerUserId: string, entries: WorkEntry[]) => Map<string, WorkRe
 type SnapshotBook = { title?: string; author?: string; isbn?: string | null };
 
 function entriesOf(data: string, publicBooks: string | null): WorkEntry[] {
-  const board = JSON.parse(data) as { pool?: unknown };
-  const pool = Array.isArray(board.pool) ? board.pool : [];
+  const board: unknown = JSON.parse(data);
+  const poolValue = board && typeof board === "object" ? (board as { pool?: unknown }).pool : undefined;
+  const pool = Array.isArray(poolValue) ? poolValue : [];
   const parsed: unknown = publicBooks ? JSON.parse(publicBooks) : null;
   const snapshot = Array.isArray(parsed) && parsed.length === pool.length ? (parsed as SnapshotBook[]) : [];
   return boardKeys(board).map((key) => {

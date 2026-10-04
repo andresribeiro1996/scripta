@@ -548,3 +548,25 @@ test("an existing database gains the placement work column", () => {
   assert.ok(columnNames(db, "tierlist_ballot_placements").includes("work_id"));
   assert.ok(columnNames(db, "tierlist_works").includes("work_id"));
 });
+
+test("a ballot on two keys sharing one work stores both placements with that work and keeps the histogram per key", () => {
+  const db = freshDb();
+  const repo = createSqliteTierlistsRepository(db);
+  repo.insert(row({ id: "w1", vote_code: "code", voting_open: 1 }));
+  db.prepare("INSERT INTO tierlist_works (tierlist_id, key, work_id) VALUES ('w1', 'b1', 'work-1'), ('w1', 'b2', 'work-1')").run();
+  repo.saveBallot(ballot({ id: "bal1", tierlist_id: "w1" }), [{ bookKey: "b1", tierId: "s" }, { bookKey: "b2", tierId: "s" }]);
+  const stored = db.prepare("SELECT book_key, work_id FROM tierlist_ballot_placements WHERE ballot_id = 'bal1' ORDER BY book_key").all();
+  assert.deepEqual(stored.map((r) => ({ ...r })), [{ book_key: "b1", work_id: "work-1" }, { book_key: "b2", work_id: "work-1" }]);
+  assert.deepEqual(repo.histogram("w1").map((c) => [c.bookKey, c.tierId, c.votes]).sort(), [["b1", "s", 1], ["b2", "s", 1]]);
+});
+
+test("rekeying keeps a stored work when the merge could not resolve one", () => {
+  const db = freshDb();
+  db.prepare("INSERT INTO tierlists (id, owner_user_id, origin_user_id, name, data, created_at, updated_at) VALUES ('t1', 'u1', 'u1', 'n', ?, 't0', 't0')").run(
+    JSON.stringify({ tiers: [{ id: "s", label: "S", color: "#000000", bookKeys: [] }], pool: ["k-old", "k-keep"] })
+  );
+  db.prepare("INSERT INTO tierlist_works (tierlist_id, key, work_id) VALUES ('t1', 'k-old', 'w-old'), ('t1', 'k-keep', 'w-keep')").run();
+  createSqliteTierlistsRepository(db).rekeyBooks("u1", ["k-old"], "k-keep", null);
+  const works = db.prepare("SELECT key, work_id FROM tierlist_works WHERE tierlist_id = 't1'").all();
+  assert.deepEqual(works.map((r) => ({ ...r })), [{ key: "k-keep", work_id: "w-keep" }]);
+});

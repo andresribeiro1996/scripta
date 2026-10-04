@@ -157,6 +157,11 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
       const update = db.prepare("UPDATE tierlists SET data = ?, updated_at = ? WHERE id = ?");
       const dropWorks = db.prepare("DELETE FROM tierlist_works WHERE tierlist_id = ? AND key IN (SELECT value FROM json_each(?))");
       const fromKeysJson = JSON.stringify(fromKeys);
+      const hasWorks = db.prepare("SELECT 1 FROM tierlist_works WHERE tierlist_id = ? LIMIT 1");
+      const keepWork = db.prepare(`
+        INSERT INTO tierlist_works (tierlist_id, key, work_id) VALUES (?, ?, ?)
+        ON CONFLICT (tierlist_id, key) DO UPDATE SET work_id = COALESCE(excluded.work_id, tierlist_works.work_id)
+      `);
       db.exec("BEGIN IMMEDIATE");
       try {
         for (const row of db.prepare("SELECT id, data FROM tierlists WHERE owner_user_id = ? AND vote_code IS NULL").all(userId) as Array<{ id: string; data: string }>) {
@@ -164,8 +169,9 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
           const after = JSON.stringify(rekeyTierBoard(parsed, from, toKey));
           if (after === JSON.stringify(parsed)) continue;
           update.run(after, now, row.id);
+          if (!hasWorks.get(row.id)) continue;
           dropWorks.run(row.id, fromKeysJson);
-          insertWorkStmt.run(row.id, toKey, toWork);
+          keepWork.run(row.id, toKey, toWork);
         }
         db.exec("COMMIT");
       } catch (error) {

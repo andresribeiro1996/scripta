@@ -17,6 +17,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
 const { applyTierlistsMigrations } = await import("./adapters/sqlite/connection.js");
 const { createTierlistsWorksStep } = await import("./worksSweep.js");
+const { createSqliteTierlistsRepository } = await import("./adapters/sqlite/sqliteTierlistsRepository.js");
 
 function freshDb(): DatabaseSync {
   const db = new DatabaseSync(":memory:");
@@ -99,4 +100,22 @@ test("a re-sweep never replaces a stored work with NULL and drops keys off the b
   const step = createTierlistsWorksStep(db, (_owner, entries) => new Map(entries.map((entry) => [entry.key, { workId: null, title: null }])));
   step(0, 250);
   assert.deepEqual(worksOf(db, "t5"), [{ key: "a", work_id: "w-a" }, { key: "b", work_id: null }]);
+});
+
+test("a list with no works rows stays pending after a rekey and ends with rows for all its keys", () => {
+  const db = freshDb();
+  insertList(db, "t6", "u1", "u1", ["k-old", "k-keep", "other"], null);
+  createSqliteTierlistsRepository(db).rekeyBooks("u1", ["k-old"], "k-keep", "w-keep");
+  assert.deepEqual(worksOf(db, "t6"), []);
+  const step = createTierlistsWorksStep(db, (_owner, entries) => new Map(entries.map((entry) => [entry.key, { workId: `w-${entry.key}`, title: null }])));
+  assert.equal(step(0, 250).visited, 1);
+  assert.deepEqual(worksOf(db, "t6"), [{ key: "k-keep", work_id: "w-k-keep" }, { key: "other", work_id: "w-other" }]);
+});
+
+test("a list whose stored data is not an object is visited without throwing", () => {
+  const db = freshDb();
+  insertList(db, "t7", "u1", "u1", [], null);
+  db.prepare("UPDATE tierlists SET data = 'null' WHERE id = 't7'").run();
+  const step = createTierlistsWorksStep(db, (_owner, entries) => new Map(entries.map((entry) => [entry.key, { workId: null, title: null }])));
+  assert.equal(step(0, 250).visited, 1);
 });
