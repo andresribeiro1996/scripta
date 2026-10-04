@@ -16,3 +16,5 @@ export { resolvePublicLibrary, resolvePublicLibraryData, readerGlyphFor, sharedB
 export type { PublicBookData, PublicHighlight, ResolvedPublicData, PublicDataRequest } from "./publicResolver.js";
 export { WorkResolutionError, duplicateWorkMessage, firstDuplicateWork, keepFirstPerWork, resolveEntryWorks, workIdsByKey } from "./works.js";
 export type { WorkEntry, WorkRef } from "./works.js";
+export { startWorksSweep, sweepLibraryWorks } from "./worksSweep.js";
+export type { SweepBatch, WorksSweepStep } from "./worksSweep.js";

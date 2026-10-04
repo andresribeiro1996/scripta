@@ -103,6 +103,19 @@ Each account only ever sees its own document — verified in testing with two se
 
 "Auth required" means: `Authorization: Bearer <accessToken>`.
 
+### Works (phase E1)
+
+- **`resolveEntryWorks`** (`library/works.ts`) turns a book key into a work id for another module: the owner's library row first (its stored `work_id`, canonicalised), then the entry's own title and author. A catalog failure throws `WorkResolutionError`, which routes answer as `503`.
+- **The works sweep** (`library/worksSweep.ts`, started in `app.ts` after the last module registers) runs off the boot path, once at start and every 10 minutes. It runs each step in turn, 250 rows per batch, yielding to the event loop between batches and paging by `rowid`, so rows that never resolve can't keep it running. Its one step so far fills `library_books.work_id` where it is NULL; a failure is logged (`works sweep failed`), never thrown, and the timer is unref'd and stopped on close.
+
+#### Works check
+
+Read-only counts of rows still missing a work id (`library.nullWithIdentity` should sit near 0 once the sweep has run), over `railway ssh`. A section whose table or column isn't deployed yet reports "not deployed":
+
+```bash
+railway ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && node scripts/works-check.mjs'
+```
+
 ### `gallery`
 - **A per-account pool of uploaded images**, primarily meant to be assignable as custom book covers by the [frontend](../frontend/README.md#gallery-and-custom-book-covers) — but the module itself is generic; it doesn't know anything about books.
 - Unlike `library`, this module does NOT treat uploads as an opaque blob it just stores — every upload goes through a real validation/normalization pipeline before anything is trusted:
