@@ -40,7 +40,7 @@ import { deleteArenaUserData, getArenaPublicApi, registerArenaModule, rekeyArena
 import { deleteCommunityUserData, getCommunityPublicApi, registerCommunityModule } from "./modules/community/index.js";
 import { enqueueBookCovers, registerBooksModule } from "./modules/books/index.js";
 import { deleteGalleryUserData, registerGalleryModule } from "./modules/gallery/index.js";
-import { deleteLibraryUserData, registerLibraryModule, resolvePublicLibrary, readerGlyphFor, resolveEntryWorks, sharedBookCounts, sharedBooks, startWorksSweep, sweepLibraryWorks, type BookEvent } from "./modules/library/index.js";
+import { deleteLibraryUserData, registerLibraryModule, resolvePublicLibrary, readerGlyphFor, resolveEntryWorks, WorkResolutionError, sharedBookCounts, sharedBooks, startWorksSweep, sweepLibraryWorks, type BookEvent } from "./modules/library/index.js";
 import { deleteMuralsUserData, getMuralsPublicApi, registerMuralsModule, rekeyMuralsBooks } from "./modules/murals/index.js";
 import { deleteQuizzesUserData, getQuizzesPublicApi, registerQuizzesModule, rekeyQuizzesBooks } from "./modules/quizzes/index.js";
 import { deleteSocialsUserData, registerSocialsModule } from "./modules/socials/index.js";
@@ -162,7 +162,12 @@ export function buildApp() {
       }
     },
     rekeyBooks: (userId: string, fromKeys: string[], toKey: string) => {
-      const toWork = resolveEntryWorks(userId, [{ key: toKey }]).get(toKey)?.workId ?? null;
+      let toWork: string | null = null;
+      try {
+        toWork = resolveEntryWorks(userId, [{ key: toKey }]).get(toKey)?.workId ?? null;
+      } catch (error) {
+        if (!(error instanceof WorkResolutionError)) throw error;
+      }
       rekeyArenaBooks(userId, fromKeys, toKey, toWork);
       for (const rekey of [rekeyMuralsBooks, rekeyTierlistsBooks, rekeyQuizzesBooks]) rekey(userId, fromKeys, toKey);
     }
