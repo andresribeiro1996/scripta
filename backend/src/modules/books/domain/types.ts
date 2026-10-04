@@ -65,3 +65,11 @@ export interface NewBook {
   sources?: DataSource[];
   createdBy?: BookCreator;
 }
+
+export interface WorkView {
+  id: string;
+  olWorkKey: string | null;
+  title: string;
+  author: string;
+  editions: Array<{ id: string; isbn: string | null; title: string; author: string; olWorkKey: string | null }>;
+}

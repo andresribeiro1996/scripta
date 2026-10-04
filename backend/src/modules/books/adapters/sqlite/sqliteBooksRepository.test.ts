@@ -15,6 +15,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
 const { applyBooksMigrations, openBooksDb } = await import("./connection.js");
 const { createSqliteBooksRepository } = await import("./sqliteBooksRepository.js");
+const { WorkMergeError } = await import("../../domain/errors.js");
 
 const NOW = "2026-10-01T00:00:00.000Z";
 const richDetails = { summary: "Open Library synopsis.", rating: 4, ratingCount: 3, sourceUrl: "https://openlibrary.org/works/OL1W", genres: ["Fantasy" as const], pages: 300, publisher: "Bantam", year: 1975, translator: null };
@@ -862,4 +863,126 @@ test("the title key columns are added to an existing database once", () => {
   const columns = (db.prepare("PRAGMA table_info(books)").all() as Array<{ name: string }>).map((column) => column.name);
   assert.ok(columns.includes("title_key") && columns.includes("title_group_blocked_at"));
   assert.ok(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_books_title_key'").get());
+});
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const at = (days: number) => new Date(Date.parse(NOW) + days * DAY_MS).toISOString();
+
+test("mergeWorks moves every edition into the target, leaves merged_into, and keeps chains one hop long", () => {
+  const { db, repo } = freshRepo();
+  const empty = repo.createBook({ title: "", author: "", isbn: "9789720000001" }, ["isbn:9789720000001"], NOW);
+  const portuguese = repo.createBook({ title: "Ensaio sobre a Cegueira", author: "José Saramago", isbn: "9789720000002" }, ["isbn:9789720000002"], NOW);
+  const english = repo.createBook({ title: "Blindness", author: "José Saramago", isbn: "9780156007757", workKey: "OL1W" }, ["isbn:9780156007757"], NOW);
+
+  assert.equal(repo.mergeWorks(portuguese.work_id!, empty.work_id!), empty.work_id);
+  assert.deepEqual([workById(db, empty.work_id).title, workById(db, empty.work_id).author], ["Ensaio sobre a Cegueira", "José Saramago"]);
+  assert.equal(repo.getBook(portuguese.id)!.work_id, empty.work_id);
+  assert.equal(workById(db, portuguese.work_id).merged_into, empty.work_id);
+
+  assert.equal(repo.mergeWorks(empty.work_id!, english.work_id!), english.work_id);
+  assert.deepEqual([empty.id, portuguese.id, english.id].map((id) => repo.getBook(id)!.work_id), [english.work_id, english.work_id, english.work_id]);
+  assert.deepEqual([empty.work_id, portuguese.work_id].map((id) => workById(db, id).merged_into), [english.work_id, english.work_id]);
+  assert.deepEqual([empty.work_id, portuguese.work_id, english.work_id].map((id) => repo.resolveWorkId(id!)), [english.work_id, english.work_id, english.work_id]);
+  assert.equal(workById(db, english.work_id).title, "Blindness");
+  assert.equal(repo.getBook(portuguese.id)!.ol_work_key, null);
+});
+
+test("mergeWorks resolves a merged target first", () => {
+  const { repo } = freshRepo();
+  const a = repo.createBook({ title: "A", author: "X", isbn: "9789720000001" }, ["isbn:9789720000001"], NOW);
+  const b = repo.createBook({ title: "B", author: "X", isbn: "9789720000002" }, ["isbn:9789720000002"], NOW);
+  const c = repo.createBook({ title: "C", author: "X", isbn: "9789720000003" }, ["isbn:9789720000003"], NOW);
+  repo.mergeWorks(b.work_id!, a.work_id!);
+  assert.equal(repo.mergeWorks(c.work_id!, b.work_id!), a.work_id);
+  assert.equal(repo.getBook(c.id)!.work_id, a.work_id);
+});
+
+test("mergeWorks refuses an unknown, merged or keyed source, an unknown target and a merge into itself, and changes nothing", () => {
+  const { db, repo } = freshRepo();
+  const keyed = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593", workKey: "OL1W" }, ["isbn:9780441013593"], NOW);
+  const a = repo.createBook({ title: "A", author: "X", isbn: "9789720000001" }, ["isbn:9789720000001"], NOW);
+  const b = repo.createBook({ title: "B", author: "X", isbn: "9789720000002" }, ["isbn:9789720000002"], NOW);
+  repo.mergeWorks(b.work_id!, a.work_id!);
+  const snapshot = () => ({ works: db.prepare("SELECT * FROM works ORDER BY id").all(), books: db.prepare("SELECT id, work_id FROM books ORDER BY id").all() });
+  const before = snapshot();
+  assert.throws(() => repo.mergeWorks("no-such-work", a.work_id!), WorkMergeError);
+  assert.throws(() => repo.mergeWorks(b.work_id!, keyed.work_id!), WorkMergeError);
+  assert.throws(() => repo.mergeWorks(keyed.work_id!, a.work_id!), WorkMergeError);
+  assert.throws(() => repo.mergeWorks(a.work_id!, "no-such-work"), WorkMergeError);
+  assert.throws(() => repo.mergeWorks(a.work_id!, b.work_id!), WorkMergeError);
+  assert.deepEqual(snapshot(), before);
+});
+
+test("resolveWorkId returns null for an unknown id and throws on a chain longer than one hop", () => {
+  const { db, repo } = freshRepo();
+  const a = repo.createBook({ title: "A", author: "X", isbn: "9789720000001" }, ["isbn:9789720000001"], NOW);
+  const b = repo.createBook({ title: "B", author: "X", isbn: "9789720000002" }, ["isbn:9789720000002"], NOW);
+  const c = repo.createBook({ title: "C", author: "X", isbn: "9789720000003" }, ["isbn:9789720000003"], NOW);
+  assert.equal(repo.resolveWorkId("no-such-work"), null);
+  assert.equal(repo.resolveWorkId(a.work_id!), a.work_id);
+  db.prepare("UPDATE works SET merged_into = ? WHERE id = ?").run(b.work_id, a.work_id);
+  db.prepare("UPDATE works SET merged_into = ? WHERE id = ?").run(c.work_id, b.work_id);
+  assert.throws(() => repo.resolveWorkId(a.work_id!), /one hop/);
+});
+
+test("an edition leaving a grouped work through setWorkKey repoints the works merged into it", () => {
+  const { db, repo } = freshRepo();
+  const keyed = repo.createBook({ title: "Os Maias", author: "Eça de Queirós", isbn: "9789725681367", workKey: "OL846513W" }, ["isbn:9789725681367"], NOW);
+  const first = repo.createBook({ title: "Maias", author: "Eça de Queirós", isbn: "9789720000001" }, ["isbn:9789720000001"], NOW);
+  const second = repo.createBook({ title: "Maias", author: "Eça de Queirós", isbn: "9789720000002" }, ["isbn:9789720000002"], NOW);
+  repo.mergeWorks(second.work_id!, first.work_id!);
+  repo.setWorkKey(first.id, "OL846513W");
+  repo.setWorkKey(second.id, "OL846513W");
+  assert.equal(workById(db, first.work_id).merged_into, keyed.work_id);
+  assert.equal(workById(db, second.work_id).merged_into, keyed.work_id);
+  assert.equal(repo.resolveWorkId(second.work_id!), keyed.work_id);
+});
+
+test("detachEdition gives a grouped edition a keyless work of its own and blocks it, and only blocks an edition already alone", () => {
+  const { db, repo } = freshRepo();
+  const keyed = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593", workKey: "OL1W" }, ["isbn:9780441013593"], NOW);
+  const joined = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780593099322" }, ["isbn:9780593099322"], NOW);
+  repo.mergeWorks(joined.work_id!, keyed.work_id!);
+
+  const own = repo.detachEdition(joined.id, at(1));
+  const detached = repo.getBook(joined.id)!;
+  assert.equal(detached.work_id, own);
+  assert.notEqual(own, keyed.work_id);
+  assert.equal(detached.title_group_blocked_at, at(1));
+  assert.deepEqual([workById(db, own).ol_work_key, workById(db, own).title, workById(db, own).created_at], [null, "Dune", at(1)]);
+  assert.equal(repo.getBook(keyed.id)!.work_id, keyed.work_id);
+
+  const alone = repo.createBook({ title: "Emma", author: "Jane Austen", isbn: "9780141439587" }, ["isbn:9780141439587"], NOW);
+  assert.equal(repo.detachEdition(alone.id, at(2)), alone.work_id);
+  assert.equal(repo.getBook(alone.id)!.title_group_blocked_at, at(2));
+});
+
+test("detachEdition refuses an edition with its own Open Library key, an edition without a work and an unknown edition", () => {
+  const { db, repo } = freshRepo();
+  const keyed = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593", workKey: "OL1W" }, ["isbn:9780441013593"], NOW);
+  const legacy = repo.createBook({ title: "Emma", author: "Jane Austen", isbn: "9780141439587" }, ["isbn:9780141439587"], NOW);
+  db.prepare("UPDATE books SET work_id = NULL WHERE id = ?").run(legacy.id);
+  assert.throws(() => repo.detachEdition(keyed.id, at(1)), WorkMergeError);
+  assert.throws(() => repo.detachEdition(legacy.id, at(1)), WorkMergeError);
+  assert.throws(() => repo.detachEdition("no-such-book", at(1)), WorkMergeError);
+  assert.equal(repo.getBook(keyed.id)!.title_group_blocked_at, null);
+  assert.equal(repo.getBook(legacy.id)!.title_group_blocked_at, null);
+});
+
+test("getWorkView lists a work's editions oldest first", () => {
+  const { repo } = freshRepo();
+  const english = repo.createBook({ title: "Blindness", author: "José Saramago", isbn: "9780156007757", workKey: "OL1W" }, ["isbn:9780156007757"], NOW);
+  const portuguese = repo.createBook({ title: "Ensaio sobre a Cegueira", author: "José Saramago", isbn: "9789720000002" }, ["isbn:9789720000002"], at(1));
+  repo.mergeWorks(portuguese.work_id!, english.work_id!);
+  assert.deepEqual(repo.getWorkView(english.work_id!), {
+    id: english.work_id,
+    olWorkKey: "OL1W",
+    title: "Blindness",
+    author: "José Saramago",
+    editions: [
+      { id: english.id, isbn: "9780156007757", title: "Blindness", author: "José Saramago", olWorkKey: "OL1W" },
+      { id: portuguese.id, isbn: "9789720000002", title: "Ensaio sobre a Cegueira", author: "José Saramago", olWorkKey: null }
+    ]
+  });
+  assert.equal(repo.getWorkView("no-such-work"), undefined);
 });
