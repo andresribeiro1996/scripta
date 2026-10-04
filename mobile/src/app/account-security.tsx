@@ -62,8 +62,8 @@ export default function AccountSecurityPage() {
           <Text selectable style={[typography.body, { color: colors.text }]}>{account.data.email} · {account.data.emailVerified ? "Verified" : "Not verified"}</Text>
           {!account.data.emailEnabled && <Text style={{ color: colors.textDim }}>Email delivery is temporarily unavailable.</Text>}
           {!account.data.emailVerified && <Button label="Send verification email" variant="secondary" disabled={busy || !account.data.emailEnabled} onPress={() => void run("verify")} />}
-          {account.data.hasPassword ? <Button label="Change password" variant="secondary" disabled={busy} onPress={() => { setMode("password"); setError(""); }} /> : <Text style={{ color: colors.textDim }}>Your password is managed by Google.</Text>}
-          {account.data.canChangeEmail && <Button label="Correct email" variant="secondary" disabled={busy || !account.data.emailEnabled} onPress={() => { setEmail(account.data.email); setMode("email"); setError(""); }} />}
+          {account.data.hasPassword ? <Button label="Change password" variant="secondary" disabled={busy} onPress={() => { setMode("password"); setError(""); setConfirmError(""); }} /> : <Text style={{ color: colors.textDim }}>Your password is managed by Google.</Text>}
+          {account.data.canChangeEmail && <Button label="Correct email" variant="secondary" disabled={busy || !account.data.emailEnabled} onPress={() => { setEmail(account.data.email); setMode("email"); setError(""); setConfirmError(""); }} />}
         </>}
         {message ? <Text accessibilityLiveRegion="polite" style={{ color: colors.text }}>{message}</Text> : null}
         {!mode && error ? <Text accessibilityRole="alert" selectable style={{ color: colors.danger }}>{error}</Text> : null}
