@@ -138,10 +138,10 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
   `);
 
   return {
-    rekeyBooks(userId, fromKeys, toKey) {
+    rekeyBooks(userId, fromKeys, toKey, toWork) {
       const from = new Set(fromKeys);
       const remove = db.prepare("DELETE FROM tournament_slots WHERE tournament_id = ? AND slot_index = ?");
-      const rename = db.prepare("UPDATE tournament_slots SET book_key = ? WHERE tournament_id = ? AND slot_index = ?");
+      const rename = db.prepare("UPDATE tournament_slots SET book_key = ?, work_id = ? WHERE tournament_id = ? AND slot_index = ?");
       db.exec("BEGIN IMMEDIATE");
       try {
         for (const { id } of db.prepare("SELECT id FROM tournaments WHERE owner_user_id = ? AND status = 'seeding'").all(userId) as Array<{ id: string }>) {
@@ -151,7 +151,7 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
             if (!from.has(slot.book_key)) continue;
             if (hasTarget) remove.run(id, slot.slot_index);
             else {
-              rename.run(toKey, id, slot.slot_index);
+              rename.run(toKey, toWork, id, slot.slot_index);
               hasTarget = true;
             }
           }

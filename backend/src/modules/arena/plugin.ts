@@ -61,8 +61,8 @@ export function getArenaPublicApi(): ArenaPublicApi {
 
 let rekeyingArena: ReturnType<typeof createSqliteArenaRepository> | undefined;
 
-export function rekeyArenaBooks(userId: string, fromKeys: string[], toKey: string) {
-  (rekeyingArena ??= createSqliteArenaRepository(openArenaDb())).rekeyBooks(userId, fromKeys, toKey);
+export function rekeyArenaBooks(userId: string, fromKeys: string[], toKey: string, toWork: string | null) {
+  (rekeyingArena ??= createSqliteArenaRepository(openArenaDb())).rekeyBooks(userId, fromKeys, toKey, toWork);
 }
 
 let erasingArena: ReturnType<typeof createSqliteArenaRepository> | undefined;

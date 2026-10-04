@@ -105,8 +105,15 @@ test("PUT slots answers 503 and stores nothing when the catalog is unavailable",
   await app.close();
 });
 
-test("PUT slots by a non-owner is a 404 and writes nothing to the catalog", async () => {
-  const { app, id } = await arenaApp();
+test("PUT slots by a non-owner is a 404, leaves the slots alone and writes nothing to the catalog", async () => {
+  const { applyBooksMigrations } = await import("../books/adapters/sqlite/connection.js");
+  const { app, db, id } = await arenaApp();
+  const seeded = await putSlots(app, id, [
+    { key: "ta:dune|frank herbert", title: "Dune", author: "Frank Herbert" },
+    { key: "ta:orlando|virginia woolf", title: "Orlando", author: "Virginia Woolf" }
+  ]);
+  assert.equal(seeded.statusCode, 204);
+  const slotsBefore = db.prepare("SELECT slot_index, book_key, title, work_id FROM tournament_slots WHERE tournament_id = ? ORDER BY slot_index").all(id);
   const res = await app.inject({
     method: "PUT",
     url: `/arenas/${id}/slots`,
@@ -114,7 +121,9 @@ test("PUT slots by a non-owner is a 404 and writes nothing to the catalog", asyn
     payload: { slots: [{ slotIndex: 0, book: { key: "ta:zzyzx|nobody", title: "Zzyzx Road Atlas", author: "Nobody Atall", cover: null } }] }
   });
   assert.equal(res.statusCode, 404);
+  assert.deepEqual(db.prepare("SELECT slot_index, book_key, title, work_id FROM tournament_slots WHERE tournament_id = ? ORDER BY slot_index").all(id), slotsBefore);
   const catalog = new DatabaseSync(process.env.COVERS_DB_PATH!);
+  applyBooksMigrations(catalog);
   assert.equal((catalog.prepare("SELECT COUNT(*) AS n FROM books WHERE title = ?").get("Zzyzx Road Atlas") as { n: number }).n, 0);
   catalog.close();
   await app.close();

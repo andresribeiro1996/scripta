@@ -310,11 +310,20 @@ test("rekeyBooks rewrites seeding slots only and drops a slot that would duplica
   slot.run("both", 0, "new");
   slot.run("both", 1, "old");
   slot.run("active", 0, "old");
-  createSqliteArenaRepository(db).rekeyBooks("u1", ["old"], "new");
+  createSqliteArenaRepository(db).rekeyBooks("u1", ["old"], "new", null);
   const keys = (id: string) => (db.prepare("SELECT book_key FROM tournament_slots WHERE tournament_id = ? ORDER BY slot_index").all(id) as Array<{ book_key: string }>).map((row) => row.book_key);
   assert.deepEqual(keys("seeding"), ["new"]);
   assert.deepEqual(keys("both"), ["new"]);
   assert.deepEqual(keys("active"), ["old"]);
+});
+
+test("rekeying a seeding tournament moves the slot to the kept copy's work", () => {
+  const db = freshDb();
+  db.prepare("INSERT INTO tournaments (id, owner_user_id, name, bracket_size, round_duration_minutes, status) VALUES ('t1', 'u1', 'n', 2, 60, 'seeding')").run();
+  db.prepare("INSERT INTO tournament_slots (tournament_id, slot_index, book_key, title, author, work_id) VALUES ('t1', 0, 'k-old', 't', 'a', 'w-old')").run();
+  createSqliteArenaRepository(db).rekeyBooks("u1", ["k-old"], "k-keep", "w-keep");
+  const slot = db.prepare("SELECT book_key, work_id FROM tournament_slots WHERE tournament_id = 't1'").get();
+  assert.deepEqual({ ...slot }, { book_key: "k-keep", work_id: "w-keep" });
 });
 
 function tournament(overrides: Partial<TournamentRow> & { id: string }): TournamentRow {

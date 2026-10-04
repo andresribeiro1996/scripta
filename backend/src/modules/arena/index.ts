@@ -4,3 +4,4 @@
 
 export { arenaPlugin as registerArenaModule, deleteArenaUserData, rekeyArenaBooks } from "./plugin.js";
 export { getArenaPublicApi } from "./plugin.js";
+export { sweepArenaWorks } from "./worksSweep.js";

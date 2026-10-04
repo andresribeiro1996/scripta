@@ -36,11 +36,11 @@ import {
   setDashboardSeenAt,
   userHasUsername
 } from "./modules/auth/index.js";
-import { deleteArenaUserData, getArenaPublicApi, registerArenaModule, rekeyArenaBooks } from "./modules/arena/index.js";
+import { deleteArenaUserData, getArenaPublicApi, registerArenaModule, rekeyArenaBooks, sweepArenaWorks } from "./modules/arena/index.js";
 import { deleteCommunityUserData, getCommunityPublicApi, registerCommunityModule } from "./modules/community/index.js";
 import { enqueueBookCovers, registerBooksModule } from "./modules/books/index.js";
 import { deleteGalleryUserData, registerGalleryModule } from "./modules/gallery/index.js";
-import { deleteLibraryUserData, registerLibraryModule, resolvePublicLibrary, readerGlyphFor, sharedBookCounts, sharedBooks, startWorksSweep, sweepLibraryWorks, type BookEvent } from "./modules/library/index.js";
+import { deleteLibraryUserData, registerLibraryModule, resolvePublicLibrary, readerGlyphFor, resolveEntryWorks, sharedBookCounts, sharedBooks, startWorksSweep, sweepLibraryWorks, type BookEvent } from "./modules/library/index.js";
 import { deleteMuralsUserData, getMuralsPublicApi, registerMuralsModule, rekeyMuralsBooks } from "./modules/murals/index.js";
 import { deleteQuizzesUserData, getQuizzesPublicApi, registerQuizzesModule, rekeyQuizzesBooks } from "./modules/quizzes/index.js";
 import { deleteSocialsUserData, registerSocialsModule } from "./modules/socials/index.js";
@@ -162,7 +162,9 @@ export function buildApp() {
       }
     },
     rekeyBooks: (userId: string, fromKeys: string[], toKey: string) => {
-      for (const rekey of [rekeyMuralsBooks, rekeyTierlistsBooks, rekeyArenaBooks, rekeyQuizzesBooks]) rekey(userId, fromKeys, toKey);
+      const toWork = resolveEntryWorks(userId, [{ key: toKey }]).get(toKey)?.workId ?? null;
+      rekeyArenaBooks(userId, fromKeys, toKey, toWork);
+      for (const rekey of [rekeyMuralsBooks, rekeyTierlistsBooks, rekeyQuizzesBooks]) rekey(userId, fromKeys, toKey);
     }
   });
   app.register(registerGalleryModule);
@@ -224,7 +226,7 @@ export function buildApp() {
   });
   app.register(registerQuizzesModule);
 
-  const stopWorksSweep = startWorksSweep([sweepLibraryWorks], app.log);
+  const stopWorksSweep = startWorksSweep([sweepLibraryWorks, sweepArenaWorks], app.log);
   app.addHook("onClose", async () => {
     stopWorksSweep();
   });
