@@ -117,7 +117,7 @@ cleanup.
    each run, so it never goes stale.
 6. Sweep, in this order:
    1. **First run.** Sign out, sign up `beta-<unix-time>@local.test` on the
-      local backend, go through choose-username and welcome-avatar, then the
+      local backend, go through welcome-avatar (choose-username is Google-only), then the
       empty library, shelf, murals and games.
    2. **Dev account.** Sign out, then cold restart
       (`am force-stop host.exp.exponent` + deep link); dev auto-login
