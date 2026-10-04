@@ -22,6 +22,7 @@
     "dev:status": "node scripts/dev-status.mjs",
     "dev:tunnels": "node scripts/dev-tunnels.mjs",
     "dev:wait": "node scripts/dev-wait.mjs",
+    "dev:snapshot": "node scripts/dev-snapshot.mjs",
     "dev:link-deps": "node scripts/dev-worktree-deps.mjs",
     "test:scripts": "node --test scripts/*.test.mjs",
     "test": "npm run test:scripts && npm test --workspaces --if-present",
