@@ -1715,6 +1715,20 @@ test("a public library view of the 10 MiB fixture never parses the document and 
   }
 });
 
+test("a small save on a document with odd fields succeeds and keeps the rows equal to those derived from it", () => {
+  const odd = { Title: 42, Attribution: "Numeric Title Author", ISBN: 9780141439587, ReadStatus: 1, highlights: [{ BookmarkID: 7, Text: 5 }, "not a highlight"] };
+  const books = [...changeLibrary().books, odd, null, "not a book"];
+  const { db, service } = setup();
+  service.saveLibrary("u1", { books, groups: changeLibrary().groups });
+  service.applyChange("u1", { kind: "book", bookKey: keyOf(3), rating: 4 });
+  assert.deepEqual(rowsInDb(db, "u1"), rowsOfStored(db, "u1"));
+  service.applyChange("u1", { kind: "book", bookKey: keyOf(5), readStatus: 2, day: "2026-10-02" });
+  assert.deepEqual(rowsInDb(db, "u1"), rowsOfStored(db, "u1"));
+  service.applyChange("u1", { kind: "membership", groupId: "shelf", bookKey: bookKey(odd), member: true });
+  assert.deepEqual(rowsInDb(db, "u1"), rowsOfStored(db, "u1"));
+  assert.equal(rowsInDb(db, "u1").books.length, 12);
+  db.close();
+});
 
 test("after each kind of small save the rows equal those derived from the stored document", () => {
   const settled = shelf(10);
