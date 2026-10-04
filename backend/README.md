@@ -110,12 +110,14 @@ Each account only ever sees its own document — verified in testing with two se
 - **Library step:** fills `library_books.work_id` where it is NULL.
 - **Arena step:** fills `tournament_slots.work_id`, both duel sides and `winner_work_id` from the owner's library, then the slot and duel titles. Slot writes reject a second edition of one work with `409`, and a library merge moves the kept copy's work onto the owner's seeding slots (a catalog failure there leaves the slot's work NULL for the sweep to refill).
 - **Tier-list step:** each list gets a `tierlist_works` row per book plus work ids on ballot placements, swept from the creator's library then the `public_books` snapshot (a ballot saved before the sweep keeps a NULL placement work until it runs). Create and PUT reject a second edition of one work with `409`, and a library merge moves the kept copy's work.
-- **Quiz step:** each quiz gets a `quiz_works` row per book, swept from the owner's library then the quiz's own book titles (which is what resolves curated `pool-*` books). Create keeps the first edition of each work, PUT rejects a second edition with `409`, and a library merge moves the kept copy's work.
+- **Quiz step:** each quiz gets a `quiz_works` row per book, swept from the owner's library then the quiz's own book titles (which is what resolves curated `pool-*` books). Create keeps the first edition of each work, PUT returns `409` only when the save adds a second edition (a quiz that already held two keeps both and still saves), and a library merge moves the kept copy's work.
 - **Mural step:** each mural gets a `mural_works` row per book key its spotlight, shelf, quote, quote-collection and legacy tier-list blocks reference (`extractReferences`), swept from the owner's library. Two editions of one work are allowed, and a library merge moves the kept copy's work.
 
 #### Works check
 
 Read-only counts of rows still missing a work id (`library.nullWithIdentity` should sit near 0 once the sweep has run), over `railway ssh`. A section whose table or column isn't deployed yet reports "not deployed":
+
+Read it by the `*Null` counts only; those should approach 0. `itemsWithoutRows` for tier lists, quizzes and murals never reaches 0, because items with no book keys get no rows. Remaining NULLs are orphaned keys (deleted books) or rows whose title can't resolve.
 
 ```bash
 railway ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && node scripts/works-check.mjs'
