@@ -114,7 +114,9 @@ new `librarySaver.ts`, their tests, and the exports.
     - `saveWhole(updater)`, which replaces each app's `updateLibrary` and
       keeps today's single 409 replay (fetch, re-run the updater, resend
       once);
-    - `receive(document)`.
+    - merges.
+
+    `receive(document)` is not a queue job (see above).
   - The `baseUpdatedAt` rule on success.
   - Drop the change and fetch on failure.
   - Always fetch after an add.
