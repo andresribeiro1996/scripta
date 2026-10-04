@@ -8,6 +8,7 @@ export interface CoverBlobStore {
 }
 
 export interface BooksRepository {
+  transaction<T>(write: () => T): T;
   findBookByKey(key: string): BookRow | undefined;
   findBooksByKeys(keys: string[]): Map<string, BookRow>;
   getBook(id: string): BookRow | undefined;
@@ -32,6 +33,8 @@ export interface BooksRepository {
   setAppleChecked(bookId: string, at: string): void;
   setWorkKey(id: string, key: string | null | undefined): void;
   assignMissingWorks(limit: number): number;
+  assignWork(bookId: string): string;
+  canonicalWorkIds(ids: string[]): Map<string, string>;
   setLanguage(id: string, tag: string | null): void;
   setPublisherUrl(id: string, url: string): void;
   listUpgradeWantedIds(): string[];
