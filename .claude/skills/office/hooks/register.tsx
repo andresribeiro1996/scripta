@@ -1,6 +1,6 @@
 import { atom, read, update } from 'claude-code'
 import type { Register } from 'claude-code'
-import type { Snapshot } from '../types'
+import type { Agent, Snapshot } from '../types'
 import { emptyOffice, HEAVY_USD, newlyHeavy, reduce, statusText, type OfficeEvent } from './model.ts'
 import { freshFiles, parseFloors, sameFloors, shouldWrite, snapshotOf } from './floors.ts'
 import { buttonLabel, detailRows } from './details.ts'
@@ -36,12 +36,15 @@ async function guard($: any, label: string, fn: () => Promise<void>) {
 }
 
 async function apply($: any, ev: OfficeEvent) {
-  const before = await read($, officeAtom)
-  await update($, officeAtom, o => reduce(o, ev))
+  let crossed: Agent[] = []
+  await update($, officeAtom, o => {
+    const n = reduce(o, ev)
+    crossed = newlyHeavy(o, n)
+    return n
+  })
   dirty = true
-  const after = await read($, officeAtom)
-  $.ui.status(statusText(after))
-  for (const a of newlyHeavy(before, after)) $.ui.toast(`office: ${a.type} · ${a.description} passed $${HEAVY_USD}`)
+  $.ui.status(statusText(await read($, officeAtom)))
+  for (const a of crossed) $.ui.toast(`office: ${a.type} · ${a.description} passed $${HEAVY_USD}`)
 }
 
 async function writeSnapshot($: any, ended: boolean) {

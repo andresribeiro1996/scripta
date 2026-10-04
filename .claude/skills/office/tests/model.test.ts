@@ -182,5 +182,5 @@ test('a toast is due once when a subagent crosses the heavy mark', () => {
   assert.deepEqual(newlyHeavy(b, step(b, 1000)), [])
   const mainBefore = emptyOffice(0)
   assert.deepEqual(newlyHeavy(mainBefore, step(mainBefore, 500_000, null)), [])
-  assert.deepEqual(newlyHeavy(emptyOffice(0), { ...b, agents: b.agents }).map(x => x.id), ['a1'])
+  assert.deepEqual(newlyHeavy(emptyOffice(0), b).map(x => x.id), ['a1'])
 })
