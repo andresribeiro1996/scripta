@@ -6,7 +6,7 @@ Index of third-party services Scripta depends on. Plan and price columns marked 
 
 | Service | Used for | Where | Plan | Cost risk |
 |---|---|---|---|---|
-| Railway | Fastify API at api.atmyshelf.com, 500 MB `/data` volume | `railway.json`, `backend/scripts/*litestream.sh` | ? | Paid, usage-based. Volume growth (SQLite + uploads) and always-on compute. `railway.json` config-as-code stops working 2026-12-01: migrate with `railway config migrate` |
+| Railway | Fastify API at api.atmyshelf.com, 5 GB `/data` volume | `.railway/railway.ts`, `backend/scripts/*litestream.sh` | ? | Paid, usage-based. Volume growth (SQLite + uploads) and always-on compute |
 | Cloudflare R2 | `atmyshelf-images` (public, images.atmyshelf.com), `atmyshelf-backups` (Litestream, 14 day retention) | `backend/src/storage/`, `backend/litestream.yml` | ? (pay-as-you-go with free allowance) | Free while under the monthly storage and operation allowance; egress is free. Grows with covers, gallery uploads and daily snapshots of 11 DBs |
 | Cloudflare Pages | Web PWA at atmyshelf.com, `assetlinks.json` | dashboard only, no wrangler config | ? (presumably free) | Free tier is generous; builds per month are the only limit |
 | Cloudflare DNS | atmyshelf.com, api., images. | dashboard | Free | none. Registrar unknown, renewal is a yearly cost |
