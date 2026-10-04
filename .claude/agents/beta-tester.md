@@ -12,7 +12,7 @@ Run every command from the worktree root: `scripts/…` and `mobile/src/app` are
 ## Setup
 
 1. Read `.claude/skills/emulator-verify/SKILL.md` in the worktree you were given. Follow it for the lease check, starting the stack, the adb driving rules and the release. A sweep is optional work: if every device is held by another worktree, stop and report "emulator occupied".
-2. Start from clean fixture data. If `node scripts/dev-status.mjs --json` shows this worktree already has a stack, run `npm run dev:release` first: `--reset` under a running stack does nothing. Then `node scripts/dev-emulator.mjs --reset`, and take the serial and Metro port from `node scripts/dev-status.mjs --json`, as the skill says. Drag Expo Go's dev FAB to the lower-left once, as the skill says.
+2. Start from clean fixture data. If `node scripts/dev-status.mjs --json` shows this worktree already has a stack, run `npm run dev:release` first: `--reset` under a running stack does nothing. Then `node scripts/dev-emulator.mjs --reset`, and take the serial and Metro port from `node scripts/dev-status.mjs --json`, as the skill says. Drag Expo Go's dev FAB to the lower-left once, as the skill says. If `dev-emulator.mjs` refuses (for example "N stacks are already running (limit 4)", or the load gate), stop and report it. Never release or kill another worktree's stack.
 3. Clear the device log and note where Metro's log ends. Shell variables do not survive between your commands, so keep the number:
    ```bash
    adb -s <serial> logcat -c
@@ -31,7 +31,7 @@ Run every command from the worktree root: `scripts/…` and `mobile/src/app` are
 node scripts/dev-snapshot.mjs <NN>-<screen>-<state> --out <output dir>
 ```
 
-`NN` is a running two-digit counter. It saves a shrunk screenshot and prints the screen's controls:
+`NN` is a running two-digit counter. It saves a screenshot (shrunk only when its long side is over 1200px) and prints the screen's controls:
 
 ```
 07-murals · 411×914dp · saved <dir>/07-murals.png
@@ -42,9 +42,9 @@ node scripts/dev-snapshot.mjs <NN>-<screen>-<state> --out <output dir>
   tap 540,2100  "Save"  379×52dp  (disabled)
 ```
 
-A row ending `⚠ under <label>` has its centre covered by that control (often a floating button): scroll the item clear before tapping it, or tap a visible part of it.
+A row ending `⚠ under <label>` has its centre covered by that control (often a floating button): scroll the item clear before tapping it, or tap a visible part of it. The marker covers app controls only. Expo Go's FAB (`· desc="Tools"`, dragged to the lower-left at setup) is not clickable in the listing, so it can still sit over a tap centre: avoid centres within about 40px of it, or drag it elsewhere.
 
-Navigate from the listing: `adb -s <serial> shell input tap <x> <y>` with the printed centre. After a tap that navigates or submits, wait for the next screen before the next snapshot, so a spinner or transition is not reported as "never loads":
+Navigate from the listing: `adb -s <serial> shell input tap <x> <y>` with the printed centre. After a tap that navigates or submits, wait for the next screen before the next snapshot, so a spinner or transition is not reported as "never loads". Wait on a quoted text row from the listing, never on a `desc=` label: `dev:wait` matches visible text only.
 
 ```bash
 npm run dev:wait -- "<text expected on the next screen>" --timeout 30
@@ -52,11 +52,12 @@ npm run dev:wait -- "<text expected on the next screen>" --timeout 30
 
 Open the PNG with Read on a screen's first visit and whenever something visual changed, not after every tap; the listing is enough to navigate. "dump failed — screenshot only" means read the PNG instead.
 
-To check a label, the shrunk PNG is not enough. Take a full-resolution screenshot and crop a window around the control's printed centre (device pixels, offsets not below 0), then Read the crop. `<W>` is 600; when the label is longer than that, make it the control's printed width in pixels (dp × density / 160, with density from `adb -s <serial> shell wm density`):
+To check a label, the saved PNG may be too small or shrunk. Take a full-resolution screenshot, crop a window around the control's printed centre, upscale the crop, then Read it. `<W>` is the control's printed width in pixels (dp × density / 160, with density from `adb -s <serial> shell wm density`) plus 40, at least 120 and at most the screen's width in pixels. The crop window must stay inside the screen, so offsets are not below 0:
 
 ```bash
 adb -s <serial> exec-out screencap -p > <out>/<NN>-full.png
-sips -c 300 <W> --cropOffset <y - 150> <x - W/2> <out>/<NN>-full.png --out <out>/<NN>-zoom.png
+sips -c 120 <W> --cropOffset <y - 60> <x - W/2> <out>/<NN>-full.png --out <out>/<NN>-zoom.png
+sips -Z <3 × W> <out>/<NN>-zoom.png
 ```
 
 ## Sweep
@@ -68,14 +69,14 @@ Never change the password or email of `scripta-dev@local.test`, and never delete
 In this order:
 
 1. **First run.** Sign out from Settings. On the login screen choose "Sign up" and create the throwaway account: email `beta-<unix time>@local.test`, username `beta_<unix time>` (3-30 letters, digits, `_` or `.`, so no hyphen), a password of 8 or more characters; this is the local dev backend. Email signup goes straight to welcome-avatar (`choose-username` is Google-only). Then look at the empty library, My shelf, Murals and Games. Last, Account security: change the password (that signs you out; sign in again with the new one), correct the email if the screen offers it, then delete the account. Deleting signs out, which leaves the app ready for step 2's cold restart.
-2. **Dev account.** Cold restart: `adb -s <serial> shell am force-stop host.exp.exponent`, then open `exp://127.0.0.1:<metro>`. Dev auto-login signs in `scripta-dev@local.test` with 24 books. If it lands on the login screen instead, sign in with the username and password in `scripts/fixtures/account.json`. Then each tab (Home, My shelf, Games, Murals, Settings) and every screen they lead to. On its Account security screen, look but do not use Change password, Correct email or Delete account…. Create one of each thing the app makes (a mural, a collection, a tier list, a quiz, a library share link, a mural share link) so the next step has something to open.
+2. **Dev account.** Cold restart: `adb -s <serial> shell am force-stop host.exp.exponent`, then open `exp://127.0.0.1:<metro>`. Dev auto-login signs in `scripta-dev@local.test` with 24 books. If it lands on the login screen instead, sign in with the username and password in `scripts/fixtures/account.json`. Then each tab (Home, My shelf, Games, Murals, Settings) and every screen they lead to. On its Account security screen, look but do not use Change password, Correct email or Delete account…. Create one of each thing the app makes (a mural, a collection, a tier list, a quiz, a tournament (+, Random fill, Start), a library share link, a mural share link) so the next step has something to open.
 3. **Public routes by deep link** (`exp://127.0.0.1:<metro>/--/<route>`). Read each input off the app's own screens, never from `backend/data` or a `.sqlite` file. The snapshot listing clips labels at 60 characters and share URLs carrying a 36-character id are longer, so read full URLs from the `text=` attribute of the raw dump:
    ```bash
    adb -s <serial> shell uiautomator dump /sdcard/ui.xml && adb -s <serial> shell cat /sdcard/ui.xml | rg -o 'text="[^"]*(shared|arena|vote|play)/[^"]*"'
    ```
    Where each input is:
    - Library and mural share links: the "Share link" field on the library's Share screen after "Create share link", and the line under the mural share sheet's "QR code" view after "Create public link". They are web URLs such as `https://…/shared/murals/<token>`; keep the path and drop the origin, giving `…/--/shared/murals/<token>` and `…/--/shared/library/<token>`.
-   - Tier-list vote code: "Open voting…" in the tier list's actions menu asks "Open to anyone" or "Members only"; confirm one, then reopen Share. Its "QR code" view shows `…/vote/<code>`; open `vote/<code>`.
+   - Tier-list vote code: "Open voting…" in the tier list's actions menu asks "Open to anyone" or "Members only"; confirm one; the share sheet opens on its own, tap "QR code". That view shows `…/vote/<code>`; open `vote/<code>`.
    - Quiz play code: publish the quiz first ("Publish…" in its actions menu, then confirm); only then does "Share challenge link" appear there. It opens the Android share sheet, where the code appears only as `…/play/<code>` in the text preview. Read it from the raw dump, then dismiss the sheet with Android back.
    - Arena id: open any tournament, tap "Share tournament" in its header, then "QR code". The line under the code is `…/arena/<id>`; open `arena/<id>` by deep link so the route is cold-opened, not just tapped into.
    - A route that does not exist, such as `nope`.
@@ -104,7 +105,8 @@ Category: bug · UX friction · design-system breach · accessibility · copy.
 Before reporting:
 
 - Reproduce a bug a second time. A visual or copy finding needs one clear screenshot.
-- Run the skill's "suspect the harness first" checks before blaming the app.
+- Run checks 1, 3 and 4 of the skill's "suspect the harness first" list before blaming the app. Never run check 2: it puts a marker into a screen's source, and you make no source edits.
+- LogBox toasts and their dismiss X are dev chrome (a toast lists as `tap … desc="!, <message>"`, its X as an unlabelled `⚠ <44dp` tap). Record the message under JavaScript errors, dismiss it, and never report it as a UI finding.
 - Check every label you quote in a zoomed crop of the screenshot (the recipe above), not in the listing.
 - A `⚠ <44dp` row is a candidate. Report it only after `rg -n hitSlop` on the component that renders it finds none.
 - A `(no label)` tap is an accessibility finding (TalkBack cannot name it). Confirm with `rg` that the component sets no `accessibilityLabel`.
@@ -124,13 +126,13 @@ Append each finding to `report.md` the moment it is confirmed, and update its ro
    ```
    Deduplicate and count.
 2. `npm run dev:release`, whatever happened. The emulator is not needed for the rest.
-3. Rewrite `report.md` in final form: summary at the top, findings ranked by severity, then by how central the screen is.
+3. Rewrite `report.md` in final form: the screen size from any snapshot header in the title line, the summary at the top, findings ranked by severity, then by how central the screen is.
 4. Reply with the report's path and its Summary section, nothing else.
 
 ## Report template
 
 ```markdown
-# Beta sweep, <YYYY-MM-DD HH:MM>, <branch> @ <short sha>
+# Beta sweep, <YYYY-MM-DD HH:MM>, <branch> @ <short sha>, <W×H>dp
 
 ## Summary
 <n> blocker · <n> major · <n> minor · <n> polish. Fix first: #<a>, #<b>, #<c>, one line each on why.

@@ -35,7 +35,7 @@ Get the serial and ports for this worktree from `node scripts/dev-status.mjs --j
 Wait for a state; never sleep a guessed number of seconds:
 
 ```bash
-npm run dev:wait -- "Library" --timeout 120
+npm run dev:wait -- "My shelf" --timeout 120
 ```
 
 On timeout it prints the screen it gave up on — read that first (a splash means still bundling, a wrong route means the app went elsewhere).

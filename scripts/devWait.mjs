@@ -41,18 +41,22 @@ export function screenHasText(xml, needle) {
   return parseScreenText(xml).some((text) => text.toLowerCase().includes(wanted));
 }
 
+function runAdb(command, args, options) {
+  return execFileSync(command, args, { ...options, env: { ...process.env, ...androidEnv(), LC_ALL: "C" } });
+}
+
 // Bounded and never throwing, like the other adb reads here: a device that is
 // mid-reboot, or an app that is not drawing yet, is "no text on screen" — a
 // state to keep polling through, not an error to abort on.
-export function readScreenText(serial, { exec = execFileSync, timeoutMs = 10000 } = {}) {
+export function readScreenText(serial, { exec = runAdb, timeoutMs = 10000 } = {}) {
   const run = (args) =>
     exec("adb", ["-s", serial, ...args], {
       encoding: "utf8",
       timeout: timeoutMs,
-      env: { ...process.env, ...androidEnv(), LC_ALL: "C" },
       maxBuffer: 16 * 1024 * 1024,
     });
   try {
+    run(["shell", "rm", "-f", "/sdcard/ui.xml"]);
     run(["shell", "uiautomator", "dump", "/sdcard/ui.xml"]);
     return run(["shell", "cat", "/sdcard/ui.xml"]) ?? "";
   } catch {
