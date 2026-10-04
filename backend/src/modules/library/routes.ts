@@ -12,6 +12,7 @@ import { env } from "../../config/env.js";
 import { authGuard, rateLimitKey } from "../auth/index.js";
 import { LIBRARY_SMALL_SAVE_MAX_BYTES } from "./domain/constants.js";
 import { LibraryChangeNotFoundError, LibraryConflictError, LibraryTooLargeError, NoLibraryDocumentError } from "./domain/errors.js";
+import type { LibraryDocumentText } from "./domain/types.js";
 import { libraryTooLargeMessage } from "./domain/sizeLimit.js";
 import { ImportBusyError, InvalidImportError, parseImport } from "./import/parseImport.js";
 import type { LibraryService } from "./service.js";
@@ -119,6 +120,11 @@ function applyChange(service: LibraryService, userId: string, change: LibraryCha
   }
 }
 
+function sendDocumentText(reply: FastifyReply, document: LibraryDocumentText) {
+  const body = `{"data":${document.data},"updatedAt":${JSON.stringify(document.updatedAt)},"shareToken":${JSON.stringify(document.shareToken)},"shareUrl":${JSON.stringify(document.shareUrl)}}`;
+  return reply.type("application/json; charset=utf-8").send(body);
+}
+
 export function buildLibraryRoutes(service: LibraryService) {
   return async function libraryRoutes(app: FastifyInstance) {
     await sweepStaleImportDirs().catch((error) => app.log.warn({ err: error }, "stale import cleanup failed"));
@@ -127,11 +133,11 @@ export function buildLibraryRoutes(service: LibraryService) {
       await reads.register(fastifyRateLimit, { max: 60, timeWindow: "1 minute", keyGenerator: rateLimitKey });
 
       reads.get("/library", { preHandler: authGuard }, async (request, reply) => {
-        const library = service.getLibrary(request.user.id);
+        const library = service.getLibraryText(request.user.id);
         if (!library) {
           return reply.code(404).send({ error: "No library saved yet." });
         }
-        return reply.send(library);
+        return sendDocumentText(reply, library);
       });
     });
 
@@ -154,7 +160,7 @@ export function buildLibraryRoutes(service: LibraryService) {
         }
         try {
           const library = service.saveLibrary(request.user.id, parsed.data.data, parsed.data.updatedAt, parsed.data.source);
-          return reply.send(library);
+          return sendDocumentText(reply, library);
         } catch (error) {
           if (error instanceof LibraryConflictError) {
             return reply.code(409).send({ error: error.message, current: service.getLibrary(request.user.id) });
@@ -191,7 +197,7 @@ export function buildLibraryRoutes(service: LibraryService) {
           return reply.code(400).send({ error: "Expected { keep, merge: [...], updatedAt }." });
         }
         try {
-          return reply.send(service.mergeBooks(request.user.id, parsed.data.keep, parsed.data.merge, parsed.data.updatedAt));
+          return sendDocumentText(reply, service.mergeBooks(request.user.id, parsed.data.keep, parsed.data.merge, parsed.data.updatedAt));
         } catch (error) {
           if (error instanceof NoLibraryDocumentError) return reply.code(404).send({ error: "No library saved yet." });
           if (error instanceof LibraryConflictError) {

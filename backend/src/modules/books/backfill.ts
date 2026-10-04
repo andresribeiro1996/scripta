@@ -1,5 +1,6 @@
 export const BACKFILL_INTERVAL_MS = 10 * 60 * 1000;
 export const DETAILS_BATCH_SIZE = 50;
+const WORKS_BATCH_SIZE = 250;
 
 interface Timers {
   setInterval: (callback: () => void, delay: number) => NodeJS.Timeout;
@@ -39,4 +40,33 @@ export function startDetailsBackfill(
     controller.abort();
     stopTimer();
   };
+}
+
+interface WorksLog {
+  info: (details: object, message: string) => void;
+  error: (details: object, message: string) => void;
+}
+
+export function startWorksBackfill(
+  assignMissingWorks: (limit: number) => number,
+  log: WorksLog,
+  intervalMs?: number,
+  timers?: Timers
+): () => void {
+  return startDetailsBackfill(
+    async (signal) => {
+      let assigned = 0;
+      for (;;) {
+        await new Promise(setImmediate);
+        if (signal.aborted) break;
+        const batch = assignMissingWorks(WORKS_BATCH_SIZE);
+        assigned += batch;
+        if (batch < WORKS_BATCH_SIZE) break;
+      }
+      if (assigned > 0) log.info({ assigned }, "assigned works to existing editions");
+    },
+    (error) => log.error({ err: error }, "works backfill failed"),
+    intervalMs,
+    timers
+  );
 }
