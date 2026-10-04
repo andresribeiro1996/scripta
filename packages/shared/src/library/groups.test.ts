@@ -4,6 +4,7 @@ import {
   addBookToGroup,
   addKeyToGroup,
   deriveSeriesGroups,
+  isGroup,
   normalizeGroupName,
   removeBookFromGroup,
   removeKeyFromGroup,
@@ -98,6 +99,61 @@ test("removeKeyFromGroup acts on every group sharing the id that holds the key, 
   const bothHave = frozen([group({ id: "g", type: "collection", name: "A", bookKeys: ["ta:a|"] }), group({ id: "g", type: "collection", name: "B", bookKeys: ["ta:a|", "ta:b|"] })]);
   assert.deepEqual(removeKeyFromGroup(bothHave, "g", "ta:a|").map((g) => g.bookKeys), [[], ["ta:b|"]]);
   assert.equal(removeKeyFromGroup(groups, "g", "ta:z|"), groups);
+});
+
+function malformedGroups(): Group[] {
+  const entries: unknown[] = [
+    null,
+    7,
+    "group",
+    [],
+    { id: "g", type: "series", bookKeys: ["ta:a|"], createdAt: STAMP, updatedAt: STAMP },
+    { id: "g", type: "series", name: 5, bookKeys: ["ta:a|"], createdAt: STAMP, updatedAt: STAMP },
+    { id: "g", type: "series", name: "Dune Saga", bookKeys: "ta:a|", createdAt: STAMP, updatedAt: STAMP },
+    { id: "g", type: "series", name: "Dune Saga", bookKeys: null, createdAt: STAMP, updatedAt: STAMP },
+    { id: "g", type: "series", name: "Dune Saga", createdAt: STAMP, updatedAt: STAMP }
+  ];
+  for (const entry of entries) if (typeof entry === "object" && entry !== null) Object.freeze(entry);
+  return Object.freeze(entries) as Group[];
+}
+
+test("isGroup accepts an object with a text name and a list of keys, and nothing else", () => {
+  assert.equal(isGroup(group({ id: "g", type: "collection", name: "C" })), true);
+  assert.equal(isGroup({ name: "No id", bookKeys: [] }), true);
+  const entries = malformedGroups();
+  assert.deepEqual(entries.map(isGroup), entries.map(() => false));
+});
+
+test("the key helpers pass malformed groups through unchanged, never match them, and never throw", () => {
+  const entries = malformedGroups();
+  assert.equal(addKeyToGroup(entries, "g", "ta:b|"), entries);
+  assert.equal(removeKeyFromGroup(entries, "g", "ta:a|"), entries);
+
+  const valid = group({ id: "g", type: "series", name: "Valid", bookKeys: ["ta:a|"] });
+  const added = addKeyToGroup([...entries, valid], "g", "ta:b|");
+  assert.equal(added.length, entries.length + 1);
+  entries.forEach((entry, i) => assert.equal(added[i], entry));
+  assert.deepEqual(added.at(-1)!.bookKeys, ["ta:a|", "ta:b|"]);
+
+  const removed = removeKeyFromGroup([...entries, valid], "g", "ta:a|");
+  entries.forEach((entry, i) => assert.equal(removed[i], entry));
+  assert.deepEqual(removed.at(-1)!.bookKeys, []);
+});
+
+test("deriveSeriesGroups passes malformed groups through unchanged and never matches them", () => {
+  const dune = { Title: "Dune", Attribution: "Frank Herbert", Series: "Dune Saga" };
+  const entries = malformedGroups();
+
+  const seeded = deriveSeriesGroups([dune], entries);
+  assert.equal(seeded.length, entries.length + 1);
+  entries.forEach((entry, i) => assert.equal(seeded[i], entry));
+  assert.deepEqual([seeded.at(-1)!.type, seeded.at(-1)!.name, seeded.at(-1)!.bookKeys], ["series", "Dune Saga", [bookKey(dune)]]);
+
+  const valid = group({ id: "v", type: "series", name: "dune saga" });
+  const filed = deriveSeriesGroups([dune], [...entries, valid]);
+  assert.equal(filed.length, entries.length + 1);
+  entries.forEach((entry, i) => assert.equal(filed[i], entry));
+  assert.deepEqual(filed.at(-1)!.bookKeys, [bookKey(dune)]);
 });
 
 test("addBookToGroup and removeBookFromGroup act on the book's bookKey", () => {

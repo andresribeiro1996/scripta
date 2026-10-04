@@ -152,3 +152,28 @@ test("an add to a library with no books or groups starts from nothing", () => {
   assert.equal(result.data.books.length, 1);
   assert.equal(result.data.book_count, 1);
 });
+
+test("a group lookup passes malformed groups through unchanged, never matches them, and never throws", () => {
+  const malformed: unknown[] = [
+    null,
+    "group",
+    { id: "shelf", type: "collection", bookKeys: [] },
+    { id: "shelf", type: "collection", name: "Bad keys", bookKeys: "ta:dune|frank herbert" },
+    { id: "shelf", type: "collection", name: "No keys" }
+  ];
+  const only = { books: [dune, emma], groups: malformed as Group[] };
+  assert.deepEqual(applyLibraryChange(only, { kind: "membership", groupId: "shelf", bookKey: duneKey, member: true }), { error: "no-group" });
+  assert.deepEqual(applyLibraryChange(only, { kind: "membership", groupId: "shelf", bookKey: duneKey, member: false }), { error: "no-group" });
+
+  const valid = group({ id: "shelf", bookKeys: [emmaKey] });
+  const mixed = { books: [dune, emma], groups: [...malformed as Group[], valid] };
+  const ticked = applyLibraryChange(mixed, { kind: "membership", groupId: "shelf", bookKey: duneKey, member: true });
+  assert.ok("data" in ticked && ticked.changed);
+  malformed.forEach((entry, i) => assert.equal(ticked.data.groups![i], entry));
+  assert.deepEqual(ticked.data.groups!.at(-1)!.bookKeys, [emmaKey, duneKey]);
+
+  const added = applyLibraryChange(mixed, { kind: "add", book: { Title: "Neuromancer", Attribution: "William Gibson", Series: "Sprawl" } });
+  assert.ok("data" in added);
+  malformed.forEach((entry, i) => assert.equal(added.data.groups![i], entry));
+  assert.equal(added.data.groups!.length, malformed.length + 2);
+});

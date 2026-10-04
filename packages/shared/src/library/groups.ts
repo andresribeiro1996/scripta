@@ -41,6 +41,10 @@ export function normalizeGroupName(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+export function isGroup(value: unknown): value is Group {
+  return typeof value === "object" && value !== null && typeof (value as Group).name === "string" && Array.isArray((value as Group).bookKeys);
+}
+
 /** Builds a group WITHOUT appending it, so a caller that needs the new
  *  group's id can have it — createGroup() below only hands back the new
  *  array, and fishing the id back out of that (by diffing, or trusting
@@ -70,13 +74,13 @@ export function deleteGroup(groups: Group[], id: string): Group[] {
 
 export function addKeyToGroup(groups: Group[], id: string, key: string): Group[] {
   const now = new Date().toISOString();
-  const next = groups.map((g) => (g.id === id && !g.bookKeys.includes(key) ? { ...g, bookKeys: [...g.bookKeys, key], updatedAt: now } : g));
+  const next = groups.map((g) => (isGroup(g) && g.id === id && !g.bookKeys.includes(key) ? { ...g, bookKeys: [...g.bookKeys, key], updatedAt: now } : g));
   return next.some((g, i) => g !== groups[i]) ? next : groups;
 }
 
 export function removeKeyFromGroup(groups: Group[], id: string, key: string): Group[] {
   const now = new Date().toISOString();
-  const next = groups.map((g) => (g.id === id && g.bookKeys.includes(key) ? { ...g, bookKeys: g.bookKeys.filter((k) => k !== key), updatedAt: now } : g));
+  const next = groups.map((g) => (isGroup(g) && g.id === id && g.bookKeys.includes(key) ? { ...g, bookKeys: g.bookKeys.filter((k) => k !== key), updatedAt: now } : g));
   return next.some((g, i) => g !== groups[i]) ? next : groups;
 }
 
@@ -158,7 +162,7 @@ export function deriveSeriesGroups(books: Array<Record<string, unknown>>, groups
   const result = [...groups];
   const indexByName = new Map<string, number>();
   result.forEach((g, i) => {
-    if (g.type !== "series") return;
+    if (!isGroup(g) || g.type !== "series") return;
     const name = normalizeGroupName(g.name);
     if (!indexByName.has(name)) indexByName.set(name, i);
   });

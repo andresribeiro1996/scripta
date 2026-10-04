@@ -12,6 +12,7 @@ export interface LibraryRepository {
    *  (with its server-assigned updatedAt) so the service doesn't need to
    *  compute or guess it. */
   upsertDocument(userId: string, dataJson: string, derived: LibraryDerived, expectedUpdatedAt?: string): LibraryDocumentRow | undefined;
+  updateDocumentData(userId: string, dataJson: string, expectedUpdatedAt: string, glyph: LibraryDerived["glyph"] | "keep"): string | undefined;
   listStaleUserIds(): string[];
   setDerived(userId: string, derived: LibraryDerived, sourceUpdatedAt: string): void;
   deleteOrphanedDerived(): void;

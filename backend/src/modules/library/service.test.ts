@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { mock, test } from "node:test";
-import { bookKey, localDay } from "@scripta/shared";
+import { applyLibraryChange, bookKey, localDay, type LibraryChange, type LibraryData } from "@scripta/shared";
 
 // service.js reaches config/env.ts through covers/index.js (peekCachedCoverUrl),
 // and that module process.exit(1)s on an unsatisfied schema at import time. Set
@@ -25,10 +25,10 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
 const { createSqliteLibraryRepository } = await import("./adapters/sqlite/sqliteLibraryRepository.js");
 const { applyLibrarySchema, openLibraryDb } = await import("./adapters/sqlite/connection.js");
-const { LibraryConflictError, LibraryTooLargeError } = await import("./domain/errors.js");
+const { LibraryChangeNotFoundError, LibraryConflictError, LibraryTooLargeError, NoLibraryDocumentError } = await import("./domain/errors.js");
 const { backfillLibraryDerived, readEmbeddedMurals } = await import("./migration.js");
 const { LIBRARY_DERIVED_VERSION, LIBRARY_MATCH_BOOK_CAP, LIBRARY_PUT_HEADROOM_BYTES } = await import("./domain/constants.js");
-const { createLibraryService, deriveLibraryData } = await import("./service.js");
+const { createLibraryService, deriveGlyph, deriveLibraryData } = await import("./service.js");
 const { readerGlyphFor, sharedBookCounts, sharedBooks } = await import("./publicResolver.js");
 const { peekCachedCoverUrl } = await import("../books/index.js");
 
@@ -933,4 +933,465 @@ test("sharedBooks falls back to the cached cover for a book with none of its own
   const cached = peekCachedCoverUrl({ isbn: "9780141439587" });
   assert.ok(cached);
   assert.deepEqual(sharedBooks("cache-viewer", "cache-spy", 3), [{ title: "Emma", author: "Jane Austen", coverUrl: cached }]);
+});
+
+const STAMP = "2026-01-01T00:00:00.000Z";
+const owned = (i: number, extra: Book = {}): Book => ({ ContentID: `k${i}`, Title: `Book ${i}`, Attribution: `Author ${i}`, ReadStatus: 2, ...extra });
+const groupOf = (id: string, type: string, bookKeys: string[] = []) => ({ id, type, name: `Group ${id}`, bookKeys, createdAt: STAMP, updatedAt: STAMP });
+
+function changeLibrary() {
+  const books = [...Array.from({ length: 10 }, (_, i) => owned(i, i === 5 ? { Rating: 3 } : {})), owned(10, { ReadStatus: 1 })];
+  return { books, groups: [groupOf("saga", "series", books.slice(0, 3).map(bookKey)), groupOf("shelf", "collection")] };
+}
+
+const keyOf = (i: number) => bookKey(owned(i));
+
+function normalized(data: unknown, previous: unknown) {
+  const known = new Set(((previous as { groups?: Array<{ id: string }> }).groups ?? []).map((group) => group.id));
+  const doc = data as { groups?: Array<Record<string, unknown>> };
+  return { ...doc, groups: doc.groups?.map((group) => ({ ...group, id: known.has(String(group.id)) ? group.id : "new", createdAt: "t", updatedAt: "t" })) };
+}
+
+const neuromancer = { ContentID: "manual:n", Title: "Neuromancer", Attribution: "William Gibson", ISBN: "9780441569595", Series: "Sprawl", ReadStatus: 0 };
+
+test("applyChange stores what applyLibraryChange makes of the stored document, for each kind of change", () => {
+  const changes: LibraryChange[] = [
+    { kind: "membership", groupId: "shelf", bookKey: keyOf(3), member: true },
+    { kind: "membership", groupId: "saga", bookKey: keyOf(0), member: false },
+    { kind: "book", bookKey: keyOf(10), readStatus: 2, day: "2026-10-02" },
+    { kind: "book", bookKey: keyOf(3), rating: 4 },
+    { kind: "add", book: neuromancer }
+  ];
+  for (const change of changes) {
+    const { db, service } = setup();
+    const saved = service.saveLibrary("u1", changeLibrary());
+    const previous = service.getLibrary("u1")!.data as LibraryData;
+
+    const answer = service.applyChange("u1", change);
+
+    const stored = service.getLibrary("u1")!;
+    assert.deepEqual(answer, { updatedAt: stored.updatedAt, baseUpdatedAt: saved.updatedAt });
+    assert.notEqual(answer.updatedAt, saved.updatedAt);
+    const expected = applyLibraryChange(previous, change);
+    assert.ok("data" in expected && expected.changed);
+    assert.deepEqual(normalized(stored.data, previous), normalized(JSON.parse(JSON.stringify(expected.data)), previous));
+    db.close();
+  }
+});
+
+test("a membership or book change that alters nothing, or is sent twice, writes once", () => {
+  const { db, repo, service } = setup();
+  const saved = service.saveLibrary("u1", changeLibrary());
+  const updates = mock.method(repo, "updateDocumentData");
+  const upserts = mock.method(repo, "upsertDocument");
+  const noOps: LibraryChange[] = [
+    { kind: "membership", groupId: "saga", bookKey: keyOf(0), member: true },
+    { kind: "membership", groupId: "shelf", bookKey: keyOf(0), member: false },
+    { kind: "book", bookKey: keyOf(0), readStatus: 2, day: "2026-10-02" },
+    { kind: "book", bookKey: keyOf(5), rating: 3 }
+  ];
+  for (const change of noOps) {
+    assert.deepEqual(service.applyChange("u1", change), { updatedAt: saved.updatedAt, baseUpdatedAt: saved.updatedAt });
+  }
+  assert.equal(updates.mock.callCount(), 0);
+  assert.equal(service.getLibrary("u1")?.updatedAt, saved.updatedAt);
+
+  const tick: LibraryChange = { kind: "membership", groupId: "shelf", bookKey: keyOf(3), member: true };
+  const first = service.applyChange("u1", tick);
+  const again = service.applyChange("u1", tick);
+  assert.deepEqual(again, { updatedAt: first.updatedAt, baseUpdatedAt: first.updatedAt });
+  assert.equal(updates.mock.callCount(), 1);
+  assert.equal(upserts.mock.callCount(), 0);
+  db.close();
+});
+
+test("membership and book changes leave the match keys alone, and an add rebuilds them", () => {
+  const { db, service } = setup();
+  service.saveLibrary("u1", changeLibrary());
+  db.prepare(`DELETE FROM library_match_keys WHERE user_id = 'u1' AND key = ?`).run("ta:book 7|author 7");
+  const before = keyRows(db, "u1");
+  assert.equal(before.length, 10);
+
+  service.applyChange("u1", { kind: "membership", groupId: "shelf", bookKey: keyOf(3), member: true });
+  service.applyChange("u1", { kind: "book", bookKey: keyOf(10), readStatus: 2, day: "2026-10-02" });
+  service.applyChange("u1", { kind: "book", bookKey: keyOf(3), rating: 5 });
+  assert.deepEqual(keyRows(db, "u1"), before);
+
+  service.applyChange("u1", { kind: "add", book: neuromancer });
+  const after = keyRows(db, "u1");
+  assert.equal(after.length, 13);
+  assert.deepEqual(after.filter((row) => row.book_ref === 7).map((row) => row.key), ["ta:book 7|author 7"]);
+  assert.deepEqual(after.filter((row) => row.book_ref === 11).map((row) => row.key), ["isbn:9780441569595", "ta:neuromancer|william gibson"]);
+  db.close();
+});
+
+test("a membership change recomputes the glyph in a series group and keeps it in a collection, and the derived version moves with the document", () => {
+  const { db, service } = setup();
+  service.saveLibrary("u1", changeLibrary());
+  assert.equal(storedGlyph(db, "u1"), "carto");
+  const tamper = () => db.prepare(`UPDATE library_derived SET glyph = 'star' WHERE user_id = 'u1'`).run();
+
+  tamper();
+  const kept = service.applyChange("u1", { kind: "membership", groupId: "shelf", bookKey: keyOf(3), member: true });
+  assert.equal(storedGlyph(db, "u1"), "star");
+  assert.equal(derivedSource(db, "u1"), kept.updatedAt);
+
+  const leaving = service.applyChange("u1", { kind: "membership", groupId: "saga", bookKey: keyOf(0), member: false });
+  assert.equal(storedGlyph(db, "u1"), null);
+  assert.equal(derivedSource(db, "u1"), leaving.updatedAt);
+
+  tamper();
+  const joining = service.applyChange("u1", { kind: "membership", groupId: "saga", bookKey: keyOf(3), member: true });
+  assert.equal(storedGlyph(db, "u1"), "carto");
+  assert.equal(derivedSource(db, "u1"), joining.updatedAt);
+  db.close();
+});
+
+test("a status moving to or from Finished recomputes the glyph, and any other change to a book keeps it", () => {
+  const { db, service } = setup();
+  service.saveLibrary("u1", changeLibrary());
+  const tamper = () => db.prepare(`UPDATE library_derived SET glyph = 'star' WHERE user_id = 'u1'`).run();
+
+  tamper();
+  service.applyChange("u1", { kind: "book", bookKey: keyOf(10), readStatus: 0 });
+  service.applyChange("u1", { kind: "book", bookKey: keyOf(3), rating: 4 });
+  assert.equal(storedGlyph(db, "u1"), "star");
+
+  const reaching = service.applyChange("u1", { kind: "book", bookKey: keyOf(10), readStatus: 2, day: "2026-10-02" });
+  assert.equal(storedGlyph(db, "u1"), null);
+  assert.equal(derivedSource(db, "u1"), reaching.updatedAt);
+
+  tamper();
+  const leaving = service.applyChange("u1", { kind: "book", bookKey: keyOf(5), readStatus: 1 });
+  assert.equal(storedGlyph(db, "u1"), "carto");
+  assert.equal(derivedSource(db, "u1"), leaving.updatedAt);
+  db.close();
+});
+
+test("after a change the boot backfill re-derives nothing", () => {
+  fileService.saveLibrary("change-fresh", changeLibrary());
+  fileService.applyChange("change-fresh", { kind: "membership", groupId: "shelf", bookKey: keyOf(3), member: true });
+  fileService.applyChange("change-fresh", { kind: "membership", groupId: "saga", bookKey: keyOf(0), member: false });
+  fileService.applyChange("change-fresh", { kind: "book", bookKey: keyOf(3), rating: 5 });
+  fileDb.prepare(`UPDATE library_derived SET glyph = 'star' WHERE user_id = 'change-fresh'`).run();
+  fileDb.prepare(`DELETE FROM library_match_keys WHERE user_id = 'change-fresh' AND key LIKE 'ta:book 1|%'`).run();
+  const keys = keyRows(fileDb, "change-fresh");
+
+  backfillLibraryDerived();
+  backfillLibraryDerived();
+
+  assert.equal(storedGlyph(fileDb, "change-fresh"), "star");
+  assert.deepEqual(keyRows(fileDb, "change-fresh"), keys);
+  assert.equal(derivedSource(fileDb, "change-fresh"), fileService.getLibrary("change-fresh")?.updatedAt);
+});
+
+test("a change to a library whose derived rows were already stale leaves them stale for the backfill", () => {
+  fileService.saveLibrary("change-stale", changeLibrary());
+  fileDb.prepare(`UPDATE library_derived SET glyph = 'star', source_updated_at = '2000-01-01T00:00:00.000Z' WHERE user_id = 'change-stale'`).run();
+  const keys = keyRows(fileDb, "change-stale");
+
+  fileService.applyChange("change-stale", { kind: "membership", groupId: "saga", bookKey: keyOf(0), member: false });
+  fileService.applyChange("change-stale", { kind: "book", bookKey: keyOf(3), rating: 4 });
+
+  assert.equal(derivedSource(fileDb, "change-stale"), "2000-01-01T00:00:00.000Z");
+  assert.equal(storedGlyph(fileDb, "change-stale"), "star");
+  assert.deepEqual(keyRows(fileDb, "change-stale"), keys);
+
+  backfillLibraryDerived();
+
+  assert.equal(derivedSource(fileDb, "change-stale"), fileService.getLibrary("change-stale")?.updatedAt);
+  assert.equal(storedGlyph(fileDb, "change-stale"), null);
+});
+
+test("applyChange emits book_finished for a status that reaches Finished and nothing for any other change", () => {
+  const { db, service, events } = setup();
+  service.saveLibrary("u1", changeLibrary());
+  events.length = 0;
+
+  service.applyChange("u1", { kind: "membership", groupId: "shelf", bookKey: keyOf(3), member: true });
+  service.applyChange("u1", { kind: "book", bookKey: keyOf(3), rating: 4 });
+  service.applyChange("u1", { kind: "book", bookKey: keyOf(5), readStatus: 1 });
+  service.applyChange("u1", { kind: "book", bookKey: keyOf(10), readStatus: 0 });
+  service.applyChange("u1", { kind: "book", bookKey: keyOf(0), readStatus: 2, day: "2026-10-02" });
+  assert.deepEqual(events, []);
+
+  service.applyChange("u1", { kind: "book", bookKey: keyOf(10), readStatus: 2, day: "2026-10-02" });
+  assert.deepEqual(events, [
+    { userId: "u1", type: "book_finished", refId: "k10", payload: { title: "Book 10", author: "Author 10", isbn: null, coverUrl: null, status: 2 } }
+  ]);
+  db.close();
+});
+
+test("applyChange parses the stored document once, whatever it emits", () => {
+  const { db, service, events } = setup();
+  service.saveLibrary("u1", changeLibrary());
+  const parse = mock.method(JSON, "parse");
+  try {
+    service.applyChange("u1", { kind: "book", bookKey: keyOf(10), readStatus: 2, day: "2026-10-02" });
+    assert.equal(events.length, 1);
+    assert.equal(parse.mock.callCount(), 1);
+    service.applyChange("u1", { kind: "add", book: neuromancer });
+    assert.equal(events.length, 2);
+    assert.equal(parse.mock.callCount(), 2);
+  } finally {
+    parse.mock.restore();
+  }
+  db.close();
+});
+
+test("applyChange emits book_added for an add, the first add of a new account included", () => {
+  const { db, service, events } = setup();
+
+  const first = service.applyChange("u1", { kind: "add", book: neuromancer });
+  assert.equal(first.baseUpdatedAt, null);
+  assert.deepEqual(events.map(({ type, refId }) => ({ type, refId })), [{ type: "book_added", refId: "manual:n" }]);
+  assert.equal(events[0]?.payload.title, "Neuromancer");
+  events.length = 0;
+
+  service.applyChange("u1", { kind: "add", book: { ContentID: "manual:e", Title: "Emma", Attribution: "Jane Austen", ReadStatus: 0 } });
+  assert.deepEqual(events.map(({ type, refId }) => ({ type, refId })), [{ type: "book_added", refId: "manual:e" }]);
+  db.close();
+});
+
+test("a status change that finishes many books at once emits at most 10 events, the first ones in document order", () => {
+  const { db, service, events } = setup();
+  const twins = Array.from({ length: 12 }, (_, i) => ({ ContentID: `t${i}`, Title: "Twin", Attribution: "Same Author", ReadStatus: 0 }));
+  service.saveLibrary("u1", { books: twins });
+  events.length = 0;
+
+  service.applyChange("u1", { kind: "book", bookKey: bookKey(twins[0]!), readStatus: 2, day: "2026-10-02" });
+
+  assert.deepEqual(events.map((event) => event.refId), twins.slice(0, 10).map((book) => book.ContentID));
+  db.close();
+});
+
+test("a failing event emitter does not fail a change that was written", () => {
+  const db = memoryDb();
+  const service = createLibraryService(createSqliteLibraryRepository(db), () => "", MAX_DOCUMENT_BYTES, () => {
+    throw new Error("community db locked");
+  });
+  service.saveLibrary("u1", changeLibrary());
+
+  const answer = service.applyChange("u1", { kind: "book", bookKey: keyOf(10), readStatus: 2, day: "2026-10-02" });
+
+  assert.equal(service.getLibrary("u1")?.updatedAt, answer.updatedAt);
+  assert.equal((booksOf(service, "u1")[10] as Book).ReadStatus, 2);
+  db.close();
+});
+
+test("applyChange answers a missing library, group or book with a typed error and writes nothing", () => {
+  const { db, service, events } = setup();
+  const tick: LibraryChange = { kind: "membership", groupId: "shelf", bookKey: keyOf(3), member: true };
+  assert.throws(() => service.applyChange("nobody", tick), NoLibraryDocumentError);
+  assert.throws(() => service.applyChange("nobody", { kind: "book", bookKey: keyOf(3), rating: 4 }), NoLibraryDocumentError);
+  assert.equal(service.getLibrary("nobody"), null);
+
+  const saved = service.saveLibrary("u1", changeLibrary());
+  const rejectedAs = (reason: "no-group" | "no-book") => (error: unknown) => error instanceof LibraryChangeNotFoundError && error.reason === reason;
+  const unknownGroup: LibraryChange = { kind: "membership", groupId: "gone", bookKey: keyOf(3), member: true };
+  const unknownBookInGroup: LibraryChange = { kind: "membership", groupId: "shelf", bookKey: "ta:nobody|", member: true };
+  const unknownBook: LibraryChange = { kind: "book", bookKey: "ta:nobody|", readStatus: 2, day: "2026-10-02" };
+  assert.throws(() => service.applyChange("u1", unknownGroup), rejectedAs("no-group"));
+  assert.throws(() => service.applyChange("u1", unknownBookInGroup), rejectedAs("no-book"));
+  assert.throws(() => service.applyChange("u1", unknownBook), rejectedAs("no-book"));
+
+  assert.equal(service.getLibrary("u1")?.updatedAt, saved.updatedAt);
+  assert.deepEqual(events, []);
+  db.close();
+});
+
+test("a key with no book can still be taken out of a group", () => {
+  const { db, service } = setup();
+  service.saveLibrary("u1", { books: [owned(0)], groups: [groupOf("shelf", "collection", ["ta:removed|"])] });
+
+  service.applyChange("u1", { kind: "membership", groupId: "shelf", bookKey: "ta:removed|", member: false });
+
+  assert.deepEqual((service.getLibrary("u1")?.data as { groups: Array<{ bookKeys: string[] }> }).groups[0]?.bookKeys, []);
+  db.close();
+});
+
+test("a first add creates the library, answering with no base version", () => {
+  const { db, service } = setup();
+  const answer = service.applyChange("u1", { kind: "add", book: neuromancer });
+  assert.equal(answer.baseUpdatedAt, null);
+  assert.equal(service.getLibrary("u1")?.updatedAt, answer.updatedAt);
+  assert.deepEqual(booksOf(service, "u1").map((book) => book.Title), ["Neuromancer"]);
+  assert.equal(storedGlyph(db, "u1"), null);
+  assert.deepEqual(keyRows(db, "u1").map((row) => row.key), ["isbn:9780441569595", "ta:neuromancer|william gibson"]);
+  db.close();
+});
+
+test("applyChange refuses a stored document it cannot read and leaves it alone", () => {
+  const { db, repo, service } = setup();
+  ["not json", "[]", "{}", '{"books":5}', "null"].forEach((stored, i) => {
+    const userId = `unreadable-${i}`;
+    repo.upsertDocument(userId, stored, { glyph: null, keys: [] });
+    assert.throws(() => service.applyChange(userId, { kind: "add", book: neuromancer }), /unreadable/);
+    assert.throws(() => service.applyChange(userId, { kind: "book", bookKey: keyOf(3), rating: 4 }), /unreadable/);
+    assert.equal(repo.getDocument(userId)?.data, stored);
+  });
+  db.close();
+});
+
+test("applyChange refuses a change that grows the document past the limit minus the PUT headroom, but not one that changes nothing", () => {
+  const base = changeLibrary();
+  const { db, service, events } = setup(Buffer.byteLength(JSON.stringify(base)) + LIBRARY_PUT_HEADROOM_BYTES);
+  const saved = service.saveLibrary("u1", base);
+
+  assert.throws(() => service.applyChange("u1", { kind: "book", bookKey: keyOf(10), readStatus: 2, day: "2026-10-02" }), LibraryTooLargeError);
+  assert.throws(() => service.applyChange("u1", { kind: "add", book: neuromancer }), LibraryTooLargeError);
+  assert.deepEqual(service.getLibrary("u1")?.data, base);
+  assert.equal(service.getLibrary("u1")?.updatedAt, saved.updatedAt);
+  assert.deepEqual(events, []);
+
+  assert.deepEqual(service.applyChange("u1", { kind: "book", bookKey: keyOf(0), readStatus: 2, day: "2026-10-02" }), { updatedAt: saved.updatedAt, baseUpdatedAt: saved.updatedAt });
+  db.close();
+});
+
+test("a change whose write loses to another version is a conflict, and emits nothing", () => {
+  const { db, repo, events } = setup();
+  const losing = createLibraryService({ ...repo, updateDocumentData: () => undefined, upsertDocument: () => undefined }, () => "", MAX_DOCUMENT_BYTES, (userId, batch) => {
+    events.push(...batch.map((event) => ({ userId, ...event })));
+  });
+  const real = createLibraryService(repo, () => "", MAX_DOCUMENT_BYTES);
+  real.saveLibrary("u1", changeLibrary());
+
+  assert.throws(() => losing.applyChange("u1", { kind: "book", bookKey: keyOf(10), readStatus: 2, day: "2026-10-02" }), LibraryConflictError);
+  assert.throws(() => losing.applyChange("u1", { kind: "add", book: neuromancer }), LibraryConflictError);
+  assert.throws(() => losing.applyChange("u2", { kind: "add", book: neuromancer }), LibraryConflictError);
+  assert.deepEqual(events, []);
+  db.close();
+});
+
+test("applyChange passes malformed stored groups through untouched", () => {
+  const { db, service } = setup();
+  const odd: unknown[] = [
+    null,
+    7,
+    "group",
+    { id: "shelf", type: "collection", bookKeys: [] },
+    { id: "shelf", type: "series", name: "Bad keys", bookKeys: "ta:book 3|author 3" },
+    { id: "shelf", type: "series", name: 5, bookKeys: [] },
+    { id: "shelf", type: "series", name: "No keys" },
+    { id: "shelf", type: "series", name: "Null keys", bookKeys: null },
+    { id: "shelf", type: "series", bookKeys: [keyOf(0), keyOf(1), keyOf(2)] }
+  ];
+  const library = { books: changeLibrary().books, groups: [...odd, groupOf("shelf", "collection")] };
+  service.saveLibrary("u1", library);
+  const groupsOf = () => (service.getLibrary("u1")!.data as { groups: unknown[] }).groups;
+
+  service.applyChange("u1", { kind: "membership", groupId: "shelf", bookKey: keyOf(3), member: true });
+  service.applyChange("u1", { kind: "book", bookKey: keyOf(10), readStatus: 2, day: "2026-10-02" });
+  service.applyChange("u1", { kind: "add", book: neuromancer });
+
+  assert.deepEqual(groupsOf().slice(0, odd.length), odd);
+  assert.deepEqual((groupsOf()[odd.length] as { bookKeys: string[] }).bookKeys, [keyOf(3)]);
+  assert.equal(groupsOf().length, odd.length + 2);
+  assert.equal(storedGlyph(db, "u1"), null);
+  assert.throws(() => service.applyChange("u1", { kind: "membership", groupId: "gone", bookKey: keyOf(3), member: true }), LibraryChangeNotFoundError);
+  db.close();
+});
+
+test("deriveGlyph gives the glyph deriveLibraryData stores, for a library of any shape", () => {
+  const settled = changeLibrary();
+  const leaning = { books: shelf(11), groups: [seriesGroup(shelf(11).slice(0, 3))] };
+  const unkeyed = { id: "g2", type: "series", name: "No keys" };
+  const nameless = { id: "g3", type: "series", bookKeys: shelf(10).map(bookKey) };
+  const odd = { books: [null, 7, ...shelf(10)], groups: [null, { name: 5 }, unkeyed, nameless, seriesGroup(shelf(10).slice(0, 3))] };
+  const unnamed = { books: shelf(10), groups: [nameless] };
+  const numbered = { books: shelf(10).map((book) => ({ ...book, Attribution: 7 })) };
+  const libraries: unknown[] = [settled, leaning, odd, unnamed, numbered, { books: shelf(3), groups: [] }, { books: [] }, { books: "none" }, {}, [], null, "text", 7];
+  for (const library of libraries) assert.equal(deriveGlyph(library), deriveLibraryData(library).glyph);
+  assert.equal(deriveGlyph(settled), "carto");
+  assert.equal(deriveGlyph(leaning), null);
+  assert.equal(deriveGlyph(odd), "carto");
+  assert.equal(deriveGlyph(unnamed), null);
+  assert.equal(deriveGlyph(numbered), null);
+});
+
+const derivedRow = (db: DatabaseSync, userId: string) => {
+  const row = db.prepare(`SELECT glyph, source_updated_at FROM library_derived WHERE user_id = ?`).get(userId) as { glyph: string | null; source_updated_at: string } | undefined;
+  return row && { ...row };
+};
+
+test("updateDocumentData stores the data under a new version after the one it was given", () => {
+  const { db, repo } = setup();
+  const first = repo.upsertDocument("u1", JSON.stringify({ books: [] }), { glyph: null, keys: [] })!;
+
+  const second = repo.updateDocumentData("u1", JSON.stringify({ books: ["next"] }), first.updated_at, "keep")!;
+  assert.ok(second > first.updated_at);
+  assert.deepEqual({ ...repo.getDocument("u1") }, { user_id: "u1", data: JSON.stringify({ books: ["next"] }), updated_at: second, share_token: null });
+
+  const future = "2099-01-01T00:00:00.000Z";
+  db.prepare(`UPDATE library_documents SET updated_at = ? WHERE user_id = 'u1'`).run(future);
+  assert.equal(repo.updateDocumentData("u1", JSON.stringify({ books: [] }), future, "keep"), "2099-01-01T00:00:00.001Z");
+  db.close();
+});
+
+test("updateDocumentData with the wrong version, or no document, changes nothing", () => {
+  const { db, repo } = setup();
+  const row = { key: "ta:a|b", book_ref: 0, title: "A", author: "B", isbn: null, cover: null };
+  const first = repo.upsertDocument("u1", JSON.stringify({ books: [] }), { glyph: "star", keys: [row] })!;
+  const second = repo.updateDocumentData("u1", JSON.stringify({ books: ["second"] }), first.updated_at, "keep")!;
+
+  assert.equal(repo.updateDocumentData("u1", JSON.stringify({ books: ["stale"] }), first.updated_at, null), undefined);
+  assert.equal(repo.updateDocumentData("u1", JSON.stringify({ books: ["none"] }), "2000-01-01T00:00:00.000Z", "keep"), undefined);
+  assert.equal(repo.updateDocumentData("nobody", JSON.stringify({ books: [] }), second, null), undefined);
+
+  assert.equal(repo.getDocument("u1")?.data, JSON.stringify({ books: ["second"] }));
+  assert.equal(repo.getDocument("u1")?.updated_at, second);
+  assert.deepEqual(derivedRow(db, "u1"), { glyph: "star", source_updated_at: second });
+  assert.equal(repo.getDocument("nobody"), undefined);
+  assert.equal(derivedRow(db, "nobody"), undefined);
+  db.close();
+});
+
+test("updateDocumentData with a glyph writes it where the derived row was current, and leaves a stale or missing row alone", () => {
+  const { db, repo } = setup();
+  const first = repo.upsertDocument("u1", JSON.stringify({ books: [] }), { glyph: "star", keys: [] })!;
+
+  const second = repo.updateDocumentData("u1", JSON.stringify({ books: [1] }), first.updated_at, "carto")!;
+  assert.deepEqual(derivedRow(db, "u1"), { glyph: "carto", source_updated_at: second });
+  const third = repo.updateDocumentData("u1", JSON.stringify({ books: [2] }), second, null)!;
+  assert.deepEqual(derivedRow(db, "u1"), { glyph: null, source_updated_at: third });
+
+  db.prepare(`UPDATE library_derived SET glyph = 'star', source_updated_at = '2000-01-01T00:00:00.000Z' WHERE user_id = 'u1'`).run();
+  repo.updateDocumentData("u1", JSON.stringify({ books: [3] }), third, "carto");
+  assert.deepEqual(derivedRow(db, "u1"), { glyph: "star", source_updated_at: "2000-01-01T00:00:00.000Z" });
+
+  db.prepare(`DELETE FROM library_derived WHERE user_id = 'u1'`).run();
+  repo.updateDocumentData("u1", JSON.stringify({ books: [4] }), repo.getDocument("u1")!.updated_at, "carto");
+  assert.equal(derivedRow(db, "u1"), undefined);
+  db.close();
+});
+
+test("updateDocumentData with keep moves the derived version only where it was current, and never touches the glyph", () => {
+  const { db, repo } = setup();
+  const first = repo.upsertDocument("u1", JSON.stringify({ books: [] }), { glyph: "star", keys: [] })!;
+
+  const second = repo.updateDocumentData("u1", JSON.stringify({ books: [1] }), first.updated_at, "keep")!;
+  assert.deepEqual(derivedRow(db, "u1"), { glyph: "star", source_updated_at: second });
+
+  db.prepare(`UPDATE library_derived SET source_updated_at = '2000-01-01T00:00:00.000Z' WHERE user_id = 'u1'`).run();
+  repo.updateDocumentData("u1", JSON.stringify({ books: [2] }), second, "keep");
+  assert.deepEqual(derivedRow(db, "u1"), { glyph: "star", source_updated_at: "2000-01-01T00:00:00.000Z" });
+  db.close();
+});
+
+test("updateDocumentData never touches the match keys or the share token", () => {
+  const { db, repo } = setup();
+  const keys = [
+    { key: "ta:a|b", book_ref: 0, title: "A", author: "B", isbn: null, cover: null },
+    { key: "isbn:9780441013593", book_ref: 1, title: "C", author: "D", isbn: "9780441013593", cover: "https://covers.test/c.jpg" }
+  ];
+  const first = repo.upsertDocument("u1", JSON.stringify({ books: [] }), { glyph: null, keys })!;
+  repo.setShareToken("u1", "token-1");
+  const before = keyRows(db, "u1");
+
+  const second = repo.updateDocumentData("u1", JSON.stringify({ books: ["changed"] }), first.updated_at, "carto")!;
+  repo.updateDocumentData("u1", JSON.stringify({ books: ["again"] }), second, "keep");
+
+  assert.deepEqual(keyRows(db, "u1"), before);
+  assert.equal(repo.getDocument("u1")?.share_token, "token-1");
+  db.close();
 });

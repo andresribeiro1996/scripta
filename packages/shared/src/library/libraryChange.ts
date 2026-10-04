@@ -1,6 +1,6 @@
 import { buildMergedLibrary } from "./addPipeline.js";
 import { setRating, type FinishRating } from "./finish.js";
-import { addKeyToGroup, removeKeyFromGroup } from "./groups.js";
+import { addKeyToGroup, isGroup, removeKeyFromGroup } from "./groups.js";
 import { setReadStatus, type ReadStatus } from "./libraryView.js";
 import { bookKey } from "./merge.js";
 import type { LibraryData } from "./types.js";
@@ -17,7 +17,7 @@ export function applyLibraryChange(data: LibraryData, change: LibraryChange): Ap
 
   if (change.kind === "membership") {
     const groups = data.groups ?? [];
-    if (!groups.some((group) => group.id === change.groupId)) return { error: "no-group" };
+    if (!groups.some((group) => isGroup(group) && group.id === change.groupId)) return { error: "no-group" };
     if (change.member && !data.books.some((book) => bookKey(book) === change.bookKey)) return { error: "no-book" };
     const next = change.member ? addKeyToGroup(groups, change.groupId, change.bookKey) : removeKeyFromGroup(groups, change.groupId, change.bookKey);
     return next === groups ? { data, changed: false } : { data: { ...data, groups: next }, changed: true };
