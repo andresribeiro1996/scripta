@@ -8,6 +8,10 @@ export class ApiError extends Error {
   }
 }
 
+export function isPermanentError(error: unknown): boolean {
+  return error instanceof ApiError && error.status >= 400 && error.status < 500 && error.status !== 408 && error.status !== 429;
+}
+
 interface RequestInit {
   method?: string;
   body?: unknown;

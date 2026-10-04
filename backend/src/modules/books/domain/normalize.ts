@@ -1,4 +1,4 @@
-import { firstAuthor, normalizeIsbn, normalizeTitle, normalizeWords, titleNumbers } from "@scripta/shared";
+import { canonicalIsbn, firstAuthor, normalizeIsbn, normalizeTitle, normalizeWords, titleNumbers } from "@scripta/shared";
 import type { BooksRepository } from "./ports.js";
 import type { BookRow } from "./types.js";
 
@@ -42,6 +42,7 @@ export interface BookLookup {
 
 export interface BookIdentity {
   key: string;
+  aliasKeys: string[];
   titleKey: string | null;
   isbn: string | null;
   title: string;
@@ -96,14 +97,19 @@ export function workTitleKey(title: string, author: string): string {
 }
 
 export function lookupIdentity(lookup: BookLookup): BookIdentity | null {
-  const isbn = normalizeIsbn(lookup.isbn ?? "") || null;
+  const raw = normalizeIsbn(lookup.isbn ?? "").toUpperCase();
+  const isbn = canonicalIsbn(raw) || null;
   const title = (lookup.title ?? "").trim();
   const author = (lookup.author ?? "").trim();
   const titleKey = catalogTitleKey(title, author);
-  if (isbn) return { key: `isbn:${isbn}`, titleKey, isbn, title, author };
-  return titleKey ? { key: titleKey, titleKey, isbn: null, title, author } : null;
+  if (isbn) return { key: `isbn:${isbn}`, aliasKeys: raw.length === 10 ? [`isbn:${raw}`] : [], titleKey, isbn, title, author };
+  return titleKey ? { key: titleKey, aliasKeys: [], titleKey, isbn: null, title, author } : null;
 }
 
 export function findByIdentity(repo: Pick<BooksRepository, "findBookByKey">, identity: BookIdentity): BookRow | undefined {
-  return repo.findBookByKey(identity.key) ?? (identity.titleKey && identity.titleKey !== identity.key ? repo.findBookByKey(identity.titleKey) : undefined);
+  for (const key of [identity.key, ...identity.aliasKeys]) {
+    const found = repo.findBookByKey(key);
+    if (found) return found;
+  }
+  return identity.titleKey && identity.titleKey !== identity.key ? repo.findBookByKey(identity.titleKey) : undefined;
 }

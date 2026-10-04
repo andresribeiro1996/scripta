@@ -16,7 +16,7 @@ export interface PeekCachedCoverParams {
 
 let repo: BooksRepository | null = null;
 
-function booksRepository(): BooksRepository {
+export function booksRepository(): BooksRepository {
   return (repo ??= createSqliteBooksRepository(openBooksDb()));
 }
 

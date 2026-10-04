@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { Stack } from "expo-router";
+import { router, Stack } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { createVoterToken } from "@scripta/shared";
 import { useAuth } from "../../core/auth";
+import { isPermanentError } from "../../core/apiClient";
 import { Button, Dialog, EmptyState, ErrorState, HeaderActions, IconButton, Input, Menu, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, spacing, typography, useTheme } from "../../ui";
 import { AddBookSheet } from "../community/AddBookSheet";
 import { fetchTournament, renameTournament, resolveTiebreak, settleDuelEarly, voteOnDuel } from "./api";
@@ -79,7 +80,7 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
   }
 
   if (!token || tournament.isPending) return <Screen bottom top={false} style={styles.centered}><Skeleton height={160} /></Screen>;
-  if (tournament.isError || !data) return <Screen bottom top={false} style={styles.centered}><ErrorState title="Tournament unavailable" body={tournament.error instanceof Error ? tournament.error.message : "No such tournament."} actionLabel="Retry" onAction={() => void tournament.refetch()} /></Screen>;
+  if (tournament.isError || !data) return <Screen bottom top={false} style={styles.centered}><ErrorState title="Tournament unavailable" body={tournament.error instanceof Error ? tournament.error.message : "No such tournament."} actionLabel={isPermanentError(tournament.error) ? "Go to Atmyshelf" : "Retry"} onAction={isPermanentError(tournament.error) ? () => router.replace("/") : () => void tournament.refetch()} /></Screen>;
 
   const votable = votableDuels(data.duels);
   const next = votable[0];

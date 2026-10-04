@@ -22,6 +22,7 @@
     "dev:status": "node scripts/dev-status.mjs",
     "dev:tunnels": "node scripts/dev-tunnels.mjs",
     "dev:wait": "node scripts/dev-wait.mjs",
+    "dev:snapshot": "node scripts/dev-snapshot.mjs",
     "dev:link-deps": "node scripts/dev-worktree-deps.mjs",
     "test:scripts": "node --test scripts/*.test.mjs",
     "test": "npm run test:scripts && npm test --workspaces --if-present",
@@ -34,6 +35,7 @@
     "ffmpeg-static@5.3.0": true
   },
   "devDependencies": {
-    "patch-package": "^8.0.1"
+    "patch-package": "^8.0.1",
+    "railway": "^3.12.0"
   }
 }

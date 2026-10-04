@@ -80,6 +80,41 @@ function harness(overrides: Partial<Deps> = {}) {
   return { db, repo, files, sizes, enqueued, warnings, service, bookId, advance: (ms: number) => { clock += ms; } };
 }
 
+test("an ISBN-10 and its ISBN-13 resolve to one edition", () => {
+  const { service, db } = harness();
+  service.resolveCover({ isbn: "0441013597", title: "Dune", author: "Frank Herbert" });
+  service.resolveCover({ isbn: "9780441013593", title: "Dune", author: "Frank Herbert" });
+  assert.equal((db.prepare("SELECT COUNT(*) AS n FROM books").get() as { n: number }).n, 1);
+  const keys = (db.prepare("SELECT key FROM book_keys ORDER BY key").all() as Array<{ key: string }>).map((row) => row.key);
+  assert.ok(keys.includes("isbn:9780441013593"));
+  assert.ok(keys.includes("isbn:0441013597"));
+});
+
+test("a lookup finds an edition stored only under its ISBN-10 key", () => {
+  const { service, db, repo } = harness();
+  const legacy = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "0441013597" }, ["isbn:0441013597"], "2026-01-01T00:00:00.000Z");
+  service.resolveCover({ isbn: "0441013597", title: "Dune", author: "Frank Herbert" });
+  assert.equal((db.prepare("SELECT COUNT(*) AS n FROM books").get() as { n: number }).n, 1);
+  assert.equal(repo.findBookByKey("isbn:9780441013593")?.id, legacy.id);
+});
+
+test("looking up an existing edition by its canonical key writes no keys", () => {
+  const { service, repo } = harness();
+  service.resolveCover({ isbn: "0441013597", title: "Dune", author: "Frank Herbert" });
+  const addKey = repo.addKey;
+  let writes = 0;
+  repo.addKey = (...args) => { writes += 1; addKey(...args); };
+  service.resolveCover({ isbn: "9780441013593", title: "Dune", author: "Frank Herbert" });
+  service.resolveCover({ isbn: "0441013597", title: "Dune", author: "Frank Herbert" });
+  assert.equal(writes, 0);
+});
+
+test("repo.transaction nests inside an open transaction", () => {
+  const { repo } = harness();
+  const book = repo.transaction(() => repo.createBook({ title: "Orlando", author: "Virginia Woolf", isbn: null }, ["ta:orlando|woolf|"], "2026-01-01T00:00:00.000Z"));
+  assert.ok(repo.getBook(book.id));
+});
+
 test("a new book answers pending and repeat requests reuse the same row", () => {
   const { service, enqueued, db } = harness();
   assert.deepEqual(service.resolveCover(orlando), { url: null, fullUrl: null, pending: true, upgrading: false });

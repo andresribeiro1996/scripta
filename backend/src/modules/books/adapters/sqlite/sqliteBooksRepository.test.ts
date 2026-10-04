@@ -14,6 +14,7 @@ process.env.JWT_ACCESS_SECRET = "a".repeat(64);
 process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
 const { applyBooksMigrations, openBooksDb } = await import("./connection.js");
+const { findOrCreateBook } = await import("../../domain/findOrCreate.js");
 const { createSqliteBooksRepository } = await import("./sqliteBooksRepository.js");
 const { WorkMergeError } = await import("../../domain/errors.js");
 
@@ -1066,4 +1067,66 @@ test("groupKeylessWorks merges at most its limit per batch", () => {
   assert.equal(repo.groupKeylessWorks(1), 1);
   assert.equal(repo.groupKeylessWorks(1), 1);
   assert.equal(repo.groupKeylessWorks(1), 0);
+});
+
+function rerunPass(db: DatabaseSync) {
+  db.exec("PRAGMA user_version = 1");
+  applyBooksMigrations(db);
+}
+
+test("the ISBN-10 pass adds the ISBN-13 key when no edition holds it", () => {
+  const { db, repo } = freshRepo();
+  const book = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "0441013597" }, ["isbn:0441013597"], NOW);
+  rerunPass(db);
+  assert.equal(repo.findBookByKey("isbn:9780441013593")?.id, book.id);
+  assert.equal(repo.getBook(book.id)?.isbn, "9780441013593");
+});
+
+test("the ISBN-10 pass handles a lowercase check digit", () => {
+  const { db, repo } = freshRepo();
+  const book = repo.createBook({ title: "Gödel", author: "Hofstadter", isbn: "080442957x" }, ["isbn:080442957x"], NOW);
+  rerunPass(db);
+  assert.equal(repo.findBookByKey("isbn:9780804429573")?.id, book.id);
+  assert.equal(repo.getBook(book.id)?.isbn, "9780804429573");
+});
+
+test("after the ISBN-10 pass an ISBN-13 lookup finds the legacy row without a second book", () => {
+  const { db, repo } = freshRepo();
+  const book = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "0441013597" }, ["isbn:0441013597"], NOW);
+  rerunPass(db);
+  const found = findOrCreateBook(repo, { isbn: "9780441013593", title: "Dune", author: "Frank Herbert" }, NOW);
+  assert.equal(found?.id, book.id);
+  assert.equal(countOf(db, "books"), 1);
+});
+
+test("the ISBN-10 pass merges a lone keyless work into the other edition's work", () => {
+  const { db, repo } = freshRepo();
+  const ten = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "0441013597" }, ["isbn:0441013597"], NOW);
+  const thirteen = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593", workKey: "OL893415W" }, ["isbn:9780441013593"], NOW);
+  rerunPass(db);
+  assert.equal(repo.getBook(ten.id)?.work_id, thirteen.work_id);
+  assert.equal(workById(db, ten.work_id).merged_into, thirteen.work_id);
+  assert.equal(repo.findBookByKey("isbn:0441013597")?.id, ten.id);
+});
+
+test("the ISBN-10 pass merges the other way when only the ISBN-13 work is lone and keyless", () => {
+  const { db, repo } = freshRepo();
+  const ten = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "0441013597", workKey: "OL893415W" }, ["isbn:0441013597"], NOW);
+  const thirteen = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593" }, ["isbn:9780441013593"], NOW);
+  rerunPass(db);
+  assert.equal(repo.getBook(thirteen.id)?.work_id, ten.work_id);
+  assert.equal(workById(db, thirteen.work_id).merged_into, ten.work_id);
+});
+
+test("the ISBN-10 pass leaves two keyed works that disagree alone", () => {
+  const { db, repo } = freshRepo();
+  const ten = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "0441013597", workKey: "OL1W" }, ["isbn:0441013597"], NOW);
+  const thirteen = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593", workKey: "OL2W" }, ["isbn:9780441013593"], NOW);
+  rerunPass(db);
+  assert.notEqual(repo.getBook(ten.id)?.work_id, repo.getBook(thirteen.id)?.work_id);
+});
+
+test("the ISBN-10 pass runs once", () => {
+  const { db } = freshRepo();
+  assert.equal((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version, 2);
 });

@@ -6,6 +6,7 @@ import { DatabaseSync } from "node:sqlite";
 import { mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { canonicalIsbn } from "@scripta/shared";
 import { env } from "../../../../config/env.js";
 import { MIN_GOOD_WIDTH } from "../../domain/constants.js";
 import { catalogTitleKey } from "../../domain/normalize.js";
@@ -77,6 +78,7 @@ export function applyBooksMigrations(db: DatabaseSync): void {
     }
   }
   backfillTitleKeys(db);
+  joinIsbn10Editions(db);
 }
 
 function backfillTitleKeys(db: DatabaseSync): void {
@@ -91,6 +93,53 @@ function backfillTitleKeys(db: DatabaseSync): void {
       if (key) insertKey.run(key, row.id);
     }
     db.exec("PRAGMA user_version = 1");
+    db.exec("COMMIT");
+  } catch (error) {
+    if (db.isTransaction) db.exec("ROLLBACK");
+    throw error;
+  }
+}
+
+function joinIsbn10Editions(db: DatabaseSync): void {
+  const { user_version: version } = db.prepare("PRAGMA user_version").get() as { user_version: number };
+  if (version >= 2) return;
+  const tens = db.prepare("SELECT key, book_id FROM book_keys WHERE key LIKE 'isbn:%' AND length(key) = 15").all() as Array<{ key: string; book_id: string }>;
+  const ownerOf = db.prepare("SELECT book_id FROM book_keys WHERE key = ?");
+  const addKey = db.prepare("INSERT OR IGNORE INTO book_keys (key, book_id) VALUES (?, ?)");
+  const setIsbn = db.prepare("UPDATE books SET isbn = ? WHERE id = ? AND (isbn IS NULL OR length(isbn) = 10)");
+  const workOf = db.prepare(`
+    SELECT works.id AS id, works.ol_work_key AS ol_work_key, (SELECT COUNT(*) FROM books AS other WHERE other.work_id = works.id) AS editions
+    FROM books JOIN works ON works.id = books.work_id WHERE books.id = ?
+  `);
+  const moveBook = db.prepare("UPDATE books SET work_id = ? WHERE id = ?");
+  const mergeWork = db.prepare("UPDATE works SET merged_into = ? WHERE id = ?");
+  type Work = { id: string; ol_work_key: string | null; editions: number };
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    for (const { key, book_id: tenId } of tens) {
+      const isbn13 = canonicalIsbn(key.slice("isbn:".length));
+      if (isbn13.length !== 13) continue;
+      const thirteenId = (ownerOf.get(`isbn:${isbn13}`) as { book_id: string } | undefined)?.book_id;
+      if (!thirteenId) {
+        addKey.run(`isbn:${isbn13}`, tenId);
+        setIsbn.run(isbn13, tenId);
+        continue;
+      }
+      if (thirteenId === tenId) continue;
+      const tenWork = workOf.get(tenId) as Work | undefined;
+      const thirteenWork = workOf.get(thirteenId) as Work | undefined;
+      if (!tenWork || !thirteenWork || tenWork.id === thirteenWork.id) continue;
+      if (!tenWork.ol_work_key && tenWork.editions === 1) {
+        moveBook.run(thirteenWork.id, tenId);
+        mergeWork.run(thirteenWork.id, tenWork.id);
+      } else if (!thirteenWork.ol_work_key && thirteenWork.editions === 1) {
+        moveBook.run(tenWork.id, thirteenId);
+        mergeWork.run(tenWork.id, thirteenWork.id);
+      } else {
+        console.warn(`books: left ISBN-10 pair apart: ${key} (${tenWork.ol_work_key ?? "no key"}) vs isbn:${isbn13} (${thirteenWork.ol_work_key ?? "no key"})`);
+      }
+    }
+    db.exec("PRAGMA user_version = 2");
     db.exec("COMMIT");
   } catch (error) {
     if (db.isTransaction) db.exec("ROLLBACK");
