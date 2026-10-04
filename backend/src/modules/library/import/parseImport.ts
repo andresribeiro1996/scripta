@@ -1,4 +1,5 @@
 import type { LibraryData } from "@scripta/shared";
+import { BOOK_CSV_ERRORS } from "@scripta/shared";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { importTooLargeMessage } from "../domain/sizeLimit.js";
@@ -17,11 +18,15 @@ export interface ImportPreview {
 }
 
 const SAFE_IMPORT_ERRORS = new Set([
+  ...BOOK_CSV_ERRORS,
   "The import contains too many rows.",
   "`content` table has none of the required Kobo columns.",
   "Couldn't decode that file as text, and it isn't a SQLite database.",
   'That JSON is missing a "books" array.',
   "Didn't recognize that file as Kobo SQLite, library JSON, Goodreads CSV, or StoryGraph CSV.",
+  "Didn't recognize that file — choose Kobo SQLite, library JSON, Goodreads, StoryGraph, Calibre, or a book CSV with Title and Author columns.",
+  "Didn't recognize that file — choose Kobo SQLite, library JSON, Goodreads, StoryGraph, Calibre, LibraryThing TSV, or a book CSV with Title and Author columns.",
+  "Didn't recognize that file — choose Kobo SQLite, library JSON, Goodreads, StoryGraph, Calibre, LibraryThing TSV, BookWyrm CSV, or a book CSV with Title and Author columns.",
   "Couldn't parse that CSV export.",
   "That Goodreads CSV doesn't have any books in it.",
   "That StoryGraph CSV doesn't have any books in it.",

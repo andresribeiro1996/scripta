@@ -19,6 +19,7 @@ export * from "./libraryChangeRequest.js";
 export * from "./librarySaver.js";
 export * from "./libraryStyle.js";
 export * from "./csv.js";
+export * from "./bookCsv.js";
 export * from "./goodreads.js";
 export * from "./storygraph.js";
 export * from "./covers.js";

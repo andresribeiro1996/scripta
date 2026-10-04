@@ -53,7 +53,7 @@ export function PrivacyPage() {
               <li>
                 <b>Your library:</b> the books you import or add, with their titles, authors, ISBNs, reading status and
                 dates, ratings, reviews, highlights and notes, and the series, collections, styles and murals you make.
-                When you import a file from Kobo, Goodreads or StoryGraph, we read it to extract your books and delete
+                When you import a file from Kobo, Goodreads, StoryGraph, Calibre, LibraryThing, BookWyrm or a spreadsheet, we read it to extract your books and delete
                 the file straight away.
               </li>
               <li>
