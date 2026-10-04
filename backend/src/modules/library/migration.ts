@@ -11,8 +11,7 @@
 
 import { openLibraryDb } from "./adapters/sqlite/connection.js";
 import { createSqliteLibraryRepository } from "./adapters/sqlite/sqliteLibraryRepository.js";
-import type { LibraryDerived } from "./domain/types.js";
-import { deriveLibraryData } from "./service.js";
+import { deriveLibraryData, deriveLibraryRows } from "./service.js";
 
 /** One embedded mural pulled out of one user's library JSON, still in its
  *  original (frontend `Mural`-shaped, see frontend/src/lib/murals.ts) raw
@@ -101,16 +100,14 @@ export function clearEmbeddedMuralsField(userIds: string[]): void {
   }
 }
 
-function deriveStoredDocument(userId: string, dataJson: string): LibraryDerived {
-  let parsed: unknown;
+function parseStoredDocument(userId: string, dataJson: string): unknown {
   try {
-    parsed = JSON.parse(dataJson);
+    return JSON.parse(dataJson);
   } catch (error) {
     if (!(error instanceof SyntaxError)) throw error;
     console.error(`library backfill: storing ${userId}'s library without derived data`, error);
-    return { glyph: null, keys: [] };
+    return undefined;
   }
-  return deriveLibraryData(parsed);
 }
 
 export function backfillLibraryDerived(): void {
@@ -118,10 +115,16 @@ export function backfillLibraryDerived(): void {
   try {
     const repo = createSqliteLibraryRepository(db);
     repo.deleteOrphanedDerived();
-    for (const userId of repo.listStaleUserIds()) {
+    const stale = repo.listStaleUserIds();
+    const started = performance.now();
+    for (const userId of stale) {
       const row = repo.getDocument(userId);
-      if (row) repo.setDerived(userId, deriveStoredDocument(userId, row.data), row.updated_at);
+      if (!row) continue;
+      const parsed = parseStoredDocument(userId, row.data);
+      repo.setDerived(userId, deriveLibraryData(parsed), row.updated_at);
+      repo.setRows(userId, deriveLibraryRows(parsed, (error, what) => console.error(`library backfill: ${userId}: ${what}`, error)), row.updated_at);
     }
+    if (stale.length > 0) console.log(`library backfill: rebuilt ${stale.length} accounts in ${Math.round(performance.now() - started)} ms`);
   } finally {
     db.close();
   }

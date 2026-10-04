@@ -2,13 +2,13 @@
 // LibraryRepository port, not on SQLite — same reasoning as
 // modules/auth/service.ts.
 
-import { randomUUID } from "node:crypto";
-import { applyLibraryChange, bookKey, bookMatchKeys, buildManualBook, isCertainMatch, isFinishedBook, isGroup, localDay, mergeDuplicateBooks, readerIdentity, seedCoverLookup, setReadStatus, type CoverLookupParams, type IdentityKey, type LibraryChange, type LibraryChangeAnswer, type LibraryData } from "@scripta/shared";
+import { createHash, randomUUID } from "node:crypto";
+import { applyLibraryChange, bookKey, bookMatchKeys, buildManualBook, calculateShelfTheme, isCertainMatch, isFinishedBook, isGroup, localDay, mergeDuplicateBooks, publicReaderCard, readerIdentity, seedCoverLookup, setReadStatus, type CoverLookupParams, type IdentityKey, type LibraryChange, type LibraryChangeAnswer, type LibraryData } from "@scripta/shared";
 import type { BookRecommendationInput } from "@scripta/shared/community";
 import { BOOK_EVENTS_PER_SAVE, COVER_URL_MAX_LENGTH, DISPLAY_TEXT_MAX_LENGTH, LIBRARY_MATCH_BOOK_CAP, LIBRARY_PUT_HEADROOM_BYTES, MATCH_KEY_MAX_LENGTH } from "./domain/constants.js";
 import { LibraryChangeNotFoundError, LibraryConflictError, LibraryTooLargeError, NoLibraryDocumentError } from "./domain/errors.js";
 import type { LibraryRepository } from "./domain/ports.js";
-import type { LibraryDerived, LibraryDocument, LibraryDocumentRow, LibraryMatchKeyRow } from "./domain/types.js";
+import type { LibraryBookRows, LibraryDerived, LibraryDocument, LibraryDocumentRow, LibraryHighlightRow, LibraryMatchKeyRow, LibraryRows } from "./domain/types.js";
 import { libraryParts, normalizeIsbn, toPublicLibraryData, toReaderGroups } from "./publicResolver.js";
 
 export type BookEvent = { type: "book_added" | "book_finished"; refId: string; payload: Record<string, unknown> };
@@ -73,6 +73,98 @@ export function deriveLibraryData(data: unknown): LibraryDerived {
     }
   });
   return { glyph: settledGlyph(books, parts.groupRecords), keys };
+}
+
+export type ReportSkippedRow = (error: TypeError, what: string) => void;
+
+function number(value: unknown): number | null {
+  return typeof value === "number" ? value : null;
+}
+
+function finishedYear(book: Record<string, unknown>): number | null {
+  if (!isFinishedBook(book)) return null;
+  const raw = book.DateLastRead;
+  if (typeof raw !== "string" || !raw) return null;
+  const year = new Date(raw).getFullYear();
+  return Number.isNaN(year) ? null : year;
+}
+
+export function bookRowHash(book: Record<string, unknown>): string {
+  return createHash("sha256").update(JSON.stringify(book)).digest("hex");
+}
+
+export function bookRow(book: Record<string, unknown>, position: number, report: ReportSkippedRow): LibraryBookRows {
+  const highlights: LibraryHighlightRow[] = [];
+  const marks = Array.isArray(book.highlights) ? book.highlights : [];
+  const key = bookKey(book);
+  marks.forEach((mark, index) => {
+    if (!isRecord(mark)) return;
+    let id: string;
+    try {
+      id = String(mark.BookmarkID);
+    } catch (error) {
+      if (!(error instanceof TypeError)) throw error;
+      report(error, `no row for highlight ${index} of book ${position}`);
+      return;
+    }
+    highlights.push({ highlight_id: id, text: text(mark.Text) ?? null, annotation: text(mark.Annotation) ?? null });
+  });
+  return {
+    book: {
+      position,
+      book_key: key,
+      title: text(book.Title) ?? null,
+      author: text(book.Attribution) ?? null,
+      isbn: text(book.ISBN) ?? null,
+      image_id: text(book.ImageId) ?? null,
+      read_status: number(book.ReadStatus),
+      series_number: number(book.SeriesNumber),
+      sort_order: number(book._order),
+      cover_url: text(book._coverUrl) ?? null,
+      finished_year: finishedYear(book),
+      row_hash: bookRowHash(book)
+    },
+    highlights
+  };
+}
+
+export function libraryMeta(data: Record<string, unknown>): string {
+  return JSON.stringify({ source: data.source, schema_version: data.schema_version, book_count: data.book_count, name: data.name, groups: data.groups, style: data.style });
+}
+
+export function deriveLibraryRows(data: unknown, report: ReportSkippedRow): LibraryRows {
+  const parts = libraryParts(data);
+  if (!parts) return { books: [], summary: { meta: null, reader_card: null, shelf_theme: null, total_books: 0, finished_count: 0, in_progress_count: 0, total_highlights: 0 } };
+  const doc = data as Record<string, unknown>;
+  const books: LibraryBookRows[] = [];
+  (doc.books as unknown[]).forEach((book, position) => {
+    if (!isRecord(book)) return;
+    try {
+      books.push(bookRow(book, position, report));
+    } catch (error) {
+      if (!(error instanceof TypeError)) throw error;
+      report(error, `no row for book ${position}`);
+    }
+  });
+  let readerCard: string | null = null;
+  try {
+    readerCard = JSON.stringify(publicReaderCard(readerIdentity(parts.allBooks, toReaderGroups(parts.groupRecords))));
+  } catch (error) {
+    if (!(error instanceof TypeError)) throw error;
+    report(error, "no reader card");
+  }
+  return {
+    books,
+    summary: {
+      meta: libraryMeta(doc),
+      reader_card: readerCard,
+      shelf_theme: JSON.stringify(calculateShelfTheme(parts.allBooks)),
+      total_books: parts.allBooks.length,
+      finished_count: parts.allBooks.filter(isFinishedBook).length,
+      in_progress_count: parts.allBooks.filter((book) => book.ReadStatus === 1).length,
+      total_highlights: parts.allBooks.reduce((sum, book) => sum + (Array.isArray(book.highlights) ? book.highlights.length : 0), 0)
+    }
+  };
 }
 
 function bookPayload(book: Record<string, unknown>, status: number): Record<string, unknown> {
@@ -177,6 +269,12 @@ function coverLookupsOf(data: unknown): CoverLookupParams[] {
 }
 
 export function createLibraryService(repo: LibraryRepository, publicUrlFor: (token: string) => string, maxDocumentBytes: number, emitBookEvents?: EmitBookEvents, enqueueCovers?: EnqueueCovers, rekeyBooks?: RekeyBooks, logError?: LogError): LibraryService {
+  const logSkipped = logError ?? ((error: unknown, message: string) => console.error(message, error));
+
+  function rowsOf(userId: string, data: unknown): LibraryRows {
+    return deriveLibraryRows(data, (error, what) => logSkipped(error, `library rows of ${userId}: ${what}`));
+  }
+
   function serializeWithinLimit(document: unknown): string {
     const json = JSON.stringify(document);
     if (Buffer.byteLength(json) > maxDocumentBytes - LIBRARY_PUT_HEADROOM_BYTES) throw new LibraryTooLargeError();
@@ -192,7 +290,7 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
 
     saveLibrary(userId, data, expectedUpdatedAt, source) {
       const previous = source === "import" ? undefined : repo.getDocument(userId);
-      const row = repo.upsertDocument(userId, JSON.stringify(data), deriveLibraryData(data), expectedUpdatedAt);
+      const row = repo.upsertDocument(userId, JSON.stringify(data), deriveLibraryData(data), rowsOf(userId, data), expectedUpdatedAt);
       if (!row) throw new LibraryConflictError();
       if (previous !== undefined && emitBookEvents) {
         try {
@@ -229,7 +327,7 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
         if (Number(match.ReadStatus ?? 0) === input.readStatus) return { key, updated: false };
         const updatedBook = setReadStatus(match, input.readStatus, input.day ?? localDay());
         const reshelved = { ...doc, books: books.map((b) => (b === match ? updatedBook : b)) };
-        const saved = repo.upsertDocument(userId, serializeWithinLimit(reshelved), deriveLibraryData(reshelved), row?.updated_at);
+        const saved = repo.upsertDocument(userId, serializeWithinLimit(reshelved), deriveLibraryData(reshelved), rowsOf(userId, reshelved), row?.updated_at);
         if (!saved) throw new LibraryConflictError();
         if (input.readStatus === 2 && emitBookEvents) {
           try {
@@ -256,7 +354,7 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
       );
       const book = input.coverUrl ? { ...built, _coverUrl: input.coverUrl } : built;
       const appended = { ...doc, books: [...books, book] };
-      const saved = repo.upsertDocument(userId, serializeWithinLimit(appended), deriveLibraryData(appended), row?.updated_at);
+      const saved = repo.upsertDocument(userId, serializeWithinLimit(appended), deriveLibraryData(appended), rowsOf(userId, appended), row?.updated_at);
       if (!saved) throw new LibraryConflictError();
       if (emitBookEvents) {
         try {
@@ -279,7 +377,7 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
       const present = new Set(library.books.filter(isRecord).map(bookKey));
       const fromKeys = merge.filter((key) => key !== keep && present.has(key));
       if (fromKeys.length > 0 && rekeyBooks) rekeyBooks(userId, fromKeys, keep);
-      const saved = repo.upsertDocument(userId, json, deriveLibraryData(next), row.updated_at);
+      const saved = repo.upsertDocument(userId, json, deriveLibraryData(next), rowsOf(userId, next), row.updated_at);
       if (!saved) throw new LibraryConflictError();
       return toLibraryDocument(saved, publicUrlFor);
     },
@@ -297,7 +395,7 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
       const updatedAt =
         row && change.kind !== "add"
           ? repo.updateDocumentData(userId, json, row.updated_at, glyph)
-          : repo.upsertDocument(userId, json, deriveLibraryData(result.data), row?.updated_at)?.updated_at;
+          : repo.upsertDocument(userId, json, deriveLibraryData(result.data), rowsOf(userId, result.data), row?.updated_at)?.updated_at;
       if (!updatedAt) throw new LibraryConflictError();
       if (emitBookEvents && (change.kind === "add" || flipped.some(isFinishedBook))) {
         try {

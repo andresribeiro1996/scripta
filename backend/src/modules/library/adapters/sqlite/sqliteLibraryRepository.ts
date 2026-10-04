@@ -4,7 +4,7 @@
 
 import type { DatabaseSync } from "node:sqlite";
 import type { LibraryRepository } from "../../domain/ports.js";
-import type { LibraryDerived, LibraryDocumentRow } from "../../domain/types.js";
+import type { LibraryDerived, LibraryDocumentRow, LibraryRows } from "../../domain/types.js";
 
 export function createSqliteLibraryRepository(db: DatabaseSync): LibraryRepository {
   const getStmt = db.prepare(`SELECT * FROM library_documents WHERE user_id = ?`);
@@ -45,13 +45,48 @@ export function createSqliteLibraryRepository(db: DatabaseSync): LibraryReposito
   const listStaleStmt = db.prepare(`
     SELECT library_documents.user_id FROM library_documents
     LEFT JOIN library_derived ON library_derived.user_id = library_documents.user_id
+    LEFT JOIN library_summary ON library_summary.user_id = library_documents.user_id
     WHERE library_derived.user_id IS NULL OR library_derived.source_updated_at != library_documents.updated_at
+      OR library_summary.user_id IS NULL OR library_summary.source_updated_at != library_documents.updated_at
+  `);
+  const listRowHashesStmt = db.prepare(`SELECT position, row_hash FROM library_books WHERE user_id = ?`);
+  const upsertBookStmt = db.prepare(`
+    INSERT OR REPLACE INTO library_books (user_id, position, book_key, title, author, isbn, image_id, read_status, series_number, sort_order, cover_url, finished_year, row_hash)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const deleteBookStmt = db.prepare(`DELETE FROM library_books WHERE user_id = ? AND position = ?`);
+  const deletePositionHighlightsStmt = db.prepare(`DELETE FROM library_highlights WHERE user_id = ? AND position = ?`);
+  const insertHighlightStmt = db.prepare(`INSERT OR IGNORE INTO library_highlights (user_id, position, highlight_id, text, annotation) VALUES (?, ?, ?, ?, ?)`);
+  const upsertSummaryStmt = db.prepare(`
+    INSERT INTO library_summary (user_id, meta, reader_card, shelf_theme, total_books, finished_count, in_progress_count, total_highlights, source_updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(user_id) DO UPDATE SET meta = excluded.meta, reader_card = excluded.reader_card, shelf_theme = excluded.shelf_theme,
+      total_books = excluded.total_books, finished_count = excluded.finished_count, in_progress_count = excluded.in_progress_count,
+      total_highlights = excluded.total_highlights, source_updated_at = excluded.source_updated_at
   `);
 
   function writeDerived(userId: string, derived: LibraryDerived, sourceUpdatedAt: string) {
     deleteKeysStmt.run(userId);
     for (const row of derived.keys) insertKeyStmt.run(userId, row.key, row.book_ref, row.title, row.author, row.isbn, row.cover);
     setDerivedStmt.run(userId, derived.glyph, sourceUpdatedAt);
+  }
+
+  function writeRows(userId: string, rows: LibraryRows, sourceUpdatedAt: string) {
+    const stored = new Map((listRowHashesStmt.all(userId) as Array<{ position: number; row_hash: string }>).map((row) => [row.position, row.row_hash]));
+    for (const { book, highlights } of rows.books) {
+      const unchanged = stored.get(book.position) === book.row_hash;
+      stored.delete(book.position);
+      if (unchanged) continue;
+      upsertBookStmt.run(userId, book.position, book.book_key, book.title, book.author, book.isbn, book.image_id, book.read_status, book.series_number, book.sort_order, book.cover_url, book.finished_year, book.row_hash);
+      deletePositionHighlightsStmt.run(userId, book.position);
+      for (const highlight of highlights) insertHighlightStmt.run(userId, book.position, highlight.highlight_id, highlight.text, highlight.annotation);
+    }
+    for (const position of stored.keys()) {
+      deleteBookStmt.run(userId, position);
+      deletePositionHighlightsStmt.run(userId, position);
+    }
+    const { summary } = rows;
+    upsertSummaryStmt.run(userId, summary.meta, summary.reader_card, summary.shelf_theme, summary.total_books, summary.finished_count, summary.in_progress_count, summary.total_highlights, sourceUpdatedAt);
   }
 
   function inTransaction<T>(write: () => T): T {
@@ -72,13 +107,16 @@ export function createSqliteLibraryRepository(db: DatabaseSync): LibraryReposito
         db.prepare("DELETE FROM library_documents WHERE user_id = ?").run(userId);
         db.prepare("DELETE FROM library_derived WHERE user_id = ?").run(userId);
         deleteKeysStmt.run(userId);
+        db.prepare("DELETE FROM library_books WHERE user_id = ?").run(userId);
+        db.prepare("DELETE FROM library_highlights WHERE user_id = ?").run(userId);
+        db.prepare("DELETE FROM library_summary WHERE user_id = ?").run(userId);
       });
     },
     getDocument(userId) {
       return getStmt.get(userId) as LibraryDocumentRow | undefined;
     },
 
-    upsertDocument(userId, dataJson, derived, expectedUpdatedAt) {
+    upsertDocument(userId, dataJson, derived, rows, expectedUpdatedAt) {
       return inTransaction(() => {
         const current = getStmt.get(userId) as LibraryDocumentRow | undefined;
         const updatedAt = new Date(Math.max(Date.now(), current ? Date.parse(current.updated_at) + 1 : 0)).toISOString();
@@ -90,6 +128,7 @@ export function createSqliteLibraryRepository(db: DatabaseSync): LibraryReposito
         });
         if (result.changes === 0) return undefined;
         writeDerived(userId, derived, updatedAt);
+        writeRows(userId, rows, updatedAt);
         return getStmt.get(userId) as unknown as LibraryDocumentRow;
       });
     },
@@ -114,11 +153,18 @@ export function createSqliteLibraryRepository(db: DatabaseSync): LibraryReposito
       inTransaction(() => writeDerived(userId, derived, sourceUpdatedAt));
     },
 
+    setRows(userId, rows, sourceUpdatedAt) {
+      inTransaction(() => writeRows(userId, rows, sourceUpdatedAt));
+    },
+
     deleteOrphanedDerived() {
       const orphaned = `NOT EXISTS (SELECT 1 FROM library_documents WHERE library_documents.user_id = library_derived.user_id)`;
       inTransaction(() => {
         db.exec(`DELETE FROM library_match_keys WHERE user_id IN (SELECT user_id FROM library_derived WHERE ${orphaned})`);
         db.exec(`DELETE FROM library_derived WHERE ${orphaned}`);
+        for (const table of ["library_books", "library_highlights", "library_summary"]) {
+          db.exec(`DELETE FROM ${table} WHERE NOT EXISTS (SELECT 1 FROM library_documents WHERE library_documents.user_id = ${table}.user_id)`);
+        }
       });
     },
 

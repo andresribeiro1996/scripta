@@ -28,9 +28,11 @@ const { applyLibrarySchema, openLibraryDb } = await import("./adapters/sqlite/co
 const { LibraryChangeNotFoundError, LibraryConflictError, LibraryTooLargeError, NoLibraryDocumentError } = await import("./domain/errors.js");
 const { backfillLibraryDerived, readEmbeddedMurals } = await import("./migration.js");
 const { LIBRARY_DERIVED_VERSION, LIBRARY_MATCH_BOOK_CAP, LIBRARY_PUT_HEADROOM_BYTES } = await import("./domain/constants.js");
-const { createLibraryService, deriveGlyph, deriveLibraryData } = await import("./service.js");
+const { createLibraryService, deriveGlyph, deriveLibraryData, deriveLibraryRows } = await import("./service.js");
 const { readerGlyphFor, sharedBookCounts, sharedBooks } = await import("./publicResolver.js");
 const { peekCachedCoverUrl } = await import("../books/index.js");
+
+const emptyRows = deriveLibraryRows({ books: [] }, () => undefined);
 
 function memoryDb(): DatabaseSync {
   const db = new DatabaseSync(":memory:");
@@ -682,15 +684,15 @@ test("a save rejected for a stale version leaves the stored keys and glyph as th
 
 test("the document and its derived rows are written in one transaction", () => {
   const { db, repo } = setup();
-  const first = repo.upsertDocument("u1", JSON.stringify({ books: [] }), { glyph: null, keys: [] })!;
+  const first = repo.upsertDocument("u1", JSON.stringify({ books: [] }), { glyph: null, keys: [] }, emptyRows)!;
   const row = { key: "ta:a|b", book_ref: 0, title: "A", author: "B", isbn: null, cover: null };
 
-  assert.throws(() => repo.upsertDocument("u1", JSON.stringify({ books: ["changed"] }), { glyph: null, keys: [row, row] }, first.updated_at), /UNIQUE/);
+  assert.throws(() => repo.upsertDocument("u1", JSON.stringify({ books: ["changed"] }), { glyph: null, keys: [row, row] }, emptyRows, first.updated_at), /UNIQUE/);
 
   assert.equal(repo.getDocument("u1")?.data, JSON.stringify({ books: [] }));
   assert.deepEqual(keyRows(db, "u1"), []);
   assert.equal(derivedSource(db, "u1"), first.updated_at);
-  assert.ok(repo.upsertDocument("u1", JSON.stringify({ books: ["next"] }), { glyph: null, keys: [row] }, first.updated_at));
+  assert.ok(repo.upsertDocument("u1", JSON.stringify({ books: ["next"] }), { glyph: null, keys: [row] }, emptyRows, first.updated_at));
   assert.equal(keyRows(db, "u1").length, 1);
   db.close();
 });
@@ -1073,6 +1075,8 @@ test("after a change the boot backfill re-derives nothing", () => {
   fileService.applyChange("change-fresh", { kind: "membership", groupId: "shelf", bookKey: keyOf(3), member: true });
   fileService.applyChange("change-fresh", { kind: "membership", groupId: "saga", bookKey: keyOf(0), member: false });
   fileService.applyChange("change-fresh", { kind: "book", bookKey: keyOf(3), rating: 5 });
+  const changed = fileService.getLibrary("change-fresh")!;
+  createSqliteLibraryRepository(fileDb).setRows("change-fresh", deriveLibraryRows(changed.data, () => undefined), changed.updatedAt);
   fileDb.prepare(`UPDATE library_derived SET glyph = 'star' WHERE user_id = 'change-fresh'`).run();
   fileDb.prepare(`DELETE FROM library_match_keys WHERE user_id = 'change-fresh' AND key LIKE 'ta:book 1|%'`).run();
   const keys = keyRows(fileDb, "change-fresh");
@@ -1241,7 +1245,7 @@ test("applyChange refuses a stored document it cannot read and leaves it alone",
   const { db, repo, service } = setup();
   ["not json", "[]", "{}", '{"books":5}', "null"].forEach((stored, i) => {
     const userId = `unreadable-${i}`;
-    repo.upsertDocument(userId, stored, { glyph: null, keys: [] });
+    repo.upsertDocument(userId, stored, { glyph: null, keys: [] }, emptyRows);
     assert.throws(() => service.applyChange(userId, { kind: "add", book: neuromancer }), /unreadable/);
     assert.throws(() => service.applyChange(userId, { kind: "book", bookKey: keyOf(3), rating: 4 }), /unreadable/);
     assert.equal(repo.getDocument(userId)?.data, stored);
@@ -1359,7 +1363,7 @@ const derivedRow = (db: DatabaseSync, userId: string) => {
 
 test("updateDocumentData stores the data under a new version after the one it was given", () => {
   const { db, repo } = setup();
-  const first = repo.upsertDocument("u1", JSON.stringify({ books: [] }), { glyph: null, keys: [] })!;
+  const first = repo.upsertDocument("u1", JSON.stringify({ books: [] }), { glyph: null, keys: [] }, emptyRows)!;
 
   const second = repo.updateDocumentData("u1", JSON.stringify({ books: ["next"] }), first.updated_at, "keep")!;
   assert.ok(second > first.updated_at);
@@ -1374,7 +1378,7 @@ test("updateDocumentData stores the data under a new version after the one it wa
 test("updateDocumentData with the wrong version, or no document, changes nothing", () => {
   const { db, repo } = setup();
   const row = { key: "ta:a|b", book_ref: 0, title: "A", author: "B", isbn: null, cover: null };
-  const first = repo.upsertDocument("u1", JSON.stringify({ books: [] }), { glyph: "star", keys: [row] })!;
+  const first = repo.upsertDocument("u1", JSON.stringify({ books: [] }), { glyph: "star", keys: [row] }, emptyRows)!;
   const second = repo.updateDocumentData("u1", JSON.stringify({ books: ["second"] }), first.updated_at, "keep")!;
 
   assert.equal(repo.updateDocumentData("u1", JSON.stringify({ books: ["stale"] }), first.updated_at, null), undefined);
@@ -1391,7 +1395,7 @@ test("updateDocumentData with the wrong version, or no document, changes nothing
 
 test("updateDocumentData with a glyph writes it where the derived row was current, and leaves a stale or missing row alone", () => {
   const { db, repo } = setup();
-  const first = repo.upsertDocument("u1", JSON.stringify({ books: [] }), { glyph: "star", keys: [] })!;
+  const first = repo.upsertDocument("u1", JSON.stringify({ books: [] }), { glyph: "star", keys: [] }, emptyRows)!;
 
   const second = repo.updateDocumentData("u1", JSON.stringify({ books: [1] }), first.updated_at, "carto")!;
   assert.deepEqual(derivedRow(db, "u1"), { glyph: "carto", source_updated_at: second });
@@ -1410,7 +1414,7 @@ test("updateDocumentData with a glyph writes it where the derived row was curren
 
 test("updateDocumentData with keep moves the derived version only where it was current, and never touches the glyph", () => {
   const { db, repo } = setup();
-  const first = repo.upsertDocument("u1", JSON.stringify({ books: [] }), { glyph: "star", keys: [] })!;
+  const first = repo.upsertDocument("u1", JSON.stringify({ books: [] }), { glyph: "star", keys: [] }, emptyRows)!;
 
   const second = repo.updateDocumentData("u1", JSON.stringify({ books: [1] }), first.updated_at, "keep")!;
   assert.deepEqual(derivedRow(db, "u1"), { glyph: "star", source_updated_at: second });
@@ -1427,7 +1431,7 @@ test("updateDocumentData never touches the match keys or the share token", () =>
     { key: "ta:a|b", book_ref: 0, title: "A", author: "B", isbn: null, cover: null },
     { key: "isbn:9780441013593", book_ref: 1, title: "C", author: "D", isbn: "9780441013593", cover: "https://covers.test/c.jpg" }
   ];
-  const first = repo.upsertDocument("u1", JSON.stringify({ books: [] }), { glyph: null, keys })!;
+  const first = repo.upsertDocument("u1", JSON.stringify({ books: [] }), { glyph: null, keys }, emptyRows)!;
   repo.setShareToken("u1", "token-1");
   const before = keyRows(db, "u1");
 
@@ -1438,3 +1442,252 @@ test("updateDocumentData never touches the match keys or the share token", () =>
   assert.equal(repo.getDocument("u1")?.share_token, "token-1");
   db.close();
 });
+
+const rowsInDb = (db: DatabaseSync, userId: string) => ({
+  books: (db.prepare(`SELECT position, book_key, title, author, isbn, image_id, read_status, series_number, sort_order, cover_url, finished_year, row_hash FROM library_books WHERE user_id = ? ORDER BY position`).all(userId) as Array<Record<string, unknown>>).map((row) => ({ ...row })),
+  highlights: (db.prepare(`SELECT position, highlight_id, text, annotation FROM library_highlights WHERE user_id = ? ORDER BY position, highlight_id`).all(userId) as Array<Record<string, unknown>>).map((row) => ({ ...row })),
+  summary: { ...(db.prepare(`SELECT meta, reader_card, shelf_theme, total_books, finished_count, in_progress_count, total_highlights, source_updated_at FROM library_summary WHERE user_id = ?`).get(userId) as Record<string, unknown> | undefined) }
+});
+
+function rowsOfStored(db: DatabaseSync, userId: string) {
+  const stored = db.prepare(`SELECT data, updated_at FROM library_documents WHERE user_id = ?`).get(userId) as { data: string; updated_at: string };
+  const derived = deriveLibraryRows(JSON.parse(stored.data), () => undefined);
+  return {
+    books: derived.books.map((rows) => ({ ...rows.book })),
+    highlights: derived.books.flatMap((rows) => rows.highlights.map((highlight) => ({ position: rows.book.position, ...highlight }))).sort((a, b) => a.position - b.position || (a.highlight_id < b.highlight_id ? -1 : 1)),
+    summary: { ...derived.summary, source_updated_at: stored.updated_at }
+  };
+}
+
+function trackRowWrites(db: DatabaseSync) {
+  db.exec(`
+    CREATE TABLE row_writes (kind TEXT, position INTEGER);
+    CREATE TRIGGER track_books AFTER INSERT ON library_books BEGIN INSERT INTO row_writes VALUES ('book', NEW.position); END;
+    CREATE TRIGGER track_highlights AFTER INSERT ON library_highlights BEGIN INSERT INTO row_writes VALUES ('highlight', NEW.position); END;
+  `);
+  return () => {
+    const writes = (db.prepare(`SELECT kind, position FROM row_writes ORDER BY kind, position`).all() as Array<{ kind: string; position: number }>).map((row) => `${row.kind}:${row.position}`);
+    db.exec(`DELETE FROM row_writes`);
+    return writes;
+  };
+}
+
+const marked = (title: string, ids: unknown[]): Book => ({ Title: title, Attribution: "Writer", highlights: ids.map((id, i) => ({ BookmarkID: id, Text: `${title} ${i}` })) });
+
+test("rows match the stored document after a save, an edit, a reorder, a deletion and a merge, and an edit writes only its own rows", () => {
+  const { db, service } = setup();
+  const takeWrites = trackRowWrites(db);
+  const a = marked("Alpha", ["a1", "a2"]);
+  const b = marked("Beta", ["b1"]);
+  const c = marked("Gamma", ["c1", "c2", "c3"]);
+  let saved = service.saveLibrary("u1", { name: "Mine", books: [a, b, c] });
+  assert.deepEqual(rowsInDb(db, "u1"), rowsOfStored(db, "u1"));
+  assert.equal(rowsInDb(db, "u1").books.length, 3);
+  takeWrites();
+
+  saved = service.saveLibrary("u1", { name: "Mine", books: [a, { ...b, ReadStatus: 2 }, c] }, saved.updatedAt);
+  assert.deepEqual(takeWrites(), ["book:1", "highlight:1"]);
+  assert.deepEqual(rowsInDb(db, "u1"), rowsOfStored(db, "u1"));
+
+  saved = service.saveLibrary("u1", { name: "Mine", books: [c, a, { ...b, ReadStatus: 2 }] }, saved.updatedAt);
+  assert.deepEqual(takeWrites(), ["book:0", "book:1", "book:2", "highlight:0", "highlight:0", "highlight:0", "highlight:1", "highlight:1", "highlight:2"]);
+  assert.deepEqual(rowsInDb(db, "u1"), rowsOfStored(db, "u1"));
+
+  saved = service.saveLibrary("u1", { name: "Mine", books: [c, a] }, saved.updatedAt);
+  assert.deepEqual(takeWrites(), []);
+  assert.deepEqual(rowsInDb(db, "u1"), rowsOfStored(db, "u1"));
+  assert.equal(rowsInDb(db, "u1").books.length, 2);
+  assert.ok(!rowsInDb(db, "u1").highlights.some((highlight) => highlight.position === 2));
+
+  const twin = { ...a, ISBN: "9780441013593" };
+  saved = service.saveLibrary("u1", { books: [dune(), twin, { Title: "Other", Attribution: "Writer" }] }, saved.updatedAt);
+  takeWrites();
+  const merged = service.mergeBooks("u1", bookKey(dune()), [bookKey(twin)], saved.updatedAt);
+  assert.deepEqual(rowsInDb(db, "u1"), rowsOfStored(db, "u1"));
+  assert.equal(rowsInDb(db, "u1").summary.source_updated_at, merged.updatedAt);
+  db.close();
+});
+
+test("an unchanged save writes no book or highlight rows but still moves the summary to the new version", () => {
+  const { db, service } = setup();
+  const takeWrites = trackRowWrites(db);
+  const books = [marked("Alpha", ["a1"]), marked("Beta", ["b1"])];
+  const first = service.saveLibrary("u1", { books });
+  takeWrites();
+  const second = service.saveLibrary("u1", { books }, first.updatedAt);
+
+  assert.deepEqual(takeWrites(), []);
+  assert.equal(rowsInDb(db, "u1").summary.source_updated_at, second.updatedAt);
+  db.close();
+});
+
+test("addBook and an applyChange add keep the rows in step", () => {
+  const { db, service } = setup();
+  service.saveLibrary("u1", { books: [dune({ ContentID: "k1", ReadStatus: 0 })] });
+  service.addBook("u1", { title: "Emma", author: "Jane Austen", readStatus: 1 });
+  service.addBook("u1", { title: "Dune", author: "Frank Herbert", isbn: "9780441013593", readStatus: 2, day: "2024-03-02" });
+  assert.deepEqual(rowsInDb(db, "u1"), rowsOfStored(db, "u1"));
+  service.applyChange("u1", { kind: "add", book: { ...emma, Title: "Persuasion", ISBN: "" } });
+  assert.deepEqual(rowsInDb(db, "u1"), rowsOfStored(db, "u1"));
+  assert.equal(rowsInDb(db, "u1").books.length, 3);
+  db.close();
+});
+
+test("duplicate and missing BookmarkIDs do not fail a save, the first duplicate wins and a missing id is the string undefined", () => {
+  const { db, service } = setup();
+  const book = {
+    Title: "Alpha",
+    Attribution: "Writer",
+    highlights: [{ BookmarkID: "h1", Text: "first" }, { BookmarkID: "h1", Text: "second" }, { Text: "no id" }, "not an object", { BookmarkID: 7, Text: 5, Annotation: "note" }]
+  };
+  service.saveLibrary("u1", { books: [book] });
+
+  assert.deepEqual(rowsInDb(db, "u1").highlights, [
+    { position: 0, highlight_id: "7", text: null, annotation: "note" },
+    { position: 0, highlight_id: "h1", text: "first", annotation: null },
+    { position: 0, highlight_id: "undefined", text: "no id", annotation: null }
+  ]);
+  assert.equal(rowsInDb(db, "u1").summary.total_highlights, 5);
+  db.close();
+});
+
+test("typed columns hold a value only when its type matches, as numbers, and a position skips a non-object entry", () => {
+  const { db, service } = setup();
+  service.saveLibrary("u1", {
+    books: [
+      { Title: "Alpha", Attribution: "Writer", ReadStatus: "2", SeriesNumber: "1", _order: 2 ** 60, ISBN: 9780441013593, ImageId: "img", _coverUrl: "" },
+      "not an object",
+      { Title: 5, ReadStatus: 2, DateLastRead: "2021-06-01T12:00:00Z", _coverUrl: "https://c/x.jpg" }
+    ]
+  });
+
+  const { books } = rowsInDb(db, "u1");
+  assert.deepEqual(books.map((row) => row.position), [0, 2]);
+  assert.deepEqual([books[0]!.read_status, books[0]!.series_number, books[0]!.isbn, books[0]!.image_id, books[0]!.cover_url, books[0]!.finished_year], [null, null, null, "img", "", null]);
+  assert.equal(books[0]!.sort_order, 2 ** 60);
+  assert.equal(books[0]!.book_key, "isbn:9780441013593");
+  assert.deepEqual([books[1]!.title, books[1]!.read_status, books[1]!.cover_url, books[1]!.finished_year], [null, 2, "https://c/x.jpg", 2021]);
+  assert.deepEqual({ ...rowsInDb(db, "u1").summary, meta: undefined, source_updated_at: undefined, reader_card: undefined, shelf_theme: undefined }, { meta: undefined, reader_card: undefined, shelf_theme: undefined, total_books: 2, finished_count: 1, in_progress_count: 0, total_highlights: 0, source_updated_at: undefined });
+  db.close();
+});
+
+test("the summary keeps the document's own fields in meta", () => {
+  const { db, service } = setup();
+  const groups = [seriesGroup([dune()])];
+  service.saveLibrary("u1", { source: "kobo", schema_version: 2, book_count: 9, name: "Mine", groups, style: { accent: "red" }, books: [dune(), "x"], murals: [{ id: "m" }] });
+
+  assert.deepEqual(JSON.parse(rowsInDb(db, "u1").summary.meta as string), { source: "kobo", schema_version: 2, book_count: 9, name: "Mine", groups, style: { accent: "red" } });
+  db.close();
+});
+
+test("a document written without touching the new tables is rebuilt by the next startup", () => {
+  const books = [dune({ ReadStatus: 2, highlights: [{ BookmarkID: "h", Text: "quote" }] }), emma];
+  fileService.saveLibrary("rolled-back", { books });
+  rawDocument("rolled-back", JSON.stringify({ name: "Edited elsewhere", books: [emma] }), "2099-02-01T00:00:00.000Z");
+  const repo = createSqliteLibraryRepository(fileDb);
+  assert.ok(repo.listStaleUserIds().includes("rolled-back"));
+  repo.setDerived("rolled-back", deriveLibraryData({ books: [emma] }), "2099-02-01T00:00:00.000Z");
+  assert.equal(derivedSource(fileDb, "rolled-back"), "2099-02-01T00:00:00.000Z");
+  assert.notEqual(rowsInDb(fileDb, "rolled-back").summary.source_updated_at, "2099-02-01T00:00:00.000Z");
+  assert.ok(repo.listStaleUserIds().includes("rolled-back"));
+
+  backfillLibraryDerived();
+
+  assert.deepEqual(rowsInDb(fileDb, "rolled-back"), rowsOfStored(fileDb, "rolled-back"));
+  assert.deepEqual(rowsInDb(fileDb, "rolled-back").books.map((row) => row.title), ["Emma"]);
+  assert.deepEqual(rowsInDb(fileDb, "rolled-back").highlights, []);
+  assert.ok(!repo.listStaleUserIds().includes("rolled-back"));
+});
+
+test("an unreadable document's rebuild leaves a NULL meta and no rows", () => {
+  const logged = mock.method(console, "error", () => undefined);
+  try {
+    fileService.saveLibrary("unreadable-rows", { books: [dune({ highlights: [{ BookmarkID: "h", Text: "quote" }] })] });
+    assert.equal(rowsInDb(fileDb, "unreadable-rows").books.length, 1);
+    rawDocument("unreadable-rows", "not json", "2099-03-01T00:00:00.000Z");
+    rawDocument("shapeless-rows", JSON.stringify({ name: "no books" }));
+
+    backfillLibraryDerived();
+
+    for (const userId of ["unreadable-rows", "shapeless-rows"]) {
+      const rows = rowsInDb(fileDb, userId);
+      assert.equal(rows.summary.meta, null);
+      assert.equal(rows.summary.total_books, 0);
+      assert.deepEqual([rows.books, rows.highlights], [[], []]);
+    }
+    assert.equal(rowsInDb(fileDb, "unreadable-rows").summary.source_updated_at, "2099-03-01T00:00:00.000Z");
+  } finally {
+    logged.mock.restore();
+  }
+});
+
+test("deleting an account or cleaning up orphans clears every row table, with or without a derived row", () => {
+  const { db, repo, service } = setup();
+  const keep = marked("Keep", ["k"]);
+  service.saveLibrary("gone", { books: [marked("Gone", ["g"])] });
+  service.saveLibrary("orphaned", { books: [marked("Orphan", ["o"])] });
+  service.saveLibrary("kept", { books: [keep] });
+
+  repo.deleteUserData("gone");
+  db.prepare(`DELETE FROM library_documents WHERE user_id = 'orphaned'`).run();
+  db.prepare(`DELETE FROM library_derived WHERE user_id = 'orphaned'`).run();
+  repo.deleteOrphanedDerived();
+
+  for (const userId of ["gone", "orphaned"]) {
+    assert.deepEqual(rowsInDb(db, userId), { books: [], highlights: [], summary: {} });
+  }
+  assert.deepEqual(rowsInDb(db, "kept"), rowsOfStored(db, "kept"));
+  assert.equal(rowsInDb(db, "kept").books.length, 1);
+  db.close();
+});
+
+test("a document with a value that cannot be turned into text saves, and boot rebuilds it, without a row for the bad book", () => {
+  const logged = mock.method(console, "error", () => undefined);
+  try {
+    const odd = { Title: "Dune", Attribution: { toString: 5 }, ISBN: "9780441013593", ReadStatus: 2 };
+    const badMark = { Title: "Marked", Attribution: "Writer", highlights: [{ BookmarkID: { toString: 5 }, Text: "lost" }, { BookmarkID: "ok", Text: "kept" }] };
+    const noKey = { Title: "Odd", Attribution: { toString: 5 } };
+    const doc = { books: [odd, noKey, badMark, emma] };
+    const { db, service } = setup();
+    service.saveLibrary("u1", doc);
+    db.close();
+    rawDocument("rows-odd", JSON.stringify(doc));
+    rawDocument("rows-odd-card", JSON.stringify({ books: [...shelf(10), odd] }));
+
+    backfillLibraryDerived();
+
+    const rows = rowsInDb(fileDb, "rows-odd");
+    assert.deepEqual(rows.books.map((row) => row.position), [0, 2, 3]);
+    assert.deepEqual(rows.highlights.map((row) => row.highlight_id), ["ok"]);
+    const card = rowsInDb(fileDb, "rows-odd-card");
+    assert.equal(card.books.length, 11);
+    assert.equal(card.summary.reader_card, null);
+    assert.ok(card.summary.shelf_theme);
+    assert.ok(logged.mock.callCount() >= 4);
+  } finally {
+    logged.mock.restore();
+  }
+});
+
+test("rebuilding the 10 MiB timing fixture rewrites every row and logs how long it took", () => {
+  const filler = "x".repeat(140);
+  const books = Array.from({ length: 5000 }, (_, i) => ({
+    Title: `Book ${i} ${filler}`,
+    Attribution: `Author ${i % 400}`,
+    ReadStatus: i % 3,
+    highlights: Array.from({ length: 10 }, (_, j) => ({ BookmarkID: `${i}-${j}`, Text: `Quote ${j}`, Annotation: j % 2 ? "note" : "" }))
+  }));
+  const json = JSON.stringify({ books });
+  rawDocument("fixture", json.padEnd(10 * 1024 * 1024 - 1024, " "));
+  const log = mock.method(console, "log");
+  try {
+    backfillLibraryDerived();
+    assert.equal(rowsInDb(fileDb, "fixture").books.length, 5000);
+    assert.equal(rowsInDb(fileDb, "fixture").highlights.length, 50000);
+    assert.match(String(log.mock.calls[0]?.arguments[0]), /rebuilt \d+ accounts in \d+ ms/);
+  } finally {
+    log.mock.restore();
+    createSqliteLibraryRepository(fileDb).deleteUserData("fixture");
+  }
+});
+
