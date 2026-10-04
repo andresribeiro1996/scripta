@@ -103,6 +103,27 @@ test("processing stores the first good cover; resolve serves thumb and full URLs
   assert.equal(h.repo.getImage(imageId)!.source_url, "https://a/1");
 });
 
+test("a cover set while the worker uploaded is not overwritten", async () => {
+  let rivalSet = false;
+  const h: ReturnType<typeof harness> = harness({
+    sources: { isbndb: null, apple: isbnSource("https://a/1"), openlibrary: emptySource },
+    blobs: {
+      save: async () => {
+        if (rivalSet) return;
+        rivalSet = true;
+        h.repo.setCover(h.bookId("isbn:9780141184272"), { imageId: "uploaded", status: "manual", checkedAt: "2026-10-01T00:00:00.000Z" });
+      }
+    }
+  });
+  h.sizes.set("https://a/1", [900, 1400]);
+  h.service.resolveCover(orlando);
+  await h.service.processBook(h.bookId("isbn:9780141184272"), "background");
+  const row = h.repo.findBookByKey("isbn:9780141184272")!;
+  assert.equal(row.cover_image_id, "uploaded");
+  assert.equal(row.cover_status, "manual");
+  assert.equal(row.cover_upgrade_wanted_at, null);
+});
+
 test("a complete miss is remembered for 30 days", async () => {
   const h = harness();
   h.service.resolveCover(orlando);

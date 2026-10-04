@@ -244,7 +244,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
 
         if (outcome.complete) {
           backoffUntil.delete(bookId);
-          deps.repo.setCover(bookId, { imageId, status, checkedAt: at });
+          if (!deps.repo.setCoverIf(bookId, latest.cover_image_id, { imageId, status, checkedAt: at })) return;
           if (lane === "upgrade") {
             deps.repo.setUpgradeWanted(bookId, null);
           } else if (lane !== "background") {
@@ -255,7 +255,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
           return;
         }
         backoffUntil.set(bookId, Math.max(now().getTime() + UNAVAILABLE_BACKOFF_MS, ...outcome.failures.map((failure) => failure.retryAt ?? 0)));
-        if (imageId !== latest.cover_image_id) deps.repo.setCover(bookId, { imageId, status, checkedAt: latest.cover_checked_at });
+        if (imageId !== latest.cover_image_id) deps.repo.setCoverIf(bookId, latest.cover_image_id, { imageId, status, checkedAt: latest.cover_checked_at });
       } catch (error) {
         backoffUntil.set(bookId, now().getTime() + UNAVAILABLE_BACKOFF_MS);
         throw error;

@@ -23,6 +23,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     VALUES ($id, $book_id, $source, $source_url, $origin, $width, $height, $byte_size, $created_at)
   `);
   const setCoverStmt = db.prepare(`UPDATE books SET cover_image_id = ?, cover_status = ?, cover_checked_at = ? WHERE id = ?`);
+  const setCoverIfStmt = db.prepare(`UPDATE books SET cover_image_id = ?, cover_status = ?, cover_checked_at = ? WHERE id = ? AND cover_image_id IS ?`);
   const addRejectionStmt = db.prepare(`INSERT OR IGNORE INTO cover_rejections (book_id, source_url, created_at) VALUES (?, ?, ?)`);
   const rejectionsStmt = db.prepare(`SELECT source_url FROM cover_rejections WHERE book_id = ?`);
   const takesSummary = `$summary IS NOT NULL AND (summary IS NULL OR summary = '' OR $summary_source = 'publisher')`;
@@ -77,11 +78,14 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     getBook: (id) => byIdStmt.get(id) as BookRow | undefined,
 
     createBook(input, keys, createdAt) {
-      const existing = keys.map((key) => byKeyStmt.get(key) as BookRow | undefined).find(Boolean);
-      if (existing) return existing;
       const id = randomUUID();
-      db.exec("BEGIN");
+      db.exec("BEGIN IMMEDIATE");
       try {
+        const existing = keys.map((key) => byKeyStmt.get(key) as BookRow | undefined).find(Boolean);
+        if (existing) {
+          db.exec("COMMIT");
+          return existing;
+        }
         insertBookStmt.run({
           $id: id,
           $title: input.title,
@@ -99,7 +103,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         for (const key of keys) insertKeyIfMissingStmt.run(key, id);
         db.exec("COMMIT");
       } catch (error) {
-        db.exec("ROLLBACK");
+        if (db.isTransaction) db.exec("ROLLBACK");
         throw error;
       }
       return byIdStmt.get(id) as unknown as BookRow;
@@ -137,6 +141,10 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       setCoverStmt.run(cover.imageId, cover.status, cover.checkedAt, bookId);
     },
 
+    setCoverIf(bookId, expectedImageId, cover) {
+      return setCoverIfStmt.run(cover.imageId, cover.status, cover.checkedAt, bookId, expectedImageId).changes > 0;
+    },
+
     addRejection(bookId, sourceUrl, createdAt) {
       addRejectionStmt.run(bookId, sourceUrl, createdAt);
     },
@@ -146,14 +154,14 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     },
 
     saveDetails(bookId, details, sources, summarySource, checkedAt) {
-      db.exec("BEGIN");
+      db.exec("BEGIN IMMEDIATE");
       try {
         mergeDetails(bookId, details, summarySource);
         const stored = JSON.parse((byIdStmt.get(bookId) as BookRow | undefined)?.data_sources ?? "[]") as DataSource[];
         saveDetailsStmt.run(details.rating, details.ratingCount, JSON.stringify(details.genres), JSON.stringify([...new Set([...stored, ...sources])]), details.sourceUrl, checkedAt, bookId);
         db.exec("COMMIT");
       } catch (error) {
-        db.exec("ROLLBACK");
+        if (db.isTransaction) db.exec("ROLLBACK");
         throw error;
       }
     },

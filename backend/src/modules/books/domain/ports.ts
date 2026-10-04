@@ -17,6 +17,7 @@ export interface BooksRepository {
   getImage(id: string): CoverImageRow | undefined;
   insertImage(row: CoverImageRow): void;
   setCover(bookId: string, cover: { imageId: string | null; status: CoverStatus | null; checkedAt: string | null }): void;
+  setCoverIf(bookId: string, expectedImageId: string | null, cover: { imageId: string | null; status: CoverStatus | null; checkedAt: string | null }): boolean;
   addRejection(bookId: string, sourceUrl: string, createdAt: string): void;
   listRejectedUrls(bookId: string): Set<string>;
   saveDetails(bookId: string, details: CatalogBookMetadata, sources: DataSource[], summarySource: DataSource | null, checkedAt: string): void;
