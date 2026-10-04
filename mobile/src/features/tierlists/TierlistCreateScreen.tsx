@@ -1,13 +1,12 @@
 import { useState } from "react";
 import { Stack, router } from "expo-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { bookKey, createTier, DEFAULT_TIER_PRESET, filterBooks, type TierlistData } from "@scripta/shared";
 import { FlatList, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { useLibrary } from "../library";
 import { Button, ErrorState, Input, Screen, Segmented, Skeleton, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { createTierlist, type Tierlist } from "./api";
-
 
 const VISIBILITY = [{ value: "private", label: "Private" }, { value: "public", label: "Public" }] as const;
 const ACCESS = [{ value: "anonymous", label: "Anyone" }, { value: "members", label: "Members" }] as const;

@@ -1,10 +1,7 @@
-// Mirrors frontend/src/api/library.ts's fetchLibrary/saveLibrary/
-// shareLibrary/unshareLibrary, on top of this app's own apiClient
-// (auth:true — refresh is handled inside, see core/apiClient.ts).
-//
 import type { LibraryChange, LibraryChangeAnswer } from "@scripta/shared";
 import type { BookRecommendationInput } from "@scripta/shared/community";
 import { apiClient, ApiError } from "../../../core/api";
+import { libraryChangeRequest } from "./changeRequest";
 import { LibraryConflictError } from "./conflict";
 import type { LibraryData, LibraryDocument } from "./types";
 
@@ -34,12 +31,8 @@ export async function saveLibrary(data: LibraryData, expectedUpdatedAt?: string,
 }
 
 export function sendLibraryChange(change: LibraryChange, signal: AbortSignal): Promise<LibraryChangeAnswer> {
-  if (change.kind === "membership") {
-    return apiClient.request(`/library/groups/${encodeURIComponent(change.groupId)}/books`, { method: "POST", auth: true, signal, body: { bookKey: change.bookKey, member: change.member } });
-  }
-  if (change.kind === "add") return apiClient.request("/library/books/add", { method: "POST", auth: true, signal, body: { book: change.book } });
-  const { kind: _kind, ...body } = change;
-  return apiClient.request("/library/books", { method: "PATCH", auth: true, signal, body });
+  const { path, body, method } = libraryChangeRequest(change);
+  return apiClient.request(path, { method, auth: true, signal, body });
 }
 
 export async function addBookToLibrary(rec: BookRecommendationInput): Promise<{ key: string; updated: boolean }> {

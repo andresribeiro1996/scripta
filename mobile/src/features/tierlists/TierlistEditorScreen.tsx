@@ -17,7 +17,6 @@ import { TierlistShareImage } from "./TierlistShareImage";
 import { ContentShareSheet } from "../sharing/ContentShareSheet";
 import { publicContentUrl } from "../sharing/links";
 
-
 type EditorView = "sort" | "board" | "results";
 
 const VOTE_VIEWS = [{ value: "board", label: "My board" }, { value: "results", label: "Community" }] as const;

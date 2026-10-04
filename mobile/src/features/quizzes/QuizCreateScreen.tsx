@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Stack, router } from "expo-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { QUIZ_POOL, QUIZ_QUESTION_TYPES, bookKey, booksInGroup, eligibleTypes, normalizeImageId, normalizeIsbn, type Group, type QuizBook, type QuizData, type QuizQuestionType } from "@scripta/shared";
 import { FlatList, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
@@ -8,7 +8,6 @@ import { useLibrary } from "../library";
 import { Button, Input, Screen, Segmented, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { resolveCover } from "../library/api/covers";
 import { createQuiz, type Quiz } from "./api";
-
 
 const SOURCES = [{ value: "shelf", label: "Shelf" }, { value: "collection", label: "Collection" }, { value: "pool", label: "Famous books" }] as const;
 type Source = (typeof SOURCES)[number]["value"];

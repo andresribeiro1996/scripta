@@ -8,7 +8,6 @@ import { Button, EmptyState, ErrorState, Input, Screen, Sheet, Skeleton, Toast, 
 import { useLibrary } from "../library";
 import { createTournament, fetchTournament, randomFillTournament, resolveCover, setTournamentSlots, startTournament, type TournamentSummary } from "./api";
 
-
 export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: TournamentSummary; onStarted: (id: string) => void }) {
   const { colors } = useTheme();
   const queryClient = useQueryClient();
