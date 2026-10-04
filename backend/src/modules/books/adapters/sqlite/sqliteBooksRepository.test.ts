@@ -986,3 +986,84 @@ test("getWorkView lists a work's editions oldest first", () => {
   });
   assert.equal(repo.getWorkView("no-such-work"), undefined);
 });
+
+const edition = (repo: ReturnType<typeof createSqliteBooksRepository>, isbn: string, title: string, author: string, workKey?: string, created = NOW) =>
+  repo.createBook({ title, author, isbn, workKey }, [`isbn:${isbn}`], created);
+
+test("a keyless work joins the single keyed work that shares its title key, and keeps no key of its own", () => {
+  const { db, repo } = freshRepo();
+  const keyed = edition(repo, "9780441013593", "Dune", "Frank Herbert", "OL893415W");
+  const keyless = edition(repo, "9780593099322", "Dune", "Frank Herbert");
+  assert.equal(repo.groupKeylessWorks(250), 1);
+  const moved = repo.getBook(keyless.id)!;
+  assert.deepEqual([moved.work_id, moved.ol_work_key], [keyed.work_id, null]);
+  assert.equal(workById(db, keyless.work_id).merged_into, keyed.work_id);
+  assert.equal(repo.groupKeylessWorks(250), 0);
+});
+
+test("keyless works sharing a title key merge into the oldest of them", () => {
+  const { db, repo } = freshRepo();
+  const oldest = edition(repo, "9789720000001", "Ensaio sobre a Cegueira", "José Saramago", undefined, at(0));
+  const middle = edition(repo, "9789720000002", "Ensaio Sobre a Cegueira", "Saramago, José", undefined, at(1));
+  const newest = edition(repo, "9789720000003", "Ensaio sobre a cegueira", "José Saramago", undefined, at(2));
+  assert.equal(repo.groupKeylessWorks(250), 1);
+  assert.deepEqual([oldest, newest].map((book) => repo.getBook(book.id)!.work_id), [oldest.work_id, oldest.work_id]);
+  assert.equal(repo.getBook(middle.id)!.work_id, middle.work_id);
+  assert.equal(workById(db, oldest.work_id).merged_into, null);
+});
+
+test("grouping skips ambiguous title keys, authorless and unkeyed editions, mixed works and blocked editions", () => {
+  const { db, repo } = freshRepo();
+  edition(repo, "9780000000001", "Poems", "Emily Dickinson", "OL1W");
+  edition(repo, "9780000000002", "Poems", "Emily Dickinson", "OL2W");
+  edition(repo, "9780000000003", "Poems", "Emily Dickinson");
+  edition(repo, "9780000000004", "Orlando", "");
+  edition(repo, "9780000000005", "Orlando", "");
+  const pending = edition(repo, "9780000000006", "Emma", "Jane Austen");
+  edition(repo, "9780000000007", "Emma", "Jane Austen", "OL3W");
+  db.prepare("UPDATE books SET title_key = NULL WHERE id = ?").run(pending.id);
+  const english = edition(repo, "9780000000008", "Blindness", "José Saramago");
+  const portuguese = edition(repo, "9780000000009", "Ensaio sobre a Cegueira", "José Saramago");
+  repo.mergeWorks(portuguese.work_id!, english.work_id!);
+  edition(repo, "9780000000010", "Blindness", "José Saramago", "OL4W");
+  const blocked = edition(repo, "9780000000011", "Dune", "Frank Herbert");
+  repo.detachEdition(blocked.id, at(1));
+  edition(repo, "9780000000012", "Dune", "Frank Herbert", "OL5W");
+  assert.equal(repo.groupKeylessWorks(250), 0);
+  assert.equal(repo.getBook(blocked.id)!.work_id, blocked.work_id);
+});
+
+test("a keyed edition arriving later pulls a keyless group into its work, and every old id resolves there", () => {
+  const { db, repo } = freshRepo();
+  const first = edition(repo, "9789720000001", "Os Maias", "Eça de Queirós", undefined, at(0));
+  const second = edition(repo, "9789720000002", "Os Maias", "Eça de Queirós", undefined, at(1));
+  assert.equal(repo.groupKeylessWorks(250), 1);
+  const keyed = edition(repo, "9789725681367", "Os Maias", "Eça de Queirós", "OL846513W", at(2));
+  assert.equal(repo.groupKeylessWorks(250), 1);
+  assert.deepEqual([first, second, keyed].map((book) => repo.getBook(book.id)!.work_id), [keyed.work_id, keyed.work_id, keyed.work_id]);
+  assert.deepEqual([first.work_id, second.work_id].map((id) => workById(db, id).merged_into), [keyed.work_id, keyed.work_id]);
+});
+
+test("Open Library's key moves a title-grouped edition out to its own work, and grouping leaves it there", () => {
+  const { repo } = freshRepo();
+  const keyed = edition(repo, "9780441013593", "Dune", "Frank Herbert", "OL1W");
+  const grouped = edition(repo, "9780593099322", "Dune", "Frank Herbert");
+  repo.groupKeylessWorks(250);
+  repo.setWorkKey(grouped.id, "OL9W");
+  const moved = repo.getBook(grouped.id)!;
+  assert.notEqual(moved.work_id, keyed.work_id);
+  assert.equal(repo.getWorkView(moved.work_id!)!.olWorkKey, "OL9W");
+  assert.equal(repo.getBook(keyed.id)!.work_id, keyed.work_id);
+  assert.equal(repo.groupKeylessWorks(250), 0);
+});
+
+test("groupKeylessWorks merges at most its limit per batch", () => {
+  const { repo } = freshRepo();
+  edition(repo, "9780441013593", "Dune", "Frank Herbert", "OL1W");
+  edition(repo, "9780593099322", "Dune", "Frank Herbert");
+  edition(repo, "9780141439587", "Emma", "Jane Austen", "OL2W");
+  edition(repo, "9780141439588", "Emma", "Jane Austen");
+  assert.equal(repo.groupKeylessWorks(1), 1);
+  assert.equal(repo.groupKeylessWorks(1), 1);
+  assert.equal(repo.groupKeylessWorks(1), 0);
+});

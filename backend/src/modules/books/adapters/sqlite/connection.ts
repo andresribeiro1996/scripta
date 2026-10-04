@@ -43,6 +43,7 @@ export function applyBooksMigrations(db: DatabaseSync): void {
   if (!columns.some((column) => column.name === "title_group_blocked_at")) db.exec("ALTER TABLE books ADD COLUMN title_group_blocked_at TEXT");
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_work ON books(work_id)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_title_key ON books(title_key)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_works_merged_into ON works(merged_into)");
   const imageColumns = db.prepare("PRAGMA table_info(cover_images)").all() as Array<{ name: string }>;
   if (!imageColumns.some((column) => column.name === "origin")) db.exec("ALTER TABLE cover_images ADD COLUMN origin TEXT");
   const legacy = db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'cover_cache'`).get();

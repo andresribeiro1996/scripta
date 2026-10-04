@@ -47,6 +47,38 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const editionCountStmt = db.prepare(`SELECT COUNT(*) AS n FROM books WHERE work_id = ?`);
   const workStmt = db.prepare(`SELECT id, ol_work_key, title, author FROM works WHERE id = ?`);
   const workEditionsStmt = db.prepare(`SELECT id, isbn, title, author, ol_work_key FROM books WHERE work_id = ? ORDER BY created_at, rowid`);
+  const groupablePairsStmt = db.prepare(`
+    WITH candidates AS (
+      SELECT works.id AS work_id, MIN(books.title_key) AS title_key, works.created_at AS created_at
+      FROM works JOIN books ON books.work_id = works.id
+      WHERE works.ol_work_key IS NULL AND works.merged_into IS NULL
+      GROUP BY works.id
+      HAVING COUNT(books.title_key) = COUNT(*)
+        AND COUNT(DISTINCT books.title_key) = 1
+        AND MIN(books.title_key) <> ''
+        AND COUNT(books.title_group_blocked_at) = 0
+    ),
+    keyed AS (
+      SELECT books.title_key AS title_key, MIN(works.id) AS target, COUNT(DISTINCT works.id) AS works
+      FROM books JOIN works ON works.id = books.work_id
+      WHERE works.ol_work_key IS NOT NULL AND works.merged_into IS NULL
+        AND books.title_group_blocked_at IS NULL
+        AND books.title_key IN (SELECT title_key FROM candidates)
+      GROUP BY books.title_key
+    ),
+    oldest AS (
+      SELECT title_key, work_id AS target
+      FROM (SELECT title_key, work_id, ROW_NUMBER() OVER (PARTITION BY title_key ORDER BY created_at, work_id) AS rank FROM candidates)
+      WHERE rank = 1
+    )
+    SELECT candidates.work_id AS source, COALESCE(keyed.target, oldest.target) AS target
+    FROM candidates
+    JOIN oldest ON oldest.title_key = candidates.title_key
+    LEFT JOIN keyed ON keyed.title_key = candidates.title_key
+    WHERE keyed.works = 1 OR (keyed.title_key IS NULL AND candidates.work_id <> oldest.target)
+    ORDER BY candidates.created_at, candidates.work_id
+    LIMIT ?
+  `);
   const makeSearchableStmt = db.prepare(`
     INSERT INTO books_fts (book_id, title, author)
     SELECT id, title, author FROM books WHERE id = ? AND title != '' AND NOT EXISTS (SELECT 1 FROM books_fts WHERE book_id = ?)
@@ -347,6 +379,14 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         author: work.author,
         editions: editions.map((edition) => ({ id: edition.id, isbn: edition.isbn, title: edition.title, author: edition.author, olWorkKey: edition.ol_work_key }))
       } satisfies WorkView;
+    },
+
+    groupKeylessWorks(limit) {
+      return inTransaction(() => {
+        const pairs = groupablePairsStmt.all(limit) as Array<{ source: string; target: string }>;
+        for (const pair of pairs) mergeInto(pair.source, pair.target);
+        return pairs.length;
+      });
     },
 
     setLanguage(id, tag) {

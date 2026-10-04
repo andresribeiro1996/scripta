@@ -92,7 +92,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     (signal) => service.backfillDetails(DETAILS_BATCH_SIZE, signal),
     (error) => app.log.error({ err: error }, "details backfill failed")
   );
-  const stopWorksBackfill = startWorksBackfill(repo.assignMissingWorks, app.log);
+  const stopWorksBackfill = startWorksBackfill(repo, app.log);
   activeService = service;
   app.addHook("onClose", async () => {
     activeService = null;

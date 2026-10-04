@@ -33,6 +33,7 @@ export interface BooksRepository {
   setWorkKey(id: string, key: string | null | undefined): void;
   assignMissingWorks(limit: number): number;
   fillTitleKeys(limit: number): number;
+  groupKeylessWorks(limit: number): number;
   mergeWorks(fromId: string, intoId: string): string;
   detachEdition(bookId: string, at: string): string;
   resolveWorkId(id: string): string | null;
