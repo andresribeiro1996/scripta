@@ -113,7 +113,7 @@ else prices as sonnet. The same table produced the $4 heavy mark.
 - Each desk shows the agent's sprite, a text state label, the description,
   `type · model`, the last call, and a spend bar that fills to the heavy mark
   ($4) and shows **heavy** past it.
-- Poses: working = typing (two front frames alternated by SMIL), retrying =
+- Poses: working = typing (the standing frame bobs 1px by SMIL), retrying =
   ↻ bubble, idle = seated still, done = empty chair with ✓. Every pose has a
   text label, so nothing relies on colour.
 
@@ -179,7 +179,7 @@ writer, so nothing can be overwritten.
 
 ## Testing
 
-- **`model.ts`** (`claude plugin test`): spawn creates a record; tool calls
+- **`model.ts`** (`node --test '.claude/skills/office/tests/*.test.ts'`; `claude plugin test` is switched off on Claude Code 2.1.287 and the tested modules need no engine): spawn creates a record; tool calls
   update the last call; two identical failures set retrying and a success
   clears it; usage adds cost per agent at the table's prices; turn.complete sets done;
   done agents drop after 10 minutes on the mocked clock; main never gets a
@@ -195,9 +195,10 @@ writer, so nothing can be overwritten.
   4 agents stays under 131072 characters.
 - **Sprites**: every recipe composes without throwing at 18×32, and the
   generic recipe covers an unknown type.
-- **UI**: mount the pane on `desktop` and `terminal`; each state's label is
-  present, heavy appears past the mark, and the done agent is gone after 10
-  minutes.
+- **UI**: through the pure `officeSvg` and `terminalRows` functions; each
+  state's label is present, heavy appears past the mark, markup and control
+  characters cannot break the SVG. `register.tsx` has no unit tests; the live
+  check covers it.
 - **Live check**: open `/office`, dispatch two subagents (one runs a failing
   command twice); see two desks, retrying, then done, with spend bars moving.
   Then start a second session in another worktree, dispatch one subagent
