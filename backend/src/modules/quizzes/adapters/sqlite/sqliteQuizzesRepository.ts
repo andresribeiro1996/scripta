@@ -130,10 +130,17 @@ export function createSqliteQuizzesRepository(db: DatabaseSync): QuizzesReposito
       }
     },
 
-    rekeyBooks(userId, fromKeys, toKey) {
+    rekeyBooks(userId, fromKeys, toKey, toWork) {
       const from = new Set(fromKeys);
       const now = new Date().toISOString();
       const update = db.prepare("UPDATE quizzes SET data = ?, updated_at = ? WHERE id = ?");
+      const dropWorks = db.prepare("DELETE FROM quiz_works WHERE quiz_id = ? AND key IN (SELECT value FROM json_each(?))");
+      const fromKeysJson = JSON.stringify(fromKeys);
+      const hasWorks = db.prepare("SELECT 1 FROM quiz_works WHERE quiz_id = ? LIMIT 1");
+      const keepWork = db.prepare(`
+        INSERT INTO quiz_works (quiz_id, key, work_id) VALUES (?, ?, ?)
+        ON CONFLICT (quiz_id, key) DO UPDATE SET work_id = COALESCE(excluded.work_id, quiz_works.work_id)
+      `);
       db.exec("BEGIN IMMEDIATE");
       try {
         for (const row of db.prepare("SELECT id, data FROM quizzes WHERE owner_user_id = ? AND vote_code IS NULL").all(userId) as Array<{ id: string; data: string }>) {
@@ -148,7 +155,11 @@ export function createSqliteQuizzesRepository(db: DatabaseSync): QuizzesReposito
             return [{ ...book, key }];
           });
           const after = JSON.stringify({ ...parsed, books });
-          if (after !== JSON.stringify(parsed)) update.run(after, now, row.id);
+          if (after === JSON.stringify(parsed)) continue;
+          update.run(after, now, row.id);
+          if (!hasWorks.get(row.id)) continue;
+          dropWorks.run(row.id, fromKeysJson);
+          keepWork.run(row.id, toKey, toWork);
         }
         db.exec("COMMIT");
       } catch (error) {

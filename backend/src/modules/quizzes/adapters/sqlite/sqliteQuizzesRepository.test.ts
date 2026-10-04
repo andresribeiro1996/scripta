@@ -206,7 +206,7 @@ test("rekeyBooks rewrites the owner's unpublished quiz books and de-duplicates b
   const data = JSON.stringify({ sourceLabel: "", questionCount: 5, allowedTypes: [], books: [{ key: "new", title: "Dune" }, { key: "old", title: "Dune" }, { key: "x", title: "X" }], questions: null });
   insert.run("draft", "u1", data, null);
   insert.run("published", "u1", data, "CODE1");
-  createSqliteQuizzesRepository(db).rekeyBooks("u1", ["old"], "new");
+  createSqliteQuizzesRepository(db).rekeyBooks("u1", ["old"], "new", null);
   const read = (id: string) => db.prepare("SELECT data, updated_at FROM quizzes WHERE id = ?").get(id) as { data: string; updated_at: string };
   assert.deepEqual(JSON.parse(read("draft").data).books, [{ key: "new", title: "Dune" }, { key: "x", title: "X" }]);
   assert.notEqual(read("draft").updated_at, "t0");
