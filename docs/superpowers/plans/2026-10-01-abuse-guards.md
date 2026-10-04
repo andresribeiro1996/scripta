@@ -105,8 +105,8 @@ key of every per-IP limit, is whatever the client writes. A numeric hop count
 is not an option: Fastify 5.12 ignores `X-Forwarded-For` entirely for a
 number (`lib/request.js`, "Fail closed").
 
-- [ ] `trustedProxies.ts` exports one array: `"loopback"`, `"linklocal"`,
-  `"uniquelocal"`, `"100.64.0.0/10"`, then Cloudflare's current ranges.
+- [ ] `trustedProxies.ts` exports one array: `"loopback"`,
+  `"100.64.0.0/10"`, then Cloudflare's current ranges.
   Fetch them from `https://www.cloudflare.com/ips-v4` and
   `https://www.cloudflare.com/ips-v6` and paste them verbatim; put the source
   URLs and fetch date in the commit message.

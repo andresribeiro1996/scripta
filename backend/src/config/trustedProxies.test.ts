@@ -11,22 +11,35 @@ async function clientIp(remoteAddress: string, forwardedFor: string) {
   return response.payload;
 }
 
-test("a private peer's forwarded chain is read from the right, skipping Cloudflare and ignoring what the client wrote", async () => {
-  assert.equal(await clientIp("10.0.0.5", "6.6.6.6, 203.0.113.9, 172.64.1.1"), "203.0.113.9");
+test("the Cloudflare to Railway chain yields the client, skipping the edge and Cloudflare hops and ignoring what the client wrote", async () => {
+  assert.equal(await clientIp("100.64.0.7", "6.6.6.6, 203.0.113.9, 172.64.1.1"), "203.0.113.9");
 });
 
-test("a peer in 100.64.0.0/10 is a trusted proxy", async () => {
+test("any peer in 100.64.0.0/10 is a trusted proxy, not only the observed addresses", async () => {
   assert.equal(await clientIp("100.64.3.4", "203.0.113.9"), "203.0.113.9");
+  assert.equal(await clientIp("100.127.255.254", "203.0.113.9"), "203.0.113.9");
+});
+
+test("a client hitting Railway directly cannot claim a Cloudflare hop to pick its own address", async () => {
+  assert.equal(await clientIp("100.64.0.7", "6.6.6.6, 172.64.1.1"), "6.6.6.6");
+  assert.equal(await clientIp("203.0.113.50", "6.6.6.6, 172.64.1.1"), "203.0.113.50");
 });
 
 test("a public peer is the client, whatever it forwards", async () => {
   assert.equal(await clientIp("203.0.113.50", "6.6.6.6"), "203.0.113.50");
 });
 
-test("an IPv4-mapped peer counts as its IPv4 address", async () => {
-  assert.equal(await clientIp("::ffff:10.0.0.5", "203.0.113.9"), "203.0.113.9");
+test("loopback is a trusted proxy, as is its IPv4-mapped form", async () => {
+  assert.equal(await clientIp("127.0.0.1", "203.0.113.9"), "203.0.113.9");
+  assert.equal(await clientIp("::ffff:127.0.0.1", "203.0.113.9"), "203.0.113.9");
 });
 
-test("IPv6 private peers and Cloudflare IPv6 hops are trusted proxies", async () => {
-  assert.equal(await clientIp("fd12:3456::7", "6.6.6.6, 203.0.113.9, 2606:4700::1111"), "203.0.113.9");
+test("Cloudflare IPv6 hops are trusted proxies", async () => {
+  assert.equal(await clientIp("100.64.0.7", "6.6.6.6, 203.0.113.9, 2606:4700::1111"), "203.0.113.9");
+});
+
+test("link-local and unique-local peers are the client, whatever they forward", async () => {
+  for (const peer of ["169.254.1.1", "fe80::1", "10.0.0.5", "192.168.1.5", "172.16.0.5", "fd12:3456::7"]) {
+    assert.equal(await clientIp(peer, "203.0.113.9"), peer);
+  }
 });
