@@ -1,7 +1,25 @@
 # Agent circuit breaker, with an office view
 
 Date: 2026-10-04
-Status: design approved in conversation (sections 1–3); spec awaiting review
+Status: **shelved** 2026-10-04: two weeks of transcripts show no retry loops,
+and every no-progress trip was a legitimate device pass (see "Why shelved")
+
+## Why shelved
+
+Replaying the 543 subagent dispatches of 2026-09-20 → 2026-10-04 (every
+worktree) against the rules below:
+
+- **Retry loop**: 0 dispatches would have tripped.
+- **No progress**: 9 would have tripped, all of them device passes reading
+  screenshots, which is that job. Stopping them means re-dispatching, which
+  costs more than it saves.
+- **Where spend goes**: `general-purpose` took 163M of 195M weighted tokens
+  (84%, 427 dispatches). The 18 device passes took 35M (18%), the largest
+  7.9M, all as `general-purpose`; `device-checker` was dispatched zero times.
+
+The cost is routing, not runaways. The fix taken instead: CLAUDE.md now says
+device passes never go to `general-purpose`. Revisit this spec if a replay
+ever shows real retry loops.
 
 ## Problem
 

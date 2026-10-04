@@ -18,7 +18,7 @@ The main session plans, designs and reviews; routine work goes to the saved agen
 | Branch touches auth, tokens, OAuth, share links or who can see what | run the `security-review` skill before merge |
 | User says commit / push / merge / "is it on main?" | the `ship` skill |
 
-When a skill says to dispatch an implementer, spec reviewer or code reviewer, use these agents instead of `general-purpose`. A task that failed twice on Sonnet is escalated to Opus, not retried a third time.
+When a skill says to dispatch an implementer, spec reviewer or code reviewer, use these agents instead of `general-purpose`. A device pass, including one bundled with a task's "verify", always goes to `device-checker`, never `general-purpose`. A task that failed twice on Sonnet is escalated to Opus, not retried a third time.
 
 # Shell
 
