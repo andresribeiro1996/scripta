@@ -38,3 +38,14 @@ export function peekCachedCoverUrls(params: PeekCachedCoverParams[]): Array<stri
     return imageId ? coverUrlFor(imageId, "thumb") : null;
   });
 }
+
+export function peekWorkId(params: PeekCachedCoverParams): string | null {
+  const identity = lookupIdentity(params);
+  if (!identity) return null;
+  const workId = findByIdentity(booksRepository(), identity)?.work_id;
+  return workId ? booksRepository().resolveWorkId(workId) : null;
+}
+
+export function resolveWorkId(workId: string): string | null {
+  return booksRepository().resolveWorkId(workId);
+}

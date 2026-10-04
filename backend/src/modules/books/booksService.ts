@@ -2,11 +2,11 @@ import { randomUUID } from "node:crypto";
 import { looksLikeIsbnQuery, normalizeIsbn, type BookGenre, type BookMetadata, type BookSearchResult } from "@scripta/shared";
 import { findBestCover, type CoverSources, type FetchCoverImage } from "./coverResolver.js";
 import { MIN_GOOD_WIDTH } from "./domain/constants.js";
-import { BookNotFoundError, FileTooLargeError, InvalidImageError, SourcePausedError, SourceUnavailableError } from "./domain/errors.js";
+import { BookNotFoundError, FileTooLargeError, InvalidImageError, SourcePausedError, SourceUnavailableError, WorkMergeError } from "./domain/errors.js";
 import { encodeCover, type EncodedCover } from "./domain/images.js";
 import { editionLanguage, findByIdentity, isPortugueseIsbn, lookupIdentity, SEARCH_LIMIT, searchTokens, type BookIdentity, type BookLookup } from "./domain/normalize.js";
 import type { BookCatalog, BooksRepository, CatalogSearchHit, CoverBlobStore, CoverSource, EditionRecordSource } from "./domain/ports.js";
-import type { BookRow, CoverSourceName, CoverStatus } from "./domain/types.js";
+import type { BookRow, CoverSourceName, CoverStatus, WorkView } from "./domain/types.js";
 import type { CoverPriority } from "./worker.js";
 
 const RETRY_AFTER_MS = 30 * 24 * 60 * 60 * 1000;
@@ -56,6 +56,8 @@ export interface BooksService {
   isAdmin(userId: string): boolean;
   rejectCover(lookup: BookLookup): ResolvedCover;
   uploadCover(lookup: BookLookup, bytes: Buffer): Promise<ResolvedCover>;
+  mergeWorks(from: BookLookup, into: BookLookup): WorkView;
+  detachEdition(edition: BookLookup): WorkView;
 }
 
 export async function storeCoverImage(
@@ -183,6 +185,19 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       deps.repo.makeSearchable(book.id);
       return book.cover_image_id ? { ...result, coverUrl: deps.publicUrlFor(book.cover_image_id, "thumb") } : result;
     });
+  }
+
+  function existingEdition(lookup: BookLookup): BookRow {
+    const identity = lookupIdentity(lookup);
+    const book = identity ? (identity.isbn ? deps.repo.findBookByKey(identity.key) : findByIdentity(deps.repo, identity)) : undefined;
+    if (!book) throw new BookNotFoundError();
+    return book;
+  }
+
+  function workView(workId: string): WorkView {
+    const view = deps.repo.getWorkView(workId);
+    if (!view) throw new Error(`Work ${workId} is missing.`);
+    return view;
   }
 
   async function lookupDetails(book: BookRow, catalog: BookCatalog) {
@@ -356,6 +371,17 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       backoffUntil.delete(book.id);
       deps.enqueue(book.id, "front");
       return { url: null, fullUrl: null, pending: true, upgrading: false };
+    },
+
+    mergeWorks(from, into) {
+      const source = existingEdition(from);
+      const target = existingEdition(into);
+      if (!source.work_id || !target.work_id) throw new WorkMergeError("That edition has no work yet.");
+      return workView(deps.repo.mergeWorks(source.work_id, target.work_id));
+    },
+
+    detachEdition(edition) {
+      return workView(deps.repo.detachEdition(existingEdition(edition).id, now().toISOString()));
     },
 
     async uploadCover(lookup, bytes) {
