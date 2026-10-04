@@ -30,6 +30,8 @@ import {
 import type { ArenaRepository } from "./domain/ports.js";
 import type { DuelRow, SeedBookInput, SeedPreview, TournamentRow, TournamentSlotRow } from "./domain/types.js";
 
+export type ResolveBookWorks = (ownerUserId: string, books: SeedBookInput[]) => Map<string, { workId: string | null }>;
+
 export interface TournamentSummary {
   id: string;
   name: string;
@@ -84,8 +86,8 @@ export interface ArenaService {
   listPublicByIds(ids: string[]): TournamentSummary[];
   votedAmong(voterUserId: string, ids: string[]): string[];
   getTournamentView(id: string, voterToken?: string, viewerUserId?: string | null): TournamentView | null;
-  setSlotsManual(tournamentId: string, ownerUserId: string, entries: Array<{ slotIndex: number; book: SeedBookInput }>): void;
-  randomFill(tournamentId: string, ownerUserId: string, pool: SeedBookInput[]): void;
+  setSlotsManual(tournamentId: string, ownerUserId: string, entries: Array<{ slotIndex: number; book: SeedBookInput }>, resolveWorks: ResolveBookWorks): void;
+  randomFill(tournamentId: string, ownerUserId: string, pool: SeedBookInput[], resolveWorks: ResolveBookWorks): void;
   getPublicSummary(tournamentId: string): TournamentSummary | undefined;
   start(tournamentId: string, ownerUserId: string): void;
   /** Casts one vote. `voterUserId` is the signed-in caller's account id,
@@ -355,18 +357,20 @@ export function createArenaService(repo: ArenaRepository, emitPublished?: EmitPu
       return toTournamentSummary(tournament, previewFromSlots(repo.getSlots(tournament.id)), winner);
     },
 
-    setSlotsManual(tournamentId, ownerUserId, entries) {
+    setSlotsManual(tournamentId, ownerUserId, requested, resolveWorks) {
       const tournament = repo.getOwnedTournament(tournamentId, ownerUserId);
       if (!tournament) throw new TournamentNotFoundError();
       if (tournament.status !== "seeding") throw new TournamentAlreadyStartedError();
 
-      const indices = new Set(entries.map((e) => e.slotIndex));
-      if (indices.size !== entries.length) throw new DuplicateSlotError();
-      if (entries.some((e) => e.slotIndex < 0 || e.slotIndex >= tournament.bracket_size)) {
+      const indices = new Set(requested.map((e) => e.slotIndex));
+      if (indices.size !== requested.length) throw new DuplicateSlotError();
+      if (requested.some((e) => e.slotIndex < 0 || e.slotIndex >= tournament.bracket_size)) {
         throw new InvalidSlotIndexError(tournament.bracket_size);
       }
-      const keys = new Set(entries.map((e) => e.book.key));
-      if (keys.size !== entries.length) throw new DuplicateBookError();
+      const keys = new Set(requested.map((e) => e.book.key));
+      if (keys.size !== requested.length) throw new DuplicateBookError();
+      const resolved = resolveWorks(ownerUserId, requested.map((e) => e.book));
+      const entries = requested.map((e) => ({ ...e, book: { ...e.book, workId: resolved.get(e.book.key)?.workId ?? null } }));
       const works = new Set<string>();
       for (const { book } of entries) {
         if (!book.workId) continue;
@@ -388,10 +392,12 @@ export function createArenaService(repo: ArenaRepository, emitPublished?: EmitPu
       repo.replaceSlots(tournamentId, rows);
     },
 
-    randomFill(tournamentId, ownerUserId, pool) {
+    randomFill(tournamentId, ownerUserId, requested, resolveWorks) {
       const tournament = repo.getOwnedTournament(tournamentId, ownerUserId);
       if (!tournament) throw new TournamentNotFoundError();
       if (tournament.status !== "seeding") throw new TournamentAlreadyStartedError();
+      const resolved = resolveWorks(ownerUserId, requested);
+      const pool = requested.map((book) => ({ ...book, workId: resolved.get(book.key)?.workId ?? null }));
       const seen = new Set<string>();
       const unique = pool.filter((book) => !book.workId || (!seen.has(book.workId) && (seen.add(book.workId), true)));
       if (unique.length < tournament.bracket_size) throw new NotEnoughBooksError(tournament.bracket_size, unique.length);

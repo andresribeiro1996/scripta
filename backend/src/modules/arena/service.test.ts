@@ -190,6 +190,10 @@ function createInMemoryArenaRepository(): ArenaRepository {
   };
 }
 
+function resolveByWorkId(_ownerUserId: string, books: Array<{ key: string; workId?: string | null }>) {
+  return new Map(books.map((book) => [book.key, { workId: book.workId ?? null }]));
+}
+
 function makeBook(n: number) {
   return { key: `book-${n}`, title: `Book ${n}`, author: `Author ${n}`, cover: null };
 }
@@ -204,7 +208,7 @@ test("a summary carries the seeded cover preview and how many slots are filled",
   service.setSlotsManual(tournament.id, "owner-1", Array.from({ length: 9 }, (_, index) => ({
     slotIndex: index,
     book: makeBookWithCover(index + 1)
-  })));
+  })), resolveByWorkId);
 
   const summary = service.listMine("owner-1")[0];
   assert.equal(summary?.filledSlots, 9);
@@ -219,7 +223,7 @@ test("a cover preview skips slots seeded without art but still counts them", () 
     { slotIndex: 0, book: makeBook(1) },
     { slotIndex: 1, book: makeBookWithCover(2) },
     { slotIndex: 2, book: makeBook(3) }
-  ]);
+  ], resolveByWorkId);
 
   const summary = service.listMine("owner-1")[0];
   assert.equal(summary?.filledSlots, 3);
@@ -272,7 +276,7 @@ test("start rejects an incompletely-seeded tournament", () => {
   service.setSlotsManual(tournament.id, "owner-1", [
     { slotIndex: 0, book: makeBook(1) },
     { slotIndex: 1, book: makeBook(2) }
-  ]);
+  ], resolveByWorkId);
   assert.throws(() => service.start(tournament.id, "owner-1"), IncompleteSeedError);
 });
 
@@ -280,7 +284,7 @@ test("random-fill rejects a pool smaller than the bracket", () => {
   const service = createArenaService(createInMemoryArenaRepository());
   const tournament = service.createTournament("owner-1", { name: "Test", bracketSize: 4, roundDurationMinutes: 60 });
   assert.throws(
-    () => service.randomFill(tournament.id, "owner-1", [makeBook(1), makeBook(2)]),
+    () => service.randomFill(tournament.id, "owner-1", [makeBook(1), makeBook(2)], resolveByWorkId),
     NotEnoughBooksError
   );
 });
@@ -293,7 +297,7 @@ test("a full round of voting settles duels and advances to the next round, endin
     { slotIndex: 1, book: makeBook(2) },
     { slotIndex: 2, book: makeBook(3) },
     { slotIndex: 3, book: makeBook(4) }
-  ]);
+  ], resolveByWorkId);
   service.start(tournament.id, "owner-1");
 
   let view = service.getTournamentView(tournament.id);
@@ -336,7 +340,7 @@ test("works flow from slots into round one and on to the next round's duels", ()
   service.setSlotsManual(
     tournament.id,
     "owner-1",
-    [1, 2, 3, 4].map((n) => ({ slotIndex: n - 1, book: { ...makeBook(n), workId: `w${n}` } }))
+    [1, 2, 3, 4].map((n) => ({ slotIndex: n - 1, book: { ...makeBook(n), workId: `w${n}` } })), resolveByWorkId
   );
   service.start(tournament.id, "owner-1");
 
@@ -362,7 +366,7 @@ test("two editions of one work can't fill two slots", () => {
       service.setSlotsManual(tournament.id, "owner-1", [
         { slotIndex: 0, book: { key: "k1", title: "Dune", author: "Frank Herbert", cover: null, workId: "w1" } },
         { slotIndex: 1, book: { key: "k2", title: "Dune", author: "Frank Herbert", cover: null, workId: "w1" } }
-      ]),
+      ], resolveByWorkId),
     (error: unknown) => error instanceof DuplicateBookError && error.message.includes("Dune")
   );
 });
@@ -375,7 +379,7 @@ test("random fill keeps the first edition of each work", () => {
     { ...makeBook(1), key: "k1", workId: "w1" },
     { ...makeBook(2), key: "k2", workId: "w1" },
     { ...makeBook(3), key: "k3", workId: "w3" }
-  ]);
+  ], resolveByWorkId);
   assert.deepEqual(repo.getSlots(tournament.id).map((slot) => slot.book_key).sort(), ["k1", "k3"]);
 });
 
@@ -387,7 +391,7 @@ test("random fill counts distinct works against the bracket size", () => {
       service.randomFill(tournament.id, "owner-1", [
         { ...makeBook(1), key: "k1", workId: "w1" },
         { ...makeBook(2), key: "k2", workId: "w1" }
-      ]),
+      ], resolveByWorkId),
     NotEnoughBooksError
   );
 });
@@ -398,7 +402,7 @@ test("a completed tournament's summary carries the champion book", () => {
   service.setSlotsManual(tournament.id, "owner-1", [
     { slotIndex: 0, book: makeBookWithCover(1) },
     { slotIndex: 1, book: makeBook(2) }
-  ]);
+  ], resolveByWorkId);
   service.start(tournament.id, "owner-1");
   const duel = service.getTournamentView(tournament.id)!.duels[0]!;
   service.vote(tournament.id, duel.id, "voter-1", "book-1");
@@ -418,7 +422,7 @@ test("a seeding or active tournament's summary has no winner yet", () => {
   service.setSlotsManual(running.id, "owner-1", [
     { slotIndex: 0, book: makeBook(1) },
     { slotIndex: 1, book: makeBook(2) }
-  ]);
+  ], resolveByWorkId);
   service.start(running.id, "owner-1");
   assert.equal(service.listMine("owner-1").find((t) => t.id === running.id)?.winner, null);
 });
@@ -429,7 +433,7 @@ test("a tied duel waits for the owner's tie-break instead of auto-advancing", ()
   service.setSlotsManual(tournament.id, "owner-1", [
     { slotIndex: 0, book: makeBook(1) },
     { slotIndex: 1, book: makeBook(2) }
-  ]);
+  ], resolveByWorkId);
   service.start(tournament.id, "owner-1");
   const duel = service.getTournamentView(tournament.id)!.duels[0]!;
 
@@ -457,7 +461,7 @@ test("a voter can't vote twice on the same duel, or for a book not in it", () =>
   service.setSlotsManual(tournament.id, "owner-1", [
     { slotIndex: 0, book: makeBook(1) },
     { slotIndex: 1, book: makeBook(2) }
-  ]);
+  ], resolveByWorkId);
   service.start(tournament.id, "owner-1");
   const duel = service.getTournamentView(tournament.id)!.duels[0]!;
 
@@ -472,7 +476,7 @@ test("runScheduledSweep only settles duels whose deadline has actually passed", 
   service.setSlotsManual(tournament.id, "owner-1", [
     { slotIndex: 0, book: makeBook(1) },
     { slotIndex: 1, book: makeBook(2) }
-  ]);
+  ], resolveByWorkId);
   service.start(tournament.id, "owner-1");
   const duel = service.getTournamentView(tournament.id)!.duels[0]!;
   service.vote(tournament.id, duel.id, "voter-1", "book-1");
@@ -491,7 +495,7 @@ test("only the owner can seed, start, settle, or tie-break a tournament", () => 
   const service = createArenaService(createInMemoryArenaRepository());
   const tournament = service.createTournament("owner-1", { name: "Test", bracketSize: 2, roundDurationMinutes: 60 });
   assert.throws(
-    () => service.setSlotsManual(tournament.id, "someone-else", [{ slotIndex: 0, book: makeBook(1) }]),
+    () => service.setSlotsManual(tournament.id, "someone-else", [{ slotIndex: 0, book: makeBook(1) }], resolveByWorkId),
     TournamentNotFoundError
   );
 });
@@ -502,7 +506,7 @@ test("a settled or already-completed duel can't be voted on", () => {
   service.setSlotsManual(tournament.id, "owner-1", [
     { slotIndex: 0, book: makeBook(1) },
     { slotIndex: 1, book: makeBook(2) }
-  ]);
+  ], resolveByWorkId);
   service.start(tournament.id, "owner-1");
   const duel = service.getTournamentView(tournament.id)!.duels[0]!;
   service.vote(tournament.id, duel.id, "voter-1", "book-1");
@@ -517,16 +521,16 @@ test("start, setSlotsManual, and randomFill all reject a tournament that isn't i
   service.setSlotsManual(tournament.id, "owner-1", [
     { slotIndex: 0, book: makeBook(1) },
     { slotIndex: 1, book: makeBook(2) }
-  ]);
+  ], resolveByWorkId);
   service.start(tournament.id, "owner-1");
 
   assert.throws(() => service.start(tournament.id, "owner-1"), TournamentAlreadyStartedError);
   assert.throws(
-    () => service.setSlotsManual(tournament.id, "owner-1", [{ slotIndex: 0, book: makeBook(3) }]),
+    () => service.setSlotsManual(tournament.id, "owner-1", [{ slotIndex: 0, book: makeBook(3) }], resolveByWorkId),
     TournamentAlreadyStartedError
   );
   assert.throws(
-    () => service.randomFill(tournament.id, "owner-1", [makeBook(1), makeBook(2)]),
+    () => service.randomFill(tournament.id, "owner-1", [makeBook(1), makeBook(2)], resolveByWorkId),
     TournamentAlreadyStartedError
   );
 });
@@ -539,7 +543,7 @@ test("start emits exactly one publish event and the public summary flips", () =>
   service.setSlotsManual(t.id, "owner-1", [
     { slotIndex: 0, book: makeBook(1) },
     { slotIndex: 1, book: makeBook(2) }
-  ]);
+  ], resolveByWorkId);
 
   assert.equal(service.getPublicSummary(t.id), undefined);
   service.start(t.id, "owner-1");
@@ -554,7 +558,7 @@ function startedTournament(service: ReturnType<typeof createArenaService>, owner
   service.setSlotsManual(
     tournament.id,
     owner,
-    Array.from({ length: 2 }, (_, i) => ({ slotIndex: i, book: makeBook(i + 1 + books) }))
+    Array.from({ length: 2 }, (_, i) => ({ slotIndex: i, book: makeBook(i + 1 + books) })), resolveByWorkId
   );
   service.start(tournament.id, owner);
   return tournament;
@@ -695,7 +699,7 @@ test("listPublicByIds builds covers and winners for the requested started tourna
   service.setSlotsManual(first.id, "owner-1", [
     { slotIndex: 0, book: makeBookWithCover(1) },
     { slotIndex: 1, book: makeBookWithCover(2) }
-  ]);
+  ], resolveByWorkId);
   service.start(first.id, "owner-1");
   const second = startedTournament(service, "owner-1", "Second", 2);
   startedTournament(service, "owner-1", "Third", 4);

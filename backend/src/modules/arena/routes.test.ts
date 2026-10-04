@@ -34,12 +34,14 @@ test("GET /arenas/public allows 30 requests a minute per caller", async () => {
   await app.close();
 });
 
-async function arenaApp() {
+type ArenaRoutesResolver = NonNullable<Parameters<typeof buildArenaRoutes>[1]>;
+
+async function arenaApp(resolveWorks?: ArenaRoutesResolver) {
   const db = new DatabaseSync(":memory:");
   applyArenaMigrations(db);
   const app = Fastify();
   app.decorate("authenticateAccessToken", (token: string) => ({ id: token, email: `${token}@example.test`, username: token, avatarId: null }));
-  await app.register(buildArenaRoutes(createArenaService(createSqliteArenaRepository(db))));
+  await app.register(buildArenaRoutes(createArenaService(createSqliteArenaRepository(db)), resolveWorks));
   const created = await app.inject({
     method: "POST",
     url: "/arenas",
@@ -85,5 +87,35 @@ test("PUT slots with two editions of one work is a 409 naming it", async () => {
   ]);
   assert.equal(res.statusCode, 409);
   assert.match(res.json().error, /Dune/);
+  await app.close();
+});
+
+test("PUT slots answers 503 and stores nothing when the catalog is unavailable", async () => {
+  const { WorkResolutionError } = await import("../library/index.js");
+  const { app, db, id } = await arenaApp(() => {
+    throw new WorkResolutionError(new Error("catalog down"));
+  });
+  const res = await putSlots(app, id, [
+    { key: "k1", title: "Dune", author: "Frank Herbert" },
+    { key: "k2", title: "Orlando", author: "Virginia Woolf" }
+  ]);
+  assert.equal(res.statusCode, 503);
+  assert.match(res.json().error, /catalog/i);
+  assert.equal((db.prepare("SELECT COUNT(*) AS n FROM tournament_slots WHERE tournament_id = ?").get(id) as { n: number }).n, 0);
+  await app.close();
+});
+
+test("PUT slots by a non-owner is a 404 and writes nothing to the catalog", async () => {
+  const { app, id } = await arenaApp();
+  const res = await app.inject({
+    method: "PUT",
+    url: `/arenas/${id}/slots`,
+    headers: { authorization: "Bearer u2" },
+    payload: { slots: [{ slotIndex: 0, book: { key: "ta:zzyzx|nobody", title: "Zzyzx Road Atlas", author: "Nobody Atall", cover: null } }] }
+  });
+  assert.equal(res.statusCode, 404);
+  const catalog = new DatabaseSync(process.env.COVERS_DB_PATH!);
+  assert.equal((catalog.prepare("SELECT COUNT(*) AS n FROM books WHERE title = ?").get("Zzyzx Road Atlas") as { n: number }).n, 0);
+  catalog.close();
   await app.close();
 });

@@ -13,8 +13,8 @@ import {
   TournamentAlreadyStartedError,
   TournamentNotFoundError
 } from "./domain/errors.js";
-import { resolveEntryWorks, WorkResolutionError, type WorkRef } from "../library/index.js";
-import type { ArenaService } from "./service.js";
+import { resolveEntryWorks, WorkResolutionError } from "../library/index.js";
+import type { ArenaService, ResolveBookWorks } from "./service.js";
 
 function statusForArenaError(err: ArenaError): number {
   if (err instanceof TournamentNotFoundError || err instanceof DuelNotFoundError) return 404;
@@ -22,10 +22,6 @@ function statusForArenaError(err: ArenaError): number {
   if (err instanceof TournamentAlreadyStartedError) return 409;
   if (err instanceof DuplicateBookError) return 409;
   return 400;
-}
-
-function withWorks<T extends { key: string; title: string; author: string }>(works: Map<string, WorkRef>, book: T): T & { workId: string | null } {
-  return { ...book, workId: works.get(book.key)?.workId ?? null };
 }
 
 const idParamSchema = z.object({ id: z.string().uuid() });
@@ -67,7 +63,7 @@ const listPublicQuerySchema = z.object({
 
 const getTournamentQuerySchema = z.object({ voterToken: z.string().min(1).max(100).optional() });
 
-export function buildArenaRoutes(service: ArenaService) {
+export function buildArenaRoutes(service: ArenaService, resolveWorks: ResolveBookWorks = resolveEntryWorks) {
   return async function arenaRoutes(app: FastifyInstance) {
     app.post("/arenas", { preHandler: authGuard }, async (request, reply) => {
       const parsed = createTournamentSchema.safeParse(request.body);
@@ -124,17 +120,11 @@ export function buildArenaRoutes(service: ArenaService) {
       if (!params.success) return reply.code(400).send({ error: "Invalid tournament id." });
       const body = setSlotsSchema.safeParse(request.body);
       if (!body.success) return reply.code(400).send({ error: "Expected {slots: [{slotIndex, book}, ...]}." });
-      let works: Map<string, WorkRef>;
       try {
-        works = resolveEntryWorks(request.user.id, body.data.slots.map((slot) => slot.book));
-      } catch (err) {
-        if (err instanceof WorkResolutionError) return reply.code(503).send({ error: err.message });
-        throw err;
-      }
-      try {
-        service.setSlotsManual(params.data.id, request.user.id, body.data.slots.map((slot) => ({ ...slot, book: withWorks(works, slot.book) })));
+        service.setSlotsManual(params.data.id, request.user.id, body.data.slots, resolveWorks);
         return reply.code(204).send();
       } catch (err) {
+        if (err instanceof WorkResolutionError) return reply.code(503).send({ error: err.message });
         if (err instanceof ArenaError) return reply.code(statusForArenaError(err)).send({ error: err.message });
         throw err;
       }
@@ -145,17 +135,11 @@ export function buildArenaRoutes(service: ArenaService) {
       if (!params.success) return reply.code(400).send({ error: "Invalid tournament id." });
       const body = randomFillSchema.safeParse(request.body);
       if (!body.success) return reply.code(400).send({ error: "Expected {pool: [book, ...]}." });
-      let works: Map<string, WorkRef>;
       try {
-        works = resolveEntryWorks(request.user.id, body.data.pool);
-      } catch (err) {
-        if (err instanceof WorkResolutionError) return reply.code(503).send({ error: err.message });
-        throw err;
-      }
-      try {
-        service.randomFill(params.data.id, request.user.id, body.data.pool.map((book) => withWorks(works, book)));
+        service.randomFill(params.data.id, request.user.id, body.data.pool, resolveWorks);
         return reply.code(204).send();
       } catch (err) {
+        if (err instanceof WorkResolutionError) return reply.code(503).send({ error: err.message });
         if (err instanceof ArenaError) return reply.code(statusForArenaError(err)).send({ error: err.message });
         throw err;
       }
