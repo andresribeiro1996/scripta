@@ -116,3 +116,38 @@ test("a stale save is a 409 and writes no works", async () => {
   assert.deepEqual(workRows(db, mural.id), []);
   await app.close();
 });
+
+test("a save with an unknown folder is a 400 that resolves nothing, even with the catalog down", async () => {
+  addLibraryBook("u5", 0, "ta:hyperion|dan simmons", "Hyperion", "Dan Simmons");
+  const { app, db, service } = await muralApp();
+  const mural = service.createMural("u5", "Folder");
+  const payload = { blocks: [{ id: "b1", type: "spotlight", layout, bookKey: "ta:hyperion|dan simmons" }], folderId: "00000000-0000-4000-8000-000000000000" };
+
+  const before = catalogBookCount();
+  const res = await app.inject({ method: "PUT", url: `/murals/${mural.id}`, headers: { authorization: "Bearer u5" }, payload });
+  assert.equal(res.statusCode, 400);
+  assert.equal(catalogBookCount(), before);
+  assert.deepEqual(workRows(db, mural.id), []);
+  await app.close();
+
+  const failing: Resolver = () => { throw new WorkResolutionError(new Error("down")); };
+  const down = await muralApp(failing);
+  const other = down.service.createMural("u5", "Folder");
+  const res503 = await down.app.inject({ method: "PUT", url: `/murals/${other.id}`, headers: { authorization: "Bearer u5" }, payload });
+  assert.equal(res503.statusCode, 400);
+  await down.app.close();
+});
+
+test("a save without blocks leaves the stored works alone", async () => {
+  addLibraryBook("u6", 0, DUNE_KEY, "Dune", "Frank Herbert");
+  const { app, db, service, putBlocks } = await muralApp();
+  const mural = service.createMural("u6", "Rename");
+  assert.equal((await putBlocks(mural.id, "u6", [{ id: "b1", type: "spotlight", layout, bookKey: DUNE_KEY }])).statusCode, 200);
+  const stored = workRows(db, mural.id);
+  assert.equal(stored.length, 1);
+
+  const res = await app.inject({ method: "PUT", url: `/murals/${mural.id}`, headers: { authorization: "Bearer u6" }, payload: { name: "Renamed" } });
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(workRows(db, mural.id), stored);
+  await app.close();
+});

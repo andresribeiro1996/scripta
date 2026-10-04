@@ -119,18 +119,11 @@ export function buildMuralRoutes(service: MuralsService, resolveWorks: typeof re
       if (!body.success) {
         return reply.code(400).send({ error: body.error.issues[0]?.message ?? "Invalid request." });
       }
-      let works: Map<string, string | null> | undefined;
-      if (body.data.blocks !== undefined && service.getMural(request.user.id, params.data.id)) {
-        const keys = [...extractReferences(body.data.blocks).bookKeys];
-        try {
-          works = workIdsByKey(keys, resolveWorks(request.user.id, keys.map((key) => ({ key }))));
-        } catch (err) {
-          if (err instanceof WorkResolutionError) return reply.code(503).send({ error: err.message });
-          throw err;
-        }
-      }
       try {
-        const mural = service.updateMural(request.user.id, params.data.id, body.data, works);
+        const mural = service.updateMural(request.user.id, params.data.id, body.data, (blocks) => {
+          const keys = [...extractReferences(blocks).bookKeys];
+          return workIdsByKey(keys, resolveWorks(request.user.id, keys.map((key) => ({ key }))));
+        });
         if (!mural) {
           return reply.code(404).send({ error: "No mural with that id." });
         }
@@ -140,6 +133,7 @@ export function buildMuralRoutes(service: MuralsService, resolveWorks: typeof re
           return reply.code(409).send({ error: err.message, current: service.getMural(request.user.id, params.data.id) });
         }
         if (err instanceof InvalidFolderReferenceError) return reply.code(400).send({ error: err.message });
+        if (err instanceof WorkResolutionError) return reply.code(503).send({ error: err.message });
         throw err;
       }
     });
