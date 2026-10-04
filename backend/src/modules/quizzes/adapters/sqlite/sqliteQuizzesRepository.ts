@@ -90,7 +90,7 @@ export function createSqliteQuizzesRepository(db: DatabaseSync): QuizzesReposito
 
     delete(id, userId) {
       if (!getOwnedStmt.get(id, userId)) return false;
-      db.exec("BEGIN");
+      db.exec("BEGIN IMMEDIATE");
       try {
         deleteAnswersStmt.run(id);
         deletePlaysStmt.run(id);
@@ -98,7 +98,7 @@ export function createSqliteQuizzesRepository(db: DatabaseSync): QuizzesReposito
         db.exec("COMMIT");
         return result.changes > 0;
       } catch (error) {
-        db.exec("ROLLBACK");
+        if (db.isTransaction) db.exec("ROLLBACK");
         throw error;
       }
     },
@@ -125,7 +125,7 @@ export function createSqliteQuizzesRepository(db: DatabaseSync): QuizzesReposito
         }
         db.exec("COMMIT");
       } catch (error) {
-        db.exec("ROLLBACK");
+        if (db.isTransaction) db.exec("ROLLBACK");
         throw error;
       }
     },
@@ -142,7 +142,7 @@ export function createSqliteQuizzesRepository(db: DatabaseSync): QuizzesReposito
         db.prepare("UPDATE quiz_plays SET voter_user_id = NULL WHERE voter_user_id = ?").run(userId);
         db.exec("COMMIT");
       } catch (error) {
-        db.exec("ROLLBACK");
+        if (db.isTransaction) db.exec("ROLLBACK");
         throw error;
       }
     },
@@ -174,7 +174,7 @@ export function createSqliteQuizzesRepository(db: DatabaseSync): QuizzesReposito
     },
 
     savePlay(play, answers) {
-      db.exec("BEGIN");
+      db.exec("BEGIN IMMEDIATE");
       try {
         insertPlayStmt.run({
           $id: play.id,
@@ -197,7 +197,7 @@ export function createSqliteQuizzesRepository(db: DatabaseSync): QuizzesReposito
         }
         db.exec("COMMIT");
       } catch (error) {
-        db.exec("ROLLBACK");
+        if (db.isTransaction) db.exec("ROLLBACK");
         throw error;
       }
     },

@@ -156,7 +156,7 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
         }
         db.exec("COMMIT");
       } catch (error) {
-        db.exec("ROLLBACK");
+        if (db.isTransaction) db.exec("ROLLBACK");
         throw error;
       }
     },
@@ -167,7 +167,7 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
         db.prepare("UPDATE votes SET voter_user_id = NULL WHERE voter_user_id = ?").run(userId);
         db.exec("COMMIT");
       } catch (error) {
-        db.exec("ROLLBACK");
+        if (db.isTransaction) db.exec("ROLLBACK");
         throw error;
       }
     },

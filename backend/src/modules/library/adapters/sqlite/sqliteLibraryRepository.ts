@@ -49,7 +49,7 @@ export function createSqliteLibraryRepository(db: DatabaseSync): LibraryReposito
       db.exec("COMMIT");
       return result;
     } catch (error) {
-      db.exec("ROLLBACK");
+      if (db.isTransaction) db.exec("ROLLBACK");
       throw error;
     }
   }

@@ -55,7 +55,7 @@ export function createSqliteMuralsRepository(db: DatabaseSync): MuralsRepository
         db.prepare("DELETE FROM mural_folders WHERE user_id = ?").run(userId);
         db.exec("COMMIT");
       } catch (error) {
-        db.exec("ROLLBACK");
+        if (db.isTransaction) db.exec("ROLLBACK");
         throw error;
       }
     },
@@ -72,7 +72,7 @@ export function createSqliteMuralsRepository(db: DatabaseSync): MuralsRepository
         }
         db.exec("COMMIT");
       } catch (error) {
-        db.exec("ROLLBACK");
+        if (db.isTransaction) db.exec("ROLLBACK");
         throw error;
       }
     },

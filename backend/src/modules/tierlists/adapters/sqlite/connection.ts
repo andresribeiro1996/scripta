@@ -57,7 +57,7 @@ function fillNameKeys(db: DatabaseSync): void {
     for (const row of stale) update.run(normalizeWords(row.name), row.id);
     db.exec("COMMIT");
   } catch (error) {
-    db.exec("ROLLBACK");
+    if (db.isTransaction) db.exec("ROLLBACK");
     throw error;
   }
 }
