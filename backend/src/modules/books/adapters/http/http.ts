@@ -1,7 +1,7 @@
 import { SourceUnavailableError } from "../../domain/errors.js";
 
 const TIMEOUT_MS = 10_000;
-const USER_AGENT = "Atmyshelf/1.0 (book covers)";
+export const USER_AGENT = "Atmyshelf/1.0 (+https://atmyshelf.com)";
 
 export type Throttle = <T>(task: () => Promise<T>, options?: { urgent?: boolean }) => Promise<T>;
 
