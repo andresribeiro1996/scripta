@@ -36,6 +36,8 @@ export interface BookRow {
   work_id: string | null;
   language: string | null;
   work_checked_at: string | null;
+  title_key: string | null;
+  title_group_blocked_at: string | null;
   created_at: string;
 }
 

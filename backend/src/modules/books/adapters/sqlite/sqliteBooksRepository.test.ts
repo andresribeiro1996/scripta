@@ -823,3 +823,43 @@ test("publisher details never mark a book found or touch its data sources", () =
   const row = repo.getBook(book.id)!;
   assert.deepEqual([row.details_status, row.details_checked_at, row.data_sources, row.rating], [null, null, "[]", null]);
 });
+
+test("createBook and fillIdentity store the edition's title key, and only a titled edition gets one", () => {
+  const { repo } = freshRepo();
+  const dune = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593" }, ["isbn:9780441013593"], NOW);
+  const authorless = repo.createBook({ title: "Dune", author: "", isbn: "9780441013594" }, ["isbn:9780441013594"], NOW);
+  const untitled = repo.createBook({ title: "", author: "", isbn: "9789720000001" }, ["isbn:9789720000001"], NOW);
+  assert.deepEqual([dune.title_key, authorless.title_key, untitled.title_key], ["ta:dune|frank herbert|", "", null]);
+  assert.equal(untitled.title_group_blocked_at, null);
+  repo.fillIdentity(untitled.id, "Ensaio sobre a Cegueira", "José Saramago");
+  assert.equal(repo.getBook(untitled.id)!.title_key, "ta:ensaio sobre a cegueira|jose saramago|");
+});
+
+test("fillTitleKeys computes the keys stored rows lack, in batches, and leaves untitled rows for fillIdentity", () => {
+  const { db, repo } = freshRepo();
+  const ids = [
+    repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593" }, ["isbn:9780441013593"], NOW).id,
+    repo.createBook({ title: "Emma", author: "Jane Austen", isbn: "9780141439587" }, ["isbn:9780141439587"], NOW).id,
+    repo.createBook({ title: "Orlando", author: "", isbn: "9780141184272" }, ["isbn:9780141184272"], NOW).id
+  ];
+  const untitled = repo.createBook({ title: "", author: "", isbn: "9789720000001" }, ["isbn:9789720000001"], NOW).id;
+  db.exec("UPDATE books SET title_key = NULL");
+  assert.equal(repo.fillTitleKeys(2), 2);
+  assert.equal(repo.fillTitleKeys(2), 1);
+  assert.equal(repo.fillTitleKeys(2), 0);
+  assert.deepEqual(ids.map((id) => repo.getBook(id)!.title_key), ["ta:dune|frank herbert|", "ta:emma|jane austen|", ""]);
+  assert.equal(repo.getBook(untitled)!.title_key, null);
+});
+
+test("the title key columns are added to an existing database once", () => {
+  const db = new DatabaseSync(":memory:");
+  applyBooksMigrations(db);
+  db.exec("DROP INDEX idx_books_title_key");
+  db.exec("ALTER TABLE books DROP COLUMN title_key");
+  db.exec("ALTER TABLE books DROP COLUMN title_group_blocked_at");
+  applyBooksMigrations(db);
+  applyBooksMigrations(db);
+  const columns = (db.prepare("PRAGMA table_info(books)").all() as Array<{ name: string }>).map((column) => column.name);
+  assert.ok(columns.includes("title_key") && columns.includes("title_group_blocked_at"));
+  assert.ok(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_books_title_key'").get());
+});

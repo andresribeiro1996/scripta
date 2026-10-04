@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
-import { normalizeWorkKey } from "../../domain/normalize.js";
+import { normalizeWorkKey, workTitleKey } from "../../domain/normalize.js";
 import type { BooksRepository, MergeableDetails } from "../../domain/ports.js";
 import type { BookRow, CoverImageRow, DataSource, SummarySource } from "../../domain/types.js";
 
@@ -9,11 +9,11 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const byKeysStmt = db.prepare(`SELECT book_keys.key AS key, books.* FROM book_keys JOIN books ON books.id = book_keys.book_id WHERE book_keys.key IN (SELECT value FROM json_each(?))`);
   const byIdStmt = db.prepare(`SELECT * FROM books WHERE id = ?`);
   const insertBookStmt = db.prepare(`
-    INSERT INTO books (id, title, author, year, publisher, isbn, ol_cover_id, ol_work_key, work_id, genres, data_sources, created_by, created_at)
-    VALUES ($id, $title, $author, $year, $publisher, $isbn, $ol_cover_id, $ol_work_key, $work_id, $genres, $data_sources, $created_by, $created_at)
+    INSERT INTO books (id, title, author, year, publisher, isbn, ol_cover_id, ol_work_key, work_id, genres, data_sources, created_by, title_key, created_at)
+    VALUES ($id, $title, $author, $year, $publisher, $isbn, $ol_cover_id, $ol_work_key, $work_id, $genres, $data_sources, $created_by, $title_key, $created_at)
   `);
   const insertKeyIfMissingStmt = db.prepare(`INSERT OR IGNORE INTO book_keys (key, book_id) VALUES (?, ?)`);
-  const fillIdentityStmt = db.prepare(`UPDATE books SET title = ?, author = ? WHERE id = ? AND title = ''`);
+  const fillIdentityStmt = db.prepare(`UPDATE books SET title = ?, author = ?, title_key = ? WHERE id = ? AND title = ''`);
   const workByKeyStmt = db.prepare(`SELECT id FROM works WHERE ol_work_key = ?`);
   const insertWorkStmt = db.prepare(`INSERT INTO works (id, ol_work_key, title, author, created_at) VALUES (?, ?, ?, ?, ?)`);
   const fillWorkIdentityStmt = db.prepare(`
@@ -27,6 +27,8 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     UPDATE works SET ol_work_key = ?
     WHERE id = ? AND ol_work_key IS NULL AND NOT EXISTS (SELECT 1 FROM books WHERE work_id = works.id AND id != ?)
   `);
+  const missingTitleKeyStmt = db.prepare(`SELECT id, title, author FROM books WHERE title_key IS NULL AND title <> '' LIMIT ?`);
+  const setTitleKeyStmt = db.prepare(`UPDATE books SET title_key = ? WHERE id = ?`);
   const unassignedStmt = db.prepare(`SELECT id, ol_work_key, title, author, created_at FROM books WHERE work_id IS NULL LIMIT ?`);
   const moveBookStmt = db.prepare(`UPDATE books SET work_id = ? WHERE id = ?`);
   const mergeEmptyWorkStmt = db.prepare(`UPDATE works SET merged_into = ? WHERE id = ? AND NOT EXISTS (SELECT 1 FROM books WHERE work_id = works.id)`);
@@ -140,6 +142,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
           $genres: JSON.stringify(input.genres ?? []),
           $data_sources: JSON.stringify(input.sources ?? []),
           $created_by: input.createdBy ?? null,
+          $title_key: input.title ? workTitleKey(input.title, input.author) : null,
           $created_at: createdAt
         });
         for (const key of keys) insertKeyIfMissingStmt.run(key, id);
@@ -154,7 +157,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
 
     fillIdentity(id, title, author) {
       inTransaction(() => {
-        fillIdentityStmt.run(title, author, id);
+        fillIdentityStmt.run(title, author, title ? workTitleKey(title, author) : null, id);
         fillWorkIdentityStmt.run(id);
       });
     },
@@ -258,6 +261,14 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
           moveBookStmt.run(workId, row.id);
           if (held) fillWorkIdentityStmt.run(row.id);
         }
+        return rows.length;
+      });
+    },
+
+    fillTitleKeys(limit) {
+      return inTransaction(() => {
+        const rows = missingTitleKeyStmt.all(limit) as Array<{ id: string; title: string; author: string }>;
+        for (const row of rows) setTitleKeyStmt.run(workTitleKey(row.title, row.author), row.id);
         return rows.length;
       });
     },

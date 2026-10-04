@@ -91,6 +91,10 @@ export function catalogTitleKey(title: string, author: string): string | null {
   return main ? `ta:${main}|${firstAuthor(author)}|${titleNumbers(title)}` : null;
 }
 
+export function workTitleKey(title: string, author: string): string {
+  return firstAuthor(author) ? catalogTitleKey(title, author) ?? "" : "";
+}
+
 export function lookupIdentity(lookup: BookLookup): BookIdentity | null {
   const isbn = normalizeIsbn(lookup.isbn ?? "") || null;
   const title = (lookup.title ?? "").trim();

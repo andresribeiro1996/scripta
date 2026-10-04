@@ -7,6 +7,7 @@ import {
   PORTUGAL_ISBN13_PREFIXES,
   authorMatches,
   catalogTitleKey,
+  workTitleKey,
   editionLanguage,
   isPortugalIsbn,
   isPortugueseIsbn,
@@ -121,4 +122,13 @@ test("Portuguese takes its region from the ISBN group: pt-PT for Portugal, pt-BR
 test("only Portuguese is regional: another language ignores the ISBN group", () => {
   assert.equal(editionLanguage(["eng"], "9789722518888"), "en");
   assert.equal(editionLanguage(["spa"], "9788535914849"), "es");
+});
+
+test("workTitleKey is the catalog title key only when both the title and the first author have letters", () => {
+  assert.equal(workTitleKey("Dune", "Frank Herbert"), "ta:dune|frank herbert|");
+  assert.equal(workTitleKey("Ensaio sobre a Cegueira", "José Saramago, Outro"), "ta:ensaio sobre a cegueira|jose saramago|");
+  assert.equal(workTitleKey("The Complete Works 2", "Shakespeare"), "ta:the complete works 2|shakespeare|2");
+  assert.equal(workTitleKey("Dune", ""), "");
+  assert.equal(workTitleKey("Dune", "—"), "");
+  assert.equal(workTitleKey("?!", "Frank Herbert"), "");
 });

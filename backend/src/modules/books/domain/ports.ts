@@ -32,6 +32,7 @@ export interface BooksRepository {
   setAppleChecked(bookId: string, at: string): void;
   setWorkKey(id: string, key: string | null | undefined): void;
   assignMissingWorks(limit: number): number;
+  fillTitleKeys(limit: number): number;
   setLanguage(id: string, tag: string | null): void;
   setPublisherUrl(id: string, url: string): void;
   listUpgradeWantedIds(): string[];
