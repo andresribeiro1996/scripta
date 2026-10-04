@@ -18,6 +18,7 @@ test("the Cloudflare to Railway chain yields the client, skipping the edge and C
 test("any peer in 100.64.0.0/10 is a trusted proxy, not only the observed addresses", async () => {
   assert.equal(await clientIp("100.64.3.4", "203.0.113.9"), "203.0.113.9");
   assert.equal(await clientIp("100.127.255.254", "203.0.113.9"), "203.0.113.9");
+  assert.equal(await clientIp("::ffff:100.64.0.7", "203.0.113.9"), "203.0.113.9");
 });
 
 test("a client hitting Railway directly cannot claim a Cloudflare hop to pick its own address", async () => {
@@ -39,7 +40,7 @@ test("Cloudflare IPv6 hops are trusted proxies", async () => {
 });
 
 test("link-local and unique-local peers are the client, whatever they forward", async () => {
-  for (const peer of ["169.254.1.1", "fe80::1", "10.0.0.5", "192.168.1.5", "172.16.0.5", "fd12:3456::7"]) {
+  for (const peer of ["169.254.1.1", "fe80::1", "10.0.0.5", "192.168.1.5", "172.16.0.5", "fd12:3456::7", "::ffff:10.0.0.5"]) {
     assert.equal(await clientIp(peer, "203.0.113.9"), peer);
   }
 });
