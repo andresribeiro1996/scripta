@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS library_books (
   sort_order    REAL,
   cover_url     TEXT,
   finished_year INTEGER,
+  work_id       TEXT,
   row_hash      TEXT NOT NULL,
   PRIMARY KEY (user_id, position)
 );
