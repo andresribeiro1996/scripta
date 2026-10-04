@@ -16,6 +16,18 @@ export function createSqliteLibraryRepository(db: DatabaseSync): LibraryReposito
     ON CONFLICT(user_id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at
     WHERE library_documents.updated_at = $expected_updated_at
   `);
+  const updateDataStmt = db.prepare(`
+    UPDATE library_documents SET data = $data, updated_at = $updated_at
+    WHERE user_id = $user_id AND updated_at = $expected_updated_at
+  `);
+  const setGlyphStmt = db.prepare(`
+    UPDATE library_derived SET glyph = $glyph, source_updated_at = $updated_at
+    WHERE user_id = $user_id AND source_updated_at = $expected_updated_at
+  `);
+  const keepDerivedStmt = db.prepare(`
+    UPDATE library_derived SET source_updated_at = $updated_at
+    WHERE user_id = $user_id AND source_updated_at = $expected_updated_at
+  `);
   // Deliberately leaves share_token untouched on conflict — re-saving a
   // library document (a normal, frequent PUT /library) must never disturb
   // an existing share link.
@@ -79,6 +91,18 @@ export function createSqliteLibraryRepository(db: DatabaseSync): LibraryReposito
         if (result.changes === 0) return undefined;
         writeDerived(userId, derived, updatedAt);
         return getStmt.get(userId) as unknown as LibraryDocumentRow;
+      });
+    },
+
+    updateDocumentData(userId, dataJson, expectedUpdatedAt, glyph) {
+      return inTransaction(() => {
+        const updatedAt = new Date(Math.max(Date.now(), Date.parse(expectedUpdatedAt) + 1)).toISOString();
+        const result = updateDataStmt.run({ $user_id: userId, $data: dataJson, $updated_at: updatedAt, $expected_updated_at: expectedUpdatedAt });
+        if (result.changes === 0) return undefined;
+        const derived = { $user_id: userId, $updated_at: updatedAt, $expected_updated_at: expectedUpdatedAt };
+        if (glyph === "keep") keepDerivedStmt.run(derived);
+        else setGlyphStmt.run({ ...derived, $glyph: glyph });
+        return updatedAt;
       });
     },
 

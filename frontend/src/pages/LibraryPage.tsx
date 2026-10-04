@@ -5,6 +5,7 @@ import { flushSync } from "react-dom";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   addReaderNote,
+  buildMergedLibrary,
   findDuplicates,
   newId,
   readSnapshot,
@@ -41,11 +42,11 @@ import { useLibrary } from "../hooks/useLibrary";
 import { useMurals } from "../hooks/useMurals";
 import { clearBookCover, setBookCover } from "../lib/bookCovers";
 import { parseImportedFile } from "../lib/fileImport";
-import { deriveSeriesGroups, removeBooksFromAllGroups } from "../lib/groups";
-import { assignBookOrder, orderLibraryBooks, reorderOnDrop, seriesGroupByBookKey } from "../lib/libraryOrder";
+import { removeBooksFromAllGroups } from "../lib/groups";
+import { orderLibraryBooks, reorderOnDrop, seriesGroupByBookKey } from "../lib/libraryOrder";
 import { effectiveCardStyle, resolveLibraryStyle, type PerCardStyle } from "../lib/libraryStyle";
 import { filterBooks, localDay, setReadStatus, sortBooks, type ReadStatus, type SortKey, type StatusFilter } from "../lib/libraryView";
-import { bookKey, mergeLibraryData } from "../lib/merge";
+import { bookKey } from "../lib/merge";
 import { restoreDeletedBooks } from "../lib/restoreDeletedBooks";
 
 /** Applies a React state update wrapped in the View Transitions API when
@@ -152,15 +153,7 @@ export function LibraryPage() {
   async function mergeAndSave(parsed: LibraryData, source?: "import") {
     // Read the freshest cached copy, not a stale closure — same
     // reasoning as handleRenameLibrary above.
-    await updateLibrary(
-      (existing) => {
-        const merged = mergeLibraryData(existing, parsed);
-        const ordered = { ...merged, books: assignBookOrder(merged.books) };
-        return { ...ordered, groups: deriveSeriesGroups(ordered.books, ordered.groups ?? []) };
-      },
-      undefined,
-      source
-    );
+    await updateLibrary((existing) => buildMergedLibrary(existing, parsed), undefined, source);
   }
 
   async function handleFileChosen(file: File) {
