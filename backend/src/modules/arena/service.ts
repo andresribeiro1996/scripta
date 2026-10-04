@@ -132,7 +132,7 @@ function toTournamentSummary(row: TournamentRow, preview: SeedPreview, winner: S
     ownerUserId: row.owner_user_id,
     covers: preview.covers,
     filledSlots: preview.filledSlots,
-    winner
+    winner: winner && { key: winner.key, title: winner.title, author: winner.author, cover: winner.cover }
   };
 }
 
@@ -167,8 +167,8 @@ function summariesWithPreviews(repo: ArenaRepository, rows: TournamentRow[]): To
 
 function winnerBookFromDuel(d: DuelRow): SeedBookInput {
   return d.winner_key === d.book_a_key
-    ? { key: d.book_a_key, title: d.book_a_title, author: d.book_a_author, cover: d.book_a_cover }
-    : { key: d.book_b_key, title: d.book_b_title, author: d.book_b_author, cover: d.book_b_cover };
+    ? { key: d.book_a_key, title: d.book_a_title, author: d.book_a_author, cover: d.book_a_cover, workId: d.book_a_work_id }
+    : { key: d.book_b_key, title: d.book_b_title, author: d.book_b_author, cover: d.book_b_cover, workId: d.book_b_work_id };
 }
 
 function buildDuelsForRound(
@@ -192,11 +192,14 @@ function buildDuelsForRound(
       book_a_title: a.title,
       book_a_author: a.author,
       book_a_cover: a.cover,
+      book_a_work_id: a.workId ?? null,
       book_b_key: b.key,
       book_b_title: b.title,
       book_b_author: b.author,
       book_b_cover: b.cover,
+      book_b_work_id: b.workId ?? null,
       winner_key: null,
+      winner_work_id: null,
       status: "active",
       opens_at: opensAtIso,
       closes_at: closesAt,
@@ -364,6 +367,12 @@ export function createArenaService(repo: ArenaRepository, emitPublished?: EmitPu
       }
       const keys = new Set(entries.map((e) => e.book.key));
       if (keys.size !== entries.length) throw new DuplicateBookError();
+      const works = new Set<string>();
+      for (const { book } of entries) {
+        if (!book.workId) continue;
+        if (works.has(book.workId)) throw new DuplicateBookError(book.title);
+        works.add(book.workId);
+      }
 
       // Full-replace, same semantics as PUT /library — see this module's
       // own domain/ports.ts comment on replaceSlots.
@@ -373,7 +382,8 @@ export function createArenaService(repo: ArenaRepository, emitPublished?: EmitPu
         book_key: e.book.key,
         title: e.book.title,
         author: e.book.author,
-        cover_url: e.book.cover
+        cover_url: e.book.cover,
+        work_id: e.book.workId ?? null
       }));
       repo.replaceSlots(tournamentId, rows);
     },
@@ -382,10 +392,12 @@ export function createArenaService(repo: ArenaRepository, emitPublished?: EmitPu
       const tournament = repo.getOwnedTournament(tournamentId, ownerUserId);
       if (!tournament) throw new TournamentNotFoundError();
       if (tournament.status !== "seeding") throw new TournamentAlreadyStartedError();
-      if (pool.length < tournament.bracket_size) throw new NotEnoughBooksError(tournament.bracket_size, pool.length);
+      const seen = new Set<string>();
+      const unique = pool.filter((book) => !book.workId || (!seen.has(book.workId) && (seen.add(book.workId), true)));
+      if (unique.length < tournament.bracket_size) throw new NotEnoughBooksError(tournament.bracket_size, unique.length);
 
       // Fisher-Yates.
-      const shuffled = [...pool];
+      const shuffled = [...unique];
       for (let i = shuffled.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [shuffled[i], shuffled[j]] = [shuffled[j]!, shuffled[i]!];
@@ -397,7 +409,8 @@ export function createArenaService(repo: ArenaRepository, emitPublished?: EmitPu
         book_key: book.key,
         title: book.title,
         author: book.author,
-        cover_url: book.cover
+        cover_url: book.cover,
+        work_id: book.workId ?? null
       }));
       repo.replaceSlots(tournamentId, rows);
     },
@@ -409,7 +422,7 @@ export function createArenaService(repo: ArenaRepository, emitPublished?: EmitPu
       const slots = repo.getSlots(tournamentId).sort((a, b) => a.slot_index - b.slot_index);
       if (slots.length !== tournament.bracket_size) throw new IncompleteSeedError(tournament.bracket_size, slots.length);
 
-      const books: SeedBookInput[] = slots.map((s) => ({ key: s.book_key, title: s.title, author: s.author, cover: s.cover_url }));
+      const books: SeedBookInput[] = slots.map((s) => ({ key: s.book_key, title: s.title, author: s.author, cover: s.cover_url, workId: s.work_id }));
       const nowIso = new Date().toISOString();
       const duels = buildDuelsForRound(tournamentId, 1, books, nowIso, tournament.round_duration_minutes);
       repo.insertDuels(duels);

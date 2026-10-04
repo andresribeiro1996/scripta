@@ -11,6 +11,7 @@ import {
   AlreadyVotedError,
   DuelNotTiedError,
   DuelNotVotableError,
+  DuplicateBookError,
   IncompleteSeedError,
   InvalidBookError,
   InvalidBracketSizeError,
@@ -119,6 +120,7 @@ function createInMemoryArenaRepository(): ArenaRepository {
       if (d) {
         d.status = status;
         d.winner_key = winnerKey;
+        d.winner_work_id = winnerKey === d.book_a_key ? d.book_a_work_id : winnerKey === d.book_b_key ? d.book_b_work_id : null;
         d.settled_at = settledAt;
       }
     },
@@ -325,6 +327,69 @@ test("a full round of voting settles duels and advances to the next round, endin
   view = service.getTournamentView(tournament.id);
   assert.equal(view?.status, "completed");
   assert.equal(view?.duels.find((d) => d.roundNumber === 2)?.winnerKey, "book-1");
+});
+
+test("works flow from slots into round one and on to the next round's duels", () => {
+  const repo = createInMemoryArenaRepository();
+  const service = createArenaService(repo);
+  const tournament = service.createTournament("owner-1", { name: "Test", bracketSize: 4, roundDurationMinutes: 60 });
+  service.setSlotsManual(
+    tournament.id,
+    "owner-1",
+    [1, 2, 3, 4].map((n) => ({ slotIndex: n - 1, book: { ...makeBook(n), workId: `w${n}` } }))
+  );
+  service.start(tournament.id, "owner-1");
+
+  const roundOne = repo.getDuelsForRound(tournament.id, 1).sort((a, b) => a.duel_index - b.duel_index);
+  assert.deepEqual(roundOne.map((d) => [d.book_a_work_id, d.book_b_work_id]), [["w1", "w2"], ["w3", "w4"]]);
+
+  service.vote(tournament.id, roundOne[0]!.id, "voter-1", "book-1");
+  service.vote(tournament.id, roundOne[1]!.id, "voter-1", "book-3");
+  service.settleEarly(tournament.id, "owner-1", roundOne[0]!.id);
+  service.settleEarly(tournament.id, "owner-1", roundOne[1]!.id);
+
+  assert.equal(repo.getDuel(roundOne[0]!.id)?.winner_work_id, "w1");
+  const [final] = repo.getDuelsForRound(tournament.id, 2);
+  assert.equal(final?.book_a_work_id, "w1");
+  assert.equal(final?.book_b_work_id, "w3");
+});
+
+test("two editions of one work can't fill two slots", () => {
+  const service = createArenaService(createInMemoryArenaRepository());
+  const tournament = service.createTournament("owner-1", { name: "Test", bracketSize: 4, roundDurationMinutes: 60 });
+  assert.throws(
+    () =>
+      service.setSlotsManual(tournament.id, "owner-1", [
+        { slotIndex: 0, book: { key: "k1", title: "Dune", author: "Frank Herbert", cover: null, workId: "w1" } },
+        { slotIndex: 1, book: { key: "k2", title: "Dune", author: "Frank Herbert", cover: null, workId: "w1" } }
+      ]),
+    (error: unknown) => error instanceof DuplicateBookError && error.message.includes("Dune")
+  );
+});
+
+test("random fill keeps the first edition of each work", () => {
+  const repo = createInMemoryArenaRepository();
+  const service = createArenaService(repo);
+  const tournament = service.createTournament("owner-1", { name: "Test", bracketSize: 2, roundDurationMinutes: 60 });
+  service.randomFill(tournament.id, "owner-1", [
+    { ...makeBook(1), key: "k1", workId: "w1" },
+    { ...makeBook(2), key: "k2", workId: "w1" },
+    { ...makeBook(3), key: "k3", workId: "w3" }
+  ]);
+  assert.deepEqual(repo.getSlots(tournament.id).map((slot) => slot.book_key).sort(), ["k1", "k3"]);
+});
+
+test("random fill counts distinct works against the bracket size", () => {
+  const service = createArenaService(createInMemoryArenaRepository());
+  const tournament = service.createTournament("owner-1", { name: "Test", bracketSize: 2, roundDurationMinutes: 60 });
+  assert.throws(
+    () =>
+      service.randomFill(tournament.id, "owner-1", [
+        { ...makeBook(1), key: "k1", workId: "w1" },
+        { ...makeBook(2), key: "k2", workId: "w1" }
+      ]),
+    NotEnoughBooksError
+  );
 });
 
 test("a completed tournament's summary carries the champion book", () => {
