@@ -103,3 +103,14 @@ test("a row with malformed blocks JSON fails the whole run and rolls back earlie
   assert.throws(() => resetPresetBlockStyles(db), SyntaxError);
   assert.equal(row(db, "m1").blocks, before);
 });
+
+test("a trigger that rolls the transaction back surfaces its own error and keeps every row", () => {
+  const db = muralsDb();
+  const stored = [{ id: "a", type: "empty", layout: { x: 0, y: 0, w: 4, h: 4 }, style: baseStyle }];
+  seed(db, "m1", stored);
+  seed(db, "m2", stored);
+  db.exec("CREATE TRIGGER boom BEFORE UPDATE ON murals WHEN NEW.id = 'm2' BEGIN SELECT RAISE(ROLLBACK, 'trigger boom'); END");
+  assert.throws(() => resetPresetBlockStyles(db), /trigger boom/);
+  assert.deepEqual(JSON.parse(row(db, "m1").blocks), stored);
+  assert.equal(db.isTransaction, false);
+});

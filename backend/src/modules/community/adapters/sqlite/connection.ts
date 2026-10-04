@@ -39,7 +39,7 @@ export function inTransaction<T>(db: DatabaseSync, work: () => T): T {
     db.exec("COMMIT");
     return result;
   } catch (error) {
-    db.exec("ROLLBACK");
+    if (db.isTransaction) db.exec("ROLLBACK");
     throw error;
   }
 }
