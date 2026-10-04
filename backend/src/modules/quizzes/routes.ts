@@ -7,7 +7,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { authGuard, getOptionalAuthenticatedUser } from "../auth/index.js";
-import { duplicateWorkMessage, firstDuplicateWork, keepFirstPerWork, resolveEntryWorks, resolvePublicLibraryData, WorkResolutionError, workIdsByKey, type WorkRef } from "../library/index.js";
+import { duplicateWorkMessage, keepFirstPerWork, resolveEntryWorks, resolvePublicLibraryData, WorkResolutionError, workIdsByKey, type WorkRef } from "../library/index.js";
 import type { PlayOutcome, Player, QuizzesService } from "./service.js";
 
 const idParamSchema = z.object({ id: z.string().uuid() });
@@ -100,11 +100,22 @@ export function buildQuizRoutes(service: QuizzesService, resolveWorks: ResolveQu
         if (new Set(keys).size !== keys.length) return reply.code(400).send({ error: "Duplicate book." });
       }
       let works: Map<string, string | null> | undefined;
-      if (body.data.data && service.getQuiz(request.user.id, params.data.id)?.voteCode === null) {
+      const stored = service.getQuiz(request.user.id, params.data.id);
+      if (body.data.data && stored?.voteCode === null) {
+        const storedKeys = new Set(((stored.data as { books?: Array<{ key?: unknown }> }).books ?? []).map((book) => book.key));
         const keys = body.data.data.books.map((b) => b.key);
         const resolved = resolveBooks(resolveWorks, request.user.id, body.data.data.books);
         if ("error" in resolved) return reply.code(resolved.status).send({ error: resolved.error });
-        const duplicate = firstDuplicateWork(keys, resolved.works);
+        const perWork = new Map<string, number>();
+        for (const key of keys) {
+          const workId = resolved.works.get(key)?.workId;
+          if (workId) perWork.set(workId, (perWork.get(workId) ?? 0) + 1);
+        }
+        const addedKey = keys.find((key) => {
+          const workId = resolved.works.get(key)?.workId;
+          return !storedKeys.has(key) && workId && perWork.get(workId)! > 1;
+        });
+        const duplicate = addedKey === undefined ? undefined : resolved.works.get(addedKey);
         if (duplicate) return reply.code(409).send({ error: duplicateWorkMessage(duplicate) });
         works = workIdsByKey(keys, resolved.works);
       }

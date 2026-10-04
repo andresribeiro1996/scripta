@@ -243,6 +243,20 @@ test("updating a quiz with two editions of one work is a 409", async () => {
   await app.close();
 });
 
+test("a draft already holding two editions keeps both when saved again", async () => {
+  addLibraryBook("u5", 0, DUNE_A.key, "Dune", "Frank Herbert", "0441013597");
+  addLibraryBook("u5", 1, DUNE_B.key, "Dune", "Frank Herbert", "9780441013593");
+  const { app, db, service, send } = await quizApp();
+  const legacy = service.createQuiz("u5", "Legacy", { books: [DUNE_A, DUNE_B] });
+
+  const kept = await send("PUT", `/quizzes/${legacy.id}`, "u5", { data: { questionCount: 3, books: [DUNE_A, DUNE_B] } });
+  assert.equal(kept.statusCode, 200);
+  const rows = db.prepare("SELECT key FROM quiz_works WHERE quiz_id = ? ORDER BY key").all(legacy.id) as Array<{ key: string }>;
+  assert.deepEqual(rows.map((row) => row.key), [DUNE_A.key, DUNE_B.key].sort());
+
+  await app.close();
+});
+
 test("an unreachable catalog is a 503 and stores nothing", async () => {
   const failing: QuizRoutesResolver = () => { throw new WorkResolutionError(new Error("down")); };
   const { app, db, service, send } = await quizApp(failing);
