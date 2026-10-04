@@ -13,9 +13,9 @@ sessions' files are left there; they are ignored once three minutes old.
 ## Tests
 
     claude plugin validate .claude/skills/office
-    claude plugin test .claude/skills/office
+    node --test '.claude/skills/office/tests/*.test.ts'
 
-If `claude plugin test` reports function hooks are off, prefix it with
-`CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`. CI does not run these.
+The tests use Node's runner because the tested modules don't need the engine.
+CI does not run these.
 
 Spec: `docs/superpowers/specs/2026-10-04-agent-office-view-design.md`.
