@@ -24,13 +24,16 @@ export function ReaderCardBlock({ books, groups, readerName, publicCard, editabl
   const plateOf = (key: string | null) => READER_PLATES.find((plate) => plate.key === key);
   const name = (key: string | null) => plateOf(key)?.name;
   const epithet = plateOf(card.identity)?.epithet;
-  const onLayout = (event: LayoutChangeEvent) => setBox(event.nativeEvent.layout);
+  const onLayout = (event: LayoutChangeEvent) => {
+    const { width, height } = event.nativeEvent.layout;
+    setBox((current) => current.width === width && current.height === height ? current : { width, height });
+  };
   const width = Math.max(0, Math.min(box.width, box.height / PLATE_RATIO));
   const plate = width > 0 ? <SvgXml xml={xml} width={width} height={width * PLATE_RATIO} /> : null;
   const sheetPlateWidth = Math.min(windowWidth - spacing.xl * 2, SHEET_PLATE_MAX);
   return (
     <>
-      <View onLayout={onLayout} style={styles.plateBox}>
+      <View pointerEvents={editable ? "none" : "auto"} onLayout={onLayout} style={styles.plateBox}>
         {editable
           ? plate
           : <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={() => setOpen(true)} style={{ width, height: width * PLATE_RATIO }}>{plate}</Pressable>}

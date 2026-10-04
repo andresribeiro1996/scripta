@@ -1,6 +1,7 @@
-import { blockTextColors, resolveBlockColor, type Group, type PublicReaderCard } from "@scripta/shared";
+import { blockTextColors, moveMuralBlock, resolveBlockColor, type Group, type PublicReaderCard } from "@scripta/shared";
 import { themes, type ThemeColors } from "@scripta/shared/themes";
 import GridLayout from "react-grid-layout";
+import { DndContext } from "@dnd-kit/core";
 import { useRef, useState, type CSSProperties } from "react";
 import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
@@ -10,6 +11,8 @@ import { muralThemeStyle } from "../../lib/theme";
 import { ActionSheet } from "../Sheet";
 import { MobileBlockPreview } from "./MobileBlockPreview";
 import { MuralBlockDetail } from "./MuralBlockDetail";
+import { DraggableMuralBlock, useMuralDrag } from "./useMuralDrag";
+import { MuralExpandButtons } from "./MuralExpandButtons";
 
 const CANVAS_WIDTH = 1200;
 const ROW_HEIGHT = 28;
@@ -158,6 +161,8 @@ export function MobileMuralCanvas({
   onDeleteBlock,
   onStartResize,
   onLayoutChange,
+  onDragChange,
+  onToggleExpansion,
   onDraftChange,
   onApplyDraft,
   onCancelDraft,
@@ -183,7 +188,9 @@ export function MobileMuralCanvas({
   onDuplicateBlock?: (blockId: string) => void;
   onDeleteBlock?: (blockId: string) => void;
   onStartResize?: (block: MuralBlock) => void;
+  onDragChange?: (dragging: boolean) => void;
   onLayoutChange?: (blockId: string, layout: BlockLayout) => void;
+  onToggleExpansion?: (blockId: string, axis: "w" | "h", bottom: number, top: number) => void;
   onDraftChange?: (layout: BlockLayout) => void;
   onApplyDraft?: () => void;
   onCancelDraft?: () => void;
@@ -192,20 +199,28 @@ export function MobileMuralCanvas({
   revertNonce?: number;
 }) {
   const viewportRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const dockRef = useRef<HTMLDivElement>(null);
   const blockRefs = useRef(new Map<string, HTMLDivElement>());
   const pointerStart = useRef<{ x: number; y: number } | null>(null);
   const [viewportWidth, setViewportWidth] = useState(0);
   const [focusedBlockId, setFocusedBlockId] = useState<string | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
   const selected = mural.blocks.find((block) => block.id === selectedBlockId);
-  const displayBlocks = draft
+  const draftBlocks = draft
     ? draft.kind === "move" || draft.kind === "resize"
       ? mural.blocks.map((block) => (block.id === draft.block.id ? draft.block : block))
       : mural.blocks.some((block) => block.id === draft.block.id) ? mural.blocks : [...mural.blocks, draft.block]
     : mural.blocks;
-  const maxBottom = Math.max(0, ...displayBlocks.map((block) => block.layout.y + block.layout.h));
-  const logicalHeight = Math.max(20, maxBottom * (ROW_HEIGHT + MARGIN) + PADDING);
+  const displayBlocks = draft ? moveMuralBlock(draftBlocks, draft.block.id, draft.block.layout) : draftBlocks;
   const scale = viewportWidth > 0 ? viewportWidth / CANVAS_WIDTH : 1;
+  const drag = useMuralDrag(draftBlocks, canvasRef, (id, next) => {
+    if (draft && id === draft.block.id) onDraftChange?.(next);
+    else onLayoutChange?.(id, next);
+  }, scale, onDragChange);
+  const previewBlocks = drag.drop ? drag.blocks : displayBlocks;
+  const maxBottom = Math.max(0, ...previewBlocks.map((block) => block.layout.y + block.layout.h), drag.drop ? drag.drop.layout.y + drag.drop.layout.h : 0);
+  const logicalHeight = Math.max(20, (maxBottom + (editMode ? 12 : 0)) * (ROW_HEIGHT + MARGIN) + PADDING);
   const focused = displayBlocks.find((block) => block.id === focusedBlockId);
 
   function setViewport(element: HTMLDivElement | null) {
@@ -232,7 +247,7 @@ export function MobileMuralCanvas({
   }
 
   const canDrag = editMode && draft?.kind !== "resize";
-  const layout = displayBlocks.map((block) => ({
+  const layout = previewBlocks.map((block) => ({
     ...block.layout,
     i: block.id,
     static: !canDrag || Boolean(draft && block.id !== draft.block.id)
@@ -240,9 +255,10 @@ export function MobileMuralCanvas({
   const originalMoveBlock = draft?.kind === "move" ? mural.blocks.find((block) => block.id === draft.block.id) : undefined;
   if (originalMoveBlock) layout.push({ ...originalMoveBlock.layout, i: "__origin", static: true });
 
-  const controlsPadding = draft?.kind === "resize" ? "pb-60" : draft ? "pb-36" : editMode && selected ? "pb-24" : "";
+  const controlsPadding = draft?.kind === "resize" ? "pb-60" : draft ? "pb-36" : editMode && selected ? "pb-36" : "";
 
   return (
+    <DndContext {...drag.context}>
     <div className={`relative bg-(--color-bg) ${controlsPadding}`}>
       <div
         ref={setViewport}
@@ -251,6 +267,7 @@ export function MobileMuralCanvas({
       >
         {viewportWidth > 0 && (
           <div
+            ref={canvasRef}
             className="absolute top-0 left-0 origin-top-left"
             style={{ width: CANVAS_WIDTH, transform: `scale(${scale})` }}
             onPointerDownCapture={(event) => {
@@ -273,24 +290,16 @@ export function MobileMuralCanvas({
               margin={[MARGIN, MARGIN]}
               containerPadding={[PADDING, PADDING]}
               layout={layout}
-              isDraggable={canDrag}
+              isDraggable={false}
               isResizable={false}
               transformScale={scale}
               compactType={null}
+              allowOverlap={Boolean(drag.drop)}
               preventCollision
-              onDragStart={(_layout, _oldItem, item) => onSelectBlock?.(item.i)}
-              onDragStop={(_layout, _oldItem, item) => {
-                const next = { x: item.x, y: item.y, w: item.w, h: item.h };
-                if (draft && item.i === draft.block.id) {
-                  onDraftChange?.(next);
-                  return;
-                }
-                const current = mural.blocks.find((block) => block.id === item.i);
-                if (current && JSON.stringify(current.layout) !== JSON.stringify(next)) onLayoutChange?.(item.i, next);
-              }}
             >
               {displayBlocks.map((block) => (
-                <div key={block.id} data-grid={block.layout}>
+                <div key={block.id} style={{ zIndex: drag.drop?.id === block.id ? 10 : undefined }}>
+                  <DraggableMuralBlock id={block.id} scale={scale} disabled={!canDrag || Boolean(busy) || Boolean(draft && block.id !== draft.block.id)}>
                   <BlockFrame
                     block={block}
                     selected={editMode && block.id === selectedBlockId}
@@ -313,6 +322,7 @@ export function MobileMuralCanvas({
                       else blockRefs.current.delete(block.id);
                     }}
                   />
+                  </DraggableMuralBlock>
                 </div>
               ))}
               {originalMoveBlock && (
@@ -327,15 +337,16 @@ export function MobileMuralCanvas({
         )}
       </div>
 
-      {editMode && selected && !draft && (
-        <div className="fixed inset-x-4 bottom-[calc(env(safe-area-inset-bottom,0px)+0.75rem)] z-40 mx-auto grid max-w-xl grid-cols-3 gap-1 rounded-2xl border border-(--color-border) bg-(--color-surface)/95 p-1.5 shadow-xl backdrop-blur">
+      {editMode && selected && !draft && !drag.drop && (
+        <div ref={dockRef} className="fixed inset-x-4 bottom-[calc(env(safe-area-inset-bottom,0px)+0.75rem)] z-40 mx-auto grid max-w-xl grid-cols-3 gap-1 rounded-2xl border border-(--color-border) bg-(--color-surface)/95 p-1.5 shadow-xl backdrop-blur">
           <button onClick={() => setFocusedBlockId(selected.id)} className="min-h-11 rounded-xl px-3 text-sm font-semibold hover:bg-(--color-surface-hover)">Open</button>
           <button onClick={() => onStartResize?.(selected)} className="min-h-11 rounded-xl px-3 text-sm font-semibold hover:bg-(--color-surface-hover)">Resize</button>
           <button onClick={() => setMoreOpen(true)} className="min-h-11 rounded-xl px-3 text-sm font-semibold hover:bg-(--color-surface-hover)">More</button>
+          <div className="col-span-3 flex gap-1"><MuralExpandButtons block={selected} canvas={canvasRef} scale={scale} busy={busy} bottomEdge={() => dockRef.current?.getBoundingClientRect().top ?? window.innerHeight} onToggle={onToggleExpansion} /></div>
         </div>
       )}
 
-      {draft && (
+      {draft && !drag.drop && (
         <div className="fixed inset-x-4 bottom-[calc(env(safe-area-inset-bottom,0px)+0.75rem)] z-40 mx-auto max-w-xl rounded-2xl border border-(--color-border) bg-(--color-surface)/95 p-3 shadow-xl backdrop-blur">
           {draft.kind === "resize" ? (
             <>
@@ -379,7 +390,7 @@ export function MobileMuralCanvas({
         </div>
       )}
 
-      {moreOpen && selected && (
+      {moreOpen && selected && !drag.drop && (
         <ActionSheet
           title="Block actions"
           onClose={() => setMoreOpen(false)}
@@ -412,5 +423,6 @@ export function MobileMuralCanvas({
         />
       )}
     </div>
+    </DndContext>
   );
 }

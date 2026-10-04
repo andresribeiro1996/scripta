@@ -15,22 +15,12 @@
 //      touches a developer's own backend/data/*.sqlite, and so the server
 //      scripts/dev-emulator.mjs starts afterward (with the same overrides)
 //      reads the very database this just wrote.
-//   3. signs up (or, on a re-run, logs in as) a fixed local-only account —
-//      backend/src/modules/auth/service.ts directly, no HTTP — so the
-//      refresh token is real, correctly hashed, and stays valid for
-//      whatever backend/src/config/env.ts's ACCESS/REFRESH_TOKEN_TTL says.
 //   4. writes the fixture library (scripts/fixtures/library.json) straight
 //      into library_documents — a raw row, not a request, so no service
 //      logic runs; the next boot's backfill sees its new updated_at and
 //      re-derives that user's library_derived and library_match_keys rows.
 //      Only on first creation, or with --reset: a plain re-run leaves an
 //      existing account's library alone so testing progress survives.
-//   5. writes the refresh token into mobile/.env.local as
-//      EXPO_PUBLIC_DEV_REFRESH_TOKEN, which mobile/src/core/devSession.ts
-//      picks up on next boot (dev builds only — see that file's own
-//      comment for why this can't reach a release build); also fills in
-//      EXPO_PUBLIC_API_URL with a localhost default, but only when absent
-//      — never clobbering a phone tester's own LAN IP.
 //
 // Idempotent: re-running logs back into the same account without touching
 // its library (pass --reset to force the library back to the fixture's
@@ -45,18 +35,19 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { devDataDir, devDataDirEnv } from "./devDataDir.mjs";
 import { defaultEnvLine, upsertEnvLine } from "./devEnvFile.mjs";
+import devAccount from "./fixtures/account.json" with { type: "json" };
 
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const backendDir = join(repoRoot, "backend");
 
-export const DEV_EMAIL = "scripta-dev@local.test";
-export const DEV_USERNAME = "scripta_dev";
+export const DEV_EMAIL = devAccount.email;
+export const DEV_USERNAME = devAccount.username;
 // Not a real secret — a fixed, committed-in-source password for a
 // synthetic local-only account with fixture data, scoped to this
 // worktree's own backend/data/dev/auth.sqlite. Fixed (not random) on
 // purpose: it's what lets a re-run log back into the SAME account instead
 // of needing to remember or persist a generated one.
-export const DEV_PASSWORD = "scripta-dev-local-only";
+export const DEV_PASSWORD = devAccount.password;
 
 const flags = new Set(process.argv.slice(2));
 const forceReset = flags.has("--reset");
@@ -122,14 +113,13 @@ async function main() {
   const authService = createAuthService(authRepository, avatarStore);
 
   let user;
-  let tokens;
   let created;
   try {
-    ({ user, tokens } = await authService.signup(DEV_EMAIL, DEV_USERNAME, DEV_PASSWORD));
+    ({ user } = await authService.signup(DEV_EMAIL, DEV_USERNAME, DEV_PASSWORD));
     created = true;
   } catch (error) {
     if (error instanceof EmailInUseError || error instanceof UsernameInUseError) {
-      ({ user, tokens } = await authService.login(DEV_EMAIL, DEV_PASSWORD));
+      ({ user } = await authService.login(DEV_EMAIL, DEV_PASSWORD));
       created = false;
     } else {
       throw error;
@@ -155,7 +145,8 @@ async function main() {
   const mobileDir = join(repoRoot, "mobile");
   mkdirSync(mobileDir, { recursive: true });
   const mobileEnvPath = join(mobileDir, ".env.local");
-  upsertEnvLine(mobileEnvPath, "EXPO_PUBLIC_DEV_REFRESH_TOKEN", tokens.refreshToken);
+  writeFileSync(mobileEnvPath, (existsSync(mobileEnvPath) ? readFileSync(mobileEnvPath, "utf8") : "").replace(/^EXPO_PUBLIC_DEV_REFRESH_TOKEN=.*\n?/gm, ""));
+  upsertEnvLine(mobileEnvPath, "EXPO_PUBLIC_DEV_AUTO_LOGIN", "true");
   defaultEnvLine(mobileEnvPath, "EXPO_PUBLIC_API_URL", "http://127.0.0.1:3000");
 
   if (bookCount !== null) {
@@ -163,7 +154,7 @@ async function main() {
   } else {
     console.log(`Signed back into dev account ${DEV_EMAIL} (user ${user.id}); library left untouched (pass --reset to reseed it).`);
   }
-  console.log("mobile/.env.local now has EXPO_PUBLIC_DEV_REFRESH_TOKEN set.");
+  console.log("Development auto-login enabled in mobile/.env.local.");
 }
 
 // Guarded: dev-emulator.mjs imports this module just for the DEV_USERNAME
