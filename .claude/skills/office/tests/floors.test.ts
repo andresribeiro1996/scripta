@@ -59,3 +59,14 @@ test('a snapshot with a malformed agent is skipped without hiding the others', (
   assert.deepEqual(floors.map(f => f.sessionId), ['good'])
   assert.deepEqual(bad, ['broken.json'])
 })
+
+test('a snapshot drops the failed call input and leaves the office alone', () => {
+  const office = emptyOffice(0)
+  const agent = { ...office.agents[0] ?? { id: 'a', description: 'd', type: 't', model: 'm', state: 'working', lastCall: '', costUsd: 0, startedAt: 0, finishedAt: null, failCount: 2 }, failKey: 'x'.repeat(1000) }
+  const input = { ...office, agents: [agent] }
+  const snap = snapshotOf('s1', '/repo', input, 0, false)
+  assert.equal(snap.agents.length, 1)
+  assert.ok(snap.agents.every(a => a.failKey === null))
+  assert.ok(JSON.stringify(snap).length < 2000)
+  assert.equal(input.agents[0].failKey, 'x'.repeat(1000))
+})

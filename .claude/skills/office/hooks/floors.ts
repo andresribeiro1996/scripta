@@ -6,7 +6,7 @@ export const REFRESH_MS = 60 * 1000
 
 export function snapshotOf(sessionId: string, root: string, office: Office, at: number, ended: boolean): Snapshot {
   const worktree = root.split('/').filter(Boolean).pop() ?? root
-  return { sessionId, worktree, updatedAt: at, ended, agents: office.agents }
+  return { sessionId, worktree, updatedAt: at, ended, agents: office.agents.map(a => ({ ...a, failKey: null })) }
 }
 
 export function shouldWrite(lastWriteAt: number, dirty: boolean, at: number): boolean {
