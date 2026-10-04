@@ -29,6 +29,7 @@ export function applyBooksMigrations(db: DatabaseSync): void {
   const columns = db.prepare("PRAGMA table_info(books)").all() as Array<{ name: string }>;
   if (!columns.some((column) => column.name === "data_sources")) db.exec("ALTER TABLE books ADD COLUMN data_sources TEXT NOT NULL DEFAULT '[]'");
   if (!columns.some((column) => column.name === "cover_upgrade_wanted_at")) db.exec("ALTER TABLE books ADD COLUMN cover_upgrade_wanted_at TEXT");
+  if (!columns.some((column) => column.name === "apple_checked_at")) db.exec("ALTER TABLE books ADD COLUMN apple_checked_at TEXT");
   if (!columns.some((column) => column.name === "ol_work_key")) db.exec("ALTER TABLE books ADD COLUMN ol_work_key TEXT");
   if (!columns.some((column) => column.name === "publisher_url")) db.exec("ALTER TABLE books ADD COLUMN publisher_url TEXT");
   if (!columns.some((column) => column.name === "created_by")) db.exec("ALTER TABLE books ADD COLUMN created_by TEXT");

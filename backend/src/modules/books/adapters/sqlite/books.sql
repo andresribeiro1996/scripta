@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS books (
   cover_status        TEXT,
   cover_checked_at    TEXT,
   cover_upgrade_wanted_at TEXT,
+  apple_checked_at    TEXT,
   ol_work_key         TEXT,
   publisher_url       TEXT,
   created_by          TEXT,

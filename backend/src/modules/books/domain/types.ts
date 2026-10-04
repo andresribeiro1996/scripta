@@ -29,6 +29,7 @@ export interface BookRow {
   cover_status: CoverStatus | null;
   cover_checked_at: string | null;
   cover_upgrade_wanted_at: string | null;
+  apple_checked_at: string | null;
   ol_work_key: string | null;
   publisher_url: string | null;
   created_by: BookCreator | null;

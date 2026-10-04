@@ -50,8 +50,8 @@ export function createAppleSource(throttle: Throttle): CoverSource {
       }
       return [];
     },
-    async byTitle(title, _author, accept) {
-      for (const country of DEFAULT_STOREFRONTS) {
+    async byTitle(title, _author, accept, isbn = null) {
+      for (const country of storefrontsFor(isbn)) {
         const params = new URLSearchParams({ term: title, media: "ebook", limit: SEARCH_LIMIT, country });
         const hits = parseAppleResults(await get(`https://itunes.apple.com/search?${params}`)).filter(accept);
         if (hits.length) return hits.map(strip);

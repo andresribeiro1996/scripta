@@ -159,6 +159,7 @@ test("a better image replaces the pointer and keeps the old file", async () => {
   await h.service.processBook(id, "background");
   const oldImage = h.repo.getBook(id)!.cover_image_id!;
   h.sizes.set("https://a/small", [900, 1400]);
+  h.advance(30 * DAY);
   await h.service.processBook(id, "background");
   const newImage = h.repo.getBook(id)!.cover_image_id!;
   assert.notEqual(newImage, oldImage);
@@ -215,6 +216,108 @@ test("a plain 503 keeps the 10-minute backoff and is still warned about", async 
   h.advance(1);
   h.service.resolveCover(orlando);
   assert.equal(h.enqueued.length, 1);
+});
+
+function recordingSource(calls: string[], name: string, behaviour: () => Promise<[]> = async () => []): CoverSource {
+  return {
+    byIsbn: async () => { calls.push(`${name}:isbn`); return behaviour(); },
+    byTitle: async () => { calls.push(`${name}:title`); return behaviour(); }
+  };
+}
+
+function pausedIsbndb(retryAt: number, calls: string[]) {
+  return recordingSource(calls, "isbndb", async () => { throw new SourcePausedError("isbndb", "paused", { retryAt }); });
+}
+
+test("a background lookup stamps Apple's answer even when ISBNdb is paused, and the retry skips Apple", async () => {
+  const HOUR = 60 * 60 * 1000;
+  const calls: string[] = [];
+  const h = harness({ sources: { isbndb: pausedIsbndb(Date.parse("2026-10-01T00:00:00.000Z") + 5 * HOUR, calls), apple: recordingSource(calls, "apple"), openlibrary: recordingSource(calls, "openlibrary") } });
+  h.service.resolveCover(orlando);
+  const id = h.bookId("isbn:9780141184272");
+  await h.service.processBook(id, "background");
+  assert.deepEqual(calls, ["apple:isbn", "isbndb:isbn", "openlibrary:isbn", "apple:title", "isbndb:title", "openlibrary:title"]);
+  const row = h.repo.getBook(id)!;
+  assert.equal(row.apple_checked_at, "2026-10-01T00:00:00.000Z");
+  assert.equal(row.cover_status, null);
+  h.advance(5 * HOUR);
+  calls.length = 0;
+  await h.service.processBook(id, "background");
+  assert.deepEqual(calls, ["isbndb:isbn", "openlibrary:isbn", "isbndb:title", "openlibrary:title"]);
+});
+
+test("a low-res Apple cover stays unchecked while ISBNdb is paused, and a wider ISBNdb cover replaces it later", async () => {
+  const HOUR = 60 * 60 * 1000;
+  const calls: string[] = [];
+  let paused = true;
+  const isbndb: CoverSource = {
+    byIsbn: async () => {
+      calls.push("isbndb:isbn");
+      if (paused) throw new SourcePausedError("isbndb", "paused", { retryAt: Date.parse("2026-10-01T00:00:00.000Z") + 5 * HOUR });
+      return [{ source: "isbndb", url: "https://i/wide" }];
+    },
+    byTitle: async () => []
+  };
+  const h = harness({ sources: { isbndb, apple: { ...isbnSource("https://a/small", calls), byTitle: async () => [] }, openlibrary: emptySource } });
+  h.sizes.set("https://a/small", [300, 460]);
+  h.sizes.set("https://i/wide", [900, 1400]);
+  h.service.resolveCover(orlando);
+  const id = h.bookId("isbn:9780141184272");
+  await h.service.processBook(id, "background");
+  let row = h.repo.getBook(id)!;
+  assert.equal(row.apple_checked_at, "2026-10-01T00:00:00.000Z");
+  assert.deepEqual([row.cover_status, row.cover_checked_at], ["low_res", null]);
+  assert.notEqual(row.cover_image_id, null);
+  assert.deepEqual(h.repo.listUncheckedCoverIds(), [id]);
+  const small = row.cover_image_id;
+  h.advance(5 * HOUR);
+  paused = false;
+  calls.length = 0;
+  await h.service.processBook(id, "background");
+  assert.deepEqual(calls, ["isbndb:isbn"]);
+  row = h.repo.getBook(id)!;
+  assert.notEqual(row.cover_image_id, small);
+  assert.equal(row.cover_status, "good");
+  assert.notEqual(row.cover_checked_at, null);
+  assert.deepEqual(h.repo.listUncheckedCoverIds(), []);
+});
+
+test("an Apple failure does not stamp the book", async () => {
+  const failing: CoverSource = { byIsbn: async () => { throw new SourceUnavailableError("apple", "HTTP 503", { status: 503 }); }, byTitle: async () => [] };
+  const h = harness({ sources: { isbndb: null, apple: failing, openlibrary: emptySource } });
+  h.service.resolveCover(orlando);
+  const id = h.bookId("isbn:9780141184272");
+  await h.service.processBook(id, "background");
+  assert.equal(h.repo.getBook(id)!.apple_checked_at, null);
+});
+
+test("the background lane asks Apple again once its answer is 30 days old", async () => {
+  const calls: string[] = [];
+  const h = harness({ sources: { isbndb: null, apple: recordingSource(calls, "apple"), openlibrary: emptySource } });
+  h.service.resolveCover(orlando);
+  const id = h.bookId("isbn:9780141184272");
+  h.repo.setAppleChecked(id, "2026-10-01T00:00:00.000Z");
+  h.advance(30 * DAY - 1);
+  await h.service.processBook(id, "background");
+  assert.deepEqual(calls, []);
+  h.advance(1);
+  await h.service.processBook(id, "background");
+  assert.deepEqual(calls, ["apple:isbn", "apple:title"]);
+  assert.equal(h.repo.getBook(id)!.apple_checked_at, "2026-10-31T00:00:00.000Z");
+});
+
+test("the upgrade lane asks Apple even for a stamped book; front and normal never do", async () => {
+  const calls: string[] = [];
+  const h = harness({ sources: { isbndb: null, apple: recordingSource(calls, "apple"), openlibrary: emptySource } });
+  h.service.resolveCover(orlando);
+  const id = h.bookId("isbn:9780141184272");
+  h.repo.setAppleChecked(id, "2026-10-01T00:00:00.000Z");
+  await h.service.processBook(id, "upgrade");
+  assert.deepEqual(calls, ["apple:isbn", "apple:title"]);
+  calls.length = 0;
+  await h.service.processBook(id, "front");
+  await h.service.processBook(id, "normal");
+  assert.deepEqual(calls, []);
 });
 
 test("resolve queues at the back unless asked to jump the queue", () => {

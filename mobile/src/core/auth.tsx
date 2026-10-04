@@ -3,8 +3,9 @@ import { AppState } from "react-native";
 import { File } from "expo-file-system";
 import { GoogleSignInCancelledError, startGoogleSignIn } from "../features/auth/googleSignIn";
 import { apiClient, logout, refreshAccessToken, setSessionExpiredHandler } from "./api";
-import { recoverDevSession, seedDevSession } from "./devSession";
+import { recoverDevSession } from "./devSession";
 import { getAccessToken, secureTokenStore, setAccessToken } from "./tokenStore";
+import devAccount from "../../../scripts/fixtures/account.json";
 
 interface AuthUser {
   id: string;
@@ -54,6 +55,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [unreachable, setUnreachable] = useState(false);
 
+  const signIn = useCallback(async (identifier: string, password: string) => {
+    const res = await apiClient.request<AuthTokenResponse>("/auth/login", {
+      method: "POST",
+      body: { identifier, password },
+    });
+    setAccessToken(res.accessToken);
+    setUser(res.user);
+    await secureTokenStore.setRefreshToken(res.refreshToken);
+  }, []);
+
   /** Whether a failed load means "signed out" or merely "couldn't reach the
    *  server" is decided by what survives in the store: refreshAccessToken
    *  clears the refresh token on 401/403 and deliberately leaves it alone on
@@ -61,24 +72,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    *  we simply could not load yet. */
   const loadSession = useCallback(async () => {
     try {
-      // Dev-only, and a no-op unless both conditions below hold: see
-      // devSession.ts's own comment for why this can't reach a release
-      // build. Lets scripts/dev-emulator.mjs boot straight into a
-      // signed-in session on a fresh emulator install, no password.
-      await seedDevSession(secureTokenStore, {
-        isDev: __DEV__,
-        devToken: process.env.EXPO_PUBLIC_DEV_REFRESH_TOKEN,
-      });
       // Shared with api.ts's own 401 retry — see refreshAccessToken's
       // own comment for why this must be the SAME coalesced call rather
       // than a second, independent refresh done inline here.
       let refreshed = await refreshAccessToken();
-      // A dev store left holding a token from before the fixture was reseeded
-      // fails here; swapping in the current one costs a second refresh and
-      // saves typing a password on every reset.
-      if (!refreshed && await recoverDevSession(secureTokenStore, { isDev: __DEV__, devToken: process.env.EXPO_PUBLIC_DEV_REFRESH_TOKEN })) {
-        refreshed = await refreshAccessToken();
-      }
+      if (!refreshed) refreshed = await recoverDevSession(secureTokenStore,
+        { isDev: __DEV__, enabled: process.env.EXPO_PUBLIC_DEV_AUTO_LOGIN === "true" },
+        () => signIn(devAccount.email, devAccount.password));
       if (refreshed) {
         // /auth/refresh returns tokens only — the user has to come from
         // a separate /auth/me call (found during Task 2's own on-device
@@ -95,7 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setReady(true);
     }
-  }, []);
+  }, [signIn]);
 
   useEffect(() => {
     const clearSessionExpiredHandler = setSessionExpiredHandler(() => {
@@ -118,16 +118,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     return () => subscription.remove();
   }, [loadSession, unreachable]);
-
-  const signIn = useCallback(async (identifier: string, password: string) => {
-    const res = await apiClient.request<AuthTokenResponse>("/auth/login", {
-      method: "POST",
-      body: { identifier, password },
-    });
-    setAccessToken(res.accessToken);
-    setUser(res.user);
-    await secureTokenStore.setRefreshToken(res.refreshToken);
-  }, []);
 
   const signUp = useCallback(async (email: string, username: string, password: string) => {
     const res = await apiClient.request<AuthTokenResponse>("/auth/signup", {

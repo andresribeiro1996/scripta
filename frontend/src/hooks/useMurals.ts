@@ -27,13 +27,13 @@ import {
   unshareMuralApi,
   updateMuralApi
 } from "../api/murals";
-import { ensureBookBlockHeights, scrubBooksFromMurals, scrubImageFromMurals, type Mural, type MuralBlock } from "../lib/murals";
+import { compactMuralBlocks, ensureBookBlockHeights, scrubBooksFromMurals, scrubImageFromMurals, type Mural, type MuralBlock } from "../lib/murals";
 
 export function useMurals() {
   const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: ["murals"],
-    queryFn: async () => (await fetchMurals()).map((mural) => ({ ...mural, blocks: ensureBookBlockHeights(mural.blocks) }))
+    queryFn: async () => (await fetchMurals()).map((mural) => ({ ...mural, blocks: compactMuralBlocks(ensureBookBlockHeights(mural.blocks)) }))
   });
 
   function current(): Mural[] {
@@ -50,7 +50,7 @@ export function useMurals() {
   }
 
   function replaceOne(updated: Mural) {
-    setMurals(current().map((m) => (m.id === updated.id ? { ...updated, blocks: ensureBookBlockHeights(updated.blocks) } : m)));
+    setMurals(current().map((m) => (m.id === updated.id ? { ...updated, blocks: compactMuralBlocks(ensureBookBlockHeights(updated.blocks)) } : m)));
   }
 
   async function create(name: string, theme: ThemeId, folderId: string | null = null): Promise<Mural> {
@@ -72,9 +72,21 @@ export function useMurals() {
   }
 
   async function saveBlocks(id: string, blocks: MuralBlock[]): Promise<Mural> {
-    const updated = await updateMuralApi(id, { blocks });
-    replaceOne(updated);
-    return updated;
+    await queryClient.cancelQueries({ queryKey: ["murals"] });
+    const before = currentMural(id);
+    const next = compactMuralBlocks(ensureBookBlockHeights(blocks));
+    if (before) replaceOne({ ...before, blocks: next });
+    const optimistic = currentMural(id)?.blocks;
+    try {
+      const updated = await updateMuralApi(id, { blocks: next });
+      const latest = currentMural(id);
+      if (!before || latest?.blocks === optimistic) replaceOne({ ...(latest ?? updated), blocks: updated.blocks, updatedAt: updated.updatedAt });
+      return updated;
+    } catch (error) {
+      const latest = currentMural(id);
+      if (before && latest && latest.blocks === optimistic) replaceOne({ ...latest, blocks: before.blocks });
+      throw error;
+    }
   }
 
   async function remove(id: string): Promise<void> {

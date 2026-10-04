@@ -28,6 +28,7 @@ export interface BooksRepository {
   listUncheckedCoverIds(): string[];
   listUncheckedDetailIds(limit: number): string[];
   setUpgradeWanted(bookId: string, at: string | null): void;
+  setAppleChecked(bookId: string, at: string): void;
   setWorkKey(id: string, key: string | null | undefined): void;
   assignMissingWorks(limit: number): number;
   setLanguage(id: string, tag: string | null): void;
@@ -47,7 +48,7 @@ export interface TitledCandidate extends CoverCandidate {
 
 export interface CoverSource {
   byIsbn(isbn: string): Promise<CoverCandidate[]>;
-  byTitle(title: string, author: string, accept: (candidate: TitledCandidate) => boolean): Promise<CoverCandidate[]>;
+  byTitle(title: string, author: string, accept: (candidate: TitledCandidate) => boolean, isbn?: string | null): Promise<CoverCandidate[]>;
 }
 
 export interface CatalogSearchHit {
