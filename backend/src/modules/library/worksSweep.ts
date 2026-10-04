@@ -54,7 +54,7 @@ export function startWorksSweep(steps: WorksSweepStep[], log: SweepLog, interval
 
 export function createLibraryWorksStep(db: DatabaseSync, resolve: (lookups: WorkLookup[]) => Array<string | null>): WorksSweepStep {
   const pendingStmt = db.prepare(`
-    SELECT rowid, isbn, title, author FROM library_books
+    SELECT rowid, isbn, title, author FROM library_books NOT INDEXED
     WHERE work_id IS NULL AND rowid > ? AND (isbn IS NOT NULL OR title IS NOT NULL)
     ORDER BY rowid LIMIT ?
   `);
@@ -64,10 +64,17 @@ export function createLibraryWorksStep(db: DatabaseSync, resolve: (lookups: Work
     if (rows.length === 0) return { lastRowid: afterRowid, visited: 0, resolved: 0 };
     const ids = resolve(rows.map((row) => ({ isbn: row.isbn, title: row.title, author: row.author })));
     let resolved = 0;
-    rows.forEach((row, index) => {
-      const id = ids[index];
-      if (id && setStmt.run(id, row.rowid).changes === 1) resolved++;
-    });
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      rows.forEach((row, index) => {
+        const id = ids[index];
+        if (id && setStmt.run(id, row.rowid).changes === 1) resolved++;
+      });
+      db.exec("COMMIT");
+    } catch (error) {
+      if (db.isTransaction) db.exec("ROLLBACK");
+      throw error;
+    }
     return { lastRowid: rows[rows.length - 1]!.rowid, visited: rows.length, resolved };
   };
 }

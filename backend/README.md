@@ -105,7 +105,7 @@ Each account only ever sees its own document — verified in testing with two se
 
 ### Works (phase E1)
 
-- **`resolveEntryWorks`** (`library/works.ts`) turns a book key into a work id for another module: the owner's library row first (its stored `work_id`, canonicalised), then the entry's own title and author. A catalog failure throws `WorkResolutionError`, which routes answer as `503`.
+- **`resolveEntryWorks`** (`library/works.ts`) turns a book key into a work id for another module: the owner's library row first (its stored `work_id`, canonicalised), then the entry's own title and author. A catalog failure throws `WorkResolutionError`; callers must map it to `503`.
 - **The works sweep** (`library/worksSweep.ts`, started in `app.ts` after the last module registers) runs off the boot path, once at start and every 10 minutes. It runs each step in turn, 250 rows per batch, yielding to the event loop between batches and paging by `rowid`, so rows that never resolve can't keep it running. Its one step so far fills `library_books.work_id` where it is NULL; a failure is logged (`works sweep failed`), never thrown, and the timer is unref'd and stopped on close.
 
 #### Works check

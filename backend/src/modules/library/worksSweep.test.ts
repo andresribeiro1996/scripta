@@ -52,8 +52,24 @@ test("a front insert during a catalog outage is refilled by the next sweep", () 
   const { db, insert } = libraryDb();
   insert.run("u1", 0, "ta:new|a", "New", "A", null, null);
   insert.run("u1", 1, "ta:dune|frank herbert", "Dune", "Frank Herbert", null, null);
-  createLibraryWorksStep(db, (lookups) => lookups.map((lookup) => `w-${lookup.title}`))(0, 250);
-  assert.equal((db.prepare("SELECT COUNT(*) AS n FROM library_books WHERE work_id IS NULL").get() as { n: number }).n, 0);
+  const nullCount = () => (db.prepare("SELECT COUNT(*) AS n FROM library_books WHERE work_id IS NULL").get() as { n: number }).n;
+  const outage = createLibraryWorksStep(db, (lookups) => lookups.map(() => null));
+  assert.equal(outage(0, 250).resolved, 0);
+  assert.equal(nullCount(), 2);
+  const recovered = createLibraryWorksStep(db, (lookups) => lookups.map((lookup) => `w-${lookup.title}`));
+  assert.equal(recovered(0, 250).resolved, 2);
+  assert.equal(nullCount(), 0);
+});
+
+test("a failing resolver leaves the rows NULL and no transaction open", () => {
+  const { db, insert } = libraryDb();
+  insert.run("u1", 0, "ta:dune|frank herbert", "Dune", "Frank Herbert", null, null);
+  const step = createLibraryWorksStep(db, () => {
+    throw new Error("catalog down");
+  });
+  assert.throws(() => step(0, 250), /catalog down/);
+  assert.equal(db.isTransaction, false);
+  assert.equal((db.prepare("SELECT COUNT(*) AS n FROM library_books WHERE work_id IS NULL").get() as { n: number }).n, 1);
 });
 
 test("startWorksSweep runs every step to the end and logs what it resolved", async () => {
