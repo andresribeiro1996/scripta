@@ -1292,6 +1292,33 @@ test("applyChange passes malformed stored groups through untouched", () => {
   db.close();
 });
 
+test("applyChange passes non-record entries in books through untouched", () => {
+  const { db, service } = setup();
+  const junk: unknown[] = [null, 7, "book"];
+  service.saveLibrary("u1", { books: [...junk, ...changeLibrary().books], groups: [groupOf("shelf", "collection")] });
+  const storedBooks = () => (service.getLibrary("u1")!.data as { books: unknown[] }).books;
+
+  service.applyChange("u1", { kind: "membership", groupId: "shelf", bookKey: keyOf(3), member: true });
+  service.applyChange("u1", { kind: "book", bookKey: keyOf(10), readStatus: 2, day: "2026-10-02" });
+  assert.deepEqual(storedBooks().slice(0, junk.length), junk);
+  service.applyChange("u1", { kind: "add", book: neuromancer });
+  assert.equal(storedBooks().filter((book) => book === null || typeof book !== "object").length, junk.length);
+  assert.ok(storedBooks().some((book) => (book as { Title?: string } | null)?.Title === neuromancer.Title));
+  db.close();
+});
+
+test("applyChange passes a groups that is not an array through untouched", () => {
+  const { db, service } = setup();
+  service.saveLibrary("u1", { books: changeLibrary().books, groups: "shelf" });
+  const storedGroups = () => (service.getLibrary("u1")!.data as { groups: unknown }).groups;
+
+  assert.throws(() => service.applyChange("u1", { kind: "membership", groupId: "shelf", bookKey: keyOf(3), member: true }), LibraryChangeNotFoundError);
+  service.applyChange("u1", { kind: "book", bookKey: keyOf(10), readStatus: 2, day: "2026-10-02" });
+  service.applyChange("u1", { kind: "add", book: neuromancer });
+  assert.equal(storedGroups(), "shelf");
+  db.close();
+});
+
 test("deriveGlyph gives the glyph deriveLibraryData stores, for a library of any shape", () => {
   const settled = changeLibrary();
   const leaning = { books: shelf(11), groups: [seriesGroup(shelf(11).slice(0, 3))] };

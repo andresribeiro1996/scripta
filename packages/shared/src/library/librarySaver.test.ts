@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { applyLibraryChange, type LibraryChange } from "./libraryChange.js";
-import { createLibrarySaver, type LibraryChangeAnswer, type LibraryDocument, type LibrarySaverDeps } from "./librarySaver.js";
+import { createLibrarySaver, type LibraryChangeAnswer, type LibrarySaverDeps } from "./librarySaver.js";
 import { bookKey } from "./merge.js";
 import { saveFailureMessage } from "./saveFailure.js";
-import type { LibraryData } from "./types.js";
+import type { LibraryData, LibraryDocument } from "./types.js";
 
 class StatusError extends Error {
   constructor(readonly status: number, message = `Request failed (${status})`) {
@@ -115,7 +115,7 @@ test("a tick shows at once, and when the server applied it to this very copy the
   assert.deepEqual(keysOf(h.last()), [duneKey]);
   assert.equal(h.last()!.updatedAt, version(1));
 
-  assert.equal(await ticking, true);
+  assert.equal((await ticking).ok, true);
   assert.equal(h.writes.length, before + 2);
   assert.equal(h.last()!.updatedAt, version(2));
   assert.deepEqual(keysOf(h.last()), [duneKey]);
@@ -136,12 +136,12 @@ test("two devices: a copy that is behind keeps its version, and the next whole s
   stale = srv.doc;
   srv.commit({ ...srv.doc!.data, books: [...srv.doc!.data.books, { Title: "Neuromancer", Attribution: "William Gibson" }] });
 
-  assert.equal(await h.saver.submit(tick(duneKey)), true);
+  assert.equal((await h.saver.submit(tick(duneKey))).ok, true);
   await flush();
   assert.equal(srv.doc!.updatedAt, version(3));
   assert.equal(h.last()!.updatedAt, version(1));
   assert.deepEqual(keysOf(h.last()), [duneKey]);
-  assert.equal(h.saver.hasPending(), true);
+  assert.equal(h.saver.hasPending(), false);
 
   stale = null;
   await h.saver.saveWhole((data) => ({ ...data, name: "Renamed" }));
@@ -161,13 +161,13 @@ test("a stale service-worker copy: stale answers are ignored, the tick stays sho
   const loaded = await h.saver.fetch();
   assert.equal(loaded!.updatedAt, version(1));
 
-  assert.equal(await h.saver.submit(tick(duneKey)), true);
+  assert.equal((await h.saver.submit(tick(duneKey))).ok, true);
   await flush();
   const refetched = await h.saver.fetch();
   assert.equal(refetched!.updatedAt, version(1));
   assert.deepEqual(keysOf(refetched), [duneKey]);
   assert.equal(refetched!.data.name, "Mine");
-  assert.equal(h.saver.hasPending(), true);
+  assert.equal(h.saver.hasPending(), false);
 
   stale = null;
   await h.saver.saveWhole((data) => ({ ...data, distinctBooks: [[duneKey, emmaKey]] }));
@@ -186,7 +186,7 @@ test("a stale copy that is revalidated later replaces the copy and drops the tic
   await h.saver.fetch();
   await h.saver.submit(tick(duneKey));
   await flush();
-  assert.equal(h.saver.hasPending(), true);
+  assert.equal(h.saver.hasPending(), false);
 
   stale = null;
   const revalidated = await h.saver.fetch();
@@ -217,7 +217,7 @@ test("a rename racing a tick: the other device's rename lands while the tick is 
   await flush();
   srv.commit({ ...srv.doc!.data, name: "Renamed on the phone" });
   gate.resolve();
-  assert.equal(await ticking, true);
+  assert.equal((await ticking).ok, true);
   await flush();
   assert.equal(srv.doc!.updatedAt, version(3));
   assert.equal(h.last()!.data.name, "Mine");
@@ -254,7 +254,7 @@ for (const failFirst of [false, true]) {
     await flush();
     gates[2]!.resolve();
 
-    assert.deepEqual(await Promise.all(taps), [!failFirst, true, true]);
+    assert.deepEqual((await Promise.all(taps)).map((r) => r.ok), [!failFirst, true, true]);
     await flush();
     for (const view of h.writes.slice(lastTap)) assert.deepEqual(keysOf(view), [duneKey]);
     assert.deepEqual(keysOf(srv.doc), [duneKey]);
@@ -286,7 +286,7 @@ test("pending ticks survive a document landing mid-queue, and a receive is not h
   assert.deepEqual(keysOf(view), [duneKey, emmaKey]);
 
   gate.resolve();
-  assert.deepEqual([await first, await second], [true, true]);
+  assert.deepEqual([(await first).ok, (await second).ok], [true, true]);
   assert.equal(h.fetches.count, 2);
   assert.deepEqual(keysOf(h.last()), [duneKey, emmaKey]);
   assert.equal(h.last()!.updatedAt, srv.doc!.updatedAt);
@@ -320,7 +320,7 @@ for (const [label, answer] of [
 
     const ticking = h.saver.submit(tick(duneKey));
     assert.deepEqual(keysOf(h.last()), [duneKey]);
-    assert.equal(await ticking, false);
+    assert.equal((await ticking).ok, false);
     assert.deepEqual(keysOf(h.last()), []);
     assert.equal(h.last()!.updatedAt, version(2));
     assert.equal(h.saver.hasPending(), false);
@@ -341,7 +341,7 @@ test("a failed change does not stop the changes queued behind it", { timeout: 50
   });
   await h.saver.fetch();
   const results = await Promise.all([h.saver.submit(tick(duneKey)), h.saver.submit(tick(emmaKey))]);
-  assert.deepEqual(results, [false, true]);
+  assert.deepEqual(results.map((r) => r.ok), [false, true]);
   assert.deepEqual(keysOf(srv.doc), [emmaKey]);
   assert.deepEqual(keysOf(h.last()), [emmaKey]);
 });
@@ -410,7 +410,7 @@ test("a share response applies its token to a copy ahead of it without moving th
   assert.deepEqual(keysOf(h.last()), [duneKey]);
 
   gate.resolve();
-  assert.equal(await ticking, true);
+  assert.equal((await ticking).ok, true);
   assert.equal(h.last()!.shareToken, "t1");
 });
 
@@ -434,7 +434,7 @@ test("an add seeding a series is never folded into the copy: the fetched documen
   const adding = h.saver.submit({ kind: "add", book: neuromancer });
   const seededHere = h.last()!.data.groups!.find((g) => g.type === "series")!;
   assert.deepEqual(titles(h.last()!.data), ["Dune", "Emma", "Neuromancer"]);
-  assert.equal(await adding, true);
+  assert.equal((await adding).ok, true);
   await flush();
 
   assert.equal(h.fetches.count, 2);
@@ -446,7 +446,7 @@ test("an add seeding a series is never folded into the copy: the fetched documen
   assert.equal(seriesId, seededThere.id);
   assert.equal(h.saver.hasPending(), false);
 
-  assert.equal(await h.saver.submit({ kind: "membership", groupId: seriesId, bookKey: duneKey, member: true }), true);
+  assert.equal((await h.saver.submit({ kind: "membership", groupId: seriesId, bookKey: duneKey, member: true })).ok, true);
   assert.deepEqual(srv.doc!.data.groups!.find((g) => g.id === seriesId)!.bookKeys, [bookKey(neuromancer), duneKey]);
 });
 
@@ -458,7 +458,7 @@ test("an add to an account with no library yet shows at once and is replaced by 
 
   const adding = h.saver.submit({ kind: "add", book: { Title: "Emma", Attribution: "Jane Austen" } });
   assert.deepEqual(titles(h.last()!.data), ["Emma"]);
-  assert.equal(await adding, true);
+  assert.equal((await adding).ok, true);
   await flush();
   assert.equal(h.fetches.count, 2);
   assert.equal(h.last()!.updatedAt, version(1));
@@ -474,7 +474,7 @@ test("a failed add leaves nothing behind in an account with no library", { timeo
     }
   });
   await h.saver.fetch();
-  assert.equal(await h.saver.submit({ kind: "add", book: { Title: "Emma", Attribution: "Jane Austen" } }), false);
+  assert.equal((await h.saver.submit({ kind: "add", book: { Title: "Emma", Attribution: "Jane Austen" } })).ok, false);
   assert.equal(h.last(), null);
   assert.equal(h.saver.hasPending(), false);
 });
@@ -522,9 +522,8 @@ test("changes, whole saves and merges run one at a time, in the order they were 
 
   assert.deepEqual(events, ["send", "put", "send", "merge"]);
   assert.equal(busiest, 1);
-  assert.equal(first, true);
+  assert.deepEqual([first, third], [{ ok: true }, { ok: true }]);
   assert.equal((whole as LibraryDocument).data.name, "Renamed");
-  assert.equal(third, true);
   assert.equal((mergedDocument as LibraryDocument).data.name, "Merged");
   assert.deepEqual(h.puts.map((put) => put.expected), [version(2)]);
   assert.deepEqual(merged, [version(4)]);
@@ -553,7 +552,7 @@ test("a whole save is uploaded from the confirmed copy, not from taps still queu
 
   gate.resolve();
   await saving;
-  assert.equal(await ticking, true);
+  assert.equal((await ticking).ok, true);
   assert.equal(srv.doc!.data.name, "Renamed");
   assert.deepEqual(keysOf(srv.doc), [duneKey]);
   assert.deepEqual(keysOf(h.last()), [duneKey]);
@@ -582,7 +581,7 @@ test("a replay inside a whole save does not deadlock on the queue, and the jobs 
   const saving = h.saver.saveWhole((data) => ({ ...data, distinctBooks: [[duneKey, emmaKey]] }));
   const ticking = h.saver.submit(tick(duneKey));
   const saved = await saving;
-  assert.equal(await ticking, true);
+  assert.equal((await ticking).ok, true);
   assert.deepEqual(h.puts.map((put) => put.expected), [version(1), version(2)]);
   assert.equal(saved.data.name, "Renamed on the phone");
   assert.deepEqual(keysOf(srv.doc), [duneKey]);
@@ -737,14 +736,14 @@ test("a new tap is applied to the current view; earlier pending changes run agai
   assert.equal(reorders, 2);
 
   sendGate.resolve();
-  assert.equal(await failing, false);
+  assert.equal((await failing).ok, false);
   assert.equal(reorders, 3);
   assert.deepEqual(keysOf(h.last()), [emmaKey]);
   assert.deepEqual(titles(h.last()!.data), ["Emma", "Dune"]);
 
   refreshGate.resolve(srv.doc);
   await saving;
-  assert.equal(await later, true);
+  assert.equal((await later).ok, true);
   assert.deepEqual(titles(srv.doc!.data), ["Emma", "Dune"]);
   assert.deepEqual(keysOf(srv.doc), [emmaKey]);
 });
@@ -774,7 +773,7 @@ test("a merge that fails is rejected and the jobs behind it still run", { timeou
   });
   const ticking = h.saver.submit(tick(duneKey));
   await assert.rejects(merging, (error) => error === failure);
-  assert.equal(await ticking, true);
+  assert.equal((await ticking).ok, true);
 });
 
 test("a change that gets no answer is aborted after 30 s and treated as a failure, and the next change still runs", { timeout: 5000 }, async (t) => {
@@ -803,9 +802,9 @@ test("a change that gets no answer is aborted after 30 s and treated as a failur
 
   t.mock.timers.tick(1);
   await flush();
-  assert.equal(await first, false);
+  assert.equal((await first).ok, false);
   assert.equal(signals[0]!.aborted, true);
-  assert.equal(await second, true);
+  assert.equal((await second).ok, true);
   assert.deepEqual(keysOf(h.last()), [emmaKey]);
   assert.deepEqual(keysOf(srv.doc), [emmaKey]);
 });
@@ -834,7 +833,7 @@ test("a whole save that gets no answer is aborted after 60 s and rejected, and t
   await flush();
   await rejected;
   assert.equal(signals[0]!.aborted, true);
-  assert.equal(await ticking, true);
+  assert.equal((await ticking).ok, true);
   assert.deepEqual(keysOf(srv.doc), [duneKey]);
 });
 
@@ -862,7 +861,7 @@ test("dispose drops the jobs not yet sent and stops the one running: nothing is 
   const fetches = h.fetches.count;
   assert.equal(h.saver.hasPending(), false);
 
-  assert.deepEqual([await running, await queued], [false, false]);
+  assert.deepEqual([(await running).ok, (await queued).ok], [false, false]);
   await savingRejected;
   await mergeRejected;
   gate.resolve();
@@ -933,7 +932,7 @@ test("dispose while an answer is being waited on writes nothing when it arrives"
   h.saver.dispose();
   const writes = h.writes.length;
   gate.resolve();
-  assert.equal(await ticking, false);
+  assert.equal((await ticking).ok, false);
   await flush();
   assert.equal(h.writes.length, writes);
   assert.equal(h.fetches.count, 1);
@@ -948,7 +947,7 @@ test("after dispose every call settles at once and nothing is sent, fetched or w
   const writes = h.writes.length;
   const fetches = h.fetches.count;
 
-  assert.equal(await h.saver.submit(tick(duneKey)), false);
+  assert.equal((await h.saver.submit(tick(duneKey))).ok, false);
   await assert.rejects(h.saver.saveWhole((data) => data));
   await assert.rejects(h.saver.merge(async () => srv.doc!));
   h.saver.receive(srv.commit({ ...srv.doc!.data, name: "Renamed on the phone" }));
@@ -1006,7 +1005,7 @@ test("a change answered after a document that already holds it landed leaves pen
   assert.equal(h.saver.hasPending(), true);
 
   answerGate.resolve();
-  assert.equal(await ticking, true);
+  assert.equal((await ticking).ok, true);
   assert.equal(h.saver.hasPending(), false);
   assert.deepEqual(keysOf(h.last()), [duneKey]);
   assert.equal(h.last()!.updatedAt, version(2));
@@ -1017,7 +1016,7 @@ test("a change that alters nothing on the server leaves the copy at its version"
   const h = harness(srv);
   await h.saver.fetch();
 
-  assert.equal(await h.saver.submit(tick(duneKey)), true);
+  assert.equal((await h.saver.submit(tick(duneKey))).ok, true);
   assert.equal(srv.doc!.updatedAt, version(1));
   assert.equal(h.last()!.updatedAt, version(1));
   assert.equal(h.saver.hasPending(), false);
@@ -1032,12 +1031,234 @@ test("a change the copy cannot apply is not folded: the copy keeps its version a
   const h = harness(srv, { send: async () => ({ updatedAt: version(2), baseUpdatedAt: version(1) }) });
   await h.saver.fetch();
 
-  assert.equal(await h.saver.submit({ kind: "membership", groupId: "gone", bookKey: duneKey, member: true }), true);
+  assert.equal((await h.saver.submit({ kind: "membership", groupId: "gone", bookKey: duneKey, member: true })).ok, true);
   await flush();
   assert.equal(h.last()!.updatedAt, version(1));
-  assert.equal(h.saver.hasPending(), true);
+  assert.equal(h.saver.hasPending(), false);
   assert.equal(h.fetches.count, 2);
 
   await h.saver.saveWhole((data) => ({ ...data, name: "Renamed" }));
   assert.equal(h.puts[0]!.expected, version(1));
+});
+
+test("a failed change hands the caller the server's error, so a 429 is not shown as a lost connection", { timeout: 5000 }, async () => {
+  const srv = server(shelf());
+  const failure = new StatusError(429, "Too Many Requests");
+  const h = harness(srv, {
+    send: async () => {
+      throw failure;
+    }
+  });
+  await h.saver.fetch();
+  const result = await h.saver.submit(tick(duneKey));
+  assert.deepEqual(result, { ok: false, error: failure });
+  assert.equal(saveFailureMessage((result as { error: unknown }).error, "Couldn't save."), "Too many changes in a row — wait a minute and try again.");
+});
+
+test("a change dropped, interrupted or refused by dispose reports that the library was closed", { timeout: 5000 }, async () => {
+  const srv = server(shelf());
+  const gate = deferred();
+  const h = harness(srv, {
+    send: async (change) => {
+      await gate.promise;
+      return srv.send(change);
+    }
+  });
+  await h.saver.fetch();
+  const running = h.saver.submit(tick(duneKey));
+  const queued = h.saver.submit(tick(emmaKey));
+  await flush();
+  h.saver.dispose();
+  for (const result of [await running, await queued, await h.saver.submit(tick(duneKey))]) {
+    assert.equal(result.ok, false);
+    assert.match(String((result as { error: unknown }).error), /closed/);
+  }
+});
+
+test("a change is resolved when the server answers, not after the follow-up fetch", { timeout: 5000 }, async () => {
+  const srv = server(shelf());
+  const never = new Promise<LibraryDocument | null>(() => {});
+  let fetches = 0;
+  const h = harness(srv, { fetch: () => (fetches++ === 0 ? Promise.resolve(srv.doc) : never) });
+  await h.saver.fetch();
+  assert.deepEqual(await h.saver.submit({ kind: "add", book: { Title: "Neuromancer", Attribution: "William Gibson" } }), { ok: true });
+});
+
+test("hasPending ignores a change the server already saved", { timeout: 5000 }, async () => {
+  const srv = server(shelf());
+  const h = harness(srv, { send: async () => ({ updatedAt: version(9), baseUpdatedAt: version(1) }) });
+  await h.saver.fetch();
+  const ticking = h.saver.submit(tick(duneKey));
+  assert.equal(h.saver.hasPending(), true);
+  await ticking;
+  assert.equal(h.saver.hasPending(), false);
+  assert.deepEqual(keysOf(h.last()), [duneKey]);
+});
+
+function throwingWriteSaver(srv: Server, failOn: (call: number) => boolean) {
+  let calls = 0;
+  const boom = new Error("write failed");
+  const writes: Array<LibraryDocument | null> = [];
+  const saver = createLibrarySaver({
+    send: async (change) => srv.send(change),
+    put: async (data, expected) => srv.put(data, expected),
+    fetch: async () => srv.doc,
+    write: (view) => {
+      if (failOn(++calls)) throw boom;
+      writes.push(view);
+    }
+  });
+  return { saver, boom, writes };
+}
+
+test("an exception inside a change does not strand the queue behind it", { timeout: 5000 }, async () => {
+  const srv = server(shelf());
+  const h = throwingWriteSaver(srv, (call) => call === 4);
+  await h.saver.fetch();
+  const first = h.saver.submit(tick(duneKey));
+  const second = h.saver.submit(tick(emmaKey));
+  assert.deepEqual(await first, { ok: false, error: h.boom });
+  assert.deepEqual(await second, { ok: true });
+  assert.deepEqual(keysOf(srv.doc), [duneKey, emmaKey]);
+  assert.equal(h.saver.hasPending(), false);
+});
+
+test("an exception while a change is first shown is returned, not thrown, and nothing is sent", { timeout: 5000 }, async () => {
+  const srv = server(shelf());
+  const h = throwingWriteSaver(srv, (call) => call === 2);
+  await h.saver.fetch();
+  assert.deepEqual(await h.saver.submit(tick(duneKey)), { ok: false, error: h.boom });
+  assert.equal(h.saver.hasPending(), false);
+  assert.deepEqual(keysOf(srv.doc), []);
+  assert.deepEqual(await h.saver.submit(tick(duneKey)), { ok: true });
+});
+
+test("an exception inside a merge rejects it and the jobs behind it still run", { timeout: 5000 }, async () => {
+  const srv = server(shelf());
+  const h = throwingWriteSaver(srv, (call) => call === 3);
+  await h.saver.fetch();
+  const merging = assert.rejects(h.saver.merge(async (expected) => srv.put({ ...srv.doc!.data, name: "Merged" }, expected)), h.boom);
+  const ticking = h.saver.submit(tick(duneKey));
+  await merging;
+  assert.deepEqual(await ticking, { ok: true });
+});
+
+test("an exception inside a whole save rejects it and the jobs behind it still run", { timeout: 5000 }, async () => {
+  const srv = server(shelf());
+  const h = throwingWriteSaver(srv, (call) => call === 3);
+  await h.saver.fetch();
+  const saving = assert.rejects(h.saver.saveWhole((data) => ({ ...data, name: "Renamed" })), h.boom);
+  const ticking = h.saver.submit(tick(duneKey));
+  await saving;
+  assert.deepEqual(await ticking, { ok: true });
+});
+
+test("the refresh after a failed change is aborted after 10 s, and the next change runs then", { timeout: 5000 }, async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const srv = server(shelf());
+  const signals: Array<AbortSignal | undefined> = [];
+  let fetches = 0;
+  let sends = 0;
+  const h = harness(srv, {
+    send: async (change) => {
+      if (sends++ === 0) throw new StatusError(500);
+      return srv.send(change);
+    },
+    fetch: (signal) => {
+      if (fetches++ === 0) return Promise.resolve(srv.doc);
+      signals.push(signal);
+      return new Promise<LibraryDocument | null>(() => {});
+    }
+  });
+  await h.saver.fetch();
+  const failing = h.saver.submit(tick(duneKey));
+  const next = h.saver.submit(tick(emmaKey));
+  assert.equal((await failing).ok, false);
+  await flush();
+  t.mock.timers.tick(9_999);
+  await flush();
+  assert.equal(signals[0]!.aborted, false);
+  assert.equal(h.sent.length, 1);
+
+  t.mock.timers.tick(1);
+  assert.equal((await next).ok, true);
+  assert.equal(signals[0]!.aborted, true);
+});
+
+test("the fetch inside a 409 replay is aborted after 60 s and the save rejected", { timeout: 5000 }, async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const srv = server(shelf());
+  const signals: Array<AbortSignal | undefined> = [];
+  let fetches = 0;
+  const h = harness(srv, {
+    fetch: (signal) => {
+      if (fetches++ === 0) return Promise.resolve(srv.doc);
+      signals.push(signal);
+      return new Promise<LibraryDocument | null>(() => {});
+    }
+  });
+  await h.saver.fetch();
+  srv.commit({ ...srv.doc!.data, name: "Renamed on the phone" });
+  const saving = assert.rejects(h.saver.saveWhole((data) => ({ ...data, name: "Mine" })), /did not answer/);
+  await flush();
+  t.mock.timers.tick(59_999);
+  await flush();
+  assert.equal(signals[0]!.aborted, false);
+  t.mock.timers.tick(1);
+  await saving;
+  assert.equal(signals[0]!.aborted, true);
+  assert.equal(h.puts.length, 1);
+});
+
+test("a merge request that gets no answer is aborted after 60 s and rejected, and the next job still runs", { timeout: 5000 }, async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const srv = server(shelf());
+  const h = harness(srv);
+  await h.saver.fetch();
+  let signal: AbortSignal | undefined;
+  const merging = assert.rejects(
+    h.saver.merge((_expected, requestSignal) => {
+      signal = requestSignal;
+      return new Promise<LibraryDocument>(() => {});
+    }),
+    /did not answer/
+  );
+  const ticking = h.saver.submit(tick(duneKey));
+  await flush();
+  t.mock.timers.tick(59_999);
+  await flush();
+  assert.equal(signal!.aborted, false);
+  assert.equal(h.sent.length, 0);
+  t.mock.timers.tick(1);
+  await merging;
+  assert.equal(signal!.aborted, true);
+  assert.equal((await ticking).ok, true);
+});
+
+test("dispose landing between a 409 and its handler neither refetches nor resends", { timeout: 5000 }, async () => {
+  const srv = server(shelf());
+  const conflict = deferred<LibraryDocument>();
+  const h = harness(srv, { put: () => conflict.promise });
+  await h.saver.fetch();
+  const saving = assert.rejects(h.saver.saveWhole((data) => ({ ...data, name: "Mine" })), (error) => error instanceof StatusError && error.status === 409);
+  await flush();
+  assert.equal(h.puts.length, 1);
+  conflict.reject(new StatusError(409));
+  h.saver.dispose();
+  await saving;
+  await flush();
+  assert.equal(h.puts.length, 1);
+  assert.equal(h.fetches.count, 1);
+});
+
+test("a share response that changes only the url replaces the url and keeps the token", { timeout: 5000 }, async () => {
+  const srv = server(shelf());
+  const h = harness(srv);
+  const loaded = (await h.saver.fetch())!;
+  h.saver.receiveShare({ ...loaded, shareToken: "t1", shareUrl: "https://atmyshelf.test/t1" });
+  const before = h.writes.length;
+  h.saver.receiveShare({ ...loaded, shareToken: "t1", shareUrl: "https://shelf.example/t1" });
+  assert.equal(h.writes.length, before + 1);
+  assert.equal(h.last()!.shareToken, "t1");
+  assert.equal(h.last()!.shareUrl, "https://shelf.example/t1");
 });

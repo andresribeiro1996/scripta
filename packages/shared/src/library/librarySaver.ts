@@ -1,15 +1,11 @@
 import { applyLibraryChange, type LibraryChange } from "./libraryChange.js";
-import type { LibraryData } from "./types.js";
+import type { LibraryData, LibraryDocument } from "./types.js";
 
 const CHANGE_TIMEOUT_MS = 30_000;
+const REFRESH_TIMEOUT_MS = 10_000;
 const WHOLE_SAVE_TIMEOUT_MS = 60_000;
 
-export interface LibraryDocument {
-  data: LibraryData;
-  updatedAt: string;
-  shareToken: string | null;
-  shareUrl: string | null;
-}
+export type LibrarySubmitResult = { ok: true } | { ok: false; error: unknown };
 
 export interface LibraryChangeAnswer {
   updatedAt: string;
@@ -29,7 +25,7 @@ export interface LibrarySaveOptions {
 }
 
 export interface LibrarySaver {
-  submit(change: LibraryChange): Promise<boolean>;
+  submit(change: LibraryChange): Promise<LibrarySubmitResult>;
   saveWhole(updater: (data: LibraryData) => LibraryData, options?: LibrarySaveOptions): Promise<LibraryDocument>;
   merge(request: (expectedUpdatedAt: string | undefined, signal: AbortSignal) => Promise<LibraryDocument>): Promise<LibraryDocument>;
   receive(document: LibraryDocument): void;
@@ -47,6 +43,7 @@ interface Entry {
 interface Job {
   run(): Promise<void>;
   drop(): void;
+  fail(error: unknown): void;
 }
 
 function isConflict(error: unknown): boolean {
@@ -99,7 +96,7 @@ export function createLibrarySaver(deps: LibrarySaverDeps): LibrarySaver {
   }
 
   function receive(document: LibraryDocument) {
-    if (disposed || (confirmed && document.updatedAt <= confirmed.updatedAt)) return;
+    if (confirmed && document.updatedAt <= confirmed.updatedAt) return;
     confirmed = document;
     pending = pending.filter((entry) => entry.savedAt === undefined || entry.savedAt > document.updatedAt);
     recompute();
@@ -152,7 +149,7 @@ export function createLibrarySaver(deps: LibrarySaverDeps): LibrarySaver {
     if (disposed) return;
     let fetched: LibraryDocument | null;
     try {
-      fetched = await call(CHANGE_TIMEOUT_MS, (signal) => deps.fetch(signal));
+      fetched = await call(REFRESH_TIMEOUT_MS, (signal) => deps.fetch(signal));
     } catch {
       return;
     }
@@ -181,7 +178,13 @@ export function createLibrarySaver(deps: LibrarySaverDeps): LibrarySaver {
   async function pump() {
     running = true;
     try {
-      for (let job = queue.shift(); job; job = queue.shift()) await job.run();
+      for (let job = queue.shift(); job; job = queue.shift()) {
+        try {
+          await job.run();
+        } catch (error) {
+          job.fail(error);
+        }
+      }
     } finally {
       running = false;
     }
@@ -192,34 +195,39 @@ export function createLibrarySaver(deps: LibrarySaverDeps): LibrarySaver {
     if (!running) void pump();
   }
 
-  function submit(change: LibraryChange): Promise<boolean> {
-    if (disposed) return Promise.resolve(false);
+  function submit(change: LibraryChange): Promise<LibrarySubmitResult> {
+    if (disposed) return Promise.resolve({ ok: false, error: disposedError() });
     const entry: Entry = {
       apply(data) {
         const applied = applyLibraryChange(data, change);
         return "error" in applied ? data : applied.data;
       }
     };
-    track(entry);
-    return new Promise<boolean>((resolve) => {
+    try {
+      track(entry);
+    } catch (error) {
+      pending = pending.filter((other) => other !== entry);
+      return Promise.resolve({ ok: false, error });
+    }
+    return new Promise<LibrarySubmitResult>((resolve) => {
       enqueue({
-        drop: () => resolve(false),
+        drop: () => resolve({ ok: false, error: disposedError() }),
+        fail(error) {
+          pending = pending.filter((other) => other !== entry);
+          resolve({ ok: false, error });
+        },
         async run() {
           let answer: LibraryChangeAnswer;
           try {
             answer = await call(CHANGE_TIMEOUT_MS, (signal) => deps.send(change, signal));
-          } catch {
+          } catch (error) {
             release(entry);
-            resolve(false);
+            resolve({ ok: false, error });
             await refresh();
             return;
           }
-          if (disposed) {
-            resolve(false);
-            return;
-          }
           const folded = settle(entry, change, answer);
-          resolve(true);
+          resolve({ ok: true });
           if (!folded) await refresh();
         }
       });
@@ -233,6 +241,10 @@ export function createLibrarySaver(deps: LibrarySaverDeps): LibrarySaver {
     return new Promise<LibraryDocument>((resolve, reject) => {
       enqueue({
         drop: () => reject(disposedError()),
+        fail(error) {
+          if (entry) pending = pending.filter((other) => other !== entry);
+          reject(error);
+        },
         async run() {
           let saved: LibraryDocument;
           try {
@@ -241,10 +253,6 @@ export function createLibrarySaver(deps: LibrarySaverDeps): LibrarySaver {
             if (entry) release(entry);
             reject(error);
             if (entry) await refresh();
-            return;
-          }
-          if (disposed) {
-            reject(disposedError());
             return;
           }
           if (entry) markSaved(entry, saved.updatedAt);
@@ -260,15 +268,11 @@ export function createLibrarySaver(deps: LibrarySaverDeps): LibrarySaver {
     return new Promise<LibraryDocument>((resolve, reject) => {
       enqueue({
         drop: () => reject(disposedError()),
+        fail: reject,
         async run() {
-          try {
-            const document = await call(WHOLE_SAVE_TIMEOUT_MS, (signal) => request(confirmed?.updatedAt, signal));
-            if (disposed) throw disposedError();
-            receive(document);
-            resolve(document);
-          } catch (error) {
-            reject(error);
-          }
+          const document = await call(WHOLE_SAVE_TIMEOUT_MS, (signal) => request(confirmed?.updatedAt, signal));
+          receive(document);
+          resolve(document);
         }
       });
     });
@@ -289,5 +293,5 @@ export function createLibrarySaver(deps: LibrarySaverDeps): LibrarySaver {
     for (const job of queue.splice(0)) job.drop();
   }
 
-  return { submit, saveWhole, merge, receive, receiveShare, fetch: fetchView, hasPending: () => pending.length > 0, dispose };
+  return { submit, saveWhole, merge, receive, receiveShare, fetch: fetchView, hasPending: () => pending.some((entry) => entry.savedAt === undefined), dispose };
 }

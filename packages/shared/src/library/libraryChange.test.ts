@@ -177,3 +177,41 @@ test("a group lookup passes malformed groups through unchanged, never matches th
   malformed.forEach((entry, i) => assert.equal(added.data.groups![i], entry));
   assert.equal(added.data.groups!.length, malformed.length + 2);
 });
+
+test("a non-record entry in books is passed through untouched by every kind of change, and never throws", () => {
+  const junk: unknown[] = [null, 7, "book"];
+  const data = { books: [...junk as Array<Record<string, unknown>>, dune, emma], groups: [group({ id: "shelf" })] };
+
+  const ticked = applyLibraryChange(data, { kind: "membership", groupId: "shelf", bookKey: duneKey, member: true });
+  assert.ok("data" in ticked && ticked.changed);
+  assert.equal(ticked.data.books, data.books);
+  assert.deepEqual(applyLibraryChange(data, { kind: "membership", groupId: "shelf", bookKey: "ta:nobody|", member: true }), { error: "no-book" });
+
+  const finished = applyLibraryChange(data, { kind: "book", bookKey: duneKey, readStatus: 2, day: "2026-10-02" });
+  assert.ok("data" in finished && finished.changed);
+  junk.forEach((entry, i) => assert.equal(finished.data.books[i], entry));
+  assert.deepEqual(finished.data.books[3], { ...dune, ReadStatus: 2, DateLastRead: "2026-10-02", ___PercentRead: 100 });
+  assert.deepEqual(applyLibraryChange(data, { kind: "book", bookKey: "ta:nobody|", rating: 3 }), { error: "no-book" });
+
+  const added = applyLibraryChange(data, { kind: "add", book: { Title: "Neuromancer", Attribution: "William Gibson" } });
+  assert.ok("data" in added);
+  assert.deepEqual(added.data.books.filter((book) => typeof book !== "object" || book === null), junk);
+  assert.equal(added.data.books.filter((book) => typeof book === "object" && book !== null).length, 3);
+  assert.equal(added.data.book_count, 6);
+});
+
+test("a groups that is not an array is passed through untouched, and a membership change finds no group", () => {
+  for (const groups of ["shelf", 7, { id: "shelf" }, null]) {
+    const data = { books: [dune, emma], groups } as unknown as LibraryData;
+    assert.deepEqual(applyLibraryChange(data, { kind: "membership", groupId: "shelf", bookKey: duneKey, member: true }), { error: "no-group" });
+
+    const rated = applyLibraryChange(data, { kind: "book", bookKey: duneKey, rating: 4 });
+    assert.ok("data" in rated && rated.changed);
+    assert.equal(rated.data.groups, groups);
+
+    const added = applyLibraryChange(data, { kind: "add", book: { Title: "Neuromancer", Attribution: "William Gibson", Series: "Sprawl" } });
+    assert.ok("data" in added);
+    assert.equal(added.data.groups, groups);
+    assert.equal(added.data.books.length, 3);
+  }
+});

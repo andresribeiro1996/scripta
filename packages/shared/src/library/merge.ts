@@ -1,8 +1,3 @@
-// Merging a newly-imported library into the one already saved for this
-// account. Only kicks in from the SECOND import onward — the first import
-// has nothing to merge against, so it's saved as-is (see frontend's
-// DashboardPage).
-
 import type { LibraryData } from "./types.js";
 import { certainFacts, matchFacts } from "./bookMatch.js";
 import { normalizeIsbn } from "./covers.js";
