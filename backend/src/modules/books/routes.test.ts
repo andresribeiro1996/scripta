@@ -192,6 +192,10 @@ test("an admin lookup with an ISBN never falls back to another edition's title",
   repo.createBook({ title: "Emma", author: "Jane Austen", isbn: "9780141439587" }, ["isbn:9780141439587"], "2026-10-01T00:00:00.000Z");
   const res = await call(service, { method: "POST", url: "/books/works/merge", payload: { from: { isbn: "9789999999999", title: "Dune", author: "Frank Herbert" }, into: { isbn: "9780141439587" } } }, "admin");
   assert.equal(res.statusCode, 404);
+  for (const isbn of ["123", "not-an-isbn"]) {
+    const bad = await call(service, { method: "POST", url: "/books/works/merge", payload: { from: { isbn, title: "Dune", author: "Frank Herbert" }, into: { isbn: "9780141439587" } } }, "admin");
+    assert.equal(bad.statusCode, 404);
+  }
 });
 
 test("the admin detaches an edition from a grouped work, and a keyed edition is refused", async () => {

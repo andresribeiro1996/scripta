@@ -189,6 +189,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
 
   function existingEdition(lookup: BookLookup): BookRow {
     const identity = lookupIdentity(lookup);
+    if (lookup.isbn?.trim() && !identity?.isbn) throw new BookNotFoundError();
     const book = identity ? (identity.isbn ? deps.repo.findBookByKey(identity.key) : findByIdentity(deps.repo, identity)) : undefined;
     if (!book) throw new BookNotFoundError();
     return book;
