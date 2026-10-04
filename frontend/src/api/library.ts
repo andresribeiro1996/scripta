@@ -1,4 +1,4 @@
-import type { LibraryChange, LibraryChangeAnswer, LibraryData } from "@scripta/shared";
+import { libraryChangeRequest, type LibraryChange, type LibraryChangeAnswer, type LibraryData } from "@scripta/shared";
 import type { BookRecommendationInput } from "@scripta/shared/community";
 import { ApiError, apiFetch } from "./client";
 
@@ -45,15 +45,8 @@ export async function saveLibrary(data: LibraryData, updatedAt: string | undefin
 }
 
 export async function sendLibraryChange(change: LibraryChange, signal: AbortSignal): Promise<LibraryChangeAnswer> {
-  if (change.kind === "membership") {
-    const { groupId, bookKey, member } = change;
-    return (await apiFetch(`/library/groups/${encodeURIComponent(groupId)}/books`, { method: "POST", body: JSON.stringify({ bookKey, member }), signal })) as LibraryChangeAnswer;
-  }
-  if (change.kind === "book") {
-    const { bookKey, readStatus, rating, day } = change;
-    return (await apiFetch("/library/books", { method: "PATCH", body: JSON.stringify({ bookKey, readStatus, rating, day }), signal })) as LibraryChangeAnswer;
-  }
-  return (await apiFetch("/library/books/add", { method: "POST", body: JSON.stringify({ book: change.book }), signal })) as LibraryChangeAnswer;
+  const { method, path, body } = libraryChangeRequest(change);
+  return (await apiFetch(path, { method, body: JSON.stringify(body), signal })) as LibraryChangeAnswer;
 }
 
 /** Same-shelf upsert behind POST /library/books — adding a book you

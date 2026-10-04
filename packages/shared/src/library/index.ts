@@ -15,6 +15,7 @@ export * from "./groups.js";
 export * from "./libraryOrder.js";
 export * from "./addPipeline.js";
 export * from "./libraryChange.js";
+export * from "./libraryChangeRequest.js";
 export * from "./librarySaver.js";
 export * from "./libraryStyle.js";
 export * from "./csv.js";

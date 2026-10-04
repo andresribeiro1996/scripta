@@ -120,8 +120,6 @@ export function LibraryPage() {
   // them — a re-import of the same file is housekeeping, not reading
   // activity. The manual add passes no source, so its save still emits.
   async function mergeAndSave(parsed: LibraryData, source?: "import") {
-    // Read the freshest cached copy, not a stale closure — same
-    // reasoning as handleRenameLibrary above.
     await updateLibrary((existing) => buildMergedLibrary(existing, parsed), { source });
   }
 

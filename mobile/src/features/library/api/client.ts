@@ -1,7 +1,6 @@
-import type { LibraryChange, LibraryChangeAnswer } from "@scripta/shared";
+import { libraryChangeRequest, type LibraryChange, type LibraryChangeAnswer } from "@scripta/shared";
 import type { BookRecommendationInput } from "@scripta/shared/community";
 import { apiClient, ApiError } from "../../../core/api";
-import { libraryChangeRequest } from "./changeRequest";
 import { LibraryConflictError } from "./conflict";
 import type { LibraryData, LibraryDocument } from "./types";
 
