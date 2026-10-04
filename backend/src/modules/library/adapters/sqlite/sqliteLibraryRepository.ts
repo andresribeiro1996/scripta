@@ -63,8 +63,8 @@ export function createSqliteLibraryRepository(db: DatabaseSync, rowsVersion = LI
     UPDATE library_summary SET
       meta = CASE WHEN $set_meta THEN $meta ELSE meta END,
       reader_card = CASE WHEN $set_reader_card THEN $reader_card ELSE reader_card END,
-      finished_count = $finished, in_progress_count = $in_progress, source_updated_at = $updated_at, rows_version = $rows_version
-    WHERE user_id = $user_id AND source_updated_at = $expected_updated_at
+      finished_count = $finished, in_progress_count = $in_progress, source_updated_at = $updated_at
+    WHERE user_id = $user_id AND source_updated_at = $expected_updated_at AND rows_version = $rows_version
   `);
   const upsertSummaryStmt = db.prepare(`
     INSERT INTO library_summary (user_id, meta, reader_card, shelf_theme, total_books, finished_count, in_progress_count, total_highlights, source_updated_at, rows_version)

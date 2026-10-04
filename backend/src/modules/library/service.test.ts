@@ -1777,6 +1777,29 @@ test("a small save on an account whose summary was stale leaves it stale, and th
   assert.ok(!createSqliteLibraryRepository(fileDb).listStaleUserIds().includes("small-stale"));
 });
 
+test("a small save on an account whose rows are at an older version leaves it stale, and the startup step rebuilds every row", () => {
+  const userId = "small-old-version";
+  const hashes = () => (fileDb.prepare(`SELECT row_hash FROM library_books WHERE user_id = ? ORDER BY position`).all(userId) as Array<{ row_hash: string }>).map((row) => row.row_hash);
+  const document = fileDb.prepare(`SELECT updated_at FROM library_documents WHERE user_id = ?`);
+  fileService.saveLibrary(userId, { books: [marked("Alpha", ["a1"]), marked("Beta", ["b1"])] });
+  const { updated_at } = document.get(userId) as { updated_at: string };
+  const data = JSON.parse((fileDb.prepare(`SELECT data FROM library_documents WHERE user_id = ?`).get(userId) as { data: string }).data);
+  createSqliteLibraryRepository(fileDb, 0).setRows(userId, deriveLibraryRows(data, () => undefined, 0), updated_at);
+  const old = hashes();
+
+  fileService.applyChange(userId, { kind: "book", bookKey: bookKey(marked("Beta", [])), readStatus: 2, day: "2026-10-02" });
+
+  assert.ok(createSqliteLibraryRepository(fileDb).listStaleUserIds().includes(userId));
+  assert.equal((fileDb.prepare(`SELECT rows_version FROM library_summary WHERE user_id = ?`).get(userId) as { rows_version: number }).rows_version, 0);
+  assert.deepEqual(hashes(), old);
+
+  backfillLibraryDerived();
+
+  assert.ok(!createSqliteLibraryRepository(fileDb).listStaleUserIds().includes(userId));
+  assert.ok(hashes().every((hash, position) => hash !== old[position]));
+  assert.deepEqual(rowsInDb(fileDb, userId), rowsOfStored(fileDb, userId));
+});
+
 test("raising the rows version rebuilds every account and rewrites every book row, and the same version rebuilds nothing", () => {
   const users = ["rv-a", "rv-b"];
   const hashes = (userId: string) => (fileDb.prepare(`SELECT row_hash FROM library_books WHERE user_id = ? ORDER BY position`).all(userId) as Array<{ row_hash: string }>).map((row) => row.row_hash);
@@ -1788,9 +1811,11 @@ test("raising the rows version rebuilds every account and rewrites every book ro
       createSqliteLibraryRepository(fileDb, rowsVersion).setRows(userId, deriveLibraryRows(JSON.parse((fileDb.prepare(`SELECT data FROM library_documents WHERE user_id = ?`).get(userId) as { data: string }).data), () => undefined, rowsVersion), row.updated_at);
     }
   };
-  for (const userId of users) fileService.saveLibrary(userId, { books: [dune(), emma] });
+  const highlightTexts = (userId: string) => (fileDb.prepare(`SELECT text FROM library_highlights WHERE user_id = ? ORDER BY position, highlight_id`).all(userId) as Array<{ text: string }>).map((row) => row.text);
+  for (const userId of users) fileService.saveLibrary(userId, { books: [marked("Alpha", ["a1"]), marked("Beta", ["b1"])] });
   settled(0);
   const old = users.map(hashes);
+  for (const userId of users) fileDb.prepare(`UPDATE library_highlights SET text = 'old' WHERE user_id = ?`).run(userId);
   assert.deepEqual(users.map(version), [0, 0]);
 
   backfillLibraryDerived();
@@ -1802,6 +1827,7 @@ test("raising the rows version rebuilds every account and rewrites every book ro
     assert.ok(rebuilt.every((hash, position) => hash !== old[index]![position]));
   });
   assert.deepEqual(staleUsers(1), []);
+  for (const userId of users) assert.deepEqual(highlightTexts(userId), ["Alpha 0", "Beta 0"]);
   const settledHashes = users.map(hashes);
 
   backfillLibraryDerived();
