@@ -17,10 +17,7 @@ export default defineRailway(() => {
     start: "sh backend/scripts/start-with-litestream.sh",
     healthcheck: "/health",
     healthcheckTimeout: 300,
-    deploy: {
-      restartPolicyType: "ON_FAILURE",
-      restartPolicyMaxRetries: 5,
-    },
+    deploy: { restartPolicyMaxRetries: 5 },
     replicas: { iad: 1 },
     domains: [{ domain: "api.atmyshelf.com", port: 3000 }],
     volumeMounts: { "/data": scriptaVolume },
