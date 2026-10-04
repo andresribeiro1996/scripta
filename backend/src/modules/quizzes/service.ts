@@ -97,9 +97,9 @@ function toPublicQuestion(question: QuizQuestion, bookByKey: Map<string, QuizBoo
 
 export interface QuizzesService {
   listQuizzes(userId: string): Quiz[];
-  createQuiz(userId: string, name: string, data: unknown): Quiz;
+  createQuiz(userId: string, name: string, data: unknown, works?: Map<string, string | null>): Quiz;
   getQuiz(userId: string, id: string): Quiz | undefined;
-  updateQuiz(userId: string, id: string, patch: { name?: string; data?: unknown }): Quiz | undefined;
+  updateQuiz(userId: string, id: string, patch: { name?: string; data?: unknown }, works?: Map<string, string | null>): Quiz | undefined;
   deleteQuiz(userId: string, id: string): boolean;
   /** `resolvedBooks` carries the public cover URLs the route resolved from
    *  the owner's library (the same resolver tierlists' open-voting uses);
@@ -122,7 +122,7 @@ export function createQuizzesService(repo: QuizzesRepository): QuizzesService {
       return repo.listByUser(userId).map(toQuiz);
     },
 
-    createQuiz(userId, name, data) {
+    createQuiz(userId, name, data, works) {
       const now = new Date().toISOString();
       const row: QuizRow = {
         id: randomUUID(),
@@ -134,7 +134,7 @@ export function createQuizzesService(repo: QuizzesRepository): QuizzesService {
         created_at: now,
         updated_at: now
       };
-      repo.insert(row);
+      repo.insert(row, works);
       return toQuiz(row);
     },
 
@@ -143,7 +143,7 @@ export function createQuizzesService(repo: QuizzesRepository): QuizzesService {
       return row ? toQuiz(row) : undefined;
     },
 
-    updateQuiz(userId, id, patch) {
+    updateQuiz(userId, id, patch, works) {
       if (patch.data !== undefined || patch.name !== undefined) {
         const existing = repo.getOwned(id, userId);
         // undefined covers BOTH "not yours" and "already published" — a
@@ -154,7 +154,7 @@ export function createQuizzesService(repo: QuizzesRepository): QuizzesService {
       const row = repo.update(id, userId, {
         ...(patch.name !== undefined ? { name: patch.name } : {}),
         ...(patch.data !== undefined ? { data: JSON.stringify(patch.data) } : {})
-      });
+      }, works);
       return row ? toQuiz(row) : undefined;
     },
 
