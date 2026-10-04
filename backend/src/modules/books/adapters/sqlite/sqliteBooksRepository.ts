@@ -28,6 +28,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     WHERE id = ? AND ol_work_key IS NULL AND NOT EXISTS (SELECT 1 FROM books WHERE work_id = works.id AND id != ?)
   `);
   const unassignedStmt = db.prepare(`SELECT id, ol_work_key, title, author, created_at FROM books WHERE work_id IS NULL LIMIT ?`);
+  const canonicalWorksStmt = db.prepare(`SELECT id, COALESCE(merged_into, id) AS canonical FROM works WHERE id IN (SELECT value FROM json_each(?))`);
   const moveBookStmt = db.prepare(`UPDATE books SET work_id = ? WHERE id = ?`);
   const mergeEmptyWorkStmt = db.prepare(`UPDATE works SET merged_into = ? WHERE id = ? AND NOT EXISTS (SELECT 1 FROM books WHERE work_id = works.id)`);
   const makeSearchableStmt = db.prepare(`
@@ -92,6 +93,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   }
 
   function inTransaction<T>(write: () => T): T {
+    if (db.isTransaction) return write();
     db.exec("BEGIN IMMEDIATE");
     try {
       const result = write();
@@ -109,7 +111,24 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     return id;
   }
 
+  type UnassignedBook = { id: string; ol_work_key: string | null; title: string; author: string; created_at: string };
+
+  function giveWork(row: UnassignedBook): string {
+    const held = row.ol_work_key ? (workByKeyStmt.get(row.ol_work_key) as { id: string } | undefined) : undefined;
+    const workId = held?.id ?? insertWork(row.ol_work_key, row.title, row.author, row.created_at);
+    moveBookStmt.run(workId, row.id);
+    if (held) fillWorkIdentityStmt.run(row.id);
+    return workId;
+  }
+
   return {
+    transaction: inTransaction,
+
+    canonicalWorkIds(ids) {
+      const rows = canonicalWorksStmt.all(JSON.stringify(ids)) as Array<{ id: string; canonical: string }>;
+      return new Map(rows.map((row) => [row.id, row.canonical]));
+    },
+
     findBookByKey: (key) => byKeyStmt.get(key) as BookRow | undefined,
 
     findBooksByKeys(keys) {
@@ -251,14 +270,17 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
 
     assignMissingWorks(limit) {
       return inTransaction(() => {
-        const rows = unassignedStmt.all(limit) as unknown as Array<{ id: string; ol_work_key: string | null; title: string; author: string; created_at: string }>;
-        for (const row of rows) {
-          const held = row.ol_work_key ? (workByKeyStmt.get(row.ol_work_key) as { id: string } | undefined) : undefined;
-          const workId = held?.id ?? insertWork(row.ol_work_key, row.title, row.author, row.created_at);
-          moveBookStmt.run(workId, row.id);
-          if (held) fillWorkIdentityStmt.run(row.id);
-        }
+        const rows = unassignedStmt.all(limit) as unknown as UnassignedBook[];
+        for (const row of rows) giveWork(row);
         return rows.length;
+      });
+    },
+
+    assignWork(bookId) {
+      return inTransaction(() => {
+        const book = byIdStmt.get(bookId) as unknown as (UnassignedBook & { work_id: string | null }) | undefined;
+        if (!book) throw new Error(`Unknown book ${bookId}`);
+        return book.work_id ?? giveWork(book);
       });
     },
 
