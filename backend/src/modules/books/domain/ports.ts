@@ -34,6 +34,9 @@ export interface BooksRepository {
   assignMissingWorks(limit: number): number;
   fillTitleKeys(limit: number): number;
   groupKeylessWorks(limit: number): number;
+  listWorkLookupIds(limit: number, recheckBefore: string): string[];
+  markWorkChecked(id: string, at: string): void;
+  replaceLanguage(id: string, tag: string): void;
   mergeWorks(fromId: string, intoId: string): string;
   detachEdition(bookId: string, at: string): string;
   resolveWorkId(id: string): string | null;
@@ -75,4 +78,14 @@ export interface CatalogDetails {
 export interface BookCatalog {
   fetchDetails(lookup: { isbn: string | null; title: string; author: string }): Promise<CatalogDetails | null>;
   search(query: { isbn: string } | { text: string }): Promise<CatalogSearchHit[]>;
+}
+
+export interface EditionRecord {
+  title: string;
+  workKey: string | null;
+  languages: string[];
+}
+
+export interface EditionRecordSource {
+  fetchEditionRecord(isbn: string): Promise<EditionRecord | null>;
 }

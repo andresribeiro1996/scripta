@@ -4,12 +4,13 @@ import { findBestCover, type CoverSources, type FetchCoverImage } from "./coverR
 import { MIN_GOOD_WIDTH } from "./domain/constants.js";
 import { BookNotFoundError, FileTooLargeError, InvalidImageError, SourcePausedError, SourceUnavailableError } from "./domain/errors.js";
 import { encodeCover, type EncodedCover } from "./domain/images.js";
-import { findByIdentity, isPortugueseIsbn, lookupIdentity, SEARCH_LIMIT, searchTokens, type BookIdentity, type BookLookup } from "./domain/normalize.js";
-import type { BookCatalog, BooksRepository, CatalogSearchHit, CoverBlobStore, CoverSource } from "./domain/ports.js";
+import { editionLanguage, findByIdentity, isPortugueseIsbn, lookupIdentity, SEARCH_LIMIT, searchTokens, type BookIdentity, type BookLookup } from "./domain/normalize.js";
+import type { BookCatalog, BooksRepository, CatalogSearchHit, CoverBlobStore, CoverSource, EditionRecordSource } from "./domain/ports.js";
 import type { BookRow, CoverSourceName, CoverStatus } from "./domain/types.js";
 import type { CoverPriority } from "./worker.js";
 
 const RETRY_AFTER_MS = 30 * 24 * 60 * 60 * 1000;
+const WORK_RECHECK_MS = 30 * 24 * 60 * 60 * 1000;
 const UNAVAILABLE_BACKOFF_MS = 10 * 60 * 1000;
 const COVER_EXTENSION = "webp";
 const NO_SOURCE: CoverSource = { byIsbn: async () => [], byTitle: async () => [] };
@@ -33,6 +34,7 @@ export interface BooksServiceDeps {
   sources: CoverSources;
   catalog: BookCatalog;
   backgroundCatalog: BookCatalog;
+  editionRecords: EditionRecordSource;
   fetchImage: FetchCoverImage;
   enqueue: (bookId: string, priority?: CoverPriority) => void;
   publicUrlFor: (imageId: string, size: CoverFileSize) => string;
@@ -48,6 +50,7 @@ export interface BooksService {
   processBook(bookId: string, lane: CoverPriority): Promise<void>;
   getDetails(lookup: BookLookup): Promise<BookMetadata | null>;
   backfillDetails(limit: number, signal?: AbortSignal): Promise<number | null>;
+  backfillWorkKeys(limit: number, signal?: AbortSignal): Promise<number | null>;
   search(query: string): BookSearchResult[];
   searchExternal(query: string): Promise<BookSearchResult[]>;
   isAdmin(userId: string): boolean;
@@ -293,6 +296,29 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
           deps.repo.markDetailsAttempted(id, now().toISOString());
           deps.warn({ bookId: id, source: error.source, error: error.message }, "details source unavailable");
         }
+      }
+      return null;
+    },
+
+    async backfillWorkKeys(limit, signal) {
+      const recheckBefore = new Date(now().getTime() - WORK_RECHECK_MS).toISOString();
+      for (const id of deps.repo.listWorkLookupIds(limit, recheckBefore)) {
+        if (signal?.aborted) return null;
+        const book = deps.repo.getBook(id);
+        if (!book?.isbn || book.ol_work_key) continue;
+        try {
+          const record = await deps.editionRecords.fetchEditionRecord(book.isbn);
+          if (record?.workKey) {
+            deps.repo.setWorkKey(id, record.workKey);
+            const language = editionLanguage(record.languages, book.isbn);
+            if (language) deps.repo.replaceLanguage(id, language);
+          }
+        } catch (error) {
+          if (!(error instanceof SourceUnavailableError)) throw error;
+          if (error.retryAt !== undefined) return error.retryAt;
+          deps.warn({ bookId: id, source: error.source, error: error.message }, "work key source unavailable");
+        }
+        deps.repo.markWorkChecked(id, now().toISOString());
       }
       return null;
     },

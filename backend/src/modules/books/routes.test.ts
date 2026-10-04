@@ -35,6 +35,7 @@ function makeService(overrides: Partial<Deps> = {}) {
     sources: { isbndb: null, apple: empty, openlibrary: empty },
     catalog: { fetchDetails: async () => null, search: async () => [] },
     backgroundCatalog: { fetchDetails: async () => null, search: async () => [] },
+    editionRecords: { fetchEditionRecord: async () => null },
     fetchImage: async () => null,
     enqueue: () => {},
     publicUrlFor,

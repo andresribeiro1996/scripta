@@ -79,6 +79,16 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     ORDER BY candidates.created_at, candidates.work_id
     LIMIT ?
   `);
+  const workLookupStmt = db.prepare(`
+    SELECT id FROM books
+    WHERE ol_work_key IS NULL AND isbn IS NOT NULL AND details_status IS NOT NULL
+      AND (created_by IS NULL OR created_by <> 'publisher')
+      AND (work_checked_at IS NULL OR work_checked_at < ?)
+    ORDER BY work_checked_at IS NOT NULL, created_by IS NOT NULL, work_checked_at, created_at, rowid
+    LIMIT ?
+  `);
+  const workCheckedStmt = db.prepare(`UPDATE books SET work_checked_at = ? WHERE id = ?`);
+  const replaceLanguageStmt = db.prepare(`UPDATE books SET language = ? WHERE id = ?`);
   const makeSearchableStmt = db.prepare(`
     INSERT INTO books_fts (book_id, title, author)
     SELECT id, title, author FROM books WHERE id = ? AND title != '' AND NOT EXISTS (SELECT 1 FROM books_fts WHERE book_id = ?)
@@ -387,6 +397,18 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         for (const pair of pairs) mergeInto(pair.source, pair.target);
         return pairs.length;
       });
+    },
+
+    listWorkLookupIds(limit, recheckBefore) {
+      return (workLookupStmt.all(recheckBefore, limit) as Array<{ id: string }>).map((row) => row.id);
+    },
+
+    markWorkChecked(id, at) {
+      workCheckedStmt.run(at, id);
+    },
+
+    replaceLanguage(id, tag) {
+      replaceLanguageStmt.run(tag, id);
     },
 
     setLanguage(id, tag) {
