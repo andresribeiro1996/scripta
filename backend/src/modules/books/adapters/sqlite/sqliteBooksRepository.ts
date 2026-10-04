@@ -92,6 +92,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   }
 
   function inTransaction<T>(write: () => T): T {
+    if (db.isTransaction) return write();
     db.exec("BEGIN IMMEDIATE");
     try {
       const result = write();
@@ -110,6 +111,8 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   }
 
   return {
+    transaction: inTransaction,
+
     findBookByKey: (key) => byKeyStmt.get(key) as BookRow | undefined,
 
     findBooksByKeys(keys) {

@@ -8,6 +8,7 @@ export interface CoverBlobStore {
 }
 
 export interface BooksRepository {
+  transaction<T>(write: () => T): T;
   findBookByKey(key: string): BookRow | undefined;
   findBooksByKeys(keys: string[]): Map<string, BookRow>;
   getBook(id: string): BookRow | undefined;
