@@ -419,7 +419,7 @@ test("mergeBooks rewrites references, then saves the merged library", () => {
   const saved = service.saveLibrary("u1", { books: [koboDune, goodreadsDune], groups: [{ id: "g", type: "collection", name: "c", bookKeys: [bookKey(goodreadsDune)], createdAt: "t", updatedAt: "t" }] });
   const merged = service.mergeBooks("u1", bookKey(koboDune), [bookKey(goodreadsDune)], saved.updatedAt);
   assert.deepEqual(rekeys, [["u1", [bookKey(goodreadsDune)], bookKey(koboDune)]]);
-  const data = merged.data as { books: Array<Record<string, unknown>>; groups: Array<{ bookKeys: string[] }> };
+  const data = JSON.parse(merged.data) as { books: Array<Record<string, unknown>>; groups: Array<{ bookKeys: string[] }> };
   assert.equal(data.books.length, 1);
   assert.equal(data.books[0]!.ReadStatus, 2);
   assert.deepEqual(data.groups[0]!.bookKeys, [bookKey(koboDune)]);

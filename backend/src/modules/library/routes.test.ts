@@ -227,9 +227,9 @@ test("POST /library/books that would take the library past the cap answers 413 l
   const res = await addBook({ title: "Dune", author: "Frank Herbert", readStatus: 0 });
   assert.equal(res.statusCode, 413);
   assert.deepEqual(res.json(), tooLargeBody);
-  const after = service.getLibrary("u1");
+  const after = service.getLibraryText("u1");
   assert.equal(after?.updatedAt, saved.updatedAt);
-  assert.deepEqual(after?.data, saved.data);
+  assert.equal(after?.data, saved.data);
   await app.close();
 });
 
@@ -254,9 +254,9 @@ test("POST /library/books/merge that would take the library past the cap answers
   const res = await merge({ keep: bookKey(isbn), merge: [bookKey(short)], updatedAt: saved.updatedAt });
   assert.equal(res.statusCode, 413);
   assert.deepEqual(res.json(), tooLargeBody);
-  const after = service.getLibrary("u1");
+  const after = service.getLibraryText("u1");
   assert.equal(after?.updatedAt, saved.updatedAt);
-  assert.deepEqual(after?.data, saved.data);
+  assert.equal(after?.data, saved.data);
   await app.close();
 });
 

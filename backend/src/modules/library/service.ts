@@ -8,7 +8,7 @@ import type { BookRecommendationInput } from "@scripta/shared/community";
 import { BOOK_EVENTS_PER_SAVE, COVER_URL_MAX_LENGTH, DISPLAY_TEXT_MAX_LENGTH, LIBRARY_MATCH_BOOK_CAP, LIBRARY_PUT_HEADROOM_BYTES, MATCH_KEY_MAX_LENGTH } from "./domain/constants.js";
 import { LibraryChangeNotFoundError, LibraryConflictError, LibraryTooLargeError, NoLibraryDocumentError } from "./domain/errors.js";
 import type { LibraryRepository } from "./domain/ports.js";
-import type { LibraryBookRow, LibraryBookRows, LibraryDerived, LibraryDocument, LibraryDocumentRow, LibraryHighlightRow, LibraryMatchKeyRow, LibraryRows, LibrarySmallSave } from "./domain/types.js";
+import type { LibraryBookRow, LibraryBookRows, LibraryDerived, LibraryDocument, LibraryDocumentRow, LibraryDocumentText, LibraryHighlightRow, LibraryMatchKeyRow, LibraryRows, LibrarySmallSave } from "./domain/types.js";
 import { libraryParts, resolvePublicLibrary, toReaderGroups } from "./publicResolver.js";
 
 export type BookEvent = { type: "book_added" | "book_finished"; refId: string; payload: Record<string, unknown> };
@@ -239,16 +239,26 @@ function toLibraryDocument(row: LibraryDocumentRow, publicUrlFor: (token: string
   };
 }
 
+function toLibraryDocumentText(row: LibraryDocumentRow, publicUrlFor: (token: string) => string): LibraryDocumentText {
+  return {
+    data: row.data,
+    updatedAt: row.updated_at,
+    shareToken: row.share_token,
+    shareUrl: row.share_token ? publicUrlFor(row.share_token) : null
+  };
+}
+
 export interface LibraryService {
   getLibrary(userId: string): LibraryDocument | null;
-  saveLibrary(userId: string, data: unknown, expectedUpdatedAt?: string, source?: "import"): LibraryDocument;
+  getLibraryText(userId: string): LibraryDocumentText | null;
+  saveLibrary(userId: string, data: unknown, expectedUpdatedAt?: string, source?: "import"): LibraryDocumentText;
   /** Same-shelf book upsert behind POST /library/books: matches an
    *  existing book with the shared certain-match rule and updates its
    *  reading status in place — or appends a manual: book when nothing
    *  matches. `updated` distinguishes "matched and re-shelved" from
    *  "appended". */
   addBook(userId: string, input: BookRecommendationInput): { key: string; updated: boolean };
-  mergeBooks(userId: string, keep: string, merge: string[], expectedUpdatedAt: string): LibraryDocument;
+  mergeBooks(userId: string, keep: string, merge: string[], expectedUpdatedAt: string): LibraryDocumentText;
   applyChange(userId: string, change: LibraryChange): LibraryChangeAnswer;
   /** Idempotent: a document that's already shared keeps its existing
    *  token rather than minting a new one, so a re-opened share modal (or
@@ -310,6 +320,12 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
       return toLibraryDocument(row, publicUrlFor);
     },
 
+    getLibraryText(userId) {
+      const row = repo.getDocument(userId);
+      if (!row) return null;
+      return toLibraryDocumentText(row, publicUrlFor);
+    },
+
     saveLibrary(userId, data, expectedUpdatedAt, source) {
       const previous = source === "import" ? undefined : repo.getDocument(userId);
       const row = repo.upsertDocument(userId, JSON.stringify(data), deriveLibraryData(data), rowsOf(userId, data), expectedUpdatedAt);
@@ -323,7 +339,7 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
         }
       }
       if (source === "import" && enqueueCovers) enqueueCovers(coverLookupsOf(data));
-      return toLibraryDocument(row, publicUrlFor);
+      return toLibraryDocumentText(row, publicUrlFor);
     },
 
     addBook(userId, input) {
@@ -393,7 +409,7 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
       if (!row) throw new NoLibraryDocumentError();
       const library = parseStoredLibrary(row);
       const next = mergeDuplicateBooks(library, keep, merge);
-      if (next === library) return toLibraryDocument(row, publicUrlFor);
+      if (next === library) return toLibraryDocumentText(row, publicUrlFor);
       if (row.updated_at !== expectedUpdatedAt) throw new LibraryConflictError();
       const json = serializeWithinLimit(next);
       const present = new Set(library.books.filter(isRecord).map(bookKey));
@@ -401,7 +417,7 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
       if (fromKeys.length > 0 && rekeyBooks) rekeyBooks(userId, fromKeys, keep);
       const saved = repo.upsertDocument(userId, json, deriveLibraryData(next), rowsOf(userId, next), row.updated_at);
       if (!saved) throw new LibraryConflictError();
-      return toLibraryDocument(saved, publicUrlFor);
+      return toLibraryDocumentText(saved, publicUrlFor);
     },
 
     applyChange(userId, change) {

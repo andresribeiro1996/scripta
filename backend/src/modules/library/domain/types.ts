@@ -30,6 +30,13 @@ export interface LibraryDocument {
   shareUrl: string | null;
 }
 
+export interface LibraryDocumentText {
+  data: string;
+  updatedAt: string;
+  shareToken: string | null;
+  shareUrl: string | null;
+}
+
 export interface LibraryMatchKeyRow {
   key: string;
   book_ref: number;
