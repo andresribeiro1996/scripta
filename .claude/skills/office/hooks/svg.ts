@@ -8,10 +8,10 @@ export const SVG_LIMIT = 131072
 
 const PAD = 10
 const CELL_W = 160
-const CELL_H = 170
+const CELL_H = 180
 const HEADER_H = 30
 const STRIP_H = 84
-const MINI_W = 70
+const MINI_W = 90
 const INK = '#2b2b33'
 const FLOOR = '#e6dcc6'
 const GRID = '#d8ccb2'
@@ -106,9 +106,9 @@ function desk(agent: Agent, x: number, y: number): string {
     parts.push(text(x + 34, y + 31, '↻', `fill="${HOT}" font-size="14"`))
   }
   parts.push(text(x + 8, y + 108, agent.state, `font-weight="bold" fill="${agent.state === 'retrying' ? HOT : INK}"`))
-  parts.push(text(x + 8, y + 122, cut(agent.description, 24), `fill="${INK}"`))
+  parts.push(text(x + 8, y + 122, cut(agent.description, 22), `fill="${INK}"`))
   parts.push(text(x + 8, y + 136, agent.id === MAIN_ID ? `boss · ${modelShort(agent.model)}` : `${agent.type} · ${modelShort(agent.model)}`, `fill="#5b5b66"`))
-  parts.push(text(x + 8, y + 150, cut(agent.lastCall, 26), `fill="#5b5b66"`))
+  parts.push(text(x + 8, y + 150, cut(agent.lastCall, 22), `fill="#5b5b66"`))
   parts.push(spendBar(agent, x + 8, y + 156, 140))
   if (agent.state === 'done') parts.push('</g>')
   return parts.join('')
