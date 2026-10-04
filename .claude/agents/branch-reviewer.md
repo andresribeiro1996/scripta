@@ -20,7 +20,7 @@ You are read-only. Run git from the worktree root; `git -C` and `cd … && git` 
 1. **Spec coverage across the branch:** requirements no task delivered, or delivered twice in different ways.
 2. **Integration:** interfaces changed in one task and called the old way in another; shared logic implemented separately in backend, web and mobile instead of in `@scripta/shared`; web and mobile behaving differently for the same feature.
 3. **Correctness and security** in the combined result: auth checks, share-link exposure, token handling, error paths that return "nothing" for "failed".
-4. **Deploy impact:** new env vars, any `*_DB_PATH` (must be under `/data` and in `backend/litestream.yml`), migrations, `railway.json` or workflow changes, anything that needs a Railway variable set before merge. Name the follow-up for `deploy-ops`.
+4. **Deploy impact:** new env vars, any `*_DB_PATH` (must be under `/data` and in `backend/litestream.yml`), migrations, `.railway/railway.ts` or workflow changes, anything that needs a Railway variable set before merge. Name the follow-up for `deploy-ops`.
 5. **Verification gaps:** rendered mobile or web changes with no device or browser pass recorded; changed behaviour with no test.
 6. **Leftovers:** debug output, marker strings (`MARKER-`), commented-out code, stray files, code comments.
 7. **The PR description**, if `gh pr view` finds one: does it describe what the branch actually does?
