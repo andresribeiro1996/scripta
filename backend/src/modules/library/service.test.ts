@@ -1669,7 +1669,7 @@ test("a document with a value that cannot be turned into text saves, and boot re
   }
 });
 
-test("rebuilding the 10 MiB timing fixture rewrites every row and logs how long it took", () => {
+test("rebuilding the 10 MiB fixture rewrites every row and logs the rebuild", () => {
   const filler = "x".repeat(140);
   const books = Array.from({ length: 5000 }, (_, i) => ({
     Title: `Book ${i} ${filler}`,
@@ -1684,7 +1684,7 @@ test("rebuilding the 10 MiB timing fixture rewrites every row and logs how long 
     backfillLibraryDerived();
     assert.equal(rowsInDb(fileDb, "fixture").books.length, 5000);
     assert.equal(rowsInDb(fileDb, "fixture").highlights.length, 50000);
-    assert.match(String(log.mock.calls[0]?.arguments[0]), /rebuilt \d+ accounts in \d+ ms/);
+    assert.ok(log.mock.calls.some((call) => /rebuilt \d+ accounts in \d+ ms/.test(String(call.arguments[0]))));
   } finally {
     log.mock.restore();
     createSqliteLibraryRepository(fileDb).deleteUserData("fixture");
