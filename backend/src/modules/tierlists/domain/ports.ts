@@ -13,12 +13,12 @@ export interface TierlistsRepository {
    *  or it exists but isn't owned by userId. service.ts treats both cases
    *  identically (a caller-facing 404, not a server error). */
   getOwned(id: string, userId: string): TierlistRow | undefined;
-  insert(row: TierlistRow): void;
+  insert(row: TierlistRow, works?: Map<string, string | null>): void;
   /** Ownership-checked partial update — merges `patch` onto the existing
    *  row (only the keys present in `patch` change) and returns the
    *  merged, persisted row. Returns undefined if no row with that id was
    *  owned by userId. */
-  update(id: string, userId: string, patch: Partial<Pick<TierlistRow, "name" | "data">>): TierlistRow | undefined;
+  update(id: string, userId: string, patch: Partial<Pick<TierlistRow, "name" | "data">>, works?: Map<string, string | null>): TierlistRow | undefined;
   /** Returns true if a row was actually deleted (i.e. it existed AND was
    *  owned by userId). */
   delete(id: string, userId: string): boolean;
