@@ -67,6 +67,22 @@ The boot murals scan already streams only documents that still hold murals
   `books` array, gives slightly different answers per route. `PUT /library`
   can't write either, so only legacy rows could hit them; the NULL-`meta`
   answer replaces them, and that is accepted.
+- **Odd fields never fail a write or boot.** `String()` throws on a client
+  value like `{"toString":5}` (commit 4a614448 added `textFields` to stop
+  exactly that in saves; see the "backfill-odd" document at
+  `service.test.ts:739`). Rows are computed inside the save transaction and
+  before `listen`, so a throw would fail every save for that account and
+  crash-loop boot. So:
+  - A book whose `bookKey` throws gets no book row and no highlight rows. A
+    highlight whose `String(BookmarkID)` throws gets no row. Log each once,
+    with the user id and position.
+  - If the reader card throws, store `reader_card` as NULL and log it. A
+    mural that asks for the reader card then fails with a 500, as it does
+    today for that document.
+  - Catch only `TypeError` from these calls; anything else propagates.
+  - Today such a document already gives a 500 on the public reads that hit
+    the bad field. Serving it without the bad book is the accepted
+    difference, and Task 1's golden fixtures leave these documents out.
 - **Columns are only what a phase-B read needs.** If a projection reads a
   field this plan doesn't list, add it under the same rules and say so in the
   commit. Don't add others: every column is private data in a table the
@@ -147,8 +163,12 @@ leave them stale, and the stale check below rebuilds them on roll-forward.
       (`publicResolver.ts:146`).
     - These names don't clash with the document's own `book_count` inside
       `meta`.
+- [ ] **`bookRow(book, position)`**, which builds one book row and its highlight
+  rows under the definitions above, and **`libraryMeta(data)`**, which builds
+  `meta`. Export both from `service.ts`. Every write path, Task 2b included,
+  uses them, so the typed-column rules live in one place.
 - [ ] **`deriveLibraryRows(data)`** in `service.ts`, next to
-  `deriveLibraryData`. It is pure, and returns the book rows, highlight rows
+  `deriveLibraryData`, built from `bookRow` and `libraryMeta`. It is pure, and returns the book rows, highlight rows
   and summary under the definitions above. Its `reader_card` is
   `publicReaderCard(readerIdentity(libraryParts(raw).allBooks,
   toReaderGroups(groupRecords)))` on the raw books, as `publicResolver.ts:425`
@@ -201,6 +221,9 @@ leave them stale, and the stale check below rebuilds them on roll-forward.
   - An unreadable document's rebuild leaves NULL `meta` and no rows.
   - Deletion and orphan cleanup clear everything, including when
     `library_derived` has no row for that user.
+  - The "backfill-odd" document (`service.test.ts:739`) saves, and boot
+    rebuilds it, without throwing. The bad book has no row, and
+    `reader_card` is NULL if it throws.
 
 ## Task 2b: Small saves keep the rows in step
 
@@ -225,9 +248,10 @@ tests.
       same objects for the rest). Finding them needs no hashing or `bookKey`
       scan.
     - `applyChange` passes the repository full row values for those
-      positions, built by the same row helper and `bookRowHash`.
+      positions, built by `bookRow`.
     - Highlights are untouched.
-  - **Membership change:** no book rows change; `meta.groups` is replaced.
+  - **Membership change:** no book rows change; `meta` is rebuilt with
+    `libraryMeta`.
   - **Summary:**
     - Recount `finished_count` and `in_progress_count` from the parsed
       books, in one loop with no stringify.
@@ -327,9 +351,11 @@ tests. Callers to re-check: murals, the community profile, quizzes
   order: `{"data":<stored text>,"updatedAt":…,"shareToken":…,"shareUrl":…}`.
   The values are `JSON.stringify`'d and the header is `Content-Type:
   application/json; charset=utf-8`.
-  - Stored text is only ever written by `JSON.stringify` on the server, so
-    it is valid JSON. A document the summary marks unreadable (NULL `meta`)
-    still gets today's 500.
+  - Stored text is only ever written by `JSON.stringify` on the server, so it
+    is valid JSON. `getLibraryText` doesn't read `library_summary`. Today an
+    unparseable stored document gives `GET /library` a 500; it would now
+    send that text as is. Only a hand-edited database could hold one, and
+    that difference is accepted.
 - [ ] Task 1's `GET /library` and 409 assertions pass unchanged.
 
 ## Done when
