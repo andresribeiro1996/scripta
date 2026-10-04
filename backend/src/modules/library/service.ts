@@ -119,8 +119,8 @@ function parseStoredLibrary(row: LibraryDocumentRow): LibraryData {
   let parsed: unknown;
   try {
     parsed = JSON.parse(row.data);
-  } catch {
-    throw new Error("Stored library document is unreadable; refusing to rewrite it.");
+  } catch (error) {
+    throw new Error("Stored library document is unreadable; refusing to rewrite it.", { cause: error });
   }
   if (!isRecord(parsed) || !Array.isArray(parsed.books)) throw new Error("Stored library document is unreadable; refusing to rewrite it.");
   return parsed as LibraryData;

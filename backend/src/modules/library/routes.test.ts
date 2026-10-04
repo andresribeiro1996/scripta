@@ -324,6 +324,7 @@ test("PATCH /library/books answers 400, 401 and 404", async () => {
   assert.equal((await patch({ bookKey: key, rating: 6 })).statusCode, 400);
   assert.equal((await patch({ bookKey: key, rating: 0 })).statusCode, 400);
   assert.equal((await patch({ bookKey: key, readStatus: 1, day: "yesterday" })).statusCode, 400);
+  assert.equal((await patch({ bookKey: key, readStatus: 2, day: "2026-02-30" })).statusCode, 400);
   assert.equal((await patch({ bookKey: key, rating: 3 })).statusCode, 404);
   service.saveLibrary("u1", shelfLibrary());
   assert.equal((await patch({ bookKey: "ta:nobody|", rating: 3 })).statusCode, 404);

@@ -69,13 +69,21 @@ const saveLibrarySchema = z.object({
     .passthrough()
 });
 
+const daySchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .refine((day) => {
+    const date = new Date(`${day}T00:00:00Z`);
+    return !Number.isNaN(date.getTime()) && date.toISOString().startsWith(day);
+  });
+
 const addBookSchema = z.object({
   title: z.string().min(1),
   author: z.string().min(1),
   isbn: z.string().min(1).nullable().optional(),
   coverUrl: z.string().min(1).nullable().optional(),
   readStatus: z.union([z.literal(0), z.literal(1), z.literal(2)]),
-  day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()
+  day: daySchema.optional()
 });
 
 const mergeBooksSchema = z.object({
@@ -93,7 +101,7 @@ const bookChangeSchema = z
     bookKey: bookKeySchema,
     readStatus: z.union([z.literal(0), z.literal(1), z.literal(2)]).optional(),
     rating: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)]).optional(),
-    day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()
+    day: daySchema.optional()
   })
   .refine((body) => body.readStatus !== undefined || body.rating !== undefined)
   .refine((body) => body.readStatus !== 2 || body.day !== undefined);
