@@ -56,6 +56,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     SELECT id FROM books WHERE details_status IS NULL ORDER BY details_checked_at IS NOT NULL, created_by IS NOT NULL, details_checked_at, created_at, rowid LIMIT ?
   `);
   const setUpgradeWantedStmt = db.prepare(`UPDATE books SET cover_upgrade_wanted_at = ? WHERE id = ?`);
+  const setAppleCheckedStmt = db.prepare(`UPDATE books SET apple_checked_at = ? WHERE id = ?`);
   const setWorkKeyStmt = db.prepare(`UPDATE books SET ol_work_key = ? WHERE id = ? AND ol_work_key IS NULL`);
   const setPublisherUrlStmt = db.prepare(`UPDATE books SET publisher_url = ? WHERE id = ? AND publisher_url IS NULL`);
   const upgradeWantedStmt = db.prepare(`SELECT id FROM books WHERE cover_upgrade_wanted_at IS NOT NULL ORDER BY cover_upgrade_wanted_at, rowid`);
@@ -191,6 +192,10 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
 
     setUpgradeWanted(bookId, at) {
       setUpgradeWantedStmt.run(at, bookId);
+    },
+
+    setAppleChecked(bookId, at) {
+      setAppleCheckedStmt.run(at, bookId);
     },
 
     setWorkKey(id, key) {

@@ -390,7 +390,17 @@ test("an existing database gains publisher_url, created_by and cover_images.orig
   assert.equal(book.pages, null);
   assert.equal(book.translator, null);
   assert.equal(book.summary_source, null);
+  assert.equal(book.apple_checked_at, null);
   assert.equal(repo.getImage("img")!.origin, null);
+});
+
+test("setAppleChecked stamps the book and survives a repeated migration", () => {
+  const { db, repo } = freshRepo();
+  const book = repo.createBook({ title: "A", author: "A", isbn: null }, ["ta:a|a|"], NOW);
+  assert.equal(book.apple_checked_at, null);
+  repo.setAppleChecked(book.id, NOW);
+  applyBooksMigrations(db);
+  assert.equal(repo.getBook(book.id)!.apple_checked_at, NOW);
 });
 
 test("insertImage stores the origin and createBook stores its creator", () => {
