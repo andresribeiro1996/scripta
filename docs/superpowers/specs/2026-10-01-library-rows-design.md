@@ -35,30 +35,24 @@ complete. It fixes the read side now without touching either client.
 ## Phase B data model (`library.sqlite`)
 
 ```
-library_books
-  user_id, position          PRIMARY KEY      -- index in data.books
+library_books                -- one row per object entry in data.books
+  user_id, position          PRIMARY KEY      -- raw index in data.books
   book_key                   TEXT NOT NULL    -- bookKey(), what groups, murals and games reference
-  title, author, isbn, image_id, series, series_number,
-  read_status, percent_read, rating, date_last_read,
-  sort_order, cover_url, cover_image_id,       -- _order, _coverUrl, _coverImageId
-  genres                     TEXT             -- JSON array, as stored
-  highlight_count            INTEGER
+  title, author, isbn, image_id, cover_url    -- stored only when a string
+  read_status, series_number, sort_order REAL -- stored only when a number
+  finished_year              INTEGER
   row_hash                   TEXT             -- of the book's JSON, to skip unchanged books
   index (user_id, book_key), index (user_id, read_status)
 
 library_highlights
-  user_id, position, highlight_id  PRIMARY KEY  -- BookmarkID
-  text, annotation, type, created_at
-
-library_groups
-  user_id, group_id          PRIMARY KEY
-  type, name, position, book_keys  TEXT        -- JSON array, as stored
+  user_id, position, highlight_id  PRIMARY KEY  -- String(BookmarkID), first wins
+  text, annotation
 
 library_summary              -- beside library_derived, which stays as it is
   user_id                    PRIMARY KEY
-  name, style                -- the document's own fields, as stored
-  glyph, reader_card, shelf_theme   -- computed at save, as JSON
-  book_count, finished_count, in_progress_count, highlight_count
+  meta                       -- JSON: the document's own fields incl. groups and style; NULL if unreadable
+  reader_card, shelf_theme   -- computed at save, as JSON
+  total_books, finished_count, in_progress_count, total_highlights
   source_updated_at          -- the document version these rows came from
 ```
 
@@ -88,7 +82,7 @@ library_summary              -- beside library_derived, which stays as it is
 
 | Route | Today | Phase B |
 |---|---|---|
-| `GET /library/shared/:token`, `GET /community/profiles/:username/library` | parse the whole document, redact, one covers lookup per book | `SELECT` the public columns from `library_books` plus `library_summary` / `library_groups`; covers for books without one in one batched lookup through the books module's public API |
+| `GET /library/shared/:token`, `GET /community/profiles/:username/library` | parse the whole document, redact, one covers lookup per book | `SELECT` the public columns from `library_books` plus `library_summary` (groups in its `meta`); covers for books without one in one batched lookup through the books module's public API |
 | `GET /murals/shared/:token`, profile shelf mural | parse the whole document, index every book | point lookups for the referenced `book_key`s and highlight ids; currently-reading by `read_status = 1`; stats, shelf theme and reader card from `library_summary` |
 | `GET /library` (owner) | parse the document, then serialise it again | send the stored JSON text inside the response without parsing it |
 | `PUT /library` echo | parse the document just written | reuse the JSON text just written |

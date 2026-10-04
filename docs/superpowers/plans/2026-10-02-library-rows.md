@@ -26,16 +26,21 @@ npm test --workspace backend
 ---
 
 The boot murals scan already streams only documents that still hold murals
-(`migration.ts:37`, c2a797d6), so it needs no task here.
+(`migration.ts:39`, c2a797d6), so it needs no task here.
 
 ## Definitions (every task uses these)
 
 - **Position** is the raw index in `data.books`. An entry that isn't an
-  object (`isRecord` from shared; arrays count as objects, as there) gets no
-  row; its index is skipped, not renumbered. Full rebuilds, whole saves and
+  object (the backend's `isRecord`, `service.ts:24`; arrays count as objects)
+  gets no row; its index is skipped, not renumbered. Full rebuilds, whole saves and
   small saves all use this, so their positions agree.
-- **`book_key`** comes from shared `bookKey`. Task 4 deletes the identical copy
+- **`book_key`** comes from shared `bookKey`. Task 3 deletes the identical copy
   in `publicResolver.ts:115`.
+- **The normalised ISBN** is `book_key.startsWith("isbn:") ? book_key.slice(5)
+  : null`. Shared `bookKey` and `normalizeIsbn` match the resolver's copies
+  byte for byte. Murals' `isbn` and both routes' cover-lookup ISBN use it,
+  so a numeric `ISBN` still works as it does today. The raw `isbn` column
+  only feeds the library route's `ISBN` field.
 - **`row_hash`** comes from one helper, `bookRowHash(book)`: a hash of
   `JSON.stringify(book)`. Every write path uses it.
 - **Typed columns keep today's checks.** The public projections test every
@@ -44,14 +49,24 @@ The boot murals scan already streams only documents that still hold murals
     projection makes, else NULL. On read, NULL is an absent key for the
     shared and profile library, and whatever today's projection gives for a
     missing field in murals (`null`, "Untitled", "Unknown author").
+    `_coverUrl` is the exception: the library routes always emit it, as
+    `null` when there is no cover (`publicResolver.ts:241`).
   - `isbn` and `image_id` are stored raw (strings only). The library routes
-    return them raw. Murals apply `normalizeIsbn` and `normalizeImageId` on
-    read, as today.
+    return them raw. Murals take the ISBN from `book_key` (above), and apply
+    `normalizeImageId` on read, as today.
   - `cover_url` is stored only when it is a string, `""` included, as today.
   - `read_status`, `series_number` and `sort_order` are REAL. An integral
     value past 2^53 in an INTEGER column can't be read without `readBigInts`,
     and every public view of that account would return 500. A string such as
     `"2"` is NULL, never converted.
+- **Unreadable** means the stored text doesn't parse, or `libraryParts` of it
+  is null. Such a document gets a summary with NULL `meta`, and its book and
+  highlight rows are deleted. Reads treat a NULL `meta` as today's parse
+  failure: the shared link 404s, the profile library is null, and murals
+  are empty. Today a document whose JSON isn't an object, or that has no
+  `books` array, gives slightly different answers per route. `PUT /library`
+  can't write either, so only legacy rows could hit them; the NULL-`meta`
+  answer replaces them, and that is accepted.
 - **Columns are only what a phase-B read needs.** If a projection reads a
   field this plan doesn't list, add it under the same rules and say so in the
   commit. Don't add others: every column is private data in a table the
@@ -94,7 +109,7 @@ prove nothing changed.
   (`application/json; charset=utf-8`), and a 409 from `PUT /library` with
   its `current` body.
 
-## Task 2: Rows kept in step with the document
+## Task 2a: Rows kept in step with the document
 
 **Files:** `backend/src/modules/library/adapters/sqlite/{schema.sql,sqliteLibraryRepository.ts}`,
 `backend/src/modules/library/domain/{types.ts,ports.ts}`,
@@ -113,14 +128,13 @@ leave them stale, and the stale check below rebuilds them on roll-forward.
     read_status)`.
     - `finished_year` is computed exactly like today's `finishedInYear`.
   - `library_highlights (user_id, position, highlight_id, text, annotation,
-    type, created_at, PRIMARY KEY (user_id, position, highlight_id))`.
+    PRIMARY KEY (user_id, position, highlight_id))`. The mural quote block
+    reads only `Text` and `Annotation` (`publicResolver.ts:399-400`).
     - `highlight_id = String(BookmarkID)`, so a missing id is `"undefined"`,
       matching `publicResolver.ts:394`.
     - Insert with `INSERT OR IGNORE`, so the first of a duplicate id wins,
       as `find` does.
     - Non-object highlights get no row.
-    - Store only the fields the mural quote block reads; check
-      `publicResolver.ts` for the list.
   - `library_summary (user_id PRIMARY KEY, meta, reader_card, shelf_theme,
     total_books, finished_count, in_progress_count, total_highlights,
     source_updated_at NOT NULL)`.
@@ -135,7 +149,11 @@ leave them stale, and the stale check below rebuilds them on roll-forward.
       `meta`.
 - [ ] **`deriveLibraryRows(data)`** in `service.ts`, next to
   `deriveLibraryData`. It is pure, and returns the book rows, highlight rows
-  and summary under the definitions above.
+  and summary under the definitions above. Its `reader_card` is
+  `publicReaderCard(readerIdentity(libraryParts(raw).allBooks,
+  toReaderGroups(groupRecords)))` on the raw books, as `publicResolver.ts:425`
+  computes it today, and its `shelf_theme` is `calculateShelfTheme` on the
+  same books.
 - [ ] **`writeRows`** runs in the same transaction as the document, on every
   whole-document write path: `saveLibrary`, `addBook`, `mergeBooks`, and
   `applyChange` for an add (which goes through `upsertDocument`).
@@ -147,6 +165,53 @@ leave them stale, and the stale check below rebuilds them on roll-forward.
   - An unchanged save writes no book or highlight rows. Test it with
     `total_changes()` or a write counter, not rowids, because an UPDATE keeps
     the rowid.
+- [ ] **Stale check.** Today `listStaleStmt` joins only `library_derived`, and
+  `backfillLibraryDerived` only calls `setDerived`. Extend both:
+  - An account is stale when its `library_derived` is stale (as now), or when
+    its `library_summary` row is missing or its `source_updated_at` differs
+    from `library_documents.updated_at`.
+  - For each stale account the loop writes `library_derived` (as now) and
+    the rows and summary through `writeRows`, one document at a time.
+  - On first boot that is every account. Log the count and the time taken.
+  - An unreadable document gets a summary with NULL `meta`, and its existing
+    book and highlight rows are deleted.
+- [ ] **Deletion:**
+  - `deleteUserData` clears the three new tables.
+  - `deleteOrphanedDerived` also clears them for users with no document. Check
+    each new table against `library_documents` directly, not through
+    `library_derived`, which may be gone or already cleared. An account
+    deleted while a rolled-back build ran would otherwise keep its books and
+    highlight text forever.
+- [ ] **Fixture:** the timing fixture is built by a test helper. It holds
+  5,000 books with 50,000 highlights, padded with long titles to about
+  10 MiB. Don't commit generated data.
+- [ ] **Tests:**
+  - After a save, an edit of one book, a reorder, a deletion and a merge,
+    the rows match `deriveLibraryRows` of the stored document. Only the
+    edited row is written.
+  - Duplicate and missing `BookmarkID`s don't fail a save.
+  - Typed columns follow the rules above: a string `"2"` status is NULL, and
+    an `_order` of 2^60 reads back.
+  - A document written without touching the new tables (as a rolled-back
+    build would) is rebuilt by the next startup. Bring
+    `library_derived.source_updated_at` up to the document's `updated_at`
+    first (with `repo.setDerived` or a raw UPDATE), so that only the summary
+    is stale. That is what a rolled-back build leaves; without that step,
+    today's check alone would pass the test.
+  - An unreadable document's rebuild leaves NULL `meta` and no rows.
+  - Deletion and orphan cleanup clear everything, including when
+    `library_derived` has no row for that user.
+
+## Task 2b: Small saves keep the rows in step
+
+**Files:** `backend/src/modules/library/{service.ts,adapters/sqlite/sqliteLibraryRepository.ts,domain/ports.ts}`,
+tests.
+
+- [ ] **`updateDocumentData`'s new signature:**
+  `updateDocumentData(userId, json, expectedUpdatedAt, glyph | "keep",
+  rows: { books: BookRow[]; counts: { finished: number; inProgress: number };
+  meta: string | "keep"; readerCard: string | "keep" })`. The other summary
+  fields stay as stored.
 - [ ] **Small saves keep the rows in step.** `applyChange` writes a
   membership or book change through `updateDocumentData`. After the
   document UPDATE, in the same transaction:
@@ -166,45 +231,29 @@ leave them stale, and the stale check below rebuilds them on roll-forward.
   - **Summary:**
     - Recount `finished_count` and `in_progress_count` from the parsed
       books, in one loop with no stringify.
-    - Recompute `reader_card` on exactly the glyph's rule (both use
-      `readerIdentity`: a status to or from Finished, or a tick in a series
-      group); otherwise keep it.
+    - Recompute `reader_card` on exactly the glyph's rule (a status to or
+      from Finished, or a tick in a series group); otherwise keep it.
+      Compute it as `publicResolver.ts:425` does today:
+      `publicReaderCard(readerIdentity(libraryParts(raw).allBooks,
+      toReaderGroups(groupRecords)))`, on the raw books. Never reuse the
+      glyph's identity, which runs on `textFields` copies: a numeric `Title`
+      becomes `undefined` there, so the dedupe and counts differ.
     - Keep `shelf_theme`, which reads only genres, and no membership or book
       change alters them.
-  - **Measure** a book change and a membership change on the fixture below,
+  - **Measure** a book change and a membership change on Task 2a's fixture,
     before and after, and put both in the commit message. The goal is no
-    more than about 10 ms added to 2a's 140–200 ms.
-- [ ] **Stale check.** The startup step (`backfillLibraryDerived` and its
-  `listStaleUserIds`) also treats an account as stale when its
-  `library_summary` row is missing or its `source_updated_at` differs from
-  `library_documents.updated_at`.
-  - It rebuilds that account's rows one document at a time, as now.
-  - On first boot that is every account. Log the count and the time taken.
-  - An unreadable document gets a summary with NULL `meta` and no book rows.
-- [ ] **Deletion:**
-  - `deleteUserData` clears the three new tables.
-  - `deleteOrphanedDerived` also clears them for users with no document. An
-    account deleted while a rolled-back build ran would otherwise keep its
-    books and highlight text forever.
-- [ ] **Fixture:** the timing fixture is built by a test helper. It holds
-  5,000 books with 50,000 highlights, padded with long titles to about
-  10 MiB. Don't commit generated data.
+    more than about 10 ms added to the 140–200 ms that small saves measured
+    (a6ab168).
 - [ ] **Tests:**
-  - After a save, an edit of one book, a reorder, a deletion and a merge,
-    the rows match `deriveLibraryRows` of the stored document. Only the
-    edited row is written.
-  - Duplicate and missing `BookmarkID`s don't fail a save.
-  - Typed columns follow the rules above: a string `"2"` status is NULL, and
-    an `_order` of 2^60 reads back.
   - After each kind of small save, the rows equal `deriveLibraryRows` of the
     stored document. The kinds are a tick in a series group, a tick in a
     collection, a status to and from Finished, a rating, and an add.
-  - A small save on an account whose rows were stale leaves them stale, and
-    the startup step then rebuilds them.
+  - A book change rewrites only that book's row.
+  - A small save on an account whose summary was stale leaves it stale, and
+    the startup step then rebuilds it. As in 2a, bring
+    `library_derived.source_updated_at` current first, so that only the
+    summary is stale.
   - A startup run straight after a change rebuilds nothing.
-  - A document written without touching the new tables (as a rolled-back
-    build would) is rebuilt by the next startup.
-  - Deletion and orphan cleanup clear everything.
 
 ## Task 3: Public reads use rows
 
@@ -214,8 +263,10 @@ tests. Callers to re-check: murals, the community profile, quizzes
 (`quizzes/routes.ts:117`) and tierlists (`tierlists/routes.ts:87,146,245`).
 
 - [ ] **Look up the owner without reading the document.**
-  - By share token: select `user_id`, `share_token` and `updated_at` only.
-    Today's `getByShareTokenStmt` is `SELECT *`.
+  - By share token: select `user_id` and `share_token` only. Today's
+    `getByShareTokenStmt` is `SELECT *`. Serve the rows even if the summary
+    is older than the document: that only happens across a rollback, and
+    the next boot fixes it. Never fall back to parsing the document.
   - By user: check `library_summary`. Today `getDocumentStmt` selects
     `data`.
   - A missing summary, or a NULL `meta`, gives exactly today's answer for an
@@ -223,9 +274,13 @@ tests. Callers to re-check: murals, the community profile, quizzes
     (`service.ts:337-342`, `publicResolver.ts:330`).
 - [ ] **Books module: `peekCachedCoverUrls(params[])`.**
   - It resolves many lookups in one query, keys through `json_each`.
-  - It keeps `findByIdentity`'s two-step order: the ISBN key first, then
-    `titleKey`. A book with neither gets null, as `lookupIdentity` gives.
-  - Test that it agrees with `peekCachedCoverUrl` called one by one.
+  - It keeps `findByIdentity`'s exact rule (`books/domain/normalize.ts:69-70`).
+    It uses the title key only when no book row exists for the ISBN key. An
+    ISBN row with no cover gives null, even when a title row has one. Don't
+    write it as a `COALESCE` of the two covers. A book with neither key gets
+    null, as `lookupIdentity` gives.
+  - Test that it agrees with `peekCachedCoverUrl` called one by one. Include
+    an ISBN row with no cover next to a title row that has one.
 - [ ] **One builder** serves both the shared library and the profile library,
   replacing `service.getPublicByToken`'s and
   `publicResolver.resolvePublicLibrary`'s two paths.
@@ -259,13 +314,19 @@ tests. Callers to re-check: murals, the community profile, quizzes
 
 **Files:** `backend/src/modules/library/{service.ts,routes.ts}`, tests.
 
-- [ ] Add a separate method that returns the stored text. Leave
-  `getLibrary` and `saveLibrary` alone: the 409 `current` body
-  (`routes.ts:160,198`) and unshare (`routes.ts:219`) use them, and returning
-  text there would put a JSON string inside JSON for installed clients.
+- [ ] Leave `getLibrary` alone: the 409 `current` body (`routes.ts:160,198`)
+  and unshare (`routes.ts:219`) use it, and returning text there would put a
+  JSON string inside JSON for installed clients.
+- [ ] Add `getLibraryText(userId)`, which returns the stored text plus
+  `updatedAt`, `shareToken` and `shareUrl`. Change `saveLibrary` and
+  `mergeBooks`, the no-op path at `service.ts:276` included, to return that
+  same shape with the text they just wrote, instead of `toLibraryDocument`,
+  which parses it again. Update their other callers.
 - [ ] `GET /library`, the `PUT /library` echo and the `POST
-  /library/books/merge` echo send `{"data":<stored text>,…}`, built as a
-  string, with `Content-Type: application/json; charset=utf-8`.
+  /library/books/merge` echo send the body built as a string, keys in this
+  order: `{"data":<stored text>,"updatedAt":…,"shareToken":…,"shareUrl":…}`.
+  The values are `JSON.stringify`'d and the header is `Content-Type:
+  application/json; charset=utf-8`.
   - Stored text is only ever written by `JSON.stringify` on the server, so
     it is valid JSON. A document the summary marks unreadable (NULL `meta`)
     still gets today's 500.
