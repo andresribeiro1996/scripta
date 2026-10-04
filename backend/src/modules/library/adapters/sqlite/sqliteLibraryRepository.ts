@@ -3,10 +3,11 @@
 // LibraryRepository interface this fulfills.
 
 import type { DatabaseSync } from "node:sqlite";
+import { LIBRARY_ROWS_VERSION } from "../../domain/constants.js";
 import type { LibraryRepository } from "../../domain/ports.js";
 import type { LibraryDerived, LibraryDocumentRow, LibraryRows, LibrarySmallSave } from "../../domain/types.js";
 
-export function createSqliteLibraryRepository(db: DatabaseSync): LibraryRepository {
+export function createSqliteLibraryRepository(db: DatabaseSync, rowsVersion = LIBRARY_ROWS_VERSION): LibraryRepository {
   const getStmt = db.prepare(`SELECT * FROM library_documents WHERE user_id = ?`);
   // One document per user: insert on first save, replace on every save
   // after that. SQLite's upsert clause does this in one round trip.
@@ -48,6 +49,7 @@ export function createSqliteLibraryRepository(db: DatabaseSync): LibraryReposito
     LEFT JOIN library_summary ON library_summary.user_id = library_documents.user_id
     WHERE library_derived.user_id IS NULL OR library_derived.source_updated_at != library_documents.updated_at
       OR library_summary.user_id IS NULL OR library_summary.source_updated_at != library_documents.updated_at
+      OR library_summary.rows_version != ?
   `);
   const listRowHashesStmt = db.prepare(`SELECT position, row_hash FROM library_books WHERE user_id = ?`);
   const upsertBookStmt = db.prepare(`
@@ -61,15 +63,16 @@ export function createSqliteLibraryRepository(db: DatabaseSync): LibraryReposito
     UPDATE library_summary SET
       meta = CASE WHEN $set_meta THEN $meta ELSE meta END,
       reader_card = CASE WHEN $set_reader_card THEN $reader_card ELSE reader_card END,
-      finished_count = $finished, in_progress_count = $in_progress, source_updated_at = $updated_at
+      finished_count = $finished, in_progress_count = $in_progress, source_updated_at = $updated_at, rows_version = $rows_version
     WHERE user_id = $user_id AND source_updated_at = $expected_updated_at
   `);
   const upsertSummaryStmt = db.prepare(`
-    INSERT INTO library_summary (user_id, meta, reader_card, shelf_theme, total_books, finished_count, in_progress_count, total_highlights, source_updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO library_summary (user_id, meta, reader_card, shelf_theme, total_books, finished_count, in_progress_count, total_highlights, source_updated_at, rows_version)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(user_id) DO UPDATE SET meta = excluded.meta, reader_card = excluded.reader_card, shelf_theme = excluded.shelf_theme,
       total_books = excluded.total_books, finished_count = excluded.finished_count, in_progress_count = excluded.in_progress_count,
-      total_highlights = excluded.total_highlights, source_updated_at = excluded.source_updated_at
+      total_highlights = excluded.total_highlights, source_updated_at = excluded.source_updated_at,
+      rows_version = excluded.rows_version
   `);
 
   function writeDerived(userId: string, derived: LibraryDerived, sourceUpdatedAt: string) {
@@ -93,7 +96,7 @@ export function createSqliteLibraryRepository(db: DatabaseSync): LibraryReposito
       deletePositionHighlightsStmt.run(userId, position);
     }
     const { summary } = rows;
-    upsertSummaryStmt.run(userId, summary.meta, summary.reader_card, summary.shelf_theme, summary.total_books, summary.finished_count, summary.in_progress_count, summary.total_highlights, sourceUpdatedAt);
+    upsertSummaryStmt.run(userId, summary.meta, summary.reader_card, summary.shelf_theme, summary.total_books, summary.finished_count, summary.in_progress_count, summary.total_highlights, sourceUpdatedAt, rowsVersion);
   }
 
   function writeSmallSave(userId: string, rows: LibrarySmallSave, updatedAt: string, expectedUpdatedAt: string) {
@@ -106,6 +109,7 @@ export function createSqliteLibraryRepository(db: DatabaseSync): LibraryReposito
       $finished: rows.counts.finished,
       $in_progress: rows.counts.inProgress,
       $updated_at: updatedAt,
+      $rows_version: rowsVersion,
       $expected_updated_at: expectedUpdatedAt
     });
     if (result.changes === 0) return;
@@ -172,7 +176,7 @@ export function createSqliteLibraryRepository(db: DatabaseSync): LibraryReposito
     },
 
     listStaleUserIds() {
-      return (listStaleStmt.all() as Array<{ user_id: string }>).map((row) => row.user_id);
+      return (listStaleStmt.all(rowsVersion) as Array<{ user_id: string }>).map((row) => row.user_id);
     },
 
     setDerived(userId, derived, sourceUpdatedAt) {

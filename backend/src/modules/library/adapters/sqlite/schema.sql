@@ -66,5 +66,6 @@ CREATE TABLE IF NOT EXISTS library_summary (
   finished_count    INTEGER NOT NULL,
   in_progress_count INTEGER NOT NULL,
   total_highlights  INTEGER NOT NULL,
-  source_updated_at TEXT NOT NULL
+  source_updated_at TEXT NOT NULL,
+  rows_version      INTEGER NOT NULL
 );

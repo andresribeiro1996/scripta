@@ -380,3 +380,8 @@ tests. Callers to re-check: murals, the community profile, quizzes
 - A rollback to pre-rows main is safe. On roll-forward, the stale check
   rebuilds every account saved in between. Orphan cleanup clears accounts
   deleted in between.
+- A change to how a row is derived (`bookRow`, `libraryMeta`,
+  `deriveLibraryRows`) must raise `LIBRARY_ROWS_VERSION` in
+  `domain/constants.ts`. It is hashed into every `row_hash` and stored in
+  `library_summary.rows_version`, so the next boot rebuilds every account
+  and rewrites every row.

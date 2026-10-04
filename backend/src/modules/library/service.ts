@@ -5,7 +5,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { applyLibraryChange, bookKey, bookMatchKeys, buildManualBook, calculateShelfTheme, isCertainMatch, isFinishedBook, isGroup, localDay, mergeDuplicateBooks, normalizeIsbn, publicReaderCard, readerIdentity, seedCoverLookup, setReadStatus, type CoverLookupParams, type IdentityKey, type LibraryChange, type LibraryChangeAnswer, type LibraryData } from "@scripta/shared";
 import type { BookRecommendationInput } from "@scripta/shared/community";
-import { BOOK_EVENTS_PER_SAVE, COVER_URL_MAX_LENGTH, DISPLAY_TEXT_MAX_LENGTH, LIBRARY_MATCH_BOOK_CAP, LIBRARY_PUT_HEADROOM_BYTES, MATCH_KEY_MAX_LENGTH } from "./domain/constants.js";
+import { BOOK_EVENTS_PER_SAVE, COVER_URL_MAX_LENGTH, DISPLAY_TEXT_MAX_LENGTH, LIBRARY_MATCH_BOOK_CAP, LIBRARY_PUT_HEADROOM_BYTES, LIBRARY_ROWS_VERSION, MATCH_KEY_MAX_LENGTH } from "./domain/constants.js";
 import { LibraryChangeNotFoundError, LibraryConflictError, LibraryTooLargeError, NoLibraryDocumentError } from "./domain/errors.js";
 import type { LibraryRepository } from "./domain/ports.js";
 import type { LibraryBookRow, LibraryBookRows, LibraryDerived, LibraryDocument, LibraryDocumentRow, LibraryDocumentText, LibraryHighlightRow, LibraryMatchKeyRow, LibraryRows, LibrarySmallSave } from "./domain/types.js";
@@ -89,11 +89,11 @@ function finishedYear(book: Record<string, unknown>): number | null {
   return Number.isNaN(year) ? null : year;
 }
 
-export function bookRowHash(book: Record<string, unknown>): string {
-  return createHash("sha256").update(JSON.stringify(book)).digest("hex");
+export function bookRowHash(book: Record<string, unknown>, rowsVersion = LIBRARY_ROWS_VERSION): string {
+  return createHash("sha256").update(`${rowsVersion}:${JSON.stringify(book)}`).digest("hex");
 }
 
-export function bookRow(book: Record<string, unknown>, position: number, report: ReportSkippedRow): LibraryBookRows {
+export function bookRow(book: Record<string, unknown>, position: number, report: ReportSkippedRow, rowsVersion = LIBRARY_ROWS_VERSION): LibraryBookRows {
   const highlights: LibraryHighlightRow[] = [];
   const marks = Array.isArray(book.highlights) ? book.highlights : [];
   const key = bookKey(book);
@@ -122,7 +122,7 @@ export function bookRow(book: Record<string, unknown>, position: number, report:
       sort_order: number(book._order),
       cover_url: text(book._coverUrl) ?? null,
       finished_year: finishedYear(book),
-      row_hash: bookRowHash(book)
+      row_hash: bookRowHash(book, rowsVersion)
     },
     highlights
   };
@@ -142,7 +142,7 @@ export function readerCardOf(parts: { allBooks: Record<string, unknown>[]; group
   }
 }
 
-export function deriveLibraryRows(data: unknown, report: ReportSkippedRow): LibraryRows {
+export function deriveLibraryRows(data: unknown, report: ReportSkippedRow, rowsVersion = LIBRARY_ROWS_VERSION): LibraryRows {
   const parts = libraryParts(data);
   if (!parts) return { books: [], summary: { meta: null, reader_card: null, shelf_theme: null, total_books: 0, finished_count: 0, in_progress_count: 0, total_highlights: 0 } };
   const doc = data as Record<string, unknown>;
@@ -150,7 +150,7 @@ export function deriveLibraryRows(data: unknown, report: ReportSkippedRow): Libr
   (doc.books as unknown[]).forEach((book, position) => {
     if (!isRecord(book)) return;
     try {
-      books.push(bookRow(book, position, report));
+      books.push(bookRow(book, position, report, rowsVersion));
     } catch (error) {
       if (!(error instanceof TypeError)) throw error;
       report(error, `no row for book ${position}`);

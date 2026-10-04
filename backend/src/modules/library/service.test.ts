@@ -1776,3 +1776,40 @@ test("a small save on an account whose summary was stale leaves it stale, and th
   assert.deepEqual(rowsInDb(fileDb, "small-stale"), rowsOfStored(fileDb, "small-stale"));
   assert.ok(!createSqliteLibraryRepository(fileDb).listStaleUserIds().includes("small-stale"));
 });
+
+test("raising the rows version rebuilds every account and rewrites every book row, and the same version rebuilds nothing", () => {
+  const users = ["rv-a", "rv-b"];
+  const hashes = (userId: string) => (fileDb.prepare(`SELECT row_hash FROM library_books WHERE user_id = ? ORDER BY position`).all(userId) as Array<{ row_hash: string }>).map((row) => row.row_hash);
+  const version = (userId: string) => (fileDb.prepare(`SELECT rows_version FROM library_summary WHERE user_id = ?`).get(userId) as { rows_version: number }).rows_version;
+  const staleUsers = (rowsVersion: number) => createSqliteLibraryRepository(fileDb, rowsVersion).listStaleUserIds().filter((userId) => users.includes(userId));
+  const settled = (rowsVersion: number) => {
+    for (const userId of users) {
+      const row = fileDb.prepare(`SELECT updated_at FROM library_documents WHERE user_id = ?`).get(userId) as { updated_at: string };
+      createSqliteLibraryRepository(fileDb, rowsVersion).setRows(userId, deriveLibraryRows(JSON.parse((fileDb.prepare(`SELECT data FROM library_documents WHERE user_id = ?`).get(userId) as { data: string }).data), () => undefined, rowsVersion), row.updated_at);
+    }
+  };
+  for (const userId of users) fileService.saveLibrary(userId, { books: [dune(), emma] });
+  settled(0);
+  const old = users.map(hashes);
+  assert.deepEqual(users.map(version), [0, 0]);
+
+  backfillLibraryDerived();
+
+  assert.deepEqual(users.map(version), [1, 1]);
+  users.forEach((userId, index) => {
+    const rebuilt = hashes(userId);
+    assert.equal(rebuilt.length, 2);
+    assert.ok(rebuilt.every((hash, position) => hash !== old[index]![position]));
+  });
+  assert.deepEqual(staleUsers(1), []);
+  const settledHashes = users.map(hashes);
+
+  backfillLibraryDerived();
+  assert.deepEqual(users.map(hashes), settledHashes);
+
+  assert.deepEqual(staleUsers(2), users);
+  backfillLibraryDerived(2);
+  assert.deepEqual(users.map(version), [2, 2]);
+  users.forEach((userId, index) => assert.ok(hashes(userId).every((hash, position) => hash !== settledHashes[index]![position])));
+  assert.deepEqual(staleUsers(2), []);
+});

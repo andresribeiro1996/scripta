@@ -11,6 +11,7 @@
 
 import { openLibraryDb } from "./adapters/sqlite/connection.js";
 import { createSqliteLibraryRepository } from "./adapters/sqlite/sqliteLibraryRepository.js";
+import { LIBRARY_ROWS_VERSION } from "./domain/constants.js";
 import { deriveLibraryData, deriveLibraryRows } from "./service.js";
 
 /** One embedded mural pulled out of one user's library JSON, still in its
@@ -110,10 +111,10 @@ function parseStoredDocument(userId: string, dataJson: string): unknown {
   }
 }
 
-export function backfillLibraryDerived(): void {
+export function backfillLibraryDerived(rowsVersion = LIBRARY_ROWS_VERSION): void {
   const db = openLibraryDb();
   try {
-    const repo = createSqliteLibraryRepository(db);
+    const repo = createSqliteLibraryRepository(db, rowsVersion);
     repo.deleteOrphanedDerived();
     const stale = repo.listStaleUserIds();
     const started = performance.now();
@@ -122,7 +123,7 @@ export function backfillLibraryDerived(): void {
       if (!row) continue;
       const parsed = parseStoredDocument(userId, row.data);
       repo.setDerived(userId, deriveLibraryData(parsed), row.updated_at);
-      repo.setRows(userId, deriveLibraryRows(parsed, (error, what) => console.error(`library backfill: ${userId}: ${what}`, error)), row.updated_at);
+      repo.setRows(userId, deriveLibraryRows(parsed, (error, what) => console.error(`library backfill: ${userId}: ${what}`, error), rowsVersion), row.updated_at);
     }
     if (stale.length > 0) console.log(`library backfill: rebuilt ${stale.length} accounts in ${Math.round(performance.now() - started)} ms`);
   } finally {
