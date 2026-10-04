@@ -221,9 +221,12 @@ leave them stale, and the stale check below rebuilds them on roll-forward.
   - An unreadable document's rebuild leaves NULL `meta` and no rows.
   - Deletion and orphan cleanup clear everything, including when
     `library_derived` has no row for that user.
-  - The "backfill-odd" document (`service.test.ts:739`) saves, and boot
-    rebuilds it, without throwing. The bad book has no row, and
-    `reader_card` is NULL if it throws.
+  - Documents whose fields throw save, and boot rebuilds them, without
+    throwing. A book with no ISBN and an object `Attribution` (so `bookKey`
+    throws) gets no row. A highlight with an object `BookmarkID` gets no
+    row. Ten finished books plus an odd one make the reader card throw, so
+    `reader_card` is NULL. ("backfill-odd" at `service.test.ts:739` has a
+    valid ISBN and one book, so it hits neither path.)
 
 ## Task 2b: Small saves keep the rows in step
 
