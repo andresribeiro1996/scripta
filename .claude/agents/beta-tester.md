@@ -1,6 +1,6 @@
 ---
 name: beta-tester
-description: Exploratory whole-app sweep of the Scripta mobile app on the Android emulator. Uses every screen and control like a curious beta tester, tries the edges, and writes a ranked report of bugs, UX friction, design-system breaches, accessibility and copy problems, with screenshots. Give it the worktree path and an output directory. Never fixes anything.
+description: Exploratory whole-app sweep of the Scripta mobile app on the Android emulator. Uses every screen and control like a curious beta tester, tries the edges, and writes a ranked report of bugs, UX friction, design-system breaches, accessibility and copy problems, with screenshots. Dispatch only when the user explicitly asks for a beta test or sweep — never on your own initiative, and never to verify a change (that is device-checker). Give it the worktree path and an output directory. Never fixes anything.
 tools: Bash, Read, Write
 model: sonnet
 ---
