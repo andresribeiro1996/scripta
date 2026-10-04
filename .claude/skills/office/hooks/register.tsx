@@ -10,12 +10,26 @@ const officeAtom = atom({ plugin: 'office', key: 'office' } as const, emptyOffic
 const floorsAtom = atom({ plugin: 'office', key: 'floors' } as const, [] as Snapshot[])
 const reported = new Set<string>()
 let dirty = true
+const failures = new Set<string>()
+let beating = false
+let reading = false
 let lastWriteAt = 0
 
 async function dirOf($: any): Promise<string> {
   const home = await $.env.get('HOME')
   if (!home) throw new Error('office: HOME is not set')
   return `${home}/.claude/office`
+}
+
+async function guard($: any, label: string, fn: () => Promise<void>) {
+  try {
+    await fn()
+  } catch (err) {
+    const key = `${label}: ${err instanceof Error ? err.message : String(err)}`
+    if (failures.has(key)) return
+    failures.add(key)
+    $.ui.log(`office: ${key}`, { to: 'debug' })
+  }
 }
 
 async function apply($: any, ev: OfficeEvent) {
@@ -57,14 +71,23 @@ export const register: Register = on => {
     await $.command.register({ name: 'office', description: "Show this machine's agents as an office" })
     const at = await $.clock.now()
     await update($, officeAtom, o => (o.agents[0].startedAt === 0 ? emptyOffice(at) : o))
-    $.clock.every(1000, () => beat($))
-    $.clock.every(2000, () => readFloors($))
+    $.clock.every(1000, () => {
+      if (beating) return
+      beating = true
+      void guard($, 'beat', () => beat($)).finally(() => { beating = false })
+    })
+    $.clock.every(2000, () => {
+      if (reading) return
+      reading = true
+      void guard($, 'readFloors', () => readFloors($)).finally(() => { reading = false })
+    })
     return next(e)
   })
 
   on('session.end', async ($, e, next) => {
-    await writeSnapshot($, true)
-    return next(e)
+    const r = await next(e)
+    await guard($, 'session.end', () => writeSnapshot($, true))
+    return r
   })
 
   on('command.run', { command: 'office' }, async $ => {
@@ -74,44 +97,50 @@ export const register: Register = on => {
 
   on('agent.spawn', async ($, e, next) => {
     const r: any = await next(e)
-    if (typeof r?.agentId === 'string') {
-      await apply($, {
-        kind: 'spawn',
-        agentId: r.agentId,
-        description: e.description ?? '',
-        type: e.subagentType ?? 'general-purpose',
-        model: r.model ?? '',
-        at: await $.clock.now(),
-      })
-    }
+    await guard($, 'agent.spawn', async () => {
+      if (typeof r?.agentId === 'string') {
+        await apply($, {
+          kind: 'spawn',
+          agentId: r.agentId,
+          description: e.description ?? '',
+          type: e.subagentType ?? 'general-purpose',
+          model: r.model ?? '',
+          at: await $.clock.now(),
+        })
+      }
+    })
     return r
   })
 
   on('tool.call', async ($, e, next) => {
     const r: any = await next(e)
-    const { tool, tool_use_id: _id, agentId, ...input } = e as any
-    await apply($, {
-      kind: 'call',
-      agentId: agentId ?? null,
-      tool,
-      input,
-      isError: r?.isError === true && r?.deny === undefined,
-      at: await $.clock.now(),
+    await guard($, 'tool.call', async () => {
+      const { tool, tool_use_id: _id, agentId, ...input } = e as any
+      await apply($, {
+        kind: 'call',
+        agentId: agentId ?? null,
+        tool,
+        input,
+        isError: r?.isError === true && r?.deny === undefined,
+        at: await $.clock.now(),
+      })
     })
     return r
   })
 
   on('turn.step', async function* ($, e, next) {
     const r: any = yield* next(e)
-    if (r?.usage) {
-      await apply($, { kind: 'step', agentId: (e as any).agentId ?? null, model: r.usage.model ?? '', usage: r.usage, at: await $.clock.now() })
-    }
+    await guard($, 'turn.step', async () => {
+      if (r?.usage) {
+        await apply($, { kind: 'step', agentId: (e as any).agentId ?? null, model: r.usage.model ?? '', usage: r.usage, at: await $.clock.now() })
+      }
+    })
     return r
   })
 
   on('turn.complete', async ($, e, next) => {
     const r = await next(e)
-    await apply($, { kind: 'complete', agentId: e.agentId ?? null, at: await $.clock.now() })
+    await guard($, 'turn.complete', async () => { await apply($, { kind: 'complete', agentId: e.agentId ?? null, at: await $.clock.now() }) })
     return r
   })
 
