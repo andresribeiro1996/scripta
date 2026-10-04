@@ -59,6 +59,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
       : await fetchBytes(candidate.source, candidate.url);
     return bytes ? encodeCover(bytes) : null;
   };
+  const backgroundOpenLibrary = createOpenLibraryCatalog(openLibraryThrottle, false);
   const service = createBooksService({
     repo,
     blobs: { save: (id, extension, bytes) => createObjectStore().put(`covers/${id}.${extension}`, bytes, "image/webp") },
@@ -72,10 +73,11 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
       isbndbConfigured ? createIsbndbCatalog(env.ISBNDB_API_KEY, isbndbThrottle, isbndbGate) : null
     ),
     backgroundCatalog: createCompositeCatalog(
-      createOpenLibraryCatalog(openLibraryThrottle, false),
+      backgroundOpenLibrary,
       isbndbConfigured ? capDailyCalls(createIsbndbCatalog(env.ISBNDB_API_KEY, isbndbThrottle, isbndbGate, false), BACKGROUND_ISBNDB_DAILY_CAP) : null,
       true
     ),
+    editionRecords: backgroundOpenLibrary,
     fetchImage,
     enqueue: (bookId, priority) => worker.enqueue(bookId, priority),
     publicUrlFor: coverUrlFor,
@@ -92,13 +94,18 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     (signal) => service.backfillDetails(DETAILS_BATCH_SIZE, signal),
     (error) => app.log.error({ err: error }, "details backfill failed")
   );
-  const stopWorksBackfill = startWorksBackfill(repo.assignMissingWorks, app.log);
+  const stopWorksBackfill = startWorksBackfill(repo, app.log);
+  const stopWorkKeyBackfill = startDetailsBackfill(
+    (signal) => service.backfillWorkKeys(DETAILS_BATCH_SIZE, signal),
+    (error) => app.log.error({ err: error }, "work key backfill failed")
+  );
   activeService = service;
   app.addHook("onClose", async () => {
     activeService = null;
     stopBackfill();
     stopDetailsBackfill();
     stopWorksBackfill();
+    stopWorkKeyBackfill();
     worker.stop();
   });
 

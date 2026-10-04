@@ -136,3 +136,18 @@ test("an edition record with no work or language, or that is not a record at all
   assert.deepEqual(parseEditionRecord({ works: [{}], languages: [{ key: 7 }, null, "por", { key: "/languages/por" }] }), { title: "", workKey: null, languages: ["/languages/por"] });
   for (const nothing of [null, undefined, "nonsense", 3, []]) assert.deepEqual(parseEditionRecord(nothing), { title: "", workKey: null, languages: [] }, String(nothing));
 });
+
+test("an edition record comes from /isbn/, and an ISBN Open Library doesn't know is null", async () => {
+  const catalog = createOpenLibraryCatalog(direct);
+  const requests = respond([{ title: "Os Maias", works: [{ key: "/works/OL846513W" }], languages: [{ key: "/languages/por" }] }]);
+  assert.deepEqual(await catalog.fetchEditionRecord("9789725681367"), { title: "Os Maias", workKey: "/works/OL846513W", languages: ["/languages/por"] });
+  assert.deepEqual(requests, ["https://openlibrary.org/isbn/9789725681367.json"]);
+  globalThis.fetch = (async () => new Response("<html>not found</html>", { status: 404 })) as typeof fetch;
+  assert.equal(await catalog.fetchEditionRecord("9789722541701"), null);
+});
+
+test("a rate-limited edition record lookup is unavailable with its retry time", async () => {
+  const catalog = createOpenLibraryCatalog(direct);
+  globalThis.fetch = (async () => new Response("slow down", { status: 429, headers: { "retry-after": "60" } })) as typeof fetch;
+  await assert.rejects(catalog.fetchEditionRecord("9789725681367"), (error: unknown) => error instanceof SourceUnavailableError && error.status === 429 && typeof error.retryAt === "number");
+});

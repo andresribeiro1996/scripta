@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { authGuard } from "../auth/index.js";
 import { MAX_UPLOAD_BYTES, type BooksService, type CoverFileSize } from "./booksService.js";
-import { BookNotFoundError, FileTooLargeError, InvalidImageError, SourceUnavailableError } from "./domain/errors.js";
+import { BookNotFoundError, FileTooLargeError, InvalidImageError, SourceUnavailableError, WorkMergeError } from "./domain/errors.js";
 
 const lookupSchema = z.object({
   isbn: z.string().max(64).optional(),
@@ -14,6 +14,9 @@ const fileParamsSchema = z.object({ id: z.string().uuid(), size: z.enum(["file",
 
 const FORBIDDEN = { error: "Only the admin can change shared covers." };
 const NOT_FOUND = { error: "No such book." };
+const WORKS_FORBIDDEN = { error: "Only the admin can merge works." };
+const mergeSchema = z.object({ from: lookupSchema, into: lookupSchema });
+const detachSchema = z.object({ edition: lookupSchema });
 
 const MAX_BATCH = 100;
 const batchSchema = z.array(lookupSchema).max(MAX_BATCH);
@@ -115,6 +118,36 @@ export function buildAdminRoutes(service: BooksService) {
         if (error instanceof FileTooLargeError) return reply.code(413).send({ error: error.message });
         if (error instanceof InvalidImageError) return reply.code(422).send({ error: error.message });
         if (error instanceof BookNotFoundError) return reply.code(404).send(NOT_FOUND);
+        throw error;
+      }
+    });
+
+    app.post("/books/works/merge", { preHandler: authGuard }, async (request, reply) => {
+      if (!service.isAdmin(request.user.id)) return reply.code(403).send(WORKS_FORBIDDEN);
+      const parsed = mergeSchema.safeParse(request.body);
+      if (!parsed.success || !isLookable(parsed.data.from) || !isLookable(parsed.data.into)) {
+        return reply.code(400).send({ error: "Send from and into, each with an isbn or a title (author optional)." });
+      }
+      try {
+        return reply.send(service.mergeWorks(parsed.data.from, parsed.data.into));
+      } catch (error) {
+        if (error instanceof BookNotFoundError) return reply.code(404).send(NOT_FOUND);
+        if (error instanceof WorkMergeError) return reply.code(409).send({ error: error.message });
+        throw error;
+      }
+    });
+
+    app.post("/books/works/detach", { preHandler: authGuard }, async (request, reply) => {
+      if (!service.isAdmin(request.user.id)) return reply.code(403).send(WORKS_FORBIDDEN);
+      const parsed = detachSchema.safeParse(request.body);
+      if (!parsed.success || !isLookable(parsed.data.edition)) {
+        return reply.code(400).send({ error: "Send the edition with an isbn or a title (author optional)." });
+      }
+      try {
+        return reply.send(service.detachEdition(parsed.data.edition));
+      } catch (error) {
+        if (error instanceof BookNotFoundError) return reply.code(404).send(NOT_FOUND);
+        if (error instanceof WorkMergeError) return reply.code(409).send({ error: error.message });
         throw error;
       }
     });

@@ -36,6 +36,8 @@ export interface BookRow {
   work_id: string | null;
   language: string | null;
   work_checked_at: string | null;
+  title_key: string | null;
+  title_group_blocked_at: string | null;
   created_at: string;
 }
 
@@ -62,4 +64,12 @@ export interface NewBook {
   genres?: string[];
   sources?: DataSource[];
   createdBy?: BookCreator;
+}
+
+export interface WorkView {
+  id: string;
+  olWorkKey: string | null;
+  title: string;
+  author: string;
+  editions: Array<{ id: string; isbn: string | null; title: string; author: string; olWorkKey: string | null }>;
 }
