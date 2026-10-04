@@ -50,7 +50,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   `);
 
   const uncheckedStmt = db.prepare(`
-    SELECT id FROM books WHERE cover_image_id IS NULL AND cover_status IS NULL ORDER BY created_at, rowid
+    SELECT id FROM books WHERE cover_checked_at IS NULL AND (cover_status IS NULL OR cover_status = 'low_res') ORDER BY created_at, rowid
   `);
   const uncheckedDetailsStmt = db.prepare(`
     SELECT id FROM books WHERE details_status IS NULL ORDER BY details_checked_at IS NOT NULL, created_by IS NOT NULL, details_checked_at, created_at, rowid LIMIT ?

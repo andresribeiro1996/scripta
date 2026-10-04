@@ -246,6 +246,42 @@ test("a background lookup stamps Apple's answer even when ISBNdb is paused, and 
   assert.deepEqual(calls, ["isbndb:isbn", "openlibrary:isbn", "isbndb:title", "openlibrary:title"]);
 });
 
+test("a low-res Apple cover stays unchecked while ISBNdb is paused, and a wider ISBNdb cover replaces it later", async () => {
+  const HOUR = 60 * 60 * 1000;
+  const calls: string[] = [];
+  let paused = true;
+  const isbndb: CoverSource = {
+    byIsbn: async () => {
+      calls.push("isbndb:isbn");
+      if (paused) throw new SourcePausedError("isbndb", "paused", { retryAt: Date.parse("2026-10-01T00:00:00.000Z") + 5 * HOUR });
+      return [{ source: "isbndb", url: "https://i/wide" }];
+    },
+    byTitle: async () => []
+  };
+  const h = harness({ sources: { isbndb, apple: { ...isbnSource("https://a/small", calls), byTitle: async () => [] }, openlibrary: emptySource } });
+  h.sizes.set("https://a/small", [300, 460]);
+  h.sizes.set("https://i/wide", [900, 1400]);
+  h.service.resolveCover(orlando);
+  const id = h.bookId("isbn:9780141184272");
+  await h.service.processBook(id, "background");
+  let row = h.repo.getBook(id)!;
+  assert.equal(row.apple_checked_at, "2026-10-01T00:00:00.000Z");
+  assert.deepEqual([row.cover_status, row.cover_checked_at], ["low_res", null]);
+  assert.notEqual(row.cover_image_id, null);
+  assert.deepEqual(h.repo.listUncheckedCoverIds(), [id]);
+  const small = row.cover_image_id;
+  h.advance(5 * HOUR);
+  paused = false;
+  calls.length = 0;
+  await h.service.processBook(id, "background");
+  assert.deepEqual(calls, ["isbndb:isbn"]);
+  row = h.repo.getBook(id)!;
+  assert.notEqual(row.cover_image_id, small);
+  assert.equal(row.cover_status, "good");
+  assert.notEqual(row.cover_checked_at, null);
+  assert.deepEqual(h.repo.listUncheckedCoverIds(), []);
+});
+
 test("an Apple failure does not stamp the book", async () => {
   const failing: CoverSource = { byIsbn: async () => { throw new SourceUnavailableError("apple", "HTTP 503", { status: 503 }); }, byTitle: async () => [] };
   const h = harness({ sources: { isbndb: null, apple: failing, openlibrary: emptySource } });
