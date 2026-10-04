@@ -1,7 +1,7 @@
 # Beta tester agent
 
 Date: 2026-10-04
-Status: design agreed, awaiting spec review
+Status: approved 2026-10-04; plan in `docs/superpowers/plans/2026-10-04-beta-tester-agent.md`
 
 ## Problem
 
@@ -32,10 +32,10 @@ them on their own phone.
 
 | File | Change |
 |---|---|
-| `scripts/devSnapshot.mjs` | New. Pure functions: parse uiautomator XML nodes, px→dp, format the listing. |
-| `scripts/devSnapshot.test.mjs` | New. Unit tests against a captured XML fixture. |
-| `scripts/fixtures/uiautomator-sample.xml` | New. One real dump from the emulator, used by the tests. |
-| `scripts/dev-snapshot.mjs` | New. CLI: lease lookup, adb calls, file writes, prints the listing. |
+| `scripts/devSnapshot.mjs` | New. Parse uiautomator XML, px→dp, format the listing, `parseSnapshotArgs`, and `takeSnapshot` (adb + sips, injectable for tests). |
+| `scripts/devSnapshot.test.mjs` | New. Unit tests with inline abridged dumps, the way `devWait.test.mjs` does it. |
+| `scripts/devWait.mjs` | Extract and export `decodeEntities`, adding numeric entities (`&#10;`). |
+| `scripts/dev-snapshot.mjs` | New. CLI: lease lookup, prints `takeSnapshot`'s output. |
 | `package.json` | Add `"dev:snapshot": "node scripts/dev-snapshot.mjs"`. |
 | `.claude/agents/beta-tester.md` | New agent. |
 | `.gitignore` | Add `/beta-tests/`. |
@@ -56,24 +56,34 @@ npm run dev:snapshot -- <name> --out <dir>
 3. `uiautomator dump` via the existing `readScreenText` in `devWait.mjs`.
 4. `adb shell wm density` → dp = px × 160 / density. Read on every call; it is
    one cheap shell call and survives an AVD swap.
-5. Prints the listing to stdout, one line per node that has text,
-   `content-desc` or `clickable="true"`, in tree order:
+5. Prints the listing to stdout in tree order:
 
 ```
 07-murals-list · 411×914dp · saved <dir>/07-murals-list.png
-  tap 540,206   "New mural"             363×52dp
-  tap  44,132   desc="Back"              36×36dp  ⚠ <44dp
-  tap 540,1180  "Summer reads"          379×96dp
-       ·        "Murals"
+  · "Murals"
+  tap 44,132  desc="Back"  36×36dp  ⚠ <44dp
+  tap 540,1180  "Summer reads · 12 books"  379×96dp
+  tap 1000,1190  (no label)  48×48dp
+  tap 540,2100  "Save"  379×52dp  (disabled)
 ```
 
-- `tap x,y` is the node's centre in device pixels, ready for `input tap`.
-  Non-clickable nodes print `·` instead.
+- One `tap x,y` row per clickable node; `x,y` is its centre in device pixels,
+  ready for `input tap`. Its label is its `content-desc`, else the text of
+  its non-clickable descendants joined with ` · `, else `(no label)` (a
+  control TalkBack cannot name). Text consumed into a tap row is not printed
+  again; nested clickables get their own rows.
+- One `·` row per non-clickable node with text or `content-desc` that is not
+  inside a clickable.
+- Nodes with zero width or height are skipped with their subtree.
 - `⚠ <44dp` marks a clickable node whose width or height is under 44dp
-  (DESIGN.md's touch-target floor). It is a candidate only: uiautomator bounds
-  exclude `hitSlop`.
-- Entities are decoded the same way `parseScreenText` decodes them; reuse or
-  extend that function rather than writing a second decoder.
+  (DESIGN.md's touch-target floor). Sizes print floored, so a flagged node
+  never shows 44. It is a candidate only: uiautomator bounds exclude
+  `hitSlop`.
+- `(disabled)` marks `enabled="false"`.
+- Labels collapse whitespace to one space and clip at 60 characters with `…`.
+- Entities are decoded by `decodeEntities`, extracted from `parseScreenText`
+  in `devWait.mjs` and extended with numeric entities, since uiautomator
+  writes a newline inside text as `&#10;`.
 
 Errors: `readScreenText` already returns `""` on a failed dump. The helper
 retries the dump once; if it is still empty it keeps the screenshot, prints
@@ -98,7 +108,8 @@ cleanup.
    held, stop and report "emulator occupied"; a sweep is optional work.
 2. `node scripts/dev-emulator.mjs --reset`, so every sweep starts from the
    same 24-book fixture plus the three fixture users.
-3. `adb logcat -c`.
+3. `adb logcat -c`, and record the byte size of
+   `$TMPDIR/scripta-dev-emulator/metro.log`.
 4. Read `DESIGN.md` once. Read a feature spec under `docs/superpowers/specs/`
    only when a behaviour looks wrong, to check whether it is intended.
 5. Build the coverage list by listing `mobile/src/app/` (expo-router files,
@@ -110,17 +121,20 @@ cleanup.
       empty library, shelf, murals and games.
    2. **Dev account.** Sign out, then cold restart
       (`am force-stop host.exp.exponent` + deep link); dev auto-login
-      restores `scripta-dev@local.test`. Then each of the five tabs and the
-      stack routes they reach.
+      restores `scripta-dev@local.test`. If it lands on login instead, sign
+      in with the credentials in `scripts/fixtures/account.json`. Then each
+      of the five tabs and the stack routes they reach.
    3. **Public routes by deep link:** share links the sweep created,
       `vote/<code>`, `play/<code>`, `arena/<id>`.
 7. On each screen: `dev:snapshot`; Read the PNG on first visit or after a
    visual change; use every control once; try the edges: empty and very long
-   input, emoji, double-tap, back mid-action, landscape rotation, destructive
-   actions with their confirm and undo. Append each finding to `report.md`
+   input, emoji, double-tap, back mid-action, destructive actions with their
+   confirm and undo. (No rotation: `app.json` locks portrait.) Append each finding to `report.md`
    as soon as it is confirmed, and mark the route in the coverage table.
 8. `adb logcat -d ReactNativeJS:E '*:S'` for JavaScript errors raised during
-   the run.
+   the run. If logcat holds no `ReactNativeJS` lines at all, JS logs are not
+   reaching it: read `metro.log` from the byte offset recorded at step 3
+   instead.
 9. Finish the report (summary, JavaScript errors, leftover state), then
    `npm run dev:release`, whatever happened.
 
@@ -178,22 +192,25 @@ tasks through the existing implementer flow. The tester never fixes anything.
 
 ## Testing
 
-- `scripts/devSnapshot.test.mjs` (runs under `npm run test:scripts`): node
-  parsing from the captured fixture, px→dp at density 420, the `<44dp` flag
-  at the boundary (43.9 flagged, 44 not), entity decoding, non-clickable nodes
-  printed with `·`, nodes with neither text nor desc nor clickable skipped.
-- The CLI wrapper stays thin like `dev-wait.mjs` and is exercised by hand once
-  on the emulator.
+- `scripts/devSnapshot.test.mjs` (runs under `npm run test:scripts`): the
+  full listing for an abridged dump, px→dp at density 420 with the `<44dp`
+  boundary (115px flagged, 116px not), labels from descendants, nested
+  clickables, `(no label)`, `(disabled)`, zero-area skip, entity and newline
+  decoding, clipping, `wm density` parsing, and `takeSnapshot` with a fake
+  adb: retry after one empty dump, "screenshot only" after two, and a failed
+  `screencap` propagating. `androidEnv()` throws without an SDK (as on CI), so
+  tests always inject `exec`.
+- The CLI wrapper stays thin like `dev-wait.mjs`. A `device-checker` pass
+  runs it once on a real screen before the first sweep.
 - Acceptance: one real whole-app sweep, reviewed with the user. Shallow or
   wrong findings mean tuning the agent prompt, or moving to approach C.
 
 ## Verify during implementation
 
-- That `console.error` from the app reaches `logcat` under `ReactNativeJS`
-  in Expo Go. If not, read `metro.log` in `$TMPDIR/scripta-dev-emulator/`
-  from a byte offset taken at step 3 instead.
-- That sign-out followed by a cold restart lands on the dev account (auto-login
-  only runs in `loadSession`, when no refresh token survives).
+- That a real dump yields a usable listing: tap centres hit the named
+  controls, and buttons are labelled rather than mostly `(no label)`.
+- Whether `console.error` reaches `logcat` under `ReactNativeJS` in Expo Go.
+  The agent falls back to `metro.log` at runtime either way.
 
 ## Risks
 
