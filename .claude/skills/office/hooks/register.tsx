@@ -149,15 +149,6 @@ export const register: Register = on => {
     return r
   })
 
-  on('ui.press', { plugin: 'office' }, async ($, e, next) => {
-    if (!e.element.startsWith(AGENT_KEY)) return next(e)
-    await guard($, 'ui.press', async () => {
-      const id = e.element.slice(AGENT_KEY.length)
-      await update($, openAtom, open => (open === id ? null : id))
-    })
-    return { element: e.element }
-  })
-
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const view = {
       own: await read($, officeAtom),
@@ -170,7 +161,7 @@ export const register: Register = on => {
     const { Box, Text, Button } = $.ui.resolve(e)
     const agents = view.own.agents.map(a => (
       <Box flexDirection="column">
-        <Button key={`${AGENT_KEY}${a.id}`} label={buttonLabel(a, a.id === open)} />
+        <Button key={`${AGENT_KEY}${a.id}`} label={buttonLabel(a, a.id === open)} onPress={() => { void guard($, 'press', () => update($, openAtom, cur => (cur === a.id ? null : a.id))) }} />
         {a.id === open && detailRows(a, view.at).map(line => <Text>{line}</Text>)}
       </Box>
     ))
