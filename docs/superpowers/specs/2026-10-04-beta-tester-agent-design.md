@@ -117,9 +117,11 @@ cleanup.
    each run, so it never goes stale.
 6. Sweep, in this order:
    1. **First run.** Sign out, sign up `beta-<unix-time>@local.test` on the
-      local backend, go through welcome-avatar (choose-username is Google-only), then the
-      empty library, shelf, murals and games.
-   2. **Dev account.** Sign out, then cold restart
+      local backend, go through welcome-avatar (choose-username is
+      Google-only), then the empty library, shelf, murals and games. Last,
+      on Account security: change the password, correct the email, delete
+      the account (which signs out).
+   2. **Dev account.** Cold restart
       (`am force-stop host.exp.exponent` + deep link); dev auto-login
       restores `scripta-dev@local.test`. If it lands on login instead, sign
       in with the credentials in `scripts/fixtures/account.json`. Then each
