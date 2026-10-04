@@ -59,7 +59,7 @@ const books: unknown[] = [
     ]
   },
   { ContentID: "k2", Attribution: "Anon Author", ReadStatus: 0 },
-  { ContentID: "k3", Title: "Orphan Title", ReadStatus: 2, DateLastRead: `${year - 1}-12-31T10:00:00Z`, _genres: ["Fantasy"] },
+  { ContentID: "k3", Title: "Orphan Title", ReadStatus: 2, DateLastRead: `${year - 1}-06-15T12:00:00Z`, _genres: ["Fantasy"] },
   { ContentID: "k4", Title: 42, Attribution: "Numeric Author", ISBN: 9780141439587, ImageId: 5, ReadStatus: "2", _order: "7", SeriesNumber: "2" },
   null,
   7,
@@ -71,7 +71,7 @@ const books: unknown[] = [
   { ContentID: "k12", Title: "Isbn Without Cover", Attribution: "Cache Author", ISBN: "9784444444444", ReadStatus: 1 },
   { ContentID: "k13", Title: "Bad Date", Attribution: "Date Author", ReadStatus: 2, DateLastRead: "not a date" },
   { ContentID: "k14", Title: "Numeric Date", Attribution: "Date Author", ReadStatus: 2, DateLastRead: 12345 },
-  { ContentID: "k15", Title: "Finished This Year", Attribution: "Date Author", ReadStatus: 2, DateLastRead: `${year}-01-01T12:00:00Z`, _order: 2 ** 60 },
+  { ContentID: "k15", Title: "Finished This Year", Attribution: "Date Author", ReadStatus: 2, DateLastRead: `${year}-01-02T12:00:00Z`, _order: 2 ** 60 },
   { ContentID: "k16", Title: "Emma", Attribution: "Jane Austen", ISBN: "9780141439587X", ReadStatus: 1, _coverUrl: 5, SeriesNumber: 2, _genres: ["Romance", "Fantasy"] }
 ];
 
