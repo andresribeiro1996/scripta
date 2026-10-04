@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import { SourceUnavailableError } from "../../domain/errors.js";
-import { createThrottle, fetchBytes, fetchJson } from "./http.js";
+import { createThrottle, fetchBytes, fetchJson, USER_AGENT } from "./http.js";
 
 const originalFetch = globalThis.fetch;
 afterEach(() => {
@@ -20,6 +20,8 @@ test("fetchJson parses a body, maps 404 to null and sends headers", async () => 
   });
   assert.deepEqual(await fetchJson("isbndb", "https://api.test/a", { Authorization: "k" }), { ok: true });
   assert.equal(seen?.get("Authorization"), "k");
+  assert.equal(seen?.get("User-Agent"), "Atmyshelf/1.0 (+https://atmyshelf.com)");
+  assert.equal(USER_AGENT, "Atmyshelf/1.0 (+https://atmyshelf.com)");
   stub(() => new Response("", { status: 404 }));
   assert.equal(await fetchJson("isbndb", "https://api.test/a"), null);
 });

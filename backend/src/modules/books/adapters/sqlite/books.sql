@@ -1,3 +1,12 @@
+CREATE TABLE IF NOT EXISTS works (
+  id           TEXT PRIMARY KEY,
+  ol_work_key  TEXT UNIQUE,
+  title        TEXT NOT NULL,
+  author       TEXT NOT NULL,
+  merged_into  TEXT REFERENCES works(id),
+  created_at   TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS books (
   id                  TEXT PRIMARY KEY,
   title               TEXT NOT NULL,
@@ -25,6 +34,9 @@ CREATE TABLE IF NOT EXISTS books (
   ol_work_key         TEXT,
   publisher_url       TEXT,
   created_by          TEXT,
+  work_id             TEXT REFERENCES works(id),
+  language            TEXT,
+  work_checked_at     TEXT,
   created_at          TEXT NOT NULL
 );
 

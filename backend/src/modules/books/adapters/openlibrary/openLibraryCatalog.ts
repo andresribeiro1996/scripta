@@ -2,6 +2,23 @@ import { buildBookMetadata, findOpenLibraryMatch, mapOpenLibraryDoc } from "@scr
 import type { BookCatalog } from "../../domain/ports.js";
 import { fetchJson, type Throttle } from "../http/http.js";
 
+export interface EditionRecord {
+  title: string;
+  workKey: string | null;
+  languages: string[];
+}
+
+const keyOf = (value: unknown): string | null => (value && typeof value === "object" && typeof (value as { key?: unknown }).key === "string" ? (value as { key: string }).key : null);
+
+export function parseEditionRecord(record: unknown): EditionRecord {
+  const fields: Record<string, unknown> = record && typeof record === "object" ? (record as Record<string, unknown>) : {};
+  return {
+    title: typeof fields.title === "string" ? fields.title.trim() : "",
+    workKey: Array.isArray(fields.works) ? keyOf(fields.works[0]) : null,
+    languages: Array.isArray(fields.languages) ? fields.languages.flatMap((language) => keyOf(language) ?? []) : []
+  };
+}
+
 export function createOpenLibraryCatalog(throttle: Throttle, urgent = true): BookCatalog {
   const get = (url: string) => throttle(() => fetchJson("openlibrary", url), { urgent });
   return {

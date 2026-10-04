@@ -14,6 +14,7 @@ process.env.GALLERY_DB_PATH ??= join(scratchDir, "gallery.sqlite");
 
 const { applyLibrarySchema } = await import("./connection.js");
 const { createSqliteLibraryRepository } = await import("./sqliteLibraryRepository.js");
+const { deriveLibraryRows } = await import("../../service.js");
 
 test("a trigger that rolls the transaction back surfaces its own error and keeps every row", () => {
   const db = new DatabaseSync(":memory:");
@@ -21,7 +22,7 @@ test("a trigger that rolls the transaction back surfaces its own error and keeps
   const repo = createSqliteLibraryRepository(db);
   db.exec("CREATE TRIGGER boom BEFORE INSERT ON library_match_keys BEGIN SELECT RAISE(ROLLBACK, 'trigger boom'); END");
   const derived = { glyph: null, keys: [{ key: "k", book_ref: 0, title: "T", author: "A", isbn: null, cover: null }] };
-  assert.throws(() => repo.upsertDocument("u1", "{}", derived), /trigger boom/);
+  assert.throws(() => repo.upsertDocument("u1", "{}", derived, deriveLibraryRows({ books: [] }, () => undefined)), /trigger boom/);
   assert.equal(repo.getDocument("u1"), undefined);
   assert.equal(db.isTransaction, false);
 });

@@ -1,4 +1,5 @@
 export const LIBRARY_DERIVED_VERSION = 1;
+export const LIBRARY_ROWS_VERSION = 1;
 export const LIBRARY_MATCH_BOOK_CAP = 20000;
 export const MATCH_KEY_MAX_LENGTH = 300;
 export const DISPLAY_TEXT_MAX_LENGTH = 200;

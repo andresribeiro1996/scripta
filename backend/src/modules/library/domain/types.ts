@@ -30,6 +30,13 @@ export interface LibraryDocument {
   shareUrl: string | null;
 }
 
+export interface LibraryDocumentText {
+  data: string;
+  updatedAt: string;
+  shareToken: string | null;
+  shareUrl: string | null;
+}
+
 export interface LibraryMatchKeyRow {
   key: string;
   book_ref: number;
@@ -42,4 +49,52 @@ export interface LibraryMatchKeyRow {
 export interface LibraryDerived {
   glyph: IdentityKey | null;
   keys: LibraryMatchKeyRow[];
+}
+
+export interface LibraryBookRow {
+  position: number;
+  book_key: string;
+  title: string | null;
+  author: string | null;
+  isbn: string | null;
+  image_id: string | null;
+  read_status: number | null;
+  series_number: number | null;
+  sort_order: number | null;
+  cover_url: string | null;
+  finished_year: number | null;
+  row_hash: string;
+}
+
+export interface LibraryHighlightRow {
+  highlight_id: string;
+  text: string | null;
+  annotation: string | null;
+}
+
+export interface LibraryBookRows {
+  book: LibraryBookRow;
+  highlights: LibraryHighlightRow[];
+}
+
+export interface LibrarySummaryRow {
+  meta: string | null;
+  reader_card: string | null;
+  shelf_theme: string | null;
+  total_books: number;
+  finished_count: number;
+  in_progress_count: number;
+  total_highlights: number;
+}
+
+export interface LibraryRows {
+  books: LibraryBookRows[];
+  summary: LibrarySummaryRow;
+}
+
+export interface LibrarySmallSave {
+  books: LibraryBookRow[];
+  counts: { finished: number; inProgress: number };
+  meta: string | "keep";
+  readerCard: string | null | "keep";
 }

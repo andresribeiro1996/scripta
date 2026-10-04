@@ -6,7 +6,7 @@ import { bookMetadataOptions } from "../lib/bookMetadata";
 
 export function useGenreEnrichment(
   books: Array<Record<string, unknown>>,
-  updateLibrary: (updater: (current: LibraryData) => LibraryData, base?: LibraryDocument) => Promise<LibraryDocument>,
+  updateLibrary: (updater: (current: LibraryData) => LibraryData) => Promise<LibraryDocument>,
 ) {
   const client = useQueryClient();
   const save = useRef(updateLibrary);
