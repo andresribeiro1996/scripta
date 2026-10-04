@@ -1,5 +1,5 @@
 import { setTimeout as sleep } from "node:timers/promises";
-import { createThrottle } from "../adapters/http/http.js";
+import { USER_AGENT, createThrottle } from "../adapters/http/http.js";
 import { PORTUGAL_ISBN_PREFIXES, parseRankedWorks, rankedWorksUrl, type SeedEntry, type SeedLanguage } from "./rankedWorks.js";
 
 const PAGE = 1000;
@@ -12,7 +12,7 @@ async function fetchPage(url: string, log: (line: string) => void): Promise<unkn
     let failure: Error;
     let reason: string;
     try {
-      const res = await fetch(url, { headers: { "User-Agent": "Atmyshelf/1.0 (book covers)" }, signal: AbortSignal.timeout(TIMEOUT_MS) });
+      const res = await fetch(url, { headers: { "User-Agent": USER_AGENT }, signal: AbortSignal.timeout(TIMEOUT_MS) });
       if (res.ok) return await res.json();
       failure = new Error(`Open Library HTTP ${res.status} for ${url}`);
       if (res.status < 500 && res.status !== 429) throw failure;

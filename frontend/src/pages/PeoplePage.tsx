@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { personCaption, type PersonResult, type SuggestedReader } from "@scripta/shared/community";
+import { followFailureMessage, personCaption, type PersonResult, type SuggestedReader } from "@scripta/shared/community";
 import { AuthorAvatar } from "../components/CommunityAuthorAvatar";
 import { EmptyState } from "../components/EmptyState";
 import { CommunityIcon } from "../components/NavIcons";
@@ -47,8 +47,8 @@ function PeoplePane() {
       if (person.viewerFollows) await unfollowUser(person.user.userId);
       else await followUser(person.user.userId);
       await queryClient.invalidateQueries({ queryKey: ["community", "people"] });
-    } catch {
-      setFollowError("Couldn't update who you follow.");
+    } catch (error) {
+      setFollowError(followFailureMessage(error, "Couldn't update who you follow."));
     } finally {
       setBusyId(null);
     }
