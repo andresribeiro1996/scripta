@@ -44,7 +44,7 @@ import { deleteLibraryUserData, registerLibraryModule, resolvePublicLibrary, rea
 import { deleteMuralsUserData, getMuralsPublicApi, registerMuralsModule, rekeyMuralsBooks } from "./modules/murals/index.js";
 import { deleteQuizzesUserData, getQuizzesPublicApi, registerQuizzesModule, rekeyQuizzesBooks } from "./modules/quizzes/index.js";
 import { deleteSocialsUserData, registerSocialsModule } from "./modules/socials/index.js";
-import { deleteTierlistsUserData, registerTierlistsModule, getTierlistsPublicApi, rekeyTierlistsBooks } from "./modules/tierlists/index.js";
+import { deleteTierlistsUserData, registerTierlistsModule, getTierlistsPublicApi, rekeyTierlistsBooks, sweepTierlistsWorks } from "./modules/tierlists/index.js";
 import { registerWaitlistModule } from "./modules/waitlist/index.js";
 
 const genReqId = () => randomUUID();
@@ -169,7 +169,8 @@ export function buildApp() {
         if (!(error instanceof WorkResolutionError)) throw error;
       }
       rekeyArenaBooks(userId, fromKeys, toKey, toWork);
-      for (const rekey of [rekeyMuralsBooks, rekeyTierlistsBooks, rekeyQuizzesBooks]) rekey(userId, fromKeys, toKey);
+      rekeyTierlistsBooks(userId, fromKeys, toKey, toWork);
+      for (const rekey of [rekeyMuralsBooks, rekeyQuizzesBooks]) rekey(userId, fromKeys, toKey);
     }
   });
   app.register(registerGalleryModule);
@@ -231,7 +232,7 @@ export function buildApp() {
   });
   app.register(registerQuizzesModule);
 
-  const stopWorksSweep = startWorksSweep([sweepLibraryWorks, sweepArenaWorks], app.log);
+  const stopWorksSweep = startWorksSweep([sweepLibraryWorks, sweepArenaWorks, sweepTierlistsWorks], app.log);
   app.addHook("onClose", async () => {
     stopWorksSweep();
   });

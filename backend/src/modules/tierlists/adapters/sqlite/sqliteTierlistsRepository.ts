@@ -151,16 +151,21 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
   }
 
   return {
-    rekeyBooks(userId, fromKeys, toKey) {
+    rekeyBooks(userId, fromKeys, toKey, toWork) {
       const from = new Set(fromKeys);
       const now = new Date().toISOString();
       const update = db.prepare("UPDATE tierlists SET data = ?, updated_at = ? WHERE id = ?");
+      const dropWorks = db.prepare("DELETE FROM tierlist_works WHERE tierlist_id = ? AND key IN (SELECT value FROM json_each(?))");
+      const fromKeysJson = JSON.stringify(fromKeys);
       db.exec("BEGIN IMMEDIATE");
       try {
         for (const row of db.prepare("SELECT id, data FROM tierlists WHERE owner_user_id = ? AND vote_code IS NULL").all(userId) as Array<{ id: string; data: string }>) {
           const parsed = JSON.parse(row.data) as Record<string, unknown>;
           const after = JSON.stringify(rekeyTierBoard(parsed, from, toKey));
-          if (after !== JSON.stringify(parsed)) update.run(after, now, row.id);
+          if (after === JSON.stringify(parsed)) continue;
+          update.run(after, now, row.id);
+          dropWorks.run(row.id, fromKeysJson);
+          insertWorkStmt.run(row.id, toKey, toWork);
         }
         db.exec("COMMIT");
       } catch (error) {

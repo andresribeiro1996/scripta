@@ -289,12 +289,26 @@ test("rekeyBooks rewrites the owner's unpublished tier lists only", async () => 
   insert.run("draft", "u1", "u1", data, null);
   insert.run("published", "u1", "u1", data, "CODE1");
   insert.run("other", "u2", "u2", data, null);
-  createSqliteTierlistsRepository(db).rekeyBooks("u1", ["old"], "new");
+  createSqliteTierlistsRepository(db).rekeyBooks("u1", ["old"], "new", null);
   const read = (id: string) => db.prepare("SELECT data, updated_at FROM tierlists WHERE id = ?").get(id) as { data: string; updated_at: string };
   assert.deepEqual(JSON.parse(read("draft").data), { tiers: [{ id: "s", label: "S", color: "#000000", bookKeys: ["new"] }], pool: ["y"] });
   assert.notEqual(read("draft").updated_at, "t0");
   assert.equal(read("published").data, data);
   assert.equal(read("other").data, data);
+});
+
+test("rekeying a private list moves its works rows to the kept copy", async () => {
+  const { createSqliteTierlistsRepository } = await import("./sqliteTierlistsRepository.js");
+  const db = freshDb();
+  db.prepare("INSERT INTO tierlists (id, owner_user_id, origin_user_id, name, data, created_at, updated_at) VALUES ('t1', 'u1', 'u1', 'n', ?, 't0', 't0')").run(
+    JSON.stringify({ tiers: [{ id: "s", label: "S", color: "#000000", bookKeys: [] }], pool: ["k-old"] })
+  );
+  db.prepare("INSERT INTO tierlist_works (tierlist_id, key, work_id) VALUES ('t1', 'k-old', 'w-old')").run();
+  createSqliteTierlistsRepository(db).rekeyBooks("u1", ["k-old"], "k-keep", "w-keep");
+  const list = db.prepare("SELECT data FROM tierlists WHERE id = 't1'").get() as { data: string };
+  assert.deepEqual((JSON.parse(list.data) as { pool: string[] }).pool, ["k-keep"]);
+  const works = db.prepare("SELECT key, work_id FROM tierlist_works WHERE tierlist_id = 't1'").all();
+  assert.deepEqual(works.map((row) => ({ ...row })), [{ key: "k-keep", work_id: "w-keep" }]);
 });
 
 function nameKey(db: DatabaseSync, id: string): string | null {

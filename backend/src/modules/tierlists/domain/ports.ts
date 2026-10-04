@@ -7,7 +7,7 @@ import type { TierlistRow, BallotRow, BallotTotals, HistogramCell, Placement, Ti
 
 export interface TierlistsRepository {
   deleteUserData(userId: string): void;
-  rekeyBooks(userId: string, fromKeys: string[], toKey: string): void;
+  rekeyBooks(userId: string, fromKeys: string[], toKey: string, toWork: string | null): void;
   listByUser(userId: string): TierlistRow[];
   /** Ownership-checked lookup — undefined if no row with that id exists,
    *  or it exists but isn't owned by userId. service.ts treats both cases
