@@ -1130,7 +1130,10 @@ test("a coin photo is rejected", async () => {
 });
 
 test("an image that is already cover-shaped is stored without classification", async () => {
-  const original = await png(500, 750);
+  const original = await sharp({ create: { width: 1200, height: 1700, channels: 3, background: "#ffffff" } })
+    .composite([{ input: { create: { width: 700, height: 1100, channels: 3, background: "#aa3322" } }, left: 250, top: 300 }])
+    .png()
+    .toBuffer();
   const h = await harness({ images: { [MUSEU_IMAGE]: original } });
   const book = addBook(h.repo, MUSEU);
 
@@ -1138,9 +1141,24 @@ test("an image that is already cover-shaped is stored without classification", a
 
   const { encodeCover } = await import("../domain/images.js");
   const expected = (await encodeCover(original))!;
-  assert.equal(h.repo.getImage(h.repo.getBook(book.id)!.cover_image_id!)!.byte_size, expected.full.length);
+  const image = h.repo.getImage(h.repo.getBook(book.id)!.cover_image_id!)!;
+  assert.equal(image.width, expected.width);
+  assert.equal(image.height, expected.height);
+  assert.equal(image.byte_size, expected.full.length);
   assert.equal(reports["Antígona"]!.cropped, 0);
   assert.equal(reports["Antígona"]!.squareAccepted, 0);
+});
+
+test("a blank square is rejected and stores nothing", async () => {
+  const blank = await sharp({ create: { width: 800, height: 800, channels: 3, background: "#ffffff" } }).png().toBuffer();
+  const h = await harness({ images: { [MUSEU_IMAGE]: blank } });
+  const book = addBook(h.repo, MUSEU);
+
+  const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  assert.equal(reports["Antígona"]!.rejectedImage, 1);
+  assert.equal(reports["Antígona"]!.squareAccepted, 0);
+  assert.equal(h.repo.getBook(book.id)!.cover_image_id, null);
 });
 
 test("a dry run downloads and classifies nothing", async () => {

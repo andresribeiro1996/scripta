@@ -134,6 +134,16 @@ test("a white cover on a white canvas is not cropped down to its text block", as
   assert.equal(await classifyPublisherImage(image), null);
 });
 
+test("a blank square is refused whatever its colour", async () => {
+  for (const colour of ["#ffffff", "#eeeeee", "#000000", "#ff0000"]) {
+    assert.equal(await classifyPublisherImage(await canvas(800, 800, colour, [])), null);
+  }
+});
+
+test("a blank square with a small logo on a light canvas is refused", async () => {
+  assert.equal(await classifyPublisherImage(await canvas(800, 800, "#f4f4f4", [await rectangle(60, 40, "#444444", 370, 380)])), null);
+});
+
 test("a landscape image is refused", async () => {
   assert.equal(await classifyPublisherImage(await colourBlocks(2000, 1000)), null);
 });

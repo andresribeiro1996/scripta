@@ -18,6 +18,7 @@ const MIN_CROP_AREA = 0.3;
 const FLAT_MIN_RATIO = 0.75;
 const WHITE_CANVAS_MEAN = 235;
 const CANVAS_KEPT = 0.97;
+const BLANK_STDEV = 8;
 
 export interface EncodedCover {
   full: Buffer;
@@ -74,6 +75,8 @@ export async function classifyPublisherImage(input: Buffer): Promise<PublisherIm
       .raw()
       .toBuffer({ resolveWithObject: true });
     const { width: smallWidth, height: smallHeight, channels: smallChannels } = small.info;
+    const { channels: spread } = await sharp(small.data, { raw: { width: smallWidth, height: smallHeight, channels: smallChannels } }).stats();
+    if (spread.every((channel) => channel.stdev < BLANK_STDEV)) return null;
     const pixel = (x: number, y: number): [number, number, number] => {
       const offset = (y * smallWidth + x) * smallChannels;
       return [small.data[offset] ?? 0, small.data[offset + 1] ?? 0, small.data[offset + 2] ?? 0];
