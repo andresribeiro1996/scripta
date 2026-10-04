@@ -207,6 +207,7 @@ export function createLibrarySaver(deps: LibrarySaverDeps): LibrarySaver {
       track(entry);
     } catch (error) {
       pending = pending.filter((other) => other !== entry);
+      recompute();
       return Promise.resolve({ ok: false, error });
     }
     return new Promise<LibrarySubmitResult>((resolve) => {
@@ -237,7 +238,15 @@ export function createLibrarySaver(deps: LibrarySaverDeps): LibrarySaver {
   function saveWhole(updater: (data: LibraryData) => LibraryData, options: LibrarySaveOptions = {}): Promise<LibraryDocument> {
     if (disposed) return Promise.reject(disposedError());
     const entry: Entry | undefined = options.optimistic ? { apply: updater } : undefined;
-    if (entry) track(entry);
+    if (entry) {
+      try {
+        track(entry);
+      } catch (error) {
+        pending = pending.filter((other) => other !== entry);
+        recompute();
+        return Promise.reject(error);
+      }
+    }
     return new Promise<LibraryDocument>((resolve, reject) => {
       enqueue({
         drop: () => reject(disposedError()),

@@ -1179,6 +1179,22 @@ test("a failing event emitter does not fail a change that was written", () => {
   db.close();
 });
 
+test("a failing event emitter is logged and the change still saves", () => {
+  const db = memoryDb();
+  const logged: unknown[] = [];
+  const failure = new Error("community db locked");
+  const service = createLibraryService(createSqliteLibraryRepository(db), () => "", MAX_DOCUMENT_BYTES, () => {
+    throw failure;
+  }, undefined, undefined, (error) => { logged.push(error); });
+  service.saveLibrary("u1", changeLibrary());
+
+  const answer = service.applyChange("u1", { kind: "book", bookKey: keyOf(10), readStatus: 2, day: "2026-10-02" });
+
+  assert.equal(service.getLibrary("u1")?.updatedAt, answer.updatedAt);
+  assert.deepEqual(logged, [failure]);
+  db.close();
+});
+
 test("applyChange answers a missing library, group or book with a typed error and writes nothing", () => {
   const { db, service, events } = setup();
   const tick: LibraryChange = { kind: "membership", groupId: "shelf", bookKey: keyOf(3), member: true };

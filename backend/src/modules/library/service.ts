@@ -19,6 +19,8 @@ export type EnqueueCovers = (lookups: CoverLookupParams[]) => void;
 
 export type RekeyBooks = (userId: string, fromKeys: string[], toKey: string) => void;
 
+export type LogError = (error: unknown, message: string) => void;
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -117,8 +119,8 @@ function parseStoredLibrary(row: LibraryDocumentRow): LibraryData {
   let parsed: unknown;
   try {
     parsed = JSON.parse(row.data);
-  } catch (error) {
-    if (!(error instanceof SyntaxError)) throw error;
+  } catch {
+    throw new Error("Stored library document is unreadable; refusing to rewrite it.");
   }
   if (!isRecord(parsed) || !Array.isArray(parsed.books)) throw new Error("Stored library document is unreadable; refusing to rewrite it.");
   return parsed as LibraryData;
@@ -174,7 +176,7 @@ function coverLookupsOf(data: unknown): CoverLookupParams[] {
   return books.filter(isRecord).flatMap((book) => seedCoverLookup(book) ?? []);
 }
 
-export function createLibraryService(repo: LibraryRepository, publicUrlFor: (token: string) => string, maxDocumentBytes: number, emitBookEvents?: EmitBookEvents, enqueueCovers?: EnqueueCovers, rekeyBooks?: RekeyBooks): LibraryService {
+export function createLibraryService(repo: LibraryRepository, publicUrlFor: (token: string) => string, maxDocumentBytes: number, emitBookEvents?: EmitBookEvents, enqueueCovers?: EnqueueCovers, rekeyBooks?: RekeyBooks, logError?: LogError): LibraryService {
   function serializeWithinLimit(document: unknown): string {
     const json = JSON.stringify(document);
     if (Buffer.byteLength(json) > maxDocumentBytes - LIBRARY_PUT_HEADROOM_BYTES) throw new LibraryTooLargeError();
@@ -196,9 +198,8 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
         try {
           const events = diffBookEvents(JSON.parse(previous.data), data).slice(0, BOOK_EVENTS_PER_SAVE);
           if (events.length > 0) emitBookEvents(userId, events);
-        } catch {
-          // Activity is best-effort: a diff must never fail an otherwise
-          // successful save (e.g. an unparsable previous document).
+        } catch (error) {
+          logError?.(error, "book events failed after a library save");
         }
       }
       if (source === "import" && enqueueCovers) enqueueCovers(coverLookupsOf(data));
@@ -233,8 +234,8 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
         if (input.readStatus === 2 && emitBookEvents) {
           try {
             emitBookEvents(userId, [{ type: "book_finished", refId: key, payload: bookPayload(updatedBook, input.readStatus) }]);
-          } catch {
-            // Same best-effort contract as the saveLibrary diff above.
+          } catch (error) {
+            logError?.(error, "book events failed after a library save");
           }
         }
         return { key, updated: true };
@@ -260,8 +261,8 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
       if (emitBookEvents) {
         try {
           emitBookEvents(userId, [{ type: "book_added", refId: `manual:${id}`, payload: bookPayload(book, input.readStatus) }]);
-        } catch {
-          // Same best-effort contract as the saveLibrary diff above.
+        } catch (error) {
+          logError?.(error, "book events failed after a library save");
         }
       }
       return { key: `manual:${id}`, updated: false };
@@ -302,7 +303,9 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
         try {
           const events = diffBookEvents(previous, result.data).slice(0, BOOK_EVENTS_PER_SAVE);
           if (events.length > 0) emitBookEvents(userId, events);
-        } catch {}
+        } catch (error) {
+          logError?.(error, "book events failed after a library save");
+        }
       }
       return { updatedAt, baseUpdatedAt: row?.updated_at ?? null };
     },

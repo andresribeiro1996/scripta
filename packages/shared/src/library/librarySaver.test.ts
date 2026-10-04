@@ -1262,3 +1262,34 @@ test("a share response that changes only the url replaces the url and keeps the 
   assert.equal(h.last()!.shareToken, "t1");
   assert.equal(h.last()!.shareUrl, "https://shelf.example/t1");
 });
+
+for (const mode of ["submit", "saveWhole"] as const) {
+  test(`a write that throws during ${mode} leaves nothing pending and the view without the change`, { timeout: 5000 }, async () => {
+    const srv = server(shelf());
+    const writes: Array<LibraryDocument | null> = [];
+    let armed = false;
+    const saver = createLibrarySaver({
+      send: (change) => Promise.resolve().then(() => srv.send(change)),
+      put: (data, expected) => Promise.resolve().then(() => srv.put(data, expected)),
+      fetch: () => Promise.resolve(srv.doc),
+      write: (view) => {
+        if (armed) {
+          armed = false;
+          throw new Error("write failed");
+        }
+        writes.push(view);
+      }
+    });
+    await saver.fetch();
+    armed = true;
+    if (mode === "submit") {
+      const result = await saver.submit(tick(duneKey));
+      assert.equal(result.ok, false);
+    } else {
+      await assert.rejects(saver.saveWhole((data) => ({ ...data, name: "Renamed" }), { optimistic: true }), /write failed/);
+    }
+    assert.equal(saver.hasPending(), false);
+    assert.deepEqual(keysOf(writes.at(-1)), []);
+    assert.equal(writes.at(-1)!.data.name, "Mine");
+  });
+}
