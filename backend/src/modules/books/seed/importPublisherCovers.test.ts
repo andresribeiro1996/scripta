@@ -17,7 +17,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 const { applyBooksMigrations } = await import("../adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("../adapters/sqlite/sqliteBooksRepository.js");
 const { SourceUnavailableError } = await import("../domain/errors.js");
-const { importPublisherCovers } = await import("./importPublisherCovers.js");
+const { importPublisherCovers, importedLanguage } = await import("./importPublisherCovers.js");
 
 type Deps = Parameters<typeof importPublisherCovers>[0];
 type Site = Parameters<typeof importPublisherCovers>[1][number];
@@ -883,14 +883,14 @@ test("a product URL that is not an absolute web address is not recorded", async 
   assert.equal(h.repo.findBookByKey(`isbn:${MUSEU}`)!.publisher_url, null);
 });
 
-test("a dry run records no product page, creator or origin", async () => {
+test("a dry run records no product page, creator, origin or language", async () => {
   const h = await harness();
   const book = addBook(h.repo, MUSEU);
 
   await importPublisherCovers(h.deps, [antigona], { dryRun: true });
 
   assert.equal(h.repo.getBook(book.id)!.publisher_url, null);
-  assert.equal((h.db.prepare("SELECT COUNT(*) AS n FROM books WHERE created_by IS NOT NULL OR publisher_url IS NOT NULL").get() as { n: number }).n, 0);
+  assert.equal((h.db.prepare("SELECT COUNT(*) AS n FROM books WHERE created_by IS NOT NULL OR publisher_url IS NOT NULL OR language IS NOT NULL").get() as { n: number }).n, 0);
   assert.equal(h.imageCount(), 0);
 });
 
@@ -1222,4 +1222,40 @@ test("a dry run downloads and classifies nothing", async () => {
   assert.deepEqual(h.imageRequests, []);
   assert.equal(h.imageCount(), 0);
   assert.equal(reports["Antígona"]!.cropped, 0);
+});
+
+test("the importer's language is the one Open Library states, else pt-PT for a Portugal ISBN, and nothing for any other", () => {
+  assert.equal(importedLanguage(["/languages/eng"], "9789722518888"), "en");
+  assert.equal(importedLanguage(["por"], "9789722518888"), "pt-PT");
+  assert.equal(importedLanguage([], "9789722518888"), "pt-PT");
+  assert.equal(importedLanguage([], "9789896410001"), "pt-PT");
+  assert.equal(importedLanguage([], "9722518887"), "pt-PT");
+  assert.equal(importedLanguage([], "9788535914849"), null);
+  assert.equal(importedLanguage([], "9780141184272"), null);
+  assert.equal(importedLanguage(["/languages/lat"], "9789722518888"), null);
+});
+
+test("every book the importer creates gets pt-PT from its Portugal ISBN, and an existing one is filled only where it has no language", async () => {
+  const h = await harness();
+  const empty = addBook(h.repo, MUSEU);
+  const stated = addBook(h.repo, "9789726084679");
+  h.repo.setLanguage(stated.id, "en");
+
+  await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  assert.equal(h.repo.getBook(empty.id)!.language, "pt-PT");
+  assert.equal(h.repo.getBook(stated.id)!.language, "en");
+  assert.ok(h.bookCount() > 2);
+  assert.deepEqual((h.db.prepare("SELECT DISTINCT language FROM books WHERE id != ?").all(stated.id) as Array<{ language: string | null }>).map((row) => row.language), ["pt-PT"]);
+});
+
+test("a language Open Library states for the edition replaces the Portugal fallback, and one it cannot map is not guessed over", async () => {
+  const stated = await harness({ lookup: async () => ({ title: "Guerra Branca", author: "Bruno Maçães", workKey: "/works/OL7W", languages: ["/languages/eng"] }) });
+  await importPublisherCovers(stated.deps, [relogio], { dryRun: false });
+  assert.equal(stated.repo.findBookByKey(`isbn:${GUERRA}`)!.language, "en");
+  assert.equal(stated.repo.findBookByKey("isbn:9789899061354")!.language, "pt-PT");
+
+  const unmapped = await harness({ lookup: async () => ({ title: "Guerra Branca", author: "Bruno Maçães", workKey: "/works/OL7W", languages: ["/languages/lat"] }) });
+  await importPublisherCovers(unmapped.deps, [relogio], { dryRun: false });
+  assert.equal(unmapped.repo.findBookByKey(`isbn:${GUERRA}`)!.language, null);
 });

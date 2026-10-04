@@ -30,6 +30,8 @@ export interface BooksRepository {
   setUpgradeWanted(bookId: string, at: string | null): void;
   setWorkKey(id: string, key: string | null | undefined): void;
   assignMissingWorks(limit: number): number;
+  setLanguage(id: string, tag: string | null): void;
+  replaceLanguage(id: string, tag: string | null): void;
   setPublisherUrl(id: string, url: string): void;
   listUpgradeWantedIds(): string[];
 }

@@ -12,6 +12,7 @@ const OPEN_LIBRARY_GAP_MS = 1000;
 
 const { SourceUnavailableError } = await import("../dist/modules/books/domain/errors.js");
 const { createThrottle, fetchJson } = await import("../dist/modules/books/adapters/http/http.js");
+const { parseEditionRecord } = await import("../dist/modules/books/adapters/openlibrary/openLibraryCatalog.js");
 const { openBooksDb } = await import("../dist/modules/books/adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("../dist/modules/books/adapters/sqlite/sqliteBooksRepository.js");
 const { importPublisherCovers } = await import("../dist/modules/books/seed/importPublisherCovers.js");
@@ -40,10 +41,8 @@ async function lookupOpenLibrary(isbn) {
   const query = new URLSearchParams({ q: `isbn:${isbn}`, fields: "author_name", limit: "1" });
   const data = await openLibrary(`https://openlibrary.org/search.json?${query}`);
   const authors = Array.isArray(data?.docs?.[0]?.author_name) ? data.docs[0].author_name.filter((name) => typeof name === "string") : [];
-  const edition = await openLibrary(`https://openlibrary.org/isbn/${isbn}.json`);
-  const title = typeof edition?.title === "string" ? edition.title.trim() : "";
-  const workKey = typeof edition?.works?.[0]?.key === "string" ? edition.works[0].key : null;
-  return { title: authors.length > 0 ? title || null : null, author: authors.join(", "), workKey };
+  const edition = parseEditionRecord(await openLibrary(`https://openlibrary.org/isbn/${isbn}.json`));
+  return { title: authors.length > 0 ? edition.title || null : null, author: authors.join(", "), workKey: edition.workKey, languages: edition.languages };
 }
 
 const store = createObjectStore();

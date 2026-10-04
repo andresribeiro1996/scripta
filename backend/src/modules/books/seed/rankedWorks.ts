@@ -10,9 +10,8 @@ export interface SeedEntry {
   workKey: string;
   readers: number;
   subjects: string[];
+  languages: string[];
 }
-
-export const PORTUGAL_ISBN_PREFIXES = ["978972", "978989"] as const;
 
 const MAX_SUBJECTS = 10;
 const FIELDS = "key,title,author_name,readinglog_count,subject,editions,editions.title,editions.isbn,editions.language";
@@ -49,7 +48,8 @@ export function parseRankedWorks(json: unknown, lang: SeedLanguage, isbnPrefix?:
       lang,
       workKey: work.key,
       readers: typeof work.readinglog_count === "number" ? work.readinglog_count : 0,
-      subjects: strings(work.subject).slice(0, MAX_SUBJECTS)
+      subjects: strings(work.subject).slice(0, MAX_SUBJECTS),
+      languages: strings(edition?.language)
     }];
   });
 }
