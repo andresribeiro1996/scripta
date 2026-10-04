@@ -64,17 +64,20 @@ Two facts from the code shape the design:
 
 ```
 books
-  + title_key               TEXT   -- catalogTitleKey(title, author); NULL when the title is empty
+  + title_key               TEXT   -- workTitleKey(title, author); '' when not groupable; NULL until computed
   + title_group_blocked_at  TEXT   -- set by a manual detach; the grouping pass skips this edition
   index (title_key)
 ```
 
 `title_key` is the catalog's existing `ta:` format
 (`ta:<normalizeTitle>|<firstAuthor>|<title numbers>`), stored per edition
-because `book_keys` gives each alias to only one edition. `createBook` and
-`fillIdentity` write it; titles change nowhere else. The works backfill fills
-rows where `title_key IS NULL AND title <> ''`, which covers existing rows and
-rows written by an importer or seed process still running older code.
+because `book_keys` gives each alias to only one edition. `workTitleKey`
+returns it when both the main title and the first author normalize to
+something, and `''` otherwise, so an edition with no usable author is computed
+once and never grouped. `createBook` and `fillIdentity` write it; titles
+change nowhere else. The works backfill fills rows where `title_key IS NULL
+AND title <> ''`, which covers existing rows and rows written by an importer or
+seed process still running older code.
 
 ## Title grouping
 
@@ -83,9 +86,8 @@ after `assignMissingWorks`, in batches, each batch one `BEGIN IMMEDIATE`
 transaction, yielding between batches.
 
 **A candidate** is a live keyless work (`ol_work_key IS NULL AND merged_into
-IS NULL`) whose editions all have the same non-empty `title_key`, a non-empty
-author, and no `title_group_blocked_at`. Any other keyless work is left
-alone.
+IS NULL`) whose editions all have the same non-empty `title_key` and no
+`title_group_blocked_at`. Any other keyless work is left alone.
 
 **The target** for a candidate's `title_key`, over the editions of live works
 other than its own, ignoring blocked editions:
@@ -136,9 +138,13 @@ the existing `parseEditionRecord`.
   filled (the works spec's rule).
 - 404, or a record without `works`: no change.
 - Either way, `work_checked_at` is set.
-- `SourceUnavailableError` (timeouts, 5xx, 429 with its `Retry-After`) stops
-  the batch and returns its `retryAt`, as the details backfill does. Anything
-  else propagates and is logged by the tick.
+- A `SourceUnavailableError` with a `retryAt` (a 429 with `Retry-After`, or a
+  `SourcePausedError`) stops the batch without stamping the edition and
+  returns the `retryAt`, so the tick pauses until then.
+- A `SourceUnavailableError` without one (timeout, 5xx, invalid JSON) is
+  logged as a warning and stamps `work_checked_at`, so the edition is retried
+  in 30 days instead of blocking the front of the queue.
+- Anything else propagates and is logged by the tick.
 
 Publisher editions are excluded because none in the sample were known;
 including them is a one-line filter change.
@@ -166,10 +172,11 @@ transaction.
 
 **`resolveWorkId(workId)`** follows `merged_into` and returns the live work id,
 or `null` for an unknown id; more than one hop throws, since it means the
-invariant broke. **`workIdForEdition(bookId)`** returns the edition's
-current `work_id`. Both go on the books module's public API for phase E, which
-should read a reader's work through the edition rather than keep its own copy
-of a work id.
+invariant broke. **`peekWorkId({ isbn, title, author })`** finds the edition
+the way `peekCachedCoverUrl` does (`findByIdentity`, never creating one) and
+returns its live work id, or `null`. Both go on the books module's public API
+for phase E, which should read a reader's work through the edition rather than
+keep its own copy of a work id.
 
 ## Admin routes
 
