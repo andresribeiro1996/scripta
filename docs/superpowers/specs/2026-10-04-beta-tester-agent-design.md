@@ -62,11 +62,15 @@ npm run dev:snapshot -- <name> --out <dir>
    "screencap returned `<n>` bytes, not a PNG".
 4. `adb shell wm density` → dp = px × 160 / density. Read on every call; it is
    one cheap shell call and survives an AVD swap.
-5. A second dump (dump B), after the screencap. The listing is built from B,
-   falling back to A when B is empty. When the visible text of A and B
-   differs (`parseScreenText`), the header line ends with
+5. A second dump (dump B), after the screencap, retried once if empty like A.
+   The listing is built from B, falling back to A when B is still empty. When
+   the visible text of A and B differs (`parseScreenText`; an empty B has no
+   text), the header line ends with
    ` · screen was still changing — snapshot again`: the screen moved while
-   the PNG was taken, so the agent snapshots again before reading it.
+   the PNG was taken, so the agent snapshots again under the same name before
+   reading it. A second note means live text (an arena countdown) is
+   updating: it stops, reads the PNG, and treats the listing as current to
+   within a few seconds.
 6. Prints the listing to stdout in tree order:
 
 ```
@@ -150,8 +154,10 @@ cleanup.
       `vote/<code>`, `play/<code>`, `arena/<id>`.
 7. On each screen: `dev:snapshot`; Read the PNG on first visit or after a
    visual change; use every control once; try the edges: empty and very long
-   input, emoji, double-tap, back mid-action, destructive actions with their
-   confirm and undo. (No rotation: `app.json` locks portrait.) Append each finding to `report.md`
+   input, double-tap, back mid-action, destructive actions with their
+   confirm and undo. (No rotation: `app.json` locks portrait. Emoji is not
+   tested: adb `input text` cannot type it, so the report's harness notes
+   say so.) Append each finding to `report.md`
    as soon as it is confirmed, and mark the route in the coverage table.
 8. `adb logcat -d ReactNativeJS:E '*:S'` for JavaScript errors raised during
    the run. If logcat holds no `ReactNativeJS` lines at all, JS logs are not
@@ -220,8 +226,8 @@ tasks through the existing implementer flow. The tester never fixes anything.
   clickables, `(no label)`, `(disabled)`, zero-area skip, entity and newline
   decoding, clipping, `wm density` parsing, and `takeSnapshot` with a fake
   adb: the dump → screencap → density → dump order, retry after one empty
-  first dump, the "still changing" note when the two dumps differ and none
-  when they match, "screenshot only" after two empty dumps, and a failed
+  first dump, the "still changing" note when the two dumps differ (including
+  a second dump that stays empty after its retry) and none when they match, "screenshot only" after two empty dumps, and a failed
   `screencap` propagating. `androidEnv()` throws without an SDK (as on CI), so
   tests always inject `exec`.
 - The CLI wrapper stays thin like `dev-wait.mjs`. A `device-checker` pass

@@ -44,7 +44,7 @@ node scripts/dev-snapshot.mjs <NN>-<screen>-<state> --out <output dir>
 
 A row ending `⚠ under <label>` has its centre covered by that control (often a floating button): scroll the item clear before tapping it, or tap a visible part of it. The marker covers app controls only. Expo Go's FAB (`· desc="Tools"`, dragged to the left edge at mid-height at setup) is not clickable in the listing, so it can still sit over a tap centre: avoid centres within about 40px of it, or drag it elsewhere, never back over the tab bar or the header.
 
-A header ending `· screen was still changing — snapshot again` means the screen was animating while it was captured: snapshot again before reading the PNG.
+A header ending `· screen was still changing — snapshot again` means the screen was animating while it was captured: snapshot again under the same name (keep `NN`, so no stale PNG is left beside the real one) before reading the PNG. If the second snapshot says it too, live text (a countdown or timer) is updating: stop, read the PNG, and treat the listing as current to within a few seconds.
 
 Navigate from the listing: `adb -s <serial> shell input tap <x> <y>` with the printed centre. After a tap that navigates or submits, wait for the next screen before the next snapshot, so a spinner or transition is not reported as "never loads". Wait on a quoted text row from the listing, never on a `desc=` label: `dev:wait` matches visible text only. After opening a menu, sheet, dialog or deep link, `dev:wait` for a text inside it before the first tap. If a tap seems to do nothing, snapshot before tapping again: a tap lost on a surface that was still animating is harness, not a finding, unless it reproduces on a settled screen.
 
@@ -129,7 +129,7 @@ Append each finding to `report.md` the moment it is confirmed, and update its ro
    ```
    Deduplicate and count.
 2. `npm run dev:release`, whatever happened. The emulator is not needed for the rest.
-3. Rewrite `report.md` in final form: the screen size from any snapshot header in the title line, the summary at the top, findings ranked by severity, then by how central the screen is; within a severity, a finding that says "seen at <W>dp" ranks below one that does not.
+3. Rewrite `report.md` in final form: the screen size from any snapshot header in the title line, the summary at the top, findings ranked by severity first, then a finding that says "seen at <W>dp" after the ones that do not, then how central the screen is.
 4. Reply with the report's path and its Summary section, nothing else.
 
 ## Report template

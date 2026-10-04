@@ -220,12 +220,28 @@ test("takeSnapshot adds no note when both dumps show the same text", () => {
   assert.equal(output.split("\n")[0], `07-murals · 1080×2400dp · saved ${join(dir, "07-murals.png")}`);
 });
 
-test("takeSnapshot falls back to the first dump, without a note, when the second is empty", () => {
+test("takeSnapshot lists the first dump and says the screen was still changing when the second dump fails twice", () => {
   const dir = mkdtempSync(join(tmpdir(), "dev-snapshot-"));
-  const dumps = [SCREEN, ""];
+  const dumps = [SCREEN, "", ""];
+  const output = takeSnapshot("emulator-5554", "07-murals", dir, { exec: fakeAdb([]), read: () => dumps.shift() });
+  assert.equal(output.split("\n")[0], `07-murals · 1080×2400dp · saved ${join(dir, "07-murals.png")} · screen was still changing — snapshot again`);
+  assert.equal(output.split("\n")[1], '  · "Murals"');
+  assert.equal(dumps.length, 0);
+});
+
+test("takeSnapshot retries an empty second dump once and adds no note when the retry matches the first", () => {
+  const dir = mkdtempSync(join(tmpdir(), "dev-snapshot-"));
+  const dumps = [SCREEN, "", SCREEN];
   const output = takeSnapshot("emulator-5554", "07-murals", dir, { exec: fakeAdb([]), read: () => dumps.shift() });
   assert.equal(output.split("\n")[0], `07-murals · 1080×2400dp · saved ${join(dir, "07-murals.png")}`);
-  assert.equal(output.split("\n")[1], '  · "Murals"');
+  assert.equal(dumps.length, 0);
+});
+
+test("takeSnapshot adds no note when neither dump has any text", () => {
+  const dir = mkdtempSync(join(tmpdir(), "dev-snapshot-"));
+  const dumps = ["<hierarchy></hierarchy>", "", ""];
+  const output = takeSnapshot("emulator-5554", "07-murals", dir, { exec: fakeAdb([]), read: () => dumps.shift() });
+  assert.equal(output, `07-murals · 0×0dp · saved ${join(dir, "07-murals.png")}`);
 });
 
 test("takeSnapshot rejects a screencap that is not a PNG", () => {

@@ -143,8 +143,8 @@ export function takeSnapshot(serial, name, outDir, { exec = runTool, read = read
   if (longSide > MAX_SIDE) exec("sips", ["-Z", String(MAX_SIDE), pngPath], { stdio: "ignore" });
   if (!before) return `${name} · dump failed — screenshot only · saved ${pngPath}`;
   const density = parseDensity(adb(["shell", "wm", "density"], { encoding: "utf8" }));
-  const after = read(serial);
-  const changing = after && JSON.stringify(parseScreenText(before)) !== JSON.stringify(parseScreenText(after));
+  const after = read(serial) || read(serial);
+  const changing = JSON.stringify(parseScreenText(before)) !== JSON.stringify(parseScreenText(after));
   return formatListing({ name, pngPath, xml: after || before, density, note: changing ? STILL_CHANGING : "" });
 }
 
