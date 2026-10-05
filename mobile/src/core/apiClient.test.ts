@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { saveFailureMessage } from "@scripta/shared";
-import { createApiClient } from "./apiClient.js";
+import { ApiError, createApiClient, isPermanentError } from "./apiClient.js";
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -252,4 +252,11 @@ test("a refresh that fails on the network leaves the refresh token in place", as
 
   assert.equal(await session.refreshAccessToken(), false);
   assert.equal(tokenStore.read(), "refresh-1", "a network failure is not proof the session is gone");
+});
+
+test("only a definite 4xx answer is a permanent error", () => {
+  for (const status of [400, 401, 403, 404, 410]) assert.equal(isPermanentError(new ApiError(status, "No")), true);
+  for (const status of [408, 429, 500, 502, 503]) assert.equal(isPermanentError(new ApiError(status, "No")), false);
+  assert.equal(isPermanentError(new TypeError("Network request failed")), false);
+  assert.equal(isPermanentError(null), false);
 });

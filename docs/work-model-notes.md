@@ -12,9 +12,9 @@ A catalog `books` row is an edition (an ISBN) or a title-plus-author identity, a
 
 ## Gaps to plan for
 
-- **Books Open Library doesn't know** get no work key. That includes many small Portuguese presses. They need works of our own (our id), grouped by title plus author where it's safe, and linked to an Open Library work later if one appears. Wikidata and PORBASE (the national library catalogue) have work-level ids for some Portuguese books.
-- **Backfill.** Rows without a key can be filled from `/isbn/{isbn}.json` at 1 request/s, in the background.
-- **The title key (`ta:`)** acts like a work key but uses edition titles, which differ by language. It caused the importer's English-title collision fixed on 2026-10-01, so it shouldn't become the work key.
+- **Books Open Library doesn't know** get works of our own, grouped by title key where it's safe and joined to a keyed work with the same title key (`2026-10-04-keyless-works-design.md`). Wikidata and PORBASE (the national library catalogue) have work-level ids for some Portuguese books; neither is used yet.
+- **Backfill.** Built: user and seed editions without a key are looked up at `/isbn/{isbn}.json` in the background. Publisher editions are not, since Open Library knew none of a sample of 31.
+- **The title key (`ta:`)** alias still never chooses a work, because edition titles differ by language and the alias caused the importer's English-title collision fixed on 2026-10-01. The stored `books.title_key` groups only keyless works, skips keys shared by several keyed works, and an admin detach blocks a wrong grouping.
 - **Who benefits:**
   - Social "who read this book" should match by work, across editions and languages.
   - Library duplicate review can use the work as a "maybe the same book" hint. It must never auto-merge, since owning two editions is legitimate.

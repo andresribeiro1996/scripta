@@ -15,7 +15,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
 const { openBooksDb } = await import("./adapters/sqlite/connection.js");
 const { lookupIdentity } = await import("./domain/normalize.js");
-const { peekCachedCoverUrl, peekCachedCoverUrls } = await import("./publicCoverLookup.js");
+const { peekCachedCoverUrl, peekCachedCoverUrls, peekWorkId, resolveWorkId } = await import("./publicCoverLookup.js");
 
 const db = openBooksDb();
 function cacheBook(id: string, imageId: string | null, keys: string[]) {
@@ -55,4 +55,19 @@ test("peekCachedCoverUrls agrees with peekCachedCoverUrl called one by one", () 
 test("peekCachedCoverUrls gives nothing for no lookups and null for lookups with no key", () => {
   assert.deepEqual(peekCachedCoverUrls([]), []);
   assert.deepEqual(peekCachedCoverUrls([{}, { isbn: "bad" }]), [null, null]);
+});
+
+test("peekWorkId finds an edition's live work without creating anything, and resolveWorkId follows merged_into", () => {
+  db.prepare(`INSERT INTO works (id, ol_work_key, title, author, merged_into, created_at) VALUES ('w-live', 'OL1W', 'Dune', 'Frank Herbert', NULL, '2026-01-01T00:00:00.000Z')`).run();
+  db.prepare(`INSERT INTO works (id, ol_work_key, title, author, merged_into, created_at) VALUES ('w-merged', NULL, 'Dune', 'Frank Herbert', 'w-live', '2026-01-01T00:00:00.000Z')`).run();
+  cacheBook("in-work", null, ["isbn:9787777777777"]);
+  db.prepare("UPDATE books SET work_id = 'w-live' WHERE id = 'in-work'").run();
+  const books = (db.prepare("SELECT COUNT(*) AS n FROM books").get() as { n: number }).n;
+  assert.equal(peekWorkId({ isbn: "9787777777777" }), "w-live");
+  assert.equal(peekWorkId({ isbn: "9784444444444" }), null);
+  assert.equal(peekWorkId({ title: "Never Seen", author: "Nobody" }), null);
+  assert.equal((db.prepare("SELECT COUNT(*) AS n FROM books").get() as { n: number }).n, books);
+  assert.equal(resolveWorkId("w-merged"), "w-live");
+  assert.equal(resolveWorkId("w-live"), "w-live");
+  assert.equal(resolveWorkId("no-such-work"), null);
 });

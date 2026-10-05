@@ -92,6 +92,10 @@ export function catalogTitleKey(title: string, author: string): string | null {
   return main ? `ta:${main}|${firstAuthor(author)}|${titleNumbers(title)}` : null;
 }
 
+export function workTitleKey(title: string, author: string): string {
+  return firstAuthor(author) ? catalogTitleKey(title, author) ?? "" : "";
+}
+
 export function lookupIdentity(lookup: BookLookup): BookIdentity | null {
   const raw = normalizeIsbn(lookup.isbn ?? "").toUpperCase();
   const isbn = canonicalIsbn(raw) || null;

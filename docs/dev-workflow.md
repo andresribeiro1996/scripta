@@ -26,6 +26,8 @@ npm run dev:wait -- "Sign in" --timeout 120
 
 It polls `uiautomator dump` on the emulator this worktree leases, prints how long it took, and on a timeout prints the screen it gave up on — which is usually the whole diagnosis (a splash means still bundling, the wrong route means the app went somewhere else). Chain it: `npm run dev:wait -- "Sign in" && adb -s <serial> exec-out screencap -p > screen.png`.
 
+`npm run dev:snapshot -- <name> --out <dir>` takes the screenshot and prints the screen's controls in one call: each tap target with its centre in device pixels, its size in dp and `⚠ <44dp` when it is under the 44dp minimum, plus `⚠ under <label>` when another control covers its centre. `dev:wait` matches visible text only, so wait on a quoted text row from that listing, not on a `desc=` label.
+
 Any route can be opened directly, which saves signing out to reach an auth screen:
 
 ```

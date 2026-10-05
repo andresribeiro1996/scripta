@@ -1,4 +1,5 @@
-import { Stack } from "expo-router";
+import { router, Stack } from "expo-router";
+import { isPermanentError } from "../../core/apiClient";
 import { useQuery } from "@tanstack/react-query";
 import { StyleSheet, View } from "react-native";
 import { ErrorState, Screen, Skeleton } from "../../ui";
@@ -11,7 +12,7 @@ export function SharedLibraryScreen({ token }: { token: string }) {
   const query = useQuery({ queryKey: ["shared-library", token], queryFn: () => fetchSharedLibrary(token), enabled: Boolean(token), retry: false });
 
   if (query.isPending) return <View style={[styles.center, { backgroundColor: colors.background }]}><Skeleton height={180} /></View>;
-  if (query.isError || !query.data) return <View style={[styles.center, { backgroundColor: colors.background }]}><ErrorState title="Library unavailable" body="This link is invalid or no longer active." /></View>;
+  if (query.isError || !query.data) return <View style={[styles.center, { backgroundColor: colors.background }]}><ErrorState title="Library unavailable" body="This link is invalid or no longer active." actionLabel={isPermanentError(query.error) ? "Go to Atmyshelf" : "Retry"} onAction={isPermanentError(query.error) ? () => router.replace("/") : () => void query.refetch()} /></View>;
   return <Screen bottom top={false}>
     <Stack.Screen options={{ headerShown: true, title: query.data.data.name || "Library" }} />
     <PublicLibraryGrid library={query.data.data} />
