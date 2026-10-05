@@ -50,6 +50,7 @@ export interface TierlistsRepository {
    *  re-vote that moves a book must not leave the old placement behind). */
   saveBallot(ballot: BallotRow, placements: Placement[]): void;
   getPlacements(ballotId: string): Placement[];
+  storedWorks(tierlistId: string): Map<string, string | null>;
   histogram(tierlistId: string): HistogramCell[];
   ballotCount(tierlistId: string): number;
   /** Ballot totals for every tier list at once — one grouped count, so
