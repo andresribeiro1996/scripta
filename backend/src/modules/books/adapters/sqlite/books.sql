@@ -37,6 +37,8 @@ CREATE TABLE IF NOT EXISTS books (
   work_id             TEXT REFERENCES works(id),
   language            TEXT,
   work_checked_at     TEXT,
+  title_key           TEXT,
+  title_group_blocked_at TEXT,
   created_at          TEXT NOT NULL
 );
 

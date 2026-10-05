@@ -47,23 +47,34 @@ interface WorksLog {
   error: (details: object, message: string) => void;
 }
 
+export interface WorksSteps {
+  assignMissingWorks: (limit: number) => number;
+  fillTitleKeys: (limit: number) => number;
+  groupKeylessWorks: (limit: number) => number;
+}
+
 export function startWorksBackfill(
-  assignMissingWorks: (limit: number) => number,
+  steps: WorksSteps,
   log: WorksLog,
   intervalMs?: number,
   timers?: Timers
 ): () => void {
   return startDetailsBackfill(
     async (signal) => {
-      let assigned = 0;
-      for (;;) {
-        await new Promise(setImmediate);
-        if (signal.aborted) break;
-        const batch = assignMissingWorks(WORKS_BATCH_SIZE);
-        assigned += batch;
-        if (batch < WORKS_BATCH_SIZE) break;
-      }
-      if (assigned > 0) log.info({ assigned }, "assigned works to existing editions");
+      const counts = { assigned: 0, titleKeyed: 0, grouped: 0 };
+      const drain = async (step: (limit: number) => number, field: keyof typeof counts) => {
+        for (;;) {
+          await new Promise(setImmediate);
+          if (signal.aborted) return;
+          const batch = step(WORKS_BATCH_SIZE);
+          counts[field] += batch;
+          if (batch < WORKS_BATCH_SIZE) return;
+        }
+      };
+      await drain(steps.assignMissingWorks, "assigned");
+      await drain(steps.fillTitleKeys, "titleKeyed");
+      await drain(steps.groupKeylessWorks, "grouped");
+      if (counts.assigned + counts.titleKeyed + counts.grouped > 0) log.info(counts, "updated works for existing editions");
     },
     (error) => log.error({ err: error }, "works backfill failed"),
     intervalMs,

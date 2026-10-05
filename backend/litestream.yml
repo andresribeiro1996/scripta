@@ -32,6 +32,7 @@ dbs:
       endpoint: ${R2_ENDPOINT}
       region: auto
   - path: /data/covers.sqlite
+    truncate-page-n: 12800
     replica:
       url: s3://${R2_BACKUPS_BUCKET}/covers.sqlite
       endpoint: ${R2_ENDPOINT}
