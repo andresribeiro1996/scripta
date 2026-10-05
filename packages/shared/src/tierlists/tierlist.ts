@@ -4,11 +4,11 @@ export interface TierDefinition {
   id: string;
   label: string;
   color: string;
-  bookKeys: string[];
+  workIds: string[];
 }
 
 export function createTier(label: string, color: string): TierDefinition {
-  return { id: newId(), label, color, bookKeys: [] };
+  return { id: newId(), label, color, workIds: [] };
 }
 
 export const DEFAULT_TIER_PRESET = [

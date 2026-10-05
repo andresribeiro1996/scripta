@@ -7,16 +7,18 @@
 // 10,000 produce the same input. Every mode is derived from it here rather
 // than being fetched separately, so switching modes never hits the network.
 
+import type { Placement } from "./ballot.js";
+
 export type AggregationMode = "average" | "plurality" | "median";
 
 export interface HistogramCell {
-  bookKey: string;
+  workId: string;
   tierId: string;
   votes: number;
 }
 
 export interface BookResult {
-  bookKey: string;
+  workId: string;
   /** null when nobody ranked this book. */
   tierId: string | null;
   /** The mean tier index, kept raw so books can be ordered WITHIN a tier.
@@ -42,30 +44,30 @@ export function aggregate(
 ): BookResult[] {
   const tierIndex = new Map(tierIds.map((id, index) => [id, index] as const));
 
-  // votesByBook[bookKey][tierIndex] = count. A cell naming a tier that no
+  // votesByWork[workId][tierIndex] = count. A cell naming a tier that no
   // longer exists is dropped rather than throwing — a frozen community
   // copy shouldn't be able to produce one, but this is public input on a
   // read path.
-  const votesByBook = new Map<string, number[]>();
+  const votesByWork = new Map<string, number[]>();
   for (const cell of histogram) {
     const index = tierIndex.get(cell.tierId);
     if (index === undefined) continue;
-    const counts = votesByBook.get(cell.bookKey) ?? new Array<number>(tierIds.length).fill(0);
+    const counts = votesByWork.get(cell.workId) ?? new Array<number>(tierIds.length).fill(0);
     counts[index] += cell.votes;
-    votesByBook.set(cell.bookKey, counts);
+    votesByWork.set(cell.workId, counts);
   }
 
-  return pool.map((bookKey) => {
-    const counts = votesByBook.get(bookKey);
+  return pool.map((workId) => {
+    const counts = votesByWork.get(workId);
     const total = counts?.reduce((sum, n) => sum + n, 0) ?? 0;
     if (!counts || total === 0) {
-      return { bookKey, tierId: null, score: null, votes: 0, spread: 0 };
+      return { workId, tierId: null, score: null, votes: 0, spread: 0 };
     }
 
     const score = counts.reduce((sum, n, index) => sum + n * index, 0) / total;
     const winner = winningIndex(counts, total, score, mode);
     return {
-      bookKey,
+      workId,
       tierId: tierIds[winner] ?? null,
       score,
       votes: total,
@@ -77,8 +79,8 @@ export function aggregate(
 /** A ballot is exactly the books the voter PLACED. Anything still sitting
  *  in the pool is left out entirely — that absence is how "no opinion" is
  *  recorded, and it's why results carry a per-book vote count. */
-export function toPlacements(data: { tiers: Array<{ id: string; bookKeys: string[] }> }): Array<{ bookKey: string; tierId: string }> {
-  return data.tiers.flatMap((tier) => tier.bookKeys.map((bookKey) => ({ bookKey, tierId: tier.id })));
+export function toPlacements(data: { tiers: Array<{ id: string; workIds: string[] }> }): Placement[] {
+  return data.tiers.flatMap((tier) => tier.workIds.map((workId) => ({ workId, tierId: tier.id })));
 }
 
 function winningIndex(counts: number[], total: number, score: number, mode: AggregationMode): number {

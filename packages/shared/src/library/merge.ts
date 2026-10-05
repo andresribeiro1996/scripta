@@ -9,6 +9,7 @@ import { normalizeIsbn } from "./covers.js";
  *  (common for indie/sideloaded titles) — imprecise, but the only signal
  *  available across sources that don't share a real ISBN. */
 export function bookKey(book: Record<string, unknown>): string {
+  if (typeof book._key === "string") return book._key;
   const isbn = normalizeIsbn(book.ISBN);
   if (isbn) return `isbn:${isbn}`;
   const title = normalizeForMatch(book.Title);
