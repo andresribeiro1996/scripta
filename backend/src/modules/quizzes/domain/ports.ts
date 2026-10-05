@@ -21,6 +21,7 @@ export interface QuizzesRepository {
    *  not deleted, so leaderboards keep their rows (tierlists' precedent). */
   deleteUserData(userId: string): void;
   rekeyBooks(userId: string, fromKeys: string[], toKey: string, toWork: string | null): void;
+  storedWorks(quizId: string): Map<string, string | null>;
 
   /** Lookup by public code — NOT ownership-checked: this backs the public
    *  play routes, where the caller may have no session at all. */

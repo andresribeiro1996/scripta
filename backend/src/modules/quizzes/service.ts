@@ -101,6 +101,7 @@ export interface QuizzesService {
   getQuiz(userId: string, id: string): Quiz | undefined;
   updateQuiz(userId: string, id: string, patch: { name?: string; data?: unknown }, works?: Map<string, string | null>): Quiz | undefined;
   deleteQuiz(userId: string, id: string): boolean;
+  storedWorks(quizId: string): Map<string, string | null>;
   /** `resolvedBooks` carries the public cover URLs the route resolved from
    *  the owner's library (the same resolver tierlists' open-voting uses);
    *  books that already carry one (pool picks) keep theirs. */
@@ -160,6 +161,10 @@ export function createQuizzesService(repo: QuizzesRepository): QuizzesService {
 
     deleteQuiz(userId, id) {
       return repo.delete(id, userId);
+    },
+
+    storedWorks(quizId) {
+      return repo.storedWorks(quizId);
     },
 
     publishQuiz(userId, id, resolvedBooks) {

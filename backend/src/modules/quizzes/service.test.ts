@@ -14,6 +14,9 @@ function createInMemoryRepo(): QuizzesRepository {
   const answers = new Map<string, AnswerRow[]>();
   return {
     rekeyBooks() {},
+    storedWorks() {
+      return new Map();
+    },
     listByUser: (userId) => [...quizzes.values()].filter((q) => q.owner_user_id === userId),
     getOwned: (id, userId) => {
       const q = quizzes.get(id);

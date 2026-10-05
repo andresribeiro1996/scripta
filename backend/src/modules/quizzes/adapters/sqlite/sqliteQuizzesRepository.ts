@@ -18,6 +18,7 @@ export function createSqliteQuizzesRepository(db: DatabaseSync): QuizzesReposito
   const deleteQuizStmt = db.prepare(`DELETE FROM quizzes WHERE id = ? AND owner_user_id = ?`);
   const deletePlaysStmt = db.prepare(`DELETE FROM quiz_plays WHERE quiz_id = ?`);
   const deleteWorksStmt = db.prepare(`DELETE FROM quiz_works WHERE quiz_id = ?`);
+  const storedWorksStmt = db.prepare(`SELECT key, work_id FROM quiz_works WHERE quiz_id = ?`);
   const insertWorkStmt = db.prepare(`INSERT INTO quiz_works (quiz_id, key, work_id) VALUES (?, ?, ?)`);
   const deleteAnswersStmt = db.prepare(`DELETE FROM quiz_play_answers WHERE quiz_id = ?`);
   const getByVoteCodeStmt = db.prepare(`SELECT * FROM quizzes WHERE vote_code = ?`);
@@ -128,6 +129,10 @@ export function createSqliteQuizzesRepository(db: DatabaseSync): QuizzesReposito
         if (db.isTransaction) db.exec("ROLLBACK");
         throw error;
       }
+    },
+
+    storedWorks(quizId) {
+      return new Map((storedWorksStmt.all(quizId) as Array<{ key: string; work_id: string | null }>).map((row) => [row.key, row.work_id]));
     },
 
     rekeyBooks(userId, fromKeys, toKey, toWork) {
