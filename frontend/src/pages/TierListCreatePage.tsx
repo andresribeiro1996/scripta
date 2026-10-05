@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { createTier, DEFAULT_TIER_PRESET, workIdOf, type TierlistData } from "@scripta/shared";
 import { PageContainer } from "../components/PageContainer";
 import { useLibrary } from "../hooks/useLibrary";
 import { useTierlists } from "../hooks/useTierlists";
 import { useWorkBooks } from "../hooks/useWorkBooks";
+import { booksByWork } from "../lib/booksByWork";
 
 export function TierListCreatePage() {
   const navigate = useNavigate();
@@ -19,7 +20,8 @@ export function TierListCreatePage() {
   const [access, setAccess] = useState<"anonymous" | "members">("anonymous");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const books = useWorkBooks(library).filter((book) => workIdOf(book));
+  const workBooks = useWorkBooks(library);
+  const books = useMemo(() => [...booksByWork(workBooks).values()], [workBooks]);
   const needle = search.trim().toLowerCase();
   const filtered = books.filter((book) => !needle || String(book.Title ?? "").toLowerCase().includes(needle) || String(book.Attribution ?? "").toLowerCase().includes(needle));
 

@@ -12,11 +12,13 @@
 // books AND assigns slots server-side — this component never runs the
 // shuffle itself).
 
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import type { SeedBook } from "../../api/arena";
 import { useLibrary } from "../../hooks/useLibrary";
 import { toSeedBook } from "../../lib/arenaSeed";
-import { withWorkIds, workIdOf } from "@scripta/shared";
+import { workIdOf } from "@scripta/shared";
+import { useWorkBooks } from "../../hooks/useWorkBooks";
+import { booksByWork } from "../../lib/booksByWork";
 import { CoverImage } from "../BookCard";
 import { BookSearchList } from "../murals/pickers";
 import { useDismissible } from "../../hooks/useDismissible";
@@ -45,7 +47,8 @@ export function SeedSlotGrid({
   sizeControl?: ReactNode;
 }) {
   const { data: library } = useLibrary();
-  const books = withWorkIds((library?.data as { books?: Array<Record<string, unknown>> } | undefined)?.books ?? [], library?.works).filter((b) => workIdOf(b));
+  const workBooks = useWorkBooks(library);
+  const books = useMemo(() => [...booksByWork(workBooks).values()], [workBooks]);
   const [pickingSlot, setPickingSlot] = useState<number | null>(null);
   // Always-mounted grid — lock only while the picker modal is up.
   useScrollLock(pickingSlot !== null);

@@ -11,6 +11,7 @@ import { resolveCover } from "../api/covers";
 import { normalizeImageId, normalizeIsbn } from "../lib/covers";
 import { useLibrary } from "../hooks/useLibrary";
 import { useWorkBooks } from "../hooks/useWorkBooks";
+import { booksByWork } from "../lib/booksByWork";
 
 function toQuizBook(book: Record<string, unknown>, resolvedCover: string | null | undefined): QuizBookInput {
   return {
@@ -61,7 +62,7 @@ export function QuizCreatePage() {
   const collection = collections.find((group) => group.id === collectionId);
 
   const shelfRawBooks = useMemo(
-    () => (source === "collection" ? (collection ? booksInGroup(collection, libraryBooks) : []) : source === "shelf" ? libraryBooks : []),
+    () => [...booksByWork(source === "collection" ? (collection ? booksInGroup(collection, libraryBooks) : []) : source === "shelf" ? libraryBooks : []).values()],
     [source, collection, libraryBooks]
   );
 
@@ -190,7 +191,7 @@ export function QuizCreatePage() {
             )}
             {source === "shelf" && (
               <p className="text-sm text-(--color-text-dim)">
-                {isLoading ? "Loading books…" : isError ? <button onClick={() => void refetch()} className="text-left text-(--color-accent)">Couldn't load your library. Retry</button> : `${libraryBooks.length} books on your shelf.`}
+                {isLoading ? "Loading books…" : isError ? <button onClick={() => void refetch()} className="text-left text-(--color-accent)">Couldn't load your library. Retry</button> : `${shelfRawBooks.length} books on your shelf.`}
               </p>
             )}
             <p className="text-sm text-(--color-text-dim)">{books.length} {books.length === 1 ? "book" : "books"} selected</p>

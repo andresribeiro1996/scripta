@@ -3,6 +3,7 @@ import { MiniBookTile } from "../murals/blocks/BookBlocks";
 import { useScrollLock } from "../../hooks/useScrollLock";
 import { useDismissible } from "../../hooks/useDismissible";
 import { workIdOf } from "@scripta/shared";
+import { booksByWork } from "../../lib/booksByWork";
 
 /** Picks several books into a tier list's pool in one trip.
  *
@@ -33,8 +34,9 @@ export function AddBooksSheet({
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return books;
-    return books.filter(
+    const unique = [...booksByWork(books).values()];
+    if (!q) return unique;
+    return unique.filter(
       (b) => String(b.Title ?? "").toLowerCase().includes(q) || String(b.Attribution ?? "").toLowerCase().includes(q)
     );
   }, [books, search]);
