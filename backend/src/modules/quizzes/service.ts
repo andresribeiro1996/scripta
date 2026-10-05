@@ -3,10 +3,10 @@
 // module's service.ts.
 
 import { randomBytes, randomUUID } from "node:crypto";
-import { QUIZ_QUESTION_TYPES, generateQuizQuestions, gradeAnswers, type PublicQuizQuestion, type QuestionStat, type QuizBook, type QuizQuestion, type QuizQuestionType, type ResultPlay, type SubmittedAnswer } from "@scripta/shared";
+import { QUIZ_QUESTION_TYPES, generateQuizQuestions, gradeAnswers, type PublicQuizQuestion, type QuestionStat, type QuizQuestionType, type ResultPlay, type SubmittedAnswer } from "@scripta/shared";
 import type { GameParticipation } from "@scripta/shared/community";
 import type { QuizzesRepository } from "./domain/ports.js";
-import type { AnswerRow, PlayRow, Quiz, QuizRow } from "./domain/types.js";
+import type { AnswerRow, PlayRow, Quiz, QuizRow, StoredQuizBook, StoredQuizQuestion } from "./domain/types.js";
 
 function toQuiz(row: QuizRow): Quiz {
   const parsed = JSON.parse(row.data) as unknown;
@@ -27,8 +27,8 @@ interface QuizDocument {
   sourceLabel: string;
   questionCount: number;
   allowedTypes: QuizQuestionType[];
-  books: QuizBook[];
-  questions: QuizQuestion[] | null;
+  books: StoredQuizBook[];
+  questions: StoredQuizQuestion[] | null;
 }
 
 function readDocument(quiz: Quiz): QuizDocument {
@@ -82,7 +82,7 @@ function toResultPlay(row: PlayRow): ResultPlay {
   return { playId: row.id, playerName: row.player_name, score: row.score, durationMs: row.duration_ms, createdAt: row.created_at };
 }
 
-function toPublicQuestion(question: QuizQuestion, bookByKey: Map<string, QuizBook>): PublicQuizQuestion {
+function toPublicQuestion(question: StoredQuizQuestion, bookByKey: Map<string, StoredQuizBook>): PublicQuizQuestion {
   const book = bookByKey.get(question.bookKey);
   const prompt =
     question.type === "cover_title"
@@ -171,7 +171,7 @@ export function createQuizzesService(repo: QuizzesRepository): QuizzesService {
       const coverByKey = new Map(resolvedBooks.map((b) => [b.bookKey, b.coverUrl]));
       const books = doc.books.map((b) => ({ ...b, coverUrl: b.coverUrl ?? coverByKey.get(b.key) ?? null }));
       const code = generateVoteCode();
-      const questions = generateQuizQuestions(books, { questionCount: doc.questionCount, allowedTypes: doc.allowedTypes }, code);
+      const questions = generateQuizQuestions(books, { questionCount: doc.questionCount, allowedTypes: doc.allowedTypes }, code).map((question) => ({ id: question.id, type: question.type, bookKey: question.book.key, options: question.options, answerIndex: question.answerIndex }));
       if (questions.length !== doc.questionCount) {
         return { ok: false, reason: "invalid", error: "Not enough books have the covers, quotes, or blurbs those question types need." };
       }

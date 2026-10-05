@@ -4,13 +4,16 @@ export type QuizQuestionType = (typeof QUIZ_QUESTION_TYPES)[number];
 
 /** Publish-time snapshot of one book — same philosophy as tournament
  *  slots: editing the library later never mutates a live quiz. */
-export interface QuizBook {
-  key: string;
+export interface QuizBookContent {
   title: string;
   author: string;
   coverUrl: string | null;
   quote: string | null;
   blurb: string | null;
+}
+
+export interface QuizBook extends QuizBookContent {
+  key: string;
 }
 
 export interface QuizQuestion {
