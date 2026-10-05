@@ -34,3 +34,10 @@ CREATE TABLE IF NOT EXISTS mural_folders (
 );
 CREATE INDEX IF NOT EXISTS idx_mural_folders_user_id ON mural_folders(user_id);
 
+CREATE TABLE IF NOT EXISTS mural_works (
+  mural_id TEXT NOT NULL,
+  key      TEXT NOT NULL,
+  work_id  TEXT,
+  PRIMARY KEY (mural_id, key)
+);
+CREATE INDEX IF NOT EXISTS idx_mural_works_work ON mural_works(work_id);
