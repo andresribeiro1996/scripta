@@ -61,7 +61,7 @@ export function ownedItems(tab: ArenaTab, tournaments: TournamentSummary[], tier
   }
   return tierlists.map((source) => {
     const tiers = source.data.tiers.length;
-    const books = source.data.tiers.reduce((total, tier) => total + tier.bookKeys.length, 0);
+    const books = source.data.tiers.reduce((total, tier) => total + tier.workIds.length, 0);
     const voting = source.voteCode ? ` · voting ${source.votingOpen ? "open" : "closed"}` : "";
     return {
       id: source.id,
@@ -145,8 +145,8 @@ export type TierSegment = { color: string; weight: number };
  *  ladder draws even segments — the palette still reads, the proportions
  *  just aren't claiming anything. */
 export function tierDistribution(tiers: TierDefinition[]): TierSegment[] {
-  const sorted = tiers.reduce((total, tier) => total + tier.bookKeys.length, 0);
-  return tiers.map((tier) => ({ color: tier.color, weight: sorted === 0 ? 1 : tier.bookKeys.length }));
+  const sorted = tiers.reduce((total, tier) => total + tier.workIds.length, 0);
+  return tiers.map((tier) => ({ color: tier.color, weight: sorted === 0 ? 1 : tier.workIds.length }));
 }
 
 export function tournamentProgress(tournament: TournamentSummary): {

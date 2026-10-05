@@ -107,7 +107,7 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
           <ArenaVoteDeck
             duel={next}
             disabled={busy === next.id}
-            onVote={(bookKey) => void action(next.id, () => voteOnDuel(id, next.id, token, bookKey, Boolean(user)))}
+            onVote={(workId) => void action(next.id, () => voteOnDuel(id, next.id, token, workId, Boolean(user)))}
           />
         </View>
       );
@@ -145,7 +145,7 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
               isOwner={isOwner}
               busyDuelId={busy}
               onSettle={(duelId) => void action(duelId, () => settleDuelEarly(id, duelId))}
-              onTiebreak={(duelId, bookKey) => void action(duelId, () => resolveTiebreak(id, duelId, bookKey))}
+              onTiebreak={(duelId, workId) => void action(duelId, () => resolveTiebreak(id, duelId, workId))}
             />
           </ScrollView>
           <View style={[styles.classicBar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
@@ -165,7 +165,7 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
         onRefresh={refresh}
         onShowClassic={() => setBracketView("classic")}
         onSettle={(duelId) => void action(duelId, () => settleDuelEarly(id, duelId))}
-        onTiebreak={(duelId, bookKey) => void action(duelId, () => resolveTiebreak(id, duelId, bookKey))}
+        onTiebreak={(duelId, workId) => void action(duelId, () => resolveTiebreak(id, duelId, workId))}
       />
     );
   };

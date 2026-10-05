@@ -35,8 +35,16 @@ export function bracketSlots(bracketSize: number, duels: Duel[]): Array<{ key: s
 export function tournamentChampion(bracketSize: number, duels: Duel[]): DuelSide | null {
   const lastRound = bracketShape(bracketSize, duels).at(-1);
   const final = lastRound?.length === 1 ? lastRound[0] : null;
-  if (!final?.winnerKey) return null;
-  return final.winnerKey === final.bookA.key ? final.bookA : final.bookB;
+  return final ? duelWinner(final) : null;
+}
+
+/** The side that went through, found by work id. A settled duel can carry
+ *  no winner the client can name (an orphan side has no work), and two
+ *  sides that share a work give it to side A, as the server does. */
+export function duelWinner(duel: Duel): DuelSide | null {
+  if (duel.status !== "settled" || !duel.winnerWorkId) return null;
+  if (duel.bookA.workId === duel.winnerWorkId) return duel.bookA;
+  return duel.bookB.workId === duel.winnerWorkId ? duel.bookB : null;
 }
 
 export function matchEmptyCopy(status: TournamentView["status"], hasDuels: boolean): { title: string; body: string } {

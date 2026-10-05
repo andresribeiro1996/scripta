@@ -29,7 +29,8 @@ export interface VotingBoard {
 }
 
 export interface PublicBook {
-  key?: string;
+  key: string;
+  workId: string | null;
   title: string;
   author?: string;
   isbn?: string;
@@ -39,7 +40,7 @@ export interface PublicBook {
 
 export interface BallotResponse {
   ballotId: string;
-  placements: Array<{ bookKey: string; tierId: string }>;
+  placements: Array<{ workId: string; tierId: string }>;
   results: { histogram: HistogramCell[]; ballotCount: number };
 }
 
@@ -84,7 +85,7 @@ export function fetchVotingBoard(code: string) {
   return apiClient.request<{ board: VotingBoard; books: PublicBook[] }>(`/tierlists/voting/${encodeURIComponent(code)}`);
 }
 
-export function submitBallot(code: string, placements: Array<{ bookKey: string; tierId: string }>, ballotId: string | null, authenticated: boolean) {
+export function submitBallot(code: string, placements: Array<{ workId: string; tierId: string }>, ballotId: string | null, authenticated: boolean) {
   const suffix = ballotId ? `/${encodeURIComponent(ballotId)}` : "";
   return apiClient.request<BallotResponse>(`/tierlists/voting/${encodeURIComponent(code)}/ballot${suffix}`, {
     method: ballotId ? "PUT" : "POST",

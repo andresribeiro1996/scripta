@@ -8,7 +8,7 @@ export function DuelSideRow({ side, duel }: { side: DuelSide; duel: Duel }) {
   const { colors } = useTheme();
   const percent = sharePercent(side.votes, duel);
   return (
-    <View accessibilityLabel={`${side.title} by ${side.author}`} style={[styles.side, { borderColor: duel.winnerKey === side.key ? colors.success : colors.border }]}>
+    <View accessibilityLabel={`${side.title} by ${side.author}`} style={[styles.side, { borderColor: side.workId !== null && duel.winnerWorkId === side.workId ? colors.success : colors.border }]}>
       <BookCover cover={side.cover} title={side.title} width={46} height={66} />
       <View style={styles.grow}>
         <Text numberOfLines={2} {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{side.title}</Text>

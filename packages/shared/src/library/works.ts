@@ -10,3 +10,12 @@ export function withWorkIds(books: Array<Record<string, unknown>>, works: Record
 export function workIdOf(book: Record<string, unknown>): string | undefined {
   return typeof book._workId === "string" ? book._workId : undefined;
 }
+
+export function booksByWork(books: Array<Record<string, unknown>>): Map<string, Record<string, unknown>> {
+  const byWork = new Map<string, Record<string, unknown>>();
+  for (const book of books) {
+    const workId = workIdOf(book);
+    if (workId && !byWork.has(workId)) byWork.set(workId, book);
+  }
+  return byWork;
+}

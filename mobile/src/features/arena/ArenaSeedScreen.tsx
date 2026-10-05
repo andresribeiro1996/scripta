@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Stack } from "expo-router";
 import { FlatList, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { filterBooks, seedCoverLookup, toSeedBook, type SeedBook } from "@scripta/shared";
+import { booksByWork, filterBooks, seedCoverLookup, toSeedBook, workIdOf, type SeedBook } from "@scripta/shared";
 import { Button, EmptyState, ErrorState, Input, Screen, Sheet, Skeleton, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
-import { useLibrary } from "../library";
+import { useLibrary, useWorkBooks } from "../library";
 import { createTournament, fetchTournament, randomFillTournament, resolveCover, setTournamentSlots, startTournament, type TournamentSummary } from "./api";
 
 export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: TournamentSummary; onStarted: (id: string) => void }) {
@@ -21,6 +21,10 @@ export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: Tourna
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const library = useLibrary();
+  const workBooks = useWorkBooks(library.data);
+  const books = useMemo(() => [...booksByWork(workBooks).values()], [workBooks]);
+  const assigned = new Set(slots.flatMap((book) => book?.workId ? [book.workId] : []));
+  const available = books.filter((book) => !assigned.has(workIdOf(book) ?? ""));
   const saved = useQuery({
     queryKey: ["arena", current?.id, "seed"],
     queryFn: () => fetchTournament(current!.id, "owner-seed"),
@@ -59,8 +63,10 @@ export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: Tourna
     try {
       const lookup = seedCoverLookup(book);
       const cover = lookup ? await resolveCover(book) : null;
+      const seed = toSeedBook(book, cover);
+      if (!seed) throw new Error("That book isn't in the catalog.");
       const next = [...slots];
-      next[slotIndex] = toSeedBook(book, cover);
+      next[slotIndex] = seed;
       setSlots(next);
       setSlotToAssign(null);
       await persist(next);
@@ -76,8 +82,7 @@ export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: Tourna
     setError(null);
     try {
       const target = await materialize();
-      const books = library.data?.data?.books ?? [];
-      const pool = await Promise.all(books.map(async (book) => toSeedBook(book, seedCoverLookup(book) ? await resolveCover(book) : null)));
+      const pool = (await Promise.all(available.map(async (book) => toSeedBook(book, seedCoverLookup(book) ? await resolveCover(book) : null)))).filter((seed): seed is SeedBook => seed !== null);
       await randomFillTournament(target.id, pool);
       const refreshed = await fetchTournament(target.id, "owner-seed");
       const byIndex = new Map(refreshed.slots.map((slot) => [slot.slotIndex, slot]));
@@ -105,9 +110,7 @@ export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: Tourna
     }
   }
 
-  const books = library.data?.data?.books ?? [];
-  const assigned = new Set(slots.flatMap((book) => book ? [book.key] : []));
-  const availableBooks = filterBooks(books, bookSearch, "all").filter((book) => !assigned.has(toSeedBook(book, null).key));
+  const pickable = filterBooks(available, bookSearch, "all");
   return (
     <Screen top={false} style={styles.screen}>
       <Stack.Screen options={{ headerShown: true, title: "Seed tournament" }} />
@@ -121,7 +124,7 @@ export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: Tourna
       ) : null}
       {error ? <Toast visible message={error} tone="error" /> : null}
       <View style={styles.actions}>
-        <Button label="Random fill" variant="secondary" loading={busy} disabled={!books.length} onPress={randomFill} />
+        <Button label="Random fill" variant="secondary" loading={busy} disabled={!available.length} onPress={randomFill} />
         <Button label="Save progress" variant="secondary" loading={busy} onPress={() => void persist().catch((reason: unknown) => setError(reason instanceof Error ? reason.message : "Couldn't save."))} />
         <Button label="Start" loading={busy} disabled={slots.some((slot) => !slot)} onPress={start} />
       </View>
@@ -142,8 +145,8 @@ export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: Tourna
       <Sheet visible={slotToAssign !== null} title={`Choose book for slot ${(slotToAssign ?? 0) + 1}`} onClose={() => setSlotToAssign(null)}>
         <Input label="Search books" value={bookSearch} onChangeText={setBookSearch} placeholder="Title or author" autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" returnKeyType="search" />
         <FlatList
-          data={availableBooks}
-          keyExtractor={(book) => toSeedBook(book, null).key}
+          data={pickable}
+          keyExtractor={(book) => workIdOf(book) ?? ""}
           style={styles.picker}
           ListEmptyComponent={<EmptyState title="No available books" body={bookSearch ? "Try a different search." : "Every available book is already assigned."} />}
           renderItem={({ item }) => <Pressable accessibilityLabel={`Assign ${String(item.Title ?? "Untitled")}`} accessibilityRole="button" accessibilityState={{ disabled: busy }} disabled={busy} onPress={() => void seedBook(item, slotToAssign!)} style={styles.pickRow}><Text numberOfLines={1} {...dynamicType} style={[typography.body, { color: colors.text }]}>{String(item.Title ?? "Untitled")}</Text></Pressable>}

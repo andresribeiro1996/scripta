@@ -163,6 +163,24 @@ test("multipart bodies are sent unchanged without a JSON content type", async ()
   await session.apiClient.request("/gallery", { method: "POST", body: form, auth: true });
   assert.equal(received?.body, form);
   assert.equal(new Headers(received?.headers).has("Content-Type"), false);
+  assert.equal(new Headers(received?.headers).get("X-Scripta-Works"), "1");
+});
+
+test("every request asks for the works format", async () => {
+  let received: RequestInit | undefined;
+  const session = createApiClient(
+    "http://api.test",
+    { async getRefreshToken() { return null; }, async setRefreshToken() {}, async clearRefreshToken() {} },
+    () => null,
+    () => {},
+    async (_input, init) => {
+      received = init;
+      return jsonResponse(200, { ok: true });
+    },
+  );
+
+  await session.apiClient.request("/library");
+  assert.equal(new Headers(received?.headers).get("X-Scripta-Works"), "1");
 });
 
 test("non-JSON responses become ApiError messages", async () => {

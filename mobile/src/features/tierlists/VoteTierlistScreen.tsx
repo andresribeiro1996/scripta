@@ -1,5 +1,5 @@
 import { RankingMethodSelector } from "./RankingMethodSelector";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ballotBoard, blankBoard, toPlacements, type AggregationMode, type TierlistData } from "@scripta/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -12,10 +12,10 @@ import { isPermanentError } from "../../core/apiClient";
 import { Button, EmptyState, ErrorState, Fab, IconButton, Screen, Sheet, Skeleton, SwipeableTabs, Toast, dynamicType, spacing, typography, useTheme } from "../../ui";
 import { AddBookSheet } from "../community/AddBookSheet";
 import { fetchBallot, fetchMyBallot, fetchVotingBoard, submitBallot, type BallotResponse, type PublicBook } from "./api";
-import { keyOf, TierBoard, TierHead, type TierBook } from "./TierBoard";
+import { TierBoard, TierHead, workOf, type TierBook } from "./TierBoard";
 import { TierlistResults } from "./TierlistResults";
 import { TierSortDeck } from "./TierSortDeck";
-import { moveBookTo } from "./tierBoardData";
+import { moveBookTo, votingBooks } from "./tierBoardData";
 import { TierlistShareImage } from "./TierlistShareImage";
 import { shareableCommunityResults } from "./tierlistShareData";
 import { ContentShareSheet } from "../sharing/ContentShareSheet";
@@ -31,7 +31,7 @@ export function VoteTierlistScreen({ code, startInRank = false }: { code: string
   const [ballot, setBallot] = useState<BallotResponse | null>(null);
   const [working, setWorking] = useState<TierlistData | null>(null);
   const [view, setView] = useState<"rank" | "board" | "community">(startInRank ? "rank" : "board");
-  const [selectedBookKey, setSelectedBookKey] = useState<string | null>(null);
+  const [selectedWorkId, setSelectedWorkId] = useState<string | null>(null);
   const [editing, setEditing] = useState(startInRank);
   const [ballotLoading, setBallotLoading] = useState(true);
   const [ballotError, setBallotError] = useState<string | null>(null);
@@ -48,6 +48,7 @@ export function VoteTierlistScreen({ code, startInRank = false }: { code: string
   const [resultMode, setResultMode] = useState<AggregationMode>("average");
   const boardQuery = useQuery({ queryKey: ["tierlists", "voting", code], queryFn: () => fetchVotingBoard(code), enabled: Boolean(code), retry: false });
   const votingBoard = boardQuery.data?.board;
+  const books: TierBook[] = useMemo(() => votingBooks(boardQuery.data?.books ?? []), [boardQuery.data?.books]);
   useEffect(() => {
     if (!sharing) return;
     let active = true;
@@ -82,13 +83,12 @@ export function VoteTierlistScreen({ code, startInRank = false }: { code: string
   if (boardQuery.isError || !boardQuery.data) return <Screen bottom style={styles.screen}><ErrorState title="No tier list at that link" body="Check the voting code and try again." actionLabel={isPermanentError(boardQuery.error) ? "Go to Atmyshelf" : "Retry"} onAction={isPermanentError(boardQuery.error) ? () => router.replace("/") : () => void boardQuery.refetch()} /></Screen>;
   if (ballotError) return <Screen bottom style={styles.screen}><ErrorState title="Your votes unavailable" body={ballotError} actionLabel="Retry" onAction={() => { setBallotError(null); setBallotLoading(true); if (user) void fetchMyBallot(code).then(setBallot).catch((reason) => setBallotError(String(reason))).finally(() => setBallotLoading(false)); else if (storedId) void fetchBallot(code, storedId, false).then(setBallot).catch((reason) => setBallotError(String(reason))).finally(() => setBallotLoading(false)); }} /></Screen>;
   const { board } = boardQuery.data;
-  const books: TierBook[] = boardQuery.data.books.map((book) => ({ Title: book.title, Attribution: book.author, ISBN: book.isbn, ImageId: book.imageId, _coverUrl: book.coverUrl }));
-  const allKeys = new Set(books.map(keyOf));
-  const cleanBoard = { ...board, pool: board.pool.filter((key) => allKeys.has(key)) };
+  const allWorks = new Set(books.flatMap((book) => { const id = workOf(book); return id ? [id] : []; }));
+  const cleanBoard = { ...board, pool: board.pool.filter((id) => allWorks.has(id)) };
   const data = working ?? (ballot ? ballotBoard(cleanBoard, ballot.placements) : blankBoard(cleanBoard));
   const blocked = board.access === "members" && !user;
   const canEdit = board.votingOpen && !board.promotedAt && !blocked && (!ballot || editing);
-  const showRank = view === "rank" && canEdit && (data.pool.length > 0 || selectedBookKey !== null);
+  const showRank = view === "rank" && canEdit && (data.pool.length > 0 || selectedWorkId !== null);
   const placements = toPlacements(data);
   const dirty = JSON.stringify(placements) !== JSON.stringify(ballot?.placements ?? []);
   const changeData = setWorking;
@@ -129,9 +129,9 @@ export function VoteTierlistScreen({ code, startInRank = false }: { code: string
       if (page !== "community") return <View style={styles.page}>
         <TierHead>
         <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{board.promotedAt ? "Permanent reference" : board.votingOpen ? "Voting open" : "Voting closed"} · {ballot ? dirty ? "Unsaved changes" : "Votes submitted" : "Not submitted"}</Text>
-        {showRank ? <Pressable accessibilityRole="button" accessibilityLabel="Back to board" onPress={() => { setSelectedBookKey(null); setView("board"); }}><Text {...dynamicType} style={[typography.body, { color: colors.accent }]}>‹ Board</Text></Pressable> : <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{placements.length} of {cleanBoard.pool.length} ranked</Text>}
+        {showRank ? <Pressable accessibilityRole="button" accessibilityLabel="Back to board" onPress={() => { setSelectedWorkId(null); setView("board"); }}><Text {...dynamicType} style={[typography.body, { color: colors.accent }]}>‹ Board</Text></Pressable> : <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{placements.length} of {cleanBoard.pool.length} ranked</Text>}
         </TierHead>
-        {showRank ? <TierSortDeck data={data} books={books} selectedBookKey={selectedBookKey} onAssign={(key, tierId) => { changeData(moveBookTo(data, key, tierId)); if (selectedBookKey || (data.pool.length === 1 && data.pool.includes(key))) { setSelectedBookKey(null); setView("board"); } }} /> : <TierBoard data={data} books={books} onChange={canEdit ? changeData : () => {}} structureEditable={false} poolLabel="Unranked" bottomClearance={76} onReassign={canEdit ? (key) => { setSelectedBookKey(key); setView("rank"); } : undefined} />}
+        {showRank ? <TierSortDeck data={data} books={books} selectedWorkId={selectedWorkId} onAssign={(workId, tierId) => { changeData(moveBookTo(data, workId, tierId)); if (selectedWorkId || (data.pool.length === 1 && data.pool.includes(workId))) { setSelectedWorkId(null); setView("board"); } }} /> : <TierBoard data={data} books={books} onChange={canEdit ? changeData : () => {}} structureEditable={false} poolLabel="Unranked" bottomClearance={76} onReassign={canEdit ? (workId) => { setSelectedWorkId(workId); setView("rank"); } : undefined} />}
         {blocked && board.votingOpen ? <Button label="Sign in to vote" onPress={() => router.push({ pathname: "/(public)/login", params: { returnTo: `/vote/${code}` } } as never)} /> : null}
         {canEdit && (data.pool.length === 0 || placements.length > 0) ? <View style={[styles.complete, view === "board" && data.pool.length > 0 ? styles.fabClearance : null]}>{data.pool.length === 0 ? <Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>All books ranked</Text> : null}<Button label={ballot ? "Update votes" : "Submit votes"} loading={busy} disabled={!dirty || !placements.length} onPress={() => void submit()} /></View> : null}
       </View>;
@@ -142,7 +142,7 @@ export function VoteTierlistScreen({ code, startInRank = false }: { code: string
     <Sheet visible={booksOpen} title="Books" onClose={() => setBooksOpen(false)}>
       <FlatList
         data={boardQuery.data.books}
-        keyExtractor={(book, index) => book.key ?? `${book.title}-${index}`}
+        keyExtractor={(book) => book.key}
         style={styles.list}
         contentContainerStyle={styles.listContent}
         renderItem={({ item }) => <Pressable accessibilityLabel={`${item.title} by ${item.author ?? ""}`} onPress={() => openAddBook(item)} style={styles.bookRow}>
