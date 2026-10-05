@@ -27,7 +27,7 @@ const ISBNDB_GAP_MS = 1100;
 const APPLE_GAP_MS = 3200;
 const OPEN_LIBRARY_GAP_MS = 1000;
 const OPEN_LIBRARY_COVER_GAP_MS = 3100;
-const BACKGROUND_ISBNDB_DAILY_CAP = 1500;
+const BACKGROUND_ISBNDB_DAILY_CAP = 6000;
 
 let activeService: BooksService | null = null;
 
