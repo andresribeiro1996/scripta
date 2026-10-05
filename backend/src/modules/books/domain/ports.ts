@@ -1,5 +1,5 @@
 import type { BookMetadata, BookSearchResult, CatalogBookMetadata } from "@scripta/shared";
-import type { BookRow, CoverImageRow, CoverSourceName, CoverStatus, DataSource, NewBook, SummarySource } from "./types.js";
+import type { BookRow, CoverImageRow, CoverSourceName, CoverStatus, DataSource, NewBook, SummarySource, WorkView } from "./types.js";
 
 export type MergeableDetails = Pick<BookMetadata, "summary" | "pages" | "year" | "publisher" | "translator">;
 
@@ -33,6 +33,15 @@ export interface BooksRepository {
   setAppleChecked(bookId: string, at: string): void;
   setWorkKey(id: string, key: string | null | undefined): void;
   assignMissingWorks(limit: number): number;
+  fillTitleKeys(limit: number): number;
+  groupKeylessWorks(limit: number): number;
+  listWorkLookupIds(limit: number, recheckBefore: string): string[];
+  markWorkChecked(id: string, at: string): void;
+  replaceLanguage(id: string, tag: string): void;
+  mergeWorks(fromId: string, intoId: string): string;
+  detachEdition(bookId: string, at: string): string;
+  resolveWorkId(id: string): string | null;
+  getWorkView(id: string): WorkView | undefined;
   assignWork(bookId: string): string;
   canonicalWorkIds(ids: string[]): Map<string, string>;
   setLanguage(id: string, tag: string | null): void;
@@ -72,4 +81,14 @@ export interface CatalogDetails {
 export interface BookCatalog {
   fetchDetails(lookup: { isbn: string | null; title: string; author: string }): Promise<CatalogDetails | null>;
   search(query: { isbn: string } | { text: string }): Promise<CatalogSearchHit[]>;
+}
+
+export interface EditionRecord {
+  title: string;
+  workKey: string | null;
+  languages: string[];
+}
+
+export interface EditionRecordSource {
+  fetchEditionRecord(isbn: string): Promise<EditionRecord | null>;
 }
