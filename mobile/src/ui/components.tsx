@@ -91,9 +91,11 @@ const RevealField = createContext<((field: View) => void) | null>(null);
 export function FormScroll({
   children,
   contentContainerStyle,
+  scrollToEnd = false,
 }: {
   children: ReactNode;
   contentContainerStyle?: ViewStyle;
+  scrollToEnd?: boolean;
 }) {
   const frame = useRef<View>(null);
   const scroll = useRef<ScrollView>(null);
@@ -125,6 +127,10 @@ export function FormScroll({
       );
     });
   }, []);
+
+  useEffect(() => {
+    if (scrollToEnd) requestAnimationFrame(() => scroll.current?.scrollToEnd({ animated: true }));
+  }, [scrollToEnd]);
 
   useEffect(() => {
     const measureOverlap = (keyboardTop: number) => {

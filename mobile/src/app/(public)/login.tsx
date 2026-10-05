@@ -16,7 +16,7 @@ const AUTH_MODES = [
 ] as const;
 
 export default function LoginPage() {
-  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
+  const { returnTo, notice } = useLocalSearchParams<{ returnTo?: string; notice?: string }>();
   const { ready, user, signUp, signIn, signInWithGoogle } = useAuth();
   const { colors } = useTheme();
   const [mode, setMode] = useState<"login" | "signup">("login");
@@ -28,6 +28,7 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [googleBusy, setGoogleBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [noticeDismissed, setNoticeDismissed] = useState(false);
   const identifierRef = useRef<TextInput>(null);
   const usernameRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
@@ -66,6 +67,7 @@ export default function LoginPage() {
       return;
     }
     locked.current = true;
+    setNoticeDismissed(true);
     startAuthNavigation(returnTo, mode === "signup");
     setBusy(true);
     setError(null);
@@ -110,6 +112,10 @@ export default function LoginPage() {
           <Text accessibilityRole="alert" style={[styles.server, { color: colors.danger }]}>
             Can&apos;t reach the server. Check your connection.
           </Text>
+        ) : notice === "password-changed" && !noticeDismissed ? (
+          <Text accessibilityLiveRegion="polite" style={[styles.server, { color: colors.text }]}>
+            Password changed. Log in with your new password.
+          </Text>
         ) : (
           <Text style={[styles.server, { color: colors.textDim }]}>Your bookshelf, everywhere.</Text>
         )}
@@ -119,7 +125,7 @@ export default function LoginPage() {
             accessibilityLabel="Sign in or create an account"
             options={AUTH_MODES}
             value={mode}
-            onChange={(next) => { if (locked.current) return; setMode(next); setError(null); setFieldErrors({}); }}
+            onChange={(next) => { if (locked.current) return; setMode(next); setNoticeDismissed(true); setError(null); setFieldErrors({}); }}
           />
         </View>
 
