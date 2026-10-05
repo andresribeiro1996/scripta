@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { parseScreenText, screenHasText, waitForText } from "./devWait.mjs";
+import { parseScreenText, readScreenText, screenHasText, waitForText } from "./devWait.mjs";
 
 // An abridged `uiautomator dump`: every node carries a text attribute, and
 // all but a couple are empty (layout nodes), which is why the empties are
@@ -88,4 +88,25 @@ test("--absent waits for something to go away", async () => {
   });
   assert.equal(result.found, true);
   assert.equal(result.elapsedMs, 2000);
+});
+
+test("readScreenText removes the old dump before dumping, so a failed dump is not read as the previous screen", () => {
+  const calls = [];
+  const exec = (command, args) => {
+    calls.push([command, ...args]);
+    return args.at(-2) === "cat" ? SCREEN : "";
+  };
+  assert.equal(readScreenText("emulator-5554", { exec }), SCREEN);
+  assert.deepEqual(calls, [
+    ["adb", "-s", "emulator-5554", "shell", "rm", "-f", "/sdcard/ui.xml"],
+    ["adb", "-s", "emulator-5554", "shell", "uiautomator", "dump", "/sdcard/ui.xml"],
+    ["adb", "-s", "emulator-5554", "shell", "cat", "/sdcard/ui.xml"],
+  ]);
+});
+
+test("readScreenText answers empty rather than throwing when adb fails", () => {
+  const exec = () => {
+    throw new Error("device offline");
+  };
+  assert.equal(readScreenText("emulator-5554", { exec }), "");
 });

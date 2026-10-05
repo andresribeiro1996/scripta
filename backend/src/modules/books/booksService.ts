@@ -2,15 +2,16 @@ import { randomUUID } from "node:crypto";
 import { canonicalIsbn, looksLikeIsbnQuery, type BookGenre, type BookMetadata, type BookSearchResult } from "@scripta/shared";
 import { findBestCover, type CoverSources, type FetchCoverImage } from "./coverResolver.js";
 import { MIN_GOOD_WIDTH } from "./domain/constants.js";
-import { BookNotFoundError, FileTooLargeError, InvalidImageError, SourcePausedError, SourceUnavailableError } from "./domain/errors.js";
+import { BookNotFoundError, FileTooLargeError, InvalidImageError, SourcePausedError, SourceUnavailableError, WorkMergeError } from "./domain/errors.js";
 import { encodeCover, type EncodedCover } from "./domain/images.js";
 import { findExisting, findOrCreateBook, keysOf } from "./domain/findOrCreate.js";
-import { findByIdentity, isPortugueseIsbn, lookupIdentity, SEARCH_LIMIT, searchTokens, type BookLookup } from "./domain/normalize.js";
-import type { BookCatalog, BooksRepository, CatalogSearchHit, CoverBlobStore, CoverSource } from "./domain/ports.js";
-import type { BookRow, CoverSourceName, CoverStatus } from "./domain/types.js";
+import { editionLanguage, findByIdentity, isPortugueseIsbn, lookupIdentity, SEARCH_LIMIT, searchTokens, type BookIdentity, type BookLookup } from "./domain/normalize.js";
+import type { BookCatalog, BooksRepository, CatalogSearchHit, CoverBlobStore, CoverSource, EditionRecordSource } from "./domain/ports.js";
+import type { BookRow, CoverSourceName, CoverStatus, WorkView } from "./domain/types.js";
 import type { CoverPriority } from "./worker.js";
 
 const RETRY_AFTER_MS = 30 * 24 * 60 * 60 * 1000;
+const WORK_RECHECK_MS = 30 * 24 * 60 * 60 * 1000;
 const UNAVAILABLE_BACKOFF_MS = 10 * 60 * 1000;
 const COVER_EXTENSION = "webp";
 const NO_SOURCE: CoverSource = { byIsbn: async () => [], byTitle: async () => [] };
@@ -34,6 +35,7 @@ export interface BooksServiceDeps {
   sources: CoverSources;
   catalog: BookCatalog;
   backgroundCatalog: BookCatalog;
+  editionRecords: EditionRecordSource;
   fetchImage: FetchCoverImage;
   enqueue: (bookId: string, priority?: CoverPriority) => void;
   publicUrlFor: (imageId: string, size: CoverFileSize) => string;
@@ -49,11 +51,14 @@ export interface BooksService {
   processBook(bookId: string, lane: CoverPriority): Promise<void>;
   getDetails(lookup: BookLookup): Promise<BookMetadata | null>;
   backfillDetails(limit: number, signal?: AbortSignal): Promise<number | null>;
+  backfillWorkKeys(limit: number, signal?: AbortSignal): Promise<number | null>;
   search(query: string): BookSearchResult[];
   searchExternal(query: string): Promise<BookSearchResult[]>;
   isAdmin(userId: string): boolean;
   rejectCover(lookup: BookLookup): ResolvedCover;
   uploadCover(lookup: BookLookup, bytes: Buffer): Promise<ResolvedCover>;
+  mergeWorks(from: BookLookup, into: BookLookup): WorkView;
+  detachEdition(edition: BookLookup): WorkView;
 }
 
 export async function storeCoverImage(
@@ -152,6 +157,20 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       deps.repo.makeSearchable(book.id);
       return book.cover_image_id ? { ...result, coverUrl: deps.publicUrlFor(book.cover_image_id, "thumb") } : result;
     });
+  }
+
+  function existingEdition(lookup: BookLookup): BookRow {
+    const identity = lookupIdentity(lookup);
+    if (lookup.isbn?.trim() && !identity?.isbn) throw new BookNotFoundError();
+    const book = identity ? (identity.isbn ? deps.repo.findBookByKey(identity.key) : findByIdentity(deps.repo, identity)) : undefined;
+    if (!book) throw new BookNotFoundError();
+    return book;
+  }
+
+  function workView(workId: string): WorkView {
+    const view = deps.repo.getWorkView(workId);
+    if (!view) throw new Error(`Work ${workId} is missing.`);
+    return view;
   }
 
   async function lookupDetails(book: BookRow, catalog: BookCatalog) {
@@ -269,6 +288,30 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       return null;
     },
 
+    async backfillWorkKeys(limit, signal) {
+      const recheckBefore = new Date(now().getTime() - WORK_RECHECK_MS).toISOString();
+      for (const id of deps.repo.listWorkLookupIds(limit, recheckBefore)) {
+        if (signal?.aborted) return null;
+        const book = deps.repo.getBook(id);
+        if (!book?.isbn || book.ol_work_key) continue;
+        try {
+          const record = await deps.editionRecords.fetchEditionRecord(book.isbn);
+          if (record?.workKey) {
+            deps.repo.setWorkKey(id, record.workKey);
+            const language = editionLanguage(record.languages, book.isbn);
+            if (language) deps.repo.replaceLanguage(id, language);
+          }
+        } catch (error) {
+          if (!(error instanceof SourceUnavailableError)) throw error;
+          if (error.retryAt !== undefined) return error.retryAt;
+          if (error.status === 429) return now().getTime() + UNAVAILABLE_BACKOFF_MS;
+          deps.warn({ bookId: id, source: error.source, error: error.message }, "work key source unavailable");
+        }
+        deps.repo.markWorkChecked(id, now().toISOString());
+      }
+      return null;
+    },
+
     search(query) {
       const trimmed = query.trim();
       if (!trimmed) return [];
@@ -302,6 +345,17 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       backoffUntil.delete(book.id);
       deps.enqueue(book.id, "front");
       return { url: null, fullUrl: null, pending: true, upgrading: false };
+    },
+
+    mergeWorks(from, into) {
+      const source = existingEdition(from);
+      const target = existingEdition(into);
+      if (!source.work_id || !target.work_id) throw new WorkMergeError("That edition has no work yet.");
+      return workView(deps.repo.mergeWorks(source.work_id, target.work_id));
+    },
+
+    detachEdition(edition) {
+      return workView(deps.repo.detachEdition(existingEdition(edition).id, now().toISOString()));
     },
 
     async uploadCover(lookup, bytes) {

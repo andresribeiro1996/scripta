@@ -1,12 +1,6 @@
 import { buildBookMetadata, findOpenLibraryMatch, mapOpenLibraryDoc } from "@scripta/shared";
-import type { BookCatalog } from "../../domain/ports.js";
+import type { BookCatalog, EditionRecord, EditionRecordSource } from "../../domain/ports.js";
 import { fetchJson, type Throttle } from "../http/http.js";
-
-export interface EditionRecord {
-  title: string;
-  workKey: string | null;
-  languages: string[];
-}
 
 const keyOf = (value: unknown): string | null => (value && typeof value === "object" && typeof (value as { key?: unknown }).key === "string" ? (value as { key: string }).key : null);
 
@@ -19,7 +13,7 @@ export function parseEditionRecord(record: unknown): EditionRecord {
   };
 }
 
-export function createOpenLibraryCatalog(throttle: Throttle, urgent = true): BookCatalog {
+export function createOpenLibraryCatalog(throttle: Throttle, urgent = true): BookCatalog & EditionRecordSource {
   const get = (url: string) => throttle(() => fetchJson("openlibrary", url), { urgent });
   return {
     async fetchDetails({ isbn, title, author }) {
@@ -49,6 +43,11 @@ export function createOpenLibraryCatalog(throttle: Throttle, urgent = true): Boo
         const result = mapOpenLibraryDoc(doc);
         return result ? [{ result, olCoverId: typeof doc.cover_i === "number" ? doc.cover_i : null, workKey: typeof doc.key === "string" ? doc.key : null, source: "openlibrary" as const }] : [];
       });
+    },
+
+    async fetchEditionRecord(isbn) {
+      const record = await get(`https://openlibrary.org/isbn/${encodeURIComponent(isbn)}.json`);
+      return record === null ? null : parseEditionRecord(record);
     }
   };
 }
