@@ -49,3 +49,11 @@ CREATE TABLE IF NOT EXISTS quiz_play_answers (
 );
 CREATE INDEX IF NOT EXISTS idx_quiz_play_answers_quiz
   ON quiz_play_answers(quiz_id, question_id, choice_index);
+
+CREATE TABLE IF NOT EXISTS quiz_works (
+  quiz_id TEXT NOT NULL,
+  key     TEXT NOT NULL,
+  work_id TEXT,
+  PRIMARY KEY (quiz_id, key)
+);
+CREATE INDEX IF NOT EXISTS idx_quiz_works_work ON quiz_works(work_id);

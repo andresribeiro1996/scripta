@@ -7,7 +7,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { authGuard, getOptionalAuthenticatedUser } from "../auth/index.js";
-import { resolvePublicLibraryData } from "../library/index.js";
+import { duplicateWorkMessage, keepFirstPerWork, resolveEntryWorks, resolvePublicLibraryData, WorkResolutionError, workIdsByKey, type WorkRef } from "../library/index.js";
 import type { PlayOutcome, Player, QuizzesService } from "./service.js";
 
 const idParamSchema = z.object({ id: z.string().uuid() });
@@ -50,7 +50,18 @@ const playSchema = z.object({
   playerName: z.string().trim().max(40).optional()
 });
 
-export function buildQuizRoutes(service: QuizzesService) {
+type ResolveQuizWorks = typeof resolveEntryWorks;
+
+function resolveBooks(resolveWorks: ResolveQuizWorks, userId: string, books: z.infer<typeof quizBookSchema>[]): { works: Map<string, WorkRef> } | { status: 503; error: string } {
+  try {
+    return { works: resolveWorks(userId, books) };
+  } catch (err) {
+    if (err instanceof WorkResolutionError) return { status: 503, error: err.message };
+    throw err;
+  }
+}
+
+export function buildQuizRoutes(service: QuizzesService, resolveWorks: ResolveQuizWorks = resolveEntryWorks) {
   return async function quizRoutes(app: FastifyInstance) {
     app.get("/quizzes", { preHandler: authGuard }, async (request, reply) => {
       return reply.send({ quizzes: service.listQuizzes(request.user.id) });
@@ -64,7 +75,10 @@ export function buildQuizRoutes(service: QuizzesService) {
       const { name, data } = parsed.data;
       const keys = data.books.map((b) => b.key);
       if (new Set(keys).size !== keys.length) return reply.code(400).send({ error: "Duplicate book." });
-      const quiz = service.createQuiz(request.user.id, name, data);
+      const resolved = resolveBooks(resolveWorks, request.user.id, data.books);
+      if ("error" in resolved) return reply.code(resolved.status).send({ error: resolved.error });
+      const books = keepFirstPerWork(data.books, (book) => book.key, resolved.works);
+      const quiz = service.createQuiz(request.user.id, name, { ...data, books }, workIdsByKey(books.map((book) => book.key), resolved.works));
       return reply.code(201).send(quiz);
     });
 
@@ -85,10 +99,30 @@ export function buildQuizRoutes(service: QuizzesService) {
         const keys = body.data.data.books.map((b) => b.key);
         if (new Set(keys).size !== keys.length) return reply.code(400).send({ error: "Duplicate book." });
       }
+      let works: Map<string, string | null> | undefined;
+      const stored = service.getQuiz(request.user.id, params.data.id);
+      if (body.data.data && stored?.voteCode === null) {
+        const storedKeys = new Set(((stored.data as { books?: Array<{ key?: unknown }> }).books ?? []).map((book) => book.key));
+        const keys = body.data.data.books.map((b) => b.key);
+        const resolved = resolveBooks(resolveWorks, request.user.id, body.data.data.books);
+        if ("error" in resolved) return reply.code(resolved.status).send({ error: resolved.error });
+        const perWork = new Map<string, number>();
+        for (const key of keys) {
+          const workId = resolved.works.get(key)?.workId;
+          if (workId) perWork.set(workId, (perWork.get(workId) ?? 0) + 1);
+        }
+        const addedKey = keys.find((key) => {
+          const workId = resolved.works.get(key)?.workId;
+          return !storedKeys.has(key) && workId && perWork.get(workId)! > 1;
+        });
+        const duplicate = addedKey === undefined ? undefined : resolved.works.get(addedKey);
+        if (duplicate) return reply.code(409).send({ error: duplicateWorkMessage(duplicate) });
+        works = workIdsByKey(keys, resolved.works);
+      }
       // undefined = not found, not owned, OR already published — a
       // published quiz's seeded set must not drift, and 404 covers all
       // three without leaking which (same convention as tierlists).
-      const quiz = service.updateQuiz(request.user.id, params.data.id, body.data);
+      const quiz = service.updateQuiz(request.user.id, params.data.id, body.data, works);
       if (!quiz) return reply.code(404).send({ error: "No quiz with that id." });
       return reply.send(quiz);
     });

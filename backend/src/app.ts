@@ -42,7 +42,7 @@ import { enqueueBookCovers, registerBooksModule } from "./modules/books/index.js
 import { deleteGalleryUserData, registerGalleryModule } from "./modules/gallery/index.js";
 import { deleteLibraryUserData, registerLibraryModule, resolvePublicLibrary, readerGlyphFor, resolveEntryWorks, WorkResolutionError, sharedBookCounts, sharedBooks, startWorksSweep, sweepLibraryWorks, type BookEvent } from "./modules/library/index.js";
 import { deleteMuralsUserData, getMuralsPublicApi, registerMuralsModule, rekeyMuralsBooks } from "./modules/murals/index.js";
-import { deleteQuizzesUserData, getQuizzesPublicApi, registerQuizzesModule, rekeyQuizzesBooks } from "./modules/quizzes/index.js";
+import { deleteQuizzesUserData, getQuizzesPublicApi, registerQuizzesModule, rekeyQuizzesBooks, sweepQuizzesWorks } from "./modules/quizzes/index.js";
 import { deleteSocialsUserData, registerSocialsModule } from "./modules/socials/index.js";
 import { deleteTierlistsUserData, registerTierlistsModule, getTierlistsPublicApi, rekeyTierlistsBooks, sweepTierlistsWorks } from "./modules/tierlists/index.js";
 import { registerWaitlistModule } from "./modules/waitlist/index.js";
@@ -170,7 +170,8 @@ export function buildApp() {
       }
       rekeyArenaBooks(userId, fromKeys, toKey, toWork);
       rekeyTierlistsBooks(userId, fromKeys, toKey, toWork);
-      for (const rekey of [rekeyMuralsBooks, rekeyQuizzesBooks]) rekey(userId, fromKeys, toKey);
+      rekeyQuizzesBooks(userId, fromKeys, toKey, toWork);
+      rekeyMuralsBooks(userId, fromKeys, toKey);
     }
   });
   app.register(registerGalleryModule);
@@ -232,7 +233,7 @@ export function buildApp() {
   });
   app.register(registerQuizzesModule);
 
-  const stopWorksSweep = startWorksSweep([sweepLibraryWorks, sweepArenaWorks, sweepTierlistsWorks], app.log);
+  const stopWorksSweep = startWorksSweep([sweepLibraryWorks, sweepArenaWorks, sweepTierlistsWorks, sweepQuizzesWorks], app.log);
   app.addHook("onClose", async () => {
     stopWorksSweep();
   });
