@@ -238,3 +238,22 @@ test("works-format random fill keeps one slot per work", async () => {
   assert.equal(new Set(stored).size, 2);
   await app.close();
 });
+
+test("a works-format re-seed keeps a stored slot key and keys a new work by the normal rule", async () => {
+  const [kept, fresh] = [work("Stored Key Book"), work("Fresh Book")];
+  const { app, db, id, headers, seed } = await worksArena("a6");
+  const legacy = await app.inject({
+    method: "PUT",
+    url: `/arenas/${id}/slots`,
+    headers: { authorization: "Bearer a6" },
+    payload: { slots: [{ slotIndex: 0, book: { key: "ta:stored key book|someone", title: "Stored Key Book", author: "Someone", cover: null } }] }
+  });
+  assert.equal(legacy.statusCode, 204);
+  assert.equal((db.prepare("SELECT work_id FROM tournament_slots WHERE tournament_id = ?").get(id) as { work_id: string }).work_id, kept);
+  libraryCopy("a6", 0, "isbn:9780000000099", kept);
+  libraryCopy("a6", 1, "isbn:9780000000098", fresh);
+  assert.equal((await seed([{ workId: kept, title: "Stored Key Book" }, { workId: fresh, title: "Fresh Book" }])).statusCode, 204);
+  const rows = (db.prepare("SELECT book_key, work_id FROM tournament_slots WHERE tournament_id = ? ORDER BY slot_index").all(id) as Array<Record<string, unknown>>).map((row) => ({ ...row }));
+  assert.deepEqual(rows, [{ book_key: "ta:stored key book|someone", work_id: kept }, { book_key: "isbn:9780000000098", work_id: fresh }]);
+  await app.close();
+});
