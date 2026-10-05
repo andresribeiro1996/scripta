@@ -15,7 +15,7 @@ process.env.JWT_ACCESS_SECRET = "a".repeat(64);
 process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
 const { applyLibrarySchema } = await import("./adapters/sqlite/connection.js");
-const { createEntryWorksResolver, duplicateWorkMessage, firstDuplicateWork, keepFirstPerWork, workIdsByKey, WorkResolutionError } = await import("./works.js");
+const { canonicalWorkIds, createEntryWorksResolver, duplicateWorkMessage, firstDuplicateWork, keepFirstPerWork, workIdsByKey, WorkResolutionError } = await import("./works.js");
 
 function harness(resolve: (lookups: Array<{ isbn?: string | null; title?: string | null }>) => Array<string | null> = (lookups) => lookups.map((lookup) => `w-${lookup.title ?? lookup.isbn}`), canonical: Record<string, string> = {}) {
   const db = new DatabaseSync(":memory:");
@@ -77,4 +77,17 @@ test("workIdsByKey skips empty keys and duplicateWorkMessage names the book", ()
   assert.deepEqual([...workIdsByKey(["a", "", "z"], works)], [["a", "w1"], ["z", null]]);
   assert.equal(duplicateWorkMessage({ workId: "w1", title: "Dune" }), "Dune is already here as another edition.");
   assert.equal(duplicateWorkMessage({ workId: "w1", title: null }), "That book is already here as another edition.");
+});
+
+test("canonicalWorkIds dedupes, skips the catalog for no ids, and wraps catalog errors", () => {
+  const calls: string[][] = [];
+  const canonical = (ids: string[]) => {
+    calls.push(ids);
+    return new Map(ids.map((id) => [id, id === "w-old" ? "w-new" : id]));
+  };
+  assert.deepEqual(canonicalWorkIds([], canonical), new Map());
+  assert.deepEqual(calls, []);
+  assert.deepEqual(canonicalWorkIds(["w-old", "w-old", "w-2"], canonical), new Map([["w-old", "w-new"], ["w-2", "w-2"]]));
+  assert.deepEqual(calls, [["w-old", "w-2"]]);
+  assert.throws(() => canonicalWorkIds(["w-1"], () => { throw new Error("down"); }), WorkResolutionError);
 });

@@ -51,6 +51,7 @@ export function createSqliteLibraryRepository(db: DatabaseSync, rowsVersion = LI
       OR library_summary.user_id IS NULL OR library_summary.source_updated_at != library_documents.updated_at
       OR library_summary.rows_version != ?
   `);
+  const workIdsStmt = db.prepare(`SELECT book_key, work_id FROM library_books WHERE user_id = ? AND work_id IS NOT NULL ORDER BY position`);
   const listRowHashesStmt = db.prepare(`SELECT position, row_hash FROM library_books WHERE user_id = ?`);
   const upsertBookStmt = db.prepare(`
     INSERT INTO library_books (user_id, position, book_key, title, author, isbn, image_id, read_status, series_number, sort_order, cover_url, finished_year, row_hash, work_id)
@@ -190,6 +191,9 @@ export function createSqliteLibraryRepository(db: DatabaseSync, rowsVersion = LI
     },
 
     rowHashes,
+    workIds(userId) {
+      return workIdsStmt.all(userId) as unknown as Array<{ book_key: string; work_id: string }>;
+    },
 
     setDerived(userId, derived, sourceUpdatedAt) {
       inTransaction(() => writeDerived(userId, derived, sourceUpdatedAt));

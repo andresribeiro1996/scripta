@@ -20,6 +20,16 @@ export class WorkResolutionError extends Error {
   }
 }
 
+export function canonicalWorkIds(ids: string[], canonical: (ids: string[]) => Map<string, string> = canonicalWorks): Map<string, string> {
+  const unique = [...new Set(ids)];
+  if (unique.length === 0) return new Map();
+  try {
+    return canonical(unique);
+  } catch (error) {
+    throw new WorkResolutionError(error);
+  }
+}
+
 interface ResolverDeps {
   db: DatabaseSync;
   resolveWorks: (lookups: WorkLookup[]) => Array<string | null>;

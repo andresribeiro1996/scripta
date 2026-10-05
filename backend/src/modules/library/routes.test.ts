@@ -13,6 +13,7 @@ process.env.AUTH_DB_PATH = join(scratch, "auth.sqlite");
 process.env.LIBRARY_DB_PATH = join(scratch, "library.sqlite");
 process.env.GALLERY_DB_PATH = join(scratch, "gallery.sqlite");
 process.env.GALLERY_STORAGE_PATH = join(scratch, "gallery-files");
+process.env.COVERS_DB_PATH = join(scratch, "covers.sqlite");
 process.env.JWT_ACCESS_SECRET = "a".repeat(64);
 process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
@@ -438,5 +439,16 @@ test("a change that loses a race for the document answers 409", async () => {
   const res = await app.inject({ method: "PATCH", url: "/library/books", headers: { authorization: "Bearer u1" }, payload: { bookKey: bookKey(kobo), rating: 3 } });
   assert.equal(res.statusCode, 409);
   assert.ok((res.json() as { error: string }).error);
+  await app.close();
+});
+
+test("PUT and GET /library answer each copy's work id", async () => {
+  const { app, put } = await setup();
+  const saved = await put(JSON.stringify({ data: { books: [kobo] } }));
+  assert.equal(saved.statusCode, 200);
+  const workId = saved.json().works["ta:dune|frank herbert"];
+  assert.equal(typeof workId, "string");
+  const read = await app.inject({ method: "GET", url: "/library", headers: { authorization: "Bearer u1" } });
+  assert.deepEqual(read.json().works, { "ta:dune|frank herbert": workId });
   await app.close();
 });
