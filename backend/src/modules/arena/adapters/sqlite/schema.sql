@@ -35,8 +35,11 @@ CREATE TABLE IF NOT EXISTS tournament_slots (
   title          TEXT NOT NULL,
   author         TEXT NOT NULL,
   cover_url      TEXT,
+  work_id        TEXT,
   PRIMARY KEY (tournament_id, slot_index)
 );
+
+CREATE INDEX IF NOT EXISTS idx_tournament_slots_work ON tournament_slots(work_id);
 
 -- Both books are denormalized directly onto the duel row rather than
 -- joined from tournament_slots — reading or voting on one duel should
@@ -50,11 +53,14 @@ CREATE TABLE IF NOT EXISTS duels (
   book_a_title    TEXT NOT NULL,
   book_a_author   TEXT NOT NULL,
   book_a_cover    TEXT,
+  book_a_work_id  TEXT,
   book_b_key      TEXT NOT NULL,
   book_b_title    TEXT NOT NULL,
   book_b_author   TEXT NOT NULL,
   book_b_cover    TEXT,
+  book_b_work_id  TEXT,
   winner_key      TEXT,
+  winner_work_id  TEXT,
   status          TEXT NOT NULL DEFAULT 'active', -- 'active' | 'tied_pending_tiebreak' | 'settled'
   opens_at        TEXT NOT NULL,
   closes_at       TEXT NOT NULL,
