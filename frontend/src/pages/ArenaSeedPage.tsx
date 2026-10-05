@@ -19,6 +19,7 @@ import { OptionSheet } from "../components/Sheet";
 import { useArena } from "../hooks/useArena";
 import { useLibrary } from "../hooks/useLibrary";
 import { toSeedBook } from "../lib/arenaSeed";
+import { withWorkIds, workIdOf } from "@scripta/shared";
 
 /** Bracket sizes offered for a draft. Powers of two only — the service
  *  rejects anything else, and every round has to halve cleanly down to
@@ -190,8 +191,8 @@ export function ArenaSeedPage() {
     setRandomFilling(true);
     setActionError(null);
     try {
-      const books = ((library?.data as { books?: Array<Record<string, unknown>> } | undefined)?.books ?? []) as Array<Record<string, unknown>>;
-      const pool = await Promise.all(books.map((book) => toSeedBook(book)));
+      const books = withWorkIds((library?.data as { books?: Array<Record<string, unknown>> } | undefined)?.books ?? [], library?.works).filter((book) => workIdOf(book));
+      const pool = (await Promise.all(books.map((book) => toSeedBook(book)))).filter((seed): seed is SeedBook => seed !== null);
       const target = await materialize();
       if (!target) return;
       await randomFillTournament(target.id, pool);

@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { ResolvedTierlist } from "../api/tierlists";
 import { bookMetadataOptions } from "../lib/bookMetadata";
+import { booksByWork } from "../lib/booksByWork";
 import { bookKey } from "../lib/merge";
 import type { MuralBlock } from "../lib/murals";
 
@@ -11,21 +12,29 @@ export function muralMetadataBooks(
   tierlistData?: (id: string) => ResolvedTierlist | undefined
 ) {
   const keys = new Set<string>();
+  const workIds = new Set<string>();
   for (const block of blocks) {
     if (block.type === "spotlight") keys.add(block.bookKey);
     if (block.type === "shelf") block.bookKeys.forEach((key) => keys.add(key));
     if (block.type === "currentlyReading") books.filter((book) => book.ReadStatus === 1).forEach((book) => keys.add(bookKey(book)));
     if (block.type === "tierlist") {
       const tierlist = tierlistData?.(block.tierlistId);
-      tierlist?.tiers.forEach((tier) => tier.bookKeys.forEach((key) => keys.add(key)));
-      tierlist?.pool.forEach((key) => keys.add(key));
+      tierlist?.tiers.forEach((tier) => tier.workIds.forEach((id) => workIds.add(id)));
+      tierlist?.pool.forEach((id) => workIds.add(id));
     }
   }
   const byKey = new Map(books.map((book) => [bookKey(book), book]));
-  return [...keys].flatMap((key) => {
-    const book = byKey.get(key);
-    return book ? [book] : [];
-  });
+  const byWork = booksByWork(books);
+  return [
+    ...[...keys].flatMap((key) => {
+      const book = byKey.get(key);
+      return book ? [book] : [];
+    }),
+    ...[...workIds].flatMap((id) => {
+      const book = byWork.get(id);
+      return book ? [book] : [];
+    })
+  ];
 }
 
 export function useMuralBookMetadata(

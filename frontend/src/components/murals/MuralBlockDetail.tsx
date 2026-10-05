@@ -13,6 +13,7 @@ import {
   type ReaderProfile,
   type ShelfTheme
 } from "../../lib/murals";
+import { booksByWork } from "../../lib/booksByWork";
 import { bookKey } from "../../lib/merge";
 import { computeStat } from "../../lib/muralStats";
 import { muralThemeStyle } from "../../lib/theme";
@@ -97,17 +98,18 @@ export function MuralBlockDetail({
   const spotlight = block.type === "spotlight" ? books.find((book) => bookKey(book) === block.bookKey) : undefined;
   const book = selectedBook ?? spotlight;
   const tierlist = block.type === "tierlist" ? tierlistData?.(block.tierlistId) : undefined;
+  const byWork = booksByWork(books);
   const groups =
     block.type === "shelf"
       ? [{ title: "", books: resolveShelfBooks(block, books) }]
       : block.type === "currentlyReading"
         ? [{ title: "", books: books.filter((item) => item.ReadStatus === 1) }]
         : tierlist
-          ? [...tierlist.tiers.map((tier) => ({ title: tier.label, keys: tier.bookKeys })), { title: "Unranked", keys: tierlist.pool }].map(
+          ? [...tierlist.tiers.map((tier) => ({ title: tier.label, keys: tier.workIds })), { title: "Unranked", keys: tierlist.pool }].map(
               (group) => ({
                 title: group.title,
                 books: group.keys
-                  .map((key) => books.find((item) => bookKey(item) === key))
+                  .map((workId) => byWork.get(workId))
                   .filter((item): item is Record<string, unknown> => Boolean(item))
               })
             )

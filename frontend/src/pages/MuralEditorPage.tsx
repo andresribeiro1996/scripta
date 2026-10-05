@@ -19,6 +19,7 @@ import { useLibrary } from "../hooks/useLibrary";
 import { useMuralFullscreen } from "../hooks/useMuralFullscreen";
 import { useMurals } from "../hooks/useMurals";
 import { useTierlists } from "../hooks/useTierlists";
+import { useWorkBooks } from "../hooks/useWorkBooks";
 import { muralThemeStyle, useResolvedTheme } from "../lib/theme";
 import { type BlockStyle } from "../lib/libraryStyle";
 import { useAuth } from "../auth/AuthContext";
@@ -66,7 +67,7 @@ export function MuralEditorPage() {
     const tierlist = tierlists?.find((t) => t.id === tierlistId);
     return tierlist ? { name: tierlist.name, tiers: tierlist.data.tiers, pool: tierlist.data.pool } : undefined;
   };
-  const books = library?.data.books ?? [];
+  const books = useWorkBooks(library);
   const murals = muralsData ?? [];
   // `/dashboard/murals/new` opens an UNSAVED mural. Clicking "New mural"
   // used to POST one immediately, so every idle tap left an "Untitled
