@@ -128,3 +128,22 @@ test("PUT slots by a non-owner is a 404, leaves the slots alone and writes nothi
   catalog.close();
   await app.close();
 });
+
+test("GET /arenas/:id and /arenas/mine speak works with the header and keys without it", async () => {
+  const { app, id } = await arenaApp();
+  assert.equal((await putSlots(app, id, [
+    { key: "ta:dune|frank herbert", title: "Dune", author: "Frank Herbert" },
+    { key: "ta:orlando|virginia woolf", title: "Orlando", author: "Virginia Woolf" }
+  ])).statusCode, 204);
+  const works = await app.inject({ method: "GET", url: `/arenas/${id}`, headers: { "x-scripta-works": "1" } });
+  assert.match(String(works.headers.vary), /X-Scripta-Works/);
+  const slots = works.json().tournament.slots as Array<Record<string, unknown>>;
+  assert.deepEqual(Object.keys(slots[0]!), ["slotIndex", "workId", "title", "author", "cover"]);
+  assert.equal(typeof slots[0]!.workId, "string");
+  const legacy = await app.inject({ method: "GET", url: `/arenas/${id}` });
+  assert.deepEqual(Object.keys(legacy.json().tournament.slots[0]), ["slotIndex", "key", "title", "author", "cover"]);
+  assert.doesNotMatch(legacy.body, /workId/);
+  const mine = await app.inject({ method: "GET", url: "/arenas/mine", headers: { authorization: "Bearer u1", "x-scripta-works": "1" } });
+  assert.equal(mine.json().tournaments[0].winner, null);
+  await app.close();
+});

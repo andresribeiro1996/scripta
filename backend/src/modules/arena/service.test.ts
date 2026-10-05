@@ -410,7 +410,7 @@ test("a completed tournament's summary carries the champion book", () => {
 
   const summary = service.listMine("owner-1")[0];
   assert.equal(summary?.status, "completed");
-  assert.deepEqual(summary?.winner, makeBookWithCover(1));
+  assert.deepEqual(summary?.winner, { ...makeBookWithCover(1), workId: null });
 });
 
 test("a seeding or active tournament's summary has no winner yet", () => {
@@ -714,7 +714,7 @@ test("listPublicByIds builds covers and winners for the requested started tourna
   const ofFirst = summaries.find((summary) => summary.id === first.id)!;
   assert.deepEqual(ofFirst, service.getPublicSummary(first.id));
   assert.equal(ofFirst.status, "completed");
-  assert.deepEqual(ofFirst.winner, makeBookWithCover(1));
+  assert.deepEqual(ofFirst.winner, { ...makeBookWithCover(1), workId: null });
   assert.deepEqual(ofFirst.covers, ["https://covers.test/1.jpg", "https://covers.test/2.jpg"]);
   assert.equal(summaries.find((summary) => summary.id === second.id)?.winner, null);
   assert.deepEqual(service.listPublicByIds([]), []);
@@ -733,4 +733,59 @@ test("votedAmong returns only the requested tournaments the account voted in, ne
   assert.deepEqual(service.votedAmong("voter-1", [first.id, second.id, mine.id]), [first.id]);
   assert.deepEqual(service.votedAmong("voter-1", []), []);
   assert.deepEqual(service.votedAmong("nobody", [first.id]), []);
+});
+
+const canonicalIdentity = (ids: string[]) => new Map(ids.map((id) => [id, id]));
+
+function startedDuel(canonical: (ids: string[]) => Map<string, string> = canonicalIdentity) {
+  const service = createArenaService(createInMemoryArenaRepository(), undefined, undefined, canonical);
+  const tournament = service.createTournament("owner-1", { name: "Test", bracketSize: 2, roundDurationMinutes: 60 });
+  service.setSlotsManual(tournament.id, "owner-1", [
+    { slotIndex: 0, book: { ...makeBook(1), workId: "w1" } },
+    { slotIndex: 1, book: { ...makeBook(2), workId: "w2" } }
+  ], resolveByWorkId);
+  service.start(tournament.id, "owner-1");
+  const duel = service.getTournamentView(tournament.id)!.duels[0]!;
+  return { service, tournament, duel };
+}
+
+test("views carry each slot's, side's and winner's work", () => {
+  const { service, tournament, duel } = startedDuel();
+  const view = service.getTournamentView(tournament.id)!;
+  assert.deepEqual(view.slots.map((slot) => slot.workId), ["w1", "w2"]);
+  assert.deepEqual([duel.bookA.workId, duel.bookB.workId, duel.winnerWorkId], ["w1", "w2", null]);
+  service.vote(tournament.id, duel.id, "v1", "book-2");
+  service.settleEarly(tournament.id, "owner-1", duel.id);
+  const settled = service.getTournamentView(tournament.id)!;
+  assert.equal(settled.duels[0]!.winnerWorkId, "w2");
+  assert.equal(settled.winner?.workId, "w2");
+});
+
+test("a vote by work lands on the side holding that work, through merges", () => {
+  const { service, tournament, duel } = startedDuel((ids) => new Map(ids.map((id) => [id, id === "w2-old" ? "w2" : id])));
+  service.vote(tournament.id, duel.id, "v1", { workId: "w2-old" });
+  assert.equal(service.getTournamentView(tournament.id)!.duels[0]!.bookB.votes, 1);
+  assert.throws(() => service.vote(tournament.id, duel.id, "v2", { workId: "w9" }), InvalidBookError);
+});
+
+test("a vote by work for a duel whose sides share a work goes to side A", () => {
+  const { service, tournament, duel } = startedDuel((ids) => new Map(ids.map((id) => [id, id === "w2" ? "w1" : id])));
+  service.vote(tournament.id, duel.id, "v1", { workId: "w1" });
+  const after = service.getTournamentView(tournament.id)!.duels[0]!;
+  assert.deepEqual([after.bookA.votes, after.bookB.votes], [1, 0]);
+});
+
+test("a tiebreak by work settles that side", () => {
+  const { service, tournament, duel } = startedDuel();
+  service.settleEarly(tournament.id, "owner-1", duel.id);
+  service.tiebreak(tournament.id, "owner-1", duel.id, { workId: "w2" });
+  assert.equal(service.getTournamentView(tournament.id)!.duels[0]!.winnerKey, "book-2");
+});
+
+test("seedingSlots answers only the owner of a tournament still seeding", () => {
+  const { service, tournament } = startedDuel();
+  assert.throws(() => service.seedingSlots(tournament.id, "owner-1"), TournamentAlreadyStartedError);
+  assert.throws(() => service.seedingSlots(tournament.id, "someone"), TournamentNotFoundError);
+  const seeding = service.createTournament("owner-1", { name: "Next", bracketSize: 2, roundDurationMinutes: 60 });
+  assert.deepEqual(service.seedingSlots(seeding.id, "owner-1"), []);
 });

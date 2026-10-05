@@ -14,7 +14,9 @@ import {
   TournamentNotFoundError
 } from "./domain/errors.js";
 import { resolveEntryWorks, WorkResolutionError } from "../library/index.js";
+import { worksFormat } from "../../worksFormat.js";
 import type { ArenaService, ResolveBookWorks } from "./service.js";
+import { summariesForWire, tournamentForWire } from "./wire.js";
 
 function statusForArenaError(err: ArenaError): number {
   if (err instanceof TournamentNotFoundError || err instanceof DuelNotFoundError) return 404;
@@ -78,11 +80,11 @@ export function buildArenaRoutes(service: ArenaService, resolveWorks: ResolveBoo
     });
 
     app.get("/arenas/mine", { preHandler: authGuard }, async (request, reply) => {
-      return reply.send({ tournaments: service.listMine(request.user.id) });
+      return reply.send({ tournaments: summariesForWire(service.listMine(request.user.id), worksFormat(request, reply)) });
     });
 
     app.get("/arenas/voted", { preHandler: authGuard }, async (request, reply) => {
-      return reply.send({ tournaments: service.listVoted(request.user.id) });
+      return reply.send({ tournaments: summariesForWire(service.listVoted(request.user.id), worksFormat(request, reply)) });
     });
 
     await app.register(async (scoped) => {
@@ -90,7 +92,7 @@ export function buildArenaRoutes(service: ArenaService, resolveWorks: ResolveBoo
       scoped.get("/arenas/public", async (request, reply) => {
         const parsed = listPublicQuerySchema.safeParse(request.query);
         if (!parsed.success) return reply.code(400).send({ error: "Invalid limit/offset." });
-        return reply.send({ tournaments: service.listPublic(parsed.data.limit, parsed.data.offset) });
+        return reply.send({ tournaments: summariesForWire(service.listPublic(parsed.data.limit, parsed.data.offset), worksFormat(request, reply)) });
       });
     });
 
@@ -101,6 +103,7 @@ export function buildArenaRoutes(service: ArenaService, resolveWorks: ResolveBoo
     // owner" itself against its own session, with no new auth primitive
     // needed here.
     app.get("/arenas/:id", async (request, reply) => {
+      const works = worksFormat(request, reply);
       const params = idParamSchema.safeParse(request.params);
       if (!params.success) return reply.code(400).send({ error: "Invalid tournament id." });
       const query = getTournamentQuerySchema.safeParse(request.query);
@@ -112,7 +115,7 @@ export function buildArenaRoutes(service: ArenaService, resolveWorks: ResolveBoo
       const viewer = getOptionalAuthenticatedUser(request);
       const tournament = service.getTournamentView(params.data.id, query.data.voterToken, viewer?.id ?? null);
       if (!tournament) return reply.code(404).send({ error: "No such tournament." });
-      return reply.send({ tournament });
+      return reply.send({ tournament: tournamentForWire(tournament, works) });
     });
 
     app.put("/arenas/:id/slots", { preHandler: authGuard }, async (request, reply) => {
