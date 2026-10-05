@@ -5,6 +5,9 @@
 // describes for every other module's service layer.
 
 import assert from "node:assert/strict";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
 import { normalizeWords } from "@scripta/shared";
 import {
@@ -21,8 +24,17 @@ import {
 } from "./domain/errors.js";
 import type { ArenaRepository } from "./domain/ports.js";
 import type { DuelRow, SeedPreview, TournamentRow, TournamentSlotRow, VoteRow } from "./domain/types.js";
-import { createArenaService } from "./service.js";
 import type { DuelView } from "./service.js";
+
+const scratch = mkdtempSync(join(tmpdir(), "arena-service-test-"));
+process.env.AUTH_DB_PATH = join(scratch, "auth.sqlite");
+process.env.LIBRARY_DB_PATH = join(scratch, "library.sqlite");
+process.env.GALLERY_DB_PATH = join(scratch, "gallery.sqlite");
+process.env.COVERS_DB_PATH = join(scratch, "covers.sqlite");
+process.env.JWT_ACCESS_SECRET = "a".repeat(64);
+process.env.JWT_REFRESH_SECRET = "b".repeat(64);
+
+const { createArenaService } = await import("./service.js");
 
 function createInMemoryArenaRepository(): ArenaRepository {
   const tournaments = new Map<string, TournamentRow>();
