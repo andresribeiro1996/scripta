@@ -14,6 +14,7 @@ export interface LibraryRepository {
   upsertDocument(userId: string, dataJson: string, derived: LibraryDerived, rows: LibraryRows, expectedUpdatedAt?: string): LibraryDocumentRow | undefined;
   updateDocumentData(userId: string, dataJson: string, expectedUpdatedAt: string, glyph: LibraryDerived["glyph"] | "keep", rows: LibrarySmallSave): string | undefined;
   listStaleUserIds(): string[];
+  rowHashes(userId: string): Map<number, string>;
   setDerived(userId: string, derived: LibraryDerived, sourceUpdatedAt: string): void;
   setRows(userId: string, rows: LibraryRows, sourceUpdatedAt: string): void;
   deleteOrphanedDerived(): void;
