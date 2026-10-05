@@ -121,7 +121,10 @@ export function buildApp() {
   // parse; everything else becomes an opaque 500 with the detail logged
   // server-side only.
   app.setErrorHandler((error: FastifyError, request, reply) => {
-    if (error instanceof WorkResolutionError) return reply.code(503).send({ error: error.message });
+    if (error instanceof WorkResolutionError) {
+      request.log.error(error);
+      return reply.code(503).send({ error: error.message });
+    }
     const statusCode = typeof error.statusCode === "number" && error.statusCode >= 400 && error.statusCode < 500 ? error.statusCode : 500;
     if (statusCode === 500) {
       request.log.error(error);
