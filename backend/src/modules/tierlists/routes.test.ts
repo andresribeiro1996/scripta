@@ -318,6 +318,7 @@ test("a works-format create stores copy keys, answers works, and reads back as k
   assert.deepEqual(legacy.json().data, { tiers: [{ id: "s", label: "S", color: "#c9482f", bookKeys: ["isbn:9780000000002"] }], pool: [loose] });
   const listed = await app.inject({ method: "GET", url: "/tierlists", headers: worksHeaders("t1") });
   assert.deepEqual(listed.json().tierlists[0].data.pool, [loose]);
+  assert.match(String(listed.headers.vary), /X-Scripta-Works/);
   await app.close();
 });
 
