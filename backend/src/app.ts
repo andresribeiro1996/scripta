@@ -41,7 +41,7 @@ import { deleteCommunityUserData, getCommunityPublicApi, registerCommunityModule
 import { enqueueBookCovers, registerBooksModule } from "./modules/books/index.js";
 import { deleteGalleryUserData, registerGalleryModule } from "./modules/gallery/index.js";
 import { deleteLibraryUserData, registerLibraryModule, resolvePublicLibrary, readerGlyphFor, resolveEntryWorks, WorkResolutionError, sharedBookCounts, sharedBooks, startWorksSweep, sweepLibraryWorks, type BookEvent } from "./modules/library/index.js";
-import { deleteMuralsUserData, getMuralsPublicApi, registerMuralsModule, rekeyMuralsBooks } from "./modules/murals/index.js";
+import { deleteMuralsUserData, getMuralsPublicApi, registerMuralsModule, rekeyMuralsBooks, sweepMuralsWorks } from "./modules/murals/index.js";
 import { deleteQuizzesUserData, getQuizzesPublicApi, registerQuizzesModule, rekeyQuizzesBooks, sweepQuizzesWorks } from "./modules/quizzes/index.js";
 import { deleteSocialsUserData, registerSocialsModule } from "./modules/socials/index.js";
 import { deleteTierlistsUserData, registerTierlistsModule, getTierlistsPublicApi, rekeyTierlistsBooks, sweepTierlistsWorks } from "./modules/tierlists/index.js";
@@ -168,10 +168,7 @@ export function buildApp() {
       } catch (error) {
         if (!(error instanceof WorkResolutionError)) throw error;
       }
-      rekeyArenaBooks(userId, fromKeys, toKey, toWork);
-      rekeyTierlistsBooks(userId, fromKeys, toKey, toWork);
-      rekeyQuizzesBooks(userId, fromKeys, toKey, toWork);
-      rekeyMuralsBooks(userId, fromKeys, toKey);
+      for (const rekey of [rekeyArenaBooks, rekeyTierlistsBooks, rekeyQuizzesBooks, rekeyMuralsBooks]) rekey(userId, fromKeys, toKey, toWork);
     }
   });
   app.register(registerGalleryModule);
@@ -233,7 +230,7 @@ export function buildApp() {
   });
   app.register(registerQuizzesModule);
 
-  const stopWorksSweep = startWorksSweep([sweepLibraryWorks, sweepArenaWorks, sweepTierlistsWorks, sweepQuizzesWorks], app.log);
+  const stopWorksSweep = startWorksSweep([sweepLibraryWorks, sweepArenaWorks, sweepTierlistsWorks, sweepQuizzesWorks, sweepMuralsWorks], app.log);
   app.addHook("onClose", async () => {
     stopWorksSweep();
   });

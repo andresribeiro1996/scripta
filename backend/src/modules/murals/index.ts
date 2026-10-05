@@ -4,6 +4,7 @@
 
 export { muralsPlugin as registerMuralsModule, deleteMuralsUserData, rekeyMuralsBooks } from "./plugin.js";
 export { getMuralsPublicApi } from "./plugin.js";
+export { sweepMuralsWorks } from "./worksSweep.js";
 export { createMuralsPublicApi, type MuralsPublicApi } from "./publicApi.js";
 export type { MuralPublicPayload } from "./domain/publicPayload.js";
 // Startup-migration insert step — see migration.ts and
