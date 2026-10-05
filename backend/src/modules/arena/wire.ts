@@ -1,4 +1,5 @@
-import { canonicalWorkIds } from "../library/index.js";
+import { canonicalByKey, canonicalWorkIds, firstKeyPerWork, keysForWorks, knownWorkIds } from "../library/index.js";
+import type { TournamentSlotRow } from "./domain/types.js";
 import type { DuelSideView, DuelView, SeedBookView, TournamentSummary, TournamentView } from "./service.js";
 
 type Canonical = Map<string, string> | null;
@@ -57,4 +58,17 @@ export function tournamentForWire(view: TournamentView, works: boolean) {
     slots: view.slots.map(({ slotIndex, ...book }) => ({ slotIndex, ...bookForWire(book, canonical) })),
     duels: view.duels.map((duel) => duelForWire(duel, canonical))
   };
+}
+
+export function keyedSeedBooks<T extends { workId: string }>(ownerUserId: string, books: T[], slots: TournamentSlotRow[]) {
+  const ids = knownWorkIds(books.map((book) => book.workId));
+  const stored = canonicalByKey(new Map(slots.map((slot) => [slot.book_key, slot.work_id])));
+  const keys = keysForWorks(ownerUserId, ids, firstKeyPerWork(slots.map((slot) => slot.book_key), stored));
+  const works = new Map<string, { workId: string | null }>();
+  const keyed = books.map(({ workId: _workId, ...book }, index) => {
+    const key = keys.get(ids[index]!)!;
+    works.set(key, { workId: ids[index]! });
+    return { ...book, key };
+  });
+  return { books: keyed, works, ids };
 }
