@@ -37,6 +37,8 @@ const { applyTierlistsMigrations } = await import("./adapters/sqlite/connection.
 const { createSqliteTierlistsRepository } = await import("./adapters/sqlite/sqliteTierlistsRepository.js");
 const { createTierlistsService } = await import("./service.js");
 const { buildPublicTierlistRoutes, buildTierlistRoutes, buildTierlistShareVideoRoutes } = await import("./routes.js");
+const { openTierlistsDb } = await import("./adapters/sqlite/connection.js");
+const { tierlistsForWire } = await import("./index.js");
 const { openLibraryDb } = await import("../library/adapters/sqlite/connection.js");
 const { applyBooksMigrations, openBooksDb } = await import("../books/adapters/sqlite/connection.js");
 const { resolveWorks } = await import("../books/index.js");
@@ -357,5 +359,82 @@ test("owner results and open-voting answer works", async () => {
   assert.deepEqual(results.json().histogram, [{ workId: a, tierId: "s", votes: 1 }]);
   const toggled = await app.inject({ method: "PUT", url: `/tierlists/${id}/voting`, headers: worksHeaders("t4"), payload: { open: false } });
   assert.deepEqual(toggled.json().tierlist.data.pool, [b, a]);
+  await app.close();
+});
+
+const summarize = (userId: string) =>
+  openLibraryDb().prepare("INSERT INTO library_summary (user_id, meta, total_books, finished_count, in_progress_count, total_highlights, source_updated_at, rows_version) VALUES (?, '{}', 0, 0, 0, 0, '2026-01-01', 1)").run(userId);
+
+async function publicApp(service: Service, signedInAs?: string) {
+  const app = Fastify();
+  if (signedInAs) app.decorate("authenticateAccessToken", (token: string) => (token === signedInAs ? { id: signedInAs, email: `${signedInAs}@example.test`, username: signedInAs, avatarId: null } : null));
+  await app.register(buildPublicTierlistRoutes(service));
+  return app;
+}
+
+test("the voting board and ballots speak works with the header", async () => {
+  const [a, b] = [titleWork("Board A"), titleWork("Board B")];
+  copy("t5", 0, "ta:board a|someone", a);
+  copy("t5", 1, "ta:board b|someone", b);
+  summarize("t5");
+  const { app, service } = await ownerApp();
+  const created = await app.inject({ method: "POST", url: "/tierlists", headers: worksHeaders("t5"), payload: { name: "Public", data: { tiers: [tier([])], pool: [a, b] }, access: "anonymous" } });
+  const code = created.json().voteCode as string;
+  const voter = await publicApp(service);
+  const board = await voter.inject({ method: "GET", url: `/tierlists/voting/${code}`, headers: { "x-scripta-works": "1" } });
+  assert.deepEqual(board.json().board.pool, [a, b]);
+  assert.deepEqual(board.json().books.map((book: { key: string; workId: string }) => [book.key, book.workId]), [["ta:board a|someone", a], ["ta:board b|someone", b]]);
+  const ballot = await voter.inject({ method: "POST", url: `/tierlists/voting/${code}/ballot`, headers: { "x-scripta-works": "1" }, payload: { placements: [{ workId: b, tierId: "s" }] } });
+  assert.equal(ballot.statusCode, 200);
+  assert.deepEqual(ballot.json().placements, [{ workId: b, tierId: "s" }]);
+  assert.deepEqual(ballot.json().results.histogram, [{ workId: b, tierId: "s", votes: 1 }]);
+  const stray = await voter.inject({ method: "POST", url: `/tierlists/voting/${code}/ballot`, headers: { "x-scripta-works": "1" }, payload: { placements: [{ workId: "not-a-work", tierId: "s" }] } });
+  assert.equal(stray.statusCode, 400);
+  const legacy = await voter.inject({ method: "GET", url: `/tierlists/voting/${code}` });
+  assert.deepEqual(legacy.json().board.pool, ["ta:board a|someone", "ta:board b|someone"]);
+  await voter.close();
+  await app.close();
+});
+
+test("a frozen snapshot shorter than the pool falls back to the live library", async () => {
+  const [a, b] = [titleWork("Short A"), titleWork("Short B")];
+  copy("t6", 0, "ta:short a|someone", a);
+  copy("t6", 1, "ta:short b|someone", b);
+  summarize("t6");
+  const { app, service } = await ownerApp();
+  const created = await app.inject({ method: "POST", url: "/tierlists", headers: worksHeaders("t6"), payload: { name: "Short", data: { tiers: [tier([])], pool: [a, b] }, access: "anonymous" } });
+  const code = created.json().voteCode as string;
+  const row = service.getVotingBoard(code)!;
+  const voter = await publicApp({ ...service, getVotingBoard: () => ({ ...row, publicBooks: row.publicBooks!.slice(0, 1) }) });
+  const board = await voter.inject({ method: "GET", url: `/tierlists/voting/${code}`, headers: { "x-scripta-works": "1" } });
+  assert.deepEqual(board.json().books.map((book: { workId: string }) => book.workId), [a, b]);
+  await voter.close();
+  await app.close();
+});
+
+test("tierlistsForWire swaps a mural's tier-list keys for works and leaves today's format alone", () => {
+  const insert = openTierlistsDb().prepare("INSERT INTO tierlist_works (tierlist_id, key, work_id) VALUES ('t-map', ?, ?)");
+  insert.run("k1", "w1");
+  insert.run("k2", "w2");
+  const tierlists = { "t-map": { name: "On the wall", tiers: [{ id: "s", label: "S", color: "#000000", bookKeys: ["k1"] }], pool: ["k2", "k-orphan"] } };
+  assert.equal(tierlistsForWire(tierlists, false), tierlists);
+  assert.deepEqual(tierlistsForWire(tierlists, true), { "t-map": { name: "On the wall", tiers: [{ id: "s", label: "S", color: "#000000", workIds: ["w1"] }], pool: ["w2"] } });
+});
+
+test("works-format ballots keep the members-only and closed-voting refusals", async () => {
+  const a = titleWork("Guarded A");
+  copy("t7", 0, "ta:guarded a|someone", a);
+  summarize("t7");
+  const { app, service } = await ownerApp();
+  const created = await app.inject({ method: "POST", url: "/tierlists", headers: worksHeaders("t7"), payload: { name: "Guarded", data: { tiers: [tier([])], pool: [a] }, access: "members" } });
+  const { id, voteCode } = created.json() as { id: string; voteCode: string };
+  const voter = await publicApp(service);
+  const headers = { "x-scripta-works": "1" };
+  const payload = { placements: [{ workId: a, tierId: "s" }] };
+  assert.equal((await voter.inject({ method: "POST", url: `/tierlists/voting/${voteCode}/ballot`, headers, payload })).statusCode, 401);
+  await app.inject({ method: "PUT", url: `/tierlists/${id}/voting`, headers: worksHeaders("t7"), payload: { access: "anonymous", open: false } });
+  assert.equal((await voter.inject({ method: "POST", url: `/tierlists/voting/${voteCode}/ballot`, headers, payload })).statusCode, 409);
+  assert.equal((await voter.inject({ method: "POST", url: "/tierlists/voting/nope/ballot", headers, payload })).statusCode, 404);
+  await voter.close();
   await app.close();
 });
