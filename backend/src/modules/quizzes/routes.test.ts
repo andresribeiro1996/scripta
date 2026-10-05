@@ -328,3 +328,36 @@ test("a works-format PUT keeps stored keys, rejects an unknown work and a second
   assert.equal((await put([worksBook("Put B", b), worksBook("Put B old edition", old)])).statusCode, 409);
   await app.close();
 });
+
+test("a works-format create refuses a title the catalog can't resolve", async () => {
+  const { app } = await quizApp();
+  const created = await app.inject({ method: "POST", url: "/quizzes", headers: quizHeaders("q3"), payload: { name: "Bad", data: { books: [worksBook("???")] } } });
+  assert.equal(created.statusCode, 400);
+  assert.equal(created.json().error, "That book isn't in the catalog.");
+  await app.close();
+});
+
+test("a works-format publish and read answer questions and books by work", async () => {
+  const ids = ["Pub A", "Pub B", "Pub C", "Pub D"].map(named);
+  const { app } = await quizApp();
+  const created = await app.inject({
+    method: "POST",
+    url: "/quizzes",
+    headers: quizHeaders("q4"),
+    payload: { name: "Publish", data: { questionCount: 3, allowedTypes: ["cover_title"], books: ids.map((id, index) => worksBook(`Pub ${"ABCD"[index]}`, id)) } }
+  });
+  assert.equal(created.statusCode, 201);
+  const published = await app.inject({ method: "POST", url: `/quizzes/${created.json().id}/publish`, headers: quizHeaders("q4") });
+  assert.equal(published.statusCode, 201);
+  const questions = published.json().quiz.data.questions as Array<Record<string, unknown>>;
+  assert.equal(questions.length, 3);
+  for (const question of questions) {
+    assert.ok(ids.includes(question.workId as string));
+    assert.equal("bookKey" in question, false);
+  }
+  const read = await app.inject({ method: "GET", url: `/quizzes/${created.json().id}`, headers: quizHeaders("q4") });
+  const books = read.json().data.books as Array<{ workId: string }>;
+  assert.deepEqual(books.map((entry) => entry.workId), ids);
+  assert.doesNotMatch(read.body, /"key"/);
+  await app.close();
+});

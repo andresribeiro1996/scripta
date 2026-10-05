@@ -89,6 +89,7 @@ export function buildQuizRoutes(service: QuizzesService, resolveWorks: ResolveQu
         if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? "Invalid request." });
         try {
           const ids = quizBookWorks(parsed.data.data.books);
+          if (ids.some((id) => id === null)) return reply.code(400).send({ error: "That book isn't in the catalog." });
           const seen = new Set<string>();
           const kept = parsed.data.data.books.flatMap((entry, index) => {
             const id = ids[index];
