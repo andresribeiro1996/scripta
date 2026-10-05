@@ -68,8 +68,8 @@ export function getTierlistsPublicApi(): TierlistsPublicApi {
 
 let rekeyingTierlists: ReturnType<typeof createSqliteTierlistsRepository> | undefined;
 
-export function rekeyTierlistsBooks(userId: string, fromKeys: string[], toKey: string) {
-  (rekeyingTierlists ??= createSqliteTierlistsRepository(openTierlistsDb())).rekeyBooks(userId, fromKeys, toKey);
+export function rekeyTierlistsBooks(userId: string, fromKeys: string[], toKey: string, toWork: string | null) {
+  (rekeyingTierlists ??= createSqliteTierlistsRepository(openTierlistsDb())).rekeyBooks(userId, fromKeys, toKey, toWork);
 }
 
 let erasingTierlists: ReturnType<typeof createSqliteTierlistsRepository> | undefined;

@@ -55,7 +55,17 @@ CREATE TABLE IF NOT EXISTS tierlist_ballot_placements (
   tierlist_id TEXT NOT NULL,
   book_key    TEXT NOT NULL,
   tier_id     TEXT NOT NULL,
+  work_id     TEXT,
   PRIMARY KEY (ballot_id, book_key)
 );
 CREATE INDEX IF NOT EXISTS idx_tierlist_placements_histogram
   ON tierlist_ballot_placements(tierlist_id, book_key, tier_id);
+
+CREATE TABLE IF NOT EXISTS tierlist_works (
+  tierlist_id TEXT NOT NULL,
+  key         TEXT NOT NULL,
+  work_id     TEXT,
+  PRIMARY KEY (tierlist_id, key)
+);
+CREATE INDEX IF NOT EXISTS idx_tierlist_works_work ON tierlist_works(work_id);
+CREATE INDEX IF NOT EXISTS idx_tierlist_placements_work ON tierlist_ballot_placements(work_id, tier_id);

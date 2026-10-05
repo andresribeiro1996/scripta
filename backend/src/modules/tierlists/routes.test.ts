@@ -36,7 +36,9 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 const { applyTierlistsMigrations } = await import("./adapters/sqlite/connection.js");
 const { createSqliteTierlistsRepository } = await import("./adapters/sqlite/sqliteTierlistsRepository.js");
 const { createTierlistsService } = await import("./service.js");
-const { buildPublicTierlistRoutes, buildTierlistShareVideoRoutes } = await import("./routes.js");
+const { buildPublicTierlistRoutes, buildTierlistRoutes, buildTierlistShareVideoRoutes } = await import("./routes.js");
+const { openLibraryDb } = await import("../library/adapters/sqlite/connection.js");
+const { applyBooksMigrations } = await import("../books/adapters/sqlite/connection.js");
 
 type Service = ReturnType<typeof createTierlistsService>;
 
@@ -184,4 +186,104 @@ test("a members-only poll refuses an anonymous ballot with 401 {error}", async (
   assert.equal(status, 401);
   assert.equal("ok" in body, false);
   assert.equal(typeof body.error, "string");
+});
+
+type TierlistRoutesResolver = NonNullable<Parameters<typeof buildTierlistRoutes>[1]>;
+
+async function boardApp(resolveWorks?: TierlistRoutesResolver) {
+  const db = new DatabaseSync(":memory:");
+  applyTierlistsMigrations(db);
+  const service = createTierlistsService(createSqliteTierlistsRepository(db));
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", (token: string) => ({ id: token, email: `${token}@example.test`, username: token, avatarId: null }));
+  await app.register(buildTierlistRoutes(service, resolveWorks));
+  const send = (method: "POST" | "PUT", url: string, user: string, payload: unknown) =>
+    app.inject({ method, url, headers: { authorization: `Bearer ${user}` }, payload: payload as Record<string, unknown> });
+  return { app, db, service, send };
+}
+
+const emptyTier = { id: "s", label: "S", color: "#ff0000", bookKeys: [] as string[] };
+const boardOf = (pool: string[]) => ({ tiers: [emptyTier], pool });
+
+function addLibraryBook(userId: string, position: number, bookKey: string, title: string, author: string, isbn: string | null) {
+  const library = openLibraryDb();
+  library.prepare("INSERT INTO library_books (user_id, position, book_key, title, author, isbn, row_hash) VALUES (?, ?, ?, ?, ?, ?, 'h')").run(userId, position, bookKey, title, author, isbn);
+  library.close();
+}
+
+function catalogBookCount(): number {
+  const catalog = new DatabaseSync(process.env.COVERS_DB_PATH!);
+  applyBooksMigrations(catalog);
+  const { count } = catalog.prepare("SELECT COUNT(*) AS count FROM books").get() as { count: number };
+  catalog.close();
+  return count;
+}
+
+test("creating a list echoes its keys and stores their works", async () => {
+  const { app, db, send } = await boardApp();
+  const res = await send("POST", "/tierlists", "u1", { name: "Keys", data: boardOf(["pool-a", "pool-b"]) });
+  assert.equal(res.statusCode, 201);
+  const created = res.json() as { id: string; data: { pool: string[] } };
+  assert.deepEqual(created.data.pool, ["pool-a", "pool-b"]);
+  const rows = db.prepare("SELECT key FROM tierlist_works WHERE tierlist_id = ? ORDER BY key").all(created.id) as Array<{ key: string }>;
+  assert.deepEqual(rows.map((row) => row.key), ["pool-a", "pool-b"]);
+  await app.close();
+});
+
+test("creating or updating a list with two editions of one work is a 409", async () => {
+  addLibraryBook("u1", 0, "isbn:0441013597", "Dune", "Frank Herbert", "0441013597");
+  addLibraryBook("u1", 1, "isbn:9780441013593", "Dune", "Frank Herbert", "9780441013593");
+  const { app, db, send } = await boardApp();
+  const both = boardOf(["isbn:0441013597", "isbn:9780441013593"]);
+
+  const created = await send("POST", "/tierlists", "u1", { name: "Dupes", data: both });
+  assert.equal(created.statusCode, 409);
+  assert.match((created.json() as { error: string }).error, /Dune/);
+  assert.equal((db.prepare("SELECT COUNT(*) AS count FROM tierlists").get() as { count: number }).count, 0);
+
+  const single = await send("POST", "/tierlists", "u1", { name: "One", data: boardOf(["isbn:0441013597"]) });
+  assert.equal(single.statusCode, 201);
+  const id = (single.json() as { id: string }).id;
+  const updated = await send("PUT", `/tierlists/${id}`, "u1", { data: both });
+  assert.equal(updated.statusCode, 409);
+  assert.match((updated.json() as { error: string }).error, /Dune/);
+  const stored = db.prepare("SELECT key FROM tierlist_works WHERE tierlist_id = ?").all(id) as Array<{ key: string }>;
+  assert.deepEqual(stored.map((row) => row.key), ["isbn:0441013597"]);
+  await app.close();
+});
+
+test("an unreachable catalog is a 503 and stores nothing", async () => {
+  const { WorkResolutionError } = await import("../library/index.js");
+  const failing: TierlistRoutesResolver = () => { throw new WorkResolutionError(new Error("down")); };
+  const { app, db, service, send } = await boardApp(failing);
+
+  const created = await send("POST", "/tierlists", "u1", { name: "Down", data: boardOf(["pool-a"]) });
+  assert.equal(created.statusCode, 503);
+  assert.equal((db.prepare("SELECT COUNT(*) AS count FROM tierlists").get() as { count: number }).count, 0);
+
+  const existing = service.createTierlist("u1", "Existing", boardOf(["old"]));
+  const updated = await send("PUT", `/tierlists/${existing.id}`, "u1", { data: boardOf(["new"]) });
+  assert.equal(updated.statusCode, 503);
+  assert.deepEqual(service.getTierlist("u1", existing.id)!.data, boardOf(["old"]));
+  await app.close();
+});
+
+test("a rejected update resolves nothing and keeps its status", async () => {
+  addLibraryBook("u1", 2, "isbn:9780441569595", "Neuromancer", "William Gibson", "9780441569595");
+  addLibraryBook("u2", 0, "isbn:9780441569595", "Neuromancer", "William Gibson", "9780441569595");
+  const { app, service, send } = await boardApp();
+  const mine = service.createTierlist("u1", "Mine", boardOf([]));
+  const promoted = service.createTierlist("u1", "Promoted", boardOf([]));
+  service.openVoting("u1", promoted.id, "anonymous");
+  const data = boardOf(["isbn:9780441569595"]);
+
+  const before = catalogBookCount();
+  assert.equal((await send("PUT", `/tierlists/${mine.id}`, "u2", { data })).statusCode, 404);
+  assert.equal((await send("PUT", `/tierlists/${promoted.id}`, "u1", { data })).statusCode, 404);
+  assert.equal((await send("PUT", `/tierlists/${mine.id}`, "u1", { data: "nope" })).statusCode, 400);
+  assert.equal(catalogBookCount(), before);
+
+  assert.equal((await send("PUT", `/tierlists/${mine.id}`, "u1", { data })).statusCode, 200);
+  assert.equal(catalogBookCount(), before + 1);
+  await app.close();
 });

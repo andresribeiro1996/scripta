@@ -4,3 +4,4 @@
 
 export { quizzesPlugin as registerQuizzesModule, deleteQuizzesUserData, getQuizzesPublicApi, rekeyQuizzesBooks } from "./plugin.js";
 export type { QuizzesPublicApi } from "./service.js";
+export { sweepQuizzesWorks } from "./worksSweep.js";

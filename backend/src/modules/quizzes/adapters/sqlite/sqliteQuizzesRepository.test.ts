@@ -65,6 +65,31 @@ test("update merges the patch and refuses published quizzes", () => {
   assert.equal(repo.update("quiz-1", "u1", { name: "Nope" }), undefined);
 });
 
+test("insert and update keep quiz_works in step; delete clears it", () => {
+  const db = new DatabaseSync(":memory:");
+  applyQuizzesMigrations(db);
+  const repo = createSqliteQuizzesRepository(db);
+  const rows = (quizId: string) =>
+    (db.prepare("SELECT key, work_id FROM quiz_works WHERE quiz_id = ? ORDER BY key").all(quizId) as Array<{ key: string; work_id: string | null }>).map((row) => ({ key: row.key, work_id: row.work_id }));
+
+  repo.insert(quizRow(), new Map([["b0", "w0"]]));
+  assert.deepEqual(rows("quiz-1"), [{ key: "b0", work_id: "w0" }]);
+
+  repo.update("quiz-1", "u1", { data: '{"a":1}' }, new Map([["b1", "w1"]]));
+  assert.deepEqual(rows("quiz-1"), [{ key: "b1", work_id: "w1" }]);
+
+  repo.update("quiz-1", "u1", { name: "Renamed" });
+  assert.deepEqual(rows("quiz-1"), [{ key: "b1", work_id: "w1" }]);
+
+  repo.insert(quizRow({ id: "quiz-2", owner_user_id: "u2" }), new Map([["b2", null]]));
+  assert.equal(repo.delete("quiz-1", "u1"), true);
+  assert.deepEqual(rows("quiz-1"), []);
+  assert.deepEqual(rows("quiz-2"), [{ key: "b2", work_id: null }]);
+
+  repo.deleteUserData("u2");
+  assert.deepEqual(rows("quiz-2"), []);
+});
+
 test("publish stamps code + play_open once, and vote codes are unique", () => {
   const repo = makeRepo();
   repo.insert(quizRow());
@@ -181,7 +206,7 @@ test("rekeyBooks rewrites the owner's unpublished quiz books and de-duplicates b
   const data = JSON.stringify({ sourceLabel: "", questionCount: 5, allowedTypes: [], books: [{ key: "new", title: "Dune" }, { key: "old", title: "Dune" }, { key: "x", title: "X" }], questions: null });
   insert.run("draft", "u1", data, null);
   insert.run("published", "u1", data, "CODE1");
-  createSqliteQuizzesRepository(db).rekeyBooks("u1", ["old"], "new");
+  createSqliteQuizzesRepository(db).rekeyBooks("u1", ["old"], "new", null);
   const read = (id: string) => db.prepare("SELECT data, updated_at FROM quizzes WHERE id = ?").get(id) as { data: string; updated_at: string };
   assert.deepEqual(JSON.parse(read("draft").data).books, [{ key: "new", title: "Dune" }, { key: "x", title: "X" }]);
   assert.notEqual(read("draft").updated_at, "t0");

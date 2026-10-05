@@ -12,7 +12,8 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { authGuard, getOptionalAuthenticatedUser } from "../auth/index.js";
-import { resolvePublicLibraryData } from "../library/index.js";
+import { duplicateWorkMessage, firstDuplicateWork, resolveEntryWorks, resolvePublicLibraryData, WorkResolutionError, workIdsByKey } from "../library/index.js";
+import { boardKeys } from "./domain/boardKeys.js";
 import type { BallotOutcome, TierlistsService, Voter } from "./service.js";
 import { InvalidShareImageError, MAX_SHARE_IMAGE_BYTES, renderShareVideo, ShareVideoRenderError } from "./shareVideo.js";
 
@@ -60,7 +61,22 @@ const listPublicQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0)
 });
 
-export function buildTierlistRoutes(service: TierlistsService) {
+type ResolveBoardWorks = typeof resolveEntryWorks;
+
+function resolveBoard(resolveWorks: ResolveBoardWorks, userId: string, data: unknown): { works: Map<string, string | null> } | { status: 409 | 503; error: string } {
+  const keys = boardKeys(data);
+  try {
+    const refs = resolveWorks(userId, keys.map((key) => ({ key })));
+    const duplicate = firstDuplicateWork(keys, refs);
+    if (duplicate) return { status: 409, error: duplicateWorkMessage(duplicate) };
+    return { works: workIdsByKey(keys, refs) };
+  } catch (err) {
+    if (err instanceof WorkResolutionError) return { status: 503, error: err.message };
+    throw err;
+  }
+}
+
+export function buildTierlistRoutes(service: TierlistsService, resolveWorks: ResolveBoardWorks = resolveEntryWorks) {
   return async function tierlistRoutes(app: FastifyInstance) {
     app.get("/tierlists", { preHandler: authGuard }, async (request, reply) => {
       return reply.send({ tierlists: service.listTierlists(request.user.id) });
@@ -86,7 +102,9 @@ export function buildTierlistRoutes(service: TierlistsService) {
       const keys = data ? [...new Set([...data.pool, ...data.tiers.flatMap((tier) => tier.bookKeys)])] : [];
       const publicBooks = access ? resolvePublicLibraryData(request.user.id, { bookKeys: keys, highlightRefs: [], needsCurrentlyReading: false, statsMetrics: [] }).books : [];
       if (access && publicBooks.length !== keys.length) return reply.code(400).send({ error: "A selected book is no longer in your library." });
-      const tierlist = service.createTierlist(request.user.id, name, data, access, publicBooks);
+      const board = data ? resolveBoard(resolveWorks, request.user.id, data) : undefined;
+      if (board && "error" in board) return reply.code(board.status).send({ error: board.error });
+      const tierlist = service.createTierlist(request.user.id, name, data, access, publicBooks, board?.works);
       return reply.code(201).send(tierlist);
     });
 
@@ -111,7 +129,13 @@ export function buildTierlistRoutes(service: TierlistsService) {
       if (!body.success) {
         return reply.code(400).send({ error: body.error.issues[0]?.message ?? "Invalid request." });
       }
-      const tierlist = service.updateTierlist(request.user.id, params.data.id, body.data);
+      let works: Map<string, string | null> | undefined;
+      if (body.data.data !== undefined && service.getTierlist(request.user.id, params.data.id)?.voteCode === null) {
+        const board = resolveBoard(resolveWorks, request.user.id, body.data.data);
+        if ("error" in board) return reply.code(board.status).send({ error: board.error });
+        works = board.works;
+      }
+      const tierlist = service.updateTierlist(request.user.id, params.data.id, body.data, works);
       if (!tierlist) {
         return reply.code(404).send({ error: "No tier list with that id." });
       }

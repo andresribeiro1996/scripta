@@ -76,9 +76,11 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
   `);
   const deletePlacementsStmt = db.prepare(`DELETE FROM tierlist_ballot_placements WHERE ballot_id = ?`);
   const insertPlacementStmt = db.prepare(`
-    INSERT INTO tierlist_ballot_placements (ballot_id, tierlist_id, book_key, tier_id)
-    VALUES ($ballot_id, $tierlist_id, $book_key, $tier_id)
+    INSERT INTO tierlist_ballot_placements (ballot_id, tierlist_id, book_key, tier_id, work_id)
+    VALUES ($ballot_id, $tierlist_id, $book_key, $tier_id, (SELECT work_id FROM tierlist_works WHERE tierlist_id = $tierlist_id AND key = $book_key))
   `);
+  const deleteWorksStmt = db.prepare(`DELETE FROM tierlist_works WHERE tierlist_id = ?`);
+  const insertWorkStmt = db.prepare(`INSERT OR REPLACE INTO tierlist_works (tierlist_id, key, work_id) VALUES (?, ?, ?)`);
   const getBallotByIdStmt = db.prepare(`SELECT * FROM tierlist_ballots WHERE tierlist_id = ? AND id = ?`);
   const getBallotByVoterStmt = db.prepare(`SELECT * FROM tierlist_ballots WHERE tierlist_id = ? AND voter_user_id = ?`);
   const getPlacementsStmt = db.prepare(
@@ -109,6 +111,24 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
     ORDER BY created_at DESC LIMIT ?
   `);
 
+  function setWorks(tierlistId: string, works: Map<string, string | null>): void {
+    deleteWorksStmt.run(tierlistId);
+    for (const [key, workId] of works) insertWorkStmt.run(tierlistId, key, workId);
+  }
+
+  function inTransaction<T>(write: () => T): T {
+    if (db.isTransaction) return write();
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      const result = write();
+      db.exec("COMMIT");
+      return result;
+    } catch (error) {
+      if (db.isTransaction) db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
   function saveBallotRow(ballot: BallotRow, placements: Placement[]): void {
     insertBallotStmt.run({
       $id: ballot.id,
@@ -131,16 +151,27 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
   }
 
   return {
-    rekeyBooks(userId, fromKeys, toKey) {
+    rekeyBooks(userId, fromKeys, toKey, toWork) {
       const from = new Set(fromKeys);
       const now = new Date().toISOString();
       const update = db.prepare("UPDATE tierlists SET data = ?, updated_at = ? WHERE id = ?");
+      const dropWorks = db.prepare("DELETE FROM tierlist_works WHERE tierlist_id = ? AND key IN (SELECT value FROM json_each(?))");
+      const fromKeysJson = JSON.stringify(fromKeys);
+      const hasWorks = db.prepare("SELECT 1 FROM tierlist_works WHERE tierlist_id = ? LIMIT 1");
+      const keepWork = db.prepare(`
+        INSERT INTO tierlist_works (tierlist_id, key, work_id) VALUES (?, ?, ?)
+        ON CONFLICT (tierlist_id, key) DO UPDATE SET work_id = COALESCE(excluded.work_id, tierlist_works.work_id)
+      `);
       db.exec("BEGIN IMMEDIATE");
       try {
         for (const row of db.prepare("SELECT id, data FROM tierlists WHERE owner_user_id = ? AND vote_code IS NULL").all(userId) as Array<{ id: string; data: string }>) {
           const parsed = JSON.parse(row.data) as Record<string, unknown>;
           const after = JSON.stringify(rekeyTierBoard(parsed, from, toKey));
-          if (after !== JSON.stringify(parsed)) update.run(after, now, row.id);
+          if (after === JSON.stringify(parsed)) continue;
+          update.run(after, now, row.id);
+          if (!hasWorks.get(row.id)) continue;
+          dropWorks.run(row.id, fromKeysJson);
+          keepWork.run(row.id, toKey, toWork);
         }
         db.exec("COMMIT");
       } catch (error) {
@@ -152,6 +183,7 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
       db.exec("BEGIN IMMEDIATE");
       try {
         db.prepare("DELETE FROM tierlist_ballot_placements WHERE tierlist_id IN (SELECT id FROM tierlists WHERE owner_user_id = ?)").run(userId);
+        db.prepare("DELETE FROM tierlist_works WHERE tierlist_id IN (SELECT id FROM tierlists WHERE owner_user_id = ?)").run(userId);
         db.prepare("DELETE FROM tierlist_ballots WHERE tierlist_id IN (SELECT id FROM tierlists WHERE owner_user_id = ?)").run(userId);
         db.prepare("DELETE FROM tierlists WHERE owner_user_id = ?").run(userId);
         db.prepare("UPDATE tierlist_ballots SET voter_user_id = NULL WHERE voter_user_id = ?").run(userId);
@@ -169,40 +201,46 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
       return getOwnedStmt.get(id, userId) as TierlistRow | undefined;
     },
 
-    insert(row) {
-      insertStmt.run({
-        $id: row.id,
-        $owner_user_id: row.owner_user_id,
-        $origin_user_id: row.origin_user_id,
-        $name: row.name,
-        $name_key: normalizeWords(row.name),
-        $data: row.data,
-        $vote_code: row.vote_code,
-        $vote_access: row.vote_access,
-        $voting_open: row.voting_open,
-        $source_tierlist_id: row.source_tierlist_id,
-        $promoted_at: row.promoted_at,
-        $public_books: row.public_books,
-        $created_at: row.created_at,
-        $updated_at: row.updated_at
+    insert(row, works) {
+      inTransaction(() => {
+        insertStmt.run({
+          $id: row.id,
+          $owner_user_id: row.owner_user_id,
+          $origin_user_id: row.origin_user_id,
+          $name: row.name,
+          $name_key: normalizeWords(row.name),
+          $data: row.data,
+          $vote_code: row.vote_code,
+          $vote_access: row.vote_access,
+          $voting_open: row.voting_open,
+          $source_tierlist_id: row.source_tierlist_id,
+          $promoted_at: row.promoted_at,
+          $public_books: row.public_books,
+          $created_at: row.created_at,
+          $updated_at: row.updated_at
+        });
+        if (works) setWorks(row.id, works);
       });
     },
 
-    update(id, userId, patch) {
-      const existing = getOwnedStmt.get(id, userId) as TierlistRow | undefined;
-      if (!existing) return undefined;
+    update(id, userId, patch, works) {
+      return inTransaction(() => {
+        const existing = getOwnedStmt.get(id, userId) as TierlistRow | undefined;
+        if (!existing) return undefined;
 
-      const updatedAt = new Date().toISOString();
-      const merged: TierlistRow = { ...existing, ...patch, updated_at: updatedAt };
-      updateStmt.run({
-        $id: id,
-        $owner_user_id: userId,
-        $name: merged.name,
-        $name_key: normalizeWords(merged.name),
-        $data: merged.data,
-        $updated_at: updatedAt
+        const updatedAt = new Date().toISOString();
+        const merged: TierlistRow = { ...existing, ...patch, updated_at: updatedAt };
+        updateStmt.run({
+          $id: id,
+          $owner_user_id: userId,
+          $name: merged.name,
+          $name_key: normalizeWords(merged.name),
+          $data: merged.data,
+          $updated_at: updatedAt
+        });
+        if (works) setWorks(id, works);
+        return merged;
       });
-      return merged;
     },
 
     delete(id, userId) {
@@ -210,6 +248,7 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
       db.exec("BEGIN IMMEDIATE");
       try {
         deletePlacementsForTierlistStmt.run(id);
+        deleteWorksStmt.run(id);
         deleteBallotsStmt.run(id);
         const result = deleteStmt.run(id, userId);
         db.exec("COMMIT");
