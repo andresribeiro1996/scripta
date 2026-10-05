@@ -38,7 +38,8 @@ const { createSqliteTierlistsRepository } = await import("./adapters/sqlite/sqli
 const { createTierlistsService } = await import("./service.js");
 const { buildPublicTierlistRoutes, buildTierlistRoutes, buildTierlistShareVideoRoutes } = await import("./routes.js");
 const { openLibraryDb } = await import("../library/adapters/sqlite/connection.js");
-const { applyBooksMigrations } = await import("../books/adapters/sqlite/connection.js");
+const { applyBooksMigrations, openBooksDb } = await import("../books/adapters/sqlite/connection.js");
+const { resolveWorks } = await import("../books/index.js");
 
 type Service = ReturnType<typeof createTierlistsService>;
 
@@ -285,5 +286,76 @@ test("a rejected update resolves nothing and keeps its status", async () => {
 
   assert.equal((await send("PUT", `/tierlists/${mine.id}`, "u1", { data })).statusCode, 200);
   assert.equal(catalogBookCount(), before + 1);
+  await app.close();
+});
+
+async function ownerApp() {
+  const db = new DatabaseSync(":memory:");
+  applyTierlistsMigrations(db);
+  const service = createTierlistsService(createSqliteTierlistsRepository(db));
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", (token: string) => ({ id: token, email: `${token}@example.test`, username: token, avatarId: null }));
+  await app.register(buildTierlistRoutes(service));
+  return { app, service };
+}
+
+const worksHeaders = (user: string) => ({ authorization: `Bearer ${user}`, "x-scripta-works": "1" });
+const titleWork = (title: string) => resolveWorks([{ isbn: null, title, author: "Someone" }])[0]!;
+const copy = (userId: string, position: number, key: string, workId: string) =>
+  openLibraryDb().prepare("INSERT INTO library_books (user_id, position, book_key, title, author, row_hash, work_id) VALUES (?, ?, ?, 'T', 'A', 'h', ?)").run(userId, position, key, workId);
+const tier = (workIds: string[]) => ({ id: "s", label: "S", color: "#c9482f", workIds });
+
+test("a works-format create stores copy keys, answers works, and reads back as keys without the header", async () => {
+  const [held, loose] = [titleWork("Owner Holds"), titleWork("Owner Lacks")];
+  copy("t1", 0, "isbn:9780000000002", held);
+  const { app } = await ownerApp();
+  const created = await app.inject({ method: "POST", url: "/tierlists", headers: worksHeaders("t1"), payload: { name: "Mine", data: { tiers: [tier([held])], pool: [loose] } } });
+  assert.equal(created.statusCode, 201);
+  assert.deepEqual(created.json().data, { tiers: [tier([held])], pool: [loose] });
+  const legacy = await app.inject({ method: "GET", url: `/tierlists/${created.json().id}`, headers: { authorization: "Bearer t1" } });
+  assert.deepEqual(legacy.json().data, { tiers: [{ id: "s", label: "S", color: "#c9482f", bookKeys: ["isbn:9780000000002"] }], pool: [loose] });
+  const listed = await app.inject({ method: "GET", url: "/tierlists", headers: worksHeaders("t1") });
+  assert.deepEqual(listed.json().tierlists[0].data.pool, [loose]);
+  await app.close();
+});
+
+test("a works-format create rejects an unknown work, a repeated work, and two editions of one work", async () => {
+  const [old, kept] = [titleWork("First Edition"), titleWork("Second Edition")];
+  openBooksDb().prepare("UPDATE works SET merged_into = ? WHERE id = ?").run(kept, old);
+  const { app } = await ownerApp();
+  const create = (pool: string[]) => app.inject({ method: "POST", url: "/tierlists", headers: worksHeaders("t2"), payload: { name: "X", data: { tiers: [tier([])], pool } } });
+  assert.equal((await create(["not-a-work"])).statusCode, 400);
+  assert.equal((await create([kept, kept])).statusCode, 400);
+  assert.equal((await create([kept, old])).statusCode, 409);
+  await app.close();
+});
+
+test("a works-format PUT keeps the stored key of a work already on the list", async () => {
+  const [held, added] = [titleWork("Kept Key"), titleWork("Added Later")];
+  copy("t3", 0, "ta:kept key|someone", held);
+  const { app, service } = await ownerApp();
+  const created = await app.inject({ method: "POST", url: "/tierlists", headers: { authorization: "Bearer t3" }, payload: { name: "Old build", data: { tiers: [{ id: "s", label: "S", color: "#c9482f", bookKeys: [] }], pool: ["ta:kept key|someone"] } } });
+  const id = created.json().id as string;
+  const put = await app.inject({ method: "PUT", url: `/tierlists/${id}`, headers: worksHeaders("t3"), payload: { data: { tiers: [tier([held])], pool: [added] } } });
+  assert.equal(put.statusCode, 200);
+  assert.deepEqual(put.json().data, { tiers: [tier([held])], pool: [added] });
+  assert.deepEqual((service.getTierlist("t3", id)!.data as { tiers: Array<{ bookKeys: string[] }> }).tiers[0]!.bookKeys, ["ta:kept key|someone"]);
+  await app.close();
+});
+
+test("owner results and open-voting answer works", async () => {
+  const [a, b] = [titleWork("Ranked A"), titleWork("Ranked B")];
+  copy("t4", 0, "ta:ranked a|someone", a);
+  copy("t4", 1, "ta:ranked b|someone", b);
+  const { app } = await ownerApp();
+  const created = await app.inject({ method: "POST", url: "/tierlists", headers: worksHeaders("t4"), payload: { name: "Poll", data: { tiers: [tier([a])], pool: [b] } } });
+  const id = created.json().id as string;
+  const opened = await app.inject({ method: "POST", url: `/tierlists/${id}/open-voting`, headers: worksHeaders("t4"), payload: { access: "anonymous" } });
+  assert.equal(opened.statusCode, 201);
+  assert.deepEqual(opened.json().tierlist.data.pool, [b, a]);
+  const results = await app.inject({ method: "GET", url: `/tierlists/${id}/results`, headers: worksHeaders("t4") });
+  assert.deepEqual(results.json().histogram, [{ workId: a, tierId: "s", votes: 1 }]);
+  const toggled = await app.inject({ method: "PUT", url: `/tierlists/${id}/voting`, headers: worksHeaders("t4"), payload: { open: false } });
+  assert.deepEqual(toggled.json().tierlist.data.pool, [b, a]);
   await app.close();
 });

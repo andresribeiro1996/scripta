@@ -11,10 +11,13 @@
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
+import { sendWorksError, worksFormat } from "../../worksFormat.js";
 import { authGuard, getOptionalAuthenticatedUser } from "../auth/index.js";
-import { duplicateWorkMessage, firstDuplicateWork, resolveEntryWorks, resolvePublicLibraryData, WorkResolutionError, workIdsByKey } from "../library/index.js";
+import { canonicalByKey, duplicateWorkMessage, firstDuplicateWork, firstKeyPerWork, resolveEntryWorks, resolvePublicLibraryData, WorkResolutionError, workIdsByKey } from "../library/index.js";
 import { boardKeys } from "./domain/boardKeys.js";
+import type { Tierlist } from "./domain/types.js";
 import type { BallotOutcome, TierlistsService, Voter } from "./service.js";
+import { boardKeysInOrder, histogramToWorks, keyedBoard, tierlistToWorks } from "./wire.js";
 import { InvalidShareImageError, MAX_SHARE_IMAGE_BYTES, renderShareVideo, ShareVideoRenderError } from "./shareVideo.js";
 
 const idParamSchema = z.object({ id: z.string().uuid() });
@@ -40,6 +43,20 @@ const updateTierlistSchema = z
     message: "At least one of name or data must be provided."
   });
 
+const worksTierSchema = z.object({ id: z.string().min(1), label: z.string().trim().min(1).max(30), color: z.string().regex(/^#[0-9a-f]{6}$/i), workIds: z.array(z.string().min(1)) });
+
+const worksBoardSchema = z.object({ tiers: z.array(worksTierSchema), pool: z.array(z.string().min(1)).max(500) });
+
+const createWorksSchema = z.object({
+  name: z.string().trim().min(1, "name is required and must be non-empty.").max(200),
+  data: worksBoardSchema.extend({ tiers: z.array(worksTierSchema).min(1) }).optional(),
+  access: z.enum(["anonymous", "members"]).optional()
+});
+
+const updateWorksSchema = z
+  .object({ name: z.string().min(1).optional(), data: worksBoardSchema.optional() })
+  .refine((body) => body.name !== undefined || body.data !== undefined, { message: "At least one of name or data must be provided." });
+
 const voteAccessSchema = z.enum(["anonymous", "members"]);
 
 const openVotingSchema = z.object({ access: voteAccessSchema });
@@ -61,6 +78,10 @@ const listPublicQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0)
 });
 
+function withWorks(service: TierlistsService, tierlist: Tierlist, works: boolean): Tierlist {
+  return works ? tierlistToWorks(tierlist, service.storedWorks(tierlist.id)) : tierlist;
+}
+
 type ResolveBoardWorks = typeof resolveEntryWorks;
 
 function resolveBoard(resolveWorks: ResolveBoardWorks, userId: string, data: unknown): { works: Map<string, string | null> } | { status: 409 | 503; error: string } {
@@ -79,7 +100,8 @@ function resolveBoard(resolveWorks: ResolveBoardWorks, userId: string, data: unk
 export function buildTierlistRoutes(service: TierlistsService, resolveWorks: ResolveBoardWorks = resolveEntryWorks) {
   return async function tierlistRoutes(app: FastifyInstance) {
     app.get("/tierlists", { preHandler: authGuard }, async (request, reply) => {
-      return reply.send({ tierlists: service.listTierlists(request.user.id) });
+      const works = worksFormat(request, reply);
+      return reply.send({ tierlists: service.listTierlists(request.user.id).map((tierlist) => withWorks(service, tierlist, works)) });
     });
 
     app.get("/tierlists/voted", { preHandler: authGuard }, async (request, reply) => {
@@ -87,6 +109,28 @@ export function buildTierlistRoutes(service: TierlistsService, resolveWorks: Res
     });
 
     app.post("/tierlists", { preHandler: authGuard }, async (request, reply) => {
+      if (worksFormat(request, reply)) {
+        const parsed = createWorksSchema.safeParse(request.body);
+        if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? "Invalid request." });
+        const { name, data, access } = parsed.data;
+        if (access && !data) return reply.code(400).send({ error: "Choose books and tiers before publishing." });
+        if (data) {
+          const ids = data.tiers.map((tier) => tier.id);
+          if (new Set(ids).size !== ids.length) return reply.code(400).send({ error: "Duplicate tier or book." });
+          if (access && (!data.pool.length || data.tiers.some((tier) => tier.workIds.length))) return reply.code(400).send({ error: "Public tier lists need an unranked book pool." });
+        }
+        try {
+          const keyed = data ? keyedBoard(request.user.id, data, undefined, new Map()) : undefined;
+          if (keyed && keyed.status !== undefined) return reply.code(keyed.status).send({ error: keyed.error });
+          const keys = keyed ? [...new Set([...keyed.data.pool, ...keyed.data.tiers.flatMap((tier) => tier.bookKeys)])] : [];
+          const publicBooks = access ? resolvePublicLibraryData(request.user.id, { bookKeys: keys, highlightRefs: [], needsCurrentlyReading: false, statsMetrics: [] }).books : [];
+          if (access && publicBooks.length !== keys.length) return reply.code(400).send({ error: "A selected book is no longer in your library." });
+          const tierlist = service.createTierlist(request.user.id, name, keyed?.data, access, publicBooks, keyed?.works);
+          return reply.code(201).send(withWorks(service, tierlist, true));
+        } catch (err) {
+          return sendWorksError(reply, err);
+        }
+      }
       const parsed = createTierlistSchema.safeParse(request.body);
       if (!parsed.success) {
         return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? "Invalid request." });
@@ -117,13 +161,32 @@ export function buildTierlistRoutes(service: TierlistsService, resolveWorks: Res
       if (!tierlist) {
         return reply.code(404).send({ error: "No tier list with that id." });
       }
-      return reply.send(tierlist);
+      return reply.send(withWorks(service, tierlist, worksFormat(request, reply)));
     });
 
     app.put("/tierlists/:id", { preHandler: authGuard }, async (request, reply) => {
       const params = idParamSchema.safeParse(request.params);
       if (!params.success) {
         return reply.code(400).send({ error: "Invalid tier list id." });
+      }
+      if (worksFormat(request, reply)) {
+        const body = updateWorksSchema.safeParse(request.body);
+        if (!body.success) return reply.code(400).send({ error: body.error.issues[0]?.message ?? "Invalid request." });
+        try {
+          let keyed: ReturnType<typeof keyedBoard> | undefined;
+          if (body.data.data !== undefined) {
+            const owned = service.getTierlist(request.user.id, params.data.id);
+            if (!owned || owned.voteCode !== null) return reply.code(404).send({ error: "No tier list with that id." });
+            const result = keyedBoard(request.user.id, body.data.data, owned.data, service.storedWorks(owned.id));
+            if (result.status !== undefined) return reply.code(result.status).send({ error: result.error });
+            keyed = result;
+          }
+          const tierlist = service.updateTierlist(request.user.id, params.data.id, { ...(body.data.name !== undefined ? { name: body.data.name } : {}), ...(keyed ? { data: keyed.data } : {}) }, keyed?.works);
+          if (!tierlist) return reply.code(404).send({ error: "No tier list with that id." });
+          return reply.send(withWorks(service, tierlist, true));
+        } catch (err) {
+          return sendWorksError(reply, err);
+        }
       }
       const body = updateTierlistSchema.safeParse(request.body);
       if (!body.success) {
@@ -155,6 +218,7 @@ export function buildTierlistRoutes(service: TierlistsService, resolveWorks: Res
     });
 
     app.post("/tierlists/:id/open-voting", { preHandler: authGuard }, async (request, reply) => {
+      const works = worksFormat(request, reply);
       const params = idParamSchema.safeParse(request.params);
       if (!params.success) {
         return reply.code(400).send({ error: "Invalid tier list id." });
@@ -172,7 +236,7 @@ export function buildTierlistRoutes(service: TierlistsService, resolveWorks: Res
       if (!tierlist) {
         return reply.code(404).send({ error: "No tier list with that id." });
       }
-      return reply.code(201).send({ tierlist, voteCode: tierlist.voteCode });
+      return reply.code(201).send({ tierlist: withWorks(service, tierlist, works), voteCode: tierlist.voteCode });
     });
 
     app.put("/tierlists/:id/voting", { preHandler: authGuard }, async (request, reply) => {
@@ -188,7 +252,7 @@ export function buildTierlistRoutes(service: TierlistsService, resolveWorks: Res
       if (!tierlist) {
         return reply.code(404).send({ error: "No tier list with that id." });
       }
-      return reply.send({ tierlist });
+      return reply.send({ tierlist: withWorks(service, tierlist, worksFormat(request, reply)) });
     });
 
     app.get("/tierlists/:id/results", { preHandler: authGuard }, async (request, reply) => {
@@ -199,10 +263,15 @@ export function buildTierlistRoutes(service: TierlistsService, resolveWorks: Res
       // Ownership-checked BEFORE reading results: getResults takes a plain
       // tier list id, so without this an authenticated user could read any
       // poll's raw histogram by id.
-      if (!service.getTierlist(request.user.id, params.data.id)) {
+      const owned = service.getTierlist(request.user.id, params.data.id);
+      if (!owned) {
         return reply.code(404).send({ error: "No tier list with that id." });
       }
-      return reply.send(service.getResults(params.data.id));
+      const results = service.getResults(params.data.id);
+      if (!worksFormat(request, reply)) return reply.send(results);
+      const stored = canonicalByKey(service.storedWorks(owned.id));
+      const first = new Set(firstKeyPerWork(boardKeysInOrder(owned.data), stored).values());
+      return reply.send({ histogram: histogramToWorks(results.histogram, stored, first), ballotCount: results.ballotCount });
     });
   };
 }
