@@ -123,6 +123,10 @@ Read it by the `*Null` counts only; those should approach 0. `itemsWithoutRows` 
 railway ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && node scripts/works-check.mjs'
 ```
 
+### Works format (phase E2)
+
+Web and mobile send `X-Scripta-Works: 1`. With it, arena, tier-list and quiz routes, and the tier-list map in the public mural and profile, take and return work ids (`workId`, `workIds`, `winnerWorkId`) instead of book keys; without it they answer exactly as before. Storage is unchanged until the removal: routes translate through the E1 work columns and side tables, and a works-format write stores the owner's copy key for each new work, or the work id when there is no copy. Every header-less request to one of those routes logs `legacy client` with its method and route, which is how we learn that old builds are gone. Library documents carry `works` (book key → canonical work id) and public books carry `key` and `workId` for every client. Spec: `docs/superpowers/specs/2026-10-05-works-phase-e2-design.md`.
+
 ### `gallery`
 - **A per-account pool of uploaded images**, primarily meant to be assignable as custom book covers by the [frontend](../frontend/README.md#gallery-and-custom-book-covers) — but the module itself is generic; it doesn't know anything about books.
 - Unlike `library`, this module does NOT treat uploads as an opaque blob it just stores — every upload goes through a real validation/normalization pipeline before anything is trusted:
