@@ -47,8 +47,8 @@ export class InvalidSlotIndexError extends ArenaError {
 }
 
 export class DuplicateBookError extends ArenaError {
-  constructor() {
-    super("The same book can't fill two bracket slots.");
+  constructor(title?: string) {
+    super(title ? `${title} is already here as another edition.` : "The same book can't fill two bracket slots.");
   }
 }
 

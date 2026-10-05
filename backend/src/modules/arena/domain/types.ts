@@ -32,6 +32,7 @@ export interface TournamentSlotRow {
   title: string;
   author: string;
   cover_url: string | null;
+  work_id: string | null;
 }
 
 /** What a list card needs about a tournament's seeded pool: the first few
@@ -51,11 +52,14 @@ export interface DuelRow {
   book_a_title: string;
   book_a_author: string;
   book_a_cover: string | null;
+  book_a_work_id: string | null;
   book_b_key: string;
   book_b_title: string;
   book_b_author: string;
   book_b_cover: string | null;
+  book_b_work_id: string | null;
   winner_key: string | null;
+  winner_work_id: string | null;
   status: "active" | "tied_pending_tiebreak" | "settled";
   opens_at: string;
   closes_at: string;
@@ -84,4 +88,5 @@ export interface SeedBookInput {
   title: string;
   author: string;
   cover: string | null;
+  workId?: string | null;
 }

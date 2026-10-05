@@ -31,8 +31,8 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
 
   const deleteSlotsStmt = db.prepare(`DELETE FROM tournament_slots WHERE tournament_id = ?`);
   const insertSlotStmt = db.prepare(`
-    INSERT INTO tournament_slots (tournament_id, slot_index, book_key, title, author, cover_url)
-    VALUES ($tournament_id, $slot_index, $book_key, $title, $author, $cover_url)
+    INSERT INTO tournament_slots (tournament_id, slot_index, book_key, title, author, cover_url, work_id)
+    VALUES ($tournament_id, $slot_index, $book_key, $title, $author, $cover_url, $work_id)
   `);
   const getSlotsStmt = db.prepare(`SELECT * FROM tournament_slots WHERE tournament_id = ? ORDER BY slot_index ASC`);
   // One statement for a whole page of cards. The IN list is built per call
@@ -46,10 +46,10 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
     );
 
   const insertDuelStmt = db.prepare(`
-    INSERT INTO duels (id, tournament_id, round_number, duel_index, book_a_key, book_a_title, book_a_author, book_a_cover,
-      book_b_key, book_b_title, book_b_author, book_b_cover, winner_key, status, opens_at, closes_at, settled_at)
-    VALUES ($id, $tournament_id, $round_number, $duel_index, $book_a_key, $book_a_title, $book_a_author, $book_a_cover,
-      $book_b_key, $book_b_title, $book_b_author, $book_b_cover, $winner_key, $status, $opens_at, $closes_at, $settled_at)
+    INSERT INTO duels (id, tournament_id, round_number, duel_index, book_a_key, book_a_title, book_a_author, book_a_cover, book_a_work_id,
+      book_b_key, book_b_title, book_b_author, book_b_cover, book_b_work_id, winner_key, winner_work_id, status, opens_at, closes_at, settled_at)
+    VALUES ($id, $tournament_id, $round_number, $duel_index, $book_a_key, $book_a_title, $book_a_author, $book_a_cover, $book_a_work_id,
+      $book_b_key, $book_b_title, $book_b_author, $book_b_cover, $book_b_work_id, $winner_key, $winner_work_id, $status, $opens_at, $closes_at, $settled_at)
   `);
   const getDuelStmt = db.prepare(`SELECT * FROM duels WHERE id = ?`);
   const getDuelsForTournamentStmt = db.prepare(`SELECT * FROM duels WHERE tournament_id = ? ORDER BY round_number ASC, duel_index ASC`);
@@ -63,7 +63,9 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
         `AND d.round_number = (SELECT MAX(d2.round_number) FROM duels d2 WHERE d2.tournament_id = d.tournament_id)`
     );
   const updateDuelSettlementStmt = db.prepare(`
-    UPDATE duels SET status = $status, winner_key = $winner_key, settled_at = $settled_at WHERE id = $id
+    UPDATE duels SET status = $status, winner_key = $winner_key, settled_at = $settled_at,
+      winner_work_id = CASE WHEN $winner_key = book_a_key THEN book_a_work_id WHEN $winner_key = book_b_key THEN book_b_work_id END
+    WHERE id = $id
   `);
   const findDueStmt = db.prepare(`SELECT * FROM duels WHERE status = 'active' AND closes_at <= ?`);
 
@@ -136,10 +138,10 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
   `);
 
   return {
-    rekeyBooks(userId, fromKeys, toKey) {
+    rekeyBooks(userId, fromKeys, toKey, toWork) {
       const from = new Set(fromKeys);
       const remove = db.prepare("DELETE FROM tournament_slots WHERE tournament_id = ? AND slot_index = ?");
-      const rename = db.prepare("UPDATE tournament_slots SET book_key = ? WHERE tournament_id = ? AND slot_index = ?");
+      const rename = db.prepare("UPDATE tournament_slots SET book_key = ?, work_id = ? WHERE tournament_id = ? AND slot_index = ?");
       db.exec("BEGIN IMMEDIATE");
       try {
         for (const { id } of db.prepare("SELECT id FROM tournaments WHERE owner_user_id = ? AND status = 'seeding'").all(userId) as Array<{ id: string }>) {
@@ -149,7 +151,7 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
             if (!from.has(slot.book_key)) continue;
             if (hasTarget) remove.run(id, slot.slot_index);
             else {
-              rename.run(toKey, id, slot.slot_index);
+              rename.run(toKey, toWork, id, slot.slot_index);
               hasTarget = true;
             }
           }
@@ -223,7 +225,8 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
           $book_key: slot.book_key,
           $title: slot.title,
           $author: slot.author,
-          $cover_url: slot.cover_url
+          $cover_url: slot.cover_url,
+          $work_id: slot.work_id
         });
       }
     },
@@ -257,11 +260,14 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
           $book_a_title: duel.book_a_title,
           $book_a_author: duel.book_a_author,
           $book_a_cover: duel.book_a_cover,
+          $book_a_work_id: duel.book_a_work_id,
           $book_b_key: duel.book_b_key,
           $book_b_title: duel.book_b_title,
           $book_b_author: duel.book_b_author,
           $book_b_cover: duel.book_b_cover,
+          $book_b_work_id: duel.book_b_work_id,
           $winner_key: duel.winner_key,
+          $winner_work_id: duel.winner_work_id,
           $status: duel.status,
           $opens_at: duel.opens_at,
           $closes_at: duel.closes_at,

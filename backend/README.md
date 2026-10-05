@@ -106,7 +106,7 @@ Each account only ever sees its own document — verified in testing with two se
 ### Works (phase E1)
 
 - **`resolveEntryWorks`** (`library/works.ts`) turns a book key into a work id for another module: the owner's library row first (its stored `work_id`, canonicalised), then the entry's own title and author. A catalog failure throws `WorkResolutionError`; callers must map it to `503`.
-- **The works sweep** (`library/worksSweep.ts`, started in `app.ts` after the last module registers) runs off the boot path, once at start and every 10 minutes. It runs each step in turn, 250 rows per batch, yielding to the event loop between batches and paging by `rowid`, so rows that never resolve can't keep it running. Its one step so far fills `library_books.work_id` where it is NULL; a failure is logged (`works sweep failed`), never thrown, and the timer is unref'd and stopped on close.
+- **The works sweep** (`library/worksSweep.ts`, started in `app.ts` after the last module registers) runs off the boot path, once at start and every 10 minutes. It runs each step in turn, 250 rows per batch, yielding to the event loop between batches and paging by `rowid`, so rows that never resolve can't keep it running. Its steps fill `library_books.work_id` where it is NULL, and the arena step fills `tournament_slots.work_id`, both duel sides and `winner_work_id` from the owner's library, then the slot and duel titles. Arena slot writes reject a second edition of one work with `409`, and a library merge moves the kept copy's work onto the owner's seeding slots (a catalog failure there leaves the slot's work NULL for the sweep to refill); a failure is logged (`works sweep failed`), never thrown, and the timer is unref'd and stopped on close.
 
 #### Works check
 

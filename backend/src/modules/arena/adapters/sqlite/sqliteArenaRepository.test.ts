@@ -85,6 +85,16 @@ test("applyArenaMigrations is idempotent", () => {
   assert.ok(columnNames(db, "votes").includes("voter_user_id"));
 });
 
+test("arena tables gain work id columns on an existing database", () => {
+  const db = new DatabaseSync(":memory:");
+  db.exec("CREATE TABLE tournaments (id TEXT PRIMARY KEY, owner_user_id TEXT NOT NULL, name TEXT NOT NULL, name_key TEXT, status TEXT, created_at TEXT)");
+  db.exec("CREATE TABLE tournament_slots (tournament_id TEXT NOT NULL, slot_index INTEGER NOT NULL, book_key TEXT NOT NULL, title TEXT NOT NULL, author TEXT NOT NULL, cover_url TEXT, PRIMARY KEY (tournament_id, slot_index))");
+  db.exec("CREATE TABLE duels (id TEXT PRIMARY KEY, tournament_id TEXT NOT NULL, round_number INTEGER NOT NULL, duel_index INTEGER NOT NULL, book_a_key TEXT NOT NULL, book_a_title TEXT NOT NULL, book_a_author TEXT NOT NULL, book_a_cover TEXT, book_b_key TEXT NOT NULL, book_b_title TEXT NOT NULL, book_b_author TEXT NOT NULL, book_b_cover TEXT, winner_key TEXT, status TEXT NOT NULL DEFAULT 'active', opens_at TEXT NOT NULL, closes_at TEXT NOT NULL, settled_at TEXT)");
+  applyArenaMigrations(db);
+  assert.ok(columnNames(db, "tournament_slots").includes("work_id"));
+  for (const column of ["book_a_work_id", "book_b_work_id", "winner_work_id"]) assert.ok(columnNames(db, "duels").includes(column));
+});
+
 const { createSqliteArenaRepository } = await import("./sqliteArenaRepository.js");
 import type { DuelRow, TournamentRow, VoteRow } from "../../domain/types.js";
 
@@ -120,6 +130,15 @@ test("listVotedByUser returns others' tournaments with a stamped vote, latest vo
 
   assert.deepEqual(repo.listVotedByUser("voter-1").map((t: TournamentRow) => t.name), ["New vote", "Old vote"]);
   assert.deepEqual(repo.listVotedByUser("nobody"), []);
+});
+
+test("settling a duel records the winner's work", () => {
+  const db = freshDb();
+  seedTournament(db, "t1", "u1", "Work winner");
+  db.prepare(`UPDATE duels SET book_a_work_id = 'w-a', book_b_work_id = 'w-b', winner_key = NULL, status = 'active' WHERE id = 'duel-t1'`).run();
+  const repo = createSqliteArenaRepository(db);
+  repo.updateDuelSettlement("duel-t1", "settled", "b", "2026-10-04T00:00:00.000Z");
+  assert.equal((db.prepare("SELECT winner_work_id FROM duels WHERE id = ?").get("duel-t1") as { winner_work_id: string | null }).winner_work_id, "w-b");
 });
 
 test("linkVotesToUser claims only the token's unclaimed votes and never steals claimed ones", () => {
@@ -291,11 +310,20 @@ test("rekeyBooks rewrites seeding slots only and drops a slot that would duplica
   slot.run("both", 0, "new");
   slot.run("both", 1, "old");
   slot.run("active", 0, "old");
-  createSqliteArenaRepository(db).rekeyBooks("u1", ["old"], "new");
+  createSqliteArenaRepository(db).rekeyBooks("u1", ["old"], "new", null);
   const keys = (id: string) => (db.prepare("SELECT book_key FROM tournament_slots WHERE tournament_id = ? ORDER BY slot_index").all(id) as Array<{ book_key: string }>).map((row) => row.book_key);
   assert.deepEqual(keys("seeding"), ["new"]);
   assert.deepEqual(keys("both"), ["new"]);
   assert.deepEqual(keys("active"), ["old"]);
+});
+
+test("rekeying a seeding tournament moves the slot to the kept copy's work", () => {
+  const db = freshDb();
+  db.prepare("INSERT INTO tournaments (id, owner_user_id, name, bracket_size, round_duration_minutes, status) VALUES ('t1', 'u1', 'n', 2, 60, 'seeding')").run();
+  db.prepare("INSERT INTO tournament_slots (tournament_id, slot_index, book_key, title, author, work_id) VALUES ('t1', 0, 'k-old', 't', 'a', 'w-old')").run();
+  createSqliteArenaRepository(db).rekeyBooks("u1", ["k-old"], "k-keep", "w-keep");
+  const slot = db.prepare("SELECT book_key, work_id FROM tournament_slots WHERE tournament_id = 't1'").get();
+  assert.deepEqual({ ...slot }, { book_key: "k-keep", work_id: "w-keep" });
 });
 
 function tournament(overrides: Partial<TournamentRow> & { id: string }): TournamentRow {
