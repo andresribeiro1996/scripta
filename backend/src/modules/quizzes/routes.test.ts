@@ -361,3 +361,36 @@ test("a works-format publish and read answer questions and books by work", async
   assert.doesNotMatch(read.body, /"key"/);
   await app.close();
 });
+
+test("a works-format PUT keeps the key a legacy book was stored under", async () => {
+  const kept = named("Put Keep");
+  const { app } = await quizApp();
+  const created = await app.inject({ method: "POST", url: "/quizzes", headers: { authorization: "Bearer q5" }, payload: { name: "Keys", data: { books: [book("ta:put keep|someone", "Put Keep", "Someone")] } } });
+  assert.equal(created.statusCode, 201);
+  addLibraryBook("q5", 0, "isbn:9780000000099", "Put Keep", "Someone", null);
+  openLibraryDb().prepare("UPDATE library_books SET work_id = ? WHERE user_id = 'q5'").run(kept);
+  const put = await app.inject({ method: "PUT", url: `/quizzes/${created.json().id}`, headers: quizHeaders("q5"), payload: { data: { books: [worksBook("Put Keep", kept), worksBook("Put Second")] } } });
+  assert.equal(put.statusCode, 200);
+  const legacy = await app.inject({ method: "GET", url: `/quizzes/${created.json().id}`, headers: { authorization: "Bearer q5" } });
+  assert.equal(legacy.json().data.books[0].key, "ta:put keep|someone");
+  await app.close();
+});
+
+test("a works-format read leaves out an unresolved book and a second edition of one work", async () => {
+  const [first, second] = [named("Edition One"), named("Edition Two")];
+  const { app } = await quizApp();
+  const created = await app.inject({
+    method: "POST",
+    url: "/quizzes",
+    headers: { authorization: "Bearer q6" },
+    payload: { name: "Reads", data: { books: [book("pool-q", "???"), book("pool-e1", "Edition One", "Someone"), book("pool-e2", "Edition Two", "Someone")] } }
+  });
+  assert.equal(created.statusCode, 201);
+  assert.equal(created.json().data.books.length, 3);
+  openBooksDb().prepare("UPDATE works SET merged_into = ? WHERE id = ?").run(first, second);
+  const read = await app.inject({ method: "GET", url: `/quizzes/${created.json().id}`, headers: quizHeaders("q6") });
+  assert.equal(read.statusCode, 200);
+  assert.deepEqual(read.json().data.books.map((entry: { workId: string }) => entry.workId), [first]);
+  assert.match(String(read.headers.vary), /X-Scripta-Works/);
+  await app.close();
+});
