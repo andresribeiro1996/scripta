@@ -81,14 +81,14 @@ export interface TierlistDiscoverRef {
 
 export interface TierlistsService {
   listTierlists(userId: string): Tierlist[];
-  createTierlist(userId: string, name: string, data?: TierlistDocument, access?: VoteAccess, publicBooks?: unknown[]): Tierlist;
+  createTierlist(userId: string, name: string, data?: TierlistDocument, access?: VoteAccess, publicBooks?: unknown[], works?: Map<string, string | null>): Tierlist;
   /** undefined if no tier list with that id is owned by userId — a
    *  caller-facing 404, not a server error. Same convention as
    *  modules/murals/service.ts's getMural. */
   getTierlist(userId: string, id: string): Tierlist | undefined;
   /** Partial merge onto the existing row — only the keys present in
    *  `patch` change. undefined if not owned. */
-  updateTierlist(userId: string, id: string, patch: { name?: string; data?: unknown }): Tierlist | undefined;
+  updateTierlist(userId: string, id: string, patch: { name?: string; data?: unknown }, works?: Map<string, string | null>): Tierlist | undefined;
   /** Returns false if no tier list with that id was owned by userId —
    *  same convention as modules/murals/service.ts's deleteMural. */
   deleteTierlist(userId: string, id: string): boolean;
@@ -206,7 +206,7 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
       return repo.listByUser(userId).map(toTierlist);
     },
 
-    createTierlist(userId, name, data, access, publicBooks) {
+    createTierlist(userId, name, data, access, publicBooks, works) {
       const now = new Date().toISOString();
       const row: TierlistRow = {
         id: randomUUID(),
@@ -226,7 +226,7 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
         created_at: now,
         updated_at: now
       };
-      repo.insert(row);
+      repo.insert(row, works);
       if (access) emitPublished?.(row.id, userId);
       return toTierlist(row);
     },
@@ -236,7 +236,7 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
       return row ? toTierlist(row) : undefined;
     },
 
-    updateTierlist(userId, id, patch) {
+    updateTierlist(userId, id, patch, works) {
       if (patch.data !== undefined || patch.name !== undefined) {
         const existing = repo.getOwned(id, userId);
         if (!existing) return undefined;
@@ -245,7 +245,7 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
       const row = repo.update(id, userId, {
         ...(patch.name !== undefined ? { name: patch.name } : {}),
         ...(patch.data !== undefined ? { data: JSON.stringify(patch.data) } : {})
-      });
+      }, works);
       return row ? toTierlist(row) : undefined;
     },
 

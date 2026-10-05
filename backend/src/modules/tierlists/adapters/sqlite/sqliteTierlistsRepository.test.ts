@@ -289,12 +289,26 @@ test("rekeyBooks rewrites the owner's unpublished tier lists only", async () => 
   insert.run("draft", "u1", "u1", data, null);
   insert.run("published", "u1", "u1", data, "CODE1");
   insert.run("other", "u2", "u2", data, null);
-  createSqliteTierlistsRepository(db).rekeyBooks("u1", ["old"], "new");
+  createSqliteTierlistsRepository(db).rekeyBooks("u1", ["old"], "new", null);
   const read = (id: string) => db.prepare("SELECT data, updated_at FROM tierlists WHERE id = ?").get(id) as { data: string; updated_at: string };
   assert.deepEqual(JSON.parse(read("draft").data), { tiers: [{ id: "s", label: "S", color: "#000000", bookKeys: ["new"] }], pool: ["y"] });
   assert.notEqual(read("draft").updated_at, "t0");
   assert.equal(read("published").data, data);
   assert.equal(read("other").data, data);
+});
+
+test("rekeying a private list moves its works rows to the kept copy", async () => {
+  const { createSqliteTierlistsRepository } = await import("./sqliteTierlistsRepository.js");
+  const db = freshDb();
+  db.prepare("INSERT INTO tierlists (id, owner_user_id, origin_user_id, name, data, created_at, updated_at) VALUES ('t1', 'u1', 'u1', 'n', ?, 't0', 't0')").run(
+    JSON.stringify({ tiers: [{ id: "s", label: "S", color: "#000000", bookKeys: [] }], pool: ["k-old"] })
+  );
+  db.prepare("INSERT INTO tierlist_works (tierlist_id, key, work_id) VALUES ('t1', 'k-old', 'w-old')").run();
+  createSqliteTierlistsRepository(db).rekeyBooks("u1", ["k-old"], "k-keep", "w-keep");
+  const list = db.prepare("SELECT data FROM tierlists WHERE id = 't1'").get() as { data: string };
+  assert.deepEqual((JSON.parse(list.data) as { pool: string[] }).pool, ["k-keep"]);
+  const works = db.prepare("SELECT key, work_id FROM tierlist_works WHERE tierlist_id = 't1'").all();
+  assert.deepEqual(works.map((row) => ({ ...row })), [{ key: "k-keep", work_id: "w-keep" }]);
 });
 
 function nameKey(db: DatabaseSync, id: string): string | null {
@@ -446,4 +460,113 @@ test("a trigger that rolls the transaction back surfaces its own error and keeps
   assert.equal(repo.getByVoteCode("abc12345"), undefined);
   assert.equal(repo.listByUser("u1")[0]?.vote_code, null);
   assert.equal(db.isTransaction, false);
+});
+
+const works = (entries: Array<[string, string | null]>) => new Map(entries);
+
+function workRows(db: DatabaseSync, tierlistId: string) {
+  return db.prepare("SELECT key, work_id FROM tierlist_works WHERE tierlist_id = ? ORDER BY key").all(tierlistId).map((r) => ({ ...r }));
+}
+
+function placementWorks(db: DatabaseSync, ballotId: string) {
+  return db.prepare("SELECT book_key, work_id FROM tierlist_ballot_placements WHERE ballot_id = ? ORDER BY book_key").all(ballotId).map((r) => ({ ...r }));
+}
+
+test("insert and update write the list's works in step with its data", () => {
+  const db = freshDb();
+  const repo = createSqliteTierlistsRepository(db);
+  repo.insert(row({ id: "t1", data: JSON.stringify({ tiers: [], pool: ["a", "b"] }) }), works([["a", "w1"], ["b", null]]));
+  repo.update("t1", "u1", { data: JSON.stringify({ tiers: [], pool: ["b", "c"] }) }, works([["b", null], ["c", "w3"]]));
+  assert.deepEqual(workRows(db, "t1"), [{ key: "b", work_id: null }, { key: "c", work_id: "w3" }]);
+});
+
+test("an update without works leaves the stored works alone", () => {
+  const db = freshDb();
+  const repo = createSqliteTierlistsRepository(db);
+  repo.insert(row({ id: "t1" }), works([["a", "w1"]]));
+  repo.update("t1", "u1", { name: "Renamed" });
+  assert.deepEqual(workRows(db, "t1"), [{ key: "a", work_id: "w1" }]);
+});
+
+test("an update on a list the user does not own writes no works", () => {
+  const db = freshDb();
+  const repo = createSqliteTierlistsRepository(db);
+  repo.insert(row({ id: "t1" }), works([["a", "w1"]]));
+  assert.equal(repo.update("t1", "intruder", { name: "x" }, works([["a", "w9"]])), undefined);
+  assert.deepEqual(workRows(db, "t1"), [{ key: "a", work_id: "w1" }]);
+});
+
+test("a ballot placement takes its work from the list", () => {
+  const db = freshDb();
+  const repo = createSqliteTierlistsRepository(db);
+  repo.insert(row({ id: "t1", vote_code: "code1", voting_open: 1 }), works([["a", "w1"]]));
+  repo.saveBallot(ballot({ id: "bal1", tierlist_id: "t1", voter_user_id: "u2" }), [{ bookKey: "a", tierId: "s" }]);
+  assert.deepEqual(placementWorks(db, "bal1"), [{ book_key: "a", work_id: "w1" }]);
+});
+
+test("a ballot on a list with no works rows yet still saves with a NULL work", () => {
+  const db = freshDb();
+  const repo = createSqliteTierlistsRepository(db);
+  repo.insert(row({ id: "t2", vote_code: "code2", voting_open: 1 }));
+  repo.saveBallot(ballot({ id: "bal2", tierlist_id: "t2", voter_user_id: "u2" }), [{ bookKey: "a", tierId: "s" }]);
+  assert.deepEqual(placementWorks(db, "bal2"), [{ book_key: "a", work_id: null }]);
+});
+
+test("deleting a list or a user's data clears its works", () => {
+  const db = freshDb();
+  const repo = createSqliteTierlistsRepository(db);
+  repo.insert(row({ id: "t1" }), works([["a", "w1"]]));
+  assert.equal(repo.delete("t1", "u1"), true);
+  assert.deepEqual(workRows(db, "t1"), []);
+  repo.insert(row({ id: "t2" }), works([["a", "w1"]]));
+  repo.deleteUserData("u1");
+  assert.deepEqual(workRows(db, "t2"), []);
+});
+
+test("an existing database gains the placement work column", () => {
+  const db = new DatabaseSync(":memory:");
+  db.exec(`
+    CREATE TABLE tierlists (
+      id TEXT PRIMARY KEY, owner_user_id TEXT NOT NULL, origin_user_id TEXT NOT NULL,
+      name TEXT NOT NULL, name_key TEXT, data TEXT NOT NULL DEFAULT '{}',
+      vote_code TEXT, vote_access TEXT NOT NULL DEFAULT 'anonymous',
+      voting_open INTEGER NOT NULL DEFAULT 0, source_tierlist_id TEXT, promoted_at TEXT,
+      public_books TEXT, created_at TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL DEFAULT ''
+    );
+    CREATE TABLE tierlist_ballots (
+      id TEXT PRIMARY KEY, tierlist_id TEXT NOT NULL, voter_user_id TEXT,
+      created_at TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL DEFAULT ''
+    );
+    CREATE TABLE tierlist_ballot_placements (
+      ballot_id TEXT NOT NULL REFERENCES tierlist_ballots(id) ON DELETE CASCADE,
+      tierlist_id TEXT NOT NULL, book_key TEXT NOT NULL, tier_id TEXT NOT NULL,
+      PRIMARY KEY (ballot_id, book_key)
+    );
+  `);
+  assert.ok(!columnNames(db, "tierlist_ballot_placements").includes("work_id"));
+  applyTierlistsMigrations(db);
+  assert.ok(columnNames(db, "tierlist_ballot_placements").includes("work_id"));
+  assert.ok(columnNames(db, "tierlist_works").includes("work_id"));
+});
+
+test("a ballot on two keys sharing one work stores both placements with that work and keeps the histogram per key", () => {
+  const db = freshDb();
+  const repo = createSqliteTierlistsRepository(db);
+  repo.insert(row({ id: "w1", vote_code: "code", voting_open: 1 }));
+  db.prepare("INSERT INTO tierlist_works (tierlist_id, key, work_id) VALUES ('w1', 'b1', 'work-1'), ('w1', 'b2', 'work-1')").run();
+  repo.saveBallot(ballot({ id: "bal1", tierlist_id: "w1" }), [{ bookKey: "b1", tierId: "s" }, { bookKey: "b2", tierId: "s" }]);
+  const stored = db.prepare("SELECT book_key, work_id FROM tierlist_ballot_placements WHERE ballot_id = 'bal1' ORDER BY book_key").all();
+  assert.deepEqual(stored.map((r) => ({ ...r })), [{ book_key: "b1", work_id: "work-1" }, { book_key: "b2", work_id: "work-1" }]);
+  assert.deepEqual(repo.histogram("w1").map((c) => [c.bookKey, c.tierId, c.votes]).sort(), [["b1", "s", 1], ["b2", "s", 1]]);
+});
+
+test("rekeying keeps a stored work when the merge could not resolve one", () => {
+  const db = freshDb();
+  db.prepare("INSERT INTO tierlists (id, owner_user_id, origin_user_id, name, data, created_at, updated_at) VALUES ('t1', 'u1', 'u1', 'n', ?, 't0', 't0')").run(
+    JSON.stringify({ tiers: [{ id: "s", label: "S", color: "#000000", bookKeys: [] }], pool: ["k-old", "k-keep"] })
+  );
+  db.prepare("INSERT INTO tierlist_works (tierlist_id, key, work_id) VALUES ('t1', 'k-old', 'w-old'), ('t1', 'k-keep', 'w-keep')").run();
+  createSqliteTierlistsRepository(db).rekeyBooks("u1", ["k-old"], "k-keep", null);
+  const works = db.prepare("SELECT key, work_id FROM tierlist_works WHERE tierlist_id = 't1'").all();
+  assert.deepEqual(works.map((r) => ({ ...r })), [{ key: "k-keep", work_id: "w-keep" }]);
 });
