@@ -36,8 +36,8 @@ works check was clean: every `*Null` count was 0.
 4. **The removal is the first non-additive step of the works effort.** It
    rewrites stored JSON and rebuilds tables, so a rollback needs a restore.
    It waits for the gate and runs one game database at a time.
-5. **Clients change once.** Each client moves all three games in one PR,
-   because the header switches every game route at once.
+5. **Clients change once.** Shared, web and mobile move all three games in
+   one PR, because the header switches every game route at once.
 
 ## Formats
 
@@ -97,9 +97,10 @@ routes whose format changes call it:
 - arena: `GET /arenas/:id`, `/arenas/mine`, `/arenas/voted`, `/arenas/public`,
   `PUT /arenas/:id/slots`, `random-fill`, `vote`, `tiebreak`;
 - tier lists: `POST /tierlists`, `GET /tierlists`, `GET` and
-  `PUT /tierlists/:id`, `open-voting`, `results`,
-  `GET /tierlists/voting/:code`, and the ballot routes;
-- quizzes: the owner routes (`POST`, `PUT`, `GET`, `publish`);
+  `PUT /tierlists/:id`, `open-voting`, `PUT /tierlists/:id/voting`,
+  `results`, `GET /tierlists/voting/:code`, and the ballot routes;
+- quizzes: the owner routes (`POST`, `PUT`, `GET`, `publish`,
+  `PUT /quizzes/:id/voting`);
 - `GET /murals/shared/:token` and `GET /community/profiles/:username`, for
   their tier-list map.
 
@@ -167,19 +168,19 @@ Storage is unchanged. Translation goes through E1's columns and side tables.
   results match by `workId`.
 - No client persists a book key (no offline queue, no persisted query cache),
   so nothing client-side needs migrating.
-- **Web goes first.** Its PR adds the works-format types and helpers to
-  `@scripta/shared` next to today's (`arena/types.ts`, `tierlists/`,
-  `quizzes/types.ts`) and turns the header on for web.
-- **Mobile follows.** Its PR moves mobile over and deletes the old shared
-  types and helpers. Until it ships, mobile shows up in the legacy log, as
-  expected.
+- **One client PR.** `@scripta/shared`, web and mobile switch together,
+  because both clients use the same shared game types and helpers
+  (`SeedBook`, `Duel`, `TierDefinition`, `Placement`, `HistogramCell`,
+  `aggregate`, `QuizBook`). Splitting web from mobile would mean carrying
+  two copies of each for the days in between. Decided while writing the
+  plan, 2026-10-05.
 
 ## Gate
 
 The removal starts only when both of these hold, and you decide:
 
 - no `legacy client` line in the Railway logs for 14 days, counted from the
-  mobile PR's OTA publish;
+  client PR's OTA publish;
 - EAS Update insights for the `production` channel shows no device still on
   the embedded bundle or an older update.
 
@@ -269,23 +270,22 @@ Stacked PRs, each merged by you, in order:
 | 2 | Server arena | works format |
 | 3 | Server tier lists | works format, including the mural and profile `tierlists` map |
 | 4 | Server quizzes | works format |
-| 5 | Web | works types added to shared, header on for web. Merges only after a `curl` with the header shows `workId` in production. |
-| 6 | Mobile | old shared types deleted. It adds no native dependency, so it ships as an OTA update on merge. |
+| 5 | Clients | shared, web and mobile switch to the works format and send the header. Merges only after PRs 2–4 answer in the works format in production. It adds no native dependency, so mobile ships as an OTA update on merge. |
 | — | Gate | as above |
-| 7–9 | Removal | arena, tier lists, quizzes, each after the pre-removal check |
-| 10 | Clients | drop the header |
+| 6–8 | Removal | arena, tier lists, quizzes, each after the pre-removal check |
+| 9 | Clients | drop the header |
 
-PRs 1–6 are additive: an older server build ignores the header and serves
+PRs 1–5 are additive: an older server build ignores the header and serves
 today's format, so rolling them back needs no restore.
 
 ## Not in E2
 
-- The work page. It can start once PR 6 is live, because clients already
+- The work page. It can start once PR 5 is live, because clients already
   have work ids by then.
 - Murals moving to works. Reader overlap by work (`library_match_keys` is
   unchanged), and stats.
 - A general client-version mechanism. The header exists for this migration
-  only, and PR 10 removes it.
+  only, and PR 9 removes it.
 
 ## Verification
 
@@ -311,7 +311,7 @@ today's format, so rolling them back needs no restore.
   - the duplicate-work 409 still fires, and `Vary` is set;
   - tier lists also cover the frozen snapshot zip, a length mismatch, and
     the mural and profile map.
-- **PRs 5–6:**
+- **PR 5:**
   - shared tests for `workIdOf`, ballots, results and seeding;
   - public mural matching by `key` (`adapters.test.ts`);
   - voting by `workId`;
@@ -319,7 +319,7 @@ today's format, so rolling them back needs no restore.
   - a `device-checker` pass covering arena seed and vote, tier list create,
     edit, vote and results, quiz create, and a public mural with a tier list
     block.
-- **PRs 7–9:**
+- **PRs 6–8:**
   - migration tests from E1-shaped fixtures: entries without a work,
     duplicate works, a snapshot length mismatch, a duel whose sides share a
     work, a promoted tier list;
