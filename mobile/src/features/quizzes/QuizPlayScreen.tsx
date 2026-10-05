@@ -101,7 +101,7 @@ export function QuizPlayScreen({ code }: { code: string }) {
       const answered = Object.keys(answers).length;
       const complete = isComplete(questions, answers);
       const onLast = index === questions.length - 1;
-      return <FormScroll contentContainerStyle={styles.page}>
+      return <FormScroll contentContainerStyle={styles.page} scrollToEnd={onLast && complete}>
         <View style={[styles.track, { backgroundColor: colors.border }]}><View style={[styles.fill, { backgroundColor: colors.accent, width: `${Math.round((answered / questions.length) * 100)}%` }]} /></View>
         <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Question {index + 1} of {questions.length}</Text>
         <Prompt question={question} />
