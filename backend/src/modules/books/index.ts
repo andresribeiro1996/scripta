@@ -8,7 +8,7 @@ export { booksPlugin as registerBooksModule, enqueueBookCovers } from "./plugin.
 // can create the book row and queue a background lookup — neither one
 // calls a cover source directly; only the worker that later picks up a
 // queued lookup does that.
-export { peekCachedCoverUrl, peekCachedCoverUrls, peekWorkId, resolveWorkId } from "./publicCoverLookup.js";
+export { peekCachedCoverUrl, peekCachedCoverUrls } from "./publicCoverLookup.js";
 export type { PeekCachedCoverParams } from "./publicCoverLookup.js";
 export { canonicalWorks, resolveWorks } from "./works.js";
 export type { WorkLookup } from "./works.js";

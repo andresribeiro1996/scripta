@@ -170,13 +170,12 @@ transaction.
 - When the edition shares its work with other editions, gives it a new keyless
   work from its own title and author. When it is alone, only the block is set.
 
-**`resolveWorkId(workId)`** follows `merged_into` and returns the live work id,
-or `null` for an unknown id; more than one hop throws, since it means the
-invariant broke. **`peekWorkId({ isbn, title, author })`** finds the edition
-the way `peekCachedCoverUrl` does (`findByIdentity`, never creating one) and
-returns its live work id, or `null`. Both go on the books module's public API
-for phase E, which should read a reader's work through the edition rather than
-keep its own copy of a work id.
+**`resolveWorkId(workId)`** on the repository follows `merged_into` and returns
+the live work id, or `null` for an unknown id; more than one hop throws, since
+it means the invariant broke. `mergeWorks` uses it. It is not on the books
+module's public API: phase E1's `resolveWorks(lookups)` and
+`canonicalWorks(ids)` (`books/works.ts`) are the one way other modules resolve
+a work, and library rows store the result in `work_id`.
 
 ## Admin routes
 
