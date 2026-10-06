@@ -33,12 +33,6 @@ export function getQuizzesPublicApi(): QuizzesPublicApi {
   return cachedApi;
 }
 
-let rekeyingQuizzes: ReturnType<typeof createSqliteQuizzesRepository> | undefined;
-
-export function rekeyQuizzesBooks(userId: string, fromKeys: string[], toKey: string, toWork: string | null) {
-  (rekeyingQuizzes ??= createSqliteQuizzesRepository(openQuizzesDb())).rekeyBooks(userId, fromKeys, toKey, toWork);
-}
-
 let erasingQuizzes: ReturnType<typeof createSqliteQuizzesRepository> | undefined;
 
 export function deleteQuizzesUserData(userId: string) {
