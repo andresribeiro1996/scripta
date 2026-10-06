@@ -678,7 +678,8 @@ test("100 distinct member voters promote the same list and revoke creator contro
   assert.equal(service.getPublishedRef(list.id)?.ownerUserId, "creator");
 });
 
-test("listVotedByUser lists others' polls the account balloted on, latest ballot first", async () => {
+test("listVotedByUser lists others' polls the account balloted on, latest ballot first", (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: Date.now() });
   const service = makeService();
   const first = openPoll(service);
   const second = openPoll(service);
@@ -688,9 +689,8 @@ test("listVotedByUser lists others' polls the account balloted on, latest ballot
   service.submitBallot(first.code, [], { kind: "user", userId: "u9" });
   assert.deepEqual(service.listVotedByUser("u9").map((r) => r.voteCode), [first.code]);
 
-  // A fresh ballot on a second poll reorders by latest ballot; the delay
-  // keeps the two ballots' updated_at values comparable.
-  await new Promise((resolve) => setTimeout(resolve, 5));
+  // A fresh ballot on a second poll reorders by latest ballot.
+  t.mock.timers.tick(5);
   service.submitBallot(second.code, [], { kind: "user", userId: "u9" });
   assert.deepEqual(service.listVotedByUser("u9").map((r) => r.voteCode), [second.code, first.code]);
 
