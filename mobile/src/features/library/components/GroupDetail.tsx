@@ -223,11 +223,13 @@ export function GroupDetail({ groupId }: { groupId: string }) {
       {group && pickerOpen && <BookPickerSheet group={group} allBooks={books} onToggle={handleToggleBook} onClose={() => setPickerOpen(false)} />}
 
       <PerCardStyleSheet
+        key={`${groupId}-${styleOpen}`}
         visible={styleOpen}
         name={group?.name ?? ""}
-        priorityText="the library-wide"
+        inheritedFrom={library?.data.name ? `library “${library.data.name}”` : "your library"}
         currentOverride={group?.style}
         seedStyle={style}
+        previewBook={members[0]}
         onSave={handleSaveGroupStyle}
         onClose={() => setStyleOpen(false)}
       />

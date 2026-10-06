@@ -60,7 +60,14 @@ test("reset revokes required and optional access, refresh rotation grace, and re
     app.get("/optional", async (request) => ({ user: getOptionalAuthenticatedUser(request) }));
     const headers = { authorization: `Bearer ${session.tokens.accessToken}` };
     assert.equal((await app.inject({ url: "/private", headers })).statusCode, 401);
-    assert.equal((await app.inject({ url: "/optional", headers })).json().user, null);
+    assert.equal((await app.inject({ url: "/optional", headers })).statusCode, 401);
+    assert.equal((await app.inject({ url: "/optional", headers: { authorization: "Bearer not-a-token" } })).statusCode, 401);
+    const anonymous = await app.inject({ url: "/optional" });
+    assert.equal(anonymous.statusCode, 200);
+    assert.equal(anonymous.json().user, null);
+    const signedIn = await app.inject({ url: "/optional", headers: { authorization: `Bearer ${fresh.tokens.accessToken}` } });
+    assert.equal(signedIn.statusCode, 200);
+    assert.equal(signedIn.json().user.id, fresh.user.id);
     assert.equal((await app.inject({ url: "/private", headers: { authorization: `Bearer ${fresh.tokens.accessToken}` } })).statusCode, 200);
     await app.close();
   } finally { db.close(); }
