@@ -4,7 +4,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { QuizzesRepository } from "./domain/ports.js";
-import type { AnswerRow, PlayRow, QuizRow, StoredQuizBook } from "./domain/types.js";
+import type { QuizBook } from "@scripta/shared";
+import type { AnswerRow, PlayRow, QuizRow } from "./domain/types.js";
 import { createQuizzesService } from "./service.js";
 
 function createInMemoryRepo(): QuizzesRepository {
@@ -12,10 +13,6 @@ function createInMemoryRepo(): QuizzesRepository {
   const plays = new Map<string, PlayRow>();
   const answers = new Map<string, AnswerRow[]>();
   return {
-    rekeyBooks() {},
-    storedWorks() {
-      return new Map();
-    },
     listByUser: (userId) => [...quizzes.values()].filter((q) => q.owner_user_id === userId),
     getOwned: (id, userId) => {
       const q = quizzes.get(id);
@@ -91,13 +88,13 @@ function createInMemoryRepo(): QuizzesRepository {
   };
 }
 
-const book = (key: string, extra: Partial<StoredQuizBook> = {}): StoredQuizBook => ({
-  key,
-  title: `Title ${key}`,
+const book = (workId: string, extra: Partial<QuizBook> = {}): QuizBook => ({
+  workId,
+  title: `Title ${workId}`,
   author: "A",
-  coverUrl: `https://covers.test/${key}.jpg`,
-  quote: `Quote ${key}`,
-  blurb: `Blurb ${key}`,
+  coverUrl: `https://covers.test/${workId}.jpg`,
+  quote: `Quote ${workId}`,
+  blurb: `Blurb ${workId}`,
   ...extra
 });
 
@@ -128,10 +125,10 @@ test("publish generates the full seeded set, mints a code, and opens play", () =
 
 test("publish resolves covers for shelf books that lack one", () => {
   const { service, quizId } = makeService();
-  const outcome = service.publishQuiz("u1", quizId, [{ bookKey: "b0", coverUrl: "https://resolved.test/b0.jpg" }]);
+  const outcome = service.publishQuiz("u1", quizId, [{ workId: "b0", coverUrl: "https://resolved.test/b0.jpg" }]);
   assert.ok(outcome.ok);
-  const data = outcome.ok ? (outcome.quiz.data as { books: Array<{ key: string; coverUrl: string | null }> }) : null;
-  assert.equal(data!.books.find((b) => b.key === "b0")!.coverUrl, "https://resolved.test/b0.jpg");
+  const data = outcome.ok ? (outcome.quiz.data as { books: Array<{ workId: string; coverUrl: string | null }> }) : null;
+  assert.equal(data!.books.find((b) => b.workId === "b0")!.coverUrl, "https://resolved.test/b0.jpg");
 });
 
 test("publish refuses another user's quiz and a second publish", () => {
@@ -237,4 +234,19 @@ test("results order plays score-then-speed and include per-question stats", () =
   assert.deepEqual(results!.plays.map((p) => p.playerName), ["Fast", "Slow"]);
   assert.ok(results!.stats.length > 0);
   assert.equal(results!.questionCount, 3);
+});
+
+test("the play board looks each question's book up by its stored work", () => {
+  const { service, quizId } = makeService();
+  const published = service.publishQuiz("u1", quizId, [{ workId: "b0", coverUrl: "https://resolved.test/b0.jpg" }]);
+  assert.ok(published.ok);
+  const code = published.ok ? published.quiz.voteCode! : "";
+  const stored = service.getQuiz("u1", quizId)!.data as { books: QuizBook[]; questions: Array<{ id: string; type: string; workId: string }> };
+  const board = service.getPlayBoard(code)!;
+  for (const question of board.questions) {
+    const source = stored.questions.find((q) => q.id === question.id)!;
+    const owner = stored.books.find((b) => b.workId === source.workId)!;
+    const expected = { cover_title: owner.coverUrl, title_cover: owner.title, quote_title: owner.quote, blurb_title: owner.blurb }[source.type];
+    assert.equal(question.prompt, expected);
+  }
 });

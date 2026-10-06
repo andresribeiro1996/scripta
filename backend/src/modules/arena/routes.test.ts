@@ -20,7 +20,6 @@ const { createArenaService } = await import("./service.js");
 const { buildArenaRoutes, buildVoteRoute } = await import("./routes.js");
 const { resolveWorks } = await import("../books/index.js");
 const { openBooksDb } = await import("../books/adapters/sqlite/connection.js");
-const { openLibraryDb } = await import("../library/adapters/sqlite/connection.js");
 
 test("GET /arenas/public allows 30 requests a minute per caller", async () => {
   const db = new DatabaseSync(":memory:");
@@ -37,124 +36,6 @@ test("GET /arenas/public allows 30 requests a minute per caller", async () => {
   await app.close();
 });
 
-type ArenaRoutesResolver = NonNullable<Parameters<typeof buildArenaRoutes>[1]>;
-
-async function arenaApp(resolveWorks?: ArenaRoutesResolver) {
-  const db = new DatabaseSync(":memory:");
-  applyArenaMigrations(db);
-  const app = Fastify();
-  app.decorate("authenticateAccessToken", (token: string) => ({ id: token, email: `${token}@example.test`, username: token, avatarId: null }));
-  await app.register(buildArenaRoutes(createArenaService(createSqliteArenaRepository(db)), resolveWorks));
-  const created = await app.inject({
-    method: "POST",
-    url: "/arenas",
-    headers: { authorization: "Bearer u1" },
-    payload: { name: "Classics", bracketSize: 2, roundDurationMinutes: 60 }
-  });
-  assert.equal(created.statusCode, 201);
-  return { app, db, id: created.json().tournament.id as string };
-}
-
-function putSlots(app: Awaited<ReturnType<typeof arenaApp>>["app"], id: string, books: Array<{ key: string; title: string; author: string }>) {
-  return app.inject({
-    method: "PUT",
-    url: `/arenas/${id}/slots`,
-    headers: { authorization: "Bearer u1" },
-    payload: { slots: books.map((book, slotIndex) => ({ slotIndex, book: { ...book, cover: null } })) }
-  });
-}
-
-test("PUT slots echoes keys and stores each slot's work", async () => {
-  const { app, db, id } = await arenaApp();
-  const keys = ["ta:dune|frank herbert", "ta:orlando|virginia woolf"];
-  const res = await putSlots(app, id, [
-    { key: keys[0]!, title: "Dune", author: "Frank Herbert" },
-    { key: keys[1]!, title: "Orlando", author: "Virginia Woolf" }
-  ]);
-  assert.equal(res.statusCode, 204);
-  const view = await app.inject({ method: "GET", url: `/arenas/${id}` });
-  assert.equal(view.statusCode, 200);
-  assert.deepEqual(view.json().tournament.slots.map((slot: { key: string }) => slot.key), keys);
-  assert.doesNotMatch(view.body, /workId|work_id/);
-  const rows = db.prepare("SELECT book_key, work_id FROM tournament_slots WHERE tournament_id = ? ORDER BY slot_index").all(id) as Array<{ book_key: string; work_id: string | null }>;
-  assert.deepEqual(rows.map((row) => row.book_key), keys);
-  for (const row of rows) assert.ok(row.work_id);
-  await app.close();
-});
-
-test("PUT slots with two editions of one work is a 409 naming it", async () => {
-  const { app, id } = await arenaApp();
-  const res = await putSlots(app, id, [
-    { key: "isbn:0441013597", title: "Dune", author: "Frank Herbert" },
-    { key: "isbn:9780441013593", title: "Dune", author: "Frank Herbert" }
-  ]);
-  assert.equal(res.statusCode, 409);
-  assert.match(res.json().error, /Dune/);
-  await app.close();
-});
-
-test("PUT slots answers 503 and stores nothing when the catalog is unavailable", async () => {
-  const { WorkResolutionError } = await import("../library/index.js");
-  const { app, db, id } = await arenaApp(() => {
-    throw new WorkResolutionError(new Error("catalog down"));
-  });
-  const res = await putSlots(app, id, [
-    { key: "k1", title: "Dune", author: "Frank Herbert" },
-    { key: "k2", title: "Orlando", author: "Virginia Woolf" }
-  ]);
-  assert.equal(res.statusCode, 503);
-  assert.match(res.json().error, /catalog/i);
-  assert.equal((db.prepare("SELECT COUNT(*) AS n FROM tournament_slots WHERE tournament_id = ?").get(id) as { n: number }).n, 0);
-  await app.close();
-});
-
-test("PUT slots by a non-owner is a 404, leaves the slots alone and writes nothing to the catalog", async () => {
-  const { applyBooksMigrations } = await import("../books/adapters/sqlite/connection.js");
-  const { app, db, id } = await arenaApp();
-  const seeded = await putSlots(app, id, [
-    { key: "ta:dune|frank herbert", title: "Dune", author: "Frank Herbert" },
-    { key: "ta:orlando|virginia woolf", title: "Orlando", author: "Virginia Woolf" }
-  ]);
-  assert.equal(seeded.statusCode, 204);
-  const slotsBefore = db.prepare("SELECT slot_index, book_key, title, work_id FROM tournament_slots WHERE tournament_id = ? ORDER BY slot_index").all(id);
-  const res = await app.inject({
-    method: "PUT",
-    url: `/arenas/${id}/slots`,
-    headers: { authorization: "Bearer u2" },
-    payload: { slots: [{ slotIndex: 0, book: { key: "ta:zzyzx|nobody", title: "Zzyzx Road Atlas", author: "Nobody Atall", cover: null } }] }
-  });
-  assert.equal(res.statusCode, 404);
-  assert.deepEqual(db.prepare("SELECT slot_index, book_key, title, work_id FROM tournament_slots WHERE tournament_id = ? ORDER BY slot_index").all(id), slotsBefore);
-  const catalog = new DatabaseSync(process.env.COVERS_DB_PATH!);
-  applyBooksMigrations(catalog);
-  assert.equal((catalog.prepare("SELECT COUNT(*) AS n FROM books WHERE title = ?").get("Zzyzx Road Atlas") as { n: number }).n, 0);
-  catalog.close();
-  await app.close();
-});
-
-test("GET /arenas/:id and /arenas/mine speak works with the header and keys without it", async () => {
-  const { app, id } = await arenaApp();
-  assert.equal((await putSlots(app, id, [
-    { key: "ta:dune|frank herbert", title: "Dune", author: "Frank Herbert" },
-    { key: "ta:orlando|virginia woolf", title: "Orlando", author: "Virginia Woolf" }
-  ])).statusCode, 204);
-  const works = await app.inject({ method: "GET", url: `/arenas/${id}`, headers: { "x-scripta-works": "1" } });
-  assert.match(String(works.headers.vary), /X-Scripta-Works/);
-  const slots = works.json().tournament.slots as Array<Record<string, unknown>>;
-  assert.deepEqual(Object.keys(slots[0]!), ["slotIndex", "workId", "title", "author", "cover"]);
-  assert.equal(typeof slots[0]!.workId, "string");
-  const legacy = await app.inject({ method: "GET", url: `/arenas/${id}` });
-  assert.deepEqual(Object.keys(legacy.json().tournament.slots[0]), ["slotIndex", "key", "title", "author", "cover"]);
-  assert.doesNotMatch(legacy.body, /workId/);
-  const mine = await app.inject({ method: "GET", url: "/arenas/mine", headers: { authorization: "Bearer u1", "x-scripta-works": "1" } });
-  assert.equal(mine.json().tournaments[0].winner, null);
-  await app.close();
-});
-
-function libraryCopy(userId: string, position: number, key: string, workId: string) {
-  openLibraryDb().prepare("INSERT INTO library_books (user_id, position, book_key, title, author, row_hash, work_id) VALUES (?, ?, ?, 'T', 'A', 'h', ?)").run(userId, position, key, workId);
-}
-
 async function worksArena(owner: string) {
   const db = new DatabaseSync(":memory:");
   applyArenaMigrations(db);
@@ -164,26 +45,53 @@ async function worksArena(owner: string) {
   await app.register(buildArenaRoutes(service));
   await app.register(buildVoteRoute(service));
   const created = await app.inject({ method: "POST", url: "/arenas", headers: { authorization: `Bearer ${owner}` }, payload: { name: "Works", bracketSize: 2, roundDurationMinutes: 60 } });
-  const headers = { authorization: `Bearer ${owner}`, "x-scripta-works": "1" };
+  const headers = { authorization: `Bearer ${owner}` };
   const id = created.json().tournament.id as string;
-  const seed = (books: Array<{ workId: string; title: string }>) =>
-    app.inject({ method: "PUT", url: `/arenas/${id}/slots`, headers, payload: { slots: books.map((book, slotIndex) => ({ slotIndex, book: { ...book, author: "Someone", cover: null } })) } });
-  const view = async () => (await app.inject({ method: "GET", url: `/arenas/${id}`, headers: { "x-scripta-works": "1" } })).json().tournament;
+  const seed = (books: Array<{ workId: string; title: string }>, as = headers) =>
+    app.inject({ method: "PUT", url: `/arenas/${id}/slots`, headers: as, payload: { slots: books.map((book, slotIndex) => ({ slotIndex, book: { ...book, author: "Someone", cover: null } })) } });
+  const view = async () => (await app.inject({ method: "GET", url: `/arenas/${id}` })).json().tournament;
   return { app, db, id, headers, seed, view };
 }
 
 const work = (title: string) => resolveWorks([{ isbn: null, title, author: "Someone" }])[0]!;
 
-test("works-format slots store the owner's copy key, or the work id with no copy", async () => {
-  const [kept, loose] = [work("Copy Kept"), work("No Copy")];
-  libraryCopy("a1", 0, "isbn:9780000000001", kept);
-  const { app, db, id, seed, view } = await worksArena("a1");
-  assert.equal((await seed([{ workId: kept, title: "Copy Kept" }, { workId: loose, title: "No Copy" }])).statusCode, 204);
-  const rows = (db.prepare("SELECT book_key, work_id FROM tournament_slots WHERE tournament_id = ? ORDER BY slot_index").all(id) as Array<Record<string, unknown>>).map((row) => ({ ...row }));
-  assert.deepEqual(rows, [{ book_key: "isbn:9780000000001", work_id: kept }, { book_key: loose, work_id: loose }]);
-  assert.deepEqual((await view()).slots.map((slot: { workId: string }) => slot.workId), [kept, loose]);
-  const legacy = await app.inject({ method: "GET", url: `/arenas/${id}` });
-  assert.deepEqual(legacy.json().tournament.slots.map((slot: { key: string }) => slot.key), ["isbn:9780000000001", loose]);
+test("slots are stored as works and read back as works", async () => {
+  const [a, b] = [work("Plain One"), work("Plain Two")];
+  const { app, db, id, seed } = await worksArena("a1");
+  assert.equal((await seed([{ workId: a, title: "Plain One" }, { workId: b, title: "Plain Two" }])).statusCode, 204);
+  const rows = (db.prepare("SELECT work_id FROM tournament_slots WHERE tournament_id = ? ORDER BY slot_index").all(id) as Array<Record<string, unknown>>).map((row) => ({ ...row }));
+  assert.deepEqual(rows, [{ work_id: a }, { work_id: b }]);
+  const res = await app.inject({ method: "GET", url: `/arenas/${id}` });
+  const slots = res.json().tournament.slots as Array<Record<string, unknown>>;
+  assert.deepEqual(Object.keys(slots[0]!), ["slotIndex", "workId", "title", "author", "cover"]);
+  assert.deepEqual(slots.map((slot) => slot.workId), [a, b]);
+  assert.doesNotMatch(res.body, /"key"/);
+  const mine = await app.inject({ method: "GET", url: "/arenas/mine", headers: { authorization: "Bearer a1" } });
+  assert.equal(mine.json().tournaments[0].winner, null);
+  await app.close();
+});
+
+test("a request without the works header gets works too", async () => {
+  const [a, b] = [work("Headerless One"), work("Headerless Two")];
+  const { app, id, headers, seed, view } = await worksArena("a1b");
+  await seed([{ workId: a, title: "Headerless One" }, { workId: b, title: "Headerless Two" }]);
+  await app.inject({ method: "POST", url: `/arenas/${id}/start`, headers });
+  const duelId = (await view()).duels[0].id as string;
+  await app.inject({ method: "POST", url: `/arenas/${id}/duels/${duelId}/vote`, payload: { voterToken: "t1", workId: a } });
+  await app.inject({ method: "POST", url: `/arenas/${id}/duels/${duelId}/settle`, headers });
+  const listed = await app.inject({ method: "GET", url: "/arenas/public" });
+  assert.deepEqual(listed.json().tournaments[0].winner, { workId: a, title: "Headerless One", author: "Someone", cover: null });
+  await app.close();
+});
+
+test("PUT slots by a non-owner is a 404 and leaves the slots alone", async () => {
+  const [a, b] = [work("Owned One"), work("Owned Two")];
+  const { app, db, id, seed } = await worksArena("a1c");
+  assert.equal((await seed([{ workId: a, title: "Owned One" }, { workId: b, title: "Owned Two" }])).statusCode, 204);
+  const before = db.prepare("SELECT slot_index, work_id, title FROM tournament_slots WHERE tournament_id = ? ORDER BY slot_index").all(id);
+  const res = await seed([{ workId: b, title: "Owned Two" }], { authorization: "Bearer someone-else" });
+  assert.equal(res.statusCode, 404);
+  assert.deepEqual(db.prepare("SELECT slot_index, work_id, title FROM tournament_slots WHERE tournament_id = ? ORDER BY slot_index").all(id), before);
   await app.close();
 });
 
@@ -196,7 +104,7 @@ test("a merged-away work id is stored as its canonical work", async () => {
   await app.close();
 });
 
-test("works-format slots reject an unknown work and two editions of one work", async () => {
+test("slots reject an unknown work and two editions of one work", async () => {
   const [old, target] = [work("Edition One"), work("Edition Two")];
   openBooksDb().prepare("UPDATE works SET merged_into = ? WHERE id = ?").run(target, old);
   const { app, seed } = await worksArena("a3");
@@ -215,7 +123,7 @@ test("votes and tiebreaks by work, including a duel whose sides now share a work
   await seed([{ workId: a, title: "Side A Book" }, { workId: b, title: "Side B Book" }]);
   assert.equal((await app.inject({ method: "POST", url: `/arenas/${id}/start`, headers })).statusCode, 204);
   const duelId = (await view()).duels[0].id as string;
-  const vote = (voterToken: string, workId: string) => app.inject({ method: "POST", url: `/arenas/${id}/duels/${duelId}/vote`, headers: { "x-scripta-works": "1" }, payload: { voterToken, workId } });
+  const vote = (voterToken: string, workId: string) => app.inject({ method: "POST", url: `/arenas/${id}/duels/${duelId}/vote`, payload: { voterToken, workId } });
   assert.equal((await vote("v1", b)).statusCode, 204);
   assert.equal((await vote("v2", "not-a-work")).statusCode, 400);
   assert.equal((await view()).duels[0].bookB.votes, 1);
@@ -229,7 +137,7 @@ test("votes and tiebreaks by work, including a duel whose sides now share a work
   await app.close();
 });
 
-test("works-format random fill keeps one slot per work", async () => {
+test("random fill keeps one slot per work", async () => {
   const [a, b, c] = [work("Fill One"), work("Fill Two"), work("Fill Three")];
   const { app, db, id, headers } = await worksArena("a5");
   const res = await app.inject({ method: "POST", url: `/arenas/${id}/random-fill`, headers, payload: { pool: [a, a, b, c].map((workId) => ({ workId, title: "T", author: "A", cover: null })) } });
@@ -239,21 +147,41 @@ test("works-format random fill keeps one slot per work", async () => {
   await app.close();
 });
 
-test("a works-format re-seed keeps a stored slot key and keys a new work by the normal rule", async () => {
-  const [kept, fresh] = [work("Stored Key Book"), work("Fresh Book")];
-  const { app, db, id, headers, seed } = await worksArena("a6");
-  const legacy = await app.inject({
-    method: "PUT",
-    url: `/arenas/${id}/slots`,
-    headers: { authorization: "Bearer a6" },
-    payload: { slots: [{ slotIndex: 0, book: { key: "ta:stored key book|someone", title: "Stored Key Book", author: "Someone", cover: null } }] }
-  });
-  assert.equal(legacy.statusCode, 204);
-  assert.equal((db.prepare("SELECT work_id FROM tournament_slots WHERE tournament_id = ?").get(id) as { work_id: string }).work_id, kept);
-  libraryCopy("a6", 0, "isbn:9780000000099", kept);
-  libraryCopy("a6", 1, "isbn:9780000000098", fresh);
-  assert.equal((await seed([{ workId: kept, title: "Stored Key Book" }, { workId: fresh, title: "Fresh Book" }])).statusCode, 204);
-  const rows = (db.prepare("SELECT book_key, work_id FROM tournament_slots WHERE tournament_id = ? ORDER BY slot_index").all(id) as Array<Record<string, unknown>>).map((row) => ({ ...row }));
-  assert.deepEqual(rows, [{ book_key: "ta:stored key book|someone", work_id: kept }, { book_key: "isbn:9780000000098", work_id: fresh }]);
+test("a work merged after a duel was written still takes votes and is answered as its target", async () => {
+  const [old, target, other] = [work("Later Merged"), work("Later Target"), work("Later Other")];
+  const { app, db, id, headers, seed, view } = await worksArena("a7");
+  await seed([{ workId: other, title: "Later Other" }, { workId: old, title: "Later Merged" }]);
+  await app.inject({ method: "POST", url: `/arenas/${id}/start`, headers });
+  assert.equal((db.prepare("SELECT book_b_work_id AS w FROM duels WHERE tournament_id = ?").get(id) as { w: string }).w, old);
+  openBooksDb().prepare("UPDATE works SET merged_into = ? WHERE id = ?").run(target, old);
+  const duel = (await view()).duels[0];
+  assert.equal(duel.bookB.workId, target);
+  const res = await app.inject({ method: "POST", url: `/arenas/${id}/duels/${duel.id}/vote`, payload: { voterToken: "m1", workId: target } });
+  assert.equal(res.statusCode, 204);
+  assert.equal((await view()).duels[0].bookB.votes, 1);
+  await app.close();
+});
+
+test("PUT slots and random-fill answer 503 when the catalog is unavailable", async () => {
+  const [a, b] = [work("Down One"), work("Down Two")];
+  const { app, db, id, headers } = await worksArena("a8");
+  const catalog = openBooksDb();
+  catalog.exec("ALTER TABLE works RENAME TO works_away");
+  try {
+    const put = await app.inject({ method: "PUT", url: `/arenas/${id}/slots`, headers, payload: { slots: [a, b].map((workId, slotIndex) => ({ slotIndex, book: { workId, title: "T", author: "A", cover: null } })) } });
+    assert.equal(put.statusCode, 503);
+    const fill = await app.inject({ method: "POST", url: `/arenas/${id}/random-fill`, headers, payload: { pool: [a, b].map((workId) => ({ workId, title: "T", author: "A", cover: null })) } });
+    assert.equal(fill.statusCode, 503);
+  } finally {
+    catalog.exec("ALTER TABLE works_away RENAME TO works");
+  }
+  assert.equal((db.prepare("SELECT COUNT(*) AS n FROM tournament_slots WHERE tournament_id = ?").get(id) as { n: number }).n, 0);
+  await app.close();
+});
+
+test("a non-owner sending an unknown work to PUT slots gets 404, not 400", async () => {
+  const { app, seed } = await worksArena("a9");
+  const res = await seed([{ workId: "not-a-work", title: "X" }], { authorization: "Bearer intruder" });
+  assert.equal(res.statusCode, 404);
   await app.close();
 });
