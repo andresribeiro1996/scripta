@@ -17,7 +17,7 @@ import { duplicateWorkMessage, firstKeyPerWork, knownWorkIds, resolvePublicBooks
 import { boardWorks } from "./domain/boardKeys.js";
 import type { Tierlist } from "./domain/types.js";
 import type { BallotOutcome, TierlistsService, Voter } from "./service.js";
-import { boardBooks, canonicalBoard, canonicalFirst, histogramToWorks, placementsFromWorks, placementsToWorks, type WorksBoard } from "./wire.js";
+import { boardBooks, boardCanonical, canonicalBoard, canonicalFirst, histogramToWorks, placementsFromWorks, placementsToWorks, type WorksBoard } from "./wire.js";
 import { InvalidShareImageError, MAX_SHARE_IMAGE_BYTES, renderShareVideo, ShareVideoRenderError } from "./shareVideo.js";
 
 const idParamSchema = z.object({ id: z.string().uuid() });
@@ -169,13 +169,12 @@ export function buildTierlistRoutes(service: TierlistsService) {
       const owned = service.getTierlist(request.user.id, params.data.id);
       if (!owned) return reply.code(404).send({ error: "No tier list with that id." });
       try {
-        const board = canonicalBoard(owned.data);
-        const data = { tiers: board.tiers.map((tier) => ({ ...tier, workIds: [] })), pool: [...board.pool, ...board.tiers.flatMap((tier) => tier.workIds)] };
+        const known = boardCanonical(owned.data);
         const tierlist = service.openVoting(request.user.id, params.data.id, body.data.access, booksInOrder(request.user.id, boardWorks(owned.data)));
         if (!tierlist) {
           return reply.code(404).send({ error: "No tier list with that id." });
         }
-        return reply.code(201).send({ tierlist: { ...tierlist, data }, voteCode: tierlist.voteCode });
+        return reply.code(201).send({ tierlist: { ...tierlist, data: canonicalBoard(tierlist.data, known) }, voteCode: tierlist.voteCode });
       } catch (err) {
         return sendWorksError(reply, err);
       }
