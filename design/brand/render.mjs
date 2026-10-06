@@ -24,6 +24,8 @@ const exports = [
   ["frontend/public/icon-192.png", 192, 192, "mark", 0.66, PAPER, DARK_BG],
   ["frontend/public/icon-512.png", 512, 512, "mark", 0.56, PAPER, DARK_BG],
   ["frontend/public/logo.png", 992, 1070, "lockup", 0.84, INK, null],
+  ["frontend/public/email/mark.png", 112, 112, "mark", 1, INK, null],
+  ["frontend/public/email/mark-dark.png", 112, 112, "mark", 1, DARK_TEXT, null],
   ["mobile/assets/images/favicon.png", 48, 48, "mark", 0.82, PAPER, DARK_BG],
   ["mobile/assets/images/icon.png", 1024, 1024, "mark", 0.66, PAPER, DARK_BG],
   ["mobile/assets/images/adaptive-foreground.png", 1024, 1024, "mark", 0.43, PAPER, null],

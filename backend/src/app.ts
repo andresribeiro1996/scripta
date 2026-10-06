@@ -29,6 +29,7 @@ import {
   getDashboardSeenAt,
   getUserTheme,
   registerAuthModule,
+  renderEmail,
   resolvePublicReaderProfile,
   resolvePublicReaderProfiles,
   searchUsernameOwners,
@@ -173,7 +174,12 @@ export function buildApp() {
   });
   app.register(registerGalleryModule);
   app.register(registerBooksModule, {
-    alert: emailEnabled && env.ALERT_EMAIL ? (subject: string, text: string) => sendAccountEmail(env.ALERT_EMAIL, subject, text) : undefined
+    alert: emailEnabled && env.ALERT_EMAIL
+      ? (subject: string, text: string) => {
+          const mail = renderEmail({ heading: subject, paragraphs: [text] }, env.FRONTEND_URL);
+          return sendAccountEmail(env.ALERT_EMAIL, subject, mail.text, mail.html);
+        }
+      : undefined
   });
   app.register(registerSocialsModule);
   app.register(registerWaitlistModule, { sendEmail: emailEnabled ? sendAccountEmail : undefined });
