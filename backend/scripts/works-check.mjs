@@ -51,7 +51,7 @@ const e2 = {};
 
 for (const [name, envName, check] of [
   ["arena", "ARENA_DB_PATH", (db) => has(db, "tournament_slots", "book_key") ? {
-    slotsWithoutWork: count(db, "SELECT COUNT(*) AS n FROM tournament_slots WHERE work_id IS NULL"),
+    slotsWithoutWork: count(db, "SELECT COUNT(*) AS n FROM tournament_slots WHERE work_id IS NULL AND book_key != ''"),
     duelSidesWithoutWork: count(db, "SELECT COUNT(*) AS n FROM duels WHERE book_a_work_id IS NULL OR book_b_work_id IS NULL"),
     tournamentsSharingWork: count(db, sharedWork("tournament_slots", "tournament_id")),
     duelsSharingWork: count(db, "SELECT COUNT(*) AS n FROM duels WHERE book_a_work_id = book_b_work_id"),
