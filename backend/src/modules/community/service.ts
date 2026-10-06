@@ -253,7 +253,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
             kind: "reading",
             id: event.id,
             actor: withGlyph(actor, event.user_id, glyphOf),
-            book: { title: String(payload.title ?? ""), author: String(payload.author ?? ""), coverUrl },
+            book: { title: String(payload.title ?? ""), author: String(payload.author ?? ""), coverUrl, workId: typeof payload.workId === "string" ? payload.workId : null },
             finished: event.type === "book_finished",
             createdAt: event.created_at
           };

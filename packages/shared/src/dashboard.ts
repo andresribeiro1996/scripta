@@ -7,6 +7,7 @@ export interface DigestBook {
   title: string;
   author: string;
   coverUrl: string | null;
+  workId?: string | null;
 }
 
 export interface ParticipationGame {

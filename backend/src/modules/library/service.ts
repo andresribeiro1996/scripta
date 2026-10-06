@@ -182,13 +182,14 @@ export function deriveLibraryRows(data: unknown, report: ReportSkippedRow, rowsV
   };
 }
 
-function bookPayload(book: Record<string, unknown>, status: number): Record<string, unknown> {
+function bookPayload(book: Record<string, unknown>, status: number, workId: string | null): Record<string, unknown> {
   return {
     title: String(book.Title ?? ""),
     author: String(book.Attribution ?? ""),
     isbn: book.ISBN == null ? null : String(book.ISBN),
     coverUrl: typeof book._coverUrl === "string" ? book._coverUrl : null,
-    status
+    status,
+    workId
   };
 }
 
@@ -196,7 +197,7 @@ function contentId(book: Record<string, unknown>): string {
   return String(book.ContentID ?? "");
 }
 
-function diffBookEvents(previous: unknown, data: unknown): BookEvent[] {
+function diffBookEvents(previous: unknown, data: unknown, workOf: (book: Record<string, unknown>) => string | null): BookEvent[] {
   const prevBooks = new Map<string, Record<string, unknown>>();
   if (isRecord(previous) && Array.isArray(previous.books)) {
     for (const book of previous.books) {
@@ -214,9 +215,9 @@ function diffBookEvents(previous: unknown, data: unknown): BookEvent[] {
     const status = Number(book.ReadStatus ?? 0);
     const prev = prevBooks.get(refId);
     if (!prev) {
-      events.push({ type: "book_added", refId, payload: bookPayload(book, status) });
+      events.push({ type: "book_added", refId, payload: bookPayload(book, status, workOf(book)) });
     } else if (Number(prev.ReadStatus ?? 0) !== 2 && status === 2) {
-      events.push({ type: "book_finished", refId, payload: bookPayload(book, status) });
+      events.push({ type: "book_finished", refId, payload: bookPayload(book, status, workOf(book)) });
     }
   }
   return events;
@@ -336,6 +337,11 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
     return works;
   }
 
+  function workOfUser(userId: string): (book: Record<string, unknown>) => string | null {
+    const works = worksOf(userId);
+    return (book) => works[bookKey(book)] ?? null;
+  }
+
   function smallSave(userId: string, previous: LibraryData, next: LibraryData, change: LibraryChange, recomputeCard: boolean): LibrarySmallSave {
     const report: ReportSkippedRow = (error, what) => logSkipped(error, `library rows of ${userId}: ${what}`);
     const books: LibraryBookRow[] = [];
@@ -380,7 +386,7 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
       if (!row) throw new LibraryConflictError();
       if (previous !== undefined && emitBookEvents) {
         try {
-          const events = diffBookEvents(JSON.parse(previous.data), data).slice(0, BOOK_EVENTS_PER_SAVE);
+          const events = diffBookEvents(JSON.parse(previous.data), data, workOfUser(userId)).slice(0, BOOK_EVENTS_PER_SAVE);
           if (events.length > 0) emitBookEvents(userId, events);
         } catch (error) {
           logError?.(error, "book events failed after a library save");
@@ -417,7 +423,7 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
         if (!saved) throw new LibraryConflictError();
         if (input.readStatus === 2 && emitBookEvents) {
           try {
-            emitBookEvents(userId, [{ type: "book_finished", refId: key, payload: bookPayload(updatedBook, input.readStatus) }]);
+            emitBookEvents(userId, [{ type: "book_finished", refId: key, payload: bookPayload(updatedBook, input.readStatus, workOfUser(userId)(updatedBook)) }]);
           } catch (error) {
             logError?.(error, "book events failed after a library save");
           }
@@ -444,7 +450,7 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
       if (!saved) throw new LibraryConflictError();
       if (emitBookEvents) {
         try {
-          emitBookEvents(userId, [{ type: "book_added", refId: `manual:${id}`, payload: bookPayload(book, input.readStatus) }]);
+          emitBookEvents(userId, [{ type: "book_added", refId: `manual:${id}`, payload: bookPayload(book, input.readStatus, workOfUser(userId)(book)) }]);
         } catch (error) {
           logError?.(error, "book events failed after a library save");
         }
@@ -488,7 +494,7 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
       if (!updatedAt) throw new LibraryConflictError();
       if (emitBookEvents && (change.kind === "add" || flipped.some(isFinishedBook))) {
         try {
-          const events = diffBookEvents(previous, result.data).slice(0, BOOK_EVENTS_PER_SAVE);
+          const events = diffBookEvents(previous, result.data, workOfUser(userId)).slice(0, BOOK_EVENTS_PER_SAVE);
           if (events.length > 0) emitBookEvents(userId, events);
         } catch (error) {
           logError?.(error, "book events failed after a library save");
