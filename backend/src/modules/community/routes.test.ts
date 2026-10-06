@@ -98,6 +98,17 @@ test("discover passes the viewer through when signed in", async () => {
   await app.close();
 });
 
+test("discover answers 401 for a rejected token and 200 anonymously with no header", async () => {
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", () => null);
+  await app.register(buildPublicCommunityRoutes(fakeService()));
+  const rejected = await app.inject({ method: "GET", url: "/community/discover", headers: { authorization: "Bearer expired" } });
+  assert.equal(rejected.statusCode, 401);
+  const anonymous = await app.inject({ method: "GET", url: "/community/discover" });
+  assert.equal(anonymous.statusCode, 200);
+  await app.close();
+});
+
 test("discover rejects a bad type with 400", async () => {
   const app = Fastify();
   await app.register(buildPublicCommunityRoutes(fakeService()));
