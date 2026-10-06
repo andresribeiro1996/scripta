@@ -572,7 +572,8 @@ function startedTournament(service: ReturnType<typeof createArenaService>, owner
   return tournament;
 }
 
-test("a signed-in vote stamps the account and backfills the token's earlier anonymous votes", async () => {
+test("a signed-in vote stamps the account and backfills the token's earlier anonymous votes", (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: Date.now() });
   const service = createArenaService(createInMemoryArenaRepository());
   const first = startedTournament(service, "owner-1", "First", 0);
   const second = startedTournament(service, "owner-1", "Second", 10);
@@ -583,10 +584,7 @@ test("a signed-in vote stamps the account and backfills the token's earlier anon
   service.vote(first.id, duelA.id, "voter-token-1", "w1");
   assert.equal(service.listVoted("voter-1").length, 0);
 
-  // Distinct wall-clock times: "most recent vote first" needs comparable
-  // created_at values, and two synchronous votes can land in one
-  // millisecond.
-  await new Promise((resolve) => setTimeout(resolve, 5));
+  t.mock.timers.tick(5);
   service.vote(second.id, duelB.id, "voter-token-1", "w11", "voter-1");
 
   const voted = service.listVoted("voter-1");
