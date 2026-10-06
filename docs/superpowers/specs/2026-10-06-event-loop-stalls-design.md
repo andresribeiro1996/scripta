@@ -1,7 +1,8 @@
 # Event-loop stalls: name them, then remove the background ones
 
 Date: 2026-10-06
-Status: outline approved in conversation; this spec awaits review
+Status: approved 2026-10-06. Workstream 5 was added after the planning
+measurements, at the user's call.
 
 ## Problem
 
@@ -69,9 +70,27 @@ That is the first thing to fix.
   them is small. Workstream 1 times each one. If one turns out to be
   slow, deleting a migration that has finished in production is a
   separate change.
-- **`groupablePairsStmt` redesign.** It aggregates every keyless work on
-  each call. Workstream 2 measures it. If it is over budget, stop and bring
-  the numbers back rather than redesigning it inside this change.
+- **An incremental `groupablePairsStmt`.** Looking only at works that
+  changed since the last run would keep grouping fast and timely, but it
+  isn't worth a redesign for this use case. Decided 2026-10-06; see
+  workstream 5.
+
+## Measured while planning
+
+A 73 MB file database with 78k synthetic books, about 40% of them with a
+1,200-character summary, on a development Mac with a warm cache:
+
+| Query | No new index | With its index |
+|---|---|---|
+| `enqueueUnchecked` (all unchecked and upgrade-wanted ids) | 43 ms | 0.4 ms for a 500-row page |
+| details batch (`uncheckedDetailsStmt`) | 21 ms | under 0.1 ms |
+| work-key batch (`workLookupStmt`) | 17 ms | under 0.1 ms |
+| `groupKeylessWorks(250)` (`groupablePairsStmt`) | 123–133 ms | no change |
+
+`groupablePairsStmt` re-aggregates all ~19k keyless works on every call.
+Forcing its `keyed` part to start from the candidates' title keys saved
+under 10%. That made it the likeliest single cause of the 10-minute
+stalls, and the reason for workstream 5.
 
 ## Budget
 
@@ -103,19 +122,23 @@ these names:
 
 | Name | What it wraps |
 |---|---|
-| `cover-enqueue` | each `enqueueUnchecked` call, boot included |
-| `details-backfill` | the batch query and each book's synchronous writes in `backfillDetails` |
-| `work-key-backfill` | the same in `backfillWorkKeys` |
-| `works-backfill:<step>` | each `drain` batch: `assignMissingWorks`, `fillTitleKeys`, `groupKeylessWorks` |
+| `cover-enqueue` | each timed `enqueueUnchecked` call |
+| `books:<method>` | every call into the books repository: the backfill queries, the works steps, and the writes the details, work-key and cover jobs make |
 | `works-sweep:<module>` | each 250-row batch in `startWorksSweep` |
-| `cover-worker` | the synchronous repository work around each cover job |
 | `arena-sweep` | `runScheduledSweep` |
-| `community-archive` | each archive batch |
-| `startup:<step>` | each step of `runStartupMigrations`, and each module's `open*Db()` during plugin registration |
+| `startup:<step>` | each step of `runStartupMigrations`, the books database open, and the first `enqueueUnchecked` |
 
-`startup:*` steps log their duration at info even under the threshold.
-The startup log is one line per step per boot, and it is the only way to
-see what the growing 1.5 s is made of.
+The books repository is wrapped once, method by method, where the plugin
+creates it (`timedMethods`). The details, work-key and cover jobs do
+almost all of their synchronous work through it, so this one wrapper
+names their stalls without touching the service code.
+
+The community archive isn't wrapped. It runs once a day, so it can't
+explain 50 stalls a day, and its batches already yield.
+
+`startup:*` steps log their duration at info even under the threshold,
+and boot ends with one `startup finished` line that gives the total. The
+startup log is the only way to see what the growing 1.5 s is made of.
 
 The per-request `trace` context is not involved: these jobs emit no
 events.
@@ -137,9 +160,10 @@ NOT EXISTS` lines, one per statement:
   expressions matching its `ORDER BY`.
 
 The plan writes the exact DDL, checked with `EXPLAIN QUERY PLAN`. The test
-for each statement asserts its plan uses the index: no `SCAN books` and no
-`USE TEMP B-TREE FOR ORDER BY`. That test guards the next person who
-edits the query and drifts from the index.
+for each statement asserts its plan names its index and has no `TEMP
+B-TREE`. That test guards the next person who edits the query and drifts
+from the index. The four SQL strings move to exported constants, so the
+test explains the same text the repository runs.
 
 The index build runs once on an existing database, about 78k rows, at the
 first boot after deploy. That boot is before `listen()`.
@@ -163,9 +187,10 @@ at the front of the order would fill every page, and the books behind
 them would never be scheduled.
 
 Set `COVER_ENQUEUE_BATCH` to at least twice what the worker can finish in
-one 10-minute interval. The plan derives that from the worker's three
-slots and the source throttles in `books/plugin.ts`. The backfill must
-not get slower.
+one 10-minute interval, so the backfill doesn't get slower. Background
+and upgrade jobs use Apple Books, and the worker runs only one of those at
+a time. Apple calls are spaced 3.2 s apart, so at most about 190 such jobs
+finish in 10 minutes. `COVER_ENQUEUE_BATCH = 500`.
 
 ### 4. One way to open a database, with `synchronous = NORMAL`
 
@@ -185,6 +210,24 @@ that window is already the recovery point.
 
 The read-only open in `library/import/importChild.ts` stays as it is.
 
+### 5. Group keyless works once a day, or when the admin asks
+
+Decided 2026-10-06. Grouping every 10 minutes is too often for what it
+does, and a version that only looks at changes isn't worth building.
+
+- The 10-minute works backfill keeps `assignMissingWorks` and
+  `fillTitleKeys`. Both are indexed, `LIMIT`ed lookups.
+- `groupKeylessWorks` moves to its own job. It runs at boot, then every
+  24 hours, draining batches of 250 with a yield before each batch, as
+  today.
+- `POST /books/works/group`, admin only like `POST /books/works/merge`,
+  runs it now and answers `{ grouped }`. If a run is already going, it
+  answers 409 and starts nothing, so two runs never overlap. Like the other
+  works admin routes, it has no button in the apps.
+
+The cost: an edition with no Open Library work can take up to a day to
+join its title group, unless the admin runs grouping by hand.
+
 ## Testing
 
 - `stallLog.test.ts`: `timeSync` logs over the threshold, stays silent
@@ -197,20 +240,26 @@ The read-only open in `library/import/importChild.ts` stays as it is.
   - Consecutive calls continue where the last one stopped.
   - A short page wraps to the start.
   - Backed-off ids at the front don't starve the ids behind them.
+- `backfill.test.ts`: the grouping job runs at start and on its daily
+  timer. A run started while one is going returns without grouping. A
+  failed run is logged and doesn't block the next one.
+- `routes.test.ts`: `POST /books/works/group` is 401 signed out and 403
+  for a non-admin. It answers `{ grouped }` for the admin, and 409 while a
+  run is going.
 - One test that a database opened through `openSqlite` reports
   `journal_mode` `wal`, `synchronous` 1 and `busy_timeout` 5000.
 - `backend/package.json`'s `test` script lists files explicitly. Any new
   test file goes on that list, or it never runs.
-- Measurement, recorded in the PR description: a scratch script builds the
-  synthetic 78k-book catalog in memory. The keyless-works plan's step 7
-  did the same (`docs/superpowers/plans/2026-10-04-keyless-works.md`). It
-  times each statement in workstream 2, `groupKeylessWorks(250)`, and
-  `enqueueUnchecked`, before and after. The script is not committed.
+- Measurement: the "before" numbers are in
+  [Measured while planning](#measured-while-planning). The PR description
+  repeats the "after" column from a scratch script on the same synthetic
+  database. The script is not committed.
 
 ## Rollout and verification
 
-One PR, four workstreams, in order: 1, then 2 and 3, then 4. Workstream 1
-is useful on its own, so it may ship first if the rest runs long.
+One PR, five workstreams, in order: 1, then 2, 3 and 5, then 4.
+Workstream 1 is useful on its own, so it may ship first if the rest runs
+long.
 
 After deploy:
 
