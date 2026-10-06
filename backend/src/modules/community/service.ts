@@ -253,7 +253,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
             kind: "reading",
             id: event.id,
             actor: withGlyph(actor, event.user_id, glyphOf),
-            book: { title: String(payload.title ?? ""), author: String(payload.author ?? ""), coverUrl },
+            book: { title: String(payload.title ?? ""), author: String(payload.author ?? ""), coverUrl, workId: typeof payload.workId === "string" ? payload.workId : null },
             finished: event.type === "book_finished",
             createdAt: event.created_at
           };
@@ -575,6 +575,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
 
 export interface CommunityPublicApi {
   emitEvent(userId: string, type: ActivityEventType, refType: CommunityRefType, refId: string, payload?: Record<string, unknown>): void;
+  readerVisibility(viewerId: string | null, userIds: string[]): Map<string, { followed: boolean; published: boolean; showGlyph: boolean }>;
 }
 
 export function createCommunityPublicApi(repo: CommunityRepository, now: () => number = Date.now): CommunityPublicApi {
@@ -584,6 +585,18 @@ export function createCommunityPublicApi(repo: CommunityRepository, now: () => n
     emitEvent(userId, type, refType, refId, payload) {
       if (READING_EVENT_TYPES.includes(type) && atBookCap(userId)) return;
       repo.insertEvent(newEvent(userId, type, refType, refId, payload, now));
+    },
+    readerVisibility(viewerId, userIds) {
+      const visible = new Map<string, { followed: boolean; published: boolean; showGlyph: boolean }>();
+      if (userIds.length === 0) return visible;
+      const followees = new Set(viewerId ? repo.listFollowees(viewerId) : []);
+      for (const row of repo.visibilityRows(userIds)) {
+        const published = row.published === 1;
+        const followed = followees.has(row.user_id) && (published || row.show_reading === 1);
+        if (!published && !followed) continue;
+        visible.set(row.user_id, { followed, published, showGlyph: published && row.show_reader_glyph === 1 });
+      }
+      return visible;
     }
   };
 }

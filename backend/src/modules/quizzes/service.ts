@@ -6,7 +6,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { QUIZ_QUESTION_TYPES, generateQuizQuestions, gradeAnswers, type PublicQuizQuestion, type QuestionStat, type QuizBook, type QuizQuestion, type QuizQuestionType, type ResultPlay, type SubmittedAnswer } from "@scripta/shared";
 import type { GameParticipation } from "@scripta/shared/community";
 import type { QuizzesRepository } from "./domain/ports.js";
-import type { AnswerRow, PlayRow, Quiz, QuizRow } from "./domain/types.js";
+import type { AnswerRow, PlayRow, Quiz, QuizGameRow, QuizRow } from "./domain/types.js";
 
 function toQuiz(row: QuizRow): Quiz {
   const parsed = JSON.parse(row.data) as unknown;
@@ -111,6 +111,7 @@ export interface QuizzesService {
   getPlay(code: string, player: Player): PlayOutcome;
   getResults(userId: string, id: string): QuizResults | undefined;
   getPublicResults(code: string): { plays: Array<Omit<ResultPlay, "playId">>; questionCount: number } | undefined;
+  listPublishedByWorks(workIds: string[], limit: number): QuizGameRow[];
   participationByOwner(ownerUserId: string, since: string): GameParticipation[];
 }
 
@@ -294,6 +295,8 @@ export function createQuizzesService(repo: QuizzesRepository): QuizzesService {
       };
     },
 
+    listPublishedByWorks: (workIds, limit) => repo.listPublishedByWorks(workIds, limit),
+
     participationByOwner(ownerUserId, since) {
       return repo.listParticipation(ownerUserId, since).map((row) => ({
         id: row.id,
@@ -307,10 +310,27 @@ export function createQuizzesService(repo: QuizzesRepository): QuizzesService {
   };
 }
 
+export interface GameByWork {
+  id: string;
+  name: string;
+  path: string;
+  ownerUserId: string | null;
+}
+
 export interface QuizzesPublicApi {
   participationByOwner(ownerUserId: string, since: string): GameParticipation[];
+  publishedByWorks(workIds: string[], limit: number): GameByWork[];
 }
 
 export function createQuizzesPublicApi(service: QuizzesService): QuizzesPublicApi {
-  return { participationByOwner: (ownerUserId, since) => service.participationByOwner(ownerUserId, since) };
+  return {
+    participationByOwner: (ownerUserId, since) => service.participationByOwner(ownerUserId, since),
+    publishedByWorks: (workIds, limit) =>
+      service.listPublishedByWorks(workIds, limit).map((row) => ({
+        id: row.id,
+        name: row.name,
+        path: `/play/${row.vote_code}`,
+        ownerUserId: row.owner_user_id
+      }))
+  };
 }

@@ -40,6 +40,9 @@ function createRepoFake() {
     getFollow(followerId, followeeId) {
       return follows.get(key(followerId, followeeId));
     },
+    visibilityRows() {
+      return [];
+    },
     listFollowees(followerId) {
       return [...follows.values()].filter((row) => row.follower_id === followerId).map((row) => row.followee_id);
     },
@@ -2031,7 +2034,7 @@ test("dashboard shows a followee's reading and votes only while their switches a
     repo.upsertProfile(profileRow(id));
     repo.insertFollow({ follower_id: "viewer", followee_id: id, created_at: at(1) });
     tierlistRefs.set(`t-${id}`, tierRef(`t-${id}`, "carol"));
-    repo.insertEvent({ id: `${id}-added`, user_id: id, type: "book_added", ref_type: "book", ref_id: `${id}-b1`, payload: JSON.stringify({ title: "Dune", author: "Herbert", coverUrl: "https://covers.test/dune.jpg" }), created_at: at(2) });
+    repo.insertEvent({ id: `${id}-added`, user_id: id, type: "book_added", ref_type: "book", ref_id: `${id}-b1`, payload: JSON.stringify({ title: "Dune", author: "Herbert", coverUrl: "https://covers.test/dune.jpg", workId: "w1" }), created_at: at(2) });
     repo.insertEvent({ id: `${id}-finished`, user_id: id, type: "book_finished", ref_type: "book", ref_id: `${id}-b2`, payload: JSON.stringify({ title: "Emma", author: "Austen" }), created_at: at(3) });
     repo.insertEvent({ id: `${id}-vote`, user_id: id, type: "voted_on", ref_type: "tierlist", ref_id: `t-${id}`, payload: JSON.stringify({ game: "tierlist" }), created_at: at(4) });
     for (let i = 0; i < 25; i++) {
@@ -2044,8 +2047,8 @@ test("dashboard shows a followee's reading and votes only while their switches a
   const { items } = service.getDashboard("viewer", undefined, 3);
   assert.deepEqual(items.map((item) => [item.kind, item.id]), [["vote", "bob-vote"], ["reading", "alice-finished"], ["reading", "alice-added"]]);
   assert.deepEqual(items.flatMap((item) => (item.kind === "reading" ? [[item.finished, item.book]] : [])), [
-    [true, { title: "Emma", author: "Austen", coverUrl: null }],
-    [false, { title: "Dune", author: "Herbert", coverUrl: "https://covers.test/dune.jpg" }]
+    [true, { title: "Emma", author: "Austen", coverUrl: null, workId: null }],
+    [false, { title: "Dune", author: "Herbert", coverUrl: "https://covers.test/dune.jpg", workId: "w1" }]
   ]);
 });
 

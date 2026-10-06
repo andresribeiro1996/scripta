@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { followFailureMessage, personCaption, suggestionReason } from "./helpers.js";
+import { activityRow, followFailureMessage, personCaption, suggestionReason } from "./helpers.js";
 import type { PersonResult, SuggestedReader } from "./types.js";
 
 test("suggestionReason counts the shared books, singular or plural", () => {
@@ -52,4 +52,11 @@ test("followFailureMessage shows the server's message on a 409 and the generic o
   assert.equal(followFailureMessage(new StatusError(500, "Request failed (500)"), "generic"), "generic");
   assert.equal(followFailureMessage(new Error("Network request failed"), "generic"), "generic");
   assert.equal(followFailureMessage({ status: 409, message: limit }, "generic"), "generic");
+});
+
+test("activity rows for book events carry the work id when the event has one", () => {
+  const at = "2026-10-06T00:00:00Z";
+  assert.equal(activityRow({ id: "e", type: "book_finished", payload: { title: "Dune", author: "FH", workId: "w1", status: 2 }, createdAt: at }).workId, "w1");
+  assert.equal(activityRow({ id: "e", type: "book_added", payload: { title: "Dune" }, createdAt: at }).workId, null);
+  assert.equal(activityRow({ id: "e", type: "following", payload: { username: "ana", workId: "w1" }, createdAt: at }).workId, null);
 });

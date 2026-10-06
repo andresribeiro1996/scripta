@@ -96,6 +96,7 @@ export interface ActivityRow {
   covers: string[];
   href: string | null;
   username: string | null;
+  workId: string | null;
 }
 
 function text(value: unknown): string {
@@ -108,7 +109,7 @@ function covers(value: unknown): string[] {
 
 export function activityRow(item: ActivityItem): ActivityRow {
   const p = item.payload;
-  const base = { covers: covers(p.covers), href: text(p.href) || null, username: null };
+  const base = { covers: covers(p.covers), href: text(p.href) || null, username: null, workId: null };
   switch (item.type) {
     case "tierlist_published":
       return { ...base, kind: "publication", label: "Published a tier list", tone: "accent", title: text(p.name), meta: text(p.detail) };
@@ -116,11 +117,11 @@ export function activityRow(item: ActivityItem): ActivityRow {
       return { ...base, kind: "publication", label: "Started a tournament", tone: "accent", title: text(p.name), meta: text(p.detail) };
     case "book_added": {
       const cover = text(p.coverUrl);
-      return { ...base, kind: "reading", label: "Added to library", tone: "dim", title: text(p.title), meta: [text(p.author), statusLabel(Number(p.status ?? 0))].filter(Boolean).join(" · "), covers: cover ? [cover] : [] };
+      return { ...base, kind: "reading", label: "Added to library", tone: "dim", title: text(p.title), meta: [text(p.author), statusLabel(Number(p.status ?? 0))].filter(Boolean).join(" · "), covers: cover ? [cover] : [], workId: text(p.workId) || null };
     }
     case "book_finished": {
       const cover = text(p.coverUrl);
-      return { ...base, kind: "reading", label: "Finished reading", tone: "success", title: text(p.title), meta: text(p.author), covers: cover ? [cover] : [] };
+      return { ...base, kind: "reading", label: "Finished reading", tone: "success", title: text(p.title), meta: text(p.author), covers: cover ? [cover] : [], workId: text(p.workId) || null };
     }
     case "following":
       return { ...base, kind: "follow", label: "Followed", tone: "dim", title: `@${text(p.username)}`, meta: "", username: text(p.username) || null };

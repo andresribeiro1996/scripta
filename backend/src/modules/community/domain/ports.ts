@@ -23,6 +23,7 @@ export interface CommunityRepository {
   listPublishedProfiles(limit: number): ProfileRow[];
   getFeedSettings(userId: string): FeedSettings | null;
   updateFeedSettings(userId: string, settings: FeedSettings): void;
+  visibilityRows(userIds: string[]): Array<{ user_id: string; published: number; show_reading: number; show_reader_glyph: number }>;
 
   insertEvent(row: EventRow): void;
   countEventsSince(userId: string, since: string, types: readonly ActivityEventType[], limit: number): number;

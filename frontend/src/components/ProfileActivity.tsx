@@ -35,7 +35,7 @@ function Glyph({ item, size }: { item: ActivityItem; size: number }) {
 function ActivityEntry({ item }: { item: ActivityItem }) {
   const row = activityRow(item);
   const tone = TONE[row.tone];
-  const target = row.href ?? (row.username ? `/community/u/${row.username}` : null);
+  const target = row.workId ? `/work/${row.workId}` : row.href ?? (row.username ? `/community/u/${row.username}` : null);
   const body: ReactNode = (
     <>
       <span className="relative h-[72px] w-[86px] shrink-0">

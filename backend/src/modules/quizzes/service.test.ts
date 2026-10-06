@@ -83,6 +83,7 @@ function createInMemoryRepo(): QuizzesRepository {
         picks: [...s.picks.entries()].map(([choiceIndex, count]) => ({ choiceIndex, count }))
       }));
     },
+    listPublishedByWorks: () => [],
     listParticipation: () => [],
     listRecentPlayers: () => []
   };

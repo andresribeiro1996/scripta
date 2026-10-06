@@ -29,7 +29,7 @@ import {
 } from "./domain/errors.js";
 import { canonicalWorkIds } from "../library/index.js";
 import type { ArenaRepository } from "./domain/ports.js";
-import type { DuelRow, SeedBookInput, SeedPreview, TournamentRow, TournamentSlotRow } from "./domain/types.js";
+import type { DuelRow, SeedBookInput, SeedPreview, TournamentGameRow, TournamentRow, TournamentSlotRow } from "./domain/types.js";
 
 export interface SeedBookView {
   workId: string | null;
@@ -90,6 +90,7 @@ export interface ArenaService {
   listPublic(limit: number, offset: number): TournamentSummary[];
   discoverWindow(needle: string, limit: number): TournamentDiscoverRef[];
   listPublicByIds(ids: string[]): TournamentSummary[];
+  listPublishedByWorks(workIds: string[], limit: number): TournamentGameRow[];
   votedAmong(voterUserId: string, ids: string[]): string[];
   getTournamentView(id: string, voterToken?: string, viewerUserId?: string | null): TournamentView | null;
   setSlotsManual(tournamentId: string, ownerUserId: string, entries: Array<{ slotIndex: number; book: SeedBookInput }>): void;
@@ -343,6 +344,8 @@ export function createArenaService(
       return repo.discoverWindow(needle, limit).map((row) => ({ id: row.id, createdAt: row.created_at, ownerUserId: row.owner_user_id }));
     },
 
+    listPublishedByWorks: (workIds, limit) => repo.listPublishedByWorks(workIds, limit),
+
     listPublicByIds(ids) {
       return summariesWithPreviews(repo, repo.listPublicByIds(ids));
     },
@@ -524,10 +527,18 @@ export interface PublishedTournamentRef {
   covers: string[];
 }
 
+export interface GameByWork {
+  id: string;
+  name: string;
+  path: string;
+  ownerUserId: string | null;
+}
+
 export interface ArenaPublicApi {
   discoverWindow(needle: string, limit: number): TournamentDiscoverRef[];
   getPublishedMany(ids: string[]): PublishedTournamentRef[];
   votedAmong(voterUserId: string, ids: string[]): string[];
+  publishedByWorks(workIds: string[], limit: number): GameByWork[];
   getPublished(id: string): PublishedTournamentRef | undefined;
   listPublishedByOwner(ownerUserId: string): PublishedTournamentRef[];
   participationByOwner(ownerUserId: string, since: string): GameParticipation[];
@@ -550,6 +561,13 @@ export function createArenaPublicApi(service: ArenaService): ArenaPublicApi {
     discoverWindow: (needle, limit) => service.discoverWindow(needle, limit),
     getPublishedMany: (ids) => service.listPublicByIds(ids).map(toPublishedRef),
     votedAmong: (voterUserId, ids) => service.votedAmong(voterUserId, ids),
+    publishedByWorks: (workIds, limit) =>
+      service.listPublishedByWorks(workIds, limit).map((row) => ({
+        id: row.id,
+        name: row.name,
+        path: `/arena/${row.id}`,
+        ownerUserId: row.owner_user_id
+      })),
     getPublished: (id) => {
       const summary = service.getPublicSummary(id);
       return summary ? toPublishedRef(summary) : undefined;

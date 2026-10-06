@@ -28,6 +28,7 @@ export function BookDetail({
   book,
   onOpenStyle,
   onOpenCoverPicker,
+  onOpenWork,
   onSetStatus,
   onSetRating,
   onDeleteNote,
@@ -36,6 +37,7 @@ export function BookDetail({
   book: Record<string, unknown> | null;
   onOpenStyle: (book: Record<string, unknown>) => void;
   onOpenCoverPicker: (book: Record<string, unknown>) => void;
+  onOpenWork?: () => void;
   onSetStatus: (book: Record<string, unknown>, status: ReadStatus) => void | Promise<void>;
   onSetRating: (book: Record<string, unknown>, rating: FinishRating) => void;
   onDeleteNote: (book: Record<string, unknown>, bookmarkId: string) => void;
@@ -85,6 +87,7 @@ export function BookDetail({
         <View style={styles.actions}>
           <Button label="Style" variant="secondary" onPress={() => onOpenStyle(book)} />
           <Button label="Cover" variant="secondary" onPress={() => onOpenCoverPicker(book)} />
+          {onOpenWork ? <Button label="About this book" variant="secondary" onPress={onOpenWork} /> : null}
         </View>
 
         <View>

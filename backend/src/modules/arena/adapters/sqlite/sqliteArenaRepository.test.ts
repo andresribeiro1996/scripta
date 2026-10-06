@@ -81,7 +81,7 @@ test("an E1-shaped arena database is migrated on open", () => {
 });
 
 const { createSqliteArenaRepository } = await import("./sqliteArenaRepository.js");
-import type { DuelRow, TournamentRow, VoteRow } from "../../domain/types.js";
+import type { DuelRow, TournamentRow, TournamentSlotRow, VoteRow } from "../../domain/types.js";
 
 function seedTournament(db: DatabaseSync, id: string, owner: string, name: string) {
   db.prepare(
@@ -419,4 +419,28 @@ test("a trigger that rolls the transaction back surfaces its own error and keeps
   assert.throws(() => repo.deleteUserData("u1"), /trigger boom/);
   assert.equal((db.prepare("SELECT COUNT(*) AS n FROM tournaments WHERE owner_user_id = 'u1'").get() as { n: number }).n, 1);
   assert.equal(db.isTransaction, false);
+});
+
+test("started tournaments seeding any of the given works, newest first; seeding brackets never", async () => {
+  const { createArenaService, createArenaPublicApi } = await import("../../service.js");
+  const repo = createSqliteArenaRepository(freshDb());
+  const slot = (tournamentId: string, index: number, workId: string): TournamentSlotRow => ({ tournament_id: tournamentId, slot_index: index, work_id: workId, title: "T", author: "A", cover_url: null });
+  repo.insertTournament(tournament({ id: "old", name: "Old", status: "completed", created_at: "2026-01-01T00:00:00.000Z" }));
+  repo.insertTournament(tournament({ id: "both", name: "Both", status: "active", owner_user_id: "u2", created_at: "2026-02-01T00:00:00.000Z" }));
+  repo.insertTournament(tournament({ id: "other", name: "Other", status: "active", created_at: "2026-03-01T00:00:00.000Z" }));
+  repo.insertTournament(tournament({ id: "draft", name: "Draft", status: "seeding", created_at: "2026-04-01T00:00:00.000Z" }));
+  repo.replaceSlots("old", [slot("old", 0, "w-old"), slot("old", 1, "w-x")]);
+  repo.replaceSlots("both", [slot("both", 0, "w-old"), slot("both", 1, "w-new")]);
+  repo.replaceSlots("other", [slot("other", 0, "w-other")]);
+  repo.replaceSlots("draft", [slot("draft", 0, "w-old"), slot("draft", 1, "w-new")]);
+
+  assert.deepEqual(repo.listPublishedByWorks(["w-new", "w-old"], 20).map((r) => r.id), ["both", "old"]);
+  assert.deepEqual(repo.listPublishedByWorks(["w-new", "w-old"], 1).map((r) => r.id), ["both"]);
+  assert.equal(repo.listPublishedByWorks([], 20).length, 0);
+
+  const api = createArenaPublicApi(createArenaService(repo));
+  assert.deepEqual(api.publishedByWorks(["w-new", "w-old"], 20), [
+    { id: "both", name: "Both", path: "/arena/both", ownerUserId: "u2" },
+    { id: "old", name: "Old", path: "/arena/old", ownerUserId: "u1" }
+  ]);
 });

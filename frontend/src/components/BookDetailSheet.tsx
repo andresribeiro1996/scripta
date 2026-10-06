@@ -1,6 +1,7 @@
 import { readingPercent, type FinishRating } from "@scripta/shared";
 import { useQuery } from "@tanstack/react-query";
 import { useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { fetchIsAdmin, rejectSharedCover, uploadSharedCover } from "../api/books";
 import { forgetResolvedCover, rememberResolvedCover } from "../api/covers";
 import { coverParamsFor, CoverImage } from "./BookCard";
@@ -14,6 +15,7 @@ import { useScrollLock } from "../hooks/useScrollLock";
 
 export function BookDetailSheet({
   book,
+  workId,
   onOpenStyle,
   onOpenCoverPicker,
   onSetStatus,
@@ -22,6 +24,7 @@ export function BookDetailSheet({
   onClose
 }: {
   book: Record<string, unknown>;
+  workId?: string;
   onOpenStyle: (book: Record<string, unknown>) => void;
   onOpenCoverPicker: (book: Record<string, unknown>) => void;
   onSetStatus: (book: Record<string, unknown>, status: ReadStatus) => void;
@@ -112,6 +115,11 @@ export function BookDetailSheet({
               <button onClick={() => onOpenCoverPicker(book)} className={actionClass}>
                 Cover
               </button>
+              {workId && (
+                <Link to={`/work/${workId}`} className={actionClass}>
+                  About this book
+                </Link>
+              )}
               {isAdmin && (
                 <>
                   <button onClick={() => void rejectCover()} className={actionClass}>

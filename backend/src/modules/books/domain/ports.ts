@@ -1,5 +1,5 @@
 import type { BookMetadata, BookSearchResult, CatalogBookMetadata } from "@scripta/shared";
-import type { BookRow, CoverImageRow, CoverSourceName, CoverStatus, DataSource, NewBook, SummarySource, WorkView } from "./types.js";
+import type { BookRow, CoverImageRow, CoverSourceName, CoverStatus, DataSource, NewBook, SummarySource, WorkPageRows, WorkView } from "./types.js";
 
 export type MergeableDetails = Pick<BookMetadata, "summary" | "pages" | "year" | "publisher" | "translator">;
 
@@ -45,6 +45,7 @@ export interface BooksRepository {
   detachEdition(bookId: string, at: string): string;
   resolveWorkId(id: string): string | null;
   getWorkView(id: string): WorkView | undefined;
+  workPageRows(id: string): WorkPageRows | undefined;
   assignWork(bookId: string): string;
   setWorkSummary(bookId: string, summary: string): void;
   getWorkSummary(bookId: string): { summary: string | null; olWorkKey: string | null } | undefined;

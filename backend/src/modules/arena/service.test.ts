@@ -191,6 +191,9 @@ function createInMemoryArenaRepository(): ArenaRepository {
         return tournament !== undefined && tournament.owner_user_id !== voterUserId && votes.some((v) => v.voter_user_id === voterUserId && duels.get(v.duel_id)?.tournament_id === id);
       });
     },
+    listPublishedByWorks() {
+      return [];
+    },
     listParticipation() {
       return [];
     },

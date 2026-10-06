@@ -37,19 +37,19 @@ test("defaults keep reading private", () => {
 test("activityRow gives each event a label, tone, title and link", () => {
   const row = (type: ActivityItem["type"], payload: Record<string, unknown>) => activityRow({ id: "1", type, payload, createdAt: "x" });
   assert.deepEqual(row("book_added", { title: "Dune", author: "Frank Herbert", status: 1, coverUrl: "dune.jpg" }), {
-    kind: "reading", label: "Added to library", tone: "dim", title: "Dune", meta: "Frank Herbert · Reading", covers: ["dune.jpg"], href: null, username: null
+    kind: "reading", label: "Added to library", tone: "dim", title: "Dune", meta: "Frank Herbert · Reading", covers: ["dune.jpg"], href: null, username: null, workId: null
   });
   assert.deepEqual(row("book_finished", { title: "Dune", author: "", coverUrl: null }), {
-    kind: "reading", label: "Finished reading", tone: "success", title: "Dune", meta: "", covers: [], href: null, username: null
+    kind: "reading", label: "Finished reading", tone: "success", title: "Dune", meta: "", covers: [], href: null, username: null, workId: null
   });
   assert.deepEqual(row("tierlist_published", { name: "Best of 2025", href: "/vote/abc", detail: "5 books · 2 ballots", covers: ["a", "b", "c", "d", 7] }), {
-    kind: "publication", label: "Published a tier list", tone: "accent", title: "Best of 2025", meta: "5 books · 2 ballots", covers: ["a", "b", "c"], href: "/vote/abc", username: null
+    kind: "publication", label: "Published a tier list", tone: "accent", title: "Best of 2025", meta: "5 books · 2 ballots", covers: ["a", "b", "c"], href: "/vote/abc", username: null, workId: null
   });
   assert.equal(row("tournament_published", { name: "Cup" }).label, "Started a tournament");
   assert.equal(row("voted_on", { game: "tierlist", name: "Cosy reads" }).label, "Ranked a tier list");
   assert.equal(row("voted_on", { game: "tournament", name: "March Madness", href: "/arena/g1" }).href, "/arena/g1");
   assert.deepEqual(row("following", { username: "mia" }), {
-    kind: "follow", label: "Followed", tone: "dim", title: "@mia", meta: "", covers: [], href: null, username: "mia"
+    kind: "follow", label: "Followed", tone: "dim", title: "@mia", meta: "", covers: [], href: null, username: "mia", workId: null
   });
   assert.equal(row("mural_published", { muralId: "m1" }).kind, "mural");
 });
