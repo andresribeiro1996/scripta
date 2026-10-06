@@ -3,11 +3,12 @@
 // from every other module's, per the module-isolation convention.
 
 import { normalizeWords } from "@scripta/shared";
-import { DatabaseSync } from "node:sqlite";
-import { mkdirSync, readFileSync } from "node:fs";
+import type { DatabaseSync } from "node:sqlite";
+import { readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { env } from "../../../../config/env.js";
+import { openSqlite } from "../../../../db/openSqlite.js";
 
 const adapterDir = dirname(fileURLToPath(import.meta.url));
 
@@ -68,11 +69,7 @@ function fillNameKeys(db: DatabaseSync): void {
 }
 
 export function openTierlistsDb(): DatabaseSync {
-  mkdirSync(dirname(env.TIERLISTS_DB_PATH), { recursive: true });
-
-  const db = new DatabaseSync(env.TIERLISTS_DB_PATH);
-  db.exec("PRAGMA journal_mode = WAL");
-  db.exec("PRAGMA busy_timeout = 5000");
+  const db = openSqlite(env.TIERLISTS_DB_PATH);
   applyTierlistsMigrations(db);
 
   return db;

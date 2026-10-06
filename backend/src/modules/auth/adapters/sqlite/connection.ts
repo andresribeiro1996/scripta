@@ -3,11 +3,12 @@
 // imports it; only sqliteAuthRepository.ts (the other half of this
 // adapter) and plugin.ts (the composition root) do.
 
-import { DatabaseSync } from "node:sqlite";
-import { mkdirSync, readFileSync } from "node:fs";
+import type { DatabaseSync } from "node:sqlite";
+import { readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { env } from "../../../../config/env.js";
+import { openSqlite } from "../../../../db/openSqlite.js";
 
 const adapterDir = dirname(fileURLToPath(import.meta.url));
 
@@ -58,11 +59,7 @@ export function applyAuthMigrations(db: DatabaseSync): void {
 }
 
 export function openAuthDb(): DatabaseSync {
-  mkdirSync(dirname(env.AUTH_DB_PATH), { recursive: true });
-
-  const db = new DatabaseSync(env.AUTH_DB_PATH);
-  db.exec("PRAGMA journal_mode = WAL");
-  db.exec("PRAGMA busy_timeout = 5000");
+  const db = openSqlite(env.AUTH_DB_PATH);
   db.exec("PRAGMA foreign_keys = ON");
 
   applyAuthMigrations(db);

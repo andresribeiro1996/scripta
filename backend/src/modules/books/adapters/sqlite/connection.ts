@@ -1,13 +1,11 @@
-// Opens (and migrates) this module's own SQLite database — mirrors
-// modules/gallery/adapters/sqlite/connection.ts exactly.
-
 import { randomUUID } from "node:crypto";
-import { DatabaseSync } from "node:sqlite";
-import { mkdirSync, readFileSync } from "node:fs";
+import type { DatabaseSync } from "node:sqlite";
+import { readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { canonicalIsbn } from "@scripta/shared";
 import { env } from "../../../../config/env.js";
+import { openSqlite } from "../../../../db/openSqlite.js";
 import { MIN_GOOD_WIDTH } from "../../domain/constants.js";
 import { catalogTitleKey } from "../../domain/normalize.js";
 
@@ -152,10 +150,7 @@ function joinIsbn10Editions(db: DatabaseSync): void {
 }
 
 export function openBooksDb(): DatabaseSync {
-  mkdirSync(dirname(env.COVERS_DB_PATH), { recursive: true });
-  const db = new DatabaseSync(env.COVERS_DB_PATH);
-  db.exec("PRAGMA journal_mode = WAL");
-  db.exec("PRAGMA busy_timeout = 5000");
+  const db = openSqlite(env.COVERS_DB_PATH);
   applyBooksMigrations(db);
   return db;
 }

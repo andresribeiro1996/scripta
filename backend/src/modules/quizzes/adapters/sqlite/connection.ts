@@ -2,11 +2,12 @@
 // modules/tierlists/adapters/sqlite/connection.ts. A new module with no
 // legacy databases: migrations are just "run the schema".
 
-import { DatabaseSync } from "node:sqlite";
-import { mkdirSync, readFileSync } from "node:fs";
+import type { DatabaseSync } from "node:sqlite";
+import { readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { env } from "../../../../config/env.js";
+import { openSqlite } from "../../../../db/openSqlite.js";
 
 const adapterDir = dirname(fileURLToPath(import.meta.url));
 
@@ -15,11 +16,7 @@ export function applyQuizzesMigrations(db: DatabaseSync): void {
 }
 
 export function openQuizzesDb(): DatabaseSync {
-  mkdirSync(dirname(env.QUIZZES_DB_PATH), { recursive: true });
-
-  const db = new DatabaseSync(env.QUIZZES_DB_PATH);
-  db.exec("PRAGMA journal_mode = WAL");
-  db.exec("PRAGMA busy_timeout = 5000");
+  const db = openSqlite(env.QUIZZES_DB_PATH);
   applyQuizzesMigrations(db);
 
   return db;
