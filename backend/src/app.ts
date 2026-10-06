@@ -38,14 +38,15 @@ import {
 } from "./modules/auth/index.js";
 import { deleteArenaUserData, getArenaPublicApi, registerArenaModule } from "./modules/arena/index.js";
 import { deleteCommunityUserData, getCommunityPublicApi, registerCommunityModule } from "./modules/community/index.js";
-import { enqueueBookCovers, registerBooksModule } from "./modules/books/index.js";
+import { enqueueBookCovers, getWorkPage, registerBooksModule } from "./modules/books/index.js";
 import { deleteGalleryUserData, registerGalleryModule } from "./modules/gallery/index.js";
-import { deleteLibraryUserData, registerLibraryModule, resolvePublicLibrary, readerGlyphFor, resolveEntryWorks, WorkResolutionError, sharedBookCounts, sharedBooks, startWorksSweep, sweepLibraryWorks, type BookEvent } from "./modules/library/index.js";
+import { copyOfWork, deleteLibraryUserData, holdersOfWorks, registerLibraryModule, resolvePublicLibrary, readerGlyphFor, resolveEntryWorks, WorkResolutionError, sharedBookCounts, sharedBooks, startWorksSweep, sweepLibraryWorks, type BookEvent } from "./modules/library/index.js";
 import { deleteMuralsUserData, getMuralsPublicApi, registerMuralsModule, rekeyMuralsBooks, sweepMuralsWorks } from "./modules/murals/index.js";
 import { deleteQuizzesUserData, getQuizzesPublicApi, registerQuizzesModule } from "./modules/quizzes/index.js";
 import { deleteSocialsUserData, registerSocialsModule } from "./modules/socials/index.js";
 import { deleteTierlistsUserData, registerTierlistsModule, getTierlistsPublicApi } from "./modules/tierlists/index.js";
 import { registerWaitlistModule } from "./modules/waitlist/index.js";
+import { registerWorksModule } from "./modules/works/index.js";
 
 const genReqId = () => randomUUID();
 
@@ -234,6 +235,17 @@ export function buildApp() {
     }
   });
   app.register(registerQuizzesModule);
+  app.register(registerWorksModule, {
+    getWorkPage,
+    holdersOfWorks,
+    copyOfWork,
+    readerVisibility: (viewerId: string | null, userIds: string[]) => getCommunityPublicApi().readerVisibility(viewerId, userIds),
+    resolveProfiles: resolvePublicReaderProfiles,
+    readerGlyphFor,
+    tierlists: (workIds: string[], limit: number) => getTierlistsPublicApi().publishedByWorks(workIds, limit),
+    arenas: (workIds: string[], limit: number) => getArenaPublicApi().publishedByWorks(workIds, limit),
+    quizzes: (workIds: string[], limit: number) => getQuizzesPublicApi().publishedByWorks(workIds, limit)
+  });
 
   const stopWorksSweep = startWorksSweep([sweepLibraryWorks, sweepMuralsWorks], app.log);
   app.addHook("onClose", async () => {
