@@ -22,6 +22,7 @@ export function WorkScreen({ id }: { id: string }) {
   const [adding, setAdding] = useState(false);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const query = useQuery({ queryKey: ["works", id], queryFn: () => fetchWork(id, Boolean(user)), retry: false });
   const canonicalId = query.data?.work.id;
 
@@ -29,10 +30,12 @@ export function WorkScreen({ id }: { id: string }) {
     if (canonicalId && canonicalId !== id) router.replace(`/work/${canonicalId}` as never);
   }, [canonicalId, id]);
 
-  if (query.isError) {
+  const untitled = <Stack.Screen options={{ headerShown: true, title: "" }} />;
+  if (!query.data && query.isError) {
     const permanent = isPermanentError(query.error);
     return (
       <Screen bottom top={false} style={styles.centered}>
+        {untitled}
         <ErrorState
           title="Book unavailable"
           body={query.error instanceof Error ? query.error.message : "Couldn't load this book."}
@@ -42,7 +45,7 @@ export function WorkScreen({ id }: { id: string }) {
       </Screen>
     );
   }
-  if (!query.data || query.data.work.id !== id) return <Screen bottom top={false} style={styles.centered}><Skeleton height={160} /></Screen>;
+  if (!query.data || query.data.work.id !== id) return <Screen bottom top={false} style={styles.centered}>{untitled}<Skeleton height={160} /></Screen>;
 
   const page = query.data;
   const { work } = page;
@@ -89,7 +92,8 @@ export function WorkScreen({ id }: { id: string }) {
         {model.about ? (
           <View style={styles.section}>
             {heading("About this book")}
-            <Text {...dynamicType} style={[typography.body, { color: colors.text }]}>{model.about}</Text>
+            <Text {...dynamicType} style={[typography.body, { color: colors.text }]}>{aboutOpen || !model.aboutPreview ? model.about : model.aboutPreview}</Text>
+            {model.aboutPreview ? <Button label={aboutOpen ? "Show less" : "Show more"} variant="secondary" onPress={() => setAboutOpen(!aboutOpen)} /> : null}
           </View>
         ) : null}
 

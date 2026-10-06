@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { WorkPage } from "@scripta/shared";
-import { workScreenSections } from "./workScreenModel.js";
+import { workPath, workScreenSections } from "./workScreenModel.js";
 
 const page: WorkPage = {
   work: { id: "w", title: "Dune", author: "Frank Herbert", summary: null, coverUrl: null, editions: [] },
@@ -26,4 +26,17 @@ test("no copy and no games read as such", () => {
   const model = workScreenSections({ ...page, mine: null, games: { tierlists: [], arenas: [], quizzes: [] } });
   assert.equal(model.mine, null);
   assert.equal(model.gamesEmpty, true);
+});
+
+test("a long summary gets a preview, a short one does not", () => {
+  const long = `${"Spice and sand. ".repeat(40)}The end.`;
+  const preview = workScreenSections({ ...page, work: { ...page.work, summary: long } }).aboutPreview;
+  assert.ok(preview && preview.endsWith("…") && !preview.includes("The end."));
+  assert.equal(workScreenSections({ ...page, work: { ...page.work, summary: "Spice." } }).aboutPreview, null);
+});
+
+test("a work opened from inside the tabs stays in them; from a root-level screen it opens above it", () => {
+  assert.equal(workPath("w1", ["(app)", "(arena)", "tierlist", "[id]"]), "/work/w1");
+  assert.equal(workPath("w1", ["arena", "[id]"]), "/(public)/work/w1");
+  assert.equal(workPath("w1", ["vote", "[code]"]), "/(public)/work/w1");
 });
