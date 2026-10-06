@@ -78,10 +78,10 @@ export function keyedBoard(ownerUserId: string, board: WorksBoard, data: unknown
       tiers: board.tiers.map(({ workIds, ...tier }) => ({ ...tier, bookKeys: workIds.map(keyOf) })),
       pool: board.pool.map(keyOf)
     },
-    works: new Map<string, string | null>(ids.map((id) => [keys.get(id)!, id]))
+    works: new Map<string, string>(ids.map((id) => [keys.get(id)!, id]))
   };
 }
 
-export function tierlistToWorks(tierlist: Tierlist, stored: Map<string, string | null>): Tierlist {
-  return { ...tierlist, data: boardToWorks(tierlist.data, canonicalByKey(stored)) };
+export function tierlistToWorks(tierlist: Tierlist, works: Map<string, string>): Tierlist {
+  return { ...tierlist, data: boardToWorks(tierlist.data, works) };
 }

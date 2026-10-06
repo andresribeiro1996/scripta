@@ -29,6 +29,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+function withoutClientTags<T>(book: T): T {
+  if (!isRecord(book) || Array.isArray(book)) return book;
+  const { _key, _workId, ...rest } = book;
+  return rest as T;
+}
+
 function text(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
@@ -224,7 +230,7 @@ function parseStoredLibrary(row: LibraryDocumentRow): LibraryData {
     throw new Error("Stored library document is unreadable; refusing to rewrite it.", { cause: error });
   }
   if (!isRecord(parsed) || !Array.isArray(parsed.books)) throw new Error("Stored library document is unreadable; refusing to rewrite it.");
-  return parsed as LibraryData;
+  return { ...parsed, books: parsed.books.map(withoutClientTags) } as LibraryData;
 }
 
 function flippedBooks(before: LibraryData, after: LibraryData): Array<Record<string, unknown>> {
@@ -367,7 +373,8 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
       return toLibraryDocumentText(row, publicUrlFor, worksOf(userId));
     },
 
-    saveLibrary(userId, data, expectedUpdatedAt, source) {
+    saveLibrary(userId, input, expectedUpdatedAt, source) {
+      const data = isRecord(input) && Array.isArray(input.books) ? { ...input, books: input.books.map(withoutClientTags) } : input;
       const previous = source === "import" ? undefined : repo.getDocument(userId);
       const row = repo.upsertDocument(userId, JSON.stringify(data), deriveLibraryData(data), rowsWithWorks(userId, data), expectedUpdatedAt);
       if (!row) throw new LibraryConflictError();
@@ -461,7 +468,8 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
       return toLibraryDocumentText(saved, publicUrlFor, worksOf(userId));
     },
 
-    applyChange(userId, change) {
+    applyChange(userId, input) {
+      const change = input.kind === "add" ? { ...input, book: withoutClientTags(input.book) } : input;
       const row = repo.getDocument(userId);
       if (!row && change.kind !== "add") throw new NoLibraryDocumentError();
       const previous: LibraryData = row ? parseStoredLibrary(row) : { books: [] };
