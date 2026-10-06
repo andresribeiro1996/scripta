@@ -89,9 +89,10 @@ export function useMurals() {
     const generation = generationOf(id);
     return enqueueWrite(id, async () => {
       if (generationOf(id) !== generation) throw new MuralConflictError();
-      await queryClient.cancelQueries({ queryKey: ["murals"] });
+      const loaded = queryClient.getQueryData(["murals"]) !== undefined;
+      if (loaded) await queryClient.cancelQueries({ queryKey: ["murals"] });
       const result = await work();
-      await queryClient.cancelQueries({ queryKey: ["murals"] });
+      if (loaded) await queryClient.cancelQueries({ queryKey: ["murals"] });
       return result;
     });
   }

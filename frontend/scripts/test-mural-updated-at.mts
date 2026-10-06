@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createElement } from "react";
 import { renderToString } from "react-dom/server";
-import { QueryClient, QueryClientProvider, QueryObserver } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MuralConflictError, useMurals } from "../src/hooks/useMurals";
 import type { Mural, MuralBlock } from "../src/lib/murals";
 
@@ -230,6 +230,29 @@ test("a refetch that starts during a write is cancelled once the write is stored
     await answer(0, (call) => Response.json({ ...m, ...call.body, updatedAt: "t1" }));
     await renaming;
     assert.equal(aborted, true);
+  } finally {
+    restore();
+  }
+});
+
+test("a write does not cancel the first load when nothing is cached yet", async () => {
+  const m = makeMural("cold");
+  const { client, hook, answer, restore } = setup([m]);
+  const write = hook();
+  client.removeQueries({ queryKey: ["murals"] });
+  let aborted = false;
+  let finish!: (murals: Mural[]) => void;
+  const loading = client.fetchQuery({
+    queryKey: ["murals"],
+    queryFn: ({ signal }) => new Promise<Mural[]>((resolve) => { finish = resolve; signal.addEventListener("abort", () => { aborted = true; }); })
+  });
+  try {
+    const renaming = write.rename(m.id, "Renamed");
+    await answer(0, (call) => Response.json({ ...m, ...call.body, updatedAt: "t1" }));
+    await renaming;
+    assert.equal(aborted, false);
+    finish([m]);
+    assert.deepEqual(await loading, [m]);
   } finally {
     restore();
   }
