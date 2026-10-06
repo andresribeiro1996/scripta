@@ -26,11 +26,12 @@ const { buildPublicQuizRoutes, buildQuizRoutes } = await import("./routes.js");
 const { openLibraryDb } = await import("../library/adapters/sqlite/connection.js");
 const { applyBooksMigrations, openBooksDb } = await import("../books/adapters/sqlite/connection.js");
 const { resolveWorks } = await import("../books/index.js");
-const { WorkResolutionError } = await import("../library/index.js");
 
 type Service = ReturnType<typeof createQuizzesService>;
 
-const book = (key: string, title = `Title ${key}`, author = "A") => ({ key, title, author, coverUrl: `https://covers.test/${key}.jpg`, quote: `Quote ${key}`, blurb: null });
+const named = (title: string) => resolveWorks([{ isbn: null, title, author: "Someone" }])[0]!;
+const book = (workId: string, title = `Title ${workId}`, author = "A") => ({ workId, title, author, coverUrl: `https://covers.test/${workId}.jpg`, quote: `Quote ${workId}`, blurb: null });
+const worksBook = (title: string, workId?: string, coverUrl: string | null = `https://covers.test/${encodeURIComponent(title)}.jpg`) => ({ ...(workId ? { workId } : {}), title, author: "Someone", coverUrl, quote: null, blurb: null });
 
 /** A published 3-question quiz with its code and the owner-held answer key. */
 function publishedQuiz() {
@@ -127,80 +128,18 @@ test("an unknown code is a 404 everywhere", async () => {
   assert.equal((await call(service, { method: "POST", url: "/quizzes/voting/nosuchcode/play", body: wellShaped })).status, 404);
 });
 
-// Owner-route wire shape: PUT must validate the document with the same
-// schema POST uses — the quiz document drives publish-time generation, so
-// an unvalidated update can poison a later publish.
-async function callOwner(service: Service, options: InjectOptions, token = "u1") {
-  const app = Fastify();
-  app.decorate("authenticateAccessToken", (value: string) => value === token ? { id: token, email: `${token}@example.test`, username: token, avatarId: null } : null);
-  await app.register(buildQuizRoutes(service));
-  const res = await app.inject({ ...options, headers: { ...options.headers, authorization: `Bearer ${token}` } });
-  await app.close();
-  return { status: res.statusCode, body: res.json() as Record<string, never> };
-}
-
-test("PUT validates the document: null books, duplicates and bad shapes are 400s", async () => {
-  const db = new DatabaseSync(":memory:");
-  applyQuizzesMigrations(db);
-  const service = createQuizzesService(createSqliteQuizzesRepository(db));
-  const created = service.createQuiz("u1", "Draft", {
-    sourceLabel: "Shelf",
-    questionCount: 3,
-    allowedTypes: ["cover_title"],
-    books: Array.from({ length: 6 }, (_, i) => book(`b${i}`)),
-    questions: null
-  });
-
-  const nullBooks = await callOwner(service, { method: "PUT", url: `/quizzes/${created.id}`, body: { data: { books: [null, null, null, null] } } });
-  assert.equal(nullBooks.status, 400);
-
-  const duplicate = await callOwner(service, {
-    method: "PUT",
-    url: `/quizzes/${created.id}`,
-    body: { data: { books: [book("b1"), book("b1")] } }
-  });
-  assert.equal(duplicate.status, 400);
-
-  const badCount = await callOwner(service, {
-    method: "PUT",
-    url: `/quizzes/${created.id}`,
-    body: { data: { questionCount: 99, books: [] } }
-  });
-  assert.equal(badCount.status, 400);
-
-  const valid = await callOwner(service, {
-    method: "PUT",
-    url: `/quizzes/${created.id}`,
-    body: { data: { questionCount: 2, books: [book("b1"), book("b2"), book("b3"), book("b4")] } }
-  });
-  assert.equal(valid.status, 200);
-  const stored = (valid.body as unknown as { data: { questionCount: number; books: unknown[] } }).data;
-  assert.equal(stored.questionCount, 2);
-  assert.equal(stored.books.length, 4);
-
-  // The document is replace-on-PUT: omitted fields fall back to their
-  // defaults, same whole-document semantics as PUT /library.
-  assert.deepEqual((service.getQuiz("u1", created.id)!.data as { sourceLabel: string }).sourceLabel, "");
-});
-
-type QuizRoutesResolver = NonNullable<Parameters<typeof buildQuizRoutes>[1]>;
-
-async function quizApp(resolveWorks?: QuizRoutesResolver) {
+async function quizApp() {
   const db = new DatabaseSync(":memory:");
   applyQuizzesMigrations(db);
   const service = createQuizzesService(createSqliteQuizzesRepository(db));
   const app = Fastify();
   app.decorate("authenticateAccessToken", (token: string) => ({ id: token, email: `${token}@example.test`, username: token, avatarId: null }));
-  await app.register(buildQuizRoutes(service, resolveWorks));
+  await app.register(buildQuizRoutes(service));
+  await app.register(buildPublicQuizRoutes(service));
   const send = (method: "POST" | "PUT", url: string, user: string, payload: unknown) =>
     app.inject({ method, url, headers: { authorization: `Bearer ${user}` }, payload: payload as Record<string, unknown> });
-  return { app, db, service, send };
-}
-
-function addLibraryBook(userId: string, position: number, bookKey: string, title: string, author: string, isbn: string | null) {
-  const library = openLibraryDb();
-  library.prepare("INSERT INTO library_books (user_id, position, book_key, title, author, isbn, row_hash) VALUES (?, ?, ?, ?, ?, ?, 'h')").run(userId, position, bookKey, title, author, isbn);
-  library.close();
+  const get = (url: string, user: string) => app.inject({ method: "GET", url, headers: { authorization: `Bearer ${user}` } });
+  return { app, db, service, send, get };
 }
 
 function catalogBookCount(): number {
@@ -211,186 +150,166 @@ function catalogBookCount(): number {
   return count;
 }
 
-const DUNE_A = book("isbn:0441013597", "Dune", "Frank Herbert");
-const DUNE_B = book("isbn:9780441013593", "Dune", "Frank Herbert");
+function addLibraryBook(userId: string, workId: string, title: string) {
+  const library = openLibraryDb();
+  library.prepare("INSERT INTO library_books (user_id, position, book_key, title, author, row_hash, work_id) VALUES (?, 0, ?, ?, 'Someone', 'h', ?)").run(userId, `ta:${title.toLowerCase()}|someone`, title, workId);
+  library.close();
+}
 
-test("creating a quiz from a shelf keeps the first edition of each work", async () => {
-  addLibraryBook("u1", 0, DUNE_A.key, "Dune", "Frank Herbert", "0441013597");
-  addLibraryBook("u1", 1, DUNE_B.key, "Dune", "Frank Herbert", "9780441013593");
-  const { app, db, send } = await quizApp();
-
-  const res = await send("POST", "/quizzes", "u1", { name: "Shelf", data: { books: [DUNE_A, DUNE_B, book("pool-1984", "1984", "George Orwell")] } });
-  assert.equal(res.statusCode, 201);
-  const created = res.json() as { id: string; data: { books: Array<{ key: string }> } };
-  assert.deepEqual(created.data.books.map((b) => b.key), [DUNE_A.key, "pool-1984"]);
-  const rows = db.prepare("SELECT key, work_id FROM quiz_works WHERE quiz_id = ? ORDER BY key").all(created.id) as Array<{ key: string; work_id: string | null }>;
-  assert.equal(rows.length, 2);
-  assert.ok(rows.every((row) => row.work_id !== null));
-  await app.close();
-});
-
-test("updating a quiz with two editions of one work is a 409", async () => {
-  addLibraryBook("u2", 0, DUNE_A.key, "Dune", "Frank Herbert", "0441013597");
-  addLibraryBook("u2", 1, DUNE_B.key, "Dune", "Frank Herbert", "9780441013593");
-  const { app, db, send } = await quizApp();
-
-  const created = await send("POST", "/quizzes", "u2", { name: "One", data: { books: [DUNE_A] } });
-  const id = (created.json() as { id: string }).id;
-  const updated = await send("PUT", `/quizzes/${id}`, "u2", { data: { books: [DUNE_A, DUNE_B] } });
-  assert.equal(updated.statusCode, 409);
-  assert.match((updated.json() as { error: string }).error, /Dune/);
-  const stored = db.prepare("SELECT key FROM quiz_works WHERE quiz_id = ?").all(id) as Array<{ key: string }>;
-  assert.deepEqual(stored.map((row) => row.key), [DUNE_A.key]);
-  await app.close();
-});
-
-test("a draft already holding two editions keeps both when saved again", async () => {
-  addLibraryBook("u5", 0, DUNE_A.key, "Dune", "Frank Herbert", "0441013597");
-  addLibraryBook("u5", 1, DUNE_B.key, "Dune", "Frank Herbert", "9780441013593");
-  const { app, db, service, send } = await quizApp();
-  const legacy = service.createQuiz("u5", "Legacy", { books: [DUNE_A, DUNE_B] });
-
-  const kept = await send("PUT", `/quizzes/${legacy.id}`, "u5", { data: { questionCount: 3, books: [DUNE_A, DUNE_B] } });
-  assert.equal(kept.statusCode, 200);
-  const rows = db.prepare("SELECT key FROM quiz_works WHERE quiz_id = ? ORDER BY key").all(legacy.id) as Array<{ key: string }>;
-  assert.deepEqual(rows.map((row) => row.key), [DUNE_A.key, DUNE_B.key].sort());
-
-  await app.close();
-});
-
-test("an unreachable catalog is a 503 and stores nothing", async () => {
-  const failing: QuizRoutesResolver = () => { throw new WorkResolutionError(new Error("down")); };
-  const { app, db, service, send } = await quizApp(failing);
-
-  const created = await send("POST", "/quizzes", "u1", { name: "Down", data: { books: [book("pool-a")] } });
-  assert.equal(created.statusCode, 503);
-  assert.equal((created.json() as { error: string }).error.length > 0, true);
-  assert.equal((db.prepare("SELECT COUNT(*) AS count FROM quizzes").get() as { count: number }).count, 0);
-
-  const existing = service.createQuiz("u1", "Existing", { books: [book("old")] });
-  const updated = await send("PUT", `/quizzes/${existing.id}`, "u1", { data: { books: [book("new")] } });
-  assert.equal(updated.statusCode, 503);
-  assert.deepEqual((service.getQuiz("u1", existing.id)!.data as { books: Array<{ key: string }> }).books.map((b) => b.key), ["old"]);
-  await app.close();
-});
-
-test("a rejected quiz update resolves nothing and keeps its status", async () => {
-  addLibraryBook("u3", 2, "isbn:9780441569595", "Neuromancer", "William Gibson", "9780441569595");
-  addLibraryBook("u4", 0, "isbn:9780441569595", "Neuromancer", "William Gibson", "9780441569595");
-  const { app, service, send } = await quizApp();
-  const mine = service.createQuiz("u3", "Mine", { books: [] });
-  const published = service.createQuiz("u3", "Published", { questionCount: 2, allowedTypes: ["cover_title"], books: Array.from({ length: 4 }, (_, i) => book(`p${i}`)) });
-  assert.ok(service.publishQuiz("u3", published.id, []).ok);
-  const data = { books: [book("isbn:9780441569595", "Neuromancer", "William Gibson")] };
-
-  const before = catalogBookCount();
-  assert.equal((await send("PUT", `/quizzes/${mine.id}`, "u4", { data })).statusCode, 404);
-  assert.equal((await send("PUT", `/quizzes/${published.id}`, "u3", { data })).statusCode, 404);
-  assert.equal((await send("PUT", `/quizzes/${mine.id}`, "u3", { data: "nope" })).statusCode, 400);
-  assert.equal(catalogBookCount(), before);
-
-  assert.equal((await send("PUT", `/quizzes/${mine.id}`, "u3", { data })).statusCode, 200);
-  assert.equal(catalogBookCount(), before + 1);
-  await app.close();
-});
-
-const quizHeaders = (user: string) => ({ authorization: `Bearer ${user}`, "x-scripta-works": "1" });
-const named = (title: string) => resolveWorks([{ isbn: null, title, author: "Someone" }])[0]!;
-const worksBook = (title: string, workId?: string) => ({ ...(workId ? { workId } : {}), title, author: "Someone", coverUrl: "https://covers.test/x.jpg", quote: null, blurb: null });
-
-test("a works-format create resolves pool books by title, keeps one book per work, and answers works", async () => {
+test("creating a quiz resolves pool books by title and keeps the first book per work", async () => {
   const held = named("Quiz Held");
-  openLibraryDb().prepare("INSERT INTO library_books (user_id, position, book_key, title, author, row_hash, work_id) VALUES ('q1', 0, 'ta:quiz held|someone', 'Quiz Held', 'Someone', 'h', ?)").run(held);
-  const { app } = await quizApp();
-  const created = await app.inject({ method: "POST", url: "/quizzes", headers: quizHeaders("q1"), payload: { name: "Mixed", data: { books: [worksBook("Quiz Held", held), worksBook("Pool Classic"), worksBook("Quiz Held again", held)] } } });
+  addLibraryBook("q1", held, "Quiz Held");
+  const { app, db, send } = await quizApp();
+  const created = await send("POST", "/quizzes", "q1", { name: "Mixed", data: { books: [worksBook("Quiz Held", held), worksBook("Pool Classic"), worksBook("Quiz Held again", held)] } });
   assert.equal(created.statusCode, 201);
   const books = created.json().data.books as Array<{ workId: string; title: string }>;
   assert.deepEqual(books.map((entry) => entry.title), ["Quiz Held", "Pool Classic"]);
   assert.equal(books[0]!.workId, held);
   assert.equal(books[1]!.workId, named("Pool Classic"));
   assert.doesNotMatch(created.body, /"key"/);
-  const legacy = await app.inject({ method: "GET", url: `/quizzes/${created.json().id}`, headers: { authorization: "Bearer q1" } });
-  assert.deepEqual(legacy.json().data.books.map((entry: { key: string }) => entry.key), ["ta:quiz held|someone", named("Pool Classic")]);
+  const rows = db.prepare("SELECT work_id FROM quiz_works WHERE quiz_id = ? ORDER BY work_id").all(created.json().id) as Array<{ work_id: string }>;
+  assert.deepEqual(rows.map((row) => row.work_id), [held, named("Pool Classic")].sort());
   await app.close();
 });
 
-test("a works-format PUT keeps stored keys, rejects an unknown work and a second edition", async () => {
+test("creating a quiz refuses a title the catalog can't resolve and an unknown work", async () => {
+  const { app, send } = await quizApp();
+  const unresolved = await send("POST", "/quizzes", "q3", { name: "Bad", data: { books: [worksBook("???")] } });
+  assert.equal(unresolved.statusCode, 400);
+  assert.equal(unresolved.json().error, "That book isn't in the catalog.");
+  const unknown = await send("POST", "/quizzes", "q3", { name: "Bad", data: { books: [worksBook("Nope", "not-a-work")] } });
+  assert.equal(unknown.statusCode, 400);
+  await app.close();
+});
+
+test("PUT validates the document and replaces it whole", async () => {
+  const ids = ["Put V1", "Put V2", "Put V3", "Put V4"].map(named);
+  const { app, service, send } = await quizApp();
+  const created = service.createQuiz("q7", "Draft", { sourceLabel: "Shelf", questionCount: 3, allowedTypes: ["cover_title"], books: [], questions: null });
+  const url = `/quizzes/${created.id}`;
+
+  assert.equal((await send("PUT", url, "q7", { data: { books: [null, null, null, null] } })).statusCode, 400);
+  assert.equal((await send("PUT", url, "q7", { data: { questionCount: 99, books: [] } })).statusCode, 400);
+  assert.equal((await send("PUT", url, "q7", {})).statusCode, 400);
+
+  const valid = await send("PUT", url, "q7", { data: { questionCount: 2, books: ids.map((id, index) => worksBook(`Put V${index + 1}`, id)) } });
+  assert.equal(valid.statusCode, 200);
+  assert.equal(valid.json().data.questionCount, 2);
+  assert.deepEqual(valid.json().data.books.map((entry: { workId: string }) => entry.workId), ids);
+  assert.equal((service.getQuiz("q7", created.id)!.data as { sourceLabel: string }).sourceLabel, "");
+  await app.close();
+});
+
+test("PUT rejects an unknown work and a second edition of one work", async () => {
   const [a, b, old] = [named("Put A"), named("Put B"), named("Put B old edition")];
   openBooksDb().prepare("UPDATE works SET merged_into = ? WHERE id = ?").run(b, old);
-  const { app } = await quizApp();
-  const created = await app.inject({ method: "POST", url: "/quizzes", headers: quizHeaders("q2"), payload: { name: "Edit", data: { books: [worksBook("Put A", a)] } } });
+  const { app, db, send } = await quizApp();
+  const created = await send("POST", "/quizzes", "q2", { name: "Edit", data: { books: [worksBook("Put A", a)] } });
   const id = created.json().id as string;
-  const put = (books: unknown[]) => app.inject({ method: "PUT", url: `/quizzes/${id}`, headers: quizHeaders("q2"), payload: { data: { books } } });
+  const put = (books: unknown[]) => send("PUT", `/quizzes/${id}`, "q2", { data: { books } });
   const ok = await put([worksBook("Put A", a), worksBook("Put B", b)]);
   assert.equal(ok.statusCode, 200);
   assert.deepEqual(ok.json().data.books.map((entry: { workId: string }) => entry.workId), [a, b]);
   assert.equal((await put([worksBook("Put A", "not-a-work")])).statusCode, 400);
-  assert.equal((await put([worksBook("Put B", b), worksBook("Put B old edition", old)])).statusCode, 409);
+  const second = await put([worksBook("Put B", b), worksBook("Put B old edition", old)]);
+  assert.equal(second.statusCode, 409);
+  assert.match(second.json().error, /Put B old edition/);
+  const rows = db.prepare("SELECT work_id FROM quiz_works WHERE quiz_id = ? ORDER BY work_id").all(id) as Array<{ work_id: string }>;
+  assert.deepEqual(rows.map((row) => row.work_id), [a, b].sort());
   await app.close();
 });
 
-test("a works-format create refuses a title the catalog can't resolve", async () => {
-  const { app } = await quizApp();
-  const created = await app.inject({ method: "POST", url: "/quizzes", headers: quizHeaders("q3"), payload: { name: "Bad", data: { books: [worksBook("???")] } } });
-  assert.equal(created.statusCode, 400);
-  assert.equal(created.json().error, "That book isn't in the catalog.");
+test("an unreachable catalog is a 503 and stores nothing", async () => {
+  const [a, b] = [named("Catalog Down"), named("Catalog Down Two")];
+  const { app, db, service, send } = await quizApp();
+  const existing = service.createQuiz("q8", "Existing", { books: [{ ...book(a, "Catalog Down") }] });
+  const coverless = ["Down C1", "Down C2", "Down C3", "Down C4"].map((title) => ({ ...book(named(title), title), coverUrl: null }));
+  const pending = service.createQuiz("q8", "Pending", { questionCount: 2, allowedTypes: ["title_cover", "blurb_title"], books: coverless });
+  const catalog = openBooksDb();
+  catalog.exec("ALTER TABLE works RENAME TO works_away");
+  try {
+    const created = await send("POST", "/quizzes", "q8", { name: "Down", data: { books: [worksBook("Catalog Down", a)] } });
+    assert.equal(created.statusCode, 503);
+    const updated = await send("PUT", `/quizzes/${existing.id}`, "q8", { data: { books: [worksBook("Catalog Down Two", b)] } });
+    assert.equal(updated.statusCode, 503);
+    const published = await send("POST", `/quizzes/${pending.id}/publish`, "q8", {});
+    assert.equal(published.statusCode, 503);
+  } finally {
+    catalog.exec("ALTER TABLE works_away RENAME TO works");
+  }
+  assert.equal((db.prepare("SELECT COUNT(*) AS count FROM quizzes").get() as { count: number }).count, 2);
+  assert.deepEqual((service.getQuiz("q8", existing.id)!.data as { books: Array<{ workId: string }> }).books.map((entry) => entry.workId), [a]);
+  assert.equal(service.getQuiz("q8", pending.id)!.voteCode, null);
   await app.close();
 });
 
-test("a works-format publish and read answer questions and books by work", async () => {
-  const ids = ["Pub A", "Pub B", "Pub C", "Pub D"].map(named);
-  const { app } = await quizApp();
-  const created = await app.inject({
-    method: "POST",
-    url: "/quizzes",
-    headers: quizHeaders("q4"),
-    payload: { name: "Publish", data: { questionCount: 3, allowedTypes: ["cover_title"], books: ids.map((id, index) => worksBook(`Pub ${"ABCD"[index]}`, id)) } }
-  });
+test("a rejected quiz update resolves nothing and keeps its status", async () => {
+  const { app, service, send } = await quizApp();
+  const mine = service.createQuiz("q9", "Mine", { books: [] });
+  const published = service.createQuiz("q9", "Published", { questionCount: 2, allowedTypes: ["cover_title"], books: Array.from({ length: 4 }, (_, i) => book(`p${i}`)) });
+  assert.ok(service.publishQuiz("q9", published.id, []).ok);
+  const data = { books: [worksBook("Reject Probe Title")] };
+
+  const before = catalogBookCount();
+  assert.equal((await send("PUT", `/quizzes/${mine.id}`, "q10", { data })).statusCode, 404);
+  assert.equal((await send("PUT", `/quizzes/${published.id}`, "q9", { data })).statusCode, 404);
+  assert.equal((await send("PUT", `/quizzes/${mine.id}`, "q9", { data: "nope" })).statusCode, 400);
+  assert.equal(catalogBookCount(), before);
+
+  assert.equal((await send("PUT", `/quizzes/${mine.id}`, "q9", { data })).statusCode, 200);
+  assert.equal(catalogBookCount(), before + 1);
+  await app.close();
+});
+
+async function publishedWorksQuiz(user: string, titles: string[], questionCount: number, allowedTypes: string[]) {
+  const ids = titles.map(named);
+  const ctx = await quizApp();
+  const created = await ctx.send("POST", "/quizzes", user, { name: "Publish", data: { questionCount, allowedTypes, books: ids.map((id, index) => worksBook(titles[index]!, id)) } });
   assert.equal(created.statusCode, 201);
-  const published = await app.inject({ method: "POST", url: `/quizzes/${created.json().id}/publish`, headers: quizHeaders("q4") });
+  const published = await ctx.send("POST", `/quizzes/${created.json().id}/publish`, user, {});
   assert.equal(published.statusCode, 201);
+  return { ...ctx, ids, quizId: created.json().id as string, published };
+}
+
+test("publish and read answer questions and books by work", async () => {
+  const { app, ids, quizId, published, get } = await publishedWorksQuiz("q4", ["Pub A", "Pub B", "Pub C", "Pub D"], 3, ["cover_title"]);
   const questions = published.json().quiz.data.questions as Array<Record<string, unknown>>;
   assert.equal(questions.length, 3);
   for (const question of questions) {
     assert.ok(ids.includes(question.workId as string));
     assert.equal("bookKey" in question, false);
   }
-  const read = await app.inject({ method: "GET", url: `/quizzes/${created.json().id}`, headers: quizHeaders("q4") });
-  const books = read.json().data.books as Array<{ workId: string }>;
-  assert.deepEqual(books.map((entry) => entry.workId), ids);
+  const read = await get(`/quizzes/${quizId}`, "q4");
+  assert.deepEqual(read.json().data.books.map((entry: { workId: string }) => entry.workId), ids);
   assert.doesNotMatch(read.body, /"key"/);
   await app.close();
 });
 
-test("a works-format PUT keeps the key a legacy book was stored under", async () => {
-  const kept = named("Put Keep");
-  const { app } = await quizApp();
-  const created = await app.inject({ method: "POST", url: "/quizzes", headers: { authorization: "Bearer q5" }, payload: { name: "Keys", data: { books: [book("ta:put keep|someone", "Put Keep", "Someone")] } } });
-  assert.equal(created.statusCode, 201);
-  addLibraryBook("q5", 0, "isbn:9780000000099", "Put Keep", "Someone", null);
-  openLibraryDb().prepare("UPDATE library_books SET work_id = ? WHERE user_id = 'q5'").run(kept);
-  const put = await app.inject({ method: "PUT", url: `/quizzes/${created.json().id}`, headers: quizHeaders("q5"), payload: { data: { books: [worksBook("Put Keep", kept), worksBook("Put Second")] } } });
-  assert.equal(put.statusCode, 200);
-  const legacy = await app.inject({ method: "GET", url: `/quizzes/${created.json().id}`, headers: { authorization: "Bearer q5" } });
-  assert.equal(legacy.json().data.books[0].key, "ta:put keep|someone");
+test("a published question whose book's work was merged answers the canonical work", async () => {
+  const { app, ids, quizId, get } = await publishedWorksQuiz("q6", ["Merge A", "Merge B", "Merge C", "Merge D"], 4, ["title_cover"]);
+  const [first, second] = ids as [string, string];
+  openBooksDb().prepare("UPDATE works SET merged_into = ? WHERE id = ?").run(first, second);
+  const read = await get(`/quizzes/${quizId}`, "q6");
+  assert.equal(read.statusCode, 200);
+  const data = read.json().data as { books: Array<{ workId: string }>; questions: Array<{ workId: string }> };
+  assert.deepEqual(data.books.map((entry) => entry.workId), [first, ids[2], ids[3]]);
+  assert.equal(data.questions.filter((question) => question.workId === first).length, 2);
+  assert.equal(data.questions.some((question) => question.workId === second), false);
   await app.close();
 });
 
-test("a works-format read leaves out an unresolved book and a second edition of one work", async () => {
-  const [first, second] = [named("Edition One"), named("Edition Two")];
-  const { app } = await quizApp();
-  const created = await app.inject({
-    method: "POST",
-    url: "/quizzes",
-    headers: { authorization: "Bearer q6" },
-    payload: { name: "Reads", data: { books: [book("pool-q", "???"), book("pool-e1", "Edition One", "Someone"), book("pool-e2", "Edition Two", "Someone")] } }
-  });
-  assert.equal(created.statusCode, 201);
-  assert.equal(created.json().data.books.length, 3);
-  openBooksDb().prepare("UPDATE works SET merged_into = ? WHERE id = ?").run(first, second);
-  const read = await app.inject({ method: "GET", url: `/quizzes/${created.json().id}`, headers: quizHeaders("q6") });
-  assert.equal(read.statusCode, 200);
-  assert.deepEqual(read.json().data.books.map((entry: { workId: string }) => entry.workId), [first]);
-  assert.match(String(read.headers.vary), /X-Scripta-Works/);
+test("the public board shows each question's prompt from its own book after two editions merge", async () => {
+  const titles = ["Board A", "Board B", "Board C", "Board D"];
+  const { app, ids, service, quizId, get } = await publishedWorksQuiz("q11", titles, 4, ["title_cover"]);
+  const stored = service.getQuiz("q11", quizId)!;
+  const code = stored.voteCode!;
+  const questions = (stored.data as { questions: Array<{ id: string; workId: string }> }).questions;
+  const titleOf = new Map(ids.map((id, index) => [id, titles[index]!]));
+  openBooksDb().prepare("UPDATE works SET merged_into = ? WHERE id = ?").run(ids[0]!, ids[1]!);
+  const board = await get(`/quizzes/voting/${code}`, "q11");
+  assert.equal(board.statusCode, 200);
+  const prompts = new Map((board.json().board.questions as Array<{ id: string; prompt: string }>).map((question) => [question.id, question.prompt]));
+  for (const question of questions) assert.equal(prompts.get(question.id), titleOf.get(question.workId));
+  assert.deepEqual([...prompts.values()].sort(), [...titles].sort());
   await app.close();
 });

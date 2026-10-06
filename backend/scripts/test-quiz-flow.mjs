@@ -26,14 +26,13 @@ function check(label, condition, detail) {
 }
 
 const books = Array.from({ length: 5 }, (_, i) => ({
-  key: `book-${unique}-${i}`,
-  title: `Test Book ${i}`,
+  title: `Test Book ${unique} ${i}`,
   author: `Author ${i}`,
   coverUrl: `https://covers.example.test/${i}.jpg`,
   quote: `A famous line from Test Book ${i}.`,
   blurb: null
 }));
-books.push({ key: `book-${unique}-no-cover`, title: "Test Book quoteless", author: "Author X", coverUrl: null, quote: "A line from the coverless book.", blurb: null });
+books.push({ title: `Test Book ${unique} quoteless`, author: "Author X", coverUrl: null, quote: "A line from the coverless book.", blurb: null });
 
 async function main() {
   console.log(`Testing against ${base}\nUsing throwaway account: ${email} / @${username}\n`);
@@ -69,12 +68,12 @@ async function main() {
     body: JSON.stringify({ name: "Renamed Flow Quiz" })
   });
   check("rename returns 200", renameRes.status === 200, `got ${renameRes.status}`);
-  const dupRes = await fetch(`${base}/quizzes`, {
-    method: "POST",
+  const dupRes = await fetch(`${base}/quizzes/${quizId}`, {
+    method: "PUT",
     headers: authHeaders,
-    body: JSON.stringify({ name: "Dup", data: { sourceLabel: "", questionCount: 5, allowedTypes: ["cover_title"], books: [books[0], books[0]], questions: null } })
+    body: JSON.stringify({ data: { sourceLabel: "Shelf", questionCount: 5, allowedTypes: ["cover_title"], books: [books[0], books[0]] } })
   });
-  check("duplicate book keys are a 400", dupRes.status === 400, `got ${dupRes.status}`);
+  check("two copies of one work are a 409", dupRes.status === 409, `got ${dupRes.status}`);
 
   console.log("\n4. Publish mints a code and opens play");
   const publishRes = await fetch(`${base}/quizzes/${quizId}/publish`, { method: "POST", headers: authHeaders, body: JSON.stringify({}) });
