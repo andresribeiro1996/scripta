@@ -384,16 +384,17 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
       const previous = source === "import" ? undefined : repo.getDocument(userId);
       const row = repo.upsertDocument(userId, JSON.stringify(data), deriveLibraryData(data), rowsWithWorks(userId, data), expectedUpdatedAt);
       if (!row) throw new LibraryConflictError();
+      const works = worksOf(userId);
       if (previous !== undefined && emitBookEvents) {
         try {
-          const events = diffBookEvents(JSON.parse(previous.data), data, workOfUser(userId)).slice(0, BOOK_EVENTS_PER_SAVE);
+          const events = diffBookEvents(JSON.parse(previous.data), data, (book) => works[bookKey(book)] ?? null).slice(0, BOOK_EVENTS_PER_SAVE);
           if (events.length > 0) emitBookEvents(userId, events);
         } catch (error) {
           logError?.(error, "book events failed after a library save");
         }
       }
       if (source === "import" && enqueueCovers) enqueueCovers(coverLookupsOf(data));
-      return toLibraryDocumentText(row, publicUrlFor, worksOf(userId));
+      return toLibraryDocumentText(row, publicUrlFor, works);
     },
 
     addBook(userId, input) {

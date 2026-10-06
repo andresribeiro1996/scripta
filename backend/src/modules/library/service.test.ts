@@ -1984,6 +1984,19 @@ test("saveLibrary stamps the new and finished books' events with the work the sa
   assert.equal(events[0]?.payload.workId, "w-Reading");
 });
 
+test("saveLibrary reads the user's works once per save", () => {
+  const repo = createSqliteLibraryRepository(memoryDb());
+  let reads = 0;
+  const service = createLibraryService({ ...repo, workIds: (userId) => { reads++; return repo.workIds(userId); } }, () => "", MAX_DOCUMENT_BYTES, () => {}, undefined, undefined, undefined, titleWorks, (ids) => new Map(ids.map((id) => [id, id])));
+  const first = service.saveLibrary("u1", { books: [{ ContentID: "k1", Title: "Reading", Attribution: "A", ReadStatus: 1 }] });
+  reads = 0;
+
+  const saved = service.saveLibrary("u1", { books: [{ ContentID: "k1", Title: "Reading", Attribution: "A", ReadStatus: 2 }] }, first.updatedAt);
+
+  assert.equal(reads, 1);
+  assert.deepEqual(Object.values(saved.works), ["w-Reading"]);
+});
+
 test("a direct add and a re-shelved match carry the work id too", () => {
   const { service, events } = setupWithWorks();
   service.addBook("u1", { title: "Dune", author: "Frank Herbert", readStatus: 0 });
