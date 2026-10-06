@@ -8,7 +8,10 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { authGuard, getOptionalAuthenticatedUser } from "../auth/index.js";
 import { duplicateWorkMessage, keepFirstPerWork, resolveEntryWorks, resolvePublicLibraryData, WorkResolutionError, workIdsByKey, type WorkRef } from "../library/index.js";
+import { sendWorksError, worksFormat } from "../../worksFormat.js";
+import type { Quiz } from "./domain/types.js";
 import type { PlayOutcome, Player, QuizzesService } from "./service.js";
+import { keyedQuizBooks, quizBookWorks, quizToWorks } from "./wire.js";
 
 const idParamSchema = z.object({ id: z.string().uuid() });
 const codeParamSchema = z.object({ code: z.string().min(1).max(64) });
@@ -42,6 +45,16 @@ const updateQuizSchema = z
   .object({ name: z.string().min(1).optional(), data: quizDataSchema.optional() })
   .refine((body) => body.name !== undefined || body.data !== undefined, { message: "At least one of name or data must be provided." });
 
+const quizWorkBookSchema = quizBookSchema.omit({ key: true }).extend({ workId: z.string().min(1).max(200).optional() });
+
+const quizWorksDataSchema = quizDataSchema.extend({ books: z.array(quizWorkBookSchema).max(500).default([]) });
+
+const createQuizWorksSchema = z.object({ name: createQuizSchema.shape.name, data: quizWorksDataSchema });
+
+const updateQuizWorksSchema = z
+  .object({ name: z.string().min(1).optional(), data: quizWorksDataSchema.optional() })
+  .refine((body) => body.name !== undefined || body.data !== undefined, { message: "At least one of name or data must be provided." });
+
 const playStateSchema = z.object({ open: z.boolean() });
 
 const playSchema = z.object({
@@ -63,11 +76,34 @@ function resolveBooks(resolveWorks: ResolveQuizWorks, userId: string, books: z.i
 
 export function buildQuizRoutes(service: QuizzesService, resolveWorks: ResolveQuizWorks = resolveEntryWorks) {
   return async function quizRoutes(app: FastifyInstance) {
+    const withWorks = (quiz: Quiz, works: boolean) => (works ? quizToWorks(quiz, service.storedWorks(quiz.id)) : quiz);
+
     app.get("/quizzes", { preHandler: authGuard }, async (request, reply) => {
-      return reply.send({ quizzes: service.listQuizzes(request.user.id) });
+      const works = worksFormat(request, reply);
+      return reply.send({ quizzes: service.listQuizzes(request.user.id).map((quiz) => withWorks(quiz, works)) });
     });
 
     app.post("/quizzes", { preHandler: authGuard }, async (request, reply) => {
+      if (worksFormat(request, reply)) {
+        const parsed = createQuizWorksSchema.safeParse(request.body);
+        if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? "Invalid request." });
+        try {
+          const ids = quizBookWorks(parsed.data.data.books);
+          if (ids.some((id) => id === null)) return reply.code(400).send({ error: "That book isn't in the catalog." });
+          const seen = new Set<string>();
+          const kept = parsed.data.data.books.flatMap((entry, index) => {
+            const id = ids[index];
+            if (!id || seen.has(id)) return [];
+            seen.add(id);
+            return [{ entry, id }];
+          });
+          const keyed = keyedQuizBooks(request.user.id, kept.map((item) => item.entry), kept.map((item) => item.id), [], new Map());
+          const quiz = service.createQuiz(request.user.id, parsed.data.name, { ...parsed.data.data, books: keyed.books }, keyed.works);
+          return reply.code(201).send(withWorks(quiz, true));
+        } catch (err) {
+          return sendWorksError(reply, err);
+        }
+      }
       const parsed = createQuizSchema.safeParse(request.body);
       if (!parsed.success) {
         return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? "Invalid request." });
@@ -85,14 +121,41 @@ export function buildQuizRoutes(service: QuizzesService, resolveWorks: ResolveQu
     app.get("/quizzes/:id", { preHandler: authGuard }, async (request, reply) => {
       const params = idParamSchema.safeParse(request.params);
       if (!params.success) return reply.code(400).send({ error: "Invalid quiz id." });
+      const works = worksFormat(request, reply);
       const quiz = service.getQuiz(request.user.id, params.data.id);
       if (!quiz) return reply.code(404).send({ error: "No quiz with that id." });
-      return reply.send(quiz);
+      return reply.send(withWorks(quiz, works));
     });
 
     app.put("/quizzes/:id", { preHandler: authGuard }, async (request, reply) => {
       const params = idParamSchema.safeParse(request.params);
       if (!params.success) return reply.code(400).send({ error: "Invalid quiz id." });
+      if (worksFormat(request, reply)) {
+        const body = updateQuizWorksSchema.safeParse(request.body);
+        if (!body.success) return reply.code(400).send({ error: body.error.issues[0]?.message ?? "Invalid request." });
+        try {
+          let data: unknown;
+          let keyedWorks: Map<string, string | null> | undefined;
+          if (body.data.data) {
+            const owned = service.getQuiz(request.user.id, params.data.id);
+            if (!owned || owned.voteCode !== null) return reply.code(404).send({ error: "No quiz with that id." });
+            const books = body.data.data.books;
+            const ids = quizBookWorks(books);
+            if (ids.some((id) => id === null)) return reply.code(400).send({ error: "That book isn't in the catalog." });
+            const duplicate = ids.findIndex((id, index) => ids.indexOf(id) !== index);
+            if (duplicate !== -1) return reply.code(409).send({ error: duplicateWorkMessage({ workId: null, title: books[duplicate]!.title }) });
+            const storedKeys = ((owned.data as { books?: Array<{ key?: unknown }> }).books ?? []).flatMap((entry) => (typeof entry.key === "string" ? [entry.key] : []));
+            const keyed = keyedQuizBooks(request.user.id, books, ids as string[], storedKeys, service.storedWorks(owned.id));
+            data = { ...body.data.data, books: keyed.books };
+            keyedWorks = keyed.works;
+          }
+          const quiz = service.updateQuiz(request.user.id, params.data.id, { ...(body.data.name !== undefined ? { name: body.data.name } : {}), ...(data !== undefined ? { data } : {}) }, keyedWorks);
+          if (!quiz) return reply.code(404).send({ error: "No quiz with that id." });
+          return reply.send(withWorks(quiz, true));
+        } catch (err) {
+          return sendWorksError(reply, err);
+        }
+      }
       const body = updateQuizSchema.safeParse(request.body);
       if (!body.success) return reply.code(400).send({ error: body.error.issues[0]?.message ?? "Invalid request." });
       if (body.data.data) {
@@ -138,13 +201,14 @@ export function buildQuizRoutes(service: QuizzesService, resolveWorks: ResolveQu
     app.post("/quizzes/:id/publish", { preHandler: authGuard }, async (request, reply) => {
       const params = idParamSchema.safeParse(request.params);
       if (!params.success) return reply.code(400).send({ error: "Invalid quiz id." });
+      const works = worksFormat(request, reply);
       const owned = service.getQuiz(request.user.id, params.data.id);
       if (!owned) return reply.code(404).send({ error: "No quiz with that id." });
       // Same public-cover resolver tierlists' open-voting route uses: book
       // keys become redacted public book shapes, never a raw library read.
       // Only books without their own cover need it — pool picks carry one —
-      // and since PublicBookData is keyless (stale keys are skipped), the
-      // positional zip is only safe when every requested key resolved.
+      // and since stale keys are skipped, the positional zip is only safe
+      // when every requested key resolved.
       const ownedBooks = (owned.data as { books?: Array<{ key: string; coverUrl?: string | null }> }).books ?? [];
       const needCover = ownedBooks.filter((b) => !b.coverUrl);
       const resolved = needCover.length
@@ -165,7 +229,7 @@ export function buildQuizRoutes(service: QuizzesService, resolveWorks: ResolveQu
         if (outcome.reason === "already-published") return reply.code(409).send({ error: outcome.error });
         return reply.code(400).send({ error: outcome.error });
       }
-      return reply.code(201).send({ quiz: outcome.quiz, voteCode: outcome.quiz.voteCode });
+      return reply.code(201).send({ quiz: withWorks(outcome.quiz, works), voteCode: outcome.quiz.voteCode });
     });
 
     app.put("/quizzes/:id/voting", { preHandler: authGuard }, async (request, reply) => {
@@ -173,9 +237,10 @@ export function buildQuizRoutes(service: QuizzesService, resolveWorks: ResolveQu
       if (!params.success) return reply.code(400).send({ error: "Invalid quiz id." });
       const body = playStateSchema.safeParse(request.body);
       if (!body.success) return reply.code(400).send({ error: body.error.issues[0]?.message ?? "Invalid request." });
+      const works = worksFormat(request, reply);
       const quiz = service.setPlayState(request.user.id, params.data.id, body.data.open);
       if (!quiz) return reply.code(404).send({ error: "No quiz with that id." });
-      return reply.send({ quiz });
+      return reply.send({ quiz: withWorks(quiz, works) });
     });
 
     app.get("/quizzes/:id/results", { preHandler: authGuard }, async (request, reply) => {
