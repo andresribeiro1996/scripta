@@ -416,3 +416,72 @@ test("a ballot with the catalog down answers 503 and stores no ballot", async ()
   await voter.close();
   await app.close();
 });
+
+function breakCatalog(): () => void {
+  const catalog = openBooksDb();
+  catalog.exec("ALTER TABLE works RENAME TO works_down");
+  return () => {
+    catalog.exec("ALTER TABLE works_down RENAME TO works");
+    catalog.close();
+  };
+}
+
+test("an open-voting with the catalog down is a 503 and writes nothing", async () => {
+  const [a, b] = [titleWork("Down Ranked A"), titleWork("Down Ranked B")];
+  copy("d1", 0, "ta:down ranked a|someone", a);
+  copy("d1", 1, "ta:down ranked b|someone", b);
+  const { app, service } = await ownerApp();
+  const created = await app.inject({ method: "POST", url: "/tierlists", headers: headers("d1"), payload: { name: "Poll", data: { tiers: [tier([a])], pool: [b] } } });
+  assert.equal(created.statusCode, 201);
+  const id = created.json().id as string;
+  const restore = breakCatalog();
+  try {
+    const opened = await app.inject({ method: "POST", url: `/tierlists/${id}/open-voting`, headers: headers("d1"), payload: { access: "anonymous" } });
+    assert.equal(opened.statusCode, 503);
+  } finally {
+    restore();
+  }
+  assert.equal(service.getTierlist("d1", id)!.voteCode, null);
+  const retried = await app.inject({ method: "POST", url: `/tierlists/${id}/open-voting`, headers: headers("d1"), payload: { access: "anonymous" } });
+  assert.equal(retried.statusCode, 201);
+  await app.close();
+});
+
+test("a create answers from the works it keyed, even if the catalog dies right after the write", async () => {
+  const [a, b] = [titleWork("Gone Ranked A"), titleWork("Gone Ranked B")];
+  copy("d2", 0, "ta:gone ranked a|someone", a);
+  const db = new DatabaseSync(":memory:");
+  applyTierlistsMigrations(db);
+  const real = createTierlistsService(createSqliteTierlistsRepository(db));
+  let restore = () => {};
+  const service: Service = {
+    ...real,
+    createTierlist: (...args) => {
+      const tierlist = real.createTierlist(...args);
+      restore = breakCatalog();
+      return tierlist;
+    }
+  };
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", (token: string) => ({ id: token, email: `${token}@example.test`, username: token, avatarId: null }));
+  await app.register(buildTierlistRoutes(service));
+  try {
+    const created = await app.inject({ method: "POST", url: "/tierlists", headers: headers("d2"), payload: { name: "Gone", data: { tiers: [tier([a])], pool: [b] } } });
+    assert.equal(created.statusCode, 201);
+    assert.deepEqual(created.json().data, { tiers: [tier([a])], pool: [b] });
+    assert.equal((db.prepare("SELECT COUNT(*) AS count FROM tierlists").get() as { count: number }).count, 1);
+  } finally {
+    restore();
+  }
+  await app.close();
+});
+
+test("a create with no board answers an empty works board", async () => {
+  const { app } = await ownerApp();
+  const created = await app.inject({ method: "POST", url: "/tierlists", headers: headers("d3"), payload: { name: "Blank" } });
+  assert.equal(created.statusCode, 201);
+  assert.equal(created.json().name, "Blank");
+  assert.deepEqual(created.json().data.pool, []);
+  assert.ok(created.json().data.tiers.every((entry: { workIds: string[] }) => entry.workIds.length === 0));
+  await app.close();
+});
