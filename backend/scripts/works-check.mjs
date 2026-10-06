@@ -45,4 +45,47 @@ for (const [name, envName, table, item, idColumn] of [
   } : "not deployed");
 }
 
+const has = (db, table, column) => columns(db, table).includes(column);
+const sharedWork = (table, idColumn) => `SELECT COUNT(*) AS n FROM (SELECT ${idColumn} FROM ${table} WHERE work_id IS NOT NULL GROUP BY ${idColumn}, work_id HAVING COUNT(*) > 1)`;
+const e2 = {};
+
+for (const [name, envName, check] of [
+  ["arena", "ARENA_DB_PATH", (db) => has(db, "tournament_slots", "book_key") ? {
+    slotsWithoutWork: count(db, "SELECT COUNT(*) AS n FROM tournament_slots WHERE work_id IS NULL"),
+    duelSidesWithoutWork: count(db, "SELECT COUNT(*) AS n FROM duels WHERE book_a_work_id IS NULL OR book_b_work_id IS NULL"),
+    tournamentsSharingWork: count(db, sharedWork("tournament_slots", "tournament_id")),
+    duelsSharingWork: count(db, "SELECT COUNT(*) AS n FROM duels WHERE book_a_work_id = book_b_work_id"),
+    votesOnNeitherSide: count(db, "SELECT COUNT(*) AS n FROM votes AS v JOIN duels AS d ON d.id = v.duel_id WHERE v.book_key NOT IN (d.book_a_key, d.book_b_key)"),
+    winnersOnNeitherSide: count(db, "SELECT COUNT(*) AS n FROM duels WHERE winner_key IS NOT NULL AND winner_key NOT IN (book_a_key, book_b_key)")
+  } : "migrated"],
+  ["tierlists", "TIERLISTS_DB_PATH", (db) => has(db, "tierlist_works", "key") ? {
+    entriesWithoutWork: count(db, `SELECT COUNT(*) AS n FROM (
+      SELECT t.id, p.value AS key FROM tierlists AS t, json_each(t.data, '$.pool') AS p
+      UNION ALL
+      SELECT t.id, k.value FROM tierlists AS t, json_each(t.data, '$.tiers') AS tr, json_each(tr.value, '$.bookKeys') AS k
+    ) AS e WHERE NOT EXISTS (SELECT 1 FROM tierlist_works AS w WHERE w.tierlist_id = e.id AND w.key = e.key AND w.work_id IS NOT NULL)`),
+    placementsWithoutWork: count(db, "SELECT COUNT(*) AS n FROM tierlist_ballot_placements WHERE work_id IS NULL"),
+    listsSharingWork: count(db, sharedWork("tierlist_works", "tierlist_id")),
+    snapshotMismatches: count(db, "SELECT COUNT(*) AS n FROM tierlists WHERE public_books IS NOT NULL AND json_array_length(public_books) != json_array_length(data, '$.pool')")
+  } : "migrated"],
+  ["quizzes", "QUIZZES_DB_PATH", (db) => has(db, "quiz_works", "key") ? {
+    booksWithoutWork: count(db, `SELECT COUNT(*) AS n FROM quizzes AS q, json_each(q.data, '$.books') AS b
+      WHERE NOT EXISTS (SELECT 1 FROM quiz_works AS w WHERE w.quiz_id = q.id AND w.key = json_extract(b.value, '$.key') AND w.work_id IS NOT NULL)`),
+    quizzesSharingWork: count(db, sharedWork("quiz_works", "quiz_id"))
+  } : "migrated"]
+]) {
+  const path = process.env[envName];
+  if (!path) {
+    e2[name] = "no path";
+    continue;
+  }
+  const db = new DatabaseSync(path, { readOnly: true });
+  try {
+    e2[name] = check(db);
+  } finally {
+    db.close();
+  }
+}
+report.e2 = e2;
+
 console.log(JSON.stringify(report, null, 2));
