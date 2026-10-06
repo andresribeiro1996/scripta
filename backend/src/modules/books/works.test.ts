@@ -15,7 +15,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
 const { applyBooksMigrations } = await import("./adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("./adapters/sqlite/sqliteBooksRepository.js");
-const { resolveWorksWith, canonicalWorksWith } = await import("./works.js");
+const { resolveWorksWith, canonicalWorksWith, getWorkPageWith } = await import("./works.js");
 
 function freshRepo() {
   const db = new DatabaseSync(":memory:");
@@ -64,4 +64,29 @@ test("resolveWorks resolves 2,000 new books in one transaction quickly", () => {
   const ids = resolveWorksWith(repo, lookups);
   assert.equal(ids.filter(Boolean).length, 2000);
   assert.ok(performance.now() - started < 3000, `took ${performance.now() - started} ms`);
+});
+
+test("a work page lists the canonical work, its editions and every alias, and an old id resolves to it", () => {
+  const db = new DatabaseSync(":memory:");
+  applyBooksMigrations(db);
+  const repo = createSqliteBooksRepository(db);
+  const [kept] = resolveWorksWith(repo, [{ isbn: "9780441013593", title: "Dune", author: "Frank Herbert" }]);
+  const [gone] = resolveWorksWith(repo, [{ isbn: null, title: "Duna", author: "Frank Herbert" }]);
+  db.prepare("UPDATE books SET summary = 'Spice.', language = 'en', year = 1965 WHERE work_id = ?").run(kept!);
+  repo.mergeWorks(gone!, kept!);
+  const page = getWorkPageWith(repo, (imageId) => `cover:${imageId}`, gone!);
+  assert.equal(page!.id, kept);
+  assert.deepEqual(new Set(page!.aliasIds), new Set([kept, gone]));
+  assert.equal(page!.editions.length, 2);
+  assert.equal(page!.editions.find((e) => e.isbn === "9780441013593")!.summary, "Spice.");
+  assert.equal(getWorkPageWith(repo, () => "x", "not-a-work"), undefined);
+});
+
+test("a keyless work with no summary or cover answers nulls", () => {
+  const db = new DatabaseSync(":memory:");
+  applyBooksMigrations(db);
+  const repo = createSqliteBooksRepository(db);
+  const [id] = resolveWorksWith(repo, [{ isbn: null, title: "Quiet Book", author: "Nobody" }]);
+  const page = getWorkPageWith(repo, () => "never", id!)!;
+  assert.deepEqual(page.editions.map((e) => [e.summary, e.coverUrl]), [[null, null]]);
 });

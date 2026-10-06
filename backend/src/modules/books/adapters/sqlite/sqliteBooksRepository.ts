@@ -3,7 +3,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { normalizeWorkKey, workTitleKey } from "../../domain/normalize.js";
 import type { BooksRepository, MergeableDetails } from "../../domain/ports.js";
 import { WorkMergeError } from "../../domain/errors.js";
-import type { BookRow, CoverImageRow, DataSource, SummarySource, WorkView } from "../../domain/types.js";
+import type { BookRow, CoverImageRow, DataSource, SummarySource, WorkPageRows, WorkView } from "../../domain/types.js";
 
 export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const byKeyStmt = db.prepare(`SELECT books.* FROM book_keys JOIN books ON books.id = book_keys.book_id WHERE book_keys.key = ?`);
@@ -47,6 +47,8 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const blockTitleGroupStmt = db.prepare(`UPDATE books SET title_group_blocked_at = ? WHERE id = ?`);
   const editionCountStmt = db.prepare(`SELECT COUNT(*) AS n FROM books WHERE work_id = ?`);
   const workStmt = db.prepare(`SELECT id, ol_work_key, title, author FROM works WHERE id = ?`);
+  const aliasStmt = db.prepare(`SELECT id FROM works WHERE merged_into = ?`);
+  const pageEditionsStmt = db.prepare(`SELECT id, title, language, year, isbn, summary, cover_image_id FROM books WHERE work_id = ? ORDER BY created_at, rowid`);
   const workEditionsStmt = db.prepare(`SELECT id, isbn, title, author, ol_work_key FROM books WHERE work_id = ? ORDER BY created_at, rowid`);
   const groupablePairsStmt = db.prepare(`
     WITH candidates AS (
@@ -403,6 +405,19 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         author: work.author,
         editions: editions.map((edition) => ({ id: edition.id, isbn: edition.isbn, title: edition.title, author: edition.author, olWorkKey: edition.ol_work_key }))
       } satisfies WorkView;
+    },
+
+    workPageRows(id) {
+      const canonical = liveWorkId(id);
+      if (canonical === null) return undefined;
+      const work = workStmt.get(canonical) as { id: string; title: string; author: string } | undefined;
+      if (!work) return undefined;
+      const aliases = (aliasStmt.all(canonical) as Array<{ id: string }>).map((row) => row.id);
+      return {
+        work: { id: work.id, title: work.title, author: work.author },
+        aliasIds: [canonical, ...aliases],
+        editions: pageEditionsStmt.all(canonical) as WorkPageRows["editions"]
+      };
     },
 
     groupKeylessWorks(limit) {

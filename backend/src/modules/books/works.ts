@@ -1,7 +1,7 @@
 import { findOrCreateBook } from "./domain/findOrCreate.js";
 import type { BookLookup } from "./domain/normalize.js";
 import type { BooksRepository } from "./domain/ports.js";
-import { booksRepository } from "./publicCoverLookup.js";
+import { booksRepository, coverUrlFor } from "./publicCoverLookup.js";
 
 export type WorkLookup = BookLookup;
 
@@ -25,4 +25,34 @@ export function resolveWorks(lookups: WorkLookup[]): Array<string | null> {
 
 export function canonicalWorks(ids: string[]): Map<string, string> {
   return canonicalWorksWith(booksRepository(), ids);
+}
+
+export type CatalogWorkPage = {
+  id: string;
+  title: string;
+  author: string;
+  aliasIds: string[];
+  editions: Array<{ bookId: string; title: string; language: string | null; year: number | null; isbn: string | null; summary: string | null; coverUrl: string | null }>;
+};
+
+export function getWorkPageWith(books: BooksRepository, coverUrl: (imageId: string) => string, id: string): CatalogWorkPage | undefined {
+  const rows = books.workPageRows(id);
+  if (!rows) return undefined;
+  return {
+    ...rows.work,
+    aliasIds: rows.aliasIds,
+    editions: rows.editions.map((edition) => ({
+      bookId: edition.id,
+      title: edition.title,
+      language: edition.language,
+      year: edition.year,
+      isbn: edition.isbn,
+      summary: edition.summary?.trim() ? edition.summary : null,
+      coverUrl: edition.cover_image_id ? coverUrl(edition.cover_image_id) : null
+    }))
+  };
+}
+
+export function getWorkPage(id: string): CatalogWorkPage | undefined {
+  return getWorkPageWith(booksRepository(), (imageId) => coverUrlFor(imageId, "file"), id);
 }
