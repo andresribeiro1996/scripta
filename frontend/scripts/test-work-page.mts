@@ -1,0 +1,50 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { createElement } from "react";
+import { renderToString } from "react-dom/server";
+import { MemoryRouter } from "react-router-dom";
+import type { WorkPage } from "@scripta/shared";
+import { WorkPageView } from "../src/components/work/WorkPageView";
+
+const page: WorkPage = {
+  work: { id: "w", title: "Dune", author: "Frank Herbert", summary: null, coverUrl: null, editions: [{ bookId: "e1", title: "Dune", language: "en", year: 1965, isbn: "9780441013593", mine: true }] },
+  mine: { bookKey: "isbn:9780441013593", readStatus: 2, rating: 4, highlightCount: 3 },
+  readers: {
+    followed: [{ username: "ana", avatarUrl: null, readStatus: 1, published: false }],
+    others: [{ username: "bo", avatarUrl: null, readStatus: 2, published: true }],
+    counts: { readers: 2, finished: 1 }
+  },
+  games: { tierlists: [{ id: "t1", name: "Best SF", owner: "app", path: "/vote/abc" }], arenas: [], quizzes: [] }
+};
+
+const render = (props: Parameters<typeof WorkPageView>[0]) => renderToString(createElement(MemoryRouter, null, createElement(WorkPageView, props)));
+
+test("all four sections render in order, with no summary and no cover", () => {
+  const html = render({ page, signedIn: true, onAdd: () => undefined, onShare: () => undefined });
+  const order = ["Dune", "Your copy", "Readers", "Games"].map((text) => html.indexOf(text));
+  assert.deepEqual([...order].sort((a, b) => a - b), order);
+  assert.ok(order.every((index) => index >= 0));
+  assert.ok(html.includes("Loved it"));
+  assert.ok(html.includes("2 readers · 1 finished"));
+  assert.ok(html.includes("Scripta"));
+  assert.ok(!html.includes("About this book"));
+});
+
+test("signed out: no copy shows the add action, and readers don't link to profiles", () => {
+  const html = render({ page: { ...page, mine: null }, signedIn: false, onAdd: () => undefined, onShare: () => undefined });
+  assert.ok(html.includes("Not in your library"));
+  assert.ok(html.includes("Add to library"));
+  assert.ok(!html.includes("/community/u/bo"));
+});
+
+test("signed in: only published readers link to their profile", () => {
+  const html = render({ page, signedIn: true, onAdd: () => undefined, onShare: () => undefined });
+  assert.ok(html.includes("/community/u/bo"));
+  assert.ok(!html.includes("/community/u/ana"));
+});
+
+test("an empty work page says so instead of rendering empty sections", () => {
+  const html = render({ page: { ...page, readers: { followed: [], others: [], counts: { readers: 0, finished: 0 } }, games: { tierlists: [], arenas: [], quizzes: [] } }, signedIn: false, onAdd: () => undefined, onShare: () => undefined });
+  assert.ok(html.includes("No readers yet"));
+  assert.ok(html.includes("No public games use this book yet."));
+});

@@ -9,7 +9,7 @@
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b --noEmit",
     "lint": "oxlint",
-    "test": "tsx --test scripts/test-*.mts",
+    "test": "tsx --tsconfig tsconfig.app.json --test scripts/test-*.mts",
     "themes": "tsx scripts/generate-themes-css.mts",
     "screenshots:landing": "node scripts/landing-screenshots.mjs",
     "preview": "vite preview",
