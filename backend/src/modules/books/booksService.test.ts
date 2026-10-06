@@ -15,7 +15,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
 const { applyBooksMigrations } = await import("./adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("./adapters/sqlite/sqliteBooksRepository.js");
-const { createBooksService } = await import("./booksService.js");
+const { createBooksService, COVER_ENQUEUE_BATCH } = await import("./booksService.js");
 const { default: sharp } = await import("sharp");
 const { BookNotFoundError, FileTooLargeError, InvalidImageError, SourcePausedError, SourceUnavailableError } = await import("./domain/errors.js");
 const { createCoverWorker } = await import("./worker.js");
@@ -305,7 +305,7 @@ test("a low-res Apple cover stays unchecked while ISBNdb is paused, and a wider 
   assert.equal(row.apple_checked_at, "2026-10-01T00:00:00.000Z");
   assert.deepEqual([row.cover_status, row.cover_checked_at], ["low_res", null]);
   assert.notEqual(row.cover_image_id, null);
-  assert.deepEqual(h.repo.listUncheckedCoverIds(), [id]);
+  assert.deepEqual(h.repo.listUncheckedCoverIds(null, 100).ids, [id]);
   const small = row.cover_image_id;
   h.advance(5 * HOUR);
   paused = false;
@@ -316,7 +316,7 @@ test("a low-res Apple cover stays unchecked while ISBNdb is paused, and a wider 
   assert.notEqual(row.cover_image_id, small);
   assert.equal(row.cover_status, "good");
   assert.notEqual(row.cover_checked_at, null);
-  assert.deepEqual(h.repo.listUncheckedCoverIds(), []);
+  assert.deepEqual(h.repo.listUncheckedCoverIds(null, 100).ids, []);
 });
 
 test("an Apple failure does not stamp the book", async () => {
@@ -851,7 +851,7 @@ test("an upload clears a pending upgrade so the tick stops requeueing the book",
   const cover = await h.service.uploadCover(orlando, photo);
   assert.equal(h.repo.getBook(id)!.cover_upgrade_wanted_at, null);
   assert.equal(cover.upgrading, false);
-  assert.deepEqual(h.repo.listUpgradeWantedIds(), []);
+  assert.deepEqual(h.repo.listUpgradeWantedIds(null, 100).ids, []);
 });
 
 test("uploads that are too large or not images are refused", async () => {
@@ -1527,6 +1527,58 @@ test("an aborted work key lookup starts no further requests", async () => {
   lookupBooks(h, [{ isbn: "9789720000001" }, { isbn: "9789720000002" }]);
   await h.service.backfillWorkKeys(50, controller.signal);
   assert.equal(calls.length, 1);
+});
+
+test("enqueueUnchecked queues one batch per call, continues where it stopped, and wraps after a short page", () => {
+  const h = harness();
+  const at = "2026-09-01T00:00:00.000Z";
+  const ids = Array.from({ length: COVER_ENQUEUE_BATCH + 1 }, (_, i) => h.repo.createBook({ title: `Book ${i}`, author: "Author", isbn: null }, [`ta:book ${i}|author|`], at).id);
+  const queued = () => h.enqueued.splice(0).filter((entry) => entry.priority === "background").map((entry) => entry.bookId);
+
+  h.service.enqueueUnchecked();
+  assert.deepEqual(queued(), ids.slice(0, COVER_ENQUEUE_BATCH));
+
+  h.service.enqueueUnchecked();
+  assert.deepEqual(queued(), [ids[COVER_ENQUEUE_BATCH]]);
+
+  h.service.enqueueUnchecked();
+  assert.deepEqual(queued(), ids.slice(0, COVER_ENQUEUE_BATCH));
+});
+
+test("enqueueUpgrade queues one batch per call, continues where it stopped, and wraps after a short page", () => {
+  const h = harness();
+  const created = "2026-09-01T00:00:00.000Z";
+  const ids = Array.from({ length: COVER_ENQUEUE_BATCH + 1 }, (_, i) => {
+    const id = h.repo.createBook({ title: `Book ${i}`, author: "Author", isbn: null }, [`ta:book ${i}|author|`], created).id;
+    h.repo.setCover(id, { imageId: null, status: "missing", checkedAt: created });
+    h.repo.setUpgradeWanted(id, created);
+    return id;
+  });
+  const queued = () => h.enqueued.splice(0).filter((entry) => entry.priority === "upgrade").map((entry) => entry.bookId);
+
+  h.service.enqueueUnchecked();
+  assert.deepEqual(queued(), ids.slice(0, COVER_ENQUEUE_BATCH));
+
+  h.service.enqueueUnchecked();
+  assert.deepEqual(queued(), [ids[COVER_ENQUEUE_BATCH]]);
+
+  h.service.enqueueUnchecked();
+  assert.deepEqual(queued(), ids.slice(0, COVER_ENQUEUE_BATCH));
+});
+
+test("enqueueUnchecked reaches the books behind a full page of books in backoff", async () => {
+  const failing: CoverSource = { byIsbn: async () => { throw new SourceUnavailableError("apple", "HTTP 429"); }, byTitle: async () => { throw new SourceUnavailableError("apple", "HTTP 429"); } };
+  const h = harness({ sources: { isbndb: null, apple: failing, openlibrary: emptySource } });
+  const at = "2026-09-01T00:00:00.000Z";
+  const ids = Array.from({ length: COVER_ENQUEUE_BATCH + 1 }, (_, i) => h.repo.createBook({ title: `Book ${i}`, author: "Author", isbn: null }, [`ta:book ${i}|author|`], at).id);
+  for (const id of ids.slice(0, COVER_ENQUEUE_BATCH)) await h.service.processBook(id, "background");
+  h.enqueued.length = 0;
+
+  h.service.enqueueUnchecked();
+  assert.deepEqual(h.enqueued, []);
+
+  h.service.enqueueUnchecked();
+  assert.deepEqual(h.enqueued, [{ bookId: ids[COVER_ENQUEUE_BATCH], priority: "background" }]);
 });
 
 const ENGLISH_WORK = "The story of a boy who leaves his village and the war that is waiting for him in the north.";
