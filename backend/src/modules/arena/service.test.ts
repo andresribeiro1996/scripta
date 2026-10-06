@@ -311,7 +311,6 @@ test("a full round of voting settles duels and advances to the next round, endin
   assert.equal(view?.status, "active");
 
   const [duelA, duelB] = view!.duels as [DuelView, DuelView];
-  // w1 beats w2 (2 votes to 1); w3 beats w4 (1 vote to 0)
   service.vote(tournament.id, duelA.id, "voter-1", "w1");
   service.vote(tournament.id, duelA.id, "voter-2", "w1");
   service.vote(tournament.id, duelA.id, "voter-3", "w2");
@@ -779,6 +778,20 @@ test("a vote by work for a duel whose sides share a work goes to side A", () => 
   service.vote(tournament.id, duel.id, "v1", "w1");
   const after = service.getTournamentView(tournament.id)!.duels[0]!;
   assert.deepEqual([after.bookA.votes, after.bookB.votes], [1, 0]);
+});
+
+test("a vote naming a work merged after the write lands on that side and the view answers the target", () => {
+  const merged = new Map([["old", "target"]]);
+  const service = createArenaService(createInMemoryArenaRepository(), undefined, undefined, (ids) => new Map(ids.map((id) => [id, merged.get(id) ?? id])));
+  const tournament = service.createTournament("owner-1", { name: "Test", bracketSize: 2, roundDurationMinutes: 60 });
+  service.setSlotsManual(tournament.id, "owner-1", [
+    { slotIndex: 0, book: makeBook(1) },
+    { slotIndex: 1, book: { ...makeBook(2), workId: "old" } }
+  ]);
+  service.start(tournament.id, "owner-1");
+  const duel = service.getTournamentView(tournament.id)!.duels[0]!;
+  service.vote(tournament.id, duel.id, "v1", "target");
+  assert.equal(service.getTournamentView(tournament.id)!.duels[0]!.bookB.votes, 1);
 });
 
 test("a tiebreak by work settles that side", () => {

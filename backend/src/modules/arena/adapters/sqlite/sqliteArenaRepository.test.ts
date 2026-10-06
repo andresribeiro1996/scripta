@@ -74,6 +74,10 @@ test("an E1-shaped arena database is migrated on open", () => {
   assert.ok(indexes.includes("idx_votes_duel_side"));
   assert.ok(indexes.includes("idx_votes_duel_user"));
   assert.equal(indexes.includes("idx_votes_duel_book"), false);
+
+  applyArenaMigrations(db);
+  assert.equal(columnNames(db, "duels").includes("winner_work_id"), false);
+  assert.equal(columnNames(db, "tournament_slots").includes("book_key"), false);
 });
 
 const { createSqliteArenaRepository } = await import("./sqliteArenaRepository.js");

@@ -148,3 +148,42 @@ test("random fill keeps one slot per work", async () => {
   assert.equal(new Set(stored).size, 2);
   await app.close();
 });
+
+test("a work merged after a duel was written still takes votes and is answered as its target", async () => {
+  const [old, target, other] = [work("Later Merged"), work("Later Target"), work("Later Other")];
+  const { app, db, id, headers, seed, view } = await worksArena("a7");
+  await seed([{ workId: other, title: "Later Other" }, { workId: old, title: "Later Merged" }]);
+  await app.inject({ method: "POST", url: `/arenas/${id}/start`, headers });
+  assert.equal((db.prepare("SELECT book_b_work_id AS w FROM duels WHERE tournament_id = ?").get(id) as { w: string }).w, old);
+  openBooksDb().prepare("UPDATE works SET merged_into = ? WHERE id = ?").run(target, old);
+  const duel = (await view()).duels[0];
+  assert.equal(duel.bookB.workId, target);
+  const res = await app.inject({ method: "POST", url: `/arenas/${id}/duels/${duel.id}/vote`, payload: { voterToken: "m1", workId: target } });
+  assert.equal(res.statusCode, 204);
+  assert.equal((await view()).duels[0].bookB.votes, 1);
+  await app.close();
+});
+
+test("PUT slots and random-fill answer 503 when the catalog is unavailable", async () => {
+  const [a, b] = [work("Down One"), work("Down Two")];
+  const { app, db, id, headers } = await worksArena("a8");
+  const catalog = openBooksDb();
+  catalog.exec("ALTER TABLE works RENAME TO works_away");
+  try {
+    const put = await app.inject({ method: "PUT", url: `/arenas/${id}/slots`, headers, payload: { slots: [a, b].map((workId, slotIndex) => ({ slotIndex, book: { workId, title: "T", author: "A", cover: null } })) } });
+    assert.equal(put.statusCode, 503);
+    const fill = await app.inject({ method: "POST", url: `/arenas/${id}/random-fill`, headers, payload: { pool: [a, b].map((workId) => ({ workId, title: "T", author: "A", cover: null })) } });
+    assert.equal(fill.statusCode, 503);
+  } finally {
+    catalog.exec("ALTER TABLE works_away RENAME TO works");
+  }
+  assert.equal((db.prepare("SELECT COUNT(*) AS n FROM tournament_slots WHERE tournament_id = ?").get(id) as { n: number }).n, 0);
+  await app.close();
+});
+
+test("a non-owner sending an unknown work to PUT slots gets 404, not 400", async () => {
+  const { app, seed } = await worksArena("a9");
+  const res = await seed([{ workId: "not-a-work", title: "X" }], { authorization: "Bearer intruder" });
+  assert.equal(res.statusCode, 404);
+  await app.close();
+});
