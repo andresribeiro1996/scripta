@@ -42,7 +42,10 @@ export function WorkPage() {
   return (
     <>
       <WorkPageView page={page} signedIn={Boolean(session)} onAdd={() => setAdding(true)} onShare={share} />
-      {adding ? <AddBookSheet book={{ title: page.work.title, author: page.work.author, isbn: firstEdition?.isbn ?? null, coverUrl: page.work.coverUrl }} onClose={() => setAdding(false)} /> : null}
+      {adding ? <AddBookSheet book={{ title: page.work.title, author: page.work.author, isbn: firstEdition?.isbn ?? null, coverUrl: page.work.coverUrl }} onClose={() => {
+        setAdding(false);
+        void refetch();
+      }} /> : null}
     </>
   );
 }
