@@ -162,16 +162,17 @@ async function seed() {
     if (visibility === "shared") mural = await request("POST", `/murals/${mural.id}/share`, {}, tokens.alice);
     murals[visibility] = mural;
   }
+  const { works } = await request("GET", "/library", undefined, tokens.alice);
+  const workIds = keys.map((key) => works[key]);
   const polls = {};
   for (const access of ["members", "anonymous"]) {
     const source = await request("POST", "/tierlists", { name: `Alice's ${access} book poll` }, tokens.alice, 201);
-    const tiers = source.data.tiers.map((tier, index) => ({ ...tier, bookKeys: index === 0 ? [keys[0]] : [] }));
-    await request("PUT", `/tierlists/${source.id}`, { data: { tiers, pool: keys.slice(1) } }, tokens.alice);
+    const tiers = source.data.tiers.map((tier, index) => ({ ...tier, workIds: index === 0 ? [workIds[0]] : [] }));
+    await request("PUT", `/tierlists/${source.id}`, { data: { tiers, pool: workIds.slice(1) } }, tokens.alice);
     const { tierlist } = await request("POST", `/tierlists/${source.id}/open-voting`, { access }, tokens.alice, 201);
-    const ballot = await request("POST", `/tierlists/voting/${tierlist.voteCode}/ballot`, { placements: [{ bookKey: keys[0], tierId: tiers[1].id }, { bookKey: keys[1], tierId: tiers[0].id }] }, tokens.bob);
+    const ballot = await request("POST", `/tierlists/voting/${tierlist.voteCode}/ballot`, { placements: [{ workId: workIds[0], tierId: tiers[1].id }, { workId: workIds[1], tierId: tiers[0].id }] }, tokens.bob);
     polls[access] = { id: tierlist.id, code: tierlist.voteCode, bobBallotId: ballot.ballotId };
   }
-  const { works } = await request("GET", "/library", undefined, tokens.alice);
   const { tournament } = await request("POST", "/arenas", { name: "Alice's weekend bracket", bracketSize: 4, roundDurationMinutes: 10080 }, tokens.alice, 201);
   await request("PUT", `/arenas/${tournament.id}/slots`, { slots: pool.map((book, slotIndex) => ({ slotIndex, book: { workId: works[bookKey(book)], title: book.Title, author: book.Attribution, cover: covers.get(bookKey(book)) ?? null } })) }, tokens.alice, 204);
   await request("POST", `/arenas/${tournament.id}/start`, {}, tokens.alice, 204);

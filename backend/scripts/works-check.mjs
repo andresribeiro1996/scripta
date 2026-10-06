@@ -42,11 +42,15 @@ for (const [name, envName, table, item, idColumn] of [
   ["quizzes", "QUIZZES_DB_PATH", "quiz_works", "quizzes", "quiz_id"],
   ["murals", "MURALS_DB_PATH", "mural_works", "murals", "mural_id"]
 ]) {
-  section(name, process.env[envName], (db) => columns(db, table).length > 0 ? {
-    itemsWithoutRows: count(db, `SELECT COUNT(*) AS n FROM ${item} WHERE NOT EXISTS (SELECT 1 FROM ${table} AS w WHERE w.${idColumn} = ${item}.id)`),
-    rowsNull: count(db, `SELECT COUNT(*) AS n FROM ${table} WHERE work_id IS NULL`),
-    ...(name === "tierlists" ? { placementsNull: count(db, "SELECT COUNT(*) AS n FROM tierlist_ballot_placements WHERE work_id IS NULL") } : {})
-  } : "not deployed");
+  section(name, process.env[envName], (db) => {
+    if (columns(db, table).length === 0) return "not deployed";
+    const worksOnly = name === "tierlists" && !columns(db, table).includes("key");
+    return {
+      itemsWithoutRows: count(db, `SELECT COUNT(*) AS n FROM ${item} WHERE ${worksOnly ? "json_array_length(data, '$.pool') > 0 AND " : ""}NOT EXISTS (SELECT 1 FROM ${table} AS w WHERE w.${idColumn} = ${item}.id)`),
+      rowsNull: worksOnly ? 0 : count(db, `SELECT COUNT(*) AS n FROM ${table} WHERE work_id IS NULL`),
+      ...(name === "tierlists" ? { placementsNull: worksOnly ? 0 : count(db, "SELECT COUNT(*) AS n FROM tierlist_ballot_placements WHERE work_id IS NULL") } : {})
+    };
+  });
 }
 
 const has = (db, table, column) => columns(db, table).includes(column);

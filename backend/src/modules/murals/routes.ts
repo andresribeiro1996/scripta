@@ -23,10 +23,9 @@
 import type { FastifyInstance } from "fastify";
 import { THEME_IDS } from "@scripta/shared/themes";
 import { z } from "zod";
-import { worksFormat } from "../../worksFormat.js";
 import { authGuard } from "../auth/index.js";
 import { resolveEntryWorks, workIdsByKey, WorkResolutionError } from "../library/index.js";
-import { tierlistsForWire, type TierlistData } from "../tierlists/index.js";
+import type { TierlistData } from "../tierlists/index.js";
 import { extractReferences } from "./domain/blockRefs.js";
 import { FolderCycleError, InvalidFolderReferenceError, MuralConflictError } from "./domain/errors.js";
 import { resolveMuralPublicPayload } from "./domain/publicPayload.js";
@@ -285,7 +284,6 @@ export function buildPublicMuralRoutes(service: MuralsService, getTierlistData?:
     // Fastify's router never confuses the two, "shared" is just a literal
     // segment there, not a mural id.
     app.get<{ Params: { token: string } }>("/murals/shared/:token", async (request, reply) => {
-      const works = worksFormat(request, reply);
       const row = service.getRowByShareToken(request.params.token);
       if (!row) {
         return reply.code(404).send({ error: "No shared mural at that link." });
@@ -318,7 +316,7 @@ export function buildPublicMuralRoutes(service: MuralsService, getTierlistData?:
         readerCard: payload.library.readerCard,
         profile: payload.profile,
         imageUrls: payload.imageUrls,
-        tierlists: tierlistsForWire(payload.tierlists, works)
+        tierlists: payload.tierlists
       });
     });
   };

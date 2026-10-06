@@ -13,31 +13,42 @@ process.env.TIERLISTS_DB_PATH = join(scratch, "tierlists.sqlite");
 process.env.JWT_ACCESS_SECRET = "a".repeat(64);
 process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
-const { boardBooksToWorks, boardKeysInOrder, boardToWorks, histogramToWorks, placementsFromWorks, placementsToWorks } = await import("./wire.js");
+const { boardBooks, canonicalBoard, canonicalFirst, histogramToWorks, placementsFromWorks, placementsToWorks } = await import("./wire.js");
+const { openBooksDb } = await import("../books/adapters/sqlite/connection.js");
+const { resolveWorks } = await import("../books/index.js");
 
-const works = new Map([["k1", "w1"], ["k2", "w1"], ["k3", "w3"]]);
-const data = { tiers: [{ id: "s", label: "S", color: "#000000", bookKeys: ["k2"] }], pool: ["k1", "k3", "k-orphan"] };
+const work = (title: string) => resolveWorks([{ isbn: null, title, author: "Someone" }])[0]!;
+const [old, kept, other] = [work("Wire Old"), work("Wire Kept"), work("Wire Other")];
+openBooksDb().prepare("UPDATE works SET merged_into = ? WHERE id = ?").run(kept, old);
 
-test("boardToWorks swaps keys for works, tiers before pool, first edition wins, orphans left out", () => {
-  assert.deepEqual(boardKeysInOrder(data), ["k2", "k1", "k3", "k-orphan"]);
-  assert.deepEqual(boardToWorks(data, works), { tiers: [{ id: "s", label: "S", color: "#000000", workIds: ["w1"] }], pool: ["w3"] });
+test("canonicalBoard canonicalizes ids, tiers before pool, first work wins", () => {
+  const data = { tiers: [{ id: "s", label: "S", color: "#000000", workIds: [old] }], pool: [kept, other] };
+  assert.deepEqual(canonicalBoard(data), { tiers: [{ id: "s", label: "S", color: "#000000", workIds: [kept] }], pool: [other] });
 });
 
-test("histogram cells and placements keep only each work's first key", () => {
-  const first = new Set(["k2", "k3"]);
-  assert.deepEqual(histogramToWorks([{ bookKey: "k1", tierId: "s", votes: 4 }, { bookKey: "k2", tierId: "s", votes: 2 }, { bookKey: "k3", tierId: "s", votes: 1 }], works, first), [{ workId: "w1", tierId: "s", votes: 2 }, { workId: "w3", tierId: "s", votes: 1 }]);
-  assert.deepEqual(placementsToWorks([{ bookKey: "k1", tierId: "s" }, { bookKey: "k3", tierId: "a" }], works, first), [{ workId: "w3", tierId: "a" }]);
+test("canonicalFirst keeps only the first stored id of each canonical work", () => {
+  const { canonical, first } = canonicalFirst([old, other, kept]);
+  assert.equal(canonical.get(old), kept);
+  assert.deepEqual([...first].sort(), [old, other].sort());
 });
 
-test("placementsFromWorks maps each work to its board key and refuses a work not on the board", () => {
-  const keyByWork = new Map([["w1", "k2"], ["w3", "k3"]]);
-  assert.deepEqual(placementsFromWorks([{ workId: "w1-old", tierId: "s" }], ["w1"], keyByWork), [{ bookKey: "k2", tierId: "s" }]);
-  assert.equal(placementsFromWorks([{ workId: "w9", tierId: "s" }], ["w9"], keyByWork), null);
+test("histogram cells and placements keep only each work's first stored id and emit the canonical one", () => {
+  const { canonical, first } = canonicalFirst([old, kept, other]);
+  assert.deepEqual(histogramToWorks([{ workId: kept, tierId: "s", votes: 4 }, { workId: old, tierId: "s", votes: 2 }, { workId: other, tierId: "s", votes: 1 }], canonical, first), [{ workId: kept, tierId: "s", votes: 2 }, { workId: other, tierId: "s", votes: 1 }]);
+  assert.deepEqual(placementsToWorks([{ workId: kept, tierId: "s" }, { workId: other, tierId: "a" }], canonical, first), [{ workId: other, tierId: "a" }]);
 });
 
-test("a frozen snapshot is zipped with the pool when the lengths match, else books come live", () => {
-  const live = () => [{ title: "Live", key: "k1", workId: "w1" }];
-  assert.deepEqual(boardBooksToWorks(["k1", "k3"], [{ title: "A" }, { title: "B" }], works, live), [{ title: "A", key: "k1", workId: "w1" }, { title: "B", key: "k3", workId: "w3" }]);
-  assert.deepEqual(boardBooksToWorks(["k1", "k3"], [{ title: "A" }], works, live), live());
-  assert.deepEqual(boardBooksToWorks(["k1"], null, works, live), live());
+test("placementsFromWorks maps each canonical id to the stored id and refuses a work not on the board", () => {
+  const storedByCanonical = new Map([[kept, old], [other, other]]);
+  assert.deepEqual(placementsFromWorks([{ workId: kept, tierId: "s" }], [kept], storedByCanonical), [{ workId: old, tierId: "s" }]);
+  assert.equal(placementsFromWorks([{ workId: "w9", tierId: "s" }], ["w9"], storedByCanonical), null);
+});
+
+test("boardBooks matches snapshot books by canonical work and falls back to live when one is missing", () => {
+  const live = () => [{ title: "Live" }];
+  const snapshot = [{ title: "A", key: "ka", workId: old }, { title: "B", key: "kb", workId: other }];
+  assert.deepEqual(boardBooks([kept, other], snapshot, live), snapshot);
+  assert.deepEqual(boardBooks([other, kept], snapshot, live), [snapshot[1], snapshot[0]]);
+  assert.deepEqual(boardBooks([kept, other], [snapshot[1]!], live), live());
+  assert.deepEqual(boardBooks([kept], null, live), live());
 });

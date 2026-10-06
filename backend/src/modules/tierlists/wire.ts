@@ -1,5 +1,5 @@
-import { canonicalByKey, duplicateWorkMessage, firstKeyPerWork, keysForWorks, knownWorkIds } from "../library/index.js";
-import type { HistogramCell, Placement, Tierlist } from "./domain/types.js";
+import { canonicalByKey, canonicalWorkIds, firstKeyPerWork } from "../library/index.js";
+import type { HistogramCell, Placement } from "./domain/types.js";
 
 export interface WorksTier {
   id: string;
@@ -25,63 +25,59 @@ function poolOf(data: unknown): unknown[] {
   return list((data as { pool?: unknown } | null)?.pool);
 }
 
-export function boardKeysInOrder(data: unknown): string[] {
-  return [...tiersOf(data).flatMap((tier) => list(tier.bookKeys)), ...poolOf(data)].filter((key): key is string => typeof key === "string" && key !== "");
+function storedIds(data: unknown): string[] {
+  return [...tiersOf(data).flatMap((tier) => list(tier.workIds)), ...poolOf(data)].filter((id): id is string => typeof id === "string" && id !== "");
 }
 
-export function boardToWorks(data: unknown, works: Map<string, string>) {
+function selfMap(ids: string[]) {
+  return canonicalByKey(new Map(ids.map((id) => [id, id])));
+}
+
+export function canonicalBoard(data: unknown): WorksBoard {
+  const canonical = selfMap(storedIds(data));
   const seen = new Set<string>();
-  const take = (keys: unknown) =>
-    list(keys).flatMap((key) => {
-      const work = typeof key === "string" ? works.get(key) : undefined;
+  const take = (ids: unknown) =>
+    list(ids).flatMap((id) => {
+      const work = typeof id === "string" ? canonical.get(id) : undefined;
       if (!work || seen.has(work)) return [];
       seen.add(work);
       return [work];
     });
-  const tiers = tiersOf(data).map(({ bookKeys, ...tier }) => ({ ...tier, workIds: take(bookKeys) }));
+  const tiers = tiersOf(data).map((tier) => ({ ...tier, workIds: take(tier.workIds) })) as unknown as WorksTier[];
   return { tiers, pool: take(poolOf(data)) };
 }
 
-export function histogramToWorks(cells: HistogramCell[], works: Map<string, string>, firstKeys: Set<string>) {
-  return cells.flatMap((cell) => (firstKeys.has(cell.bookKey) ? [{ workId: works.get(cell.bookKey)!, tierId: cell.tierId, votes: cell.votes }] : []));
+export function canonicalFirst(ids: string[]): { canonical: Map<string, string>; first: Set<string> } {
+  const canonical = selfMap(ids);
+  return { canonical, first: new Set(firstKeyPerWork(ids, canonical).values()) };
 }
 
-export function placementsToWorks(placements: Placement[], works: Map<string, string>, firstKeys: Set<string>) {
-  return placements.flatMap((placement) => (firstKeys.has(placement.bookKey) ? [{ workId: works.get(placement.bookKey)!, tierId: placement.tierId }] : []));
+export function histogramToWorks(cells: HistogramCell[], canonical: Map<string, string>, first: Set<string>) {
+  return cells.flatMap((cell) => (first.has(cell.workId) ? [{ workId: canonical.get(cell.workId)!, tierId: cell.tierId, votes: cell.votes }] : []));
 }
 
-export function placementsFromWorks(placements: Array<{ workId: string; tierId: string }>, ids: string[], keyByWork: Map<string, string>): Placement[] | null {
-  const keyed: Placement[] = [];
+export function placementsToWorks(placements: Placement[], canonical: Map<string, string>, first: Set<string>) {
+  return placements.flatMap((placement) => (first.has(placement.workId) ? [{ workId: canonical.get(placement.workId)!, tierId: placement.tierId }] : []));
+}
+
+export function placementsFromWorks(placements: Array<{ workId: string; tierId: string }>, ids: string[], storedByCanonical: Map<string, string>): Placement[] | null {
+  const stored: Placement[] = [];
   for (const [index, placement] of placements.entries()) {
-    const bookKey = keyByWork.get(ids[index]!);
-    if (!bookKey) return null;
-    keyed.push({ bookKey, tierId: placement.tierId });
+    const workId = storedByCanonical.get(ids[index]!);
+    if (!workId) return null;
+    stored.push({ workId, tierId: placement.tierId });
   }
-  return keyed;
+  return stored;
 }
 
-export function boardBooksToWorks(pool: string[], snapshot: unknown[] | null, works: Map<string, string>, live: () => unknown[]): unknown[] {
-  if (!snapshot || snapshot.length !== pool.length) return live();
-  return snapshot.map((book, index) => ({ ...(book as Record<string, unknown>), key: pool[index], workId: works.get(pool[index]!) ?? null }));
-}
-
-export function keyedBoard(ownerUserId: string, board: WorksBoard, data: unknown, stored: Map<string, string | null>) {
-  const all = [...board.tiers.flatMap((tier) => tier.workIds), ...board.pool];
-  if (new Set(all).size !== all.length) return { status: 400 as const, error: "Duplicate tier or book." };
-  const ids = knownWorkIds(all);
-  if (new Set(ids).size !== ids.length) return { status: 409 as const, error: duplicateWorkMessage({ workId: null, title: null }) };
-  const canonical = new Map(all.map((id, index) => [id, ids[index]!]));
-  const keys = keysForWorks(ownerUserId, ids, firstKeyPerWork(boardKeysInOrder(data), canonicalByKey(stored)));
-  const keyOf = (id: string) => keys.get(canonical.get(id)!)!;
-  return {
-    data: {
-      tiers: board.tiers.map(({ workIds, ...tier }) => ({ ...tier, bookKeys: workIds.map(keyOf) })),
-      pool: board.pool.map(keyOf)
-    },
-    works: new Map<string, string | null>(ids.map((id) => [keys.get(id)!, id]))
-  };
-}
-
-export function tierlistToWorks(tierlist: Tierlist, stored: Map<string, string | null>): Tierlist {
-  return { ...tierlist, data: boardToWorks(tierlist.data, canonicalByKey(stored)) };
+export function boardBooks(pool: string[], snapshot: unknown[] | null, live: () => unknown[]): unknown[] {
+  if (!snapshot) return live();
+  const entries = snapshot.filter((book): book is Record<string, unknown> => typeof book === "object" && book !== null);
+  const canonical = canonicalWorkIds(entries.flatMap((book) => (typeof book.workId === "string" ? [book.workId] : [])));
+  const byWork = new Map<string, Record<string, unknown>>();
+  for (const book of entries) {
+    const work = typeof book.workId === "string" ? canonical.get(book.workId) : undefined;
+    if (work && !byWork.has(work)) byWork.set(work, book);
+  }
+  return pool.every((id) => byWork.has(id)) ? pool.map((id) => byWork.get(id)!) : live();
 }
