@@ -225,6 +225,7 @@ test("an unreachable catalog is a 503 and stores nothing", async () => {
   const existing = service.createQuiz("q8", "Existing", { books: [{ ...book(a, "Catalog Down") }] });
   const coverless = ["Down C1", "Down C2", "Down C3", "Down C4"].map((title) => ({ ...book(named(title), title), coverUrl: null }));
   const pending = service.createQuiz("q8", "Pending", { questionCount: 2, allowedTypes: ["title_cover", "blurb_title"], books: coverless });
+  const covered = service.createQuiz("q8", "Covered", { questionCount: 2, allowedTypes: ["cover_title"], books: ["Down K1", "Down K2", "Down K3", "Down K4"].map((title) => book(named(title), title)) });
   const catalog = openBooksDb();
   catalog.exec("ALTER TABLE works RENAME TO works_away");
   try {
@@ -234,12 +235,14 @@ test("an unreachable catalog is a 503 and stores nothing", async () => {
     assert.equal(updated.statusCode, 503);
     const published = await send("POST", `/quizzes/${pending.id}/publish`, "q8", {});
     assert.equal(published.statusCode, 503);
+    assert.equal((await send("POST", `/quizzes/${covered.id}/publish`, "q8", {})).statusCode, 503);
   } finally {
     catalog.exec("ALTER TABLE works_away RENAME TO works");
   }
-  assert.equal((db.prepare("SELECT COUNT(*) AS count FROM quizzes").get() as { count: number }).count, 2);
+  assert.equal((db.prepare("SELECT COUNT(*) AS count FROM quizzes").get() as { count: number }).count, 3);
   assert.deepEqual((service.getQuiz("q8", existing.id)!.data as { books: Array<{ workId: string }> }).books.map((entry) => entry.workId), [a]);
   assert.equal(service.getQuiz("q8", pending.id)!.voteCode, null);
+  assert.equal(service.getQuiz("q8", covered.id)!.voteCode, null);
   await app.close();
 });
 
@@ -311,5 +314,17 @@ test("the public board shows each question's prompt from its own book after two 
   const prompts = new Map((board.json().board.questions as Array<{ id: string; prompt: string }>).map((question) => [question.id, question.prompt]));
   for (const question of questions) assert.equal(prompts.get(question.id), titleOf.get(question.workId));
   assert.deepEqual([...prompts.values()].sort(), [...titles].sort());
+  await app.close();
+});
+
+test("publish counts one book per work after two editions merge", async () => {
+  const ids = ["Dup Pub A", "Dup Pub B", "Dup Pub C", "Dup Pub D"].map(named);
+  const { app, service, send } = await quizApp();
+  const draft = service.createQuiz("q13", "Merged", { questionCount: 2, allowedTypes: ["cover_title"], books: ids.map((id, index) => book(id, `Dup Pub ${"ABCD"[index]}`)) });
+  openBooksDb().prepare("UPDATE works SET merged_into = ? WHERE id = ?").run(ids[0]!, ids[1]!);
+  const published = await send("POST", `/quizzes/${draft.id}/publish`, "q13", {});
+  assert.equal(published.statusCode, 400);
+  assert.match(published.json().error, /at least 4 books/i);
+  assert.equal(service.getQuiz("q13", draft.id)!.voteCode, null);
   await app.close();
 });

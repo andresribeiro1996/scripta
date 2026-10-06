@@ -104,7 +104,7 @@ export interface QuizzesService {
   /** `resolvedBooks` carries the public cover URLs the route resolved from
    *  the owner's library (the same resolver tierlists' open-voting uses);
    *  books that already carry one (pool picks) keep theirs. */
-  publishQuiz(userId: string, id: string, resolvedBooks: Array<{ workId: string; coverUrl: string | null }>): PublishOutcome;
+  publishQuiz(userId: string, id: string, resolvedBooks: Array<{ workId: string; coverUrl: string | null }>, canonical?: Map<string, string>): PublishOutcome;
   setPlayState(userId: string, id: string, open: boolean): Quiz | undefined;
   getPlayBoard(code: string): PlayBoard | undefined;
   submitPlay(code: string, answers: SubmittedAnswer[], durationMs: number, playerName: string | null, player: Player): PlayOutcome;
@@ -162,11 +162,18 @@ export function createQuizzesService(repo: QuizzesRepository): QuizzesService {
       return repo.delete(id, userId);
     },
 
-    publishQuiz(userId, id, resolvedBooks) {
+    publishQuiz(userId, id, resolvedBooks, canonical = new Map()) {
       const row = repo.getOwned(id, userId);
       if (!row) return { ok: false, reason: "not-found" };
       if (row.vote_code !== null) return { ok: false, reason: "already-published", error: "This quiz is already published." };
       const doc = readDocument(toQuiz(row));
+      const seenWorks = new Set<string>();
+      doc.books = doc.books.filter((b) => {
+        const work = canonical.get(b.workId) ?? b.workId;
+        if (seenWorks.has(work)) return false;
+        seenWorks.add(work);
+        return true;
+      });
       if (doc.books.length < 4) return { ok: false, reason: "invalid", error: "A quiz needs at least 4 books." };
       const coverByWork = new Map(resolvedBooks.map((b) => [b.workId, b.coverUrl]));
       const books = doc.books.map((b) => ({ ...b, coverUrl: b.coverUrl ?? coverByWork.get(b.workId) ?? null }));

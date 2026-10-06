@@ -7,7 +7,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { authGuard, getOptionalAuthenticatedUser } from "../auth/index.js";
-import { duplicateWorkMessage, resolvePublicBooksByWork } from "../library/index.js";
+import { canonicalByKey, duplicateWorkMessage, resolvePublicBooksByWork } from "../library/index.js";
 import { sendWorksError } from "../../worksFormat.js";
 import type { PlayOutcome, Player, QuizzesService } from "./service.js";
 import { quizBookWorks, quizToWorks } from "./wire.js";
@@ -55,7 +55,7 @@ const playSchema = z.object({
 export function buildQuizRoutes(service: QuizzesService) {
   return async function quizRoutes(app: FastifyInstance) {
     app.get("/quizzes", { preHandler: authGuard }, async (request, reply) => {
-      return reply.send({ quizzes: service.listQuizzes(request.user.id).map(quizToWorks) });
+      return reply.send({ quizzes: service.listQuizzes(request.user.id).map((quiz) => quizToWorks(quiz)) });
     });
 
     app.post("/quizzes", { preHandler: authGuard }, async (request, reply) => {
@@ -127,19 +127,21 @@ export function buildQuizRoutes(service: QuizzesService) {
       const ownedBooks = (owned.data as { books?: Array<{ workId: string; coverUrl?: string | null }> }).books ?? [];
       const needCover = ownedBooks.filter((b) => !b.coverUrl);
       let found: ReturnType<typeof resolvePublicBooksByWork>;
+      let canonical: Map<string, string>;
       try {
+        canonical = canonicalByKey(new Map(ownedBooks.map((b) => [b.workId, b.workId])));
         found = needCover.length ? resolvePublicBooksByWork(request.user.id, needCover.map((b) => b.workId)) : new Map();
       } catch (err) {
         return sendWorksError(reply, err);
       }
       const resolvedBooks = needCover.flatMap((b) => (found.has(b.workId) ? [{ workId: b.workId, coverUrl: found.get(b.workId)!.coverUrl }] : []));
-      const outcome = service.publishQuiz(request.user.id, params.data.id, resolvedBooks);
+      const outcome = service.publishQuiz(request.user.id, params.data.id, resolvedBooks, canonical);
       if (!outcome.ok) {
         if (outcome.reason === "not-found") return reply.code(404).send({ error: "No quiz with that id." });
         if (outcome.reason === "already-published") return reply.code(409).send({ error: outcome.error });
         return reply.code(400).send({ error: outcome.error });
       }
-      return reply.code(201).send({ quiz: quizToWorks(outcome.quiz), voteCode: outcome.quiz.voteCode });
+      return reply.code(201).send({ quiz: quizToWorks(outcome.quiz, canonical), voteCode: outcome.quiz.voteCode });
     });
 
     app.put("/quizzes/:id/voting", { preHandler: authGuard }, async (request, reply) => {
