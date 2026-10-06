@@ -42,6 +42,13 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         author = CASE WHEN author = '' THEN COALESCE((SELECT author FROM books WHERE work_id = works.id AND author <> '' ORDER BY created_at, rowid LIMIT 1), '') ELSE author END
     WHERE id = ? AND (title = '' OR author = '')
   `);
+  const setWorkSummaryStmt = db.prepare(`UPDATE works SET summary = ? WHERE id = ? AND summary IS NULL`);
+  const carryWorkSummaryStmt = db.prepare(`UPDATE works SET summary = (SELECT summary FROM works WHERE id = ?) WHERE id = ? AND summary IS NULL`);
+  const workSummaryStmt = db.prepare(`
+    SELECT target.summary AS summary, target.ol_work_key AS olWorkKey
+    FROM books JOIN works AS own ON own.id = books.work_id JOIN works AS target ON target.id = COALESCE(own.merged_into, own.id)
+    WHERE books.id = ?
+  `);
   const markMergedStmt = db.prepare(`UPDATE works SET merged_into = ? WHERE id = ?`);
   const repointMergedStmt = db.prepare(`UPDATE works SET merged_into = ? WHERE merged_into = ?`);
   const blockTitleGroupStmt = db.prepare(`UPDATE books SET title_group_blocked_at = ? WHERE id = ?`);
@@ -185,6 +192,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
 
   function mergeInto(from: string, into: string) {
     moveWorkEditionsStmt.run(into, from);
+    carryWorkSummaryStmt.run(from, into);
     fillWorkFromEditionsStmt.run(into);
     markMergedStmt.run(into, from);
     repointMergedStmt.run(into, from);
@@ -447,6 +455,17 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         return book.work_id ?? giveWork(book);
       });
     },
+
+    setWorkSummary(bookId, summary) {
+      inTransaction(() => {
+        const book = byIdStmt.get(bookId) as unknown as (UnassignedBook & { work_id: string | null }) | undefined;
+        if (!book) throw new Error(`Unknown book ${bookId}`);
+        const workId = liveWorkId(book.work_id ?? giveWork(book));
+        if (workId) setWorkSummaryStmt.run(summary, workId);
+      });
+    },
+
+    getWorkSummary: (bookId) => workSummaryStmt.get(bookId) as { summary: string | null; olWorkKey: string | null } | undefined,
 
     setLanguage(id, tag) {
       if (tag) setLanguageStmt.run(tag, id);

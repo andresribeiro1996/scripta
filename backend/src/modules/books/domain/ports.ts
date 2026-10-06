@@ -44,6 +44,8 @@ export interface BooksRepository {
   getWorkView(id: string): WorkView | undefined;
   workPageRows(id: string): WorkPageRows | undefined;
   assignWork(bookId: string): string;
+  setWorkSummary(bookId: string, summary: string): void;
+  getWorkSummary(bookId: string): { summary: string | null; olWorkKey: string | null } | undefined;
   canonicalWorkIds(ids: string[]): Map<string, string>;
   setLanguage(id: string, tag: string | null): void;
   setPublisherUrl(id: string, url: string): void;
@@ -77,10 +79,11 @@ export interface CatalogDetails {
   sources: DataSource[];
   summarySource: DataSource | null;
   workKey?: string | null;
+  workSummary?: string | null;
 }
 
 export interface BookCatalog {
-  fetchDetails(lookup: { isbn: string | null; title: string; author: string }): Promise<CatalogDetails | null>;
+  fetchDetails(lookup: { isbn: string | null; title: string; author: string; language?: string | null }): Promise<CatalogDetails | null>;
   search(query: { isbn: string } | { text: string }): Promise<CatalogSearchHit[]>;
 }
 
