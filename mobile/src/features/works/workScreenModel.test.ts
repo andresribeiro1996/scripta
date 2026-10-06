@@ -2,7 +2,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { WorkPage } from "@scripta/shared";
+import type { WorkPage, WorkReader } from "@scripta/shared";
 import { workPath, workScreenSections } from "./workScreenModel.js";
 
 const page: WorkPage = {
@@ -16,10 +16,18 @@ test("the screen model orders sections and words each row", () => {
   const model = workScreenSections(page);
   assert.deepEqual(model.mine, { status: "Finished", detail: "All-time · 1 highlight" });
   assert.equal(model.about, null);
-  assert.deepEqual(model.readerGroups.map((group) => [group.title, group.rows.map((row) => [row.username, row.status, row.linksToProfile])]), [["People you follow", [["ana", "Reading", false]]]]);
+  assert.deepEqual(model.readerGroups.map((group) => [group.title, group.rows.map((row) => [row.username, row.status, row.linksToProfile])]), [[null, [["ana", "Reading", false]]]]);
   assert.equal(model.countsLabel, "1 reader");
   assert.deepEqual(model.games, [{ key: "arena-a1", title: "SF", detail: "Tournament · bo", path: "/arena/a1" }]);
   assert.equal(model.gamesEmpty, false);
+});
+
+test("reader groups are titled only when both have rows", () => {
+  const other: WorkReader = { username: "bo", avatarUrl: null, readStatus: 2, published: true };
+  const both = workScreenSections({ ...page, readers: { ...page.readers, others: [other] } });
+  assert.deepEqual(both.readerGroups.map((group) => group.title), ["People you follow", "Other readers"]);
+  const onlyOthers = workScreenSections({ ...page, readers: { ...page.readers, followed: [], others: [other] } });
+  assert.deepEqual(onlyOthers.readerGroups.map((group) => group.title), [null]);
 });
 
 test("no copy and no games read as such", () => {

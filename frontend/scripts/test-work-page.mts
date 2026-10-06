@@ -40,16 +40,26 @@ test("Back links to the given fallback without history, and is a button with it"
 });
 
 test("signed out: no copy shows the add action, and readers don't link to profiles", () => {
-  const html = render({ page: { ...page, mine: null }, signedIn: false, backTo: "/", onBack: null, onAdd: () => undefined, onShare: () => undefined });
+  const html = render({ page: { ...page, mine: null, readers: { ...page.readers, followed: [] } }, signedIn: false, backTo: "/", onBack: null, onAdd: () => undefined, onShare: () => undefined });
   assert.ok(html.includes("Not in your library"));
   assert.ok(html.includes("Add to library"));
   assert.ok(!html.includes("/community/u/bo"));
+  assert.ok(html.includes("bo"));
+  assert.ok(!html.includes("<h3"));
 });
 
 test("signed in: only published readers link to their profile", () => {
   const html = render({ page, signedIn: true, backTo: "/", onBack: null, onAdd: () => undefined, onShare: () => undefined });
   assert.ok(html.includes("/community/u/bo"));
   assert.ok(!html.includes("/community/u/ana"));
+  assert.ok(html.includes("People you follow"));
+  assert.ok(html.includes("Other readers"));
+});
+
+test("signed in with only one group: no sub-heading under Readers", () => {
+  const html = render({ page: { ...page, readers: { ...page.readers, followed: [] } }, signedIn: true, backTo: "/", onBack: null, onAdd: () => undefined, onShare: () => undefined });
+  assert.ok(!html.includes("Other readers"));
+  assert.ok(!html.includes("<h3"));
 });
 
 test("an empty work page says so instead of rendering empty sections", () => {
