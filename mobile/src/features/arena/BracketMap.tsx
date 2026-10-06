@@ -19,7 +19,7 @@
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
-import { bracketShape, countdownLabel, needsVote, type BracketSlot, type Duel, type DuelSide } from "@scripta/shared";
+import { bracketShape, countdownLabel, duelWinner, needsVote, type BracketSlot, type Duel, type DuelSide } from "@scripta/shared";
 import { Icon, Sheet, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "./BookCover";
 import { DuelSideRow } from "./DuelSideRow";
@@ -93,12 +93,14 @@ function MatchTile({
   busy: boolean;
   onOpen: (duel: Duel) => void;
   onSettle: (duelId: string) => void;
-  onTiebreak: (duelId: string, bookKey: string) => void;
+  onTiebreak: (duelId: string, workId: string) => void;
 }) {
   const { colors } = useTheme();
   if (!duel) return <EmptyTile />;
-  const decided = duel.winnerKey !== null;
+  const decided = duel.status === "settled";
+  const winner = duelWinner(duel);
   const tiebreak = isOwner && duel.status === "tied_pending_tiebreak";
+  const pick = (side: DuelSide) => (tiebreak && side.workId ? () => onTiebreak(duel.id, side.workId!) : undefined);
   return (
     <Pressable
       accessibilityRole="button"
@@ -107,11 +109,11 @@ function MatchTile({
       style={styles.tile}
     >
       {needsVote(duel) ? <View style={[styles.voteDot, { backgroundColor: colors.accent, borderColor: colors.surface }]} /> : null}
-      <MatchSide side={duel.bookA} isWinner={duel.winnerKey === duel.bookA.key} decided={decided} busy={busy} onPick={tiebreak ? () => onTiebreak(duel.id, duel.bookA.key) : undefined} />
+      <MatchSide side={duel.bookA} isWinner={winner === duel.bookA} decided={decided} busy={busy} onPick={pick(duel.bookA)} />
       <View style={styles.vsWrap}>
         <Text {...dynamicType} style={[typography.caption, styles.vsLabel, { color: duel.status === "active" ? colors.accent : colors.textDim }]}>vs</Text>
       </View>
-      <MatchSide side={duel.bookB} isWinner={duel.winnerKey === duel.bookB.key} decided={decided} busy={busy} onPick={tiebreak ? () => onTiebreak(duel.id, duel.bookB.key) : undefined} />
+      <MatchSide side={duel.bookB} isWinner={winner === duel.bookB} decided={decided} busy={busy} onPick={pick(duel.bookB)} />
       {isOwner && duel.status === "active" ? (
         <Pressable
           accessibilityRole="button"
@@ -154,7 +156,7 @@ function RoundRow({
   busyDuelId: string | null;
   onOpen: (duel: Duel) => void;
   onSettle: (duelId: string) => void;
-  onTiebreak: (duelId: string, bookKey: string) => void;
+  onTiebreak: (duelId: string, workId: string) => void;
 }) {
   const { colors } = useTheme();
   return (
@@ -195,7 +197,7 @@ export function BracketMap({
   isOwner: boolean;
   busyDuelId: string | null;
   onSettle: (duelId: string) => void;
-  onTiebreak: (duelId: string, bookKey: string) => void;
+  onTiebreak: (duelId: string, workId: string) => void;
 }) {
   const { colors } = useTheme();
   const [openId, setOpenId] = useState<string | null>(null);
@@ -226,9 +228,7 @@ export function BracketMap({
   }
 
   const finalDuel = hasCentre ? finalRound[0] : null;
-  const champion: DuelSide | null = finalDuel?.winnerKey
-    ? (finalDuel.winnerKey === finalDuel.bookA.key ? finalDuel.bookA : finalDuel.bookB)
-    : null;
+  const champion: DuelSide | null = finalDuel ? duelWinner(finalDuel) : null;
 
   return (
     <View style={styles.map}>

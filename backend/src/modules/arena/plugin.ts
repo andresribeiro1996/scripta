@@ -59,12 +59,6 @@ export function getArenaPublicApi(): ArenaPublicApi {
   return cachedApi;
 }
 
-let rekeyingArena: ReturnType<typeof createSqliteArenaRepository> | undefined;
-
-export function rekeyArenaBooks(userId: string, fromKeys: string[], toKey: string) {
-  (rekeyingArena ??= createSqliteArenaRepository(openArenaDb())).rekeyBooks(userId, fromKeys, toKey);
-}
-
 let erasingArena: ReturnType<typeof createSqliteArenaRepository> | undefined;
 
 export function deleteArenaUserData(userId: string) {

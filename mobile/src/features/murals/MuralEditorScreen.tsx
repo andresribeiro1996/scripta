@@ -88,6 +88,8 @@ export function MuralEditorScreen({ id }: { id: string }) {
   const [copiedStyle, setCopiedStyle] = useState<BlockStyle | null>(null);
   const [adding, setAdding] = useState(false);
   const [renaming, setRenaming] = useState(false);
+  const [draftName, setDraftName] = useState("");
+  const [nameError, setNameError] = useState<string | undefined>();
   const [picking, setPicking] = useState<PickerKind | null>(null);
   const [search, setSearch] = useState("");
   const [quoteBook, setQuoteBook] = useState<Record<string, unknown> | null>(null);
@@ -226,7 +228,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
       />
       {error ? <Toast visible message={error} tone="error" /> : null}
       <Animated.ScrollView ref={scrollRef} onLayout={(event) => setViewportHeight(event.nativeEvent.layout.height)} onScroll={onScroll} scrollEventThrottle={16} onContentSizeChange={(_width, height) => contentHeight.set(height)} keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.canvasScroll, { paddingBottom: Math.max(120, dockHeight + spacing.md) }]}>
-        <Pressable accessibilityLabel={`Rename mural, ${currentName}`} accessibilityRole="button" hitSlop={spacing.sm} onPress={() => setRenaming(true)} style={styles.heading}>
+        <Pressable accessibilityLabel={`Rename mural, ${currentName}`} accessibilityRole="button" hitSlop={spacing.sm} onPress={() => { setDraftName(currentName); setNameError(undefined); setRenaming(true); }} style={styles.heading}>
           <Text display numberOfLines={2} style={[typography.title, styles.headingText, { color: colors.text }]}>{currentName}</Text>
           <Icon color={colors.textDim} name="edit" size={18} />
         </Pressable>
@@ -240,7 +242,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
       {selected ? <View pointerEvents={blockToolsHidden ? "none" : "auto"} accessibilityElementsHidden={blockToolsHidden} importantForAccessibility={blockToolsHidden ? "no-hide-descendants" : "auto"} onLayout={(event) => { const height = event.nativeEvent.layout.height; setDockHeight(height); if (!dragging) bottomInset.set(height + spacing.md); }} style={[styles.dock, { opacity: blockToolsHidden ? 0 : 1, backgroundColor: colors.surface, borderColor: colors.border }]}><BlockActionBar actions={blockActions} disabled={busy} /></View> : !dragging ? <Fab label="Add" accessibilityLabel="Add block" onPress={() => setAdding(true)} /> : null}
       {history.length && !blockToolsHidden ? <View style={[styles.undo, { bottom: selected ? dockHeight + spacing.md : spacing.md }]}><Button label="Undo" variant="secondary" disabled={busy} onPress={undo} /></View> : null}
       <Dialog visible={renaming} title="Rename mural" onClose={() => setRenaming(false)}>
-        <View style={styles.dialog}><Input label="Mural name" value={currentName} onChangeText={setName} /><Button label="Done" onPress={() => setRenaming(false)} /></View>
+        <View style={styles.dialog}><Input label="Mural name" value={draftName} error={nameError} onChangeText={(text) => { setDraftName(text); setNameError(undefined); }} /><Button label="Done" onPress={() => { const trimmed = draftName.trim(); if (!trimmed) { setNameError("Name can't be empty"); return; } setName(trimmed); setRenaming(false); }} /></View>
       </Dialog>
       <MuralShareSheet mural={shareFor} books={books} groups={groups} images={gallery.data ?? []} tierlists={tierlists.data ?? []} profile={profile} draft={shareFor !== null && (shareFor.name !== mural.name || shareFor.theme !== mural.theme || shareFor.blocks !== mural.blocks)} contentReady={!libraryQuery.isPending && !gallery.isPending && !tierlists.isPending} contentError={libraryQuery.error?.message ?? gallery.error?.message ?? tierlists.error?.message ?? undefined} onRetryContent={() => { void libraryQuery.refetch(); void gallery.refetch(); void tierlists.refetch(); }} onClose={() => setShareFor(null)} onEnableLink={async () => {
         if (shareFor === null) return;

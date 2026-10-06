@@ -7,6 +7,7 @@ import {
   PORTUGAL_ISBN13_PREFIXES,
   authorMatches,
   catalogTitleKey,
+  workTitleKey,
   editionLanguage,
   isPortugalIsbn,
   isPortugueseIsbn,
@@ -42,6 +43,7 @@ test("author matching accepts any listed name, including translator-first record
 test("lookup identity prefers a valid ISBN and falls back to title + author", () => {
   assert.deepEqual(lookupIdentity({ isbn: "978-0-14-118427-2", title: "Orlando", author: "Virginia Woolf" }), {
     key: "isbn:9780141184272",
+    aliasKeys: [],
     titleKey: "ta:orlando|virginia woolf|",
     isbn: "9780141184272",
     title: "Orlando",
@@ -49,6 +51,7 @@ test("lookup identity prefers a valid ISBN and falls back to title + author", ()
   });
   assert.deepEqual(lookupIdentity({ isbn: "urn:uuid:ac11a7ae-d21e-42bb-8cfe-b85022867ac4", title: " The Stranger ", author: "Albert Camus" }), {
     key: "ta:the stranger|albert camus|",
+    aliasKeys: [],
     titleKey: "ta:the stranger|albert camus|",
     isbn: null,
     title: "The Stranger",
@@ -56,6 +59,18 @@ test("lookup identity prefers a valid ISBN and falls back to title + author", ()
   });
   assert.equal(lookupIdentity({ title: "?!", author: "Someone" }), null);
   assert.equal(lookupIdentity({}), null);
+});
+
+test("lookupIdentity keys an ISBN-10 by its ISBN-13 and keeps the ISBN-10 as an alias", () => {
+  const identity = lookupIdentity({ isbn: "0-441-01359-7", title: "Dune", author: "Frank Herbert" })!;
+  assert.equal(identity.key, "isbn:9780441013593");
+  assert.equal(identity.isbn, "9780441013593");
+  assert.deepEqual(identity.aliasKeys, ["isbn:0441013597"]);
+});
+
+test("lookupIdentity has no alias for an ISBN-13 or a title-only lookup", () => {
+  assert.deepEqual(lookupIdentity({ isbn: "9780441013593", title: "Dune", author: "" })!.aliasKeys, []);
+  assert.deepEqual(lookupIdentity({ title: "Dune", author: "Frank Herbert" })!.aliasKeys, []);
 });
 
 test("search tokens are plain words, safe for FTS", () => {
@@ -121,4 +136,13 @@ test("Portuguese takes its region from the ISBN group: pt-PT for Portugal, pt-BR
 test("only Portuguese is regional: another language ignores the ISBN group", () => {
   assert.equal(editionLanguage(["eng"], "9789722518888"), "en");
   assert.equal(editionLanguage(["spa"], "9788535914849"), "es");
+});
+
+test("workTitleKey is the catalog title key only when both the title and the first author have letters", () => {
+  assert.equal(workTitleKey("Dune", "Frank Herbert"), "ta:dune|frank herbert|");
+  assert.equal(workTitleKey("Ensaio sobre a Cegueira", "José Saramago, Outro"), "ta:ensaio sobre a cegueira|jose saramago|");
+  assert.equal(workTitleKey("The Complete Works 2", "Shakespeare"), "ta:the complete works 2|shakespeare|2");
+  assert.equal(workTitleKey("Dune", ""), "");
+  assert.equal(workTitleKey("Dune", "—"), "");
+  assert.equal(workTitleKey("?!", "Frank Herbert"), "");
 });

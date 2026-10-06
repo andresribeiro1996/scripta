@@ -68,15 +68,15 @@ export interface BallotRow {
 /** One book placed in one tier by one ballot. A book the voter left
  *  unranked simply has no Placement — that is how "no opinion" is stored. */
 export interface Placement {
-  bookKey: string;
+  workId: string;
   tierId: string;
 }
 
-/** How many ballots put `bookKey` in `tierId`. Cells with zero votes are
+/** How many ballots put `workId` in `tierId`. Cells with zero votes are
  *  absent, so a histogram is at most pool_size × tier_count entries
  *  regardless of how many people voted. */
 export interface HistogramCell {
-  bookKey: string;
+  workId: string;
   tierId: string;
   votes: number;
 }

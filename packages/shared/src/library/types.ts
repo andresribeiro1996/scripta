@@ -35,4 +35,5 @@ export interface LibraryDocument {
   updatedAt: string;
   shareToken: string | null;
   shareUrl: string | null;
+  works?: Record<string, string>;
 }

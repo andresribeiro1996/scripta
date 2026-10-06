@@ -1,5 +1,5 @@
 import { useDraggable, useDroppable } from "@dnd-kit/core";
-import { readingPercent } from "@scripta/shared";
+import { readingPercent, booksByWork } from "@scripta/shared";
 import type { ReactNode } from "react";
 import { CoverImage } from "../../BookCard";
 import type { ResolvedTierlist } from "../../../api/tierlists";
@@ -190,13 +190,13 @@ export function CurrentlyReadingBlockView({ books }: { books: Array<Record<strin
  *  renderer — all ranking/editing lives in TierListEditorPage, whose own
  *  draggable tiles (DraggableTierTile below) are shared from this file. */
 export function TierRow({ tier, books }: { tier: TierDefinition; books: Array<Record<string, unknown>> }) {
-  const byKey = new Map(books.map((b) => [bookKey(b), b] as const));
-  // Walking `tier.bookKeys` directly (not filtering to resolved books
-  // first) so each tile still knows its own real bookKey string — a
+  const byWork = booksByWork(books);
+  // Walking `tier.workIds` directly (not filtering to resolved books
+  // first) so each tile still knows its own real work id — a
   // dangling reference (book deleted some other way) is silently
   // skipped, same tolerant convention resolveShelfBooks already uses for
   // a shelf.
-  const resolvedKeys = tier.bookKeys.filter((k) => byKey.has(k));
+  const resolvedKeys = tier.workIds.filter((k) => byWork.has(k));
   return (
     <TierRowShell tier={tier}>
       {resolvedKeys.length === 0 ? (
@@ -205,7 +205,7 @@ export function TierRow({ tier, books }: { tier: TierDefinition; books: Array<Re
         <TierRowTiles>
           {resolvedKeys.map((key) => (
             <div key={key} className="h-[6em] w-[4em] shrink-0 overflow-hidden">
-              <MiniBookTile book={byKey.get(key)!} showTitle={false} showAuthor={false} />
+              <MiniBookTile book={byWork.get(key)!} showTitle={false} showAuthor={false} />
             </div>
           ))}
         </TierRowTiles>
@@ -262,15 +262,15 @@ export function TierRow({ tier, books }: { tier: TierDefinition; books: Array<Re
  *  sidesteps that entirely. */
 export function DraggableTierTile({
   book,
-  bookKeyStr,
+  workId,
   menuItems
 }: {
   book: Record<string, unknown>;
-  bookKeyStr: string;
+  workId: string;
   menuItems: OptionsMenuItem[];
 }) {
-  const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({ id: bookKeyStr });
-  const { setNodeRef: setDropRef, isOver } = useDroppable({ id: bookKeyStr });
+  const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({ id: workId });
+  const { setNodeRef: setDropRef, isOver } = useDroppable({ id: workId });
   const setRefs = (el: HTMLDivElement | null) => {
     setDragRef(el);
     setDropRef(el);

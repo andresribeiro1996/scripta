@@ -42,7 +42,7 @@ export interface VotingBoard {
 
 export interface BallotResponse {
   ballotId: string;
-  placements: Array<{ bookKey: string; tierId: string }>;
+  placements: Array<{ workId: string; tierId: string }>;
   results: { histogram: HistogramCell[]; ballotCount: number };
 }
 
@@ -80,7 +80,7 @@ export async function fetchVotingBoard(code: string): Promise<{ board: VotingBoa
  *  only the anonymous voter's handle, ignored for a signed-in caller. */
 export async function submitBallotApi(
   code: string,
-  placements: Array<{ bookKey: string; tierId: string }>,
+  placements: Array<{ workId: string; tierId: string }>,
   ballotId: string | null
 ): Promise<BallotResponse> {
   const encodedCode = encodeURIComponent(code);

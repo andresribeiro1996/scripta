@@ -14,18 +14,18 @@ const FLY_OUT_DISTANCE = 500;
 
 function VoteHalf({
   side,
-  winKey,
-  loseKey,
+  winId,
+  loseId,
   disabled,
   edge,
   onVote,
 }: {
   side: DuelSide;
-  winKey: string;
-  loseKey: string;
+  winId: string | null;
+  loseId: string | null;
   disabled: boolean;
   edge: "left" | "right";
-  onVote: (bookKey: string) => void;
+  onVote: (workId: string) => void;
 }) {
   const { colors } = useTheme();
   const y = useSharedValue(0);
@@ -42,18 +42,18 @@ function VoteHalf({
       if (committed.get()) return;
       const direction = event.translationY <= -SWIPE_THRESHOLD || event.velocityY < -850 && event.translationY < -30 ? -1
         : event.translationY >= SWIPE_THRESHOLD || event.velocityY > 850 && event.translationY > 30 ? 1 : 0;
-      if (!direction) {
+      const workId = direction < 0 ? winId : loseId;
+      if (!direction || !workId) {
         y.set(withSpring(0, { duration: 400, dampingRatio: 0.8, velocity: event.velocityY, reduceMotion: ReduceMotion.System }));
         return;
       }
       committed.set(true);
       scheduleOnRN(commitHaptic);
-      const bookKey = direction < 0 ? winKey : loseKey;
       if (reducedMotion) {
-        scheduleOnRN(onVote, bookKey);
+        scheduleOnRN(onVote, workId);
       } else {
         y.set(withTiming(direction * FLY_OUT_DISTANCE, { duration: 180 }, (finished) => {
-          if (finished) scheduleOnRN(onVote, bookKey);
+          if (finished) scheduleOnRN(onVote, workId);
         }));
       }
     });
@@ -61,9 +61,10 @@ function VoteHalf({
   // letting the pan try first and racing a tap alongside it resolves cleanly:
   // real drags activate the pan and the tap never fires, taps activate on
   // release with the pan still pending.
-  const tap = Gesture.Tap().enabled(!disabled).onEnd(() => {
+  const tap = Gesture.Tap().enabled(!disabled && winId !== null).onEnd(() => {
+    if (!winId) return;
     scheduleOnRN(commitHaptic);
-    scheduleOnRN(onVote, winKey);
+    scheduleOnRN(onVote, winId);
   });
 
   const cardStyle = useAnimatedStyle(() => ({ transform: [
@@ -87,7 +88,8 @@ function VoteHalf({
         accessibilityRole="button"
         accessibilityLabel={`${side.title} by ${side.author}`}
         accessibilityHint="Picks this book as the winner"
-        onAccessibilityTap={() => onVote(winKey)}
+        accessibilityState={{ disabled: disabled || winId === null }}
+        onAccessibilityTap={() => { if (winId) onVote(winId); }}
         style={[styles.half, rounding, cardStyle]}
       >
         <BookCover cover={side.cover} title={side.title} fill />
@@ -110,17 +112,17 @@ function VoteHalf({
 /** One card at a time, remounted per attempt: a swipe animates a half off
  *  screen, so both the next duel and a retry of this one need fresh ones
  *  back at rest. */
-export function ArenaVoteDeck({ duel, disabled, onVote }: { duel: Duel; disabled: boolean; onVote: (bookKey: string) => void }) {
+export function ArenaVoteDeck({ duel, disabled, onVote }: { duel: Duel; disabled: boolean; onVote: (workId: string) => void }) {
   const { colors } = useTheme();
   const [attempt, setAttempt] = useState(0);
-  const vote = (bookKey: string) => { setAttempt((n) => n + 1); onVote(bookKey); };
+  const vote = (workId: string) => { setAttempt((n) => n + 1); onVote(workId); };
 
   return (
     <View key={`${duel.id}:${attempt}`} style={styles.wrap}>
       <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.center, { color: colors.text }]}>Round {duel.roundNumber} · Match {duel.duelIndex + 1} · {countdownLabel(duel.closesAt)}</Text>
       <View style={styles.row}>
-        <VoteHalf side={duel.bookA} winKey={duel.bookA.key} loseKey={duel.bookB.key} disabled={disabled} edge="left" onVote={vote} />
-        <VoteHalf side={duel.bookB} winKey={duel.bookB.key} loseKey={duel.bookA.key} disabled={disabled} edge="right" onVote={vote} />
+        <VoteHalf side={duel.bookA} winId={duel.bookA.workId} loseId={duel.bookB.workId} disabled={disabled} edge="left" onVote={vote} />
+        <VoteHalf side={duel.bookB} winId={duel.bookB.workId} loseId={duel.bookA.workId} disabled={disabled} edge="right" onVote={vote} />
         <View pointerEvents="none" style={[styles.vs, { backgroundColor: colors.surface, borderColor: colors.border }]}><Text style={[styles.vsText, { color: colors.text }]}>VS</Text></View>
       </View>
       <Text {...dynamicType} style={[typography.caption, styles.center, { color: colors.textDim }]}>Swipe a cover up to pick it, down to pass — or tap it</Text>

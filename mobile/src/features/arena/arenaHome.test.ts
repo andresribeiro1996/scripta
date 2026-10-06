@@ -30,7 +30,7 @@ const tournament = (over: Partial<TournamentSummary> = {}): TournamentSummary =>
 const tierlist = (over: Partial<Tierlist> = {}): Tierlist => ({
   id: "l1",
   name: "Fantasy ranked",
-  data: { tiers: [{ id: "s", label: "S", color: "#000000", bookKeys: [] }], pool: [] },
+  data: { tiers: [{ id: "s", label: "S", color: "#000000", workIds: [] }], pool: [] },
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
   voteCode: null,
@@ -45,7 +45,7 @@ const tierlist = (over: Partial<Tierlist> = {}): Tierlist => ({
 const quiz = (over: Partial<Quiz> = {}): Quiz => ({
   id: "q1",
   name: "Cover quiz",
-  data: { sourceLabel: "", questionCount: 10, allowedTypes: [], books: [{ key: "k", title: "T", author: "A", coverUrl: null, quote: null, blurb: null }], questions: null },
+  data: { sourceLabel: "", questionCount: 10, allowedTypes: [], books: [{ workId: "k", title: "T", author: "A", coverUrl: null, quote: null, blurb: null }], questions: null },
   voteCode: null,
   playOpen: false,
   createdAt: "2026-01-01T00:00:00.000Z",
@@ -73,8 +73,8 @@ test("owned items summarise each kind for its card", () => {
   assert.equal(itemDetail(ownedItems("tierlists", [], [tierlist({ voteCode: "abc", votingOpen: true })])), "0 books · 1 tier · voting open");
 
   const sorted = tierlist({ data: { tiers: [
-    { id: "s", label: "S", color: "#c9482f", bookKeys: ["a", "b"] },
-    { id: "a", label: "A", color: "#d98a3d", bookKeys: ["c"] },
+    { id: "s", label: "S", color: "#c9482f", workIds: ["a", "b"] },
+    { id: "a", label: "A", color: "#d98a3d", workIds: ["c"] },
   ], pool: [] } });
   assert.equal(itemDetail(ownedItems("tierlists", [], [sorted])), "3 books · 2 tiers");
 });
@@ -105,9 +105,9 @@ test("empty copy distinguishes an empty tab from an unmatched search", () => {
 
 test("tier distribution weights each segment by how many books sit in it", () => {
   const segments = tierDistribution([
-    { id: "s", label: "S", color: "#c9482f", bookKeys: ["a", "b", "c"] },
-    { id: "a", label: "A", color: "#d98a3d", bookKeys: ["d"] },
-    { id: "b", label: "B", color: "#c9a53d", bookKeys: [] },
+    { id: "s", label: "S", color: "#c9482f", workIds: ["a", "b", "c"] },
+    { id: "a", label: "A", color: "#d98a3d", workIds: ["d"] },
+    { id: "b", label: "B", color: "#c9a53d", workIds: [] },
   ]);
   assert.deepEqual(segments, [
     { color: "#c9482f", weight: 3 },
@@ -118,8 +118,8 @@ test("tier distribution weights each segment by how many books sit in it", () =>
 
 test("a tier list with nothing sorted yet draws an even ladder, not an empty bar", () => {
   const segments = tierDistribution([
-    { id: "s", label: "S", color: "#c9482f", bookKeys: [] },
-    { id: "a", label: "A", color: "#d98a3d", bookKeys: [] },
+    { id: "s", label: "S", color: "#c9482f", workIds: [] },
+    { id: "a", label: "A", color: "#d98a3d", workIds: [] },
   ]);
   assert.deepEqual(segments.map((segment) => segment.weight), [1, 1]);
   assert.deepEqual(tierDistribution([]), []);
@@ -148,7 +148,7 @@ test("the cover remainder counts seeded books with no thumbnail shown", () => {
 });
 
 test("the champion is drawn once — as the card's cover, not in the stack too", () => {
-  const champion = { key: "b", title: "Hyperion", author: "Simmons", cover: "b" };
+  const champion = { workId: "b", title: "Hyperion", author: "Simmons", cover: "b" };
   const finished = tournament({ status: "completed", filledSlots: 4, covers: ["a", "b", "c"], winner: champion });
   assert.deepEqual(previewCovers(finished), ["a", "c"]);
   // Two in the stack, one as the winner cover, one seeded without art.

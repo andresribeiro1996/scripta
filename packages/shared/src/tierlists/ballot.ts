@@ -16,19 +16,19 @@ export interface PublishedBoard {
 }
 
 export interface Placement {
-  bookKey: string;
+  workId: string;
   tierId: string;
 }
 
 export function blankBoard(board: PublishedBoard): TierlistData {
-  return { tiers: board.tiers.map((tier) => ({ ...tier, bookKeys: [] })), pool: board.pool };
+  return { tiers: board.tiers.map((tier) => ({ ...tier, workIds: [] })), pool: board.pool };
 }
 
 export function ballotBoard(board: PublishedBoard, placements: Placement[]): TierlistData {
-  const tiers = board.tiers.map((tier) => ({ ...tier, bookKeys: placements.filter((placement) => placement.tierId === tier.id).map((placement) => placement.bookKey) }));
+  const tiers = board.tiers.map((tier) => ({ ...tier, workIds: placements.filter((placement) => placement.tierId === tier.id).map((placement) => placement.workId) }));
   // Derived from what actually landed in a tier, not from the placements:
   // a placement naming a tier the board no longer has must leave its book
   // in the pool rather than drop it off the board entirely.
-  const ranked = new Set(tiers.flatMap((tier) => tier.bookKeys));
-  return { tiers, pool: board.pool.filter((key) => !ranked.has(key)) };
+  const ranked = new Set(tiers.flatMap((tier) => tier.workIds));
+  return { tiers, pool: board.pool.filter((workId) => !ranked.has(workId)) };
 }

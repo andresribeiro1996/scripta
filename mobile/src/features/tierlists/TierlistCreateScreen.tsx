@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Stack, router } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { bookKey, createTier, DEFAULT_TIER_PRESET, filterBooks, type TierlistData } from "@scripta/shared";
+import { booksByWork, createTier, DEFAULT_TIER_PRESET, filterBooks, workIdOf, type TierlistData } from "@scripta/shared";
 import { FlatList, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
-import { useLibrary } from "../library";
+import { useLibrary, useWorkBooks } from "../library";
 import { Button, ErrorState, Input, Screen, Segmented, Skeleton, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { createTierlist, type Tierlist } from "./api";
 
@@ -24,7 +24,8 @@ export function TierlistCreateScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const library = useLibrary();
-  const books = library.data?.data?.books ?? [];
+  const workBooks = useWorkBooks(library.data);
+  const books = useMemo(() => [...booksByWork(workBooks).values()], [workBooks]);
   const selected = new Set(pool);
   const filtered = filterBooks(books, search, "all");
 
@@ -52,12 +53,12 @@ export function TierlistCreateScreen() {
       <Input label={`Books in pool · ${pool.length}`} value={search} onChangeText={setSearch} placeholder="Search your library" autoCapitalize="none" autoCorrect={false} />
       {library.isPending ? <Skeleton height={160} /> : library.isError ? <ErrorState body="Your library couldn't be loaded." actionLabel="Retry" onAction={() => void library.refetch()} /> : <FlatList
         data={filtered}
-        keyExtractor={bookKey}
+        keyExtractor={(book) => workIdOf(book) ?? ""}
         ListEmptyComponent={<Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>No books found.</Text>}
         renderItem={({ item }) => {
-          const key = bookKey(item);
-          const checked = selected.has(key);
-          return <Pressable accessibilityRole="checkbox" accessibilityState={{ checked }} onPress={() => setPool((value) => checked ? value.filter((entry) => entry !== key) : [...value, key])} style={[styles.book, { borderColor: checked ? colors.accent : colors.border, backgroundColor: checked ? colors.accentSoft : colors.surface }]}>
+          const workId = workIdOf(item) ?? "";
+          const checked = selected.has(workId);
+          return <Pressable accessibilityRole="checkbox" accessibilityState={{ checked }} onPress={() => setPool((value) => checked ? value.filter((entry) => entry !== workId) : [...value, workId])} style={[styles.book, { borderColor: checked ? colors.accent : colors.border, backgroundColor: checked ? colors.accentSoft : colors.surface }]}>
             <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.grow, { color: colors.text }]}>{String(item.Title ?? "Untitled")}</Text>
             <Text {...dynamicType} style={[typography.body, { color: colors.accent }]}>{checked ? "✓" : "+"}</Text>
           </Pressable>;

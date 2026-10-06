@@ -37,7 +37,9 @@ the design notes this spec follows.
 3. **Keyless editions get works of our own**, one per edition in this phase.
    Titles and `ta:` keys never choose a work: edition titles differ by
    language, and the title key caused a real collision bug (fixed
-   2026-10-01).
+   2026-10-01). Superseded on 2026-10-04 by
+   `2026-10-04-keyless-works-design.md`: `ta:` aliases still never choose a
+   work, but a stored title key groups keyless works.
 4. **Covers stay per edition.**
 5. **Every edition records its language** as a BCP 47 tag (`en`, `pt-PT`,
    `pt-BR`, `es`, …), or `NULL` when no source says.
@@ -136,8 +138,8 @@ the background lookup, if it is built.
 
 ## Not in this phase
 
-- **Grouping keyless editions by title plus author.** Until then each is its
-  own work, and `ta:` keys never choose a work.
+- **Grouping keyless editions by title plus author.** Built in
+  `2026-10-04-keyless-works-design.md`.
 - **Library rows and reader overlap by work**
   (`2026-10-01-library-rows-design.md`).
 - **Games storing `work_id`** instead of `bookKey`: phase E.

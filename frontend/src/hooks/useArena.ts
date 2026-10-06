@@ -29,8 +29,8 @@ export function useArena(id: string) {
     refetchInterval: (q) => (q.state.data?.status === "completed" ? false : POLL_INTERVAL_MS)
   });
 
-  async function vote(duelId: string, bookKey: string) {
-    await voteOnDuel(id, duelId, voterToken, bookKey);
+  async function vote(duelId: string, workId: string) {
+    await voteOnDuel(id, duelId, voterToken, workId);
     await queryClient.invalidateQueries({ queryKey });
   }
 

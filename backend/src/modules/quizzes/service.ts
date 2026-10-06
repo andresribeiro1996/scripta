@@ -82,8 +82,8 @@ function toResultPlay(row: PlayRow): ResultPlay {
   return { playId: row.id, playerName: row.player_name, score: row.score, durationMs: row.duration_ms, createdAt: row.created_at };
 }
 
-function toPublicQuestion(question: QuizQuestion, bookByKey: Map<string, QuizBook>): PublicQuizQuestion {
-  const book = bookByKey.get(question.bookKey);
+function toPublicQuestion(question: QuizQuestion, bookByWork: Map<string, QuizBook>): PublicQuizQuestion {
+  const book = question.workId === null ? undefined : bookByWork.get(question.workId);
   const prompt =
     question.type === "cover_title"
       ? book?.coverUrl ?? ""
@@ -104,7 +104,7 @@ export interface QuizzesService {
   /** `resolvedBooks` carries the public cover URLs the route resolved from
    *  the owner's library (the same resolver tierlists' open-voting uses);
    *  books that already carry one (pool picks) keep theirs. */
-  publishQuiz(userId: string, id: string, resolvedBooks: Array<{ bookKey: string; coverUrl: string | null }>): PublishOutcome;
+  publishQuiz(userId: string, id: string, resolvedBooks: Array<{ workId: string; coverUrl: string | null }>, canonical?: Map<string, string>): PublishOutcome;
   setPlayState(userId: string, id: string, open: boolean): Quiz | undefined;
   getPlayBoard(code: string): PlayBoard | undefined;
   submitPlay(code: string, answers: SubmittedAnswer[], durationMs: number, playerName: string | null, player: Player): PlayOutcome;
@@ -162,16 +162,23 @@ export function createQuizzesService(repo: QuizzesRepository): QuizzesService {
       return repo.delete(id, userId);
     },
 
-    publishQuiz(userId, id, resolvedBooks) {
+    publishQuiz(userId, id, resolvedBooks, canonical = new Map()) {
       const row = repo.getOwned(id, userId);
       if (!row) return { ok: false, reason: "not-found" };
       if (row.vote_code !== null) return { ok: false, reason: "already-published", error: "This quiz is already published." };
       const doc = readDocument(toQuiz(row));
+      const seenWorks = new Set<string>();
+      doc.books = doc.books.filter((b) => {
+        const work = canonical.get(b.workId) ?? b.workId;
+        if (seenWorks.has(work)) return false;
+        seenWorks.add(work);
+        return true;
+      });
       if (doc.books.length < 4) return { ok: false, reason: "invalid", error: "A quiz needs at least 4 books." };
-      const coverByKey = new Map(resolvedBooks.map((b) => [b.bookKey, b.coverUrl]));
-      const books = doc.books.map((b) => ({ ...b, coverUrl: b.coverUrl ?? coverByKey.get(b.key) ?? null }));
+      const coverByWork = new Map(resolvedBooks.map((b) => [b.workId, b.coverUrl]));
+      const books = doc.books.map((b) => ({ ...b, coverUrl: b.coverUrl ?? coverByWork.get(b.workId) ?? null }));
       const code = generateVoteCode();
-      const questions = generateQuizQuestions(books, { questionCount: doc.questionCount, allowedTypes: doc.allowedTypes }, code);
+      const questions = generateQuizQuestions(books, { questionCount: doc.questionCount, allowedTypes: doc.allowedTypes }, code).map((question) => ({ id: question.id, type: question.type, workId: question.book.workId, options: question.options, answerIndex: question.answerIndex }));
       if (questions.length !== doc.questionCount) {
         return { ok: false, reason: "invalid", error: "Not enough books have the covers, quotes, or blurbs those question types need." };
       }
@@ -189,14 +196,14 @@ export function createQuizzesService(repo: QuizzesRepository): QuizzesService {
       const row = repo.getByVoteCode(code);
       if (!row) return undefined;
       const doc = readDocument(toQuiz(row));
-      const bookByKey = new Map(doc.books.map((b) => [b.key, b]));
+      const bookByWork = new Map(doc.books.map((b) => [b.workId, b]));
       return {
         name: row.name,
         sourceLabel: doc.sourceLabel,
         questionCount: doc.questionCount,
         playOpen: row.play_open === 1,
         playCount: repo.playCount(row.id),
-        questions: (doc.questions ?? []).map((q) => toPublicQuestion(q, bookByKey))
+        questions: (doc.questions ?? []).map((q) => toPublicQuestion(q, bookByWork))
       };
     },
 

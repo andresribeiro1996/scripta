@@ -6,7 +6,7 @@
 
 import { getSession } from "../auth/tokenStore";
 import { apiFetch, publicFetch } from "./client";
-import type { PublicQuizQuestion, QuestionStat, QuizData, ResultPlay } from "@scripta/shared";
+import type { PublicQuizQuestion, QuestionStat, QuizData, QuizDataInput, ResultPlay } from "@scripta/shared";
 
 export type { PublicQuizQuestion, QuestionStat, QuizData, ResultPlay };
 
@@ -51,7 +51,7 @@ export async function fetchQuiz(id: string): Promise<Quiz> {
   return (await apiFetch(`/quizzes/${id}`)) as Quiz;
 }
 
-export async function createQuizApi(name: string, data: QuizData): Promise<Quiz> {
+export async function createQuizApi(name: string, data: QuizDataInput): Promise<Quiz> {
   return (await apiFetch("/quizzes", { method: "POST", body: JSON.stringify({ name, data }) })) as Quiz;
 }
 

@@ -29,6 +29,7 @@
 // padding: with flexible cells, anything hanging past a cell's boundary
 // would overlap its neighbour instead of meeting it.
 
+import { duelWinner } from "@scripta/shared";
 import { useMemo, useState } from "react";
 import type { Duel, DuelSide, TournamentView } from "../../api/arena";
 import { CoverImage } from "../BookCard";
@@ -113,7 +114,8 @@ function EmptyTile() {
 
 function MatchTile({ duel, onOpen }: { duel: BracketSlot; onOpen: () => void }) {
   if (!duel) return <EmptyTile />;
-  const decided = duel.winnerKey !== null;
+  const decided = duel.status === "settled";
+  const winner = duelWinner(duel);
   const pctA = sharePercent(duel.bookA.votes, duel);
   const pctB = sharePercent(duel.bookB.votes, duel);
 
@@ -133,7 +135,7 @@ function MatchTile({ duel, onOpen }: { duel: BracketSlot; onOpen: () => void }) 
         `${duel.bookA.title} versus ${duel.bookB.title}` +
         (pctA === null ? ", no votes yet" : `, ${pctA}% to ${pctB}%`) +
         (needsVote(duel) ? ", you haven't voted" : "") +
-        (decided ? `, ${duel.winnerKey === duel.bookA.key ? duel.bookA.title : duel.bookB.title} advanced` : "")
+        (winner ? `, ${winner.title} advanced` : "")
       }
       className={`relative flex w-full items-stretch rounded border bg-(--color-surface) text-left hover:bg-(--color-surface-hover) sm:rounded-lg ${
         duel.status === "active" ? "border-(--color-accent)" : "border-(--color-border)"
@@ -149,9 +151,9 @@ function MatchTile({ duel, onOpen }: { duel: BracketSlot; onOpen: () => void }) 
           aria-hidden
         />
       )}
-      <MatchSide side={duel.bookA} duel={duel} isWinner={duel.winnerKey === duel.bookA.key} decided={decided} />
+      <MatchSide side={duel.bookA} duel={duel} isWinner={winner === duel.bookA} decided={decided} />
       <div className="w-px shrink-0 bg-(--color-border)" />
-      <MatchSide side={duel.bookB} duel={duel} isWinner={duel.winnerKey === duel.bookB.key} decided={decided} />
+      <MatchSide side={duel.bookB} duel={duel} isWinner={winner === duel.bookB} decided={decided} />
     </button>
   );
 }
@@ -160,7 +162,7 @@ function MatchTile({ duel, onOpen }: { duel: BracketSlot; onOpen: () => void }) 
 function SheetSide({ side, duel }: { side: DuelSide; duel: Duel }) {
   const coverBook = useMemo(() => coverBookFor(side), [side.title, side.author, side.cover]);
   const pct = sharePercent(side.votes, duel);
-  const won = duel.winnerKey === side.key;
+  const won = duelWinner(duel) === side;
   return (
     <div className="flex min-w-0 flex-1 flex-col items-center text-center">
       <div className={`relative aspect-2/3 w-16 overflow-hidden rounded-lg bg-(--color-border) ${won ? "ring-2 ring-(--color-accent)" : ""}`}>
@@ -203,11 +205,12 @@ function MatchSheet({
   duel: Duel;
   canVote: boolean;
   voting: boolean;
-  onVote: ((bookKey: string) => void) | undefined;
+  onVote: ((workId: string) => void) | undefined;
   onClose: () => void;
 }) {
   const countdown = useCountdown(duel.closesAt);
-  const decided = duel.winnerKey !== null;
+  const decided = duel.status === "settled";
+  const winner = duelWinner(duel);
   return (
     <Sheet title="Match" onClose={onClose}>
       <div className="flex items-start gap-2 px-2 pt-1">
@@ -217,11 +220,13 @@ function MatchSheet({
       </div>
 
       <p className="mt-3 text-center text-xs text-(--color-text-dim)">
-        {decided
-          ? `${duel.winnerKey === duel.bookA.key ? duel.bookA.title : duel.bookB.title} advanced`
-          : duel.status === "active"
-            ? countdown
-            : "Waiting on a tiebreak"}
+        {winner
+          ? `${winner.title} advanced`
+          : duel.status === "settled"
+            ? "Settled"
+            : duel.status === "active"
+              ? countdown
+              : "Waiting on a tiebreak"}
       </p>
 
       {canVote && onVote && (
@@ -230,9 +235,9 @@ function MatchSheet({
           <div className="flex gap-2">
             {[duel.bookA, duel.bookB].map((s) => (
               <button
-                key={s.key}
-                onClick={() => onVote(s.key)}
-                disabled={voting}
+                key={s.workId ?? s.title}
+                onClick={() => s.workId && onVote(s.workId)}
+                disabled={voting || s.workId === null}
                 className="min-h-11 min-w-0 flex-1 truncate rounded-lg bg-(--color-accent) px-3 text-sm font-semibold text-(--color-on-accent) disabled:opacity-60"
               >
                 {s.title}
@@ -335,7 +340,7 @@ export function BracketMap({
 }: {
   tournament: TournamentView;
   /** Casts a vote. Omitted for a viewer who can't vote at all. */
-  onVote?: (duelId: string, bookKey: string) => void;
+  onVote?: (duelId: string, workId: string) => void;
   /** The duel whose vote is currently in flight, so its buttons disable. */
   votingDuelId?: string | null;
 }) {
@@ -387,12 +392,7 @@ export function BracketMap({
   }
 
   const finalDuel = hasCentre ? finalRound[0]! : null;
-  const champion: DuelSide | null =
-    finalDuel && finalDuel.winnerKey
-      ? finalDuel.winnerKey === finalDuel.bookA.key
-        ? finalDuel.bookA
-        : finalDuel.bookB
-      : null;
+  const champion: DuelSide | null = finalDuel ? duelWinner(finalDuel) : null;
 
   return (
     <div className="flex w-full flex-col">
@@ -456,7 +456,7 @@ export function BracketMap({
           duel={openDuel}
           canVote={tournament.status === "active" && openDuel.status === "active" && !openDuel.hasVoted && Boolean(onVote)}
           voting={votingDuelId === openDuel.id}
-          onVote={onVote ? (bookKey) => onVote(openDuel.id, bookKey) : undefined}
+          onVote={onVote ? (workId) => onVote(openDuel.id, workId) : undefined}
           onClose={() => setOpen(null)}
         />
       )}

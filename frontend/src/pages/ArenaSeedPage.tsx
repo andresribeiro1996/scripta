@@ -3,6 +3,7 @@
 // session isn't this tournament's owner, or if it's already started
 // (seeding is a one-time step).
 
+import { booksByWork } from "@scripta/shared";
 import { useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import {
@@ -19,6 +20,7 @@ import { OptionSheet } from "../components/Sheet";
 import { useArena } from "../hooks/useArena";
 import { useLibrary } from "../hooks/useLibrary";
 import { toSeedBook } from "../lib/arenaSeed";
+import { useWorkBooks } from "../hooks/useWorkBooks";
 
 /** Bracket sizes offered for a draft. Powers of two only — the service
  *  rejects anything else, and every round has to halve cleanly down to
@@ -44,6 +46,7 @@ export function ArenaSeedPage() {
   const isDraft = id === "new";
   const { tournament, isLoading, refetch } = useArena(isDraft ? "" : id!);
   const { data: library } = useLibrary();
+  const workBooks = useWorkBooks(library);
   const [slots, setSlots] = useState<Array<SeedBook | null>>([]);
   const [starting, setStarting] = useState(false);
   const [randomFilling, setRandomFilling] = useState(false);
@@ -190,8 +193,7 @@ export function ArenaSeedPage() {
     setRandomFilling(true);
     setActionError(null);
     try {
-      const books = ((library?.data as { books?: Array<Record<string, unknown>> } | undefined)?.books ?? []) as Array<Record<string, unknown>>;
-      const pool = await Promise.all(books.map((book) => toSeedBook(book)));
+      const pool = (await Promise.all([...booksByWork(workBooks).values()].map((book) => toSeedBook(book)))).filter((seed): seed is SeedBook => seed !== null);
       const target = await materialize();
       if (!target) return;
       await randomFillTournament(target.id, pool);

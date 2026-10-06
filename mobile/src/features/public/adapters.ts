@@ -3,7 +3,7 @@ import type { Tierlist } from "../tierlists/api";
 import type { PublicBookData, PublicHighlight } from "./api";
 
 function privateBook(book: PublicBookData): Record<string, unknown> {
-  return { Title: book.title, Attribution: book.author, ISBN: book.isbn, ImageId: book.imageId, _coverUrl: book.coverUrl, ReadStatus: book.readStatus, highlights: [] };
+  return { Title: book.title, Attribution: book.author, ISBN: book.isbn, ImageId: book.imageId, _coverUrl: book.coverUrl, ReadStatus: book.readStatus, _key: book.key, _workId: book.workId ?? undefined, highlights: [] };
 }
 
 export function reconstructBooks(books: PublicBookData[], reading: PublicBookData[], highlights: PublicHighlight[]) {

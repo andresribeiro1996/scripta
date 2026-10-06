@@ -8,6 +8,7 @@ import { Text } from "../../ui/Text";
 import { API_URL } from "../../core/config";
 import { Button, Dialog, ErrorState, FormScroll, IconButton, Input, Menu, type MenuItem, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { coverUrlForApi } from "../library/lib/coverUrl";
+import { publicContentUrl } from "../sharing/links";
 import { fetchQuizResults, publishQuiz, setPlayState, updateQuiz, type Quiz } from "./api";
 
 type EditorView = "setup" | "results";
@@ -20,12 +21,6 @@ const TYPE_LABELS: Record<QuizQuestionType, string> = {
   quote_title: "Quote → title",
   blurb_title: "Blurb → title",
 };
-
-// The public web origin — the same host the universal links claim.
-// Linking.createURL would strand recipients without the app on a
-// scripta:/// or exp:// URL; the HTTPS link plays in any browser and
-// opens the installed app for those who have it.
-const WEB_ORIGIN = "https://atmyshelf.com";
 
 const uriFor = (url: string): string => coverUrlForApi(url, API_URL);
 
@@ -89,12 +84,21 @@ export function QuizEditorScreen({ quiz, onUpdated }: { quiz: Quiz; onUpdated: (
     }
   }
 
+  async function shareChallengeLink() {
+    setError(null);
+    try {
+      await Share.share({ message: await publicContentUrl(`/play/${current.voteCode}`) });
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Couldn't create a public link.");
+    }
+  }
+
   const frozen = current.voteCode !== null;
   const dirty = !frozen && JSON.stringify(data) !== JSON.stringify(current.data);
   const lockEdits = publishing;
   const actionItems: MenuItem[] = frozen
     ? [
-      { label: "Share challenge link", onPress: () => void Share.share({ message: `${WEB_ORIGIN}/play/${current.voteCode}` }) },
+      { label: "Share challenge link", onPress: () => void shareChallengeLink() },
       { label: current.playOpen ? "Close for play" : "Open for play", onPress: () => void run(() => setPlayState(current.id, !current.playOpen)) },
     ]
     : [{ label: "Publish…", onPress: () => setConfirmingPublish(true) }];
@@ -125,10 +129,10 @@ export function QuizEditorScreen({ quiz, onUpdated }: { quiz: Quiz; onUpdated: (
           {!offered ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>no book has this data</Text> : <Text {...dynamicType} style={[typography.body, { color: colors.accent }]}>{checked ? "✓" : ""}</Text>}
         </Pressable>;
       })}
-      {data.books.map((book) => <View key={book.key} style={[styles.book, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+      {data.books.map((book) => <View key={book.workId} style={[styles.book, { borderColor: colors.border, backgroundColor: colors.surface }]}>
         <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{book.title}</Text>
-        <Input label="Quote (optional)" value={book.quote ?? ""} editable={!lockEdits} onChangeText={(quote) => setData((value) => ({ ...value, books: value.books.map((entry) => entry.key === book.key ? { ...entry, quote } : entry) }))} placeholder="Paste a line from this book…" multiline />
-        <Input label="Blurb (optional)" value={book.blurb ?? ""} editable={!lockEdits} onChangeText={(blurb) => setData((value) => ({ ...value, books: value.books.map((entry) => entry.key === book.key ? { ...entry, blurb } : entry) }))} multiline />
+        <Input label="Quote (optional)" value={book.quote ?? ""} editable={!lockEdits} onChangeText={(quote) => setData((value) => ({ ...value, books: value.books.map((entry) => entry.workId === book.workId ? { ...entry, quote } : entry) }))} placeholder="Paste a line from this book…" multiline />
+        <Input label="Blurb (optional)" value={book.blurb ?? ""} editable={!lockEdits} onChangeText={(blurb) => setData((value) => ({ ...value, books: value.books.map((entry) => entry.workId === book.workId ? { ...entry, blurb } : entry) }))} multiline />
       </View>)}
       <Button label="Publish quiz" loading={publishing} disabled={data.books.length < 4 || busy} onPress={() => setConfirmingPublish(true)} />
       {data.books.length < 4 ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>A quiz needs at least 4 books.</Text> : null}
