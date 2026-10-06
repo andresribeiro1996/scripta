@@ -14,7 +14,7 @@ const fileParamsSchema = z.object({ id: z.string().uuid(), size: z.enum(["file",
 
 const FORBIDDEN = { error: "Only the admin can change shared covers." };
 const NOT_FOUND = { error: "No such book." };
-const WORKS_FORBIDDEN = { error: "Only the admin can merge works." };
+const WORKS_FORBIDDEN = { error: "Only the admin can change works." };
 const mergeSchema = z.object({ from: lookupSchema, into: lookupSchema });
 const detachSchema = z.object({ edition: lookupSchema });
 
@@ -87,7 +87,7 @@ export function buildCatalogRoutes(service: BooksService) {
   };
 }
 
-export function buildAdminRoutes(service: BooksService) {
+export function buildAdminRoutes(service: BooksService, groupWorks: () => Promise<number | null>) {
   return async function adminRoutes(app: FastifyInstance) {
     app.get("/books/admin", { preHandler: authGuard }, async (request, reply) => {
       return reply.send({ isAdmin: service.isAdmin(request.user.id) });
@@ -135,6 +135,13 @@ export function buildAdminRoutes(service: BooksService) {
         if (error instanceof WorkMergeError) return reply.code(409).send({ error: error.message });
         throw error;
       }
+    });
+
+    app.post("/books/works/group", { preHandler: authGuard }, async (request, reply) => {
+      if (!service.isAdmin(request.user.id)) return reply.code(403).send(WORKS_FORBIDDEN);
+      const grouped = await groupWorks();
+      if (grouped === null) return reply.code(409).send({ error: "Grouping is already running." });
+      return reply.send({ grouped });
     });
 
     app.post("/books/works/detach", { preHandler: authGuard }, async (request, reply) => {

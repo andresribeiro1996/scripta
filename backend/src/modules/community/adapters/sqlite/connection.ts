@@ -1,19 +1,16 @@
-import { DatabaseSync } from "node:sqlite";
-import { mkdirSync, readFileSync } from "node:fs";
+import type { DatabaseSync } from "node:sqlite";
+import { readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { normalizeFeedSettings, type FeedSettings } from "@scripta/shared/community";
 import { env } from "../../../../config/env.js";
+import { openSqlite } from "../../../../db/openSqlite.js";
 import { FEED_EVENT_TYPES, FEED_WINDOW_MS } from "../../domain/feed.js";
 
 const adapterDir = dirname(fileURLToPath(import.meta.url));
 
 export function openCommunityDb(): DatabaseSync {
-  mkdirSync(dirname(env.COMMUNITY_DB_PATH), { recursive: true });
-
-  const db = new DatabaseSync(env.COMMUNITY_DB_PATH);
-  db.exec("PRAGMA journal_mode = WAL");
-  db.exec("PRAGMA busy_timeout = 5000");
+  const db = openSqlite(env.COMMUNITY_DB_PATH);
   db.exec("PRAGMA foreign_keys = ON");
 
   const schema = readFileSync(`${adapterDir}/schema.sql`, "utf8");
