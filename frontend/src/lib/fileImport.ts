@@ -7,6 +7,7 @@
 // CSV shape by its own distinct header columns.
 
 import type { LibraryData } from "../api/library";
+import { bookCsvToLibraryJson, decodeLibraryImport } from "@scripta/shared";
 import { goodreadsCsvToLibraryJson, looksLikeGoodreadsCsv } from "./goodreads";
 import { isSqliteBytes, parseSqliteFile } from "./sqlite";
 import { looksLikeStorygraphCsv, storygraphCsvToLibraryJson } from "./storygraph";
@@ -18,12 +19,7 @@ export async function parseImportedFile(file: File): Promise<LibraryData> {
     return parseSqliteFile(bytes);
   }
 
-  let text: string;
-  try {
-    text = new TextDecoder("utf-8").decode(bytes);
-  } catch {
-    throw new Error("Couldn't decode that file as text, and it's not a SQLite database.");
-  }
+  const text = decodeLibraryImport(bytes);
 
   const parsedJson = tryParseJson(text);
   if (parsedJson) {
@@ -41,8 +37,11 @@ export async function parseImportedFile(file: File): Promise<LibraryData> {
     return storygraphCsvToLibraryJson(text);
   }
 
+  const books = bookCsvToLibraryJson(text);
+  if (books) return books;
+
   throw new Error(
-    "Didn't recognize that file — it's not a KoboReader.sqlite database, a kobo-export library JSON, a Goodreads library CSV export, or a StoryGraph library CSV export."
+    "Didn't recognize that file — choose Kobo SQLite, library JSON, Goodreads, StoryGraph, Calibre, LibraryThing TSV, BookWyrm CSV, or a book CSV with Title and Author columns."
   );
 }
 

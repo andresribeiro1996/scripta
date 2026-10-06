@@ -142,6 +142,8 @@ The web route tree has a native equivalent. The native tab shell uses shorter in
 
 ## Conventions
 
+- Import accepts Kobo SQLite, `library.json`, Goodreads, StoryGraph, Calibre CSV catalogs, LibraryThing TSV exports, BookWyrm book-list CSVs and spreadsheet CSVs. CSV files use the backend preview endpoint and shared parsers; confirm the preview to merge/save. **Save CSV template** in the import screen opens the system share sheet for saving a spreadsheet template. Title and Author are required; optional blank fields preserve existing data. Status is `to-read`, `reading` or `read`, ratings are 0–5, dates are `YYYY-MM-DD`, and ISBNs should be stored as text. Calibre standard metadata is supported; custom reading-status columns are not inferred.
+
 - One React version across the workspace: root `package.json` `overrides` pins `react`/`react-dom` to Expo SDK 57's exact version, and `frontend` declares the same. Do not widen either range without checking the other — two React copies in one Metro bundle fail with "Invalid hook call".
 - No `metro.config.js`: `@expo/metro-config` auto-detects the npm workspace root.
 - Shared logic goes in `@scripta/shared` (`packages/shared`, compiled `dist`), never duplicated between clients. Wave 1 fills it.

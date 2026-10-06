@@ -5,17 +5,20 @@
 /** Handles quoted fields, commas and newlines inside quotes, and "" as an
  *  escaped quote. Both Goodreads' and StoryGraph's exports need all of
  *  this — review text routinely contains commas and line breaks. */
-export function parseCsv(text: string): string[][] {
+export function parseCsv(text: string, delimiter: "," | "\t" = ","): string[][] {
+  text = text.replace(/^\uFEFF/, "");
   const rows: string[][] = [];
   let row: string[] = [];
   let field = "";
   let inQuotes = false;
+  let afterQuote = false;
   let i = 0;
   const len = text.length;
 
   function pushField() {
     row.push(field);
     field = "";
+    afterQuote = false;
   }
   function pushRow() {
     pushField();
@@ -33,6 +36,7 @@ export function parseCsv(text: string): string[][] {
           continue;
         }
         inQuotes = false;
+        afterQuote = true;
         i++;
         continue;
       }
@@ -40,12 +44,16 @@ export function parseCsv(text: string): string[][] {
       i++;
       continue;
     }
-    if (c === '"') {
+    if (afterQuote && c !== delimiter && c !== "\r" && c !== "\n" && c !== " " && c !== "\t") {
+      throw new Error("That CSV has invalid quoting.");
+    }
+    if (c === '"' && (delimiter === "," || field === "" || field === "=")) {
+      if (field !== "" && field !== "=") throw new Error("That CSV has invalid quoting.");
       inQuotes = true;
       i++;
       continue;
     }
-    if (c === ",") {
+    if (c === delimiter) {
       pushField();
       i++;
       continue;
@@ -62,6 +70,7 @@ export function parseCsv(text: string): string[][] {
     field += c;
     i++;
   }
+  if (inQuotes) throw new Error("That CSV has invalid quoting.");
   if (field.length > 0 || row.length > 0) pushRow();
 
   return rows;
