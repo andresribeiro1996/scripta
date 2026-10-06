@@ -1,4 +1,4 @@
-import type { FastifyReply, FastifyRequest } from "fastify";
+import type { FastifyReply } from "fastify";
 import { UnknownWorkError, WorkResolutionError } from "./modules/library/index.js";
 
 export function sendWorksError(reply: FastifyReply, err: unknown) {

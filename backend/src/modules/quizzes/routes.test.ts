@@ -381,3 +381,19 @@ test("a create answers from the books it resolved, even if the catalog dies righ
   }
   await app.close();
 });
+
+test("publish fills a missing cover from the owner's library copy of that work", async () => {
+  const ids = ["Fill A", "Fill B", "Fill C", "Fill D"].map(named);
+  const library = openLibraryDb();
+  library.prepare("INSERT INTO library_books (user_id, position, book_key, title, author, cover_url, row_hash, work_id) VALUES ('q14', 0, 'ta:fill a|someone', 'Fill A', 'Someone', 'https://covers.test/library-copy.jpg', 'h', ?)").run(ids[0]!);
+  library.prepare("INSERT INTO library_summary (user_id, meta, total_books, finished_count, in_progress_count, total_highlights, source_updated_at, rows_version) VALUES ('q14', '{}', 1, 0, 0, 0, '2026-01-01', 1)").run();
+  const { app, send, get } = await quizApp();
+  const created = await send("POST", "/quizzes", "q14", { name: "Fill", data: { questionCount: 3, allowedTypes: ["cover_title"], books: ids.map((id, index) => worksBook(`Fill ${"ABCD"[index]}`, id, index === 0 ? null : undefined)) } });
+  assert.equal(created.statusCode, 201);
+  assert.equal(created.json().data.books[0].coverUrl, null);
+  const published = await send("POST", `/quizzes/${created.json().id}/publish`, "q14", {});
+  assert.equal(published.statusCode, 201);
+  assert.deepEqual(published.json().quiz.data.books.map((entry: { coverUrl: string | null }) => entry.coverUrl), ["https://covers.test/library-copy.jpg", "https://covers.test/Fill%20B.jpg", "https://covers.test/Fill%20C.jpg", "https://covers.test/Fill%20D.jpg"]);
+  assert.equal((await get(`/quizzes/${created.json().id}`, "q14")).json().data.books[0].coverUrl, "https://covers.test/library-copy.jpg");
+  await app.close();
+});
