@@ -92,6 +92,8 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
       updated_at = excluded.updated_at
   `);
 
+  const visibilityStmt = db.prepare(`SELECT user_id, published, show_reading, show_reader_glyph FROM profiles WHERE user_id IN (SELECT value FROM json_each(?))`);
+
   const listEventsStmt = db.prepare(`
     SELECT * FROM events WHERE user_id = ? AND ${notHidden} ORDER BY created_at DESC, id DESC LIMIT ?
   `);
@@ -208,6 +210,10 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
         $feed_settings: JSON.stringify(settings),
         ...feedSettingColumns(settings)
       });
+    },
+    visibilityRows(userIds) {
+      if (userIds.length === 0) return [];
+      return visibilityStmt.all(JSON.stringify(userIds)) as Array<{ user_id: string; published: number; show_reading: number; show_reader_glyph: number }>;
     },
     insertEvent(row) {
       inTransaction(db, () => {

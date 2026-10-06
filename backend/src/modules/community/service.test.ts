@@ -40,6 +40,9 @@ function createRepoFake() {
     getFollow(followerId, followeeId) {
       return follows.get(key(followerId, followeeId));
     },
+    visibilityRows() {
+      return [];
+    },
     listFollowees(followerId) {
       return [...follows.values()].filter((row) => row.follower_id === followerId).map((row) => row.followee_id);
     },
