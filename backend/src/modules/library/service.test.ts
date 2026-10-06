@@ -1947,3 +1947,25 @@ test("raising the rows version rebuilds every account and rewrites every book ro
   users.forEach((userId, index) => assert.ok(hashes(userId).every((hash, position) => hash !== settledHashes[index]![position])));
   assert.deepEqual(staleUsers(2), []);
 });
+
+const titleWorks = (lookups: Array<{ title?: string | null }>) => lookups.map((lookup) => `w-${lookup.title}`);
+
+test("every library document answer carries each copy's canonical work", () => {
+  const service = createLibraryService(createSqliteLibraryRepository(memoryDb()), () => "", 10_000_000, undefined, undefined, undefined, undefined, titleWorks, (ids) => new Map(ids.map((id) => [id, id === "w-Dune" ? "w-dune" : id])));
+  const saved = service.saveLibrary("u1", { books: [{ Title: "Dune", Attribution: "Frank Herbert" }, { Title: "Orlando", Attribution: "Virginia Woolf" }] });
+  const works = { "ta:dune|frank herbert": "w-dune", "ta:orlando|virginia woolf": "w-Orlando" };
+  assert.deepEqual(saved.works, works);
+  assert.deepEqual(service.getLibraryText("u1")!.works, works);
+  assert.deepEqual(service.getLibrary("u1")!.works, works);
+  assert.deepEqual(service.share("u1").works, works);
+});
+
+test("a catalog outage still answers the library with stored work ids and logs it", () => {
+  const logged: string[] = [];
+  const service = createLibraryService(createSqliteLibraryRepository(memoryDb()), () => "", 10_000_000, undefined, undefined, undefined, (_error, message) => logged.push(message), titleWorks, () => {
+    throw new Error("catalog down");
+  });
+  service.saveLibrary("u1", { books: [{ Title: "Dune", Attribution: "Frank Herbert" }] });
+  assert.deepEqual(service.getLibrary("u1")!.works, { "ta:dune|frank herbert": "w-Dune" });
+  assert.ok(logged.some((message) => message.includes("work canonical lookup failed for u1")));
+});

@@ -20,6 +20,7 @@ const { openLibraryDb } = await import("./adapters/sqlite/connection.js");
 const { createLibraryService } = await import("./service.js");
 const { resolvePublicLibrary, resolvePublicLibraryData } = await import("./publicResolver.js");
 const { buildLibraryRoutes } = await import("./routes.js");
+const { resolveWorks } = await import("../books/index.js");
 const { openBooksDb } = await import("../books/adapters/sqlite/connection.js");
 const { lookupIdentity } = await import("../books/domain/normalize.js");
 const { coverUrlFor } = await import("../books/publicCoverLookup.js");
@@ -109,6 +110,8 @@ const saved = {
   bare: service.saveLibrary(users.bare, { books: [{ Title: "Only Title" }, { Attribution: "Only Author" }, {}] })
 };
 const tokens = { main: service.share(users.main).shareToken!, empty: service.share(users.empty).shareToken!, bare: service.share(users.bare).shareToken! };
+
+const workOf = (userId: string, key: string) => (openLibraryDb().prepare("SELECT work_id FROM library_books WHERE user_id = ? AND book_key = ? ORDER BY position LIMIT 1").get(userId, key) as { work_id: string | null }).work_id;
 
 const json = (value: unknown) => JSON.parse(JSON.stringify(value)) as unknown;
 
@@ -482,7 +485,9 @@ const expectedDataMain = {
       isbn: null,
       imageId: null,
       coverUrl: null,
-      readStatus: 1
+      readStatus: 1,
+      key: "ta:emma|jane austen",
+      workId: workOf(users.main, "ta:emma|jane austen")
     },
     {
       title: "Dune",
@@ -490,7 +495,9 @@ const expectedDataMain = {
       isbn: "9780441013593",
       imageId: null,
       coverUrl: null,
-      readStatus: 2
+      readStatus: 2,
+      key: "isbn:9780441013593",
+      workId: workOf(users.main, "isbn:9780441013593")
     },
     {
       title: "Untitled",
@@ -498,7 +505,9 @@ const expectedDataMain = {
       isbn: null,
       imageId: null,
       coverUrl: null,
-      readStatus: 0
+      readStatus: 0,
+      key: "ta:|anon author",
+      workId: workOf(users.main, "ta:|anon author")
     },
     {
       title: "Manual Cover",
@@ -506,7 +515,9 @@ const expectedDataMain = {
       isbn: "9781111111111",
       imageId: "0f2b6c3e-5d1a-4b7e-9c40-1a2b3c4d5e6f",
       coverUrl: "https://covers.test/manual.jpg",
-      readStatus: 1
+      readStatus: 1,
+      key: "isbn:9781111111111",
+      workId: workOf(users.main, "isbn:9781111111111")
     },
     {
       title: "Untitled",
@@ -514,7 +525,9 @@ const expectedDataMain = {
       isbn: "9780141439587",
       imageId: null,
       coverUrl: null,
-      readStatus: null
+      readStatus: null,
+      key: "isbn:9780141439587",
+      workId: workOf(users.main, "isbn:9780141439587")
     },
     {
       title: "Cached By Isbn",
@@ -522,7 +535,9 @@ const expectedDataMain = {
       isbn: "9783333333333",
       imageId: null,
       coverUrl: coverUrlFor(CACHE_ISBN_ID, "thumb"),
-      readStatus: 0
+      readStatus: 0,
+      key: "isbn:9783333333333",
+      workId: workOf(users.main, "isbn:9783333333333")
     },
     {
       title: "Cached By Title",
@@ -530,7 +545,9 @@ const expectedDataMain = {
       isbn: null,
       imageId: null,
       coverUrl: coverUrlFor(CACHE_TITLE_ID, "thumb"),
-      readStatus: 0
+      readStatus: 0,
+      key: "ta:cached by title|cache author",
+      workId: workOf(users.main, "ta:cached by title|cache author")
     },
     {
       title: "Isbn Without Cover",
@@ -538,7 +555,9 @@ const expectedDataMain = {
       isbn: "9784444444444",
       imageId: null,
       coverUrl: null,
-      readStatus: 1
+      readStatus: 1,
+      key: "isbn:9784444444444",
+      workId: workOf(users.main, "isbn:9784444444444")
     },
     {
       title: "Empty Cover",
@@ -546,7 +565,9 @@ const expectedDataMain = {
       isbn: "9782222222222",
       imageId: null,
       coverUrl: "",
-      readStatus: 0
+      readStatus: 0,
+      key: "isbn:9782222222222",
+      workId: workOf(users.main, "isbn:9782222222222")
     },
     {
       title: "Untitled",
@@ -554,7 +575,9 @@ const expectedDataMain = {
       isbn: null,
       imageId: null,
       coverUrl: null,
-      readStatus: null
+      readStatus: null,
+      key: "ta:|",
+      workId: workOf(users.main, "ta:|")
     },
     {
       title: "Bad Date",
@@ -562,7 +585,9 @@ const expectedDataMain = {
       isbn: null,
       imageId: null,
       coverUrl: null,
-      readStatus: 2
+      readStatus: 2,
+      key: "ta:bad date|date author",
+      workId: workOf(users.main, "ta:bad date|date author")
     }
   ],
   highlights: [
@@ -610,7 +635,9 @@ const expectedDataMain = {
       isbn: "9780441013593",
       imageId: null,
       coverUrl: null,
-      readStatus: 1
+      readStatus: 1,
+      key: "isbn:9780441013593",
+      workId: workOf(users.main, "isbn:9780441013593")
     },
     {
       title: "Manual Cover",
@@ -618,7 +645,9 @@ const expectedDataMain = {
       isbn: "9781111111111",
       imageId: "0f2b6c3e-5d1a-4b7e-9c40-1a2b3c4d5e6f",
       coverUrl: "https://covers.test/manual.jpg",
-      readStatus: 1
+      readStatus: 1,
+      key: "isbn:9781111111111",
+      workId: workOf(users.main, "isbn:9781111111111")
     },
     {
       title: "Isbn Without Cover",
@@ -626,7 +655,9 @@ const expectedDataMain = {
       isbn: "9784444444444",
       imageId: null,
       coverUrl: null,
-      readStatus: 1
+      readStatus: 1,
+      key: "isbn:9784444444444",
+      workId: workOf(users.main, "isbn:9784444444444")
     },
     {
       title: "Emma",
@@ -634,7 +665,9 @@ const expectedDataMain = {
       isbn: null,
       imageId: null,
       coverUrl: null,
-      readStatus: 1
+      readStatus: 1,
+      key: "ta:emma|jane austen",
+      workId: workOf(users.main, "ta:emma|jane austen")
     }
   ],
   stats: {
@@ -723,7 +756,9 @@ const expectedDataBare = {
       isbn: null,
       imageId: null,
       coverUrl: null,
-      readStatus: null
+      readStatus: null,
+      key: "ta:only title|",
+      workId: workOf(users.bare, "ta:only title|")
     },
     {
       title: "Untitled",
@@ -731,7 +766,9 @@ const expectedDataBare = {
       isbn: null,
       imageId: null,
       coverUrl: null,
-      readStatus: null
+      readStatus: null,
+      key: "ta:|only author",
+      workId: workOf(users.bare, "ta:|only author")
     },
     {
       title: "Untitled",
@@ -739,7 +776,9 @@ const expectedDataBare = {
       isbn: null,
       imageId: null,
       coverUrl: null,
-      readStatus: null
+      readStatus: null,
+      key: "ta:|",
+      workId: workOf(users.bare, "ta:|")
     }
   ],
   highlights: [],
@@ -849,7 +888,7 @@ test("GET /library sends the stored document as UTF-8 JSON", async () => {
   const res = await app.inject({ method: "GET", url: "/library", headers: { authorization: `Bearer ${users.main}` } });
   assert.equal(res.statusCode, 200);
   assert.equal(res.headers["content-type"], "application/json; charset=utf-8");
-  assert.equal(res.body, JSON.stringify({ data: stored.data, updatedAt: saved.main.updatedAt, shareToken: tokens.main, shareUrl: `https://scripta.test/shared/${tokens.main}` }));
+  assert.equal(res.body, JSON.stringify({ data: stored.data, updatedAt: saved.main.updatedAt, shareToken: tokens.main, shareUrl: `https://scripta.test/shared/${tokens.main}`, works: stored.works }));
   assert.deepEqual(JSON.parse(res.body).data, json(mainDocument));
   await app.close();
 });
@@ -860,7 +899,7 @@ test("GET /library sends null share fields for an unshared library", async () =>
   const stored = service.getLibrary("pv-private")!;
   const res = await app.inject({ method: "GET", url: "/library", headers: { authorization: "Bearer pv-private" } });
   assert.equal(res.headers["content-type"], "application/json; charset=utf-8");
-  assert.equal(res.body, JSON.stringify({ data: { books: [{ Title: "Mine" }] }, updatedAt: stored.updatedAt, shareToken: null, shareUrl: null }));
+  assert.equal(res.body, JSON.stringify({ data: { books: [{ Title: "Mine" }] }, updatedAt: stored.updatedAt, shareToken: null, shareUrl: null, works: stored.works }));
   await app.close();
 });
 
@@ -878,4 +917,20 @@ test("PUT /library answers a stale updatedAt with 409 and the current document",
   assert.equal(res.body, JSON.stringify({ error: "The library changed elsewhere since it was loaded.", current: stored }));
   assert.deepEqual(service.getLibrary(users.empty)!.data, { books: [], name: "Nothing yet" });
   await app.close();
+});
+
+test("public books carry their row's key and canonical work, even for a keyless book with no author", () => {
+  const userId = "public-works";
+  service.saveLibrary(userId, { books: [{ ContentID: "w1", Title: "Orlando", Attribution: "", ReadStatus: 1 }] });
+  const row = openLibraryDb().prepare("SELECT book_key, work_id FROM library_books WHERE user_id = ?").get(userId) as { book_key: string; work_id: string };
+  assert.equal(row.book_key, "ta:orlando|");
+  const request = { bookKeys: [row.book_key], highlightRefs: [], needsCurrentlyReading: true, statsMetrics: [] };
+  const before = resolvePublicLibraryData(userId, request);
+  assert.equal(before.books[0]!.author, "Unknown author");
+  assert.equal(before.books[0]!.key, "ta:orlando|");
+  assert.equal(before.books[0]!.workId, row.work_id);
+  assert.equal(before.currentlyReading[0]!.workId, row.work_id);
+  const [target] = resolveWorks([{ isbn: null, title: "Orlando: A Biography", author: "Virginia Woolf" }]);
+  openBooksDb().prepare("UPDATE works SET merged_into = ? WHERE id = ?").run(target!, row.work_id);
+  assert.equal(resolvePublicLibraryData(userId, request).books[0]!.workId, target);
 });

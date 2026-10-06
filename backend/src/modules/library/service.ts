@@ -9,7 +9,8 @@ import { BOOK_EVENTS_PER_SAVE, COVER_URL_MAX_LENGTH, DISPLAY_TEXT_MAX_LENGTH, LI
 import { LibraryChangeNotFoundError, LibraryConflictError, LibraryTooLargeError, NoLibraryDocumentError } from "./domain/errors.js";
 import type { LibraryRepository } from "./domain/ports.js";
 import type { LibraryBookRow, LibraryBookRows, LibraryDerived, LibraryDocument, LibraryDocumentRow, LibraryDocumentText, LibraryHighlightRow, LibraryMatchKeyRow, LibraryRows, LibrarySmallSave } from "./domain/types.js";
-import { resolveWorks as resolveCatalogWorks } from "../books/index.js";
+import { canonicalWorks as canonicalCatalogWorks, resolveWorks as resolveCatalogWorks } from "../books/index.js";
+import { canonicalWorkIds, WorkResolutionError } from "./works.js";
 import { libraryParts, resolvePublicLibrary, toReaderGroups } from "./publicResolver.js";
 
 export type BookEvent = { type: "book_added" | "book_finished"; refId: string; payload: Record<string, unknown> };
@@ -234,23 +235,27 @@ function seriesGroupChanged(before: LibraryData, after: LibraryData): boolean {
   return (after.groups ?? []).some((group, i) => group !== before.groups?.[i] && isGroup(group) && group.type === "series");
 }
 
-function toLibraryDocument(row: LibraryDocumentRow, publicUrlFor: (token: string) => string): LibraryDocument {
+function toLibraryDocument(row: LibraryDocumentRow, publicUrlFor: (token: string) => string, works: Record<string, string>): LibraryDocument {
   return {
     data: JSON.parse(row.data),
     updatedAt: row.updated_at,
     shareToken: row.share_token,
-    shareUrl: row.share_token ? publicUrlFor(row.share_token) : null
+    shareUrl: row.share_token ? publicUrlFor(row.share_token) : null,
+    works
   };
 }
 
-function toLibraryDocumentText(row: LibraryDocumentRow, publicUrlFor: (token: string) => string): LibraryDocumentText {
+function toLibraryDocumentText(row: LibraryDocumentRow, publicUrlFor: (token: string) => string, works: Record<string, string>): LibraryDocumentText {
   return {
     data: row.data,
     updatedAt: row.updated_at,
     shareToken: row.share_token,
-    shareUrl: row.share_token ? publicUrlFor(row.share_token) : null
+    shareUrl: row.share_token ? publicUrlFor(row.share_token) : null,
+    works
   };
 }
+
+export type CanonicalWorks = (ids: string[]) => Map<string, string>;
 
 export interface LibraryService {
   getLibrary(userId: string): LibraryDocument | null;
@@ -286,7 +291,7 @@ function coverLookupsOf(data: unknown): CoverLookupParams[] {
   return books.filter(isRecord).flatMap((book) => seedCoverLookup(book) ?? []);
 }
 
-export function createLibraryService(repo: LibraryRepository, publicUrlFor: (token: string) => string, maxDocumentBytes: number, emitBookEvents?: EmitBookEvents, enqueueCovers?: EnqueueCovers, rekeyBooks?: RekeyBooks, logError?: LogError, resolveWorks: ResolveWorks = resolveCatalogWorks): LibraryService {
+export function createLibraryService(repo: LibraryRepository, publicUrlFor: (token: string) => string, maxDocumentBytes: number, emitBookEvents?: EmitBookEvents, enqueueCovers?: EnqueueCovers, rekeyBooks?: RekeyBooks, logError?: LogError, resolveWorks: ResolveWorks = resolveCatalogWorks, canonicalWorks: CanonicalWorks = canonicalCatalogWorks): LibraryService {
   const logSkipped = logError ?? ((error: unknown, message: string) => console.error(message, error));
 
   function rowsOf(userId: string, data: unknown): LibraryRows {
@@ -309,6 +314,20 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
     const rows = rowsOf(userId, data);
     withWorks(userId, rows.books.map(({ book }) => book));
     return rows;
+  }
+
+  function worksOf(userId: string): Record<string, string> {
+    const rows = repo.workIds(userId);
+    let canonical = new Map<string, string>();
+    try {
+      canonical = canonicalWorkIds(rows.map((row) => row.work_id), canonicalWorks);
+    } catch (error) {
+      if (!(error instanceof WorkResolutionError)) throw error;
+      logSkipped(error, `work canonical lookup failed for ${userId}`);
+    }
+    const works: Record<string, string> = {};
+    for (const row of rows) works[row.book_key] ??= canonical.get(row.work_id) ?? row.work_id;
+    return works;
   }
 
   function smallSave(userId: string, previous: LibraryData, next: LibraryData, change: LibraryChange, recomputeCard: boolean): LibrarySmallSave {
@@ -339,13 +358,13 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
     getLibrary(userId) {
       const row = repo.getDocument(userId);
       if (!row) return null;
-      return toLibraryDocument(row, publicUrlFor);
+      return toLibraryDocument(row, publicUrlFor, worksOf(userId));
     },
 
     getLibraryText(userId) {
       const row = repo.getDocument(userId);
       if (!row) return null;
-      return toLibraryDocumentText(row, publicUrlFor);
+      return toLibraryDocumentText(row, publicUrlFor, worksOf(userId));
     },
 
     saveLibrary(userId, data, expectedUpdatedAt, source) {
@@ -361,7 +380,7 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
         }
       }
       if (source === "import" && enqueueCovers) enqueueCovers(coverLookupsOf(data));
-      return toLibraryDocumentText(row, publicUrlFor);
+      return toLibraryDocumentText(row, publicUrlFor, worksOf(userId));
     },
 
     addBook(userId, input) {
@@ -431,7 +450,7 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
       if (!row) throw new NoLibraryDocumentError();
       const library = parseStoredLibrary(row);
       const next = mergeDuplicateBooks(library, keep, merge);
-      if (next === library) return toLibraryDocumentText(row, publicUrlFor);
+      if (next === library) return toLibraryDocumentText(row, publicUrlFor, worksOf(userId));
       if (row.updated_at !== expectedUpdatedAt) throw new LibraryConflictError();
       const json = serializeWithinLimit(next);
       const present = new Set(library.books.filter(isRecord).map(bookKey));
@@ -439,7 +458,7 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
       if (fromKeys.length > 0 && rekeyBooks) rekeyBooks(userId, fromKeys, keep);
       const saved = repo.upsertDocument(userId, json, deriveLibraryData(next), rowsWithWorks(userId, next), row.updated_at);
       if (!saved) throw new LibraryConflictError();
-      return toLibraryDocumentText(saved, publicUrlFor);
+      return toLibraryDocumentText(saved, publicUrlFor, worksOf(userId));
     },
 
     applyChange(userId, change) {
@@ -473,7 +492,7 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
     share(userId) {
       const existing = repo.getDocument(userId);
       if (!existing) throw new NoLibraryDocumentError();
-      if (existing.share_token) return toLibraryDocument(existing, publicUrlFor);
+      if (existing.share_token) return toLibraryDocument(existing, publicUrlFor, worksOf(userId));
 
       const row = repo.setShareToken(userId, randomUUID());
       // Can only be undefined if the row vanished between the getDocument
@@ -481,7 +500,7 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
       // documents, so this is unreachable in practice, but keeps the
       // return type honest rather than asserting non-null.
       if (!row) throw new NoLibraryDocumentError();
-      return toLibraryDocument(row, publicUrlFor);
+      return toLibraryDocument(row, publicUrlFor, worksOf(userId));
     },
 
     unshare(userId) {

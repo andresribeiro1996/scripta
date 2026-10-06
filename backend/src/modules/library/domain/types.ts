@@ -28,6 +28,7 @@ export interface LibraryDocument {
    *  — null whenever shareToken is null. Same "compute at the edge, off a
    *  publicUrlFor closure" pattern as modules/gallery's GalleryImage.url. */
   shareUrl: string | null;
+  works: Record<string, string>;
 }
 
 export interface LibraryDocumentText {
@@ -35,6 +36,7 @@ export interface LibraryDocumentText {
   updatedAt: string;
   shareToken: string | null;
   shareUrl: string | null;
+  works: Record<string, string>;
 }
 
 export interface LibraryMatchKeyRow {
