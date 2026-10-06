@@ -28,9 +28,13 @@ section("library", process.env.LIBRARY_DB_PATH, (db) => columns(db, "library_boo
 } : "work_id not deployed");
 
 section("arena", process.env.ARENA_DB_PATH, (db) => columns(db, "tournament_slots").includes("work_id") ? {
-  slotsNull: count(db, "SELECT COUNT(*) AS n FROM tournament_slots WHERE work_id IS NULL AND book_key != ''"),
+  slotsNull: count(db, columns(db, "tournament_slots").includes("book_key")
+    ? "SELECT COUNT(*) AS n FROM tournament_slots WHERE work_id IS NULL AND book_key != ''"
+    : "SELECT COUNT(*) AS n FROM tournament_slots WHERE work_id IS NULL"),
   duelSidesNull: count(db, "SELECT COUNT(*) AS n FROM duels WHERE book_a_work_id IS NULL OR book_b_work_id IS NULL"),
-  winnersNull: count(db, "SELECT COUNT(*) AS n FROM duels WHERE winner_key IS NOT NULL AND winner_work_id IS NULL")
+  winnersNull: count(db, columns(db, "duels").includes("winner_key")
+    ? "SELECT COUNT(*) AS n FROM duels WHERE winner_key IS NOT NULL AND winner_work_id IS NULL"
+    : "SELECT COUNT(*) AS n FROM duels WHERE winner_side IS NOT NULL AND CASE winner_side WHEN 'a' THEN book_a_work_id ELSE book_b_work_id END IS NULL")
 } : "not deployed");
 
 for (const [name, envName, table, item, idColumn] of [

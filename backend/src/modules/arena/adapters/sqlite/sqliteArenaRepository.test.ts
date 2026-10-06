@@ -36,48 +36,6 @@ test("a fresh database has the voter_user_id column and its partial index", () =
   assert.ok(indexes.some((i) => i.name === "idx_votes_duel_user"), "the one-vote-per-account unique index must exist");
 });
 
-test("migrating a pre-existing votes table adds the column without losing rows", () => {
-  const db = new DatabaseSync(":memory:");
-  db.exec(`
-    CREATE TABLE tournaments (
-      id TEXT PRIMARY KEY, owner_user_id TEXT NOT NULL, name TEXT NOT NULL,
-      bracket_size INTEGER NOT NULL, round_duration_minutes INTEGER NOT NULL,
-      status TEXT NOT NULL DEFAULT 'seeding', current_round INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL, updated_at TEXT NOT NULL
-    );
-    CREATE TABLE duels (
-      id TEXT PRIMARY KEY, tournament_id TEXT NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
-      round_number INTEGER NOT NULL, duel_index INTEGER NOT NULL,
-      book_a_key TEXT NOT NULL, book_a_title TEXT NOT NULL, book_a_author TEXT NOT NULL, book_a_cover TEXT,
-      book_b_key TEXT NOT NULL, book_b_title TEXT NOT NULL, book_b_author TEXT NOT NULL, book_b_cover TEXT,
-      winner_key TEXT, status TEXT NOT NULL DEFAULT 'active', opens_at TEXT NOT NULL, closes_at TEXT NOT NULL, settled_at TEXT
-    );
-    CREATE TABLE votes (
-      id TEXT PRIMARY KEY,
-      duel_id TEXT NOT NULL REFERENCES duels(id) ON DELETE CASCADE,
-      voter_token TEXT NOT NULL,
-      book_key TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      UNIQUE (duel_id, voter_token)
-    );
-    INSERT INTO tournaments VALUES ('t1','u1','Old',2,60,'completed',1,'2026-01-01','2026-01-01');
-    INSERT INTO duels VALUES ('d1','t1',1,0,'a','A','x',NULL,'b','B','y',NULL,'a','settled','2026-01-01','2026-01-02','2026-01-02');
-    INSERT INTO votes VALUES ('v1','d1','tok', 'a', '2026-01-01');
-  `);
-
-  applyArenaMigrations(db);
-
-  assert.ok(columnNames(db, "votes").includes("voter_user_id"));
-  const row = db.prepare(`SELECT voter_token, voter_user_id, book_key FROM votes WHERE id = 'v1'`).get() as {
-    voter_token: string;
-    voter_user_id: string | null;
-    book_key: string;
-  };
-  assert.equal(row.voter_token, "tok");
-  assert.equal(row.voter_user_id, null);
-  assert.equal(row.book_key, "a");
-});
-
 test("applyArenaMigrations is idempotent", () => {
   const db = freshDb();
   applyArenaMigrations(db);
@@ -85,14 +43,37 @@ test("applyArenaMigrations is idempotent", () => {
   assert.ok(columnNames(db, "votes").includes("voter_user_id"));
 });
 
-test("arena tables gain work id columns on an existing database", () => {
+const E1_SCHEMA = `
+  CREATE TABLE tournaments (id TEXT PRIMARY KEY, owner_user_id TEXT NOT NULL, name TEXT NOT NULL, name_key TEXT, bracket_size INTEGER NOT NULL, round_duration_minutes INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'seeding', current_round INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL DEFAULT '');
+  CREATE TABLE tournament_slots (tournament_id TEXT NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE, slot_index INTEGER NOT NULL, book_key TEXT NOT NULL, title TEXT NOT NULL, author TEXT NOT NULL, cover_url TEXT, work_id TEXT, PRIMARY KEY (tournament_id, slot_index));
+  CREATE TABLE duels (id TEXT PRIMARY KEY, tournament_id TEXT NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE, round_number INTEGER NOT NULL, duel_index INTEGER NOT NULL,
+    book_a_key TEXT NOT NULL, book_a_title TEXT NOT NULL, book_a_author TEXT NOT NULL, book_a_cover TEXT, book_a_work_id TEXT,
+    book_b_key TEXT NOT NULL, book_b_title TEXT NOT NULL, book_b_author TEXT NOT NULL, book_b_cover TEXT, book_b_work_id TEXT,
+    winner_key TEXT, winner_work_id TEXT, status TEXT NOT NULL DEFAULT 'active', opens_at TEXT NOT NULL, closes_at TEXT NOT NULL, settled_at TEXT);
+  CREATE TABLE votes (id TEXT PRIMARY KEY, duel_id TEXT NOT NULL REFERENCES duels(id) ON DELETE CASCADE, voter_token TEXT NOT NULL, voter_user_id TEXT, book_key TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT '', UNIQUE (duel_id, voter_token));
+  CREATE INDEX idx_votes_duel_book ON votes(duel_id, book_key);
+`;
+
+test("an E1-shaped arena database is migrated on open", () => {
   const db = new DatabaseSync(":memory:");
-  db.exec("CREATE TABLE tournaments (id TEXT PRIMARY KEY, owner_user_id TEXT NOT NULL, name TEXT NOT NULL, name_key TEXT, status TEXT, created_at TEXT)");
-  db.exec("CREATE TABLE tournament_slots (tournament_id TEXT NOT NULL, slot_index INTEGER NOT NULL, book_key TEXT NOT NULL, title TEXT NOT NULL, author TEXT NOT NULL, cover_url TEXT, PRIMARY KEY (tournament_id, slot_index))");
-  db.exec("CREATE TABLE duels (id TEXT PRIMARY KEY, tournament_id TEXT NOT NULL, round_number INTEGER NOT NULL, duel_index INTEGER NOT NULL, book_a_key TEXT NOT NULL, book_a_title TEXT NOT NULL, book_a_author TEXT NOT NULL, book_a_cover TEXT, book_b_key TEXT NOT NULL, book_b_title TEXT NOT NULL, book_b_author TEXT NOT NULL, book_b_cover TEXT, winner_key TEXT, status TEXT NOT NULL DEFAULT 'active', opens_at TEXT NOT NULL, closes_at TEXT NOT NULL, settled_at TEXT)");
+  db.exec(E1_SCHEMA);
+  db.exec(`
+    INSERT INTO tournaments (id, owner_user_id, name, bracket_size, round_duration_minutes, status) VALUES ('t1', 'u1', 'T', 2, 60, 'active');
+    INSERT INTO tournament_slots VALUES ('t1', 0, 'isbn:1', 'Dune', 'Herbert', NULL, 'w-dune'), ('t1', 1, 'isbn:2', 'Emma', 'Austen', NULL, 'w-emma');
+    INSERT INTO duels VALUES ('d1', 't1', 1, 0, 'isbn:1', 'Dune', 'Herbert', NULL, 'w-dune', 'isbn:2', 'Emma', 'Austen', NULL, 'w-emma', 'isbn:2', 'w-emma', 'settled', 'x', 'y', 'z');
+    INSERT INTO votes (id, duel_id, voter_token, voter_user_id, book_key) VALUES ('v1', 'd1', 'a', 'u9', 'isbn:1'), ('v2', 'd1', 'b', 'u8', 'isbn:2'), ('v3', 'd1', 'c', NULL, 'isbn:2');
+  `);
+
   applyArenaMigrations(db);
-  assert.ok(columnNames(db, "tournament_slots").includes("work_id"));
-  for (const column of ["book_a_work_id", "book_b_work_id", "winner_work_id"]) assert.ok(columnNames(db, "duels").includes(column));
+
+  assert.deepEqual(db.prepare("SELECT side, COUNT(*) AS n FROM votes GROUP BY side ORDER BY side").all().map((r) => ({ ...r })), [{ side: "a", n: 1 }, { side: "b", n: 2 }]);
+  assert.equal((db.prepare("SELECT winner_side FROM duels WHERE id = 'd1'").get() as { winner_side: string }).winner_side, "b");
+  assert.equal(columnNames(db, "tournament_slots").includes("book_key"), false);
+  assert.equal(columnNames(db, "duels").includes("winner_work_id"), false);
+  const indexes = (db.prepare("SELECT name FROM sqlite_master WHERE type = 'index'").all() as Array<{ name: string }>).map((i) => i.name);
+  assert.ok(indexes.includes("idx_votes_duel_side"));
+  assert.ok(indexes.includes("idx_votes_duel_user"));
+  assert.equal(indexes.includes("idx_votes_duel_book"), false);
 });
 
 const { createSqliteArenaRepository } = await import("./sqliteArenaRepository.js");
@@ -104,14 +85,14 @@ function seedTournament(db: DatabaseSync, id: string, owner: string, name: strin
      VALUES (?, ?, ?, 2, 60, 'completed', 1, '2026-01-01', '2026-01-01')`
   ).run(id, owner, name);
   db.prepare(
-    `INSERT INTO duels (id, tournament_id, round_number, duel_index, book_a_key, book_a_title, book_a_author, book_a_cover,
-       book_b_key, book_b_title, book_b_author, book_b_cover, winner_key, status, opens_at, closes_at, settled_at)
-     VALUES (?, ?, 1, 0, 'a', 'A', 'x', NULL, 'b', 'B', 'y', NULL, 'a', 'settled', '2026-01-01', '2026-01-02', '2026-01-02')`
+    `INSERT INTO duels (id, tournament_id, round_number, duel_index, book_a_work_id, book_a_title, book_a_author, book_a_cover,
+       book_b_work_id, book_b_title, book_b_author, book_b_cover, winner_side, status, opens_at, closes_at, settled_at)
+     VALUES (?, ?, 1, 0, 'w-a', 'A', 'x', NULL, 'w-b', 'B', 'y', NULL, 'a', 'settled', '2026-01-01', '2026-01-02', '2026-01-02')`
   ).run(`duel-${id}`, id);
 }
 
 function vote(id: string, duelId: string, token: string, user: string | null, createdAt: string): VoteRow {
-  return { id, duel_id: duelId, voter_token: token, voter_user_id: user, book_key: "a", created_at: createdAt };
+  return { id, duel_id: duelId, voter_token: token, voter_user_id: user, side: "a", created_at: createdAt };
 }
 
 test("listVotedByUser returns others' tournaments with a stamped vote, latest vote first", () => {
@@ -132,13 +113,18 @@ test("listVotedByUser returns others' tournaments with a stamped vote, latest vo
   assert.deepEqual(repo.listVotedByUser("nobody"), []);
 });
 
-test("settling a duel records the winner's work", () => {
+test("settling a duel records the winning side and counting reads votes per side", () => {
   const db = freshDb();
-  seedTournament(db, "t1", "u1", "Work winner");
-  db.prepare(`UPDATE duels SET book_a_work_id = 'w-a', book_b_work_id = 'w-b', winner_key = NULL, status = 'active' WHERE id = 'duel-t1'`).run();
+  seedTournament(db, "t1", "u1", "Side winner");
+  db.prepare(`UPDATE duels SET winner_side = NULL, status = 'active' WHERE id = 'duel-t1'`).run();
   const repo = createSqliteArenaRepository(db);
+  repo.insertVote({ ...vote("v1", "duel-t1", "tok-1", null, "2026-01-01T00:00:00.000Z"), side: "b" });
+  repo.insertVote({ ...vote("v2", "duel-t1", "tok-2", null, "2026-01-02T00:00:00.000Z"), side: "b" });
+  repo.insertVote(vote("v3", "duel-t1", "tok-3", null, "2026-01-03T00:00:00.000Z"));
+  assert.deepEqual(repo.countVotesBySide("duel-t1"), { a: 1, b: 2 });
+  assert.deepEqual(repo.countVotesBySide("nothing"), { a: 0, b: 0 });
   repo.updateDuelSettlement("duel-t1", "settled", "b", "2026-10-04T00:00:00.000Z");
-  assert.equal((db.prepare("SELECT winner_work_id FROM duels WHERE id = ?").get("duel-t1") as { winner_work_id: string | null }).winner_work_id, "w-b");
+  assert.equal((db.prepare("SELECT winner_side FROM duels WHERE id = ?").get("duel-t1") as { winner_side: string | null }).winner_side, "b");
 });
 
 test("linkVotesToUser claims only the token's unclaimed votes and never steals claimed ones", () => {
@@ -213,7 +199,7 @@ test("the boot migration dedupes pre-existing multi-votes before creating idx_vo
   seedTournament(db, "t1", "u1", "One");
   db.exec(`DROP INDEX idx_votes_duel_user`);
   db.exec(`
-    INSERT INTO votes (id, duel_id, voter_token, voter_user_id, book_key, created_at) VALUES
+    INSERT INTO votes (id, duel_id, voter_token, voter_user_id, side, created_at) VALUES
       ('keep',   'duel-t1', 'token-a', 'voter-1', 'a', '2026-01-01T00:00:00.000Z'),
       ('first',  'duel-t1', 'token-b', 'voter-1', 'b', '2026-01-02T00:00:00.000Z'),
       ('second', 'duel-t1', 'token-c', 'voter-1', 'a', '2026-01-03T00:00:00.000Z'),
@@ -233,12 +219,12 @@ test("deleteUserData removes the user's tournaments and unlinks their votes on a
   const db = freshDb();
   const repo = createSqliteArenaRepository(db);
   const duel = (id: string, tournament: string) =>
-    db.prepare(`INSERT INTO duels (id, tournament_id, round_number, duel_index, book_a_key, book_a_title, book_a_author, book_b_key, book_b_title, book_b_author, opens_at, closes_at)
+    db.prepare(`INSERT INTO duels (id, tournament_id, round_number, duel_index, book_a_work_id, book_a_title, book_a_author, book_b_work_id, book_b_title, book_b_author, opens_at, closes_at)
       VALUES (?, ?, 1, 0, 'a', 'A', 'x', 'b', 'B', 'y', '2026-01-01', '2026-01-02')`).run(id, tournament);
   db.prepare(`INSERT INTO tournaments (id, owner_user_id, name, bracket_size, round_duration_minutes) VALUES ('mine', 'leaver', 'Mine', 4, 60), ('theirs', 'stayer', 'Theirs', 4, 60)`).run();
   duel("d-mine", "mine");
   duel("d-theirs", "theirs");
-  db.prepare(`INSERT INTO votes (id, duel_id, voter_token, voter_user_id, book_key) VALUES ('v1', 'd-mine', 't1', 'stayer', 'a'), ('v2', 'd-theirs', 't2', 'leaver', 'b')`).run();
+  db.prepare(`INSERT INTO votes (id, duel_id, voter_token, voter_user_id, side) VALUES ('v1', 'd-mine', 't1', 'stayer', 'a'), ('v2', 'd-theirs', 't2', 'leaver', 'b')`).run();
   repo.deleteUserData("leaver");
   assert.deepEqual(db.prepare(`SELECT id FROM tournaments`).all().map((r) => r.id), ["theirs"]);
   assert.deepEqual(db.prepare(`SELECT id, voter_user_id FROM votes`).all().map((r) => ({ ...r })), [{ id: "v2", voter_user_id: null }]);
@@ -252,7 +238,7 @@ test("participation counts each voter once per started tournament, at their firs
   const repo = createSqliteArenaRepository(db);
   repo.updateTournamentStatus("t2", "seeding", 0);
   db.prepare(
-    `INSERT INTO duels (id, tournament_id, round_number, duel_index, book_a_key, book_a_title, book_a_author, book_b_key, book_b_title, book_b_author, opens_at, closes_at)
+    `INSERT INTO duels (id, tournament_id, round_number, duel_index, book_a_work_id, book_a_title, book_a_author, book_b_work_id, book_b_title, book_b_author, opens_at, closes_at)
      VALUES ('duel-t1-b', 't1', 1, 1, 'c', 'C', 'x', 'd', 'D', 'y', '2026-01-01', '2026-01-02')`
   ).run();
 
@@ -282,7 +268,7 @@ test("participation lists only the tournaments with a vote since the marker, cou
   seedTournament(db, "busy", "u1", "Busy");
   seedTournament(db, "revisited", "u1", "Revisited");
   db.prepare(
-    `INSERT INTO duels (id, tournament_id, round_number, duel_index, book_a_key, book_a_title, book_a_author, book_b_key, book_b_title, book_b_author, opens_at, closes_at)
+    `INSERT INTO duels (id, tournament_id, round_number, duel_index, book_a_work_id, book_a_title, book_a_author, book_b_work_id, book_b_title, book_b_author, opens_at, closes_at)
      VALUES ('duel-revisited-b', 'revisited', 2, 0, 'c', 'C', 'x', 'd', 'D', 'y', '2026-01-01', '2026-01-02')`
   ).run();
   const repo = createSqliteArenaRepository(db);
@@ -297,33 +283,6 @@ test("participation lists only the tournaments with a vote since the marker, cou
   assert.deepEqual(listed("2026-02-01T00:00:00.000Z"), [["busy", 2, "2026-02-10T00:00:00.000Z"], ["revisited", 1, "2026-01-03T00:00:00.000Z"]]);
   assert.deepEqual(listed("2026-02-12T00:00:00.000Z"), [["revisited", 1, "2026-01-03T00:00:00.000Z"]]);
   assert.deepEqual(listed("2026-02-12T00:00:00.001Z"), []);
-});
-
-test("rekeyBooks rewrites seeding slots only and drops a slot that would duplicate the survivor", () => {
-  const db = freshDb();
-  const tournament = db.prepare("INSERT INTO tournaments (id, owner_user_id, name, bracket_size, round_duration_minutes, status) VALUES (?, ?, 'n', 8, 60, ?)");
-  tournament.run("seeding", "u1", "seeding");
-  tournament.run("both", "u1", "seeding");
-  tournament.run("active", "u1", "active");
-  const slot = db.prepare("INSERT INTO tournament_slots (tournament_id, slot_index, book_key, title, author) VALUES (?, ?, ?, 't', 'a')");
-  slot.run("seeding", 0, "old");
-  slot.run("both", 0, "new");
-  slot.run("both", 1, "old");
-  slot.run("active", 0, "old");
-  createSqliteArenaRepository(db).rekeyBooks("u1", ["old"], "new", null);
-  const keys = (id: string) => (db.prepare("SELECT book_key FROM tournament_slots WHERE tournament_id = ? ORDER BY slot_index").all(id) as Array<{ book_key: string }>).map((row) => row.book_key);
-  assert.deepEqual(keys("seeding"), ["new"]);
-  assert.deepEqual(keys("both"), ["new"]);
-  assert.deepEqual(keys("active"), ["old"]);
-});
-
-test("rekeying a seeding tournament moves the slot to the kept copy's work", () => {
-  const db = freshDb();
-  db.prepare("INSERT INTO tournaments (id, owner_user_id, name, bracket_size, round_duration_minutes, status) VALUES ('t1', 'u1', 'n', 2, 60, 'seeding')").run();
-  db.prepare("INSERT INTO tournament_slots (tournament_id, slot_index, book_key, title, author, work_id) VALUES ('t1', 0, 'k-old', 't', 'a', 'w-old')").run();
-  createSqliteArenaRepository(db).rekeyBooks("u1", ["k-old"], "k-keep", "w-keep");
-  const slot = db.prepare("SELECT book_key, work_id FROM tournament_slots WHERE tournament_id = 't1'").get();
-  assert.deepEqual({ ...slot }, { book_key: "k-keep", work_id: "w-keep" });
 });
 
 function tournament(overrides: Partial<TournamentRow> & { id: string }): TournamentRow {
