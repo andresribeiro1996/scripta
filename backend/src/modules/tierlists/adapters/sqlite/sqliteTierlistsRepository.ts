@@ -6,7 +6,7 @@ import { normalizeWords } from "@scripta/shared";
 import type { DatabaseSync } from "node:sqlite";
 import { boardWorks } from "../../domain/boardKeys.js";
 import type { TierlistsRepository } from "../../domain/ports.js";
-import type { TierlistRow, BallotRow, BallotTotals, Placement, TierlistDiscoverRow } from "../../domain/types.js";
+import type { TierlistRow, BallotRow, BallotTotals, Placement, TierlistDiscoverRow, TierlistGameRow } from "../../domain/types.js";
 
 export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepository {
   const insertStmt = db.prepare(`
@@ -38,6 +38,12 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
     `SELECT id, created_at, origin_user_id, promoted_at FROM tierlists WHERE vote_code IS NOT NULL AND name_key LIKE '%' || ? || '%' ORDER BY created_at DESC LIMIT ?`
   );
   const listPublicByIdsStmt = db.prepare(`SELECT * FROM tierlists WHERE vote_code IS NOT NULL AND id IN (SELECT value FROM json_each(?))`);
+  const listPublishedByWorksStmt = db.prepare(`
+    SELECT DISTINCT t.id, t.name, t.vote_code, t.owner_user_id, t.origin_user_id, t.created_at
+    FROM tierlist_works w JOIN tierlists t ON t.id = w.tierlist_id
+    WHERE w.work_id IN (SELECT value FROM json_each(?)) AND t.vote_code IS NOT NULL
+    ORDER BY t.created_at DESC LIMIT ?
+  `);
   const ballotTotalsForStmt = db.prepare(`
     SELECT b.tierlist_id,
       COUNT(*) AS ballots,
@@ -293,6 +299,11 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
     discoverWindow(needle, limit) {
       const rows = needle ? discoverSearchStmt.all(needle, limit) : discoverWindowStmt.all(limit);
       return rows as unknown as TierlistDiscoverRow[];
+    },
+
+    listPublishedByWorks(workIds, limit) {
+      if (workIds.length === 0) return [];
+      return listPublishedByWorksStmt.all(JSON.stringify(workIds), limit) as unknown as TierlistGameRow[];
     },
 
     listPublicByIds(ids) {

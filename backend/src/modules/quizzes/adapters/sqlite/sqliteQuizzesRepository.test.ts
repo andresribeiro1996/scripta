@@ -246,3 +246,23 @@ test("a trigger that rolls the transaction back surfaces its own error and keeps
   assert.equal(repo.playCount("quiz-1"), 1);
   assert.equal(db.isTransaction, false);
 });
+
+test("published quizzes about any of the given works, newest first; drafts never", async () => {
+  const { createQuizzesService, createQuizzesPublicApi } = await import("../../service.js");
+  const repo = makeRepo();
+  const books = (...workIds: string[]) => JSON.stringify({ books: workIds.map((workId) => ({ workId })) });
+  repo.insert(quizRow({ id: "old", name: "Old", data: books("w-old", "w-x"), vote_code: "code-old", created_at: "2026-01-01T00:00:00Z" }));
+  repo.insert(quizRow({ id: "both", name: "Both", owner_user_id: "u2", data: books("w-old", "w-new"), vote_code: "code-both", created_at: "2026-02-01T00:00:00Z" }));
+  repo.insert(quizRow({ id: "other", name: "Other", data: books("w-other"), vote_code: "code-other", created_at: "2026-03-01T00:00:00Z" }));
+  repo.insert(quizRow({ id: "draft", name: "Draft", data: books("w-old", "w-new"), created_at: "2026-04-01T00:00:00Z" }));
+
+  assert.deepEqual(repo.listPublishedByWorks(["w-new", "w-old"], 20).map((r) => r.id), ["both", "old"]);
+  assert.deepEqual(repo.listPublishedByWorks(["w-new", "w-old"], 1).map((r) => r.id), ["both"]);
+  assert.equal(repo.listPublishedByWorks([], 20).length, 0);
+
+  const api = createQuizzesPublicApi(createQuizzesService(repo));
+  assert.deepEqual(api.publishedByWorks(["w-new", "w-old"], 20), [
+    { id: "both", name: "Both", path: "/play/code-both", ownerUserId: "u2" },
+    { id: "old", name: "Old", path: "/play/code-old", ownerUserId: "u1" }
+  ]);
+});

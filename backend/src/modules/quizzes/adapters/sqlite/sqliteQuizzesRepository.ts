@@ -4,7 +4,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { QuestionStat } from "@scripta/shared";
 import type { QuizzesRepository } from "../../domain/ports.js";
-import type { AnswerRow, PlayRow, QuizRow } from "../../domain/types.js";
+import type { AnswerRow, PlayRow, QuizGameRow, QuizRow } from "../../domain/types.js";
 
 export function createSqliteQuizzesRepository(db: DatabaseSync): QuizzesRepository {
   const insertStmt = db.prepare(`
@@ -20,6 +20,12 @@ export function createSqliteQuizzesRepository(db: DatabaseSync): QuizzesReposito
   const deleteWorksStmt = db.prepare(`DELETE FROM quiz_works WHERE quiz_id = ?`);
   const insertWorkStmt = db.prepare(`INSERT OR IGNORE INTO quiz_works (quiz_id, work_id) VALUES (?, ?)`);
   const deleteAnswersStmt = db.prepare(`DELETE FROM quiz_play_answers WHERE quiz_id = ?`);
+  const listPublishedByWorksStmt = db.prepare(`
+    SELECT DISTINCT q.id, q.name, q.vote_code, q.owner_user_id, q.created_at
+    FROM quiz_works w JOIN quizzes q ON q.id = w.quiz_id
+    WHERE w.work_id IN (SELECT value FROM json_each(?)) AND q.vote_code IS NOT NULL
+    ORDER BY q.created_at DESC LIMIT ?
+  `);
   const getByVoteCodeStmt = db.prepare(`SELECT * FROM quizzes WHERE vote_code = ?`);
   const publishStmt = db.prepare(`UPDATE quizzes SET data = ?, vote_code = ?, play_open = 1, updated_at = ? WHERE id = ? AND owner_user_id = ? AND vote_code IS NULL`);
   const setPlayOpenStmt = db.prepare(`UPDATE quizzes SET play_open = $play_open, updated_at = $updated_at WHERE id = $id AND owner_user_id = $owner_user_id`);
@@ -236,6 +242,11 @@ export function createSqliteQuizzesRepository(db: DatabaseSync): QuizzesReposito
         stat.picks.push({ choiceIndex: Number(row.choice_index), count: Number(row.picks) });
       }
       return [...byQuestion.values()];
+    },
+
+    listPublishedByWorks(workIds, limit) {
+      if (workIds.length === 0) return [];
+      return listPublishedByWorksStmt.all(JSON.stringify(workIds), limit) as unknown as QuizGameRow[];
     },
 
     listParticipation(ownerUserId, since) {
