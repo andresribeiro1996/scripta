@@ -398,7 +398,7 @@ test("publish fills a missing cover from the owner's library copy of that work",
   await app.close();
 });
 
-test("an edit or play toggle with the catalog down is a 503 and writes nothing", async () => {
+test("a name-only edit with the catalog down is a 503 and writes nothing", async () => {
   const ids = ["Edit Down A", "Edit Down B", "Edit Down C", "Edit Down D"].map(named);
   const { app, service, send } = await quizApp();
   const created = await send("POST", "/quizzes", "q15", { name: "Before", data: { books: ids.map((id, index) => worksBook(`Edit Down ${"ABCD"[index]}`, id)) } });
@@ -425,5 +425,19 @@ test("a play toggle with the catalog down is a 503 and leaves the play state", a
   }
   assert.equal(service.getQuiz("q16", quizId)!.playOpen, before);
   assert.equal((await send("PUT", `/quizzes/${quizId}/voting`, "q16", { open: !before })).statusCode, 200);
+  await app.close();
+});
+
+test("a play toggle by someone who does not own the quiz is a 404, and a published quiz's name-only edit is a 404 with the catalog down", async () => {
+  const { app, service, send, quizId } = await publishedWorksQuiz("q17", ["Own A", "Own B", "Own C", "Own D"], 3, ["cover_title"]);
+  const before = service.getQuiz("q17", quizId)!.playOpen;
+  assert.equal((await send("PUT", `/quizzes/${quizId}/voting`, "q18", { open: !before })).statusCode, 404);
+  assert.equal(service.getQuiz("q17", quizId)!.playOpen, before);
+  const restore = breakCatalog();
+  try {
+    assert.equal((await send("PUT", `/quizzes/${quizId}`, "q17", { name: "Renamed" })).statusCode, 404);
+  } finally {
+    restore();
+  }
   await app.close();
 });

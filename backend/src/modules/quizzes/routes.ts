@@ -94,9 +94,9 @@ export function buildQuizRoutes(service: QuizzesService) {
       try {
         let data: unknown;
         const owned = service.getQuiz(request.user.id, params.data.id);
-        let known = owned ? canonicalForQuiz(owned) : undefined;
+        if (!owned || owned.voteCode !== null) return reply.code(404).send({ error: "No quiz with that id." });
+        let known: Map<string, string>;
         if (body.data.data) {
-          if (!owned || owned.voteCode !== null) return reply.code(404).send({ error: "No quiz with that id." });
           const books = body.data.data.books;
           const ids = quizBookWorks(books);
           if (ids.some((id) => id === null)) return reply.code(400).send({ error: "That book isn't in the catalog." });
@@ -104,6 +104,8 @@ export function buildQuizRoutes(service: QuizzesService) {
           if (duplicate !== -1) return reply.code(409).send({ error: duplicateWorkMessage({ workId: null, title: books[duplicate]!.title }) });
           data = { ...body.data.data, books: books.map((book, index) => ({ ...book, workId: ids[index]! })) };
           known = new Map(ids.map((id) => [id!, id!]));
+        } else {
+          known = canonicalForQuiz(owned);
         }
         const quiz = service.updateQuiz(request.user.id, params.data.id, { ...(body.data.name !== undefined ? { name: body.data.name } : {}), ...(data !== undefined ? { data } : {}) });
         if (!quiz) return reply.code(404).send({ error: "No quiz with that id." });
