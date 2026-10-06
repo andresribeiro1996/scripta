@@ -3,7 +3,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import Fastify from "fastify";
+import Fastify, { type FastifyError } from "fastify";
 
 const scratch = mkdtempSync(join(tmpdir(), "works-routes-test-"));
 process.env.AUTH_DB_PATH = join(scratch, "auth.sqlite");
@@ -19,7 +19,11 @@ const { WorkResolutionError } = await import("../library/index.js");
 function appWith(getPage: (id: string, viewerId: string | null) => unknown) {
   const app = Fastify();
   app.decorate("authenticateAccessToken", (token: string) => (token === "good" ? { id: "viewer", email: "v@example.test", username: "viewer", avatarId: null } : null));
-  app.setErrorHandler((error, _request, reply) => (error instanceof WorkResolutionError ? reply.code(503).send({ error: error.message }) : reply.code(500).send({ error: "Internal server error" })));
+  app.setErrorHandler((error: FastifyError, _request, reply) => {
+    if (error instanceof WorkResolutionError) return reply.code(503).send({ error: error.message });
+    const statusCode = typeof error.statusCode === "number" && error.statusCode >= 400 && error.statusCode < 500 ? error.statusCode : 500;
+    return statusCode === 500 ? reply.code(500).send({ error: "Internal server error" }) : reply.code(statusCode).send({ error: error.message });
+  });
   void app.register(buildWorkRoutes({ getPage } as never));
   return app;
 }
@@ -32,14 +36,14 @@ test("an unknown id is a 404 with the agreed message", async () => {
   await app.close();
 });
 
-test("the viewer is optional, and responses are never cached", async () => {
+test("the viewer is optional, a bad token is a 401, and responses are never cached", async () => {
   const seen: Array<string | null> = [];
   const app = appWith((_id, viewerId) => { seen.push(viewerId); return { work: { id: "w" } }; });
   const anonymous = await app.inject({ url: "/works/w" });
   const signedIn = await app.inject({ url: "/works/w", headers: { authorization: "Bearer good" } });
   const badToken = await app.inject({ url: "/works/w", headers: { authorization: "Bearer bad" } });
-  assert.deepEqual([anonymous.statusCode, signedIn.statusCode, badToken.statusCode], [200, 200, 200]);
-  assert.deepEqual(seen, [null, "viewer", null]);
+  assert.deepEqual([anonymous.statusCode, signedIn.statusCode, badToken.statusCode], [200, 200, 401]);
+  assert.deepEqual(seen, [null, "viewer"]);
   assert.equal(signedIn.headers["cache-control"], "no-store");
   await app.close();
 });
