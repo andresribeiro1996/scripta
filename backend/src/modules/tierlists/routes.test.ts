@@ -485,3 +485,47 @@ test("a create with no board answers an empty works board", async () => {
   assert.ok(created.json().data.tiers.every((entry: { workIds: string[] }) => entry.workIds.length === 0));
   await app.close();
 });
+
+test("open-voting answers the pool the stored row and later reads have after two editions merge", async () => {
+  const [a, b, c, w] = [titleWork("Merge Open A"), titleWork("Merge Open B"), titleWork("Merge Open C"), titleWork("Merge Open W")];
+  const { app } = await ownerApp();
+  const created = await app.inject({ method: "POST", url: "/tierlists", headers: headers("m1"), payload: { name: "Merge", data: { tiers: [tier([a])], pool: [b, c] } } });
+  assert.equal(created.statusCode, 201);
+  const id = created.json().id as string;
+  mergeInto(a, w);
+  mergeInto(b, w);
+  const opened = await app.inject({ method: "POST", url: `/tierlists/${id}/open-voting`, headers: headers("m1"), payload: { access: "anonymous" } });
+  assert.equal(opened.statusCode, 201);
+  assert.deepEqual(opened.json().tierlist.data.pool, [w, c]);
+  const read = await app.inject({ method: "GET", url: `/tierlists/${id}`, headers: headers("m1") });
+  assert.deepEqual(read.json().data.pool, opened.json().tierlist.data.pool);
+  await app.close();
+});
+
+test("a PUT and a voting toggle with the catalog down are 503 and change nothing, and a non-owner toggle is a 404", async () => {
+  const [a, b] = [titleWork("Edit Down A"), titleWork("Edit Down B")];
+  const { app, service } = await ownerApp();
+  const created = await app.inject({ method: "POST", url: "/tierlists", headers: headers("m2"), payload: { name: "Before", data: { tiers: [tier([])], pool: [a, b] } } });
+  const id = created.json().id as string;
+  const restore = breakCatalog();
+  try {
+    assert.equal((await app.inject({ method: "PUT", url: `/tierlists/${id}`, headers: headers("m2"), payload: { name: "After" } })).statusCode, 503);
+  } finally {
+    restore();
+  }
+  assert.equal(service.getTierlist("m2", id)!.name, "Before");
+  assert.equal((await app.inject({ method: "PUT", url: `/tierlists/${id}`, headers: headers("m2"), payload: { name: "After" } })).statusCode, 200);
+  const published = await app.inject({ method: "POST", url: `/tierlists/${id}/open-voting`, headers: headers("m2"), payload: { access: "anonymous" } });
+  assert.equal(published.statusCode, 201);
+  const open = service.getTierlist("m2", id)!.votingOpen;
+  const down = breakCatalog();
+  try {
+    assert.equal((await app.inject({ method: "PUT", url: `/tierlists/${id}/voting`, headers: headers("m2"), payload: { open: !open } })).statusCode, 503);
+  } finally {
+    down();
+  }
+  assert.equal(service.getTierlist("m2", id)!.votingOpen, open);
+  assert.equal((await app.inject({ method: "PUT", url: `/tierlists/${id}/voting`, headers: headers("m2"), payload: { open: !open } })).statusCode, 200);
+  assert.equal((await app.inject({ method: "PUT", url: `/tierlists/${id}/voting`, headers: headers("m3"), payload: { open: open } })).statusCode, 404);
+  await app.close();
+});

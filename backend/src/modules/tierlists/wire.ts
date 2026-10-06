@@ -33,8 +33,12 @@ function selfMap(ids: string[]) {
   return canonicalByKey(new Map(ids.map((id) => [id, id])));
 }
 
-export function canonicalBoard(data: unknown): WorksBoard {
-  const canonical = selfMap(storedIds(data));
+export function boardCanonical(data: unknown): Map<string, string> {
+  return selfMap(storedIds(data));
+}
+
+export function canonicalBoard(data: unknown, known?: Map<string, string>): WorksBoard {
+  const canonical = known ?? boardCanonical(data);
   const seen = new Set<string>();
   const take = (ids: unknown) =>
     list(ids).flatMap((id) => {
