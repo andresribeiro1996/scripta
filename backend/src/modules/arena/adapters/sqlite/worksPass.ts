@@ -71,6 +71,8 @@ export function migrateArenaToWorks(db: DatabaseSync): void {
           ALTER TABLE votes_new RENAME TO votes;
           PRAGMA user_version = 1;
         `);
+        const broken = db.prepare("PRAGMA foreign_key_check").all();
+        if (broken.length > 0) throw new Error(`arena works pass left ${broken.length} broken foreign keys`);
       }
       db.exec("COMMIT");
     } catch (error) {
@@ -80,6 +82,4 @@ export function migrateArenaToWorks(db: DatabaseSync): void {
   } finally {
     db.exec("PRAGMA foreign_keys = ON");
   }
-  const broken = db.prepare("PRAGMA foreign_key_check").all();
-  if (broken.length > 0) throw new Error(`arena works pass left ${broken.length} broken foreign keys`);
 }

@@ -59,3 +59,13 @@ test("a second run, and a fresh database, are no-ops", () => {
   migrateArenaToWorks(fresh);
   assert.equal((fresh.prepare("PRAGMA user_version").get() as { user_version: number }).user_version, 0);
 });
+
+test("a pass that would leave broken foreign keys rolls back", () => {
+  const db = e1Db();
+  db.exec("PRAGMA foreign_keys = OFF");
+  db.exec("INSERT INTO duels VALUES ('d2', 'gone', 1, 1, 'isbn:1', 'Dune', 'Herbert', NULL, 'w-dune', 'ta:dune|herbert', 'Dune again', 'Herbert', NULL, 'w-dune', NULL, NULL, 'active', 'x', 'y', NULL)");
+  db.exec("PRAGMA foreign_keys = ON");
+  assert.throws(() => migrateArenaToWorks(db), /broken foreign keys/);
+  assert.equal(columnNames(db, "tournament_slots").includes("book_key"), true);
+  assert.equal((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version, 0);
+});
