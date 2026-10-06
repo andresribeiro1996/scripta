@@ -8,8 +8,19 @@ export class ApiError extends Error {
   }
 }
 
+export function isPermanentError(error: unknown): boolean {
+  return error instanceof ApiError && error.status >= 400 && error.status < 500 && error.status !== 408 && error.status !== 429;
+}
+
+interface RequestInit {
+  method?: string;
+  body?: unknown;
+  auth?: boolean;
+  signal?: AbortSignal;
+}
+
 export interface ApiClient {
-  request<T>(path: string, init?: { method?: string; body?: unknown; auth?: boolean }): Promise<T>;
+  request<T>(path: string, init?: RequestInit): Promise<T>;
 }
 
 interface TokenStore {
@@ -33,7 +44,7 @@ export function createApiClient(
 ) {
   async function rawRequest<T>(
     path: string,
-    init: { method?: string; body?: unknown; auth?: boolean },
+    init: RequestInit,
   ): Promise<RawResponse<T>> {
     const headers: Record<string, string> = {};
     const accessTokenUsed = init.auth ? getAccessToken() : null;
@@ -44,6 +55,7 @@ export function createApiClient(
       method: init.method ?? "GET",
       headers,
       body: init.body === undefined ? undefined : multipart ? init.body as FormData : JSON.stringify(init.body),
+      signal: init.signal,
     });
     const text = await res.text();
     let body: unknown = {};
@@ -120,7 +132,7 @@ export function createApiClient(
   }
 
   const apiClient: ApiClient = {
-    async request<T>(path: string, init: { method?: string; body?: unknown; auth?: boolean } = {}) {
+    async request<T>(path: string, init: RequestInit = {}) {
       // No access token is not the same as no session. It is also the shape
       // left by a cold start whose refresh lost the network — the refresh
       // token is still good, so try it before declaring the user signed out.

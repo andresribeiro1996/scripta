@@ -1,4 +1,4 @@
-import { ensureBookBlockHeights, scrubBooksFromMurals, scrubImageFromMurals, type Mural, type MuralBlock, type MuralFolder } from "@scripta/shared";
+import { compactMuralBlocks, ensureBookBlockHeights, scrubBooksFromMurals, scrubImageFromMurals, type Mural, type MuralBlock, type MuralFolder } from "@scripta/shared";
 import type { ThemeId } from "@scripta/shared/themes";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as api from "./api";
@@ -6,7 +6,7 @@ import * as api from "./api";
 export const MURALS_QUERY_KEY = ["murals"] as const;
 export const MURAL_FOLDERS_QUERY_KEY = ["mural-folders"] as const;
 
-export const withGrownBlocks = (mural: Mural): Mural => ({ ...mural, blocks: ensureBookBlockHeights(mural.blocks) });
+export const withGrownBlocks = (mural: Mural): Mural => ({ ...mural, blocks: compactMuralBlocks(ensureBookBlockHeights(mural.blocks)) });
 const withGrownBlocksAll = (murals: Mural[]) => murals.map(withGrownBlocks);
 
 export function useMurals() {

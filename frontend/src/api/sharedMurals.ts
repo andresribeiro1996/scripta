@@ -17,6 +17,8 @@ import { publicFetch } from "./client";
 import type { ResolvedTierlist } from "./tierlists";
 
 export interface PublicBookData {
+  key: string;
+  workId: string | null;
   title: string;
   author: string;
   isbn: string | null;

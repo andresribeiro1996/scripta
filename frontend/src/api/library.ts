@@ -1,4 +1,4 @@
-import type { LibraryData } from "@scripta/shared";
+import { libraryChangeRequest, type LibraryDocument, type LibraryChange, type LibraryChangeAnswer, type LibraryData } from "@scripta/shared";
 import type { BookRecommendationInput } from "@scripta/shared/community";
 import { ApiError, apiFetch } from "./client";
 
@@ -9,29 +9,35 @@ import { ApiError, apiFetch } from "./client";
 // `from "../api/library"` import keeps working unchanged.
 export type { LibraryData } from "@scripta/shared";
 
-export interface LibraryDocument {
-  data: LibraryData;
-  updatedAt: string;
-  /** Public share link state — null until shared. Idempotent share (a
-   *  document that's already shared keeps its existing token) / plain
-   *  unshare, same shape as a mural's own shareToken/shareUrl
-   *  (lib/murals.ts's Mural). */
-  shareToken: string | null;
-  shareUrl: string | null;
-}
+export type { LibraryDocument } from "@scripta/shared";
 
-/** null means "no library saved yet" (backend 404s, not an error case here) */
-export async function fetchLibrary(): Promise<LibraryDocument | null> {
+export const LIBRARY_REFRESH_PATH = "/library?fresh=1";
+
+async function getLibrary(path: string, signal?: AbortSignal): Promise<LibraryDocument | null> {
   try {
-    return (await apiFetch("/library")) as LibraryDocument;
+    return (await apiFetch(path, { signal })) as LibraryDocument;
   } catch (err) {
     if (err instanceof ApiError && err.status === 404) return null;
     throw err;
   }
 }
 
-export async function saveLibrary(data: LibraryData, updatedAt?: string, source?: "import"): Promise<LibraryDocument> {
-  return (await apiFetch("/library", { method: "PUT", body: JSON.stringify({ data, updatedAt, source }) })) as LibraryDocument;
+export async function fetchLibrary(signal?: AbortSignal): Promise<LibraryDocument | null> {
+  try {
+    return await getLibrary(LIBRARY_REFRESH_PATH, signal);
+  } catch (err) {
+    if (!(err instanceof TypeError)) throw err;
+    return getLibrary("/library", signal);
+  }
+}
+
+export async function saveLibrary(data: LibraryData, updatedAt: string | undefined, source: "import" | undefined, signal?: AbortSignal): Promise<LibraryDocument> {
+  return (await apiFetch("/library", { method: "PUT", body: JSON.stringify({ data, updatedAt, source }), signal })) as LibraryDocument;
+}
+
+export async function sendLibraryChange(change: LibraryChange, signal: AbortSignal): Promise<LibraryChangeAnswer> {
+  const { method, path, body } = libraryChangeRequest(change);
+  return (await apiFetch(path, { method, body: JSON.stringify(body), signal })) as LibraryChangeAnswer;
 }
 
 /** Same-shelf upsert behind POST /library/books — adding a book you
@@ -49,6 +55,6 @@ export async function unshareLibrary(): Promise<LibraryDocument> {
   return (await apiFetch("/library/unshare", { method: "POST" })) as LibraryDocument;
 }
 
-export async function mergeLibraryBooks(keep: string, merge: string[], updatedAt: string): Promise<LibraryDocument> {
-  return (await apiFetch("/library/books/merge", { method: "POST", body: JSON.stringify({ keep, merge, updatedAt }) })) as LibraryDocument;
+export async function mergeLibraryBooks(keep: string, merge: string[], updatedAt: string, signal?: AbortSignal): Promise<LibraryDocument> {
+  return (await apiFetch("/library/books/merge", { method: "POST", body: JSON.stringify({ keep, merge, updatedAt }), signal })) as LibraryDocument;
 }

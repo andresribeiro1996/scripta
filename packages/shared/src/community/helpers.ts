@@ -169,3 +169,8 @@ export function personCaption(person: PersonResult | SuggestedReader): string {
   if (person.private) return "Private";
   return `${person.followerCount} ${person.followerCount === 1 ? "follower" : "followers"}`;
 }
+
+export function followFailureMessage(error: unknown, generic: string): string {
+  if (!(error instanceof Error) || !("status" in error)) return generic;
+  return error.status === 409 && error.message ? error.message : generic;
+}

@@ -46,7 +46,7 @@ export function ThemeToggle() {
       type="button"
       onClick={() => applyThemePreference(scheme === "dark" ? "light" : "dark")}
       aria-label={scheme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
-      className="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-(--color-border) text-(--color-text-dim) transition-colors hover:bg-(--color-surface-hover) hover:text-(--color-text)"
+      className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-(--color-text-dim) transition-colors hover:bg-(--color-surface-hover) hover:text-(--color-text)"
     >
       {scheme === "dark" ? <SunIcon /> : <MoonIcon />}
     </button>

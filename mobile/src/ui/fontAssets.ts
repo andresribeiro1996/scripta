@@ -1,4 +1,6 @@
 export const FONT_ASSETS: Record<string, number> = {
+  "playfair-400": require("../../assets/fonts/playfair-400.ttf"),
+  "inter-400": require("../../assets/fonts/inter-400.ttf"),
   "playfair-700": require("../../assets/fonts/playfair-700.ttf"),
   "literata-400": require("../../assets/fonts/literata-400.ttf"),
   "literata-700": require("../../assets/fonts/literata-700.ttf"),

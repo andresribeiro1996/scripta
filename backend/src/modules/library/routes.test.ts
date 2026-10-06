@@ -13,6 +13,7 @@ process.env.AUTH_DB_PATH = join(scratch, "auth.sqlite");
 process.env.LIBRARY_DB_PATH = join(scratch, "library.sqlite");
 process.env.GALLERY_DB_PATH = join(scratch, "gallery.sqlite");
 process.env.GALLERY_STORAGE_PATH = join(scratch, "gallery-files");
+process.env.COVERS_DB_PATH = join(scratch, "covers.sqlite");
 process.env.JWT_ACCESS_SECRET = "a".repeat(64);
 process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
@@ -62,7 +63,7 @@ async function setup() {
     app.inject({ method: "PUT", url: "/library", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, payload });
   const otherWrite = (index: number, token = "u1") =>
     app.inject({ ...otherWrites[index % otherWrites.length]!, headers: { authorization: `Bearer ${token}` }, payload: {} });
-  return { app, service, merge, addBook, put, otherWrite };
+  return { app, db, service, merge, addBook, put, otherWrite };
 }
 
 test("PUT /library saves a book whose fields aren't text", async () => {
@@ -71,6 +72,19 @@ test("PUT /library saves a book whose fields aren't text", async () => {
   const res = await app.inject({ method: "PUT", url: "/library", headers: { authorization: "Bearer u1" }, payload: { data: { books: [book] } } });
   assert.equal(res.statusCode, 200);
   assert.deepEqual((res.json() as { data: { books: unknown[] } }).data.books, [book]);
+  await app.close();
+});
+
+test("GET /library?fresh=1 answers like GET /library", async () => {
+  const { app } = await setup();
+  const book = { Title: "Dune", ISBN: "9780441013593" };
+  await app.inject({ method: "PUT", url: "/library", headers: { authorization: "Bearer u1" }, payload: { data: { books: [book] } } });
+  const get = (url: string) => app.inject({ method: "GET", url, headers: { authorization: "Bearer u1" } });
+  const plain = await get("/library");
+  const fresh = await get("/library?fresh=1");
+  assert.equal(fresh.statusCode, 200);
+  assert.equal(fresh.statusCode, plain.statusCode);
+  assert.deepEqual(fresh.json(), plain.json());
   await app.close();
 });
 
@@ -227,9 +241,9 @@ test("POST /library/books that would take the library past the cap answers 413 l
   const res = await addBook({ title: "Dune", author: "Frank Herbert", readStatus: 0 });
   assert.equal(res.statusCode, 413);
   assert.deepEqual(res.json(), tooLargeBody);
-  const after = service.getLibrary("u1");
+  const after = service.getLibraryText("u1");
   assert.equal(after?.updatedAt, saved.updatedAt);
-  assert.deepEqual(after?.data, saved.data);
+  assert.equal(after?.data, saved.data);
   await app.close();
 });
 
@@ -254,8 +268,215 @@ test("POST /library/books/merge that would take the library past the cap answers
   const res = await merge({ keep: bookKey(isbn), merge: [bookKey(short)], updatedAt: saved.updatedAt });
   assert.equal(res.statusCode, 413);
   assert.deepEqual(res.json(), tooLargeBody);
-  const after = service.getLibrary("u1");
+  const after = service.getLibraryText("u1");
   assert.equal(after?.updatedAt, saved.updatedAt);
-  assert.deepEqual(after?.data, saved.data);
+  assert.equal(after?.data, saved.data);
+  await app.close();
+});
+
+const shelfLibrary = () => ({
+  books: [kobo, { ContentID: "k2", Title: "Emma", Attribution: "Jane Austen", ReadStatus: 0 }],
+  groups: [{ id: "g1", type: "collection", name: "Favourites", bookKeys: [], createdAt: "2020-01-01T00:00:00.000Z", updatedAt: "2020-01-01T00:00:00.000Z" }]
+});
+
+async function changeSetup() {
+  const base = await setup();
+  const send = (method: "POST" | "PATCH", url: string, payload: unknown, token: string | null = "u1") =>
+    base.app.inject({ method, url, headers: token ? { authorization: `Bearer ${token}` } : {}, payload: payload as object });
+  const tick = (payload: unknown, token: string | null = "u1", groupId = "g1") => send("POST", `/library/groups/${groupId}/books`, payload, token);
+  const patch = (payload: unknown, token: string | null = "u1") => send("PATCH", "/library/books", payload, token);
+  const add = (payload: unknown, token: string | null = "u1") => send("POST", "/library/books/add", payload, token);
+  return { ...base, tick, patch, add };
+}
+
+test("POST /library/groups/:groupId/books ticks a book and answers the versions", async () => {
+  const { app, service, tick } = await changeSetup();
+  const saved = service.saveLibrary("u1", shelfLibrary());
+  const res = await tick({ bookKey: bookKey(kobo), member: true });
+  assert.equal(res.statusCode, 200);
+  const body = res.json() as { updatedAt: string; baseUpdatedAt: string };
+  assert.equal(body.baseUpdatedAt, saved.updatedAt);
+  assert.notEqual(body.updatedAt, saved.updatedAt);
+  const groups = (service.getLibrary("u1")!.data as ReturnType<typeof shelfLibrary>).groups;
+  assert.deepEqual(groups[0]!.bookKeys, [bookKey(kobo)]);
+  await app.close();
+});
+
+test("POST /library/groups/:groupId/books answers 400, 401, 404 and 409", async () => {
+  const { app, service, tick } = await changeSetup();
+  assert.equal((await tick({ bookKey: "a", member: true }, null)).statusCode, 401);
+  assert.equal((await tick({ bookKey: "a" })).statusCode, 400);
+  assert.equal((await tick({ bookKey: "", member: true })).statusCode, 400);
+  assert.equal((await tick({ bookKey: "a".repeat(2001), member: true })).statusCode, 400);
+  assert.equal((await tick({ bookKey: "a", member: true })).statusCode, 404);
+  service.saveLibrary("u1", shelfLibrary());
+  assert.equal((await tick({ bookKey: bookKey(kobo), member: true }, "u1", "gone")).statusCode, 404);
+  assert.equal((await tick({ bookKey: "ta:nobody|", member: true })).statusCode, 404);
+  await app.close();
+});
+
+test("PATCH /library/books sets status and rating", async () => {
+  const { app, service, patch } = await changeSetup();
+  service.saveLibrary("u1", shelfLibrary());
+  const res = await patch({ bookKey: bookKey(kobo), readStatus: 2, rating: 4, day: "2026-10-02" });
+  assert.equal(res.statusCode, 200);
+  const book = (service.getLibrary("u1")!.data as ReturnType<typeof shelfLibrary>).books[0] as Record<string, unknown>;
+  assert.equal(book.ReadStatus, 2);
+  assert.equal(book.DateLastRead, "2026-10-02");
+  assert.equal((await patch({ bookKey: bookKey(kobo), readStatus: 0 })).statusCode, 200);
+  assert.equal((await patch({ bookKey: bookKey(kobo), rating: 5 })).statusCode, 200);
+  await app.close();
+});
+
+test("PATCH /library/books answers 400, 401 and 404", async () => {
+  const { app, service, patch } = await changeSetup();
+  const key = bookKey(kobo);
+  assert.equal((await patch({ bookKey: key, rating: 3 }, null)).statusCode, 401);
+  assert.equal((await patch({ bookKey: key })).statusCode, 400);
+  assert.equal((await patch({ bookKey: key, readStatus: 2 })).statusCode, 400);
+  assert.equal((await patch({ bookKey: key, readStatus: 3 })).statusCode, 400);
+  assert.equal((await patch({ bookKey: key, rating: 6 })).statusCode, 400);
+  assert.equal((await patch({ bookKey: key, rating: 0 })).statusCode, 400);
+  assert.equal((await patch({ bookKey: key, readStatus: 1, day: "yesterday" })).statusCode, 400);
+  assert.equal((await patch({ bookKey: key, readStatus: 2, day: "2026-02-30" })).statusCode, 400);
+  assert.equal((await patch({ bookKey: key, rating: 3 })).statusCode, 404);
+  service.saveLibrary("u1", shelfLibrary());
+  assert.equal((await patch({ bookKey: "ta:nobody|", rating: 3 })).statusCode, 404);
+  await app.close();
+});
+
+test("POST /library/books/add appends a book, creating the library when there is none", async () => {
+  const { app, service, add } = await changeSetup();
+  const res = await add({ book: { Title: "Emma", Attribution: "Jane Austen", ReadStatus: 0 } });
+  assert.equal(res.statusCode, 200);
+  assert.equal((res.json() as { baseUpdatedAt: string | null }).baseUpdatedAt, null);
+  assert.equal((service.getLibrary("u1")!.data as ReturnType<typeof shelfLibrary>).books.length, 1);
+  assert.equal((await add({ book: { Title: "Dune" } })).statusCode, 200);
+  assert.equal((service.getLibrary("u1")!.data as ReturnType<typeof shelfLibrary>).books.length, 2);
+  await app.close();
+});
+
+test("POST /library/books/add answers 400, 401 and 413", async () => {
+  const { app, add } = await changeSetup();
+  assert.equal((await add({ book: { Title: "Dune" } }, null)).statusCode, 401);
+  assert.equal((await add({})).statusCode, 400);
+  assert.equal((await add({ book: {} })).statusCode, 400);
+  assert.equal((await add({ book: { Title: "" } })).statusCode, 400);
+  assert.equal((await add({ book: { Title: 5 } })).statusCode, 400);
+  assert.equal((await add({ book: { Title: "Dune", padding: "x".repeat(65 * 1024) } })).statusCode, 413);
+  await app.close();
+});
+
+test("a change that would push the library past the limit answers 413 with the size body", async () => {
+  const db = new DatabaseSync(":memory:");
+  applyLibrarySchema(db);
+  const service = createLibraryService(createSqliteLibraryRepository(db), () => "", LIBRARY_PUT_HEADROOM_BYTES + 200);
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", (token: string) => ({ id: token, email: `${token}@example.test`, username: token, avatarId: null }));
+  await app.register(buildLibraryRoutes(service));
+  const res = await app.inject({ method: "POST", url: "/library/books/add", headers: { authorization: "Bearer u1" }, payload: { book: { Title: "Dune", Attribution: "x".repeat(1000) } } });
+  assert.equal(res.statusCode, 413);
+  const body = res.json() as { code: string };
+  assert.equal(body.code, "LIBRARY_BODY_TOO_LARGE");
+  await app.close();
+});
+
+test("an unreadable stored document answers 500 and is left alone", async () => {
+  const db = new DatabaseSync(":memory:");
+  applyLibrarySchema(db);
+  const repo = createSqliteLibraryRepository(db);
+  const service = createLibraryService(repo, () => "", env.LIBRARY_BODY_LIMIT_BYTES);
+  service.saveLibrary("u1", shelfLibrary());
+  db.prepare("UPDATE library_documents SET data = ? WHERE user_id = ?").run("{broken", "u1");
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", (token: string) => ({ id: token, email: `${token}@example.test`, username: token, avatarId: null }));
+  await app.register(buildLibraryRoutes(service));
+  const res = await app.inject({ method: "PATCH", url: "/library/books", headers: { authorization: "Bearer u1" }, payload: { bookKey: bookKey(kobo), rating: 3 } });
+  assert.equal(res.statusCode, 500);
+  assert.equal(repo.getDocument("u1")!.data, "{broken");
+  await app.close();
+});
+
+test("changes get 60 a minute per account, apart from whole-library saves", async () => {
+  const { app, patch, put } = await changeSetup();
+  for (let request = 1; request <= 60; request++) assert.notEqual((await patch({ bookKey: "a", rating: 3 })).statusCode, 429);
+  assert.equal((await patch({ bookKey: "a", rating: 3 })).statusCode, 429);
+  assert.notEqual((await patch({ bookKey: "a", rating: 3 }, "u2")).statusCode, 429);
+  assert.notEqual((await put(smallSave)).statusCode, 429);
+  await app.close();
+});
+
+test("add shares the writes bucket", async () => {
+  const { app, add, otherWrite } = await changeSetup();
+  for (let request = 1; request <= 30; request++) assert.notEqual((await add({ book: { Title: "Dune" } })).statusCode, 429);
+  assert.equal((await add({ book: { Title: "Dune" } })).statusCode, 429);
+  assert.equal((await otherWrite(0)).statusCode, 429);
+  await app.close();
+});
+
+test("an old build that PUTs with the version it held before a change gets 409 and its replay succeeds", async () => {
+  const { app, service, tick, put } = await changeSetup();
+  const held = service.saveLibrary("u1", shelfLibrary());
+  assert.equal((await tick({ bookKey: bookKey(kobo), member: true })).statusCode, 200);
+  const stale = await put(JSON.stringify({ updatedAt: held.updatedAt, data: shelfLibrary() }));
+  assert.equal(stale.statusCode, 409);
+  const current = (stale.json() as { current: { updatedAt: string } }).current;
+  assert.notEqual(current.updatedAt, held.updatedAt);
+  const replay = await put(JSON.stringify({ updatedAt: current.updatedAt, data: shelfLibrary() }));
+  assert.equal(replay.statusCode, 200);
+  await app.close();
+});
+
+test("a change that loses a race for the document answers 409", async () => {
+  const db = new DatabaseSync(":memory:");
+  applyLibrarySchema(db);
+  const repo = createSqliteLibraryRepository(db);
+  createLibraryService(repo, () => "", env.LIBRARY_BODY_LIMIT_BYTES).saveLibrary("u1", shelfLibrary());
+  const service = createLibraryService({ ...repo, updateDocumentData: () => undefined }, () => "", env.LIBRARY_BODY_LIMIT_BYTES);
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", (token: string) => ({ id: token, email: `${token}@example.test`, username: token, avatarId: null }));
+  await app.register(buildLibraryRoutes(service));
+  const res = await app.inject({ method: "PATCH", url: "/library/books", headers: { authorization: "Bearer u1" }, payload: { bookKey: bookKey(kobo), rating: 3 } });
+  assert.equal(res.statusCode, 409);
+  assert.ok((res.json() as { error: string }).error);
+  await app.close();
+});
+
+test("PUT and GET /library answer each copy's work id", async () => {
+  const { app, put } = await setup();
+  const saved = await put(JSON.stringify({ data: { books: [kobo] } }));
+  assert.equal(saved.statusCode, 200);
+  const workId = saved.json().works["ta:dune|frank herbert"];
+  assert.equal(typeof workId, "string");
+  const read = await app.inject({ method: "GET", url: "/library", headers: { authorization: "Bearer u1" } });
+  assert.deepEqual(read.json().works, { "ta:dune|frank herbert": workId });
+  await app.close();
+});
+
+const tagged = { Title: "Dune", Attribution: "Frank Herbert", ISBN: "9780441013593", ReadStatus: 2, _key: "isbn:9999999999999", _workId: "some-work" };
+const { _key: _ignoredKey, _workId: _ignoredWorkId, ...untagged } = tagged;
+
+function storedKeys(db: DatabaseSync): string[] {
+  return (db.prepare("SELECT book_key FROM library_books WHERE user_id = ? ORDER BY position").all("u1") as Array<{ book_key: string }>).map((row) => row.book_key);
+}
+
+test("PUT /library keys and stores a book without the client's _key and _workId", async () => {
+  const { app, db, put } = await setup();
+  const saved = await put(JSON.stringify({ data: { books: [tagged] } }));
+  assert.equal(saved.statusCode, 200);
+  assert.deepEqual(storedKeys(db), [bookKey(untagged)]);
+  assert.notEqual(storedKeys(db)[0], "isbn:9999999999999");
+  const read = await app.inject({ method: "GET", url: "/library", headers: { authorization: "Bearer u1" } });
+  assert.deepEqual(read.json().data.books, [untagged]);
+  await app.close();
+});
+
+test("POST /library/books/add keys and stores a book without the client's _key and _workId", async () => {
+  const { app, db, add } = await changeSetup();
+  const res = await add({ book: tagged });
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(storedKeys(db), [bookKey(untagged)]);
+  const read = await app.inject({ method: "GET", url: "/library", headers: { authorization: "Bearer u1" } });
+  assert.deepEqual(read.json().data.books, [{ ...untagged, _order: 0 }]);
   await app.close();
 });

@@ -13,12 +13,13 @@ The main session plans, designs and reviews; routine work goes to the saved agen
 | Once per branch before merge, or a plan before coding | `branch-reviewer` |
 | Rendered mobile change needs a device pass | `device-checker` |
 | User wants emulator screenshots | `device-checker`, capture-only, `model: "haiku"`; send the PNGs with SendUserFile without reading them |
+| User explicitly asks for a beta test or UX sweep of the app — never otherwise, and never to verify a change | `beta-tester`; the main session evaluates `$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")/beta-tests/<YYYY-MM-DD-HHMM>/` and passes its own worktree path and the absolute output dir; send its `report.md` with SendUserFile, then triage it with the user |
 | Failing CI on a PR, or a `<ci-monitor-event>` | `ci-fixer` |
 | Production, Railway, Cloudflare, Litestream, EAS | `deploy-ops` |
 | Branch touches auth, tokens, OAuth, share links or who can see what | run the `security-review` skill before merge |
 | User says commit / push / merge / "is it on main?" | the `ship` skill |
 
-When a skill says to dispatch an implementer, spec reviewer or code reviewer, use these agents instead of `general-purpose`. A task that failed twice on Sonnet is escalated to Opus, not retried a third time.
+When a skill says to dispatch an implementer, spec reviewer or code reviewer, use these agents instead of `general-purpose`. A device pass, including one bundled with a task's "verify", always goes to `device-checker`, never `general-purpose`. A task that failed twice on Sonnet is escalated to Opus, not retried a third time.
 
 # Shell
 

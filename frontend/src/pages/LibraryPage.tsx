@@ -1,11 +1,12 @@
 import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { flushSync } from "react-dom";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   addReaderNote,
+  buildMergedLibrary,
   findDuplicates,
+  LIBRARY_CSV_TEMPLATE,
   newId,
   readSnapshot,
   removeReaderNote,
@@ -38,54 +39,32 @@ import { useToast } from "../components/Toaster";
 import { FilterIcon } from "../components/Toolbar";
 import { useDelayedShow } from "../hooks/useDelayedShow";
 import { useLibrary } from "../hooks/useLibrary";
+import { useLibrarySaver } from "../hooks/useLibrarySaver";
 import { useMurals } from "../hooks/useMurals";
 import { clearBookCover, setBookCover } from "../lib/bookCovers";
 import { parseImportedFile } from "../lib/fileImport";
-import { deriveSeriesGroups, removeBooksFromAllGroups } from "../lib/groups";
-import { assignBookOrder, orderLibraryBooks, reorderOnDrop, seriesGroupByBookKey } from "../lib/libraryOrder";
+import { removeBooksFromAllGroups } from "../lib/groups";
+import { orderLibraryBooks, reorderOnDrop, seriesGroupByBookKey } from "../lib/libraryOrder";
 import { effectiveCardStyle, resolveLibraryStyle, type PerCardStyle } from "../lib/libraryStyle";
-import { filterBooks, localDay, setReadStatus, sortBooks, type ReadStatus, type SortKey, type StatusFilter } from "../lib/libraryView";
-import { bookKey, mergeLibraryData } from "../lib/merge";
+import { filterBooks, localDay, sortBooks, type ReadStatus, type SortKey, type StatusFilter } from "../lib/libraryView";
+import { bookKey } from "../lib/merge";
+import { saveWithViewTransition } from "../lib/viewTransition";
 import { restoreDeletedBooks } from "../lib/restoreDeletedBooks";
-
-/** Applies a React state update wrapped in the View Transitions API when
- *  the browser supports it, so a drag-to-reorder visibly animates cards
- *  sliding to their new slots instead of just popping there (see
- *  BookCard.tsx's `viewTransitionName`). `flushSync` is required because
- *  the API needs the DOM to have actually re-rendered by the time its
- *  callback returns — a plain state update wouldn't commit until React's
- *  next scheduled render, too late for the transition to see it. Falls
- *  back to a plain (instant, unanimated) update on any browser that
- *  doesn't support it — this is a nice-to-have, never required. */
-function updateWithViewTransition(applyUpdate: () => void) {
-  const doc = document as Document & {
-    startViewTransition?: (cb: () => void) => { ready: Promise<void>; finished: Promise<void> };
-  };
-  if (typeof doc.startViewTransition !== "function") {
-    applyUpdate();
-    return;
-  }
-  try {
-    const transition = doc.startViewTransition(() => flushSync(applyUpdate));
-    // The state update above already committed via flushSync regardless
-    // of what happens to the animation itself — these two promises are
-    // purely about the *animation's* outcome, not the data. `ready`
-    // rejects (InvalidStateError) whenever the browser skips the
-    // transition outright — a hidden document, or another transition
-    // still in flight — which is routine, not a real failure, so both
-    // need a no-op `.catch` or it surfaces as an unhandled rejection.
-    transition.ready.catch(() => {});
-    transition.finished.catch(() => {});
-  } catch {
-    applyUpdate();
-  }
-}
 
 export function LibraryPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const csvTemplateUrl = `data:text/csv;charset=utf-8,${encodeURIComponent(LIBRARY_CSV_TEMPLATE)}`;
+
+  function downloadCsvTemplate() {
+    const link = document.createElement("a");
+    link.href = csvTemplateUrl;
+    link.download = "atmyshelf-library.csv";
+    link.click();
+  }
   const [searchParams, setSearchParams] = useSearchParams();
   const { scrubBooks } = useMurals();
+  const saver = useLibrarySaver();
   const { data: library, isLoading, updateLibrary, share: shareLibraryDoc, unshare: unshareLibraryDoc } = useLibrary();
   const possibleDuplicates = useMemo(() => {
     if (!library) return [];
@@ -150,17 +129,7 @@ export function LibraryPage() {
   // them — a re-import of the same file is housekeeping, not reading
   // activity. The manual add passes no source, so its save still emits.
   async function mergeAndSave(parsed: LibraryData, source?: "import") {
-    // Read the freshest cached copy, not a stale closure — same
-    // reasoning as handleRenameLibrary above.
-    await updateLibrary(
-      (existing) => {
-        const merged = mergeLibraryData(existing, parsed);
-        const ordered = { ...merged, books: assignBookOrder(merged.books) };
-        return { ...ordered, groups: deriveSeriesGroups(ordered.books, ordered.groups ?? []) };
-      },
-      undefined,
-      source
-    );
+    await updateLibrary((existing) => buildMergedLibrary(existing, parsed), { source });
   }
 
   async function handleFileChosen(file: File) {
@@ -178,7 +147,8 @@ export function LibraryPage() {
   }
 
   async function handleAddBook(book: Record<string, unknown>) {
-    await mergeAndSave({ books: [book] });
+    const result = await saver.submit({ kind: "add", book });
+    if (!result.ok) throw result.error;
     toast({ message: `Added "${String(book.Title ?? "book")}".` });
   }
 
@@ -186,7 +156,7 @@ export function LibraryPage() {
   // reorderOnDrop() for exactly what moves (the dragged book's whole
   // series if it's in one, otherwise just that book; collections never
   // affect this). The grid updates immediately (optimistically, and
-  // animated via updateWithViewTransition above where supported) — the
+  // animated via saveWithViewTransition where supported) — the
   // dropped card visibly takes its new slot and the card that was there
   // shifts out of the way right away, not after a network round trip.
   // The save happens in the background; a failure rolls the local state
@@ -198,20 +168,16 @@ export function LibraryPage() {
     const reordered = reorderOnDrop(current.data.books, current.data.groups ?? [], draggedKey, targetKey);
     if (reordered === current.data.books) return; // no-op (e.g. dropped within the same series)
 
-    const optimistic: LibraryDocument = { ...current, data: { ...current.data, books: reordered } };
-    updateWithViewTransition(() =>
-      queryClient.setQueryData<LibraryDocument | null>(["library"], (latest) => latest === current ? optimistic : latest)
+    const saving = saveWithViewTransition(() =>
+      updateLibrary((data) => {
+        const books = reorderOnDrop(data.books, data.groups ?? [], draggedKey, targetKey);
+        return books === data.books ? data : { ...data, books };
+      }, { optimistic: true }),
     );
-    const saving = updateLibrary((data) => ({
-      ...data,
-      books: reorderOnDrop(data.books, data.groups ?? [], draggedKey, targetKey)
-    }), current);
 
     saving.catch((err) => {
       console.error("Failed to persist new book order:", err);
       toast({ message: saveFailureMessage(err, "Couldn't save the new order — moved back."), kind: "error" });
-      queryClient.setQueryData<LibraryDocument | null>(["library"], (latest) => latest === optimistic ? current : latest);
-      void queryClient.invalidateQueries({ queryKey: ["library"] });
     });
   }
 
@@ -245,16 +211,9 @@ export function LibraryPage() {
     if (!current) return false;
     const key = bookKey(book);
     const day = localDay();
-    try {
-      await updateLibrary((data) => ({
-        ...data,
-        books: data.books.map((b) => (bookKey(b) === key ? setReadStatus(b, status, day) : b))
-      }));
-      return true;
-    } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't save the status change."), kind: "error" });
-      return false;
-    }
+    const result = await saver.submit(status === 2 ? { kind: "book", bookKey: key, readStatus: 2, day } : { kind: "book", bookKey: key, readStatus: status });
+    if (!result.ok) toast({ message: saveFailureMessage(result.error, "Couldn't save the status change."), kind: "error" });
+    return result.ok;
   }
 
   async function handleSetRating(book: Record<string, unknown>, rating: FinishRating): Promise<boolean> {
@@ -262,16 +221,9 @@ export function LibraryPage() {
     if (!current) return false;
     const key = bookKey(book);
     if (setRating(book, rating) === book) return true;
-    try {
-      await updateLibrary((data) => ({
-        ...data,
-        books: data.books.map((b) => (bookKey(b) === key ? setRating(b, rating) : b))
-      }));
-      return true;
-    } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't save the rating."), kind: "error" });
-      return false;
-    }
+    const result = await saver.submit({ kind: "book", bookKey: key, rating });
+    if (!result.ok) toast({ message: saveFailureMessage(result.error, "Couldn't save the rating."), kind: "error" });
+    return result.ok;
   }
 
   async function handleAddNote(book: Record<string, unknown>, text: string): Promise<boolean> {
@@ -480,6 +432,7 @@ export function LibraryPage() {
     },
     { label: "Add book…", onClick: () => setAddingBook(true) },
     { label: "Sync Goodreads…", onClick: () => setSyncingGoodreads(true) },
+    { label: "Download CSV template", onClick: downloadCsvTemplate },
     ...(books.length > 0 ? [{ label: "Select…", onClick: handleToggleSelectionMode }] : []),
     // Moved out of the app nav: it styles this page's cards and canvas,
     // not the app, so it belongs with the other things you do to your
@@ -602,11 +555,14 @@ export function LibraryPage() {
             >
               {importing ? "Importing…" : books.length > 0 ? "Import more…" : "Import library…"}
             </button>
+            <a href={csvTemplateUrl} download="atmyshelf-library.csv" className="min-h-11 rounded-lg border border-(--color-border) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover)">
+              CSV template
+            </a>
           </div>
           <input
             ref={fileInputRef}
             type="file"
-            accept=".json,application/json,.sqlite,.db,.sqlite3,.csv,text/csv"
+            accept=".json,application/json,.sqlite,.db,.sqlite3,.csv,text/csv,.tsv,text/tab-separated-values"
             hidden
             onChange={(e) => {
               const file = e.target.files?.[0];
@@ -655,8 +611,11 @@ export function LibraryPage() {
             <>
               Import one of: a <code>library.json</code> from the exporter CLI, a <code>KoboReader.sqlite</code> straight
               off your device's USB drive, a Goodreads library CSV export (My Books → Tools → Import/Export → Export
-              Library), or a StoryGraph library CSV export (profile icon → Manage Your Account → Manage Your Data →
-              Export StoryGraph Library).
+              Library), a StoryGraph library CSV export (profile icon → Manage Your Account → Manage Your Data →
+              Export StoryGraph Library), a Calibre CSV catalog, a LibraryThing TSV export, a BookWyrm book-list CSV, or a spreadsheet CSV.
+              <span className="mt-2 block">LibraryThing: More → Import/Export → Tab-Delimited Text. BookWyrm: Settings → Export Book List → CSV.</span>
+              <span className="mt-2 block">For Calibre, export a CSV catalog with title and authors. For spreadsheets, Title and Author are required; other fields are optional. Status: to-read, reading, or read. Rating: 0–5. Dates: YYYY-MM-DD. Blank fields keep your saved values.</span>
+              <a href={csvTemplateUrl} download="atmyshelf-library.csv" className="mt-2 inline-block min-h-11 py-2.5 text-(--color-accent) underline">Download CSV template</a>
             </>
           }
           action={

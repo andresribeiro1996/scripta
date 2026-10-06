@@ -18,16 +18,15 @@ import { GearIcon, PlusIcon, TOOLBAR_CONTROL_CLASS, ToolbarRow, toolbarIconClass
 import { useDelayedShow } from "../hooks/useDelayedShow";
 import { useDismissible } from "../hooks/useDismissible";
 import { useLibrary } from "../hooks/useLibrary";
+import { useLibrarySaver } from "../hooks/useLibrarySaver";
 import { useMurals } from "../hooks/useMurals";
 import { clearBookCover, setBookCover } from "../lib/bookCovers";
 import {
-  addBookToGroup,
   deleteGroup,
   makeGroup,
   normalizeGroupName,
   orderedGroupBooks,
   removeBooksFromAllGroups,
-  removeBookFromGroup,
   renameGroup,
   setGroupStyle,
   type Group,
@@ -62,6 +61,7 @@ const COPY: Record<GroupType, { title: string; noun: string; emptyTitle: string;
  *  the same underlying resource (see lib/groups.ts), differing only in
  *  copy and in that series also get auto-seeded from book metadata. */
 export function GroupsPage({ type }: { type: GroupType }) {
+  const saver = useLibrarySaver();
   const { data: library, isLoading, updateLibrary } = useLibrary();
   const { scrubBooks } = useMurals();
   const copy = COPY[type];
@@ -184,14 +184,8 @@ export function GroupsPage({ type }: { type: GroupType }) {
   }
 
   async function handleToggleBook(groupId: string, book: Record<string, unknown>, inGroup: boolean) {
-    try {
-      await updateLibrary((data) => ({
-        ...data,
-        groups: inGroup ? removeBookFromGroup(data.groups ?? [], groupId, book) : addBookToGroup(data.groups ?? [], groupId, book)
-      }));
-    } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't save — check your connection."), kind: "error" });
-    }
+    const result = await saver.submit({ kind: "membership", groupId, bookKey: bookKey(book), member: !inGroup });
+    if (!result.ok) toast({ message: saveFailureMessage(result.error, "Couldn't save — check your connection."), kind: "error" });
   }
 
   async function handleSaveGroupStyle(groupId: string, groupStyle: PerCardStyle | undefined) {

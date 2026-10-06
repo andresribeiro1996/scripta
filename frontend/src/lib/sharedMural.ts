@@ -4,11 +4,6 @@
 import type { PublicBookData, PublicHighlight } from "../api/sharedMurals";
 import { bookKey } from "./merge";
 
-/** The exact inverse of publicResolver.ts's toPublicBookData — see
- *  pages/SharedMuralPage.tsx's top comment. `highlights` starts empty; the
- *  caller (buildReconstructedBooks below) fills it in afterward once every
- *  book's own bookKey() is known, since a PublicHighlight only carries the
- *  bookKey it belongs to, not a nested position inside PublicBookData. */
 export function toPrivateBook(pub: PublicBookData): Record<string, unknown> {
   return {
     Title: pub.title,
@@ -17,6 +12,8 @@ export function toPrivateBook(pub: PublicBookData): Record<string, unknown> {
     ImageId: pub.imageId,
     _coverUrl: pub.coverUrl,
     ReadStatus: pub.readStatus,
+    _key: pub.key,
+    ...(pub.workId ? { _workId: pub.workId } : {}),
     highlights: [] as Array<Record<string, unknown>>
   };
 }

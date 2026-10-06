@@ -98,6 +98,17 @@ test("discover passes the viewer through when signed in", async () => {
   await app.close();
 });
 
+test("discover answers 401 for a rejected token and 200 anonymously with no header", async () => {
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", () => null);
+  await app.register(buildPublicCommunityRoutes(fakeService()));
+  const rejected = await app.inject({ method: "GET", url: "/community/discover", headers: { authorization: "Bearer expired" } });
+  assert.equal(rejected.statusCode, 401);
+  const anonymous = await app.inject({ method: "GET", url: "/community/discover" });
+  assert.equal(anonymous.statusCode, 200);
+  await app.close();
+});
+
 test("discover rejects a bad type with 400", async () => {
   const app = Fastify();
   await app.register(buildPublicCommunityRoutes(fakeService()));
@@ -421,6 +432,24 @@ test("following and unfollowing share one bucket of 30 a minute per account, apa
   assert.equal((await get("/community/people/suggested", "alice")).statusCode, 200);
   const settings = { publications: true, reading: false, votes: true, follows: true };
   assert.equal((await app.inject({ method: "PUT", url: "/community/profile/feed-settings", headers: bearer("alice"), payload: settings })).statusCode, 204);
+  await app.close();
+});
+
+test("saving feed settings and publishing share one bucket of 30 a minute per account, apart from other accounts and every other community route", async () => {
+  const { app, get } = await appWithAccounts();
+  const bearer = (token: string) => ({ authorization: `Bearer ${token}` });
+  const settings = { publications: true, reading: true, votes: true, follows: true };
+  const saveSettings = (token: string) => app.inject({ method: "PUT", url: "/community/profile/feed-settings", headers: bearer(token), payload: settings });
+  const publish = (token: string) => app.inject({ method: "PUT", url: "/community/profile/publish", headers: bearer(token), payload: { shareReading: true } });
+  for (let request = 0; request < 30; request++) assert.equal((await (request % 2 === 0 ? saveSettings : publish)("alice")).statusCode, request % 2 === 0 ? 204 : 200);
+  assert.equal((await saveSettings("alice")).statusCode, 429);
+  assert.equal((await publish("alice")).statusCode, 429);
+  assert.equal((await saveSettings("bob")).statusCode, 204);
+  assert.equal((await publish("bob")).statusCode, 200);
+  assert.equal((await app.inject({ method: "DELETE", url: "/community/profile/publish", headers: bearer("alice") })).statusCode, 204);
+  assert.equal((await app.inject({ method: "POST", url: "/community/follows", headers: bearer("alice"), payload: { userId: "carol" } })).statusCode, 204);
+  assert.equal((await get("/community/dashboard", "alice")).statusCode, 200);
+  assert.equal((await get("/community/people?q=reader", "alice")).statusCode, 200);
   await app.close();
 });
 

@@ -1,6 +1,8 @@
 import { open, readFile } from "node:fs/promises";
 import { DatabaseSync } from "node:sqlite";
 import {
+  bookCsvToLibraryJson,
+  decodeLibraryImport,
   goodreadsCsvToLibraryJson,
   looksLikeGoodreadsCsv,
   looksLikeStorygraphCsv,
@@ -115,12 +117,7 @@ function parseKobo(input: Input): LibraryData {
 }
 
 async function parseText(input: Input): Promise<LibraryData> {
-  let text: string;
-  try {
-    text = new TextDecoder("utf-8", { fatal: true }).decode(await readFile(input.path));
-  } catch {
-    fail("Couldn't decode that file as text, and it isn't a SQLite database.");
-  }
+  const text = decodeLibraryImport(await readFile(input.path));
 
   try {
     const json: unknown = JSON.parse(text);
@@ -133,10 +130,12 @@ async function parseText(input: Input): Promise<LibraryData> {
   try {
     if (looksLikeGoodreadsCsv(text)) return goodreadsCsvToLibraryJson(text);
     if (looksLikeStorygraphCsv(text)) return storygraphCsvToLibraryJson(text);
+    const books = bookCsvToLibraryJson(text);
+    if (books) return books;
   } catch (error) {
     fail(error instanceof Error ? error.message : "Couldn't parse that CSV export.");
   }
-  fail("Didn't recognize that file as Kobo SQLite, library JSON, Goodreads CSV, or StoryGraph CSV.");
+  fail("Didn't recognize that file — choose Kobo SQLite, library JSON, Goodreads, StoryGraph, Calibre, LibraryThing TSV, BookWyrm CSV, or a book CSV with Title and Author columns.");
 }
 
 async function parse(input: Input): Promise<LibraryData> {

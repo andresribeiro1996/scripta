@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { bookKey, type TierDefinition, type TierlistData } from "@scripta/shared";
+import { booksByWork, workIdOf, type TierDefinition, type TierlistData } from "@scripta/shared";
 import { Pressable, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { Text } from "../../ui/Text";
 import { Button, Dialog, IconButton, Input, Menu, type MenuItem, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
@@ -9,9 +9,8 @@ export type TierBook = Record<string, unknown>;
 
 export function titleOf(book: TierBook) { return String(book.Title ?? book.title ?? "Untitled"); }
 export function authorOf(book: TierBook) { return String(book.Attribution ?? book.author ?? "Unknown author"); }
-export function keyOf(book: TierBook) {
-  if ("Title" in book || "ISBN" in book) return bookKey(book);
-  return bookKey({ Title: book.title, Attribution: book.author, ISBN: book.isbn, ImageId: book.imageId });
+export function workOf(book: TierBook): string | undefined {
+  return workIdOf(book);
 }
 
 export function TierCover({ book, style, onLoadEnd }: { book: TierBook; style?: StyleProp<ViewStyle>; onLoadEnd?: () => void }) {
@@ -41,23 +40,23 @@ export function TierHead({ children }: { children: ReactNode }) {
   return <View style={styles.head}>{children}</View>;
 }
 
-export function TierBoard({ data, books, onChange, structureEditable, poolLabel = "Pool", onReassign, bottomClearance = 0 }: { data: TierlistData; books: TierBook[]; onChange: (data: TierlistData) => void; structureEditable: boolean; poolLabel?: string; onReassign?: (bookKey: string) => void; bottomClearance?: number }) {
+export function TierBoard({ data, books, onChange, structureEditable, poolLabel = "Pool", onReassign, bottomClearance = 0 }: { data: TierlistData; books: TierBook[]; onChange: (data: TierlistData) => void; structureEditable: boolean; poolLabel?: string; onReassign?: (workId: string) => void; bottomClearance?: number }) {
   const { colors } = useTheme();
   const [editing, setEditing] = useState<TierDefinition | null>(null);
   const [label, setLabel] = useState("");
   const [color, setColor] = useState("");
-  const byKey = new Map(books.map((book) => [keyOf(book), book]));
+  const byWork = booksByWork(books);
 
-  function keysFor(section: string) { return section === "pool" ? data.pool : data.tiers.find((tier) => tier.id === section)?.bookKeys ?? []; }
+  function idsFor(section: string) { return section === "pool" ? data.pool : data.tiers.find((tier) => tier.id === section)?.workIds ?? []; }
   function moveTier(index: number, direction: -1 | 1) {
     const tiers = [...data.tiers];
     [tiers[index], tiers[index + direction]] = [tiers[index + direction]!, tiers[index]!];
     onChange({ ...data, tiers });
   }
   function renderBooks(section: string) {
-    const keys = keysFor(section).filter((key) => byKey.has(key));
-    if (!keys.length) return <Text {...dynamicType} style={[typography.caption, styles.empty, { color: colors.textDim }]}>{section === "pool" ? "Books unavailable" : "–"}</Text>;
-    return <TierRowScroll style={section === "pool" ? styles.poolBooks : styles.booksScroll} contentContainerStyle={styles.books}>{keys.map((key) => <BookChip key={key} book={byKey.get(key)!} onReassign={onReassign ? () => onReassign(key) : undefined} />)}</TierRowScroll>;
+    const ids = idsFor(section).filter((id) => byWork.has(id));
+    if (!ids.length) return <Text {...dynamicType} style={[typography.caption, styles.empty, { color: colors.textDim }]}>{section === "pool" ? "Books unavailable" : "–"}</Text>;
+    return <TierRowScroll style={section === "pool" ? styles.poolBooks : styles.booksScroll} contentContainerStyle={styles.books}>{ids.map((id) => <BookChip key={id} book={byWork.get(id)!} onReassign={onReassign ? () => onReassign(id) : undefined} />)}</TierRowScroll>;
   }
 
   return (
@@ -85,7 +84,7 @@ export function TierBoard({ data, books, onChange, structureEditable, poolLabel 
       </View> : null}
     </ScrollView>
     <Dialog visible={editing !== null} title="Edit tier" onClose={() => setEditing(null)}>
-      <View style={styles.dialog}><Input label="Label" value={label} onChangeText={setLabel} /><Input label="Color" value={color} onChangeText={setColor} autoCapitalize="none" /><Button label="Save tier" onPress={() => { if (!editing) return; onChange({ ...data, tiers: data.tiers.map((tier) => tier.id === editing.id ? { ...tier, label: label.trim() || "Untitled", color: /^#[0-9a-f]{6}$/i.test(color) ? color : tier.color } : tier) }); setEditing(null); }} /><Button label="Delete tier" variant="destructive" onPress={() => { if (!editing) return; onChange({ tiers: data.tiers.filter((tier) => tier.id !== editing.id), pool: [...data.pool, ...editing.bookKeys] }); setEditing(null); }} /></View>
+      <View style={styles.dialog}><Input label="Label" value={label} onChangeText={setLabel} /><Input label="Color" value={color} onChangeText={setColor} autoCapitalize="none" /><Button label="Save tier" onPress={() => { if (!editing) return; onChange({ ...data, tiers: data.tiers.map((tier) => tier.id === editing.id ? { ...tier, label: label.trim() || "Untitled", color: /^#[0-9a-f]{6}$/i.test(color) ? color : tier.color } : tier) }); setEditing(null); }} /><Button label="Delete tier" variant="destructive" onPress={() => { if (!editing) return; onChange({ tiers: data.tiers.filter((tier) => tier.id !== editing.id), pool: [...data.pool, ...editing.workIds] }); setEditing(null); }} /></View>
     </Dialog>
     </>
   );

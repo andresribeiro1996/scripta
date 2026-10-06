@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { MiniBookTile } from "../murals/blocks/BookBlocks";
 import { useScrollLock } from "../../hooks/useScrollLock";
 import { useDismissible } from "../../hooks/useDismissible";
-import { bookKey } from "../../lib/merge";
+import { workIdOf, booksByWork } from "@scripta/shared";
 
 /** Picks several books into a tier list's pool in one trip.
  *
@@ -23,7 +23,7 @@ export function AddBooksSheet({
   onClose
 }: {
   books: Array<Record<string, unknown>>;
-  onAdd: (keys: string[]) => void;
+  onAdd: (workIds: string[]) => void;
   onClose: () => void;
 }) {
   useScrollLock();
@@ -33,8 +33,9 @@ export function AddBooksSheet({
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return books;
-    return books.filter(
+    const unique = [...booksByWork(books).values()];
+    if (!q) return unique;
+    return unique.filter(
       (b) => String(b.Title ?? "").toLowerCase().includes(q) || String(b.Attribution ?? "").toLowerCase().includes(q)
     );
   }, [books, search]);
@@ -74,7 +75,7 @@ export function AddBooksSheet({
           ) : (
             <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
               {filtered.map((book, i) => {
-                const key = bookKey(book);
+                const key = workIdOf(book)!;
                 const isSelected = selected.has(key);
                 return (
                   <button

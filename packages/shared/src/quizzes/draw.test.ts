@@ -4,7 +4,7 @@ import { eligibleTypes, generateQuizQuestions, hashSeed, mulberry32 } from "./dr
 import type { QuizBook, QuizConfig } from "./types.js";
 
 const book = (key: string, extra: Partial<QuizBook> = {}): QuizBook => ({
-  key,
+  workId: key,
   title: `Title ${key}`,
   author: "A",
   coverUrl: `https://covers.test/${key}.jpg`,
@@ -31,7 +31,7 @@ test("every question has 4 distinct options whose answer slot holds the answer v
   for (const q of generateQuizQuestions(books, config, "seed")) {
     assert.equal(q.options.length, 4);
     assert.equal(new Set(q.options).size, 4);
-    const answerValue = q.type === "title_cover" ? `https://covers.test/${q.bookKey}.jpg` : `Title ${q.bookKey}`;
+    const answerValue = q.type === "title_cover" ? `https://covers.test/${q.book.workId}.jpg` : `Title ${q.book.workId}`;
     assert.equal(q.options[q.answerIndex], answerValue);
   }
 });
@@ -78,4 +78,10 @@ test("options stay distinct when several books share a title", () => {
 test("a pool whose titles cannot fill 4 distinct options draws nothing rather than duplicating", () => {
   const dupes = [book("a"), book("b"), book("b2", { title: "Title b" }), book("b3", { title: "Title b" })];
   assert.equal(generateQuizQuestions(dupes, { questionCount: 4, allowedTypes: ["cover_title"] }, "s").length, 0);
+});
+
+test("a distractor is any other book object, so two books sharing a title still draw", () => {
+  const books = [book("a"), book("b"), book("c"), book("d"), book("e")];
+  const questions = generateQuizQuestions(books, { questionCount: 5, allowedTypes: ["title_cover"] }, "seed");
+  for (const question of questions) assert.ok(books.includes(question.book));
 });

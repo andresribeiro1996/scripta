@@ -15,8 +15,9 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
 const { applyBooksMigrations } = await import("./adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("./adapters/sqlite/sqliteBooksRepository.js");
-const { createBooksService } = await import("./booksService.js");
-const { SourcePausedError, SourceUnavailableError } = await import("./domain/errors.js");
+const { createBooksService, COVER_ENQUEUE_BATCH } = await import("./booksService.js");
+const { default: sharp } = await import("sharp");
+const { BookNotFoundError, FileTooLargeError, InvalidImageError, SourcePausedError, SourceUnavailableError } = await import("./domain/errors.js");
 const { createCoverWorker } = await import("./worker.js");
 const { createCompositeCatalog } = await import("./adapters/catalog/compositeCatalog.js");
 const { createThrottle } = await import("./adapters/http/http.js");
@@ -63,6 +64,7 @@ function harness(overrides: Partial<Deps> = {}) {
       fetchDetails: async () => { throw new Error("catalog not expected"); },
       search: async () => { throw new Error("catalog not expected"); }
     },
+    editionRecords: { fetchEditionRecord: async () => { throw new Error("edition records not expected"); } },
     fetchImage: async (candidate) => {
       const size = sizes.get(candidate.url);
       return size ? { full: Buffer.from(`full:${candidate.url}`), thumb: Buffer.from(`thumb:${candidate.url}`), width: size[0], height: size[1] } : null;
@@ -77,6 +79,41 @@ function harness(overrides: Partial<Deps> = {}) {
   const bookId = (key: string) => repo.findBookByKey(key)!.id;
   return { db, repo, files, sizes, enqueued, warnings, service, bookId, advance: (ms: number) => { clock += ms; } };
 }
+
+test("an ISBN-10 and its ISBN-13 resolve to one edition", () => {
+  const { service, db } = harness();
+  service.resolveCover({ isbn: "0441013597", title: "Dune", author: "Frank Herbert" });
+  service.resolveCover({ isbn: "9780441013593", title: "Dune", author: "Frank Herbert" });
+  assert.equal((db.prepare("SELECT COUNT(*) AS n FROM books").get() as { n: number }).n, 1);
+  const keys = (db.prepare("SELECT key FROM book_keys ORDER BY key").all() as Array<{ key: string }>).map((row) => row.key);
+  assert.ok(keys.includes("isbn:9780441013593"));
+  assert.ok(keys.includes("isbn:0441013597"));
+});
+
+test("a lookup finds an edition stored only under its ISBN-10 key", () => {
+  const { service, db, repo } = harness();
+  const legacy = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "0441013597" }, ["isbn:0441013597"], "2026-01-01T00:00:00.000Z");
+  service.resolveCover({ isbn: "0441013597", title: "Dune", author: "Frank Herbert" });
+  assert.equal((db.prepare("SELECT COUNT(*) AS n FROM books").get() as { n: number }).n, 1);
+  assert.equal(repo.findBookByKey("isbn:9780441013593")?.id, legacy.id);
+});
+
+test("looking up an existing edition by its canonical key writes no keys", () => {
+  const { service, repo } = harness();
+  service.resolveCover({ isbn: "0441013597", title: "Dune", author: "Frank Herbert" });
+  const addKey = repo.addKey;
+  let writes = 0;
+  repo.addKey = (...args) => { writes += 1; addKey(...args); };
+  service.resolveCover({ isbn: "9780441013593", title: "Dune", author: "Frank Herbert" });
+  service.resolveCover({ isbn: "0441013597", title: "Dune", author: "Frank Herbert" });
+  assert.equal(writes, 0);
+});
+
+test("repo.transaction nests inside an open transaction", () => {
+  const { repo } = harness();
+  const book = repo.transaction(() => repo.createBook({ title: "Orlando", author: "Virginia Woolf", isbn: null }, ["ta:orlando|woolf|"], "2026-01-01T00:00:00.000Z"));
+  assert.ok(repo.getBook(book.id));
+});
 
 test("a new book answers pending and repeat requests reuse the same row", () => {
   const { service, enqueued, db } = harness();
@@ -101,6 +138,27 @@ test("processing stores the first good cover; resolve serves thumb and full URLs
   assert.ok(h.files.has(`${imageId}.webp`));
   assert.ok(h.files.has(`${imageId}-thumb.webp`));
   assert.equal(h.repo.getImage(imageId)!.source_url, "https://a/1");
+});
+
+test("a cover set while the worker uploaded is not overwritten", async () => {
+  let rivalSet = false;
+  const h: ReturnType<typeof harness> = harness({
+    sources: { isbndb: null, apple: isbnSource("https://a/1"), openlibrary: emptySource },
+    blobs: {
+      save: async () => {
+        if (rivalSet) return;
+        rivalSet = true;
+        h.repo.setCover(h.bookId("isbn:9780141184272"), { imageId: "uploaded", status: "manual", checkedAt: "2026-10-01T00:00:00.000Z" });
+      }
+    }
+  });
+  h.sizes.set("https://a/1", [900, 1400]);
+  h.service.resolveCover(orlando);
+  await h.service.processBook(h.bookId("isbn:9780141184272"), "background");
+  const row = h.repo.findBookByKey("isbn:9780141184272")!;
+  assert.equal(row.cover_image_id, "uploaded");
+  assert.equal(row.cover_status, "manual");
+  assert.equal(row.cover_upgrade_wanted_at, null);
 });
 
 test("a complete miss is remembered for 30 days", async () => {
@@ -138,6 +196,7 @@ test("a better image replaces the pointer and keeps the old file", async () => {
   await h.service.processBook(id, "background");
   const oldImage = h.repo.getBook(id)!.cover_image_id!;
   h.sizes.set("https://a/small", [900, 1400]);
+  h.advance(30 * DAY);
   await h.service.processBook(id, "background");
   const newImage = h.repo.getBook(id)!.cover_image_id!;
   assert.notEqual(newImage, oldImage);
@@ -194,6 +253,108 @@ test("a plain 503 keeps the 10-minute backoff and is still warned about", async 
   h.advance(1);
   h.service.resolveCover(orlando);
   assert.equal(h.enqueued.length, 1);
+});
+
+function recordingSource(calls: string[], name: string, behaviour: () => Promise<[]> = async () => []): CoverSource {
+  return {
+    byIsbn: async () => { calls.push(`${name}:isbn`); return behaviour(); },
+    byTitle: async () => { calls.push(`${name}:title`); return behaviour(); }
+  };
+}
+
+function pausedIsbndb(retryAt: number, calls: string[]) {
+  return recordingSource(calls, "isbndb", async () => { throw new SourcePausedError("isbndb", "paused", { retryAt }); });
+}
+
+test("a background lookup stamps Apple's answer even when ISBNdb is paused, and the retry skips Apple", async () => {
+  const HOUR = 60 * 60 * 1000;
+  const calls: string[] = [];
+  const h = harness({ sources: { isbndb: pausedIsbndb(Date.parse("2026-10-01T00:00:00.000Z") + 5 * HOUR, calls), apple: recordingSource(calls, "apple"), openlibrary: recordingSource(calls, "openlibrary") } });
+  h.service.resolveCover(orlando);
+  const id = h.bookId("isbn:9780141184272");
+  await h.service.processBook(id, "background");
+  assert.deepEqual(calls, ["apple:isbn", "isbndb:isbn", "openlibrary:isbn", "apple:title", "isbndb:title", "openlibrary:title"]);
+  const row = h.repo.getBook(id)!;
+  assert.equal(row.apple_checked_at, "2026-10-01T00:00:00.000Z");
+  assert.equal(row.cover_status, null);
+  h.advance(5 * HOUR);
+  calls.length = 0;
+  await h.service.processBook(id, "background");
+  assert.deepEqual(calls, ["isbndb:isbn", "openlibrary:isbn", "isbndb:title", "openlibrary:title"]);
+});
+
+test("a low-res Apple cover stays unchecked while ISBNdb is paused, and a wider ISBNdb cover replaces it later", async () => {
+  const HOUR = 60 * 60 * 1000;
+  const calls: string[] = [];
+  let paused = true;
+  const isbndb: CoverSource = {
+    byIsbn: async () => {
+      calls.push("isbndb:isbn");
+      if (paused) throw new SourcePausedError("isbndb", "paused", { retryAt: Date.parse("2026-10-01T00:00:00.000Z") + 5 * HOUR });
+      return [{ source: "isbndb", url: "https://i/wide" }];
+    },
+    byTitle: async () => []
+  };
+  const h = harness({ sources: { isbndb, apple: { ...isbnSource("https://a/small", calls), byTitle: async () => [] }, openlibrary: emptySource } });
+  h.sizes.set("https://a/small", [300, 460]);
+  h.sizes.set("https://i/wide", [900, 1400]);
+  h.service.resolveCover(orlando);
+  const id = h.bookId("isbn:9780141184272");
+  await h.service.processBook(id, "background");
+  let row = h.repo.getBook(id)!;
+  assert.equal(row.apple_checked_at, "2026-10-01T00:00:00.000Z");
+  assert.deepEqual([row.cover_status, row.cover_checked_at], ["low_res", null]);
+  assert.notEqual(row.cover_image_id, null);
+  assert.deepEqual(h.repo.listUncheckedCoverIds(null, 100).ids, [id]);
+  const small = row.cover_image_id;
+  h.advance(5 * HOUR);
+  paused = false;
+  calls.length = 0;
+  await h.service.processBook(id, "background");
+  assert.deepEqual(calls, ["isbndb:isbn"]);
+  row = h.repo.getBook(id)!;
+  assert.notEqual(row.cover_image_id, small);
+  assert.equal(row.cover_status, "good");
+  assert.notEqual(row.cover_checked_at, null);
+  assert.deepEqual(h.repo.listUncheckedCoverIds(null, 100).ids, []);
+});
+
+test("an Apple failure does not stamp the book", async () => {
+  const failing: CoverSource = { byIsbn: async () => { throw new SourceUnavailableError("apple", "HTTP 503", { status: 503 }); }, byTitle: async () => [] };
+  const h = harness({ sources: { isbndb: null, apple: failing, openlibrary: emptySource } });
+  h.service.resolveCover(orlando);
+  const id = h.bookId("isbn:9780141184272");
+  await h.service.processBook(id, "background");
+  assert.equal(h.repo.getBook(id)!.apple_checked_at, null);
+});
+
+test("the background lane asks Apple again once its answer is 30 days old", async () => {
+  const calls: string[] = [];
+  const h = harness({ sources: { isbndb: null, apple: recordingSource(calls, "apple"), openlibrary: emptySource } });
+  h.service.resolveCover(orlando);
+  const id = h.bookId("isbn:9780141184272");
+  h.repo.setAppleChecked(id, "2026-10-01T00:00:00.000Z");
+  h.advance(30 * DAY - 1);
+  await h.service.processBook(id, "background");
+  assert.deepEqual(calls, []);
+  h.advance(1);
+  await h.service.processBook(id, "background");
+  assert.deepEqual(calls, ["apple:isbn", "apple:title"]);
+  assert.equal(h.repo.getBook(id)!.apple_checked_at, "2026-10-31T00:00:00.000Z");
+});
+
+test("the upgrade lane asks Apple even for a stamped book; front and normal never do", async () => {
+  const calls: string[] = [];
+  const h = harness({ sources: { isbndb: null, apple: recordingSource(calls, "apple"), openlibrary: emptySource } });
+  h.service.resolveCover(orlando);
+  const id = h.bookId("isbn:9780141184272");
+  h.repo.setAppleChecked(id, "2026-10-01T00:00:00.000Z");
+  await h.service.processBook(id, "upgrade");
+  assert.deepEqual(calls, ["apple:isbn", "apple:title"]);
+  calls.length = 0;
+  await h.service.processBook(id, "front");
+  await h.service.processBook(id, "normal");
+  assert.deepEqual(calls, []);
 });
 
 test("resolve queues at the back unless asked to jump the queue", () => {
@@ -331,10 +492,17 @@ test("a cover whose blob save rejects stores no image row and no cover pointer",
   h.sizes.set("https://a/1", [600, 900]);
   h.service.resolveCover(orlando);
   const id = h.bookId("isbn:9780141184272");
-  await assert.rejects(h.service.processBook(id, "background"), /HTTP 403/);
+  await assert.rejects(h.service.processBook(id, "background"), (e) => {
+    assert.match(String(e), /HTTP 403/);
+    return true;
+  });
   assert.equal((h.db.prepare(`SELECT COUNT(*) AS n FROM cover_images`).get() as { n: number }).n, 0);
   assert.equal(h.repo.getBook(id)!.cover_image_id, null);
-  await assert.rejects(h.service.uploadCover(orlando, await sharp({ create: { width: 600, height: 900, channels: 3, background: "#224466" } }).jpeg().toBuffer()), /HTTP 403/);
+  const photo = await sharp({ create: { width: 600, height: 900, channels: 3, background: "#224466" } }).jpeg().toBuffer();
+  await assert.rejects(h.service.uploadCover(orlando, photo), (e) => {
+    assert.match(String(e), /HTTP 403/);
+    return true;
+  });
   assert.equal((h.db.prepare(`SELECT COUNT(*) AS n FROM cover_images`).get() as { n: number }).n, 0);
 });
 
@@ -621,9 +789,6 @@ test("search never returns a book that only came from an account's library", asy
   assert.deepEqual(calls, ["search:manuscript"]);
 });
 
-const { default: sharp } = await import("sharp");
-const { BookNotFoundError, FileTooLargeError, InvalidImageError } = await import("./domain/errors.js");
-
 test("nobody is admin when ADMIN_USER_ID is blank", () => {
   assert.equal(harness().service.isAdmin(""), false);
   assert.equal(harness().service.isAdmin("u1"), false);
@@ -686,7 +851,7 @@ test("an upload clears a pending upgrade so the tick stops requeueing the book",
   const cover = await h.service.uploadCover(orlando, photo);
   assert.equal(h.repo.getBook(id)!.cover_upgrade_wanted_at, null);
   assert.equal(cover.upgrading, false);
-  assert.deepEqual(h.repo.listUpgradeWantedIds(), []);
+  assert.deepEqual(h.repo.listUpgradeWantedIds(null, 100).ids, []);
 });
 
 test("uploads that are too large or not images are refused", async () => {
@@ -1063,6 +1228,16 @@ test("an outside search stores the work key on created and existing rows", async
   assert.equal(none.repo.findBookByKey("isbn:9780441013593")!.ol_work_key, null);
 });
 
+test("an outside search puts new hits with one work key in one work, leaving no throwaway work behind", async () => {
+  const hit = (isbn: string, title: string) => ({ result: { title, authors: ["Frank Herbert"], year: null, isbn, publisher: null, coverUrl: null, genres: [] }, olCoverId: null, workKey: "/works/OL1W", source: "openlibrary" as const });
+  const h = harness({ catalog: recordingCatalog({ search: async () => [hit("9780441013593", "Dune"), hit("9789722046114", "Duna")] }).catalog });
+  await h.service.searchExternal("dune");
+  const english = h.repo.findBookByKey("isbn:9780441013593")!;
+  const portuguese = h.repo.findBookByKey("isbn:9789722046114")!;
+  assert.equal(portuguese.work_id, english.work_id);
+  assert.deepEqual(h.db.prepare("SELECT ol_work_key, title, merged_into FROM works").all().map((work) => ({ ...work })), [{ ol_work_key: "OL1W", title: "Dune", merged_into: null }]);
+});
+
 function backfillBooks(h: ReturnType<typeof harness>, count: number) {
   for (let index = 0; index < count; index++) {
     h.service.resolveCover({ isbn: null, title: `Book ${index}`, author: "Author" });
@@ -1251,4 +1426,199 @@ test("a strict background catalog leaves a book unchanged when ISBNdb is paused 
   await h.service.backfillDetails(50);
   const row = h.repo.getBook(id)!;
   assert.deepEqual([row.details_status, row.rating, row.genres, row.pages, row.summary, row.data_sources, row.details_checked_at], [null, null, "[]", null, null, "[]", null]);
+});
+
+function lookupBooks(h: ReturnType<typeof harness>, specs: Array<{ isbn: string; createdBy?: "seed" | "publisher"; checked?: boolean }>) {
+  return specs.map(({ isbn, createdBy, checked = true }, index) => {
+    const book = h.repo.createBook({ title: `Book ${index}`, author: "Someone", isbn, createdBy }, [`isbn:${isbn}`], `2026-09-0${index + 1}T00:00:00.000Z`);
+    if (checked) h.repo.markDetailsMissing(book.id, "2026-09-30T00:00:00.000Z");
+    return book.id;
+  });
+}
+
+function editionRecords(answer: (isbn: string) => Promise<{ title: string; workKey: string | null; languages: string[] } | null>, calls: string[] = []) {
+  return { fetchEditionRecord: async (isbn: string) => { calls.push(isbn); return answer(isbn); } };
+}
+
+test("the work key lookup asks for user editions first, then seed ones, and never for publisher, keyed or unchecked editions", async () => {
+  const calls: string[] = [];
+  const h = harness({ editionRecords: editionRecords(async () => null, calls) });
+  const [publisher, seed, user] = lookupBooks(h, [{ isbn: "9789720000001", createdBy: "publisher" }, { isbn: "9789720000002", createdBy: "seed" }, { isbn: "9789720000003" }]);
+  lookupBooks(h, [{ isbn: "9789720000004", checked: false }]);
+  h.repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593", workKey: "OL1W" }, ["isbn:9780441013593"], "2026-09-01T00:00:00.000Z");
+  h.repo.markDetailsMissing(h.bookId("isbn:9780441013593"), "2026-09-30T00:00:00.000Z");
+  assert.equal(await h.service.backfillWorkKeys(50), null);
+  assert.deepEqual(calls, ["9789720000003", "9789720000002"]);
+  assert.deepEqual([publisher, seed, user].map((id) => h.repo.getBook(id!)!.work_checked_at), [null, "2026-10-01T00:00:00.000Z", "2026-10-01T00:00:00.000Z"]);
+});
+
+test("a work key found by ISBN keys the edition, joins the keyed work and replaces its language", async () => {
+  const h = harness({ editionRecords: editionRecords(async () => ({ title: "Os Maias", workKey: "/works/OL846513W", languages: ["/languages/por"] })) });
+  const keyed = h.repo.createBook({ title: "The Maias", author: "Eça de Queirós", isbn: "9780141394459", workKey: "OL846513W" }, ["isbn:9780141394459"], "2026-09-01T00:00:00.000Z");
+  const [id] = lookupBooks(h, [{ isbn: "9789725681367" }]);
+  h.repo.setLanguage(id!, "en");
+  await h.service.backfillWorkKeys(50);
+  const book = h.repo.getBook(id!)!;
+  assert.deepEqual([book.ol_work_key, book.work_id, book.language], ["OL846513W", keyed.work_id, "pt-PT"]);
+});
+
+test("a miss is stamped and asked again only after 30 days", async () => {
+  const calls: string[] = [];
+  const h = harness({ editionRecords: editionRecords(async () => null, calls) });
+  lookupBooks(h, [{ isbn: "9789722541701" }]);
+  await h.service.backfillWorkKeys(50);
+  await h.service.backfillWorkKeys(50);
+  assert.deepEqual(calls, ["9789722541701"]);
+  h.advance(31 * DAY);
+  await h.service.backfillWorkKeys(50);
+  assert.deepEqual(calls, ["9789722541701", "9789722541701"]);
+});
+
+test("a record without a work changes nothing but the stamp", async () => {
+  const h = harness({ editionRecords: editionRecords(async () => ({ title: "X", workKey: null, languages: ["/languages/por"] })) });
+  const [id] = lookupBooks(h, [{ isbn: "9789722541701" }]);
+  await h.service.backfillWorkKeys(50);
+  const book = h.repo.getBook(id!)!;
+  assert.deepEqual([book.ol_work_key, book.language, book.work_checked_at], [null, null, "2026-10-01T00:00:00.000Z"]);
+});
+
+test("a rate limit ends the batch unstamped and returns when to resume", async () => {
+  const calls: string[] = [];
+  const h = harness({ editionRecords: editionRecords(async () => { throw new SourceUnavailableError("openlibrary", "HTTP 429", { status: 429, retryAt: 123_456 }); }, calls) });
+  const ids = lookupBooks(h, [{ isbn: "9789720000001" }, { isbn: "9789720000002" }]);
+  assert.equal(await h.service.backfillWorkKeys(50), 123_456);
+  assert.equal(calls.length, 1);
+  assert.deepEqual(ids.map((id) => h.repo.getBook(id)!.work_checked_at), [null, null]);
+});
+
+test("a rate limit without a retry time still ends the batch unstamped", async () => {
+  const calls: string[] = [];
+  const h = harness({ editionRecords: editionRecords(async () => { throw new SourceUnavailableError("openlibrary", "HTTP 429", { status: 429 }); }, calls) });
+  const ids = lookupBooks(h, [{ isbn: "9789720000001" }, { isbn: "9789720000002" }]);
+  assert.equal(await h.service.backfillWorkKeys(50), Date.parse("2026-10-01T00:00:00.000Z") + 10 * 60 * 1000);
+  assert.equal(calls.length, 1);
+  assert.deepEqual(ids.map((id) => h.repo.getBook(id)!.work_checked_at), [null, null]);
+  assert.deepEqual(h.warnings, []);
+});
+
+test("an outage without a retry time is warned about, stamped, and does not stop the batch", async () => {
+  const h = harness({
+    editionRecords: editionRecords(async (isbn) => {
+      if (isbn === "9789720000001") throw new SourceUnavailableError("openlibrary", "HTTP 503", { status: 503 });
+      return null;
+    })
+  });
+  const ids = lookupBooks(h, [{ isbn: "9789720000001" }, { isbn: "9789720000002" }]);
+  assert.equal(await h.service.backfillWorkKeys(50), null);
+  assert.deepEqual(ids.map((id) => h.repo.getBook(id)!.work_checked_at), ["2026-10-01T00:00:00.000Z", "2026-10-01T00:00:00.000Z"]);
+  assert.deepEqual(h.warnings, [{ details: { bookId: ids[0], source: "openlibrary", error: "openlibrary unavailable: HTTP 503" }, message: "work key source unavailable" }]);
+});
+
+test("a bug in a work key lookup propagates", async () => {
+  const h = harness({ editionRecords: editionRecords(async () => { throw new TypeError("boom"); }) });
+  lookupBooks(h, [{ isbn: "9789720000001" }]);
+  await assert.rejects(h.service.backfillWorkKeys(50), TypeError);
+});
+
+test("an aborted work key lookup starts no further requests", async () => {
+  const calls: string[] = [];
+  const controller = new AbortController();
+  const h = harness({ editionRecords: editionRecords(async () => { controller.abort(); return null; }, calls) });
+  lookupBooks(h, [{ isbn: "9789720000001" }, { isbn: "9789720000002" }]);
+  await h.service.backfillWorkKeys(50, controller.signal);
+  assert.equal(calls.length, 1);
+});
+
+test("enqueueUnchecked queues one batch per call, continues where it stopped, and wraps after a short page", () => {
+  const h = harness();
+  const at = "2026-09-01T00:00:00.000Z";
+  const ids = Array.from({ length: COVER_ENQUEUE_BATCH + 1 }, (_, i) => h.repo.createBook({ title: `Book ${i}`, author: "Author", isbn: null }, [`ta:book ${i}|author|`], at).id);
+  const queued = () => h.enqueued.splice(0).filter((entry) => entry.priority === "background").map((entry) => entry.bookId);
+
+  h.service.enqueueUnchecked();
+  assert.deepEqual(queued(), ids.slice(0, COVER_ENQUEUE_BATCH));
+
+  h.service.enqueueUnchecked();
+  assert.deepEqual(queued(), [ids[COVER_ENQUEUE_BATCH]]);
+
+  h.service.enqueueUnchecked();
+  assert.deepEqual(queued(), ids.slice(0, COVER_ENQUEUE_BATCH));
+});
+
+test("enqueueUpgrade queues one batch per call, continues where it stopped, and wraps after a short page", () => {
+  const h = harness();
+  const created = "2026-09-01T00:00:00.000Z";
+  const ids = Array.from({ length: COVER_ENQUEUE_BATCH + 1 }, (_, i) => {
+    const id = h.repo.createBook({ title: `Book ${i}`, author: "Author", isbn: null }, [`ta:book ${i}|author|`], created).id;
+    h.repo.setCover(id, { imageId: null, status: "missing", checkedAt: created });
+    h.repo.setUpgradeWanted(id, created);
+    return id;
+  });
+  const queued = () => h.enqueued.splice(0).filter((entry) => entry.priority === "upgrade").map((entry) => entry.bookId);
+
+  h.service.enqueueUnchecked();
+  assert.deepEqual(queued(), ids.slice(0, COVER_ENQUEUE_BATCH));
+
+  h.service.enqueueUnchecked();
+  assert.deepEqual(queued(), [ids[COVER_ENQUEUE_BATCH]]);
+
+  h.service.enqueueUnchecked();
+  assert.deepEqual(queued(), ids.slice(0, COVER_ENQUEUE_BATCH));
+});
+
+test("enqueueUnchecked reaches the books behind a full page of books in backoff", async () => {
+  const failing: CoverSource = { byIsbn: async () => { throw new SourceUnavailableError("apple", "HTTP 429"); }, byTitle: async () => { throw new SourceUnavailableError("apple", "HTTP 429"); } };
+  const h = harness({ sources: { isbndb: null, apple: failing, openlibrary: emptySource } });
+  const at = "2026-09-01T00:00:00.000Z";
+  const ids = Array.from({ length: COVER_ENQUEUE_BATCH + 1 }, (_, i) => h.repo.createBook({ title: `Book ${i}`, author: "Author", isbn: null }, [`ta:book ${i}|author|`], at).id);
+  for (const id of ids.slice(0, COVER_ENQUEUE_BATCH)) await h.service.processBook(id, "background");
+  h.enqueued.length = 0;
+
+  h.service.enqueueUnchecked();
+  assert.deepEqual(h.enqueued, []);
+
+  h.service.enqueueUnchecked();
+  assert.deepEqual(h.enqueued, [{ bookId: ids[COVER_ENQUEUE_BATCH], priority: "background" }]);
+});
+
+const ENGLISH_WORK = "The story of a boy who leaves his village and the war that is waiting for him in the north.";
+const workSummaryCatalog = () => recordingCatalog({
+  fetchDetails: async () => ({ metadata: { summary: null, rating: 4, ratingCount: 3, sourceUrl: "https://openlibrary.org/works/OL1W", genres: ["Science Fiction"], pages: null, publisher: null, year: null, translator: null }, sources: ["openlibrary"], summarySource: null, workKey: "/works/OL1W", workSummary: ENGLISH_WORK })
+}).catalog;
+const spiceCatalog = (workSummary: string) => recordingCatalog({
+  fetchDetails: async () => ({ metadata: { summary: "Edition text.", rating: 4, ratingCount: 3, sourceUrl: "https://openlibrary.org/works/OL1W", genres: ["Science Fiction"], pages: null, publisher: null, year: null, translator: null }, sources: ["openlibrary"], summarySource: "openlibrary", workKey: "/works/OL1W", workSummary })
+}).catalog;
+
+test("an edition without its own summary reads the work's, linked to Open Library", async () => {
+  const h = harness({ catalog: workSummaryCatalog() });
+  const details = await h.service.getDetails(dune);
+  assert.deepEqual([details?.summary, details?.summarySource, details?.sourceUrl], [ENGLISH_WORK, "openlibrary", "https://openlibrary.org/works/OL1W"]);
+  assert.equal(h.repo.findBookByKey("isbn:9780441013593")!.summary, null);
+});
+
+test("the work's summary is not shown on an edition in another language", async () => {
+  const h = harness({ catalog: workSummaryCatalog() });
+  const pt = { isbn: "9789722000000", title: "Duna", author: "Frank Herbert" };
+  assert.equal((await h.service.getDetails(pt))?.summary, null);
+  assert.equal((await h.service.getDetails(dune))?.summary, ENGLISH_WORK);
+});
+
+test("an edition's own summary wins over the work's and the work keeps the first writer", async () => {
+  const h = harness({ catalog: spiceCatalog(ENGLISH_WORK) });
+  assert.equal((await h.service.getDetails(dune))?.summary, "Edition text.");
+  const other = { isbn: "9780441172719", title: "Dune", author: "Frank Herbert" };
+  const second = harness({ catalog: spiceCatalog("Later work text.") });
+  second.repo.setWorkSummary(second.repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: other.isbn, workKey: "OL1W" }, ["isbn:" + other.isbn], "2026-10-01T00:00:00.000Z").id, "Earlier work text.");
+  await second.service.getDetails(other);
+  assert.equal(second.repo.getWorkSummary(second.bookId("isbn:" + other.isbn))?.summary, "Earlier work text.");
+});
+
+test("a publisher summary overrides the work's", async () => {
+  const h = harness({ catalog: workSummaryCatalog() });
+  await h.service.getDetails(dune);
+  const id = h.bookId("isbn:9780441013593");
+  h.repo.mergeDetails(id, { summary: "Sinopse da editora.", pages: null, year: null, publisher: null, translator: null }, "publisher");
+  h.repo.setPublisherUrl(id, "https://antigona.pt/products/dune");
+  const details = await h.service.getDetails(dune);
+  assert.deepEqual([details?.summary, details?.summarySource, details?.sourceUrl], ["Sinopse da editora.", "publisher", "https://antigona.pt/products/dune"]);
 });

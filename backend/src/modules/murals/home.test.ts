@@ -15,9 +15,12 @@ const { createSqliteMuralsRepository } = await import("./adapters/sqlite/sqliteM
 const { createMuralsService } = await import("./service.js");
 const { buildMuralRoutes, buildPublicMuralRoutes } = await import("./routes.js");
 const { openLibraryDb } = await import("../library/adapters/sqlite/connection.js");
+const { createSqliteLibraryRepository } = await import("../library/adapters/sqlite/sqliteLibraryRepository.js");
+const { createLibraryService } = await import("../library/service.js");
 const { openAuthDb } = await import("../auth/adapters/sqlite/connection.js");
 const { getAuthenticatedUserFromAccessToken } = await import("../auth/tokens.js");
 const { bookKey } = await import("@scripta/shared");
+const saveLibrary = (db: DatabaseSync, userId: string, document: unknown) => createLibraryService(createSqliteLibraryRepository(db), () => "", 10 * 1024 * 1024).saveLibrary(userId, document);
 const authorization = (sub: string) => ({ authorization: `Bearer ${jwt.sign({ sub, email: `${sub}@example.test`, username: sub }, process.env.JWT_ACCESS_SECRET!, { expiresIn: "5m" })}` });
 
 test("murals routes preserve ownership, edits and public content boundaries", async () => {
@@ -43,7 +46,7 @@ test("murals routes preserve ownership, edits and public content boundaries", as
     assert.equal((await app.inject({ method: "PUT", url: `/murals/${home.id}`, headers: authorization("stranger"), payload: { name: "Hijacked" } })).statusCode, 404);
     const book = { Title: "Shared title", Attribution: "Writer", _coverUrl: "https://example.test/cover.png", _genres: ["Fantasy"], Rating: 5, highlights: [{ BookmarkID: "secret", Type: "highlight", Text: "PRIVATE PASSAGE" }] };
     const hidden = { Title: "PRIVATE BOOK", Attribution: "Writer", _genres: ["History"] };
-    library.prepare("INSERT INTO library_documents (user_id, data) VALUES (?, ?)").run("owner", JSON.stringify({ books: [book, hidden], groups: [{ id: "private-collection-id", type: "collection", name: "PRIVATE COLLECTION NAME", bookKeys: [bookKey(book)] }] }));
+    saveLibrary(library, "owner", { books: [book, hidden], groups: [{ id: "private-collection-id", type: "collection", name: "PRIVATE COLLECTION NAME", bookKeys: [bookKey(book)] }] });
     service.updateMural("owner", home.id, { blocks: [
       { id: "s", type: "shelf", title: "", role: "finished", collectionId: "private-collection-id", bookKeys: [bookKey(hidden)], layout: { x: 0, y: 0, w: 8, h: 5 } },
       { id: "q", type: "quote", mode: "rediscover", bookKey: bookKey(book), highlightId: "secret", layout: { x: 0, y: 6, w: 8, h: 5 } },
@@ -98,13 +101,13 @@ test("public mural payload carries the reader card without leaking titles or ser
     ];
     const otherBooks = Array.from({ length: 7 }, (_, i) => ({ Title: `Standalone ${i}`, Attribution: `Author ${i + 4}`, ReadStatus: 2 }));
     const books = [...seriesBooks, ...otherBooks];
-    library.prepare("INSERT INTO library_documents (user_id, data) VALUES (?, ?)").run("cardOwner", JSON.stringify({
+    saveLibrary(library, "cardOwner", {
       books,
       groups: [
         { id: "series-id", type: "series", name: "Secret Series", bookKeys: seriesBooks.map(bookKey) },
         { id: "malformed-group", type: "series", name: 123, bookKeys: "not-an-array" }
       ]
-    }));
+    });
     const cardHome = withCard.json();
     const noCardHome = withoutCard.json();
     service.updateMural("cardOwner", cardHome.id, { blocks: [{ id: "c", type: "readerCard", layout: { x: 0, y: 0, w: 4, h: 6 } }], updatedAt: cardHome.updatedAt });
@@ -131,7 +134,7 @@ test("public mural payload carries the reader card without leaking titles or ser
       ...markedTitles.map((title, i) => ({ Title: title, Attribution: `Marked Author ${i}`, ReadStatus: 2, highlights: marks })),
       ...Array.from({ length: 7 }, (_, i) => ({ Title: `Unmarked ${i}`, Attribution: `Plain Author ${i}`, ReadStatus: 2 }))
     ];
-    library.prepare("INSERT INTO library_documents (user_id, data) VALUES (?, ?)").run("annoOwner", JSON.stringify({ books: annoBooks }));
+    saveLibrary(library, "annoOwner", { books: annoBooks });
     const annoHome = (await app.inject({ method: "POST", url: "/murals", headers: authorization("annoOwner"), payload: { name: "Anno reading space" } })).json();
     service.updateMural("annoOwner", annoHome.id, { blocks: [{ id: "c", type: "readerCard", layout: { x: 0, y: 0, w: 4, h: 6 } }], updatedAt: annoHome.updatedAt });
     const sharedAnno = service.share("annoOwner", annoHome.id)!;
@@ -151,5 +154,33 @@ test("public mural payload carries the reader card without leaking titles or ser
     library.close();
     auth.close();
     db.close();
+  }
+});
+
+test("a shared mural's tier-list block carries canonical works and resolves its books", async () => {
+  const { resolveWorks } = await import("../books/index.js");
+  const [target, other] = ["Wall Target", "Wall Other"].map((title) => resolveWorks([{ isbn: null, title, author: "Someone" }])[0]!) as [string, string];
+  const library = openLibraryDb();
+  const insertBook = library.prepare("INSERT INTO library_books (user_id, position, book_key, title, author, row_hash, work_id) VALUES ('wallOwner', ?, ?, ?, 'Someone', 'h', ?)");
+  insertBook.run(0, "ta:wall target|someone", "Wall Target", target);
+  insertBook.run(1, "ta:wall other|someone", "Wall Other", other);
+  library.prepare("INSERT INTO library_summary (user_id, meta, total_books, finished_count, in_progress_count, total_highlights, source_updated_at, rows_version) VALUES ('wallOwner', '{}', 2, 0, 0, 0, '2026-01-01', 1)").run();
+  const db = new DatabaseSync(":memory:");
+  db.exec(readFileSync(new URL("./adapters/sqlite/schema.sql", import.meta.url), "utf8"));
+  const service = createMuralsService(createSqliteMuralsRepository(db), (token) => `https://example.test/shared/${token}`, () => "light");
+  const data = { name: "On the wall", tiers: [{ id: "s", label: "S", color: "#000000", workIds: [target] }], pool: [other] };
+  const app = Fastify();
+  await app.register(buildPublicMuralRoutes(service, () => data));
+  try {
+    const home = service.createMural("wallOwner", "Wall");
+    service.updateMural("wallOwner", home.id, { blocks: [{ id: "t", type: "tierlist", tierlistId: "tl-wall", layout: { x: 0, y: 0, w: 8, h: 5 } }], updatedAt: home.updatedAt });
+    const { shareToken } = service.share("wallOwner", home.id)!;
+    const shared = (await app.inject({ method: "GET", url: `/murals/shared/${shareToken}` })).json();
+    assert.deepEqual(shared.tierlists, { "tl-wall": data });
+    assert.deepEqual(shared.books.map((book: { key: string }) => book.key).sort(), ["ta:wall other|someone", "ta:wall target|someone"]);
+  } finally {
+    await app.close();
+    db.close();
+    library.close();
   }
 });

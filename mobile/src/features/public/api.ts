@@ -3,6 +3,8 @@ import type { ThemeId } from "@scripta/shared/themes";
 import { apiClient } from "../../core/api";
 
 export interface PublicBookData {
+  key: string;
+  workId: string | null;
   title: string;
   author: string;
   isbn: string | null;

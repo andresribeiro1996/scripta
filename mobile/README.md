@@ -17,7 +17,9 @@ That script exists because the manual version below has a trap: `dev-account.mjs
 EXPO_PUBLIC_API_URL=http://<your-mac-lan-ip>:3000 npm run mobile
 ```
 
-Backend must be up, serving the SAME database `dev-account.mjs` seeded — `node --import tsx scripts/dev-account.mjs` from the repo root writes the dev account and its refresh token into `mobile/.env.local`, but only a backend started with `devDataDirEnv()`'s overrides (see `scripts/devDataDir.mjs`) reads that same `backend/data/dev/` directory. Open in Expo Go by entering `exp://<lan-ip>:8081`. `EXPO_PUBLIC_API_URL` is validated at startup — the app refuses to boot with it unset or non-http(s).
+Local previews enable `EXPO_PUBLIC_DEV_AUTO_LOGIN=true`: after an invalid or missing session, a development build signs into the synthetic fixture account through `/auth/login`. Valid saved sessions remain in use; release builds never auto-login.
+
+Backend must be up, serving the SAME database `dev-account.mjs` seeded — `node --import tsx scripts/dev-account.mjs` from the repo root prepares the dev account and enables auto-login in `mobile/.env.local`, but only a backend started with `devDataDirEnv()`'s overrides (see `scripts/devDataDir.mjs`) reads that same `backend/data/dev/` directory. Open in Expo Go by entering `exp://<lan-ip>:8081`. `EXPO_PUBLIC_API_URL` is validated at startup — the app refuses to boot with it unset or non-http(s).
 
 ## Testing on an emulator
 
@@ -140,10 +142,22 @@ The web route tree has a native equivalent. The native tab shell uses shorter in
 
 ## Conventions
 
+- Import accepts Kobo SQLite, `library.json`, Goodreads, StoryGraph, Calibre CSV catalogs, LibraryThing TSV exports, BookWyrm book-list CSVs and spreadsheet CSVs. CSV files use the backend preview endpoint and shared parsers; confirm the preview to merge/save. **Save CSV template** in the import screen opens the system share sheet for saving a spreadsheet template. Title and Author are required; optional blank fields preserve existing data. Status is `to-read`, `reading` or `read`, ratings are 0–5, dates are `YYYY-MM-DD`, and ISBNs should be stored as text. Calibre standard metadata is supported; custom reading-status columns are not inferred.
+
 - One React version across the workspace: root `package.json` `overrides` pins `react`/`react-dom` to Expo SDK 57's exact version, and `frontend` declares the same. Do not widen either range without checking the other — two React copies in one Metro bundle fail with "Invalid hook call".
 - No `metro.config.js`: `@expo/metro-config` auto-detects the npm workspace root.
 - Shared logic goes in `@scripta/shared` (`packages/shared`, compiled `dist`), never duplicated between clients. Wave 1 fills it.
 - Commands: `npm run typecheck --workspace mobile` (CI runs typecheck + `expo-doctor`).
+
+### Mural editing
+
+Long-press a block to drag it. Reanimated keeps drag positioning and collision previews on the UI thread. Neighboring blocks animate into place with a small snap buffer to avoid repeated rearrangement around a row boundary. Downward dragging switches order as soon as the dragged block enters the next row, even when the next block is tall. Side-by-side blocks swap left/right at half overlap of the narrower block when both fit in the row, preserving each block's dimensions and the rows below. Intervening blocks shift sideways to keep the row together when widths differ. Small vertical drift still permits a horizontal swap. Blocks keep their size while dragging, use the standard 8pt gutter, and stay anchored through release and interrupted settling. The scroll area grows by whole rows rather than resizing every animation frame. Every selected block moves as a single native layer and stays within the canvas bounds. Edge scrolling eases into its speed while accounting for the scroll offset. The dragged block fades to 75% of its usual opacity while neighbors preview the shared `moveMuralBlock()` collision cascade and vertical compaction; blocks pack upward in their columns, closing empty rows on load and after edits. Selected blocks have a single-row floating toolbar: Edit opens Content/Style/Size tabs, More opens an action sheet named for the block type, and Done deselects. The action sheet uses full-row touch targets for Move to top and Duplicate, with Delete separated and shown in red text. Width and height expansion live in the Size tab alongside their steppers; labels change from Expand to Restore when active. Move to top keeps the block’s size and column, rearranges affected blocks, scrolls to the top and supports Undo. Every toolbar action is a full-width native press target, without native popup wrappers in the dock. The size tab uses full-width steppers. The editing sheet fits the safe screen area with a maximum height of 640pt; its preview scales with the available space and hides on short screens, at large text sizes or while the keyboard is shown. Save is labelled Save, Saving… or Saved, and Done only deselects the block. Independent width and height toggles fill free space in both directions until another block, the mural's horizontal edges or the visible top/bottom above the action bar. Toggling again restores the original position and size, remembered in `expandedFrom` after saving. Manual resizing clears only the resized axis's toggle and rearranges affected neighbors, so shrinking and growing remain reversible. Editing controls hide during dragging and return on release or cancellation. The block toolbar and Undo also hide during mural scrolling, including momentum, and return when scrolling stops without clearing the selected block or changing the canvas layout. Undo restores the full block snapshot, including every shifted block and expansion state. Edits and undo remain local until Save.
+
+### Adding books
+
+Library → Add → Scan ISBN with camera opens the rear camera and searches the detected ISBN through the same catalog lookup as a typed search. The first book barcode stops scanning and fills the form when an edition is found. Other product barcodes are ignored. Camera access is requested when scanning starts; denied access leaves manual entry available, with an Open Settings action when permission cannot be requested again. Leaving the screen or backgrounding the app stops scanning.
+
+`expo-camera` works in Expo Go. Existing standalone builds need a new native release before they can use this module; an OTA update alone cannot add it.
 
 ### Account access
 

@@ -56,6 +56,6 @@ test("a stored key answers 200 with the image and the immutable cache header", a
 });
 
 test("the app trusts only known proxies, so a forwarded address the client wrote is ignored", async () => {
-  const res = await app.inject({ url: "/probe/ip", remoteAddress: "10.0.0.5", headers: { "x-forwarded-for": "6.6.6.6, 203.0.113.9" } });
+  const res = await app.inject({ url: "/probe/ip", remoteAddress: "100.64.0.7", headers: { "x-forwarded-for": "6.6.6.6, 203.0.113.9" } });
   assert.equal(res.payload, "203.0.113.9");
 });

@@ -8,6 +8,7 @@
 
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
+import { timeSync } from "../../stallLog.js";
 import { openArenaDb } from "./adapters/sqlite/connection.js";
 import { createSqliteArenaRepository } from "./adapters/sqlite/sqliteArenaRepository.js";
 import { buildArenaRoutes, buildVoteRoute } from "./routes.js";
@@ -28,7 +29,7 @@ export async function arenaPlugin(app: FastifyInstance, opts: ArenaPluginOptions
 
   const sweep = setInterval(() => {
     try {
-      service.runScheduledSweep();
+      timeSync(app.log, "arena-sweep", () => service.runScheduledSweep());
     } catch (err) {
       app.log.error(err, "arena round-settlement sweep failed");
     }
@@ -57,12 +58,6 @@ export function getArenaPublicApi(): ArenaPublicApi {
     cachedApi = createArenaPublicApi(service);
   }
   return cachedApi;
-}
-
-let rekeyingArena: ReturnType<typeof createSqliteArenaRepository> | undefined;
-
-export function rekeyArenaBooks(userId: string, fromKeys: string[], toKey: string) {
-  (rekeyingArena ??= createSqliteArenaRepository(openArenaDb())).rekeyBooks(userId, fromKeys, toKey);
 }
 
 let erasingArena: ReturnType<typeof createSqliteArenaRepository> | undefined;

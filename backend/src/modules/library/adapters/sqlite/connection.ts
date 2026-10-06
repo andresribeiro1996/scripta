@@ -2,11 +2,12 @@
 // file from the auth module's, per the module-isolation convention (see
 // schema.sql). Nothing in domain/ or service.ts imports this file.
 
-import { DatabaseSync } from "node:sqlite";
-import { mkdirSync, readFileSync } from "node:fs";
+import type { DatabaseSync } from "node:sqlite";
+import { readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { env } from "../../../../config/env.js";
+import { openSqlite } from "../../../../db/openSqlite.js";
 import { LIBRARY_DERIVED_VERSION } from "../../domain/constants.js";
 
 const adapterDir = dirname(fileURLToPath(import.meta.url));
@@ -33,15 +34,16 @@ export function applyLibrarySchema(db: DatabaseSync, derivedVersion = LIBRARY_DE
   // among non-null tokens, doesn't choke on every unshared row being NULL.
   db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_library_documents_share_token
            ON library_documents(share_token) WHERE share_token IS NOT NULL`);
+  const bookColumns = db.prepare(`PRAGMA table_info(library_books)`).all() as { name: string }[];
+  if (!bookColumns.some((c) => c.name === "work_id")) {
+    db.exec(`ALTER TABLE library_books ADD COLUMN work_id TEXT`);
+  }
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_library_books_work ON library_books (work_id, user_id)`);
   if (rederive) db.exec(`PRAGMA user_version = ${derivedVersion}`);
 }
 
 export function openLibraryDb(): DatabaseSync {
-  mkdirSync(dirname(env.LIBRARY_DB_PATH), { recursive: true });
-
-  const db = new DatabaseSync(env.LIBRARY_DB_PATH);
-  db.exec("PRAGMA journal_mode = WAL");
-  db.exec("PRAGMA busy_timeout = 5000");
+  const db = openSqlite(env.LIBRARY_DB_PATH);
   applyLibrarySchema(db);
 
   return db;

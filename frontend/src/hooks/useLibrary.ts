@@ -1,33 +1,27 @@
 // Shared read/mutate access to the account's one library document.
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchLibrary, saveLibrary, shareLibrary, unshareLibrary, type LibraryData, type LibraryDocument } from "../api/library";
-import { saveLibraryUpdate } from "../lib/saveLibraryUpdate";
+import { useQuery } from "@tanstack/react-query";
+import type { LibrarySaveOptions } from "@scripta/shared";
+import { shareLibrary, unshareLibrary, type LibraryData, type LibraryDocument } from "../api/library";
+import { useLibrarySaver } from "./useLibrarySaver";
 
 export function useLibrary() {
-  const queryClient = useQueryClient();
-  const query = useQuery({ queryKey: ["library"], queryFn: fetchLibrary });
+  const saver = useLibrarySaver();
+  const query = useQuery({ queryKey: ["library"], queryFn: () => saver.fetch() });
 
-  async function updateLibrary(
-    updater: (current: LibraryData) => LibraryData,
-    base?: LibraryDocument,
-    source?: "import"
-  ): Promise<LibraryDocument> {
-    const current = base ?? queryClient.getQueryData<LibraryDocument | null>(["library"]);
-    const saved = await saveLibraryUpdate(current, updater, fetchLibrary, saveLibrary, source);
-    queryClient.setQueryData(["library"], saved);
-    return saved;
+  function updateLibrary(updater: (current: LibraryData) => LibraryData, options?: LibrarySaveOptions): Promise<LibraryDocument> {
+    return saver.saveWhole(updater, options);
   }
 
   async function share(): Promise<LibraryDocument> {
     const updated = await shareLibrary();
-    queryClient.setQueryData(["library"], updated);
+    saver.receiveShare(updated);
     return updated;
   }
 
   async function unshare(): Promise<LibraryDocument> {
     const updated = await unshareLibrary();
-    queryClient.setQueryData(["library"], updated);
+    saver.receiveShare(updated);
     return updated;
   }
 

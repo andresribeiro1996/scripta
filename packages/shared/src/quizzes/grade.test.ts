@@ -4,8 +4,8 @@ import { gradeAnswers } from "./grade.js";
 import type { QuizQuestion, SubmittedAnswer } from "./types.js";
 
 const questions: QuizQuestion[] = [
-  { id: "q0", type: "cover_title", bookKey: "b1", options: ["T1", "T2", "T3", "T4"], answerIndex: 2 },
-  { id: "q1", type: "quote_title", bookKey: "b2", options: ["T1", "T2", "T3", "T4"], answerIndex: 0 }
+  { id: "q0", type: "cover_title", workId: "b1", options: ["T1", "T2", "T3", "T4"], answerIndex: 2 },
+  { id: "q1", type: "quote_title", workId: "b2", options: ["T1", "T2", "T3", "T4"], answerIndex: 0 }
 ];
 
 test("a perfect run scores every question", () => {

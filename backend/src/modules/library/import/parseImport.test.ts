@@ -63,17 +63,19 @@ async function testApp() {
   let stored: unknown = null;
   let storedAt = "2026-01-01T00:00:00.000Z";
   const service = {
-    getLibrary: () => stored ? { data: stored, updatedAt: storedAt, shareToken: null, shareUrl: null } : null,
+    getLibrary: () => stored ? { data: stored, updatedAt: storedAt, shareToken: null, shareUrl: null, works: {} } : null,
+    getLibraryText: () => stored ? { data: JSON.stringify(stored), updatedAt: storedAt, shareToken: null, shareUrl: null, works: {} } : null,
     saveLibrary: (_userId: string, data: unknown, expectedUpdatedAt?: string) => {
       if (stored && expectedUpdatedAt !== storedAt) throw new LibraryConflictError();
       stored = data;
       storedAt = new Date(Date.parse(storedAt) + 1).toISOString();
-      return { data, updatedAt: storedAt, shareToken: null, shareUrl: null };
+      return { data: JSON.stringify(data), updatedAt: storedAt, shareToken: null, shareUrl: null, works: {} };
     },
     share: () => { throw new Error("not used"); },
     unshare: () => undefined,
     addBook: () => { throw new Error("not used"); },
     mergeBooks: () => { throw new Error("not used"); },
+    applyChange: () => { throw new Error("not used"); },
     getPublicByToken: () => null
   };
   const app = Fastify();
@@ -133,6 +135,30 @@ test("library JSON only requires a books array", async () => {
   assert.equal(preview.data.custom, true);
 });
 
+test("Calibre and spreadsheet uploads use the shared parser and return safe validation errors", async () => {
+  const { app, authorization } = await testApp();
+  try {
+    for (const [csv, source] of [
+      ['\uFEFFid,title,authors,rating,series,series_index\n"1","Stoner","John Williams","5","Series","1"\n', "calibre-export"],
+      ["Title,Author,Status,Rating\nStoner,John Williams,read,4.5\n", "spreadsheet-export"]
+    ] as const) {
+      const upload = multipart(Buffer.from(csv));
+      const response = await app.inject({ method: "POST", url: "/library/import/preview", headers: { ...upload.headers, authorization }, payload: upload.payload });
+      assert.equal(response.statusCode, 200, response.body);
+      assert.equal(response.json().data.source, source);
+      assert.equal(response.json().data.books[0].Title, "Stoner");
+    }
+    const invalid = multipart(Buffer.from("Title,Author,Rating\nStoner,John Williams,6\n"));
+    const response = await app.inject({ method: "POST", url: "/library/import/preview", headers: { ...invalid.headers, authorization }, payload: invalid.payload });
+    assert.equal(response.statusCode, 422);
+    assert.equal(response.json().error, "CSV ratings must be numbers from 0 to 5.");
+    const library = await app.inject({ method: "GET", url: "/library", headers: { authorization } });
+    assert.equal(library.statusCode, 404);
+  } finally {
+    await app.close();
+  }
+});
+
 test("non-SQLite rows and results are capped", async () => {
   const tooManyRows = join(scratch, "too-many-rows.json");
   await writeFile(tooManyRows, JSON.stringify({ books: Array.from({ length: 100_001 }, () => null) }));
@@ -145,6 +171,28 @@ test("non-SQLite rows and results are capped", async () => {
     assert.equal(error.message, "This import is over 1 MB, the most Scripta can store. Import fewer books or highlights.");
     return true;
   });
+});
+
+test("LibraryThing legacy TSV and BookWyrm CSV uploads are recognized by content", async () => {
+  const { app, authorization } = await testApp();
+  try {
+    for (const [bytes, source, title] of [
+      [Buffer.from("Book Id\tTitle\tPrimary Author\tISBN\tDate Read\n1\tCafé\tAndré\t[0394729684]\t[2024-02-29]\n", "latin1"), "librarything-export", "Café"],
+      [Buffer.from("title,author_text,remote_id,isbn_13,shelf\n我穿我自己,琅俨,https://example.com/book/1,,to-read\n"), "bookwyrm-export", "我穿我自己"]
+    ] as const) {
+      const upload = multipart(bytes);
+      const response = await app.inject({ method: "POST", url: "/library/import/preview", headers: { ...upload.headers, authorization }, payload: upload.payload });
+      assert.equal(response.statusCode, 200, response.body);
+      assert.equal(response.json().data.source, source);
+      assert.equal(response.json().data.books[0].Title, title);
+    }
+    const invalid = multipart(Buffer.from("Book Id\tTitle\tPrimary Author\tDate Started\n1\tBook\tAuthor\t[2024-02-30]\n"));
+    const response = await app.inject({ method: "POST", url: "/library/import/preview", headers: { ...invalid.headers, authorization }, payload: invalid.payload });
+    assert.equal(response.statusCode, 422);
+    assert.equal(response.json().error, "CSV dates must be valid YYYY-MM-DD dates.");
+  } finally {
+    await app.close();
+  }
 });
 
 test("a Kobo SQLite whose rows exceed the cap names the limit in whole MB", async () => {

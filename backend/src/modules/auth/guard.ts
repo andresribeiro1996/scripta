@@ -19,9 +19,13 @@ declare module "fastify" {
   }
 }
 
-export async function authGuard(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+function bearerToken(request: FastifyRequest): string | null {
   const header = request.headers.authorization;
-  const token = header?.startsWith("Bearer ") ? header.slice("Bearer ".length) : null;
+  return header?.startsWith("Bearer ") ? header.slice("Bearer ".length) : null;
+}
+
+export async function authGuard(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  const token = bearerToken(request);
 
   if (!token) {
     return reply.code(401).send({ error: "Missing Authorization: Bearer <token> header." });
@@ -39,17 +43,21 @@ export async function authGuard(request: FastifyRequest, reply: FastifyReply): P
  *  behave differently for a signed-in caller (the tier list voting routes:
  *  a signed-in voter gets one ballot per account, an anonymous one gets a
  *  browser-held ballot id). Deliberately a plain function rather than a
- *  preHandler: it never rejects, so there is no reply to send, nothing to
- *  order against other preHandlers, and no need to widen `request.user`'s
- *  type declaration into a lie on routes where nobody is signed in. */
+ *  preHandler: there is nothing to order against other preHandlers, and no
+ *  need to widen `request.user`'s type declaration into a lie on routes where
+ *  nobody is signed in. No token is anonymous (null); a token that is present
+ *  but invalid or expired throws a 401, so a client refreshes instead of
+ *  silently getting the signed-out view. */
 export function getOptionalAuthenticatedUser(request: FastifyRequest): AuthenticatedUser | null {
-  const header = request.headers.authorization;
-  const token = header?.startsWith("Bearer ") ? header.slice("Bearer ".length) : null;
+  const token = bearerToken(request);
   if (!token) return null;
-  return request.server.authenticateAccessToken?.(token) ?? null;
+  const user = request.server.authenticateAccessToken?.(token);
+  if (!user) throw Object.assign(new Error("Access token is invalid or expired."), { statusCode: 401 });
+  return user;
 }
 
 export function rateLimitKey(request: FastifyRequest): string {
-  const user = getOptionalAuthenticatedUser(request);
+  const token = bearerToken(request);
+  const user = token ? request.server.authenticateAccessToken?.(token) : null;
   return user ? `user:${user.id}` : `ip:${normalizeIP(request.ip)}`;
 }

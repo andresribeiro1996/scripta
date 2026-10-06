@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { personCaption, suggestionReason } from "./helpers.js";
+import { followFailureMessage, personCaption, suggestionReason } from "./helpers.js";
 import type { PersonResult, SuggestedReader } from "./types.js";
 
 test("suggestionReason counts the shared books, singular or plural", () => {
@@ -37,4 +37,19 @@ test("personCaption counts zero followers in the plural", () => {
 
 test("personCaption counts two followers in the plural", () => {
   assert.equal(personCaption(person({ followerCount: 2 })), "2 followers");
+});
+
+class StatusError extends Error {
+  constructor(readonly status: number, message: string) {
+    super(message);
+  }
+}
+
+test("followFailureMessage shows the server's message on a 409 and the generic one otherwise", () => {
+  const limit = "You can follow up to 1,000 readers.";
+  assert.equal(followFailureMessage(new StatusError(409, limit), "generic"), limit);
+  assert.equal(followFailureMessage(new StatusError(409, ""), "generic"), "generic");
+  assert.equal(followFailureMessage(new StatusError(500, "Request failed (500)"), "generic"), "generic");
+  assert.equal(followFailureMessage(new Error("Network request failed"), "generic"), "generic");
+  assert.equal(followFailureMessage({ status: 409, message: limit }, "generic"), "generic");
 });

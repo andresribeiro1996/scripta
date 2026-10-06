@@ -4,16 +4,17 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { QUIZ_POOL, QUIZ_QUESTION_TYPES, bookKey, booksInGroup, eligibleTypes, type QuizBook, type QuizData, type QuizQuestionType } from "@scripta/shared";
+import { QUIZ_POOL, QUIZ_QUESTION_TYPES, bookKey, booksInGroup, eligibleTypes, workIdOf, type QuizBookInput, type QuizDataInput, type QuizQuestionType, booksByWork } from "@scripta/shared";
 import { PageContainer } from "../components/PageContainer";
 import { createQuizApi } from "../api/quizzes";
 import { resolveCover } from "../api/covers";
 import { normalizeImageId, normalizeIsbn } from "../lib/covers";
 import { useLibrary } from "../hooks/useLibrary";
+import { useWorkBooks } from "../hooks/useWorkBooks";
 
-function toQuizBook(book: Record<string, unknown>, resolvedCover: string | null | undefined): QuizBook {
+function toQuizBook(book: Record<string, unknown>, resolvedCover: string | null | undefined): QuizBookInput {
   return {
-    key: bookKey(book),
+    workId: workIdOf(book),
     title: String(book.Title ?? "Untitled"),
     author: String(book.Attribution ?? ""),
     // _coverUrl only exists for manually-set covers; automatically
@@ -41,7 +42,7 @@ export function QuizCreatePage() {
   const [name, setName] = useState("");
   const [source, setSource] = useState<"shelf" | "collection" | "pool">("shelf");
   const [collectionId, setCollectionId] = useState("");
-  const [poolKeys, setPoolKeys] = useState<string[]>([]);
+  const [poolIds, setPoolIds] = useState<string[]>([]);
   const [questionCount, setQuestionCount] = useState(10);
   const [allowedTypes, setAllowedTypes] = useState<QuizQuestionType[]>([...QUIZ_QUESTION_TYPES]);
   const [busy, setBusy] = useState(false);
@@ -51,7 +52,8 @@ export function QuizCreatePage() {
   // fallback would otherwise be a fresh array each render and churn the
   // memo below (and through it, the cover-resolution effect).
   const libraryData = library?.data;
-  const libraryBooks = useMemo(() => libraryData?.books ?? [], [libraryData]);
+  const workBooks = useWorkBooks(library);
+  const libraryBooks = useMemo(() => workBooks.filter((book) => workIdOf(book)), [workBooks]);
   const collections = useMemo(
     () => (libraryData?.groups ?? []).filter((group) => group.type === "collection"),
     [libraryData]
@@ -59,7 +61,7 @@ export function QuizCreatePage() {
   const collection = collections.find((group) => group.id === collectionId);
 
   const shelfRawBooks = useMemo(
-    () => (source === "collection" ? (collection ? booksInGroup(collection, libraryBooks) : []) : source === "shelf" ? libraryBooks : []),
+    () => [...booksByWork(source === "collection" ? (collection ? booksInGroup(collection, libraryBooks) : []) : source === "shelf" ? libraryBooks : []).values()],
     [source, collection, libraryBooks]
   );
 
@@ -97,9 +99,9 @@ export function QuizCreatePage() {
     };
   }, [shelfRawBooks, source]);
 
-  const books: QuizBook[] =
+  const books: QuizBookInput[] =
     source === "pool"
-      ? QUIZ_POOL.filter((book) => poolKeys.includes(book.key))
+      ? QUIZ_POOL.filter((book) => poolIds.includes(book.id)).map(({ id: _id, ...book }) => book)
       : shelfRawBooks.map((raw) => toQuizBook(raw, resolvedCovers[bookKey(raw)]));
 
   // A type is offerable only if at least one chosen book has the data it
@@ -115,7 +117,7 @@ export function QuizCreatePage() {
     setBusy(true);
     setError(null);
     try {
-      const data: QuizData = {
+      const data: QuizDataInput = {
         sourceLabel: source === "pool" ? "Famous books" : source === "collection" ? collection?.name ?? "Collection" : "My shelf",
         questionCount: effectiveQuestionCount,
         allowedTypes: effectiveTypes.length > 0 ? effectiveTypes : availableTypes,
@@ -170,13 +172,13 @@ export function QuizCreatePage() {
             {source === "pool" && (
               <div className="max-h-[50vh] space-y-2 overflow-y-auto">
                 {QUIZ_POOL.map((book) => {
-                  const checked = poolKeys.includes(book.key);
+                  const checked = poolIds.includes(book.id);
                   return (
                     <button
-                      key={book.key}
+                      key={book.id}
                       type="button"
                       aria-pressed={checked}
-                      onClick={() => setPoolKeys((value) => (checked ? value.filter((entry) => entry !== book.key) : [...value, book.key]))}
+                      onClick={() => setPoolIds((value) => (checked ? value.filter((entry) => entry !== book.id) : [...value, book.id]))}
                       className={`flex min-h-12 w-full items-center justify-between rounded-lg border px-3 py-2 text-left ${checked ? "border-(--color-accent) bg-(--color-accent-soft)" : "border-(--color-border) bg-(--color-surface)"}`}
                     >
                       <span className="truncate">{book.title} <span className="text-(--color-text-dim)">· {book.author}</span></span>
@@ -188,7 +190,7 @@ export function QuizCreatePage() {
             )}
             {source === "shelf" && (
               <p className="text-sm text-(--color-text-dim)">
-                {isLoading ? "Loading books…" : isError ? <button onClick={() => void refetch()} className="text-left text-(--color-accent)">Couldn't load your library. Retry</button> : `${libraryBooks.length} books on your shelf.`}
+                {isLoading ? "Loading books…" : isError ? <button onClick={() => void refetch()} className="text-left text-(--color-accent)">Couldn't load your library. Retry</button> : `${shelfRawBooks.length} books on your shelf.`}
               </p>
             )}
             <p className="text-sm text-(--color-text-dim)">{books.length} {books.length === 1 ? "book" : "books"} selected</p>

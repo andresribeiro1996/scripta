@@ -8,7 +8,6 @@ import type { DuelRow, SeedPreview, TournamentDiscoverRow, TournamentRow, Tourna
 
 export interface ArenaRepository {
   deleteUserData(userId: string): void;
-  rekeyBooks(userId: string, fromKeys: string[], toKey: string): void;
   insertTournament(row: TournamentRow): void;
   getTournament(id: string): TournamentRow | undefined;
   /** Ownership-checked lookup — for anything that mutates a tournament
@@ -47,7 +46,7 @@ export interface ArenaRepository {
    *  that's its single settled final, whose winner is the champion. One
    *  query for a whole page of cards, mirroring getSeedPreviews. */
   getFinalDuels(tournamentIds: string[]): DuelRow[];
-  updateDuelSettlement(id: string, status: DuelRow["status"], winnerKey: string | null, settledAt: string | null): void;
+  updateDuelSettlement(id: string, status: DuelRow["status"], winnerSide: "a" | "b" | null, settledAt: string | null): void;
   /** Backs the scheduler's sweep (service.ts's runScheduledSweep) —
    *  every `status = 'active'` duel whose closes_at has passed. */
   findActiveDuelsPastDeadline(nowIso: string): DuelRow[];
@@ -66,8 +65,7 @@ export interface ArenaRepository {
    *  duel. Called when a signed-in user votes, so their past per-device
    *  votes fold into the account's history in one statement. */
   linkVotesToUser(voterToken: string, voterUserId: string): void;
-  /** `{ [book_key]: count }` — only keys with at least one vote appear. */
-  countVotesByBook(duelId: string): Record<string, number>;
+  countVotesBySide(duelId: string): { a: number; b: number };
   /** True when this token — or, when signed in, this account on any
    *  token — has voted the duel. Keeps the view's "you voted" badge
    *  consistent with the insert-time dedup above for a signed-in voter

@@ -3,7 +3,6 @@ import { ApiError } from "../../api/client";
 import { joinWaitlist } from "../../api/waitlist";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const DEFAULT_HELP = "We’ll only email you about the launch.";
 
 export function WaitlistForm({ label }: { label: string }) {
   const [email, setEmail] = useState("");
@@ -17,7 +16,7 @@ export function WaitlistForm({ label }: { label: string }) {
     return (
       <div
         role="status"
-        className="flex w-full max-w-[520px] items-start gap-2.5 rounded-lg border border-(--color-border) bg-(--color-surface) px-4 py-3.5 text-left text-sm leading-relaxed"
+        className="flex w-full max-w-[520px] items-start gap-2.5 rounded-xl border border-(--color-border) bg-(--color-surface)/60 px-4 py-4 text-left text-sm leading-relaxed"
       >
         <svg
           width="20"
@@ -72,36 +71,41 @@ export function WaitlistForm({ label }: { label: string }) {
       }}
       className="w-full max-w-[520px] text-left"
     >
-      <label htmlFor={inputId} className="block text-sm font-semibold">
+      <label htmlFor={inputId} className="block text-center text-xs text-(--color-text-dim)">
         {label}
       </label>
-      <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+      <div className={`group mt-3 flex min-h-14 items-center gap-2 rounded-xl border bg-(--color-surface)/60 p-1.5 motion-safe:transition-[border-color,box-shadow,background-color] motion-safe:duration-300 ${error ? "border-(--color-danger) focus-within:shadow-[0_0_24px_-8px_color-mix(in_srgb,var(--color-danger)_30%,transparent)]" : "border-(--color-border) focus-within:border-(--color-text)/65 focus-within:bg-(--color-surface)/90 focus-within:shadow-[0_0_28px_-8px_color-mix(in_srgb,var(--color-text)_25%,transparent)]"}`}>
         <input
           id={inputId}
           type="email"
-          placeholder="you@example.com"
+          autoComplete="email"
+          autoCapitalize="none"
+          spellCheck={false}
+          placeholder="Email address"
           value={email}
           onChange={(e) => {
             setEmail(e.target.value);
             setError(null);
           }}
           aria-invalid={error != null}
-          aria-describedby={helpId}
-          className={`min-h-12 flex-grow rounded-lg border bg-(--color-surface) px-3.5 text-base text-(--color-text) transition-[border-color,box-shadow] duration-150 placeholder:text-(--color-text-dim) focus:border-(--color-accent) focus:ring-1 focus:ring-(--color-accent) focus:outline-none ${
-            error ? "border-(--color-danger)" : "border-(--color-border)"
-          }`}
+          aria-describedby={error ? helpId : undefined}
+          className="min-h-11 min-w-0 flex-1 rounded-md border-0 bg-transparent px-3 text-base text-(--color-text) placeholder:text-(--color-text-dim) focus:outline-none!"
         />
         <button
           type="submit"
           disabled={submitting}
-          className="flex min-h-12 shrink-0 items-center justify-center rounded-lg bg-(--color-accent) px-6 text-base font-semibold text-(--color-on-accent) transition-opacity hover:opacity-90 disabled:opacity-60"
+          aria-label={submitting ? "Adding to the launch list" : "Notify me"}
+          title="Get notified at launch"
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-(--color-text) text-(--color-bg) motion-safe:transition-[opacity,box-shadow] motion-safe:duration-300 hover:opacity-85 group-focus-within:shadow-[0_0_16px_color-mix(in_srgb,var(--color-text)_15%,transparent)] disabled:opacity-60"
         >
-          {submitting ? "Adding…" : "Notify me"}
+          {submitting ? <span aria-hidden="true">…</span> : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M5 12h14m-5-5 5 5-5 5" />
+          </svg>}
         </button>
       </div>
-      <p id={helpId} className={`mt-2 text-xs ${error ? "text-(--color-danger)" : "text-(--color-text-dim)"}`}>
-        {error ?? DEFAULT_HELP}
-      </p>
+      {error && <p id={helpId} className="mt-2 text-center text-xs text-(--color-danger)">
+        {error}
+      </p>}
     </form>
   );
 }

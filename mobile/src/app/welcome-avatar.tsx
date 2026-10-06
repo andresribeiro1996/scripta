@@ -43,8 +43,9 @@ export default function WelcomeAvatarRoute() {
     <Text style={[typography.body, { color: colors.textDim }]}>Add a profile picture, or skip this for now.</Text>
     {user.avatarId ? <Image source={{ uri: `${API_URL}/auth/avatar/${user.avatarId}/file` }} style={styles.avatar} /> : <View style={[styles.avatar, styles.initial, { backgroundColor: colors.accentSoft }]}><Text style={[styles.initialText, { color: colors.accent }]}>{(user.username ?? user.email)[0]?.toUpperCase()}</Text></View>}
     {error ? <Text accessibilityRole="alert" style={[typography.caption, { color: colors.danger }]}>{error}</Text> : null}
-    <Button label={user.avatarId ? "Choose a different photo" : "Choose a photo"} loading={busy} onPress={() => void choosePhoto()} />
-    <Button label={user.avatarId ? "Continue" : "Skip for now"} variant="secondary" disabled={busy} onPress={() => router.replace(finishAuthNavigation() as never)} />
+    {user.avatarId
+      ? <><Button label="Continue" disabled={busy} onPress={() => router.replace(finishAuthNavigation() as never)} /><Button label="Choose a different photo" variant="secondary" loading={busy} onPress={() => void choosePhoto()} /></>
+      : <><Button label="Choose a photo" loading={busy} onPress={() => void choosePhoto()} /><Button label="Skip for now" variant="secondary" disabled={busy} onPress={() => router.replace(finishAuthNavigation() as never)} /></>}
   </View>;
 }
 

@@ -1,8 +1,8 @@
 import { storeCoverImage } from "../booksService.js";
 import { MIN_GOOD_WIDTH } from "../domain/constants.js";
 import { SourceUnavailableError } from "../domain/errors.js";
-import { encodeCover, isAcceptableCover } from "../domain/images.js";
-import { normalizeTitle } from "../domain/normalize.js";
+import { classifyPublisherImage, encodeCover, isAcceptableCover, type EncodedCover } from "../domain/images.js";
+import { editionLanguage, isPortugalIsbn, normalizeTitle } from "../domain/normalize.js";
 import type { BooksRepository, CoverBlobStore } from "../domain/ports.js";
 import type { BookRow } from "../domain/types.js";
 import { PAGE_RANK, feedProducts, feedUrl, findPageIsbn, isDisallowed, parseRobots, parseShopifyProducts, parseWooProducts, withPageText, type PublisherBook, type ResolvedBook } from "./publisherFeed.js";
@@ -30,6 +30,9 @@ export interface SiteReport {
   noAuthor: number;
   unchanged: number;
   rejectedImage: number;
+  cropped: number;
+  squareAccepted: number;
+  awaitingCheck: number;
   failed: number;
 }
 
@@ -37,13 +40,14 @@ export interface OpenLibraryEdition {
   title: string | null;
   author: string;
   workKey?: string | null;
+  languages?: string[];
 }
 
 export interface ImportDeps {
   fetchText(url: string): Promise<{ status: number; text: string }>;
   fetchBytes(url: string): Promise<Buffer | null>;
   lookupOpenLibrary(isbn: string): Promise<OpenLibraryEdition | null>;
-  repo: Pick<BooksRepository, "findBookByKey" | "getBook" | "createBook" | "addKey" | "fillIdentity" | "mergeDetails" | "setWorkKey" | "setPublisherUrl" | "getImage" | "insertImage" | "setCover" | "listRejectedUrls" | "setUpgradeWanted">;
+  repo: Pick<BooksRepository, "findBookByKey" | "getBook" | "createBook" | "addKey" | "fillIdentity" | "mergeDetails" | "setWorkKey" | "setLanguage" | "setPublisherUrl" | "getImage" | "insertImage" | "setCoverIf" | "listRejectedUrls" | "setUpgradeWanted">;
   blobs: CoverBlobStore;
   now: () => Date;
   sleep: (ms: number) => Promise<void>;
@@ -52,7 +56,12 @@ export interface ImportDeps {
 
 class SiteSkipped extends Error {}
 
-const emptyReport = (): SiteReport => ({ products: 0, books: 0, fromPage: 0, pagesNoIsbn: 0, pagesBlocked: 0, pagesDeferred: 0, pageAmbiguous: 0, pageTitleMismatch: 0, coversSet: 0, created: 0, noAuthor: 0, unchanged: 0, rejectedImage: 0, failed: 0 });
+const emptyReport = (): SiteReport => ({ products: 0, books: 0, fromPage: 0, pagesNoIsbn: 0, pagesBlocked: 0, pagesDeferred: 0, pageAmbiguous: 0, pageTitleMismatch: 0, coversSet: 0, created: 0, noAuthor: 0, unchanged: 0, rejectedImage: 0, cropped: 0, squareAccepted: 0, awaitingCheck: 0, failed: 0 });
+
+export function importedLanguage(stated: string[], isbn: string): string | null {
+  if (stated.length > 0) return editionLanguage(stated, isbn);
+  return isPortugalIsbn(isbn) ? editionLanguage(["por"], isbn) : null;
+}
 
 function sameTitle(known: string, productTitle: string): boolean {
   const [short, long] = [normalizeTitle(known), normalizeTitle(productTitle)].sort((a, b) => a.length - b.length) as [string, string];
@@ -193,10 +202,11 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
   report.fromPage = unique.filter((book) => book.rank === PAGE_RANK).length;
   if (unique.length > 0) report.imageUrlPrefix = commonPrefix(unique.map((book) => book.imageUrl));
 
-  const settle = (row: BookRow, imageUrl: string, width: number | null): "unchanged" | "rejectedImage" | null => {
+  const settle = (row: BookRow, imageUrl: string, width: number | null, classified = false): "unchanged" | "rejectedImage" | "awaitingCheck" | null => {
     const current = row.cover_image_id ? deps.repo.getImage(row.cover_image_id) : undefined;
     if (current && (current.source === "upload" || current.source === "publisher" || current.source_url === imageUrl)) return "unchanged";
     if (deps.repo.listRejectedUrls(row.id).has(imageUrl)) return "rejectedImage";
+    if (classified && row.cover_status !== "missing" && row.cover_status !== "low_res") return row.cover_status === null ? "awaitingCheck" : "unchanged";
     return width !== null && width < MIN_GOOD_WIDTH && row.cover_image_id ? "unchanged" : null;
   };
 
@@ -236,10 +246,10 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
         report.coversSet++;
         continue;
       }
-      row = seedBook({ isbn: book.isbn, title, author }, deps.repo, deps.now, "publisher").book!;
+      row = seedBook({ isbn: book.isbn, title, author, workKey: memo.looked?.edition?.workKey ?? undefined }, deps.repo, deps.now, "publisher").book!;
     }
     if (!options.dryRun) {
-      deps.repo.setWorkKey(row.id, memo.looked?.edition?.workKey);
+      deps.repo.setLanguage(row.id, importedLanguage(memo.looked?.edition?.languages ?? [], book.isbn));
       deps.repo.mergeDetails(row.id, { ...book.details, publisher: site.name }, "publisher");
       if (isWebUrl(book.productUrl)) deps.repo.setPublisherUrl(row.id, book.productUrl);
     }
@@ -253,12 +263,19 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
       report.coversSet++;
       continue;
     }
-    let image: Awaited<ReturnType<typeof encodeCover>>;
+    let found: { image: EncodedCover; kind: "cropped" | "flat" | null } | null;
     try {
-      image = await request(() =>
+      found = await request(() =>
         exclusive(async () => {
           const bytes = await deps.fetchBytes(book.imageUrl);
-          return bytes && (await encodeCover(bytes));
+          const image = bytes && (await encodeCover(bytes));
+          if (!bytes || !image) return null;
+          if (isAcceptableCover("publisher", image.width, image.height)) return { image, kind: null };
+          const classified = await classifyPublisherImage(bytes);
+          if (!classified) return null;
+          if (classified.kind === "flat") return { image, kind: "flat" };
+          const recovered = await encodeCover(classified.input);
+          return recovered ? { image: recovered, kind: "cropped" } : null;
         })
       );
     } catch (error) {
@@ -266,21 +283,27 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
       report.failed++;
       continue;
     }
-    if (!image || !isAcceptableCover("publisher", image.width, image.height)) {
+    if (!found) {
       report.rejectedImage++;
       continue;
     }
+    const { image, kind } = found;
     const fresh = deps.repo.getBook(row.id)!;
-    const after = settle(fresh, book.imageUrl, image.width);
+    const after = settle(fresh, book.imageUrl, image.width, kind !== null);
     if (after) {
       report[after]++;
       continue;
     }
     const at = deps.now().toISOString();
     const imageId = await storeCoverImage(deps, row.id, "publisher", book.imageUrl, image, at, site.origin);
-    deps.repo.setCover(row.id, { imageId, status: "manual", checkedAt: at });
+    if (!deps.repo.setCoverIf(row.id, fresh.cover_image_id, { imageId, status: "manual", checkedAt: at })) {
+      report.unchanged++;
+      continue;
+    }
     deps.repo.setUpgradeWanted(row.id, null);
     report.coversSet++;
+    if (kind === "cropped") report.cropped++;
+    if (kind === "flat") report.squareAccepted++;
   }
   return report;
 }

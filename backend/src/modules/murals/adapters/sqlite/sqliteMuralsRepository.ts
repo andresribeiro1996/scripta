@@ -24,6 +24,8 @@ export function createSqliteMuralsRepository(db: DatabaseSync): MuralsRepository
       AND ($expected_updated_at IS NULL OR updated_at = $expected_updated_at)
   `);
   const deleteStmt = db.prepare(`DELETE FROM murals WHERE id = ? AND user_id = ?`);
+  const deleteWorksStmt = db.prepare(`DELETE FROM mural_works WHERE mural_id = ?`);
+  const insertWorkStmt = db.prepare(`INSERT INTO mural_works (mural_id, key, work_id) VALUES (?, ?, ?)`);
   const setShareTokenStmt = db.prepare(`UPDATE murals SET share_token = $share_token, updated_at = $updated_at WHERE id = $id AND user_id = $user_id`);
   const getByShareTokenStmt = db.prepare(`SELECT * FROM murals WHERE share_token = ?`);
   const insertFolderStmt = db.prepare(`
@@ -47,32 +49,62 @@ export function createSqliteMuralsRepository(db: DatabaseSync): MuralsRepository
   `);
   const deleteFolderStmt = db.prepare(`DELETE FROM mural_folders WHERE id = ? AND user_id = ?`);
 
+  function setWorks(muralId: string, works: Map<string, string | null>): void {
+    deleteWorksStmt.run(muralId);
+    for (const [key, workId] of works) insertWorkStmt.run(muralId, key, workId);
+  }
+
+  function inTransaction<T>(write: () => T): T {
+    if (db.isTransaction) return write();
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      const result = write();
+      db.exec("COMMIT");
+      return result;
+    } catch (error) {
+      if (db.isTransaction) db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
   return {
     deleteUserData(userId) {
       db.exec("BEGIN IMMEDIATE");
       try {
+        db.prepare("DELETE FROM mural_works WHERE mural_id IN (SELECT id FROM murals WHERE user_id = ?)").run(userId);
         db.prepare("DELETE FROM murals WHERE user_id = ?").run(userId);
         db.prepare("DELETE FROM mural_folders WHERE user_id = ?").run(userId);
         db.exec("COMMIT");
       } catch (error) {
-        db.exec("ROLLBACK");
+        if (db.isTransaction) db.exec("ROLLBACK");
         throw error;
       }
     },
-    rekeyBooks(userId, fromKeys, toKey) {
+    rekeyBooks(userId, fromKeys, toKey, toWork) {
       const from = new Set(fromKeys);
       const now = new Date().toISOString();
       const update = db.prepare("UPDATE murals SET blocks = ?, updated_at = ? WHERE id = ?");
+      const dropWorks = db.prepare("DELETE FROM mural_works WHERE mural_id = ? AND key IN (SELECT value FROM json_each(?))");
+      const fromKeysJson = JSON.stringify(fromKeys);
+      const hasWorks = db.prepare("SELECT 1 FROM mural_works WHERE mural_id = ? LIMIT 1");
+      const keepWork = db.prepare(`
+        INSERT INTO mural_works (mural_id, key, work_id) VALUES (?, ?, ?)
+        ON CONFLICT (mural_id, key) DO UPDATE SET work_id = COALESCE(excluded.work_id, mural_works.work_id)
+      `);
       db.exec("BEGIN IMMEDIATE");
       try {
         for (const row of db.prepare("SELECT id, blocks FROM murals WHERE user_id = ?").all(userId) as Array<{ id: string; blocks: string }>) {
           const before = JSON.stringify(JSON.parse(row.blocks));
           const after = JSON.stringify(rekeyBlocks(JSON.parse(row.blocks), from, toKey));
-          if (after !== before) update.run(after, now, row.id);
+          if (after === before) continue;
+          update.run(after, now, row.id);
+          if (!hasWorks.get(row.id)) continue;
+          dropWorks.run(row.id, fromKeysJson);
+          keepWork.run(row.id, toKey, toWork);
         }
         db.exec("COMMIT");
       } catch (error) {
-        db.exec("ROLLBACK");
+        if (db.isTransaction) db.exec("ROLLBACK");
         throw error;
       }
     },
@@ -100,31 +132,37 @@ export function createSqliteMuralsRepository(db: DatabaseSync): MuralsRepository
       });
     },
 
-    update(id, userId, patch, expectedUpdatedAt) {
-      const existing = getOwnedStmt.get(id, userId) as MuralRow | undefined;
-      if (!existing) return undefined;
+    update(id, userId, patch, expectedUpdatedAt, works) {
+      return inTransaction(() => {
+        const existing = getOwnedStmt.get(id, userId) as MuralRow | undefined;
+        if (!existing) return undefined;
 
-      const updatedAt = new Date(Math.max(Date.now(), Date.parse(existing.updated_at) + 1)).toISOString();
-      const merged: MuralRow = { ...existing, ...patch, updated_at: updatedAt };
-      const result = updateStmt.run({
-        $id: id,
-        $user_id: userId,
-        $name: merged.name,
-        $theme: merged.theme,
-        $blocks: merged.blocks,
-        $cover_image_id: merged.cover_image_id,
-        $cover_image_url: merged.cover_image_url,
-        $folder_id: merged.folder_id,
-        $updated_at: updatedAt,
-        $expected_updated_at: expectedUpdatedAt ?? null
+        const updatedAt = new Date(Math.max(Date.now(), Date.parse(existing.updated_at) + 1)).toISOString();
+        const merged: MuralRow = { ...existing, ...patch, updated_at: updatedAt };
+        const result = updateStmt.run({
+          $id: id,
+          $user_id: userId,
+          $name: merged.name,
+          $theme: merged.theme,
+          $blocks: merged.blocks,
+          $cover_image_id: merged.cover_image_id,
+          $cover_image_url: merged.cover_image_url,
+          $folder_id: merged.folder_id,
+          $updated_at: updatedAt,
+          $expected_updated_at: expectedUpdatedAt ?? null
+        });
+        if (result.changes === 0) return undefined;
+        if (works) setWorks(id, works);
+        return merged;
       });
-      if (result.changes === 0) return undefined;
-      return merged;
     },
 
     delete(id, userId) {
-      const result = deleteStmt.run(id, userId);
-      return result.changes > 0;
+      return inTransaction(() => {
+        if (!getOwnedStmt.get(id, userId)) return false;
+        deleteWorksStmt.run(id);
+        return deleteStmt.run(id, userId).changes > 0;
+      });
     },
 
     setShareToken(id, userId, token) {

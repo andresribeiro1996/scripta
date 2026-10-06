@@ -14,6 +14,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 process.env.NODE_ENV = "test";
 
 const { applyHomeMuralMigration } = await import("./migration.js");
+const { inTransaction } = await import("./adapters/sqlite/connection.js");
 
 function communityDb(): DatabaseSync {
   const db = new DatabaseSync(":memory:");
@@ -54,4 +55,19 @@ test("re-running is a no-op (idempotent upsert)", () => {
   applyHomeMuralMigration([{ userId: "u1", muralId: "m1" }], db);
   applyHomeMuralMigration([{ userId: "u1", muralId: "m2" }], db);
   assert.equal(getRow(db, "u1")?.mural_id, "m1");
+});
+
+test("a trigger that rolls the transaction back surfaces its own error and keeps every row", () => {
+  const db = communityDb();
+  db.prepare("INSERT INTO profiles (user_id, published, mural_id, updated_at) VALUES ('u1', 0, NULL, 't')").run();
+  db.exec("CREATE TRIGGER boom BEFORE UPDATE ON profiles BEGIN SELECT RAISE(ROLLBACK, 'trigger boom'); END");
+  assert.throws(
+    () => inTransaction(db, () => {
+      db.prepare("INSERT INTO profiles (user_id, published, mural_id, updated_at) VALUES ('u2', 0, NULL, 't')").run();
+      db.prepare("UPDATE profiles SET mural_id = 'm' WHERE user_id = 'u1'").run();
+    }),
+    /trigger boom/
+  );
+  assert.equal(getRow(db, "u2"), undefined);
+  assert.equal(db.isTransaction, false);
 });

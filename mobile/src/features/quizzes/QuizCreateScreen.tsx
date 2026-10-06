@@ -1,15 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Stack, router } from "expo-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { QUIZ_POOL, QUIZ_QUESTION_TYPES, bookKey, booksInGroup, eligibleTypes, normalizeImageId, normalizeIsbn, type Group, type QuizBook, type QuizData, type QuizQuestionType } from "@scripta/shared";
+import { useQueryClient } from "@tanstack/react-query";
+import { QUIZ_POOL, QUIZ_QUESTION_TYPES, bookKey, booksByWork, booksInGroup, eligibleTypes, normalizeImageId, normalizeIsbn, workIdOf, type QuizBookInput, type QuizDataInput, type QuizQuestionType } from "@scripta/shared";
 import { FlatList, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
-import { apiClient } from "../../core/api";
+import { useLibrary, useWorkBooks } from "../library";
 import { Button, Input, Screen, Segmented, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { resolveCover } from "../library/api/covers";
 import { createQuiz, type Quiz } from "./api";
-
-interface LibraryResponse { data: { books?: Array<Record<string, unknown>>; groups?: Group[] } | null }
 
 const SOURCES = [{ value: "shelf", label: "Shelf" }, { value: "collection", label: "Collection" }, { value: "pool", label: "Famous books" }] as const;
 type Source = (typeof SOURCES)[number]["value"];
@@ -21,9 +19,9 @@ const TYPE_LABELS: Record<QuizQuestionType, string> = {
   blurb_title: "Blurb → title",
 };
 
-function toQuizBook(book: Record<string, unknown>, resolvedCover: string | null | undefined): QuizBook {
+function toQuizBook(book: Record<string, unknown>, resolvedCover: string | null | undefined): QuizBookInput {
   return {
-    key: bookKey(book),
+    workId: workIdOf(book),
     title: String(book.Title ?? "Untitled"),
     author: String(book.Attribution ?? ""),
     coverUrl: typeof book._coverUrl === "string" && book._coverUrl ? book._coverUrl : resolvedCover ?? null,
@@ -41,18 +39,18 @@ export function QuizCreateScreen() {
   const [name, setName] = useState("");
   const [source, setSource] = useState<Source>("shelf");
   const [collectionId, setCollectionId] = useState("");
-  const [poolKeys, setPoolKeys] = useState<string[]>([]);
+  const [poolIds, setPoolIds] = useState<string[]>([]);
   const [questionCount, setQuestionCount] = useState(10);
   const [allowedTypes, setAllowedTypes] = useState<QuizQuestionType[]>([...QUIZ_QUESTION_TYPES]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const library = useQuery({ queryKey: ["library"], queryFn: () => apiClient.request<LibraryResponse>("/library", { auth: true }), retry: false });
-  const libraryBooks = library.data?.data?.books ?? [];
+  const library = useLibrary();
+  const libraryBooks = useWorkBooks(library.data);
   const collections = (library.data?.data?.groups ?? []).filter((group) => group.type === "collection");
   const collection = collections.find((group) => group.id === collectionId);
 
   const shelfRawBooks = useMemo(
-    () => (source === "collection" ? (collection ? booksInGroup(collection, libraryBooks) : []) : source === "shelf" ? libraryBooks : []),
+    () => [...booksByWork(source === "collection" ? (collection ? booksInGroup(collection, libraryBooks) : []) : source === "shelf" ? libraryBooks : []).values()],
     [source, collection, libraryBooks],
   );
 
@@ -97,8 +95,8 @@ export function QuizCreateScreen() {
     return () => { cancelled = true; };
   }, [shelfRawBooks, source, resolveAttempt]);
 
-  const books: QuizBook[] = source === "pool"
-    ? QUIZ_POOL.filter((book) => poolKeys.includes(book.key))
+  const books: QuizBookInput[] = source === "pool"
+    ? QUIZ_POOL.filter((book) => poolIds.includes(book.id)).map(({ id: _id, ...book }) => book)
     : shelfRawBooks.map((raw) => toQuizBook(raw, resolvedCovers[bookKey(raw)]));
 
   const availableTypes = QUIZ_QUESTION_TYPES.filter((type) => books.some((book) => eligibleTypes(book).includes(type)));
@@ -110,7 +108,7 @@ export function QuizCreateScreen() {
     setBusy(true);
     setError(null);
     try {
-      const data: QuizData = {
+      const data: QuizDataInput = {
         sourceLabel: source === "pool" ? "Famous books" : source === "collection" ? collection?.name ?? "Collection" : "My shelf",
         questionCount: effectiveCount,
         allowedTypes: effectiveTypes.length > 0 ? effectiveTypes : availableTypes,
@@ -145,19 +143,19 @@ export function QuizCreateScreen() {
       </View> : null}
       {source === "pool" ? <FlatList
         data={QUIZ_POOL}
-        keyExtractor={(book) => book.key}
+        keyExtractor={(book) => book.id}
         style={styles.list}
         ListEmptyComponent={<Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>No books found.</Text>}
         renderItem={({ item }) => {
-          const checked = poolKeys.includes(item.key);
-          return <Pressable accessibilityRole="checkbox" accessibilityState={{ checked }} onPress={() => setPoolKeys((value) => checked ? value.filter((entry) => entry !== item.key) : [...value, item.key])} style={[styles.row, { borderColor: checked ? colors.accent : colors.border, backgroundColor: checked ? colors.accentSoft : colors.surface }]}>
+          const checked = poolIds.includes(item.id);
+          return <Pressable accessibilityRole="checkbox" accessibilityState={{ checked }} onPress={() => setPoolIds((value) => checked ? value.filter((entry) => entry !== item.id) : [...value, item.id])} style={[styles.row, { borderColor: checked ? colors.accent : colors.border, backgroundColor: checked ? colors.accentSoft : colors.surface }]}>
             <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.grow, { color: colors.text }]}>{item.title}</Text>
             <Text {...dynamicType} style={[typography.body, { color: colors.accent }]}>{checked ? "✓" : "+"}</Text>
           </Pressable>;
         }}
       /> : null}
       {source === "shelf" ? <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>
-        {library.isPending ? "Loading books…" : library.isError ? "Your library couldn't be loaded." : `${libraryBooks.length} books on your shelf.`}
+        {library.isPending ? "Loading books…" : library.isError ? "Your library couldn't be loaded." : `${shelfRawBooks.length} books on your shelf.`}
       </Text> : null}
       {resolveFailed && source !== "pool" ? <View style={styles.resolveRetry}>
         <Text {...dynamicType} style={[typography.caption, styles.grow, { color: colors.textDim }]}>Some covers couldn't be checked, so cover questions may be unavailable.</Text>

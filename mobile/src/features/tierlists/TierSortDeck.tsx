@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { TierDefinition, TierlistData } from "@scripta/shared";
+import { booksByWork, type TierDefinition, type TierlistData } from "@scripta/shared";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { ReduceMotion, useAnimatedStyle, useSharedValue, withSpring, type SharedValue } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
@@ -7,7 +7,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { commitHaptic, liftHaptic } from "../../ui/haptics";
 import { EmptyState, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
-import { authorOf, keyOf, TierCover, titleOf, type TierBook } from "./TierBoard";
+import { authorOf, TierCover, titleOf, type TierBook } from "./TierBoard";
 
 const TARGET_SIZE = 56;
 
@@ -45,7 +45,7 @@ function DragBook({ book, x, y, lifted }: {
   </Animated.View>;
 }
 
-export function TierSortDeck({ data, books, onAssign, selectedBookKey }: { data: TierlistData; books: TierBook[]; onAssign: (bookKey: string, tierId: string) => void; selectedBookKey?: string | null }) {
+export function TierSortDeck({ data, books, onAssign, selectedWorkId }: { data: TierlistData; books: TierBook[]; onAssign: (workId: string, tierId: string) => void; selectedWorkId?: string | null }) {
   const { colors } = useTheme();
   const ringRef = useRef<View>(null);
   const zones = useSharedValue<Array<{ x: number; y: number }>>([]);
@@ -55,10 +55,10 @@ export function TierSortDeck({ data, books, onAssign, selectedBookKey }: { data:
   const x = useSharedValue(0);
   const y = useSharedValue(0);
   const lifted = useSharedValue(false);
-  const byKey = new Map(books.map((book) => [keyOf(book), book]));
-  const pending = data.pool.filter((key) => byKey.has(key));
-  const current = selectedBookKey && byKey.has(selectedBookKey) ? selectedBookKey : pending[0];
-  const book = current ? byKey.get(current) : undefined;
+  const byWork = booksByWork(books);
+  const pending = data.pool.filter((id) => byWork.has(id));
+  const current = selectedWorkId && byWork.has(selectedWorkId) ? selectedWorkId : pending[0];
+  const book = current ? byWork.get(current) : undefined;
   const radius = Math.max(0, Math.min(ring.width, ring.height) / 2 - TARGET_SIZE / 2 - spacing.xs);
 
   useEffect(() => {
@@ -118,7 +118,7 @@ export function TierSortDeck({ data, books, onAssign, selectedBookKey }: { data:
   if (!book) return <EmptyState title="Nothing left to rank" body="Every book in this list already sits in a tier." />;
 
   return <View style={styles.deck}>
-    <Text {...dynamicType} style={[typography.caption, styles.center, { color: colors.textDim }]}>{selectedBookKey ? "Choose a new tier · drag or tap a circle" : `${pending.length} ${pending.length === 1 ? "book" : "books"} left · swipe up from below`}</Text>
+    <Text {...dynamicType} style={[typography.caption, styles.center, { color: colors.textDim }]}>{selectedWorkId ? "Choose a new tier · drag or tap a circle" : `${pending.length} ${pending.length === 1 ? "book" : "books"} left · swipe up from below`}</Text>
     <GestureDetector gesture={gesture}><View ref={ringRef} style={styles.ring} onLayout={(event) => setRing(event.nativeEvent.layout)}>
       <DragBook key={current} book={book} x={x} y={y} lifted={lifted} />
       {data.tiers.map((tier, index) => <View key={tier.id} style={[styles.targetWrap, { transform: [{ translateX: radius * Math.sin(index * 2 * Math.PI / data.tiers.length) }, { translateY: -radius * Math.cos(index * 2 * Math.PI / data.tiers.length) }] }]}>

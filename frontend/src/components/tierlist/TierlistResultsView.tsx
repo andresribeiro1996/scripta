@@ -6,8 +6,8 @@
 // number of ballots — so every mode is recomputed on each render with no
 // memoization and, crucially, no network request between switches.
 
+import { booksByWork } from "@scripta/shared";
 import { aggregate, AGGREGATION_MODES, type AggregationMode, type BookResult, type HistogramCell } from "../../lib/tierlistResults";
-import { bookKey } from "../../lib/merge";
 import { MiniBookTile } from "../murals/blocks/BookBlocks";
 import { TierRowEmpty, TierRowShell, TierRowTiles } from "./TierRowShell";
 import { useState } from "react";
@@ -38,7 +38,7 @@ function ResultTile({ result, book }: { result: BookResult; book: Record<string,
 export function TierlistResultsView({ histogram, tierIds, tiers, pool, books, ballotCount }: TierlistResultsViewProps) {
   const [mode, setMode] = useState<AggregationMode>("average");
   const results = aggregate(histogram, tierIds, pool, mode);
-  const byKey = new Map(books.map((b) => [bookKey(b), b] as const));
+  const byWork = booksByWork(books);
 
   const byTier = new Map<string, BookResult[]>(tierIds.map((id) => [id, []]));
   const unranked: BookResult[] = [];
@@ -81,14 +81,14 @@ export function TierlistResultsView({ histogram, tierIds, tiers, pool, books, ba
         {tiers.map((tier) => {
           const rows = byTier.get(tier.id) ?? [];
           return (
-            <TierRowShell key={tier.id} tier={{ ...tier, bookKeys: [] }}>
+            <TierRowShell key={tier.id} tier={{ ...tier, workIds: [] }}>
               {rows.length === 0 ? (
                 <TierRowEmpty message="Nobody ranked a book here." />
               ) : (
                 <TierRowTiles>
                   {rows.map((result) => {
-                    const book = byKey.get(result.bookKey);
-                    return book ? <ResultTile key={result.bookKey} result={result} book={book} /> : null;
+                    const book = byWork.get(result.workId);
+                    return book ? <ResultTile key={result.workId} result={result} book={book} /> : null;
                   })}
                 </TierRowTiles>
               )}
@@ -102,9 +102,9 @@ export function TierlistResultsView({ histogram, tierIds, tiers, pool, books, ba
           <span className="px-1 text-xs font-semibold text-(--color-text-dim)">Nobody ranked these</span>
           <div className="flex flex-wrap gap-1.5 rounded-lg border border-dashed border-(--color-border) p-2">
             {unranked.map((result) => {
-              const book = byKey.get(result.bookKey);
+              const book = byWork.get(result.workId);
               return book ? (
-                <div key={result.bookKey} className="h-[6em] w-[4em] overflow-hidden rounded-lg">
+                <div key={result.workId} className="h-[6em] w-[4em] overflow-hidden rounded-lg">
                   <MiniBookTile book={book} showTitle={false} showAuthor={false} />
                 </div>
               ) : null;

@@ -5,11 +5,24 @@
 // backend/README.md describes for every other module's service layer.
 
 import assert from "node:assert/strict";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
 import { normalizeWords } from "@scripta/shared";
 import type { TierlistsRepository } from "./domain/ports.js";
 import type { TierlistRow, BallotRow, BallotTotals, HistogramCell, Placement } from "./domain/types.js";
-import { createTierlistsPublicApi, createTierlistsService } from "./service.js";
+
+const scratch = mkdtempSync(join(tmpdir(), "tierlists-service-test-"));
+process.env.AUTH_DB_PATH = join(scratch, "auth.sqlite");
+process.env.LIBRARY_DB_PATH = join(scratch, "library.sqlite");
+process.env.GALLERY_DB_PATH = join(scratch, "gallery.sqlite");
+process.env.COVERS_DB_PATH = join(scratch, "covers.sqlite");
+process.env.TIERLISTS_DB_PATH = join(scratch, "tierlists.sqlite");
+process.env.JWT_ACCESS_SECRET = "a".repeat(64);
+process.env.JWT_REFRESH_SECRET = "b".repeat(64);
+
+const { createTierlistsPublicApi, createTierlistsService } = await import("./service.js");
 
 function createInMemoryRepo(): TierlistsRepository {
   const tierlists = new Map<string, TierlistRow>();
@@ -18,7 +31,6 @@ function createInMemoryRepo(): TierlistsRepository {
 
   return {
     deleteUserData() {},
-    rekeyBooks() {},
     listByUser(userId) {
       return [...tierlists.values()].filter((t) => t.owner_user_id === userId && !t.promoted_at);
     },
@@ -164,8 +176,8 @@ function createInMemoryRepo(): TierlistsRepository {
       for (const ballot of ballots.values()) {
         if (ballot.tierlist_id !== tierlistId) continue;
         for (const p of placements.get(ballot.id) ?? []) {
-          const key = JSON.stringify([p.bookKey, p.tierId]);
-          const cell = counts.get(key) ?? { bookKey: p.bookKey, tierId: p.tierId, votes: 0 };
+          const key = JSON.stringify([p.workId, p.tierId]);
+          const cell = counts.get(key) ?? { workId: p.workId, tierId: p.tierId, votes: 0 };
           cell.votes += 1;
           counts.set(key, cell);
         }
@@ -214,7 +226,7 @@ test("createTierlist stores a tier list and getTierlist round-trips it", () => {
 
 test("public creation uses one immutable resource and a book snapshot", () => {
   const service = makeService();
-  const data = { tiers: [{ id: "s", label: "S", color: "#c9482f", bookKeys: [] }], pool: ["b1"] };
+  const data = { tiers: [{ id: "s", label: "S", color: "#c9482f", workIds: [] }], pool: ["b1"] };
   const created = service.createTierlist("u1", "Books", data, "anonymous", [{ key: "b1", title: "Book one" }]);
   assert.ok(created.voteCode);
   assert.equal(service.listTierlists("u1").length, 1);
@@ -245,7 +257,7 @@ test("updateTierlist renames without touching data", () => {
 test("updateTierlist replaces data without touching name", () => {
   const service = makeService();
   const t = service.createTierlist("u1", "Keep");
-  const next = { tiers: [{ id: "s", label: "S", color: "#ff7f7f", bookKeys: ["b1"] }], pool: ["b2"] };
+  const next = { tiers: [{ id: "s", label: "S", color: "#ff7f7f", workIds: ["b1"] }], pool: ["b2"] };
   const updated = service.updateTierlist("u1", t.id, { data: next });
   assert.equal(updated?.name, "Keep");
   assert.deepEqual(updated?.data, next);
@@ -296,7 +308,7 @@ test("createTierlistsPublicApi resolves the raw document and defaults missing ar
   assert.equal(freshData?.tiers.length, 5);
   assert.deepEqual(freshData?.pool, []);
 
-  const doc = { tiers: [{ id: "s", label: "S", color: "#ff7f7f", bookKeys: ["b1"] }], pool: ["b2"] };
+  const doc = { tiers: [{ id: "s", label: "S", color: "#ff7f7f", workIds: ["b1"] }], pool: ["b2"] };
   const ranked = service.createTierlist("u1", "Ranked");
   service.updateTierlist("u1", ranked.id, { data: doc });
   assert.deepEqual(api.getTierlistData("u1", ranked.id), { name: "Ranked", tiers: doc.tiers, pool: doc.pool });
@@ -310,7 +322,7 @@ test("openVoting publishes the same tier list and freezes it", () => {
   const original = service.createTierlist("u1", "Fantasy");
   const tiers = (original.data as { tiers: Array<{ id: string }> }).tiers;
   service.updateTierlist("u1", original.id, {
-    data: { tiers: tiers.map((t, i) => ({ ...t, bookKeys: i === 0 ? ["b1"] : [] })), pool: ["b2"] }
+    data: { tiers: tiers.map((t, i) => ({ ...t, workIds: i === 0 ? ["b1"] : [] })), pool: ["b2"] }
   });
 
   const copy = service.openVoting("u1", original.id, "anonymous");
@@ -331,13 +343,13 @@ test("publishing freezes the structure and keeps the whole pool", () => {
   const original = service.createTierlist("u1", "Fantasy");
   const tiers = (original.data as { tiers: Array<{ id: string }> }).tiers;
   service.updateTierlist("u1", original.id, {
-    data: { tiers: tiers.map((t, i) => ({ ...t, bookKeys: i === 0 ? ["b1"] : [] })), pool: ["b2"] }
+    data: { tiers: tiers.map((t, i) => ({ ...t, workIds: i === 0 ? ["b1"] : [] })), pool: ["b2"] }
   });
 
   const copy = service.openVoting("u1", original.id, "anonymous");
-  const data = copy?.data as { tiers: Array<{ id: string; bookKeys: string[] }>; pool: string[] };
+  const data = copy?.data as { tiers: Array<{ id: string; workIds: string[] }>; pool: string[] };
 
-  assert.deepEqual(data.tiers.map((t) => t.bookKeys), [[], [], [], [], []]);
+  assert.deepEqual(data.tiers.map((t) => t.workIds), [[], [], [], [], []]);
   assert.deepEqual(data.tiers.map((t) => t.id), tiers.map((t) => t.id));
   assert.deepEqual([...data.pool].sort(), ["b1", "b2"]);
 });
@@ -348,15 +360,15 @@ test("openVoting seeds the owner's ranking as the first ballot", () => {
   const tiers = (original.data as { tiers: Array<{ id: string }> }).tiers;
   const topTierId = tiers[0]!.id;
   service.updateTierlist("u1", original.id, {
-    data: { tiers: tiers.map((t, i) => ({ ...t, bookKeys: i === 0 ? ["b1"] : [] })), pool: ["b2"] }
+    data: { tiers: tiers.map((t, i) => ({ ...t, workIds: i === 0 ? ["b1"] : [] })), pool: ["b2"] }
   });
 
   const copy = service.openVoting("u1", original.id, "anonymous")!;
   const results = service.getResults(copy.id);
 
   assert.equal(results.ballotCount, 1);
-  assert.equal(results.histogram.find((c) => c.bookKey === "b1")?.tierId, topTierId);
-  assert.equal(results.histogram.find((c) => c.bookKey === "b2"), undefined);
+  assert.equal(results.histogram.find((c) => c.workId === "b1")?.tierId, topTierId);
+  assert.equal(results.histogram.find((c) => c.workId === "b2"), undefined);
 });
 
 test("openVoting returns undefined for an unowned tier list", () => {
@@ -413,7 +425,7 @@ function openPoll(service: ReturnType<typeof makeService>, access: "anonymous" |
   const original = service.createTierlist("u1", "Fantasy");
   const tiers = (original.data as { tiers: Array<{ id: string }> }).tiers;
   service.updateTierlist("u1", original.id, {
-    data: { tiers: tiers.map((t) => ({ ...t, bookKeys: [] })), pool: ["b1", "b2"] }
+    data: { tiers: tiers.map((t) => ({ ...t, workIds: [] })), pool: ["b1", "b2"] }
   });
   const copy = service.openVoting("u1", original.id, access)!;
   return { copy, code: copy.voteCode!, tierIds: tiers.map((t) => t.id) };
@@ -423,17 +435,17 @@ test("an anonymous ballot is created, then edited by its returned id", () => {
   const service = makeService();
   const { code, tierIds } = openPoll(service);
 
-  const first = service.submitBallot(code, [{ bookKey: "b1", tierId: tierIds[0]! }], { kind: "anonymous", ballotId: null });
+  const first = service.submitBallot(code, [{ workId: "b1", tierId: tierIds[0]! }], { kind: "anonymous", ballotId: null });
   assert.equal(first.ok, true);
   const ballotId = first.ok ? first.ballotId : "";
 
-  const edit = service.submitBallot(code, [{ bookKey: "b1", tierId: tierIds[1]! }], { kind: "anonymous", ballotId });
+  const edit = service.submitBallot(code, [{ workId: "b1", tierId: tierIds[1]! }], { kind: "anonymous", ballotId });
   assert.equal(edit.ok, true);
   assert.equal(edit.ok && edit.ballotId, ballotId);
 
   const results = service.getResults(openPollIdFor(service, code));
   assert.equal(results.ballotCount, 2);
-  assert.equal(results.histogram.find((c) => c.bookKey === "b1" && c.tierId === tierIds[1]!)?.votes, 1);
+  assert.equal(results.histogram.find((c) => c.workId === "b1" && c.tierId === tierIds[1]!)?.votes, 1);
 });
 
 function openPollIdFor(service: ReturnType<typeof makeService>, code: string): string {
@@ -444,8 +456,8 @@ test("a signed-in voter gets one ballot, edited in place across submissions", ()
   const service = makeService();
   const { code, tierIds } = openPoll(service);
 
-  const first = service.submitBallot(code, [{ bookKey: "b1", tierId: tierIds[0]! }], { kind: "user", userId: "u7" });
-  const second = service.submitBallot(code, [{ bookKey: "b1", tierId: tierIds[2]! }], { kind: "user", userId: "u7" });
+  const first = service.submitBallot(code, [{ workId: "b1", tierId: tierIds[0]! }], { kind: "user", userId: "u7" });
+  const second = service.submitBallot(code, [{ workId: "b1", tierId: tierIds[2]! }], { kind: "user", userId: "u7" });
 
   assert.equal(first.ok && second.ok && first.ballotId === second.ballotId, true);
   const results = service.getResults(openPollIdFor(service, code));
@@ -463,7 +475,7 @@ test("a signed-in voter's ballot is stored against their account id", () => {
   const { code, tierIds } = openPoll(service);
   const tierlistId = service.getVotingBoard(code)!.id;
 
-  const outcome = service.submitBallot(code, [{ bookKey: "b1", tierId: tierIds[0]! }], { kind: "user", userId: "u7" });
+  const outcome = service.submitBallot(code, [{ workId: "b1", tierId: tierIds[0]! }], { kind: "user", userId: "u7" });
 
   const stored = repo.getBallotByVoter(tierlistId, "u7");
   assert.equal(stored?.voter_user_id, "u7");
@@ -473,7 +485,7 @@ test("a signed-in voter's ballot is stored against their account id", () => {
 test("members-only refuses an anonymous ballot", () => {
   const service = makeService();
   const { code, tierIds } = openPoll(service, "members");
-  const outcome = service.submitBallot(code, [{ bookKey: "b1", tierId: tierIds[0]! }], { kind: "anonymous", ballotId: null });
+  const outcome = service.submitBallot(code, [{ workId: "b1", tierId: tierIds[0]! }], { kind: "anonymous", ballotId: null });
   assert.deepEqual(outcome, { ok: false, reason: "members-only" });
 });
 
@@ -481,7 +493,7 @@ test("a closed poll refuses new ballots", () => {
   const service = makeService();
   const { copy, code, tierIds } = openPoll(service);
   service.setVotingState("u1", copy.id, { open: false });
-  const outcome = service.submitBallot(code, [{ bookKey: "b1", tierId: tierIds[0]! }], { kind: "anonymous", ballotId: null });
+  const outcome = service.submitBallot(code, [{ workId: "b1", tierId: tierIds[0]! }], { kind: "anonymous", ballotId: null });
   assert.deepEqual(outcome, { ok: false, reason: "closed" });
 });
 
@@ -494,11 +506,11 @@ test("placements outside the frozen structure are rejected", () => {
   const service = makeService();
   const { code, tierIds } = openPoll(service);
 
-  assert.deepEqual(service.submitBallot(code, [{ bookKey: "nope", tierId: tierIds[0]! }], { kind: "anonymous", ballotId: null }), {
+  assert.deepEqual(service.submitBallot(code, [{ workId: "nope", tierId: tierIds[0]! }], { kind: "anonymous", ballotId: null }), {
     ok: false,
     reason: "invalid"
   });
-  assert.deepEqual(service.submitBallot(code, [{ bookKey: "b1", tierId: "nosuchtier" }], { kind: "anonymous", ballotId: null }), {
+  assert.deepEqual(service.submitBallot(code, [{ workId: "b1", tierId: "nosuchtier" }], { kind: "anonymous", ballotId: null }), {
     ok: false,
     reason: "invalid"
   });
@@ -506,8 +518,8 @@ test("placements outside the frozen structure are rejected", () => {
     service.submitBallot(
       code,
       [
-        { bookKey: "b1", tierId: tierIds[0]! },
-        { bookKey: "b1", tierId: tierIds[1]! }
+        { workId: "b1", tierId: tierIds[0]! },
+        { workId: "b1", tierId: tierIds[1]! }
       ],
       { kind: "anonymous", ballotId: null }
     ),
@@ -518,20 +530,20 @@ test("placements outside the frozen structure are rejected", () => {
 test("an unranked book simply has no placement", () => {
   const service = makeService();
   const { code, tierIds } = openPoll(service);
-  service.submitBallot(code, [{ bookKey: "b1", tierId: tierIds[0]! }], { kind: "anonymous", ballotId: null });
+  service.submitBallot(code, [{ workId: "b1", tierId: tierIds[0]! }], { kind: "anonymous", ballotId: null });
   const results = service.getResults(openPollIdFor(service, code));
-  assert.equal(results.histogram.some((c) => c.bookKey === "b2"), false);
+  assert.equal(results.histogram.some((c) => c.workId === "b2"), false);
 });
 
 test("getBallot rehydrates an anonymous voter's placements", () => {
   const service = makeService();
   const { code, tierIds } = openPoll(service);
-  const submitted = service.submitBallot(code, [{ bookKey: "b1", tierId: tierIds[0]! }], { kind: "anonymous", ballotId: null });
+  const submitted = service.submitBallot(code, [{ workId: "b1", tierId: tierIds[0]! }], { kind: "anonymous", ballotId: null });
   const ballotId = submitted.ok ? submitted.ballotId : "";
 
   const fetched = service.getBallot(code, { kind: "anonymous", ballotId });
   assert.equal(fetched.ok, true);
-  assert.deepEqual(fetched.ok && fetched.placements, [{ bookKey: "b1", tierId: tierIds[0]! }]);
+  assert.deepEqual(fetched.ok && fetched.placements, [{ workId: "b1", tierId: tierIds[0]! }]);
 });
 
 test("getVotingBoard exposes structure and never the owner's placements", () => {
@@ -544,7 +556,7 @@ test("getVotingBoard exposes structure and never the owner's placements", () => 
   assert.equal(board.access, "anonymous");
   assert.deepEqual([...board.pool].sort(), ["b1", "b2"]);
   assert.deepEqual(board.tiers.map((t) => t.id), tierIds);
-  assert.equal(Object.keys(board.tiers[0]!).includes("bookKeys"), false);
+  assert.equal(Object.keys(board.tiers[0]!).includes("workIds"), false);
   assert.equal(board.ballotCount, 1);
 });
 
@@ -599,8 +611,8 @@ test("a first signed-in ballot emits voted_on once", () => {
   const outcome = service.submitBallot(
     code,
     [
-      { bookKey: "b1", tierId: tierIds[0]! },
-      { bookKey: "b2", tierId: tierIds[1]! }
+      { workId: "b1", tierId: tierIds[0]! },
+      { workId: "b2", tierId: tierIds[1]! }
     ],
     { kind: "user", userId: "u7" }
   );
@@ -616,8 +628,8 @@ test("editing a signed-in ballot emits no second voted_on", () => {
   });
   const { code, tierIds } = openPoll(service);
 
-  service.submitBallot(code, [{ bookKey: "b1", tierId: tierIds[0]! }], { kind: "user", userId: "u7" });
-  service.submitBallot(code, [{ bookKey: "b1", tierId: tierIds[1]! }], { kind: "user", userId: "u7" });
+  service.submitBallot(code, [{ workId: "b1", tierId: tierIds[0]! }], { kind: "user", userId: "u7" });
+  service.submitBallot(code, [{ workId: "b1", tierId: tierIds[1]! }], { kind: "user", userId: "u7" });
 
   assert.equal(emitted.length, 1);
 });
@@ -629,7 +641,7 @@ test("an anonymous first ballot emits no voted_on", () => {
   });
   const { code, tierIds } = openPoll(service);
 
-  const outcome = service.submitBallot(code, [{ bookKey: "b1", tierId: tierIds[0]! }], { kind: "anonymous", ballotId: null });
+  const outcome = service.submitBallot(code, [{ workId: "b1", tierId: tierIds[0]! }], { kind: "anonymous", ballotId: null });
 
   assert.equal(outcome.ok, true);
   assert.deepEqual(emitted, []);
@@ -652,10 +664,10 @@ test("published refs carry origin creator and timestamps", () => {
 test("100 distinct member voters promote the same list and revoke creator control", () => {
   const service = makeService();
   const list = service.createTierlist("creator", "Reference");
-  const tiers = (list.data as { tiers: Array<{ id: string; label: string; color: string; bookKeys: string[] }> }).tiers;
+  const tiers = (list.data as { tiers: Array<{ id: string; label: string; color: string; workIds: string[] }> }).tiers;
   service.updateTierlist("creator", list.id, { data: { tiers, pool: ["b1"] } });
   const published = service.openVoting("creator", list.id, "anonymous")!;
-  const vote = [{ bookKey: "b1", tierId: tiers[0]!.id }];
+  const vote = [{ workId: "b1", tierId: tiers[0]!.id }];
   service.submitBallot(published.voteCode!, [], { kind: "user", userId: "abstainer" });
   for (let n = 0; n < 99; n++) {
     assert.equal(service.submitBallot(published.voteCode!, vote, { kind: "user", userId: `reader-${n}` }).ok, true);
@@ -675,7 +687,8 @@ test("100 distinct member voters promote the same list and revoke creator contro
   assert.equal(service.getPublishedRef(list.id)?.ownerUserId, "creator");
 });
 
-test("listVotedByUser lists others' polls the account balloted on, latest ballot first", async () => {
+test("listVotedByUser lists others' polls the account balloted on, latest ballot first", (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: Date.now() });
   const service = makeService();
   const first = openPoll(service);
   const second = openPoll(service);
@@ -685,9 +698,8 @@ test("listVotedByUser lists others' polls the account balloted on, latest ballot
   service.submitBallot(first.code, [], { kind: "user", userId: "u9" });
   assert.deepEqual(service.listVotedByUser("u9").map((r) => r.voteCode), [first.code]);
 
-  // A fresh ballot on a second poll reorders by latest ballot; the delay
-  // keeps the two ballots' updated_at values comparable.
-  await new Promise((resolve) => setTimeout(resolve, 5));
+  // A fresh ballot on a second poll reorders by latest ballot.
+  t.mock.timers.tick(5);
   service.submitBallot(second.code, [], { kind: "user", userId: "u9" });
   assert.deepEqual(service.listVotedByUser("u9").map((r) => r.voteCode), [second.code, first.code]);
 
@@ -706,7 +718,7 @@ test("listVotedByUser never lists the account's own polls", () => {
   assert.deepEqual(service.listVotedByUser("u1").map((r) => r.voteCode), []);
 });
 
-const publishedPool = { tiers: [{ id: "s", label: "S", color: "#c9482f", bookKeys: [] }], pool: ["b1", "b2", "b3"] };
+const publishedPool = { tiers: [{ id: "s", label: "S", color: "#c9482f", workIds: [] }], pool: ["b1", "b2", "b3"] };
 
 test("discoverWindow lists only published tier lists, matching the normalized needle, with their origin creator", () => {
   const repo = createInMemoryRepo();
@@ -729,11 +741,11 @@ test("getPublishedRefs builds the refs getPublishedRef does, for the requested i
   const first = openPoll(service);
   const second = openPoll(service);
   const third = openPoll(service);
-  service.submitBallot(first.code, [{ bookKey: "b1", tierId: first.tierIds[0]! }], { kind: "user", userId: "u7" });
+  service.submitBallot(first.code, [{ workId: "b1", tierId: first.tierIds[0]! }], { kind: "user", userId: "u7" });
   service.submitBallot(first.code, [], { kind: "anonymous", ballotId: null });
   service.submitBallot(first.code, [], { kind: "user", userId: "u8" });
-  service.submitBallot(second.code, [{ bookKey: "b1", tierId: second.tierIds[0]! }], { kind: "user", userId: "u7" });
-  service.submitBallot(third.code, [{ bookKey: "b1", tierId: third.tierIds[0]! }], { kind: "user", userId: "u7" });
+  service.submitBallot(second.code, [{ workId: "b1", tierId: second.tierIds[0]! }], { kind: "user", userId: "u7" });
+  service.submitBallot(third.code, [{ workId: "b1", tierId: third.tierIds[0]! }], { kind: "user", userId: "u7" });
 
   const refs = service.getPublishedRefs([first.copy.id, second.copy.id, "ghost"]);
 

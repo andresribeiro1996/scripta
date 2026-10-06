@@ -28,7 +28,7 @@ export type TournamentDiscoverRow = Pick<TournamentRow, "id" | "created_at" | "o
 export interface TournamentSlotRow {
   tournament_id: string;
   slot_index: number;
-  book_key: string;
+  work_id: string | null;
   title: string;
   author: string;
   cover_url: string | null;
@@ -47,15 +47,15 @@ export interface DuelRow {
   tournament_id: string;
   round_number: number;
   duel_index: number;
-  book_a_key: string;
   book_a_title: string;
   book_a_author: string;
   book_a_cover: string | null;
-  book_b_key: string;
+  book_a_work_id: string | null;
   book_b_title: string;
   book_b_author: string;
   book_b_cover: string | null;
-  winner_key: string | null;
+  book_b_work_id: string | null;
+  winner_side: "a" | "b" | null;
   status: "active" | "tied_pending_tiebreak" | "settled";
   opens_at: string;
   closes_at: string;
@@ -72,7 +72,7 @@ export interface VoteRow {
   duel_id: string;
   voter_token: string;
   voter_user_id: string | null;
-  book_key: string;
+  side: "a" | "b";
   created_at: string;
 }
 
@@ -80,7 +80,7 @@ export interface VoteRow {
  *  POST /arenas/:id/random-fill accept, and what tournament_slots and
  *  each side of a duel get built from. */
 export interface SeedBookInput {
-  key: string;
+  workId: string;
   title: string;
   author: string;
   cover: string | null;
