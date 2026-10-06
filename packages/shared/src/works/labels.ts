@@ -21,3 +21,9 @@ export function editionLabel(edition: WorkEdition): string {
   const parts = [edition.language, edition.year === null ? null : String(edition.year), edition.isbn].filter((part): part is string => part !== null);
   return parts.length > 0 ? parts.join(" · ") : "Edition details unknown";
 }
+
+const SUMMARY_PREVIEW_LENGTH = 320;
+
+export function summaryPreview(summary: string): string | null {
+  return summary.length > SUMMARY_PREVIEW_LENGTH ? `${summary.slice(0, SUMMARY_PREVIEW_LENGTH).replace(/\s+\S*$/, "")}…` : null;
+}

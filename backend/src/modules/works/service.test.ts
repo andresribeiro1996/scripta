@@ -89,6 +89,11 @@ test("with no work summary the first edition with one is used, and with none the
   assert.equal(createWorksService(deps({ getWorkPage: pageWith(null, [null, null]) })).getPage("w", null)!.work.summary, null);
 });
 
+test("a summary's Open Library markdown is served as plain text", () => {
+  const page = createWorksService(deps({ getWorkPage: pageWith("Sequel to *Dune*.\n\nPreceded by: [*Dune*][1]\n\n[1]: https://openlibrary.org/works/OL1W", [null, null]) })).getPage("w", null)!;
+  assert.equal(page.work.summary, "Sequel to Dune.\n\nPreceded by: Dune");
+});
+
 test("reader rows carry no feeling, dates or highlights", () => {
   const page = createWorksService(deps()).getPage("w", "viewer")!;
   for (const reader of [...page.readers.followed, ...page.readers.others]) {

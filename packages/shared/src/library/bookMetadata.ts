@@ -52,7 +52,18 @@ export function positiveInteger(value: unknown): number | null {
 export function openLibraryDescription(record: unknown): string | null {
   const raw = record && typeof record === "object" ? (record as { description?: unknown }).description : null;
   const description = typeof raw === "string" ? raw : raw && typeof raw === "object" ? (raw as { value?: unknown }).value : null;
-  return typeof description === "string" && description.trim() ? description.trim().replace(/\[([^\]]+)\]\(https?:\/\/[^)]+\)/g, "$1").replace(/\*\*([^*]+)\*\*/g, "$1") : null;
+  return typeof description === "string" ? plainDescription(description) || null : null;
+}
+
+export function plainDescription(text: string): string {
+  return text
+    .replace(/^[ \t]*\[[^\]]+\]:[ \t]*\S.*$/gm, "")
+    .replace(/\[([^\]]+)\]\(https?:\/\/[^)]+\)/g, "$1")
+    .replace(/\[([^\]]+)\]\[[^\]]*\]/g, "$1")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/\*([^*\n]+)\*/g, "$1")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 export function buildBookMetadata(match: Record<string, unknown>, work: unknown): CatalogBookMetadata {

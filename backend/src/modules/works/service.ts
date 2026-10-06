@@ -1,4 +1,4 @@
-import type { IdentityKey, ReaderProfile, WorkGameRef, WorkPage, WorkReader } from "@scripta/shared";
+import { plainDescription, type IdentityKey, type ReaderProfile, type WorkGameRef, type WorkPage, type WorkReader } from "@scripta/shared";
 import type { CatalogWorkPage } from "../books/index.js";
 import type { ViewerCopy } from "../library/index.js";
 
@@ -72,7 +72,7 @@ export function createWorksService(deps: WorksDeps) {
           id: work.id,
           title: work.title,
           author: work.author,
-          summary,
+          summary: summary && plainDescription(summary),
           coverUrl,
           editions: work.editions.map((edition) => ({ bookId: edition.bookId, title: edition.title, language: edition.language, year: edition.year, isbn: edition.isbn, mine: edition === mineEdition }))
         },
