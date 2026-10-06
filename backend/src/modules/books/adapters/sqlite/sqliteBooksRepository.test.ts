@@ -15,7 +15,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
 const { applyBooksMigrations, openBooksDb } = await import("./connection.js");
 const { findOrCreateBook } = await import("../../domain/findOrCreate.js");
-const { createSqliteBooksRepository } = await import("./sqliteBooksRepository.js");
+const { createSqliteBooksRepository, UNCHECKED_COVERS_SQL, UPGRADE_WANTED_SQL, UNCHECKED_DETAILS_SQL, WORK_LOOKUP_SQL } = await import("./sqliteBooksRepository.js");
 const { WorkMergeError } = await import("../../domain/errors.js");
 
 const NOW = "2026-10-01T00:00:00.000Z";
@@ -1155,4 +1155,19 @@ test("listUpgradeWantedIds pages by wanted time then insert order", () => {
   const first = repo.listUpgradeWantedIds(null, 2);
   assert.deepEqual(first.ids, ids.slice(0, 2));
   assert.deepEqual(repo.listUpgradeWantedIds(first.next, 2), { ids: [ids[2]], next: null });
+});
+
+test("every backfill query reads through its own partial index, with no temp sort", () => {
+  const { db } = freshRepo();
+  const cases: Array<[string, Array<string | number>, string]> = [
+    [UNCHECKED_COVERS_SQL, ["", 0, 500], "idx_books_cover_unchecked"],
+    [UPGRADE_WANTED_SQL, ["", 0, 500], "idx_books_cover_upgrade"],
+    [UNCHECKED_DETAILS_SQL, [50], "idx_books_details_unchecked"],
+    [WORK_LOOKUP_SQL, [NOW, 50], "idx_books_work_lookup"]
+  ];
+  for (const [sql, params, index] of cases) {
+    const plan = (db.prepare(`EXPLAIN QUERY PLAN ${sql}`).all(...params) as Array<{ detail: string }>).map((row) => row.detail).join(" | ");
+    assert.match(plan, new RegExp(`USING INDEX ${index}\\b`), plan);
+    assert.doesNotMatch(plan, /TEMP B-TREE/, plan);
+  }
 });

@@ -16,6 +16,19 @@ export const UPGRADE_WANTED_SQL = `
   ORDER BY cover_upgrade_wanted_at, rowid LIMIT ?
 `;
 
+export const UNCHECKED_DETAILS_SQL = `
+  SELECT id FROM books WHERE details_status IS NULL
+  ORDER BY details_checked_at IS NOT NULL, created_by IS NOT NULL, details_checked_at, created_at, rowid LIMIT ?
+`;
+export const WORK_LOOKUP_SQL = `
+  SELECT id FROM books
+  WHERE ol_work_key IS NULL AND isbn IS NOT NULL AND details_status IS NOT NULL
+    AND (created_by IS NULL OR created_by <> 'publisher')
+    AND (work_checked_at IS NULL OR work_checked_at < ?)
+  ORDER BY work_checked_at IS NOT NULL, created_by IS NOT NULL, work_checked_at, created_at, rowid
+  LIMIT ?
+`;
+
 function idPage(stmt: StatementSync, after: PageCursor | null, limit: number): IdPage {
   const rows = stmt.all(after?.at ?? "", after?.row ?? 0, limit) as Array<{ id: string; at: string; row: number }>;
   const last = rows[rows.length - 1];
@@ -97,14 +110,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     ORDER BY candidates.created_at, candidates.work_id
     LIMIT ?
   `);
-  const workLookupStmt = db.prepare(`
-    SELECT id FROM books
-    WHERE ol_work_key IS NULL AND isbn IS NOT NULL AND details_status IS NOT NULL
-      AND (created_by IS NULL OR created_by <> 'publisher')
-      AND (work_checked_at IS NULL OR work_checked_at < ?)
-    ORDER BY work_checked_at IS NOT NULL, created_by IS NOT NULL, work_checked_at, created_at, rowid
-    LIMIT ?
-  `);
+  const workLookupStmt = db.prepare(WORK_LOOKUP_SQL);
   const workCheckedStmt = db.prepare(`UPDATE books SET work_checked_at = ? WHERE id = ?`);
   const replaceLanguageStmt = db.prepare(`UPDATE books SET language = ? WHERE id = ?`);
   const makeSearchableStmt = db.prepare(`
@@ -144,9 +150,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   `);
 
   const uncheckedStmt = db.prepare(UNCHECKED_COVERS_SQL);
-  const uncheckedDetailsStmt = db.prepare(`
-    SELECT id FROM books WHERE details_status IS NULL ORDER BY details_checked_at IS NOT NULL, created_by IS NOT NULL, details_checked_at, created_at, rowid LIMIT ?
-  `);
+  const uncheckedDetailsStmt = db.prepare(UNCHECKED_DETAILS_SQL);
   const setUpgradeWantedStmt = db.prepare(`UPDATE books SET cover_upgrade_wanted_at = ? WHERE id = ?`);
   const setAppleCheckedStmt = db.prepare(`UPDATE books SET apple_checked_at = ? WHERE id = ?`);
   const setWorkKeyStmt = db.prepare(`UPDATE books SET ol_work_key = ? WHERE id = ? AND ol_work_key IS NULL`);
