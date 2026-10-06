@@ -29,8 +29,9 @@ export function createOpenLibraryCatalog(throttle: Throttle, urgent = true): Boo
       const work = await get(`https://openlibrary.org${String(match.key)}.json`);
       const edition = isbn ? await get(`https://openlibrary.org/isbn/${encodeURIComponent(isbn)}.json`) : null;
       const metadata = buildBookMetadata(match, work);
-      metadata.summary = openLibraryDescription(edition) ?? metadata.summary;
-      return { metadata, sources: ["openlibrary"], summarySource: metadata.summary ? "openlibrary" : null, workKey: String(match.key) };
+      const workSummary = metadata.summary;
+      metadata.summary = openLibraryDescription(edition);
+      return { metadata, sources: ["openlibrary"], summarySource: metadata.summary ? "openlibrary" : null, workKey: String(match.key), workSummary };
     },
 
     async search(query) {

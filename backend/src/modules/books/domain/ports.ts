@@ -43,6 +43,8 @@ export interface BooksRepository {
   resolveWorkId(id: string): string | null;
   getWorkView(id: string): WorkView | undefined;
   assignWork(bookId: string): string;
+  setWorkSummary(bookId: string, summary: string): void;
+  getWorkSummary(bookId: string): { summary: string | null; olWorkKey: string | null } | undefined;
   canonicalWorkIds(ids: string[]): Map<string, string>;
   setLanguage(id: string, tag: string | null): void;
   setPublisherUrl(id: string, url: string): void;
@@ -76,6 +78,7 @@ export interface CatalogDetails {
   sources: DataSource[];
   summarySource: DataSource | null;
   workKey?: string | null;
+  workSummary?: string | null;
 }
 
 export interface BookCatalog {

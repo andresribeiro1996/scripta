@@ -28,7 +28,7 @@ test("details come from the matching work", async () => {
   const requests = respond([{ docs: [doc] }, { description: { value: "A book summary." }, subjects: ["Science fiction", "Ecology"] }, {}]);
   assert.deepEqual(await catalog.fetchDetails({ isbn: "9780553348477", title: "Ecotopia", author: "Ernest Callenbach" }), {
     metadata: {
-      summary: "A book summary.",
+      summary: null,
       rating: 3.8,
       ratingCount: 42,
       sourceUrl: "https://openlibrary.org/works/OL123W",
@@ -39,23 +39,26 @@ test("details come from the matching work", async () => {
       translator: null
     },
     sources: ["openlibrary"],
-    summarySource: "openlibrary",
-    workKey: "/works/OL123W"
+    summarySource: null,
+    workKey: "/works/OL123W",
+    workSummary: "A book summary."
   });
   assert.equal(new URL(requests[0]!).searchParams.get("isbn"), "9780553348477");
   assert.doesNotMatch(new URL(requests[0]!).searchParams.get("fields")!, /number_of_pages_median|first_publish_year|publisher/);
 
   respond([{ docs: [doc] }, { description: "**Plain summary.** Source: [Wikipedia](https://en.wikipedia.org/wiki/Ecotopia)" }]);
-  assert.equal((await catalog.fetchDetails({ isbn: null, title: "ECOTOPIA", author: "Ernest Callenbach" }))?.metadata.summary, "Plain summary. Source: Wikipedia");
+  assert.equal((await catalog.fetchDetails({ isbn: null, title: "ECOTOPIA", author: "Ernest Callenbach" }))?.workSummary, "Plain summary. Source: Wikipedia");
 });
 
 test("an edition's own description wins over the work's", async () => {
   const catalog = createOpenLibraryCatalog(direct);
   const requests = respond([{ docs: [doc] }, { description: "Work text." }, { description: { value: "Edition text." } }]);
-  assert.equal((await catalog.fetchDetails({ isbn: "9780553348477", title: "", author: "" }))?.metadata.summary, "Edition text.");
+  const withEdition = await catalog.fetchDetails({ isbn: "9780553348477", title: "", author: "" });
+  assert.deepEqual([withEdition?.metadata.summary, withEdition?.summarySource, withEdition?.workSummary], ["Edition text.", "openlibrary", "Work text."]);
   assert.equal(requests[2], "https://openlibrary.org/isbn/9780553348477.json");
   respond([{ docs: [doc] }, { description: "Work text." }, null]);
-  assert.equal((await catalog.fetchDetails({ isbn: "9780553348477", title: "", author: "" }))?.metadata.summary, "Work text.");
+  const withoutEdition = await catalog.fetchDetails({ isbn: "9780553348477", title: "", author: "" });
+  assert.deepEqual([withoutEdition?.metadata.summary, withoutEdition?.summarySource, withoutEdition?.workSummary], [null, null, "Work text."]);
 });
 
 test("details reject mismatches and untrusted keys", async () => {

@@ -32,3 +32,15 @@ test("the filter drops a mismatched summary and keeps the rest", async () => {
   assert.deepEqual(filtered?.metadata.genres, ["Fantasy"]);
   assert.equal((await onlyMatchingLanguage(catalog).fetchDetails({ isbn: null, title: "t", author: "a", language: "en" }))?.metadata.summary, ENGLISH);
 });
+
+test("the filter leaves the work summary for read time", async () => {
+  const details: CatalogDetails = {
+    metadata: { summary: ENGLISH, rating: null, ratingCount: 0, sourceUrl: "u", genres: [], pages: null, publisher: null, year: null, translator: null },
+    sources: ["openlibrary"],
+    summarySource: "openlibrary",
+    workSummary: ENGLISH
+  };
+  const catalog: BookCatalog = { fetchDetails: async () => details, search: async () => [] };
+  const filtered = await onlyMatchingLanguage(catalog).fetchDetails({ isbn: "9789722000000", title: "t", author: "a", language: "pt" });
+  assert.deepEqual([filtered?.metadata.summary, filtered?.workSummary], [null, ENGLISH]);
+});
