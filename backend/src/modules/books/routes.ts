@@ -14,7 +14,7 @@ const fileParamsSchema = z.object({ id: z.string().uuid(), size: z.enum(["file",
 
 const FORBIDDEN = { error: "Only the admin can change shared covers." };
 const NOT_FOUND = { error: "No such book." };
-const WORKS_FORBIDDEN = { error: "Only the admin can merge works." };
+const WORKS_FORBIDDEN = { error: "Only the admin can change works." };
 const mergeSchema = z.object({ from: lookupSchema, into: lookupSchema });
 const detachSchema = z.object({ edition: lookupSchema });
 

@@ -65,12 +65,6 @@ export function buildApp() {
     ? (Fastify({ logger: true, https: devHttps, trustProxy: TRUSTED_PROXIES, genReqId }) as FastifyInstance)
     : Fastify({ logger: true, trustProxy: TRUSTED_PROXIES, genReqId });
 
-  // Moves any still-embedded library.murals[] into the new murals table
-  // before any module's routes come online — see
-  // migrations/runStartupMigrations.ts for why this is safe to run on
-  // every boot. Deliberately before app.register: this only
-  // touches the two modules' own SQLite files directly, nothing about
-  // the app instance itself.
   runStartupMigrations(app.log);
 
   registerStallLog(app);

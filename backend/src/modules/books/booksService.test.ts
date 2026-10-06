@@ -1544,3 +1544,39 @@ test("enqueueUnchecked queues one batch per call, continues where it stopped, an
   h.service.enqueueUnchecked();
   assert.deepEqual(queued(), ids.slice(0, COVER_ENQUEUE_BATCH));
 });
+
+test("enqueueUpgrade queues one batch per call, continues where it stopped, and wraps after a short page", () => {
+  const h = harness();
+  const created = "2026-09-01T00:00:00.000Z";
+  const ids = Array.from({ length: COVER_ENQUEUE_BATCH + 1 }, (_, i) => {
+    const id = h.repo.createBook({ title: `Book ${i}`, author: "Author", isbn: null }, [`ta:book ${i}|author|`], created).id;
+    h.repo.setCover(id, { imageId: null, status: "missing", checkedAt: created });
+    h.repo.setUpgradeWanted(id, created);
+    return id;
+  });
+  const queued = () => h.enqueued.splice(0).filter((entry) => entry.priority === "upgrade").map((entry) => entry.bookId);
+
+  h.service.enqueueUnchecked();
+  assert.deepEqual(queued(), ids.slice(0, COVER_ENQUEUE_BATCH));
+
+  h.service.enqueueUnchecked();
+  assert.deepEqual(queued(), [ids[COVER_ENQUEUE_BATCH]]);
+
+  h.service.enqueueUnchecked();
+  assert.deepEqual(queued(), ids.slice(0, COVER_ENQUEUE_BATCH));
+});
+
+test("enqueueUnchecked reaches the books behind a full page of books in backoff", async () => {
+  const failing: CoverSource = { byIsbn: async () => { throw new SourceUnavailableError("apple", "HTTP 429"); }, byTitle: async () => { throw new SourceUnavailableError("apple", "HTTP 429"); } };
+  const h = harness({ sources: { isbndb: null, apple: failing, openlibrary: emptySource } });
+  const at = "2026-09-01T00:00:00.000Z";
+  const ids = Array.from({ length: COVER_ENQUEUE_BATCH + 1 }, (_, i) => h.repo.createBook({ title: `Book ${i}`, author: "Author", isbn: null }, [`ta:book ${i}|author|`], at).id);
+  for (const id of ids.slice(0, COVER_ENQUEUE_BATCH)) await h.service.processBook(id, "background");
+  h.enqueued.length = 0;
+
+  h.service.enqueueUnchecked();
+  assert.deepEqual(h.enqueued, []);
+
+  h.service.enqueueUnchecked();
+  assert.deepEqual(h.enqueued, [{ bookId: ids[COVER_ENQUEUE_BATCH], priority: "background" }]);
+});
