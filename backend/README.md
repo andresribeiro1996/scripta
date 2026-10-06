@@ -112,7 +112,7 @@ Each account only ever sees its own document — verified in testing with two se
 - **Arena:** no sweep step and no rekey hook. Slots and duels store work ids and votes and winners store a side (see phase E2). Slot writes reject a second edition of one work with `409`.
 - **Tier lists:** no sweep step and no rekey hook. Boards, ballots and snapshots store work ids, `tierlist_works` lists each board's works, and reads canonicalise them, so a later catalog merge still shows one entry and still takes votes (see phase E2). Create and PUT reject a second edition of one work with `409`.
 - **Quizzes:** no sweep step and no rekey hook. Books and questions store work ids, `quiz_works` lists each quiz's works, and reads canonicalise them, so a later catalog merge still shows one entry (see phase E2). A question's prompt always comes from the stored book it was drawn from, so merged editions in a published quiz keep their own covers and quotes. Create keeps the first edition of each work and PUT rejects a second edition with `409`.
-- **Mural step:** each mural gets a `mural_works` row per book key its spotlight, shelf, quote, quote-collection and legacy tier-list blocks reference (`extractReferences`), swept from the owner's library. Two editions of one work are allowed, and a library merge moves the kept copy's work.
+- **Mural step:** each mural gets a `mural_works` row per book key its spotlight, shelf, quote and quote-collection blocks reference (`blockReferences` in `@scripta/shared`), swept from the owner's library. Two editions of one work are allowed, and a library merge moves the kept copy's work.
 
 #### Works check
 

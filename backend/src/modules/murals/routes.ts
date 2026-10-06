@@ -21,12 +21,12 @@
 // limit, same as it always did.
 
 import type { FastifyInstance } from "fastify";
+import { blockReferences } from "@scripta/shared";
 import { THEME_IDS } from "@scripta/shared/themes";
 import { z } from "zod";
 import { authGuard } from "../auth/index.js";
 import { resolveEntryWorks, workIdsByKey, WorkResolutionError } from "../library/index.js";
 import type { TierlistData } from "../tierlists/index.js";
-import { extractReferences } from "./domain/blockRefs.js";
 import { FolderCycleError, InvalidFolderReferenceError, MuralConflictError } from "./domain/errors.js";
 import { resolveMuralPublicPayload } from "./domain/publicPayload.js";
 import type { MuralsService } from "./service.js";
@@ -121,7 +121,7 @@ export function buildMuralRoutes(service: MuralsService, resolveWorks: typeof re
       }
       try {
         const mural = service.updateMural(request.user.id, params.data.id, body.data, (blocks) => {
-          const keys = [...extractReferences(blocks).bookKeys];
+          const keys = [...blockReferences(blocks).bookKeys];
           return workIdsByKey(keys, resolveWorks(request.user.id, keys.map((key) => ({ key }))));
         });
         if (!mural) {
@@ -299,10 +299,9 @@ export function buildPublicMuralRoutes(service: MuralsService, getTierlistData?:
         return reply.code(404).send({ error: "No shared mural at that link." });
       }
 
-      // extractReferences/resolvePublicLibraryData below are the whole
+      // blockReferences/resolvePublicLibraryData below are the whole
       // privacy boundary this route exists to enforce — see their own
-      // top comments (murals/domain/blockRefs.ts,
-      // modules/library/publicResolver.ts) for exactly what is and isn't
+      // top comments (modules/library/publicResolver.ts) for exactly what is and isn't
       // safe to include in the response built from them.
       const payload = resolveMuralPublicPayload(row, blocks, getTierlistData);
       reply.header("Cache-Control", "no-store");
