@@ -7,6 +7,9 @@ export interface CoverBlobStore {
   save(id: string, extension: string, bytes: Buffer): Promise<void>;
 }
 
+export interface PageCursor { at: string; row: number }
+export interface IdPage { ids: string[]; next: PageCursor | null }
+
 export interface BooksRepository {
   transaction<T>(write: () => T): T;
   findBookByKey(key: string): BookRow | undefined;
@@ -27,7 +30,7 @@ export interface BooksRepository {
   markDetailsMissing(bookId: string, checkedAt: string): void;
   markDetailsAttempted(bookId: string, checkedAt: string): void;
   searchBooks(tokens: string[], limit: number): BookRow[];
-  listUncheckedCoverIds(): string[];
+  listUncheckedCoverIds(after: PageCursor | null, limit: number): IdPage;
   listUncheckedDetailIds(limit: number): string[];
   setUpgradeWanted(bookId: string, at: string | null): void;
   setAppleChecked(bookId: string, at: string): void;
@@ -46,7 +49,7 @@ export interface BooksRepository {
   canonicalWorkIds(ids: string[]): Map<string, string>;
   setLanguage(id: string, tag: string | null): void;
   setPublisherUrl(id: string, url: string): void;
-  listUpgradeWantedIds(): string[];
+  listUpgradeWantedIds(after: PageCursor | null, limit: number): IdPage;
 }
 
 export interface CoverCandidate {

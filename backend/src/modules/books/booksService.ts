@@ -6,7 +6,7 @@ import { BookNotFoundError, FileTooLargeError, InvalidImageError, SourcePausedEr
 import { encodeCover, type EncodedCover } from "./domain/images.js";
 import { findExisting, findOrCreateBook, keysOf } from "./domain/findOrCreate.js";
 import { editionLanguage, findByIdentity, isPortugueseIsbn, lookupIdentity, SEARCH_LIMIT, searchTokens, type BookIdentity, type BookLookup } from "./domain/normalize.js";
-import type { BookCatalog, BooksRepository, CatalogSearchHit, CoverBlobStore, CoverSource, EditionRecordSource } from "./domain/ports.js";
+import type { BookCatalog, BooksRepository, CatalogSearchHit, CoverBlobStore, CoverSource, EditionRecordSource, PageCursor } from "./domain/ports.js";
 import type { BookRow, CoverSourceName, CoverStatus, WorkView } from "./domain/types.js";
 import type { CoverPriority } from "./worker.js";
 
@@ -18,6 +18,7 @@ const NO_SOURCE: CoverSource = { byIsbn: async () => [], byTitle: async () => []
 const NO_COVER: ResolvedCover = { url: null, fullUrl: null, pending: false, upgrading: false };
 const PENDING: ResolvedCover = { url: null, fullUrl: null, pending: true, upgrading: false };
 
+export const COVER_ENQUEUE_BATCH = 500;
 export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 
 export type CoverFileSize = "file" | "thumb";
@@ -80,6 +81,8 @@ export async function storeCoverImage(
 export function createBooksService(deps: BooksServiceDeps): BooksService {
   const now = deps.now ?? (() => new Date());
   const backoffUntil = new Map<string, number>();
+  let uncheckedCursor: PageCursor | null = null;
+  let upgradeCursor: PageCursor | null = null;
 
   const olderThan = (iso: string | null, ms: number) => iso === null || now().getTime() - Date.parse(iso) >= ms;
 
@@ -206,8 +209,12 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
     },
 
     enqueueUnchecked() {
-      for (const id of deps.repo.listUncheckedCoverIds()) schedule(id, "background");
-      for (const id of deps.repo.listUpgradeWantedIds()) schedule(id, "upgrade");
+      const unchecked = deps.repo.listUncheckedCoverIds(uncheckedCursor, COVER_ENQUEUE_BATCH);
+      for (const id of unchecked.ids) schedule(id, "background");
+      uncheckedCursor = unchecked.next;
+      const upgrades = deps.repo.listUpgradeWantedIds(upgradeCursor, COVER_ENQUEUE_BATCH);
+      for (const id of upgrades.ids) schedule(id, "upgrade");
+      upgradeCursor = upgrades.next;
     },
 
     async processBook(bookId, lane) {

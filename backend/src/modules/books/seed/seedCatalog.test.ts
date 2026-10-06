@@ -34,27 +34,27 @@ test("first run creates unchecked rows and a second run creates none", () => {
   const entries = [entry("9780141184272", "One"), entry("9780374520731", "Two"), entry("9780062315007", "Three")];
 
   assert.deepEqual(seedCatalog(entries, repo, () => NOW), { created: 3, existing: 0, invalid: 0 });
-  assert.equal(repo.listUncheckedCoverIds().length, 3);
+  assert.equal(repo.listUncheckedCoverIds(null, 100).ids.length, 3);
   const book = repo.findBookByKey("isbn:9780141184272")!;
   assert.equal(book.cover_status, null);
   assert.equal(book.title, "One");
   assert.equal(book.created_at, NOW.toISOString());
 
   assert.deepEqual(seedCatalog(entries, repo, () => NOW), { created: 0, existing: 3, invalid: 0 });
-  assert.equal(repo.listUncheckedCoverIds().length, 3);
+  assert.equal(repo.listUncheckedCoverIds(null, 100).ids.length, 3);
 });
 
 test("an entry with no usable identity counts as invalid", () => {
   const { repo } = setup();
   assert.deepEqual(seedCatalog([entry("not-an-isbn", "")], repo, () => NOW), { created: 0, existing: 0, invalid: 1 });
-  assert.equal(repo.listUncheckedCoverIds().length, 0);
+  assert.equal(repo.listUncheckedCoverIds(null, 100).ids.length, 0);
 });
 
 test("entries that share a key create one row", () => {
   const { repo } = setup();
   const entries = [entry("9780141184272", "One"), entry("978-0-14-118427-2", "One again")];
   assert.deepEqual(seedCatalog(entries, repo, () => NOW), { created: 1, existing: 1, invalid: 0 });
-  assert.equal(repo.listUncheckedCoverIds().length, 1);
+  assert.equal(repo.listUncheckedCoverIds(null, 100).ids.length, 1);
 });
 
 test("seedBook returns the created row, then the existing one", () => {

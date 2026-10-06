@@ -1,9 +1,26 @@
 import { randomUUID } from "node:crypto";
-import type { DatabaseSync } from "node:sqlite";
+import type { DatabaseSync, StatementSync } from "node:sqlite";
 import { normalizeWorkKey, workTitleKey } from "../../domain/normalize.js";
-import type { BooksRepository, MergeableDetails } from "../../domain/ports.js";
+import type { BooksRepository, IdPage, MergeableDetails, PageCursor } from "../../domain/ports.js";
 import { WorkMergeError } from "../../domain/errors.js";
 import type { BookRow, CoverImageRow, DataSource, SummarySource, WorkView } from "../../domain/types.js";
+
+export const UNCHECKED_COVERS_SQL = `
+  SELECT id, created_at AS at, rowid AS row FROM books
+  WHERE cover_checked_at IS NULL AND (cover_status IS NULL OR cover_status = 'low_res') AND (created_at, rowid) > (?, ?)
+  ORDER BY created_at, rowid LIMIT ?
+`;
+export const UPGRADE_WANTED_SQL = `
+  SELECT id, cover_upgrade_wanted_at AS at, rowid AS row FROM books
+  WHERE cover_upgrade_wanted_at IS NOT NULL AND (cover_upgrade_wanted_at, rowid) > (?, ?)
+  ORDER BY cover_upgrade_wanted_at, rowid LIMIT ?
+`;
+
+function idPage(stmt: StatementSync, after: PageCursor | null, limit: number): IdPage {
+  const rows = stmt.all(after?.at ?? "", after?.row ?? 0, limit) as Array<{ id: string; at: string; row: number }>;
+  const last = rows[rows.length - 1];
+  return { ids: rows.map((row) => row.id), next: rows.length === limit && last ? { at: last.at, row: last.row } : null };
+}
 
 export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const byKeyStmt = db.prepare(`SELECT books.* FROM book_keys JOIN books ON books.id = book_keys.book_id WHERE book_keys.key = ?`);
@@ -126,9 +143,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     WHERE books_fts MATCH ? ORDER BY bm25(books_fts) LIMIT ?
   `);
 
-  const uncheckedStmt = db.prepare(`
-    SELECT id FROM books WHERE cover_checked_at IS NULL AND (cover_status IS NULL OR cover_status = 'low_res') ORDER BY created_at, rowid
-  `);
+  const uncheckedStmt = db.prepare(UNCHECKED_COVERS_SQL);
   const uncheckedDetailsStmt = db.prepare(`
     SELECT id FROM books WHERE details_status IS NULL ORDER BY details_checked_at IS NOT NULL, created_by IS NOT NULL, details_checked_at, created_at, rowid LIMIT ?
   `);
@@ -137,7 +152,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const setWorkKeyStmt = db.prepare(`UPDATE books SET ol_work_key = ? WHERE id = ? AND ol_work_key IS NULL`);
   const setLanguageStmt = db.prepare(`UPDATE books SET language = ? WHERE id = ? AND language IS NULL`);
   const setPublisherUrlStmt = db.prepare(`UPDATE books SET publisher_url = ? WHERE id = ? AND publisher_url IS NULL`);
-  const upgradeWantedStmt = db.prepare(`SELECT id FROM books WHERE cover_upgrade_wanted_at IS NOT NULL ORDER BY cover_upgrade_wanted_at, rowid`);
+  const upgradeWantedStmt = db.prepare(UPGRADE_WANTED_SQL);
 
   function mergeDetails(bookId: string, details: MergeableDetails, summarySource: SummarySource | null) {
     mergeDetailsStmt.run({
@@ -315,8 +330,8 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       return searchStmt.all(tokens.map((token) => `"${token}"`).join(" "), limit) as unknown as BookRow[];
     },
 
-    listUncheckedCoverIds() {
-      return (uncheckedStmt.all() as Array<{ id: string }>).map((row) => row.id);
+    listUncheckedCoverIds(after, limit) {
+      return idPage(uncheckedStmt, after, limit);
     },
 
     listUncheckedDetailIds(limit) {
@@ -441,8 +456,8 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       setPublisherUrlStmt.run(url, id);
     },
 
-    listUpgradeWantedIds() {
-      return (upgradeWantedStmt.all() as Array<{ id: string }>).map((row) => row.id);
+    listUpgradeWantedIds(after, limit) {
+      return idPage(upgradeWantedStmt, after, limit);
     }
   };
 }

@@ -224,7 +224,7 @@ test("listUncheckedCoverIds returns only never-checked books, oldest first", () 
   repo.insertImage({ id: "img-1", book_id: good.id, source: "apple", source_url: null, width: 900, height: 1400, byte_size: 10, created_at: NOW });
   repo.setCover(good.id, { imageId: "img-1", status: "good", checkedAt: NOW });
   repo.setCover(missing.id, { imageId: null, status: "missing", checkedAt: NOW });
-  assert.deepEqual(repo.listUncheckedCoverIds(), [older.id, newer.id]);
+  assert.deepEqual(repo.listUncheckedCoverIds(null, 100).ids, [older.id, newer.id]);
 });
 
 test("listUncheckedCoverIds includes a low-res cover stored without a check time, never a manual one", () => {
@@ -235,9 +235,9 @@ test("listUncheckedCoverIds includes a low-res cover stored without a check time
   repo.setCover(low.id, { imageId: "img-low", status: "low_res", checkedAt: null });
   repo.insertImage({ id: "img-manual", book_id: manual.id, source: "upload", source_url: null, width: 300, height: 460, byte_size: 10, created_at: NOW });
   repo.setCover(manual.id, { imageId: "img-manual", status: "manual", checkedAt: null });
-  assert.deepEqual(repo.listUncheckedCoverIds(), [low.id]);
+  assert.deepEqual(repo.listUncheckedCoverIds(null, 100).ids, [low.id]);
   repo.setCover(low.id, { imageId: "img-low", status: "low_res", checkedAt: NOW });
-  assert.deepEqual(repo.listUncheckedCoverIds(), []);
+  assert.deepEqual(repo.listUncheckedCoverIds(null, 100).ids, []);
 });
 
 test("listUncheckedDetailIds returns never-checked books, oldest first, up to the limit", () => {
@@ -294,14 +294,14 @@ test("the upgrade-wanted mark round-trips and lists oldest first", () => {
   const b = repo.createBook({ title: "B", author: "B", isbn: null }, ["ta:b|b|"], NOW);
   const c = repo.createBook({ title: "C", author: "C", isbn: null }, ["ta:c|c|"], NOW);
   assert.equal(a.cover_upgrade_wanted_at, null);
-  assert.deepEqual(repo.listUpgradeWantedIds(), []);
+  assert.deepEqual(repo.listUpgradeWantedIds(null, 100).ids, []);
   repo.setUpgradeWanted(b.id, "2026-10-01T00:00:02.000Z");
   repo.setUpgradeWanted(a.id, "2026-10-01T00:00:01.000Z");
   assert.equal(repo.getBook(a.id)!.cover_upgrade_wanted_at, "2026-10-01T00:00:01.000Z");
-  assert.deepEqual(repo.listUpgradeWantedIds(), [a.id, b.id]);
+  assert.deepEqual(repo.listUpgradeWantedIds(null, 100).ids, [a.id, b.id]);
   repo.setUpgradeWanted(a.id, null);
   assert.equal(repo.getBook(a.id)!.cover_upgrade_wanted_at, null);
-  assert.deepEqual(repo.listUpgradeWantedIds(), [b.id]);
+  assert.deepEqual(repo.listUpgradeWantedIds(null, 100).ids, [b.id]);
   assert.equal(repo.getBook(c.id)!.cover_upgrade_wanted_at, null);
 });
 
@@ -319,7 +319,7 @@ test("the migration adds data_sources to a books table that predates it", () => 
   assert.equal(repo.getBook("old")!.data_sources, "[]");
   assert.equal(repo.getBook("old")!.cover_upgrade_wanted_at, null);
   repo.setUpgradeWanted("old", NOW);
-  assert.deepEqual(repo.listUpgradeWantedIds(), ["old"]);
+  assert.deepEqual(repo.listUpgradeWantedIds(null, 100).ids, ["old"]);
   repo.saveDetails("old", { summary: "Spice.", rating: null, ratingCount: 0, sourceUrl: "https://isbndb.com/book/1", genres: [], pages: null, publisher: null, year: null, translator: null }, ["isbndb"], "isbndb", NOW);
   assert.equal(repo.getBook("old")!.data_sources, '["isbndb"]');
 });
@@ -1129,4 +1129,30 @@ test("the ISBN-10 pass leaves two keyed works that disagree alone", () => {
 test("the ISBN-10 pass runs once", () => {
   const { db } = freshRepo();
   assert.equal((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version, 2);
+});
+
+test("listUncheckedCoverIds pages by created_at then insert order, and a short page ends the cycle", () => {
+  const { repo } = freshRepo();
+  const ids = ["a", "b", "c"].map((t) => repo.createBook({ title: t, author: "X", isbn: null }, [`ta:${t}|x|`], NOW).id);
+  const first = repo.listUncheckedCoverIds(null, 2);
+  assert.deepEqual(first.ids, ids.slice(0, 2));
+  assert.ok(first.next);
+  assert.deepEqual(repo.listUncheckedCoverIds(first.next, 2), { ids: [ids[2]], next: null });
+});
+
+test("a book checked between two pages does not make the next page skip anything", () => {
+  const { repo } = freshRepo();
+  const ids = ["a", "b", "c", "d"].map((t) => repo.createBook({ title: t, author: "X", isbn: null }, [`ta:${t}|x|`], NOW).id);
+  const first = repo.listUncheckedCoverIds(null, 2);
+  repo.setCover(ids[1]!, { imageId: null, status: "missing", checkedAt: NOW });
+  assert.deepEqual(repo.listUncheckedCoverIds(first.next, 2).ids, ids.slice(2));
+});
+
+test("listUpgradeWantedIds pages by wanted time then insert order", () => {
+  const { repo } = freshRepo();
+  const ids = ["a", "b", "c"].map((t) => repo.createBook({ title: t, author: "X", isbn: null }, [`ta:${t}|x|`], NOW).id);
+  for (const id of ids) repo.setUpgradeWanted(id, NOW);
+  const first = repo.listUpgradeWantedIds(null, 2);
+  assert.deepEqual(first.ids, ids.slice(0, 2));
+  assert.deepEqual(repo.listUpgradeWantedIds(first.next, 2), { ids: [ids[2]], next: null });
 });
