@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import {
-  BLOCK_TYPE_LABELS,
+  blockLabel,
   FINISH_TILE_SIZE,
   blockFinish,
   blockEffects,
@@ -230,7 +230,7 @@ export function BlockContent({ block, books, images, tierlists, profile, groups,
   }
   if (block.type === "tierlist") { const tierlist = tierlists.find((item) => item.id === block.tierlistId); return <>{eyebrow(tierlist?.name ?? "Tier list unavailable")}{tierlist?.data.tiers.map((tier) => <Text key={tier.id} style={text.body}>{tier.label}: {tier.workIds.length}</Text>)}</>; }
   if (block.type === "readerCard") return <ReaderCardBlock books={books} groups={groups ?? []} readerName={profile?.username || "reader"} publicCard={readerCardOverride} editable={editable} />;
-  return <Text style={text.body}>{BLOCK_TYPE_LABELS[block.type]}</Text>;
+  return <Text style={text.body}>{blockLabel(block.type)}</Text>;
 }
 
 const MOVES: Record<string, [number, number]> = { moveLeft: [-1, 0], moveRight: [1, 0], moveUp: [0, -1], moveDown: [0, 1] };
@@ -339,7 +339,7 @@ const CanvasBlock = memo(function CanvasBlock({ block, columnWidth, editable, se
         animated,
       ]}>
         <FinishOverlay id={block.id} style={style} colors={colors} />
-        {editable ? <Pressable accessibilityRole="button" accessibilityLabel={`${BLOCK_TYPE_LABELS[block.type]} block. Long press and drag to move`} accessibilityActions={MOVE_ACTIONS} onAccessibilityAction={(event) => { const move = MOVES[event.nativeEvent.actionName]; if (move) onMove(move[0], move[1]); }} onPress={onSelect} style={[styles.blockPress, blockPadding(style)]}>{body}</Pressable> : <View style={[styles.blockPress, blockPadding(style)]}>{body}</View>}
+        {editable ? <Pressable accessibilityRole="button" accessibilityLabel={`${blockLabel(block.type)} block. Long press and drag to move`} accessibilityActions={MOVE_ACTIONS} onAccessibilityAction={(event) => { const move = MOVES[event.nativeEvent.actionName]; if (move) onMove(move[0], move[1]); }} onPress={onSelect} style={[styles.blockPress, blockPadding(style)]}>{body}</Pressable> : <View style={[styles.blockPress, blockPadding(style)]}>{body}</View>}
         <FadeOverlay style={style} colors={colors} />
         {selected ? <View pointerEvents="none" style={{ position: "absolute", inset: 0, borderWidth: 2, borderRadius: style.cardRadius, borderColor: selectionBorderColor(style, colors) }} /> : null}
       </Animated.View>;
@@ -369,7 +369,7 @@ export function BlockPreview({ theme, block, canvasWidth, maxHeight, books, imag
   return (
     <MuralThemeScope theme={theme}>
     <View
-      accessibilityLabel={`Preview of this ${BLOCK_TYPE_LABELS[block.type]} block`}
+      accessibilityLabel={`Preview of this ${blockLabel(block.type)} block`}
       onLayout={(event) => setBoxWidth(event.nativeEvent.layout.width)}
       style={[styles.previewBox, { height: (scale ? height * scale : maxHeight) + spacing.md * 2, backgroundColor: colors.background }]}
     >

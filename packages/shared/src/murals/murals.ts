@@ -19,6 +19,9 @@ import type { BlockStyle } from "../library/libraryStyle.js";
 import type { BookGenre } from "../library/bookGenres.js";
 import { bookKey } from "../library/merge.js";
 import { THEME_IDS, type ThemeId } from "../themes/palettes.js";
+import { blockLabel, blockSize, minBlockHeight, newBlock } from "./blockKinds.js";
+
+export * from "./blockKinds.js";
 
 export type BlockLayout = { x: number; y: number; w: number; h: number };
 
@@ -86,31 +89,13 @@ export interface ReaderProfile {
   avatarUrl: string | null;
 }
 
-/** Human-readable name per block type — the single source AddBlockMenu.tsx's
- *  "+ Add block" choices draw their labels from, so a type's display name
- *  only ever needs changing in one place. */
-export const BLOCK_TYPE_LABELS: Record<BlockType, string> = {
-  spotlight: "Book spotlight",
-  shelf: "Shelf",
-  quote: "Quote spotlight",
-  quoteCollection: "Quote collection",
-  image: "Image",
-  text: "Text",
-  profile: "Reader profile",
-  currentlyReading: "Currently reading",
-  stats: "Stats",
-  empty: "Empty block",
-  tierlist: "Tier list",
-  readerCard: "Reader card"
-};
-
 export function muralBlockTitle(block: MuralBlock, books: Array<Record<string, unknown>>, tierlistName?: string) {
   if (block.type === "text") return block.heading || "Note";
-  if (block.type === "shelf" || block.type === "quoteCollection") return block.title || BLOCK_TYPE_LABELS[block.type];
+  if (block.type === "shelf" || block.type === "quoteCollection") return block.title || blockLabel(block.type);
   if (block.type === "spotlight") return String(books.find((book) => bookKey(book) === block.bookKey)?.Title ?? "Book spotlight");
   if (block.type === "image") return block.caption || "Image";
   if (block.type === "tierlist") return tierlistName || "Tier list";
-  return BLOCK_TYPE_LABELS[block.type];
+  return blockLabel(block.type);
 }
 
 export interface Mural {
@@ -165,31 +150,11 @@ export function newId(): string {
 // footprint so "Add block" drops something reasonably-shaped rather than
 // a 1x1 sliver the user has to resize before it's even legible.
 export const GRID_COLUMNS = 12;
-const DEFAULT_SIZE_BY_TYPE: Record<BlockType, { w: number; h: number }> = {
-  spotlight: { w: 3, h: 4 },
-  shelf: { w: 8, h: 4 },
-  quote: { w: 4, h: 3 },
-  quoteCollection: { w: 6, h: 4 },
-  image: { w: 4, h: 3 },
-  text: { w: 4, h: 2 },
-  profile: { w: 6, h: 5 },
-  currentlyReading: { w: 4, h: 4 },
-  stats: { w: 6, h: 2 },
-  empty: { w: 3, h: 2 },
-  // Five stacked tier rows each need enough height to read as a row, not
-  // a sliver — noticeably taller than every other type's default.
-  tierlist: { w: 10, h: 8 },
-  readerCard: { w: 4, h: 6 }
-};
-
-function minimumHeight(block: MuralBlock) {
-  return block.type === "currentlyReading" ? 6 : block.type === "shelf" ? 4 : block.type === "tierlist" ? 8 : 0;
-}
 
 export function ensureBookBlockHeights(blocks: MuralBlock[]): MuralBlock[] {
   const boundaries = new Map<number, number>();
   for (const block of blocks) {
-    const minimum = minimumHeight(block);
+    const minimum = minBlockHeight(block.type);
     const increase = Math.max(0, minimum - block.layout.h);
     if (increase > 0) {
       const boundary = block.layout.y + block.layout.h;
@@ -198,7 +163,7 @@ export function ensureBookBlockHeights(blocks: MuralBlock[]): MuralBlock[] {
   }
   if (boundaries.size === 0) return blocks;
   return blocks.map((block) => {
-    const minimum = minimumHeight(block);
+    const minimum = minBlockHeight(block.type);
     const shift = [...boundaries].reduce((total, [boundary, amount]) => total + (block.layout.y >= boundary ? amount : 0), 0);
     return withMuralBlockLayout(block, { ...block.layout, y: block.layout.y + shift, h: Math.max(block.layout.h, minimum) });
   });
@@ -217,7 +182,7 @@ function nextLayoutBelow(existing: MuralBlock[], w: number, h: number): BlockLay
 }
 
 function nextBlockLayout(existing: MuralBlock[], type: BlockType): BlockLayout {
-  const { w, h } = DEFAULT_SIZE_BY_TYPE[type];
+  const { w, h } = blockSize(type);
   return nextLayoutBelow(existing, w, h);
 }
 
@@ -381,7 +346,7 @@ export function addBlock(murals: Mural[], muralId: string, type: BlockType): { m
   const updated = murals.map((m) => {
     if (m.id !== muralId) return m;
     const layout = nextBlockLayout(m.blocks, type);
-    const block = defaultBlockForType(blockId, type, layout);
+    const block = newBlock(blockId, type, layout);
     return { ...m, blocks: [...m.blocks, block], updatedAt: now };
   });
   return { murals: updated, blockId };
@@ -413,38 +378,9 @@ export function duplicateBlock(murals: Mural[], muralId: string, blockId: string
   return changed ? result : murals;
 }
 
-function defaultBlockForType(id: string, type: BlockType, layout: BlockLayout): MuralBlock {
-  switch (type) {
-    case "spotlight":
-      return { id, type, layout, bookKey: "" };
-    case "shelf":
-      return { id, type, layout, title: "", bookKeys: [] };
-    case "quote":
-      return { id, type, layout, bookKey: "", highlightId: "" };
-    case "quoteCollection":
-      return { id, type, layout, title: "", quotes: [] };
-    case "image":
-      return { id, type, layout, imageId: "" };
-    case "text":
-      return { id, type, layout, heading: "", body: "" };
-    case "profile":
-      return { id, type, layout, bio: "", favoriteGenres: [] };
-    case "currentlyReading":
-      return { id, type, layout };
-    case "stats":
-      return { id, type, layout, metrics: ["totalBooks", "booksFinished", "totalHighlights"] };
-    case "empty":
-      return { id, type, layout };
-    case "tierlist":
-      return { id, type, layout, tierlistId: "" };
-    case "readerCard":
-      return { id, type, layout };
-  }
-}
-
 export function createBlockCandidate(type: BlockType, blocks: MuralBlock[]): MuralBlock {
-  const { w, h } = DEFAULT_SIZE_BY_TYPE[type];
-  return defaultBlockForType(newId(), type, findAvailableLayout(blocks, w, h));
+  const { w, h } = blockSize(type);
+  return newBlock(newId(), type, findAvailableLayout(blocks, w, h));
 }
 
 export function muralThemeId(theme: unknown): ThemeId {
