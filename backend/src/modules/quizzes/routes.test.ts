@@ -128,10 +128,10 @@ test("an unknown code is a 404 everywhere", async () => {
   assert.equal((await call(service, { method: "POST", url: "/quizzes/voting/nosuchcode/play", body: wellShaped })).status, 404);
 });
 
-async function quizApp() {
+async function quizApp(wrap: (service: ReturnType<typeof createQuizzesService>) => ReturnType<typeof createQuizzesService> = (service) => service) {
   const db = new DatabaseSync(":memory:");
   applyQuizzesMigrations(db);
-  const service = createQuizzesService(createSqliteQuizzesRepository(db));
+  const service = wrap(createQuizzesService(createSqliteQuizzesRepository(db)));
   const app = Fastify();
   app.decorate("authenticateAccessToken", (token: string) => ({ id: token, email: `${token}@example.test`, username: token, avatarId: null }));
   await app.register(buildQuizRoutes(service));
@@ -326,5 +326,58 @@ test("publish counts one book per work after two editions merge", async () => {
   assert.equal(published.statusCode, 400);
   assert.match(published.json().error, /at least 4 books/i);
   assert.equal(service.getQuiz("q13", draft.id)!.voteCode, null);
+  await app.close();
+});
+
+function breakCatalog(): () => void {
+  const catalog = openBooksDb();
+  catalog.exec("ALTER TABLE works RENAME TO works_down");
+  return () => {
+    catalog.exec("ALTER TABLE works_down RENAME TO works");
+    catalog.close();
+  };
+}
+
+test("a publish with the catalog down is a 503 and writes nothing", async () => {
+  const ids = ["Down A", "Down B", "Down C", "Down D"].map(named);
+  const { app, service, send } = await quizApp();
+  const created = await send("POST", "/quizzes", "q6", { name: "Down", data: { questionCount: 3, allowedTypes: ["cover_title"], books: ids.map((id, index) => worksBook(`Down ${"ABCD"[index]}`, id)) } });
+  assert.equal(created.statusCode, 201);
+  const id = created.json().id as string;
+  const restore = breakCatalog();
+  try {
+    const published = await app.inject({ method: "POST", url: `/quizzes/${id}/publish`, headers: { authorization: "Bearer q6" } });
+    assert.equal(published.statusCode, 503);
+  } finally {
+    restore();
+  }
+  const stored = service.getQuiz("q6", id)!;
+  assert.equal(stored.voteCode, null);
+  assert.equal((stored.data as { questions: unknown }).questions ?? null, null);
+  const retried = await app.inject({ method: "POST", url: `/quizzes/${id}/publish`, headers: { authorization: "Bearer q6" } });
+  assert.equal(retried.statusCode, 201);
+  await app.close();
+});
+
+test("a create answers from the books it resolved, even if the catalog dies right after the write", async () => {
+  const ids = ["Gone A", "Gone B"].map(named);
+  let restore = () => {};
+  const { app, db, send } = await quizApp((service) => ({
+    ...service,
+    createQuiz: (...args) => {
+      const quiz = service.createQuiz(...args);
+      restore = breakCatalog();
+      return quiz;
+    }
+  }));
+  try {
+    const created = await send("POST", "/quizzes", "q7", { name: "Gone", data: { books: ids.map((id, index) => worksBook(`Gone ${"AB"[index]}`, id)) } });
+    assert.equal(created.statusCode, 201);
+    assert.deepEqual(created.json().data.books.map((entry: { workId: string }) => entry.workId), ids);
+    assert.doesNotMatch(created.body, /"key"/);
+    assert.equal((db.prepare("SELECT COUNT(*) AS count FROM quizzes").get() as { count: number }).count, 1);
+  } finally {
+    restore();
+  }
   await app.close();
 });

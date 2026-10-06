@@ -72,7 +72,7 @@ export function buildQuizRoutes(service: QuizzesService) {
           return [{ ...book, workId }];
         });
         const quiz = service.createQuiz(request.user.id, parsed.data.name, { ...parsed.data.data, books });
-        return reply.code(201).send(quizToWorks(quiz));
+        return reply.code(201).send(quizToWorks(quiz, new Map(books.map((book) => [book.workId, book.workId]))));
       } catch (err) {
         return sendWorksError(reply, err);
       }

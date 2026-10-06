@@ -102,7 +102,7 @@ export function buildTierlistRoutes(service: TierlistsService) {
         const publicBooks = access && board ? booksInOrder(request.user.id, board.data.pool) : [];
         if (access && board && publicBooks.length !== board.data.pool.length) return reply.code(400).send({ error: "A selected book is no longer in your library." });
         const tierlist = service.createTierlist(request.user.id, name, board?.data, access, publicBooks);
-        return reply.code(201).send(answer(tierlist));
+        return reply.code(201).send(board ? { ...tierlist, data: board.data } : tierlist);
       } catch (err) {
         return sendWorksError(reply, err);
       }
@@ -129,16 +129,17 @@ export function buildTierlistRoutes(service: TierlistsService) {
       if (!body.success) return reply.code(400).send({ error: body.error.issues[0]?.message ?? "Invalid request." });
       try {
         let board: { data: WorksBoard } | undefined;
+        const owned = service.getTierlist(request.user.id, params.data.id);
         if (body.data.data !== undefined) {
-          const owned = service.getTierlist(request.user.id, params.data.id);
           if (!owned || owned.voteCode !== null) return reply.code(404).send({ error: "No tier list with that id." });
           const result = storedBoard(body.data.data);
           if ("error" in result) return reply.code(result.status).send({ error: result.error });
           board = result;
         }
+        const data = board?.data ?? (owned ? canonicalBoard(owned.data) : undefined);
         const tierlist = service.updateTierlist(request.user.id, params.data.id, { ...(body.data.name !== undefined ? { name: body.data.name } : {}), ...(board ? { data: board.data } : {}) });
-        if (!tierlist) return reply.code(404).send({ error: "No tier list with that id." });
-        return reply.send(answer(tierlist));
+        if (!tierlist || !data) return reply.code(404).send({ error: "No tier list with that id." });
+        return reply.send({ ...tierlist, data });
       } catch (err) {
         return sendWorksError(reply, err);
       }
@@ -168,11 +169,13 @@ export function buildTierlistRoutes(service: TierlistsService) {
       const owned = service.getTierlist(request.user.id, params.data.id);
       if (!owned) return reply.code(404).send({ error: "No tier list with that id." });
       try {
+        const board = canonicalBoard(owned.data);
+        const data = { tiers: board.tiers.map((tier) => ({ ...tier, workIds: [] })), pool: [...board.pool, ...board.tiers.flatMap((tier) => tier.workIds)] };
         const tierlist = service.openVoting(request.user.id, params.data.id, body.data.access, booksInOrder(request.user.id, boardWorks(owned.data)));
         if (!tierlist) {
           return reply.code(404).send({ error: "No tier list with that id." });
         }
-        return reply.code(201).send({ tierlist: answer(tierlist), voteCode: tierlist.voteCode });
+        return reply.code(201).send({ tierlist: { ...tierlist, data }, voteCode: tierlist.voteCode });
       } catch (err) {
         return sendWorksError(reply, err);
       }
@@ -187,11 +190,18 @@ export function buildTierlistRoutes(service: TierlistsService) {
       if (!body.success) {
         return reply.code(400).send({ error: body.error.issues[0]?.message ?? "Invalid request." });
       }
-      const tierlist = service.setVotingState(request.user.id, params.data.id, body.data);
-      if (!tierlist) {
-        return reply.code(404).send({ error: "No tier list with that id." });
+      const owned = service.getTierlist(request.user.id, params.data.id);
+      if (!owned) return reply.code(404).send({ error: "No tier list with that id." });
+      try {
+        const data = canonicalBoard(owned.data);
+        const tierlist = service.setVotingState(request.user.id, params.data.id, body.data);
+        if (!tierlist) {
+          return reply.code(404).send({ error: "No tier list with that id." });
+        }
+        return reply.send({ tierlist: { ...tierlist, data } });
+      } catch (err) {
+        return sendWorksError(reply, err);
       }
-      return reply.send({ tierlist: answer(tierlist) });
     });
 
     app.get("/tierlists/:id/results", { preHandler: authGuard }, async (request, reply) => {
