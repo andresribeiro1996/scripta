@@ -33,6 +33,7 @@ interface WorkRow {
   title: string;
   author: string;
   merged_into: string | null;
+  summary: string | null;
   created_at: string;
 }
 
@@ -427,7 +428,7 @@ const WORK_COLUMNS = ["work_id", "language", "work_checked_at"];
 
 function assertWorkSchema(db: DatabaseSync) {
   const names = (sql: string) => (db.prepare(sql).all() as Array<{ name: string }>).map((row) => row.name);
-  assert.deepEqual(names("PRAGMA table_info(works)"), ["id", "ol_work_key", "title", "author", "merged_into", "created_at"]);
+  assert.deepEqual(names("PRAGMA table_info(works)"), ["id", "ol_work_key", "title", "author", "merged_into", "created_at", "summary"]);
   assert.deepEqual(names("PRAGMA table_info(books)").filter((name) => WORK_COLUMNS.includes(name)), WORK_COLUMNS);
   assert.deepEqual(names("PRAGMA index_info(idx_books_work)"), ["work_id"]);
   assert.throws(() => db.prepare("INSERT INTO books (id, title, author, work_id, created_at) VALUES ('orphan', 'A', 'A', 'missing', ?)").run(NOW), /FOREIGN KEY constraint failed/);
@@ -1170,4 +1171,49 @@ test("every backfill query reads through its own partial index, with no temp sor
     assert.match(plan, new RegExp(`USING INDEX ${index}\\b`), plan);
     assert.doesNotMatch(plan, /TEMP B-TREE/, plan);
   }
+});
+
+test("setWorkSummary keeps the first summary, assigns a missing work and follows merged_into", () => {
+  const { db, repo } = freshRepo();
+  const a = repo.createBook({ title: "A", author: "X", isbn: "9789720000001" }, ["isbn:9789720000001"], NOW);
+  const b = repo.createBook({ title: "B", author: "X", isbn: "9789720000002", workKey: "OL2W" }, ["isbn:9789720000002"], NOW);
+  repo.setWorkSummary(a.id, "First.");
+  repo.setWorkSummary(a.id, "Second.");
+  assert.equal(workById(db, a.work_id).summary, "First.");
+  assert.deepEqual({ ...repo.getWorkSummary(a.id) }, { summary: "First.", olWorkKey: null });
+
+  repo.mergeWorks(a.work_id!, b.work_id!);
+  assert.deepEqual({ ...repo.getWorkSummary(a.id) }, { summary: "First.", olWorkKey: "OL2W" });
+  repo.setWorkSummary(b.id, "Third.");
+  assert.equal(workById(db, b.work_id).summary, "First.");
+
+  db.exec("UPDATE books SET work_id = NULL WHERE id = '" + b.id + "'");
+  repo.setWorkSummary(b.id, "Fourth.");
+  assert.ok(repo.getBook(b.id)!.work_id);
+});
+
+test("the works.summary migration moves Open Library edition summaries onto the work and leaves the rest", () => {
+  const db = new DatabaseSync(":memory:");
+  applyBooksMigrations(db);
+  db.exec("ALTER TABLE works DROP COLUMN summary");
+  const insertWork = db.prepare("INSERT INTO works (id, title, author, created_at) VALUES (?, 'T', 'A', ?)");
+  const insertBook = db.prepare("INSERT INTO books (id, title, author, work_id, summary, summary_source, created_at) VALUES (?, 'T', 'A', ?, ?, ?, ?)");
+  insertWork.run("w1", NOW);
+  insertWork.run("w2", NOW);
+  insertBook.run("b1", "w1", "Work text.", "openlibrary", NOW);
+  insertBook.run("b2", "w1", "Work text.", "openlibrary", NOW);
+  insertBook.run("b3", "w2", "Publisher text.", "publisher", NOW);
+  insertBook.run("b4", "w2", "ISBNdb text.", "isbndb", NOW);
+  insertBook.run("b5", null, "Orphan text.", "openlibrary", NOW);
+
+  applyBooksMigrations(db);
+  applyBooksMigrations(db);
+
+  const summaryOf = (id: string) => (db.prepare("SELECT summary FROM works WHERE id = ?").get(id) as { summary: string | null }).summary;
+  const edition = (id: string) => ({ ...(db.prepare("SELECT summary, summary_source FROM books WHERE id = ?").get(id) as object) });
+  assert.deepEqual([summaryOf("w1"), summaryOf("w2")], ["Work text.", null]);
+  assert.deepEqual([edition("b1"), edition("b2")], [{ summary: null, summary_source: null }, { summary: null, summary_source: null }]);
+  assert.deepEqual(edition("b3"), { summary: "Publisher text.", summary_source: "publisher" });
+  assert.deepEqual(edition("b4"), { summary: "ISBNdb text.", summary_source: "isbndb" });
+  assert.deepEqual(edition("b5"), { summary: "Orphan text.", summary_source: "openlibrary" });
 });

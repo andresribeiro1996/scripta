@@ -5,6 +5,7 @@ import { env, isbndbConfigured } from "../../config/env.js";
 import { timeStep, timeSync, timedMethods } from "../../stallLog.js";
 import { createObjectStore } from "../../storage/createObjectStore.js";
 import { createCompositeCatalog } from "./adapters/catalog/compositeCatalog.js";
+import { onlyMatchingLanguage } from "./adapters/catalog/languageFilter.js";
 import { createThrottle, fetchBytes } from "./adapters/http/http.js";
 import { createIsbndbCatalog } from "./adapters/isbndb/isbndbCatalog.js";
 import { capDailyCalls } from "./adapters/isbndb/isbndbDailyCap.js";
@@ -70,12 +71,12 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
       openlibrary: createOpenLibraryCoverSource(openLibraryThrottle)
     },
     catalog: createCompositeCatalog(
-      createOpenLibraryCatalog(openLibraryThrottle),
-      isbndbConfigured ? createIsbndbCatalog(env.ISBNDB_API_KEY, isbndbThrottle, isbndbGate) : null
+      onlyMatchingLanguage(createOpenLibraryCatalog(openLibraryThrottle)),
+      isbndbConfigured ? onlyMatchingLanguage(createIsbndbCatalog(env.ISBNDB_API_KEY, isbndbThrottle, isbndbGate)) : null
     ),
     backgroundCatalog: createCompositeCatalog(
-      backgroundOpenLibrary,
-      isbndbConfigured ? capDailyCalls(createIsbndbCatalog(env.ISBNDB_API_KEY, isbndbThrottle, isbndbGate, false), BACKGROUND_ISBNDB_DAILY_CAP) : null,
+      onlyMatchingLanguage(backgroundOpenLibrary),
+      isbndbConfigured ? onlyMatchingLanguage(capDailyCalls(createIsbndbCatalog(env.ISBNDB_API_KEY, isbndbThrottle, isbndbGate, false), BACKGROUND_ISBNDB_DAILY_CAP)) : null,
       true
     ),
     editionRecords: backgroundOpenLibrary,

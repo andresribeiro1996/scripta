@@ -6,6 +6,7 @@ import { BookNotFoundError, FileTooLargeError, InvalidImageError, SourcePausedEr
 import { encodeCover, type EncodedCover } from "./domain/images.js";
 import { findExisting, findOrCreateBook, keysOf } from "./domain/findOrCreate.js";
 import { editionLanguage, findByIdentity, isPortugueseIsbn, lookupIdentity, SEARCH_LIMIT, searchTokens, type BookIdentity, type BookLookup } from "./domain/normalize.js";
+import { summaryMatchesLanguage } from "./adapters/catalog/languageFilter.js";
 import type { BookCatalog, BooksRepository, CatalogSearchHit, CoverBlobStore, CoverSource, EditionRecordSource, PageCursor } from "./domain/ports.js";
 import type { BookRow, CoverSourceName, CoverStatus, WorkView } from "./domain/types.js";
 import type { CoverPriority } from "./worker.js";
@@ -118,18 +119,27 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
     return book.source_url ?? "";
   }
 
+  function workSummaryOf(book: BookRow): { summary: string; sourceUrl: string } | null {
+    if (book.summary) return null;
+    const work = deps.repo.getWorkSummary(book.id);
+    if (!work?.summary || !work.olWorkKey) return null;
+    if (!summaryMatchesLanguage(work.summary, book.language ?? (isPortugueseIsbn(book.isbn) ? "pt" : null))) return null;
+    return { summary: work.summary, sourceUrl: `https://openlibrary.org/works/${work.olWorkKey}` };
+  }
+
   function detailsOf(book: BookRow): BookMetadata {
+    const fromWork = workSummaryOf(book);
     return {
-      summary: book.summary,
+      summary: fromWork?.summary ?? book.summary,
       rating: book.rating,
       ratingCount: book.rating_count,
-      sourceUrl: summaryLink(book),
+      sourceUrl: fromWork?.sourceUrl ?? summaryLink(book),
       genres: JSON.parse(book.genres) as BookGenre[],
       pages: book.pages,
       publisher: book.publisher,
       year: book.year,
       translator: book.translator,
-      summarySource: book.summary_source
+      summarySource: fromWork ? "openlibrary" : book.summary_source
     };
   }
 
@@ -177,11 +187,12 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
   }
 
   async function lookupDetails(book: BookRow, catalog: BookCatalog) {
-    const details = await catalog.fetchDetails({ isbn: book.isbn, title: book.title, author: book.author });
+    const details = await catalog.fetchDetails({ isbn: book.isbn, title: book.title, author: book.author, language: book.language ?? (isPortugueseIsbn(book.isbn) ? "pt" : null) });
     const at = now().toISOString();
-    if (details && (details.metadata.summary || details.metadata.genres.length > 0 || details.metadata.rating !== null)) {
+    if (details && (details.metadata.summary || details.workSummary || details.metadata.genres.length > 0 || details.metadata.rating !== null)) {
       deps.repo.saveDetails(book.id, details.metadata, details.sources, details.summarySource, at);
       deps.repo.setWorkKey(book.id, details.workKey);
+      if (details.workSummary) deps.repo.setWorkSummary(book.id, details.workSummary);
       return;
     }
     if (details) {
