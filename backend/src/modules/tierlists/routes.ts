@@ -83,7 +83,7 @@ const listPublicQuerySchema = z.object({
 });
 
 function withWorks(service: TierlistsService, tierlist: Tierlist, works: boolean): Tierlist {
-  return works ? tierlistToWorks(tierlist, service.storedWorks(tierlist.id)) : tierlist;
+  return works ? tierlistToWorks(tierlist, canonicalByKey(service.storedWorks(tierlist.id))) : tierlist;
 }
 
 type ResolveBoardWorks = typeof resolveEntryWorks;
@@ -130,7 +130,7 @@ export function buildTierlistRoutes(service: TierlistsService, resolveWorks: Res
           const publicBooks = access ? resolvePublicLibraryData(request.user.id, { bookKeys: keys, highlightRefs: [], needsCurrentlyReading: false, statsMetrics: [] }).books : [];
           if (access && publicBooks.length !== keys.length) return reply.code(400).send({ error: "A selected book is no longer in your library." });
           const tierlist = service.createTierlist(request.user.id, name, keyed?.data, access, publicBooks, keyed?.works);
-          return reply.code(201).send(withWorks(service, tierlist, true));
+          return reply.code(201).send(tierlistToWorks(tierlist, keyed?.works ?? new Map()));
         } catch (err) {
           return sendWorksError(reply, err);
         }
@@ -233,6 +233,14 @@ export function buildTierlistRoutes(service: TierlistsService, resolveWorks: Res
       }
       const owned = service.getTierlist(request.user.id, params.data.id);
       if (!owned) return reply.code(404).send({ error: "No tier list with that id." });
+      let storedWorks: Map<string, string> | undefined;
+      if (works) {
+        try {
+          storedWorks = canonicalByKey(service.storedWorks(owned.id));
+        } catch (err) {
+          return sendWorksError(reply, err);
+        }
+      }
       const data = owned.data as { pool?: string[]; tiers?: Array<{ bookKeys?: string[] }> };
       const keys = [...new Set([...(data.pool ?? []), ...(data.tiers ?? []).flatMap((tier) => tier.bookKeys ?? [])])];
       const publicBooks = resolvePublicLibraryData(request.user.id, { bookKeys: keys, highlightRefs: [], needsCurrentlyReading: false, statsMetrics: [] }).books;
@@ -240,7 +248,7 @@ export function buildTierlistRoutes(service: TierlistsService, resolveWorks: Res
       if (!tierlist) {
         return reply.code(404).send({ error: "No tier list with that id." });
       }
-      return reply.code(201).send({ tierlist: withWorks(service, tierlist, works), voteCode: tierlist.voteCode });
+      return reply.code(201).send({ tierlist: storedWorks ? tierlistToWorks(tierlist, storedWorks) : tierlist, voteCode: tierlist.voteCode });
     });
 
     app.put("/tierlists/:id/voting", { preHandler: authGuard }, async (request, reply) => {
