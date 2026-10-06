@@ -31,6 +31,7 @@ export type CatalogWorkPage = {
   id: string;
   title: string;
   author: string;
+  summary: string | null;
   aliasIds: string[];
   editions: Array<{ bookId: string; title: string; language: string | null; year: number | null; isbn: string | null; summary: string | null; coverUrl: string | null }>;
 };
@@ -40,6 +41,7 @@ export function getWorkPageWith(books: BooksRepository, coverUrl: (imageId: stri
   if (!rows) return undefined;
   return {
     ...rows.work,
+    summary: rows.work.summary?.trim() ? rows.work.summary : null,
     aliasIds: rows.aliasIds,
     editions: rows.editions.map((edition) => ({
       bookId: edition.id,

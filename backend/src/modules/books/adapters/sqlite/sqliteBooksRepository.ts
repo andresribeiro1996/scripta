@@ -53,7 +53,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const repointMergedStmt = db.prepare(`UPDATE works SET merged_into = ? WHERE merged_into = ?`);
   const blockTitleGroupStmt = db.prepare(`UPDATE books SET title_group_blocked_at = ? WHERE id = ?`);
   const editionCountStmt = db.prepare(`SELECT COUNT(*) AS n FROM books WHERE work_id = ?`);
-  const workStmt = db.prepare(`SELECT id, ol_work_key, title, author FROM works WHERE id = ?`);
+  const workStmt = db.prepare(`SELECT id, ol_work_key, title, author, summary FROM works WHERE id = ?`);
   const aliasStmt = db.prepare(`SELECT id FROM works WHERE merged_into = ?`);
   const pageEditionsStmt = db.prepare(`SELECT id, title, language, year, isbn, summary, cover_image_id FROM books WHERE work_id = ? ORDER BY created_at, rowid`);
   const workEditionsStmt = db.prepare(`SELECT id, isbn, title, author, ol_work_key FROM books WHERE work_id = ? ORDER BY created_at, rowid`);
@@ -418,11 +418,11 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     workPageRows(id) {
       const canonical = liveWorkId(id);
       if (canonical === null) return undefined;
-      const work = workStmt.get(canonical) as { id: string; title: string; author: string } | undefined;
+      const work = workStmt.get(canonical) as { id: string; title: string; author: string; summary: string | null } | undefined;
       if (!work) return undefined;
       const aliases = (aliasStmt.all(canonical) as Array<{ id: string }>).map((row) => row.id);
       return {
-        work: { id: work.id, title: work.title, author: work.author },
+        work: { id: work.id, title: work.title, author: work.author, summary: work.summary },
         aliasIds: [canonical, ...aliases],
         editions: pageEditionsStmt.all(canonical) as WorkPageRows["editions"]
       };

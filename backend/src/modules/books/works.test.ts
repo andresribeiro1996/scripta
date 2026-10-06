@@ -82,6 +82,19 @@ test("a work page lists the canonical work, its editions and every alias, and an
   assert.equal(getWorkPageWith(repo, () => "x", "not-a-work"), undefined);
 });
 
+test("a work page answers works.summary, from the canonical work even through a merged-away id", () => {
+  const { db, repo } = freshRepo();
+  const [kept] = resolveWorksWith(repo, [{ isbn: "9780441013593", title: "Dune", author: "Frank Herbert" }]);
+  const [gone] = resolveWorksWith(repo, [{ isbn: null, title: "Duna", author: "Frank Herbert" }]);
+  assert.equal(getWorkPageWith(repo, () => "x", kept!)!.summary, null);
+  db.prepare("UPDATE works SET summary = ? WHERE id = ?").run("Spice.", kept!);
+  repo.mergeWorks(gone!, kept!);
+  assert.equal(getWorkPageWith(repo, () => "x", kept!)!.summary, "Spice.");
+  assert.equal(getWorkPageWith(repo, () => "x", gone!)!.summary, "Spice.");
+  db.prepare("UPDATE works SET summary = '  ' WHERE id = ?").run(kept!);
+  assert.equal(getWorkPageWith(repo, () => "x", kept!)!.summary, null);
+});
+
 test("a keyless work with no summary or cover answers nulls", () => {
   const db = new DatabaseSync(":memory:");
   applyBooksMigrations(db);

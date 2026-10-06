@@ -7,7 +7,7 @@ const profile = (username: string) => ({ username, avatarUrl: null });
 function deps(overrides: Partial<WorksDeps> = {}): WorksDeps {
   return {
     getWorkPage: (id) => (id === "old" || id === "w" ? {
-      id: "w", title: "Dune", author: "Frank Herbert", aliasIds: ["w", "old"],
+      id: "w", title: "Dune", author: "Frank Herbert", summary: null, aliasIds: ["w", "old"],
       editions: [
         { bookId: "e1", title: "Dune", language: "en", year: 1965, isbn: "9780441013593", summary: null, coverUrl: null },
         { bookId: "e2", title: "Duna", language: "pt-BR", year: 2017, isbn: "9788576573135", summary: "Especiaria.", coverUrl: "cover:e2" }
@@ -57,6 +57,36 @@ test("signed in: own copy, followed first, never yourself, and your edition driv
   assert.deepEqual(page.work.editions.map((e) => e.mine), [true, false]);
   assert.equal(page.work.summary, "Especiaria.");
   assert.equal(page.work.coverUrl, "https://c/mine.webp");
+});
+
+function pageWith(summary: string | null, editionSummaries: [string | null, string | null]): WorksDeps["getWorkPage"] {
+  return () => ({
+    id: "w", title: "Dune", author: "Frank Herbert", summary, aliasIds: ["w"],
+    editions: [
+      { bookId: "e1", title: "Dune", language: "en", year: 1965, isbn: "9780441013593", summary: editionSummaries[0], coverUrl: null },
+      { bookId: "e2", title: "Duna", language: "pt-BR", year: 2017, isbn: "9788576573135", summary: editionSummaries[1], coverUrl: null }
+    ]
+  });
+}
+
+test("the work's own summary beats the first edition's", () => {
+  const page = createWorksService(deps({ getWorkPage: pageWith("Spice.", [null, "Especiaria."]) })).getPage("w", null)!;
+  assert.equal(page.work.summary, "Spice.");
+});
+
+test("the viewer's edition summary beats the work's", () => {
+  const page = createWorksService(deps({ getWorkPage: pageWith("Spice.", ["Mine.", "Especiaria."]) })).getPage("w", "viewer")!;
+  assert.equal(page.work.summary, "Mine.");
+});
+
+test("a viewer whose edition has no summary gets the work's", () => {
+  const page = createWorksService(deps({ getWorkPage: pageWith("Spice.", [null, "Especiaria."]) })).getPage("w", "viewer")!;
+  assert.equal(page.work.summary, "Spice.");
+});
+
+test("with no work summary the first edition with one is used, and with none the summary is null", () => {
+  assert.equal(createWorksService(deps({ getWorkPage: pageWith(null, [null, "Especiaria."]) })).getPage("w", null)!.work.summary, "Especiaria.");
+  assert.equal(createWorksService(deps({ getWorkPage: pageWith(null, [null, null]) })).getPage("w", null)!.work.summary, null);
 });
 
 test("reader rows carry no feeling, dates or highlights", () => {

@@ -67,7 +67,7 @@ export interface NewBook {
 }
 
 export type WorkPageRows = {
-  work: { id: string; title: string; author: string };
+  work: { id: string; title: string; author: string; summary: string | null };
   aliasIds: string[];
   editions: Array<{ id: string; title: string; language: string | null; year: number | null; isbn: string | null; summary: string | null; cover_image_id: string | null }>;
 };
