@@ -446,20 +446,6 @@ export function scrubImageFromMurals(murals: Mural[], imageId: string): Mural[] 
   return changed ? result : murals;
 }
 
-/** Resolves a shelf's bookKeys back to actual book objects, in order — a
- *  key with no matching book (deleted some other way, or a merge quirk)
- *  is silently dropped rather than crashing the block, same tolerant
- *  convention as lib/groups.ts's booksInGroup. */
-export function resolveShelfBooks(block: Extract<MuralBlock, { type: "shelf" }>, books: Array<Record<string, unknown>>): Array<Record<string, unknown>> {
-  const byKey = new Map(books.map((b) => [bookKey(b), b] as const));
-  const resolved: Array<Record<string, unknown>> = [];
-  for (const key of block.bookKeys) {
-    const book = byKey.get(key);
-    if (book) resolved.push(book);
-  }
-  return resolved;
-}
-
 /** Resolves a `quote` block's book + the specific highlight within it —
  *  `null` if either no longer resolves (book deleted through some other
  *  path, or the highlight id no longer exists on it). */

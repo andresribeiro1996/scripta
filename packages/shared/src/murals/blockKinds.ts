@@ -1,4 +1,7 @@
 import { rekeyKeys } from "../library/dedupe.js";
+import { bookKey } from "../library/merge.js";
+import { booksByWork } from "../library/works.js";
+import type { TierlistData } from "../tierlists/types.js";
 import type { BlockLayout, BlockType, Mural, MuralBlock } from "./murals.js";
 
 type Content<T extends BlockType> = Omit<Extract<MuralBlock, { type: T }>, "id" | "type" | "layout" | "style" | "expandedFrom">;
@@ -50,6 +53,24 @@ const always = () => true;
 const nothing = () => {};
 const same = <B>(block: B) => block;
 
+type Book = Record<string, unknown>;
+export type TierlistLookup = (tierlistId: string) => Pick<TierlistData, "tiers" | "pool"> | undefined;
+
+function byKeys(keys: readonly string[], books: Book[]): Book[] {
+  const byKey = new Map(books.map((book) => [bookKey(book), book] as const));
+  return [...new Set(keys)].flatMap<Book>((key) => byKey.get(key) ?? []);
+}
+
+const noBooks = (): Book[] => [];
+
+/** Resolves a shelf's bookKeys back to actual book objects, in order — a
+ *  key with no matching book (deleted some other way, or a merge quirk)
+ *  is silently dropped rather than crashing the block, same tolerant
+ *  convention as lib/groups.ts's booksInGroup. */
+export function resolveShelfBooks(block: Extract<MuralBlock, { type: "shelf" }>, books: Book[]): Book[] {
+  return byKeys(block.bookKeys, books);
+}
+
 interface Kind<T extends BlockType> {
   label: string;
   size: { w: number; h: number };
@@ -60,6 +81,7 @@ interface Kind<T extends BlockType> {
   references(block: Block<T>, refs: BlockReferences): void;
   rekey(block: Block<T>, from: ReadonlySet<string>, to: string): Block<T>;
   scrub(block: Block<T>, keys: ReadonlySet<string>): Block<T> | null;
+  draws(block: Block<T>, books: Book[], tierlist?: TierlistLookup): Book[];
 }
 
 const KINDS: { [T in BlockType]: Kind<T> } = {
@@ -67,7 +89,8 @@ const KINDS: { [T in BlockType]: Kind<T> } = {
     valid: (b) => typeof b.bookKey === "string",
     references: (b, refs) => { if (nonEmpty(b.bookKey)) refs.bookKeys.add(b.bookKey); },
     rekey: (b, from, to) => (from.has(b.bookKey) ? { ...b, bookKey: to } : b),
-    scrub: (b, keys) => (keys.has(b.bookKey) ? null : b) },
+    scrub: (b, keys) => (keys.has(b.bookKey) ? null : b),
+    draws: (b, books) => byKeys([b.bookKey], books) },
   shelf: { label: "Shelf", size: { w: 8, h: 4 }, minHeight: 4, configurable: true, content: () => ({ title: "", bookKeys: [] }),
     valid: (b) => Array.isArray(b.bookKeys),
     references: (b, refs) => { if (nonEmpty(b.collectionId)) refs.collectionIds.add(b.collectionId); else addStrings(refs.bookKeys, b.bookKeys); },
@@ -77,12 +100,14 @@ const KINDS: { [T in BlockType]: Kind<T> } = {
       const bookKeys = b.bookKeys.filter((key) => !keys.has(key));
       if (bookKeys.length === b.bookKeys.length) return b;
       return bookKeys.length ? { ...b, bookKeys } : null;
-    } },
+    },
+    draws: (b, books) => resolveShelfBooks(b, books) },
   quote: { label: "Quote spotlight", size: { w: 4, h: 3 }, minHeight: 0, configurable: true, content: () => ({ bookKey: "", highlightId: "" }),
     valid: (b) => typeof b.bookKey === "string",
     references: (b, refs) => { if (b.mode !== "rediscover") addQuote(refs, b); },
     rekey: (b, from, to) => (from.has(b.bookKey) ? { ...b, bookKey: to } : b),
-    scrub: (b, keys) => (b.mode !== "rediscover" && keys.has(b.bookKey) ? null : b) },
+    scrub: (b, keys) => (b.mode !== "rediscover" && keys.has(b.bookKey) ? null : b),
+    draws: (b, books) => byKeys([b.bookKey], books) },
   quoteCollection: { label: "Quote collection", size: { w: 6, h: 4 }, minHeight: 0, configurable: true, content: () => ({ title: "", quotes: [] }),
     valid: (b) => Array.isArray(b.quotes),
     references: (b, refs) => { for (const quote of b.quotes) addQuote(refs, quote); },
@@ -91,27 +116,35 @@ const KINDS: { [T in BlockType]: Kind<T> } = {
       const quotes = b.quotes.filter((quote) => !keys.has(quote.bookKey));
       if (quotes.length === b.quotes.length) return b;
       return quotes.length ? { ...b, quotes } : null;
-    } },
+    },
+    draws: (b, books) => byKeys(b.quotes.map((quote) => quote.bookKey), books) },
   image: { label: "Image", size: { w: 4, h: 3 }, minHeight: 0, configurable: true, content: () => ({ imageId: "" }),
     valid: (b) => typeof b.imageId === "string",
     references: (b, refs) => { if (nonEmpty(b.imageId)) refs.imageIds.add(b.imageId); },
-    rekey: same, scrub: same },
+    rekey: same, scrub: same, draws: noBooks },
   text: { label: "Text", size: { w: 4, h: 2 }, minHeight: 0, configurable: true, content: () => ({ heading: "", body: "" }),
-    valid: always, references: nothing, rekey: same, scrub: same },
+    valid: always, references: nothing, rekey: same, scrub: same, draws: noBooks },
   profile: { label: "Reader profile", size: { w: 6, h: 5 }, minHeight: 0, configurable: true, content: () => ({ bio: "", favoriteGenres: [] }),
-    valid: always, references: (_b, refs) => { refs.needsShelfTheme = true; }, rekey: same, scrub: same },
+    valid: always, references: (_b, refs) => { refs.needsShelfTheme = true; }, rekey: same, scrub: same, draws: noBooks },
   currentlyReading: { label: "Currently reading", size: { w: 4, h: 6 }, minHeight: 6, configurable: false, content: () => ({}),
-    valid: always, references: (_b, refs) => { refs.needsCurrentlyReading = true; }, rekey: same, scrub: same },
+    valid: always, references: (_b, refs) => { refs.needsCurrentlyReading = true; }, rekey: same, scrub: same,
+    draws: (_b, books) => books.filter((book) => book.ReadStatus === 1) },
   stats: { label: "Stats", size: { w: 6, h: 2 }, minHeight: 0, configurable: true, content: () => ({ metrics: ["totalBooks", "booksFinished", "totalHighlights"] }),
     valid: (b) => Array.isArray(b.metrics),
     references: (b, refs) => addStrings(refs.statsMetrics, b.metrics),
-    rekey: same, scrub: same },
+    rekey: same, scrub: same, draws: noBooks },
   empty: { label: "Empty block", size: { w: 3, h: 2 }, minHeight: 0, configurable: false, content: () => ({}),
-    valid: always, references: nothing, rekey: same, scrub: same },
+    valid: always, references: nothing, rekey: same, scrub: same, draws: noBooks },
   tierlist: { label: "Tier list", size: { w: 10, h: 8 }, minHeight: 8, configurable: true, content: () => ({ tierlistId: "" }),
-    valid: always, references: nothing, rekey: same, scrub: same },
+    valid: always, references: nothing, rekey: same, scrub: same,
+    draws: (b, books, tierlist) => {
+      const data = tierlist?.(b.tierlistId);
+      if (!data) return [];
+      const byWork = booksByWork(books);
+      return [...new Set([...data.tiers.flatMap((tier) => tier.workIds), ...data.pool])].flatMap<Book>((id) => byWork.get(id) ?? []);
+    } },
   readerCard: { label: "Reader card", size: { w: 4, h: 6 }, minHeight: 0, configurable: false, content: () => ({}),
-    valid: always, references: (_b, refs) => { refs.needsReaderCard = true; }, rekey: same, scrub: same }
+    valid: always, references: (_b, refs) => { refs.needsReaderCard = true; }, rekey: same, scrub: same, draws: noBooks }
 };
 
 export const BLOCK_TYPES = Object.keys(KINDS) as BlockType[];
@@ -138,6 +171,10 @@ export function newBlock(id: string, type: BlockType, layout: BlockLayout): Mura
 
 function kindOf(block: MuralBlock): Kind<BlockType> {
   return KINDS[block.type] as Kind<BlockType>;
+}
+
+export function blockBooks(block: MuralBlock, books: Book[], tierlist?: TierlistLookup): Book[] {
+  return kindOf(block).draws(block, books, tierlist);
 }
 
 function known(value: unknown): MuralBlock | undefined {

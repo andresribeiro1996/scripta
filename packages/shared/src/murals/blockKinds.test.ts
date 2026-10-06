@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { bookKey } from "../library/merge.js";
-import { BLOCK_TYPES, blockLabel, blockReferences, createBlockCandidate, ensureBookBlockHeights, isConfigurable, muralBlockTitle, rekeyBlocks, scrubBooksFromMurals, type BlockType, type Mural, type MuralBlock } from "./murals.js";
+import { BLOCK_TYPES, blockBooks, blockLabel, blockReferences, createBlockCandidate, ensureBookBlockHeights, isConfigurable, muralBlockTitle, rekeyBlocks, scrubBooksFromMurals, type BlockType, type Mural, type MuralBlock } from "./murals.js";
 
 const make = (type: BlockType, extra: Record<string, unknown> = {}) => ({ ...createBlockCandidate(type, []), ...extra }) as MuralBlock;
 
@@ -153,4 +153,20 @@ test("scrub returns the same array when nothing is affected or no keys are given
   const murals = muralOf([{ id: "b", type: "spotlight", layout: at, bookKey: "kept" }]);
   assert.equal(scrubBooksFromMurals(murals, ["other"]), murals);
   assert.equal(scrubBooksFromMurals(murals, []), murals);
+});
+
+test("blockBooks returns the books each block draws, each once, in draw order", () => {
+  const books = ["A", "B", "C", "D"].map((Title, i) => ({ Title, Attribution: "X", ReadStatus: i === 2 ? 1 : 0, _workId: `w${i}`, highlights: [] }));
+  const key = (i: number) => bookKey(books[i]);
+  assert.deepEqual(blockBooks(make("spotlight", { bookKey: key(1) }), books), [books[1]]);
+  assert.deepEqual(blockBooks(make("spotlight", { bookKey: "missing" }), books), []);
+  assert.deepEqual(blockBooks(make("shelf", { bookKeys: [key(3), "missing", key(0)] }), books), [books[3], books[0]]);
+  assert.deepEqual(blockBooks(make("quote", { bookKey: key(0), highlightId: "h" }), books), [books[0]]);
+  assert.deepEqual(blockBooks(make("quoteCollection", { quotes: [{ bookKey: key(1), highlightId: "1" }, { bookKey: key(1), highlightId: "2" }, { bookKey: key(3), highlightId: "3" }] }), books), [books[1], books[3]]);
+  assert.deepEqual(blockBooks(make("currentlyReading"), books), [books[2]]);
+  const tiers = () => ({ tiers: [{ id: "s", label: "S", color: "red", workIds: ["w3", "missing"] }], pool: ["w0", "w3"] });
+  assert.deepEqual(blockBooks(make("tierlist", { tierlistId: "t" }), books, tiers), [books[3], books[0]]);
+  assert.deepEqual(blockBooks(make("tierlist", { tierlistId: "t" }), books, () => undefined), []);
+  assert.deepEqual(blockBooks(make("tierlist", { tierlistId: "t" }), books), []);
+  for (const type of ["image", "text", "profile", "stats", "empty", "readerCard"] as const) assert.deepEqual(blockBooks(make(type), books), []);
 });

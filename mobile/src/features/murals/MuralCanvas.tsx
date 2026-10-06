@@ -1,5 +1,6 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import {
+  blockBooks,
   blockLabel,
   FINISH_TILE_SIZE,
   blockFinish,
@@ -22,7 +23,6 @@ import {
   resolveBlockStyle,
   resolveQuote,
   resolveQuoteCollection,
-  resolveShelfBooks,
   STAT_METRIC_LABELS,
   type BlockLayout,
   type BlockStyle,
@@ -190,19 +190,19 @@ export function BlockContent({ block, books, images, tierlists, profile, groups,
     </View>;
   }
   if (block.type === "currentlyReading") {
-    const reading = books.filter((book) => book.ReadStatus === 1);
+    const reading = blockBooks(block, books);
     return <>{eyebrow("Currently reading", reading.length)}
       {reading.length ? <CoverRow blockId={block.id} books={reading} mode="reading" caption={text.caption} dim={dim} accent={blockColors.accent} editable={editable} onAssetReady={onAssetReady} /> : <EmptyBlock message="Choose books or connect a collection in Edit." style={[text.caption, dim]} />}
     </>;
   }
   if (block.type === "shelf") {
-    const selected = resolveShelfBooks(block, books);
+    const selected = blockBooks(block, books);
     return <>{eyebrow(block.title || "Shelf", selected.length)}
       {selected.length ? <CoverRow blockId={block.id} books={selected} mode="shelf" caption={text.caption} dim={dim} accent={blockColors.accent} editable={editable} onAssetReady={onAssetReady} /> : <EmptyBlock message="Choose books or connect a collection in Edit." style={[text.caption, dim]} />}
     </>;
   }
   if (block.type === "spotlight") {
-    const selected = books.filter((book) => bookKey(book) === block.bookKey);
+    const selected = blockBooks(block, books);
     return <><Text numberOfLines={1} style={text.title}>{title(selected[0])}</Text>
       {selected.length ? <View style={styles.bookRow}>{selected.slice(0, 3).map((book) => <View key={bookKey(book)} style={styles.bookColumn}><View style={styles.bookCover}><CoverImage book={book} contentFit="contain" onLoadEnd={onAssetReady ? () => onAssetReady(`cover:${block.id}:${bookKey(book)}:${String(book._coverUrl ?? "")}`) : undefined} /></View><Text numberOfLines={2} style={text.caption}>{title(book)}</Text></View>)}</View> : <EmptyBlock message="Choose books or connect a collection in Edit." style={[text.caption, dim]} />}
     </>;
@@ -468,7 +468,7 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThe
     if (block.type === "profile" && profile?.avatarUrl) return [`avatar:${block.id}:${profile.avatarUrl}`];
     if (block.type === "image") { const image = images.find((item) => item.id === block.imageId); return image ? [`image:${block.id}:${image.url}`] : []; }
     if (block.type !== "spotlight" && block.type !== "shelf" && block.type !== "currentlyReading") return [];
-    const selected = block.type === "spotlight" ? books.filter((book) => bookKey(book) === block.bookKey) : block.type === "shelf" ? resolveShelfBooks(block, books) : books.filter((book) => book.ReadStatus === 1);
+    const selected = blockBooks(block, books);
     return (block.type === "spotlight" ? selected.slice(0, 3) : selected).map((book) => `cover:${block.id}:${bookKey(book)}:${String(book._coverUrl ?? "")}`);
   });
   const imageReady = width > 0 && assetKeys.every((key) => readyAssets.has(key));

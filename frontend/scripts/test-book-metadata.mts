@@ -7,7 +7,7 @@ test("ratings preserve fractional values and reject invalid scales", () => {
   for (const value of [0, -1, 6, NaN, Infinity, "4", null]) assert.equal(validBookRating(value), null);
 });
 
-test("mural preloads select only referenced books and include resolved tiers", async () => {
+test("mural preloads select only referenced books, quotes included, each once", async () => {
   const { muralMetadataBooks } = await import("../src/hooks/useMuralBookMetadata.ts");
   const { bookKey } = await import("../src/lib/merge.ts");
   const { createBlockCandidate } = await import("../src/lib/murals.ts");
@@ -19,12 +19,13 @@ test("mural preloads select only referenced books and include resolved tiers", a
     { ...makeBlock("spotlight"), type: "spotlight" as const, bookKey: bookKey(books[0]) },
     { ...makeBlock("shelf"), type: "shelf" as const, title: "Shelf", bookKeys: [bookKey(books[1]), bookKey(books[0]), "missing"] },
     makeBlock("currentlyReading"),
-    { ...makeBlock("tierlist"), type: "tierlist" as const, tierlistId: "tiers" }
+    { ...makeBlock("tierlist"), type: "tierlist" as const, tierlistId: "tiers" },
+    { ...makeBlock("quoteCollection"), type: "quoteCollection" as const, title: "Q", quotes: [{ bookKey: bookKey(books[5]), highlightId: "h" }, { bookKey: bookKey(books[0]), highlightId: "h2" }] }
   ];
-  assert.deepEqual(muralMetadataBooks(blocks, books).map((book) => book.Title), ["Spotlight", "Shelf", "Reading"]);
+  assert.deepEqual(muralMetadataBooks(blocks, books).map((book) => book.Title), ["Spotlight", "Shelf", "Reading", "Unrelated"]);
   assert.deepEqual(muralMetadataBooks(blocks, books, () => ({
     name: "Tiers", tiers: [{ id: "tier", label: "A", color: "red", workIds: ["work-3"] }], pool: ["work-4"]
-  })).map((book) => book.Title), ["Spotlight", "Shelf", "Reading", "Ranked", "Pool"]);
+  })).map((book) => book.Title), ["Spotlight", "Shelf", "Reading", "Ranked", "Pool", "Unrelated"]);
 });
 
 test("opening details reuses completed and in-flight preloads", async (t) => {
