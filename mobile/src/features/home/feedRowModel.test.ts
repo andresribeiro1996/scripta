@@ -121,6 +121,14 @@ test("a row opens the native route for what it is about: the owner's game, a pro
   assert.equal(digestRoute(publication), digestTarget(publication));
 });
 
+test("a reading item with a work opens the work screen, without one the reader", () => {
+  const createdAt = "2026-09-30T00:00:00.000Z";
+  const reading: DigestItem = { kind: "reading", id: "e3", actor, book: { title: "Hyperion", author: "Dan Simmons", coverUrl: null }, finished: true, createdAt };
+  const withWork: DigestItem = { ...reading, book: { ...reading.book, workId: "w1" } };
+  assert.equal(digestRoute(withWork), "/work/w1");
+  assert.equal(digestRoute(reading), "/u/alice");
+});
+
 test("no other row kind carries an action", () => {
   assert.equal(feedRowModel({ kind: "publication", id: "e1", actor, type: "tierlist_published", content: tierlist, createdAt: "2026-09-17T00:00:00.000Z" }).action, null);
   assert.equal(feedRowModel({ kind: "vote", id: "e2", actor, content: tierlist, createdAt: "2026-09-17T00:00:00.000Z" }).action, null);

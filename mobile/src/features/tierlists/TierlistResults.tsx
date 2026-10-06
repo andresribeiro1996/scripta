@@ -1,9 +1,10 @@
 import { RankingMethodSelector } from "./RankingMethodSelector";
 import { useEffect, useRef, useState } from "react";
 import { aggregate, AGGREGATION_MODES, booksByWork, type AggregationMode, type HistogramCell } from "@scripta/shared";
+import { router } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
-import { Sheet, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { Button, Sheet, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { authorOf, TierCover, TierHead, TierRowScroll, titleOf, type TierBook } from "./TierBoard";
 
 const hitSlop = { top: 14, bottom: 14, left: 8, right: 8 };
@@ -94,6 +95,7 @@ export function TierlistResults({ histogram, tiers, pool, books, ballotCount, el
         {tied ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Tie for most votes; ranking method determines the displayed tier.</Text> : null}
         {tiers.map((tier, index) => <View key={tier.id} style={styles.histRow}><View style={[styles.histLabel, { backgroundColor: tier.color }]}><Text style={[typography.caption, { color: "#fff" }]}>{tier.label}</Text></View><View style={[styles.histTrack, { backgroundColor: colors.background }]}><View style={{ flex: detail.votes ? counts[index]! / detail.votes : 0, backgroundColor: tier.color }} /></View><Text {...dynamicType} style={[typography.caption, styles.histCount, { color: colors.text }]}>{counts[index]} ({detail.votes ? Math.round(counts[index]! / detail.votes * 100) : 0}%)</Text></View>)}
         {detailTier && detail.votes > 0 ? <Text {...dynamicType} style={[typography.body, styles.center, { color: colors.accent }]}>{Math.round((1 - detail.spread) * 100)}% chose {detailTier.label}</Text> : null}
+        <Button label="About this book" variant="secondary" onPress={() => { setSelected(null); router.push(`/work/${detail.workId}` as never); }} />
       </ScrollView>}
     </Sheet>
   </View>;

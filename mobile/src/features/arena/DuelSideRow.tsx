@@ -1,7 +1,8 @@
+import { router } from "expo-router";
 import { StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { duelWinner, sharePercent, type Duel, type DuelSide } from "@scripta/shared";
-import { dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { Button, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "./BookCover";
 
 export function DuelSideRow({ side, duel }: { side: DuelSide; duel: Duel }) {
@@ -14,6 +15,7 @@ export function DuelSideRow({ side, duel }: { side: DuelSide; duel: Duel }) {
         <Text numberOfLines={2} {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{side.title}</Text>
         <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{side.author}</Text>
         <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{side.votes} votes{percent === null ? "" : ` · ${percent}%`}</Text>
+        {side.workId ? <Button label="About this book" accessibilityLabel={`About ${side.title}`} variant="secondary" onPress={() => router.push(`/work/${side.workId}` as never)} /> : null}
       </View>
     </View>
   );

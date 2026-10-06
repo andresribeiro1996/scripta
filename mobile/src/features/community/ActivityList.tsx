@@ -73,7 +73,7 @@ function ActivityRowView({ item, day }: { item: ActivityItem; day: string | null
   const row = activityRow(item);
   const toneColor = row.tone === "accent" ? colors.accent : row.tone === "success" ? colors.success : colors.textDim;
   const toneFill = row.tone === "accent" ? colors.accentSoft : row.tone === "success" ? colors.successSoft : colors.surface;
-  const target = row.href ?? (row.username ? `/u/${row.username}` : null);
+  const target = row.workId ? `/work/${row.workId}` : row.href ?? (row.username ? `/u/${row.username}` : null);
   const icon = iconFor(item);
 
   const content = (pressed: boolean) => (

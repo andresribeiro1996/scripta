@@ -19,6 +19,7 @@ export function useBook(rawKey: string | undefined): {
   /** False only while the library is still loading — distinguishes "not yet"
    *  from "no such book", which the routes report differently. */
   loading: boolean;
+  workId: string | null;
 } {
   const { data: library, isPending } = useLibrary();
   const key = rawKey ? decodeURIComponent(rawKey) : undefined;
@@ -33,6 +34,7 @@ export function useBook(rawKey: string | undefined): {
       book,
       seedStyle: effectiveCardStyle(libraryStyle, seriesGroup?.style),
       loading: isPending,
+      workId: (key && library?.works?.[key]) || null,
     };
   }, [isPending, key, library]);
 }
