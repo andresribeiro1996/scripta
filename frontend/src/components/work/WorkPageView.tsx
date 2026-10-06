@@ -1,6 +1,6 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { FINISH_FEELINGS, editionLabel, gameOwnerLabel, readerCountsLabel, readerStatusLabel, type WorkGameRef, type WorkPage, type WorkReader } from "@scripta/shared";
+import { FINISH_FEELINGS, editionLabel, gameOwnerLabel, readerCountsLabel, readerStatusLabel, summaryPreview, type WorkGameRef, type WorkPage, type WorkReader } from "@scripta/shared";
 import { AuthorAvatar } from "../CommunityAuthorAvatar";
 import { CoverImage } from "../BookCard";
 import { ReaderGlyph } from "../ReaderGlyph";
@@ -10,6 +10,8 @@ const sectionHeading = "mb-3 text-lg font-bold";
 
 export function WorkPageView({ page, signedIn, onAdd, onShare }: { page: WorkPage; signedIn: boolean; onAdd: () => void; onShare: () => void }) {
   const { work, mine, readers, games } = page;
+  const [aboutOpen, setAboutOpen] = useState(false);
+  const aboutPreview = work.summary ? summaryPreview(work.summary) : null;
   const feeling = mine?.rating ? FINISH_FEELINGS.find((f) => f.rating === mine.rating)?.label ?? null : null;
   const gameRows: Array<[string, WorkGameRef[]]> = [["Tier list", games.tierlists], ["Tournament", games.arenas], ["Quiz", games.quizzes]];
   const anyGame = gameRows.some(([, list]) => list.length > 0);
@@ -37,7 +39,12 @@ export function WorkPageView({ page, signedIn, onAdd, onShare }: { page: WorkPag
           {work.summary ? (
             <section className="mt-6">
               <h2 className={sectionHeading}>About this book</h2>
-              <p className="text-sm">{work.summary}</p>
+              <p className="text-sm leading-6 whitespace-pre-wrap break-words">{aboutOpen || !aboutPreview ? work.summary : aboutPreview}</p>
+              {aboutPreview ? (
+                <button type="button" aria-expanded={aboutOpen} onClick={() => setAboutOpen(!aboutOpen)} className="min-h-11 text-sm font-semibold text-(--color-accent)">
+                  {aboutOpen ? "Show less" : "Show more"}
+                </button>
+              ) : null}
             </section>
           ) : null}
           <section className="mt-6">

@@ -48,3 +48,14 @@ test("an empty work page says so instead of rendering empty sections", () => {
   assert.ok(html.includes("No readers yet"));
   assert.ok(html.includes("No public games use this book yet."));
 });
+
+test("a long summary shows its preview and a Show more toggle; a short one shows whole", () => {
+  const long = `${"Spice and sand. ".repeat(40)}The end.`;
+  const html = render({ page: { ...page, work: { ...page.work, summary: long } }, signedIn: true, onAdd: () => undefined, onShare: () => undefined });
+  assert.ok(html.includes("About this book"));
+  assert.ok(html.includes("Show more"));
+  assert.ok(!html.includes("The end."));
+  const short = render({ page: { ...page, work: { ...page.work, summary: "Spice." } }, signedIn: true, onAdd: () => undefined, onShare: () => undefined });
+  assert.ok(short.includes("Spice."));
+  assert.ok(!short.includes("Show more"));
+});
