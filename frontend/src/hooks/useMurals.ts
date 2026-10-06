@@ -17,6 +17,7 @@
 
 import type { ThemeId } from "@scripta/shared/themes";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ApiError } from "../api/client";
 import {
   clearMuralCoverApi,
   createMuralApi,
@@ -28,6 +29,27 @@ import {
   updateMuralApi
 } from "../api/murals";
 import { compactMuralBlocks, ensureBookBlockHeights, scrubBooksFromMurals, scrubImageFromMurals, type Mural, type MuralBlock } from "../lib/murals";
+
+export class MuralConflictError extends Error {
+  constructor() {
+    super("This mural was changed somewhere else, so the latest version is showing now. Your last change wasn't saved.");
+  }
+}
+
+const writeQueues = new Map<string, Promise<void>>();
+
+function enqueueWrite<T>(id: string, work: () => Promise<T>): Promise<T> {
+  const run = (writeQueues.get(id) ?? Promise.resolve()).then(work);
+  const tail = run.then(
+    () => undefined,
+    () => undefined
+  );
+  writeQueues.set(id, tail);
+  void tail.then(() => {
+    if (writeQueues.get(id) === tail) writeQueues.delete(id);
+  });
+  return run;
+}
 
 export function useMurals() {
   const queryClient = useQueryClient();
@@ -53,6 +75,24 @@ export function useMurals() {
     setMurals(current().map((m) => (m.id === updated.id ? { ...updated, blocks: compactMuralBlocks(ensureBookBlockHeights(updated.blocks)) } : m)));
   }
 
+  async function putMural(id: string, patch: Parameters<typeof updateMuralApi>[1]): Promise<Mural> {
+    try {
+      return await updateMuralApi(id, { ...patch, updatedAt: currentMural(id)?.updatedAt });
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.status !== 409) throw error;
+      await queryClient.invalidateQueries({ queryKey: ["murals"] });
+      throw new MuralConflictError();
+    }
+  }
+
+  function writeOne(id: string, send: () => Promise<Mural>): Promise<Mural> {
+    return enqueueWrite(id, async () => {
+      const updated = await send();
+      replaceOne(updated);
+      return updated;
+    });
+  }
+
   async function create(name: string, theme: ThemeId, folderId: string | null = null): Promise<Mural> {
     const created = await createMuralApi(name, theme, folderId);
     setMurals([...current(), created]);
@@ -60,15 +100,11 @@ export function useMurals() {
   }
 
   async function rename(id: string, name: string): Promise<Mural> {
-    const updated = await updateMuralApi(id, { name });
-    replaceOne(updated);
-    return updated;
+    return writeOne(id, () => putMural(id, { name }));
   }
 
   async function setTheme(id: string, theme: ThemeId): Promise<Mural> {
-    const updated = await updateMuralApi(id, { theme });
-    replaceOne(updated);
-    return updated;
+    return writeOne(id, () => putMural(id, { theme }));
   }
 
   async function saveBlocks(id: string, blocks: MuralBlock[]): Promise<Mural> {
@@ -78,10 +114,13 @@ export function useMurals() {
     if (before) replaceOne({ ...before, blocks: next });
     const optimistic = currentMural(id)?.blocks;
     try {
-      const updated = await updateMuralApi(id, { blocks: next });
-      const latest = currentMural(id);
-      if (!before || latest?.blocks === optimistic) replaceOne({ ...(latest ?? updated), blocks: updated.blocks, updatedAt: updated.updatedAt });
-      return updated;
+      return await enqueueWrite(id, async () => {
+        const updated = await putMural(id, { blocks: next });
+        const latest = currentMural(id);
+        const base = latest ?? updated;
+        replaceOne({ ...base, blocks: !before || latest?.blocks === optimistic ? updated.blocks : base.blocks, updatedAt: updated.updatedAt });
+        return updated;
+      });
     } catch (error) {
       const latest = currentMural(id);
       if (before && latest && latest.blocks === optimistic) replaceOne({ ...latest, blocks: before.blocks });
@@ -96,33 +135,23 @@ export function useMurals() {
   }
 
   async function setCover(id: string, imageId: string, url: string): Promise<Mural> {
-    const updated = await setMuralCoverApi(id, imageId, url);
-    replaceOne(updated);
-    return updated;
+    return writeOne(id, () => setMuralCoverApi(id, imageId, url));
   }
 
   async function clearCover(id: string): Promise<Mural> {
-    const updated = await clearMuralCoverApi(id);
-    replaceOne(updated);
-    return updated;
+    return writeOne(id, () => clearMuralCoverApi(id));
   }
 
   async function share(id: string): Promise<Mural> {
-    const updated = await shareMuralApi(id);
-    replaceOne(updated);
-    return updated;
+    return writeOne(id, () => shareMuralApi(id));
   }
 
   async function unshare(id: string): Promise<Mural> {
-    const updated = await unshareMuralApi(id);
-    replaceOne(updated);
-    return updated;
+    return writeOne(id, () => unshareMuralApi(id));
   }
 
   async function move(id: string, folderId: string | null): Promise<Mural> {
-    const updated = await updateMuralApi(id, { folderId });
-    replaceOne(updated);
-    return updated;
+    return writeOne(id, () => putMural(id, { folderId }));
   }
 
   /** Scrubs one or more deleted books' keys out of every mural, PUTting
@@ -132,13 +161,12 @@ export function useMurals() {
     const after = scrubBooksFromMurals(before, keys);
     if (after === before) return; // no-op — nothing referenced these keys
 
-    const results = await Promise.all(
+    await Promise.all(
       before.map((b, i) => {
         const m = after[i];
-        return m === b ? b : updateMuralApi(b.id, { blocks: m.blocks });
+        return m === b ? b : writeOne(b.id, () => putMural(b.id, { blocks: m.blocks }));
       })
     );
-    setMurals(results);
   }
 
   /** Same idea for a deleted gallery image — a mural could need BOTH its
@@ -152,21 +180,16 @@ export function useMurals() {
     const after = scrubImageFromMurals(before, imageId);
     if (after === before) return; // no-op — nothing referenced this image
 
-    const results = await Promise.all(
-      before.map(async (b, i) => {
+    await Promise.all(
+      before.map((b, i) => {
         const m = after[i];
         if (m === b) return b;
-        let result: Mural = b;
-        if (b.coverImageId === imageId) {
-          result = await clearMuralCoverApi(b.id);
-        }
-        if (b.blocks.some((block) => block.type === "image" && block.imageId === imageId)) {
-          result = await updateMuralApi(b.id, { blocks: m.blocks });
-        }
-        return result;
+        return enqueueWrite(b.id, async () => {
+          if (b.coverImageId === imageId) replaceOne(await clearMuralCoverApi(b.id));
+          if (b.blocks.some((block) => block.type === "image" && block.imageId === imageId)) replaceOne(await putMural(b.id, { blocks: m.blocks }));
+        });
       })
     );
-    setMurals(results);
   }
 
   return { ...query, create, rename, setTheme, saveBlocks, currentMural, remove, setCover, clearCover, share, unshare, move, scrubBooks, scrubImage };

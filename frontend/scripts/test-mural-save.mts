@@ -38,7 +38,7 @@ test("mural saves display immediately, persist and roll back failures without re
       respond(Response.json(succeeds ? { ...mural, blocks: [{ ...block, heading: "After" }], updatedAt: "saved" } : { error: "Save failed" }, { status: succeeds ? 200 : 500 }));
       if (succeeds) {
         await saving;
-        assert.equal(hook.currentMural(mural.id)?.updatedAt, outcome.startsWith("newer") ? "before" : "saved");
+        assert.equal(hook.currentMural(mural.id)?.updatedAt, "saved");
         assert.equal(hook.currentMural(mural.id)?.blocks[0].heading, outcome.startsWith("newer") ? "Newer" : "After");
       } else {
         await assert.rejects(saving, /Save failed/);
