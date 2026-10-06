@@ -7,7 +7,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { authGuard, getOptionalAuthenticatedUser } from "../auth/index.js";
-import { duplicateWorkMessage, keepFirstPerWork, resolveEntryWorks, resolvePublicLibraryData, WorkResolutionError, workIdsByKey, type WorkRef } from "../library/index.js";
+import { canonicalByKey, duplicateWorkMessage, keepFirstPerWork, resolveEntryWorks, resolvePublicLibraryData, WorkResolutionError, workIdsByKey, type WorkRef } from "../library/index.js";
 import { sendWorksError, worksFormat } from "../../worksFormat.js";
 import type { Quiz } from "./domain/types.js";
 import type { PlayOutcome, Player, QuizzesService } from "./service.js";
@@ -76,7 +76,7 @@ function resolveBooks(resolveWorks: ResolveQuizWorks, userId: string, books: z.i
 
 export function buildQuizRoutes(service: QuizzesService, resolveWorks: ResolveQuizWorks = resolveEntryWorks) {
   return async function quizRoutes(app: FastifyInstance) {
-    const withWorks = (quiz: Quiz, works: boolean) => (works ? quizToWorks(quiz, service.storedWorks(quiz.id)) : quiz);
+    const withWorks = (quiz: Quiz, works: boolean) => (works ? quizToWorks(quiz, canonicalByKey(service.storedWorks(quiz.id))) : quiz);
 
     app.get("/quizzes", { preHandler: authGuard }, async (request, reply) => {
       const works = worksFormat(request, reply);
@@ -99,7 +99,7 @@ export function buildQuizRoutes(service: QuizzesService, resolveWorks: ResolveQu
           });
           const keyed = keyedQuizBooks(request.user.id, kept.map((item) => item.entry), kept.map((item) => item.id), [], new Map());
           const quiz = service.createQuiz(request.user.id, parsed.data.name, { ...parsed.data.data, books: keyed.books }, keyed.works);
-          return reply.code(201).send(withWorks(quiz, true));
+          return reply.code(201).send(quizToWorks(quiz, keyed.works));
         } catch (err) {
           return sendWorksError(reply, err);
         }
@@ -204,6 +204,14 @@ export function buildQuizRoutes(service: QuizzesService, resolveWorks: ResolveQu
       const works = worksFormat(request, reply);
       const owned = service.getQuiz(request.user.id, params.data.id);
       if (!owned) return reply.code(404).send({ error: "No quiz with that id." });
+      let storedWorks: Map<string, string> | undefined;
+      if (works) {
+        try {
+          storedWorks = canonicalByKey(service.storedWorks(owned.id));
+        } catch (err) {
+          return sendWorksError(reply, err);
+        }
+      }
       // Same public-cover resolver tierlists' open-voting route uses: book
       // keys become redacted public book shapes, never a raw library read.
       // Only books without their own cover need it — pool picks carry one —
@@ -229,7 +237,7 @@ export function buildQuizRoutes(service: QuizzesService, resolveWorks: ResolveQu
         if (outcome.reason === "already-published") return reply.code(409).send({ error: outcome.error });
         return reply.code(400).send({ error: outcome.error });
       }
-      return reply.code(201).send({ quiz: withWorks(outcome.quiz, works), voteCode: outcome.quiz.voteCode });
+      return reply.code(201).send({ quiz: storedWorks ? quizToWorks(outcome.quiz, storedWorks) : outcome.quiz, voteCode: outcome.quiz.voteCode });
     });
 
     app.put("/quizzes/:id/voting", { preHandler: authGuard }, async (request, reply) => {

@@ -185,13 +185,13 @@ test("PUT validates the document: null books, duplicates and bad shapes are 400s
 
 type QuizRoutesResolver = NonNullable<Parameters<typeof buildQuizRoutes>[1]>;
 
-async function quizApp(resolveWorks?: QuizRoutesResolver) {
+async function quizApp(resolveWorks?: QuizRoutesResolver, wrap: (service: Service) => Service = (service) => service) {
   const db = new DatabaseSync(":memory:");
   applyQuizzesMigrations(db);
   const service = createQuizzesService(createSqliteQuizzesRepository(db));
   const app = Fastify();
   app.decorate("authenticateAccessToken", (token: string) => ({ id: token, email: `${token}@example.test`, username: token, avatarId: null }));
-  await app.register(buildQuizRoutes(service, resolveWorks));
+  await app.register(buildQuizRoutes(wrap(service), resolveWorks));
   const send = (method: "POST" | "PUT", url: string, user: string, payload: unknown) =>
     app.inject({ method, url, headers: { authorization: `Bearer ${user}` }, payload: payload as Record<string, unknown> });
   return { app, db, service, send };
@@ -392,5 +392,77 @@ test("a works-format read leaves out an unresolved book and a second edition of 
   assert.equal(read.statusCode, 200);
   assert.deepEqual(read.json().data.books.map((entry: { workId: string }) => entry.workId), [first]);
   assert.match(String(read.headers.vary), /X-Scripta-Works/);
+  await app.close();
+});
+
+function breakCatalog(): () => void {
+  const catalog = openBooksDb();
+  catalog.exec("ALTER TABLE works RENAME TO works_down");
+  return () => {
+    catalog.exec("ALTER TABLE works_down RENAME TO works");
+    catalog.close();
+  };
+}
+
+test("a works-format publish with the catalog down is a 503 and writes nothing", async () => {
+  const ids = ["Down A", "Down B", "Down C", "Down D"].map(named);
+  const { app, service } = await quizApp();
+  const created = await app.inject({
+    method: "POST",
+    url: "/quizzes",
+    headers: quizHeaders("q6"),
+    payload: { name: "Down", data: { questionCount: 3, allowedTypes: ["cover_title"], books: ids.map((id, index) => worksBook(`Down ${"ABCD"[index]}`, id)) } }
+  });
+  assert.equal(created.statusCode, 201);
+  const id = created.json().id as string;
+  const restore = breakCatalog();
+  try {
+    const published = await app.inject({ method: "POST", url: `/quizzes/${id}/publish`, headers: quizHeaders("q6") });
+    assert.equal(published.statusCode, 503);
+  } finally {
+    restore();
+  }
+  const stored = service.getQuiz("q6", id)!;
+  assert.equal(stored.voteCode, null);
+  assert.equal((stored.data as { questions: unknown }).questions ?? null, null);
+  const retried = await app.inject({ method: "POST", url: `/quizzes/${id}/publish`, headers: quizHeaders("q6") });
+  assert.equal(retried.statusCode, 201);
+  await app.close();
+});
+
+test("a works-format create answers from the books it resolved, even if the catalog dies right after the write", async () => {
+  const ids = ["Gone A", "Gone B"].map(named);
+  let restore = () => {};
+  const { app, db } = await quizApp(undefined, (service) => ({
+    ...service,
+    createQuiz: (...args) => {
+      const quiz = service.createQuiz(...args);
+      restore = breakCatalog();
+      return quiz;
+    }
+  }));
+  try {
+    const created = await app.inject({ method: "POST", url: "/quizzes", headers: quizHeaders("q7"), payload: { name: "Gone", data: { books: ids.map((id, index) => worksBook(`Gone ${"AB"[index]}`, id)) } } });
+    assert.equal(created.statusCode, 201);
+    assert.deepEqual(created.json().data.books.map((entry: { workId: string }) => entry.workId), ids);
+    assert.doesNotMatch(created.body, /"key"/);
+    assert.equal((db.prepare("SELECT COUNT(*) AS count FROM quizzes").get() as { count: number }).count, 1);
+  } finally {
+    restore();
+  }
+  await app.close();
+});
+
+test("a header-less create and publish answer in the stored key shape", async () => {
+  const { app } = await quizApp();
+  const books = Array.from({ length: 4 }, (_, i) => book(`legacy-shape-${i}`, `Legacy Shape ${i}`));
+  const created = await app.inject({ method: "POST", url: "/quizzes", headers: { authorization: "Bearer q8" }, payload: { name: "Legacy", data: { questionCount: 3, allowedTypes: ["cover_title"], books } } });
+  assert.equal(created.statusCode, 201);
+  assert.deepEqual(created.json().data.books.map((entry: { key: string }) => entry.key), books.map((entry) => entry.key));
+  const published = await app.inject({ method: "POST", url: `/quizzes/${created.json().id}/publish`, headers: { authorization: "Bearer q8" } });
+  assert.equal(published.statusCode, 201);
+  assert.deepEqual(published.json().quiz.data.books.map((entry: { key: string }) => entry.key), books.map((entry) => entry.key));
+  assert.equal(typeof published.json().voteCode, "string");
+  assert.doesNotMatch(published.body, /workId/);
   await app.close();
 });
