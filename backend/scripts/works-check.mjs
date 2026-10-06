@@ -51,6 +51,7 @@ const e2 = {};
 
 for (const [name, envName, check] of [
   ["arena", "ARENA_DB_PATH", (db) => has(db, "tournament_slots", "book_key") ? {
+    foreignKeyViolations: db.prepare("PRAGMA foreign_key_check").all().length,
     slotsWithoutWork: count(db, "SELECT COUNT(*) AS n FROM tournament_slots WHERE work_id IS NULL AND book_key != ''"),
     duelSidesWithoutWork: count(db, "SELECT COUNT(*) AS n FROM duels WHERE book_a_work_id IS NULL OR book_b_work_id IS NULL"),
     tournamentsSharingWork: count(db, sharedWork("tournament_slots", "tournament_id")),
@@ -59,6 +60,7 @@ for (const [name, envName, check] of [
     winnersOnNeitherSide: count(db, "SELECT COUNT(*) AS n FROM duels WHERE winner_key IS NOT NULL AND winner_key NOT IN (book_a_key, book_b_key)")
   } : "migrated"],
   ["tierlists", "TIERLISTS_DB_PATH", (db) => has(db, "tierlist_works", "key") ? {
+    foreignKeyViolations: db.prepare("PRAGMA foreign_key_check").all().length,
     entriesWithoutWork: count(db, `SELECT COUNT(*) AS n FROM (
       SELECT t.id, p.value AS key FROM tierlists AS t, json_each(t.data, '$.pool') AS p
       UNION ALL
@@ -69,6 +71,7 @@ for (const [name, envName, check] of [
     snapshotMismatches: count(db, "SELECT COUNT(*) AS n FROM tierlists WHERE public_books IS NOT NULL AND json_array_length(public_books) != json_array_length(data, '$.pool')")
   } : "migrated"],
   ["quizzes", "QUIZZES_DB_PATH", (db) => has(db, "quiz_works", "key") ? {
+    foreignKeyViolations: db.prepare("PRAGMA foreign_key_check").all().length,
     booksWithoutWork: count(db, `SELECT COUNT(*) AS n FROM quizzes AS q, json_each(q.data, '$.books') AS b
       WHERE NOT EXISTS (SELECT 1 FROM quiz_works AS w WHERE w.quiz_id = q.id AND w.key = json_extract(b.value, '$.key') AND w.work_id IS NOT NULL)`),
     quizzesSharingWork: count(db, sharedWork("quiz_works", "quiz_id"))
