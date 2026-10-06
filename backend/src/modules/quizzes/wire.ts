@@ -2,12 +2,22 @@ import type { QuizBook, QuizQuestion } from "@scripta/shared";
 import { canonicalByKey, knownWorkIds, resolveTitleWorks } from "../library/index.js";
 import type { Quiz } from "./domain/types.js";
 
+function storedIds(quiz: Quiz): string[] {
+  const data = (quiz.data ?? {}) as Record<string, unknown>;
+  const stored = Array.isArray(data.books) ? (data.books as QuizBook[]) : [];
+  const asked = Array.isArray(data.questions) ? (data.questions as QuizQuestion[]) : [];
+  return [...stored.map((book) => book.workId), ...asked.flatMap((question) => (question.workId ? [question.workId] : []))];
+}
+
+export function canonicalForQuiz(quiz: Quiz): Map<string, string> {
+  return canonicalByKey(new Map(storedIds(quiz).map((id) => [id, id])));
+}
+
 export function quizToWorks(quiz: Quiz, known?: Map<string, string>): Quiz {
   const data = (quiz.data ?? {}) as Record<string, unknown>;
   const stored = Array.isArray(data.books) ? (data.books as QuizBook[]) : [];
   const asked = Array.isArray(data.questions) ? (data.questions as QuizQuestion[]) : null;
-  const ids = [...stored.map((book) => book.workId), ...(asked ?? []).flatMap((question) => (question.workId ? [question.workId] : []))];
-  const canonical = known ?? canonicalByKey(new Map(ids.map((id) => [id, id])));
+  const canonical = known ?? canonicalForQuiz(quiz);
   const seen = new Set<string>();
   const books = stored.flatMap((book) => {
     const workId = canonical.get(book.workId)!;

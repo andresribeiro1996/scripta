@@ -10,7 +10,7 @@ import { authGuard, getOptionalAuthenticatedUser } from "../auth/index.js";
 import { canonicalByKey, duplicateWorkMessage, resolvePublicBooksByWork } from "../library/index.js";
 import { sendWorksError } from "../../worksErrors.js";
 import type { PlayOutcome, Player, QuizzesService } from "./service.js";
-import { quizBookWorks, quizToWorks } from "./wire.js";
+import { canonicalForQuiz, quizBookWorks, quizToWorks } from "./wire.js";
 
 const idParamSchema = z.object({ id: z.string().uuid() });
 const codeParamSchema = z.object({ code: z.string().min(1).max(64) });
@@ -93,8 +93,9 @@ export function buildQuizRoutes(service: QuizzesService) {
       if (!body.success) return reply.code(400).send({ error: body.error.issues[0]?.message ?? "Invalid request." });
       try {
         let data: unknown;
+        const owned = service.getQuiz(request.user.id, params.data.id);
+        let known = owned ? canonicalForQuiz(owned) : undefined;
         if (body.data.data) {
-          const owned = service.getQuiz(request.user.id, params.data.id);
           if (!owned || owned.voteCode !== null) return reply.code(404).send({ error: "No quiz with that id." });
           const books = body.data.data.books;
           const ids = quizBookWorks(books);
@@ -102,10 +103,11 @@ export function buildQuizRoutes(service: QuizzesService) {
           const duplicate = ids.findIndex((id, index) => ids.indexOf(id) !== index);
           if (duplicate !== -1) return reply.code(409).send({ error: duplicateWorkMessage({ workId: null, title: books[duplicate]!.title }) });
           data = { ...body.data.data, books: books.map((book, index) => ({ ...book, workId: ids[index]! })) };
+          known = new Map(ids.map((id) => [id!, id!]));
         }
         const quiz = service.updateQuiz(request.user.id, params.data.id, { ...(body.data.name !== undefined ? { name: body.data.name } : {}), ...(data !== undefined ? { data } : {}) });
         if (!quiz) return reply.code(404).send({ error: "No quiz with that id." });
-        return reply.send(quizToWorks(quiz));
+        return reply.send(quizToWorks(quiz, known));
       } catch (err) {
         return sendWorksError(reply, err);
       }
@@ -149,9 +151,16 @@ export function buildQuizRoutes(service: QuizzesService) {
       if (!params.success) return reply.code(400).send({ error: "Invalid quiz id." });
       const body = playStateSchema.safeParse(request.body);
       if (!body.success) return reply.code(400).send({ error: body.error.issues[0]?.message ?? "Invalid request." });
-      const quiz = service.setPlayState(request.user.id, params.data.id, body.data.open);
-      if (!quiz) return reply.code(404).send({ error: "No quiz with that id." });
-      return reply.send({ quiz: quizToWorks(quiz) });
+      const owned = service.getQuiz(request.user.id, params.data.id);
+      if (!owned) return reply.code(404).send({ error: "No quiz with that id." });
+      try {
+        const known = canonicalForQuiz(owned);
+        const quiz = service.setPlayState(request.user.id, params.data.id, body.data.open);
+        if (!quiz) return reply.code(404).send({ error: "No quiz with that id." });
+        return reply.send({ quiz: quizToWorks(quiz, known) });
+      } catch (err) {
+        return sendWorksError(reply, err);
+      }
     });
 
     app.get("/quizzes/:id/results", { preHandler: authGuard }, async (request, reply) => {
