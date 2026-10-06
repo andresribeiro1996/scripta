@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { createElement } from "react";
 import { renderToString } from "react-dom/server";
 import { QueryClient, QueryClientProvider, QueryObserver } from "@tanstack/react-query";
-import { useMurals } from "../src/hooks/useMurals";
+import { MuralConflictError, useMurals } from "../src/hooks/useMurals";
 import type { Mural, MuralBlock } from "../src/lib/murals";
 
 const layout = { x: 0, y: 0, w: 12, h: 2 };
@@ -113,27 +113,89 @@ test("scrubImage clears the cover then sends the blocks with the updatedAt the c
   }
 });
 
-test("a 409 rejects with a message for the user, shows the server's version and does not block later writes", async () => {
+test("a 409 rejects with a message for the user, shows the server's version and drops writes queued behind it", async () => {
   const m = makeMural("conflict");
   const server = makeMural("conflict", { name: "Server", updatedAt: "t9" });
   const { client, calls, hook, answer, restore } = setup([m]);
   let refetches = 0;
   const unsubscribe = new QueryObserver(client, { queryKey: ["murals"], staleTime: Infinity, queryFn: async () => { refetches++; return [server]; } }).subscribe(() => undefined);
   try {
-    const rejected = assert.rejects(hook().saveBlocks(m.id, [textBlock("A")]), /changed somewhere else/);
-    await flush();
-    const queued = hook().rename(m.id, "Later");
+    const first = hook().saveBlocks(m.id, [textBlock("A")]);
+    const second = hook().saveBlocks(m.id, [textBlock("B")]);
+    const rejections = Promise.all([assert.rejects(first, /changed somewhere else/), assert.rejects(second, MuralConflictError)]);
     await flush();
     assert.equal(calls.length, 1);
     await answer(0, Response.json({ error: "Mural changed.", current: server }, { status: 409 }));
-    await rejected;
+    await rejections;
+    assert.equal(calls.length, 1);
     assert.equal(refetches, 1);
     assert.equal(hook().currentMural(m.id)?.name, "Server");
+    const later = hook().rename(m.id, "Later");
     await answer(1, (call) => Response.json({ ...server, ...call.body, updatedAt: "t10" }));
-    assert.equal((await queued).name, "Later");
+    assert.equal((await later).name, "Later");
     assert.equal(calls[1].body.updatedAt, "t9");
   } finally {
     unsubscribe();
+    restore();
+  }
+});
+
+test("a scrub queued behind a save starts from the saved blocks", async () => {
+  const gone: MuralBlock = { id: "g", type: "spotlight", bookKey: "gone", layout: { ...layout, y: 2 } };
+  const m = makeMural("scrub-after-save", { blocks: [gone, textBlock("Before")] });
+  const { client, calls, hook, answer, restore } = setup([m]);
+  try {
+    const saving = hook().saveBlocks(m.id, [gone, textBlock("Saved")]);
+    await flush();
+    const scrubbing = hook().scrubBooks(["gone"]);
+    await answer(0, (call) => Response.json({ ...m, ...call.body, updatedAt: "t1" }));
+    await answer(1, (call) => Response.json({ ...m, ...call.body, updatedAt: "t2" }));
+    await Promise.all([saving, scrubbing]);
+    assert.deepEqual(calls[1].body.blocks, [textBlock("Saved")]);
+    assert.equal(calls[1].body.updatedAt, "t1");
+    assert.equal(client.getQueryData<Mural[]>(["murals"])![0].updatedAt, "t2");
+  } finally {
+    restore();
+  }
+});
+
+test("a field write ahead of a save does not revert the saved blocks", async () => {
+  const m = makeMural("rename-then-save");
+  const { client, calls, hook, answer, restore } = setup([m]);
+  try {
+    const renaming = hook().rename(m.id, "Renamed");
+    await flush();
+    const saving = hook().saveBlocks(m.id, [textBlock("Saved")]);
+    await flush();
+    await answer(0, (call) => Response.json({ ...m, ...call.body, updatedAt: "t1" }));
+    await answer(1, (call) => Response.json({ ...m, ...call.body, name: "Renamed", updatedAt: "t2" }));
+    await Promise.all([renaming, saving]);
+    const cached = client.getQueryData<Mural[]>(["murals"])![0];
+    assert.equal(cached.blocks[0].type === "text" && cached.blocks[0].heading, "Saved");
+    assert.equal(cached.updatedAt, "t2");
+    assert.equal(calls[1].body.updatedAt, "t1");
+  } finally {
+    restore();
+  }
+});
+
+test("an in-flight refetch is cancelled before a write is sent", async () => {
+  const m = makeMural("refetch");
+  const { client, calls, hook, answer, restore } = setup([m]);
+  let aborted = false;
+  const refetching = client.fetchQuery({
+    queryKey: ["murals"],
+    staleTime: 0,
+    queryFn: ({ signal }) => new Promise<Mural[]>((_resolve, reject) => { signal.addEventListener("abort", () => { aborted = true; reject(new Error("cancelled")); }); })
+  });
+  refetching.catch(() => undefined);
+  try {
+    const renaming = hook().rename(m.id, "Renamed");
+    await answer(0, (call) => Response.json({ ...m, ...call.body, updatedAt: "t1" }));
+    await renaming;
+    assert.equal(aborted, true);
+    assert.equal(calls.length, 1);
+  } finally {
     restore();
   }
 });

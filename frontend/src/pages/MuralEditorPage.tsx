@@ -207,10 +207,11 @@ export function MuralEditorPage() {
     try {
       return await work;
     } catch (error) {
-      toast({ kind: "error", message: error instanceof MuralConflictError ? error.message : message });
+      const conflict = error instanceof MuralConflictError;
+      toast({ kind: "error", message: conflict ? error.message : message });
       // The PUT may have landed with only its response lost, so take the
       // server's word before forcing the canvas to match the cache.
-      await refetch();
+      if (!conflict) await refetch();
       setRevertNonce((n) => n + 1);
       return undefined;
     }

@@ -36,14 +36,16 @@ export class MuralConflictError extends Error {
   }
 }
 
-const writeQueues = new Map<string, Promise<void>>();
+const writeQueues = new Map<string, Promise<unknown>>();
+const generations = new Map<string, number>();
+
+function generationOf(id: string): number {
+  return generations.get(id) ?? 0;
+}
 
 function enqueueWrite<T>(id: string, work: () => Promise<T>): Promise<T> {
   const run = (writeQueues.get(id) ?? Promise.resolve()).then(work);
-  const tail = run.then(
-    () => undefined,
-    () => undefined
-  );
+  const tail = run.catch(() => undefined);
   writeQueues.set(id, tail);
   void tail.then(() => {
     if (writeQueues.get(id) === tail) writeQueues.delete(id);
@@ -75,20 +77,35 @@ export function useMurals() {
     setMurals(current().map((m) => (m.id === updated.id ? { ...updated, blocks: compactMuralBlocks(ensureBookBlockHeights(updated.blocks)) } : m)));
   }
 
+  function store(updated: Mural, adoptBlocksIfCacheHolds?: MuralBlock[]) {
+    const latest = currentMural(updated.id);
+    replaceOne({ ...updated, blocks: !latest || latest.blocks === adoptBlocksIfCacheHolds ? updated.blocks : latest.blocks });
+  }
+
+  function queue<T>(id: string, work: () => Promise<T>): Promise<T> {
+    const generation = generationOf(id);
+    return enqueueWrite(id, async () => {
+      if (generationOf(id) !== generation) throw new MuralConflictError();
+      await queryClient.cancelQueries({ queryKey: ["murals"] });
+      return work();
+    });
+  }
+
   async function putMural(id: string, patch: Parameters<typeof updateMuralApi>[1]): Promise<Mural> {
     try {
       return await updateMuralApi(id, { ...patch, updatedAt: currentMural(id)?.updatedAt });
     } catch (error) {
       if (!(error instanceof ApiError) || error.status !== 409) throw error;
+      generations.set(id, generationOf(id) + 1);
       await queryClient.invalidateQueries({ queryKey: ["murals"] });
       throw new MuralConflictError();
     }
   }
 
   function writeOne(id: string, send: () => Promise<Mural>): Promise<Mural> {
-    return enqueueWrite(id, async () => {
+    return queue(id, async () => {
       const updated = await send();
-      replaceOne(updated);
+      store(updated);
       return updated;
     });
   }
@@ -114,11 +131,9 @@ export function useMurals() {
     if (before) replaceOne({ ...before, blocks: next });
     const optimistic = currentMural(id)?.blocks;
     try {
-      return await enqueueWrite(id, async () => {
+      return await queue(id, async () => {
         const updated = await putMural(id, { blocks: next });
-        const latest = currentMural(id);
-        const base = latest ?? updated;
-        replaceOne({ ...base, blocks: !before || latest?.blocks === optimistic ? updated.blocks : base.blocks, updatedAt: updated.updatedAt });
+        store(updated, optimistic);
         return updated;
       });
     } catch (error) {
@@ -155,16 +170,25 @@ export function useMurals() {
   }
 
   /** Scrubs one or more deleted books' keys out of every mural, PUTting
-   *  only the murals scrubBooksFromMurals actually touched. */
+   *  only the murals scrubBooksFromMurals actually touched. The scrub
+   *  itself runs when each mural's turn in the write queue comes, so it
+   *  starts from blocks any earlier queued save has already stored. */
   async function scrubBooks(keys: Iterable<string>): Promise<void> {
+    const keySet = new Set(keys);
     const before = current();
-    const after = scrubBooksFromMurals(before, keys);
+    const after = scrubBooksFromMurals(before, keySet);
     if (after === before) return; // no-op — nothing referenced these keys
 
     await Promise.all(
       before.map((b, i) => {
-        const m = after[i];
-        return m === b ? b : writeOne(b.id, () => putMural(b.id, { blocks: m.blocks }));
+        if (after[i] === b) return b;
+        return queue(b.id, async () => {
+          const mural = currentMural(b.id);
+          if (!mural) return;
+          const [scrubbed] = scrubBooksFromMurals([mural], keySet);
+          if (scrubbed === mural) return;
+          store(await putMural(b.id, { blocks: scrubbed.blocks }), mural.blocks);
+        });
       })
     );
   }
@@ -182,11 +206,14 @@ export function useMurals() {
 
     await Promise.all(
       before.map((b, i) => {
-        const m = after[i];
-        if (m === b) return b;
-        return enqueueWrite(b.id, async () => {
-          if (b.coverImageId === imageId) replaceOne(await clearMuralCoverApi(b.id));
-          if (b.blocks.some((block) => block.type === "image" && block.imageId === imageId)) replaceOne(await putMural(b.id, { blocks: m.blocks }));
+        if (after[i] === b) return b;
+        return queue(b.id, async () => {
+          const mural = currentMural(b.id);
+          if (mural?.coverImageId === imageId) store(await clearMuralCoverApi(b.id), mural.blocks);
+          const latest = currentMural(b.id);
+          if (!latest) return;
+          const blocks = latest.blocks.filter((block) => !(block.type === "image" && block.imageId === imageId));
+          if (blocks.length !== latest.blocks.length) store(await putMural(b.id, { blocks }), latest.blocks);
         });
       })
     );
