@@ -175,11 +175,9 @@ test("a shared mural's tier-list block carries canonical works and resolves its 
     const home = service.createMural("wallOwner", "Wall");
     service.updateMural("wallOwner", home.id, { blocks: [{ id: "t", type: "tierlist", tierlistId: "tl-wall", layout: { x: 0, y: 0, w: 8, h: 5 } }], updatedAt: home.updatedAt });
     const { shareToken } = service.share("wallOwner", home.id)!;
-    for (const headers of [{}, { "x-scripta-works": "1" }]) {
-      const shared = (await app.inject({ method: "GET", url: `/murals/shared/${shareToken}`, headers })).json();
-      assert.deepEqual(shared.tierlists, { "tl-wall": data });
-      assert.deepEqual(shared.books.map((book: { key: string }) => book.key).sort(), ["ta:wall other|someone", "ta:wall target|someone"]);
-    }
+    const shared = (await app.inject({ method: "GET", url: `/murals/shared/${shareToken}` })).json();
+    assert.deepEqual(shared.tierlists, { "tl-wall": data });
+    assert.deepEqual(shared.books.map((book: { key: string }) => book.key).sort(), ["ta:wall other|someone", "ta:wall target|someone"]);
   } finally {
     await app.close();
     db.close();

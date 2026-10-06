@@ -127,9 +127,9 @@ Before each E2b removal PR merges, read the `e2` section. Arena and tier lists n
 
 Rolling back a removal means restoring that one game database to just before its deploy (see "Rolling back production to a point in time" under Backups). Older code cannot read the rebuilt tables.
 
-### Works format (phase E2)
+### Works in the games (phase E2)
 
-Web and mobile send `X-Scripta-Works: 1`. Arena stores work ids and sides, speaks only works (`workId`, `winnerWorkId`) with or without the header, and is no longer swept or rekeyed. Quizzes store work ids on their books and questions (`workId`) and speak only works with or without the header, and are no longer swept or rekeyed; a published quiz's public board looks each question's book up by the id it was stored under. Tier lists store work ids and speak only works (`workIds`, `workId`) with or without the header, in their routes and in the tier-list map of the public mural and profile; a shared mural's tier-list books resolve by work from the owner's library. Library documents carry `works` (book key → canonical work id) and public books carry `key` and `workId` for every client. Spec: `docs/superpowers/specs/2026-10-05-works-phase-e2-design.md`.
+Arena, tier lists and quizzes store work ids. Clients send and receive `workId`, `workIds` and `winnerWorkId`, and every returned id is canonical, because reads follow catalog merges made after a write. Library documents carry `works` (book key → canonical work id), and public books carry `key` and `workId`. Murals still hold library copy keys. Spec: `docs/superpowers/specs/2026-10-05-works-phase-e2-design.md`.
 
 ### `gallery`
 - **A per-account pool of uploaded images**, primarily meant to be assignable as custom book covers by the [frontend](../frontend/README.md#gallery-and-custom-book-covers) — but the module itself is generic; it doesn't know anything about books.

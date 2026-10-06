@@ -8,7 +8,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { authGuard, getOptionalAuthenticatedUser } from "../auth/index.js";
 import { canonicalByKey, duplicateWorkMessage, resolvePublicBooksByWork } from "../library/index.js";
-import { sendWorksError } from "../../worksFormat.js";
+import { sendWorksError } from "../../worksErrors.js";
 import type { PlayOutcome, Player, QuizzesService } from "./service.js";
 import { quizBookWorks, quizToWorks } from "./wire.js";
 

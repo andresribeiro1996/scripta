@@ -11,7 +11,7 @@
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
-import { sendWorksError } from "../../worksFormat.js";
+import { sendWorksError } from "../../worksErrors.js";
 import { authGuard, getOptionalAuthenticatedUser } from "../auth/index.js";
 import { duplicateWorkMessage, firstKeyPerWork, knownWorkIds, resolvePublicBooksByWork, UnknownWorkError } from "../library/index.js";
 import { boardWorks } from "./domain/boardKeys.js";
