@@ -13,7 +13,11 @@ export interface QuizBookContent {
 }
 
 export interface QuizBook extends QuizBookContent {
-  key: string;
+  workId: string;
+}
+
+export interface QuizBookInput extends QuizBookContent {
+  workId?: string;
 }
 
 export interface QuizQuestion {
@@ -21,7 +25,7 @@ export interface QuizQuestion {
    *  it, and the seeded set is written once at publish and never redrawn. */
   id: string;
   type: QuizQuestionType;
-  bookKey: string;
+  workId: string | null;
   /** Titles for cover/quote/blurb questions; cover URLs for title_cover. */
   options: string[];
   answerIndex: number;
@@ -46,6 +50,8 @@ export interface QuizData {
   /** null until publish generates the seeded set. */
   questions: QuizQuestion[] | null;
 }
+
+export type QuizDataInput = Omit<QuizData, "books"> & { books: QuizBookInput[] };
 
 export interface QuizConfig {
   questionCount: number;

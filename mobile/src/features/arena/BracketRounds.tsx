@@ -39,7 +39,7 @@
 import { Fragment, useRef, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
-import { bracketShape, countdownLabel, needsVote, sharePercent, type BracketSlot, type Duel, type DuelSide } from "@scripta/shared";
+import { bracketShape, countdownLabel, duelWinner, needsVote, sharePercent, type BracketSlot, type Duel, type DuelSide } from "@scripta/shared";
 import { Icon, Sheet, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "./BookCover";
 import { DuelSideRow } from "./DuelSideRow";
@@ -129,7 +129,7 @@ function MatchCard({
   duel,
   matchNumber,
   feeders,
-  championKey,
+  championId,
   isOwner,
   busy,
   onOpen,
@@ -139,12 +139,12 @@ function MatchCard({
   duel: BracketSlot;
   matchNumber: number;
   feeders: [string, string] | null;
-  championKey: string | null;
+  championId: string | null;
   isOwner: boolean;
   busy: boolean;
   onOpen: (duel: Duel) => void;
   onSettle: (duelId: string) => void;
-  onTiebreak: (duelId: string, bookKey: string) => void;
+  onTiebreak: (duelId: string, workId: string) => void;
 }) {
   const { colors } = useTheme();
   if (!duel) {
@@ -164,9 +164,10 @@ function MatchCard({
       </View>
     );
   }
-  const decided = duel.winnerKey !== null;
-  const winner = duel.winnerKey === duel.bookA.key ? duel.bookA : duel.winnerKey === duel.bookB.key ? duel.bookB : null;
+  const decided = duel.status === "settled";
+  const winner = duelWinner(duel);
   const tiebreak = isOwner && duel.status === "tied_pending_tiebreak";
+  const pick = (side: DuelSide) => (tiebreak && side.workId ? () => onTiebreak(duel.id, side.workId!) : undefined);
   const shareA = sharePercent(duel.bookA.votes, duel);
   // Every duel in a round shares one deadline, so the countdown belongs to
   // the round header, not to each card. Only a match that has left the
@@ -202,26 +203,26 @@ function MatchCard({
         ) : null}
       </View>
       <View style={styles.pair}>
-      <Brace winnerSide={duel.winnerKey === duel.bookA.key ? "a" : duel.winnerKey === duel.bookB.key ? "b" : null} />
+      <Brace winnerSide={winner === duel.bookA ? "a" : winner === duel.bookB ? "b" : null} />
       <View style={styles.grow}>
       <MatchRow
         side={duel.bookA}
-        isWinner={duel.winnerKey === duel.bookA.key}
-        isChampion={championKey !== null && championKey === duel.bookA.key}
+        isWinner={winner === duel.bookA}
+        isChampion={championId !== null && championId === duel.bookA.workId}
         decided={decided}
         busy={busy}
         blankTally={unvoted}
-        onPick={tiebreak ? () => onTiebreak(duel.id, duel.bookA.key) : undefined}
+        onPick={pick(duel.bookA)}
       />
       <VersusRule />
       <MatchRow
         side={duel.bookB}
-        isWinner={duel.winnerKey === duel.bookB.key}
-        isChampion={championKey !== null && championKey === duel.bookB.key}
+        isWinner={winner === duel.bookB}
+        isChampion={championId !== null && championId === duel.bookB.workId}
         decided={decided}
         busy={busy}
         blankTally={unvoted}
-        onPick={tiebreak ? () => onTiebreak(duel.id, duel.bookB.key) : undefined}
+        onPick={pick(duel.bookB)}
       />
       </View>
       </View>
@@ -258,7 +259,7 @@ export function BracketRounds({
   /** Hands the pane over to the classic whole-tree map. */
   onShowClassic: () => void;
   onSettle: (duelId: string) => void;
-  onTiebreak: (duelId: string, bookKey: string) => void;
+  onTiebreak: (duelId: string, workId: string) => void;
 }) {
   const { colors } = useTheme();
   const [openId, setOpenId] = useState<string | null>(null);
@@ -327,7 +328,7 @@ export function BracketRounds({
                 duel={duel}
                 matchNumber={i + 1}
                 feeders={roundIdx > 0 ? [feederLabel(roundIdx - 1, i * 2 + 1), feederLabel(roundIdx - 1, i * 2 + 2)] : null}
-                championKey={champion?.key ?? null}
+                championId={champion?.workId ?? null}
                 isOwner={isOwner}
                 busy={busyDuelId === duel?.id}
                 onOpen={(opened) => setOpenId(opened.id)}

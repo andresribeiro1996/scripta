@@ -129,10 +129,10 @@ export function QuizEditorScreen({ quiz, onUpdated }: { quiz: Quiz; onUpdated: (
           {!offered ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>no book has this data</Text> : <Text {...dynamicType} style={[typography.body, { color: colors.accent }]}>{checked ? "✓" : ""}</Text>}
         </Pressable>;
       })}
-      {data.books.map((book) => <View key={book.key} style={[styles.book, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+      {data.books.map((book) => <View key={book.workId} style={[styles.book, { borderColor: colors.border, backgroundColor: colors.surface }]}>
         <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{book.title}</Text>
-        <Input label="Quote (optional)" value={book.quote ?? ""} editable={!lockEdits} onChangeText={(quote) => setData((value) => ({ ...value, books: value.books.map((entry) => entry.key === book.key ? { ...entry, quote } : entry) }))} placeholder="Paste a line from this book…" multiline />
-        <Input label="Blurb (optional)" value={book.blurb ?? ""} editable={!lockEdits} onChangeText={(blurb) => setData((value) => ({ ...value, books: value.books.map((entry) => entry.key === book.key ? { ...entry, blurb } : entry) }))} multiline />
+        <Input label="Quote (optional)" value={book.quote ?? ""} editable={!lockEdits} onChangeText={(quote) => setData((value) => ({ ...value, books: value.books.map((entry) => entry.workId === book.workId ? { ...entry, quote } : entry) }))} placeholder="Paste a line from this book…" multiline />
+        <Input label="Blurb (optional)" value={book.blurb ?? ""} editable={!lockEdits} onChangeText={(blurb) => setData((value) => ({ ...value, books: value.books.map((entry) => entry.workId === book.workId ? { ...entry, blurb } : entry) }))} multiline />
       </View>)}
       <Button label="Publish quiz" loading={publishing} disabled={data.books.length < 4 || busy} onPress={() => setConfirmingPublish(true)} />
       {data.books.length < 4 ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>A quiz needs at least 4 books.</Text> : null}

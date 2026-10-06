@@ -66,10 +66,10 @@ export async function startTournament(id: string): Promise<void> {
  *  A caller who HAS a session still sends its token, so the vote (and the
  *  browser token's whole history) is claimed for the account — same
  *  treatment api/tierlistVoting.ts's ballotFetch gives ballots. */
-export async function voteOnDuel(tournamentId: string, duelId: string, voterToken: string, bookKey: string): Promise<void> {
+export async function voteOnDuel(tournamentId: string, duelId: string, voterToken: string, workId: string): Promise<void> {
   await (getSession() ? apiFetch : publicFetch)(`/arenas/${tournamentId}/duels/${duelId}/vote`, {
     method: "POST",
-    body: JSON.stringify({ voterToken, bookKey })
+    body: JSON.stringify({ voterToken, workId })
   });
 }
 
@@ -77,8 +77,8 @@ export async function settleDuelEarly(tournamentId: string, duelId: string): Pro
   await apiFetch(`/arenas/${tournamentId}/duels/${duelId}/settle`, { method: "POST" });
 }
 
-export async function resolveTiebreak(tournamentId: string, duelId: string, winnerBookKey: string): Promise<void> {
-  await apiFetch(`/arenas/${tournamentId}/duels/${duelId}/tiebreak`, { method: "POST", body: JSON.stringify({ winnerBookKey }) });
+export async function resolveTiebreak(tournamentId: string, duelId: string, winnerWorkId: string): Promise<void> {
+  await apiFetch(`/arenas/${tournamentId}/duels/${duelId}/tiebreak`, { method: "POST", body: JSON.stringify({ winnerWorkId }) });
 }
 
 /** Name only — everything else about a tournament is fixed at creation.

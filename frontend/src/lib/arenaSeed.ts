@@ -13,7 +13,7 @@ import { resolveCover } from "../api/covers";
 import type { SeedBook } from "../api/arena";
 import { seedCoverLookup, toSeedBook as createSeedBook } from "@scripta/shared";
 
-export async function toSeedBook(book: Record<string, unknown>): Promise<SeedBook> {
+export async function toSeedBook(book: Record<string, unknown>): Promise<SeedBook | null> {
   const existing = typeof book._coverUrl === "string" ? book._coverUrl : null;
   const cover = existing ?? (await resolveBookCover(book));
   return createSeedBook(book, cover);

@@ -4,7 +4,7 @@ import { eligibleTypes, generateQuizQuestions, hashSeed, mulberry32 } from "./dr
 import type { QuizBook, QuizConfig } from "./types.js";
 
 const book = (key: string, extra: Partial<QuizBook> = {}): QuizBook => ({
-  key,
+  workId: key,
   title: `Title ${key}`,
   author: "A",
   coverUrl: `https://covers.test/${key}.jpg`,
@@ -31,7 +31,7 @@ test("every question has 4 distinct options whose answer slot holds the answer v
   for (const q of generateQuizQuestions(books, config, "seed")) {
     assert.equal(q.options.length, 4);
     assert.equal(new Set(q.options).size, 4);
-    const answerValue = q.type === "title_cover" ? `https://covers.test/${q.book.key}.jpg` : `Title ${q.book.key}`;
+    const answerValue = q.type === "title_cover" ? `https://covers.test/${q.book.workId}.jpg` : `Title ${q.book.workId}`;
     assert.equal(q.options[q.answerIndex], answerValue);
   }
 });

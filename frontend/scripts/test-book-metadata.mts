@@ -12,7 +12,7 @@ test("mural preloads select only referenced books and include resolved tiers", a
   const { bookKey } = await import("../src/lib/merge.ts");
   const { createBlockCandidate } = await import("../src/lib/murals.ts");
   const books = ["Spotlight", "Shelf", "Reading", "Ranked", "Pool", "Unrelated"].map((Title, index) => ({
-    Title, Attribution: "Author", ReadStatus: index === 2 ? 1 : 0
+    Title, Attribution: "Author", ReadStatus: index === 2 ? 1 : 0, _workId: `work-${index}`
   }));
   const makeBlock = (type: Parameters<typeof createBlockCandidate>[0]) => createBlockCandidate(type, []);
   const blocks = [
@@ -23,7 +23,7 @@ test("mural preloads select only referenced books and include resolved tiers", a
   ];
   assert.deepEqual(muralMetadataBooks(blocks, books).map((book) => book.Title), ["Spotlight", "Shelf", "Reading"]);
   assert.deepEqual(muralMetadataBooks(blocks, books, () => ({
-    name: "Tiers", tiers: [{ id: "tier", label: "A", color: "red", bookKeys: [bookKey(books[3])] }], pool: [bookKey(books[4])]
+    name: "Tiers", tiers: [{ id: "tier", label: "A", color: "red", workIds: ["work-3"] }], pool: ["work-4"]
   })).map((book) => book.Title), ["Spotlight", "Shelf", "Reading", "Ranked", "Pool"]);
 });
 

@@ -60,10 +60,10 @@ export function startTournament(id: string) {
  *  token rides along — a signed-in voter's vote (and the browser token's
  *  whole history) is claimed for the account, an anonymous one stays
  *  anonymous. Same split submitBallot in features/tierlists/api.ts uses. */
-export function voteOnDuel(tournamentId: string, duelId: string, voterToken: string, bookKey: string, authenticated: boolean) {
+export function voteOnDuel(tournamentId: string, duelId: string, voterToken: string, workId: string, authenticated: boolean) {
   return apiClient.request(`/arenas/${tournamentId}/duels/${duelId}/vote`, {
     method: "POST",
-    body: { voterToken, bookKey },
+    body: { voterToken, workId },
     auth: authenticated,
   });
 }
@@ -72,8 +72,8 @@ export function settleDuelEarly(tournamentId: string, duelId: string) {
   return apiClient.request(`/arenas/${tournamentId}/duels/${duelId}/settle`, { method: "POST", auth: true });
 }
 
-export function resolveTiebreak(tournamentId: string, duelId: string, winnerBookKey: string) {
-  return apiClient.request(`/arenas/${tournamentId}/duels/${duelId}/tiebreak`, { method: "POST", body: { winnerBookKey }, auth: true });
+export function resolveTiebreak(tournamentId: string, duelId: string, winnerWorkId: string) {
+  return apiClient.request(`/arenas/${tournamentId}/duels/${duelId}/tiebreak`, { method: "POST", body: { winnerWorkId }, auth: true });
 }
 
 export function deleteTournament(id: string) {

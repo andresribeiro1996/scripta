@@ -1,4 +1,4 @@
-import type { PublicQuizQuestion, QuestionStat, QuizData, ResultPlay } from "@scripta/shared";
+import type { PublicQuizQuestion, QuestionStat, QuizData, QuizDataInput, ResultPlay } from "@scripta/shared";
 import { apiClient } from "../../core/api";
 
 export interface Quiz {
@@ -44,7 +44,7 @@ export function fetchQuiz(id: string) {
   return apiClient.request<Quiz>(`/quizzes/${id}`, { auth: true });
 }
 
-export function createQuiz(name: string, data: QuizData) {
+export function createQuiz(name: string, data: QuizDataInput) {
   return apiClient.request<Quiz>("/quizzes", { method: "POST", body: { name, data }, auth: true });
 }
 

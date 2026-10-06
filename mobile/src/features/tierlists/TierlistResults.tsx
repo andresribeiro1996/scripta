@@ -1,10 +1,10 @@
 import { RankingMethodSelector } from "./RankingMethodSelector";
 import { useEffect, useRef, useState } from "react";
-import { aggregate, AGGREGATION_MODES, type AggregationMode, type HistogramCell } from "@scripta/shared";
+import { aggregate, AGGREGATION_MODES, booksByWork, type AggregationMode, type HistogramCell } from "@scripta/shared";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { Sheet, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
-import { authorOf, keyOf, TierCover, TierHead, TierRowScroll, titleOf, type TierBook } from "./TierBoard";
+import { authorOf, TierCover, TierHead, TierRowScroll, titleOf, type TierBook } from "./TierBoard";
 
 const hitSlop = { top: 14, bottom: 14, left: 8, right: 8 };
 
@@ -23,7 +23,7 @@ export function TierlistResults({ histogram, tiers, pool, books, ballotCount, el
   eligibleVoteCount?: number;
   votingOpen?: boolean;
   promoted?: boolean;
-  ownPlacements?: Array<{ bookKey: string; tierId: string }>;
+  ownPlacements?: Array<{ workId: string; tierId: string }>;
   active?: boolean;
   mode?: AggregationMode;
   onModeChange?: (mode: AggregationMode) => void;
@@ -35,15 +35,15 @@ export function TierlistResults({ histogram, tiers, pool, books, ballotCount, el
   const [explain, setExplain] = useState(false);
   const [explainProgress, setExplainProgress] = useState(false);
   const results = aggregate(histogram, tiers.map((tier) => tier.id), pool, mode);
-  const byKey = new Map(books.map((book) => [keyOf(book), book]));
-  const mine = new Map(ownPlacements.map(({ bookKey, tierId }) => [bookKey, tierId]));
+  const byWork = booksByWork(books);
+  const mine = new Map(ownPlacements.map(({ workId, tierId }) => [workId, tierId]));
   const votedBooks = results.filter((result) => result.votes > 0).length;
   const unrankedBooks = results.filter((result) => result.tierId === null);
-  const detail = results.find((result) => result.bookKey === selected);
-  const detailBook = detail ? byKey.get(detail.bookKey) : undefined;
+  const detail = results.find((result) => result.workId === selected);
+  const detailBook = detail ? byWork.get(detail.workId) : undefined;
   const detailTier = tiers.find((tier) => tier.id === detail?.tierId);
   const myTier = tiers.find((tier) => tier.id === (selected ? mine.get(selected) : undefined));
-  const counts = tiers.map((tier) => histogram.filter((cell) => cell.bookKey === selected && cell.tierId === tier.id).reduce((sum, cell) => sum + cell.votes, 0));
+  const counts = tiers.map((tier) => histogram.filter((cell) => cell.workId === selected && cell.tierId === tier.id).reduce((sum, cell) => sum + cell.votes, 0));
   const topCount = Math.max(...counts, 0);
   const tied = topCount > 0 && counts.filter((count) => count === topCount).length > 1;
   useEffect(() => { if (active) boardScroll.current?.scrollTo({ y: 0, animated: false }); }, [active]);
@@ -51,9 +51,9 @@ export function TierlistResults({ histogram, tiers, pool, books, ballotCount, el
   function renderBooks(rows: typeof results) {
     return <TierRowScroll contentContainerStyle={styles.books}>
       {rows.length ? rows.map((result) => {
-        const book = byKey.get(result.bookKey);
-        const personal = tiers.find((item) => item.id === mine.get(result.bookKey));
-        return <Pressable key={result.bookKey} accessibilityRole="button" accessibilityLabel={`${book ? titleOf(book) : "Book"}, ${result.votes} ${result.votes === 1 ? "vote" : "votes"}${personal ? `, your rank ${personal.label}` : ""}. View vote details`} onPress={() => setSelected(result.bookKey)} style={styles.book}>
+        const book = byWork.get(result.workId);
+        const personal = tiers.find((item) => item.id === mine.get(result.workId));
+        return <Pressable key={result.workId} accessibilityRole="button" accessibilityLabel={`${book ? titleOf(book) : "Book"}, ${result.votes} ${result.votes === 1 ? "vote" : "votes"}${personal ? `, your rank ${personal.label}` : ""}. View vote details`} onPress={() => setSelected(result.workId)} style={styles.book}>
           {book ? <TierCover book={book} /> : <Text style={[typography.caption, { color: colors.text }]}>Book</Text>}
           {showMine && personal ? <View style={[styles.badge, { backgroundColor: colors.surface }]}><Text style={[typography.caption, { color: colors.text }]}>You: {personal.label}</Text></View> : null}
         </Pressable>;

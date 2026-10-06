@@ -1,4 +1,4 @@
-import { ballotBoard } from "@scripta/shared";
+import { ballotBoard, workIdOf, booksByWork } from "@scripta/shared";
 import { useEffect, useState } from "react";
 import { Link, useOutletContext, useParams } from "react-router-dom";
 import type { TierlistData } from "../api/tierlists";
@@ -12,14 +12,14 @@ import { useDismissible } from "../hooks/useDismissible";
 import { useLibrary } from "../hooks/useLibrary";
 import { useTierlists } from "../hooks/useTierlists";
 import { useTierlistResults, useTierlistVoting } from "../hooks/useTierlistVoting";
-import { bookKey } from "../lib/merge";
+import { useWorkBooks } from "../hooks/useWorkBooks";
 import { ChevronLeftIcon } from "../components/Toolbar";
 
 export function TierListEditorPage() {
   const { id } = useParams<{ id: string }>();
   const { data: library } = useLibrary();
   const { data: tierlistsData, isLoading, rename, saveData, refetch } = useTierlists();
-  const books = library?.data.books ?? [];
+  const books = useWorkBooks(library);
   const tierlist = (tierlistsData ?? []).find((t) => t.id === id);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
@@ -176,15 +176,15 @@ export function TierListEditorPage() {
     }
   }
 
-  function addBooksToPool(keys: string[]) {
-    const taken = new Set([...data.pool, ...data.tiers.flatMap((t) => t.bookKeys)]);
-    const fresh = keys.filter((k) => !taken.has(k));
+  function addBooksToPool(workIds: string[]) {
+    const taken = new Set([...data.pool, ...data.tiers.flatMap((t) => t.workIds)]);
+    const fresh = workIds.filter((id) => !taken.has(id));
     if (fresh.length === 0) return;
     void commit({ ...data, pool: [...data.pool, ...fresh] });
   }
 
-  const byKey = new Map(books.map((b) => [bookKey(b), b] as const));
-  const resolvedPool = data.pool.filter((k) => byKey.has(k));
+  const byWork = booksByWork(books);
+  const resolvedPool = data.pool.filter((id) => byWork.has(id));
 
   return (
     <PageContainer>
@@ -380,8 +380,8 @@ export function TierListEditorPage() {
       {addingBooks && (
         <AddBooksSheet
           books={books.filter((b) => {
-            const key = bookKey(b);
-            return !data.pool.includes(key) && !data.tiers.some((t) => t.bookKeys.includes(key));
+            const workId = workIdOf(b);
+            return workId !== undefined && !data.pool.includes(workId) && !data.tiers.some((t) => t.workIds.includes(workId));
           })}
           onAdd={addBooksToPool}
           onClose={() => setAddingBooks(false)}

@@ -1,4 +1,4 @@
-import type { Group, PublicReaderCard } from "@scripta/shared";
+import { booksByWork, type Group, type PublicReaderCard } from "@scripta/shared";
 import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
 import { bookKey } from "../../lib/merge";
@@ -88,13 +88,14 @@ export function MobileBlockPreview({
   }
   if (block.type === "shelf" || block.type === "currentlyReading" || block.type === "tierlist") {
     const tierlist = block.type === "tierlist" ? tierlistData?.(block.tierlistId) : undefined;
+    const byWork = booksByWork(books);
     const resolved =
       block.type === "shelf"
         ? resolveShelfBooks(block, books)
         : block.type === "currentlyReading"
           ? books.filter((book) => book.ReadStatus === 1)
-          : (tierlist?.tiers.flatMap((tier) => tier.bookKeys) ?? [])
-              .map((key) => books.find((book) => bookKey(book) === key))
+          : (tierlist?.tiers.flatMap((tier) => tier.workIds) ?? [])
+              .map((workId) => byWork.get(workId))
               .filter((book): book is Record<string, unknown> => Boolean(book));
     if (block.type === "shelf" && width >= 220 && height >= 72) {
       const coverWidth = (height - 12) * 0.75;

@@ -34,18 +34,8 @@ import { Sheet } from "../components/Sheet";
 import { TierBoard } from "../components/tierlist/TierBoard";
 import { TierlistResultsView } from "../components/tierlist/TierlistResultsView";
 import { useTierlistVoting } from "../hooks/useTierlistVoting";
+import { toPrivateBook } from "../lib/sharedMural";
 import { toPlacements } from "../lib/tierlistResults";
-
-function toPrivateBook(pub: PublicBookData): Record<string, unknown> {
-  return {
-    Title: pub.title,
-    Attribution: pub.author,
-    ISBN: pub.isbn,
-    ImageId: pub.imageId,
-    _coverUrl: pub.coverUrl,
-    ReadStatus: pub.readStatus
-  };
-}
 
 function InfoScreen({ message }: { message: string }) {
   return (

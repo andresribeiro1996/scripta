@@ -3,9 +3,8 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { QuizBook } from "@scripta/shared";
 import type { QuizzesRepository } from "./domain/ports.js";
-import type { AnswerRow, PlayRow, QuizRow } from "./domain/types.js";
+import type { AnswerRow, PlayRow, QuizRow, StoredQuizBook } from "./domain/types.js";
 import { createQuizzesService } from "./service.js";
 
 function createInMemoryRepo(): QuizzesRepository {
@@ -92,7 +91,7 @@ function createInMemoryRepo(): QuizzesRepository {
   };
 }
 
-const book = (key: string, extra: Partial<QuizBook> = {}): QuizBook => ({
+const book = (key: string, extra: Partial<StoredQuizBook> = {}): StoredQuizBook => ({
   key,
   title: `Title ${key}`,
   author: "A",

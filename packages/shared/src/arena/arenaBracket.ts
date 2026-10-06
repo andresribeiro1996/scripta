@@ -1,4 +1,4 @@
-import type { Duel } from "./types.js";
+import type { Duel, DuelSide } from "./types.js";
 
 export type BracketSlot = Duel | null;
 
@@ -25,4 +25,10 @@ export function needsVote(duel: Duel): boolean {
 export function sharePercent(votes: number, duel: Duel): number | null {
   const total = duel.bookA.votes + duel.bookB.votes;
   return total > 0 ? Math.round((votes / total) * 100) : null;
+}
+
+export function duelWinner(duel: Duel): DuelSide | null {
+  if (duel.status !== "settled" || !duel.winnerWorkId) return null;
+  if (duel.bookA.workId === duel.winnerWorkId) return duel.bookA;
+  return duel.bookB.workId === duel.winnerWorkId ? duel.bookB : null;
 }
