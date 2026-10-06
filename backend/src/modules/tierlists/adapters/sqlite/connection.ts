@@ -8,6 +8,7 @@ import { mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { env } from "../../../../config/env.js";
+import { migrateTierlistsToWorks } from "./worksPass.js";
 
 const adapterDir = dirname(fileURLToPath(import.meta.url));
 
@@ -41,6 +42,8 @@ export function applyTierlistsMigrations(db: DatabaseSync): void {
       db.exec(`UPDATE tierlists SET origin_user_id = owner_user_id WHERE origin_user_id IS NULL`);
     }
 
+    migrateTierlistsToWorks(db);
+
     // Re-run schema to create any missing tables and indexes
     db.exec(schema);
   }
@@ -57,7 +60,7 @@ function fillNameKeys(db: DatabaseSync): void {
     for (const row of stale) update.run(normalizeWords(row.name), row.id);
     db.exec("COMMIT");
   } catch (error) {
-    db.exec("ROLLBACK");
+    if (db.isTransaction) db.exec("ROLLBACK");
     throw error;
   }
 }

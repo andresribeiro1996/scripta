@@ -1,9 +1,9 @@
-import type { QuizBook } from "./types.js";
+import type { QuizBookInput } from "./types.js";
 
 const cover = (isbn: string): string => `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg`;
 
-const entry = (key: string, title: string, author: string, isbn: string, quote: string): QuizBook => ({
-  key,
+const entry = (id: string, title: string, author: string, isbn: string, quote: string): QuizBookInput & { id: string } => ({
+  id,
   title,
   author,
   coverUrl: cover(isbn),
@@ -15,7 +15,7 @@ const entry = (key: string, title: string, author: string, isbn: string, quote: 
  *  one famous opening line each — famous-lines trivia is the fun one, and
  *  these are short enough to be fair. Cover URLs are OpenLibrary's; a
  *  dead one just means CoverImage's fallback shows for that book. */
-export const QUIZ_POOL: QuizBook[] = [
+export const QUIZ_POOL: Array<QuizBookInput & { id: string }> = [
   entry("pool-pride-and-prejudice", "Pride and Prejudice", "Jane Austen", "9780141439518", "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife."),
   entry("pool-1984", "1984", "George Orwell", "9780451524935", "It was a bright cold day in April, and the clocks were striking thirteen."),
   entry("pool-moby-dick", "Moby-Dick", "Herman Melville", "9780142437247", "Call me Ishmael."),

@@ -8,11 +8,16 @@
 
 export * from "./types.js";
 export * from "./merge.js";
+export * from "./works.js";
 export * from "./bookMatch.js";
 export * from "./dedupe.js";
 export * from "./libraryView.js";
 export * from "./groups.js";
 export * from "./libraryOrder.js";
+export * from "./addPipeline.js";
+export * from "./libraryChange.js";
+export * from "./libraryChangeRequest.js";
+export * from "./librarySaver.js";
 export * from "./libraryStyle.js";
 export * from "./csv.js";
 export * from "./goodreads.js";

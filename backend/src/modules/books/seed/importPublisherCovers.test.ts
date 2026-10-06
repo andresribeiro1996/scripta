@@ -17,7 +17,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 const { applyBooksMigrations } = await import("../adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("../adapters/sqlite/sqliteBooksRepository.js");
 const { SourceUnavailableError } = await import("../domain/errors.js");
-const { importPublisherCovers } = await import("./importPublisherCovers.js");
+const { importPublisherCovers, importedLanguage } = await import("./importPublisherCovers.js");
 
 type Deps = Parameters<typeof importPublisherCovers>[0];
 type Site = Parameters<typeof importPublisherCovers>[1][number];
@@ -34,6 +34,25 @@ const BARCODE_IMAGE = "https://cdn.shopify.com/s/files/1/0000/0000/files/livro-c
 const GUERRA = "9789897837579";
 
 const png = (width: number, height: number) => sharp({ create: { width, height, channels: 3, background: "#886644" } }).png().toBuffer();
+
+const mockUp = () =>
+  sharp({ create: { width: 1800, height: 1200, channels: 3, background: "#ffffff" } })
+    .composite([{ input: { create: { width: 730, height: 1112, channels: 3, background: "#aa3322" } }, left: 535, top: 44 }])
+    .png()
+    .toBuffer();
+
+const coin = () =>
+  sharp({ create: { width: 900, height: 600, channels: 3, background: "#ffffff" } })
+    .composite([{ input: Buffer.from('<svg width="580" height="580"><circle cx="290" cy="290" r="290" fill="#b08a30"/></svg>'), left: 160, top: 10 }])
+    .png()
+    .toBuffer();
+
+const squareCover = () => {
+  const cells = 20;
+  const pixels = Buffer.alloc(cells * cells * 3);
+  for (let i = 0; i < pixels.length; i++) pixels[i] = (i * 97 + ((i * i) % 211)) % 256;
+  return sharp(pixels, { raw: { width: cells, height: cells, channels: 3 } }).resize(2000, 2000, { kernel: "nearest" }).png().toBuffer();
+};
 
 function shopifyPage(products: object[]) {
   return JSON.stringify({ products });
@@ -105,6 +124,10 @@ function addCover(repo: ReturnType<typeof createSqliteBooksRepository>, bookId: 
   return id;
 }
 
+function markMissing(repo: ReturnType<typeof createSqliteBooksRepository>, bookId: string) {
+  repo.setCover(bookId, { imageId: null, status: "missing", checkedAt: NOW.toISOString() });
+}
+
 test("an existing book gets the publisher cover as a manual cover and loses its upgrade mark", async () => {
   const h = await harness();
   const book = addBook(h.repo, MUSEU);
@@ -134,6 +157,9 @@ test("an existing book gets the publisher cover as a manual cover and loses its 
     noAuthor: 0,
     unchanged: 0,
     rejectedImage: 0,
+    cropped: 0,
+    squareAccepted: 0,
+    awaitingCheck: 0,
     failed: 0
   });
   assert.equal(h.logs.length, 1);
@@ -382,7 +408,7 @@ test("an image fetch that is unavailable counts as failed and the run goes on", 
 });
 
 test("an image that is missing, not an image or not cover-shaped is rejected", async () => {
-  const h = await harness({ images: { [MUSEU_IMAGE]: null, [BARCODE_IMAGE]: Buffer.from("not an image"), "https://cdn.shopify.com/s/files/1/1828/7185/files/2026_OMeioeaMassagem_MarshallMcLuhan_Antigona.jpg?v=1790076012": await png(600, 600) } });
+  const h = await harness({ images: { [MUSEU_IMAGE]: null, [BARCODE_IMAGE]: Buffer.from("not an image"), "https://cdn.shopify.com/s/files/1/1828/7185/files/2026_OMeioeaMassagem_MarshallMcLuhan_Antigona.jpg?v=1790076012": await png(900, 600) } });
 
   const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
 
@@ -797,6 +823,8 @@ test("a work key with no author still lands on the blank row", async () => {
   const row = h.repo.findBookByKey(`isbn:${GUERRA}`)!;
   assert.equal(row.title, "");
   assert.equal(row.ol_work_key, "OL7W");
+  assert.equal((h.db.prepare("SELECT COUNT(DISTINCT work_id) AS n FROM books WHERE ol_work_key = 'OL7W'").get() as { n: number }).n, 1);
+  assert.equal((h.db.prepare("SELECT COUNT(*) AS n FROM works WHERE merged_into IS NOT NULL").get() as { n: number }).n, 0);
 });
 
 const MUSEU_URL = "https://antigona.pt/products/o-museu-dos-esforcos-inuteis";
@@ -855,14 +883,14 @@ test("a product URL that is not an absolute web address is not recorded", async 
   assert.equal(h.repo.findBookByKey(`isbn:${MUSEU}`)!.publisher_url, null);
 });
 
-test("a dry run records no product page, creator or origin", async () => {
+test("a dry run records no product page, creator, origin or language", async () => {
   const h = await harness();
   const book = addBook(h.repo, MUSEU);
 
   await importPublisherCovers(h.deps, [antigona], { dryRun: true });
 
   assert.equal(h.repo.getBook(book.id)!.publisher_url, null);
-  assert.equal((h.db.prepare("SELECT COUNT(*) AS n FROM books WHERE created_by IS NOT NULL OR publisher_url IS NOT NULL").get() as { n: number }).n, 0);
+  assert.equal((h.db.prepare("SELECT COUNT(*) AS n FROM books WHERE created_by IS NOT NULL OR publisher_url IS NOT NULL OR language IS NOT NULL").get() as { n: number }).n, 0);
   assert.equal(h.imageCount(), 0);
 });
 
@@ -1018,4 +1046,216 @@ test("at most four sites are imported at once, and every report keeps its site's
   const reports = await run;
   assert.deepEqual(Object.keys(reports), sites.map((site) => site.name));
   assert.ok(Object.values(reports).every((report) => report.skipped !== undefined));
+});
+
+test("a mock-up photo for a book the backfill found no cover for is cropped and stored", async () => {
+  const h = await harness({ images: { [MUSEU_IMAGE]: await mockUp() } });
+  const book = addBook(h.repo, MUSEU);
+  markMissing(h.repo, book.id);
+
+  const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  const row = h.repo.getBook(book.id)!;
+  const image = h.repo.getImage(row.cover_image_id!)!;
+  assert.equal(image.source, "publisher");
+  assert.equal(row.cover_status, "manual");
+  assert.ok(image.height / image.width >= 1.2);
+  assert.equal(reports["Antígona"]!.cropped, 1);
+  assert.equal(reports["Antígona"]!.squareAccepted, 0);
+  assert.equal(reports["Antígona"]!.coversSet, 4);
+});
+
+test("a square picture-book cover is stored as it is", async () => {
+  const h = await harness({ images: { [MUSEU_IMAGE]: await squareCover() } });
+  const book = addBook(h.repo, MUSEU);
+  markMissing(h.repo, book.id);
+
+  const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  const image = h.repo.getImage(h.repo.getBook(book.id)!.cover_image_id!)!;
+  assert.equal(image.width, image.height);
+  assert.equal(reports["Antígona"]!.squareAccepted, 1);
+  assert.equal(reports["Antígona"]!.cropped, 0);
+});
+
+test("a mock-up for a book the backfill has not checked yet is left for a later run", async () => {
+  const h = await harness({ images: { [MUSEU_IMAGE]: await mockUp() } });
+  const book = addBook(h.repo, MUSEU);
+
+  const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  const row = h.repo.getBook(book.id)!;
+  assert.equal(row.cover_image_id, null);
+  assert.equal(row.cover_status, null);
+  assert.equal(reports["Antígona"]!.awaitingCheck, 1);
+  assert.equal(reports["Antígona"]!.cropped, 0);
+  assert.equal(reports["Antígona"]!.coversSet, 3);
+});
+
+test("a square cover for a book the importer just created is left for a later run", async () => {
+  const h = await harness({ images: { [MUSEU_IMAGE]: await squareCover() } });
+
+  const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  const row = h.repo.findBookByKey(`isbn:${MUSEU}`)!;
+  assert.equal(row.cover_image_id, null);
+  assert.equal(reports["Antígona"]!.awaitingCheck, 1);
+  assert.equal(reports["Antígona"]!.squareAccepted, 0);
+});
+
+test("a publisher cover that finishes uploading after another writer set a cover is not written", async () => {
+  const h = await harness();
+  const book = addBook(h.repo, MUSEU);
+  const save = h.deps.blobs.save;
+  let rival: string | null = null;
+  h.deps.blobs.save = async (id, extension, bytes) => {
+    rival ??= addCover(h.repo, book.id, "apple", 800, "https://apple.example/c.jpg", "good");
+    await save(id, extension, bytes);
+  };
+
+  const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  assert.equal(h.repo.getBook(book.id)!.cover_image_id, rival);
+  assert.equal(h.repo.getBook(book.id)!.cover_status, "good");
+  assert.equal(reports["Antígona"]!.unchanged, 1);
+  assert.equal(reports["Antígona"]!.coversSet, 3);
+});
+
+test("a mock-up never replaces a good cover", async () => {
+  const h = await harness({ images: { [MUSEU_IMAGE]: await mockUp() } });
+  const book = addBook(h.repo, MUSEU);
+  const apple = addCover(h.repo, book.id, "apple", 800, "https://apple.example/cover.jpg", "good");
+
+  const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  const row = h.repo.getBook(book.id)!;
+  assert.equal(row.cover_image_id, apple);
+  assert.equal(row.cover_status, "good");
+  assert.equal(reports["Antígona"]!.unchanged, 1);
+  assert.equal(reports["Antígona"]!.cropped, 0);
+});
+
+test("a square cover never replaces a good cover", async () => {
+  const h = await harness({ images: { [MUSEU_IMAGE]: await squareCover() } });
+  const book = addBook(h.repo, MUSEU);
+  const apple = addCover(h.repo, book.id, "apple", 800, "https://apple.example/cover.jpg", "good");
+
+  const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  assert.equal(h.repo.getBook(book.id)!.cover_image_id, apple);
+  assert.equal(reports["Antígona"]!.squareAccepted, 0);
+});
+
+test("a mock-up replaces a low-res cover", async () => {
+  const h = await harness({ images: { [MUSEU_IMAGE]: await mockUp() } });
+  const book = addBook(h.repo, MUSEU);
+  addCover(h.repo, book.id, "apple", 350, "https://apple.example/cover.jpg", "low_res");
+
+  const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  const row = h.repo.getBook(book.id)!;
+  assert.equal(h.repo.getImage(row.cover_image_id!)!.source, "publisher");
+  assert.equal(row.cover_status, "manual");
+  assert.equal(reports["Antígona"]!.cropped, 1);
+});
+
+test("a sub-400 cropped image does not replace a low-res cover", async () => {
+  const small = await sharp(await mockUp()).resize(450, 300).png().toBuffer();
+  const h = await harness({ images: { [MUSEU_IMAGE]: small } });
+  const book = addBook(h.repo, MUSEU);
+  const apple = addCover(h.repo, book.id, "apple", 350, "https://apple.example/cover.jpg", "low_res");
+
+  const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  assert.equal(h.repo.getBook(book.id)!.cover_image_id, apple);
+  assert.equal(reports["Antígona"]!.cropped, 0);
+});
+
+test("a coin photo is rejected", async () => {
+  const h = await harness({ images: { [MUSEU_IMAGE]: await coin() } });
+  const book = addBook(h.repo, MUSEU);
+
+  const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  assert.equal(reports["Antígona"]!.rejectedImage, 1);
+  assert.equal(h.repo.getBook(book.id)!.cover_image_id, null);
+});
+
+test("an image that is already cover-shaped is stored without classification", async () => {
+  const original = await sharp({ create: { width: 1200, height: 1700, channels: 3, background: "#ffffff" } })
+    .composite([{ input: { create: { width: 700, height: 1100, channels: 3, background: "#aa3322" } }, left: 250, top: 300 }])
+    .png()
+    .toBuffer();
+  const h = await harness({ images: { [MUSEU_IMAGE]: original } });
+  const book = addBook(h.repo, MUSEU);
+
+  const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  const { encodeCover } = await import("../domain/images.js");
+  const expected = (await encodeCover(original))!;
+  const image = h.repo.getImage(h.repo.getBook(book.id)!.cover_image_id!)!;
+  assert.equal(image.width, expected.width);
+  assert.equal(image.height, expected.height);
+  assert.equal(image.byte_size, expected.full.length);
+  assert.equal(reports["Antígona"]!.cropped, 0);
+  assert.equal(reports["Antígona"]!.squareAccepted, 0);
+});
+
+test("a blank square is rejected and stores nothing", async () => {
+  const blank = await sharp({ create: { width: 800, height: 800, channels: 3, background: "#ffffff" } }).png().toBuffer();
+  const h = await harness({ images: { [MUSEU_IMAGE]: blank } });
+  const book = addBook(h.repo, MUSEU);
+
+  const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  assert.equal(reports["Antígona"]!.rejectedImage, 1);
+  assert.equal(reports["Antígona"]!.squareAccepted, 0);
+  assert.equal(h.repo.getBook(book.id)!.cover_image_id, null);
+});
+
+test("a dry run downloads and classifies nothing", async () => {
+  const h = await harness({ images: { [MUSEU_IMAGE]: await mockUp() } });
+  addBook(h.repo, MUSEU);
+
+  const reports = await importPublisherCovers(h.deps, [antigona], { dryRun: true });
+
+  assert.deepEqual(h.imageRequests, []);
+  assert.equal(h.imageCount(), 0);
+  assert.equal(reports["Antígona"]!.cropped, 0);
+});
+
+test("the importer's language is the one Open Library states, else pt-PT for a Portugal ISBN, and nothing for any other", () => {
+  assert.equal(importedLanguage(["/languages/eng"], "9789722518888"), "en");
+  assert.equal(importedLanguage(["por"], "9789722518888"), "pt-PT");
+  assert.equal(importedLanguage([], "9789722518888"), "pt-PT");
+  assert.equal(importedLanguage([], "9789896410001"), "pt-PT");
+  assert.equal(importedLanguage([], "9722518887"), "pt-PT");
+  assert.equal(importedLanguage([], "9788535914849"), null);
+  assert.equal(importedLanguage([], "9780141184272"), null);
+  assert.equal(importedLanguage(["/languages/lat"], "9789722518888"), null);
+});
+
+test("every book the importer creates gets pt-PT from its Portugal ISBN, and an existing one is filled only where it has no language", async () => {
+  const h = await harness();
+  const empty = addBook(h.repo, MUSEU);
+  const stated = addBook(h.repo, "9789726084679");
+  h.repo.setLanguage(stated.id, "en");
+
+  await importPublisherCovers(h.deps, [antigona], { dryRun: false });
+
+  assert.equal(h.repo.getBook(empty.id)!.language, "pt-PT");
+  assert.equal(h.repo.getBook(stated.id)!.language, "en");
+  assert.ok(h.bookCount() > 2);
+  assert.deepEqual((h.db.prepare("SELECT DISTINCT language FROM books WHERE id != ?").all(stated.id) as Array<{ language: string | null }>).map((row) => row.language), ["pt-PT"]);
+});
+
+test("a language Open Library states for the edition replaces the Portugal fallback, and one it cannot map is not guessed over", async () => {
+  const stated = await harness({ lookup: async () => ({ title: "Guerra Branca", author: "Bruno Maçães", workKey: "/works/OL7W", languages: ["/languages/eng"] }) });
+  await importPublisherCovers(stated.deps, [relogio], { dryRun: false });
+  assert.equal(stated.repo.findBookByKey(`isbn:${GUERRA}`)!.language, "en");
+  assert.equal(stated.repo.findBookByKey("isbn:9789899061354")!.language, "pt-PT");
+
+  const unmapped = await harness({ lookup: async () => ({ title: "Guerra Branca", author: "Bruno Maçães", workKey: "/works/OL7W", languages: ["/languages/lat"] }) });
+  await importPublisherCovers(unmapped.deps, [relogio], { dryRun: false });
+  assert.equal(unmapped.repo.findBookByKey(`isbn:${GUERRA}`)!.language, null);
 });

@@ -4,8 +4,7 @@ export type QuizQuestionType = (typeof QUIZ_QUESTION_TYPES)[number];
 
 /** Publish-time snapshot of one book — same philosophy as tournament
  *  slots: editing the library later never mutates a live quiz. */
-export interface QuizBook {
-  key: string;
+export interface QuizBookContent {
   title: string;
   author: string;
   coverUrl: string | null;
@@ -13,12 +12,20 @@ export interface QuizBook {
   blurb: string | null;
 }
 
+export interface QuizBook extends QuizBookContent {
+  workId: string;
+}
+
+export interface QuizBookInput extends QuizBookContent {
+  workId?: string;
+}
+
 export interface QuizQuestion {
   /** Stable within one quiz ("q0", "q1", …) — quiz_play_answers keys on
    *  it, and the seeded set is written once at publish and never redrawn. */
   id: string;
   type: QuizQuestionType;
-  bookKey: string;
+  workId: string | null;
   /** Titles for cover/quote/blurb questions; cover URLs for title_cover. */
   options: string[];
   answerIndex: number;
@@ -43,6 +50,8 @@ export interface QuizData {
   /** null until publish generates the seeded set. */
   questions: QuizQuestion[] | null;
 }
+
+export type QuizDataInput = Omit<QuizData, "books"> & { books: QuizBookInput[] };
 
 export interface QuizConfig {
   questionCount: number;

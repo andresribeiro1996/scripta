@@ -1,8 +1,9 @@
 import { BLOCK_TYPE_LABELS, type MuralBlock } from "@scripta/shared";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Keyboard, Platform, StyleSheet, useWindowDimensions, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FormScroll, Segmented, Sheet } from "../../ui";
-import { spacing } from "../../ui/theme";
+import { minimumTouchTarget, spacing, typography } from "../../ui/theme";
 
 export type SheetTab = "content" | "style" | "layout";
 
@@ -12,12 +13,15 @@ export function BlockSheet({ block, visible, tab, onTabChange, onClose, preview,
   tab: SheetTab | null;
   onTabChange: (tab: SheetTab) => void;
   onClose: () => void;
-  preview: ReactNode;
+  preview: (maxHeight: number) => ReactNode;
   content: ReactNode | null;
   style: ReactNode | null;
   layout: ReactNode;
 }) {
-  const { height } = useWindowDimensions();
+  const { height, fontScale } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const sheetHeight = Math.min(640, height * 0.9, height - insets.top - spacing.sm);
+  const frameHeight = Math.max(0, sheetHeight - insets.bottom - spacing.xl * 2 - Math.max(minimumTouchTarget, typography.title.lineHeight * fontScale));
   const [keyboardShown, setKeyboardShown] = useState(false);
   const lastTab = useRef<SheetTab | null>(null);
   useEffect(() => {
@@ -35,14 +39,14 @@ export function BlockSheet({ block, visible, tab, onTabChange, onClose, preview,
   const tabs: Array<{ value: SheetTab; label: string }> = [
     ...(content ? [{ value: "content" as const, label: "Content" }] : []),
     ...(style ? [{ value: "style" as const, label: "Style" }] : []),
-    { value: "layout", label: "Layout" },
+    { value: "layout", label: "Size" },
   ];
   const wanted = tab ?? lastTab.current;
   const current = tabs.find((item) => item.value === wanted)?.value ?? "layout";
   return (
     <Sheet visible={visible} title={block ? BLOCK_TYPE_LABELS[block.type] : ""} onClose={onClose}>
-      <View style={[styles.frame, { height: Math.round(height * 0.8), flexShrink: 1 }]}>
-        {keyboardShown ? null : preview}
+      <View style={[styles.frame, { height: frameHeight }]}>
+        {keyboardShown || frameHeight < 320 * fontScale ? null : preview(Math.min(144, Math.round(frameHeight / 5)))}
         <Segmented options={tabs} value={current} onChange={onTabChange} accessibilityLabel="Block settings" />
         <FormScroll contentContainerStyle={styles.body}>{current === "content" ? content : current === "style" ? style : layout}</FormScroll>
       </View>
@@ -51,6 +55,6 @@ export function BlockSheet({ block, visible, tab, onTabChange, onClose, preview,
 }
 
 const styles = StyleSheet.create({
-  frame: { gap: spacing.md },
+  frame: { gap: spacing.md, flexShrink: 1 },
   body: { paddingBottom: spacing.xl },
 });

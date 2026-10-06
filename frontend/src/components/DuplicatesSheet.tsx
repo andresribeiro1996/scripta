@@ -3,12 +3,14 @@ import { useQueryClient } from "@tanstack/react-query";
 import { bookKey, markDistinct, saveFailureMessage, statusLabel } from "@scripta/shared";
 import { mergeLibraryBooks, type LibraryDocument } from "../api/library";
 import { useLibrary } from "../hooks/useLibrary";
+import { useLibrarySaver } from "../hooks/useLibrarySaver";
 import { CoverImage } from "./BookCard";
 import { Sheet } from "./Sheet";
 import { useToast } from "./Toaster";
 
 export function DuplicatesSheet({ groups, library, onClose }: { groups: string[][]; library: LibraryDocument; onClose: () => void }) {
   const { updateLibrary } = useLibrary();
+  const saver = useLibrarySaver();
   const queryClient = useQueryClient();
   const toast = useToast();
   const [busy, setBusy] = useState(false);
@@ -30,8 +32,7 @@ export function DuplicatesSheet({ groups, library, onClose }: { groups: string[]
 
   const merge = (group: string[]) =>
     run(async () => {
-      const current = queryClient.getQueryData<LibraryDocument | null>(["library"]) ?? library;
-      queryClient.setQueryData(["library"], await mergeLibraryBooks(group[0]!, group.slice(1), current.updatedAt));
+      await saver.merge((expectedUpdatedAt, signal) => mergeLibraryBooks(group[0]!, group.slice(1), expectedUpdatedAt ?? library.updatedAt, signal));
     }, "Couldn't merge these books.");
 
   const keepApart = (group: string[]) => run(() => updateLibrary((data) => markDistinct(data, group)), "Couldn't save that.");

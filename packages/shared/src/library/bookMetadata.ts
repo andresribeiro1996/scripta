@@ -49,13 +49,17 @@ export function positiveInteger(value: unknown): number | null {
   return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : null;
 }
 
+export function openLibraryDescription(record: unknown): string | null {
+  const raw = record && typeof record === "object" ? (record as { description?: unknown }).description : null;
+  const description = typeof raw === "string" ? raw : raw && typeof raw === "object" ? (raw as { value?: unknown }).value : null;
+  return typeof description === "string" && description.trim() ? description.trim().replace(/\[([^\]]+)\]\(https?:\/\/[^)]+\)/g, "$1").replace(/\*\*([^*]+)\*\*/g, "$1") : null;
+}
+
 export function buildBookMetadata(match: Record<string, unknown>, work: unknown): CatalogBookMetadata {
   const sourceUrl = `https://openlibrary.org${String(match.key)}`;
   const record = work && typeof work === "object" ? work as Record<string, unknown> : {};
-  const rawDescription = record.description;
-  const description = typeof rawDescription === "string" ? rawDescription : rawDescription && typeof rawDescription === "object" ? (rawDescription as { value?: unknown }).value : null;
   return {
-    summary: typeof description === "string" && description.trim() ? description.trim().replace(/\[([^\]]+)\]\(https?:\/\/[^)]+\)/g, "$1").replace(/\*\*([^*]+)\*\*/g, "$1") : null,
+    summary: openLibraryDescription(record),
     rating: validBookRating(match.ratings_average),
     ratingCount: typeof match.ratings_count === "number" && Number.isFinite(match.ratings_count) && match.ratings_count > 0 ? Math.floor(match.ratings_count) : 0,
     sourceUrl,

@@ -1,5 +1,5 @@
 // Shared by dev-account.mjs and dev-emulator.mjs, which write different
-// keys (EXPO_PUBLIC_DEV_REFRESH_TOKEN and EXPO_PUBLIC_API_URL) into the
+// keys (EXPO_PUBLIC_DEV_AUTO_LOGIN and EXPO_PUBLIC_API_URL) into the
 // SAME file — mobile/.env.local, auto-loaded by @expo/env (see its own
 // index.js: .env.local is one of the "local" files EXPO_PUBLIC_* secrets
 // are specifically allowed to come from). One helper means neither

@@ -1,4 +1,4 @@
-import { bracketShape, countdownLabel, needsVote, type BracketSlot, type Duel, type DuelSide } from "@scripta/shared";
+import { bracketShape, countdownLabel, duelWinner, needsVote, type BracketSlot, type Duel, type DuelSide } from "@scripta/shared";
 import type { TournamentView } from "./api";
 
 const ALL_ARENA_VIEW_TABS = [
@@ -35,8 +35,7 @@ export function bracketSlots(bracketSize: number, duels: Duel[]): Array<{ key: s
 export function tournamentChampion(bracketSize: number, duels: Duel[]): DuelSide | null {
   const lastRound = bracketShape(bracketSize, duels).at(-1);
   const final = lastRound?.length === 1 ? lastRound[0] : null;
-  if (!final?.winnerKey) return null;
-  return final.winnerKey === final.bookA.key ? final.bookA : final.bookB;
+  return final ? duelWinner(final) : null;
 }
 
 export function matchEmptyCopy(status: TournamentView["status"], hasDuels: boolean): { title: string; body: string } {

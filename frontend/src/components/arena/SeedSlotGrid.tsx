@@ -12,11 +12,12 @@
 // books AND assigns slots server-side — this component never runs the
 // shuffle itself).
 
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import type { SeedBook } from "../../api/arena";
 import { useLibrary } from "../../hooks/useLibrary";
 import { toSeedBook } from "../../lib/arenaSeed";
-import { bookKey } from "../../lib/merge";
+import { workIdOf, booksByWork } from "@scripta/shared";
+import { useWorkBooks } from "../../hooks/useWorkBooks";
 import { CoverImage } from "../BookCard";
 import { BookSearchList } from "../murals/pickers";
 import { useDismissible } from "../../hooks/useDismissible";
@@ -45,16 +46,18 @@ export function SeedSlotGrid({
   sizeControl?: ReactNode;
 }) {
   const { data: library } = useLibrary();
-  const books = ((library?.data as { books?: Array<Record<string, unknown>> } | undefined)?.books ?? []) as Array<Record<string, unknown>>;
+  const workBooks = useWorkBooks(library);
+  const books = useMemo(() => [...booksByWork(workBooks).values()], [workBooks]);
   const [pickingSlot, setPickingSlot] = useState<number | null>(null);
   // Always-mounted grid — lock only while the picker modal is up.
   useScrollLock(pickingSlot !== null);
   useDismissible(() => setPickingSlot(null), pickingSlot !== null);
-  const usedKeys = new Set(slots.filter((s): s is SeedBook => s !== null).map((s) => s.key));
+  const usedWorkIds = new Set(slots.filter((s): s is SeedBook => s !== null).map((s) => s.workId));
   const filledCount = slots.filter(Boolean).length;
 
   async function assignSlot(index: number, book: Record<string, unknown>) {
     const seedBook = await toSeedBook(book);
+    if (!seedBook) return;
     const next = [...slots];
     next[index] = seedBook;
     onChange(next);
@@ -109,7 +112,7 @@ export function SeedSlotGrid({
           >
             <h3 className="mb-3 text-sm font-semibold">Pick a book for slot {pickingSlot + 1}</h3>
             <BookSearchList
-              books={books.filter((b) => !usedKeys.has(bookKey(b)))}
+              books={books.filter((b) => !usedWorkIds.has(workIdOf(b) ?? null))}
               onSelect={(book) => void assignSlot(pickingSlot, book)}
             />
           </div>

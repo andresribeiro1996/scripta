@@ -1,16 +1,3 @@
-// Merging a newly-imported library into the one already saved for this
-// account. Only kicks in from the SECOND import onward — the first import
-// has nothing to merge against, so it's saved as-is (see frontend's
-// DashboardPage).
-//
-// This intentionally lives entirely on the client, not the backend: the
-// `library` module was built to treat the document as an opaque blob (see
-// backend/README.md's hexagonal-architecture section) — it doesn't
-// understand book shape, and shouldn't have to just for this. Each
-// client already understands book shape (it's what parses every import
-// format), so it merges locally and PUTs the result through the same
-// unchanged `saveLibrary` call.
-
 import type { LibraryData } from "./types.js";
 import { certainFacts, matchFacts } from "./bookMatch.js";
 import { normalizeIsbn } from "./covers.js";
@@ -22,6 +9,7 @@ import { normalizeIsbn } from "./covers.js";
  *  (common for indie/sideloaded titles) — imprecise, but the only signal
  *  available across sources that don't share a real ISBN. */
 export function bookKey(book: Record<string, unknown>): string {
+  if (typeof book._key === "string") return book._key;
   const isbn = normalizeIsbn(book.ISBN);
   if (isbn) return `isbn:${isbn}`;
   const title = normalizeForMatch(book.Title);

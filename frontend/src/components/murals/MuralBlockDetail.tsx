@@ -1,5 +1,5 @@
 import { useRef, useState, type ReactNode } from "react";
-import { READER_PLATES, type Group, type PublicReaderCard } from "@scripta/shared";
+import { READER_PLATES, type Group, type PublicReaderCard, booksByWork } from "@scripta/shared";
 import type { ThemeId } from "@scripta/shared/themes";
 import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
@@ -97,17 +97,18 @@ export function MuralBlockDetail({
   const spotlight = block.type === "spotlight" ? books.find((book) => bookKey(book) === block.bookKey) : undefined;
   const book = selectedBook ?? spotlight;
   const tierlist = block.type === "tierlist" ? tierlistData?.(block.tierlistId) : undefined;
+  const byWork = booksByWork(books);
   const groups =
     block.type === "shelf"
       ? [{ title: "", books: resolveShelfBooks(block, books) }]
       : block.type === "currentlyReading"
         ? [{ title: "", books: books.filter((item) => item.ReadStatus === 1) }]
         : tierlist
-          ? [...tierlist.tiers.map((tier) => ({ title: tier.label, keys: tier.bookKeys })), { title: "Unranked", keys: tierlist.pool }].map(
+          ? [...tierlist.tiers.map((tier) => ({ title: tier.label, keys: tier.workIds })), { title: "Unranked", keys: tierlist.pool }].map(
               (group) => ({
                 title: group.title,
                 books: group.keys
-                  .map((key) => books.find((item) => bookKey(item) === key))
+                  .map((workId) => byWork.get(workId))
                   .filter((item): item is Record<string, unknown> => Boolean(item))
               })
             )

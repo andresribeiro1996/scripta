@@ -91,9 +91,11 @@ const RevealField = createContext<((field: View) => void) | null>(null);
 export function FormScroll({
   children,
   contentContainerStyle,
+  scrollToEnd = false,
 }: {
   children: ReactNode;
   contentContainerStyle?: ViewStyle;
+  scrollToEnd?: boolean;
 }) {
   const frame = useRef<View>(null);
   const scroll = useRef<ScrollView>(null);
@@ -125,6 +127,10 @@ export function FormScroll({
       );
     });
   }, []);
+
+  useEffect(() => {
+    if (scrollToEnd) requestAnimationFrame(() => scroll.current?.scrollToEnd({ animated: true }));
+  }, [scrollToEnd]);
 
   useEffect(() => {
     const measureOverlap = (keyboardTop: number) => {
@@ -220,6 +226,7 @@ export function IconButton({
   tone = "default",
   framed = false,
   badge,
+  disabled = false,
 }: {
   name: IconName;
   accessibilityLabel: string;
@@ -234,6 +241,7 @@ export function IconButton({
    *  off unless asked for. */
   framed?: boolean;
   badge?: string | null;
+  disabled?: boolean;
 }) {
   const { colors } = useTheme();
   const color = tone === "danger" ? colors.danger : tone === "accent" ? colors.onAccent : colors.textDim;
@@ -241,6 +249,8 @@ export function IconButton({
     <Pressable
       accessibilityLabel={badge ? `${accessibilityLabel}, ${badge} new` : accessibilityLabel}
       accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      disabled={disabled}
       hitSlop={8}
       onPress={onPress}
       style={({ pressed }) => {
@@ -248,7 +258,7 @@ export function IconButton({
         return [
           label ? styles.labelledIconButton : styles.iconButton,
           framed ? { borderWidth: 1, borderColor: tone === "accent" ? background : colors.border } : null,
-          { backgroundColor: background },
+          { backgroundColor: background, opacity: disabled ? 0.55 : 1 },
         ];
       }}
     >
@@ -802,8 +812,8 @@ const styles = StyleSheet.create({
   closeText: { ...typography.body, fontWeight: "600" },
   toast: { borderRadius: radii.md, borderWidth: 1, paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
   state: { flexGrow: 1, justifyContent: "center", paddingVertical: spacing.xxl, paddingHorizontal: spacing.lg },
-  emptyCard: { alignItems: "center", gap: spacing.md },
-  errorCard: { alignItems: "center", gap: spacing.md, borderRadius: radii.lg, padding: spacing.lg },
+  emptyCard: { alignItems: "stretch", gap: spacing.md },
+  errorCard: { alignItems: "stretch", gap: spacing.md, borderRadius: radii.lg, padding: spacing.lg },
   stateTitle: { ...typography.title, fontWeight: "700", textAlign: "center", alignSelf: "stretch" },
   centerText: { textAlign: "center" },
   banner: { minHeight: minimumTouchTarget, justifyContent: "center", paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },

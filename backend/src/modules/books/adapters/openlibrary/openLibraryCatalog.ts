@@ -1,8 +1,19 @@
-import { buildBookMetadata, findOpenLibraryMatch, mapOpenLibraryDoc } from "@scripta/shared";
-import type { BookCatalog } from "../../domain/ports.js";
+import { buildBookMetadata, findOpenLibraryMatch, mapOpenLibraryDoc, openLibraryDescription } from "@scripta/shared";
+import type { BookCatalog, EditionRecord, EditionRecordSource } from "../../domain/ports.js";
 import { fetchJson, type Throttle } from "../http/http.js";
 
-export function createOpenLibraryCatalog(throttle: Throttle, urgent = true): BookCatalog {
+const keyOf = (value: unknown): string | null => (value && typeof value === "object" && typeof (value as { key?: unknown }).key === "string" ? (value as { key: string }).key : null);
+
+export function parseEditionRecord(record: unknown): EditionRecord {
+  const fields: Record<string, unknown> = record && typeof record === "object" ? (record as Record<string, unknown>) : {};
+  return {
+    title: typeof fields.title === "string" ? fields.title.trim() : "",
+    workKey: Array.isArray(fields.works) ? keyOf(fields.works[0]) : null,
+    languages: Array.isArray(fields.languages) ? fields.languages.flatMap((language) => keyOf(language) ?? []) : []
+  };
+}
+
+export function createOpenLibraryCatalog(throttle: Throttle, urgent = true): BookCatalog & EditionRecordSource {
   const get = (url: string) => throttle(() => fetchJson("openlibrary", url), { urgent });
   return {
     async fetchDetails({ isbn, title, author }) {
@@ -15,8 +26,12 @@ export function createOpenLibraryCatalog(throttle: Throttle, urgent = true): Boo
       }
       const match = findOpenLibraryMatch(await get(`https://openlibrary.org/search.json?${query}`), isbn ?? "", title, author);
       if (!match) return null;
-      const metadata = buildBookMetadata(match, await get(`https://openlibrary.org${String(match.key)}.json`));
-      return { metadata, sources: ["openlibrary"], summarySource: metadata.summary ? "openlibrary" : null, workKey: String(match.key) };
+      const work = await get(`https://openlibrary.org${String(match.key)}.json`);
+      const edition = isbn ? await get(`https://openlibrary.org/isbn/${encodeURIComponent(isbn)}.json`) : null;
+      const metadata = buildBookMetadata(match, work);
+      const workSummary = metadata.summary;
+      metadata.summary = openLibraryDescription(edition);
+      return { metadata, sources: ["openlibrary"], summarySource: metadata.summary ? "openlibrary" : null, workKey: String(match.key), workSummary };
     },
 
     async search(query) {
@@ -32,6 +47,11 @@ export function createOpenLibraryCatalog(throttle: Throttle, urgent = true): Boo
         const result = mapOpenLibraryDoc(doc);
         return result ? [{ result, olCoverId: typeof doc.cover_i === "number" ? doc.cover_i : null, workKey: typeof doc.key === "string" ? doc.key : null, source: "openlibrary" as const }] : [];
       });
+    },
+
+    async fetchEditionRecord(isbn) {
+      const record = await get(`https://openlibrary.org/isbn/${encodeURIComponent(isbn)}.json`);
+      return record === null ? null : parseEditionRecord(record);
     }
   };
 }

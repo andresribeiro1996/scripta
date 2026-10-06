@@ -2,7 +2,7 @@ import { muralThemeId, type ReaderProfile } from "@scripta/shared";
 import type { ThemeId } from "@scripta/shared/themes";
 import { env } from "../../../config/env.js";
 import { resolvePublicReaderProfile } from "../../auth/index.js";
-import { resolvePublicLibraryData } from "../../library/index.js";
+import { resolvePublicBooksByWork, resolvePublicLibraryData } from "../../library/index.js";
 import type { TierlistData } from "../../tierlists/index.js";
 import { extractReferences } from "./blockRefs.js";
 import type { MuralRow } from "./types.js";
@@ -38,14 +38,10 @@ export function resolveMuralPublicPayload(
       .map((id) => [id, getTierlistData?.(row.user_id, id)] as const)
       .filter((entry): entry is readonly [string, TierlistData] => entry[1] !== undefined)
   );
-  const tierlistBookKeys = new Set<string>();
-  for (const tierlist of Object.values(tierlists)) {
-    for (const key of tierlist.pool) tierlistBookKeys.add(key);
-    for (const tier of tierlist.tiers) for (const key of tier.bookKeys) tierlistBookKeys.add(key);
-  }
+  const tierlistWorkIds = [...new Set(Object.values(tierlists).flatMap((tierlist) => [...tierlist.pool, ...tierlist.tiers.flatMap((tier) => tier.workIds)]))];
 
   const libraryData = resolvePublicLibraryData(row.user_id, {
-    bookKeys: [...refs.bookKeys, ...tierlistBookKeys],
+    bookKeys: [...refs.bookKeys],
     collectionIds: [...refs.collectionIds],
     highlightRefs: refs.highlightRefs,
     needsCurrentlyReading: refs.needsCurrentlyReading,
@@ -53,6 +49,15 @@ export function resolveMuralPublicPayload(
     needsShelfTheme: refs.needsShelfTheme,
     needsReaderCard: refs.needsReaderCard
   });
+
+  if (tierlistWorkIds.length > 0) {
+    const shown = new Set(libraryData.books.map((book) => book.key));
+    for (const book of resolvePublicBooksByWork(row.user_id, tierlistWorkIds).values()) {
+      if (shown.has(book.key)) continue;
+      shown.add(book.key);
+      libraryData.books.push(book);
+    }
+  }
 
   const imageIds = [...refs.imageIds, ...(row.cover_image_id ? [row.cover_image_id] : [])];
   const imageUrls = Object.fromEntries(imageIds.map((id) => [id, `${env.PUBLIC_API_URL}/gallery/${id}/file`]));

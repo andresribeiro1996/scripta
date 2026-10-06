@@ -9,6 +9,7 @@
 // countdown re-render (and useArena's 5s poll) would re-trigger a fresh
 // cover lookup/flicker on every tick.
 
+import { duelWinner } from "@scripta/shared";
 import { useMemo } from "react";
 import type { Duel, DuelSide } from "../../api/arena";
 import { CoverImage } from "../BookCard";
@@ -91,7 +92,7 @@ export function DuelCard({
   onAddBook
 }: {
   duel: Duel;
-  onVote: (bookKey: string) => void;
+  onVote: (workId: string) => void;
   /** Non-null when voting shouldn't be allowed right now (already voted,
    *  duel settled, tournament not active) — shown instead of the
    *  countdown. */
@@ -102,6 +103,7 @@ export function DuelCard({
 }) {
   const countdown = useCountdown(duel.closesAt);
   const totalVotes = duel.bookA.votes + duel.bookB.votes;
+  const winner = duelWinner(duel);
   const canVote = duel.status === "active" && !votingDisabledReason;
 
   return (
@@ -122,18 +124,18 @@ export function DuelCard({
         <DuelSideCard
           side={duel.bookA}
           totalVotes={totalVotes}
-          isWinner={duel.winnerKey === duel.bookA.key}
-          canVote={canVote}
-          onVote={() => onVote(duel.bookA.key)}
+          isWinner={winner === duel.bookA}
+          canVote={canVote && duel.bookA.workId !== null}
+          onVote={() => duel.bookA.workId && onVote(duel.bookA.workId)}
           onAddBook={onAddBook}
         />
         <div className="flex items-center px-1 text-sm font-bold text-(--color-text-dim)">VS</div>
         <DuelSideCard
           side={duel.bookB}
           totalVotes={totalVotes}
-          isWinner={duel.winnerKey === duel.bookB.key}
-          canVote={canVote}
-          onVote={() => onVote(duel.bookB.key)}
+          isWinner={winner === duel.bookB}
+          canVote={canVote && duel.bookB.workId !== null}
+          onVote={() => duel.bookB.workId && onVote(duel.bookB.workId)}
           onAddBook={onAddBook}
         />
       </div>

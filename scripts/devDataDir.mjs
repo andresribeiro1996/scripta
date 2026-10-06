@@ -10,6 +10,7 @@
 // OLD isolated fixture directory, still used by three-users.mjs's
 // default/--check modes, unrelated to this one).
 
+import { copyFileSync, existsSync, mkdirSync, readdirSync, renameSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -33,4 +34,40 @@ export function devDataDirEnv(directory = devDataDir) {
   for (const module of DB_MODULES) env[`${module.toUpperCase()}_DB_PATH`] = join(directory, `${module}.sqlite`);
   env.FILES_STORAGE_PATH = join(directory, "files");
   return env;
+}
+
+function moveFile(from, to) {
+  mkdirSync(dirname(to), { recursive: true });
+  if (!existsSync(to)) renameSync(from, to);
+}
+
+/** Moves images an older backend left in covers-files/, gallery-files/
+ *  and avatar-files/ into files/, the only place GET /files/* serves from.
+ *  Same key mapping as backend/scripts/copy-files-to-r2.mjs did for
+ *  production, including a thumbnail copied from the full image for a
+ *  cover that never had one. */
+export function migrateLegacyFiles(directory = devDataDir) {
+  const files = join(directory, "files");
+  const covers = join(directory, "covers-files");
+  if (existsSync(covers)) {
+    const names = new Set(readdirSync(covers));
+    for (const name of names) {
+      const full = /^([0-9a-f-]{36})\.webp$/.exec(name);
+      const thumb = full && `${full[1]}-thumb.webp`;
+      if (thumb && !names.has(thumb) && !existsSync(join(files, "covers", thumb))) {
+        mkdirSync(join(files, "covers"), { recursive: true });
+        copyFileSync(join(covers, name), join(files, "covers", thumb));
+      }
+      moveFile(join(covers, name), join(files, "covers", name));
+    }
+    rmSync(covers, { recursive: true });
+  }
+  for (const [legacy, kind] of [["gallery-files", "gallery"], ["avatar-files", "avatars"]]) {
+    const source = join(directory, legacy);
+    if (!existsSync(source)) continue;
+    for (const user of readdirSync(source, { withFileTypes: true }).filter((entry) => entry.isDirectory())) {
+      for (const name of readdirSync(join(source, user.name))) moveFile(join(source, user.name, name), join(files, kind, name));
+    }
+    rmSync(source, { recursive: true });
+  }
 }

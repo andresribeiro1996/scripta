@@ -8,7 +8,7 @@
 // uploadImportPreview, consumed as-is — not modified, per this task's
 // handoff note about that skeleton). Either path ends at the same
 // preview-then-confirm step, then the caller's onMerge runs the normal
-// merge/order/series-seed pipeline (lib/mergeAndSave.ts) and one save.
+// merge/order/series-seed pipeline and one save.
 //
 // Also backs "Sync Goodreads" (frontend's SyncGoodreadsModal) — same
 // flow, this app has no separate modal for it, just different opening

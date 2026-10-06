@@ -1,17 +1,30 @@
 import { BLOCK_BACKGROUND_FINISH_OPTIONS, BLOCK_FONT_FAMILY_OPTIONS, BLOCK_INNER_SPACING_OPTIONS, BLOCK_TEXT_ALIGN_OPTIONS, BLOCK_THEME_COLOR_LABELS, normalizeHexColor, resolveBlockColor, themeColorRef, type BlockStyle, type BlockThemeColorKey } from "@scripta/shared";
+import { Collapsible, Host, RNHostView } from "@expo/ui";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Button, Icon } from "../../ui";
 import { Text } from "../../ui/Text";
 import { blockFontFamily, resolveBorderStyle } from "../../ui/libraryStyle";
 import { minimumTouchTarget, radii, spacing, typography, useTheme, type ThemeColors } from "../../ui/theme";
-import { Caption, Chip, PresetRow, Section as Group, SelectRow, SWATCHES, Tile } from "../library/components/StyleControls";
+import { Caption, Chip, PresetRow, SelectRow, SWATCHES, Tile } from "../library/components/StyleControls";
 import { ColorEditor } from "./ColorEditor";
+import { SavedLooks } from "./SavedLooks";
 import {
   BACKGROUND_FIXED_SWATCHES, BACKGROUND_THEME_SWATCHES, BORDER_SIDE_PRESETS, BORDER_STRENGTH_PRESETS, BORDER_STYLE_CHOICES, BORDER_THEME_SWATCHES,
-  BORDER_WIDTH_PRESETS, COLOR_LOOKS, CORNER_PRESETS, FADE_PRESETS, FRAME_LOOKS, SIZE_PRESETS, TEXT_THEME_SWATCHES,
+  BORDER_WIDTH_PRESETS, COLOR_LOOKS, CORNER_PRESETS, FADE_PRESETS, FRAME_LOOKS, GRADIENT_DIRECTION_PRESETS, GRADIENT_STRENGTH_PRESETS, SHADOW_BLUR_PRESETS, SHADOW_DISTANCE_PRESETS, SHADOW_STRENGTH_PRESETS, SIZE_PRESETS, TEXT_THEME_SWATCHES,
   applyLook, customColorStart, isHardToRead, matchSides, type CustomColorTarget, type Look,
 } from "./blockStyleOptions";
+
+function Group({ title, open, onOpenChange, children }: { title: string; open: boolean; onOpenChange: (open: boolean) => void; children: ReactNode }) {
+  const { colors, mode } = useTheme();
+  return (
+    <Host matchContents={{ vertical: true }} colorScheme={mode} seedColor={colors.accent}>
+      <Collapsible label={title} labelStyle={{ color: colors.text, fontSize: 16, fontWeight: "600" }} isOpen={open} onOpenChange={onOpenChange}>
+        <RNHostView matchContents><View style={styles.group}>{children}</View></RNHostView>
+      </Collapsible>
+    </Host>
+  );
+}
 
 function ColorRow({ label, palette, value, defaults, themeKeys, fixed, onChange, onCustom, editor }: {
   label: string;
@@ -75,6 +88,7 @@ export function StyleTab({ style, palette, onChange, onReset, onCopy, onPaste, c
 }) {
   const { colors } = useTheme();
   const set = (patch: Partial<BlockStyle>) => onChange({ ...style, ...patch });
+  const [section, setSection] = useState<string | null>("Background");
   const [editing, setEditing] = useState<{ target: CustomColorTarget; previous: string | null } | null>(null);
   const latest = useRef({ style, onChange, editing });
   latest.current = { style, onChange, editing };
@@ -82,6 +96,14 @@ export function StyleTab({ style, palette, onChange, onReset, onCopy, onPaste, c
     const { style: current, onChange: change, editing: open } = latest.current;
     if (open) change({ ...current, [open.target]: open.previous });
   }, []);
+  const group = (title: string) => ({
+    title,
+    open: section === title,
+    onOpenChange: (open: boolean) => {
+      if (editing) { set({ [editing.target]: editing.previous }); setEditing(null); }
+      setSection(open ? title : null);
+    },
+  });
   const customRow = (target: CustomColorTarget) => ({
     onCustom: () => { if (editing?.target !== target) setEditing({ target, previous: style[target] }); },
     editor: editing?.target === target ? (
@@ -101,20 +123,23 @@ export function StyleTab({ style, palette, onChange, onReset, onCopy, onPaste, c
   );
   return (
     <View style={styles.tab}>
-      <Group title="Looks">
-        <Caption>Color</Caption>
-        {looks(COLOR_LOOKS)}
-        <Caption>Frame</Caption>
-        {looks(FRAME_LOOKS)}
-      </Group>
-      <Group title="Color">
+      <Group {...group("Background")}>
         <ColorRow palette={palette} label="Background" value={style.backgroundColor} defaults={[{ label: "None", value: "transparent" }, { label: "Theme", value: null }]} themeKeys={BACKGROUND_THEME_SWATCHES} fixed={BACKGROUND_FIXED_SWATCHES} onChange={(backgroundColor) => set(backgroundColor === "transparent" ? { backgroundColor, cardShadow: false } : { backgroundColor })} {...customRow("backgroundColor")} />
+        <SelectRow label="Gradient" value={style.gradientColor ? "on" : "none"} options={[{ value: "none", label: "None" }, { value: "on", label: "On" }]} onChange={(value) => set({ gradientColor: value === "on" ? themeColorRef("accent") : null, ...(value === "on" && style.backgroundColor === "transparent" ? { backgroundColor: null } : {}) })} />
+        {style.gradientColor ? <>
+          <Caption>The background is the first color.</Caption>
+          <ColorRow palette={palette} label="Second color" value={style.gradientColor} defaults={[]} themeKeys={BACKGROUND_THEME_SWATCHES} fixed={BACKGROUND_FIXED_SWATCHES} onChange={(gradientColor) => set({ gradientColor })} {...customRow("gradientColor")} />
+          <PresetRow label="Direction" presets={GRADIENT_DIRECTION_PRESETS} value={style.gradientAngle} onChange={(gradientAngle) => set({ gradientAngle })} />
+          <PresetRow label="Blend strength" presets={GRADIENT_STRENGTH_PRESETS} value={style.gradientStrength} onChange={(gradientStrength) => set({ gradientStrength })} />
+        </> : null}
         <SelectRow label="Finish" value={style.backgroundFinish} options={BLOCK_BACKGROUND_FINISH_OPTIONS} onChange={(backgroundFinish) => set({ backgroundFinish })} />
         {style.backgroundColor === "transparent" ? <Caption>Shows when the block has a background</Caption> : null}
+        <SelectRow label="Inner spacing" value={style.innerSpacing} options={BLOCK_INNER_SPACING_OPTIONS} onChange={(innerSpacing) => set({ innerSpacing })} />
+      </Group>
+      <Group {...group("Text")}>
         <ColorRow palette={palette} label="Text color" value={style.textColor} defaults={[{ label: "Auto", value: null }]} themeKeys={TEXT_THEME_SWATCHES} fixed={SWATCHES} onChange={(textColor) => set({ textColor })} {...customRow("textColor")} />
         {isHardToRead(style, palette) ? <Text accessibilityLiveRegion="polite" style={[typography.caption, { color: colors.danger }]}>Hard to read on this background</Text> : null}
-      </Group>
-      <Group title="Text">
+
         <View style={styles.wrap}>
           {BLOCK_FONT_FAMILY_OPTIONS.map((option) => <Chip key={option.value} label={option.label.replace(" (system)", "")} fontFamily={blockFontFamily(option.value)} selected={style.fontFamily === option.value} onPress={() => set({ fontFamily: option.value })} />)}
         </View>
@@ -126,7 +151,7 @@ export function StyleTab({ style, palette, onChange, onReset, onCopy, onPaste, c
         </View>
         <SelectRow label="Alignment" value={style.textAlign} options={BLOCK_TEXT_ALIGN_OPTIONS} onChange={(textAlign) => set({ textAlign })} />
       </Group>
-      <Group title="Frame">
+      <Group {...group("Border")}>
         <View style={styles.wrap}>
           {CORNER_PRESETS.map(({ key, label, value: radius }) => (
             <Tile key={key} label={label} selected={style.cardRadius === radius} onPress={() => set({ cardRadius: radius })}>
@@ -152,23 +177,40 @@ export function StyleTab({ style, palette, onChange, onReset, onCopy, onPaste, c
           </View>
           <ColorRow palette={palette} label="Border color" value={style.cardBorderColor} defaults={[{ label: "Auto", value: null }]} themeKeys={BORDER_THEME_SWATCHES} fixed={SWATCHES} onChange={(cardBorderColor) => set({ cardBorderColor })} {...customRow("cardBorderColor")} />
         </> : null}
-        <SelectRow label="Shadow" value={style.cardShadow ? "soft" : "none"} options={[{ value: "none", label: "None" }, { value: "soft", label: "Soft" }]} onChange={(value) => set({ cardShadow: value === "soft" })} />
       </Group>
-      <Group title="Spacing & fade">
-        <SelectRow label="Inner spacing" value={style.innerSpacing} options={BLOCK_INNER_SPACING_OPTIONS} onChange={(innerSpacing) => set({ innerSpacing })} />
+      <Group {...group("Effects")}>
+        <SelectRow label="Shadow" value={style.cardShadow ? "on" : "none"} options={[{ value: "none", label: "None" }, { value: "on", label: "On" }]} onChange={(value) => set({ cardShadow: value === "on" })} />
+        {style.cardShadow ? <>
+          <PresetRow label="Shadow strength" presets={SHADOW_STRENGTH_PRESETS} value={style.shadowOpacity} onChange={(shadowOpacity) => set({ shadowOpacity })} />
+          <PresetRow label="Shadow softness" presets={SHADOW_BLUR_PRESETS} value={style.shadowBlur} onChange={(shadowBlur) => set({ shadowBlur })} />
+          <PresetRow label="Shadow distance" presets={SHADOW_DISTANCE_PRESETS} value={style.shadowOffsetY} onChange={(shadowOffsetY) => set({ shadowOffsetY })} />
+          <ColorRow palette={palette} label="Shadow color" value={style.shadowColor} defaults={[{ label: "Black", value: null }]} themeKeys={BORDER_THEME_SWATCHES} fixed={SWATCHES} onChange={(shadowColor) => set({ shadowColor })} {...customRow("shadowColor")} />
+        </> : null}
+
         <PresetRow label="Fade" presets={FADE_PRESETS} value={style.cardOpacity} onChange={(cardOpacity) => set({ cardOpacity })} />
+        <ColorRow palette={palette} label="Fade color" value={style.fadeColor} defaults={[{ label: "Transparent", value: null }]} themeKeys={BACKGROUND_THEME_SWATCHES} fixed={SWATCHES} onChange={(fadeColor) => set({ fadeColor })} {...customRow("fadeColor")} />
+        <Caption>Transparent fades into the mural. A color washes over the block at the selected fade level.</Caption>
       </Group>
-      <View style={styles.footer}>
-        <Button label="Reset" variant="secondary" onPress={onReset} />
-        <Button label="Copy style" variant="secondary" onPress={onCopy} />
-        <Button label="Paste style" variant="secondary" disabled={!canPaste} onPress={onPaste} />
-      </View>
+      <Group {...group("Looks")}>
+        <Caption>Color</Caption>
+        {looks(COLOR_LOOKS)}
+        <Caption>Frame</Caption>
+        {looks(FRAME_LOOKS)}
+        <Caption>Saved looks</Caption>
+        <SavedLooks style={style} onApply={(next) => { setEditing(null); onChange(next); }} />
+        <View style={styles.footer}>
+          <Button label="Reset" variant="secondary" onPress={onReset} />
+          <Button label="Copy style" variant="secondary" onPress={onCopy} />
+          <Button label="Paste style" variant="secondary" disabled={!canPaste} onPress={onPaste} />
+        </View>
+      </Group>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  tab: { gap: spacing.xl },
+  tab: { gap: spacing.sm },
+  group: { gap: spacing.sm },
   rowLabel: { fontWeight: "600" },
   wrap: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   corner: { width: 36, height: 26, borderTopWidth: 2, borderLeftWidth: 2 },

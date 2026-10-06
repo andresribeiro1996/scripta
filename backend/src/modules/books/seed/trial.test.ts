@@ -6,7 +6,7 @@ import type { CoverSource } from "../domain/ports.js";
 import type { SeedEntry } from "./rankedWorks.js";
 import { pendingEntries, summarizeTrial, trialBook, type TrialRow } from "./trial.js";
 
-const entry: SeedEntry = { isbn: "9780306406157", title: "Dune", author: "Frank Herbert", lang: "eng", workKey: "/works/OL1W", readers: 1, subjects: [] };
+const entry: SeedEntry = { isbn: "9780306406157", title: "Dune", author: "Frank Herbert", lang: "eng", workKey: "/works/OL1W", readers: 1, subjects: [], languages: [] };
 const none: CoverSource = { byIsbn: async () => [], byTitle: async () => [] };
 const giving = (source: "apple" | "isbndb" | "openlibrary", url: string): CoverSource => ({ byIsbn: async () => [{ source, url }], byTitle: async () => [] });
 const failing: CoverSource = { byIsbn: async () => { throw new SourceUnavailableError("isbndb", "HTTP 429"); }, byTitle: async () => [] };

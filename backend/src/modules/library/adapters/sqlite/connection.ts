@@ -33,6 +33,11 @@ export function applyLibrarySchema(db: DatabaseSync, derivedVersion = LIBRARY_DE
   // among non-null tokens, doesn't choke on every unshared row being NULL.
   db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_library_documents_share_token
            ON library_documents(share_token) WHERE share_token IS NOT NULL`);
+  const bookColumns = db.prepare(`PRAGMA table_info(library_books)`).all() as { name: string }[];
+  if (!bookColumns.some((c) => c.name === "work_id")) {
+    db.exec(`ALTER TABLE library_books ADD COLUMN work_id TEXT`);
+  }
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_library_books_work ON library_books (work_id, user_id)`);
   if (rederive) db.exec(`PRAGMA user_version = ${derivedVersion}`);
 }
 

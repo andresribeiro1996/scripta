@@ -47,3 +47,10 @@ export class InvalidImageError extends Error {
     this.name = "InvalidImageError";
   }
 }
+
+export class WorkMergeError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "WorkMergeError";
+  }
+}

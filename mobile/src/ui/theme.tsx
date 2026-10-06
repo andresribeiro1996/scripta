@@ -36,6 +36,7 @@ type ActiveVeil = Veil & { opacity: Animated.Value };
 
 export type ThemeMode = ThemeScheme;
 export type Theme = {
+  bundledFonts: boolean;
   id: ThemeId;
   mode: ThemeMode;
   colors: ThemeColors;
@@ -120,7 +121,7 @@ export function ThemeProvider({ children, bundledFonts }: { children: ReactNode;
     if (!preference) return null;
     const id = resolveTheme(preference, osScheme(scheme));
     const fonts = bundledFonts ? resolveFonts(id, displayFont, textFont) : SYSTEM_FONTS;
-    return { id, mode: themes[id].scheme, colors: themes[id].colors, preference, setPreference, fonts, displayFont, textFont, setFontPreference };
+    return { bundledFonts, id, mode: themes[id].scheme, colors: themes[id].colors, preference, setPreference, fonts, displayFont, textFont, setFontPreference };
   }, [preference, scheme, setPreference, bundledFonts, displayFont, textFont, setFontPreference]);
 
   useEffect(() => {
@@ -142,6 +143,7 @@ export function useTheme(): Theme {
   if (context) return context;
   const id = osScheme(scheme);
   return {
+    bundledFonts: false,
     id,
     mode: id,
     colors: themes[id].colors,
@@ -160,7 +162,7 @@ export function useTheme(): Theme {
 
 export function MuralThemeScope({ theme, children }: { theme: ThemeId; children: ReactNode }) {
   const parent = useTheme();
-  const value = useMemo<Theme>(() => ({ ...parent, id: theme, mode: themes[theme].scheme, colors: themes[theme].colors }), [parent, theme]);
+  const value = useMemo<Theme>(() => ({ ...parent, id: theme, mode: themes[theme].scheme, colors: themes[theme].colors, fonts: parent.bundledFonts ? resolveFonts(theme, parent.displayFont, parent.textFont) : SYSTEM_FONTS }), [parent, theme]);
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 

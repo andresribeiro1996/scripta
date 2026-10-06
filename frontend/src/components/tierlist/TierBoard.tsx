@@ -1,3 +1,4 @@
+import { booksByWork } from "@scripta/shared";
 import {
   closestCenter,
   DndContext,
@@ -17,7 +18,6 @@ import type { TierDefinition, TierlistData } from "../../api/tierlists";
 import { DraggableTierTile, MiniBookTile } from "../murals/blocks/BookBlocks";
 import { OptionsMenu } from "../OptionsMenu";
 import { ChevronDownIcon, ChevronUpIcon, toolbarIconClass } from "../Toolbar";
-import { bookKey } from "../../lib/merge";
 import { createTier } from "../../lib/murals";
 import { TierColorPicker } from "./TierColorPicker";
 import { TierRowEmpty, TierRowShell, TierRowTiles } from "./TierRowShell";
@@ -91,8 +91,8 @@ function TierEditorRow({
    *  color, order, and existence — is gated here. */
   structureEditable: boolean;
 }) {
-  const byKey = new Map(books.map((b) => [bookKey(b), b] as const));
-  const resolvedKeys = tier.bookKeys.filter((k) => byKey.has(k));
+  const byWork = booksByWork(books);
+  const resolvedKeys = tier.workIds.filter((k) => byWork.has(k));
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-center gap-1.5">
@@ -157,12 +157,12 @@ function TierEditorRow({
           ) : (
             <TierRowTiles>
               {resolvedKeys.map((key) => {
-                const book = byKey.get(key)!;
+                const book = byWork.get(key)!;
                 return (
                   <DraggableTierTile
                     key={key}
                     book={book}
-                    bookKeyStr={key}
+                    workId={key}
                     menuItems={[
                       ...otherTiers.map((t) => ({ label: `Move to ${t.label || "Untitled tier"}`, onClick: () => onMoveBook(key, { type: "tier", tierId: t.id }) })),
                       { label: "Return to pool", onClick: () => onMoveBook(key, { type: "pool" }) }
@@ -216,7 +216,7 @@ export function TierBoard({ data, books, onChange, structureEditable, poolLabel,
     const poolIndex = data.pool.indexOf(k);
     if (poolIndex !== -1) return { type: "pool", index: poolIndex };
     for (const t of data.tiers) {
-      const index = t.bookKeys.indexOf(k);
+      const index = t.workIds.indexOf(k);
       if (index !== -1) return { type: "tier", tierId: t.id, index };
     }
     return null;
@@ -238,14 +238,14 @@ export function TierBoard({ data, books, onChange, structureEditable, poolLabel,
       const sameRow = keyLoc.type === "pool" ? otherLoc.type === "pool" : otherLoc.type === "tier" && otherLoc.tierId === keyLoc.tierId;
 
       if (sameRow) {
-        const arr = keyLoc.type === "pool" ? data.pool : data.tiers.find((t) => t.id === keyLoc.tierId)!.bookKeys;
+        const arr = keyLoc.type === "pool" ? data.pool : data.tiers.find((t) => t.id === keyLoc.tierId)!.workIds;
         const swapped = [...arr];
         swapped[keyLoc.index] = other;
         swapped[otherLoc.index] = key;
         if (keyLoc.type === "pool") {
           onChange({ ...data, pool: swapped });
         } else {
-          onChange({ ...data, tiers: data.tiers.map((t) => (t.id === keyLoc.tierId ? { ...t, bookKeys: swapped } : t)) });
+          onChange({ ...data, tiers: data.tiers.map((t) => (t.id === keyLoc.tierId ? { ...t, workIds: swapped } : t)) });
         }
         return;
       }
@@ -253,19 +253,19 @@ export function TierBoard({ data, books, onChange, structureEditable, poolLabel,
       let nextPool = data.pool;
       let nextTiers = data.tiers;
       if (keyLoc.type === "pool") nextPool = replaceAt(nextPool, keyLoc.index, other);
-      else nextTiers = nextTiers.map((t) => (t.id === keyLoc.tierId ? { ...t, bookKeys: replaceAt(t.bookKeys, keyLoc.index, other) } : t));
+      else nextTiers = nextTiers.map((t) => (t.id === keyLoc.tierId ? { ...t, workIds: replaceAt(t.workIds, keyLoc.index, other) } : t));
       if (otherLoc.type === "pool") nextPool = replaceAt(nextPool, otherLoc.index, key);
-      else nextTiers = nextTiers.map((t) => (t.id === otherLoc.tierId ? { ...t, bookKeys: replaceAt(t.bookKeys, otherLoc.index, key) } : t));
+      else nextTiers = nextTiers.map((t) => (t.id === otherLoc.tierId ? { ...t, workIds: replaceAt(t.workIds, otherLoc.index, key) } : t));
       onChange({ ...data, pool: nextPool, tiers: nextTiers });
       return;
     }
 
     const pool = data.pool.filter((k) => k !== key);
-    const tiers = data.tiers.map((t) => ({ ...t, bookKeys: t.bookKeys.filter((k) => k !== key) }));
+    const tiers = data.tiers.map((t) => ({ ...t, workIds: t.workIds.filter((k) => k !== key) }));
     if (destination.type === "pool") {
       onChange({ ...data, pool: [...pool, key], tiers });
     } else {
-      onChange({ ...data, pool, tiers: tiers.map((t) => (t.id === destination.tierId ? { ...t, bookKeys: [...t.bookKeys, key] } : t)) });
+      onChange({ ...data, pool, tiers: tiers.map((t) => (t.id === destination.tierId ? { ...t, workIds: [...t.workIds, key] } : t)) });
     }
   }
 
@@ -283,7 +283,7 @@ export function TierBoard({ data, books, onChange, structureEditable, poolLabel,
     // a row or the pool background appends. The swap is deliberate — see
     // DraggableTierTile's comment; an earlier version re-inserted instead,
     // which slid every book between the two spots over by one.
-    const overIsTile = data.pool.includes(overId) || data.tiers.some((t) => t.bookKeys.includes(overId));
+    const overIsTile = data.pool.includes(overId) || data.tiers.some((t) => t.workIds.includes(overId));
     if (overIsTile) {
       const dest = locate(overId);
       if (!dest) return;
@@ -325,15 +325,15 @@ export function TierBoard({ data, books, onChange, structureEditable, poolLabel,
   }
 
   function deleteTier(tier: TierDefinition) {
-    onChange({ tiers: data.tiers.filter((t) => t.id !== tier.id), pool: [...data.pool, ...tier.bookKeys] });
+    onChange({ tiers: data.tiers.filter((t) => t.id !== tier.id), pool: [...data.pool, ...tier.workIds] });
   }
 
   function addTier() {
     onChange({ ...data, tiers: [...data.tiers, createTier("New tier", "#8a8580")] });
   }
 
-  const byKey = new Map(books.map((b) => [bookKey(b), b] as const));
-  const resolvedPool = data.pool.filter((k) => byKey.has(k));
+  const byWork = booksByWork(books);
+  const resolvedPool = data.pool.filter((k) => byWork.has(k));
   const poolHeading = poolLabel ?? "Pool";
 
   return (
@@ -418,8 +418,8 @@ export function TierBoard({ data, books, onChange, structureEditable, poolLabel,
                 resolvedPool.map((key) => (
                   <DraggableTierTile
                     key={key}
-                    book={byKey.get(key)!}
-                    bookKeyStr={key}
+                    book={byWork.get(key)!}
+                    workId={key}
                     menuItems={data.tiers.map((t) => ({
                       label: `Move to ${t.label || "Untitled tier"}`,
                       onClick: () => moveBook(key, { type: "tier", tierId: t.id })
@@ -446,9 +446,9 @@ export function TierBoard({ data, books, onChange, structureEditable, poolLabel,
           needs no drag listeners or drop target of its own, only to
           look like the tile being moved. */}
       <DragOverlay>
-        {activeKey && byKey.has(activeKey) ? (
+        {activeKey && byWork.has(activeKey) ? (
           <div className="h-[6em] w-[4em] cursor-grabbing overflow-hidden rounded-lg shadow-lg">
-            <MiniBookTile book={byKey.get(activeKey)!} showTitle={false} showAuthor={false} />
+            <MiniBookTile book={byWork.get(activeKey)!} showTitle={false} showAuthor={false} />
           </div>
         ) : null}
       </DragOverlay>

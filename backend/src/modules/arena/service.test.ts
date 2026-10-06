@@ -5,12 +5,16 @@
 // describes for every other module's service layer.
 
 import assert from "node:assert/strict";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
 import { normalizeWords } from "@scripta/shared";
 import {
   AlreadyVotedError,
   DuelNotTiedError,
   DuelNotVotableError,
+  DuplicateBookError,
   IncompleteSeedError,
   InvalidBookError,
   InvalidBracketSizeError,
@@ -20,8 +24,17 @@ import {
 } from "./domain/errors.js";
 import type { ArenaRepository } from "./domain/ports.js";
 import type { DuelRow, SeedPreview, TournamentRow, TournamentSlotRow, VoteRow } from "./domain/types.js";
-import { createArenaService } from "./service.js";
 import type { DuelView } from "./service.js";
+
+const scratch = mkdtempSync(join(tmpdir(), "arena-service-test-"));
+process.env.AUTH_DB_PATH = join(scratch, "auth.sqlite");
+process.env.LIBRARY_DB_PATH = join(scratch, "library.sqlite");
+process.env.GALLERY_DB_PATH = join(scratch, "gallery.sqlite");
+process.env.COVERS_DB_PATH = join(scratch, "covers.sqlite");
+process.env.JWT_ACCESS_SECRET = "a".repeat(64);
+process.env.JWT_REFRESH_SECRET = "b".repeat(64);
+
+const { createArenaService } = await import("./service.js");
 
 function createInMemoryArenaRepository(): ArenaRepository {
   const tournaments = new Map<string, TournamentRow>();
@@ -31,7 +44,6 @@ function createInMemoryArenaRepository(): ArenaRepository {
 
   return {
     deleteUserData() {},
-    rekeyBooks() {},
     insertTournament(row) {
       tournaments.set(row.id, { ...row });
     },
@@ -114,11 +126,11 @@ function createInMemoryArenaRepository(): ArenaRepository {
         return rows.filter((d) => d.round_number === maxRound);
       });
     },
-    updateDuelSettlement(id, status, winnerKey, settledAt) {
+    updateDuelSettlement(id, status, winnerSide, settledAt) {
       const d = duels.get(id);
       if (d) {
         d.status = status;
-        d.winner_key = winnerKey;
+        d.winner_side = winnerSide;
         d.settled_at = settledAt;
       }
     },
@@ -144,9 +156,9 @@ function createInMemoryArenaRepository(): ArenaRepository {
         v.voter_user_id = voterUserId;
       }
     },
-    countVotesByBook(duelId) {
-      const counts: Record<string, number> = {};
-      for (const v of votes) if (v.duel_id === duelId) counts[v.book_key] = (counts[v.book_key] ?? 0) + 1;
+    countVotesBySide(duelId) {
+      const counts = { a: 0, b: 0 };
+      for (const v of votes) if (v.duel_id === duelId) counts[v.side] += 1;
       return counts;
     },
     hasVoted(duelId, voterToken, voterUserId) {
@@ -189,11 +201,11 @@ function createInMemoryArenaRepository(): ArenaRepository {
 }
 
 function makeBook(n: number) {
-  return { key: `book-${n}`, title: `Book ${n}`, author: `Author ${n}`, cover: null };
+  return { workId: `w${n}`, title: `Book ${n}`, author: `Author ${n}`, cover: null };
 }
 
 function makeBookWithCover(n: number) {
-  return { key: `book-${n}`, title: `Book ${n}`, author: `Author ${n}`, cover: `https://covers.test/${n}.jpg` };
+  return { workId: `w${n}`, title: `Book ${n}`, author: `Author ${n}`, cover: `https://covers.test/${n}.jpg` };
 }
 
 test("a summary carries the seeded cover preview and how many slots are filled", () => {
@@ -299,11 +311,10 @@ test("a full round of voting settles duels and advances to the next round, endin
   assert.equal(view?.status, "active");
 
   const [duelA, duelB] = view!.duels as [DuelView, DuelView];
-  // book-1 beats book-2 (2 votes to 1); book-3 beats book-4 (1 vote to 0)
-  service.vote(tournament.id, duelA.id, "voter-1", "book-1");
-  service.vote(tournament.id, duelA.id, "voter-2", "book-1");
-  service.vote(tournament.id, duelA.id, "voter-3", "book-2");
-  service.vote(tournament.id, duelB.id, "voter-1", "book-3");
+  service.vote(tournament.id, duelA.id, "voter-1", "w1");
+  service.vote(tournament.id, duelA.id, "voter-2", "w1");
+  service.vote(tournament.id, duelA.id, "voter-3", "w2");
+  service.vote(tournament.id, duelB.id, "voter-1", "w3");
 
   // Force-settle both duels early (owner action), same path the
   // scheduler's timer-driven sweep uses internally.
@@ -315,16 +326,79 @@ test("a full round of voting settles duels and advances to the next round, endin
   assert.equal(view?.currentRound, 2);
   const final = view!.duels.find((d) => d.roundNumber === 2)!;
   assert.deepEqual(
-    [final.bookA.key, final.bookB.key].sort(),
-    ["book-1", "book-3"]
+    [final.bookA.workId, final.bookB.workId].sort(),
+    ["w1", "w3"]
   );
 
-  service.vote(tournament.id, final.id, "voter-1", "book-1");
+  service.vote(tournament.id, final.id, "voter-1", "w1");
   service.settleEarly(tournament.id, "owner-1", final.id);
 
   view = service.getTournamentView(tournament.id);
   assert.equal(view?.status, "completed");
-  assert.equal(view?.duels.find((d) => d.roundNumber === 2)?.winnerKey, "book-1");
+  assert.equal(view?.duels.find((d) => d.roundNumber === 2)?.winnerWorkId, "w1");
+});
+
+test("works flow from slots into round one and on to the next round's duels", () => {
+  const repo = createInMemoryArenaRepository();
+  const service = createArenaService(repo);
+  const tournament = service.createTournament("owner-1", { name: "Test", bracketSize: 4, roundDurationMinutes: 60 });
+  service.setSlotsManual(
+    tournament.id,
+    "owner-1",
+    [1, 2, 3, 4].map((n) => ({ slotIndex: n - 1, book: makeBook(n) }))
+  );
+  service.start(tournament.id, "owner-1");
+
+  const roundOne = repo.getDuelsForRound(tournament.id, 1).sort((a, b) => a.duel_index - b.duel_index);
+  assert.deepEqual(roundOne.map((d) => [d.book_a_work_id, d.book_b_work_id]), [["w1", "w2"], ["w3", "w4"]]);
+
+  service.vote(tournament.id, roundOne[0]!.id, "voter-1", "w1");
+  service.vote(tournament.id, roundOne[1]!.id, "voter-1", "w3");
+  service.settleEarly(tournament.id, "owner-1", roundOne[0]!.id);
+  service.settleEarly(tournament.id, "owner-1", roundOne[1]!.id);
+
+  assert.equal(repo.getDuel(roundOne[0]!.id)?.winner_side, "a");
+  const [final] = repo.getDuelsForRound(tournament.id, 2);
+  assert.equal(final?.book_a_work_id, "w1");
+  assert.equal(final?.book_b_work_id, "w3");
+});
+
+test("two editions of one work can't fill two slots", () => {
+  const service = createArenaService(createInMemoryArenaRepository());
+  const tournament = service.createTournament("owner-1", { name: "Test", bracketSize: 4, roundDurationMinutes: 60 });
+  assert.throws(
+    () =>
+      service.setSlotsManual(tournament.id, "owner-1", [
+        { slotIndex: 0, book: { workId: "w1", title: "Dune", author: "Frank Herbert", cover: null } },
+        { slotIndex: 1, book: { workId: "w1", title: "Dune", author: "Frank Herbert", cover: null } }
+      ]),
+    (error: unknown) => error instanceof DuplicateBookError && error.message.includes("Dune")
+  );
+});
+
+test("random fill keeps the first entry of each work", () => {
+  const repo = createInMemoryArenaRepository();
+  const service = createArenaService(repo);
+  const tournament = service.createTournament("owner-1", { name: "Test", bracketSize: 2, roundDurationMinutes: 60 });
+  service.randomFill(tournament.id, "owner-1", [
+    { ...makeBook(1), workId: "w1" },
+    { ...makeBook(2), workId: "w1" },
+    makeBook(3)
+  ]);
+  assert.deepEqual(repo.getSlots(tournament.id).map((slot) => slot.title).sort(), ["Book 1", "Book 3"]);
+});
+
+test("random fill counts distinct works against the bracket size", () => {
+  const service = createArenaService(createInMemoryArenaRepository());
+  const tournament = service.createTournament("owner-1", { name: "Test", bracketSize: 2, roundDurationMinutes: 60 });
+  assert.throws(
+    () =>
+      service.randomFill(tournament.id, "owner-1", [
+        { ...makeBook(1), workId: "w1" },
+        { ...makeBook(2), workId: "w1" }
+      ]),
+    NotEnoughBooksError
+  );
 });
 
 test("a completed tournament's summary carries the champion book", () => {
@@ -336,7 +410,7 @@ test("a completed tournament's summary carries the champion book", () => {
   ]);
   service.start(tournament.id, "owner-1");
   const duel = service.getTournamentView(tournament.id)!.duels[0]!;
-  service.vote(tournament.id, duel.id, "voter-1", "book-1");
+  service.vote(tournament.id, duel.id, "voter-1", "w1");
   service.settleEarly(tournament.id, "owner-1", duel.id);
 
   const summary = service.listMine("owner-1")[0];
@@ -368,22 +442,22 @@ test("a tied duel waits for the owner's tie-break instead of auto-advancing", ()
   service.start(tournament.id, "owner-1");
   const duel = service.getTournamentView(tournament.id)!.duels[0]!;
 
-  service.vote(tournament.id, duel.id, "voter-1", "book-1");
-  service.vote(tournament.id, duel.id, "voter-2", "book-2");
+  service.vote(tournament.id, duel.id, "voter-1", "w1");
+  service.vote(tournament.id, duel.id, "voter-2", "w2");
   service.settleEarly(tournament.id, "owner-1", duel.id);
 
   let view = service.getTournamentView(tournament.id);
   assert.equal(view?.duels[0]?.status, "tied_pending_tiebreak");
   assert.equal(view?.status, "active"); // not yet completed — waiting on the owner
 
-  service.tiebreak(tournament.id, "owner-1", duel.id, "book-2");
+  service.tiebreak(tournament.id, "owner-1", duel.id, "w2");
 
   view = service.getTournamentView(tournament.id);
   assert.equal(view?.duels[0]?.status, "settled");
-  assert.equal(view?.duels[0]?.winnerKey, "book-2");
+  assert.equal(view?.duels[0]?.winnerWorkId, "w2");
   assert.equal(view?.status, "completed"); // that was the only (final) duel
 
-  assert.throws(() => service.tiebreak(tournament.id, "owner-1", duel.id, "book-1"), DuelNotTiedError);
+  assert.throws(() => service.tiebreak(tournament.id, "owner-1", duel.id, "w1"), DuelNotTiedError);
 });
 
 test("a voter can't vote twice on the same duel, or for a book not in it", () => {
@@ -396,9 +470,9 @@ test("a voter can't vote twice on the same duel, or for a book not in it", () =>
   service.start(tournament.id, "owner-1");
   const duel = service.getTournamentView(tournament.id)!.duels[0]!;
 
-  service.vote(tournament.id, duel.id, "voter-1", "book-1");
-  assert.throws(() => service.vote(tournament.id, duel.id, "voter-1", "book-2"), AlreadyVotedError);
-  assert.throws(() => service.vote(tournament.id, duel.id, "voter-2", "book-999"), InvalidBookError);
+  service.vote(tournament.id, duel.id, "voter-1", "w1");
+  assert.throws(() => service.vote(tournament.id, duel.id, "voter-1", "w2"), AlreadyVotedError);
+  assert.throws(() => service.vote(tournament.id, duel.id, "voter-2", "w999"), InvalidBookError);
 });
 
 test("runScheduledSweep only settles duels whose deadline has actually passed", () => {
@@ -410,7 +484,7 @@ test("runScheduledSweep only settles duels whose deadline has actually passed", 
   ]);
   service.start(tournament.id, "owner-1");
   const duel = service.getTournamentView(tournament.id)!.duels[0]!;
-  service.vote(tournament.id, duel.id, "voter-1", "book-1");
+  service.vote(tournament.id, duel.id, "voter-1", "w1");
 
   // "Now" is before the duel's closes_at (round_duration_minutes: 60) —
   // the sweep must leave it alone.
@@ -440,10 +514,10 @@ test("a settled or already-completed duel can't be voted on", () => {
   ]);
   service.start(tournament.id, "owner-1");
   const duel = service.getTournamentView(tournament.id)!.duels[0]!;
-  service.vote(tournament.id, duel.id, "voter-1", "book-1");
+  service.vote(tournament.id, duel.id, "voter-1", "w1");
   service.settleEarly(tournament.id, "owner-1", duel.id);
 
-  assert.throws(() => service.vote(tournament.id, duel.id, "voter-2", "book-1"), DuelNotVotableError);
+  assert.throws(() => service.vote(tournament.id, duel.id, "voter-2", "w1"), DuelNotVotableError);
 });
 
 test("start, setSlotsManual, and randomFill all reject a tournament that isn't in seeding", () => {
@@ -503,14 +577,14 @@ test("a signed-in vote stamps the account and backfills the token's earlier anon
   const duelB = service.getTournamentView(second.id)!.duels[0]!;
 
   // Anonymous vote today, signed-in vote tomorrow, same browser token.
-  service.vote(first.id, duelA.id, "voter-token-1", "book-1");
+  service.vote(first.id, duelA.id, "voter-token-1", "w1");
   assert.equal(service.listVoted("voter-1").length, 0);
 
   // Distinct wall-clock times: "most recent vote first" needs comparable
   // created_at values, and two synchronous votes can land in one
   // millisecond.
   await new Promise((resolve) => setTimeout(resolve, 5));
-  service.vote(second.id, duelB.id, "voter-token-1", "book-11", "voter-1");
+  service.vote(second.id, duelB.id, "voter-token-1", "w11", "voter-1");
 
   const voted = service.listVoted("voter-1");
   assert.deepEqual(
@@ -519,7 +593,7 @@ test("a signed-in vote stamps the account and backfills the token's earlier anon
   );
   // The backfill only claims unclaimed votes — re-voting the same duel
   // (a 409) must not reshuffle anything.
-  assert.throws(() => service.vote(first.id, duelA.id, "voter-token-1", "book-1", "voter-1"), AlreadyVotedError);
+  assert.throws(() => service.vote(first.id, duelA.id, "voter-token-1", "w1", "voter-1"), AlreadyVotedError);
   assert.deepEqual(
     service.listVoted("voter-1").map((t) => t.name),
     ["Second", "First"]
@@ -535,7 +609,7 @@ test("a signed-in first vote emits voted_on with the tournament's name", () => {
   const t = startedTournament(service, "owner-1", "Best of 2025", 10);
   const duel = service.getTournamentView(t.id)!.duels[0]!;
 
-  service.vote(t.id, duel.id, "token-a", "book-11", "voter-1");
+  service.vote(t.id, duel.id, "token-a", "w11", "voter-1");
 
   assert.deepEqual(emitted, [["voter-1", t.id, "Best of 2025"]]);
 });
@@ -548,9 +622,9 @@ test("an already-voted duel emits no voted_on event", () => {
   );
   const t = startedTournament(service, "owner-1", "Test", 10);
   const duel = service.getTournamentView(t.id)!.duels[0]!;
-  service.vote(t.id, duel.id, "token-a", "book-11", "voter-1");
+  service.vote(t.id, duel.id, "token-a", "w11", "voter-1");
 
-  assert.throws(() => service.vote(t.id, duel.id, "token-a", "book-12", "voter-1"), AlreadyVotedError);
+  assert.throws(() => service.vote(t.id, duel.id, "token-a", "w12", "voter-1"), AlreadyVotedError);
   assert.deepEqual(emitted.length, 1);
 });
 
@@ -559,18 +633,18 @@ test("a signed-in voter cannot vote the same duel twice by switching tokens", ()
   const t = startedTournament(service, "owner-1", "Test", 10);
   const duel = service.getTournamentView(t.id)!.duels[0]!;
 
-  service.vote(t.id, duel.id, "token-a", "book-11", "voter-1");
+  service.vote(t.id, duel.id, "token-a", "w11", "voter-1");
 
-  assert.throws(() => service.vote(t.id, duel.id, "token-b", "book-12", "voter-1"), AlreadyVotedError);
+  assert.throws(() => service.vote(t.id, duel.id, "token-b", "w12", "voter-1"), AlreadyVotedError);
   // A different account on the same fresh token is a different voter.
-  service.vote(t.id, duel.id, "token-b", "book-12", "voter-2");
+  service.vote(t.id, duel.id, "token-b", "w12", "voter-2");
 });
 
 test("the view's hasVoted follows the account, not just the browser token", () => {
   const service = createArenaService(createInMemoryArenaRepository());
   const t = startedTournament(service, "owner-1", "Test", 10);
   const duel = service.getTournamentView(t.id)!.duels[0]!;
-  service.vote(t.id, duel.id, "token-a", "book-11", "voter-1");
+  service.vote(t.id, duel.id, "token-a", "w11", "voter-1");
 
   const anonymous = service.getTournamentView(t.id)!.duels[0]!;
   assert.equal(anonymous.hasVoted, false);
@@ -589,7 +663,7 @@ test("an anonymous vote emits no voted_on event", () => {
   const t = startedTournament(service, "owner-1", "Test", 10);
   const duel = service.getTournamentView(t.id)!.duels[0]!;
 
-  service.vote(t.id, duel.id, "token-a", "book-11");
+  service.vote(t.id, duel.id, "token-a", "w11");
 
   assert.deepEqual(emitted, []);
 });
@@ -601,14 +675,14 @@ test("an anonymous vote leaves no participation trail, and own tournaments stay 
   const ownDuel = service.getTournamentView(own.id)!.duels[0]!;
   const otherDuel = service.getTournamentView(other.id)!.duels[0]!;
 
-  service.vote(other.id, otherDuel.id, "token-a", "book-11", "voter-1");
-  service.vote(own.id, ownDuel.id, "token-a", "book-1", "voter-1");
+  service.vote(other.id, otherDuel.id, "token-a", "w11", "voter-1");
+  service.vote(own.id, ownDuel.id, "token-a", "w1", "voter-1");
 
   assert.deepEqual(
     service.listVoted("voter-1").map((t) => t.name),
     ["Theirs"]
   );
-  service.vote(other.id, otherDuel.id, "token-b", "book-12");
+  service.vote(other.id, otherDuel.id, "token-b", "w12");
   assert.equal(service.listVoted("voter-2").length, 0);
 });
 
@@ -636,7 +710,7 @@ test("listPublicByIds builds covers and winners for the requested started tourna
   startedTournament(service, "owner-1", "Third", 4);
   const draft = service.createTournament("owner-1", { name: "Draft", bracketSize: 2, roundDurationMinutes: 60 });
   const duel = service.getTournamentView(first.id)!.duels[0]!;
-  service.vote(first.id, duel.id, "voter-1", "book-1");
+  service.vote(first.id, duel.id, "voter-1", "w1");
   service.settleEarly(first.id, "owner-1", duel.id);
 
   const summaries = service.listPublicByIds([first.id, second.id, draft.id, "ghost"]);
@@ -658,10 +732,79 @@ test("votedAmong returns only the requested tournaments the account voted in, ne
   const mine = startedTournament(service, "voter-1", "Mine", 4);
   for (const tournament of [first, second, mine]) {
     const duel = service.getTournamentView(tournament.id)!.duels[0]!;
-    service.vote(tournament.id, duel.id, `token-${tournament.id}`, duel.bookA.key, tournament === second ? null : "voter-1");
+    service.vote(tournament.id, duel.id, `token-${tournament.id}`, duel.bookA.workId!, tournament === second ? null : "voter-1");
   }
 
   assert.deepEqual(service.votedAmong("voter-1", [first.id, second.id, mine.id]), [first.id]);
   assert.deepEqual(service.votedAmong("voter-1", []), []);
   assert.deepEqual(service.votedAmong("nobody", [first.id]), []);
+});
+
+const canonicalIdentity = (ids: string[]) => new Map(ids.map((id) => [id, id]));
+
+function startedDuel(canonical: (ids: string[]) => Map<string, string> = canonicalIdentity) {
+  const service = createArenaService(createInMemoryArenaRepository(), undefined, undefined, canonical);
+  const tournament = service.createTournament("owner-1", { name: "Test", bracketSize: 2, roundDurationMinutes: 60 });
+  service.setSlotsManual(tournament.id, "owner-1", [
+    { slotIndex: 0, book: makeBook(1) },
+    { slotIndex: 1, book: makeBook(2) }
+  ]);
+  service.start(tournament.id, "owner-1");
+  const duel = service.getTournamentView(tournament.id)!.duels[0]!;
+  return { service, tournament, duel };
+}
+
+test("views carry each slot's, side's and winner's work", () => {
+  const { service, tournament, duel } = startedDuel();
+  const view = service.getTournamentView(tournament.id)!;
+  assert.deepEqual(view.slots.map((slot) => slot.workId), ["w1", "w2"]);
+  assert.deepEqual([duel.bookA.workId, duel.bookB.workId, duel.winnerWorkId], ["w1", "w2", null]);
+  service.vote(tournament.id, duel.id, "v1", "w2");
+  service.settleEarly(tournament.id, "owner-1", duel.id);
+  const settled = service.getTournamentView(tournament.id)!;
+  assert.equal(settled.duels[0]!.winnerWorkId, "w2");
+  assert.equal(settled.winner?.workId, "w2");
+});
+
+test("a vote by work lands on the side holding that work, through merges", () => {
+  const { service, tournament, duel } = startedDuel((ids) => new Map(ids.map((id) => [id, id === "w2-old" ? "w2" : id])));
+  service.vote(tournament.id, duel.id, "v1", "w2-old");
+  assert.equal(service.getTournamentView(tournament.id)!.duels[0]!.bookB.votes, 1);
+  assert.throws(() => service.vote(tournament.id, duel.id, "v2", "w9"), InvalidBookError);
+});
+
+test("a vote by work for a duel whose sides share a work goes to side A", () => {
+  const { service, tournament, duel } = startedDuel((ids) => new Map(ids.map((id) => [id, id === "w2" ? "w1" : id])));
+  service.vote(tournament.id, duel.id, "v1", "w1");
+  const after = service.getTournamentView(tournament.id)!.duels[0]!;
+  assert.deepEqual([after.bookA.votes, after.bookB.votes], [1, 0]);
+});
+
+test("a vote naming a work merged after the write lands on that side and the view answers the target", () => {
+  const merged = new Map([["old", "target"]]);
+  const service = createArenaService(createInMemoryArenaRepository(), undefined, undefined, (ids) => new Map(ids.map((id) => [id, merged.get(id) ?? id])));
+  const tournament = service.createTournament("owner-1", { name: "Test", bracketSize: 2, roundDurationMinutes: 60 });
+  service.setSlotsManual(tournament.id, "owner-1", [
+    { slotIndex: 0, book: makeBook(1) },
+    { slotIndex: 1, book: { ...makeBook(2), workId: "old" } }
+  ]);
+  service.start(tournament.id, "owner-1");
+  const duel = service.getTournamentView(tournament.id)!.duels[0]!;
+  service.vote(tournament.id, duel.id, "v1", "target");
+  assert.equal(service.getTournamentView(tournament.id)!.duels[0]!.bookB.votes, 1);
+});
+
+test("a tiebreak by work settles that side", () => {
+  const { service, tournament, duel } = startedDuel();
+  service.settleEarly(tournament.id, "owner-1", duel.id);
+  service.tiebreak(tournament.id, "owner-1", duel.id, "w2");
+  assert.equal(service.getTournamentView(tournament.id)!.duels[0]!.winnerWorkId, "w2");
+});
+
+test("seedingSlots answers only the owner of a tournament still seeding", () => {
+  const { service, tournament } = startedDuel();
+  assert.throws(() => service.seedingSlots(tournament.id, "owner-1"), TournamentAlreadyStartedError);
+  assert.throws(() => service.seedingSlots(tournament.id, "someone"), TournamentNotFoundError);
+  const seeding = service.createTournament("owner-1", { name: "Next", bracketSize: 2, roundDurationMinutes: 60 });
+  assert.deepEqual(service.seedingSlots(seeding.id, "owner-1"), []);
 });

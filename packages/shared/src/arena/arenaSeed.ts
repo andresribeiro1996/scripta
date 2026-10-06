@@ -1,4 +1,4 @@
-import { bookKey } from "../library/merge.js";
+import { workIdOf } from "../library/works.js";
 import { normalizeImageId, normalizeIsbn } from "../library/covers.js";
 import type { SeedBook } from "./types.js";
 
@@ -22,11 +22,7 @@ export function seedCoverLookup(book: Record<string, unknown>): SeedCoverLookup 
   };
 }
 
-export function toSeedBook(book: Record<string, unknown>, cover: string | null): SeedBook {
-  return {
-    key: bookKey(book),
-    title: String(book.Title ?? "Untitled"),
-    author: String(book.Attribution ?? "Unknown author"),
-    cover
-  };
+export function toSeedBook(book: Record<string, unknown>, cover: string | null): SeedBook | null {
+  const workId = workIdOf(book);
+  return workId ? { workId, title: String(book.Title ?? "Untitled"), author: String(book.Attribution ?? "Unknown author"), cover } : null;
 }

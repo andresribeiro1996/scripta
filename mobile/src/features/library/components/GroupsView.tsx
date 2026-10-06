@@ -1,8 +1,7 @@
 // Lists Series and Collections together — they're the same underlying
 // resource (@scripta/shared's Group / groups.ts), differing only in that
-// series also get auto-seeded from book metadata (deriveSeriesGroups,
-// called from lib/mergeAndSave.ts after every import/add). The type filter
-// below narrows the list; it doesn't gate which resource is loaded.
+// series also get auto-seeded from book metadata. The type filter below
+// narrows the list; it doesn't gate which resource is loaded.
 //
 // Rows only navigate — renaming, Style, Manage books, Select/Delete, and
 // deleting the group itself all live on the detail screen
@@ -16,7 +15,7 @@
 // and `startCreating` is exposed via ref so those headers can drive this list
 // without it needing its own header.
 
-import { forwardRef, useImperativeHandle, useMemo, useState } from "react";
+import { forwardRef, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../../ui/Text";
 import { router } from "expo-router";
@@ -69,9 +68,9 @@ export const GroupsView = forwardRef<GroupsViewHandle, { search: string; onSearc
 
   const [drafting, setDrafting] = useState(false);
   const [draftName, setDraftName] = useState("");
-  const [creating, setCreating] = useState(false);
+  const draftOpen = useRef(false);
 
-  useImperativeHandle(ref, () => ({ startCreating: () => setDrafting(true) }), []);
+  useImperativeHandle(ref, () => ({ startCreating: () => { draftOpen.current = true; setDrafting(true); } }), []);
 
   const books = library?.data.books ?? [];
   const allGroups = useMemo(
@@ -87,18 +86,18 @@ export const GroupsView = forwardRef<GroupsViewHandle, { search: string; onSearc
   }, [allGroups, books, search]);
 
   async function handleCommitDraft() {
+    if (!draftOpen.current) return;
+    draftOpen.current = false;
     const name = draftName.trim();
     setDrafting(false);
     setDraftName("");
-    if (!name || creating) return;
-    setCreating(true);
+    if (!name) return;
     const group = makeGroup(draftType, name);
     await attemptUpdate(
       () => updateLibrary((data) => ({ ...data, groups: [...(data.groups ?? []), group] })),
       (error) => Alert.alert(saveFailureMessage(error, "Couldn't save — check your connection.")),
       () => router.push(`/collection/${group.id}` as never),
     );
-    setCreating(false);
   }
 
   return (

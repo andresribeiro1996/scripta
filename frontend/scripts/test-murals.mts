@@ -210,7 +210,7 @@ console.log("\n8. addBlock — the 'tierlist' block type: a reference, not an in
   // createTier stayed in lib/murals.ts even though the tiers moved:
   // TierListEditorPage.tsx's "New tier" button is its one caller.
   const tier = createTier("Custom", "#123456");
-  check("createTier builds a fresh, empty, id-bearing tier", tier.label === "Custom" && tier.color === "#123456" && tier.bookKeys.length === 0 && tier.id.length > 0);
+  check("createTier builds a fresh, empty, id-bearing tier", tier.label === "Custom" && tier.color === "#123456" && tier.workIds.length === 0 && tier.id.length > 0);
   check("createTier ids are unique per call", createTier("A", "#000").id !== createTier("A", "#000").id);
 }
 

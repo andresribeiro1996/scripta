@@ -1,6 +1,7 @@
 import fastifyMultipart from "@fastify/multipart";
 import fastifyRateLimit from "@fastify/rate-limit";
-import type { FastifyInstance, FastifyRequest } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import type { LibraryChange } from "@scripta/shared";
 import { createWriteStream } from "node:fs";
 import { mkdtemp, readdir, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -10,10 +11,13 @@ import { z } from "zod";
 import { env } from "../../config/env.js";
 import { authGuard, rateLimitKey } from "../auth/index.js";
 import { LIBRARY_SMALL_SAVE_MAX_BYTES } from "./domain/constants.js";
-import { LibraryConflictError, LibraryTooLargeError, NoLibraryDocumentError } from "./domain/errors.js";
+import { LibraryChangeNotFoundError, LibraryConflictError, LibraryTooLargeError, NoLibraryDocumentError } from "./domain/errors.js";
+import type { LibraryDocumentText } from "./domain/types.js";
 import { libraryTooLargeMessage } from "./domain/sizeLimit.js";
 import { ImportBusyError, InvalidImportError, parseImport } from "./import/parseImport.js";
 import type { LibraryService } from "./service.js";
+
+const CHANGE_BODY_LIMIT_BYTES = 64 * 1024;
 
 const IMPORT_TMP_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
@@ -66,13 +70,21 @@ const saveLibrarySchema = z.object({
     .passthrough()
 });
 
+const daySchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .refine((day) => {
+    const date = new Date(`${day}T00:00:00Z`);
+    return !Number.isNaN(date.getTime()) && date.toISOString().startsWith(day);
+  });
+
 const addBookSchema = z.object({
   title: z.string().min(1),
   author: z.string().min(1),
   isbn: z.string().min(1).nullable().optional(),
   coverUrl: z.string().min(1).nullable().optional(),
   readStatus: z.union([z.literal(0), z.literal(1), z.literal(2)]),
-  day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()
+  day: daySchema.optional()
 });
 
 const mergeBooksSchema = z.object({
@@ -80,6 +92,38 @@ const mergeBooksSchema = z.object({
   merge: z.array(z.string().min(1)).max(50),
   updatedAt: z.string().datetime()
 });
+
+const bookKeySchema = z.string().min(1).max(2000);
+
+const membershipChangeSchema = z.object({ bookKey: bookKeySchema, member: z.boolean() });
+
+const bookChangeSchema = z
+  .object({
+    bookKey: bookKeySchema,
+    readStatus: z.union([z.literal(0), z.literal(1), z.literal(2)]).optional(),
+    rating: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)]).optional(),
+    day: daySchema.optional()
+  })
+  .refine((body) => body.readStatus !== undefined || body.rating !== undefined)
+  .refine((body) => body.readStatus !== 2 || body.day !== undefined);
+
+const addChangeSchema = z.object({ book: z.object({ Title: z.string().min(1) }).passthrough() });
+
+function applyChange(service: LibraryService, userId: string, change: LibraryChange, reply: FastifyReply) {
+  try {
+    return reply.send(service.applyChange(userId, change));
+  } catch (error) {
+    if (error instanceof NoLibraryDocumentError || error instanceof LibraryChangeNotFoundError) return reply.code(404).send({ error: error.message });
+    if (error instanceof LibraryConflictError) return reply.code(409).send({ error: error.message });
+    if (error instanceof LibraryTooLargeError) return reply.code(413).send(libraryTooLargeBody());
+    throw error;
+  }
+}
+
+function sendDocumentText(reply: FastifyReply, document: LibraryDocumentText) {
+  const body = `{"data":${document.data},"updatedAt":${JSON.stringify(document.updatedAt)},"shareToken":${JSON.stringify(document.shareToken)},"shareUrl":${JSON.stringify(document.shareUrl)},"works":${JSON.stringify(document.works)}}`;
+  return reply.type("application/json; charset=utf-8").send(body);
+}
 
 export function buildLibraryRoutes(service: LibraryService) {
   return async function libraryRoutes(app: FastifyInstance) {
@@ -89,11 +133,11 @@ export function buildLibraryRoutes(service: LibraryService) {
       await reads.register(fastifyRateLimit, { max: 60, timeWindow: "1 minute", keyGenerator: rateLimitKey });
 
       reads.get("/library", { preHandler: authGuard }, async (request, reply) => {
-        const library = service.getLibrary(request.user.id);
+        const library = service.getLibraryText(request.user.id);
         if (!library) {
           return reply.code(404).send({ error: "No library saved yet." });
         }
-        return reply.send(library);
+        return sendDocumentText(reply, library);
       });
     });
 
@@ -116,7 +160,7 @@ export function buildLibraryRoutes(service: LibraryService) {
         }
         try {
           const library = service.saveLibrary(request.user.id, parsed.data.data, parsed.data.updatedAt, parsed.data.source);
-          return reply.send(library);
+          return sendDocumentText(reply, library);
         } catch (error) {
           if (error instanceof LibraryConflictError) {
             return reply.code(409).send({ error: error.message, current: service.getLibrary(request.user.id) });
@@ -141,13 +185,19 @@ export function buildLibraryRoutes(service: LibraryService) {
         }
       });
 
+      writes.post("/library/books/add", { preHandler: authGuard, bodyLimit: CHANGE_BODY_LIMIT_BYTES }, async (request, reply) => {
+        const parsed = addChangeSchema.safeParse(request.body);
+        if (!parsed.success) return reply.code(400).send({ error: "Expected { book } with a non-empty Title." });
+        return applyChange(service, request.user.id, { kind: "add", book: parsed.data.book }, reply);
+      });
+
       writes.post("/library/books/merge", { preHandler: authGuard }, async (request, reply) => {
         const parsed = mergeBooksSchema.safeParse(request.body);
         if (!parsed.success) {
           return reply.code(400).send({ error: "Expected { keep, merge: [...], updatedAt }." });
         }
         try {
-          return reply.send(service.mergeBooks(request.user.id, parsed.data.keep, parsed.data.merge, parsed.data.updatedAt));
+          return sendDocumentText(reply, service.mergeBooks(request.user.id, parsed.data.keep, parsed.data.merge, parsed.data.updatedAt));
         } catch (error) {
           if (error instanceof NoLibraryDocumentError) return reply.code(404).send({ error: "No library saved yet." });
           if (error instanceof LibraryConflictError) {
@@ -177,6 +227,24 @@ export function buildLibraryRoutes(service: LibraryService) {
           return reply.code(404).send({ error: "No library saved yet." });
         }
         return reply.send(library);
+      });
+    });
+
+    await app.register(async (changes) => {
+      await changes.register(fastifyRateLimit, { max: 60, timeWindow: "1 minute", keyGenerator: rateLimitKey });
+
+      changes.post<{ Params: { groupId: string } }>("/library/groups/:groupId/books", { preHandler: authGuard, bodyLimit: CHANGE_BODY_LIMIT_BYTES }, async (request, reply) => {
+        const parsed = membershipChangeSchema.safeParse(request.body);
+        if (!parsed.success) return reply.code(400).send({ error: "Expected { bookKey, member }." });
+        return applyChange(service, request.user.id, { kind: "membership", groupId: request.params.groupId, ...parsed.data }, reply);
+      });
+
+      changes.patch("/library/books", { preHandler: authGuard, bodyLimit: CHANGE_BODY_LIMIT_BYTES }, async (request, reply) => {
+        const parsed = bookChangeSchema.safeParse(request.body);
+        if (!parsed.success) return reply.code(400).send({ error: "Expected { bookKey, readStatus?, rating?, day? } with readStatus or rating, and day for readStatus 2." });
+        const { readStatus, day, bookKey, rating } = parsed.data;
+        const change: LibraryChange = readStatus === 2 ? { kind: "book", bookKey, rating, readStatus, day: day! } : { kind: "book", bookKey, rating, readStatus, day };
+        return applyChange(service, request.user.id, change, reply);
       });
     });
 

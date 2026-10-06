@@ -10,12 +10,10 @@ import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../../ui/Text";
 import { router, Stack } from "expo-router";
 import {
-  addBookToGroup,
   bookKey,
   deleteGroup,
   effectiveCardStyle,
   orderedGroupBooks,
-  removeBookFromGroup,
   removeBooksFromAllGroups,
   renameGroup,
   resolveLibraryStyle,
@@ -30,13 +28,13 @@ import { Button, EmptyState, ErrorState, IconButton, Input, Menu, Screen, Sheet,
 import { spacing, typography, useTheme } from "../../../ui/theme";
 import { useMurals } from "../../murals/useMurals";
 import { useLibrary } from "../hooks/useLibrary";
-import { attemptUpdate } from "../lib/attemptUpdate";
+import { assertSaved, attemptUpdate } from "../lib/attemptUpdate";
 import { BookCard } from "./BookCard";
 import { BookWrapGrid } from "./BookWrapGrid";
 import { PerCardStyleSheet } from "./PerCardStyleForm";
 
 export function GroupDetail({ groupId }: { groupId: string }) {
-  const { data: library, isPending, updateLibrary } = useLibrary();
+  const { data: library, isPending, updateLibrary, submit } = useLibrary();
   const murals = useMurals();
   const { colors } = useTheme();
 
@@ -78,10 +76,10 @@ export function GroupDetail({ groupId }: { groupId: string }) {
 
   function handleToggleBook(book: Record<string, unknown>, inGroup: boolean) {
     if (!group) return;
-    void runUpdate((data) => ({
-      ...data,
-      groups: inGroup ? removeBookFromGroup(data.groups ?? [], group.id, book) : addBookToGroup(data.groups ?? [], group.id, book),
-    }));
+    void attemptUpdate(
+      async () => assertSaved(await submit({ kind: "membership", groupId: group.id, bookKey: bookKey(book), member: !inGroup })),
+      (error) => Alert.alert(saveFailureMessage(error, "Couldn't save — check your connection.")),
+    );
   }
 
   function handleSaveGroupStyle(groupStyle: PerCardStyle | undefined) {

@@ -157,3 +157,18 @@ test("customColorStart normalises a stored HEX and never touches the style", () 
 test("customColorStart falls back to a valid palette colour for an unparseable stored value", () => {
   assert.equal(customColorStart("textColor", pick(null, "not-a-color", null), palette), palette.text.toLowerCase());
 });
+
+test("shadow and fade custom colors start from their rendered defaults and resolve theme references", () => {
+  assert.equal(customColorStart("shadowColor", DEFAULT_BLOCK_STYLE, palette), "#000000");
+  assert.equal(customColorStart("fadeColor", DEFAULT_BLOCK_STYLE, palette), palette.background);
+  const style = { ...DEFAULT_BLOCK_STYLE, shadowColor: "theme:accent", fadeColor: "#ABC" };
+  assert.equal(customColorStart("shadowColor", style, palette), palette.accent);
+  assert.equal(customColorStart("fadeColor", style, palette), "#aabbcc");
+});
+
+test("gradient colors use the existing editor and warn if the second end hides the text", () => {
+  assert.equal(customColorStart("gradientColor", DEFAULT_BLOCK_STYLE, palette), palette.accent);
+  assert.equal(customColorStart("gradientColor", { ...DEFAULT_BLOCK_STYLE, gradientColor: "theme:accentSoft" }, palette), palette.accentSoft);
+  assert.equal(isHardToRead({ ...DEFAULT_BLOCK_STYLE, backgroundColor: "#fff", textColor: "#000", gradientColor: "#000" }, palette), true);
+  assert.equal(isHardToRead({ ...DEFAULT_BLOCK_STYLE, backgroundColor: "#fff", textColor: "#000", gradientColor: "#000", gradientStrength: 25 }, palette), false);
+});

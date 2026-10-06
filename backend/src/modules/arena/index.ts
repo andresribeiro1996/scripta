@@ -2,5 +2,5 @@
 // modules/arena/ is private implementation — same convention as
 // modules/books/index.ts and modules/library/index.ts.
 
-export { arenaPlugin as registerArenaModule, deleteArenaUserData, rekeyArenaBooks } from "./plugin.js";
+export { arenaPlugin as registerArenaModule, deleteArenaUserData } from "./plugin.js";
 export { getArenaPublicApi } from "./plugin.js";

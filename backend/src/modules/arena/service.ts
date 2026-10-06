@@ -27,8 +27,16 @@ import {
   TournamentAlreadyStartedError,
   TournamentNotFoundError
 } from "./domain/errors.js";
+import { canonicalWorkIds } from "../library/index.js";
 import type { ArenaRepository } from "./domain/ports.js";
 import type { DuelRow, SeedBookInput, SeedPreview, TournamentRow, TournamentSlotRow } from "./domain/types.js";
+
+export interface SeedBookView {
+  workId: string | null;
+  title: string;
+  author: string;
+  cover: string | null;
+}
 
 export interface TournamentSummary {
   id: string;
@@ -45,7 +53,7 @@ export interface TournamentSummary {
   filledSlots: number;
   /** The champion book, once this tournament's final duel has settled —
    *  null for anything still seeding or in progress. */
-  winner: SeedBookInput | null;
+  winner: SeedBookView | null;
 }
 
 export interface TournamentDiscoverRef {
@@ -54,7 +62,7 @@ export interface TournamentDiscoverRef {
   ownerUserId: string;
 }
 
-export interface DuelSideView extends SeedBookInput {
+export interface DuelSideView extends SeedBookView {
   votes: number;
 }
 
@@ -64,7 +72,7 @@ export interface DuelView {
   duelIndex: number;
   bookA: DuelSideView;
   bookB: DuelSideView;
-  winnerKey: string | null;
+  winnerWorkId: string | null;
   status: DuelRow["status"];
   opensAt: string;
   closesAt: string;
@@ -72,7 +80,7 @@ export interface DuelView {
 }
 
 export interface TournamentView extends TournamentSummary {
-  slots: Array<{ slotIndex: number } & SeedBookInput>;
+  slots: Array<{ slotIndex: number } & SeedBookView>;
   duels: DuelView[];
 }
 
@@ -85,6 +93,7 @@ export interface ArenaService {
   votedAmong(voterUserId: string, ids: string[]): string[];
   getTournamentView(id: string, voterToken?: string, viewerUserId?: string | null): TournamentView | null;
   setSlotsManual(tournamentId: string, ownerUserId: string, entries: Array<{ slotIndex: number; book: SeedBookInput }>): void;
+  seedingSlots(tournamentId: string, ownerUserId: string): TournamentSlotRow[];
   randomFill(tournamentId: string, ownerUserId: string, pool: SeedBookInput[]): void;
   getPublicSummary(tournamentId: string): TournamentSummary | undefined;
   start(tournamentId: string, ownerUserId: string): void;
@@ -93,13 +102,13 @@ export interface ArenaService {
    *  with it AND every earlier vote under the same voter_token is claimed
    *  for the account (linkVotesToUser), so a person's pre-sign-in voting
    *  history joins their "voted in" list on their first signed-in vote. */
-  vote(tournamentId: string, duelId: string, voterToken: string, bookKey: string, voterUserId?: string | null): void;
+  vote(tournamentId: string, duelId: string, voterToken: string, workId: string, voterUserId?: string | null): void;
   /** Tournaments the account has voted in, most recent vote first —
    *  own tournaments excluded (listMine already shows those). */
   listVoted(voterUserId: string): TournamentSummary[];
   participationByOwner(ownerUserId: string, since: string): GameParticipation[];
   settleEarly(tournamentId: string, ownerUserId: string, duelId: string): void;
-  tiebreak(tournamentId: string, ownerUserId: string, duelId: string, winnerBookKey: string): void;
+  tiebreak(tournamentId: string, ownerUserId: string, duelId: string, workId: string): void;
   /** Renames a tournament. Allowed at ANY status, unlike seeding or
    *  starting: a name is a label, not part of the bracket, so there's no
    *  reason a running or finished tournament should be stuck with a
@@ -120,7 +129,7 @@ const EMPTY_PREVIEW: SeedPreview = { covers: [], filledSlots: 0 };
 // The preview and winner are required arguments rather than optional ones:
 // every caller has to say what a card should show, so a new list endpoint
 // can't quietly ship summaries with no covers/winner and no error to notice.
-function toTournamentSummary(row: TournamentRow, preview: SeedPreview, winner: SeedBookInput | null): TournamentSummary {
+function toTournamentSummary(row: TournamentRow, preview: SeedPreview, winner: SeedBookView | null): TournamentSummary {
   return {
     id: row.id,
     name: row.name,
@@ -132,16 +141,16 @@ function toTournamentSummary(row: TournamentRow, preview: SeedPreview, winner: S
     ownerUserId: row.owner_user_id,
     covers: preview.covers,
     filledSlots: preview.filledSlots,
-    winner
+    winner: winner && { workId: winner.workId, title: winner.title, author: winner.author, cover: winner.cover }
   };
 }
 
 // Only the final round's duel can produce a champion — an early round's
 // settled duel just fed its winner into the next round, not the title.
-function winnerFromDuels(duels: DuelRow[]): SeedBookInput | null {
+function winnerFromDuels(duels: DuelRow[]): SeedBookView | null {
   if (duels.length === 0) return null;
   const maxRound = Math.max(...duels.map((d) => d.round_number));
-  const final = duels.find((d) => d.round_number === maxRound && d.winner_key);
+  const final = duels.find((d) => d.round_number === maxRound && d.winner_side !== null);
   return final ? winnerBookFromDuel(final) : null;
 }
 
@@ -158,23 +167,23 @@ function summariesWithPreviews(repo: ArenaRepository, rows: TournamentRow[]): To
   if (rows.length === 0) return [];
   const previews = repo.getSeedPreviews(rows.map((row) => row.id), COVER_PREVIEW_LIMIT);
   const completedIds = rows.filter((row) => row.status === "completed").map((row) => row.id);
-  const winners = new Map<string, SeedBookInput>();
+  const winners = new Map<string, SeedBookView>();
   for (const duel of repo.getFinalDuels(completedIds)) {
-    if (duel.winner_key) winners.set(duel.tournament_id, winnerBookFromDuel(duel));
+    if (duel.winner_side !== null) winners.set(duel.tournament_id, winnerBookFromDuel(duel));
   }
   return rows.map((row) => toTournamentSummary(row, previews.get(row.id) ?? EMPTY_PREVIEW, winners.get(row.id) ?? null));
 }
 
-function winnerBookFromDuel(d: DuelRow): SeedBookInput {
-  return d.winner_key === d.book_a_key
-    ? { key: d.book_a_key, title: d.book_a_title, author: d.book_a_author, cover: d.book_a_cover }
-    : { key: d.book_b_key, title: d.book_b_title, author: d.book_b_author, cover: d.book_b_cover };
+function winnerBookFromDuel(d: DuelRow): SeedBookView {
+  return d.winner_side === "a"
+    ? { title: d.book_a_title, author: d.book_a_author, cover: d.book_a_cover, workId: d.book_a_work_id }
+    : { title: d.book_b_title, author: d.book_b_author, cover: d.book_b_cover, workId: d.book_b_work_id };
 }
 
 function buildDuelsForRound(
   tournamentId: string,
   roundNumber: number,
-  books: SeedBookInput[],
+  books: SeedBookView[],
   opensAtIso: string,
   roundDurationMinutes: number
 ): DuelRow[] {
@@ -188,15 +197,15 @@ function buildDuelsForRound(
       tournament_id: tournamentId,
       round_number: roundNumber,
       duel_index: i / 2,
-      book_a_key: a.key,
       book_a_title: a.title,
       book_a_author: a.author,
       book_a_cover: a.cover,
-      book_b_key: b.key,
+      book_a_work_id: a.workId,
       book_b_title: b.title,
       book_b_author: b.author,
       book_b_cover: b.cover,
-      winner_key: null,
+      book_b_work_id: b.workId,
+      winner_side: null,
       status: "active",
       opens_at: opensAtIso,
       closes_at: closesAt,
@@ -210,7 +219,21 @@ export type EmitPublished = (tournamentId: string, ownerUserId: string) => void;
 
 export type EmitVotedOn = (voterUserId: string, tournamentId: string, tournamentName: string | null) => void;
 
-export function createArenaService(repo: ArenaRepository, emitPublished?: EmitPublished, emitVotedOn?: EmitVotedOn): ArenaService {
+export function createArenaService(
+  repo: ArenaRepository,
+  emitPublished?: EmitPublished,
+  emitVotedOn?: EmitVotedOn,
+  canonicalWorks: (ids: string[]) => Map<string, string> = canonicalWorkIds
+): ArenaService {
+  function sideOf(duel: DuelRow, workId: string): "a" | "b" {
+    const found = canonicalWorks([workId, ...[duel.book_a_work_id, duel.book_b_work_id].filter((id): id is string => id !== null)]);
+    const canonical = (id: string | null) => (id === null ? null : found.get(id) ?? id);
+    const wanted = canonical(workId);
+    if (canonical(duel.book_a_work_id) === wanted) return "a";
+    if (canonical(duel.book_b_work_id) === wanted) return "b";
+    throw new InvalidBookError();
+  }
+
   /** Checks whether every duel in a round has settled, and if so either
    *  generates the next round (from the winners, same pairing logic as
    *  the first round) or — if that round had exactly one duel — marks
@@ -243,29 +266,26 @@ export function createArenaService(repo: ArenaRepository, emitPublished?: EmitPu
     if (duel.status !== "active") return;
     if (!force && duel.closes_at > nowIso) return;
 
-    const counts = repo.countVotesByBook(duel.id);
-    const votesA = counts[duel.book_a_key] ?? 0;
-    const votesB = counts[duel.book_b_key] ?? 0;
+    const votes = repo.countVotesBySide(duel.id);
 
-    if (votesA === votesB) {
+    if (votes.a === votes.b) {
       repo.updateDuelSettlement(duel.id, "tied_pending_tiebreak", null, null);
       return;
     }
 
-    const winnerKey = votesA > votesB ? duel.book_a_key : duel.book_b_key;
-    repo.updateDuelSettlement(duel.id, "settled", winnerKey, nowIso);
+    repo.updateDuelSettlement(duel.id, "settled", votes.a > votes.b ? "a" : "b", nowIso);
     maybeAdvanceRound(tournament, duel.round_number, nowIso);
   }
 
   function toDuelView(d: DuelRow, voterToken: string | undefined, viewerUserId: string | null | undefined): DuelView {
-    const counts = repo.countVotesByBook(d.id);
+    const votes = repo.countVotesBySide(d.id);
     return {
       id: d.id,
       roundNumber: d.round_number,
       duelIndex: d.duel_index,
-      bookA: { key: d.book_a_key, title: d.book_a_title, author: d.book_a_author, cover: d.book_a_cover, votes: counts[d.book_a_key] ?? 0 },
-      bookB: { key: d.book_b_key, title: d.book_b_title, author: d.book_b_author, cover: d.book_b_cover, votes: counts[d.book_b_key] ?? 0 },
-      winnerKey: d.winner_key,
+      bookA: { workId: d.book_a_work_id, title: d.book_a_title, author: d.book_a_author, cover: d.book_a_cover, votes: votes.a },
+      bookB: { workId: d.book_b_work_id, title: d.book_b_title, author: d.book_b_author, cover: d.book_b_cover, votes: votes.b },
+      winnerWorkId: d.winner_side === null ? null : d.winner_side === "a" ? d.book_a_work_id : d.book_b_work_id,
       status: d.status,
       opensAt: d.opens_at,
       closesAt: d.closes_at,
@@ -340,7 +360,7 @@ export function createArenaService(repo: ArenaRepository, emitPublished?: EmitPu
         .sort((a, b) => a.round_number - b.round_number || a.duel_index - b.duel_index);
       return {
         ...toTournamentSummary(tournament, previewFromSlots(slots), winnerFromDuels(duels)),
-        slots: slots.map((s) => ({ slotIndex: s.slot_index, key: s.book_key, title: s.title, author: s.author, cover: s.cover_url })),
+        slots: slots.map((s) => ({ slotIndex: s.slot_index, workId: s.work_id, title: s.title, author: s.author, cover: s.cover_url })),
         duels: duels.map((d) => toDuelView(d, voterToken, viewerUserId))
       };
     },
@@ -352,25 +372,28 @@ export function createArenaService(repo: ArenaRepository, emitPublished?: EmitPu
       return toTournamentSummary(tournament, previewFromSlots(repo.getSlots(tournament.id)), winner);
     },
 
-    setSlotsManual(tournamentId, ownerUserId, entries) {
+    setSlotsManual(tournamentId, ownerUserId, requested) {
       const tournament = repo.getOwnedTournament(tournamentId, ownerUserId);
       if (!tournament) throw new TournamentNotFoundError();
       if (tournament.status !== "seeding") throw new TournamentAlreadyStartedError();
 
-      const indices = new Set(entries.map((e) => e.slotIndex));
-      if (indices.size !== entries.length) throw new DuplicateSlotError();
-      if (entries.some((e) => e.slotIndex < 0 || e.slotIndex >= tournament.bracket_size)) {
+      const indices = new Set(requested.map((e) => e.slotIndex));
+      if (indices.size !== requested.length) throw new DuplicateSlotError();
+      if (requested.some((e) => e.slotIndex < 0 || e.slotIndex >= tournament.bracket_size)) {
         throw new InvalidSlotIndexError(tournament.bracket_size);
       }
-      const keys = new Set(entries.map((e) => e.book.key));
-      if (keys.size !== entries.length) throw new DuplicateBookError();
+      const works = new Set<string>();
+      for (const { book } of requested) {
+        if (works.has(book.workId)) throw new DuplicateBookError(book.title);
+        works.add(book.workId);
+      }
 
       // Full-replace, same semantics as PUT /library — see this module's
       // own domain/ports.ts comment on replaceSlots.
-      const rows: TournamentSlotRow[] = entries.map((e) => ({
+      const rows: TournamentSlotRow[] = requested.map((e) => ({
         tournament_id: tournamentId,
         slot_index: e.slotIndex,
-        book_key: e.book.key,
+        work_id: e.book.workId,
         title: e.book.title,
         author: e.book.author,
         cover_url: e.book.cover
@@ -378,14 +401,23 @@ export function createArenaService(repo: ArenaRepository, emitPublished?: EmitPu
       repo.replaceSlots(tournamentId, rows);
     },
 
-    randomFill(tournamentId, ownerUserId, pool) {
+    seedingSlots(tournamentId, ownerUserId) {
       const tournament = repo.getOwnedTournament(tournamentId, ownerUserId);
       if (!tournament) throw new TournamentNotFoundError();
       if (tournament.status !== "seeding") throw new TournamentAlreadyStartedError();
-      if (pool.length < tournament.bracket_size) throw new NotEnoughBooksError(tournament.bracket_size, pool.length);
+      return repo.getSlots(tournamentId);
+    },
+
+    randomFill(tournamentId, ownerUserId, requested) {
+      const tournament = repo.getOwnedTournament(tournamentId, ownerUserId);
+      if (!tournament) throw new TournamentNotFoundError();
+      if (tournament.status !== "seeding") throw new TournamentAlreadyStartedError();
+      const seen = new Set<string>();
+      const unique = requested.filter((book) => !seen.has(book.workId) && (seen.add(book.workId), true));
+      if (unique.length < tournament.bracket_size) throw new NotEnoughBooksError(tournament.bracket_size, unique.length);
 
       // Fisher-Yates.
-      const shuffled = [...pool];
+      const shuffled = [...unique];
       for (let i = shuffled.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [shuffled[i], shuffled[j]] = [shuffled[j]!, shuffled[i]!];
@@ -394,7 +426,7 @@ export function createArenaService(repo: ArenaRepository, emitPublished?: EmitPu
       const rows: TournamentSlotRow[] = chosen.map((book, i) => ({
         tournament_id: tournamentId,
         slot_index: i,
-        book_key: book.key,
+        work_id: book.workId,
         title: book.title,
         author: book.author,
         cover_url: book.cover
@@ -409,7 +441,7 @@ export function createArenaService(repo: ArenaRepository, emitPublished?: EmitPu
       const slots = repo.getSlots(tournamentId).sort((a, b) => a.slot_index - b.slot_index);
       if (slots.length !== tournament.bracket_size) throw new IncompleteSeedError(tournament.bracket_size, slots.length);
 
-      const books: SeedBookInput[] = slots.map((s) => ({ key: s.book_key, title: s.title, author: s.author, cover: s.cover_url }));
+      const books: SeedBookView[] = slots.map((s) => ({ workId: s.work_id, title: s.title, author: s.author, cover: s.cover_url }));
       const nowIso = new Date().toISOString();
       const duels = buildDuelsForRound(tournamentId, 1, books, nowIso, tournament.round_duration_minutes);
       repo.insertDuels(duels);
@@ -417,18 +449,18 @@ export function createArenaService(repo: ArenaRepository, emitPublished?: EmitPu
       emitPublished?.(tournamentId, ownerUserId);
     },
 
-    vote(tournamentId, duelId, voterToken, bookKey, voterUserId = null) {
+    vote(tournamentId, duelId, voterToken, workId, voterUserId = null) {
       const duel = repo.getDuel(duelId);
       if (!duel || duel.tournament_id !== tournamentId) throw new DuelNotFoundError();
       if (duel.status !== "active" || new Date() >= new Date(duel.closes_at)) throw new DuelNotVotableError();
-      if (bookKey !== duel.book_a_key && bookKey !== duel.book_b_key) throw new InvalidBookError();
+      const side = sideOf(duel, workId);
 
       const inserted = repo.insertVote({
         id: randomUUID(),
         duel_id: duelId,
         voter_token: voterToken,
         voter_user_id: voterUserId,
-        book_key: bookKey,
+        side,
         created_at: new Date().toISOString()
       });
       // Backfill runs even when THIS duel was already voted: the token's
@@ -448,16 +480,16 @@ export function createArenaService(repo: ArenaRepository, emitPublished?: EmitPu
       settleDuelInternal(tournament, duel, true, new Date().toISOString());
     },
 
-    tiebreak(tournamentId, ownerUserId, duelId, winnerBookKey) {
+    tiebreak(tournamentId, ownerUserId, duelId, workId) {
       const tournament = repo.getOwnedTournament(tournamentId, ownerUserId);
       if (!tournament) throw new TournamentNotFoundError();
       const duel = repo.getDuel(duelId);
       if (!duel || duel.tournament_id !== tournamentId) throw new DuelNotFoundError();
       if (duel.status !== "tied_pending_tiebreak") throw new DuelNotTiedError();
-      if (winnerBookKey !== duel.book_a_key && winnerBookKey !== duel.book_b_key) throw new InvalidBookError();
+      const winnerSide = sideOf(duel, workId);
 
       const nowIso = new Date().toISOString();
-      repo.updateDuelSettlement(duelId, "settled", winnerBookKey, nowIso);
+      repo.updateDuelSettlement(duelId, "settled", winnerSide, nowIso);
       maybeAdvanceRound(tournament, duel.round_number, nowIso);
     },
 
