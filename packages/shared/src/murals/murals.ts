@@ -11,7 +11,7 @@
 // BookmarkID, a gallery image id) rather than embedding a copy of it, same
 // as lib/groups.ts's `bookKeys` — so a block always reflects the CURRENT
 // book/highlight/image, and so it can be scrubbed cleanly when the thing
-// it points at is deleted (see scrubBooksFromMurals/scrubImageFromMurals
+// it points at is deleted (see scrubBooksFromMurals in blockKinds.ts and scrubImageFromMurals
 // below, called alongside the book-delete and gallery-image-delete flows
 // in LibraryPage.tsx/GroupsPage.tsx/useDeleteGalleryImage.ts).
 

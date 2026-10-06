@@ -103,15 +103,15 @@ export function MuralBlockDetail({
     block.type === "shelf" || block.type === "currentlyReading"
       ? [{ title: "", books: blockBooks(block, books) }]
       : tierlist
-        ? [...tierlist.tiers.map((tier) => ({ title: tier.label, keys: tier.workIds })), { title: "Unranked", keys: tierlist.pool }].map(
-            (group) => ({
-              title: group.title,
-              books: group.keys
-                .map((workId) => byWork.get(workId))
-                .filter((item): item is Record<string, unknown> => Boolean(item))
-            })
-          )
-        : undefined;
+          ? [...tierlist.tiers.map((tier) => ({ title: tier.label, keys: tier.workIds })), { title: "Unranked", keys: tierlist.pool }].map(
+              (group) => ({
+                title: group.title,
+                books: group.keys
+                  .map((workId) => byWork.get(workId))
+                  .filter((item): item is Record<string, unknown> => Boolean(item))
+              })
+            )
+          : undefined;
   const image = block.type === "image" ? images.find((item) => item.id === block.imageId) : undefined;
   const quotes =
     block.type === "quoteCollection"

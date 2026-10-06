@@ -1,5 +1,5 @@
-// Exercises lib/murals.ts — mural/block CRUD, the two scrub-on-delete
-// helpers, and the resolve* helpers block renderers use.
+// Exercises lib/murals.ts — mural/block CRUD, the image scrub-on-delete
+// helper, and the resolve* helpers block renderers use.
 // Run with:
 //   npx tsx scripts/test-murals.mts
 

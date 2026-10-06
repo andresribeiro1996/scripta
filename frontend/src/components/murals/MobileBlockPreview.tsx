@@ -3,7 +3,7 @@ import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
 import { bookKey } from "../../lib/merge";
 import { computeStat } from "../../lib/muralStats";
-import { calculateShelfTheme, muralBlockTitle, resolveQuote, resolveQuoteCollection, blockBooks, type MuralBlock, type ReaderProfile, type ShelfTheme } from "../../lib/murals";
+import { blockBooks, calculateShelfTheme, muralBlockTitle, resolveQuote, resolveQuoteCollection, type MuralBlock, type ReaderProfile, type ShelfTheme } from "../../lib/murals";
 import { CoverImage } from "../BookCard";
 import { ReaderCardBlockView } from "./blocks/ReaderCardBlock";
 

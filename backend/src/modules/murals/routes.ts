@@ -299,10 +299,10 @@ export function buildPublicMuralRoutes(service: MuralsService, getTierlistData?:
         return reply.code(404).send({ error: "No shared mural at that link." });
       }
 
-      // blockReferences/resolvePublicLibraryData below are the whole
-      // privacy boundary this route exists to enforce — see their own
-      // top comments (modules/library/publicResolver.ts) for exactly what is and isn't
-      // safe to include in the response built from them.
+      // blockReferences (@scripta/shared) and resolvePublicLibraryData below
+      // are the whole privacy boundary this route exists to enforce — see
+      // resolvePublicLibraryData's top comment (modules/library/publicResolver.ts)
+      // for exactly what is and isn't safe to include in the response built from them.
       const payload = resolveMuralPublicPayload(row, blocks, getTierlistData);
       reply.header("Cache-Control", "no-store");
       return reply.send({

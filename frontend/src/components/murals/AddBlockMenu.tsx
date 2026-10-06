@@ -4,9 +4,9 @@ import { Sheet } from "../Sheet";
 import { PlusIcon, toolbarIconClass } from "../Toolbar";
 import { blockLabel, type BlockType } from "../../lib/murals";
 
-// Label comes from blockLabel (lib/murals.ts) — the same map the
-// history log's "X block added" entries draw from — so a type's display
-// name only ever needs changing in one place. Only `description` is
+// Label comes from blockLabel (lib/murals.ts, over the shared block table) —
+// which the history log's "X block added" entries also draw from — so a type's
+// display name only ever needs changing in one place. Only `description` is
 // local, since nothing else needs it.
 const BLOCK_CHOICES: Array<{ type: BlockType; description: string }> = [
   { type: "spotlight", description: "One book, big cover, optional caption" },

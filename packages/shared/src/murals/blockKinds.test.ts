@@ -161,6 +161,7 @@ test("blockBooks returns the books each block draws, each once, in draw order", 
   assert.deepEqual(blockBooks(make("spotlight", { bookKey: key(1) }), books), [books[1]]);
   assert.deepEqual(blockBooks(make("spotlight", { bookKey: "missing" }), books), []);
   assert.deepEqual(blockBooks(make("shelf", { bookKeys: [key(3), "missing", key(0)] }), books), [books[3], books[0]]);
+  assert.deepEqual(blockBooks(make("shelf", { bookKeys: [key(1), key(1)] }), books), [books[1]]);
   assert.deepEqual(blockBooks(make("quote", { bookKey: key(0), highlightId: "h" }), books), [books[0]]);
   assert.deepEqual(blockBooks(make("quoteCollection", { quotes: [{ bookKey: key(1), highlightId: "1" }, { bookKey: key(1), highlightId: "2" }, { bookKey: key(3), highlightId: "3" }] }), books), [books[1], books[3]]);
   assert.deepEqual(blockBooks(make("currentlyReading"), books), [books[2]]);
