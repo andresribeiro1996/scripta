@@ -13,10 +13,9 @@ import {
   TournamentAlreadyStartedError,
   TournamentNotFoundError
 } from "./domain/errors.js";
-import { resolveEntryWorks, UnknownWorkError, WorkResolutionError } from "../library/index.js";
-import { worksFormat } from "../../worksFormat.js";
-import type { ArenaService, BookChoice, ResolveBookWorks } from "./service.js";
-import { keyedSeedBooks, summariesForWire, tournamentForWire } from "./wire.js";
+import { knownWorkIds, UnknownWorkError, WorkResolutionError } from "../library/index.js";
+import type { ArenaService } from "./service.js";
+import { summariesForWire, tournamentForWire } from "./wire.js";
 
 function statusForArenaError(err: ArenaError): number {
   if (err instanceof TournamentNotFoundError || err instanceof DuelNotFoundError) return 404;
@@ -29,13 +28,6 @@ function statusForArenaError(err: ArenaError): number {
 const idParamSchema = z.object({ id: z.string().uuid() });
 const duelParamSchema = z.object({ id: z.string().uuid(), duelId: z.string().uuid() });
 
-const seedBookSchema = z.object({
-  key: z.string().min(1),
-  title: z.string().min(1),
-  author: z.string().min(1),
-  cover: z.string().url().nullable().optional().transform((v) => v ?? null)
-});
-
 const createTournamentSchema = z.object({
   name: z.string().trim().min(1).max(200),
   bracketSize: z.number().int().min(2).max(128),
@@ -47,12 +39,6 @@ const createTournamentSchema = z.object({
 // rebuilding both, and `roundDurationMinutes` drives deadlines already
 // written onto live duels.
 const renameTournamentSchema = z.object({ name: z.string().trim().min(1).max(200) });
-
-const setSlotsSchema = z.object({
-  slots: z.array(z.object({ slotIndex: z.number().int().min(0), book: seedBookSchema }))
-});
-
-const randomFillSchema = z.object({ pool: z.array(seedBookSchema).min(1) });
 
 const seedWorkSchema = z.object({
   workId: z.string().min(1),
@@ -69,10 +55,6 @@ const voteWorkSchema = z.object({ voterToken: z.string().min(1).max(100), workId
 
 const tiebreakWorkSchema = z.object({ winnerWorkId: z.string().min(1) });
 
-const voteSchema = z.object({ voterToken: z.string().min(1).max(100), bookKey: z.string().min(1) });
-
-const tiebreakSchema = z.object({ winnerBookKey: z.string().min(1) });
-
 const listPublicQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20),
   offset: z.coerce.number().int().min(0).default(0)
@@ -80,7 +62,7 @@ const listPublicQuerySchema = z.object({
 
 const getTournamentQuerySchema = z.object({ voterToken: z.string().min(1).max(100).optional() });
 
-export function buildArenaRoutes(service: ArenaService, resolveWorks: ResolveBookWorks = resolveEntryWorks) {
+export function buildArenaRoutes(service: ArenaService) {
   return async function arenaRoutes(app: FastifyInstance) {
     app.post("/arenas", { preHandler: authGuard }, async (request, reply) => {
       const parsed = createTournamentSchema.safeParse(request.body);
@@ -95,11 +77,11 @@ export function buildArenaRoutes(service: ArenaService, resolveWorks: ResolveBoo
     });
 
     app.get("/arenas/mine", { preHandler: authGuard }, async (request, reply) => {
-      return reply.send({ tournaments: summariesForWire(service.listMine(request.user.id), worksFormat(request, reply)) });
+      return reply.send({ tournaments: summariesForWire(service.listMine(request.user.id)) });
     });
 
     app.get("/arenas/voted", { preHandler: authGuard }, async (request, reply) => {
-      return reply.send({ tournaments: summariesForWire(service.listVoted(request.user.id), worksFormat(request, reply)) });
+      return reply.send({ tournaments: summariesForWire(service.listVoted(request.user.id)) });
     });
 
     await app.register(async (scoped) => {
@@ -107,7 +89,7 @@ export function buildArenaRoutes(service: ArenaService, resolveWorks: ResolveBoo
       scoped.get("/arenas/public", async (request, reply) => {
         const parsed = listPublicQuerySchema.safeParse(request.query);
         if (!parsed.success) return reply.code(400).send({ error: "Invalid limit/offset." });
-        return reply.send({ tournaments: summariesForWire(service.listPublic(parsed.data.limit, parsed.data.offset), worksFormat(request, reply)) });
+        return reply.send({ tournaments: summariesForWire(service.listPublic(parsed.data.limit, parsed.data.offset)) });
       });
     });
 
@@ -118,7 +100,6 @@ export function buildArenaRoutes(service: ArenaService, resolveWorks: ResolveBoo
     // owner" itself against its own session, with no new auth primitive
     // needed here.
     app.get("/arenas/:id", async (request, reply) => {
-      const works = worksFormat(request, reply);
       const params = idParamSchema.safeParse(request.params);
       if (!params.success) return reply.code(400).send({ error: "Invalid tournament id." });
       const query = getTournamentQuerySchema.safeParse(request.query);
@@ -130,26 +111,20 @@ export function buildArenaRoutes(service: ArenaService, resolveWorks: ResolveBoo
       const viewer = getOptionalAuthenticatedUser(request);
       const tournament = service.getTournamentView(params.data.id, query.data.voterToken, viewer?.id ?? null);
       if (!tournament) return reply.code(404).send({ error: "No such tournament." });
-      return reply.send({ tournament: tournamentForWire(tournament, works) });
+      return reply.send({ tournament: tournamentForWire(tournament) });
     });
 
     app.put("/arenas/:id/slots", { preHandler: authGuard }, async (request, reply) => {
       const params = idParamSchema.safeParse(request.params);
       if (!params.success) return reply.code(400).send({ error: "Invalid tournament id." });
-      const works = worksFormat(request, reply);
+      const body = setWorkSlotsSchema.safeParse(request.body);
+      if (!body.success) return reply.code(400).send({ error: "Expected {slots: [{slotIndex, book}, ...]}." });
       try {
-        if (works) {
-          const body = setWorkSlotsSchema.safeParse(request.body);
-          if (!body.success) return reply.code(400).send({ error: "Expected {slots: [{slotIndex, book}, ...]}." });
-          const keyed = keyedSeedBooks(request.user.id, body.data.slots.map((slot) => slot.book), service.seedingSlots(params.data.id, request.user.id));
-          const duplicate = keyed.ids.findIndex((id, index) => keyed.ids.indexOf(id) !== index);
-          if (duplicate !== -1) throw new DuplicateBookError(body.data.slots[duplicate]!.book.title);
-          service.setSlotsManual(params.data.id, request.user.id, body.data.slots.map((slot, index) => ({ slotIndex: slot.slotIndex, book: keyed.books[index]! })), () => keyed.works);
-        } else {
-          const body = setSlotsSchema.safeParse(request.body);
-          if (!body.success) return reply.code(400).send({ error: "Expected {slots: [{slotIndex, book}, ...]}." });
-          service.setSlotsManual(params.data.id, request.user.id, body.data.slots, resolveWorks);
-        }
+        service.seedingSlots(params.data.id, request.user.id);
+        const ids = knownWorkIds(body.data.slots.map((slot) => slot.book.workId));
+        const duplicate = ids.findIndex((id, index) => ids.indexOf(id) !== index);
+        if (duplicate !== -1) throw new DuplicateBookError(body.data.slots[duplicate]!.book.title);
+        service.setSlotsManual(params.data.id, request.user.id, body.data.slots.map((slot, index) => ({ slotIndex: slot.slotIndex, book: { ...slot.book, workId: ids[index]! } })));
         return reply.code(204).send();
       } catch (err) {
         if (err instanceof UnknownWorkError) return reply.code(400).send({ error: err.message });
@@ -162,18 +137,12 @@ export function buildArenaRoutes(service: ArenaService, resolveWorks: ResolveBoo
     app.post("/arenas/:id/random-fill", { preHandler: authGuard }, async (request, reply) => {
       const params = idParamSchema.safeParse(request.params);
       if (!params.success) return reply.code(400).send({ error: "Invalid tournament id." });
-      const works = worksFormat(request, reply);
+      const body = randomFillWorksSchema.safeParse(request.body);
+      if (!body.success) return reply.code(400).send({ error: "Expected {pool: [book, ...]}." });
       try {
-        if (works) {
-          const body = randomFillWorksSchema.safeParse(request.body);
-          if (!body.success) return reply.code(400).send({ error: "Expected {pool: [book, ...]}." });
-          const keyed = keyedSeedBooks(request.user.id, body.data.pool, service.seedingSlots(params.data.id, request.user.id));
-          service.randomFill(params.data.id, request.user.id, keyed.books, () => keyed.works);
-        } else {
-          const body = randomFillSchema.safeParse(request.body);
-          if (!body.success) return reply.code(400).send({ error: "Expected {pool: [book, ...]}." });
-          service.randomFill(params.data.id, request.user.id, body.data.pool, resolveWorks);
-        }
+        service.seedingSlots(params.data.id, request.user.id);
+        const ids = knownWorkIds(body.data.pool.map((book) => book.workId));
+        service.randomFill(params.data.id, request.user.id, body.data.pool.map((book, index) => ({ ...book, workId: ids[index]! })));
         return reply.code(204).send();
       } catch (err) {
         if (err instanceof UnknownWorkError) return reply.code(400).send({ error: err.message });
@@ -236,19 +205,10 @@ export function buildArenaRoutes(service: ArenaService, resolveWorks: ResolveBoo
     app.post("/arenas/:id/duels/:duelId/tiebreak", { preHandler: authGuard }, async (request, reply) => {
       const params = duelParamSchema.safeParse(request.params);
       if (!params.success) return reply.code(400).send({ error: "Invalid id." });
-      const works = worksFormat(request, reply);
-      let choice: BookChoice;
-      if (works) {
-        const body = tiebreakWorkSchema.safeParse(request.body);
-        if (!body.success) return reply.code(400).send({ error: "Expected {winnerWorkId}." });
-        choice = { workId: body.data.winnerWorkId };
-      } else {
-        const body = tiebreakSchema.safeParse(request.body);
-        if (!body.success) return reply.code(400).send({ error: "Expected {winnerBookKey}." });
-        choice = body.data.winnerBookKey;
-      }
+      const body = tiebreakWorkSchema.safeParse(request.body);
+      if (!body.success) return reply.code(400).send({ error: "Expected {winnerWorkId}." });
       try {
-        service.tiebreak(params.data.id, request.user.id, params.data.duelId, choice);
+        service.tiebreak(params.data.id, request.user.id, params.data.duelId, body.data.winnerWorkId);
         return reply.code(204).send();
       } catch (err) {
         if (err instanceof WorkResolutionError) return reply.code(503).send({ error: err.message });
@@ -269,26 +229,14 @@ export function buildVoteRoute(service: ArenaService) {
     app.post("/arenas/:id/duels/:duelId/vote", async (request, reply) => {
       const params = duelParamSchema.safeParse(request.params);
       if (!params.success) return reply.code(400).send({ error: "Invalid id." });
-      const works = worksFormat(request, reply);
-      let voterToken: string;
-      let choice: BookChoice;
-      if (works) {
-        const body = voteWorkSchema.safeParse(request.body);
-        if (!body.success) return reply.code(400).send({ error: "Expected {voterToken, workId}." });
-        voterToken = body.data.voterToken;
-        choice = { workId: body.data.workId };
-      } else {
-        const body = voteSchema.safeParse(request.body);
-        if (!body.success) return reply.code(400).send({ error: "Expected {voterToken, bookKey}." });
-        voterToken = body.data.voterToken;
-        choice = body.data.bookKey;
-      }
+      const body = voteWorkSchema.safeParse(request.body);
+      if (!body.success) return reply.code(400).send({ error: "Expected {voterToken, workId}." });
       // Same optional-session treatment the tier-list ballot routes give
       // (see routes.ts there): the route is public, but a valid session
       // claims the vote — and the token's whole history — for the account.
       const user = getOptionalAuthenticatedUser(request);
       try {
-        service.vote(params.data.id, params.data.duelId, voterToken, choice, user?.id ?? null);
+        service.vote(params.data.id, params.data.duelId, body.data.voterToken, body.data.workId, user?.id ?? null);
         return reply.code(204).send();
       } catch (err) {
         if (err instanceof WorkResolutionError) return reply.code(503).send({ error: err.message });

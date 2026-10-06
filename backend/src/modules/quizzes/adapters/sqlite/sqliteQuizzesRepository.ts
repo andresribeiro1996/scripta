@@ -18,8 +18,7 @@ export function createSqliteQuizzesRepository(db: DatabaseSync): QuizzesReposito
   const deleteQuizStmt = db.prepare(`DELETE FROM quizzes WHERE id = ? AND owner_user_id = ?`);
   const deletePlaysStmt = db.prepare(`DELETE FROM quiz_plays WHERE quiz_id = ?`);
   const deleteWorksStmt = db.prepare(`DELETE FROM quiz_works WHERE quiz_id = ?`);
-  const storedWorksStmt = db.prepare(`SELECT key, work_id FROM quiz_works WHERE quiz_id = ?`);
-  const insertWorkStmt = db.prepare(`INSERT INTO quiz_works (quiz_id, key, work_id) VALUES (?, ?, ?)`);
+  const insertWorkStmt = db.prepare(`INSERT OR IGNORE INTO quiz_works (quiz_id, work_id) VALUES (?, ?)`);
   const deleteAnswersStmt = db.prepare(`DELETE FROM quiz_play_answers WHERE quiz_id = ?`);
   const getByVoteCodeStmt = db.prepare(`SELECT * FROM quizzes WHERE vote_code = ?`);
   const publishStmt = db.prepare(`UPDATE quizzes SET data = ?, vote_code = ?, play_open = 1, updated_at = ? WHERE id = ? AND owner_user_id = ? AND vote_code IS NULL`);
@@ -57,9 +56,15 @@ export function createSqliteQuizzesRepository(db: DatabaseSync): QuizzesReposito
 
   const now = (): string => new Date().toISOString();
 
-  function setWorks(quizId: string, works: Map<string, string | null>): void {
+  function setWorks(quizId: string, workIds: string[]): void {
     deleteWorksStmt.run(quizId);
-    for (const [key, workId] of works) insertWorkStmt.run(quizId, key, workId);
+    for (const workId of workIds) insertWorkStmt.run(quizId, workId);
+  }
+
+  function bookWorkIds(data: string): string[] {
+    const books = (JSON.parse(data) as { books?: unknown }).books;
+    if (!Array.isArray(books)) return [];
+    return books.flatMap((book: { workId?: unknown } | null) => (typeof book?.workId === "string" ? [book.workId] : []));
   }
 
   function inTransaction<T>(write: () => T): T {
@@ -88,7 +93,7 @@ export function createSqliteQuizzesRepository(db: DatabaseSync): QuizzesReposito
       return getByIdStmt.get(id) as QuizRow | undefined;
     },
 
-    insert(row, works) {
+    insert(row) {
       inTransaction(() => {
         insertStmt.run({
           $id: row.id,
@@ -100,17 +105,17 @@ export function createSqliteQuizzesRepository(db: DatabaseSync): QuizzesReposito
           $created_at: row.created_at,
           $updated_at: row.updated_at
         });
-        if (works) setWorks(row.id, works);
+        setWorks(row.id, bookWorkIds(row.data));
       });
     },
 
-    update(id, userId, patch, works) {
+    update(id, userId, patch) {
       return inTransaction(() => {
         const existing = getOwnedStmt.get(id, userId) as QuizRow | undefined;
         if (!existing || existing.vote_code !== null) return undefined;
         const merged: QuizRow = { ...existing, ...patch, updated_at: now() };
         updateStmt.run({ $id: id, $owner_user_id: userId, $name: merged.name, $data: merged.data, $updated_at: merged.updated_at });
-        if (works) setWorks(id, works);
+        if (patch.data !== undefined) setWorks(id, bookWorkIds(merged.data));
         return merged;
       });
     },
@@ -131,47 +136,6 @@ export function createSqliteQuizzesRepository(db: DatabaseSync): QuizzesReposito
       }
     },
 
-    storedWorks(quizId) {
-      return new Map((storedWorksStmt.all(quizId) as Array<{ key: string; work_id: string | null }>).map((row) => [row.key, row.work_id]));
-    },
-
-    rekeyBooks(userId, fromKeys, toKey, toWork) {
-      const from = new Set(fromKeys);
-      const now = new Date().toISOString();
-      const update = db.prepare("UPDATE quizzes SET data = ?, updated_at = ? WHERE id = ?");
-      const dropWorks = db.prepare("DELETE FROM quiz_works WHERE quiz_id = ? AND key IN (SELECT value FROM json_each(?))");
-      const fromKeysJson = JSON.stringify(fromKeys);
-      const hasWorks = db.prepare("SELECT 1 FROM quiz_works WHERE quiz_id = ? LIMIT 1");
-      const keepWork = db.prepare(`
-        INSERT INTO quiz_works (quiz_id, key, work_id) VALUES (?, ?, ?)
-        ON CONFLICT (quiz_id, key) DO UPDATE SET work_id = COALESCE(excluded.work_id, quiz_works.work_id)
-      `);
-      db.exec("BEGIN IMMEDIATE");
-      try {
-        for (const row of db.prepare("SELECT id, data FROM quizzes WHERE owner_user_id = ? AND vote_code IS NULL").all(userId) as Array<{ id: string; data: string }>) {
-          const parsed = JSON.parse(row.data) as Record<string, unknown>;
-          if (!Array.isArray(parsed.books)) continue;
-          const seen = new Set<string>();
-          const books = parsed.books.flatMap((book: unknown) => {
-            if (typeof book !== "object" || book === null || typeof (book as { key?: unknown }).key !== "string") return [book];
-            const key = from.has((book as { key: string }).key) ? toKey : (book as { key: string }).key;
-            if (seen.has(key)) return [];
-            seen.add(key);
-            return [{ ...book, key }];
-          });
-          const after = JSON.stringify({ ...parsed, books });
-          if (after === JSON.stringify(parsed)) continue;
-          update.run(after, now, row.id);
-          if (!hasWorks.get(row.id)) continue;
-          dropWorks.run(row.id, fromKeysJson);
-          keepWork.run(row.id, toKey, toWork);
-        }
-        db.exec("COMMIT");
-      } catch (error) {
-        if (db.isTransaction) db.exec("ROLLBACK");
-        throw error;
-      }
-    },
     deleteUserData(userId) {
       // Own quizzes (with their plays and answers) go; the account's plays
       // on other people's quizzes are unlinked, not deleted — the

@@ -50,7 +50,6 @@ export function createApiClient(
     const accessTokenUsed = init.auth ? getAccessToken() : null;
     const multipart = typeof FormData !== "undefined" && init.body instanceof FormData;
     if (init.body !== undefined && !multipart) headers["Content-Type"] = "application/json";
-    headers["X-Scripta-Works"] = "1";
     if (accessTokenUsed) headers.Authorization = `Bearer ${accessTokenUsed}`;
     const res = await fetcher(`${baseUrl}${path}`, {
       method: init.method ?? "GET",

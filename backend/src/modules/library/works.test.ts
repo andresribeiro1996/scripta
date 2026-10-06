@@ -15,7 +15,7 @@ process.env.JWT_ACCESS_SECRET = "a".repeat(64);
 process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
 const { applyLibrarySchema } = await import("./adapters/sqlite/connection.js");
-const { canonicalByKey, canonicalWorkIds, createCopyKeysResolver, createEntryWorksResolver, duplicateWorkMessage, firstDuplicateWork, firstKeyPerWork, keepFirstPerWork, keysForWorks, knownWorkIds, resolveTitleWorks, UnknownWorkError, workIdsByKey, WorkResolutionError } = await import("./works.js");
+const { canonicalByKey, canonicalWorkIds, createCopyKeysResolver, createEntryWorksResolver, duplicateWorkMessage, firstKeyPerWork, knownWorkIds, resolveTitleWorks, UnknownWorkError, workIdsByKey, WorkResolutionError } = await import("./works.js");
 
 function harness(resolve: (lookups: Array<{ isbn?: string | null; title?: string | null }>) => Array<string | null> = (lookups) => lookups.map((lookup) => `w-${lookup.title ?? lookup.isbn}`), canonical: Record<string, string> = {}) {
   const db = new DatabaseSync(":memory:");
@@ -64,12 +64,6 @@ test("an empty key and an orphaned key get no work", () => {
 test("a catalog failure becomes WorkResolutionError", () => {
   const { resolver } = harness(() => { throw new Error("locked"); });
   assert.throws(() => resolver("u1", [{ key: "x", title: "X" }]), WorkResolutionError);
-});
-
-test("firstDuplicateWork and keepFirstPerWork compare works, not keys", () => {
-  const works = new Map([["a", { workId: "w1", title: "A" }], ["b", { workId: "w1", title: "B" }], ["c", { workId: null, title: null }], ["d", { workId: null, title: null }]]);
-  assert.deepEqual(firstDuplicateWork(["a", "c", "d", "b"], works), { workId: "w1", title: "B" });
-  assert.deepEqual(keepFirstPerWork(["a", "b", "c", "d"], (key) => key, works), ["a", "c", "d"]);
 });
 
 test("workIdsByKey skips empty keys and duplicateWorkMessage names the book", () => {
@@ -121,12 +115,6 @@ test("copy keys pick the owner's first copy of each work by position, through me
   const copies = createCopyKeysResolver({ db, canonicalWorks: catalog({ "w-pt": "w-dune", "w-dune": "w-dune", "w-orlando": "w-orlando" }) });
   assert.deepEqual(copies("u1", ["w-dune", "w-none"]), new Map([["w-dune", "isbn:9780441013593"]]));
   assert.deepEqual(copies("u1", []), new Map());
-});
-
-test("keysForWorks keeps existing keys, uses a free copy key, else the work id", () => {
-  const copyKeys = (_owner: string, ids: string[]) => new Map(ids.flatMap((id) => (id === "w-copy" ? [["w-copy", "isbn:1"] as [string, string]] : id === "w-taken" ? [["w-taken", "k-existing"] as [string, string]] : [])));
-  const existing = new Map([["w-old", "k-existing"]]);
-  assert.deepEqual(keysForWorks("u1", ["w-old", "w-copy", "w-none", "w-taken"], existing, copyKeys), new Map([["w-old", "k-existing"], ["w-copy", "isbn:1"], ["w-none", "w-none"], ["w-taken", "w-taken"]]));
 });
 
 test("a key that is itself a catalog work resolves to that work", () => {
