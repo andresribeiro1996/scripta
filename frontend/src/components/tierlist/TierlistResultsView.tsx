@@ -7,6 +7,7 @@
 // memoization and, crucially, no network request between switches.
 
 import { booksByWork } from "@scripta/shared";
+import { Link } from "react-router-dom";
 import { aggregate, AGGREGATION_MODES, type AggregationMode, type BookResult, type HistogramCell } from "../../lib/tierlistResults";
 import { MiniBookTile } from "../murals/blocks/BookBlocks";
 import { TierRowEmpty, TierRowShell, TierRowTiles } from "./TierRowShell";
@@ -24,14 +25,14 @@ export interface TierlistResultsViewProps {
 function ResultTile({ result, book }: { result: BookResult; book: Record<string, unknown> }) {
   const agreement = Math.round((1 - result.spread) * 100);
   return (
-    <div className="flex w-[4em] flex-col gap-0.5">
+    <Link to={`/work/${result.workId}`} aria-label={`About ${String(book.Title ?? "Untitled")}`} className="flex w-[4em] flex-col gap-0.5">
       <div className="h-[6em] w-[4em] overflow-hidden rounded-lg">
         <MiniBookTile book={book} showTitle={false} showAuthor={false} />
       </div>
       <p className="text-center text-[0.65rem] leading-tight text-(--color-text-dim)">
         {result.votes} {result.votes === 1 ? "vote" : "votes"} · {agreement}% agree
       </p>
-    </div>
+    </Link>
   );
 }
 
@@ -104,9 +105,14 @@ export function TierlistResultsView({ histogram, tierIds, tiers, pool, books, ba
             {unranked.map((result) => {
               const book = byWork.get(result.workId);
               return book ? (
-                <div key={result.workId} className="h-[6em] w-[4em] overflow-hidden rounded-lg">
+                <Link
+                  key={result.workId}
+                  to={`/work/${result.workId}`}
+                  aria-label={`About ${String(book.Title ?? "Untitled")}`}
+                  className="block h-[6em] w-[4em] overflow-hidden rounded-lg"
+                >
                   <MiniBookTile book={book} showTitle={false} showAuthor={false} />
-                </div>
+                </Link>
               ) : null;
             })}
           </div>

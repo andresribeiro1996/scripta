@@ -698,6 +698,7 @@ export function LibraryPage() {
       {detailBook && (
         <BookDetailSheet
           book={detailBook}
+          workId={library?.works?.[bookKey(detailBook)]}
           onOpenStyle={(b) => setStyleBookKey(bookKey(b))}
           onOpenCoverPicker={(b) => setCoverBookKey(bookKey(b))}
           onSetStatus={async (b, status) => {

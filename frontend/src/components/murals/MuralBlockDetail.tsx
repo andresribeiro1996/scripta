@@ -1,5 +1,6 @@
 import { useRef, useState, type ReactNode } from "react";
-import { READER_PLATES, type Group, type PublicReaderCard, booksByWork } from "@scripta/shared";
+import { READER_PLATES, type Group, type PublicReaderCard, booksByWork, workIdOf } from "@scripta/shared";
+import { Link } from "react-router-dom";
 import type { ThemeId } from "@scripta/shared/themes";
 import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
@@ -152,6 +153,11 @@ export function MuralBlockDetail({
               <p className="mt-5 text-base leading-relaxed whitespace-pre-wrap">{block.caption}</p>
             )}
             <BookSummary book={book} />
+            {workIdOf(book) && (
+              <Link to={`/work/${workIdOf(book)}`} className="mt-4 inline-block text-sm font-semibold text-(--color-accent) hover:underline">
+                About this book
+              </Link>
+            )}
           </div>
         ) : groups ? (
           <div className="space-y-5">

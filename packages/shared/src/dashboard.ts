@@ -127,8 +127,6 @@ export function digestHeading(item: DigestItem): string {
   return `${item.actor.username} ${digestAction(item)}`;
 }
 
-// A book someone else read is not a page this reader can open — their
-// profile is the nearest thing the tap can lead to.
 export function digestTarget(item: DigestItem): string {
   switch (item.kind) {
     case "publication":
@@ -136,6 +134,7 @@ export function digestTarget(item: DigestItem): string {
     case "vote":
       return contentTarget(item.content);
     case "reading":
+      return item.book.workId ? `/work/${item.book.workId}` : `/community/u/${item.actor.username}`;
     case "follow":
       return `/community/u/${item.actor.username}`;
     case "participation":

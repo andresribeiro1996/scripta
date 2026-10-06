@@ -11,6 +11,7 @@
 
 import { duelWinner } from "@scripta/shared";
 import { useMemo } from "react";
+import { Link } from "react-router-dom";
 import type { Duel, DuelSide } from "../../api/arena";
 import { CoverImage } from "../BookCard";
 import { useCountdown } from "./useCountdown";
@@ -68,6 +69,15 @@ function DuelSideCard({
           </p>
         </div>
       </button>
+      {side.workId && (
+        <Link
+          to={`/work/${side.workId}`}
+          aria-label="About this book"
+          className="absolute left-1.5 top-1.5 z-10 rounded-full bg-black/50 px-2 py-0.5 text-sm font-bold text-white"
+        >
+          i
+        </Link>
+      )}
       {onAddBook && (
         <button
           type="button"

@@ -116,3 +116,9 @@ test("fewer than two keys yields no pair", () => {
   assert.deepEqual(upNextPair(["only"], 0), []);
   assert.deepEqual(upNextPair([], 0), []);
 });
+
+test("a reading item with a work opens the work page, without one the reader's profile", () => {
+  const base = { kind: "reading" as const, id: "e", actor, finished: true, createdAt: "2026-10-06T00:00:00Z" };
+  assert.equal(digestTarget({ ...base, book: { title: "Dune", author: "FH", coverUrl: null, workId: "w1" } }), "/work/w1");
+  assert.equal(digestTarget({ ...base, book: { title: "Dune", author: "FH", coverUrl: null } }), "/community/u/alice");
+});
