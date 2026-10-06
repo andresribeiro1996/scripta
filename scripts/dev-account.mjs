@@ -33,7 +33,7 @@ import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { devDataDir, devDataDirEnv } from "./devDataDir.mjs";
+import { devDataDir, devDataDirEnv, migrateLegacyFiles } from "./devDataDir.mjs";
 import { defaultEnvLine, upsertEnvLine } from "./devEnvFile.mjs";
 import devAccount from "./fixtures/account.json" with { type: "json" };
 
@@ -94,6 +94,7 @@ async function main() {
   // first is what makes them win over whatever backend/.env says, not the
   // reverse.
   mkdirSync(devDataDir, { recursive: true });
+  migrateLegacyFiles();
   Object.assign(process.env, devDataDirEnv());
 
   const { openAuthDb } = await import("../backend/src/modules/auth/adapters/sqlite/connection.js");
