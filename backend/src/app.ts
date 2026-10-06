@@ -181,7 +181,7 @@ export function buildApp() {
   app.register(registerBooksModule, {
     alert: emailEnabled && env.ALERT_EMAIL
       ? (subject: string, text: string) => {
-          const mail = renderEmail({ heading: subject, paragraphs: [text], tone: "danger" }, env.FRONTEND_URL);
+          const mail = renderEmail({ heading: subject, paragraphs: [text] }, env.FRONTEND_URL);
           return sendAccountEmail(env.ALERT_EMAIL, subject, mail.text, mail.html);
         }
       : undefined

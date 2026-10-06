@@ -62,13 +62,13 @@ export function createAccountSecurity(repo: AuthRepository, send: (to: string, s
       if (!row) throw new AccountActionError("This link has expired or was already used. Request a new one.");
       const passwordHash = await argon2.hash(password);
       if (!repo.completePasswordReset(hash, passwordHash)) throw new AccountActionError("This link has expired or was already used. Request a new one.");
-      if (enabled) await notify(row.email, "Your Atmyshelf password changed", { tone: "danger", heading: "Your password was reset", paragraphs: ["Your password was reset and all sessions were signed out."], footnote: "If this wasn’t you, reset your password immediately." }).catch(() => undefined);
+      if (enabled) await notify(row.email, "Your Atmyshelf password changed", { heading: "Your password was reset", paragraphs: ["Your password was reset and all sessions were signed out."], footnote: "If this wasn’t you, reset your password immediately." }).catch(() => undefined);
     },
     async changePassword(userId: string, currentPassword: string, password: string) {
       const user = repo.findUserById(userId);
       if (!user?.password_hash || !await argon2.verify(user.password_hash, currentPassword)) throw new AccountActionError("Your current password is incorrect.", 403);
       if (!repo.changePassword(userId, user.password_hash, await argon2.hash(password))) throw new AccountActionError("Your account changed. Please log in again.", 403);
-      if (enabled) await notify(user.email, "Your Atmyshelf password changed", { tone: "danger", heading: "Your password was changed", paragraphs: ["Your password was changed and all sessions were signed out."], footnote: "If this wasn’t you, reset your password immediately." }).catch(() => undefined);
+      if (enabled) await notify(user.email, "Your Atmyshelf password changed", { heading: "Your password was changed", paragraphs: ["Your password was changed and all sessions were signed out."], footnote: "If this wasn’t you, reset your password immediately." }).catch(() => undefined);
     },
     async requestVerification(userId: string, email?: string, currentPassword?: string) {
       requireEmail();

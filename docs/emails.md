@@ -13,13 +13,11 @@ The backend sends eight emails, all through Resend. Each has an HTML part (brand
 | 7 | You’re on the Atmyshelf launch list | A new waitlist signup (a repeat signup sends nothing) | The address that signed up | none | `waitlist/confirmation.ts`, `waitlist/plugin.ts` |
 | 8 | ISBNdb rejected the API key | ISBNdb answers 401/403 | `ALERT_EMAIL` | none | `books/plugin.ts`, wired in `app.ts` |
 
-Emails 4, 5 and 8 use the danger tone (red top bar).
-
 ## How they are built
 
-`sendAccountEmail(to, subject, text, html?)` in `backend/src/modules/auth/email.ts` posts to Resend's HTTP API. `renderEmail(content, siteUrl)` in `backend/src/modules/auth/emailLayout.ts` turns `{ heading, paragraphs, button?, footnote?, tone? }` into `{ text, html }`; every input is a plain string and is HTML-escaped, so there is no raw-HTML input. `text` is sent as the fallback part and carries the link on its own line.
+`sendAccountEmail(to, subject, text, html?)` in `backend/src/modules/auth/email.ts` posts to Resend's HTTP API. `renderEmail(content, siteUrl)` in `backend/src/modules/auth/emailLayout.ts` turns `{ heading, paragraphs, button?, footnote? }` into `{ text, html }`; every input is a plain string and is HTML-escaped, so there is no raw-HTML input. `text` is sent as the fallback part and carries the link on its own line.
 
-The HTML is a table layout with inline styles, so mail clients that ignore `<style>` still show the light design. Dark mode is a `prefers-color-scheme: dark` block in `<head>` using class names, with `!important` over the inline defaults. Palettes are the app's light and dark themes (`frontend/src/themes.css`). The header mark has a light and a dark `<img>`, one shown at a time. Both load from `<FRONTEND_URL>/email/mark.png` and `mark-dark.png`, so the images only show once the frontend that ships `frontend/public/email/` is deployed.
+The HTML is a table layout with inline styles, so mail clients that ignore `<style>` still show the light design. Dark mode is a `prefers-color-scheme: dark` block in `<head>` using class names, with `!important` over the inline defaults. The look is black and white on the app's paper background: black (light) or paper-white (dark) for the card border, top bar, button and links, with no accent colour. The background, surface and text tones come from the light and dark themes in `frontend/src/themes.css`. The header mark has a light and a dark `<img>`, one shown at a time. Both load from `<FRONTEND_URL>/email/mark.png` and `mark-dark.png`, so the images only show once the frontend that ships `frontend/public/email/` is deployed.
 
 ## Config
 
@@ -38,7 +36,7 @@ Without the first three, `emailEnabled` is false: recovery and verification retu
 
 ## Adding an email
 
-1. Call `renderEmail({ heading, paragraphs, button?, footnote?, tone? }, frontendUrl)` and pass `mail.text` and `mail.html` to the sender. Inside `createAccountSecurity`, use `notify(to, subject, content)`.
+1. Call `renderEmail({ heading, paragraphs, button?, footnote? }, frontendUrl)` and pass `mail.text` and `mail.html` to the sender. Inside `createAccountSecurity`, use `notify(to, subject, content)`.
 2. Keep the link in `button.url`; do not put URLs in paragraphs. Put "ignore this" and expiry sentences in `footnote`.
 3. Add the row above and a test that asserts the subject and the link.
 

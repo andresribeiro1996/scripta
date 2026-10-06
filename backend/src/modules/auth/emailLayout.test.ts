@@ -34,9 +34,12 @@ test("without a button there is no link or button markup", () => {
   assert.ok(!text.includes("https://atmyshelf.com/"));
 });
 
-test("danger tone colours the top bar in the danger colour", () => {
-  assert.ok(renderEmail({ heading: "H", paragraphs: [], tone: "danger" }, site).html.includes("border-top:4px solid #ae412e"));
-  assert.ok(renderEmail({ heading: "H", paragraphs: [] }, site).html.includes("border-top:4px solid #97532d"));
+test("the palette is black and white: no accent or danger colours remain", () => {
+  const { html } = renderEmail({ heading: "H", paragraphs: [], button: { label: "Go", url: `${site}/x` } }, site);
+  for (const colour of ["#97532d", "#e08a52", "#ae412e", "#e08072"]) assert.ok(!html.includes(colour));
+  assert.ok(html.includes("border-top:4px solid #201e1c"));
+  assert.ok(html.includes("background:#201e1c;border-radius:8px"));
+  assert.ok(html.includes("border-color: #ece8e3 !important"));
 });
 
 test("dark mode adds a media query and both marks with absolute URLs", () => {
