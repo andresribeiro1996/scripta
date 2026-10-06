@@ -1,8 +1,7 @@
 import { canonicalByKey, firstKeyPerWork, keysForWorks, knownWorkIds, resolveTitleWorks } from "../library/index.js";
 import type { Quiz, StoredQuizBook, StoredQuizQuestion } from "./domain/types.js";
 
-export function quizToWorks(quiz: Quiz, stored: Map<string, string | null>): Quiz {
-  const works = canonicalByKey(stored);
+export function quizToWorks(quiz: Quiz, works: Map<string, string>): Quiz {
   const data = (quiz.data ?? {}) as Record<string, unknown>;
   const seen = new Set<string>();
   const books = (Array.isArray(data.books) ? (data.books as StoredQuizBook[]) : []).flatMap(({ key, ...book }) => {
@@ -31,6 +30,6 @@ export function keyedQuizBooks<T extends { workId?: string }>(ownerUserId: strin
   const keys = keysForWorks(ownerUserId, ids, firstKeyPerWork(storedKeys, canonicalByKey(stored)));
   return {
     books: books.map(({ workId: _workId, ...book }, index) => ({ key: keys.get(ids[index]!)!, ...book })),
-    works: new Map<string, string | null>(ids.map((id) => [keys.get(id)!, id]))
+    works: new Map<string, string>(ids.map((id) => [keys.get(id)!, id]))
   };
 }
