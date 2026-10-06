@@ -21,7 +21,7 @@ import { assertObjectKey } from "./storage/objectStore.js";
 import { createObjectStore } from "./storage/createObjectStore.js";
 import { IMMUTABLE_CACHE_CONTROL } from "./storage/r2ObjectStore.js";
 import { runStartupMigrations } from "./migrations/runStartupMigrations.js";
-import { registerStallLog } from "./stallLog.js";
+import { registerStallLog, timeSync } from "./stallLog.js";
 import { registerTrace } from "./trace.js";
 import {
   emailEnabled,
@@ -29,6 +29,7 @@ import {
   getDashboardSeenAt,
   getUserTheme,
   registerAuthModule,
+  renderEmail,
   resolvePublicReaderProfile,
   resolvePublicReaderProfiles,
   searchUsernameOwners,
@@ -51,14 +52,7 @@ import { registerWorksModule } from "./modules/works/index.js";
 const genReqId = () => randomUUID();
 
 export function buildApp() {
-  // Moves any still-embedded library.murals[] into the new murals table
-  // before any module's routes come online — see
-  // migrations/runStartupMigrations.ts for why this is safe to run on
-  // every boot. Deliberately before Fastify/app.register: this only
-  // touches the two modules' own SQLite files directly, nothing about
-  // the app instance itself.
-  runStartupMigrations();
-
+  const bootStart = performance.now();
   // https only when devCerts.ts found a cert/key pair (see its own
   // comment). Two separate calls, not `https: devHttps`, because
   // Fastify's own overloads pick the http-vs-https server type off the
@@ -72,6 +66,8 @@ export function buildApp() {
   const app: FastifyInstance = devHttps
     ? (Fastify({ logger: true, https: devHttps, trustProxy: TRUSTED_PROXIES, genReqId }) as FastifyInstance)
     : Fastify({ logger: true, trustProxy: TRUSTED_PROXIES, genReqId });
+
+  runStartupMigrations(app.log);
 
   registerStallLog(app);
   registerTrace(app);
@@ -179,7 +175,12 @@ export function buildApp() {
   });
   app.register(registerGalleryModule);
   app.register(registerBooksModule, {
-    alert: emailEnabled && env.ALERT_EMAIL ? (subject: string, text: string) => sendAccountEmail(env.ALERT_EMAIL, subject, text) : undefined
+    alert: emailEnabled && env.ALERT_EMAIL
+      ? (subject: string, text: string) => {
+          const mail = renderEmail({ heading: subject, paragraphs: [text] }, env.FRONTEND_URL);
+          return sendAccountEmail(env.ALERT_EMAIL, subject, mail.text, mail.html);
+        }
+      : undefined
   });
   app.register(registerSocialsModule);
   app.register(registerWaitlistModule, { sendEmail: emailEnabled ? sendAccountEmail : undefined });
@@ -247,9 +248,17 @@ export function buildApp() {
     quizzes: (workIds: string[], limit: number) => getQuizzesPublicApi().publishedByWorks(workIds, limit)
   });
 
-  const stopWorksSweep = startWorksSweep([sweepLibraryWorks, sweepMuralsWorks], app.log);
+  const sweepSteps = { library: sweepLibraryWorks, murals: sweepMuralsWorks };
+  const stopWorksSweep = startWorksSweep(
+    Object.entries(sweepSteps).map(([name, step]) => (after: number, limit: number) => timeSync(app.log, `works-sweep:${name}`, () => step(after, limit))),
+    app.log
+  );
   app.addHook("onClose", async () => {
     stopWorksSweep();
+  });
+
+  app.addHook("onReady", async () => {
+    app.log.info({ ms: Math.round(performance.now() - bootStart) }, "startup finished");
   });
 
   return app;

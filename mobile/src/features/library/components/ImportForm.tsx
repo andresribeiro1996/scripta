@@ -15,10 +15,12 @@
 // copy from LibraryScreen's action menu.
 
 import { useState } from "react";
-import { File } from "expo-file-system";
+import { File, Paths } from "expo-file-system";
+import * as Sharing from "expo-sharing";
 import { ScrollView, View } from "react-native";
 import { Text } from "../../../ui/Text";
 import type { LibraryData } from "@scripta/shared";
+import { LIBRARY_CSV_TEMPLATE } from "@scripta/shared";
 import { Button, ErrorState, Skeleton } from "../../../ui/components";
 import { spacing, typography, useTheme } from "../../../ui/theme";
 import { uploadImportPreview } from "../../import/api";
@@ -41,6 +43,22 @@ export function ImportForm({
   const [warnings, setWarnings] = useState<string[]>([]);
   const [preview, setPreview] = useState<LibraryData | null>(null);
   const [merging, setMerging] = useState(false);
+  const [savingTemplate, setSavingTemplate] = useState(false);
+
+  async function saveTemplate() {
+    setError(null);
+    setSavingTemplate(true);
+    try {
+      if (!await Sharing.isAvailableAsync()) throw new Error("Saving files is unavailable on this device.");
+      const file = new File(Paths.cache, "atmyshelf-library.csv");
+      file.write(LIBRARY_CSV_TEMPLATE);
+      await Sharing.shareAsync(file.uri, { mimeType: "text/csv", UTI: "public.comma-separated-values-text", dialogTitle: "Save CSV template" });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't save the CSV template.");
+    } finally {
+      setSavingTemplate(false);
+    }
+  }
 
   async function handleChoose() {
     setError(null);
@@ -86,10 +104,17 @@ export function ImportForm({
         <Text style={[typography.body, { color: colors.textDim }]}>
           A <Text style={{ fontWeight: "700" }}>library.json</Text> from the exporter CLI, a{" "}
           <Text style={{ fontWeight: "700" }}>KoboReader.sqlite</Text> straight off your device, a Goodreads library CSV
-          export, or a StoryGraph library CSV export. Matching books are merged with what's already here, not
+          export, a StoryGraph library CSV export, a Calibre CSV catalog, a LibraryThing TSV export, a BookWyrm book-list CSV, or a spreadsheet CSV. Matching books are merged with what's already here, not
           duplicated.
         </Text>
-        <Button label={busy ? "Reading…" : "Choose a file…"} loading={busy} disabled={merging} onPress={() => void handleChoose()} />
+        <Text style={[typography.caption, { color: colors.textDim }]}>
+          LibraryThing: More → Import/Export → Tab-Delimited Text. BookWyrm: Settings → Export Book List → CSV.
+        </Text>
+        <Text style={[typography.caption, { color: colors.textDim }]}>
+          For Calibre, export a CSV catalog with title and authors. For spreadsheets, use the template: Title and Author are required; other fields are optional. Status: to-read, reading, or read. Rating: 0–5. Dates: YYYY-MM-DD. Blank fields keep your saved values.
+        </Text>
+        <Button label="Save CSV template" variant="secondary" loading={savingTemplate} disabled={busy || merging} onPress={() => void saveTemplate()} />
+        <Button label={busy ? "Reading…" : "Choose a file…"} loading={busy} disabled={merging || savingTemplate} onPress={() => void handleChoose()} />
         {busy && (
           <View style={{ gap: spacing.sm }}>
             <Skeleton height={18} />

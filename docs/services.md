@@ -10,7 +10,7 @@ Index of third-party services Scripta depends on. Plan and price columns marked 
 | Cloudflare R2 | `atmyshelf-images` (public, images.atmyshelf.com), `atmyshelf-backups` (Litestream, 14 day retention) | `backend/src/storage/`, `backend/litestream.yml` | ? (pay-as-you-go with free allowance) | Free while under the monthly storage and operation allowance; egress is free. Grows with covers, gallery uploads and daily snapshots of 11 DBs |
 | Cloudflare Pages | Web PWA at atmyshelf.com, `assetlinks.json` | dashboard only, no wrangler config | ? (presumably free) | Free tier is generous; builds per month are the only limit |
 | Cloudflare DNS | atmyshelf.com, api., images. | dashboard | Free | none. Registrar unknown, renewal is a yearly cost |
-| Resend | Auth emails, waitlist, ISBNdb alert | `backend/src/modules/auth/email.ts` | ? | Free tier has daily and monthly send caps; signups past that need a paid plan |
+| Resend | Auth emails, waitlist, ISBNdb alert | `backend/src/modules/auth/email.ts` (emails listed in `docs/emails.md`) | ? | Free tier has daily and monthly send caps; signups past that need a paid plan |
 | Google OAuth | Sign-in (web and mobile) | `backend/src/modules/auth/plugin.ts` | Free | none. Consent screen verification may be needed as users grow |
 | ISBNdb | Edition metadata, covers, search | `backend/src/modules/books/adapters/isbndb/` | Basic (paid) | Already paid, about 1 req/s and 5,000/day. Data must be deleted if the subscription lapses |
 | Apple iTunes Search API | Best free cover source | `adapters/sources/apple.ts` | Free, keyless | Rate limited (about 20/min), can be throttled or changed |

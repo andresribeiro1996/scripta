@@ -1,39 +1,49 @@
-// Native building blocks for the style panels (LibraryStyleView.tsx,
-// PerCardStyleForm.tsx) — mirrors frontend's components/StyleControls.tsx
-// section-by-section (Section/SliderRow/ToggleRow → Section/StepperRow/
-// ToggleRow/SelectRow/ColorSwatchRow here), adapted for touch:
-//
-//  - SliderRow (an HTML <input type="range">) becomes StepperRow
-//    (-/+ buttons on each side of the value) — this app has no drag-
-//    slider component installed (@react-native-community/slider isn't a
-//    dependency, and adding one is a mobile/package.json change this
-//    task doesn't own), and a stepper is fully accessible by default
-//    (VoiceOver/TalkBack increment/decrement actions) where a custom
-//    drag gesture would need its own a11y wiring.
-//  - The web's native `<input type="color">` becomes ColorSwatchRow, a
-//    fixed palette rather than a freeform picker — same reasoning
-//    (no color-picker dependency in this app yet). See this task's
-//    handoff notes.
-//
-// Every row debounces through the caller's own onApply (see
-// lib/debounce.ts) exactly like the web version's onApply/onSaveNow
-// split — a stepper tap is discrete already (not a continuous drag), but
-// holding one down still fires many times a second, so it gets the same
-// coalescing treatment as a slider drag did on the web.
-
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { normalizeHexColor } from "@scripta/shared";
+import { ColorEditor } from "../../murals/ColorEditor";
+import { matchPreset, type Preset } from "../../murals/blockStyleOptions";
+import { Icon } from "../../../ui";
 import { Pressable, StyleSheet, Switch, View } from "react-native";
 import { Text } from "../../../ui/Text";
 import { minimumTouchTarget, radii, spacing, typography, useTheme } from "../../../ui/theme";
 
-export function Section({ title, children }: { title?: string; children: ReactNode }) {
+export function Section({ title, children }: { title: string; children: ReactNode }) {
   const { colors } = useTheme();
   return (
-    <View style={[styles.section, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-      {title && <Text style={[styles.sectionTitle, { color: colors.textDim }]}>{title.toUpperCase()}</Text>}
+    <View style={styles.section}>
+      <Text accessibilityRole="header" style={[typography.caption, styles.sectionTitle, { color: colors.textDim }]}>{title}</Text>
       {children}
     </View>
   );
+}
+
+export function Caption({ children }: { children: string }) {
+  const { colors } = useTheme();
+  return <Text style={[typography.caption, { color: colors.textDim }]}>{children}</Text>;
+}
+
+export function Chip({ label, selected, onPress, fontFamily }: { label: string; selected: boolean; onPress: () => void; fontFamily?: string }) {
+  const { colors } = useTheme();
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected }} onPress={onPress} style={[styles.chip, { borderColor: selected ? colors.accent : colors.border, backgroundColor: selected ? colors.accentSoft : colors.surface }]}>
+      <Text style={{ color: selected ? colors.accent : colors.text, fontSize: 14, fontWeight: selected ? "700" : "500", fontFamily }}>{label}</Text>
+    </Pressable>
+  );
+}
+
+export function Tile({ label, selected, onPress, children }: { label: string; selected: boolean; onPress: () => void; children: ReactNode }) {
+  const { colors } = useTheme();
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected }} onPress={onPress} style={styles.tileWrap}>
+      <View style={[styles.tile, { borderColor: selected ? colors.accent : colors.border, borderWidth: selected ? 2 : 1, backgroundColor: selected ? colors.accentSoft : colors.surface }]}>{children}</View>
+      <Text style={[typography.caption, { color: colors.textDim }]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+export function PresetRow({ label, presets, value, onChange }: { label: string; presets: readonly Preset<number>[]; value: number; onChange: (value: number) => void }) {
+  const selected = matchPreset(presets, value);
+  return <View style={styles.row}><SelectRow label={label} value={selected} options={presets.map((preset) => ({ value: preset.key, label: preset.label }))} onChange={(key) => onChange(presets.find((preset) => preset.key === key)!.value)} />{selected === null ? <Caption>{`Custom · ${value}`}</Caption> : null}</View>;
 }
 
 export function StepperRow({
@@ -136,50 +146,52 @@ export function SelectRow<V extends string>({
 
 export const SWATCHES = ["#ffffff", "#141210", "#a85c32", "#47713c", "#3b5b8c", "#8c3b5b", "#b3432f", "#e0c060"];
 
-export function ColorSwatchRow({
-  label,
-  value,
-  defaultColor,
-  onEnable,
-  onChange,
-  onDisable,
-}: {
+export function ColorSwatchRow({ label, value, defaultColor, onChange }: {
   label: string;
-  /** null = "use the theme default" (this row's own on/off toggle). */
   value: string | null;
   defaultColor: string;
-  onEnable: () => void;
-  onChange: (color: string) => void;
-  onDisable: () => void;
+  onChange: (color: string | null) => void;
 }) {
   const { colors } = useTheme();
-  const enabled = value !== null;
+  const [editing, setEditing] = useState<string | null>(null);
+  const custom = value !== null && !SWATCHES.includes(value.toLowerCase());
   return (
     <View style={styles.row}>
-      <ToggleRow label={label} checked={enabled} onChange={(next) => (next ? onEnable() : onDisable())} />
-      {enabled && (
-        <View style={styles.swatchRow}>
-          {SWATCHES.map((swatch) => (
-            <Pressable
-              accessibilityLabel={`Use ${swatch}`}
-              accessibilityRole="button"
-              key={swatch}
-              onPress={() => onChange(swatch)}
-              style={[
-                styles.swatch,
-                { backgroundColor: swatch, borderColor: (value ?? defaultColor).toLowerCase() === swatch ? colors.accent : colors.border },
-              ]}
-            />
-          ))}
-        </View>
-      )}
+      <Text style={[typography.body, styles.rowLabel, { color: colors.text }]}>{label}</Text>
+      <View style={styles.swatchRow}>
+        <Chip label="Auto" selected={value === null} onPress={() => { setEditing(null); onChange(null); }} />
+        {SWATCHES.map((swatch) => (
+          <Pressable
+            key={swatch}
+            accessibilityLabel={`Use ${swatch} for ${label.toLowerCase()}`}
+            accessibilityRole="button"
+            accessibilityState={{ selected: value?.toLowerCase() === swatch }}
+            onPress={() => { setEditing(null); onChange(swatch); }}
+            style={[styles.swatch, { backgroundColor: swatch, borderColor: value?.toLowerCase() === swatch ? colors.accent : colors.border, borderWidth: value?.toLowerCase() === swatch ? 3 : 1 }]}
+          />
+        ))}
+        <Pressable
+          accessibilityLabel={`Custom ${label.toLowerCase()}${custom ? `, ${value}` : ""}`}
+          accessibilityRole="button"
+          accessibilityState={{ selected: custom }}
+          onPress={() => { if (editing === null) setEditing(normalizeHexColor(value ?? defaultColor) ?? defaultColor); }}
+          style={[styles.swatch, styles.custom, { backgroundColor: custom ? value! : colors.surface, borderColor: custom ? colors.accent : colors.border, borderWidth: custom ? 3 : 1 }]}
+        >
+          {custom ? null : <Icon name="add" size={20} color={colors.text} />}
+        </Pressable>
+      </View>
+      {editing !== null ? <ColorEditor color={editing} onChange={setEditing} onDone={() => { onChange(editing); setEditing(null); }} onCancel={() => setEditing(null)} /> : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  section: { borderWidth: 1, borderRadius: radii.lg, padding: spacing.lg, gap: spacing.md },
+  section: { gap: spacing.sm },
   sectionTitle: { ...typography.caption, fontWeight: "700", letterSpacing: 0.4 },
+  chip: { minHeight: minimumTouchTarget, justifyContent: "center", borderWidth: 1, borderRadius: radii.md, paddingHorizontal: spacing.md },
+  tileWrap: { alignItems: "center", gap: spacing.xs },
+  tile: { width: 64, height: 48, borderRadius: radii.md, alignItems: "center", justifyContent: "center" },
+  custom: { alignItems: "center", justifyContent: "center" },
   row: { gap: spacing.sm },
   rowLabel: { fontWeight: "600" },
   stepper: { flexDirection: "row", alignItems: "center", gap: spacing.md },
@@ -195,7 +207,7 @@ const styles = StyleSheet.create({
   toggleLabel: { flex: 1, paddingRight: spacing.md },
   selectBlock: { gap: spacing.xs },
   selectOptions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  selectOption: { borderWidth: 1, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  selectOption: { minHeight: minimumTouchTarget, justifyContent: "center", borderWidth: 1, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   swatchRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.xs },
-  swatch: { width: 32, height: 32, borderRadius: radii.full, borderWidth: 2 },
+  swatch: { width: minimumTouchTarget, height: minimumTouchTarget, borderRadius: radii.full },
 });

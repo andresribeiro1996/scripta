@@ -1,60 +1,41 @@
-// Mirrors frontend's components/PerCardStylePanel.tsx — the "override
-// this book/series' own card style" sheet, reused for both a book
-// (BookDetail's "Style" action) and a series (GroupsView's series
-// settings menu). See @scripta/shared's Group.style / book._style for
-// where each side persists.
-//
-// `customized`/`draft` seed from props only in their useState
-// initializers, same as the web version's own useState — but unlike the
-// web version (a fresh element tree every time PerCardStylePanel opens),
-// this sheet stays mounted with `visible` toggling so the Sheet/Modal
-// animates. Every call site MUST key this component on the target's id
-// (see GroupsView.tsx/LibraryScreen.tsx) so switching targets forces a
-// remount instead of showing the previous target's draft.
-
 import { useState } from "react";
-import { ScrollView } from "react-native";
+import { useWindowDimensions, View } from "react-native";
 import { Text } from "../../../ui/Text";
 import { extractPerCardStyle, resolvePerCardStyle, type LibraryStyleSettings, type PerCardStyle } from "@scripta/shared";
-import { Sheet } from "../../../ui/components";
+import { FormScroll, Sheet } from "../../../ui/components";
 import { spacing, typography, useTheme } from "../../../ui/theme";
 import { useDebouncedCallback } from "../lib/debounce";
 import { PerCardStyleFields } from "./PerCardStyleFields";
-import { ToggleRow } from "./StyleControls";
+import { SelectRow } from "./StyleControls";
+import { CardStylePreview } from "./LibraryStyleView";
 
 type PerCardStyleProps = {
   name: string;
-  priorityText: string;
+  inheritedFrom: string;
   currentOverride: PerCardStyle | undefined;
   seedStyle: LibraryStyleSettings;
+  previewBook?: Record<string, unknown>;
   onSave: (style: PerCardStyle | undefined) => void;
   onClose: () => void;
 };
 
-/** Presented as a modal from a screen that has its own chrome (GroupsView). */
 export function PerCardStyleSheet({ visible, ...props }: PerCardStyleProps & { visible: boolean }) {
+  const { height } = useWindowDimensions();
   return (
     <Sheet visible={visible} title={`Style for "${props.name}"`} onClose={props.onClose}>
-      <PerCardStyleForm {...props} />
+      <View style={{ height: Math.round(height * 0.8), flexShrink: 1 }}><PerCardStyleForm {...props} /></View>
     </Sheet>
   );
 }
 
 export function PerCardStyleForm({
   name,
-  priorityText,
+  inheritedFrom,
   currentOverride,
   seedStyle,
   onSave,
-  onClose,
-}: {
-  name: string;
-  priorityText: string;
-  currentOverride: PerCardStyle | undefined;
-  seedStyle: LibraryStyleSettings;
-  onSave: (style: PerCardStyle | undefined) => void;
-  onClose: () => void;
-}) {
+  previewBook,
+}: PerCardStyleProps) {
   const { colors } = useTheme();
   const [customized, setCustomized] = useState(currentOverride !== undefined);
   const [draft, setDraft] = useState<PerCardStyle>(currentOverride ? resolvePerCardStyle(currentOverride) : extractPerCardStyle(seedStyle));
@@ -80,15 +61,13 @@ export function PerCardStyleForm({
   }
 
   return (
-    <>
-      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: spacing.md, paddingBottom: spacing.xl }}>
-        <ToggleRow label="Custom style" checked={customized} onChange={toggleCustomized} />
-        {!customized ? (
-          <Text style={[typography.body, { color: colors.textDim }]}>Currently uses {priorityText} style. Turn this on to override it.</Text>
-        ) : (
-          <PerCardStyleFields draft={draft} onApply={applyPatch} onSaveNow={saveNowPatch} themeBorderColor={colors.border} />
-        )}
-      </ScrollView>
-    </>
+    <View style={{ flex: 1, gap: spacing.md }}>
+      <CardStylePreview books={previewBook ? [previewBook] : []} style={customized ? { ...seedStyle, ...draft } : seedStyle} />
+      <FormScroll contentContainerStyle={{ gap: spacing.xl, paddingBottom: spacing.xl }}>
+        <SelectRow label="Style source" value={customized ? "custom" : "inherited"} options={[{ value: "inherited", label: "Inherited" }, { value: "custom", label: "Custom" }]} onChange={(value) => toggleCustomized(value === "custom")} />
+        <Text style={[typography.caption, { color: colors.textDim }]}>{customized ? `Custom style for “${name}” overrides ${inheritedFrom}.` : `Inherited from ${inheritedFrom}. Choose Custom to change it.`}</Text>
+        {customized ? <PerCardStyleFields draft={draft} canvasColor={seedStyle.backgroundColor ?? colors.background} onApply={applyPatch} onSaveNow={saveNowPatch} /> : null}
+      </FormScroll>
+    </View>
   );
 }

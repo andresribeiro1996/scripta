@@ -17,7 +17,7 @@ import { Platform, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../../ui/Text";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import type { LibraryStyleSettings } from "@scripta/shared";
-import { statusLabel } from "@scripta/shared";
+import { CARD_OVERLAY_COMPACT_WIDTH, CARD_OVERLAY_TEXT_MIN_WIDTH, statusLabel } from "@scripta/shared";
 import { cardFontFamily, resolveBorderColor, resolveBorderStyle } from "../../../ui/libraryStyle";
 import { dynamicType, minimumTouchTarget, useTheme } from "../../../ui/theme";
 import { CoverImage } from "./CoverImage";
@@ -47,9 +47,11 @@ export function BookCard({
 }) {
   const { colors } = useTheme();
   const [hasCover, setHasCover] = useState(false);
+  const [width, setWidth] = useState(0);
+  const compact = width <= CARD_OVERLAY_COMPACT_WIDTH;
   const label = statusLabel(book.ReadStatus);
   const highlights = Array.isArray(book.highlights) ? book.highlights.length : 0;
-  const showOverlayText = style.showTitleAuthor || !hasCover;
+  const showOverlayText = (style.showTitleAuthor && width > CARD_OVERLAY_TEXT_MIN_WIDTH) || !hasCover;
   const overlayTextColor = style.cardTextColor ?? "#ffffff";
 
   const borderWidthFor = (side: keyof LibraryStyleSettings["cardBorderSides"]) =>
@@ -64,6 +66,7 @@ export function BookCard({
       accessibilityState={selectable ? { selected } : undefined}
       onPress={selectable ? () => onToggleSelect?.(book) : onPress}
       onLongPress={selectable ? undefined : onLongPress}
+      onLayout={({ nativeEvent }) => setWidth(nativeEvent.layout.width)}
       style={({ pressed }) => [
         styles.card,
         {
@@ -96,7 +99,7 @@ export function BookCard({
         </View>
       )}
 
-      {highlights > 0 && (
+      {highlights > 0 && !compact && (
         <View style={styles.highlightBadge} pointerEvents="none">
           <Text style={styles.actionText}>
             {highlights} highlight{highlights === 1 ? "" : "s"}
@@ -118,7 +121,7 @@ export function BookCard({
       )}
 
       {showOverlayText && (
-        <View style={styles.textOverlay} pointerEvents="none">
+        <View style={[styles.textOverlay, compact && { padding: 6 }]} pointerEvents="none">
           <Text
             {...dynamicType}
             numberOfLines={2}
@@ -128,7 +131,7 @@ export function BookCard({
               {
                 color: overlayTextColor,
                 fontFamily: cardFontFamily(style.cardFontFamily),
-                fontSize: style.cardFontSize * 1.15,
+                fontSize: style.cardFontSize * 1.15 * (compact ? 0.82 : 1),
                 fontWeight: style.cardBold ? "700" : "600",
                 fontStyle: style.cardItalic ? "italic" : "normal",
               },
@@ -136,7 +139,7 @@ export function BookCard({
           >
             {String(book.Title ?? "Untitled")}
           </Text>
-          <Text
+          {!compact && <Text
             {...dynamicType}
             numberOfLines={1}
             style={[
@@ -153,8 +156,8 @@ export function BookCard({
             ]}
           >
             {String(book.Attribution ?? "Unknown author")}
-          </Text>
-          <Text
+          </Text>}
+          {!compact && <Text
             {...dynamicType}
             style={[
               styles.status,
@@ -170,7 +173,7 @@ export function BookCard({
             ]}
           >
             {label}
-          </Text>
+          </Text>}
         </View>
       )}
     </Pressable>

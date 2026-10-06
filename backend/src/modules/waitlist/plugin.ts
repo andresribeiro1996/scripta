@@ -3,11 +3,11 @@ import type { FastifyInstance } from "fastify";
 import { env } from "../../config/env.js";
 import { openWaitlistDb } from "./adapters/sqlite/connection.js";
 import { createSqliteWaitlistRepository } from "./adapters/sqlite/sqliteWaitlistRepository.js";
-import { confirmationSubject, confirmationText } from "./confirmation.js";
+import { confirmationEmail, confirmationSubject } from "./confirmation.js";
 import { buildWaitlistRoutes } from "./routes.js";
 import { createWaitlistService } from "./service.js";
 
-type SendEmail = (to: string, subject: string, text: string) => Promise<void>;
+type SendEmail = (to: string, subject: string, text: string, html?: string) => Promise<void>;
 
 export async function waitlistPlugin(app: FastifyInstance, options: { sendEmail?: SendEmail } = {}) {
   const db = openWaitlistDb();
@@ -18,7 +18,8 @@ export async function waitlistPlugin(app: FastifyInstance, options: { sendEmail?
     repo,
     sendEmail &&
       ((email) => {
-        sendEmail(email, confirmationSubject, confirmationText(email, env.FRONTEND_URL)).catch((error) =>
+        const mail = confirmationEmail(email, env.FRONTEND_URL);
+        sendEmail(email, confirmationSubject, mail.text, mail.html).catch((error) =>
           app.log.error(error, "[waitlist] confirmation email failed")
         );
       })
