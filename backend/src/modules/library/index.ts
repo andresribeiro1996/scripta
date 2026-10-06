@@ -18,3 +18,4 @@ export { UnknownWorkError, WorkResolutionError, canonicalByKey, canonicalWorkIds
 export type { WorkEntry, WorkRef } from "./works.js";
 export { startWorksSweep, sweepLibraryWorks } from "./worksSweep.js";
 export type { SweepBatch, WorksSweepStep } from "./worksSweep.js";
+export { copyOfWork, holdersOfWorks, type ViewerCopy } from "./workHolders.js";
