@@ -174,7 +174,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
   }
 
   async function lookupDetails(book: BookRow, catalog: BookCatalog) {
-    const details = await catalog.fetchDetails({ isbn: book.isbn, title: book.title, author: book.author });
+    const details = await catalog.fetchDetails({ isbn: book.isbn, title: book.title, author: book.author, language: book.language ?? (isPortugueseIsbn(book.isbn) ? "pt" : null) });
     const at = now().toISOString();
     if (details && (details.metadata.summary || details.metadata.genres.length > 0 || details.metadata.rating !== null)) {
       deps.repo.saveDetails(book.id, details.metadata, details.sources, details.summarySource, at);

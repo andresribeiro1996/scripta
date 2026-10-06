@@ -1,4 +1,4 @@
-import { buildBookMetadata, findOpenLibraryMatch, mapOpenLibraryDoc } from "@scripta/shared";
+import { buildBookMetadata, findOpenLibraryMatch, mapOpenLibraryDoc, openLibraryDescription } from "@scripta/shared";
 import type { BookCatalog, EditionRecord, EditionRecordSource } from "../../domain/ports.js";
 import { fetchJson, type Throttle } from "../http/http.js";
 
@@ -26,7 +26,10 @@ export function createOpenLibraryCatalog(throttle: Throttle, urgent = true): Boo
       }
       const match = findOpenLibraryMatch(await get(`https://openlibrary.org/search.json?${query}`), isbn ?? "", title, author);
       if (!match) return null;
-      const metadata = buildBookMetadata(match, await get(`https://openlibrary.org${String(match.key)}.json`));
+      const work = await get(`https://openlibrary.org${String(match.key)}.json`);
+      const edition = isbn ? await get(`https://openlibrary.org/isbn/${encodeURIComponent(isbn)}.json`) : null;
+      const metadata = buildBookMetadata(match, work);
+      metadata.summary = openLibraryDescription(edition) ?? metadata.summary;
       return { metadata, sources: ["openlibrary"], summarySource: metadata.summary ? "openlibrary" : null, workKey: String(match.key) };
     },
 

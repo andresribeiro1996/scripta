@@ -79,7 +79,7 @@ export interface CatalogDetails {
 }
 
 export interface BookCatalog {
-  fetchDetails(lookup: { isbn: string | null; title: string; author: string }): Promise<CatalogDetails | null>;
+  fetchDetails(lookup: { isbn: string | null; title: string; author: string; language?: string | null }): Promise<CatalogDetails | null>;
   search(query: { isbn: string } | { text: string }): Promise<CatalogSearchHit[]>;
 }
 
