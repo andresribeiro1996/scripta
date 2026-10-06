@@ -15,7 +15,6 @@ import { randomUUID } from "node:crypto";
 import { STATUS_CODES } from "node:http";
 import { isAllowedOrigin } from "./config/corsOrigin.js";
 import { env } from "./config/env.js";
-import { renderEmail } from "./modules/auth/emailLayout.js";
 import { devHttps } from "./config/devCerts.js";
 import { TRUSTED_PROXIES } from "./config/trustedProxies.js";
 import { assertObjectKey } from "./storage/objectStore.js";
@@ -30,6 +29,7 @@ import {
   getDashboardSeenAt,
   getUserTheme,
   registerAuthModule,
+  renderEmail,
   resolvePublicReaderProfile,
   resolvePublicReaderProfiles,
   searchUsernameOwners,

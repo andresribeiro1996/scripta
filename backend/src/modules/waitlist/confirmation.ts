@@ -1,4 +1,4 @@
-import { renderEmail } from "../auth/emailLayout.js";
+import { renderEmail } from "../auth/index.js";
 
 export const confirmationSubject = "You’re on the Atmyshelf launch list";
 
