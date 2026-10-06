@@ -42,6 +42,7 @@ export function applyBooksMigrations(db: DatabaseSync): void {
   if (!columns.some((column) => column.name === "work_checked_at")) db.exec("ALTER TABLE books ADD COLUMN work_checked_at TEXT");
   if (!columns.some((column) => column.name === "title_key")) db.exec("ALTER TABLE books ADD COLUMN title_key TEXT");
   if (!columns.some((column) => column.name === "title_group_blocked_at")) db.exec("ALTER TABLE books ADD COLUMN title_group_blocked_at TEXT");
+  moveOpenLibrarySummariesToWorks(db);
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_work ON books(work_id)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_title_key ON books(title_key)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_works_merged_into ON works(merged_into)");
@@ -79,6 +80,31 @@ export function applyBooksMigrations(db: DatabaseSync): void {
   }
   backfillTitleKeys(db);
   joinIsbn10Editions(db);
+}
+
+function moveOpenLibrarySummariesToWorks(db: DatabaseSync): void {
+  const columns = db.prepare("PRAGMA table_info(works)").all() as Array<{ name: string }>;
+  if (columns.some((column) => column.name === "summary")) return;
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    db.exec("ALTER TABLE works ADD COLUMN summary TEXT");
+    db.exec(`
+      UPDATE works
+      SET summary = (
+        SELECT summary FROM books
+        WHERE work_id = works.id AND summary_source = 'openlibrary' AND summary IS NOT NULL AND summary <> ''
+        ORDER BY created_at, rowid LIMIT 1
+      )
+    `);
+    db.exec(`
+      UPDATE books SET summary = NULL, summary_source = NULL
+      WHERE summary_source = 'openlibrary' AND work_id IN (SELECT id FROM works WHERE summary IS NOT NULL)
+    `);
+    db.exec("COMMIT");
+  } catch (error) {
+    if (db.isTransaction) db.exec("ROLLBACK");
+    throw error;
+  }
 }
 
 function backfillTitleKeys(db: DatabaseSync): void {
