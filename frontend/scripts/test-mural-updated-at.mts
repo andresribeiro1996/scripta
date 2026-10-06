@@ -23,7 +23,7 @@ function setup(murals: Mural[]) {
   renderToString(createElement(QueryClientProvider, { client }, createElement(Probe)));
   globalThis.fetch = (url, init) =>
     new Promise<Response>((resolve) => {
-      calls.push({ method: String(init?.method), url: String(url), body: init?.body ? JSON.parse(String(init.body)) : {}, respond: resolve });
+      calls.push({ method: init?.method ?? "GET", url: String(url), body: init?.body ? JSON.parse(String(init.body)) : {}, respond: resolve });
     });
   async function answer(index: number, response: Response | ((call: Call) => Response)) {
     while (calls.length <= index) await flush();
@@ -113,12 +113,10 @@ test("scrubImage clears the cover then sends the blocks with the updatedAt the c
   }
 });
 
-test("a 409 rejects with a message for the user, shows the server's version and drops writes queued behind it", async () => {
+test("a 409 rejects with a message for the user, loads the server's version and drops writes queued behind it", async () => {
   const m = makeMural("conflict");
   const server = makeMural("conflict", { name: "Server", updatedAt: "t9" });
-  const { client, calls, hook, answer, restore } = setup([m]);
-  let refetches = 0;
-  const unsubscribe = new QueryObserver(client, { queryKey: ["murals"], staleTime: Infinity, queryFn: async () => { refetches++; return [server]; } }).subscribe(() => undefined);
+  const { calls, hook, answer, restore } = setup([m]);
   try {
     const first = hook().saveBlocks(m.id, [textBlock("A")]);
     const second = hook().saveBlocks(m.id, [textBlock("B")]);
@@ -126,16 +124,113 @@ test("a 409 rejects with a message for the user, shows the server's version and 
     await flush();
     assert.equal(calls.length, 1);
     await answer(0, Response.json({ error: "Mural changed.", current: server }, { status: 409 }));
+    await answer(1, Response.json(server));
     await rejections;
-    assert.equal(calls.length, 1);
-    assert.equal(refetches, 1);
+    assert.equal(calls.length, 2);
+    assert.equal(calls[1].method, "GET");
+    assert.equal(calls[1].url.endsWith("/murals/conflict"), true);
     assert.equal(hook().currentMural(m.id)?.name, "Server");
     const later = hook().rename(m.id, "Later");
-    await answer(1, (call) => Response.json({ ...server, ...call.body, updatedAt: "t10" }));
+    await answer(2, (call) => Response.json({ ...server, ...call.body, updatedAt: "t10" }));
     assert.equal((await later).name, "Later");
-    assert.equal(calls[1].body.updatedAt, "t9");
+    assert.equal(calls[2].body.updatedAt, "t9");
   } finally {
-    unsubscribe();
+    restore();
+  }
+});
+
+test("a write enqueued while the server version is loading is dropped", async () => {
+  const m = makeMural("loading");
+  const server = makeMural("loading", { updatedAt: "t9" });
+  const { calls, hook, answer, restore } = setup([m]);
+  try {
+    const first = assert.rejects(hook().saveBlocks(m.id, [textBlock("A")]), MuralConflictError);
+    await answer(0, Response.json({ error: "Mural changed." }, { status: 409 }));
+    await flush();
+    assert.equal(calls[1].method, "GET");
+    const during = assert.rejects(hook().rename(m.id, "During"), MuralConflictError);
+    await answer(1, Response.json(server));
+    await Promise.all([first, during]);
+    assert.equal(calls.length, 2);
+  } finally {
+    restore();
+  }
+});
+
+test("a share on a stale tab takes the server's blocks and updatedAt when nothing is pending", async () => {
+  const m = makeMural("stale-share", { updatedAt: "v1" });
+  const { client, hook, answer, restore } = setup([m]);
+  try {
+    const sharing = hook().share(m.id);
+    await answer(0, Response.json({ ...m, blocks: [textBlock("Y")], updatedAt: "v2" }));
+    await sharing;
+    const cached = client.getQueryData<Mural[]>(["murals"])![0];
+    assert.equal(cached.blocks[0].type === "text" && cached.blocks[0].heading, "Y");
+    assert.equal(cached.updatedAt, "v2");
+  } finally {
+    restore();
+  }
+});
+
+test("a share on a stale tab keeps the old updatedAt when an edit is pending, so the save conflicts", async () => {
+  const m = makeMural("stale-share-edit", { updatedAt: "v1" });
+  const { client, calls, hook, answer, restore } = setup([m]);
+  try {
+    const sharing = hook().share(m.id);
+    await flush();
+    const saving = assert.rejects(hook().saveBlocks(m.id, [textBlock("Z")]), MuralConflictError);
+    await flush();
+    await answer(0, Response.json({ ...m, blocks: [textBlock("Y")], updatedAt: "v2" }));
+    await sharing;
+    const cached = client.getQueryData<Mural[]>(["murals"])![0];
+    assert.equal(cached.blocks[0].type === "text" && cached.blocks[0].heading, "Z");
+    assert.equal(cached.updatedAt, "v1");
+    await flush();
+    assert.equal(calls[1].body.updatedAt, "v1");
+    await answer(1, Response.json({ error: "Mural changed." }, { status: 409 }));
+    await answer(2, Response.json({ ...m, blocks: [textBlock("Y")], updatedAt: "v2" }));
+    await saving;
+  } finally {
+    restore();
+  }
+});
+
+test("a share that returns the same blocks gives a pending edit the new updatedAt", async () => {
+  const m = makeMural("fresh-share-edit", { updatedAt: "v1" });
+  const { calls, hook, answer, restore } = setup([m]);
+  try {
+    const sharing = hook().share(m.id);
+    await flush();
+    const saving = hook().saveBlocks(m.id, [textBlock("Z")]);
+    await flush();
+    await answer(0, Response.json({ ...m, updatedAt: "v2" }));
+    await sharing;
+    await flush();
+    assert.equal(calls[1].body.updatedAt, "v2");
+    await answer(1, (call) => Response.json({ ...m, ...call.body, updatedAt: "v3" }));
+    await saving;
+  } finally {
+    restore();
+  }
+});
+
+test("a refetch that starts during a write is cancelled once the write is stored", async () => {
+  const m = makeMural("refetch-during");
+  const { client, hook, answer, restore } = setup([m]);
+  let aborted = false;
+  try {
+    const renaming = hook().rename(m.id, "Renamed");
+    await flush();
+    const refetching = client.fetchQuery({
+      queryKey: ["murals"],
+      staleTime: 0,
+      queryFn: ({ signal }) => new Promise<Mural[]>((_resolve, reject) => { signal.addEventListener("abort", () => { aborted = true; reject(new Error("cancelled")); }); })
+    });
+    refetching.catch(() => undefined);
+    await answer(0, (call) => Response.json({ ...m, ...call.body, updatedAt: "t1" }));
+    await renaming;
+    assert.equal(aborted, true);
+  } finally {
     restore();
   }
 });

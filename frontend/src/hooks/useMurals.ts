@@ -22,6 +22,7 @@ import {
   clearMuralCoverApi,
   createMuralApi,
   deleteMuralApi,
+  fetchMural,
   fetchMurals,
   setMuralCoverApi,
   shareMuralApi,
@@ -77,9 +78,11 @@ export function useMurals() {
     setMurals(current().map((m) => (m.id === updated.id ? { ...updated, blocks: compactMuralBlocks(ensureBookBlockHeights(updated.blocks)) } : m)));
   }
 
-  function store(updated: Mural, adoptBlocksIfCacheHolds?: MuralBlock[]) {
+  function store(updated: Mural, startBlocks: MuralBlock[] | undefined) {
     const latest = currentMural(updated.id);
-    replaceOne({ ...updated, blocks: !latest || latest.blocks === adoptBlocksIfCacheHolds ? updated.blocks : latest.blocks });
+    if (!latest || latest.blocks === startBlocks) return replaceOne(updated);
+    const unchanged = JSON.stringify(updated.blocks) === JSON.stringify(startBlocks);
+    replaceOne({ ...updated, blocks: latest.blocks, updatedAt: unchanged ? updated.updatedAt : latest.updatedAt });
   }
 
   function queue<T>(id: string, work: () => Promise<T>): Promise<T> {
@@ -87,7 +90,9 @@ export function useMurals() {
     return enqueueWrite(id, async () => {
       if (generationOf(id) !== generation) throw new MuralConflictError();
       await queryClient.cancelQueries({ queryKey: ["murals"] });
-      return work();
+      const result = await work();
+      await queryClient.cancelQueries({ queryKey: ["murals"] });
+      return result;
     });
   }
 
@@ -96,16 +101,20 @@ export function useMurals() {
       return await updateMuralApi(id, { ...patch, updatedAt: currentMural(id)?.updatedAt });
     } catch (error) {
       if (!(error instanceof ApiError) || error.status !== 409) throw error;
-      generations.set(id, generationOf(id) + 1);
-      await queryClient.invalidateQueries({ queryKey: ["murals"] });
+      try {
+        replaceOne(await fetchMural(id));
+      } finally {
+        generations.set(id, generationOf(id) + 1);
+      }
       throw new MuralConflictError();
     }
   }
 
   function writeOne(id: string, send: () => Promise<Mural>): Promise<Mural> {
     return queue(id, async () => {
+      const startBlocks = currentMural(id)?.blocks;
       const updated = await send();
-      store(updated);
+      store(updated, startBlocks);
       return updated;
     });
   }
@@ -133,7 +142,7 @@ export function useMurals() {
     try {
       return await queue(id, async () => {
         const updated = await putMural(id, { blocks: next });
-        store(updated, optimistic);
+        store(updated, next);
         return updated;
       });
     } catch (error) {
