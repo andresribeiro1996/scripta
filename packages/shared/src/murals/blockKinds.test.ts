@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { bookKey } from "../library/merge.js";
-import { BLOCK_TYPES, blockLabel, blockReferences, createBlockCandidate, ensureBookBlockHeights, isConfigurable, muralBlockTitle, rekeyBlocks, type BlockType, type MuralBlock } from "./murals.js";
+import { BLOCK_TYPES, blockLabel, blockReferences, createBlockCandidate, ensureBookBlockHeights, isConfigurable, muralBlockTitle, rekeyBlocks, scrubBooksFromMurals, type BlockType, type Mural, type MuralBlock } from "./murals.js";
 
 const make = (type: BlockType, extra: Record<string, unknown> = {}) => ({ ...createBlockCandidate(type, []), ...extra }) as MuralBlock;
 
@@ -103,4 +103,54 @@ test("rekeyBlocks passes anything it doesn't recognise through untouched", () =>
   assert.deepEqual(rekeyBlocks(odd, from, "new"), odd);
   const inlineTiers = [{ id: "1", type: "tierlist", tierlistId: "t", tiers: [{ id: "s", bookKeys: ["old"] }], pool: ["old"] }];
   assert.deepEqual(rekeyBlocks(inlineTiers, from, "new"), inlineTiers);
+});
+
+const at = { x: 0, y: 0, w: 1, h: 1 };
+const muralOf = (blocks: MuralBlock[]): Mural[] => [{ id: "m1", name: "M", theme: "light", blocks, createdAt: "", updatedAt: "", shareToken: null, shareUrl: null, folderId: null }];
+
+test("scrub removes a spotlight or quote that points at a deleted book", () => {
+  const [mural] = scrubBooksFromMurals(muralOf([
+    { id: "b1", type: "spotlight", layout: at, bookKey: "gone" },
+    { id: "b2", type: "quote", layout: at, bookKey: "gone", highlightId: "h1" },
+    { id: "b3", type: "spotlight", layout: at, bookKey: "kept" }
+  ]), ["gone"]);
+  assert.deepEqual(mural.blocks.map((b) => b.id), ["b3"]);
+});
+
+test("scrub trims shelf and quote collection members and drops them only once empty", () => {
+  const [mural] = scrubBooksFromMurals(muralOf([
+    { id: "s1", type: "shelf", layout: { x: 2, y: 5, w: 8, h: 3 }, title: "Top", bookKeys: ["gone", "a", "b"] },
+    { id: "s2", type: "shelf", layout: at, title: "One", bookKeys: ["gone"] },
+    { id: "q1", type: "quoteCollection", layout: at, title: "Q", quotes: [{ bookKey: "gone", highlightId: "h1" }, { bookKey: "a", highlightId: "h2" }] }
+  ]), ["gone"]);
+  const shelf = mural.blocks.find((b) => b.id === "s1") as Extract<MuralBlock, { type: "shelf" }>;
+  const quotes = mural.blocks.find((b) => b.id === "q1") as Extract<MuralBlock, { type: "quoteCollection" }>;
+  assert.deepEqual(shelf.bookKeys, ["a", "b"]);
+  assert.deepEqual(shelf.layout, { x: 2, y: 5, w: 8, h: 3 });
+  assert.equal(mural.blocks.some((b) => b.id === "s2"), false);
+  assert.deepEqual(quotes.quotes, [{ bookKey: "a", highlightId: "h2" }]);
+});
+
+test("scrub leaves survivors at their authored coordinates", () => {
+  const [mural] = scrubBooksFromMurals(muralOf([
+    { id: "spot", type: "spotlight", layout: { x: 0, y: 0, w: 4, h: 3 }, bookKey: "gone" },
+    { id: "shelf", type: "shelf", layout: { x: 0, y: 3, w: 8, h: 3 }, title: "S", bookKeys: ["gone", "a"] }
+  ]), ["gone"]);
+  assert.deepEqual(mural.blocks.map((b) => [b.id, b.layout.y]), [["shelf", 3]]);
+});
+
+test("scrub never touches a collection shelf, a rediscover quote or a tier list", () => {
+  const blocks: MuralBlock[] = [
+    { id: "c", type: "shelf", layout: at, title: "", bookKeys: ["gone"], collectionId: "g" },
+    { id: "r", type: "quote", layout: at, bookKey: "", highlightId: "", mode: "rediscover" },
+    { id: "t", type: "tierlist", layout: at, tierlistId: "list" }
+  ];
+  const murals = muralOf(blocks);
+  assert.equal(scrubBooksFromMurals(murals, ["gone", ""]), murals);
+});
+
+test("scrub returns the same array when nothing is affected or no keys are given", () => {
+  const murals = muralOf([{ id: "b", type: "spotlight", layout: at, bookKey: "kept" }]);
+  assert.equal(scrubBooksFromMurals(murals, ["other"]), murals);
+  assert.equal(scrubBooksFromMurals(murals, []), murals);
 });

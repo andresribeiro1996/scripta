@@ -1,5 +1,5 @@
 import { rekeyKeys } from "../library/dedupe.js";
-import type { BlockLayout, BlockType, MuralBlock } from "./murals.js";
+import type { BlockLayout, BlockType, Mural, MuralBlock } from "./murals.js";
 
 type Content<T extends BlockType> = Omit<Extract<MuralBlock, { type: T }>, "id" | "type" | "layout" | "style" | "expandedFrom">;
 
@@ -59,45 +59,59 @@ interface Kind<T extends BlockType> {
   valid(block: Record<string, unknown>): boolean;
   references(block: Block<T>, refs: BlockReferences): void;
   rekey(block: Block<T>, from: ReadonlySet<string>, to: string): Block<T>;
+  scrub(block: Block<T>, keys: ReadonlySet<string>): Block<T> | null;
 }
 
 const KINDS: { [T in BlockType]: Kind<T> } = {
   spotlight: { label: "Book spotlight", size: { w: 3, h: 4 }, minHeight: 0, configurable: true, content: () => ({ bookKey: "" }),
     valid: (b) => typeof b.bookKey === "string",
     references: (b, refs) => { if (nonEmpty(b.bookKey)) refs.bookKeys.add(b.bookKey); },
-    rekey: (b, from, to) => (from.has(b.bookKey) ? { ...b, bookKey: to } : b) },
+    rekey: (b, from, to) => (from.has(b.bookKey) ? { ...b, bookKey: to } : b),
+    scrub: (b, keys) => (keys.has(b.bookKey) ? null : b) },
   shelf: { label: "Shelf", size: { w: 8, h: 4 }, minHeight: 4, configurable: true, content: () => ({ title: "", bookKeys: [] }),
     valid: (b) => Array.isArray(b.bookKeys),
     references: (b, refs) => { if (nonEmpty(b.collectionId)) refs.collectionIds.add(b.collectionId); else addStrings(refs.bookKeys, b.bookKeys); },
-    rekey: (b, from, to) => ({ ...b, bookKeys: rekeyKeys(b.bookKeys, from, to) }) },
+    rekey: (b, from, to) => ({ ...b, bookKeys: rekeyKeys(b.bookKeys, from, to) }),
+    scrub: (b, keys) => {
+      if (b.collectionId) return b;
+      const bookKeys = b.bookKeys.filter((key) => !keys.has(key));
+      if (bookKeys.length === b.bookKeys.length) return b;
+      return bookKeys.length ? { ...b, bookKeys } : null;
+    } },
   quote: { label: "Quote spotlight", size: { w: 4, h: 3 }, minHeight: 0, configurable: true, content: () => ({ bookKey: "", highlightId: "" }),
     valid: (b) => typeof b.bookKey === "string",
     references: (b, refs) => { if (b.mode !== "rediscover") addQuote(refs, b); },
-    rekey: (b, from, to) => (from.has(b.bookKey) ? { ...b, bookKey: to } : b) },
+    rekey: (b, from, to) => (from.has(b.bookKey) ? { ...b, bookKey: to } : b),
+    scrub: (b, keys) => (b.mode !== "rediscover" && keys.has(b.bookKey) ? null : b) },
   quoteCollection: { label: "Quote collection", size: { w: 6, h: 4 }, minHeight: 0, configurable: true, content: () => ({ title: "", quotes: [] }),
     valid: (b) => Array.isArray(b.quotes),
     references: (b, refs) => { for (const quote of b.quotes) addQuote(refs, quote); },
-    rekey: (b, from, to) => ({ ...b, quotes: rekeyQuotes(b.quotes, from, to) as typeof b.quotes }) },
+    rekey: (b, from, to) => ({ ...b, quotes: rekeyQuotes(b.quotes, from, to) as typeof b.quotes }),
+    scrub: (b, keys) => {
+      const quotes = b.quotes.filter((quote) => !keys.has(quote.bookKey));
+      if (quotes.length === b.quotes.length) return b;
+      return quotes.length ? { ...b, quotes } : null;
+    } },
   image: { label: "Image", size: { w: 4, h: 3 }, minHeight: 0, configurable: true, content: () => ({ imageId: "" }),
     valid: (b) => typeof b.imageId === "string",
     references: (b, refs) => { if (nonEmpty(b.imageId)) refs.imageIds.add(b.imageId); },
-    rekey: same },
+    rekey: same, scrub: same },
   text: { label: "Text", size: { w: 4, h: 2 }, minHeight: 0, configurable: true, content: () => ({ heading: "", body: "" }),
-    valid: always, references: nothing, rekey: same },
+    valid: always, references: nothing, rekey: same, scrub: same },
   profile: { label: "Reader profile", size: { w: 6, h: 5 }, minHeight: 0, configurable: true, content: () => ({ bio: "", favoriteGenres: [] }),
-    valid: always, references: (_b, refs) => { refs.needsShelfTheme = true; }, rekey: same },
+    valid: always, references: (_b, refs) => { refs.needsShelfTheme = true; }, rekey: same, scrub: same },
   currentlyReading: { label: "Currently reading", size: { w: 4, h: 6 }, minHeight: 6, configurable: false, content: () => ({}),
-    valid: always, references: (_b, refs) => { refs.needsCurrentlyReading = true; }, rekey: same },
+    valid: always, references: (_b, refs) => { refs.needsCurrentlyReading = true; }, rekey: same, scrub: same },
   stats: { label: "Stats", size: { w: 6, h: 2 }, minHeight: 0, configurable: true, content: () => ({ metrics: ["totalBooks", "booksFinished", "totalHighlights"] }),
     valid: (b) => Array.isArray(b.metrics),
     references: (b, refs) => addStrings(refs.statsMetrics, b.metrics),
-    rekey: same },
+    rekey: same, scrub: same },
   empty: { label: "Empty block", size: { w: 3, h: 2 }, minHeight: 0, configurable: false, content: () => ({}),
-    valid: always, references: nothing, rekey: same },
+    valid: always, references: nothing, rekey: same, scrub: same },
   tierlist: { label: "Tier list", size: { w: 10, h: 8 }, minHeight: 8, configurable: true, content: () => ({ tierlistId: "" }),
-    valid: always, references: nothing, rekey: same },
+    valid: always, references: nothing, rekey: same, scrub: same },
   readerCard: { label: "Reader card", size: { w: 4, h: 6 }, minHeight: 0, configurable: false, content: () => ({}),
-    valid: always, references: (_b, refs) => { refs.needsReaderCard = true; }, rekey: same }
+    valid: always, references: (_b, refs) => { refs.needsReaderCard = true; }, rekey: same, scrub: same }
 };
 
 export const BLOCK_TYPES = Object.keys(KINDS) as BlockType[];
@@ -156,4 +170,32 @@ export function rekeyBlocks(blocks: unknown, from: ReadonlySet<string>, to: stri
     const block = known(value);
     return block ? kindOf(block).rekey(block, from, to) : value;
   });
+}
+
+/** Scrubs one or more deleted books' keys out of every mural that
+ *  referenced them, across every affected block type — called alongside
+ *  actually deleting the book(s) (see LibraryPage.tsx/GroupsPage.tsx's
+ *  handleDeleteSelected, same call site lib/groups.ts's
+ *  removeBooksFromAllGroups is used from). A block that has nothing left
+ *  to show once its reference is gone (spotlight/quote pointing straight
+ *  at the deleted book, or a shelf/quoteCollection left with zero
+ *  members) is removed entirely rather than left empty — same reasoning
+ *  as lib/bookCovers.ts falling back to auto-resolution rather than
+ *  leaving a dangling cover URL. Returns the SAME `murals` array
+ *  reference when nothing was actually affected, matching
+ *  removeBooksFromAllGroups/scrubImageFromBooks's no-op convention. */
+export function scrubBooksFromMurals(murals: Mural[], keys: Iterable<string>): Mural[] {
+  const keySet = keys instanceof Set ? keys : new Set(keys);
+  if (keySet.size === 0) return murals;
+  let changed = false;
+  const result = murals.map((m) => {
+    const blocks = m.blocks.flatMap((b) => {
+      const next = kindOf(b).scrub(b, keySet);
+      return next ? [next] : [];
+    });
+    if (blocks.length === m.blocks.length && blocks.every((b, i) => b === m.blocks[i])) return m;
+    changed = true;
+    return { ...m, blocks, updatedAt: new Date().toISOString() };
+  });
+  return changed ? result : murals;
 }
