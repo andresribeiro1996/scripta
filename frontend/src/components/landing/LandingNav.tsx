@@ -1,33 +1,16 @@
-import { BrandLockup } from "../BrandLockup";
+import { BrandMark } from "../BrandMark";
 import { ThemeToggle } from "./ThemeToggle";
-import { container, secondaryButton } from "./ui";
-
-const anchors = [
-  ["How it works", "/#how"],
-  ["Sharing", "/#sharing"],
-  ["Games", "/#games"],
-] as const;
+import { container } from "./ui";
 
 export function LandingNav() {
   return (
-    <header className="sticky top-0 z-40 border-b border-(--color-border) bg-(--color-bg)">
-      <div className={`${container} flex h-16 items-center justify-between gap-4`}>
-        <a href="/#top" aria-label="Atmyshelf home" className="flex min-h-11 items-center">
-          <BrandLockup />
+    <header>
+      <div className={`${container} grid h-28 grid-cols-[44px_1fr_44px] items-center md:h-36`}>
+        <a href="/#top" aria-label="Atmyshelf home" className="col-start-2 flex min-h-11 flex-col items-center justify-center gap-1 [&>svg]:md:h-28 [&>svg]:md:w-28">
+          <BrandMark size={80} />
+          <span className="font-sans text-lg font-normal tracking-[0.08em]">Atmyshelf</span>
         </a>
-        <nav aria-label="Sections" className="hidden items-center gap-8 text-sm text-(--color-text-dim) lg:flex">
-          {anchors.map(([label, href]) => (
-            <a key={href} href={href} className="transition-colors hover:text-(--color-text)">
-              {label}
-            </a>
-          ))}
-        </nav>
-        <div className="flex items-center gap-2">
-          <ThemeToggle />
-          <a href="/#start" className={secondaryButton}>
-            Get notified
-          </a>
-        </div>
+        <div className="self-start pt-6"><ThemeToggle /></div>
       </div>
     </header>
   );
