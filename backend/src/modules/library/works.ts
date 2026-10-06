@@ -144,23 +144,6 @@ export function copyKeysForWorks(ownerUserId: string, workIds: string[]): Map<st
   return copyKeysResolver(ownerUserId, workIds);
 }
 
-export function keysForWorks(ownerUserId: string, workIds: string[], existing: Map<string, string>, copyKeys: (ownerUserId: string, workIds: string[]) => Map<string, string> = copyKeysForWorks): Map<string, string> {
-  const unique = [...new Set(workIds)];
-  const copies = copyKeys(ownerUserId, unique.filter((id) => !existing.has(id)));
-  const used = new Set(existing.values());
-  const result = new Map<string, string>();
-  for (const id of unique) {
-    let key = existing.get(id);
-    if (key === undefined) {
-      const copy = copies.get(id);
-      key = copy !== undefined && !used.has(copy) ? copy : id;
-      used.add(key);
-    }
-    result.set(id, key);
-  }
-  return result;
-}
-
 export function resolveTitleWorks(books: Array<{ title: string; author: string }>, resolve: (lookups: WorkLookup[]) => Array<string | null> = resolveWorks): Array<string | null> {
   if (books.length === 0) return [];
   try {
@@ -168,28 +151,6 @@ export function resolveTitleWorks(books: Array<{ title: string; author: string }
   } catch (error) {
     throw new WorkResolutionError(error);
   }
-}
-
-export function firstDuplicateWork(keys: string[], works: Map<string, WorkRef>): WorkRef | undefined {
-  const seen = new Set<string>();
-  for (const key of keys) {
-    const ref = works.get(key);
-    if (!ref?.workId) continue;
-    if (seen.has(ref.workId)) return ref;
-    seen.add(ref.workId);
-  }
-  return undefined;
-}
-
-export function keepFirstPerWork<T>(items: T[], keyOf: (item: T) => string, works: Map<string, WorkRef>): T[] {
-  const seen = new Set<string>();
-  return items.filter((item) => {
-    const workId = works.get(keyOf(item))?.workId;
-    if (!workId) return true;
-    if (seen.has(workId)) return false;
-    seen.add(workId);
-    return true;
-  });
 }
 
 export function workIdsByKey(keys: string[], works: Map<string, WorkRef>): Map<string, string | null> {

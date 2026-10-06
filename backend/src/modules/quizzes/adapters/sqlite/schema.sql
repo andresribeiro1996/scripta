@@ -52,8 +52,7 @@ CREATE INDEX IF NOT EXISTS idx_quiz_play_answers_quiz
 
 CREATE TABLE IF NOT EXISTS quiz_works (
   quiz_id TEXT NOT NULL,
-  key     TEXT NOT NULL,
-  work_id TEXT,
-  PRIMARY KEY (quiz_id, key)
+  work_id TEXT NOT NULL,
+  PRIMARY KEY (quiz_id, work_id)
 );
 CREATE INDEX IF NOT EXISTS idx_quiz_works_work ON quiz_works(work_id);

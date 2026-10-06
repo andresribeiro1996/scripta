@@ -14,7 +14,7 @@ export type { EmbeddedMuralRow } from "./migration.js";
 // comment for the privacy boundary this enforces.
 export { resolvePublicLibrary, resolvePublicLibraryData, resolvePublicBooksByWork, readerGlyphFor, sharedBookCounts, sharedBooks } from "./publicResolver.js";
 export type { PublicBookData, PublicHighlight, ResolvedPublicData, PublicDataRequest } from "./publicResolver.js";
-export { UnknownWorkError, WorkResolutionError, canonicalByKey, canonicalWorkIds, copyKeysForWorks, duplicateWorkMessage, firstDuplicateWork, firstKeyPerWork, keepFirstPerWork, keysForWorks, knownWorkIds, resolveEntryWorks, resolveTitleWorks, workIdsByKey } from "./works.js";
+export { UnknownWorkError, WorkResolutionError, canonicalByKey, canonicalWorkIds, copyKeysForWorks, duplicateWorkMessage, firstKeyPerWork, knownWorkIds, resolveEntryWorks, resolveTitleWorks, workIdsByKey } from "./works.js";
 export type { WorkEntry, WorkRef } from "./works.js";
 export { startWorksSweep, sweepLibraryWorks } from "./worksSweep.js";
 export type { SweepBatch, WorksSweepStep } from "./worksSweep.js";

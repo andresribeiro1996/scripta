@@ -110,14 +110,14 @@ Each account only ever sees its own document — verified in testing with two se
 - **Library step:** fills `library_books.work_id` where it is NULL.
 - **Arena:** no sweep step and no rekey hook. Slots and duels store work ids and votes and winners store a side (see phase E2). Slot writes reject a second edition of one work with `409`.
 - **Tier lists:** no sweep step and no rekey hook. Boards, ballots and snapshots store work ids, `tierlist_works` lists each board's works, and reads canonicalise them, so a later catalog merge still shows one entry and still takes votes (see phase E2). Create and PUT reject a second edition of one work with `409`.
-- **Quiz step:** each quiz gets a `quiz_works` row per book, swept from the owner's library then the quiz's own book titles (which is what resolves curated `pool-*` books). Create keeps the first edition of each work, PUT returns `409` only when the save adds a second edition (a quiz that already held two keeps both and still saves), and a library merge moves the kept copy's work.
+- **Quizzes:** no sweep step and no rekey hook. Books and questions store work ids, `quiz_works` lists each quiz's works, and reads canonicalise them, so a later catalog merge still shows one entry (see phase E2). A question's prompt always comes from the stored book it was drawn from, so merged editions in a published quiz keep their own covers and quotes. Create keeps the first edition of each work and PUT rejects a second edition with `409`.
 - **Mural step:** each mural gets a `mural_works` row per book key its spotlight, shelf, quote, quote-collection and legacy tier-list blocks reference (`extractReferences`), swept from the owner's library. Two editions of one work are allowed, and a library merge moves the kept copy's work.
 
 #### Works check
 
 Read-only counts of rows still missing a work id (`library.nullWithIdentity` should sit near 0 once the sweep has run), over `railway ssh`. A section whose table or column isn't deployed yet reports "not deployed":
 
-Read it by the `*Null` counts only; those should approach 0. `itemsWithoutRows` for tier lists, quizzes and murals never reaches 0, because items with no book keys get no rows. Remaining NULLs are orphaned keys (deleted books) or rows whose title can't resolve.
+Read it by the `*Null` counts only; those should approach 0. `itemsWithoutRows` for murals never reaches 0, because items with no book keys get no rows. Remaining NULLs are orphaned keys (deleted books) or rows whose title can't resolve.
 
 ```bash
 railway ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && node scripts/works-check.mjs'
@@ -127,9 +127,9 @@ Before each E2b removal PR merges, read the `e2` section. Arena and tier lists n
 
 Rolling back a removal means restoring that one game database to just before its deploy (see "Rolling back production to a point in time" under Backups). Older code cannot read the rebuilt tables.
 
-### Works format (phase E2)
+### Works in the games (phase E2)
 
-Web and mobile send `X-Scripta-Works: 1`. With it, quiz routes take and return work ids (`workIds`) instead of book keys; without it they answer exactly as before. Storage is unchanged for quizzes until their removal: routes translate through the E1 work columns and side tables, and a works-format write stores the owner's copy key for each new work, or the work id when there is no copy. Every header-less request to a quiz route logs `legacy client` with its method and route, which is how we learn that old builds are gone. Arena stores work ids and sides, speaks only works (`workId`, `winnerWorkId`) with or without the header, and is no longer swept or rekeyed. Tier lists store work ids and speak only works (`workIds`, `workId`) with or without the header, in their routes and in the tier-list map of the public mural and profile; a shared mural's tier-list books resolve by work from the owner's library. Library documents carry `works` (book key → canonical work id) and public books carry `key` and `workId` for every client. Spec: `docs/superpowers/specs/2026-10-05-works-phase-e2-design.md`.
+Arena, tier lists and quizzes store work ids. Clients send and receive `workId`, `workIds` and `winnerWorkId`, and every returned id is canonical, because reads follow catalog merges made after a write. Library documents carry `works` (book key → canonical work id), and public books carry `key` and `workId`. Murals still hold library copy keys. Spec: `docs/superpowers/specs/2026-10-05-works-phase-e2-design.md`.
 
 ### `gallery`
 - **A per-account pool of uploaded images**, primarily meant to be assignable as custom book covers by the [frontend](../frontend/README.md#gallery-and-custom-book-covers) — but the module itself is generic; it doesn't know anything about books.
