@@ -547,7 +547,7 @@ railway ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 3983383
 
 Adding a database: add its `*_DB_PATH` (under `/data`) to `litestream.yml`. The start script reads the restore list from that file, and refuses to boot if a `*_DB_PATH` in the environment is missing from it.
 
-Checkpointing: nothing here sets `wal_checkpoint` or `wal_autocheckpoint`. Litestream's tips page recommends `busy_timeout = 5000` on the app's connections, so every module's `connection.ts` sets it, and disabling autocheckpoint only for high write load servers, which this is not.
+Checkpointing: nothing here sets `wal_checkpoint` or `wal_autocheckpoint`. Litestream's tips page recommends `busy_timeout = 5000` on the app's connections, so `src/db/openSqlite.ts` sets `journal_mode = WAL`, `synchronous = NORMAL` and `busy_timeout = 5000` for every database, and disabling autocheckpoint only for high write load servers, which this is not.
 
 ## Security notes
 

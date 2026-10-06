@@ -1,6 +1,3 @@
-// Opens (and migrates) this module's own SQLite database — mirrors
-// modules/books/adapters/sqlite/connection.ts exactly.
-
 import { normalizeWords } from "@scripta/shared";
 import type { DatabaseSync } from "node:sqlite";
 import { readFileSync } from "node:fs";

@@ -1,7 +1,3 @@
-// Opens (and migrates) this module's own SQLite database — mirrors
-// modules/arena/adapters/sqlite/connection.ts exactly. A separate file
-// from every other module's, per the module-isolation convention.
-
 import { normalizeWords } from "@scripta/shared";
 import type { DatabaseSync } from "node:sqlite";
 import { readFileSync } from "node:fs";
