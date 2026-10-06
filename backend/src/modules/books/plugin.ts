@@ -15,7 +15,7 @@ import { createIsbndbSource } from "./adapters/sources/isbndb.js";
 import { createOpenLibraryCoverSource } from "./adapters/sources/openLibrary.js";
 import { openBooksDb } from "./adapters/sqlite/connection.js";
 import { createSqliteBooksRepository } from "./adapters/sqlite/sqliteBooksRepository.js";
-import { DETAILS_BATCH_SIZE, startBackfill, startDetailsBackfill, startWorksBackfill } from "./backfill.js";
+import { DETAILS_BATCH_SIZE, startBackfill, startDetailsBackfill, startWorksBackfill, startWorksGrouping } from "./backfill.js";
 import { createBooksService, MAX_UPLOAD_BYTES, type BooksService } from "./booksService.js";
 import type { FetchCoverImage } from "./coverResolver.js";
 import { encodeCover } from "./domain/images.js";
@@ -96,6 +96,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     (error) => app.log.error({ err: error }, "details backfill failed")
   );
   const stopWorksBackfill = startWorksBackfill(repo, app.log);
+  const grouping = startWorksGrouping((limit) => repo.groupKeylessWorks(limit), app.log);
   const stopWorkKeyBackfill = startDetailsBackfill(
     (signal) => service.backfillWorkKeys(DETAILS_BATCH_SIZE, signal),
     (error) => app.log.error({ err: error }, "work key backfill failed")
@@ -106,6 +107,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     stopBackfill();
     stopDetailsBackfill();
     stopWorksBackfill();
+    grouping.stop();
     stopWorkKeyBackfill();
     worker.stop();
   });
@@ -121,7 +123,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
   await app.register(async (scoped) => {
     await scoped.register(fastifyRateLimit, { max: 30, timeWindow: "1 minute" });
     await scoped.register(fastifyMultipart, { limits: { fileSize: MAX_UPLOAD_BYTES, files: 1 } });
-    await scoped.register(buildAdminRoutes(service));
+    await scoped.register(buildAdminRoutes(service, () => grouping.runNow()));
   });
   await app.register(buildCoverFileRoutes(coverUrlFor));
 }

@@ -47,14 +47,14 @@ function makeService(overrides: Partial<Deps> = {}) {
   return { service, repo };
 }
 
-async function call(service: ReturnType<typeof createBooksService>, options: InjectOptions, signedInAs?: string) {
+async function call(service: ReturnType<typeof createBooksService>, options: InjectOptions, signedInAs?: string, groupWorks: () => Promise<number | null> = async () => 0) {
   const app = Fastify();
   app.decorate("authenticateAccessToken", (token: string) => (token === signedInAs ? { id: token, email: `${token}@example.test`, username: token, avatarId: null } : null));
   await app.register(fastifyMultipart, { limits: { fileSize: MAX_UPLOAD_BYTES, files: 1 } });
   await app.register(buildResolveRoutes(service));
   await app.register(buildCoverFileRoutes(publicUrlFor));
   await app.register(buildCatalogRoutes(service));
-  await app.register(buildAdminRoutes(service));
+  await app.register(buildAdminRoutes(service, groupWorks));
   const res = await app.inject(signedInAs ? { ...options, headers: { ...options.headers, authorization: `Bearer ${signedInAs}` } } : options);
   await app.close();
   return res;
@@ -211,4 +211,22 @@ test("the admin detaches an edition from a grouped work, and a keyed edition is 
   assert.equal((await call(service, { method: "POST", url: "/books/works/detach", payload: { edition: { isbn: "9780441013593" } } }, "admin")).statusCode, 409);
   assert.equal((await call(service, { method: "POST", url: "/books/works/detach", payload: { edition: {} } }, "admin")).statusCode, 400);
   assert.equal((await call(service, { method: "POST", url: "/books/works/detach", payload: { edition: { isbn: "9789999999999" } } }, "admin")).statusCode, 404);
+});
+
+test("only a signed-in admin may run works grouping", async () => {
+  const { service } = makeService();
+  const group = { method: "POST" as const, url: "/books/works/group" };
+  assert.equal((await call(service, group)).statusCode, 401);
+  assert.equal((await call(service, group, "u1")).statusCode, 403);
+});
+
+test("the admin runs works grouping and gets the count, or 409 while a run is going", async () => {
+  const { service } = makeService();
+  const group = { method: "POST" as const, url: "/books/works/group" };
+  const done = await call(service, group, "admin", async () => 12);
+  assert.equal(done.statusCode, 200);
+  assert.deepEqual(done.json(), { grouped: 12 });
+  const busy = await call(service, group, "admin", async () => null);
+  assert.equal(busy.statusCode, 409);
+  assert.deepEqual(busy.json(), { error: "Grouping is already running." });
 });
