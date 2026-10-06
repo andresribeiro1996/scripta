@@ -15,14 +15,16 @@ function parse(json: string): unknown {
 }
 
 export function rewriteBoard(dataJson: string, publicBooksJson: string | null, workByKey: Map<string, string>) {
-  const doc = parse(dataJson);
+  const doc: unknown = JSON.parse(dataJson);
   const board = isRecord(doc) ? doc : {};
   const seen = new Set<string>();
+  const kept: string[] = [];
   const take = (keys: unknown) =>
     (Array.isArray(keys) ? keys : []).flatMap((key) => {
       const work = typeof key === "string" ? workByKey.get(key) : undefined;
       if (!work || seen.has(work)) return [];
       seen.add(work);
+      kept.push(key as string);
       return [work];
     });
   const tiers = (Array.isArray(board.tiers) ? board.tiers : []).filter(isRecord).map(({ bookKeys, ...tier }) => ({ ...tier, workIds: take(bookKeys) }));
@@ -39,7 +41,7 @@ export function rewriteBoard(dataJson: string, publicBooksJson: string | null, w
     });
     publicBooks = JSON.stringify(pool.flatMap((work) => (byWork.has(work) ? [byWork.get(work)!] : [])));
   }
-  return { data: JSON.stringify({ ...board, tiers, pool }), publicBooks };
+  return { data: JSON.stringify({ ...board, tiers, pool }), publicBooks, keys: kept };
 }
 
 export function migrateTierlistsToWorks(db: DatabaseSync): void {
@@ -52,10 +54,13 @@ export function migrateTierlistsToWorks(db: DatabaseSync): void {
         if (!workByList.has(row.tierlist_id)) workByList.set(row.tierlist_id, new Map());
         workByList.get(row.tierlist_id)!.set(row.key, row.work_id);
       }
+      db.exec("CREATE TEMP TABLE kept_keys (tierlist_id TEXT NOT NULL, key TEXT NOT NULL)");
+      const keep = db.prepare("INSERT INTO kept_keys (tierlist_id, key) VALUES (?, ?)");
       const update = db.prepare("UPDATE tierlists SET data = ?, public_books = ? WHERE id = ?");
       for (const row of db.prepare("SELECT id, data, public_books FROM tierlists").all() as Array<{ id: string; data: string; public_books: string | null }>) {
         const rewritten = rewriteBoard(row.data, row.public_books, workByList.get(row.id) ?? new Map());
         update.run(rewritten.data, rewritten.publicBooks, row.id);
+        for (const key of rewritten.keys) keep.run(row.id, key);
       }
       db.exec(`
         CREATE TABLE tierlist_ballot_placements_new (
@@ -66,10 +71,11 @@ export function migrateTierlistsToWorks(db: DatabaseSync): void {
           PRIMARY KEY (ballot_id, work_id)
         );
         INSERT OR IGNORE INTO tierlist_ballot_placements_new (ballot_id, tierlist_id, work_id, tier_id)
-          SELECT p.ballot_id, p.tierlist_id, COALESCE(p.work_id, w.work_id), p.tier_id
+          SELECT p.ballot_id, p.tierlist_id, w.work_id, p.tier_id
           FROM tierlist_ballot_placements AS p
-          LEFT JOIN tierlist_works AS w ON w.tierlist_id = p.tierlist_id AND w.key = p.book_key
-          WHERE COALESCE(p.work_id, w.work_id) IS NOT NULL
+          JOIN tierlist_works AS w ON w.tierlist_id = p.tierlist_id AND w.key = p.book_key
+          JOIN kept_keys AS k ON k.tierlist_id = p.tierlist_id AND k.key = p.book_key
+          WHERE w.work_id IS NOT NULL
           ORDER BY p.rowid;
         DROP TABLE tierlist_ballot_placements;
         ALTER TABLE tierlist_ballot_placements_new RENAME TO tierlist_ballot_placements;
@@ -77,6 +83,7 @@ export function migrateTierlistsToWorks(db: DatabaseSync): void {
         INSERT OR IGNORE INTO tierlist_works_new (tierlist_id, work_id) SELECT tierlist_id, work_id FROM tierlist_works WHERE work_id IS NOT NULL;
         DROP TABLE tierlist_works;
         ALTER TABLE tierlist_works_new RENAME TO tierlist_works;
+        DROP TABLE kept_keys;
         PRAGMA user_version = 1;
       `);
     }
