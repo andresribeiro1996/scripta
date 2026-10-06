@@ -11,49 +11,28 @@
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
-import { sendWorksError, worksFormat } from "../../worksFormat.js";
+import { sendWorksError } from "../../worksErrors.js";
 import { authGuard, getOptionalAuthenticatedUser } from "../auth/index.js";
-import { canonicalByKey, duplicateWorkMessage, firstDuplicateWork, firstKeyPerWork, knownWorkIds, resolveEntryWorks, resolvePublicLibraryData, UnknownWorkError, WorkResolutionError, workIdsByKey } from "../library/index.js";
-import { boardKeys } from "./domain/boardKeys.js";
+import { duplicateWorkMessage, firstKeyPerWork, knownWorkIds, resolvePublicBooksByWork, UnknownWorkError } from "../library/index.js";
+import { boardWorks } from "./domain/boardKeys.js";
 import type { Tierlist } from "./domain/types.js";
-import type { BallotOutcome, TierlistsService, Voter, VotingBoard } from "./service.js";
-import { boardBooksToWorks, boardKeysInOrder, boardToWorks, histogramToWorks, keyedBoard, placementsFromWorks, placementsToWorks, tierlistToWorks } from "./wire.js";
+import type { BallotOutcome, TierlistsService, Voter } from "./service.js";
+import { boardBooks, boardCanonical, canonicalBoard, canonicalFirst, histogramToWorks, placementsFromWorks, placementsToWorks, type WorksBoard } from "./wire.js";
 import { InvalidShareImageError, MAX_SHARE_IMAGE_BYTES, renderShareVideo, ShareVideoRenderError } from "./shareVideo.js";
 
 const idParamSchema = z.object({ id: z.string().uuid() });
-
-const createTierlistSchema = z.object({
-  name: z.string().trim().min(1, "name is required and must be non-empty.").max(200),
-  data: z.object({
-    tiers: z.array(z.object({ id: z.string().min(1), label: z.string().trim().min(1).max(30), color: z.string().regex(/^#[0-9a-f]{6}$/i), bookKeys: z.array(z.string().min(1)) })).min(1),
-    pool: z.array(z.string().min(1)).max(500)
-  }).optional(),
-  access: z.enum(["anonymous", "members"]).optional()
-});
-
-// Deliberately light-touch, same treatment modules/murals/routes.ts gives
-// its own opaque `blocks` blob: this only checks data is an object — it
-// doesn't otherwise care what a tier list document looks like.
-const updateTierlistSchema = z
-  .object({
-    name: z.string().min(1).optional(),
-    data: z.record(z.unknown()).optional()
-  })
-  .refine((body) => body.name !== undefined || body.data !== undefined, {
-    message: "At least one of name or data must be provided."
-  });
 
 const worksTierSchema = z.object({ id: z.string().min(1), label: z.string().trim().min(1).max(30), color: z.string().regex(/^#[0-9a-f]{6}$/i), workIds: z.array(z.string().min(1)) });
 
 const worksBoardSchema = z.object({ tiers: z.array(worksTierSchema), pool: z.array(z.string().min(1)).max(500) });
 
-const createWorksSchema = z.object({
+const createTierlistSchema = z.object({
   name: z.string().trim().min(1, "name is required and must be non-empty.").max(200),
   data: worksBoardSchema.extend({ tiers: z.array(worksTierSchema).min(1) }).optional(),
   access: z.enum(["anonymous", "members"]).optional()
 });
 
-const updateWorksSchema = z
+const updateTierlistSchema = z
   .object({ name: z.string().min(1).optional(), data: worksBoardSchema.optional() })
   .refine((body) => body.name !== undefined || body.data !== undefined, { message: "At least one of name or data must be provided." });
 
@@ -70,10 +49,6 @@ const votingStateSchema = z
 const codeParamSchema = z.object({ code: z.string().min(1).max(64) });
 
 const placementsSchema = z.object({
-  placements: z.array(z.object({ bookKey: z.string().min(1), tierId: z.string().min(1) })).max(500)
-});
-
-const worksPlacementsSchema = z.object({
   placements: z.array(z.object({ workId: z.string().min(1), tierId: z.string().min(1) })).max(500)
 });
 
@@ -82,30 +57,29 @@ const listPublicQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0)
 });
 
-function withWorks(service: TierlistsService, tierlist: Tierlist, works: boolean): Tierlist {
-  return works ? tierlistToWorks(tierlist, service.storedWorks(tierlist.id)) : tierlist;
+function answer(tierlist: Tierlist): Tierlist {
+  return { ...tierlist, data: canonicalBoard(tierlist.data) };
 }
 
-type ResolveBoardWorks = typeof resolveEntryWorks;
-
-function resolveBoard(resolveWorks: ResolveBoardWorks, userId: string, data: unknown): { works: Map<string, string | null> } | { status: 409 | 503; error: string } {
-  const keys = boardKeys(data);
-  try {
-    const refs = resolveWorks(userId, keys.map((key) => ({ key })));
-    const duplicate = firstDuplicateWork(keys, refs);
-    if (duplicate) return { status: 409, error: duplicateWorkMessage(duplicate) };
-    return { works: workIdsByKey(keys, refs) };
-  } catch (err) {
-    if (err instanceof WorkResolutionError) return { status: 503, error: err.message };
-    throw err;
-  }
+function storedBoard(board: WorksBoard): { data: WorksBoard } | { status: 400 | 409; error: string } {
+  const all = [...board.tiers.flatMap((tier) => tier.workIds), ...board.pool];
+  if (new Set(all).size !== all.length) return { status: 400, error: "Duplicate tier or book." };
+  const ids = knownWorkIds(all);
+  if (new Set(ids).size !== ids.length) return { status: 409, error: duplicateWorkMessage({ workId: null, title: null }) };
+  const canonical = new Map(all.map((id, index) => [id, ids[index]!]));
+  const swap = (workIds: string[]) => workIds.map((id) => canonical.get(id)!);
+  return { data: { tiers: board.tiers.map((tier) => ({ ...tier, workIds: swap(tier.workIds) })), pool: swap(board.pool) } };
 }
 
-export function buildTierlistRoutes(service: TierlistsService, resolveWorks: ResolveBoardWorks = resolveEntryWorks) {
+function booksInOrder(ownerUserId: string, workIds: string[]): unknown[] {
+  const found = resolvePublicBooksByWork(ownerUserId, workIds);
+  return workIds.flatMap((id) => found.get(id) ?? []);
+}
+
+export function buildTierlistRoutes(service: TierlistsService) {
   return async function tierlistRoutes(app: FastifyInstance) {
     app.get("/tierlists", { preHandler: authGuard }, async (request, reply) => {
-      const works = worksFormat(request, reply);
-      return reply.send({ tierlists: service.listTierlists(request.user.id).map((tierlist) => withWorks(service, tierlist, works)) });
+      return reply.send({ tierlists: service.listTierlists(request.user.id).map(answer) });
     });
 
     app.get("/tierlists/voted", { preHandler: authGuard }, async (request, reply) => {
@@ -113,47 +87,25 @@ export function buildTierlistRoutes(service: TierlistsService, resolveWorks: Res
     });
 
     app.post("/tierlists", { preHandler: authGuard }, async (request, reply) => {
-      if (worksFormat(request, reply)) {
-        const parsed = createWorksSchema.safeParse(request.body);
-        if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? "Invalid request." });
-        const { name, data, access } = parsed.data;
-        if (access && !data) return reply.code(400).send({ error: "Choose books and tiers before publishing." });
-        if (data) {
-          const ids = data.tiers.map((tier) => tier.id);
-          if (new Set(ids).size !== ids.length) return reply.code(400).send({ error: "Duplicate tier or book." });
-          if (access && (!data.pool.length || data.tiers.some((tier) => tier.workIds.length))) return reply.code(400).send({ error: "Public tier lists need an unranked book pool." });
-        }
-        try {
-          const keyed = data ? keyedBoard(request.user.id, data, undefined, new Map()) : undefined;
-          if (keyed && keyed.status !== undefined) return reply.code(keyed.status).send({ error: keyed.error });
-          const keys = keyed ? [...new Set([...keyed.data.pool, ...keyed.data.tiers.flatMap((tier) => tier.bookKeys)])] : [];
-          const publicBooks = access ? resolvePublicLibraryData(request.user.id, { bookKeys: keys, highlightRefs: [], needsCurrentlyReading: false, statsMetrics: [] }).books : [];
-          if (access && publicBooks.length !== keys.length) return reply.code(400).send({ error: "A selected book is no longer in your library." });
-          const tierlist = service.createTierlist(request.user.id, name, keyed?.data, access, publicBooks, keyed?.works);
-          return reply.code(201).send(withWorks(service, tierlist, true));
-        } catch (err) {
-          return sendWorksError(reply, err);
-        }
-      }
       const parsed = createTierlistSchema.safeParse(request.body);
-      if (!parsed.success) {
-        return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? "Invalid request." });
-      }
+      if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? "Invalid request." });
       const { name, data, access } = parsed.data;
       if (access && !data) return reply.code(400).send({ error: "Choose books and tiers before publishing." });
       if (data) {
         const ids = data.tiers.map((tier) => tier.id);
-        const allKeys = [...data.pool, ...data.tiers.flatMap((tier) => tier.bookKeys)];
-        if (new Set(ids).size !== ids.length || new Set(allKeys).size !== allKeys.length) return reply.code(400).send({ error: "Duplicate tier or book." });
-        if (access && (!data.pool.length || data.tiers.some((tier) => tier.bookKeys.length))) return reply.code(400).send({ error: "Public tier lists need an unranked book pool." });
+        if (new Set(ids).size !== ids.length) return reply.code(400).send({ error: "Duplicate tier or book." });
+        if (access && (!data.pool.length || data.tiers.some((tier) => tier.workIds.length))) return reply.code(400).send({ error: "Public tier lists need an unranked book pool." });
       }
-      const keys = data ? [...new Set([...data.pool, ...data.tiers.flatMap((tier) => tier.bookKeys)])] : [];
-      const publicBooks = access ? resolvePublicLibraryData(request.user.id, { bookKeys: keys, highlightRefs: [], needsCurrentlyReading: false, statsMetrics: [] }).books : [];
-      if (access && publicBooks.length !== keys.length) return reply.code(400).send({ error: "A selected book is no longer in your library." });
-      const board = data ? resolveBoard(resolveWorks, request.user.id, data) : undefined;
-      if (board && "error" in board) return reply.code(board.status).send({ error: board.error });
-      const tierlist = service.createTierlist(request.user.id, name, data, access, publicBooks, board?.works);
-      return reply.code(201).send(tierlist);
+      try {
+        const board = data ? storedBoard(data) : undefined;
+        if (board && "error" in board) return reply.code(board.status).send({ error: board.error });
+        const publicBooks = access && board ? booksInOrder(request.user.id, board.data.pool) : [];
+        if (access && board && publicBooks.length !== board.data.pool.length) return reply.code(400).send({ error: "A selected book is no longer in your library." });
+        const tierlist = service.createTierlist(request.user.id, name, board?.data, access, publicBooks);
+        return reply.code(201).send(board ? { ...tierlist, data: board.data } : tierlist);
+      } catch (err) {
+        return sendWorksError(reply, err);
+      }
     });
 
     app.get("/tierlists/:id", { preHandler: authGuard }, async (request, reply) => {
@@ -165,7 +117,7 @@ export function buildTierlistRoutes(service: TierlistsService, resolveWorks: Res
       if (!tierlist) {
         return reply.code(404).send({ error: "No tier list with that id." });
       }
-      return reply.send(withWorks(service, tierlist, worksFormat(request, reply)));
+      return reply.send(answer(tierlist));
     });
 
     app.put("/tierlists/:id", { preHandler: authGuard }, async (request, reply) => {
@@ -173,40 +125,24 @@ export function buildTierlistRoutes(service: TierlistsService, resolveWorks: Res
       if (!params.success) {
         return reply.code(400).send({ error: "Invalid tier list id." });
       }
-      if (worksFormat(request, reply)) {
-        const body = updateWorksSchema.safeParse(request.body);
-        if (!body.success) return reply.code(400).send({ error: body.error.issues[0]?.message ?? "Invalid request." });
-        try {
-          let keyed: ReturnType<typeof keyedBoard> | undefined;
-          if (body.data.data !== undefined) {
-            const owned = service.getTierlist(request.user.id, params.data.id);
-            if (!owned || owned.voteCode !== null) return reply.code(404).send({ error: "No tier list with that id." });
-            const result = keyedBoard(request.user.id, body.data.data, owned.data, service.storedWorks(owned.id));
-            if (result.status !== undefined) return reply.code(result.status).send({ error: result.error });
-            keyed = result;
-          }
-          const tierlist = service.updateTierlist(request.user.id, params.data.id, { ...(body.data.name !== undefined ? { name: body.data.name } : {}), ...(keyed ? { data: keyed.data } : {}) }, keyed?.works);
-          if (!tierlist) return reply.code(404).send({ error: "No tier list with that id." });
-          return reply.send(withWorks(service, tierlist, true));
-        } catch (err) {
-          return sendWorksError(reply, err);
-        }
-      }
       const body = updateTierlistSchema.safeParse(request.body);
-      if (!body.success) {
-        return reply.code(400).send({ error: body.error.issues[0]?.message ?? "Invalid request." });
+      if (!body.success) return reply.code(400).send({ error: body.error.issues[0]?.message ?? "Invalid request." });
+      try {
+        let board: { data: WorksBoard } | undefined;
+        const owned = service.getTierlist(request.user.id, params.data.id);
+        if (body.data.data !== undefined) {
+          if (!owned || owned.voteCode !== null) return reply.code(404).send({ error: "No tier list with that id." });
+          const result = storedBoard(body.data.data);
+          if ("error" in result) return reply.code(result.status).send({ error: result.error });
+          board = result;
+        }
+        const data = board?.data ?? (owned ? canonicalBoard(owned.data) : undefined);
+        const tierlist = service.updateTierlist(request.user.id, params.data.id, { ...(body.data.name !== undefined ? { name: body.data.name } : {}), ...(board ? { data: board.data } : {}) });
+        if (!tierlist || !data) return reply.code(404).send({ error: "No tier list with that id." });
+        return reply.send({ ...tierlist, data });
+      } catch (err) {
+        return sendWorksError(reply, err);
       }
-      let works: Map<string, string | null> | undefined;
-      if (body.data.data !== undefined && service.getTierlist(request.user.id, params.data.id)?.voteCode === null) {
-        const board = resolveBoard(resolveWorks, request.user.id, body.data.data);
-        if ("error" in board) return reply.code(board.status).send({ error: board.error });
-        works = board.works;
-      }
-      const tierlist = service.updateTierlist(request.user.id, params.data.id, body.data, works);
-      if (!tierlist) {
-        return reply.code(404).send({ error: "No tier list with that id." });
-      }
-      return reply.send(tierlist);
     });
 
     app.delete("/tierlists/:id", { preHandler: authGuard }, async (request, reply) => {
@@ -222,7 +158,6 @@ export function buildTierlistRoutes(service: TierlistsService, resolveWorks: Res
     });
 
     app.post("/tierlists/:id/open-voting", { preHandler: authGuard }, async (request, reply) => {
-      const works = worksFormat(request, reply);
       const params = idParamSchema.safeParse(request.params);
       if (!params.success) {
         return reply.code(400).send({ error: "Invalid tier list id." });
@@ -233,14 +168,16 @@ export function buildTierlistRoutes(service: TierlistsService, resolveWorks: Res
       }
       const owned = service.getTierlist(request.user.id, params.data.id);
       if (!owned) return reply.code(404).send({ error: "No tier list with that id." });
-      const data = owned.data as { pool?: string[]; tiers?: Array<{ bookKeys?: string[] }> };
-      const keys = [...new Set([...(data.pool ?? []), ...(data.tiers ?? []).flatMap((tier) => tier.bookKeys ?? [])])];
-      const publicBooks = resolvePublicLibraryData(request.user.id, { bookKeys: keys, highlightRefs: [], needsCurrentlyReading: false, statsMetrics: [] }).books;
-      const tierlist = service.openVoting(request.user.id, params.data.id, body.data.access, publicBooks);
-      if (!tierlist) {
-        return reply.code(404).send({ error: "No tier list with that id." });
+      try {
+        const known = boardCanonical(owned.data);
+        const tierlist = service.openVoting(request.user.id, params.data.id, body.data.access, booksInOrder(request.user.id, boardWorks(owned.data)));
+        if (!tierlist) {
+          return reply.code(404).send({ error: "No tier list with that id." });
+        }
+        return reply.code(201).send({ tierlist: { ...tierlist, data: canonicalBoard(tierlist.data, known) }, voteCode: tierlist.voteCode });
+      } catch (err) {
+        return sendWorksError(reply, err);
       }
-      return reply.code(201).send({ tierlist: withWorks(service, tierlist, works), voteCode: tierlist.voteCode });
     });
 
     app.put("/tierlists/:id/voting", { preHandler: authGuard }, async (request, reply) => {
@@ -252,11 +189,18 @@ export function buildTierlistRoutes(service: TierlistsService, resolveWorks: Res
       if (!body.success) {
         return reply.code(400).send({ error: body.error.issues[0]?.message ?? "Invalid request." });
       }
-      const tierlist = service.setVotingState(request.user.id, params.data.id, body.data);
-      if (!tierlist) {
-        return reply.code(404).send({ error: "No tier list with that id." });
+      const owned = service.getTierlist(request.user.id, params.data.id);
+      if (!owned) return reply.code(404).send({ error: "No tier list with that id." });
+      try {
+        const data = canonicalBoard(owned.data);
+        const tierlist = service.setVotingState(request.user.id, params.data.id, body.data);
+        if (!tierlist) {
+          return reply.code(404).send({ error: "No tier list with that id." });
+        }
+        return reply.send({ tierlist: { ...tierlist, data } });
+      } catch (err) {
+        return sendWorksError(reply, err);
       }
-      return reply.send({ tierlist: withWorks(service, tierlist, worksFormat(request, reply)) });
     });
 
     app.get("/tierlists/:id/results", { preHandler: authGuard }, async (request, reply) => {
@@ -272,10 +216,8 @@ export function buildTierlistRoutes(service: TierlistsService, resolveWorks: Res
         return reply.code(404).send({ error: "No tier list with that id." });
       }
       const results = service.getResults(params.data.id);
-      if (!worksFormat(request, reply)) return reply.send(results);
-      const stored = canonicalByKey(service.storedWorks(owned.id));
-      const first = new Set(firstKeyPerWork(boardKeysInOrder(owned.data), stored).values());
-      return reply.send({ histogram: histogramToWorks(results.histogram, stored, first), ballotCount: results.ballotCount });
+      const { canonical, first } = canonicalFirst(boardWorks(owned.data));
+      return reply.send({ histogram: histogramToWorks(results.histogram, canonical, first), ballotCount: results.ballotCount });
     });
   };
 }
@@ -327,7 +269,6 @@ export function buildPublicTierlistRoutes(service: TierlistsService) {
     });
 
     app.get("/tierlists/voting/:code", async (request, reply) => {
-      const works = worksFormat(request, reply);
       const params = codeParamSchema.safeParse(request.params);
       if (!params.success) {
         return reply.code(404).send({ error: "No tier list at that link." });
@@ -337,15 +278,11 @@ export function buildPublicTierlistRoutes(service: TierlistsService) {
         return reply.code(404).send({ error: "No tier list at that link." });
       }
 
-      // Same privacy boundary the shared-mural route enforces: book keys
+      // Same privacy boundary the shared-mural route enforces: work ids
       // become redacted public book shapes via library's own resolver,
       // never a raw read of the owner's library.
-      const live = () => resolvePublicLibraryData(board.ownerUserId, {
-        bookKeys: board.pool,
-        highlightRefs: [],
-        needsCurrentlyReading: false,
-        statsMetrics: []
-      }).books;
+      const { canonical, first } = canonicalFirst(board.pool);
+      const { pool } = canonicalBoard({ pool: board.pool });
 
       // board.ownerUserId is deliberately NOT spread into the response.
       //
@@ -357,44 +294,25 @@ export function buildPublicTierlistRoutes(service: TierlistsService) {
       // ownership-checked GET /tierlists/:id/results. Once voting is closed
       // the final result IS the point, so it's included. ballotCount stays
       // in both cases — the public directory already publishes it.
-      if (!works) {
-        const libraryData = board.publicBooks !== null ? { books: board.publicBooks } : { books: live() };
-        return reply.send({
-          board: {
-            name: board.name,
-            tiers: board.tiers,
-            pool: board.pool,
-            access: board.access,
-            votingOpen: board.votingOpen,
-            ballotCount: board.ballotCount,
-            eligibleVoteCount: board.eligibleVoteCount,
-            promotedAt: board.promotedAt,
-            ...(board.votingOpen ? {} : { histogram: board.histogram })
-          },
-          books: libraryData.books
-        });
-      }
-      const stored = canonicalByKey(service.storedWorks(board.id));
-      const first = new Set(firstKeyPerWork(board.pool, stored).values());
       return reply.send({
         board: {
           name: board.name,
           tiers: board.tiers,
-          pool: boardToWorks({ pool: board.pool }, stored).pool,
+          pool,
           access: board.access,
           votingOpen: board.votingOpen,
           ballotCount: board.ballotCount,
           eligibleVoteCount: board.eligibleVoteCount,
           promotedAt: board.promotedAt,
-          ...(board.votingOpen ? {} : { histogram: histogramToWorks(board.histogram, stored, first) })
+          ...(board.votingOpen ? {} : { histogram: histogramToWorks(board.histogram, canonical, first) })
         },
-        books: boardBooksToWorks(board.pool, board.publicBooks, stored, live)
+        books: boardBooks(pool, board.publicBooks, () => booksInOrder(board.ownerUserId, pool))
       });
     });
 
-    const submitWorksBallot = (request: FastifyRequest, reply: FastifyReply, ballotId: string | null) => {
+    const submitBallot = (request: FastifyRequest, reply: FastifyReply, ballotId: string | null) => {
       const params = codeParamSchema.safeParse(request.params);
-      const body = worksPlacementsSchema.safeParse(request.body);
+      const body = placementsSchema.safeParse(request.body);
       if (!params.success || !body.success) {
         return reply.code(400).send({ error: "Invalid ballot." });
       }
@@ -402,39 +320,21 @@ export function buildPublicTierlistRoutes(service: TierlistsService) {
       if (!board) return reply.code(404).send({ error: "No tier list at that link." });
       try {
         const ids = knownWorkIds(body.data.placements.map((placement) => placement.workId));
-        const view = worksViewOf(service, board);
-        const placements = placementsFromWorks(body.data.placements, ids, view.keyByWork);
+        const view = canonicalFirst(board.pool);
+        const placements = placementsFromWorks(body.data.placements, ids, firstKeyPerWork(board.pool, view.canonical));
         if (!placements) return reply.code(400).send({ error: "Those placements don't match this tier list." });
         const outcome = service.submitBallot(params.data.code, placements, voterFor(request, ballotId));
-        return sendBallotOutcome(reply, service, params.data.code, outcome, view);
+        return sendBallotOutcome(reply, service, params.data.code, outcome, () => view);
       } catch (err) {
         if (err instanceof UnknownWorkError) return reply.code(400).send({ error: "Those placements don't match this tier list." });
-        if (err instanceof WorkResolutionError) return reply.code(503).send({ error: err.message });
-        throw err;
+        return sendWorksError(reply, err);
       }
     };
 
-    app.post("/tierlists/voting/:code/ballot", async (request, reply) => {
-      if (worksFormat(request, reply)) return submitWorksBallot(request, reply, null);
-      const params = codeParamSchema.safeParse(request.params);
-      const body = placementsSchema.safeParse(request.body);
-      if (!params.success || !body.success) {
-        return reply.code(400).send({ error: "Invalid ballot." });
-      }
-      const outcome = service.submitBallot(params.data.code, body.data.placements, voterFor(request, null));
-      return sendBallotOutcome(reply, service, params.data.code, outcome, null);
-    });
+    app.post("/tierlists/voting/:code/ballot", async (request, reply) => submitBallot(request, reply, null));
 
     app.put("/tierlists/voting/:code/ballot/:ballotId", async (request, reply) => {
-      const ballotId = (request.params as { ballotId?: string }).ballotId ?? null;
-      if (worksFormat(request, reply)) return submitWorksBallot(request, reply, ballotId);
-      const params = codeParamSchema.safeParse(request.params);
-      const body = placementsSchema.safeParse(request.body);
-      if (!params.success || !body.success) {
-        return reply.code(400).send({ error: "Invalid ballot." });
-      }
-      const outcome = service.submitBallot(params.data.code, body.data.placements, voterFor(request, ballotId));
-      return sendBallotOutcome(reply, service, params.data.code, outcome, null);
+      return submitBallot(request, reply, (request.params as { ballotId?: string }).ballotId ?? null);
     });
 
     // Two shapes because the caller may hold either half of what voterFor
@@ -447,10 +347,8 @@ export function buildPublicTierlistRoutes(service: TierlistsService) {
       if (!params.success) {
         return reply.code(404).send({ error: "No ballot at that link." });
       }
-      const works = worksFormat(request, reply);
       const outcome = service.getBallot(params.data.code, voterFor(request, ballotId));
-      const board = works ? service.getVotingBoard(params.data.code) : undefined;
-      return sendBallotOutcome(reply, service, params.data.code, outcome, board ? worksViewOf(service, board) : works ? emptyWorksView : null);
+      return sendBallotOutcome(reply, service, params.data.code, outcome, () => canonicalFirst(service.getVotingBoard(params.data.code)?.pool ?? []));
     };
     app.get("/tierlists/voting/:code/ballot", readBallot);
     app.get("/tierlists/voting/:code/ballot/:ballotId", readBallot);
@@ -465,21 +363,7 @@ function voterFor(request: FastifyRequest, ballotId: string | null): Voter {
   return user ? { kind: "user", userId: user.id } : { kind: "anonymous", ballotId };
 }
 
-interface WorksView {
-  stored: Map<string, string>;
-  keyByWork: Map<string, string>;
-  first: Set<string>;
-}
-
-const emptyWorksView: WorksView = { stored: new Map(), keyByWork: new Map(), first: new Set() };
-
-function worksViewOf(service: TierlistsService, board: VotingBoard): WorksView {
-  const stored = canonicalByKey(service.storedWorks(board.id));
-  const keyByWork = firstKeyPerWork(board.pool, stored);
-  return { stored, keyByWork, first: new Set(keyByWork.values()) };
-}
-
-function sendBallotOutcome(reply: FastifyReply, service: TierlistsService, code: string, outcome: BallotOutcome, works: WorksView | null) {
+function sendBallotOutcome(reply: FastifyReply, service: TierlistsService, code: string, outcome: BallotOutcome, view: () => ReturnType<typeof canonicalFirst>) {
   if (!outcome.ok) {
     if (outcome.reason === "not-found") return reply.code(404).send({ error: "No tier list at that link." });
     if (outcome.reason === "closed") return reply.code(409).send({ error: "Voting is closed for this tier list." });
@@ -487,16 +371,10 @@ function sendBallotOutcome(reply: FastifyReply, service: TierlistsService, code:
     return reply.code(400).send({ error: "Those placements don't match this tier list." });
   }
   const board = service.getVotingBoard(code);
-  if (!works) {
-    return reply.send({
-      ballotId: outcome.ballotId,
-      placements: outcome.placements,
-      results: { histogram: board?.histogram ?? [], ballotCount: board?.ballotCount ?? 0 }
-    });
-  }
+  const { canonical, first } = view();
   return reply.send({
     ballotId: outcome.ballotId,
-    placements: placementsToWorks(outcome.placements, works.stored, works.first),
-    results: { histogram: histogramToWorks(board?.histogram ?? [], works.stored, works.first), ballotCount: board?.ballotCount ?? 0 }
+    placements: placementsToWorks(outcome.placements, canonical, first),
+    results: { histogram: histogramToWorks(board?.histogram ?? [], canonical, first), ballotCount: board?.ballotCount ?? 0 }
   });
 }

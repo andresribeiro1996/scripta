@@ -26,8 +26,8 @@ function check(label, condition, detail) {
   }
 }
 
-function book(n) {
-  return { key: `book-${unique}-${n}`, title: `Test Book ${n}`, author: `Author ${n}`, cover: null };
+function book(n, workId) {
+  return { workId, title: `Test Book ${n}`, author: `Author ${n}`, cover: null };
 }
 
 async function main() {
@@ -43,7 +43,19 @@ async function main() {
   check("signup returns an access token", typeof accessToken === "string");
   const authHeaders = { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` };
 
-  console.log("\n2. Create a 4-book tournament");
+  console.log("\n2. Put 4 books in the library and read their works");
+  const libraryBooks = [0, 1, 2, 3].map((i) => ({ ContentID: `arena-flow-${unique}-${i}`, Title: `Test Book ${i}`, Attribution: `Author ${i}`, ISBN: null, ReadStatus: 0, ___PercentRead: 0 }));
+  const putLibraryRes = await fetch(`${base}/library`, {
+    method: "PUT",
+    headers: authHeaders,
+    body: JSON.stringify({ data: { source: "arena-flow", schema_version: 1, name: "Arena flow", book_count: libraryBooks.length, books: libraryBooks } })
+  });
+  check("library upload succeeds", putLibraryRes.ok, `got ${putLibraryRes.status}`);
+  const { works } = await (await fetch(`${base}/library`, { headers: authHeaders })).json();
+  const workIds = Object.values(works);
+  check("each library book resolves to its own work", new Set(workIds).size === 4, JSON.stringify(works));
+
+  console.log("\nCreate a 4-book tournament");
   const createRes = await fetch(`${base}/arenas`, {
     method: "POST",
     headers: authHeaders,
@@ -67,7 +79,7 @@ async function main() {
     method: "PUT",
     headers: authHeaders,
     body: JSON.stringify({
-      slots: [0, 1, 2, 3].map((i) => ({ slotIndex: i, book: book(i) }))
+      slots: [0, 1, 2, 3].map((i) => ({ slotIndex: i, book: book(i, workIds[i]) }))
     })
   });
   check("seeding returns 204", seedRes.status === 204, `got ${seedRes.status}`);
@@ -87,19 +99,19 @@ async function main() {
   await fetch(`${base}/arenas/${tournamentId}/duels/${duelA.id}/vote`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ voterToken: crypto.randomUUID(), bookKey: duelA.bookA.key })
+    body: JSON.stringify({ voterToken: crypto.randomUUID(), workId: duelA.bookA.workId })
   });
   const secondVoteToken = crypto.randomUUID();
   const firstVoteRes = await fetch(`${base}/arenas/${tournamentId}/duels/${duelA.id}/vote`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ voterToken: secondVoteToken, bookKey: duelA.bookA.key })
+    body: JSON.stringify({ voterToken: secondVoteToken, workId: duelA.bookA.workId })
   });
   check("second distinct voter's vote is accepted", firstVoteRes.status === 204, `got ${firstVoteRes.status}`);
   const dupeVoteRes = await fetch(`${base}/arenas/${tournamentId}/duels/${duelA.id}/vote`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ voterToken: secondVoteToken, bookKey: duelA.bookB.key })
+    body: JSON.stringify({ voterToken: secondVoteToken, workId: duelA.bookB.workId })
   });
   check("same voter voting again on the same duel returns 409", dupeVoteRes.status === 409, `got ${dupeVoteRes.status}`);
 
@@ -117,7 +129,7 @@ async function main() {
   const tiebreakRes = await fetch(`${base}/arenas/${tournamentId}/duels/${duelB.id}/tiebreak`, {
     method: "POST",
     headers: authHeaders,
-    body: JSON.stringify({ winnerBookKey: duelB.bookA.key })
+    body: JSON.stringify({ winnerWorkId: duelB.bookA.workId })
   });
   check("owner tie-break returns 204", tiebreakRes.status === 204, `got ${tiebreakRes.status}`);
 
@@ -132,7 +144,7 @@ async function main() {
   await fetch(`${base}/arenas/${tournamentId}/duels/${final.id}/vote`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ voterToken: crypto.randomUUID(), bookKey: final.bookA.key })
+    body: JSON.stringify({ voterToken: crypto.randomUUID(), workId: final.bookA.workId })
   });
   await fetch(`${base}/arenas/${tournamentId}/duels/${final.id}/settle`, { method: "POST", headers: authHeaders, body: JSON.stringify({}) });
   const finalRes = await fetch(`${base}/arenas/${tournamentId}`);

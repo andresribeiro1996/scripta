@@ -13,15 +13,13 @@ export interface QuizzesRepository {
   /** Unchecked lookup by id — backs results reads the SERVICE has already
    *  ownership-checked via getOwned. */
   getById(id: string): QuizRow | undefined;
-  insert(row: QuizRow, works?: Map<string, string | null>): void;
-  update(id: string, userId: string, patch: { name?: string; data?: string }, works?: Map<string, string | null>): QuizRow | undefined;
+  insert(row: QuizRow): void;
+  update(id: string, userId: string, patch: { name?: string; data?: string }): QuizRow | undefined;
   delete(id: string, userId: string): boolean;
   /** Account-deletion eraser — the caller's own quizzes, plays, and answers
    *  go away; the caller's plays on OTHER people's quizzes are unlinked,
    *  not deleted, so leaderboards keep their rows (tierlists' precedent). */
   deleteUserData(userId: string): void;
-  rekeyBooks(userId: string, fromKeys: string[], toKey: string, toWork: string | null): void;
-  storedWorks(quizId: string): Map<string, string | null>;
 
   /** Lookup by public code — NOT ownership-checked: this backs the public
    *  play routes, where the caller may have no session at all. */
