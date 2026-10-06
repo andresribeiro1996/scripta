@@ -18,7 +18,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 const { createSqliteLibraryRepository } = await import("./adapters/sqlite/sqliteLibraryRepository.js");
 const { openLibraryDb } = await import("./adapters/sqlite/connection.js");
 const { createLibraryService } = await import("./service.js");
-const { resolvePublicLibrary, resolvePublicLibraryData } = await import("./publicResolver.js");
+const { resolvePublicLibrary, resolvePublicLibraryData, resolvePublicBooksByWork } = await import("./publicResolver.js");
 const { buildLibraryRoutes } = await import("./routes.js");
 const { resolveWorks } = await import("../books/index.js");
 const { openBooksDb } = await import("../books/adapters/sqlite/connection.js");
@@ -933,4 +933,16 @@ test("public books carry their row's key and canonical work, even for a keyless 
   const [target] = resolveWorks([{ isbn: null, title: "Orlando: A Biography", author: "Virginia Woolf" }]);
   openBooksDb().prepare("UPDATE works SET merged_into = ? WHERE id = ?").run(target!, row.work_id);
   assert.equal(resolvePublicLibraryData(userId, request).books[0]!.workId, target);
+});
+
+test("public books resolve by work through the owner's first copy, and follow a merge", () => {
+  const userId = "by-work";
+  service.saveLibrary(userId, { books: [{ Title: "Kindred", Attribution: "Octavia Butler", ReadStatus: 1 }] });
+  const rows = openLibraryDb().prepare("SELECT book_key, work_id FROM library_books WHERE user_id = ? ORDER BY position").all(userId) as Array<{ book_key: string; work_id: string }>;
+  const books = resolvePublicBooksByWork(userId, [rows[0]!.work_id, "not-a-work"]);
+  assert.deepEqual([...books.keys()], [rows[0]!.work_id]);
+  assert.equal(books.get(rows[0]!.work_id)!.key, rows[0]!.book_key);
+  const [target] = resolveWorks([{ isbn: null, title: "A Separate Merge Target", author: "Someone Else" }]);
+  openBooksDb().prepare("UPDATE works SET merged_into = ? WHERE id = ?").run(target!, rows[0]!.work_id);
+  assert.equal(resolvePublicBooksByWork(userId, [rows[0]!.work_id]).get(rows[0]!.work_id)!.workId, target);
 });

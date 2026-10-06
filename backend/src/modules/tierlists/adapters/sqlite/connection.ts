@@ -8,6 +8,7 @@ import { mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { env } from "../../../../config/env.js";
+import { migrateTierlistsToWorks } from "./worksPass.js";
 
 const adapterDir = dirname(fileURLToPath(import.meta.url));
 
@@ -41,10 +42,7 @@ export function applyTierlistsMigrations(db: DatabaseSync): void {
       db.exec(`UPDATE tierlists SET origin_user_id = owner_user_id WHERE origin_user_id IS NULL`);
     }
 
-    const placementColumns = db.prepare(`PRAGMA table_info(tierlist_ballot_placements)`).all() as { name: string }[];
-    if (placementColumns.length > 0 && !placementColumns.some((c) => c.name === "work_id")) {
-      db.exec(`ALTER TABLE tierlist_ballot_placements ADD COLUMN work_id TEXT`);
-    }
+    migrateTierlistsToWorks(db);
 
     // Re-run schema to create any missing tables and indexes
     db.exec(schema);

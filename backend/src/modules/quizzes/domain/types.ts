@@ -1,18 +1,4 @@
-import type { QuizBookContent, QuizQuestionType } from "@scripta/shared";
-
 // Domain types for the quizzes module.
-
-export interface StoredQuizBook extends QuizBookContent {
-  key: string;
-}
-
-export interface StoredQuizQuestion {
-  id: string;
-  type: QuizQuestionType;
-  bookKey: string;
-  options: string[];
-  answerIndex: number;
-}
 
 /** Row shape as stored — `data` is the quiz document (QuizData in
  *  @scripta/shared) as raw JSON text, kept opaque all the way down and

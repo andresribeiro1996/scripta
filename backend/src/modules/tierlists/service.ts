@@ -7,6 +7,7 @@ import { DEFAULT_TIER_PRESET } from "@scripta/shared";
 import type { GameParticipation } from "@scripta/shared/community";
 import type { TierlistsRepository } from "./domain/ports.js";
 import type { BallotRow, HistogramCell, Placement, Tierlist, TierlistRow, VoteAccess } from "./domain/types.js";
+import { canonicalBoard } from "./wire.js";
 
 function toTierlist(row: TierlistRow): Tierlist {
   const parsed = JSON.parse(row.data) as { tiers?: unknown; pool?: unknown };
@@ -81,14 +82,14 @@ export interface TierlistDiscoverRef {
 
 export interface TierlistsService {
   listTierlists(userId: string): Tierlist[];
-  createTierlist(userId: string, name: string, data?: TierlistDocument, access?: VoteAccess, publicBooks?: unknown[], works?: Map<string, string | null>): Tierlist;
+  createTierlist(userId: string, name: string, data?: TierlistDocument, access?: VoteAccess, publicBooks?: unknown[]): Tierlist;
   /** undefined if no tier list with that id is owned by userId — a
    *  caller-facing 404, not a server error. Same convention as
    *  modules/murals/service.ts's getMural. */
   getTierlist(userId: string, id: string): Tierlist | undefined;
   /** Partial merge onto the existing row — only the keys present in
    *  `patch` change. undefined if not owned. */
-  updateTierlist(userId: string, id: string, patch: { name?: string; data?: unknown }, works?: Map<string, string | null>): Tierlist | undefined;
+  updateTierlist(userId: string, id: string, patch: { name?: string; data?: unknown }): Tierlist | undefined;
   /** Returns false if no tier list with that id was owned by userId —
    *  same convention as modules/murals/service.ts's deleteMural. */
   deleteTierlist(userId: string, id: string): boolean;
@@ -103,7 +104,6 @@ export interface TierlistsService {
   discoverWindow(needle: string, limit: number): TierlistDiscoverRef[];
   getPublishedRefs(ids: string[]): PublishedTierlistRef[];
   votedAmong(voterUserId: string, ids: string[]): string[];
-  storedWorks(tierlistId: string): Map<string, string | null>;
   getPublishedRef(id: string): PublishedTierlistRef | undefined;
   listPublishedRefsByOwner(ownerUserId: string): PublishedTierlistRef[];
   /** Public tier lists the account has a ballot on, latest ballot first —
@@ -134,7 +134,7 @@ export function generateVoteCode(): string {
 /** The two places this module looks inside the opaque `data` document —
  *  see the spec's "Why duplication simplifies everything downstream". */
 interface TierlistDocument {
-  tiers: Array<{ id: string; label: string; color: string; bookKeys: string[] }>;
+  tiers: Array<{ id: string; label: string; color: string; workIds: string[] }>;
   pool: string[];
 }
 
@@ -181,7 +181,7 @@ function parsePublicBooks(value: string | null): unknown[] | null {
 function toPublishedRef(row: TierlistRow, ballotCount: number): PublishedTierlistRef {
   const { tiers, pool } = readDocument(toTierlist(row));
   const keys = new Set(pool);
-  for (const tier of tiers) for (const key of tier.bookKeys) keys.add(key);
+  for (const tier of tiers) for (const id of tier.workIds) keys.add(id);
   return {
     id: row.id,
     ownerUserId: row.origin_user_id,
@@ -207,7 +207,7 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
       return repo.listByUser(userId).map(toTierlist);
     },
 
-    createTierlist(userId, name, data, access, publicBooks, works) {
+    createTierlist(userId, name, data, access, publicBooks) {
       const now = new Date().toISOString();
       const row: TierlistRow = {
         id: randomUUID(),
@@ -215,7 +215,7 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
         origin_user_id: userId,
         name,
         data: JSON.stringify(data ?? {
-          tiers: DEFAULT_TIER_PRESET.map((t) => ({ id: randomUUID(), label: t.label, color: t.color, bookKeys: [] })),
+          tiers: DEFAULT_TIER_PRESET.map((t) => ({ id: randomUUID(), label: t.label, color: t.color, workIds: [] })),
           pool: []
         }),
         vote_code: access ? generateVoteCode() : null,
@@ -227,7 +227,7 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
         created_at: now,
         updated_at: now
       };
-      repo.insert(row, works);
+      repo.insert(row);
       if (access) emitPublished?.(row.id, userId);
       return toTierlist(row);
     },
@@ -237,7 +237,7 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
       return row ? toTierlist(row) : undefined;
     },
 
-    updateTierlist(userId, id, patch, works) {
+    updateTierlist(userId, id, patch) {
       if (patch.data !== undefined || patch.name !== undefined) {
         const existing = repo.getOwned(id, userId);
         if (!existing) return undefined;
@@ -246,7 +246,7 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
       const row = repo.update(id, userId, {
         ...(patch.name !== undefined ? { name: patch.name } : {}),
         ...(patch.data !== undefined ? { data: JSON.stringify(patch.data) } : {})
-      }, works);
+      });
       return row ? toTierlist(row) : undefined;
     },
 
@@ -261,11 +261,11 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
 
       const { tiers, pool } = readDocument(original);
       const placements: Placement[] = [];
-      const poolKeys = new Set(pool);
+      const poolWorks = new Set(pool);
       for (const tier of tiers) {
-        for (const bookKey of tier.bookKeys) {
-          placements.push({ bookKey, tierId: tier.id });
-          poolKeys.add(bookKey);
+        for (const workId of tier.workIds) {
+          placements.push({ workId, tierId: tier.id });
+          poolWorks.add(workId);
         }
       }
 
@@ -278,7 +278,7 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
         updated_at: now
       };
 
-      const published = repo.publish(original.id, userId, JSON.stringify({ tiers: tiers.map((t) => ({ ...t, bookKeys: [] })), pool: [...poolKeys] }), access, generateVoteCode(), JSON.stringify(publicBooks), ballot, placements);
+      const published = repo.publish(original.id, userId, JSON.stringify({ tiers: tiers.map((t) => ({ ...t, workIds: [] })), pool: [...poolWorks] }), access, generateVoteCode(), JSON.stringify(publicBooks), ballot, placements);
       if (!published) return undefined;
       emitPublished?.(original.id, userId);
       return toTierlist(published);
@@ -303,10 +303,10 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
       const validTiers = new Set(tiers.map((t) => t.id));
       const seen = new Set<string>();
       for (const placement of placements) {
-        if (!validPool.has(placement.bookKey)) return { ok: false, reason: "invalid" };
+        if (!validPool.has(placement.workId)) return { ok: false, reason: "invalid" };
         if (!validTiers.has(placement.tierId)) return { ok: false, reason: "invalid" };
-        if (seen.has(placement.bookKey)) return { ok: false, reason: "invalid" };
-        seen.add(placement.bookKey);
+        if (seen.has(placement.workId)) return { ok: false, reason: "invalid" };
+        seen.add(placement.workId);
       }
 
       const existing =
@@ -403,10 +403,6 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
       return repo.votedAmong(voterUserId, ids);
     },
 
-    storedWorks(tierlistId) {
-      return repo.storedWorks(tierlistId);
-    },
-
     getPublishedRef(id) {
       const row = repo.getPublicById(id);
       return row ? { ...toPublishedRef(row, repo.ballotCount(id)), eligibleVoteCount: repo.eligibleVoteCount(row.id, row.origin_user_id) } : undefined;
@@ -441,7 +437,7 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
  *  understanding its internals" stance as `data` itself). */
 export interface TierlistData {
   name: string;
-  tiers: Array<{ id: string; label: string; color: string; bookKeys: string[] }>;
+  tiers: Array<{ id: string; label: string; color: string; workIds: string[] }>;
   pool: string[];
 }
 
@@ -470,8 +466,7 @@ export function createTierlistsPublicApi(service: TierlistsService): TierlistsPu
     getTierlistData(ownerUserId, tierlistId) {
       const tierlist = service.getTierlist(ownerUserId, tierlistId);
       if (!tierlist) return undefined;
-      const data = (tierlist.data ?? {}) as Partial<Pick<TierlistData, "tiers" | "pool">>;
-      return { name: tierlist.name, tiers: data.tiers ?? [], pool: data.pool ?? [] };
+      return { name: tierlist.name, ...canonicalBoard(tierlist.data) };
     },
     discoverWindow: (needle, limit) => service.discoverWindow(needle, limit),
     getPublishedMany: (ids) => service.getPublishedRefs(ids),

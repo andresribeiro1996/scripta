@@ -55,19 +55,17 @@ async function worksArena(owner: string) {
 
 const work = (title: string) => resolveWorks([{ isbn: null, title, author: "Someone" }])[0]!;
 
-test("slots are stored as works and read back as works with or without the header", async () => {
+test("slots are stored as works and read back as works", async () => {
   const [a, b] = [work("Plain One"), work("Plain Two")];
   const { app, db, id, seed } = await worksArena("a1");
   assert.equal((await seed([{ workId: a, title: "Plain One" }, { workId: b, title: "Plain Two" }])).statusCode, 204);
   const rows = (db.prepare("SELECT work_id FROM tournament_slots WHERE tournament_id = ? ORDER BY slot_index").all(id) as Array<Record<string, unknown>>).map((row) => ({ ...row }));
   assert.deepEqual(rows, [{ work_id: a }, { work_id: b }]);
-  for (const headers of [{}, { "x-scripta-works": "1" }]) {
-    const res = await app.inject({ method: "GET", url: `/arenas/${id}`, headers });
-    const slots = res.json().tournament.slots as Array<Record<string, unknown>>;
-    assert.deepEqual(Object.keys(slots[0]!), ["slotIndex", "workId", "title", "author", "cover"]);
-    assert.deepEqual(slots.map((slot) => slot.workId), [a, b]);
-    assert.doesNotMatch(res.body, /"key"/);
-  }
+  const res = await app.inject({ method: "GET", url: `/arenas/${id}` });
+  const slots = res.json().tournament.slots as Array<Record<string, unknown>>;
+  assert.deepEqual(Object.keys(slots[0]!), ["slotIndex", "workId", "title", "author", "cover"]);
+  assert.deepEqual(slots.map((slot) => slot.workId), [a, b]);
+  assert.doesNotMatch(res.body, /"key"/);
   const mine = await app.inject({ method: "GET", url: "/arenas/mine", headers: { authorization: "Bearer a1" } });
   assert.equal(mine.json().tournaments[0].winner, null);
   await app.close();
