@@ -1,11 +1,10 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { createTier, DEFAULT_TIER_PRESET, workIdOf, type TierlistData } from "@scripta/shared";
+import { createTier, DEFAULT_TIER_PRESET, workIdOf, type TierlistData, booksByWork } from "@scripta/shared";
 import { PageContainer } from "../components/PageContainer";
 import { useLibrary } from "../hooks/useLibrary";
 import { useTierlists } from "../hooks/useTierlists";
 import { useWorkBooks } from "../hooks/useWorkBooks";
-import { booksByWork } from "../lib/booksByWork";
 
 export function TierListCreatePage() {
   const navigate = useNavigate();

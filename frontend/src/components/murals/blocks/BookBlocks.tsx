@@ -1,9 +1,8 @@
 import { useDraggable, useDroppable } from "@dnd-kit/core";
-import { readingPercent } from "@scripta/shared";
+import { readingPercent, booksByWork } from "@scripta/shared";
 import type { ReactNode } from "react";
 import { CoverImage } from "../../BookCard";
 import type { ResolvedTierlist } from "../../../api/tierlists";
-import { booksByWork } from "../../../lib/booksByWork";
 import { bookKey } from "../../../lib/merge";
 import { resolveShelfBooks, type MuralBlock, type TierDefinition } from "../../../lib/murals";
 import { OptionsMenu, type OptionsMenuItem } from "../../OptionsMenu";

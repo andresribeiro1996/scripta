@@ -1,20 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { bookKey } from "@scripta/shared";
-import { booksByWork } from "../src/lib/booksByWork.ts";
 import { buildReconstructedBooks, toPrivateBook } from "../src/lib/sharedMural.ts";
 import type { PublicBookData } from "../src/api/sharedMurals.ts";
-
-test("booksByWork keeps the first book per work and skips books without one", () => {
-  const first = { Title: "Orlando", ISBN: "9780156031516", _workId: "w1" };
-  const second = { Title: "Orlando", _workId: "w1" };
-  const other = { Title: "Emma", _workId: "w2" };
-  const orphan = { Title: "Orphan" };
-  const byWork = booksByWork([first, second, orphan, other]);
-  assert.deepEqual([...byWork.keys()], ["w1", "w2"]);
-  assert.equal(byWork.get("w1"), first);
-  assert.equal(byWork.get("w2"), other);
-});
 
 const pub = (overrides: Partial<PublicBookData>): PublicBookData => ({
   key: "isbn:9780156031516",

@@ -9,6 +9,7 @@
 // countdown re-render (and useArena's 5s poll) would re-trigger a fresh
 // cover lookup/flicker on every tick.
 
+import { duelWinner } from "@scripta/shared";
 import { useMemo } from "react";
 import type { Duel, DuelSide } from "../../api/arena";
 import { CoverImage } from "../BookCard";
@@ -102,6 +103,7 @@ export function DuelCard({
 }) {
   const countdown = useCountdown(duel.closesAt);
   const totalVotes = duel.bookA.votes + duel.bookB.votes;
+  const winner = duelWinner(duel);
   const canVote = duel.status === "active" && !votingDisabledReason;
 
   return (
@@ -122,7 +124,7 @@ export function DuelCard({
         <DuelSideCard
           side={duel.bookA}
           totalVotes={totalVotes}
-          isWinner={duel.status === "settled" && duel.winnerWorkId === duel.bookA.workId}
+          isWinner={winner === duel.bookA}
           canVote={canVote && duel.bookA.workId !== null}
           onVote={() => duel.bookA.workId && onVote(duel.bookA.workId)}
           onAddBook={onAddBook}
@@ -131,7 +133,7 @@ export function DuelCard({
         <DuelSideCard
           side={duel.bookB}
           totalVotes={totalVotes}
-          isWinner={duel.status === "settled" && duel.winnerWorkId === duel.bookB.workId}
+          isWinner={winner === duel.bookB}
           canVote={canVote && duel.bookB.workId !== null}
           onVote={() => duel.bookB.workId && onVote(duel.bookB.workId)}
           onAddBook={onAddBook}

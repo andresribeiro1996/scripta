@@ -3,6 +3,7 @@
 // session isn't this tournament's owner, or if it's already started
 // (seeding is a one-time step).
 
+import { booksByWork } from "@scripta/shared";
 import { useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import {
@@ -20,7 +21,6 @@ import { useArena } from "../hooks/useArena";
 import { useLibrary } from "../hooks/useLibrary";
 import { toSeedBook } from "../lib/arenaSeed";
 import { useWorkBooks } from "../hooks/useWorkBooks";
-import { booksByWork } from "../lib/booksByWork";
 
 /** Bracket sizes offered for a draft. Powers of two only — the service
  *  rejects anything else, and every round has to halve cleanly down to

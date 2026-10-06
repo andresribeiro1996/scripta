@@ -1,5 +1,5 @@
 import { useRef, useState, type ReactNode } from "react";
-import { READER_PLATES, type Group, type PublicReaderCard } from "@scripta/shared";
+import { READER_PLATES, type Group, type PublicReaderCard, booksByWork } from "@scripta/shared";
 import type { ThemeId } from "@scripta/shared/themes";
 import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
@@ -13,7 +13,6 @@ import {
   type ReaderProfile,
   type ShelfTheme
 } from "../../lib/murals";
-import { booksByWork } from "../../lib/booksByWork";
 import { bookKey } from "../../lib/merge";
 import { computeStat } from "../../lib/muralStats";
 import { muralThemeStyle } from "../../lib/theme";

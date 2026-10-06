@@ -82,7 +82,7 @@ export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: Tourna
     setError(null);
     try {
       const target = await materialize();
-      const pool = (await Promise.all(available.map(async (book) => toSeedBook(book, seedCoverLookup(book) ? await resolveCover(book) : null)))).filter((seed): seed is SeedBook => seed !== null);
+      const pool = (await Promise.all(books.map(async (book) => toSeedBook(book, seedCoverLookup(book) ? await resolveCover(book) : null)))).filter((seed): seed is SeedBook => seed !== null);
       await randomFillTournament(target.id, pool);
       const refreshed = await fetchTournament(target.id, "owner-seed");
       const byIndex = new Map(refreshed.slots.map((slot) => [slot.slotIndex, slot]));
@@ -124,7 +124,7 @@ export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: Tourna
       ) : null}
       {error ? <Toast visible message={error} tone="error" /> : null}
       <View style={styles.actions}>
-        <Button label="Random fill" variant="secondary" loading={busy} disabled={!available.length} onPress={randomFill} />
+        <Button label="Random fill" variant="secondary" loading={busy} disabled={!books.length} onPress={randomFill} />
         <Button label="Save progress" variant="secondary" loading={busy} onPress={() => void persist().catch((reason: unknown) => setError(reason instanceof Error ? reason.message : "Couldn't save."))} />
         <Button label="Start" loading={busy} disabled={slots.some((slot) => !slot)} onPress={start} />
       </View>

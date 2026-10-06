@@ -6,8 +6,8 @@
 // number of ballots — so every mode is recomputed on each render with no
 // memoization and, crucially, no network request between switches.
 
+import { booksByWork } from "@scripta/shared";
 import { aggregate, AGGREGATION_MODES, type AggregationMode, type BookResult, type HistogramCell } from "../../lib/tierlistResults";
-import { booksByWork } from "../../lib/booksByWork";
 import { MiniBookTile } from "../murals/blocks/BookBlocks";
 import { TierRowEmpty, TierRowShell, TierRowTiles } from "./TierRowShell";
 import { useState } from "react";

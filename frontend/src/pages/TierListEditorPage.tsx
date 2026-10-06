@@ -1,4 +1,4 @@
-import { ballotBoard, workIdOf } from "@scripta/shared";
+import { ballotBoard, workIdOf, booksByWork } from "@scripta/shared";
 import { useEffect, useState } from "react";
 import { Link, useOutletContext, useParams } from "react-router-dom";
 import type { TierlistData } from "../api/tierlists";
@@ -12,7 +12,6 @@ import { useDismissible } from "../hooks/useDismissible";
 import { useLibrary } from "../hooks/useLibrary";
 import { useTierlists } from "../hooks/useTierlists";
 import { useTierlistResults, useTierlistVoting } from "../hooks/useTierlistVoting";
-import { booksByWork } from "../lib/booksByWork";
 import { useWorkBooks } from "../hooks/useWorkBooks";
 import { ChevronLeftIcon } from "../components/Toolbar";
 

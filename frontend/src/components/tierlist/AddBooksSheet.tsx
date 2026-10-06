@@ -2,8 +2,7 @@ import { useMemo, useState } from "react";
 import { MiniBookTile } from "../murals/blocks/BookBlocks";
 import { useScrollLock } from "../../hooks/useScrollLock";
 import { useDismissible } from "../../hooks/useDismissible";
-import { workIdOf } from "@scripta/shared";
-import { booksByWork } from "../../lib/booksByWork";
+import { workIdOf, booksByWork } from "@scripta/shared";
 
 /** Picks several books into a tier list's pool in one trip.
  *

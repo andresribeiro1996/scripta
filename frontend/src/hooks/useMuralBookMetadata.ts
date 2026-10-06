@@ -1,8 +1,8 @@
+import { booksByWork } from "@scripta/shared";
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { ResolvedTierlist } from "../api/tierlists";
 import { bookMetadataOptions } from "../lib/bookMetadata";
-import { booksByWork } from "../lib/booksByWork";
 import { bookKey } from "../lib/merge";
 import type { MuralBlock } from "../lib/murals";
 

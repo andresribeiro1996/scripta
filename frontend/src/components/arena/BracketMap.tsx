@@ -29,6 +29,7 @@
 // padding: with flexible cells, anything hanging past a cell's boundary
 // would overlap its neighbour instead of meeting it.
 
+import { duelWinner } from "@scripta/shared";
 import { useMemo, useState } from "react";
 import type { Duel, DuelSide, TournamentView } from "../../api/arena";
 import { CoverImage } from "../BookCard";
@@ -114,6 +115,7 @@ function EmptyTile() {
 function MatchTile({ duel, onOpen }: { duel: BracketSlot; onOpen: () => void }) {
   if (!duel) return <EmptyTile />;
   const decided = duel.status === "settled";
+  const winner = duelWinner(duel);
   const pctA = sharePercent(duel.bookA.votes, duel);
   const pctB = sharePercent(duel.bookB.votes, duel);
 
@@ -133,7 +135,7 @@ function MatchTile({ duel, onOpen }: { duel: BracketSlot; onOpen: () => void }) 
         `${duel.bookA.title} versus ${duel.bookB.title}` +
         (pctA === null ? ", no votes yet" : `, ${pctA}% to ${pctB}%`) +
         (needsVote(duel) ? ", you haven't voted" : "") +
-        (decided ? `, ${duel.winnerWorkId === duel.bookA.workId ? duel.bookA.title : duel.bookB.title} advanced` : "")
+        (winner ? `, ${winner.title} advanced` : "")
       }
       className={`relative flex w-full items-stretch rounded border bg-(--color-surface) text-left hover:bg-(--color-surface-hover) sm:rounded-lg ${
         duel.status === "active" ? "border-(--color-accent)" : "border-(--color-border)"
@@ -149,9 +151,9 @@ function MatchTile({ duel, onOpen }: { duel: BracketSlot; onOpen: () => void }) 
           aria-hidden
         />
       )}
-      <MatchSide side={duel.bookA} duel={duel} isWinner={decided && duel.winnerWorkId === duel.bookA.workId} decided={decided} />
+      <MatchSide side={duel.bookA} duel={duel} isWinner={winner === duel.bookA} decided={decided} />
       <div className="w-px shrink-0 bg-(--color-border)" />
-      <MatchSide side={duel.bookB} duel={duel} isWinner={decided && duel.winnerWorkId === duel.bookB.workId} decided={decided} />
+      <MatchSide side={duel.bookB} duel={duel} isWinner={winner === duel.bookB} decided={decided} />
     </button>
   );
 }
@@ -160,7 +162,7 @@ function MatchTile({ duel, onOpen }: { duel: BracketSlot; onOpen: () => void }) 
 function SheetSide({ side, duel }: { side: DuelSide; duel: Duel }) {
   const coverBook = useMemo(() => coverBookFor(side), [side.title, side.author, side.cover]);
   const pct = sharePercent(side.votes, duel);
-  const won = duel.status === "settled" && duel.winnerWorkId === side.workId;
+  const won = duelWinner(duel) === side;
   return (
     <div className="flex min-w-0 flex-1 flex-col items-center text-center">
       <div className={`relative aspect-2/3 w-16 overflow-hidden rounded-lg bg-(--color-border) ${won ? "ring-2 ring-(--color-accent)" : ""}`}>
@@ -208,6 +210,7 @@ function MatchSheet({
 }) {
   const countdown = useCountdown(duel.closesAt);
   const decided = duel.status === "settled";
+  const winner = duelWinner(duel);
   return (
     <Sheet title="Match" onClose={onClose}>
       <div className="flex items-start gap-2 px-2 pt-1">
@@ -217,11 +220,13 @@ function MatchSheet({
       </div>
 
       <p className="mt-3 text-center text-xs text-(--color-text-dim)">
-        {decided
-          ? `${duel.winnerWorkId === duel.bookA.workId ? duel.bookA.title : duel.bookB.title} advanced`
-          : duel.status === "active"
-            ? countdown
-            : "Waiting on a tiebreak"}
+        {winner
+          ? `${winner.title} advanced`
+          : duel.status === "settled"
+            ? "Settled"
+            : duel.status === "active"
+              ? countdown
+              : "Waiting on a tiebreak"}
       </p>
 
       {canVote && onVote && (
@@ -387,12 +392,7 @@ export function BracketMap({
   }
 
   const finalDuel = hasCentre ? finalRound[0]! : null;
-  const champion: DuelSide | null =
-    finalDuel && finalDuel.status === "settled"
-      ? finalDuel.winnerWorkId === finalDuel.bookA.workId
-        ? finalDuel.bookA
-        : finalDuel.bookB
-      : null;
+  const champion: DuelSide | null = finalDuel ? duelWinner(finalDuel) : null;
 
   return (
     <div className="flex w-full flex-col">

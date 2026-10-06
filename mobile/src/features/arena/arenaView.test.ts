@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { bracketShape, type Duel } from "@scripta/shared";
-import { arenaViewTabs, bracketSlots, duelWinner, matchEmptyCopy, matchNote, roundHeadline, tournamentChampion, votableDuels } from "./arenaView.js";
+import { arenaViewTabs, bracketSlots, matchEmptyCopy, matchNote, roundHeadline, tournamentChampion, votableDuels } from "./arenaView.js";
 
 const duel = (over: Partial<Duel> = {}): Duel => ({
   id: "d1",
@@ -108,13 +108,4 @@ test("a settled match with nothing in it says so, and claims nothing about who s
   assert.equal(matchNote(duel({ status: "settled", winnerWorkId: "a", bookA: { workId: "a", title: "A", author: "Author A", cover: null, votes: 3 } })), "Settled");
   assert.equal(matchNote(duel({ status: "tied_pending_tiebreak" })), "Tiebreak needed");
   assert.equal(matchNote(duel()), null);
-});
-
-test("a duel's winner is found by work id, and an orphan side never wins by being null", () => {
-  assert.equal(duelWinner(duel({ status: "settled", winnerWorkId: "b" }))?.title, "B");
-  assert.equal(duelWinner(duel({ winnerWorkId: "b" })), null);
-  const orphan = { workId: null, title: "O", author: "", cover: null, votes: 0 };
-  assert.equal(duelWinner(duel({ status: "settled", winnerWorkId: null, bookA: orphan, bookB: orphan })), null);
-  const twin = { workId: "a", title: "Twin", author: "", cover: null, votes: 0 };
-  assert.equal(duelWinner(duel({ status: "settled", winnerWorkId: "a", bookB: twin }))?.title, "A");
 });

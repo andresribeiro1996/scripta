@@ -1,7 +1,6 @@
-import type { Group, PublicReaderCard } from "@scripta/shared";
+import { booksByWork, type Group, type PublicReaderCard } from "@scripta/shared";
 import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
-import { booksByWork } from "../../lib/booksByWork";
 import { bookKey } from "../../lib/merge";
 import { computeStat } from "../../lib/muralStats";
 import { calculateShelfTheme, muralBlockTitle, resolveQuote, resolveQuoteCollection, resolveShelfBooks, type MuralBlock, type ReaderProfile, type ShelfTheme } from "../../lib/murals";

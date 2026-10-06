@@ -1,3 +1,4 @@
+import { booksByWork } from "@scripta/shared";
 import {
   closestCenter,
   DndContext,
@@ -17,7 +18,6 @@ import type { TierDefinition, TierlistData } from "../../api/tierlists";
 import { DraggableTierTile, MiniBookTile } from "../murals/blocks/BookBlocks";
 import { OptionsMenu } from "../OptionsMenu";
 import { ChevronDownIcon, ChevronUpIcon, toolbarIconClass } from "../Toolbar";
-import { booksByWork } from "../../lib/booksByWork";
 import { createTier } from "../../lib/murals";
 import { TierColorPicker } from "./TierColorPicker";
 import { TierRowEmpty, TierRowShell, TierRowTiles } from "./TierRowShell";
