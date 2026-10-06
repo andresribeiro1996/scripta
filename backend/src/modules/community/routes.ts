@@ -1,7 +1,9 @@
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { worksFormat } from "../../worksFormat.js";
 import { authGuard, getOptionalAuthenticatedUser, rateLimitKey } from "../auth/index.js";
+import { tierlistsForWire } from "../tierlists/index.js";
 import { CommunityError, FollowLimitError, InvalidCursorError, ProfileNotFoundError } from "./domain/errors.js";
 import type { CommunityService } from "./service.js";
 
@@ -155,10 +157,11 @@ export function buildPublicCommunityRoutes(service: CommunityService) {
     app.get("/community/profiles/:username", async (request, reply) => {
       const { username } = request.params as { username: string };
       try {
+        const works = worksFormat(request, reply);
         const viewer = getOptionalAuthenticatedUser(request);
         const view = service.getProfileByUsername(username, viewer?.id);
         reply.header("Cache-Control", "no-store");
-        return reply.send(view);
+        return reply.send(works && view.mural ? { ...view, mural: { ...view.mural, tierlists: tierlistsForWire(view.mural.tierlists, true) } } : view);
       } catch (err) {
         if (err instanceof ProfileNotFoundError) return reply.code(404).send({ error: "No published profile at that address." });
         throw err;

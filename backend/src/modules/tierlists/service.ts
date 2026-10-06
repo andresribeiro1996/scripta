@@ -103,6 +103,7 @@ export interface TierlistsService {
   discoverWindow(needle: string, limit: number): TierlistDiscoverRef[];
   getPublishedRefs(ids: string[]): PublishedTierlistRef[];
   votedAmong(voterUserId: string, ids: string[]): string[];
+  storedWorks(tierlistId: string): Map<string, string | null>;
   getPublishedRef(id: string): PublishedTierlistRef | undefined;
   listPublishedRefsByOwner(ownerUserId: string): PublishedTierlistRef[];
   /** Public tier lists the account has a ballot on, latest ballot first —
@@ -400,6 +401,10 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
 
     votedAmong(voterUserId, ids) {
       return repo.votedAmong(voterUserId, ids);
+    },
+
+    storedWorks(tierlistId) {
+      return repo.storedWorks(tierlistId);
     },
 
     getPublishedRef(id) {

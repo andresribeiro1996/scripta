@@ -5,12 +5,15 @@
 import fastifyMultipart from "@fastify/multipart";
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
+import { canonicalByKey } from "../library/index.js";
 import { openTierlistsDb } from "./adapters/sqlite/connection.js";
 import { createSqliteTierlistsRepository } from "./adapters/sqlite/sqliteTierlistsRepository.js";
 import { buildPublicTierlistRoutes, buildTierlistRoutes, buildTierlistShareVideoRoutes } from "./routes.js";
 import type { EmitPublished, EmitVotedOn, TierlistsPublicApi } from "./service.js";
+import type { TierlistData } from "./service.js";
 import { createTierlistsPublicApi, createTierlistsService } from "./service.js";
 import { MAX_SHARE_IMAGE_BYTES } from "./shareVideo.js";
+import { boardToWorks } from "./wire.js";
 
 export interface TierlistsPluginOptions {
   emitPublished?: EmitPublished;
@@ -76,4 +79,17 @@ let erasingTierlists: ReturnType<typeof createSqliteTierlistsRepository> | undef
 
 export function deleteTierlistsUserData(userId: string) {
   (erasingTierlists ??= createSqliteTierlistsRepository(openTierlistsDb())).deleteUserData(userId);
+}
+
+let wireRepo: ReturnType<typeof createSqliteTierlistsRepository> | undefined;
+
+export function tierlistsForWire(tierlists: Record<string, TierlistData>, works: boolean) {
+  if (!works) return tierlists;
+  const repo = (wireRepo ??= createSqliteTierlistsRepository(openTierlistsDb()));
+  return Object.fromEntries(
+    Object.entries(tierlists).map(([id, data]) => {
+      const board = boardToWorks(data, canonicalByKey(repo.storedWorks(id)));
+      return [id, { name: data.name, tiers: board.tiers, pool: board.pool }];
+    })
+  );
 }

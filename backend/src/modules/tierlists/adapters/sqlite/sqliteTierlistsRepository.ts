@@ -80,6 +80,7 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
     VALUES ($ballot_id, $tierlist_id, $book_key, $tier_id, (SELECT work_id FROM tierlist_works WHERE tierlist_id = $tierlist_id AND key = $book_key))
   `);
   const deleteWorksStmt = db.prepare(`DELETE FROM tierlist_works WHERE tierlist_id = ?`);
+  const storedWorksStmt = db.prepare(`SELECT key, work_id FROM tierlist_works WHERE tierlist_id = ?`);
   const insertWorkStmt = db.prepare(`INSERT OR REPLACE INTO tierlist_works (tierlist_id, key, work_id) VALUES (?, ?, ?)`);
   const getBallotByIdStmt = db.prepare(`SELECT * FROM tierlist_ballots WHERE tierlist_id = ? AND id = ?`);
   const getBallotByVoterStmt = db.prepare(`SELECT * FROM tierlist_ballots WHERE tierlist_id = ? AND voter_user_id = ?`);
@@ -343,6 +344,10 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
     },
 
     saveBallot: saveBallotRow,
+
+    storedWorks(tierlistId) {
+      return new Map((storedWorksStmt.all(tierlistId) as Array<{ key: string; work_id: string | null }>).map((row) => [row.key, row.work_id]));
+    },
 
     getPlacements(ballotId) {
       const rows = getPlacementsStmt.all(ballotId) as unknown as { book_key: string; tier_id: string }[];

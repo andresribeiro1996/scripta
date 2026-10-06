@@ -19,6 +19,9 @@ function createInMemoryRepo(): TierlistsRepository {
   return {
     deleteUserData() {},
     rekeyBooks() {},
+    storedWorks() {
+      return new Map();
+    },
     listByUser(userId) {
       return [...tierlists.values()].filter((t) => t.owner_user_id === userId && !t.promoted_at);
     },

@@ -156,3 +156,29 @@ test("public mural payload carries the reader card without leaking titles or ser
     db.close();
   }
 });
+
+test("a shared mural's tier-list map speaks works only with the header", async () => {
+  const { openTierlistsDb } = await import("../tierlists/adapters/sqlite/connection.js");
+  const insert = openTierlistsDb().prepare("INSERT INTO tierlist_works (tierlist_id, key, work_id) VALUES ('tl-wall', ?, ?)");
+  insert.run("k1", "w1");
+  insert.run("k2", "w2");
+  const db = new DatabaseSync(":memory:");
+  db.exec(readFileSync(new URL("./adapters/sqlite/schema.sql", import.meta.url), "utf8"));
+  const service = createMuralsService(createSqliteMuralsRepository(db), (token) => `https://example.test/shared/${token}`, () => "light");
+  const data = { name: "On the wall", tiers: [{ id: "s", label: "S", color: "#000000", bookKeys: ["k1"] }], pool: ["k2"] };
+  const app = Fastify();
+  await app.register(buildPublicMuralRoutes(service, () => data));
+  try {
+    const home = service.createMural("wallOwner", "Wall");
+    service.updateMural("wallOwner", home.id, { blocks: [{ id: "t", type: "tierlist", tierlistId: "tl-wall", layout: { x: 0, y: 0, w: 8, h: 5 } }], updatedAt: home.updatedAt });
+    const { shareToken } = service.share("wallOwner", home.id)!;
+    const works = await app.inject({ method: "GET", url: `/murals/shared/${shareToken}`, headers: { "x-scripta-works": "1" } });
+    assert.match(String(works.headers.vary), /X-Scripta-Works/);
+    assert.deepEqual(works.json().tierlists, { "tl-wall": { name: "On the wall", tiers: [{ id: "s", label: "S", color: "#000000", workIds: ["w1"] }], pool: ["w2"] } });
+    const legacy = await app.inject({ method: "GET", url: `/murals/shared/${shareToken}` });
+    assert.deepEqual(legacy.json().tierlists, { "tl-wall": data });
+  } finally {
+    await app.close();
+    db.close();
+  }
+});
