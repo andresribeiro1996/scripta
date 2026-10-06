@@ -3,7 +3,7 @@ import { isGroup, normalizeImageId, publicReaderCard, readerIdentity, type Group
 import type { SharedBook } from "@scripta/shared/community";
 import { peekCachedCoverUrl, peekCachedCoverUrls } from "../books/index.js";
 import { openLibraryDb } from "./adapters/sqlite/connection.js";
-import { canonicalWorkIds } from "./works.js";
+import { canonicalWorkIds, copyKeysForWorks } from "./works.js";
 
 export interface PublicBookData {
   title: string;
@@ -265,4 +265,18 @@ export function resolvePublicLibrary(userId: string): Record<string, unknown> | 
   if (!summary || summary.meta === null) return null;
   const rows = getStatements().booksStmt.all(userId) as unknown as BookRowRecord[];
   return { ...(JSON.parse(summary.meta) as Record<string, unknown>), books: toPublicLibraryBooks(rows) };
+}
+
+export function resolvePublicBooksByWork(ownerUserId: string, workIds: string[]): Map<string, PublicBookData> {
+  const canonical = canonicalWorkIds(workIds);
+  const keys = copyKeysForWorks(ownerUserId, [...new Set(canonical.values())]);
+  const books = resolvePublicLibraryData(ownerUserId, { bookKeys: [...new Set(keys.values())], highlightRefs: [], needsCurrentlyReading: false, statsMetrics: [] }).books;
+  const byKey = new Map(books.map((book) => [book.key, book]));
+  const result = new Map<string, PublicBookData>();
+  for (const id of workIds) {
+    const key = keys.get(canonical.get(id) ?? "");
+    const book = key === undefined ? undefined : byKey.get(key);
+    if (book) result.set(id, book);
+  }
+  return result;
 }

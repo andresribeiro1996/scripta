@@ -7,10 +7,12 @@ import { mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { env } from "../../../../config/env.js";
+import { migrateQuizzesToWorks } from "./worksPass.js";
 
 const adapterDir = dirname(fileURLToPath(import.meta.url));
 
 export function applyQuizzesMigrations(db: DatabaseSync): void {
+  migrateQuizzesToWorks(db);
   db.exec(readFileSync(`${adapterDir}/schema.sql`, "utf8"));
 }
 

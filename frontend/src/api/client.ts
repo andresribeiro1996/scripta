@@ -19,7 +19,6 @@ export class ApiError extends Error {
 
 async function rawFetch(path: string, init: RequestInit | undefined, accessToken: string | undefined): Promise<Response> {
   const headers = new Headers(init?.headers);
-  headers.set("X-Scripta-Works", "1");
   if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
   // Never for FormData (gallery uploads, api/gallery.ts): the browser has
   // to set its own multipart/form-data boundary, which it only does when

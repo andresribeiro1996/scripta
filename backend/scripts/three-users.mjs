@@ -162,21 +162,23 @@ async function seed() {
     if (visibility === "shared") mural = await request("POST", `/murals/${mural.id}/share`, {}, tokens.alice);
     murals[visibility] = mural;
   }
+  const { works } = await request("GET", "/library", undefined, tokens.alice);
+  const workIds = keys.map((key) => works[key]);
   const polls = {};
   for (const access of ["members", "anonymous"]) {
     const source = await request("POST", "/tierlists", { name: `Alice's ${access} book poll` }, tokens.alice, 201);
-    const tiers = source.data.tiers.map((tier, index) => ({ ...tier, bookKeys: index === 0 ? [keys[0]] : [] }));
-    await request("PUT", `/tierlists/${source.id}`, { data: { tiers, pool: keys.slice(1) } }, tokens.alice);
+    const tiers = source.data.tiers.map((tier, index) => ({ ...tier, workIds: index === 0 ? [workIds[0]] : [] }));
+    await request("PUT", `/tierlists/${source.id}`, { data: { tiers, pool: workIds.slice(1) } }, tokens.alice);
     const { tierlist } = await request("POST", `/tierlists/${source.id}/open-voting`, { access }, tokens.alice, 201);
-    const ballot = await request("POST", `/tierlists/voting/${tierlist.voteCode}/ballot`, { placements: [{ bookKey: keys[0], tierId: tiers[1].id }, { bookKey: keys[1], tierId: tiers[0].id }] }, tokens.bob);
+    const ballot = await request("POST", `/tierlists/voting/${tierlist.voteCode}/ballot`, { placements: [{ workId: workIds[0], tierId: tiers[1].id }, { workId: workIds[1], tierId: tiers[0].id }] }, tokens.bob);
     polls[access] = { id: tierlist.id, code: tierlist.voteCode, bobBallotId: ballot.ballotId };
   }
   const { tournament } = await request("POST", "/arenas", { name: "Alice's weekend bracket", bracketSize: 4, roundDurationMinutes: 10080 }, tokens.alice, 201);
-  await request("PUT", `/arenas/${tournament.id}/slots`, { slots: pool.map((book, slotIndex) => ({ slotIndex, book: { key: bookKey(book), title: book.Title, author: book.Attribution, cover: covers.get(bookKey(book)) ?? null } })) }, tokens.alice, 204);
+  await request("PUT", `/arenas/${tournament.id}/slots`, { slots: pool.map((book, slotIndex) => ({ slotIndex, book: { workId: works[bookKey(book)], title: book.Title, author: book.Attribution, cover: covers.get(bookKey(book)) ?? null } })) }, tokens.alice, 204);
   await request("POST", `/arenas/${tournament.id}/start`, {}, tokens.alice, 204);
   const { tournament: arena } = await request("GET", `/arenas/${tournament.id}`);
   const voterToken = "scripta-fixture-bob";
-  await request("POST", `/arenas/${arena.id}/duels/${arena.duels[0].id}/vote`, { voterToken, bookKey: arena.duels[0].bookA.key }, null, 204);
+  await request("POST", `/arenas/${arena.id}/duels/${arena.duels[0].id}/vote`, { voterToken, workId: arena.duels[0].bookA.workId }, null, 204);
   const manifest = { users, library: { shareToken: library.shareToken }, murals, polls, arena: { id: arena.id, bobVoterToken: voterToken } };
   writeFileSync(`${manifestPath}.tmp`, JSON.stringify(manifest, null, 2));
   renameSync(`${manifestPath}.tmp`, manifestPath);
@@ -213,7 +215,7 @@ async function check(fixture) {
   assert.equal((await request("GET", `/tierlists/${poll.id}/results`, undefined, tokens.alice)).ballotCount, 3);
   await request("POST", `/tierlists/voting/${fixture.polls.anonymous.code}/ballot`, { placements: [] });
   const { tournament } = await request("GET", `/arenas/${fixture.arena.id}`);
-  await request("POST", `/arenas/${tournament.id}/duels/${tournament.duels[0].id}/vote`, { voterToken: fixture.arena.bobVoterToken, bookKey: tournament.duels[0].bookA.key }, null, 409);
+  await request("POST", `/arenas/${tournament.id}/duels/${tournament.duels[0].id}/vote`, { voterToken: fixture.arena.bobVoterToken, workId: tournament.duels[0].bookA.workId }, null, 409);
   await request("POST", "/library/unshare", {}, tokens.alice);
   await request("GET", `/library/shared/${fixture.library.shareToken}`, undefined, null, 404);
   await request("POST", `/murals/${mural.id}/unshare`, {}, tokens.alice);
