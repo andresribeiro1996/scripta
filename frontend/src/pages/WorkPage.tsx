@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { AddBookSheet } from "../components/AddBookSheet";
 import { EmptyState } from "../components/EmptyState";
@@ -10,6 +10,7 @@ import { useWork } from "../hooks/useWork";
 export function WorkPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { session } = useAuth();
   const toast = useToast();
   const { page, isLoading, isNotFound, refetch } = useWork(id);
@@ -49,7 +50,7 @@ export function WorkPage() {
 
   return (
     <>
-      <WorkPageView page={page} signedIn={Boolean(session)} onAdd={() => setAdding(true)} onShare={() => void share()} />
+      <WorkPageView page={page} signedIn={Boolean(session)} backTo={session ? "/dashboard" : "/"} onBack={location.key === "default" ? null : () => navigate(-1)} onAdd={() => setAdding(true)} onShare={() => void share()} />
       {adding ? <AddBookSheet book={{ title: page.work.title, author: page.work.author, isbn: firstEdition?.isbn ?? null, coverUrl: page.work.coverUrl }} onClose={() => {
         setAdding(false);
         void refetch();

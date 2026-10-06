@@ -20,7 +20,7 @@ const page: WorkPage = {
 const render = (props: Parameters<typeof WorkPageView>[0]) => renderToString(createElement(MemoryRouter, null, createElement(WorkPageView, props)));
 
 test("all four sections render in order, with no summary and no cover", () => {
-  const html = render({ page, signedIn: true, onAdd: () => undefined, onShare: () => undefined });
+  const html = render({ page, signedIn: true, backTo: "/", onBack: null, onAdd: () => undefined, onShare: () => undefined });
   const order = ["Dune", "Your copy", "Readers", "Games"].map((text) => html.indexOf(text));
   assert.deepEqual([...order].sort((a, b) => a - b), order);
   assert.ok(order.every((index) => index >= 0));
@@ -28,34 +28,43 @@ test("all four sections render in order, with no summary and no cover", () => {
   assert.ok(html.includes("2 readers · 1 finished"));
   assert.ok(html.includes("Scripta"));
   assert.ok(!html.includes("About this book"));
+  assert.ok(html.includes("Back"));
+});
+
+test("Back links to the given fallback without history, and is a button with it", () => {
+  const link = render({ page, signedIn: true, backTo: "/dashboard", onBack: null, onAdd: () => undefined, onShare: () => undefined });
+  assert.ok(link.includes('href="/dashboard"'));
+  const button = render({ page, signedIn: true, backTo: "/dashboard", onBack: () => undefined, onAdd: () => undefined, onShare: () => undefined });
+  assert.ok(!button.includes('href="/dashboard"'));
+  assert.ok(button.includes("Back"));
 });
 
 test("signed out: no copy shows the add action, and readers don't link to profiles", () => {
-  const html = render({ page: { ...page, mine: null }, signedIn: false, onAdd: () => undefined, onShare: () => undefined });
+  const html = render({ page: { ...page, mine: null }, signedIn: false, backTo: "/", onBack: null, onAdd: () => undefined, onShare: () => undefined });
   assert.ok(html.includes("Not in your library"));
   assert.ok(html.includes("Add to library"));
   assert.ok(!html.includes("/community/u/bo"));
 });
 
 test("signed in: only published readers link to their profile", () => {
-  const html = render({ page, signedIn: true, onAdd: () => undefined, onShare: () => undefined });
+  const html = render({ page, signedIn: true, backTo: "/", onBack: null, onAdd: () => undefined, onShare: () => undefined });
   assert.ok(html.includes("/community/u/bo"));
   assert.ok(!html.includes("/community/u/ana"));
 });
 
 test("an empty work page says so instead of rendering empty sections", () => {
-  const html = render({ page: { ...page, readers: { followed: [], others: [], counts: { readers: 0, finished: 0 } }, games: { tierlists: [], arenas: [], quizzes: [] } }, signedIn: false, onAdd: () => undefined, onShare: () => undefined });
+  const html = render({ page: { ...page, readers: { followed: [], others: [], counts: { readers: 0, finished: 0 } }, games: { tierlists: [], arenas: [], quizzes: [] } }, signedIn: false, backTo: "/", onBack: null, onAdd: () => undefined, onShare: () => undefined });
   assert.ok(html.includes("No readers yet"));
   assert.ok(html.includes("No public games use this book yet."));
 });
 
 test("a long summary shows its preview and a Show more toggle; a short one shows whole", () => {
   const long = `${"Spice and sand. ".repeat(40)}The end.`;
-  const html = render({ page: { ...page, work: { ...page.work, summary: long } }, signedIn: true, onAdd: () => undefined, onShare: () => undefined });
+  const html = render({ page: { ...page, work: { ...page.work, summary: long } }, signedIn: true, backTo: "/", onBack: null, onAdd: () => undefined, onShare: () => undefined });
   assert.ok(html.includes("About this book"));
   assert.ok(html.includes("Show more"));
   assert.ok(!html.includes("The end."));
-  const short = render({ page: { ...page, work: { ...page.work, summary: "Spice." } }, signedIn: true, onAdd: () => undefined, onShare: () => undefined });
+  const short = render({ page: { ...page, work: { ...page.work, summary: "Spice." } }, signedIn: true, backTo: "/", onBack: null, onAdd: () => undefined, onShare: () => undefined });
   assert.ok(short.includes("Spice."));
   assert.ok(!short.includes("Show more"));
 });
