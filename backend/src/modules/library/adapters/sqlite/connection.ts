@@ -2,11 +2,12 @@
 // file from the auth module's, per the module-isolation convention (see
 // schema.sql). Nothing in domain/ or service.ts imports this file.
 
-import { DatabaseSync } from "node:sqlite";
-import { mkdirSync, readFileSync } from "node:fs";
+import type { DatabaseSync } from "node:sqlite";
+import { readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { env } from "../../../../config/env.js";
+import { openSqlite } from "../../../../db/openSqlite.js";
 import { LIBRARY_DERIVED_VERSION } from "../../domain/constants.js";
 
 const adapterDir = dirname(fileURLToPath(import.meta.url));
@@ -42,11 +43,7 @@ export function applyLibrarySchema(db: DatabaseSync, derivedVersion = LIBRARY_DE
 }
 
 export function openLibraryDb(): DatabaseSync {
-  mkdirSync(dirname(env.LIBRARY_DB_PATH), { recursive: true });
-
-  const db = new DatabaseSync(env.LIBRARY_DB_PATH);
-  db.exec("PRAGMA journal_mode = WAL");
-  db.exec("PRAGMA busy_timeout = 5000");
+  const db = openSqlite(env.LIBRARY_DB_PATH);
   applyLibrarySchema(db);
 
   return db;

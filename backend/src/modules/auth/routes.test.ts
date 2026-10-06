@@ -88,9 +88,10 @@ test("missing code is a 400", async () => {
   assert.equal(typeof body.error, "string");
 });
 
-test("an expired code is a 400", async () => {
+test("an expired code is a 400", async (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: Date.now() });
   const code = createAuthorizationCode({ user, tokens, codeChallenge: null }, 10);
-  await new Promise((resolve) => setTimeout(resolve, 25));
+  t.mock.timers.tick(25);
 
   const { status, body } = await call({ method: "POST", url: "/auth/google/exchange", payload: { code } });
 

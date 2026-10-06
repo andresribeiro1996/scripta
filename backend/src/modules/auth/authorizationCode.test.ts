@@ -43,21 +43,23 @@ test("a code is single-use: a second exchange attempt fails even with the right 
   assert.deepEqual(second, { ok: false, reason: "not_found" });
 });
 
-test("an expired code is rejected even before the verifier is checked", async () => {
+test("an expired code is rejected even before the verifier is checked", (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: Date.now() });
   const verifier = "correct-verifier-1234567890123456789012345";
   const code = createAuthorizationCode({ user, tokens, codeChallenge: s256(verifier) }, 10 /* ttlMs */);
 
-  await new Promise((resolve) => setTimeout(resolve, 25));
+  t.mock.timers.tick(25);
 
   const result = consumeAuthorizationCode(code, verifier);
   assert.deepEqual(result, { ok: false, reason: "expired" });
 });
 
-test("a consume attempt sweeps other expired codes from the store", async () => {
+test("a consume attempt sweeps other expired codes from the store", (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: Date.now() });
   const expiredCode = createAuthorizationCode({ user, tokens, codeChallenge: null }, 10);
   const liveCode = createAuthorizationCode({ user, tokens, codeChallenge: null });
 
-  await new Promise((resolve) => setTimeout(resolve, 25));
+  t.mock.timers.tick(25);
 
   assert.equal(consumeAuthorizationCode(liveCode, null).ok, true);
   assert.deepEqual(consumeAuthorizationCode(expiredCode, null), { ok: false, reason: "not_found" });

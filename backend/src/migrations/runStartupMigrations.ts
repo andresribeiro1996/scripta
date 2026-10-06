@@ -24,20 +24,23 @@ import { readEmbeddedMurals, clearEmbeddedMuralsField, backfillLibraryDerived } 
 import { getUserTheme } from "../modules/auth/index.js";
 import { insertMigratedMurals, listHomeDesignations, dropMuralHomes, resetPresetBlockStyles, backfillMuralThemes } from "../modules/murals/index.js";
 import { applyHomeMuralMigration } from "../modules/community/index.js";
+import { timeStep, type StepLog } from "../stallLog.js";
 
-export function runStartupMigrations(): void {
-  const homes = listHomeDesignations();
-  if (homes.length > 0) applyHomeMuralMigration(homes);
-  dropMuralHomes();
-  resetPresetBlockStyles();
+export function runStartupMigrations(log: StepLog): void {
+  const homes = timeStep(log, "startup:mural-homes", () => listHomeDesignations());
+  if (homes.length > 0) timeStep(log, "startup:home-murals", () => applyHomeMuralMigration(homes));
+  timeStep(log, "startup:drop-mural-homes", () => dropMuralHomes());
+  timeStep(log, "startup:preset-block-styles", () => resetPresetBlockStyles());
 
-  const extracted = readEmbeddedMurals();
+  const extracted = timeStep(log, "startup:embedded-murals", () => readEmbeddedMurals());
   if (extracted.length > 0) {
-    insertMigratedMurals(extracted);
-    clearEmbeddedMuralsField([...new Set(extracted.map((r) => r.userId))]);
+    timeStep(log, "startup:move-embedded-murals", () => {
+      insertMigratedMurals(extracted);
+      clearEmbeddedMuralsField([...new Set(extracted.map((r) => r.userId))]);
+    });
   }
 
-  backfillLibraryDerived();
+  timeStep(log, "startup:library-derived", () => backfillLibraryDerived());
 
-  backfillMuralThemes(getUserTheme);
+  timeStep(log, "startup:mural-themes", () => backfillMuralThemes(getUserTheme));
 }

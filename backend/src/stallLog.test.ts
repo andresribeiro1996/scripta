@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mock, test, type TestContext } from "node:test";
 import { setTimeout as sleep } from "node:timers/promises";
 import Fastify from "fastify";
-import { STALL_MS, checkEventLoop, registerStallLog } from "./stallLog.js";
+import { STALL_MS, checkEventLoop, registerStallLog, timeStep, timeSync, timedMethods } from "./stallLog.js";
 
 type LogLine = { level: number; msg: string; reqId?: string; method?: string; route?: string; blockedMs?: number; maxMs?: number };
 
@@ -216,4 +216,79 @@ test("registerStallLog's interval does not keep the process alive", (t) => {
   build(t);
 
   assert.equal((setIntervalSpy.mock.calls[0]?.result as NodeJS.Timeout).hasRef(), false);
+});
+
+test("timeSync returns the function's result and logs nothing when it is fast", () => {
+  const warn = mock.fn();
+
+  assert.equal(timeSync({ warn }, "fast-job", () => 42), 42);
+
+  assert.equal(warn.mock.callCount(), 0);
+});
+
+test("timeSync logs a slow job by name, in whole milliseconds", () => {
+  const warn = mock.fn();
+
+  timeSync({ warn }, "slow-job", () => busyWait(250));
+
+  assert.equal(warn.mock.callCount(), 1);
+  const [details, message] = warn.mock.calls[0]!.arguments as [{ job: string; blockedMs: number }, string];
+  assert.equal(message, "job blocked the event loop");
+  assert.equal(details.job, "slow-job");
+  assert.ok(details.blockedMs >= STALL_MS);
+  assert.equal(details.blockedMs, Math.round(details.blockedMs));
+});
+
+test("timeSync rethrows the very error the function threw, and still logs a slow one", () => {
+  const warn = mock.fn();
+  const boom = new Error("boom");
+
+  assert.throws(() => timeSync({ warn }, "boom-job", () => { busyWait(250); throw boom; }), (error) => error === boom);
+
+  assert.equal(warn.mock.callCount(), 1);
+});
+
+test("timeStep logs a fast startup step at info with its duration", () => {
+  const info = mock.fn();
+  const warn = mock.fn();
+
+  assert.equal(timeStep({ info, warn }, "startup:fast", () => "done"), "done");
+
+  assert.equal(warn.mock.callCount(), 0);
+  const [details, message] = info.mock.calls[0]!.arguments as [{ step: string; ms: number }, string];
+  assert.equal(message, "startup step");
+  assert.equal(details.step, "startup:fast");
+  assert.equal(details.ms, Math.round(details.ms));
+});
+
+test("timeStep logs a slow startup step as a blocked job instead", () => {
+  const info = mock.fn();
+  const warn = mock.fn();
+
+  timeStep({ info, warn }, "startup:slow", () => busyWait(250));
+
+  assert.equal(info.mock.callCount(), 0);
+  const [details, message] = warn.mock.calls[0]!.arguments as [{ job: string; blockedMs: number }, string];
+  assert.equal(message, "job blocked the event loop");
+  assert.equal(details.job, "startup:slow");
+  assert.ok(details.blockedMs >= STALL_MS);
+});
+
+test("timedMethods times each method under prefix:name and keeps results, errors and plain values", () => {
+  const warn = mock.fn();
+  const nope = new Error("nope");
+  const target = {
+    size: 3,
+    fast: (n: number) => n + 1,
+    slow: () => { busyWait(250); return "done"; },
+    fail: (): never => { throw nope; }
+  };
+
+  const timed = timedMethods(target, { warn }, "books");
+
+  assert.equal(timed.size, 3);
+  assert.equal(timed.fast(1), 2);
+  assert.equal(timed.slow(), "done");
+  assert.throws(() => timed.fail(), (error) => error === nope);
+  assert.deepEqual(warn.mock.calls.map((call) => (call.arguments[0] as { job: string }).job), ["books:slow"]);
 });
