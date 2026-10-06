@@ -117,7 +117,7 @@ export function BookDetailSheet({
               </button>
               {workId && (
                 <Link to={`/work/${workId}`} className={actionClass}>
-                  About this book
+                  Book page
                 </Link>
               )}
               {isAdmin && (
