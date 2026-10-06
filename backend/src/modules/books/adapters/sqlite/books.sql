@@ -4,7 +4,8 @@ CREATE TABLE IF NOT EXISTS works (
   title        TEXT NOT NULL,
   author       TEXT NOT NULL,
   merged_into  TEXT REFERENCES works(id),
-  created_at   TEXT NOT NULL
+  created_at   TEXT NOT NULL,
+  summary      TEXT
 );
 
 CREATE TABLE IF NOT EXISTS books (

@@ -1528,3 +1528,45 @@ test("an aborted work key lookup starts no further requests", async () => {
   await h.service.backfillWorkKeys(50, controller.signal);
   assert.equal(calls.length, 1);
 });
+
+const ENGLISH_WORK = "The story of a boy who leaves his village and the war that is waiting for him in the north.";
+const workSummaryCatalog = () => recordingCatalog({
+  fetchDetails: async () => ({ metadata: { summary: null, rating: 4, ratingCount: 3, sourceUrl: "https://openlibrary.org/works/OL1W", genres: ["Science Fiction"], pages: null, publisher: null, year: null, translator: null }, sources: ["openlibrary"], summarySource: null, workKey: "/works/OL1W", workSummary: ENGLISH_WORK })
+}).catalog;
+const spiceCatalog = (workSummary: string) => recordingCatalog({
+  fetchDetails: async () => ({ metadata: { summary: "Edition text.", rating: 4, ratingCount: 3, sourceUrl: "https://openlibrary.org/works/OL1W", genres: ["Science Fiction"], pages: null, publisher: null, year: null, translator: null }, sources: ["openlibrary"], summarySource: "openlibrary", workKey: "/works/OL1W", workSummary })
+}).catalog;
+
+test("an edition without its own summary reads the work's, linked to Open Library", async () => {
+  const h = harness({ catalog: workSummaryCatalog() });
+  const details = await h.service.getDetails(dune);
+  assert.deepEqual([details?.summary, details?.summarySource, details?.sourceUrl], [ENGLISH_WORK, "openlibrary", "https://openlibrary.org/works/OL1W"]);
+  assert.equal(h.repo.findBookByKey("isbn:9780441013593")!.summary, null);
+});
+
+test("the work's summary is not shown on an edition in another language", async () => {
+  const h = harness({ catalog: workSummaryCatalog() });
+  const pt = { isbn: "9789722000000", title: "Duna", author: "Frank Herbert" };
+  assert.equal((await h.service.getDetails(pt))?.summary, null);
+  assert.equal((await h.service.getDetails(dune))?.summary, ENGLISH_WORK);
+});
+
+test("an edition's own summary wins over the work's and the work keeps the first writer", async () => {
+  const h = harness({ catalog: spiceCatalog(ENGLISH_WORK) });
+  assert.equal((await h.service.getDetails(dune))?.summary, "Edition text.");
+  const other = { isbn: "9780441172719", title: "Dune", author: "Frank Herbert" };
+  const second = harness({ catalog: spiceCatalog("Later work text.") });
+  second.repo.setWorkSummary(second.repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: other.isbn, workKey: "OL1W" }, ["isbn:" + other.isbn], "2026-10-01T00:00:00.000Z").id, "Earlier work text.");
+  await second.service.getDetails(other);
+  assert.equal(second.repo.getWorkSummary(second.bookId("isbn:" + other.isbn))?.summary, "Earlier work text.");
+});
+
+test("a publisher summary overrides the work's", async () => {
+  const h = harness({ catalog: workSummaryCatalog() });
+  await h.service.getDetails(dune);
+  const id = h.bookId("isbn:9780441013593");
+  h.repo.mergeDetails(id, { summary: "Sinopse da editora.", pages: null, year: null, publisher: null, translator: null }, "publisher");
+  h.repo.setPublisherUrl(id, "https://antigona.pt/products/dune");
+  const details = await h.service.getDetails(dune);
+  assert.deepEqual([details?.summary, details?.summarySource, details?.sourceUrl], ["Sinopse da editora.", "publisher", "https://antigona.pt/products/dune"]);
+});

@@ -25,10 +25,10 @@ const doc = { key: "/works/OL123W", title: "Ecotopia", author_name: ["Ernest Cal
 
 test("details come from the matching work", async () => {
   const catalog = createOpenLibraryCatalog(direct);
-  const requests = respond([{ docs: [doc] }, { description: { value: "A book summary." }, subjects: ["Science fiction", "Ecology"] }]);
+  const requests = respond([{ docs: [doc] }, { description: { value: "A book summary." }, subjects: ["Science fiction", "Ecology"] }, {}]);
   assert.deepEqual(await catalog.fetchDetails({ isbn: "9780553348477", title: "Ecotopia", author: "Ernest Callenbach" }), {
     metadata: {
-      summary: "A book summary.",
+      summary: null,
       rating: 3.8,
       ratingCount: 42,
       sourceUrl: "https://openlibrary.org/works/OL123W",
@@ -39,14 +39,26 @@ test("details come from the matching work", async () => {
       translator: null
     },
     sources: ["openlibrary"],
-    summarySource: "openlibrary",
-    workKey: "/works/OL123W"
+    summarySource: null,
+    workKey: "/works/OL123W",
+    workSummary: "A book summary."
   });
   assert.equal(new URL(requests[0]!).searchParams.get("isbn"), "9780553348477");
   assert.doesNotMatch(new URL(requests[0]!).searchParams.get("fields")!, /number_of_pages_median|first_publish_year|publisher/);
 
   respond([{ docs: [doc] }, { description: "**Plain summary.** Source: [Wikipedia](https://en.wikipedia.org/wiki/Ecotopia)" }]);
-  assert.equal((await catalog.fetchDetails({ isbn: null, title: "ECOTOPIA", author: "Ernest Callenbach" }))?.metadata.summary, "Plain summary. Source: Wikipedia");
+  assert.equal((await catalog.fetchDetails({ isbn: null, title: "ECOTOPIA", author: "Ernest Callenbach" }))?.workSummary, "Plain summary. Source: Wikipedia");
+});
+
+test("an edition's own description wins over the work's", async () => {
+  const catalog = createOpenLibraryCatalog(direct);
+  const requests = respond([{ docs: [doc] }, { description: "Work text." }, { description: { value: "Edition text." } }]);
+  const withEdition = await catalog.fetchDetails({ isbn: "9780553348477", title: "", author: "" });
+  assert.deepEqual([withEdition?.metadata.summary, withEdition?.summarySource, withEdition?.workSummary], ["Edition text.", "openlibrary", "Work text."]);
+  assert.equal(requests[2], "https://openlibrary.org/isbn/9780553348477.json");
+  respond([{ docs: [doc] }, { description: "Work text." }, null]);
+  const withoutEdition = await catalog.fetchDetails({ isbn: "9780553348477", title: "", author: "" });
+  assert.deepEqual([withoutEdition?.metadata.summary, withoutEdition?.summarySource, withoutEdition?.workSummary], [null, null, "Work text."]);
 });
 
 test("details reject mismatches and untrusted keys", async () => {
@@ -63,7 +75,7 @@ test("details reject mismatches and untrusted keys", async () => {
 });
 
 test("details tolerate invalid ratings and an empty work", async () => {
-  respond([{ docs: [{ ...doc, ratings_average: 8, ratings_count: -2, number_of_pages_median: 0, first_publish_year: "1975", publisher: [] }] }, {}]);
+  respond([{ docs: [{ ...doc, ratings_average: 8, ratings_count: -2, number_of_pages_median: 0, first_publish_year: "1975", publisher: [] }] }, {}, {}]);
   const missing = await createOpenLibraryCatalog(direct).fetchDetails({ isbn: "9780553348477", title: "", author: "" });
   assert.equal(missing?.metadata.summary, null);
   assert.equal(missing?.metadata.rating, null);
@@ -101,11 +113,11 @@ test("catalog calls use the urgent lane", async () => {
     lanes.push(options?.urgent);
     return task();
   };
-  respond([{ docs: [doc] }, {}, { docs: [] }]);
+  respond([{ docs: [doc] }, {}, {}, { docs: [] }]);
   const catalog = createOpenLibraryCatalog(recording);
   await catalog.fetchDetails({ isbn: "9780553348477", title: "", author: "" });
   await catalog.search({ text: "dune" });
-  assert.deepEqual(lanes, [true, true, true]);
+  assert.deepEqual(lanes, [true, true, true, true]);
 });
 
 test("a catalog built for the background uses the normal lane", async () => {
@@ -114,9 +126,9 @@ test("a catalog built for the background uses the normal lane", async () => {
     lanes.push(options?.urgent);
     return task();
   };
-  respond([{ docs: [doc] }, {}]);
+  respond([{ docs: [doc] }, {}, {}]);
   await createOpenLibraryCatalog(recording, false).fetchDetails({ isbn: "9780553348477", title: "", author: "" });
-  assert.deepEqual(lanes, [false, false]);
+  assert.deepEqual(lanes, [false, false, false]);
 });
 
 test("an edition record gives its title, its work and its languages as Open Library writes them", () => {
