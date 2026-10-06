@@ -4,6 +4,7 @@ import { createElement } from "react";
 import { renderToString } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import type { WorkPage } from "@scripta/shared";
+import { BackLink } from "../src/components/work/BackLink";
 import { WorkPageView } from "../src/components/work/WorkPageView";
 
 const page: WorkPage = {
@@ -77,4 +78,10 @@ test("a long summary shows its preview and a Show more toggle; a short one shows
   const short = render({ page: { ...page, work: { ...page.work, summary: "Spice." } }, signedIn: true, backTo: "/", onBack: null, onAdd: () => undefined, onShare: () => undefined });
   assert.ok(short.includes("Spice."));
   assert.ok(!short.includes("Show more"));
+});
+
+test("BackLink renders on its own, as used by the loading and not-found states", () => {
+  const html = renderToString(createElement(MemoryRouter, null, createElement(BackLink, { backTo: "/", onBack: null })));
+  assert.ok(html.includes("Back"));
+  assert.ok(html.includes('href="/"'));
 });

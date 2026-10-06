@@ -4,11 +4,10 @@ import { FINISH_FEELINGS, editionLabel, gameOwnerLabel, readerCountsLabel, reade
 import { AuthorAvatar } from "../CommunityAuthorAvatar";
 import { CoverImage } from "../BookCard";
 import { ReaderGlyph } from "../ReaderGlyph";
-import { ChevronLeftIcon } from "../Toolbar";
+import { BackLink } from "./BackLink";
 
 const rowClass = "flex items-center gap-3 rounded-xl border border-(--color-border) bg-(--color-surface) p-4";
 const sectionHeading = "mb-3 text-lg font-bold";
-const backClass = "mb-2 inline-flex items-center gap-1 text-xs text-(--color-text-dim) hover:text-(--color-text)";
 
 export function WorkPageView({ page, signedIn, backTo, onBack, onAdd, onShare }: { page: WorkPage; signedIn: boolean; backTo: string; onBack: (() => void) | null; onAdd: () => void; onShare: () => void }) {
   const { work, mine, readers, games } = page;
@@ -25,17 +24,7 @@ export function WorkPageView({ page, signedIn, backTo, onBack, onAdd, onShare }:
   );
   return (
     <main className="mx-auto max-w-5xl px-5 py-8">
-      {onBack ? (
-        <button type="button" onClick={onBack} className={backClass}>
-          <ChevronLeftIcon size={13} />
-          Back
-        </button>
-      ) : (
-        <Link to={backTo} className={backClass}>
-          <ChevronLeftIcon size={13} />
-          Back
-        </Link>
-      )}
+      <BackLink backTo={backTo} onBack={onBack} />
       <header className="mb-8 flex flex-col gap-5 sm:flex-row">
         <div className="relative aspect-[2/3] w-32 shrink-0 overflow-hidden rounded-xl bg-(--color-border)">
           <CoverImage book={coverBook} size="full" />
