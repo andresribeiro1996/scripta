@@ -65,26 +65,26 @@ test("update merges the patch and refuses published quizzes", () => {
   assert.equal(repo.update("quiz-1", "u1", { name: "Nope" }), undefined);
 });
 
-test("insert and update keep quiz_works in step; delete clears it", () => {
+test("insert and update keep quiz_works in step with the books' work ids; delete clears it", () => {
   const db = new DatabaseSync(":memory:");
   applyQuizzesMigrations(db);
   const repo = createSqliteQuizzesRepository(db);
-  const rows = (quizId: string) =>
-    (db.prepare("SELECT key, work_id FROM quiz_works WHERE quiz_id = ? ORDER BY key").all(quizId) as Array<{ key: string; work_id: string | null }>).map((row) => ({ key: row.key, work_id: row.work_id }));
+  const rows = (quizId: string) => (db.prepare("SELECT work_id FROM quiz_works WHERE quiz_id = ? ORDER BY work_id").all(quizId) as Array<{ work_id: string }>).map((row) => row.work_id);
+  const doc = (...ids: string[]) => JSON.stringify({ books: ids.map((workId) => ({ workId, title: workId })), questions: null });
 
-  repo.insert(quizRow(), new Map([["b0", "w0"]]));
-  assert.deepEqual(rows("quiz-1"), [{ key: "b0", work_id: "w0" }]);
+  repo.insert(quizRow({ data: doc("w0", "w9") }));
+  assert.deepEqual(rows("quiz-1"), ["w0", "w9"]);
 
-  repo.update("quiz-1", "u1", { data: '{"a":1}' }, new Map([["b1", "w1"]]));
-  assert.deepEqual(rows("quiz-1"), [{ key: "b1", work_id: "w1" }]);
+  repo.update("quiz-1", "u1", { data: doc("w1") });
+  assert.deepEqual(rows("quiz-1"), ["w1"]);
 
   repo.update("quiz-1", "u1", { name: "Renamed" });
-  assert.deepEqual(rows("quiz-1"), [{ key: "b1", work_id: "w1" }]);
+  assert.deepEqual(rows("quiz-1"), ["w1"]);
 
-  repo.insert(quizRow({ id: "quiz-2", owner_user_id: "u2" }), new Map([["b2", null]]));
+  repo.insert(quizRow({ id: "quiz-2", owner_user_id: "u2", data: doc("w2") }));
   assert.equal(repo.delete("quiz-1", "u1"), true);
   assert.deepEqual(rows("quiz-1"), []);
-  assert.deepEqual(rows("quiz-2"), [{ key: "b2", work_id: null }]);
+  assert.deepEqual(rows("quiz-2"), ["w2"]);
 
   repo.deleteUserData("u2");
   assert.deepEqual(rows("quiz-2"), []);
@@ -199,18 +199,40 @@ test("participation lists only the quizzes played since the marker, and their co
   assert.deepEqual(listed("2026-02-10T00:00:00.001Z"), []);
 });
 
-test("rekeyBooks rewrites the owner's unpublished quiz books and de-duplicates by key", () => {
+test("an E1-shaped quiz database is migrated on open", () => {
   const db = new DatabaseSync(":memory:");
+  db.exec(`
+    CREATE TABLE quizzes (id TEXT PRIMARY KEY, owner_user_id TEXT NOT NULL, name TEXT NOT NULL, data TEXT NOT NULL DEFAULT '{}', vote_code TEXT, play_open INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL DEFAULT '');
+    CREATE TABLE quiz_plays (id TEXT PRIMARY KEY, quiz_id TEXT NOT NULL, voter_user_id TEXT, player_name TEXT, score INTEGER NOT NULL DEFAULT 0, duration_ms INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL DEFAULT '');
+    CREATE TABLE quiz_play_answers (play_id TEXT NOT NULL REFERENCES quiz_plays(id) ON DELETE CASCADE, quiz_id TEXT NOT NULL, question_id TEXT NOT NULL, choice_index INTEGER NOT NULL, correct INTEGER NOT NULL, PRIMARY KEY (play_id, question_id));
+    CREATE TABLE quiz_works (quiz_id TEXT NOT NULL, key TEXT NOT NULL, work_id TEXT, PRIMARY KEY (quiz_id, key));
+    CREATE INDEX idx_quiz_works_work ON quiz_works(work_id);
+  `);
+  const book = (key: string) => ({ key, title: `Title ${key}`, author: "A", coverUrl: `https://covers.test/${key}.jpg`, quote: null, blurb: null });
+  const data = JSON.stringify({ sourceLabel: "", questionCount: 1, allowedTypes: ["cover_title"], books: ["k0", "k1", "k2", "k3"].map(book), questions: [{ id: "q0", type: "cover_title", bookKey: "k1", options: ["a", "b", "c", "d"], answerIndex: 2 }] });
+  db.prepare("INSERT INTO quizzes (id, owner_user_id, name, data, vote_code, play_open) VALUES ('live', 'u1', 'Live', ?, 'CODE1', 1)").run(data);
+  db.exec(`
+    INSERT INTO quiz_works VALUES ('live', 'k0', 'w0'), ('live', 'k1', 'w1'), ('live', 'k2', 'w2'), ('live', 'k3', 'w3');
+    INSERT INTO quiz_plays (id, quiz_id, voter_user_id, score) VALUES ('p1', 'live', 'u9', 1);
+    INSERT INTO quiz_play_answers VALUES ('p1', 'live', 'q0', 2, 1);
+  `);
+
   applyQuizzesMigrations(db);
-  const insert = db.prepare("INSERT INTO quizzes (id, owner_user_id, name, data, vote_code, updated_at) VALUES (?, ?, 'q', ?, ?, 't0')");
-  const data = JSON.stringify({ sourceLabel: "", questionCount: 5, allowedTypes: [], books: [{ key: "new", title: "Dune" }, { key: "old", title: "Dune" }, { key: "x", title: "X" }], questions: null });
-  insert.run("draft", "u1", data, null);
-  insert.run("published", "u1", data, "CODE1");
-  createSqliteQuizzesRepository(db).rekeyBooks("u1", ["old"], "new", null);
-  const read = (id: string) => db.prepare("SELECT data, updated_at FROM quizzes WHERE id = ?").get(id) as { data: string; updated_at: string };
-  assert.deepEqual(JSON.parse(read("draft").data).books, [{ key: "new", title: "Dune" }, { key: "x", title: "X" }]);
-  assert.notEqual(read("draft").updated_at, "t0");
-  assert.equal(read("published").data, data);
+  applyQuizzesMigrations(db);
+
+  const repo = createSqliteQuizzesRepository(db);
+  const stored = JSON.parse(repo.getById("live")!.data) as { books: Array<{ workId: string }>; questions: Array<{ workId: string; bookKey?: string }> };
+  assert.deepEqual(stored.books.map((b) => b.workId), ["w0", "w1", "w2", "w3"]);
+  assert.deepEqual(stored.questions.map((q) => q.workId), ["w1"]);
+  assert.equal("bookKey" in stored.questions[0]!, false);
+  assert.equal(repo.getByVoteCode("CODE1")?.play_open, 1);
+  assert.equal(repo.getPlayByVoter("live", "u9")?.score, 1);
+  assert.deepEqual(repo.getAnswers("p1").map((a) => [a.question_id, a.choice_index, a.correct]), [["q0", 2, 1]]);
+  assert.deepEqual(db.prepare("SELECT work_id FROM quiz_works WHERE quiz_id = 'live' ORDER BY work_id").all().map((r) => r.work_id), ["w0", "w1", "w2", "w3"]);
+  const columns = (db.prepare("PRAGMA table_info(quiz_works)").all() as Array<{ name: string }>).map((c) => c.name);
+  assert.equal(columns.includes("key"), false);
+  const indexes = (db.prepare("PRAGMA index_list(quiz_works)").all() as Array<{ name: string }>).map((i) => i.name);
+  assert.equal(indexes.includes("idx_quiz_works_work"), true);
 });
 
 test("a trigger that rolls the transaction back surfaces its own error and keeps every row", () => {

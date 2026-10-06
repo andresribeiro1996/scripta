@@ -31,11 +31,10 @@ CREATE INDEX IF NOT EXISTS idx_tournaments_public ON tournaments(created_at DESC
 CREATE TABLE IF NOT EXISTS tournament_slots (
   tournament_id  TEXT NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
   slot_index     INTEGER NOT NULL,
-  book_key       TEXT NOT NULL,
+  work_id        TEXT,
   title          TEXT NOT NULL,
   author         TEXT NOT NULL,
   cover_url      TEXT,
-  work_id        TEXT,
   PRIMARY KEY (tournament_id, slot_index)
 );
 
@@ -49,18 +48,15 @@ CREATE TABLE IF NOT EXISTS duels (
   tournament_id   TEXT NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
   round_number    INTEGER NOT NULL,
   duel_index      INTEGER NOT NULL,
-  book_a_key      TEXT NOT NULL,
+  book_a_work_id  TEXT,
   book_a_title    TEXT NOT NULL,
   book_a_author   TEXT NOT NULL,
   book_a_cover    TEXT,
-  book_a_work_id  TEXT,
-  book_b_key      TEXT NOT NULL,
+  book_b_work_id  TEXT,
   book_b_title    TEXT NOT NULL,
   book_b_author   TEXT NOT NULL,
   book_b_cover    TEXT,
-  book_b_work_id  TEXT,
-  winner_key      TEXT,
-  winner_work_id  TEXT,
+  winner_side     TEXT CHECK (winner_side IN ('a', 'b')),
   status          TEXT NOT NULL DEFAULT 'active', -- 'active' | 'tied_pending_tiebreak' | 'settled'
   opens_at        TEXT NOT NULL,
   closes_at       TEXT NOT NULL,
@@ -88,12 +84,12 @@ CREATE TABLE IF NOT EXISTS votes (
   duel_id       TEXT NOT NULL REFERENCES duels(id) ON DELETE CASCADE,
   voter_token   TEXT NOT NULL,
   voter_user_id TEXT,
-  book_key      TEXT NOT NULL,
+  side          TEXT NOT NULL CHECK (side IN ('a', 'b')),
   created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   UNIQUE (duel_id, voter_token)
 );
 
-CREATE INDEX IF NOT EXISTS idx_votes_duel_book ON votes(duel_id, book_key);
+CREATE INDEX IF NOT EXISTS idx_votes_duel_side ON votes(duel_id, side);
 -- Backs "tournaments I voted in" (listVotedByUser) — partial, so the
 -- anonymous majority of rows stays out of the index.
 CREATE INDEX IF NOT EXISTS idx_votes_voter_user ON votes(voter_user_id) WHERE voter_user_id IS NOT NULL;

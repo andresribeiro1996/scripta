@@ -1,18 +1,31 @@
-import { canonicalByKey, firstKeyPerWork, keysForWorks, knownWorkIds, resolveTitleWorks } from "../library/index.js";
-import type { Quiz, StoredQuizBook, StoredQuizQuestion } from "./domain/types.js";
+import type { QuizBook, QuizQuestion } from "@scripta/shared";
+import { canonicalByKey, knownWorkIds, resolveTitleWorks } from "../library/index.js";
+import type { Quiz } from "./domain/types.js";
 
-export function quizToWorks(quiz: Quiz, works: Map<string, string>): Quiz {
+function storedIds(quiz: Quiz): string[] {
   const data = (quiz.data ?? {}) as Record<string, unknown>;
+  const stored = Array.isArray(data.books) ? (data.books as QuizBook[]) : [];
+  const asked = Array.isArray(data.questions) ? (data.questions as QuizQuestion[]) : [];
+  return [...stored.map((book) => book.workId), ...asked.flatMap((question) => (question.workId ? [question.workId] : []))];
+}
+
+export function canonicalForQuiz(quiz: Quiz): Map<string, string> {
+  return canonicalByKey(new Map(storedIds(quiz).map((id) => [id, id])));
+}
+
+export function quizToWorks(quiz: Quiz, known?: Map<string, string>): Quiz {
+  const data = (quiz.data ?? {}) as Record<string, unknown>;
+  const stored = Array.isArray(data.books) ? (data.books as QuizBook[]) : [];
+  const asked = Array.isArray(data.questions) ? (data.questions as QuizQuestion[]) : null;
+  const canonical = known ?? canonicalForQuiz(quiz);
   const seen = new Set<string>();
-  const books = (Array.isArray(data.books) ? (data.books as StoredQuizBook[]) : []).flatMap(({ key, ...book }) => {
-    const workId = works.get(key);
-    if (!workId || seen.has(workId)) return [];
+  const books = stored.flatMap((book) => {
+    const workId = canonical.get(book.workId)!;
+    if (seen.has(workId)) return [];
     seen.add(workId);
-    return [{ workId, ...book }];
+    return [{ ...book, workId }];
   });
-  const questions = Array.isArray(data.questions)
-    ? (data.questions as StoredQuizQuestion[]).map((question) => ({ id: question.id, type: question.type, workId: works.get(question.bookKey) ?? null, options: question.options, answerIndex: question.answerIndex }))
-    : data.questions;
+  const questions = asked ? asked.map((question) => ({ ...question, workId: question.workId ? canonical.get(question.workId)! : null })) : data.questions;
   return { ...quiz, data: { ...data, books, questions } };
 }
 
@@ -24,12 +37,4 @@ export function quizBookWorks(books: Array<{ workId?: string; title: string; aut
   const resolved = resolveTitleWorks(titled);
   const byBook = new Map(titled.map((book, index) => [book, resolved[index] ?? null]));
   return books.map((book) => (book.workId ? known.get(book.workId)! : byBook.get(book) ?? null));
-}
-
-export function keyedQuizBooks<T extends { workId?: string }>(ownerUserId: string, books: T[], ids: string[], storedKeys: string[], stored: Map<string, string | null>) {
-  const keys = keysForWorks(ownerUserId, ids, firstKeyPerWork(storedKeys, canonicalByKey(stored)));
-  return {
-    books: books.map(({ workId: _workId, ...book }, index) => ({ key: keys.get(ids[index]!)!, ...book })),
-    works: new Map<string, string>(ids.map((id) => [keys.get(id)!, id]))
-  };
 }

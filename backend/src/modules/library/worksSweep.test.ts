@@ -80,23 +80,54 @@ test("startWorksSweep runs every step to the end and logs what it resolved", asy
     const visited = Math.max(0, Math.min(limit, total - after));
     return { lastRowid: after + visited, visited, resolved: visited };
   };
-  const stop = startWorksSweep([pages("a", 3), pages("b", 1)], { info: (details) => infos.push(details), error: () => undefined }, 60_000, 2);
-  await new Promise((resolve) => setTimeout(resolve, 50));
+  let stop = () => {};
+  await new Promise<void>((resolve, reject) => {
+    stop = startWorksSweep(
+      [pages("a", 3), pages("b", 1)],
+      {
+        info: (details) => {
+          infos.push(details);
+          resolve();
+        },
+        error: reject,
+      },
+      60_000,
+      2,
+    );
+  });
   stop();
   assert.deepEqual(seen, [["a", 0], ["a", 2], ["b", 0]]);
   assert.deepEqual(infos, [{ resolved: 4 }]);
 });
 
-test("a failing step is logged and does not stop the next tick", async () => {
+test("a failing step is logged and does not stop the next tick", async (t) => {
+  t.mock.timers.enable({ apis: ["setInterval"] });
   const errors: object[] = [];
+  let logged = () => {};
+  const nextError = () => new Promise<void>((resolve) => (logged = resolve));
   let calls = 0;
   const step = () => {
     calls++;
     throw new Error("boom");
   };
-  const stop = startWorksSweep([step], { info: () => undefined, error: (details) => errors.push(details) }, 10, 2);
-  await new Promise((resolve) => setTimeout(resolve, 80));
+  const first = nextError();
+  const stop = startWorksSweep(
+    [step],
+    {
+      info: () => undefined,
+      error: (details) => {
+        errors.push(details);
+        logged();
+      },
+    },
+    10,
+    2,
+  );
+  await first;
+  const second = nextError();
+  t.mock.timers.tick(10);
+  await second;
   stop();
-  assert.ok(calls >= 2);
-  assert.equal(errors.length, calls);
+  assert.equal(calls, 2);
+  assert.equal(errors.length, 2);
 });

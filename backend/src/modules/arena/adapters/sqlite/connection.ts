@@ -5,6 +5,7 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { env } from "../../../../config/env.js";
 import { openSqlite } from "../../../../db/openSqlite.js";
+import { migrateArenaToWorks } from "./worksPass.js";
 
 const adapterDir = dirname(fileURLToPath(import.meta.url));
 
@@ -28,13 +29,15 @@ export function applyArenaMigrations(db: DatabaseSync): void {
   }
 
   const slotColumns = db.prepare(`PRAGMA table_info(tournament_slots)`).all() as { name: string }[];
-  if (slotColumns.length > 0 && !slotColumns.some((column) => column.name === "work_id")) {
-    db.exec(`ALTER TABLE tournament_slots ADD COLUMN work_id TEXT`);
-  }
-  const duelColumns = db.prepare(`PRAGMA table_info(duels)`).all() as { name: string }[];
-  for (const column of ["book_a_work_id", "book_b_work_id", "winner_work_id"]) {
-    if (duelColumns.length > 0 && !duelColumns.some((existing) => existing.name === column)) {
-      db.exec(`ALTER TABLE duels ADD COLUMN ${column} TEXT`);
+  if (slotColumns.some((column) => column.name === "book_key")) {
+    if (!slotColumns.some((column) => column.name === "work_id")) {
+      db.exec(`ALTER TABLE tournament_slots ADD COLUMN work_id TEXT`);
+    }
+    const duelColumns = db.prepare(`PRAGMA table_info(duels)`).all() as { name: string }[];
+    for (const column of ["book_a_work_id", "book_b_work_id", "winner_work_id"]) {
+      if (!duelColumns.some((existing) => existing.name === column)) {
+        db.exec(`ALTER TABLE duels ADD COLUMN ${column} TEXT`);
+      }
     }
   }
 
@@ -62,6 +65,8 @@ export function applyArenaMigrations(db: DatabaseSync): void {
       );
     }
   }
+
+  migrateArenaToWorks(db);
 
   const schema = readFileSync(`${adapterDir}/schema.sql`, "utf8");
   db.exec(schema);
