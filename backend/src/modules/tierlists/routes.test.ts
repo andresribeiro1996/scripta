@@ -350,6 +350,10 @@ test("a ballot naming a work that was merged after the list was written lands on
   const voter = await publicApp(service);
   const board = await voter.inject({ method: "GET", url: `/tierlists/voting/${code}` });
   assert.deepEqual(board.json().board.pool, [target, other]);
+  assert.deepEqual(board.json().books.map((book: { workId: string }) => book.workId), [target, other]);
+  db.prepare("UPDATE tierlists SET public_books = NULL WHERE vote_code = ?").run(code);
+  const live = await voter.inject({ method: "GET", url: `/tierlists/voting/${code}` });
+  assert.deepEqual(live.json().books.map((book: { workId: string }) => book.workId), [target, other]);
   const ballot = await voter.inject({ method: "POST", url: `/tierlists/voting/${code}/ballot`, payload: { placements: [{ workId: target, tierId: "s" }] } });
   assert.equal(ballot.statusCode, 200);
   assert.deepEqual(ballot.json().placements, [{ workId: target, tierId: "s" }]);
@@ -392,6 +396,23 @@ test("ballots keep the members-only and closed-voting refusals", async () => {
   await app.inject({ method: "PUT", url: `/tierlists/${id}/voting`, headers: headers("t7"), payload: { access: "anonymous", open: false } });
   assert.equal((await voter.inject({ method: "POST", url: `/tierlists/voting/${voteCode}/ballot`, payload })).statusCode, 409);
   assert.equal((await voter.inject({ method: "POST", url: "/tierlists/voting/nope/ballot", payload })).statusCode, 404);
+  await voter.close();
+  await app.close();
+});
+
+test("a ballot with the catalog down answers 503 and stores no ballot", async () => {
+  const { app, db, service, code, id } = await publishedPool("t12", ["Down Ballot A", "Down Ballot B"]);
+  const voter = await publicApp(service);
+  const placed = titleWork("Down Ballot C");
+  const catalog = openBooksDb();
+  catalog.exec("ALTER TABLE works RENAME TO works_away");
+  try {
+    const res = await voter.inject({ method: "POST", url: `/tierlists/voting/${code}/ballot`, payload: { placements: [{ workId: placed, tierId: "s" }] } });
+    assert.equal(res.statusCode, 503);
+  } finally {
+    catalog.exec("ALTER TABLE works_away RENAME TO works");
+  }
+  assert.equal((db.prepare("SELECT COUNT(*) AS n FROM tierlist_ballots WHERE tierlist_id = ?").get(id) as { n: number }).n, 0);
   await voter.close();
   await app.close();
 });

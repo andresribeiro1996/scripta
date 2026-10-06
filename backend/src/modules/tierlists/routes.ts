@@ -13,7 +13,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { sendWorksError } from "../../worksFormat.js";
 import { authGuard, getOptionalAuthenticatedUser } from "../auth/index.js";
-import { duplicateWorkMessage, firstKeyPerWork, knownWorkIds, resolvePublicBooksByWork, UnknownWorkError, WorkResolutionError } from "../library/index.js";
+import { duplicateWorkMessage, firstKeyPerWork, knownWorkIds, resolvePublicBooksByWork, UnknownWorkError } from "../library/index.js";
 import { boardWorks } from "./domain/boardKeys.js";
 import type { Tierlist } from "./domain/types.js";
 import type { BallotOutcome, TierlistsService, Voter } from "./service.js";
@@ -311,15 +311,14 @@ export function buildPublicTierlistRoutes(service: TierlistsService) {
       if (!board) return reply.code(404).send({ error: "No tier list at that link." });
       try {
         const ids = knownWorkIds(body.data.placements.map((placement) => placement.workId));
-        const { canonical } = canonicalFirst(board.pool);
-        const placements = placementsFromWorks(body.data.placements, ids, firstKeyPerWork(board.pool, canonical));
+        const view = canonicalFirst(board.pool);
+        const placements = placementsFromWorks(body.data.placements, ids, firstKeyPerWork(board.pool, view.canonical));
         if (!placements) return reply.code(400).send({ error: "Those placements don't match this tier list." });
         const outcome = service.submitBallot(params.data.code, placements, voterFor(request, ballotId));
-        return sendBallotOutcome(reply, service, params.data.code, outcome);
+        return sendBallotOutcome(reply, service, params.data.code, outcome, () => view);
       } catch (err) {
         if (err instanceof UnknownWorkError) return reply.code(400).send({ error: "Those placements don't match this tier list." });
-        if (err instanceof WorkResolutionError) return reply.code(503).send({ error: err.message });
-        throw err;
+        return sendWorksError(reply, err);
       }
     };
 
@@ -340,7 +339,7 @@ export function buildPublicTierlistRoutes(service: TierlistsService) {
         return reply.code(404).send({ error: "No ballot at that link." });
       }
       const outcome = service.getBallot(params.data.code, voterFor(request, ballotId));
-      return sendBallotOutcome(reply, service, params.data.code, outcome);
+      return sendBallotOutcome(reply, service, params.data.code, outcome, () => canonicalFirst(service.getVotingBoard(params.data.code)?.pool ?? []));
     };
     app.get("/tierlists/voting/:code/ballot", readBallot);
     app.get("/tierlists/voting/:code/ballot/:ballotId", readBallot);
@@ -355,7 +354,7 @@ function voterFor(request: FastifyRequest, ballotId: string | null): Voter {
   return user ? { kind: "user", userId: user.id } : { kind: "anonymous", ballotId };
 }
 
-function sendBallotOutcome(reply: FastifyReply, service: TierlistsService, code: string, outcome: BallotOutcome) {
+function sendBallotOutcome(reply: FastifyReply, service: TierlistsService, code: string, outcome: BallotOutcome, view: () => ReturnType<typeof canonicalFirst>) {
   if (!outcome.ok) {
     if (outcome.reason === "not-found") return reply.code(404).send({ error: "No tier list at that link." });
     if (outcome.reason === "closed") return reply.code(409).send({ error: "Voting is closed for this tier list." });
@@ -363,7 +362,7 @@ function sendBallotOutcome(reply: FastifyReply, service: TierlistsService, code:
     return reply.code(400).send({ error: "Those placements don't match this tier list." });
   }
   const board = service.getVotingBoard(code);
-  const { canonical, first } = canonicalFirst(board?.pool ?? []);
+  const { canonical, first } = view();
   return reply.send({
     ballotId: outcome.ballotId,
     placements: placementsToWorks(outcome.placements, canonical, first),

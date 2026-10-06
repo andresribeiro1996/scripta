@@ -77,7 +77,7 @@ export function boardBooks(pool: string[], snapshot: unknown[] | null, live: () 
   const byWork = new Map<string, Record<string, unknown>>();
   for (const book of entries) {
     const work = typeof book.workId === "string" ? canonical.get(book.workId) : undefined;
-    if (work && !byWork.has(work)) byWork.set(work, book);
+    if (work && !byWork.has(work)) byWork.set(work, { ...book, workId: work });
   }
   return pool.every((id) => byWork.has(id)) ? pool.map((id) => byWork.get(id)!) : live();
 }

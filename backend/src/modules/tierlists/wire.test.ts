@@ -47,8 +47,9 @@ test("placementsFromWorks maps each canonical id to the stored id and refuses a 
 test("boardBooks matches snapshot books by canonical work and falls back to live when one is missing", () => {
   const live = () => [{ title: "Live" }];
   const snapshot = [{ title: "A", key: "ka", workId: old }, { title: "B", key: "kb", workId: other }];
-  assert.deepEqual(boardBooks([kept, other], snapshot, live), snapshot);
-  assert.deepEqual(boardBooks([other, kept], snapshot, live), [snapshot[1], snapshot[0]]);
+  const canonicalSnapshot = [{ ...snapshot[0]!, workId: kept }, snapshot[1]!];
+  assert.deepEqual(boardBooks([kept, other], snapshot, live), canonicalSnapshot);
+  assert.deepEqual(boardBooks([other, kept], snapshot, live), [canonicalSnapshot[1], canonicalSnapshot[0]]);
   assert.deepEqual(boardBooks([kept, other], [snapshot[1]!], live), live());
   assert.deepEqual(boardBooks([kept], null, live), live());
 });
