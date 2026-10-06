@@ -2,6 +2,7 @@ import fastifyMultipart from "@fastify/multipart";
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
 import { env, isbndbConfigured } from "../../config/env.js";
+import { timeStep, timeSync, timedMethods } from "../../stallLog.js";
 import { createObjectStore } from "../../storage/createObjectStore.js";
 import { createCompositeCatalog } from "./adapters/catalog/compositeCatalog.js";
 import { createThrottle, fetchBytes } from "./adapters/http/http.js";
@@ -49,7 +50,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
         .catch((error: unknown) => app.log.error({ err: error }, "ISBNdb key alert failed"));
     }
   });
-  const repo = createSqliteBooksRepository(openBooksDb());
+  const repo = timedMethods(createSqliteBooksRepository(timeStep(app.log, "startup:books-open", openBooksDb)), app.log, "books");
   const isbndbThrottle = createThrottle(ISBNDB_GAP_MS);
   const openLibraryThrottle = createThrottle(OPEN_LIBRARY_GAP_MS);
   const openLibraryCoverThrottle = createThrottle(OPEN_LIBRARY_COVER_GAP_MS);
@@ -88,8 +89,8 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     (bookId, lane) => service.processBook(bookId, lane),
     (error, bookId) => app.log.error({ err: error, bookId }, "cover lookup failed")
   );
-  service.enqueueUnchecked();
-  const stopBackfill = startBackfill(() => service.enqueueUnchecked());
+  timeStep(app.log, "startup:cover-enqueue", () => service.enqueueUnchecked());
+  const stopBackfill = startBackfill(() => timeSync(app.log, "cover-enqueue", () => service.enqueueUnchecked()));
   const stopDetailsBackfill = startDetailsBackfill(
     (signal) => service.backfillDetails(DETAILS_BATCH_SIZE, signal),
     (error) => app.log.error({ err: error }, "details backfill failed")
