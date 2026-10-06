@@ -294,8 +294,8 @@ export function BracketMap({
             <Text {...dynamicType} style={[typography.caption, styles.center, { color: colors.textDim }]}>
               Round {openDuel.roundNumber} · Match {openDuel.duelIndex + 1} · {openDuel.status === "active" ? countdownLabel(openDuel.closesAt) : openDuel.status === "tied_pending_tiebreak" ? "Owner tiebreak needed" : "Settled"}
             </Text>
-            <DuelSideRow side={openDuel.bookA} duel={openDuel} />
-            <DuelSideRow side={openDuel.bookB} duel={openDuel} />
+            <DuelSideRow side={openDuel.bookA} duel={openDuel} onClose={() => setOpenId(null)} />
+            <DuelSideRow side={openDuel.bookB} duel={openDuel} onClose={() => setOpenId(null)} />
           </ScrollView>
         ) : null}
       </Sheet>
