@@ -22,7 +22,7 @@ JSON, and nothing can answer "everything that uses work X".
 | Step | What |
 |---|---|
 | **E1 (this spec)** | The server resolves every library book and every game entry to a `work_id`. Clients and payloads are unchanged. |
-| E2 | Library payloads carry `workId`, web and mobile send works, the echo keys below are deleted. Old builds keep sending `bookKey` until they are gone. |
+| E2 | Library payloads carry `workId`, web and mobile send works, the echo keys below are deleted. Old builds keep sending `bookKey` until they are gone. Spec: `2026-10-05-works-phase-e2-design.md`. |
 | Work page | A route per work on web and mobile: details, editions, your history, community references, basic stats. |
 | Stats | Arena rating across duels, rivals, "often ranked with", opt-in popular highlights, a shareable stats card. |
 

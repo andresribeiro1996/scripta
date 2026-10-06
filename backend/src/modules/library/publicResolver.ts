@@ -3,6 +3,7 @@ import { isGroup, normalizeImageId, publicReaderCard, readerIdentity, type Group
 import type { SharedBook } from "@scripta/shared/community";
 import { peekCachedCoverUrl, peekCachedCoverUrls } from "../books/index.js";
 import { openLibraryDb } from "./adapters/sqlite/connection.js";
+import { canonicalWorkIds, copyKeysForWorks } from "./works.js";
 
 export interface PublicBookData {
   title: string;
@@ -11,6 +12,8 @@ export interface PublicBookData {
   imageId: string | null;
   coverUrl: string | null;
   readStatus: number | null;
+  key: string;
+  workId: string | null;
 }
 
 export interface PublicHighlight {
@@ -55,6 +58,7 @@ interface BookRowRecord {
   series_number: number | null;
   sort_order: number | null;
   cover_url: string | null;
+  work_id: string | null;
 }
 
 interface SummaryRecord {
@@ -79,13 +83,16 @@ function coversOf(rows: BookRowRecord[]): Map<BookRowRecord, string | null> {
 
 function toPublicBooks(rows: BookRowRecord[]): PublicBookData[] {
   const covers = coversOf(rows);
+  const works = canonicalWorkIds(rows.flatMap((row) => (row.work_id ? [row.work_id] : [])));
   return rows.map((row) => ({
     title: row.title || "Untitled",
     author: row.author || "Unknown author",
     isbn: isbnOf(row),
     imageId: normalizeImageId(row.image_id) || null,
     coverUrl: row.cover_url ?? covers.get(row) ?? null,
-    readStatus: row.read_status
+    readStatus: row.read_status,
+    key: row.book_key,
+    workId: row.work_id && (works.get(row.work_id) ?? row.work_id)
   }));
 }
 
@@ -103,7 +110,7 @@ function toPublicLibraryBooks(rows: BookRowRecord[]): Record<string, unknown>[] 
   }));
 }
 
-const BOOK_COLUMNS = `SELECT position, book_key, title, author, isbn, image_id, read_status, series_number, sort_order, cover_url FROM library_books`;
+const BOOK_COLUMNS = `SELECT position, book_key, title, author, isbn, image_id, read_status, series_number, sort_order, cover_url, work_id FROM library_books`;
 
 type Statement = ReturnType<DatabaseSync["prepare"]>;
 let cached: { summaryStmt: Statement; booksStmt: Statement; booksByKeyStmt: Statement; currentlyReadingStmt: Statement; highlightStmt: Statement; finishedInYearStmt: Statement; getGlyphStmt: Statement; sharedCountsStmt: Statement; sharedBooksStmt: Statement } | null = null;
@@ -258,4 +265,18 @@ export function resolvePublicLibrary(userId: string): Record<string, unknown> | 
   if (!summary || summary.meta === null) return null;
   const rows = getStatements().booksStmt.all(userId) as unknown as BookRowRecord[];
   return { ...(JSON.parse(summary.meta) as Record<string, unknown>), books: toPublicLibraryBooks(rows) };
+}
+
+export function resolvePublicBooksByWork(ownerUserId: string, workIds: string[]): Map<string, PublicBookData> {
+  const canonical = canonicalWorkIds(workIds);
+  const keys = copyKeysForWorks(ownerUserId, [...new Set(canonical.values())]);
+  const books = resolvePublicLibraryData(ownerUserId, { bookKeys: [...new Set(keys.values())], highlightRefs: [], needsCurrentlyReading: false, statsMetrics: [] }).books;
+  const byKey = new Map(books.map((book) => [book.key, book]));
+  const result = new Map<string, PublicBookData>();
+  for (const id of workIds) {
+    const key = keys.get(canonical.get(id) ?? "");
+    const book = key === undefined ? undefined : byKey.get(key);
+    if (book) result.set(id, book);
+  }
+  return result;
 }

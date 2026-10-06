@@ -1,4 +1,4 @@
-import { libraryChangeRequest, type LibraryChange, type LibraryChangeAnswer, type LibraryData } from "@scripta/shared";
+import { libraryChangeRequest, type LibraryDocument, type LibraryChange, type LibraryChangeAnswer, type LibraryData } from "@scripta/shared";
 import type { BookRecommendationInput } from "@scripta/shared/community";
 import { ApiError, apiFetch } from "./client";
 
@@ -9,16 +9,7 @@ import { ApiError, apiFetch } from "./client";
 // `from "../api/library"` import keeps working unchanged.
 export type { LibraryData } from "@scripta/shared";
 
-export interface LibraryDocument {
-  data: LibraryData;
-  updatedAt: string;
-  /** Public share link state — null until shared. Idempotent share (a
-   *  document that's already shared keeps its existing token) / plain
-   *  unshare, same shape as a mural's own shareToken/shareUrl
-   *  (lib/murals.ts's Mural). */
-  shareToken: string | null;
-  shareUrl: string | null;
-}
+export type { LibraryDocument } from "@scripta/shared";
 
 export const LIBRARY_REFRESH_PATH = "/library?fresh=1";
 

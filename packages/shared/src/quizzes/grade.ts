@@ -1,4 +1,4 @@
-import type { QuizQuestion, SubmittedAnswer } from "./types.js";
+import type { SubmittedAnswer } from "./types.js";
 
 export interface GradeResult {
   score: number;
@@ -6,7 +6,7 @@ export interface GradeResult {
   correct: Record<string, boolean>;
 }
 
-export function gradeAnswers(questions: QuizQuestion[], submitted: SubmittedAnswer[]): GradeResult {
+export function gradeAnswers(questions: Array<{ id: string; answerIndex: number }>, submitted: SubmittedAnswer[]): GradeResult {
   const byId = new Map(questions.map((q) => [q.id, q]));
   const correct: Record<string, boolean> = {};
   let score = 0;

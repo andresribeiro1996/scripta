@@ -65,10 +65,10 @@ export function QuizEditorPage() {
     });
   }
 
-  function patchBook(bookKey: string, patch: { quote?: string | null; blurb?: string | null }): void {
+  function patchBook(workId: string, patch: { quote?: string | null; blurb?: string | null }): void {
     updateDraft((current) => ({
       ...current,
-      books: current.books.map((book) => (book.key === bookKey ? { ...book, ...patch } : book))
+      books: current.books.map((book) => (book.workId === workId ? { ...book, ...patch } : book))
     }));
   }
 
@@ -169,7 +169,7 @@ export function QuizEditorPage() {
             </div>
 
             {data.books.map((book) => (
-              <div key={book.key} className="rounded-xl border border-(--color-border) bg-(--color-surface) p-4">
+              <div key={book.workId} className="rounded-xl border border-(--color-border) bg-(--color-surface) p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <h3 className="font-semibold">{book.title}</h3>
@@ -177,7 +177,7 @@ export function QuizEditorPage() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => updateDraft((current) => ({ ...current, books: current.books.filter((entry) => entry.key !== book.key) }))}
+                    onClick={() => updateDraft((current) => ({ ...current, books: current.books.filter((entry) => entry.workId !== book.workId) }))}
                     className="min-h-9 rounded-lg border border-(--color-border) px-3 text-sm"
                   >
                     Remove
@@ -191,7 +191,7 @@ export function QuizEditorPage() {
                     placeholder="Paste a line from this book…"
                     onBlur={(event) => {
                       const value = event.target.value.trim();
-                      if (value !== (book.quote ?? "")) patchBook(book.key, { quote: value || null });
+                      if (value !== (book.quote ?? "")) patchBook(book.workId, { quote: value || null });
                     }}
                     className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2"
                   />
@@ -203,7 +203,7 @@ export function QuizEditorPage() {
                     defaultValue={book.blurb ?? ""}
                     onBlur={(event) => {
                       const value = event.target.value.trim();
-                      if (value !== (book.blurb ?? "")) patchBook(book.key, { blurb: value || null });
+                      if (value !== (book.blurb ?? "")) patchBook(book.workId, { blurb: value || null });
                     }}
                     className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2"
                   />

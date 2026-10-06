@@ -156,3 +156,31 @@ test("public mural payload carries the reader card without leaking titles or ser
     db.close();
   }
 });
+
+test("a shared mural's tier-list block carries canonical works and resolves its books", async () => {
+  const { resolveWorks } = await import("../books/index.js");
+  const [target, other] = ["Wall Target", "Wall Other"].map((title) => resolveWorks([{ isbn: null, title, author: "Someone" }])[0]!) as [string, string];
+  const library = openLibraryDb();
+  const insertBook = library.prepare("INSERT INTO library_books (user_id, position, book_key, title, author, row_hash, work_id) VALUES ('wallOwner', ?, ?, ?, 'Someone', 'h', ?)");
+  insertBook.run(0, "ta:wall target|someone", "Wall Target", target);
+  insertBook.run(1, "ta:wall other|someone", "Wall Other", other);
+  library.prepare("INSERT INTO library_summary (user_id, meta, total_books, finished_count, in_progress_count, total_highlights, source_updated_at, rows_version) VALUES ('wallOwner', '{}', 2, 0, 0, 0, '2026-01-01', 1)").run();
+  const db = new DatabaseSync(":memory:");
+  db.exec(readFileSync(new URL("./adapters/sqlite/schema.sql", import.meta.url), "utf8"));
+  const service = createMuralsService(createSqliteMuralsRepository(db), (token) => `https://example.test/shared/${token}`, () => "light");
+  const data = { name: "On the wall", tiers: [{ id: "s", label: "S", color: "#000000", workIds: [target] }], pool: [other] };
+  const app = Fastify();
+  await app.register(buildPublicMuralRoutes(service, () => data));
+  try {
+    const home = service.createMural("wallOwner", "Wall");
+    service.updateMural("wallOwner", home.id, { blocks: [{ id: "t", type: "tierlist", tierlistId: "tl-wall", layout: { x: 0, y: 0, w: 8, h: 5 } }], updatedAt: home.updatedAt });
+    const { shareToken } = service.share("wallOwner", home.id)!;
+    const shared = (await app.inject({ method: "GET", url: `/murals/shared/${shareToken}` })).json();
+    assert.deepEqual(shared.tierlists, { "tl-wall": data });
+    assert.deepEqual(shared.books.map((book: { key: string }) => book.key).sort(), ["ta:wall other|someone", "ta:wall target|someone"]);
+  } finally {
+    await app.close();
+    db.close();
+    library.close();
+  }
+});

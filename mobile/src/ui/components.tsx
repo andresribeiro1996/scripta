@@ -91,9 +91,11 @@ const RevealField = createContext<((field: View) => void) | null>(null);
 export function FormScroll({
   children,
   contentContainerStyle,
+  scrollToEnd = false,
 }: {
   children: ReactNode;
   contentContainerStyle?: ViewStyle;
+  scrollToEnd?: boolean;
 }) {
   const frame = useRef<View>(null);
   const scroll = useRef<ScrollView>(null);
@@ -125,6 +127,10 @@ export function FormScroll({
       );
     });
   }, []);
+
+  useEffect(() => {
+    if (scrollToEnd) requestAnimationFrame(() => scroll.current?.scrollToEnd({ animated: true }));
+  }, [scrollToEnd]);
 
   useEffect(() => {
     const measureOverlap = (keyboardTop: number) => {
@@ -806,8 +812,8 @@ const styles = StyleSheet.create({
   closeText: { ...typography.body, fontWeight: "600" },
   toast: { borderRadius: radii.md, borderWidth: 1, paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
   state: { flexGrow: 1, justifyContent: "center", paddingVertical: spacing.xxl, paddingHorizontal: spacing.lg },
-  emptyCard: { alignItems: "center", gap: spacing.md },
-  errorCard: { alignItems: "center", gap: spacing.md, borderRadius: radii.lg, padding: spacing.lg },
+  emptyCard: { alignItems: "stretch", gap: spacing.md },
+  errorCard: { alignItems: "stretch", gap: spacing.md, borderRadius: radii.lg, padding: spacing.lg },
   stateTitle: { ...typography.title, fontWeight: "700", textAlign: "center", alignSelf: "stretch" },
   centerText: { textAlign: "center" },
   banner: { minHeight: minimumTouchTarget, justifyContent: "center", paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },

@@ -8,7 +8,7 @@ export function tierlistShareRows(data: TierlistData, histogram?: HistogramCell[
   if (!histogram) return { tiers: data.tiers, extra: data.pool };
   const results = aggregate(histogram, data.tiers.map((tier) => tier.id), data.pool, mode);
   return {
-    tiers: data.tiers.map((tier) => ({ ...tier, bookKeys: results.filter((result) => result.tierId === tier.id).map((result) => result.bookKey) })),
-    extra: results.filter((result) => result.tierId === null).map((result) => result.bookKey),
+    tiers: data.tiers.map((tier) => ({ ...tier, workIds: results.filter((result) => result.tierId === tier.id).map((result) => result.workId) })),
+    extra: results.filter((result) => result.tierId === null).map((result) => result.workId),
   };
 }

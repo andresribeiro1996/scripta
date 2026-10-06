@@ -63,13 +63,13 @@ async function testApp() {
   let stored: unknown = null;
   let storedAt = "2026-01-01T00:00:00.000Z";
   const service = {
-    getLibrary: () => stored ? { data: stored, updatedAt: storedAt, shareToken: null, shareUrl: null } : null,
-    getLibraryText: () => stored ? { data: JSON.stringify(stored), updatedAt: storedAt, shareToken: null, shareUrl: null } : null,
+    getLibrary: () => stored ? { data: stored, updatedAt: storedAt, shareToken: null, shareUrl: null, works: {} } : null,
+    getLibraryText: () => stored ? { data: JSON.stringify(stored), updatedAt: storedAt, shareToken: null, shareUrl: null, works: {} } : null,
     saveLibrary: (_userId: string, data: unknown, expectedUpdatedAt?: string) => {
       if (stored && expectedUpdatedAt !== storedAt) throw new LibraryConflictError();
       stored = data;
       storedAt = new Date(Date.parse(storedAt) + 1).toISOString();
-      return { data: JSON.stringify(data), updatedAt: storedAt, shareToken: null, shareUrl: null };
+      return { data: JSON.stringify(data), updatedAt: storedAt, shareToken: null, shareUrl: null, works: {} };
     },
     share: () => { throw new Error("not used"); },
     unshare: () => undefined,

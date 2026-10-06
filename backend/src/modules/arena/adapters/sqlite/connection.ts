@@ -7,6 +7,7 @@ import { mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { env } from "../../../../config/env.js";
+import { migrateArenaToWorks } from "./worksPass.js";
 
 const adapterDir = dirname(fileURLToPath(import.meta.url));
 
@@ -33,6 +34,19 @@ export function applyArenaMigrations(db: DatabaseSync): void {
     db.exec(`ALTER TABLE tournaments ADD COLUMN name_key TEXT`);
   }
 
+  const slotColumns = db.prepare(`PRAGMA table_info(tournament_slots)`).all() as { name: string }[];
+  if (slotColumns.some((column) => column.name === "book_key")) {
+    if (!slotColumns.some((column) => column.name === "work_id")) {
+      db.exec(`ALTER TABLE tournament_slots ADD COLUMN work_id TEXT`);
+    }
+    const duelColumns = db.prepare(`PRAGMA table_info(duels)`).all() as { name: string }[];
+    for (const column of ["book_a_work_id", "book_b_work_id", "winner_work_id"]) {
+      if (!duelColumns.some((existing) => existing.name === column)) {
+        db.exec(`ALTER TABLE duels ADD COLUMN ${column} TEXT`);
+      }
+    }
+  }
+
   const votesExists = db
     .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='votes'`)
     .get() as { name: string } | undefined;
@@ -57,6 +71,8 @@ export function applyArenaMigrations(db: DatabaseSync): void {
       );
     }
   }
+
+  migrateArenaToWorks(db);
 
   const schema = readFileSync(`${adapterDir}/schema.sql`, "utf8");
   db.exec(schema);

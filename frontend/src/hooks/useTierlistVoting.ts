@@ -40,7 +40,7 @@ export function useTierlistVoting(code: string) {
     retry: false
   });
 
-  async function submit(placements: Array<{ bookKey: string; tierId: string }>): Promise<BallotResponse> {
+  async function submit(placements: Array<{ workId: string; tierId: string }>): Promise<BallotResponse> {
     const response = await submitBallotApi(code, placements, storedBallotId);
     localStorage.setItem(ballotStorageKey(code), response.ballotId);
     setSubmitted(response);

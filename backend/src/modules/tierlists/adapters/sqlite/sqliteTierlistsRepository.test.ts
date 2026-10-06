@@ -91,7 +91,7 @@ function row(overrides: Partial<TierlistRow> & { id: string }): TierlistRow {
     owner_user_id: "u1",
     origin_user_id: "u1",
     name: "List",
-    data: JSON.stringify({ tiers: [{ id: "s", label: "S", color: "#fff", bookKeys: [] }], pool: ["b1", "b2"] }),
+    data: JSON.stringify({ tiers: [{ id: "s", label: "S", color: "#fff", workIds: [] }], pool: ["b1", "b2"] }),
     vote_code: null,
     vote_access: "anonymous",
     voting_open: 0,
@@ -104,7 +104,7 @@ function row(overrides: Partial<TierlistRow> & { id: string }): TierlistRow {
   };
 }
 
-function insertPublished(repo: ReturnType<typeof createSqliteTierlistsRepository>, item: TierlistRow, vote: BallotRow, placements: { bookKey: string; tierId: string }[]) {
+function insertPublished(repo: ReturnType<typeof createSqliteTierlistsRepository>, item: TierlistRow, vote: BallotRow, placements: { workId: string; tierId: string }[]) {
   repo.insert(item);
   repo.saveBallot(vote, placements);
 }
@@ -124,8 +124,8 @@ test("publish updates one row with its seeded ballot atomically", () => {
   const published = repo.publish("c1", "u1", row({ id: "c1" }).data, "anonymous", "abc12345", "[]",
     ballot({ id: "bal1", tierlist_id: "c1", voter_user_id: "u1" }),
     [
-      { bookKey: "b1", tierId: "s" },
-      { bookKey: "b2", tierId: "s" }
+      { workId: "b1", tierId: "s" },
+      { workId: "b2", tierId: "s" }
     ]
   );
 
@@ -134,8 +134,8 @@ test("publish updates one row with its seeded ballot atomically", () => {
   assert.equal(repo.getByVoteCode("abc12345")?.id, "c1");
   assert.equal(repo.ballotCount("c1"), 1);
   assert.deepEqual(repo.getPlacements("bal1"), [
-    { bookKey: "b1", tierId: "s" },
-    { bookKey: "b2", tierId: "s" }
+    { workId: "b1", tierId: "s" },
+    { workId: "b2", tierId: "s" }
   ]);
   assert.equal(repo.publish("c1", "u1", "{}", "members", "second", "[]", ballot({ id: "bal2", tierlist_id: "c1" }), []), undefined);
 });
@@ -143,7 +143,7 @@ test("publish updates one row with its seeded ballot atomically", () => {
 test("promotion removes creator control and preserves public results", () => {
   const repo = createSqliteTierlistsRepository(freshDb());
   insertPublished(repo, row({ id: "c1", vote_code: "code", voting_open: 1 }), ballot({ id: "owner", tierlist_id: "c1", voter_user_id: "u1" }), []);
-  repo.saveBallot(ballot({ id: "reader", tierlist_id: "c1", voter_user_id: "u2" }), [{ bookKey: "b1", tierId: "s" }]);
+  repo.saveBallot(ballot({ id: "reader", tierlist_id: "c1", voter_user_id: "u2" }), [{ workId: "b1", tierId: "s" }]);
   assert.equal(repo.eligibleVoteCount("c1", "u1"), 1);
   repo.promote("c1", "2026-02-01T00:00:00.000Z");
   assert.equal(repo.getOwned("c1", "u1"), undefined);
@@ -156,7 +156,7 @@ test("promotion removes creator control and preserves public results", () => {
 
 test("creator deletion removes a public list and its ballots before promotion", () => {
   const repo = createSqliteTierlistsRepository(freshDb());
-  insertPublished(repo, row({ id: "c1", vote_code: "code", voting_open: 1 }), ballot({ id: "v1", tierlist_id: "c1", voter_user_id: "u2" }), [{ bookKey: "b1", tierId: "s" }]);
+  insertPublished(repo, row({ id: "c1", vote_code: "code", voting_open: 1 }), ballot({ id: "v1", tierlist_id: "c1", voter_user_id: "u2" }), [{ workId: "b1", tierId: "s" }]);
   assert.equal(repo.delete("c1", "u1"), true);
   assert.equal(repo.getByVoteCode("code"), undefined);
   assert.equal(repo.ballotCount("c1"), 0);
@@ -171,27 +171,27 @@ test("getByVoteCode returns undefined for an unknown code", () => {
 test("histogram counts each book-tier pair across ballots", () => {
   const repo = createSqliteTierlistsRepository(freshDb());
   insertPublished(repo, row({ id: "c1", vote_code: "code", voting_open: 1 }), ballot({ id: "bal1", tierlist_id: "c1" }), [
-    { bookKey: "b1", tierId: "s" }
+    { workId: "b1", tierId: "s" }
   ]);
   repo.saveBallot(ballot({ id: "bal2", tierlist_id: "c1" }), [
-    { bookKey: "b1", tierId: "s" },
-    { bookKey: "b2", tierId: "a" }
+    { workId: "b1", tierId: "s" },
+    { workId: "b2", tierId: "a" }
   ]);
 
   const cells = repo.histogram("c1");
-  assert.equal(cells.find((c) => c.bookKey === "b1" && c.tierId === "s")?.votes, 2);
-  assert.equal(cells.find((c) => c.bookKey === "b2" && c.tierId === "a")?.votes, 1);
+  assert.equal(cells.find((c) => c.workId === "b1" && c.tierId === "s")?.votes, 2);
+  assert.equal(cells.find((c) => c.workId === "b2" && c.tierId === "a")?.votes, 1);
   assert.equal(repo.ballotCount("c1"), 2);
 });
 
 test("saveBallot replaces a ballot's placements rather than appending", () => {
   const repo = createSqliteTierlistsRepository(freshDb());
   insertPublished(repo, row({ id: "c1", vote_code: "code", voting_open: 1 }), ballot({ id: "bal1", tierlist_id: "c1" }), [
-    { bookKey: "b1", tierId: "s" }
+    { workId: "b1", tierId: "s" }
   ]);
-  repo.saveBallot(ballot({ id: "bal1", tierlist_id: "c1" }), [{ bookKey: "b1", tierId: "a" }]);
+  repo.saveBallot(ballot({ id: "bal1", tierlist_id: "c1" }), [{ workId: "b1", tierId: "a" }]);
 
-  assert.deepEqual(repo.getPlacements("bal1"), [{ bookKey: "b1", tierId: "a" }]);
+  assert.deepEqual(repo.getPlacements("bal1"), [{ workId: "b1", tierId: "a" }]);
   assert.equal(repo.ballotCount("c1"), 1);
 });
 
@@ -231,7 +231,7 @@ test("deleteUserData removes the user's tier lists with their ballots and unlink
   const repo = createSqliteTierlistsRepository(db);
   db.prepare(`INSERT INTO tierlists (id, owner_user_id, origin_user_id, name) VALUES ('mine', 'leaver', 'leaver', 'Mine'), ('theirs', 'stayer', 'stayer', 'Theirs'), ('copy', 'stayer', 'leaver', 'Copy')`).run();
   db.prepare(`INSERT INTO tierlist_ballots (id, tierlist_id, voter_user_id) VALUES ('b1', 'mine', 'stayer'), ('b2', 'theirs', 'leaver')`).run();
-  db.prepare(`INSERT INTO tierlist_ballot_placements (ballot_id, tierlist_id, book_key, tier_id) VALUES ('b1', 'mine', 'k', 'S'), ('b2', 'theirs', 'k', 'A')`).run();
+  db.prepare(`INSERT INTO tierlist_ballot_placements (ballot_id, tierlist_id, work_id, tier_id) VALUES ('b1', 'mine', 'k', 'S'), ('b2', 'theirs', 'k', 'A')`).run();
   repo.deleteUserData("leaver");
   assert.deepEqual(db.prepare(`SELECT id FROM tierlists ORDER BY id`).all().map((r) => r.id), ["copy", "theirs"]);
   assert.deepEqual(db.prepare(`SELECT id, voter_user_id FROM tierlist_ballots`).all().map((r) => ({ ...r })), [{ id: "b2", voter_user_id: null }]);
@@ -279,22 +279,6 @@ test("participation lists only the lists with a ballot created since the marker,
   assert.deepEqual(listed("2026-02-01T00:00:00.000Z"), [["busy", 2, "2026-02-10T00:00:00.000Z"]]);
   assert.deepEqual(listed("2026-02-10T00:00:00.000Z"), [["busy", 2, "2026-02-10T00:00:00.000Z"]]);
   assert.deepEqual(listed("2026-02-10T00:00:00.001Z"), []);
-});
-
-test("rekeyBooks rewrites the owner's unpublished tier lists only", async () => {
-  const { createSqliteTierlistsRepository } = await import("./sqliteTierlistsRepository.js");
-  const db = freshDb();
-  const insert = db.prepare("INSERT INTO tierlists (id, owner_user_id, origin_user_id, name, data, vote_code, created_at, updated_at) VALUES (?, ?, ?, 'n', ?, ?, 't0', 't0')");
-  const data = JSON.stringify({ tiers: [{ id: "s", label: "S", color: "#000000", bookKeys: ["old"] }], pool: ["new", "y"] });
-  insert.run("draft", "u1", "u1", data, null);
-  insert.run("published", "u1", "u1", data, "CODE1");
-  insert.run("other", "u2", "u2", data, null);
-  createSqliteTierlistsRepository(db).rekeyBooks("u1", ["old"], "new");
-  const read = (id: string) => db.prepare("SELECT data, updated_at FROM tierlists WHERE id = ?").get(id) as { data: string; updated_at: string };
-  assert.deepEqual(JSON.parse(read("draft").data), { tiers: [{ id: "s", label: "S", color: "#000000", bookKeys: ["new"] }], pool: ["y"] });
-  assert.notEqual(read("draft").updated_at, "t0");
-  assert.equal(read("published").data, data);
-  assert.equal(read("other").data, data);
 });
 
 function nameKey(db: DatabaseSync, id: string): string | null {
@@ -393,7 +377,7 @@ test("ballotTotalsFor counts ballots and eligible ballots for the requested tier
   publishedList(repo, "c2", "Two", "2026-02-01T00:00:00.000Z", { owner_user_id: "u9", origin_user_id: "u9" });
   publishedList(repo, "c3", "Three", "2026-03-01T00:00:00.000Z");
   repo.insert(row({ id: "empty", name: "Empty", vote_code: "code-empty", voting_open: 1 }));
-  const placed = [{ bookKey: "b1", tierId: "s" }];
+  const placed = [{ workId: "b1", tierId: "s" }];
   repo.saveBallot(ballot({ id: "c1-u2", tierlist_id: "c1", voter_user_id: "u2" }), placed);
   repo.saveBallot(ballot({ id: "c1-u3", tierlist_id: "c1", voter_user_id: "u3" }), []);
   repo.saveBallot(ballot({ id: "c1-anon", tierlist_id: "c1", voter_user_id: null }), placed);
@@ -446,4 +430,90 @@ test("a trigger that rolls the transaction back surfaces its own error and keeps
   assert.equal(repo.getByVoteCode("abc12345"), undefined);
   assert.equal(repo.listByUser("u1")[0]?.vote_code, null);
   assert.equal(db.isTransaction, false);
+});
+
+function workRows(db: DatabaseSync, tierlistId: string) {
+  return db.prepare("SELECT work_id FROM tierlist_works WHERE tierlist_id = ? ORDER BY work_id").all(tierlistId).map((r) => r.work_id);
+}
+
+const board = (tierWorks: string[], pool: string[]) => JSON.stringify({ tiers: [{ id: "s", label: "S", color: "#fff", workIds: tierWorks }], pool });
+
+test("insert and update replace the list's works with the ones on its board", () => {
+  const db = freshDb();
+  const repo = createSqliteTierlistsRepository(db);
+  repo.insert(row({ id: "t1", data: board(["a"], ["b"]) }));
+  assert.deepEqual(workRows(db, "t1"), ["a", "b"]);
+  repo.update("t1", "u1", { data: board([], ["b", "c"]) });
+  assert.deepEqual(workRows(db, "t1"), ["b", "c"]);
+  repo.update("t1", "u1", { name: "Renamed" });
+  assert.deepEqual(workRows(db, "t1"), ["b", "c"]);
+});
+
+test("an update on a list the user does not own writes no works", () => {
+  const db = freshDb();
+  const repo = createSqliteTierlistsRepository(db);
+  repo.insert(row({ id: "t1", data: board([], ["a"]) }));
+  assert.equal(repo.update("t1", "intruder", { data: board([], ["z"]) }), undefined);
+  assert.deepEqual(workRows(db, "t1"), ["a"]);
+});
+
+test("publish replaces the list's works with the board it publishes", () => {
+  const db = freshDb();
+  const repo = createSqliteTierlistsRepository(db);
+  repo.insert(row({ id: "t1", data: board(["a"], ["b"]) }));
+  repo.publish("t1", "u1", board([], ["b", "a"]), "anonymous", "code1", "[]", ballot({ id: "bal1", tierlist_id: "t1", voter_user_id: "u1" }), [{ workId: "a", tierId: "s" }]);
+  assert.deepEqual(workRows(db, "t1"), ["a", "b"]);
+});
+
+test("a ballot's placements are stored and counted by work", () => {
+  const db = freshDb();
+  const repo = createSqliteTierlistsRepository(db);
+  repo.insert(row({ id: "t1", vote_code: "code1", voting_open: 1, data: board([], ["w1", "w2"]) }));
+  repo.saveBallot(ballot({ id: "bal1", tierlist_id: "t1" }), [{ workId: "w1", tierId: "s" }, { workId: "w2", tierId: "s" }]);
+  assert.deepEqual(db.prepare("SELECT work_id, tier_id FROM tierlist_ballot_placements WHERE ballot_id = 'bal1' ORDER BY work_id").all().map((r) => ({ ...r })), [{ work_id: "w1", tier_id: "s" }, { work_id: "w2", tier_id: "s" }]);
+  assert.deepEqual(repo.histogram("t1").map((c) => [c.workId, c.tierId, c.votes]).sort(), [["w1", "s", 1], ["w2", "s", 1]]);
+});
+
+test("deleting a list or a user's data clears its works", () => {
+  const db = freshDb();
+  const repo = createSqliteTierlistsRepository(db);
+  repo.insert(row({ id: "t1", data: board([], ["a"]) }));
+  assert.equal(repo.delete("t1", "u1"), true);
+  assert.deepEqual(workRows(db, "t1"), []);
+  repo.insert(row({ id: "t2", data: board([], ["a"]) }));
+  repo.deleteUserData("u1");
+  assert.deepEqual(workRows(db, "t2"), []);
+});
+
+test("an E1-shaped tier-list database is migrated on open", () => {
+  const db = new DatabaseSync(":memory:");
+  db.exec(`
+    CREATE TABLE tierlists (id TEXT PRIMARY KEY, owner_user_id TEXT NOT NULL, origin_user_id TEXT NOT NULL, name TEXT NOT NULL, name_key TEXT, data TEXT NOT NULL DEFAULT '{}', vote_code TEXT, vote_access TEXT NOT NULL DEFAULT 'anonymous', voting_open INTEGER NOT NULL DEFAULT 0, source_tierlist_id TEXT, promoted_at TEXT, public_books TEXT, created_at TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL DEFAULT '');
+    CREATE TABLE tierlist_ballots (id TEXT PRIMARY KEY, tierlist_id TEXT NOT NULL, voter_user_id TEXT, created_at TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL DEFAULT '');
+    CREATE TABLE tierlist_ballot_placements (ballot_id TEXT NOT NULL REFERENCES tierlist_ballots(id) ON DELETE CASCADE, tierlist_id TEXT NOT NULL, book_key TEXT NOT NULL, tier_id TEXT NOT NULL, work_id TEXT, PRIMARY KEY (ballot_id, book_key));
+    CREATE TABLE tierlist_works (tierlist_id TEXT NOT NULL, key TEXT NOT NULL, work_id TEXT, PRIMARY KEY (tierlist_id, key));
+    CREATE INDEX idx_tierlist_placements_histogram ON tierlist_ballot_placements(tierlist_id, book_key, tier_id);
+    CREATE INDEX idx_tierlist_works_work ON tierlist_works(work_id);
+    CREATE INDEX idx_tierlist_placements_work ON tierlist_ballot_placements(work_id, tier_id);
+    INSERT INTO tierlists (id, owner_user_id, origin_user_id, name, data, vote_code, voting_open, public_books) VALUES
+      ('t1', 'u1', 'u1', 'Old', '{"tiers":[{"id":"s","label":"S","color":"#000000","bookKeys":[]}],"pool":["k1","k2","k3"]}', 'code1', 1, '[{"title":"A"},{"title":"A again"},{"title":"C"}]');
+    INSERT INTO tierlist_works VALUES ('t1', 'k1', 'w1'), ('t1', 'k2', 'w1'), ('t1', 'k3', 'w3');
+    INSERT INTO tierlist_ballots (id, tierlist_id) VALUES ('b1', 't1');
+    INSERT INTO tierlist_ballot_placements VALUES ('b1', 't1', 'k1', 's', 'w1'), ('b1', 't1', 'k3', 'a', 'w3');
+  `);
+  applyTierlistsMigrations(db);
+  applyTierlistsMigrations(db);
+  const repo = createSqliteTierlistsRepository(db);
+  assert.deepEqual(JSON.parse(repo.getByVoteCode("code1")!.data), { tiers: [{ id: "s", label: "S", color: "#000000", workIds: [] }], pool: ["w1", "w3"] });
+  assert.deepEqual(repo.histogram("t1").map((c) => [c.workId, c.tierId, c.votes]).sort(), [["w1", "s", 1], ["w3", "a", 1]]);
+  assert.deepEqual(workRows(db, "t1"), ["w1", "w3"]);
+  for (const table of ["tierlist_ballot_placements", "tierlist_works"]) {
+    assert.ok(!columnNames(db, table).includes("book_key"));
+    assert.ok(!columnNames(db, table).includes("key"));
+  }
+  const indexes = (db.prepare("SELECT name FROM sqlite_master WHERE type = 'index'").all() as Array<{ name: string }>).map((r) => r.name);
+  assert.ok(indexes.includes("idx_tierlist_placements_histogram"));
+  assert.ok(indexes.includes("idx_tierlist_works_work"));
+  assert.ok(!indexes.includes("idx_tierlist_placements_work"));
+  assert.ok((db.prepare("PRAGMA index_info(idx_tierlist_placements_histogram)").all() as Array<{ name: string }>).some((c) => c.name === "work_id"));
 });

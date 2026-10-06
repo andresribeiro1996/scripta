@@ -29,12 +29,14 @@ const empty = { byIsbn: async () => [], byTitle: async () => [] };
 function makeService(overrides: Partial<Deps> = {}) {
   const db = new DatabaseSync(":memory:");
   applyBooksMigrations(db);
+  const repo = createSqliteBooksRepository(db);
   const service = createBooksService({
-    repo: createSqliteBooksRepository(db),
+    repo,
     blobs: { save: async () => {} },
     sources: { isbndb: null, apple: empty, openlibrary: empty },
     catalog: { fetchDetails: async () => null, search: async () => [] },
     backgroundCatalog: { fetchDetails: async () => null, search: async () => [] },
+    editionRecords: { fetchEditionRecord: async () => null },
     fetchImage: async () => null,
     enqueue: () => {},
     publicUrlFor,
@@ -42,7 +44,7 @@ function makeService(overrides: Partial<Deps> = {}) {
     warn: () => {},
     ...overrides
   });
-  return { service };
+  return { service, repo };
 }
 
 async function call(service: ReturnType<typeof createBooksService>, options: InjectOptions, signedInAs?: string) {
@@ -141,4 +143,72 @@ test("the admin can upload a cover and non-images are refused", async () => {
   assert.match(ok.json().url, /-thumb\.webp$/);
   const bad = await call(service, { method: "PUT", url: "/books/cover?title=Dune&author=Frank%20Herbert", ...multipart(Buffer.from("nope")) }, "admin");
   assert.equal(bad.statusCode, 422);
+});
+
+test("only a signed-in admin may merge or detach works", async () => {
+  const { service } = makeService();
+  const merge = { method: "POST" as const, url: "/books/works/merge", payload: { from: { isbn: "9789720000001" }, into: { isbn: "9789720000002" } } };
+  const detach = { method: "POST" as const, url: "/books/works/detach", payload: { edition: { isbn: "9789720000001" } } };
+  assert.equal((await call(service, merge)).statusCode, 401);
+  assert.equal((await call(service, merge, "u1")).statusCode, 403);
+  assert.equal((await call(service, detach, "u1")).statusCode, 403);
+});
+
+test("the admin merges one edition's work into another's and gets the resulting work", async () => {
+  const { service, repo } = makeService();
+  const english = repo.createBook({ title: "Blindness", author: "José Saramago", isbn: "9780156007757", workKey: "OL1W" }, ["isbn:9780156007757"], "2026-10-01T00:00:00.000Z");
+  const portuguese = repo.createBook({ title: "Ensaio sobre a Cegueira", author: "José Saramago", isbn: "9789720000002" }, ["isbn:9789720000002"], "2026-10-02T00:00:00.000Z");
+  const res = await call(service, { method: "POST", url: "/books/works/merge", payload: { from: { isbn: "978-972-0-00000-2" }, into: { isbn: "9780156007757" } } }, "admin");
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.json(), {
+    id: english.work_id,
+    olWorkKey: "OL1W",
+    title: "Blindness",
+    author: "José Saramago",
+    editions: [
+      { id: english.id, isbn: "9780156007757", title: "Blindness", author: "José Saramago", olWorkKey: "OL1W" },
+      { id: portuguese.id, isbn: "9789720000002", title: "Ensaio sobre a Cegueira", author: "José Saramago", olWorkKey: null }
+    ]
+  });
+});
+
+test("merging answers 400 for a bad body, 404 for an unknown edition and 409 for a refused merge", async () => {
+  const { service, repo } = makeService();
+  repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593", workKey: "OL1W" }, ["isbn:9780441013593"], "2026-10-01T00:00:00.000Z");
+  repo.createBook({ title: "Emma", author: "Jane Austen", isbn: "9780141439587" }, ["isbn:9780141439587"], "2026-10-01T00:00:00.000Z");
+  const merge = (payload: unknown) => call(service, { method: "POST", url: "/books/works/merge", payload: payload as object }, "admin");
+  assert.equal((await merge({ from: { isbn: "9780441013593" } })).statusCode, 400);
+  assert.equal((await merge({ from: {}, into: { isbn: "9780441013593" } })).statusCode, 400);
+  assert.equal((await merge({ from: { isbn: "9789999999999" }, into: { isbn: "9780441013593" } })).statusCode, 404);
+  const keyed = await merge({ from: { isbn: "9780441013593" }, into: { isbn: "9780141439587" } });
+  assert.equal(keyed.statusCode, 409);
+  assert.match(keyed.json().error, /Open Library/);
+  assert.equal((await merge({ from: { isbn: "9780141439587" }, into: { isbn: "9780141439587" } })).statusCode, 409);
+});
+
+test("an admin lookup with an ISBN never falls back to another edition's title", async () => {
+  const { service, repo } = makeService();
+  repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593", workKey: "OL1W" }, ["isbn:9780441013593", "ta:dune|frank herbert|"], "2026-10-01T00:00:00.000Z");
+  repo.createBook({ title: "Emma", author: "Jane Austen", isbn: "9780141439587" }, ["isbn:9780141439587"], "2026-10-01T00:00:00.000Z");
+  const res = await call(service, { method: "POST", url: "/books/works/merge", payload: { from: { isbn: "9789999999999", title: "Dune", author: "Frank Herbert" }, into: { isbn: "9780141439587" } } }, "admin");
+  assert.equal(res.statusCode, 404);
+  for (const isbn of ["123", "not-an-isbn"]) {
+    const bad = await call(service, { method: "POST", url: "/books/works/merge", payload: { from: { isbn, title: "Dune", author: "Frank Herbert" }, into: { isbn: "9780141439587" } } }, "admin");
+    assert.equal(bad.statusCode, 404);
+  }
+});
+
+test("the admin detaches an edition from a grouped work, and a keyed edition is refused", async () => {
+  const { service, repo } = makeService();
+  const keyed = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593", workKey: "OL1W" }, ["isbn:9780441013593"], "2026-10-01T00:00:00.000Z");
+  const joined = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780593099322" }, ["isbn:9780593099322"], "2026-10-01T00:00:00.000Z");
+  repo.mergeWorks(joined.work_id!, keyed.work_id!);
+  const res = await call(service, { method: "POST", url: "/books/works/detach", payload: { edition: { isbn: "9780593099322" } } }, "admin");
+  assert.equal(res.statusCode, 200);
+  assert.notEqual(res.json().id, keyed.work_id);
+  assert.deepEqual(res.json().editions.map((e: { id: string }) => e.id), [joined.id]);
+  assert.notEqual(repo.getBook(joined.id)!.title_group_blocked_at, null);
+  assert.equal((await call(service, { method: "POST", url: "/books/works/detach", payload: { edition: { isbn: "9780441013593" } } }, "admin")).statusCode, 409);
+  assert.equal((await call(service, { method: "POST", url: "/books/works/detach", payload: { edition: {} } }, "admin")).statusCode, 400);
+  assert.equal((await call(service, { method: "POST", url: "/books/works/detach", payload: { edition: { isbn: "9789999999999" } } }, "admin")).statusCode, 404);
 });

@@ -45,10 +45,10 @@ export function ArenaViewPage() {
 
   const isOwner = session?.user.id === tournament.ownerUserId;
 
-  async function handleVote(duelId: string, bookKey: string) {
+  async function handleVote(duelId: string, workId: string) {
     setVoteError(null);
     try {
-      await vote(duelId, bookKey);
+      await vote(duelId, workId);
     } catch (err) {
       setVoteError(err instanceof Error ? err.message : "Couldn't record that vote.");
     }
@@ -87,11 +87,11 @@ export function ArenaViewPage() {
     }
   }
 
-  async function handleTiebreak(duelId: string, winnerBookKey: string) {
+  async function handleTiebreak(duelId: string, winnerWorkId: string) {
     setBusyDuelId(duelId);
     setOwnerActionError(null);
     try {
-      await resolveTiebreak(tournament!.id, duelId, winnerBookKey);
+      await resolveTiebreak(tournament!.id, duelId, winnerWorkId);
       await refetch();
     } catch (err) {
       setOwnerActionError(err instanceof Error ? err.message : "Couldn't resolve that tie.");
@@ -192,7 +192,7 @@ export function ArenaViewPage() {
         ) : (
           <BracketMap
             tournament={tournament}
-            onVote={(duelId, bookKey) => void handleVote(duelId, bookKey)}
+            onVote={(duelId, workId) => void handleVote(duelId, workId)}
             votingDuelId={busyDuelId}
           />
         ))}
@@ -207,7 +207,7 @@ export function ArenaViewPage() {
             <div>
               <DuelCard
                 duel={duel}
-                onVote={(bookKey) => void handleVote(duel.id, bookKey)}
+                onVote={(workId) => void handleVote(duel.id, workId)}
                 votingDisabledReason={votingDisabledReason}
                 onAddBook={setPicked}
               />
@@ -223,15 +223,15 @@ export function ArenaViewPage() {
               {isOwner && duel.status === "tied_pending_tiebreak" && (
                 <div className="mt-2 flex gap-2">
                   <button
-                    onClick={() => void handleTiebreak(duel.id, duel.bookA.key)}
-                    disabled={busyDuelId === duel.id}
+                    onClick={() => void handleTiebreak(duel.id, duel.bookA.workId!)}
+                    disabled={busyDuelId === duel.id || duel.bookA.workId === null}
                     className="flex-1 rounded-lg bg-(--color-accent) py-2 text-xs font-medium text-(--color-on-accent)"
                   >
                     {duel.bookA.title} wins
                   </button>
                   <button
-                    onClick={() => void handleTiebreak(duel.id, duel.bookB.key)}
-                    disabled={busyDuelId === duel.id}
+                    onClick={() => void handleTiebreak(duel.id, duel.bookB.workId!)}
+                    disabled={busyDuelId === duel.id || duel.bookB.workId === null}
                     className="flex-1 rounded-lg bg-(--color-accent) py-2 text-xs font-medium text-(--color-on-accent)"
                   >
                     {duel.bookB.title} wins

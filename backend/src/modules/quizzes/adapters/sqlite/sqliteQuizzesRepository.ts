@@ -17,6 +17,8 @@ export function createSqliteQuizzesRepository(db: DatabaseSync): QuizzesReposito
   const updateStmt = db.prepare(`UPDATE quizzes SET name = $name, data = $data, updated_at = $updated_at WHERE id = $id AND owner_user_id = $owner_user_id`);
   const deleteQuizStmt = db.prepare(`DELETE FROM quizzes WHERE id = ? AND owner_user_id = ?`);
   const deletePlaysStmt = db.prepare(`DELETE FROM quiz_plays WHERE quiz_id = ?`);
+  const deleteWorksStmt = db.prepare(`DELETE FROM quiz_works WHERE quiz_id = ?`);
+  const insertWorkStmt = db.prepare(`INSERT OR IGNORE INTO quiz_works (quiz_id, work_id) VALUES (?, ?)`);
   const deleteAnswersStmt = db.prepare(`DELETE FROM quiz_play_answers WHERE quiz_id = ?`);
   const getByVoteCodeStmt = db.prepare(`SELECT * FROM quizzes WHERE vote_code = ?`);
   const publishStmt = db.prepare(`UPDATE quizzes SET data = ?, vote_code = ?, play_open = 1, updated_at = ? WHERE id = ? AND owner_user_id = ? AND vote_code IS NULL`);
@@ -54,6 +56,30 @@ export function createSqliteQuizzesRepository(db: DatabaseSync): QuizzesReposito
 
   const now = (): string => new Date().toISOString();
 
+  function setWorks(quizId: string, workIds: string[]): void {
+    deleteWorksStmt.run(quizId);
+    for (const workId of workIds) insertWorkStmt.run(quizId, workId);
+  }
+
+  function bookWorkIds(data: string): string[] {
+    const books = (JSON.parse(data) as { books?: unknown }).books;
+    if (!Array.isArray(books)) return [];
+    return books.flatMap((book: { workId?: unknown } | null) => (typeof book?.workId === "string" ? [book.workId] : []));
+  }
+
+  function inTransaction<T>(write: () => T): T {
+    if (db.isTransaction) return write();
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      const result = write();
+      db.exec("COMMIT");
+      return result;
+    } catch (error) {
+      if (db.isTransaction) db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
   return {
     listByUser(userId) {
       return listStmt.all(userId) as unknown as QuizRow[];
@@ -68,30 +94,37 @@ export function createSqliteQuizzesRepository(db: DatabaseSync): QuizzesReposito
     },
 
     insert(row) {
-      insertStmt.run({
-        $id: row.id,
-        $owner_user_id: row.owner_user_id,
-        $name: row.name,
-        $data: row.data,
-        $vote_code: row.vote_code,
-        $play_open: row.play_open,
-        $created_at: row.created_at,
-        $updated_at: row.updated_at
+      inTransaction(() => {
+        insertStmt.run({
+          $id: row.id,
+          $owner_user_id: row.owner_user_id,
+          $name: row.name,
+          $data: row.data,
+          $vote_code: row.vote_code,
+          $play_open: row.play_open,
+          $created_at: row.created_at,
+          $updated_at: row.updated_at
+        });
+        setWorks(row.id, bookWorkIds(row.data));
       });
     },
 
     update(id, userId, patch) {
-      const existing = getOwnedStmt.get(id, userId) as QuizRow | undefined;
-      if (!existing || existing.vote_code !== null) return undefined;
-      const merged: QuizRow = { ...existing, ...patch, updated_at: now() };
-      updateStmt.run({ $id: id, $owner_user_id: userId, $name: merged.name, $data: merged.data, $updated_at: merged.updated_at });
-      return merged;
+      return inTransaction(() => {
+        const existing = getOwnedStmt.get(id, userId) as QuizRow | undefined;
+        if (!existing || existing.vote_code !== null) return undefined;
+        const merged: QuizRow = { ...existing, ...patch, updated_at: now() };
+        updateStmt.run({ $id: id, $owner_user_id: userId, $name: merged.name, $data: merged.data, $updated_at: merged.updated_at });
+        if (patch.data !== undefined) setWorks(id, bookWorkIds(merged.data));
+        return merged;
+      });
     },
 
     delete(id, userId) {
       if (!getOwnedStmt.get(id, userId)) return false;
       db.exec("BEGIN IMMEDIATE");
       try {
+        deleteWorksStmt.run(id);
         deleteAnswersStmt.run(id);
         deletePlaysStmt.run(id);
         const result = deleteQuizStmt.run(id, userId);
@@ -103,32 +136,6 @@ export function createSqliteQuizzesRepository(db: DatabaseSync): QuizzesReposito
       }
     },
 
-    rekeyBooks(userId, fromKeys, toKey) {
-      const from = new Set(fromKeys);
-      const now = new Date().toISOString();
-      const update = db.prepare("UPDATE quizzes SET data = ?, updated_at = ? WHERE id = ?");
-      db.exec("BEGIN IMMEDIATE");
-      try {
-        for (const row of db.prepare("SELECT id, data FROM quizzes WHERE owner_user_id = ? AND vote_code IS NULL").all(userId) as Array<{ id: string; data: string }>) {
-          const parsed = JSON.parse(row.data) as Record<string, unknown>;
-          if (!Array.isArray(parsed.books)) continue;
-          const seen = new Set<string>();
-          const books = parsed.books.flatMap((book: unknown) => {
-            if (typeof book !== "object" || book === null || typeof (book as { key?: unknown }).key !== "string") return [book];
-            const key = from.has((book as { key: string }).key) ? toKey : (book as { key: string }).key;
-            if (seen.has(key)) return [];
-            seen.add(key);
-            return [{ ...book, key }];
-          });
-          const after = JSON.stringify({ ...parsed, books });
-          if (after !== JSON.stringify(parsed)) update.run(after, now, row.id);
-        }
-        db.exec("COMMIT");
-      } catch (error) {
-        if (db.isTransaction) db.exec("ROLLBACK");
-        throw error;
-      }
-    },
     deleteUserData(userId) {
       // Own quizzes (with their plays and answers) go; the account's plays
       // on other people's quizzes are unlinked, not deleted — the
@@ -136,6 +143,7 @@ export function createSqliteQuizzesRepository(db: DatabaseSync): QuizzesReposito
       // same unlink-not-delete rule).
       db.exec("BEGIN IMMEDIATE");
       try {
+        db.prepare("DELETE FROM quiz_works WHERE quiz_id IN (SELECT id FROM quizzes WHERE owner_user_id = ?)").run(userId);
         db.prepare("DELETE FROM quiz_play_answers WHERE quiz_id IN (SELECT id FROM quizzes WHERE owner_user_id = ?)").run(userId);
         db.prepare("DELETE FROM quiz_plays WHERE quiz_id IN (SELECT id FROM quizzes WHERE owner_user_id = ?)").run(userId);
         db.prepare("DELETE FROM quizzes WHERE owner_user_id = ?").run(userId);

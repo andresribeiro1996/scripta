@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { bookKey, createTier, DEFAULT_TIER_PRESET, type TierlistData } from "@scripta/shared";
+import { createTier, DEFAULT_TIER_PRESET, workIdOf, type TierlistData, booksByWork } from "@scripta/shared";
 import { PageContainer } from "../components/PageContainer";
 import { useLibrary } from "../hooks/useLibrary";
 import { useTierlists } from "../hooks/useTierlists";
+import { useWorkBooks } from "../hooks/useWorkBooks";
 
 export function TierListCreatePage() {
   const navigate = useNavigate();
@@ -18,7 +19,8 @@ export function TierListCreatePage() {
   const [access, setAccess] = useState<"anonymous" | "members">("anonymous");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const books = library?.data.books ?? [];
+  const workBooks = useWorkBooks(library);
+  const books = useMemo(() => [...booksByWork(workBooks).values()], [workBooks]);
   const needle = search.trim().toLowerCase();
   const filtered = books.filter((book) => !needle || String(book.Title ?? "").toLowerCase().includes(needle) || String(book.Attribution ?? "").toLowerCase().includes(needle));
 
@@ -52,7 +54,7 @@ export function TierListCreatePage() {
         </label>
         {isLoading ? <p>Loading books…</p> : isError ? <button onClick={() => void refetch()} className="text-left text-(--color-accent)">Couldn't load your library. Retry</button> : <div className="max-h-[50vh] space-y-2 overflow-y-auto">
           {filtered.map((book) => {
-            const key = bookKey(book);
+            const key = workIdOf(book)!;
             const checked = pool.includes(key);
             return <button key={key} type="button" aria-pressed={checked} onClick={() => setPool((value) => checked ? value.filter((entry) => entry !== key) : [...value, key])} className={`flex min-h-12 w-full items-center justify-between rounded-lg border px-3 py-2 text-left ${checked ? "border-(--color-accent) bg-(--color-accent-soft)" : "border-(--color-border) bg-(--color-surface)"}`}>
               <span className="truncate">{String(book.Title ?? "Untitled")}</span><span aria-hidden="true">{checked ? "✓" : "+"}</span>

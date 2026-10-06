@@ -22,15 +22,18 @@ const POLL_INTERVAL_MS = 1000;
 // Entities are decoded because a label like "Can't reach the server" arrives
 // as "Can&apos;t reach the server", and nobody writing a --text argument
 // should have to know that.
+export function decodeEntities(value) {
+  return value
+    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+    .replaceAll("&quot;", '"')
+    .replaceAll("&apos;", "'")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&amp;", "&");
+}
+
 export function parseScreenText(xml) {
-  const decode = (value) =>
-    value
-      .replaceAll("&quot;", '"')
-      .replaceAll("&apos;", "'")
-      .replaceAll("&lt;", "<")
-      .replaceAll("&gt;", ">")
-      .replaceAll("&amp;", "&");
-  return [...xml.matchAll(/text="([^"]*)"/g)].map((match) => decode(match[1])).filter((text) => text !== "");
+  return [...xml.matchAll(/text="([^"]*)"/g)].map((match) => decodeEntities(match[1])).filter((text) => text !== "");
 }
 
 export function screenHasText(xml, needle) {
@@ -38,18 +41,22 @@ export function screenHasText(xml, needle) {
   return parseScreenText(xml).some((text) => text.toLowerCase().includes(wanted));
 }
 
+function runAdb(command, args, options) {
+  return execFileSync(command, args, { ...options, env: { ...process.env, ...androidEnv(), LC_ALL: "C" } });
+}
+
 // Bounded and never throwing, like the other adb reads here: a device that is
 // mid-reboot, or an app that is not drawing yet, is "no text on screen" — a
 // state to keep polling through, not an error to abort on.
-export function readScreenText(serial, { exec = execFileSync, timeoutMs = 10000 } = {}) {
+export function readScreenText(serial, { exec = runAdb, timeoutMs = 10000 } = {}) {
   const run = (args) =>
     exec("adb", ["-s", serial, ...args], {
       encoding: "utf8",
       timeout: timeoutMs,
-      env: { ...process.env, ...androidEnv(), LC_ALL: "C" },
       maxBuffer: 16 * 1024 * 1024,
     });
   try {
+    run(["shell", "rm", "-f", "/sdcard/ui.xml"]);
     run(["shell", "uiautomator", "dump", "/sdcard/ui.xml"]);
     return run(["shell", "cat", "/sdcard/ui.xml"]) ?? "";
   } catch {

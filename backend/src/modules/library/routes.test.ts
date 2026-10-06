@@ -13,6 +13,7 @@ process.env.AUTH_DB_PATH = join(scratch, "auth.sqlite");
 process.env.LIBRARY_DB_PATH = join(scratch, "library.sqlite");
 process.env.GALLERY_DB_PATH = join(scratch, "gallery.sqlite");
 process.env.GALLERY_STORAGE_PATH = join(scratch, "gallery-files");
+process.env.COVERS_DB_PATH = join(scratch, "covers.sqlite");
 process.env.JWT_ACCESS_SECRET = "a".repeat(64);
 process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
@@ -62,7 +63,7 @@ async function setup() {
     app.inject({ method: "PUT", url: "/library", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, payload });
   const otherWrite = (index: number, token = "u1") =>
     app.inject({ ...otherWrites[index % otherWrites.length]!, headers: { authorization: `Bearer ${token}` }, payload: {} });
-  return { app, service, merge, addBook, put, otherWrite };
+  return { app, db, service, merge, addBook, put, otherWrite };
 }
 
 test("PUT /library saves a book whose fields aren't text", async () => {
@@ -438,5 +439,44 @@ test("a change that loses a race for the document answers 409", async () => {
   const res = await app.inject({ method: "PATCH", url: "/library/books", headers: { authorization: "Bearer u1" }, payload: { bookKey: bookKey(kobo), rating: 3 } });
   assert.equal(res.statusCode, 409);
   assert.ok((res.json() as { error: string }).error);
+  await app.close();
+});
+
+test("PUT and GET /library answer each copy's work id", async () => {
+  const { app, put } = await setup();
+  const saved = await put(JSON.stringify({ data: { books: [kobo] } }));
+  assert.equal(saved.statusCode, 200);
+  const workId = saved.json().works["ta:dune|frank herbert"];
+  assert.equal(typeof workId, "string");
+  const read = await app.inject({ method: "GET", url: "/library", headers: { authorization: "Bearer u1" } });
+  assert.deepEqual(read.json().works, { "ta:dune|frank herbert": workId });
+  await app.close();
+});
+
+const tagged = { Title: "Dune", Attribution: "Frank Herbert", ISBN: "9780441013593", ReadStatus: 2, _key: "isbn:9999999999999", _workId: "some-work" };
+const { _key: _ignoredKey, _workId: _ignoredWorkId, ...untagged } = tagged;
+
+function storedKeys(db: DatabaseSync): string[] {
+  return (db.prepare("SELECT book_key FROM library_books WHERE user_id = ? ORDER BY position").all("u1") as Array<{ book_key: string }>).map((row) => row.book_key);
+}
+
+test("PUT /library keys and stores a book without the client's _key and _workId", async () => {
+  const { app, db, put } = await setup();
+  const saved = await put(JSON.stringify({ data: { books: [tagged] } }));
+  assert.equal(saved.statusCode, 200);
+  assert.deepEqual(storedKeys(db), [bookKey(untagged)]);
+  assert.notEqual(storedKeys(db)[0], "isbn:9999999999999");
+  const read = await app.inject({ method: "GET", url: "/library", headers: { authorization: "Bearer u1" } });
+  assert.deepEqual(read.json().data.books, [untagged]);
+  await app.close();
+});
+
+test("POST /library/books/add keys and stores a book without the client's _key and _workId", async () => {
+  const { app, db, add } = await changeSetup();
+  const res = await add({ book: tagged });
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(storedKeys(db), [bookKey(untagged)]);
+  const read = await app.inject({ method: "GET", url: "/library", headers: { authorization: "Bearer u1" } });
+  assert.deepEqual(read.json().data.books, [{ ...untagged, _order: 0 }]);
   await app.close();
 });

@@ -1,5 +1,5 @@
 export interface SeedBook {
-  key: string;
+  workId: string | null;
   title: string;
   author: string;
   cover: string | null;
@@ -15,7 +15,7 @@ export interface Duel {
   duelIndex: number;
   bookA: DuelSide;
   bookB: DuelSide;
-  winnerKey: string | null;
+  winnerWorkId: string | null;
   status: "active" | "tied_pending_tiebreak" | "settled";
   opensAt: string;
   closesAt: string;

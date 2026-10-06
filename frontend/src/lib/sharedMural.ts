@@ -12,6 +12,8 @@ export function toPrivateBook(pub: PublicBookData): Record<string, unknown> {
     ImageId: pub.imageId,
     _coverUrl: pub.coverUrl,
     ReadStatus: pub.readStatus,
+    _key: pub.key,
+    ...(pub.workId ? { _workId: pub.workId } : {}),
     highlights: [] as Array<Record<string, unknown>>
   };
 }

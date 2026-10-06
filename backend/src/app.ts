@@ -36,15 +36,15 @@ import {
   setDashboardSeenAt,
   userHasUsername
 } from "./modules/auth/index.js";
-import { deleteArenaUserData, getArenaPublicApi, registerArenaModule, rekeyArenaBooks } from "./modules/arena/index.js";
+import { deleteArenaUserData, getArenaPublicApi, registerArenaModule } from "./modules/arena/index.js";
 import { deleteCommunityUserData, getCommunityPublicApi, registerCommunityModule } from "./modules/community/index.js";
 import { enqueueBookCovers, registerBooksModule } from "./modules/books/index.js";
 import { deleteGalleryUserData, registerGalleryModule } from "./modules/gallery/index.js";
-import { deleteLibraryUserData, registerLibraryModule, resolvePublicLibrary, readerGlyphFor, sharedBookCounts, sharedBooks, type BookEvent } from "./modules/library/index.js";
-import { deleteMuralsUserData, getMuralsPublicApi, registerMuralsModule, rekeyMuralsBooks } from "./modules/murals/index.js";
-import { deleteQuizzesUserData, getQuizzesPublicApi, registerQuizzesModule, rekeyQuizzesBooks } from "./modules/quizzes/index.js";
+import { deleteLibraryUserData, registerLibraryModule, resolvePublicLibrary, readerGlyphFor, resolveEntryWorks, WorkResolutionError, sharedBookCounts, sharedBooks, startWorksSweep, sweepLibraryWorks, type BookEvent } from "./modules/library/index.js";
+import { deleteMuralsUserData, getMuralsPublicApi, registerMuralsModule, rekeyMuralsBooks, sweepMuralsWorks } from "./modules/murals/index.js";
+import { deleteQuizzesUserData, getQuizzesPublicApi, registerQuizzesModule } from "./modules/quizzes/index.js";
 import { deleteSocialsUserData, registerSocialsModule } from "./modules/socials/index.js";
-import { deleteTierlistsUserData, registerTierlistsModule, getTierlistsPublicApi, rekeyTierlistsBooks } from "./modules/tierlists/index.js";
+import { deleteTierlistsUserData, registerTierlistsModule, getTierlistsPublicApi } from "./modules/tierlists/index.js";
 import { registerWaitlistModule } from "./modules/waitlist/index.js";
 
 const genReqId = () => randomUUID();
@@ -93,7 +93,8 @@ export function buildApp() {
     // save that silently failed. curl can't catch this: it does no
     // preflight. Verify with an OPTIONS carrying Origin and
     // Access-Control-Request-Method instead.
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"]
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+    maxAge: 86400
   });
 
   app.get("/health", async () => ({ status: "ok" }));
@@ -120,6 +121,10 @@ export function buildApp() {
   // parse; everything else becomes an opaque 500 with the detail logged
   // server-side only.
   app.setErrorHandler((error: FastifyError, request, reply) => {
+    if (error instanceof WorkResolutionError) {
+      request.log.error(error);
+      return reply.code(503).send({ error: error.message });
+    }
     const statusCode = typeof error.statusCode === "number" && error.statusCode >= 400 && error.statusCode < 500 ? error.statusCode : 500;
     if (statusCode === 500) {
       request.log.error(error);
@@ -162,7 +167,13 @@ export function buildApp() {
       }
     },
     rekeyBooks: (userId: string, fromKeys: string[], toKey: string) => {
-      for (const rekey of [rekeyMuralsBooks, rekeyTierlistsBooks, rekeyArenaBooks, rekeyQuizzesBooks]) rekey(userId, fromKeys, toKey);
+      let toWork: string | null = null;
+      try {
+        toWork = resolveEntryWorks(userId, [{ key: toKey }]).get(toKey)?.workId ?? null;
+      } catch (error) {
+        if (!(error instanceof WorkResolutionError)) throw error;
+      }
+      rekeyMuralsBooks(userId, fromKeys, toKey, toWork);
     }
   });
   app.register(registerGalleryModule);
@@ -223,6 +234,11 @@ export function buildApp() {
     }
   });
   app.register(registerQuizzesModule);
+
+  const stopWorksSweep = startWorksSweep([sweepLibraryWorks, sweepMuralsWorks], app.log);
+  app.addHook("onClose", async () => {
+    stopWorksSweep();
+  });
 
   return app;
 }

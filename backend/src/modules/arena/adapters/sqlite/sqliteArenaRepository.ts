@@ -31,8 +31,8 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
 
   const deleteSlotsStmt = db.prepare(`DELETE FROM tournament_slots WHERE tournament_id = ?`);
   const insertSlotStmt = db.prepare(`
-    INSERT INTO tournament_slots (tournament_id, slot_index, book_key, title, author, cover_url)
-    VALUES ($tournament_id, $slot_index, $book_key, $title, $author, $cover_url)
+    INSERT INTO tournament_slots (tournament_id, slot_index, work_id, title, author, cover_url)
+    VALUES ($tournament_id, $slot_index, $work_id, $title, $author, $cover_url)
   `);
   const getSlotsStmt = db.prepare(`SELECT * FROM tournament_slots WHERE tournament_id = ? ORDER BY slot_index ASC`);
   // One statement for a whole page of cards. The IN list is built per call
@@ -46,10 +46,10 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
     );
 
   const insertDuelStmt = db.prepare(`
-    INSERT INTO duels (id, tournament_id, round_number, duel_index, book_a_key, book_a_title, book_a_author, book_a_cover,
-      book_b_key, book_b_title, book_b_author, book_b_cover, winner_key, status, opens_at, closes_at, settled_at)
-    VALUES ($id, $tournament_id, $round_number, $duel_index, $book_a_key, $book_a_title, $book_a_author, $book_a_cover,
-      $book_b_key, $book_b_title, $book_b_author, $book_b_cover, $winner_key, $status, $opens_at, $closes_at, $settled_at)
+    INSERT INTO duels (id, tournament_id, round_number, duel_index, book_a_work_id, book_a_title, book_a_author, book_a_cover,
+      book_b_work_id, book_b_title, book_b_author, book_b_cover, winner_side, status, opens_at, closes_at, settled_at)
+    VALUES ($id, $tournament_id, $round_number, $duel_index, $book_a_work_id, $book_a_title, $book_a_author, $book_a_cover,
+      $book_b_work_id, $book_b_title, $book_b_author, $book_b_cover, $winner_side, $status, $opens_at, $closes_at, $settled_at)
   `);
   const getDuelStmt = db.prepare(`SELECT * FROM duels WHERE id = ?`);
   const getDuelsForTournamentStmt = db.prepare(`SELECT * FROM duels WHERE tournament_id = ? ORDER BY round_number ASC, duel_index ASC`);
@@ -63,7 +63,7 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
         `AND d.round_number = (SELECT MAX(d2.round_number) FROM duels d2 WHERE d2.tournament_id = d.tournament_id)`
     );
   const updateDuelSettlementStmt = db.prepare(`
-    UPDATE duels SET status = $status, winner_key = $winner_key, settled_at = $settled_at WHERE id = $id
+    UPDATE duels SET status = $status, winner_side = $winner_side, settled_at = $settled_at WHERE id = $id
   `);
   const findDueStmt = db.prepare(`SELECT * FROM duels WHERE status = 'active' AND closes_at <= ?`);
 
@@ -76,8 +76,8 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
   // partial unique index, so a signed-in voter can't inflate a tally by
   // minting fresh tokens.
   const insertVoteStmt = db.prepare(`
-    INSERT OR IGNORE INTO votes (id, duel_id, voter_token, voter_user_id, book_key, created_at)
-    VALUES ($id, $duel_id, $voter_token, $voter_user_id, $book_key, $created_at)
+    INSERT OR IGNORE INTO votes (id, duel_id, voter_token, voter_user_id, side, created_at)
+    VALUES ($id, $duel_id, $voter_token, $voter_user_id, $side, $created_at)
   `);
   // Backfill only — never overwrites an account already stamped onto a
   // vote (voter_user_id IS NULL guard), so two accounts sharing a browser
@@ -89,7 +89,7 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
     `UPDATE votes SET voter_user_id = $user WHERE voter_token = $token AND voter_user_id IS NULL ` +
       `AND NOT EXISTS (SELECT 1 FROM votes v2 WHERE v2.duel_id = votes.duel_id AND v2.voter_user_id = $user)`
   );
-  const countVotesStmt = db.prepare(`SELECT book_key, COUNT(*) as n FROM votes WHERE duel_id = ? GROUP BY book_key`);
+  const countVotesStmt = db.prepare(`SELECT side, COUNT(*) AS n FROM votes WHERE duel_id = ? GROUP BY side`);
   // Token match OR account match: "" and NULL binds can never equal a
   // stored value, so each dimension simply doesn't constrain when absent.
   const hasVotedStmt = db.prepare(
@@ -136,30 +136,6 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
   `);
 
   return {
-    rekeyBooks(userId, fromKeys, toKey) {
-      const from = new Set(fromKeys);
-      const remove = db.prepare("DELETE FROM tournament_slots WHERE tournament_id = ? AND slot_index = ?");
-      const rename = db.prepare("UPDATE tournament_slots SET book_key = ? WHERE tournament_id = ? AND slot_index = ?");
-      db.exec("BEGIN IMMEDIATE");
-      try {
-        for (const { id } of db.prepare("SELECT id FROM tournaments WHERE owner_user_id = ? AND status = 'seeding'").all(userId) as Array<{ id: string }>) {
-          const slots = db.prepare("SELECT slot_index, book_key FROM tournament_slots WHERE tournament_id = ? ORDER BY slot_index ASC").all(id) as Array<{ slot_index: number; book_key: string }>;
-          let hasTarget = slots.some((slot) => slot.book_key === toKey);
-          for (const slot of slots) {
-            if (!from.has(slot.book_key)) continue;
-            if (hasTarget) remove.run(id, slot.slot_index);
-            else {
-              rename.run(toKey, id, slot.slot_index);
-              hasTarget = true;
-            }
-          }
-        }
-        db.exec("COMMIT");
-      } catch (error) {
-        if (db.isTransaction) db.exec("ROLLBACK");
-        throw error;
-      }
-    },
     deleteUserData(userId) {
       db.exec("BEGIN IMMEDIATE");
       try {
@@ -220,9 +196,9 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
         insertSlotStmt.run({
           $tournament_id: slot.tournament_id,
           $slot_index: slot.slot_index,
-          $book_key: slot.book_key,
           $title: slot.title,
           $author: slot.author,
+          $work_id: slot.work_id,
           $cover_url: slot.cover_url
         });
       }
@@ -253,15 +229,15 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
           $tournament_id: duel.tournament_id,
           $round_number: duel.round_number,
           $duel_index: duel.duel_index,
-          $book_a_key: duel.book_a_key,
           $book_a_title: duel.book_a_title,
           $book_a_author: duel.book_a_author,
           $book_a_cover: duel.book_a_cover,
-          $book_b_key: duel.book_b_key,
+          $book_a_work_id: duel.book_a_work_id,
           $book_b_title: duel.book_b_title,
           $book_b_author: duel.book_b_author,
           $book_b_cover: duel.book_b_cover,
-          $winner_key: duel.winner_key,
+          $book_b_work_id: duel.book_b_work_id,
+          $winner_side: duel.winner_side,
           $status: duel.status,
           $opens_at: duel.opens_at,
           $closes_at: duel.closes_at,
@@ -282,8 +258,8 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
       if (tournamentIds.length === 0) return [];
       return finalDuelsStmt(tournamentIds.length).all(...tournamentIds) as unknown as DuelRow[];
     },
-    updateDuelSettlement(id, status, winnerKey, settledAt) {
-      updateDuelSettlementStmt.run({ $id: id, $status: status, $winner_key: winnerKey, $settled_at: settledAt });
+    updateDuelSettlement(id, status, winnerSide, settledAt) {
+      updateDuelSettlementStmt.run({ $id: id, $status: status, $winner_side: winnerSide, $settled_at: settledAt });
     },
     findActiveDuelsPastDeadline(nowIso) {
       return findDueStmt.all(nowIso) as unknown as DuelRow[];
@@ -295,7 +271,7 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
         $duel_id: row.duel_id,
         $voter_token: row.voter_token,
         $voter_user_id: row.voter_user_id,
-        $book_key: row.book_key,
+        $side: row.side,
         $created_at: row.created_at
       });
       return result.changes > 0;
@@ -303,10 +279,10 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
     linkVotesToUser(voterToken, voterUserId) {
       linkVotesStmt.run({ $token: voterToken, $user: voterUserId });
     },
-    countVotesByBook(duelId) {
-      const rows = countVotesStmt.all(duelId) as unknown as Array<{ book_key: string; n: number }>;
-      const counts: Record<string, number> = {};
-      for (const row of rows) counts[row.book_key] = row.n;
+    countVotesBySide(duelId) {
+      const rows = countVotesStmt.all(duelId) as unknown as Array<{ side: "a" | "b"; n: number }>;
+      const counts = { a: 0, b: 0 };
+      for (const row of rows) counts[row.side] = Number(row.n);
       return counts;
     },
     hasVoted(duelId, voterToken, voterUserId) {
