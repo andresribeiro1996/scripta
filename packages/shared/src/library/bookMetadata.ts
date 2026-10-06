@@ -58,10 +58,12 @@ export function openLibraryDescription(record: unknown): string | null {
 export function plainDescription(text: string): string {
   return text
     .replace(/^[ \t]*\[[^\]]+\]:[ \t]*\S.*$/gm, "")
-    .replace(/\[([^\]]+)\]\(https?:\/\/[^)]+\)/g, "$1")
-    .replace(/\[([^\]]+)\]\[[^\]]*\]/g, "$1")
-    .replace(/\*\*([^*]+)\*\*/g, "$1")
-    .replace(/\*([^*\n]+)\*/g, "$1")
+    .replace(/^[ \t]*([-*_])(?:[ \t]*\1){2,}[ \t]*$/gm, "")
+    .replace(/\[((?:\\.|[^\]\\])+)\]\(https?:\/\/[^)]+\)/g, "$1")
+    .replace(/\[((?:\\.|[^\]\\])+)\]\[[^\]]*\]/g, "$1")
+    .replace(/\*\*(\S(?:[^*\n]*\S)?)\*\*/g, "$1")
+    .replace(/\*(\S(?:[^*\n]*\S)?)\*/g, "$1")
+    .replace(/\\([[\]*_])/g, "$1")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
