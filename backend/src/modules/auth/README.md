@@ -4,7 +4,7 @@ Set `GOOGLE_CALLBACK_URL` to the browser-facing HTTPS callback URL in deployment
 
 ## Password recovery and email verification
 
-Set `RESEND_API_KEY`, `AUTH_EMAIL_FROM` (a sender on a verified Resend domain), and an HTTPS `FRONTEND_URL`. The integration uses Resend's HTTP API without an SDK. Without email configuration, password login and password changes still work; recovery returns 503 and Settings explains that email is unavailable. No credentials or reset links are logged.
+Set `RESEND_API_KEY`, `AUTH_EMAIL_FROM` (a sender on a verified Resend domain), and an HTTPS `FRONTEND_URL`. The integration uses Resend's HTTP API without an SDK. Without email configuration, password login and password changes still work; recovery returns 503 and Settings explains that email is unavailable. No credentials or reset links are logged. Every email the backend sends is listed in [`docs/emails.md`](../../../../docs/emails.md).
 
 - `POST /auth/forgot-password` accepts `{email}` and returns the same 202 message for known and unknown accounts. Delivery errors are logged without identifying the account. Resend failures can be retried after the one-minute cooldown. Google-only accounts receive Google sign-in guidance.
 - `POST /auth/reset-password` accepts `{token, password}`. Reset links expire after 30 minutes and are consumed atomically. A successful reset invalidates every refresh token (including rotation grace) and increments the account's access-token version.

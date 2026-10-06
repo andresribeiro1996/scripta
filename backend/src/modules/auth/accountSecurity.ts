@@ -1,13 +1,19 @@
 import * as argon2 from "argon2";
 import type { AccountSecurity } from "@scripta/shared";
 import type { AuthRepository } from "./domain/ports.js";
+import { renderEmail, type EmailContent } from "./emailLayout.js";
 import { generateRefreshToken, hashRefreshToken } from "./tokens.js";
 
 export class AccountActionError extends Error {
   constructor(message: string, readonly status = 400) { super(message); }
 }
 
-export function createAccountSecurity(repo: AuthRepository, send: (to: string, subject: string, text: string) => Promise<void>, frontendUrl: string, enabled: boolean, eraseUserData: (userId: string) => Promise<void>) {
+export function createAccountSecurity(repo: AuthRepository, send: (to: string, subject: string, text: string, html?: string) => Promise<void>, frontendUrl: string, enabled: boolean, eraseUserData: (userId: string) => Promise<void>) {
+  async function notify(to: string, subject: string, content: EmailContent) {
+    const mail = renderEmail(content, frontendUrl);
+    await send(to, subject, mail.text, mail.html);
+  }
+
   function requireEmail() {
     if (!enabled) throw new AccountActionError("Email delivery is unavailable. Please try again later.", 503);
   }
@@ -20,8 +26,10 @@ export function createAccountSecurity(repo: AuthRepository, send: (to: string, s
     if (!saved) return;
     const url = new URL(purpose === "reset" ? "/reset-password" : "/verify-email", frontendUrl);
     url.hash = new URLSearchParams({ token }).toString();
-    await send(email, purpose === "reset" ? "Reset your Atmyshelf password" : "Verify your Atmyshelf email",
-      `${purpose === "reset" ? "Choose a new password" : "Confirm your email address"}:\n\n${url}\n\nThis link expires in ${purpose === "reset" ? "30 minutes" : "24 hours"} and can be used once. If you didn’t request this, ignore this email.`);
+    const footnote = `This link expires in ${purpose === "reset" ? "30 minutes" : "24 hours"} and can be used once. If you didn’t request this, ignore this email.`;
+    await notify(email, purpose === "reset" ? "Reset your Atmyshelf password" : "Verify your Atmyshelf email", purpose === "reset"
+      ? { heading: "Choose a new password", paragraphs: ["We got a request to reset the password for your Atmyshelf account."], button: { label: "Reset password", url: url.toString() }, footnote }
+      : { heading: "Confirm your email address", paragraphs: ["Tap the button to confirm this address for your Atmyshelf account."], button: { label: "Verify email", url: url.toString() }, footnote });
   }
 
   return {
@@ -40,7 +48,11 @@ export function createAccountSecurity(repo: AuthRepository, send: (to: string, s
         const token = generateRefreshToken();
         if (repo.saveAccountToken({ user_id: user.id, email: user.email, purpose: "reset", token_hash: hashRefreshToken(token),
           requested_at: new Date().toISOString(), expires_at: new Date(Date.now() + 30 * 60_000).toISOString() })) {
-          await send(user.email, "Sign in to Atmyshelf", `Your account uses Google sign-in. Choose “Sign in with Google” at ${new URL("/login", frontendUrl)}. Your Google password is managed by Google.`);
+          await notify(user.email, "Sign in to Atmyshelf", {
+            heading: "Use Google to sign in",
+            paragraphs: ["Your account uses Google sign-in. Choose “Sign in with Google” on the login page.", "Your Google password is managed by Google."],
+            button: { label: "Go to login", url: new URL("/login", frontendUrl).toString() }
+          });
         }
       }
     },
@@ -50,13 +62,13 @@ export function createAccountSecurity(repo: AuthRepository, send: (to: string, s
       if (!row) throw new AccountActionError("This link has expired or was already used. Request a new one.");
       const passwordHash = await argon2.hash(password);
       if (!repo.completePasswordReset(hash, passwordHash)) throw new AccountActionError("This link has expired or was already used. Request a new one.");
-      if (enabled) await send(row.email, "Your Atmyshelf password changed", "Your password was reset and all sessions were signed out. If this wasn’t you, reset your password immediately.").catch(() => undefined);
+      if (enabled) await notify(row.email, "Your Atmyshelf password changed", { tone: "danger", heading: "Your password was reset", paragraphs: ["Your password was reset and all sessions were signed out."], footnote: "If this wasn’t you, reset your password immediately." }).catch(() => undefined);
     },
     async changePassword(userId: string, currentPassword: string, password: string) {
       const user = repo.findUserById(userId);
       if (!user?.password_hash || !await argon2.verify(user.password_hash, currentPassword)) throw new AccountActionError("Your current password is incorrect.", 403);
       if (!repo.changePassword(userId, user.password_hash, await argon2.hash(password))) throw new AccountActionError("Your account changed. Please log in again.", 403);
-      if (enabled) await send(user.email, "Your Atmyshelf password changed", "Your password was changed and all sessions were signed out. If this wasn’t you, reset your password immediately.").catch(() => undefined);
+      if (enabled) await notify(user.email, "Your Atmyshelf password changed", { tone: "danger", heading: "Your password was changed", paragraphs: ["Your password was changed and all sessions were signed out."], footnote: "If this wasn’t you, reset your password immediately." }).catch(() => undefined);
     },
     async requestVerification(userId: string, email?: string, currentPassword?: string) {
       requireEmail();
@@ -82,7 +94,7 @@ export function createAccountSecurity(repo: AuthRepository, send: (to: string, s
       repo.revokeSessions(userId);
       await eraseUserData(userId);
       repo.deleteUser(userId);
-      if (enabled) await send(user.email, "Your Atmyshelf account was deleted", "Your Atmyshelf account and everything in it — your library, murals, images, lists and connections — have been deleted. This can't be undone.").catch(() => undefined);
+      if (enabled) await notify(user.email, "Your Atmyshelf account was deleted", { heading: "Your account was deleted", paragraphs: ["Your Atmyshelf account and everything in it — your library, murals, images, lists and connections — have been deleted.", "This can’t be undone."] }).catch(() => undefined);
     },
     verifyEmail(token: string) {
       if (!repo.verifyEmail(hashRefreshToken(token))) throw new AccountActionError("This link has expired, was already used, or the email cannot be used. Request a new one.");

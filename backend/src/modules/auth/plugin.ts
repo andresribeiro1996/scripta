@@ -82,8 +82,8 @@ export async function authPlugin(app: FastifyInstance, options: { authRoot?: Fas
   const db = openAuthDb();
   const authRepository = createSqliteAuthRepository(db);
   setAvatarUrlFor(avatarUrlFor);
-  const security = createAccountSecurity(authRepository, async (to, subject, text) => {
-    try { await sendAccountEmail(to, subject, text); }
+  const security = createAccountSecurity(authRepository, async (to, subject, text, html) => {
+    try { await sendAccountEmail(to, subject, text, html); }
     catch (error) { app.log.error("Account email delivery failed; check email configuration and provider status."); throw error; }
   }, env.FRONTEND_URL, emailEnabled, createUserDataEraser(authRepository, avatarBlobStore(), async (userId) => {
     if (!options.deleteUserData) throw new Error("Account deletion needs the other modules' data erasers, and none were configured.");

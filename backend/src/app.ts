@@ -15,6 +15,7 @@ import { randomUUID } from "node:crypto";
 import { STATUS_CODES } from "node:http";
 import { isAllowedOrigin } from "./config/corsOrigin.js";
 import { env } from "./config/env.js";
+import { renderEmail } from "./modules/auth/emailLayout.js";
 import { devHttps } from "./config/devCerts.js";
 import { TRUSTED_PROXIES } from "./config/trustedProxies.js";
 import { assertObjectKey } from "./storage/objectStore.js";
@@ -178,7 +179,12 @@ export function buildApp() {
   });
   app.register(registerGalleryModule);
   app.register(registerBooksModule, {
-    alert: emailEnabled && env.ALERT_EMAIL ? (subject: string, text: string) => sendAccountEmail(env.ALERT_EMAIL, subject, text) : undefined
+    alert: emailEnabled && env.ALERT_EMAIL
+      ? (subject: string, text: string) => {
+          const mail = renderEmail({ heading: subject, paragraphs: [text], tone: "danger" }, env.FRONTEND_URL);
+          return sendAccountEmail(env.ALERT_EMAIL, subject, mail.text, mail.html);
+        }
+      : undefined
   });
   app.register(registerSocialsModule);
   app.register(registerWaitlistModule, { sendEmail: emailEnabled ? sendAccountEmail : undefined });
