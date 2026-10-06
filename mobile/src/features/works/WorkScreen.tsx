@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { router, Stack } from "expo-router";
+import { router, Stack, useSegments } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { editionLabel } from "@scripta/shared";
@@ -23,6 +23,7 @@ export function WorkScreen({ id }: { id: string }) {
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
   const [aboutOpen, setAboutOpen] = useState(false);
+  const inTabs = useSegments()[0] === "(app)";
   const query = useQuery({ queryKey: ["works", id], queryFn: () => fetchWork(id, Boolean(user)), retry: false });
   const canonicalId = query.data?.work.id;
 
@@ -139,7 +140,7 @@ export function WorkScreen({ id }: { id: string }) {
                     <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{row.status}</Text>
                   </>
                 );
-                return row.linksToProfile ? (
+                return row.linksToProfile && inTabs ? (
                   <Pressable key={row.username} accessibilityRole="button" accessibilityLabel={`Open ${row.username}'s profile, ${row.status}`} onPress={() => openProfile(row.username)} style={[card, styles.row]}>
                     {body}
                   </Pressable>
