@@ -515,7 +515,7 @@ export function SwipeableTabs<T extends string>({
   const { colors } = useTheme();
   const reducedMotion = useReducedMotion();
   const pager = useRef<PagerView>(null);
-  const [rowWidth, setRowWidth] = useState(0);
+  const [tabLayouts, setTabLayouts] = useState<readonly ({ x: number; width: number } | undefined)[]>([]);
   const index = Math.max(0, options.findIndex((option) => option.value === value));
   // position and offset arrive as separate keys on one native event, so they
   // are two values added together rather than one.
@@ -527,8 +527,9 @@ export function SwipeableTabs<T extends string>({
   // into place.
   const position = useRef(new Animated.Value(index)).current;
   const offset = useRef(new Animated.Value(0)).current;
-  const tabWidth = options.length ? rowWidth / options.length : 0;
+  const measured = options.length > 1 && options.every((_, optionIndex) => tabLayouts[optionIndex]);
   const progress = Animated.add(position, offset);
+  const indicatorInput = options.map((_, optionIndex) => optionIndex);
 
   // The pager is the source of truth for which page is showing; tapping a tab
   // asks it to move and the selection follows from onPageSelected, so a tap and
@@ -544,7 +545,6 @@ export function SwipeableTabs<T extends string>({
       <View
         accessibilityLabel={accessibilityLabel}
         accessibilityRole="tablist"
-        onLayout={(event) => setRowWidth(event.nativeEvent.layout.width)}
         style={[styles.tabRow, { borderBottomColor: colors.border }]}
       >
         {options.map((option, optionIndex) => {
@@ -555,6 +555,10 @@ export function SwipeableTabs<T extends string>({
               accessibilityRole="tab"
               accessibilityState={{ selected }}
               key={option.value}
+              onLayout={(event) => {
+                const { x, width } = event.nativeEvent.layout;
+                setTabLayouts((previous) => previous[optionIndex]?.x === x && previous[optionIndex]?.width === width ? previous : Object.assign([...previous], { [optionIndex]: { x, width } }));
+              }}
               onPress={() => reducedMotion ? pager.current?.setPageWithoutAnimation(optionIndex) : pager.current?.setPage(optionIndex)}
               style={({ pressed }) => [
                 styles.tab,
@@ -572,14 +576,16 @@ export function SwipeableTabs<T extends string>({
             </Pressable>
           );
         })}
-        {tabWidth ? (
+        {measured ? (
           <Animated.View
             style={[
               styles.tabIndicator,
               {
                 backgroundColor: colors.accent,
-                width: tabWidth,
-                transform: [{ translateX: Animated.multiply(progress, tabWidth) }],
+                transform: [
+                  { translateX: progress.interpolate({ inputRange: indicatorInput, outputRange: tabLayouts.map((layout) => layout!.x + layout!.width / 2 - 0.5) }) },
+                  { scaleX: progress.interpolate({ inputRange: indicatorInput, outputRange: tabLayouts.map((layout) => layout!.width) }) },
+                ],
               },
             ]}
           />
@@ -837,12 +843,12 @@ const styles = StyleSheet.create({
   heading: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingHorizontal: spacing.sm, marginBottom: spacing.sm },
   headingText: { flex: 1, fontWeight: "700" },
   tabRow: { flexDirection: "row", borderBottomWidth: 1 },
-  tab: { flex: 1, minHeight: minimumTouchTarget, flexDirection: "row", gap: spacing.xs, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.sm },
+  tab: { flexGrow: 1, flexShrink: 1, flexBasis: "auto", minHeight: minimumTouchTarget, flexDirection: "row", gap: spacing.xs, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.sm },
   tabLabel: { fontWeight: "700" },
   tabBadge: { minWidth: 20, height: 20, paddingHorizontal: spacing.xs, borderRadius: radii.full, alignItems: "center", justifyContent: "center" },
   tabBadgeText: { fontSize: 12, lineHeight: 16, fontWeight: "700" },
   iconBadge: { position: "absolute", top: -6, right: -6 },
-  tabIndicator: { position: "absolute", left: 0, bottom: 0, height: 3, borderTopLeftRadius: radii.sm, borderTopRightRadius: radii.sm },
+  tabIndicator: { position: "absolute", left: 0, bottom: 0, height: 3, width: 1 },
   fab: { position: "absolute", right: spacing.lg, bottom: spacing.lg, minHeight: 56, flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingHorizontal: spacing.lg, borderRadius: radii.full, elevation: 6, shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
   fabLabel: { fontWeight: "700" },
   headerActions: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
