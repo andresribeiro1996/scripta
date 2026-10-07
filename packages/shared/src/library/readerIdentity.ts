@@ -11,12 +11,13 @@ export interface ReaderIdentity {
   state: CardState;
   identity: IdentityKey | null;
   runnerUp: IdentityKey | null;
+  streak: IdentityKey | null;
   signal: ReaderSignal | null;
   leaders: ReaderLeader[];
   coverage: string[];
   missing: string | null;
 }
-export type PublicReaderCard = Pick<ReaderIdentity, "state" | "identity" | "runnerUp" | "signal" | "coverage">;
+export type PublicReaderCard = Pick<ReaderIdentity, "state" | "identity" | "runnerUp" | "signal" | "coverage"> & Partial<Pick<ReaderIdentity, "streak">>;
 
 interface Candidate { key: IdentityKey; strength: number; signal: ReaderSignal; leaders: ReaderLeader[]; gap: string }
 
@@ -66,7 +67,7 @@ export function readerIdentity(books: Book[], groups: Group[]): ReaderIdentity {
   const known = finished.filter((book) => genresOf.get(book)!.length > 0);
   const coverage = [`genres known for ${known.length} of ${n} finished books`];
   if (finished.some((book) => /^(goodreads|storygraph):/.test(String(book.ContentID ?? "")))) coverage.push("series unknown for Goodreads and StoryGraph imports");
-  const unwritten = (missing: string): ReaderIdentity => ({ state: "unwritten", identity: null, runnerUp: null, signal: null, leaders: [], coverage, missing });
+  const unwritten = (missing: string): ReaderIdentity => ({ state: "unwritten", identity: null, runnerUp: null, streak: null, signal: null, leaders: [], coverage, missing });
   if (n < MIN_BOOKS) return unwritten(`Finish ${plural(MIN_BOOKS - n, "more book")}`);
 
   const candidates: Candidate[] = [];
@@ -154,7 +155,8 @@ export function readerIdentity(books: Book[], groups: Group[]): ReaderIdentity {
   }
   const clears = (candidate: Candidate | undefined) => Boolean(candidate && candidate.strength >= 1 - EPSILON);
   const tie = clears(best) && clears(second) && second!.strength >= best.strength * 0.95 - EPSILON;
-  const shared = { identity: best.key, signal: best.signal, leaders: best.leaders, coverage };
+  const streak = second && second.strength >= 0.75 - EPSILON ? second.key : null;
+  const shared = { identity: best.key, signal: best.signal, leaders: best.leaders, coverage, streak };
   if (clears(best) && !tie) return { state: "settled", runnerUp: null, missing: null, ...shared };
   return {
     state: "leaning",
@@ -164,6 +166,6 @@ export function readerIdentity(books: Book[], groups: Group[]): ReaderIdentity {
   };
 }
 
-export function publicReaderCard({ state, identity, runnerUp, signal, coverage }: ReaderIdentity): PublicReaderCard {
-  return { state, identity, runnerUp, signal, coverage };
+export function publicReaderCard({ state, identity, runnerUp, streak, signal, coverage }: ReaderIdentity): PublicReaderCard {
+  return { state, identity, runnerUp, streak, signal, coverage };
 }
