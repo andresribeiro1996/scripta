@@ -1,4 +1,4 @@
-import type { PublicBookData, TierlistData } from "@scripta/shared";
+import type { Placement, PublicBookData, TierlistData } from "@scripta/shared";
 
 function sectionIds(data: TierlistData, section: string) {
   return section === "pool" ? data.pool : data.tiers.find((tier) => tier.id === section)?.workIds ?? [];
@@ -35,6 +35,11 @@ export function reorderBook(data: TierlistData, workId: string, direction: -1 | 
   if (target < 0 || target >= ids.length) return data;
   [ids[index], ids[target]] = [ids[target]!, ids[index]!];
   return replaceSection(data, section, ids);
+}
+
+export function samePlacements(a: Placement[], b: Placement[]): boolean {
+  const tierOf = new Map(b.map((placement) => [placement.workId, placement.tierId]));
+  return a.length === b.length && tierOf.size === b.length && a.every((placement) => tierOf.get(placement.workId) === placement.tierId);
 }
 
 export function votingBooks(books: PublicBookData[]): Array<Record<string, unknown>> {

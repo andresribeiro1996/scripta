@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ballotBoard, blankBoard, type TierlistData } from "@scripta/shared";
 import { bookKey, booksByWork } from "@scripta/shared";
-import { moveBook, moveBookTo, reorderBook, votingBooks } from "./tierBoardData.js";
+import { moveBook, moveBookTo, reorderBook, samePlacements, votingBooks } from "./tierBoardData.js";
 
 const board: TierlistData = {
   tiers: [
@@ -62,4 +62,13 @@ test("voting books keep the server's key and work id, and orphans stay out of th
   assert.equal(bookKey(books[0]!), "ta:orlando|");
   assert.deepEqual([...booksByWork(books).keys()], ["w1"]);
   assert.equal(booksByWork(books).get("w1"), books[0]);
+});
+
+test("samePlacements ignores the order the server returns placements in", () => {
+  const placed = [{ workId: "w2", tierId: "S" }, { workId: "w3", tierId: "C" }, { workId: "w1", tierId: "C" }];
+  const fromServer = [{ workId: "w1", tierId: "C" }, { workId: "w2", tierId: "S" }, { workId: "w3", tierId: "C" }];
+  assert.equal(samePlacements(placed, fromServer), true);
+  assert.equal(samePlacements(placed, [{ workId: "w1", tierId: "S" }, { workId: "w2", tierId: "S" }, { workId: "w3", tierId: "C" }]), false);
+  assert.equal(samePlacements(placed, fromServer.slice(1)), false);
+  assert.equal(samePlacements([], []), true);
 });
