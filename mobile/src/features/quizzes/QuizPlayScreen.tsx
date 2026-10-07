@@ -42,8 +42,7 @@ export function QuizPlayScreen({ code }: { code: string }) {
 
   function loadOwnPlay() {
     if (!user && !storedId) { setOwnPlayMissing(true); return; }
-    const request = user ? fetchPlay(code, null, true) : fetchPlay(code, storedId ?? null, false);
-    void request.then((found) => {
+    void fetchPlay(code, user ? null : storedId ?? null).then((found) => {
       setOwnPlay(found);
       setOwnPlayMissing(false);
       setRecoverError(null);
@@ -66,7 +65,7 @@ export function QuizPlayScreen({ code }: { code: string }) {
   const stage = playStage({
     boardReady: board.isSuccess,
     boardMissing: board.isError,
-    playOpen: board.data?.board.playOpen ?? false,
+    playOpen: board.data?.playOpen ?? false,
     resolved: !ready || storedId === undefined ? false : Boolean(result) || ownPlayMissing,
     alreadyPlayed: Boolean(result),
   });
@@ -76,7 +75,7 @@ export function QuizPlayScreen({ code }: { code: string }) {
     setError(null);
     try {
       const body = { answers: buildSubmission(questions, answers), durationMs: Date.now() - startRef.current };
-      const response = await submitPlay(code, playerName.trim() ? { ...body, playerName: playerName.trim() } : body, Boolean(user));
+      const response = await submitPlay(code, playerName.trim() ? { ...body, playerName: playerName.trim() } : body);
       setSubmitted(response);
       try { await AsyncStorage.setItem(playStorageKey(code), response.playId); }
       catch { setError("Scored, but this device couldn't save your result link."); }
@@ -88,7 +87,7 @@ export function QuizPlayScreen({ code }: { code: string }) {
   }
 
   return <Screen bottom top={false} style={styles.screen}>
-    <Stack.Screen options={{ headerShown: true, title: board.data?.board.name ?? "Quiz" }} />
+    <Stack.Screen options={{ headerShown: true, title: board.data?.name ?? "Quiz" }} />
     {error ? <Toast visible message={error} tone="error" /> : null}
     {stage === "loading" || board.isPending ? <Screen bottom style={styles.screen}><Skeleton height={180} /></Screen>
     : stage === "unavailable" ? <ErrorState title="No quiz at that link" body="Check the code and try again." actionLabel={isPermanentError(board.error) ? "Go to Atmyshelf" : "Retry"} onAction={isPermanentError(board.error) ? () => router.replace("/") : () => void board.refetch()} />
@@ -97,9 +96,9 @@ export function QuizPlayScreen({ code }: { code: string }) {
       <Text {...dynamicType} style={[typography.body, styles.center, { color: colors.textDim }]}>This quiz is closed.</Text>
       <Leaderboard code={code} />
     </View>
-    : stage === "played" && board.data ? <EndScreen code={code} board={board.data.board} result={result!} returning={submitted === null} tab={tab} setTab={setTab} />
+    : stage === "played" && board.data ? <EndScreen code={code} board={board.data} result={result!} returning={submitted === null} tab={tab} setTab={setTab} />
     : board.data ? (() => {
-      const questions = board.data.board.questions;
+      const questions = board.data.questions;
       const question = questions[index];
       const answered = Object.keys(answers).length;
       const complete = isComplete(questions, answers);
