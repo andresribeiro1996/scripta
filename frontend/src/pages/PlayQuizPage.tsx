@@ -253,22 +253,27 @@ function ResultsView({
 
 function Leaderboard({ code }: { code: string }) {
   const leaderboard = useQuery({ queryKey: ["quizPublicResults", code], queryFn: () => fetchPublicResultsApi(code) });
+  if (leaderboard.isError) return <p className="text-sm text-(--color-text-dim)">Couldn't load the leaderboard.</p>;
   if (!leaderboard.data) return null;
   return (
     <div>
       <h2 className="mb-2 text-lg font-bold">Leaderboard</h2>
-      <table className="w-full text-sm">
-        <tbody>
-          {leaderboard.data.plays.map((play, i) => (
-            <tr key={i} className="border-t border-(--color-border)">
-              <td className="py-1.5 pr-3">{i + 1}</td>
-              <td className="py-1.5 pr-3">{play.playerName ?? "Guest"}</td>
-              <td className="py-1.5 pr-3">{play.score}/{leaderboard.data.questionCount}</td>
-              <td className="py-1.5">{(play.durationMs / 1000).toFixed(1)}s</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {leaderboard.data.plays.length === 0 ? (
+        <p className="text-sm text-(--color-text-dim)">No plays yet.</p>
+      ) : (
+        <table className="w-full text-sm">
+          <tbody>
+            {leaderboard.data.plays.map((play, i) => (
+              <tr key={i} className="border-t border-(--color-border)">
+                <td className="py-1.5 pr-3">{i + 1}</td>
+                <td className="py-1.5 pr-3">{play.playerName ?? "Guest"}</td>
+                <td className="py-1.5 pr-3">{play.score}/{leaderboard.data.questionCount}</td>
+                <td className="py-1.5">{(play.durationMs / 1000).toFixed(1)}s</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }

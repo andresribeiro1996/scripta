@@ -181,6 +181,7 @@ function Leaderboard({ code }: { code: string }) {
   const leaderboard = useQuery({ queryKey: ["quizzes", "results", code], queryFn: () => fetchPublicResults(code), retry: false });
   if (leaderboard.isPending) return <View style={styles.section}><Skeleton height={180} /></View>;
   if (leaderboard.isError) return <ErrorState body="Couldn't load the leaderboard." actionLabel="Retry" onAction={() => void leaderboard.refetch()} />;
+  if (leaderboard.data.plays.length === 0) return <View style={styles.section}><Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>No plays yet.</Text></View>;
   return <ScrollView contentContainerStyle={styles.section}>
     {leaderboard.data.plays.map((play, i) => (
       <View key={`${play.playerName ?? "Guest"}-${i}`} style={[styles.leaderRow, { borderColor: colors.border }]}>
