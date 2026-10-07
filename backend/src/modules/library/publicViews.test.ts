@@ -982,7 +982,9 @@ test("a visitor's reader card carries the public style and the resolved choices,
   assert.equal(card.chosen?.signature?.title, "A Wizard of Earthsea");
   assert.equal(card.chosen?.signature?.author, "Ursula K. Le Guin");
   assert.equal(card.chosen?.signature?.note, "why");
+  assert.deepEqual(Object.keys(card.chosen!.signature!).sort(), ["author", "coverUrl", "note", "title", "workId"]);
   assert.deepEqual(card.chosen?.highlight, { text: "To light a candle", title: "A Wizard of Earthsea", author: "Ursula K. Le Guin" });
+  assert.deepEqual(Object.keys(card.chosen!.highlight!).sort(), ["author", "text", "title"]);
   assert.doesNotMatch(JSON.stringify(result), /my private note/);
   assert.deepEqual(result.books, []);
 });

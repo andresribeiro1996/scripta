@@ -595,5 +595,8 @@ test("a rejected choice stores nothing, and null clears a choice", async () => {
 test("the reader card style needs a signed-in user", async () => {
   const { app } = await setup();
   assert.equal((await app.inject({ method: "GET", url: styleUrl })).statusCode, 401);
+  assert.equal((await app.inject({ method: "PATCH", url: styleUrl, payload: { counter: "shelf" } })).statusCode, 401);
+  const stored = await app.inject({ method: "GET", url: styleUrl, headers: asUser("u1") });
+  assert.deepEqual(stored.json(), { counter: "dial", trait: "both", signature: null, highlight: null });
   await app.close();
 });
