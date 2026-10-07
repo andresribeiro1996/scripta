@@ -43,7 +43,7 @@ gh pr merge <n> --merge --auto
 
 `--auto` merges the moment required checks pass. If GitHub refuses because auto-merge is disabled on the repo: when `get_status` shows every check passing, run `gh pr merge <n> --merge`; otherwise enable the app's auto-merge with the `ccd_pr` `set_auto_merge` tool and tell the user it will merge when CI is green. Never poll CI yourself (`gh pr checks` loops, sleep, ScheduleWakeup) — the app reports check results.
 
-If CI fails, dispatch `ci-fixer`. Branches must be up to date with `main`: when `get_status` shows the PR behind, run `gh pr update-branch <n>`; when it conflicts, run the `sync_with_base_branch` tool (or merge `origin/main`), resolve, verify and push. A stacked PR whose base is not `main` gets auto-merge only once it is retargeted to `main`.
+If CI fails, dispatch `ci-fixer`. A PR that is only behind `main` still merges. When it conflicts, run the `sync_with_base_branch` tool (or merge `origin/main`), resolve, verify and push. A stacked PR whose base is not `main` gets auto-merge only once it is retargeted to `main`.
 
 ## 6. After the merge
 
