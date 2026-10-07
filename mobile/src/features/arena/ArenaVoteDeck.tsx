@@ -102,8 +102,8 @@ function VoteHalf({
           <Text numberOfLines={2} {...dynamicType} style={[typography.body, styles.strong, { color: "#ffffff" }]}>{side.title}</Text>
           <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: "rgba(255,255,255,0.8)" }]}>{side.author}</Text>
         </View>
-        <Text {...dynamicType} pointerEvents="none" style={[typography.caption, styles.center, styles.hintTop, { color: "rgba(255,255,255,0.85)" }]}>↑ wins</Text>
-        <Text {...dynamicType} pointerEvents="none" style={[typography.caption, styles.center, styles.hintBottom, { color: "rgba(255,255,255,0.6)" }]}>↓ loses</Text>
+        <Text {...dynamicType} pointerEvents="none" style={[typography.caption, styles.hint, styles.hintTop]}>↑ pick</Text>
+        <Text {...dynamicType} pointerEvents="none" style={[typography.caption, styles.hint, styles.hintBottom]}>↓ pass</Text>
       </Animated.View>
     </GestureDetector>
   );
@@ -125,7 +125,7 @@ export function ArenaVoteDeck({ duel, disabled, onVote }: { duel: Duel; disabled
         <VoteHalf side={duel.bookB} winId={duel.bookB.workId} loseId={duel.bookA.workId} disabled={disabled} edge="right" onVote={vote} />
         <View pointerEvents="none" style={[styles.vs, { backgroundColor: colors.surface, borderColor: colors.border }]}><Text style={[styles.vsText, { color: colors.text }]}>VS</Text></View>
       </View>
-      <Text {...dynamicType} style={[typography.caption, styles.center, { color: colors.textDim }]}>Swipe a cover up to pick it, down to pass — or tap it</Text>
+      <Text {...dynamicType} style={[typography.caption, styles.center, { color: colors.textDim }]}>Swipe a cover up to pick it, down to pass — or tap it to pick. Votes can't be changed.</Text>
     </View>
   );
 }
@@ -138,10 +138,11 @@ const styles = StyleSheet.create({
   vsText: { fontSize: 12, fontWeight: "700" },
   strong: { fontWeight: "700" },
   center: { textAlign: "center" },
-  hintTop: { position: "absolute", top: spacing.sm, left: 0, right: 0 },
+  hint: { position: "absolute", alignSelf: "center", color: "#ffffff", backgroundColor: "rgba(0,0,0,0.55)", borderRadius: radii.full, paddingHorizontal: spacing.sm, overflow: "hidden" },
+  hintTop: { top: spacing.sm },
   // Anchored just above the scrim band (not a fixed px offset) so it never
   // collides with the title when it wraps to two lines.
-  hintBottom: { position: "absolute", bottom: "30%", left: 0, right: 0 },
+  hintBottom: { bottom: "30%" },
   badge: { position: "absolute", alignSelf: "center", borderRadius: radii.full, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
   badgeTop: { top: "38%" },
   badgeBottom: { bottom: "38%" },
