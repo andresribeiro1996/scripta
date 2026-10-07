@@ -876,6 +876,27 @@ test("the backfill stores an unparseable document without keys, says so, and doe
   }
 });
 
+test("the backfill stores the rows before the derived marker, so a failed rows write leaves the account stale for the next boot", () => {
+  fileService.saveLibrary("crash-user", { books: [dune()] });
+  fileDb.prepare(`DELETE FROM library_derived WHERE user_id = 'crash-user'`).run();
+  const staleIds = () => createSqliteLibraryRepository(fileDb).listStaleUserIds();
+  assert.ok(staleIds().includes("crash-user"));
+  fileDb.exec(`CREATE TRIGGER crash_summary_write BEFORE INSERT ON library_summary WHEN NEW.user_id = 'crash-user' BEGIN SELECT RAISE(ABORT, 'disk full'); END`);
+  try {
+    assert.throws(() => backfillLibraryDerived(), /disk full/);
+  } finally {
+    fileDb.exec(`DROP TRIGGER crash_summary_write`);
+  }
+
+  assert.equal(storedGlyph(fileDb, "crash-user"), undefined);
+  assert.ok(staleIds().includes("crash-user"));
+
+  backfillLibraryDerived();
+
+  assert.equal(storedGlyph(fileDb, "crash-user"), null);
+  assert.equal(staleIds().includes("crash-user"), false);
+});
+
 test("raising the derived version re-derives every library at the next backfill", () => {
   const logged = mock.method(console, "error", () => undefined);
   try {
