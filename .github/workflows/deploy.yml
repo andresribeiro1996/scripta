@@ -1,0 +1,50 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Commit on main to deploy. Empty deploys the newest main commit whose CI passed.
+        required: false
+
+permissions:
+  contents: write
+  actions: read
+  checks: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Pick the commit
+        id: pick
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_SHA: ${{ inputs.sha }}
+        run: |
+          if [ -n "$INPUT_SHA" ]; then
+            sha=$(git rev-parse --verify "$INPUT_SHA^{commit}")
+          else
+            sha=$(gh run list --workflow ci.yml --branch main --event push --status success --limit 1 --json headSha --jq '.[0].headSha')
+          fi
+          git merge-base --is-ancestor "$sha" origin/main || { echo "::error::$sha is not on main"; exit 1; }
+          passed=$(gh api "repos/$GITHUB_REPOSITORY/commits/$sha/check-runs?check_name=checks" --jq '[.check_runs[].conclusion] | any(. == "success")')
+          [ "$passed" = "true" ] || { echo "::error::checks has not passed on $sha"; exit 1; }
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+      - name: Move production
+        env:
+          SHA: ${{ steps.pick.outputs.sha }}
+        run: |
+          {
+            echo "Deploying \`$SHA\`: https://github.com/$GITHUB_REPOSITORY/compare/$(git rev-parse origin/production)...$SHA"
+            echo
+            git log --oneline --first-parent "origin/production..$SHA" | sed 's/^/- /'
+          } >> "$GITHUB_STEP_SUMMARY"
+          git push origin "$SHA:refs/heads/production"

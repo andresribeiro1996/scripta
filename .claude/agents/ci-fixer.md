@@ -39,6 +39,6 @@ DOTENV_CONFIG_PATH=/nonexistent/.env npm test --workspace backend
 
 Follow the root and package `AGENTS.md` rules. Fix the code, not the assertion. Never skip, delete or loosen a test, and never weaken validation or error handling to pass. Run the full sequence again, then commit and `git push` to the PR branch.
 
-Never force-push, push to `main`, merge, or enable auto-merge.
+Never force-push, push to `main` or `production`, or run `gh pr merge`. Leave the PR's auto-merge as it is: it lands the PR once your fix is green.
 
 Report: root cause of each failure, what you changed, the full local sequence result, the pushed SHA, and anything you left for a separate PR.

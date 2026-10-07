@@ -3,7 +3,7 @@ name: Production update
 on:
   push:
     branches:
-      - main
+      - production
     paths:
       - mobile/**
       - packages/shared/**
