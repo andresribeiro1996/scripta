@@ -29,7 +29,7 @@ export class LibraryChangeNotFoundError extends LibraryError {
 }
 
 export class InvalidReaderCardChoiceError extends LibraryError {
-  constructor(readonly choice: "signature" | "highlight") {
+  constructor(choice: "signature" | "highlight") {
     super(choice === "signature" ? "The signature book has to be a finished book in your library." : "The highlight has to be one of your Kobo highlights.");
   }
 }
