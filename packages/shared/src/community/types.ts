@@ -1,5 +1,6 @@
 import type { IdentityKey } from "../readerCards/index.js";
 import type { ReaderProfile } from "../murals/murals.js";
+import type { MuralPublicPayload } from "../public/types.js";
 
 export type CommunityAuthor = ReaderProfile & { userId: string; unavailable?: boolean; readerGlyph?: IdentityKey };
 
@@ -137,4 +138,12 @@ export interface GameParticipation {
   participantCount: number;
   latestAt: string;
   recent: Array<{ userId: string; at: string }>;
+}
+
+export interface CommunityProfileView {
+  private: boolean;
+  profile: PublishedProfile;
+  mural: MuralPublicPayload | null;
+  published: { tierlists: TierlistSummary[]; tournaments: TournamentSummary[] };
+  feedSettings?: FeedSettings;
 }
