@@ -13,3 +13,4 @@ export * from "./tierlists/index.js";
 export * from "./quizzes/index.js";
 export * from "./readerCards/index.js";
 export * from "./works/index.js";
+export * from "./public/index.js";
