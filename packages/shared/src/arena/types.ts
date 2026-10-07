@@ -21,3 +21,22 @@ export interface Duel {
   closesAt: string;
   hasVoted: boolean;
 }
+
+export interface Tournament {
+  id: string;
+  name: string;
+  bracketSize: number;
+  roundDurationMinutes: number;
+  status: "seeding" | "active" | "completed";
+  currentRound: number;
+  createdAt: string;
+  ownerUserId: string;
+  covers: string[];
+  filledSlots: number;
+  winner: SeedBook | null;
+}
+
+export interface TournamentView extends Tournament {
+  slots: Array<{ slotIndex: number } & SeedBook>;
+  duels: Duel[];
+}
