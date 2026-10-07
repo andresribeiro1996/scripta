@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { ActivityItem, DiscoverItem, FeedItem } from "@scripta/shared/community";
+import type { ActivityItem, FeedItem } from "@scripta/shared/community";
 import {
   DISCOVER_FILTERS,
   contentDetail,
