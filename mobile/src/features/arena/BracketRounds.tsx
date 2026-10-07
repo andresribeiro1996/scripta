@@ -39,12 +39,12 @@
 import { Fragment, useRef, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
-import { bracketShape, countdownLabel, duelWinner, needsVote, sharePercent, type BracketSlot, type Duel, type DuelSide } from "@scripta/shared";
+import { bracketShape, countdownLabel, duelWinner, needsVote, roundLabel, sharePercent, type BracketSlot, type Duel, type DuelSide } from "@scripta/shared";
 import { Icon, Sheet, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "./BookCover";
 import { DuelSideRow } from "./DuelSideRow";
 import { BracketViewToggle } from "./BracketViewToggle";
-import { matchNote, roundHeadline, roundLabel, tournamentChampion } from "./arenaView";
+import { matchNote, roundHeadline, tournamentChampion } from "./arenaView";
 import type { TournamentView } from "./api";
 
 const BAR_HEIGHT = 64;
@@ -271,7 +271,7 @@ export function BracketRounds({
   if (byRound.length === 0) return null;
 
   function labelFor(roundIdx: number): string {
-    return roundLabel(byRound, roundIdx);
+    return roundLabel(byRound[roundIdx]?.length ?? 0, roundIdx + 1);
   }
 
   function nodeLabel(roundIdx: number): string {

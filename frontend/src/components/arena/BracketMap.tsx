@@ -35,7 +35,7 @@ import { Link } from "react-router-dom";
 import type { Duel, DuelSide, TournamentView } from "../../api/arena";
 import { CoverImage } from "../BookCard";
 import { Sheet } from "../Sheet";
-import { bracketShape, needsVote, sharePercent, type BracketSlot } from "../../lib/arenaBracket";
+import { bracketShape, needsVote, roundLabel, sharePercent, type BracketSlot } from "../../lib/arenaBracket";
 import { useCountdown } from "./useCountdown";
 
 function coverBookFor(side: DuelSide) {
@@ -391,10 +391,7 @@ export function BracketMap({
   const tileRatio = (cells: number) => cells / maxPerRow;
 
   function labelFor(roundIdx: number): string {
-    const perSide = top[roundIdx]!.length;
-    if (perSide === 1) return "Semis";
-    if (perSide === 2) return "Quarters";
-    return `Round ${roundNumbers[roundIdx]}`;
+    return roundLabel(byRound[roundIdx]!.length, roundNumbers[roundIdx]!);
   }
 
   const finalDuel = hasCentre ? finalRound[0]! : null;
