@@ -210,7 +210,7 @@ export function FinishedScreen({ book, before, onClose }: { book: Record<string,
 const styles = StyleSheet.create({
   content: { gap: spacing.lg, paddingBottom: spacing.xl },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md },
-  eyebrow: { fontWeight: "600", flexShrink: 1 },
+  eyebrow: { fontWeight: "600", flex: 1 },
   bookRow: { flexDirection: "row", gap: spacing.lg },
   cover: { width: 96, aspectRatio: 2 / 3, borderRadius: 8, overflow: "hidden" },
   bookText: { flex: 1, justifyContent: "center" },
