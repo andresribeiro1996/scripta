@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { PublicReaderCard } from "../library/readerIdentity.js";
 import { COUNTERS } from "./counters.js";
+import { INKS } from "./plates.js";
 import { renderPlate, renderReaderCard } from "./render.js";
 import { seedOf } from "./seed.js";
 import { DEFAULT_READER_CARD_STYLE, TRAITS, normalizeReaderCardStyle, type ReaderCardStyle } from "./style.js";
@@ -21,6 +22,19 @@ test("the default card draws the dial, the streak line and the streak's seal", (
   assert.match(svg, />WITH A STREAK OF THE LAMPLIGHTER</);
   assert.match(svg, /<g class="glyph id-lamp[^"]*" transform="translate\(157.25 166.25\) scale\(0.5417\)">/);
   assert.match(svg, /stroke-width="1.15"/);
+});
+
+test("the seal is inked with its own streak's inks while the plate keeps its identity's", () => {
+  const colours = (markup: string) => new Set(markup.match(/#[0-9a-f]{6}/g));
+  for (const [print, plateInk, sealInk] of [["paper", INKS.star[1], INKS.lamp[1]], ["reversed", INKS.star[2], INKS.lamp[2]]] as const) {
+    const svg = render({}, DEFAULT_READER_CARD_STYLE, print);
+    const seal = svg.match(/<g class="glyph id-lamp[^>]*>.*?<\/g>/s)![0];
+    const plate = svg.replace(seal, "");
+    assert.ok(colours(seal).has(sealInk));
+    assert.equal(colours(seal).has(plateInk), false);
+    assert.ok(colours(plate).has(plateInk));
+    assert.equal(colours(plate).has(sealInk), false);
+  }
 });
 
 test("the trait setting picks line, seal, both or neither", () => {
