@@ -390,6 +390,8 @@ const glyphShapes: Record<IdentityKey, string> = {
   loyal: `<g transform="translate(24 23.5) rotate(-22) scale(.36)"><path class="gg" d="M-18-5Q-12-30 12-44Q2-24-2-4ZM-18 5Q-12 30 12 44Q2 24-2 4ZM2-3L44-15L15 1L44 17L2 5ZM-40-1Q-20-9 6-3Q11 1 6 5Q-18 9-40 3Z"/><circle class="gg" cx="-35" cy="1" r="7"/></g>`,
 };
 
-export const glyph = (key: IdentityKey, size: number, extra = "") => `<svg xmlns="http://www.w3.org/2000/svg" class="glyph id-${key} ${extra}" viewBox="0 0 48 48" width="${size}" height="${size}" aria-hidden="true"><circle class="gd" cx="24" cy="24" r="23.5"/><circle class="gr" cx="24" cy="24" r="20.5" fill="none" stroke-width=".8"/>${glyphShapes[key]}</svg>`;
+export const glyphBody = (key: IdentityKey) => `<circle class="gd" cx="24" cy="24" r="23.5"/><circle class="gr" cx="24" cy="24" r="20.5" fill="none" stroke-width=".8"/>${glyphShapes[key]}`;
+
+export const glyph = (key: IdentityKey, size: number, extra = "") => `<svg xmlns="http://www.w3.org/2000/svg" class="glyph id-${key} ${extra}" viewBox="0 0 48 48" width="${size}" height="${size}" aria-hidden="true">${glyphBody(key)}</svg>`;
 
 export const printStyle = (ground: string, line: string) => `<style>.pg,.pgf,.gg{fill:${ground}}.pl{stroke:${line};fill:none}.pf,.pt,.gd,.gi{fill:${line}}.pgl{fill:${ground};stroke:${line}}.pgs,.gr,.gs{stroke:${ground};fill:none}.gk{stroke:${line};fill:none}</style>`;

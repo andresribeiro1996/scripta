@@ -2,7 +2,7 @@ import type { DialGroup } from "../library/readerCardFacts.js";
 import type { PublicReaderCard } from "../library/readerIdentity.js";
 import { composePlate, SANS, type PlateFace, type PlateSlots } from "./compose.js";
 import { drawCounter, SEAL_ANGLE } from "./counters.js";
-import { INKS, PAPER, PLATES, REVERSED_LINE, emblems, glyph, type IdentityKey } from "./plates.js";
+import { INKS, PAPER, PLATES, REVERSED_LINE, emblems, glyph, glyphBody, type IdentityKey } from "./plates.js";
 import type { ReaderCardStyle } from "./style.js";
 
 export type PlatePrint = "paper" | "reversed";
@@ -77,7 +77,7 @@ const SEAL_RADIUS = 64;
 function sealSlot(streak: IdentityKey, print: PlatePrint): string {
   const rad = (SEAL_ANGLE * Math.PI) / 180;
   const cx = 125 + SEAL_RADIUS * Math.sin(rad), cy = 134 - SEAL_RADIUS * Math.cos(rad);
-  const glyphSvg = renderGlyph(streak, SEAL_SIZE, print).replace("<svg ", `<svg x="${(cx - SEAL_SIZE / 2).toFixed(2)}" y="${(cy - SEAL_SIZE / 2).toFixed(2)}" `);
+  const glyphSvg = `<g class="glyph id-${streak}" transform="translate(${(cx - SEAL_SIZE / 2).toFixed(2)} ${(cy - SEAL_SIZE / 2).toFixed(2)}) scale(${(SEAL_SIZE / 48).toFixed(4)})">${withStyle(glyphBody(streak), inks(streak, print))}</g>`;
   return `<circle class="pg" cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" r="${SEAL_SIZE / 2 + 2.5}"/>${glyphSvg}`;
 }
 

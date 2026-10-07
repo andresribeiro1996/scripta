@@ -19,7 +19,7 @@ const plain = renderPlate({ identity: "star", state: "settled", readerName: "and
 test("the default card draws the dial, the streak line and the streak's seal", () => {
   const svg = render();
   assert.match(svg, />WITH A STREAK OF THE LAMPLIGHTER</);
-  assert.match(svg, /class="glyph id-lamp/);
+  assert.match(svg, /<g class="glyph id-lamp[^"]*" transform="translate\(157.25 166.25\) scale\(0.5417\)">/);
   assert.match(svg, /stroke-width="1.15"/);
 });
 

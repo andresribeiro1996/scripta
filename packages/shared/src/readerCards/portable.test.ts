@@ -20,6 +20,7 @@ function portabilityProblems(svg: string): string[] {
       if ((attr === "href" || attr === "xlink:href") && !value!.startsWith("data:")) problems.push(`${attr}="${value!.slice(0, 40)}"`);
     }
   }
+  if ((svg.match(/<svg\b/g) ?? []).length !== 1) problems.push("nested <svg>");
   if (/NaN|Infinity/.test(svg)) problems.push("NaN");
   return problems;
 }
