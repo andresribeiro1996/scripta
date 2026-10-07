@@ -23,6 +23,7 @@ process.env.JWT_ACCESS_SECRET = "a".repeat(64);
 process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
 const { createTierlistsPublicApi, createTierlistsService } = await import("./service.js");
+const { createBestEffortRecorder } = await import("../community/service.js");
 
 function createInMemoryRepo(): TierlistsRepository {
   const tierlists = new Map<string, TierlistRow>();
@@ -603,10 +604,28 @@ test("openVoting emits exactly one publish event for the same tier list", () => 
   assert.deepEqual(emitted, [[copy.id, "u1"]]);
 });
 
+test("a publish whose activity recording fails still publishes, because the best-effort recorder swallows the failure", () => {
+  const logged: string[] = [];
+  const record = createBestEffortRecorder(
+    () => {
+      throw new Error("disk full");
+    },
+    { error: (_context, message) => logged.push(message) }
+  );
+  const service = createTierlistsService(createInMemoryRepo(), (copyId, ownerUserId) => record(ownerUserId, "tierlist_published", "tierlist", copyId));
+  const original = service.createTierlist("u1", "Fantasy");
+
+  const copy = service.openVoting("u1", original.id, "anonymous");
+
+  assert.ok(copy);
+  assert.equal(service.getPublishedRef(copy.id)?.ownerUserId, "u1");
+  assert.deepEqual(logged, ["failed to record community activity"]);
+});
+
 test("a first signed-in ballot emits voted_on once", () => {
-  const emitted: Array<[string, string, string, number]> = [];
-  const service = createTierlistsService(createInMemoryRepo(), undefined, (voterUserId, tierlistId, tierlistName, placementCount) => {
-    emitted.push([voterUserId, tierlistId, tierlistName, placementCount]);
+  const emitted: Array<[string, string, string]> = [];
+  const service = createTierlistsService(createInMemoryRepo(), undefined, (voterUserId, tierlistId, tierlistName) => {
+    emitted.push([voterUserId, tierlistId, tierlistName]);
   });
   const { code, tierIds } = openPoll(service);
   const tierlistId = service.getVotingBoard(code)!.id;
@@ -621,13 +640,13 @@ test("a first signed-in ballot emits voted_on once", () => {
   );
 
   assert.equal(outcome.ok, true);
-  assert.deepEqual(emitted, [["u7", tierlistId, "Fantasy", 2]]);
+  assert.deepEqual(emitted, [["u7", tierlistId, "Fantasy"]]);
 });
 
 test("editing a signed-in ballot emits no second voted_on", () => {
-  const emitted: Array<[string, string, string, number]> = [];
-  const service = createTierlistsService(createInMemoryRepo(), undefined, (voterUserId, tierlistId, tierlistName, placementCount) => {
-    emitted.push([voterUserId, tierlistId, tierlistName, placementCount]);
+  const emitted: Array<[string, string, string]> = [];
+  const service = createTierlistsService(createInMemoryRepo(), undefined, (voterUserId, tierlistId, tierlistName) => {
+    emitted.push([voterUserId, tierlistId, tierlistName]);
   });
   const { code, tierIds } = openPoll(service);
 
@@ -638,9 +657,9 @@ test("editing a signed-in ballot emits no second voted_on", () => {
 });
 
 test("an anonymous first ballot emits no voted_on", () => {
-  const emitted: Array<[string, string, string, number]> = [];
-  const service = createTierlistsService(createInMemoryRepo(), undefined, (voterUserId, tierlistId, tierlistName, placementCount) => {
-    emitted.push([voterUserId, tierlistId, tierlistName, placementCount]);
+  const emitted: Array<[string, string, string]> = [];
+  const service = createTierlistsService(createInMemoryRepo(), undefined, (voterUserId, tierlistId, tierlistName) => {
+    emitted.push([voterUserId, tierlistId, tierlistName]);
   });
   const { code, tierIds } = openPoll(service);
 

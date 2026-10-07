@@ -53,6 +53,25 @@ function newEvent(userId: string, type: ActivityEventType, refType: CommunityRef
   return { id: randomUUID(), user_id: userId, type, ref_type: refType, ref_id: refId, payload: payload ? JSON.stringify(payload) : null, created_at: new Date(now()).toISOString(), trace_id: trace?.traceId ?? null, source: trace?.source ?? null };
 }
 
+function createActivityRecorder(repo: CommunityRepository, now: () => number): CommunityPublicApi["emitEvent"] {
+  const atBookCap = (userId: string): boolean =>
+    repo.countEventsSince(userId, new Date(now() - BOOK_EVENTS_WINDOW_MS).toISOString(), READING_EVENT_TYPES, BOOK_EVENTS_PER_DAY) >= BOOK_EVENTS_PER_DAY;
+  return (userId, type, refType, refId, payload) => {
+    if (READING_EVENT_TYPES.includes(type) && atBookCap(userId)) return;
+    repo.insertEvent(newEvent(userId, type, refType, refId, payload, now));
+  };
+}
+
+export function createBestEffortRecorder(emit: CommunityPublicApi["emitEvent"], log: { error(context: object, message: string): void }): CommunityPublicApi["emitEvent"] {
+  return (userId, type, refType, refId, payload) => {
+    try {
+      emit(userId, type, refType, refId, payload);
+    } catch (error) {
+      log.error({ err: error, type, refType, refId }, "failed to record community activity");
+    }
+  };
+}
+
 export interface PublicProfileView {
   private: boolean;
   profile: PublishedProfile;
@@ -140,9 +159,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
   const { repo, background } = deps;
   const now = deps.now ?? Date.now;
   const windowStart = (): string => new Date(now() - FEED_WINDOW_MS).toISOString();
-  const emit = (userId: string, type: ActivityEventType, refType: CommunityRefType, refId: string, payload?: Record<string, unknown>): void => {
-    repo.insertEvent(newEvent(userId, type, refType, refId, payload));
-  };
+  const emit = createActivityRecorder(repo, now);
   const settingsFor = (userId: string): FeedSettings => repo.getFeedSettings(userId) ?? DEFAULT_FEED_SETTINGS;
   const backfillInboxes = async (authorId: string, types: readonly ActivityEventType[]): Promise<void> => {
     try {
@@ -579,13 +596,8 @@ export interface CommunityPublicApi {
 }
 
 export function createCommunityPublicApi(repo: CommunityRepository, now: () => number = Date.now): CommunityPublicApi {
-  const atBookCap = (userId: string): boolean =>
-    repo.countEventsSince(userId, new Date(now() - BOOK_EVENTS_WINDOW_MS).toISOString(), READING_EVENT_TYPES, BOOK_EVENTS_PER_DAY) >= BOOK_EVENTS_PER_DAY;
   return {
-    emitEvent(userId, type, refType, refId, payload) {
-      if (READING_EVENT_TYPES.includes(type) && atBookCap(userId)) return;
-      repo.insertEvent(newEvent(userId, type, refType, refId, payload, now));
-    },
+    emitEvent: createActivityRecorder(repo, now),
     readerVisibility(viewerId, userIds) {
       const visible = new Map<string, { followed: boolean; published: boolean; showGlyph: boolean }>();
       if (userIds.length === 0) return visible;

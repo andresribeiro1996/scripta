@@ -38,7 +38,7 @@ import {
   userHasUsername
 } from "./modules/auth/index.js";
 import { deleteArenaUserData, getArenaPublicApi, registerArenaModule } from "./modules/arena/index.js";
-import { deleteCommunityUserData, getCommunityPublicApi, registerCommunityModule } from "./modules/community/index.js";
+import { createBestEffortRecorder, deleteCommunityUserData, getCommunityPublicApi, registerCommunityModule } from "./modules/community/index.js";
 import { enqueueBookCovers, getWorkPage, registerBooksModule } from "./modules/books/index.js";
 import { deleteGalleryUserData, registerGalleryModule } from "./modules/gallery/index.js";
 import { copyOfWork, deleteLibraryUserData, holdersOfWorks, registerLibraryModule, resolvePublicLibrary, readerGlyphFor, resolveEntryWorks, WorkResolutionError, sharedBookCounts, sharedBooks, startWorksSweep, sweepLibraryWorks, type BookEvent } from "./modules/library/index.js";
@@ -136,25 +136,15 @@ export function buildApp() {
       for (const erase of [deleteGalleryUserData, deleteLibraryUserData, deleteSocialsUserData, deleteMuralsUserData, deleteArenaUserData, deleteTierlistsUserData, deleteQuizzesUserData, deleteCommunityUserData]) await erase(userId);
     }
   });
+  const recordActivity = createBestEffortRecorder((...event) => getCommunityPublicApi().emitEvent(...event), app.log);
   app.register(registerArenaModule, {
-    emitPublished: (tournamentId: string, ownerUserId: string) => getCommunityPublicApi().emitEvent(ownerUserId, "tournament_published", "tournament", tournamentId),
-    emitVotedOn: (voterUserId: string, tournamentId: string, name: string | null) => {
-      try {
-        getCommunityPublicApi().emitEvent(voterUserId, "voted_on", "tournament", tournamentId, { game: "tournament", id: tournamentId, name: name ?? "" });
-      } catch (error) {
-        app.log.error(error, "failed to record voted_on for tournament");
-      }
-    }
+    emitPublished: (tournamentId: string, ownerUserId: string) => recordActivity(ownerUserId, "tournament_published", "tournament", tournamentId),
+    emitVotedOn: (voterUserId: string, tournamentId: string, name: string | null) =>
+      recordActivity(voterUserId, "voted_on", "tournament", tournamentId, { game: "tournament", id: tournamentId, name: name ?? "" })
   });
   app.register(registerLibraryModule, {
     emitBookEvents: (userId: string, events: BookEvent[]) => {
-      for (const event of events) {
-        try {
-          getCommunityPublicApi().emitEvent(userId, event.type, "book", event.refId, event.payload);
-        } catch (error) {
-          app.log.error(error, "failed to record book activity event");
-        }
-      }
+      for (const event of events) recordActivity(userId, event.type, "book", event.refId, event.payload);
     },
     enqueueCovers: (lookups: CoverLookupParams[]) => {
       try {
@@ -226,14 +216,9 @@ export function buildApp() {
     }
   });
   app.register(registerTierlistsModule, {
-    emitPublished: (copyId: string, ownerUserId: string) => getCommunityPublicApi().emitEvent(ownerUserId, "tierlist_published", "tierlist", copyId),
-    emitVotedOn: (voterUserId: string, tierlistId: string, tierlistName: string) => {
-      try {
-        getCommunityPublicApi().emitEvent(voterUserId, "voted_on", "tierlist", tierlistId, { game: "tierlist", id: tierlistId, name: tierlistName });
-      } catch (error) {
-        app.log.error(error, "failed to record voted_on for tierlist");
-      }
-    }
+    emitPublished: (copyId: string, ownerUserId: string) => recordActivity(ownerUserId, "tierlist_published", "tierlist", copyId),
+    emitVotedOn: (voterUserId: string, tierlistId: string, tierlistName: string) =>
+      recordActivity(voterUserId, "voted_on", "tierlist", tierlistId, { game: "tierlist", id: tierlistId, name: tierlistName })
   });
   app.register(registerQuizzesModule);
   app.register(registerWorksModule, {
