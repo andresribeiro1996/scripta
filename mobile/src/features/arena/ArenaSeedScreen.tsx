@@ -16,6 +16,8 @@ export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: Tourna
   const [duration, setDuration] = useState(String((tournament?.roundDurationMinutes ?? 1440) / 60));
   const [current, setCurrent] = useState(tournament);
   const [slots, setSlots] = useState<Array<SeedBook | null>>(() => Array.from({ length: tournament?.bracketSize ?? 16 }, () => null));
+  const [savedSlots, setSavedSlots] = useState<Array<SeedBook | null> | null>(null);
+  const [saving, setSaving] = useState(false);
   const [slotToAssign, setSlotToAssign] = useState<number | null>(null);
   const [bookSearch, setBookSearch] = useState("");
   const [busy, setBusy] = useState(false);
@@ -35,7 +37,9 @@ export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: Tourna
   useEffect(() => {
     if (!saved.data) return;
     const byIndex = new Map(saved.data.slots.map((slot) => [slot.slotIndex, slot]));
-    setSlots(Array.from({ length: saved.data.bracketSize }, (_, index) => byIndex.get(index) ?? null));
+    const loaded = Array.from({ length: saved.data.bracketSize }, (_, index) => byIndex.get(index) ?? null);
+    setSlots(loaded);
+    setSavedSlots(loaded);
   }, [saved.data]);
 
   async function materialize() {
@@ -53,8 +57,23 @@ export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: Tourna
     // The prefix covers this tournament's seed query AND the owner's list,
     // whose cards show the seeded covers and how many slots are filled —
     // both of which just changed.
+    setSavedSlots(nextSlots);
     await queryClient.invalidateQueries({ queryKey: ["arena"] });
     return target;
+  }
+
+  async function saveProgress() {
+    setBusy(true);
+    setSaving(true);
+    setError(null);
+    try {
+      await persist();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Couldn't save.");
+    } finally {
+      setSaving(false);
+      setBusy(false);
+    }
   }
 
   async function seedBook(book: Record<string, unknown>, slotIndex: number) {
@@ -86,7 +105,9 @@ export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: Tourna
       await randomFillTournament(target.id, pool);
       const refreshed = await fetchTournament(target.id, "owner-seed");
       const byIndex = new Map(refreshed.slots.map((slot) => [slot.slotIndex, slot]));
-      setSlots(Array.from({ length: refreshed.bracketSize }, (_, index) => byIndex.get(index) ?? null));
+      const filled = Array.from({ length: refreshed.bracketSize }, (_, index) => byIndex.get(index) ?? null);
+      setSlots(filled);
+      setSavedSlots(filled);
       await queryClient.invalidateQueries({ queryKey: ["arena"] });
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Couldn't fill the bracket.");
@@ -111,6 +132,7 @@ export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: Tourna
   }
 
   const pickable = filterBooks(available, bookSearch, "all");
+  const isSaved = Boolean(current) && savedSlots !== null && JSON.stringify(slots) === JSON.stringify(savedSlots);
   return (
     <Screen top={false} style={styles.screen}>
       <Stack.Screen options={{ headerShown: true, title: "Seed tournament" }} />
@@ -121,11 +143,13 @@ export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: Tourna
           <View style={styles.row}>{[4, 8, 16, 32, 64].map((value) => <Button key={value} label={String(value)} variant={size === value ? "primary" : "secondary"} onPress={() => { setSize(value); setSlots(Array.from({ length: value }, () => null)); }} />)}</View>
           <Input label="Round duration (hours)" keyboardType="decimal-pad" value={duration} onChangeText={setDuration} />
         </View>
-      ) : null}
+      ) : (
+        <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{current.name} · {current.bracketSize} slots · {current.roundDurationMinutes / 60} h rounds</Text>
+      )}
       {error ? <Toast visible message={error} tone="error" /> : null}
       <View style={styles.actions}>
         <Button label="Random fill" variant="secondary" loading={busy} disabled={!books.length} onPress={randomFill} />
-        <Button label="Save progress" variant="secondary" loading={busy} onPress={() => void persist().catch((reason: unknown) => setError(reason instanceof Error ? reason.message : "Couldn't save."))} />
+        <Button label={saving ? "Saving…" : isSaved ? "Saved" : "Save progress"} variant="secondary" disabled={busy || isSaved} onPress={() => void saveProgress()} />
         <Button label="Start" loading={busy} disabled={slots.some((slot) => !slot)} onPress={start} />
       </View>
       {library.isPending ? <Skeleton height={120} /> : library.isError ? <ErrorState body="Your library couldn't be loaded." actionLabel="Retry" onAction={() => void library.refetch()} /> : (

@@ -7,7 +7,7 @@ import { FlatList, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { apiClient, ApiError } from "../../core/api";
 import { useLibrary, useWorkBooks } from "../library";
-import { Button, Dialog, EmptyState, ErrorState, Fab, HeaderActions, IconButton, Input, Menu, type MenuItem, Screen, Sheet, Skeleton, SwipeableTabs, Toast, dynamicType, spacing, typography, useTheme } from "../../ui";
+import { Button, Dialog, EmptyState, ErrorState, Fab, HeaderActions, IconButton, Input, Menu, type MenuItem, SaveStateButton, Screen, Sheet, Skeleton, SwipeableTabs, Toast, dynamicType, spacing, typography, useTheme } from "../../ui";
 import { fetchMyBallot, fetchTierlistResults, fetchVotingBoard, openVoting, renderTierlistShareVideo, setVotingState, updateTierlist, type Tierlist } from "./api";
 import { moveBookTo, votingBooks } from "./tierBoardData";
 import { TierBoard, TierHead } from "./TierBoard";
@@ -129,8 +129,8 @@ export function TierlistEditorScreen({ tierlist, onUpdated, startInRank = false 
       { label: current.voteAccess === "anonymous" ? "Require members" : "Allow anyone", onPress: () => void run(() => setVotingState(current.id, { access: current.voteAccess === "anonymous" ? "members" : "anonymous" })) },
     ]
     : [
-      { label: "Rename", onPress: () => setRenaming(true) },
-      { label: "Add books", onPress: () => setAdding(true) },
+      { label: "Rename…", onPress: () => setRenaming(true) },
+      { label: "Add books…", onPress: () => setAdding(true) },
       { label: "Add tier", onPress: () => setData((value) => ({ ...value, tiers: [...value.tiers, createTier("New tier", "#8a8580")] })) },
       { label: "Open voting…", onPress: () => setConfirmingVoting(true) },
     ];
@@ -140,7 +140,7 @@ export function TierlistEditorScreen({ tierlist, onUpdated, startInRank = false 
       headerShown: true,
       title: current.name,
       headerRight: () => <HeaderActions>
-        {!frozen ? <IconButton framed accessibilityLabel="Save changes" label="Save" name="confirm" onPress={() => void save()} /> : null}
+        {!frozen ? <SaveStateButton busy={busy} unsaved={dirty} onPress={() => void save()} /> : null}
         <IconButton framed accessibilityLabel="Share tier list" name="share" onPress={showShare} />
         <Menu title={current.name} items={actionItems}><IconButton framed accessibilityLabel="Tier list actions" name="more" /></Menu>
       </HeaderActions>,
