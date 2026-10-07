@@ -117,7 +117,7 @@ export function ContentShareSheet({ visible, onClose, title, description, url, c
           {view === "qr" && shareUrl ? <>
             <View style={[styles.qr, { backgroundColor: colors.background }]}>
               <View style={{ padding: spacing.md, backgroundColor: "white", borderRadius: radii.xl }}>
-                <QRCode value={shareUrl} size={Math.min(220, width - 112)} quietZone={8} backgroundColor="white" color="black" />
+                <QRCode value={shareUrl} size={Math.min(220, width - 136)} quietZone={8} backgroundColor="white" color="black" />
               </View>
               <Text style={[typography.caption, { color: colors.textDim, alignSelf: "stretch", textAlign: "center" }]}>Open in Atmyshelf</Text>
             </View>
@@ -165,5 +165,5 @@ const styles = StyleSheet.create({
   choice: { flexGrow: 1, padding: spacing.md, gap: spacing.sm, borderRadius: radii.xl, borderCurve: "continuous" },
   choiceIcon: { width: minimumTouchTarget, height: minimumTouchTarget, borderRadius: radii.lg, alignItems: "center", justifyContent: "center" },
   note: { padding: spacing.md, borderRadius: radii.lg },
-  qr: { alignItems: "center", gap: spacing.lg, paddingVertical: spacing.xxl, borderRadius: radii.xl },
+  qr: { alignItems: "center", gap: spacing.sm, paddingVertical: spacing.lg, borderRadius: radii.xl },
 });
