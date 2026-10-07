@@ -3,7 +3,7 @@
 // modules/auth/service.ts.
 
 import { createHash, randomUUID } from "node:crypto";
-import { applyLibraryChange, bookKey, bookMatchKeys, buildManualBook, calculateShelfTheme, isCertainMatch, isFinishedBook, isGroup, localDay, mergeDuplicateBooks, normalizeIsbn, publicReaderCard, readerIdentity, seedCoverLookup, setReadStatus, type CoverLookupParams, type IdentityKey, type LibraryChange, type LibraryChangeAnswer, type LibraryData } from "@scripta/shared";
+import { applyLibraryChange, bookKey, bookMatchKeys, buildManualBook, calculateShelfTheme, isCertainMatch, isFinishedBook, isGroup, localDay, mergeDuplicateBooks, normalizeIsbn, publicReaderCardOf, readerIdentity, seedCoverLookup, setReadStatus, type CoverLookupParams, type IdentityKey, type LibraryChange, type LibraryChangeAnswer, type LibraryData } from "@scripta/shared";
 import type { BookRecommendationInput } from "@scripta/shared/community";
 import { BOOK_EVENTS_PER_SAVE, COVER_URL_MAX_LENGTH, DISPLAY_TEXT_MAX_LENGTH, LIBRARY_MATCH_BOOK_CAP, LIBRARY_PUT_HEADROOM_BYTES, LIBRARY_ROWS_VERSION, MATCH_KEY_MAX_LENGTH } from "./domain/constants.js";
 import { LibraryChangeNotFoundError, LibraryConflictError, LibraryTooLargeError, NoLibraryDocumentError } from "./domain/errors.js";
@@ -145,7 +145,7 @@ export function libraryMeta(data: Record<string, unknown>): string {
 
 export function readerCardOf(parts: { allBooks: Record<string, unknown>[]; groupRecords: Record<string, unknown>[] }, report: ReportSkippedRow): string | null {
   try {
-    return JSON.stringify(publicReaderCard(readerIdentity(parts.allBooks, toReaderGroups(parts.groupRecords))));
+    return JSON.stringify(publicReaderCardOf(parts.allBooks, toReaderGroups(parts.groupRecords)));
   } catch (error) {
     if (!(error instanceof TypeError)) throw error;
     report(error, "no reader card");

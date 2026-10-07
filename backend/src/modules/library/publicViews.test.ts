@@ -115,6 +115,12 @@ const workOf = (userId: string, key: string) => (openLibraryDb().prepare("SELECT
 
 const json = (value: unknown) => JSON.parse(JSON.stringify(value)) as unknown;
 
+function withoutDialAndFacts(view: ReturnType<typeof resolvePublicLibraryData>) {
+  const { readerCard, ...rest } = json(view) as { readerCard: Record<string, unknown> };
+  const { dial, facts, ...identity } = readerCard;
+  return { view: { ...rest, readerCard: identity }, dial, facts };
+}
+
 const fullRequest = {
   collectionIds: ["col1", "col2", "saga", "missing"],
   bookKeys: [emma, "ta:ghost|nobody", dune, noTitle, manual, numeric, emma, "isbn:9783333333333", "ta:cached by title|cache author", "isbn:9784444444444", "isbn:9782222222222", "ta:|", "ta:bad date|date author"],
@@ -690,6 +696,7 @@ const expectedDataMain = {
     state: "settled",
     identity: "loyal",
     runnerUp: null,
+    streak: null,
     signal: {
       counted: 3,
       of: 5,
@@ -738,6 +745,7 @@ const expectedDataEmpty = {
     state: "unwritten",
     identity: null,
     runnerUp: null,
+    streak: null,
     signal: null,
     coverage: [
       "genres known for 0 of 0 finished books"
@@ -799,6 +807,7 @@ const expectedDataBare = {
     state: "unwritten",
     identity: null,
     runnerUp: null,
+    streak: null,
     signal: null,
     coverage: [
       "genres known for 0 of 0 finished books"
@@ -821,6 +830,7 @@ const expectedDataGhost = {
     state: "unwritten",
     identity: null,
     runnerUp: null,
+    streak: null,
     signal: null,
     coverage: [
       "genres known for 0 of 0 finished books"
@@ -850,7 +860,9 @@ test("the profile library view", () => {
 });
 
 test("the mural data view with every kind of reference", () => {
-  assert.deepEqual(json(resolvePublicLibraryData(users.main, fullRequest)), expectedDataMain);
+  const { view, dial, facts } = withoutDialAndFacts(resolvePublicLibraryData(users.main, fullRequest));
+  assert.deepEqual(view, expectedDataMain);
+  assert.ok(dial && facts);
 });
 
 test("the mural data view without requests", () => {
@@ -858,8 +870,12 @@ test("the mural data view without requests", () => {
 });
 
 test("the mural data view of an empty library, a sparse one and a missing one", () => {
-  assert.deepEqual(json(resolvePublicLibraryData(users.empty, { ...fullRequest, collectionIds: ["col1"] })), expectedDataEmpty);
-  assert.deepEqual(json(resolvePublicLibraryData(users.bare, { ...fullRequest, bookKeys: ["ta:only title|", "ta:|only author", "ta:|"] })), expectedDataBare);
+  const empty = withoutDialAndFacts(resolvePublicLibraryData(users.empty, { ...fullRequest, collectionIds: ["col1"] }));
+  assert.deepEqual(empty.view, expectedDataEmpty);
+  assert.ok(empty.dial && empty.facts);
+  const bare = withoutDialAndFacts(resolvePublicLibraryData(users.bare, { ...fullRequest, bookKeys: ["ta:only title|", "ta:|only author", "ta:|"] }));
+  assert.deepEqual(bare.view, expectedDataBare);
+  assert.ok(bare.dial && bare.facts);
   assert.deepEqual(json(resolvePublicLibraryData("pv-ghost", fullRequest)), expectedDataGhost);
 });
 

@@ -117,13 +117,16 @@ test("public mural payload carries the reader card without leaking titles or ser
     const withoutCardResponse = await app.inject({ method: "GET", url: `/murals/shared/${sharedWithoutCard.shareToken}` });
     assert.equal(withCardResponse.statusCode, 200, "a malformed group must not 500 the public payload");
     const withCardBody = withCardResponse.json();
-    assert.deepEqual(withCardBody.readerCard, {
+    const { dial, facts, ...cardIdentity } = withCardBody.readerCard;
+    assert.deepEqual(cardIdentity, {
       state: "settled",
       identity: "carto",
       runnerUp: null,
+      streak: null,
       signal: { counted: 3, of: 10, label: "3 of 10 finished books are in a series" },
       coverage: ["genres known for 0 of 10 finished books"]
     });
+    assert.ok(dial && facts);
     assert.equal(withCardBody.profile?.username, "cardOwner");
     for (const secretValue of ["Secret Series", "Klara"]) assert.equal(withCardResponse.body.includes(secretValue), false);
     assert.equal("readerCard" in withoutCardResponse.json(), false);
@@ -148,7 +151,7 @@ test("public mural payload carries the reader card without leaking titles or ser
     service.updateMural("noLibraryOwner", noLibraryHome.id, { blocks: [{ id: "c", type: "readerCard", layout: { x: 0, y: 0, w: 4, h: 6 } }], updatedAt: noLibraryHome.updatedAt });
     const sharedNoLibrary = service.share("noLibraryOwner", noLibraryHome.id)!;
     const noLibraryBody = (await app.inject({ method: "GET", url: `/murals/shared/${sharedNoLibrary.shareToken}` })).json();
-    assert.deepEqual(noLibraryBody.readerCard, { state: "unwritten", identity: null, runnerUp: null, signal: null, coverage: ["genres known for 0 of 0 finished books"] });
+    assert.deepEqual(noLibraryBody.readerCard, { state: "unwritten", identity: null, runnerUp: null, streak: null, signal: null, coverage: ["genres known for 0 of 0 finished books"] });
   } finally {
     await app.close();
     library.close();

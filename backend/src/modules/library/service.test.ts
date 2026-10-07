@@ -2023,3 +2023,21 @@ test("a catalog outage still answers the library with stored work ids and logs i
   assert.deepEqual(service.getLibrary("u1")!.works, { "ta:dune|frank herbert": "w-Dune" });
   assert.ok(logged.some((message) => message.includes("work canonical lookup failed for u1")));
 });
+
+test("a saved library's reader card carries the streak, the dial and the facts", () => {
+  const { db, service } = setup();
+  service.saveLibrary("u1", changeLibrary());
+  const card = JSON.parse(rowsInDb(db, "u1").summary.reader_card as string);
+  assert.equal(card.facts.finished, 10);
+  assert.equal(card.facts.series, 1);
+  assert.ok(Array.isArray(card.dial.segments));
+  assert.ok("streak" in card);
+  assert.equal("leaders" in card, false);
+});
+
+test("finishing or unfinishing a book recomputes the stored facts", () => {
+  const { db, service } = setup();
+  service.saveLibrary("u1", changeLibrary());
+  service.applyChange("u1", { kind: "book", bookKey: keyOf(3), readStatus: 0 });
+  assert.equal(JSON.parse(rowsInDb(db, "u1").summary.reader_card as string).facts.finished, 9);
+});
