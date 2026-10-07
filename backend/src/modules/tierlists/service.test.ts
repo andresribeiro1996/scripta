@@ -604,9 +604,9 @@ test("openVoting emits exactly one publish event for the same tier list", () => 
 });
 
 test("a first signed-in ballot emits voted_on once", () => {
-  const emitted: Array<[string, string, string, number]> = [];
-  const service = createTierlistsService(createInMemoryRepo(), undefined, (voterUserId, tierlistId, tierlistName, placementCount) => {
-    emitted.push([voterUserId, tierlistId, tierlistName, placementCount]);
+  const emitted: Array<[string, string, string]> = [];
+  const service = createTierlistsService(createInMemoryRepo(), undefined, (voterUserId, tierlistId, tierlistName) => {
+    emitted.push([voterUserId, tierlistId, tierlistName]);
   });
   const { code, tierIds } = openPoll(service);
   const tierlistId = service.getVotingBoard(code)!.id;
@@ -621,13 +621,13 @@ test("a first signed-in ballot emits voted_on once", () => {
   );
 
   assert.equal(outcome.ok, true);
-  assert.deepEqual(emitted, [["u7", tierlistId, "Fantasy", 2]]);
+  assert.deepEqual(emitted, [["u7", tierlistId, "Fantasy"]]);
 });
 
 test("editing a signed-in ballot emits no second voted_on", () => {
-  const emitted: Array<[string, string, string, number]> = [];
-  const service = createTierlistsService(createInMemoryRepo(), undefined, (voterUserId, tierlistId, tierlistName, placementCount) => {
-    emitted.push([voterUserId, tierlistId, tierlistName, placementCount]);
+  const emitted: Array<[string, string, string]> = [];
+  const service = createTierlistsService(createInMemoryRepo(), undefined, (voterUserId, tierlistId, tierlistName) => {
+    emitted.push([voterUserId, tierlistId, tierlistName]);
   });
   const { code, tierIds } = openPoll(service);
 
@@ -638,9 +638,9 @@ test("editing a signed-in ballot emits no second voted_on", () => {
 });
 
 test("an anonymous first ballot emits no voted_on", () => {
-  const emitted: Array<[string, string, string, number]> = [];
-  const service = createTierlistsService(createInMemoryRepo(), undefined, (voterUserId, tierlistId, tierlistName, placementCount) => {
-    emitted.push([voterUserId, tierlistId, tierlistName, placementCount]);
+  const emitted: Array<[string, string, string]> = [];
+  const service = createTierlistsService(createInMemoryRepo(), undefined, (voterUserId, tierlistId, tierlistName) => {
+    emitted.push([voterUserId, tierlistId, tierlistName]);
   });
   const { code, tierIds } = openPoll(service);
 

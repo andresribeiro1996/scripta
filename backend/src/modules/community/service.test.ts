@@ -13,7 +13,7 @@ import type { EventRow, FollowRow, ProfileRow } from "./domain/types.js";
 import { FollowLimitError, InvalidCursorError, MuralNotOwnedError, NotFollowingError, ProfileNotFoundError, SelfFollowError, UsernameRequiredError } from "./domain/errors.js";
 import { ACTIVITY_EVENT_TYPES, FEED_EVENT_TYPES } from "./domain/feed.js";
 import { registerTrace } from "../../trace.js";
-import { createCommunityPublicApi, createCommunityService, type CommunityDeps, type CommunityPublicApi, type CommunityService } from "./service.js";
+import { createBestEffortRecorder, createCommunityPublicApi, createCommunityService, type CommunityDeps, type CommunityPublicApi, type CommunityService } from "./service.js";
 
 function createRepoFake() {
   const follows = new Map<string, FollowRow>();
@@ -473,6 +473,40 @@ test("an event the service emits records the request that caused it, and nothing
 test("an event emitted through the public API other modules call records the request that caused it, and nothing outside a request", async () => {
   const { repo, events } = createRepoFake();
   await emitInsideAndOutsideARequest(createCommunityPublicApi(repo).emitEvent, events);
+});
+
+test("events the service records itself use the injected clock, uncapped, whatever the author's book events", () => {
+  const { repo, events } = createRepoFake();
+  const { deps, readerProfiles, usernames, ownedMurals } = createDeps(repo);
+  const later = NOW + 12345;
+  const service = createCommunityService({ ...deps, now: () => later });
+  emitBookEvents(createCommunityPublicApi(repo, () => NOW), "bob", "book", 100);
+  readerProfiles.set("alice", reader("alice"));
+  repo.upsertProfile(profileRow("alice"));
+  usernames.set("bob", "bob");
+  ownedMurals.add("bob:m1");
+
+  service.follow("bob", "alice");
+  service.publishProfile("bob", { muralId: "m1" });
+
+  const own = events.filter((event) => event.type === "following" || event.type === "mural_published");
+  assert.deepEqual(own.map((event) => event.type).sort(), ["following", "mural_published"]);
+  assert.ok(own.every((event) => event.created_at === new Date(later).toISOString()));
+});
+
+test("recording an event never throws out of the best-effort recorder, which logs what failed", () => {
+  const logged: Array<{ context: object; message: string }> = [];
+  const failure = new Error("disk full");
+  const record = createBestEffortRecorder(
+    () => {
+      throw failure;
+    },
+    { error: (context, message) => logged.push({ context, message }) }
+  );
+
+  record("alice", "tierlist_published", "tierlist", "t1");
+
+  assert.deepEqual(logged, [{ context: { err: failure, userId: "alice", type: "tierlist_published", refType: "tierlist", refId: "t1" }, message: "failed to record community activity" }]);
 });
 
 const HOUR_MS = 60 * 60 * 1000;
