@@ -26,3 +26,17 @@ test("a trigger that rolls the transaction back surfaces its own error and keeps
   assert.equal(repo.getDocument("u1"), undefined);
   assert.equal(db.isTransaction, false);
 });
+
+test("a reader card style is stored per user, replaced on write and erased with the user", () => {
+  const db = new DatabaseSync(":memory:");
+  applyLibrarySchema(db);
+  const repo = createSqliteLibraryRepository(db);
+  assert.equal(repo.getReaderCardStyle("u1"), undefined);
+  repo.setReaderCardStyle("u1", `{"counter":"shelf"}`);
+  repo.setReaderCardStyle("u1", `{"counter":"ring"}`);
+  repo.setReaderCardStyle("u2", `{"counter":"dial"}`);
+  assert.equal(repo.getReaderCardStyle("u1"), `{"counter":"ring"}`);
+  repo.deleteUserData("u1");
+  assert.equal(repo.getReaderCardStyle("u1"), undefined);
+  assert.equal(repo.getReaderCardStyle("u2"), `{"counter":"dial"}`);
+});

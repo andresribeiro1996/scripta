@@ -70,3 +70,9 @@ CREATE TABLE IF NOT EXISTS library_summary (
   source_updated_at TEXT NOT NULL,
   rows_version      INTEGER NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS reader_card_styles (
+  user_id    TEXT PRIMARY KEY,
+  style      TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);

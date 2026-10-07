@@ -9,6 +9,12 @@ import type { LibraryDerived, LibraryDocumentRow, LibraryRows, LibrarySmallSave 
 
 export function createSqliteLibraryRepository(db: DatabaseSync, rowsVersion = LIBRARY_ROWS_VERSION): LibraryRepository {
   const getStmt = db.prepare(`SELECT * FROM library_documents WHERE user_id = ?`);
+  const getStyleStmt = db.prepare(`SELECT style FROM reader_card_styles WHERE user_id = ?`);
+  const setStyleStmt = db.prepare(`
+    INSERT INTO reader_card_styles (user_id, style, updated_at)
+    VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+    ON CONFLICT(user_id) DO UPDATE SET style = excluded.style, updated_at = excluded.updated_at
+  `);
   // One document per user: insert on first save, replace on every save
   // after that. SQLite's upsert clause does this in one round trip.
   const upsertStmt = db.prepare(`
@@ -150,6 +156,7 @@ export function createSqliteLibraryRepository(db: DatabaseSync, rowsVersion = LI
         db.prepare("DELETE FROM library_books WHERE user_id = ?").run(userId);
         db.prepare("DELETE FROM library_highlights WHERE user_id = ?").run(userId);
         db.prepare("DELETE FROM library_summary WHERE user_id = ?").run(userId);
+        db.prepare("DELETE FROM reader_card_styles WHERE user_id = ?").run(userId);
       });
     },
     getDocument(userId) {
@@ -222,6 +229,14 @@ export function createSqliteLibraryRepository(db: DatabaseSync, rowsVersion = LI
 
     getShareOwner(token) {
       return (getShareOwnerStmt.get(token) as { user_id: string } | undefined)?.user_id;
+    },
+
+    getReaderCardStyle(userId) {
+      return (getStyleStmt.get(userId) as { style: string } | undefined)?.style;
+    },
+
+    setReaderCardStyle(userId, style) {
+      setStyleStmt.run(userId, style);
     }
   };
 }

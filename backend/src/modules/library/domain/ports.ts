@@ -29,4 +29,6 @@ export interface LibraryRepository {
    *  token itself is the credential, same trust model as
    *  modules/gallery's unguessable image ids. */
   getShareOwner(token: string): string | undefined;
+  getReaderCardStyle(userId: string): string | undefined;
+  setReaderCardStyle(userId: string, style: string): void;
 }
