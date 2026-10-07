@@ -115,8 +115,8 @@ export interface Mural {
    *  image deletion (scrubImageFromMurals below) knows which murals it's
    *  actually responsible for; `coverImageUrl` is what's actually
    *  rendered, so the card doesn't need a separate fetch to resolve it. */
-  coverImageId?: string;
-  coverImageUrl?: string;
+  coverImageId?: string | null;
+  coverImageUrl?: string | null;
   /** Public share link state — same idempotent-share/plain-unshare shape
    *  as the library document's own shareToken/shareUrl (api/library.ts's
    *  LibraryDocument). null until shared; see hooks/useMurals.ts's
