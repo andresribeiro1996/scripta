@@ -583,8 +583,8 @@ export function SwipeableTabs<T extends string>({
               {
                 backgroundColor: colors.accent,
                 transform: [
-                  { translateX: progress.interpolate({ inputRange: indicatorInput, outputRange: tabLayouts.map((layout) => layout!.x + layout!.width / 2 - 0.5) }) },
-                  { scaleX: progress.interpolate({ inputRange: indicatorInput, outputRange: tabLayouts.map((layout) => layout!.width) }) },
+                  { translateX: progress.interpolate({ inputRange: indicatorInput, outputRange: options.map((_, optionIndex) => tabLayouts[optionIndex]!.x + tabLayouts[optionIndex]!.width / 2 - 0.5) }) },
+                  { scaleX: progress.interpolate({ inputRange: indicatorInput, outputRange: options.map((_, optionIndex) => tabLayouts[optionIndex]!.width) }) },
                 ],
               },
             ]}
