@@ -4,35 +4,14 @@
 // at all, and this route requires none (the token itself IS the access
 // control — see backend/src/modules/murals/routes.ts's own comment on
 // GET /murals/shared/:token for why it's never cached).
-//
-// PublicBookData/PublicHighlight mirror the backend's redacted shapes
-// exactly (backend/src/modules/library/publicResolver.ts) — same
-// no-shared-package duplication every other cross-boundary type in this
-// app already has (see that file's own top comment).
 
-import type { PublicReaderCard } from "@scripta/shared";
+import type { PublicBookData, PublicHighlight, PublicReaderCard } from "@scripta/shared";
 import type { ThemeId } from "@scripta/shared/themes";
 import type { MuralBlock, ReaderProfile, ShelfTheme } from "../lib/murals";
 import { publicFetch } from "./client";
 import type { ResolvedTierlist } from "./tierlists";
 
-export interface PublicBookData {
-  key: string;
-  workId: string | null;
-  title: string;
-  author: string;
-  isbn: string | null;
-  imageId: string | null;
-  coverUrl: string | null;
-  readStatus: number | null;
-}
-
-export interface PublicHighlight {
-  bookKey: string;
-  highlightId: string;
-  text: string;
-  annotation: string | null;
-}
+export type { PublicBookData, PublicHighlight } from "@scripta/shared";
 
 export interface SharedMuralPayload {
   mural: { id: string; name: string; theme: ThemeId; blocks: MuralBlock[]; coverImageUrl: string | null };

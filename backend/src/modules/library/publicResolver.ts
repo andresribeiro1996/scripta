@@ -1,27 +1,11 @@
 import type { DatabaseSync } from "node:sqlite";
-import { isGroup, normalizeImageId, publicReaderCard, readerIdentity, type Group, type IdentityKey, type PublicReaderCard, type ShelfTheme } from "@scripta/shared";
+import { isGroup, normalizeImageId, publicReaderCard, readerIdentity, type Group, type IdentityKey, type PublicBookData, type PublicHighlight, type PublicReaderCard, type ShelfTheme } from "@scripta/shared";
 import type { SharedBook } from "@scripta/shared/community";
 import { peekCachedCoverUrl, peekCachedCoverUrls } from "../books/index.js";
 import { openLibraryDb } from "./adapters/sqlite/connection.js";
 import { canonicalWorkIds, copyKeysForWorks } from "./works.js";
 
-export interface PublicBookData {
-  title: string;
-  author: string;
-  isbn: string | null;
-  imageId: string | null;
-  coverUrl: string | null;
-  readStatus: number | null;
-  key: string;
-  workId: string | null;
-}
-
-export interface PublicHighlight {
-  bookKey: string;
-  highlightId: string;
-  text: string;
-  annotation: string | null;
-}
+export type { PublicBookData, PublicHighlight };
 
 export interface ResolvedPublicData {
   collectionBooks?: Record<string, string[]>;

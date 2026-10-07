@@ -53,10 +53,11 @@ test("a ballot placing a book in a tier that no longer exists drops the placemen
 });
 
 test("voting books keep the server's key and work id, and orphans stay out of the work lookup", () => {
+  const book = { author: "", isbn: null, imageId: null, coverUrl: null, readStatus: null };
   const books = votingBooks([
-    { key: "ta:orlando|", workId: "w1", title: "Orlando" },
-    { key: "isbn:1", workId: "w1", title: "Orlando", isbn: "1" },
-    { key: "ta:orphan|", workId: null, title: "Orphan" },
+    { ...book, key: "ta:orlando|", workId: "w1", title: "Orlando" },
+    { ...book, key: "isbn:1", workId: "w1", title: "Orlando", isbn: "1" },
+    { ...book, key: "ta:orphan|", workId: null, title: "Orphan" },
   ]);
   assert.equal(bookKey(books[0]!), "ta:orlando|");
   assert.deepEqual([...booksByWork(books).keys()], ["w1"]);

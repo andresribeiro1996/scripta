@@ -3,7 +3,7 @@
 // module's service.ts.
 
 import { randomBytes, randomUUID } from "node:crypto";
-import { DEFAULT_TIER_PRESET } from "@scripta/shared";
+import { DEFAULT_TIER_PRESET, type ResolvedTierlist, type VotedTierlist } from "@scripta/shared";
 import type { GameParticipation } from "@scripta/shared/community";
 import type { TierlistsRepository } from "./domain/ports.js";
 import type { BallotRow, HistogramCell, Placement, Tierlist, TierlistGameRow, TierlistRow, VoteAccess } from "./domain/types.js";
@@ -117,7 +117,7 @@ export interface TierlistsService {
   /** Public tier lists the account has a ballot on, latest ballot first —
    *  own polls excluded (openVoting seeds the owner's ballot, which is
    *  not participation). Feeds the "Voted on" section of the games list. */
-  listVotedByUser(voterUserId: string): PublishedTierlistRef[];
+  listVotedByUser(voterUserId: string): VotedTierlist[];
   participationByOwner(ownerUserId: string, since: string): GameParticipation[];
 }
 
@@ -441,16 +441,6 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
   };
 }
 
-/** The raw document shape the cross-module getter below hands out —
- *  tiers/pool are OPAQUE JSON values cast to their expected shape, never
- *  validated here (same "store and return the document without
- *  understanding its internals" stance as `data` itself). */
-export interface TierlistData {
-  name: string;
-  tiers: Array<{ id: string; label: string; color: string; workIds: string[] }>;
-  pool: string[];
-}
-
 /** tierlists' cross-module public surface — the ONLY way another module
  *  (murals, for its public GET /murals/shared/:token route) may read a
  *  tier list. app.ts gets a ready-built instance from plugin.ts's
@@ -459,7 +449,7 @@ export interface TierlistData {
  *  same module-boundary discipline every cross-module import in this
  *  codebase already follows. */
 export interface TierlistsPublicApi {
-  getTierlistData(ownerUserId: string, tierlistId: string): TierlistData | undefined;
+  getTierlistData(ownerUserId: string, tierlistId: string): ResolvedTierlist | undefined;
   discoverWindow(needle: string, limit: number): TierlistDiscoverRef[];
   getPublishedMany(ids: string[]): PublishedTierlistRef[];
   votedAmong(voterUserId: string, ids: string[]): string[];

@@ -7,7 +7,7 @@ import fastifyRateLimit from "@fastify/rate-limit";
 import type { ThemeId } from "@scripta/shared/themes";
 import type { FastifyInstance } from "fastify";
 import { env } from "../../config/env.js";
-import type { TierlistData } from "../tierlists/index.js";
+import type { ResolvedTierlist } from "@scripta/shared";
 import { createSqliteMuralsRepository } from "./adapters/sqlite/sqliteMuralsRepository.js";
 import { openMuralsDb } from "./adapters/sqlite/connection.js";
 import { buildMuralRoutes, buildPublicMuralRoutes } from "./routes.js";
@@ -20,7 +20,7 @@ import { createMuralsService } from "./service.js";
  *  tierlist block references. See routes.ts's buildPublicMuralRoutes. */
 export interface MuralsPluginOptions {
   resolveOwnerTheme: (userId: string) => ThemeId;
-  getTierlistData?: (ownerUserId: string, tierlistId: string) => TierlistData | undefined;
+  getTierlistData?: (ownerUserId: string, tierlistId: string) => ResolvedTierlist | undefined;
 }
 
 export async function muralsPlugin(app: FastifyInstance, opts: MuralsPluginOptions) {
@@ -55,7 +55,7 @@ export async function muralsPlugin(app: FastifyInstance, opts: MuralsPluginOptio
 
 let cachedPublicApi: MuralsPublicApi | null = null;
 
-export function getMuralsPublicApi(getTierlistData?: (ownerUserId: string, tierlistId: string) => TierlistData | undefined): MuralsPublicApi {
+export function getMuralsPublicApi(getTierlistData?: (ownerUserId: string, tierlistId: string) => ResolvedTierlist | undefined): MuralsPublicApi {
   if (!cachedPublicApi) {
     cachedPublicApi = createMuralsPublicApi(createSqliteMuralsRepository(openMuralsDb()), getTierlistData);
   }

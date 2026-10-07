@@ -1,4 +1,4 @@
-import type { TierlistData } from "../tierlists/index.js";
+import type { ResolvedTierlist } from "@scripta/shared";
 import type { MuralsRepository } from "./domain/ports.js";
 import { resolveMuralPublicPayload, type MuralPublicPayload } from "./domain/publicPayload.js";
 
@@ -9,7 +9,7 @@ export interface MuralsPublicApi {
 
 export function createMuralsPublicApi(
   repo: MuralsRepository,
-  getTierlistData?: (ownerUserId: string, tierlistId: string) => TierlistData | undefined
+  getTierlistData?: (ownerUserId: string, tierlistId: string) => ResolvedTierlist | undefined
 ): MuralsPublicApi {
   return {
     ownsMural(userId, muralId) {

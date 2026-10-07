@@ -1,9 +1,8 @@
-import { blockReferences, muralThemeId, type ReaderProfile } from "@scripta/shared";
+import { blockReferences, muralThemeId, type ReaderProfile, type ResolvedTierlist } from "@scripta/shared";
 import type { ThemeId } from "@scripta/shared/themes";
 import { env } from "../../../config/env.js";
 import { resolvePublicReaderProfile } from "../../auth/index.js";
 import { resolvePublicBooksByWork, resolvePublicLibraryData } from "../../library/index.js";
-import type { TierlistData } from "../../tierlists/index.js";
 import type { MuralRow } from "./types.js";
 
 type PublicLibraryData = ReturnType<typeof resolvePublicLibraryData>;
@@ -13,13 +12,13 @@ export interface MuralPublicPayload {
   library: PublicLibraryData;
   profile: ReaderProfile | undefined;
   imageUrls: Record<string, string | null>;
-  tierlists: Record<string, TierlistData>;
+  tierlists: Record<string, ResolvedTierlist>;
 }
 
 export function resolveMuralPublicPayload(
   row: MuralRow,
   blocks: unknown,
-  getTierlistData?: (ownerUserId: string, tierlistId: string) => TierlistData | undefined
+  getTierlistData?: (ownerUserId: string, tierlistId: string) => ResolvedTierlist | undefined
 ): MuralPublicPayload {
   const refs = blockReferences(blocks);
 
@@ -35,7 +34,7 @@ export function resolveMuralPublicPayload(
   const tierlists = Object.fromEntries(
     tierlistIds
       .map((id) => [id, getTierlistData?.(row.user_id, id)] as const)
-      .filter((entry): entry is readonly [string, TierlistData] => entry[1] !== undefined)
+      .filter((entry): entry is readonly [string, ResolvedTierlist] => entry[1] !== undefined)
   );
   const tierlistWorkIds = [...new Set(Object.values(tierlists).flatMap((tierlist) => [...tierlist.pool, ...tierlist.tiers.flatMap((tier) => tier.workIds)]))];
 
