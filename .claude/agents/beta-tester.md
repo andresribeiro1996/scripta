@@ -12,18 +12,21 @@ Run every command from the worktree root: `scripts/…` and `mobile/src/app` are
 ## Setup
 
 1. Read `.claude/skills/emulator-verify/SKILL.md` in the worktree you were given. Follow it for the lease check, starting the stack, the adb driving rules and the release. A sweep is optional work: if every device is held by another worktree, stop and report "emulator occupied".
-2. Start from clean fixture data. If `node scripts/dev-status.mjs --json` shows this worktree already has a stack, run `npm run dev:release` first: `--reset` under a running stack does nothing. Then `node scripts/dev-emulator.mjs --reset`, and take the serial and Metro port from `node scripts/dev-status.mjs --json`, as the skill says. Drag Expo Go's dev FAB to the left edge at mid-height, clear of the tab bar and the header, once, as the skill says. If `dev-emulator.mjs` refuses (for example "N stacks are already running (limit 4)", or the load gate), stop and report it. Never release or kill another worktree's stack.
-3. Clear the device log and note where Metro's log ends. Shell variables do not survive between your commands, so keep the number:
+2. Start from clean fixture data. If `node scripts/dev-status.mjs --json` shows this worktree already has a stack, run `npm run dev:release` first: `--reset` under a running stack does nothing. Then `node scripts/dev-emulator.mjs --reset`, and take the serial and Metro port from `node scripts/dev-status.mjs --json`, as the skill says. If `dev-emulator.mjs` refuses (for example "N stacks are already running (limit 4)", or the load gate), stop and report it. Never release or kill another worktree's stack.
+3. Narrow the screen to 360dp, the width of the user's phone; the emulator's default 411dp hides wrapping and clipping bugs. Read the width in pixels from `adb -s <serial> shell wm size` (the Override line if there is one), run `adb -s <serial> shell wm density <width × 160 / 360, rounded>`, then cold-restart Expo Go: `adb -s <serial> shell am force-stop host.exp.exponent`, then open `exp://127.0.0.1:<metro>`. Snapshot headers now start `360×`. Then drag Expo Go's dev FAB to the left edge at mid-height, clear of the tab bar and the header, once, as the skill says.
+4. Clear the device log and note where Metro's log ends. Shell variables do not survive between your commands, so keep the number:
    ```bash
    adb -s <serial> logcat -c
    wc -c < "$(node -p 'require("node:os").tmpdir()')/scripta-dev-emulator/metro.log"
    ```
-4. Read `DESIGN.md` once. It is the standard for design-system, accessibility and copy findings. Read a spec under `docs/superpowers/specs/` only when a behaviour looks wrong, to check whether it is intended.
-5. Build the coverage list, every route the app has:
+5. Read `DESIGN.md` once. It is the standard for design-system, accessibility and copy findings. Read a spec under `docs/superpowers/specs/` only when a behaviour looks wrong, to check whether it is intended.
+6. Build the coverage list, every route the app has:
    ```bash
    find mobile/src/app -name '*.tsx' ! -name '_layout.tsx' ! -path '*/dashboard/*' | sort
    ```
    Write `report.md` in the output directory now, from the template below, with every route "not reached". `choose-username` stays "not reached — Google sign-in only".
+
+   Routes are only the top level. Whenever a screen opens a sheet, a set of tabs or collapsible groups, add a row for each, named `<route> › <sheet> › <tab> › <group>`, and open every one. Where a form changes with a type, add a row per type: the mural block sheet's Content tab is different for each block type the add-block menu offers, while its Style groups and Size tab are shared, so they get one row each.
 
 ## Looking at a screen
 
@@ -34,7 +37,7 @@ node scripts/dev-snapshot.mjs <NN>-<screen>-<state> --out <output dir>
 `NN` is a running two-digit counter. It saves a screenshot (shrunk only when its long side is over 1200px) and prints the screen's controls:
 
 ```
-07-murals · 411×914dp · saved <dir>/07-murals.png
+07-murals · 360×800dp · saved <dir>/07-murals.png
   · "Murals"
   tap 44,132  desc="Back"  36×36dp  ⚠ <44dp
   tap 540,1180  "Summer reads · 12 books"  379×96dp
@@ -53,6 +56,8 @@ npm run dev:wait -- "<text expected on the next screen>" --timeout 30
 ```
 
 Open the PNG with Read on a screen's first visit and whenever something visual changed, not after every tap; the listing is enough to navigate. "dump failed — screenshot only" means read the PNG instead.
+
+When you read a PNG, look for: text or a control cut off at a panel or screen edge (a label missing its first letters, a row of chips or swatches that starts or stops mid-item), the same text twice in one block, overlapping elements, and text running out of its box.
 
 To check a label, the saved PNG may be too small or shrunk. Take a full-resolution screenshot, crop a window around the control's printed centre, upscale the crop, then Read it. `<W>` is the control's printed width in pixels (dp × density / 160, with density from `adb -s <serial> shell wm density`) plus 40, at least 120 and at most the screen's width in pixels. The crop window must stay inside the screen, so offsets are not below 0:
 
@@ -88,6 +93,7 @@ Orientation is not tested: the app is portrait-locked.
 On every screen, use each control once. Then try the edges that apply:
 
 - empty input, 300-character input; skip emoji, `adb shell input text` cannot type it, so list "emoji input not tested" in the harness notes
+- after changing a field, find the new value in the sheet's preview and on the screen after closing the sheet, and once per editor after a cold restart too; a saved value that shows up nowhere is the action silently doing nothing
 - double-tap on anything that submits
 - Android back in the middle of an action, and right after one
 - destructive actions: is there a confirm, does it say what will be lost, is there undo
@@ -110,7 +116,8 @@ Before reporting:
 - Run checks 1, 3 and 4 of the skill's "suspect the harness first" list before blaming the app. Never run check 2: it puts a marker into a screen's source, and you make no source edits.
 - LogBox toasts and their dismiss X are dev chrome (a toast lists as `tap … desc="!, <message>"`, its X as an unlabelled `⚠ <44dp` tap). Record the message under JavaScript errors, dismiss it, and never report it as a UI finding.
 - Check every label you quote in a zoomed crop of the screenshot (the recipe above), not in the listing.
-- A `⚠ <44dp` row is a candidate. Report it only after `rg -n hitSlop` on the component that renders it finds none.
+- A `⚠ <44dp` row is a candidate. Check the PNG first: a control cut off at a panel edge also lists as under 44dp, and that is a clipping bug, not a target-size one. Report a small target only after `rg -n hitSlop` on the component that renders it finds none.
+- For a value that shows up nowhere, `rg` the field name under `mobile/src`: name the file that saves it and the component that draws that block, and say whether that component reads it.
 - A `(no label)` tap is an accessibility finding (TalkBack cannot name it). Confirm with `rg` that the component sets no `accessibilityLabel`.
 - One cause seen on several screens is one finding that lists every screen.
 - A finding that depends on the narrow test screen (wrapping, truncation, below the fold) says "seen at <W>dp" in Actual, with W from the snapshot header.
@@ -128,7 +135,7 @@ Append each finding to `report.md` the moment it is confirmed, and update its ro
    tail -c +<count + 1> "$(node -p 'require("node:os").tmpdir()')/scripta-dev-emulator/metro.log" | rg -i "error|warn"
    ```
    Deduplicate and count.
-2. `npm run dev:release`, whatever happened. The emulator is not needed for the rest.
+2. `adb -s <serial> shell wm density reset`, then `npm run dev:release`, whatever happened: the next worktree to lease the emulator expects the default width. The emulator is not needed for the rest.
 3. Rewrite `report.md` in final form: the screen size from any snapshot header in the title line, the summary at the top, findings ranked by severity first, then a finding that says "seen at <W>dp" after the ones that do not, then how central the screen is.
 4. Reply with the report's path and its Summary section, nothing else.
 

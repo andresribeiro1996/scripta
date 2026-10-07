@@ -1,7 +1,7 @@
 import { BLOCK_BACKGROUND_FINISH_OPTIONS, BLOCK_FONT_FAMILY_OPTIONS, BLOCK_INNER_SPACING_OPTIONS, BLOCK_TEXT_ALIGN_OPTIONS, BLOCK_THEME_COLOR_LABELS, normalizeHexColor, resolveBlockColor, themeColorRef, type BlockStyle, type BlockThemeColorKey } from "@scripta/shared";
 import { Collapsible, Host, RNHostView } from "@expo/ui";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Button, Icon } from "../../ui";
 import { Text } from "../../ui/Text";
 import { blockFontFamily, resolveBorderStyle } from "../../ui/libraryStyle";
@@ -15,12 +15,14 @@ import {
   applyLook, customColorStart, isHardToRead, matchSides, type CustomColorTarget, type Look,
 } from "./blockStyleOptions";
 
-function Group({ title, open, onOpenChange, children }: { title: string; open: boolean; onOpenChange: (open: boolean) => void; children: ReactNode }) {
+const COLLAPSIBLE_CONTENT_INSET = 32;
+
+function Group({ title, open, onOpenChange, width, children }: { title: string; open: boolean; onOpenChange: (open: boolean) => void; width?: number; children: ReactNode }) {
   const { colors, mode } = useTheme();
   return (
     <Host matchContents={{ vertical: true }} colorScheme={mode} seedColor={colors.accent}>
       <Collapsible label={title} labelStyle={{ color: colors.text, fontSize: 16, fontWeight: "600" }} isOpen={open} onOpenChange={onOpenChange}>
-        <RNHostView matchContents><View style={styles.group}>{children}</View></RNHostView>
+        <RNHostView matchContents><View style={[styles.group, { width }]}>{children}</View></RNHostView>
       </Collapsible>
     </Host>
   );
@@ -89,6 +91,8 @@ export function StyleTab({ style, palette, onChange, onReset, onCopy, onPaste, c
   const { colors } = useTheme();
   const set = (patch: Partial<BlockStyle>) => onChange({ ...style, ...patch });
   const [section, setSection] = useState<string | null>("Background");
+  const [tabWidth, setTabWidth] = useState(0);
+  const groupWidth = Platform.OS === "android" && tabWidth > 0 ? tabWidth - COLLAPSIBLE_CONTENT_INSET : undefined;
   const [editing, setEditing] = useState<{ target: CustomColorTarget; previous: string | null } | null>(null);
   const latest = useRef({ style, onChange, editing });
   latest.current = { style, onChange, editing };
@@ -98,6 +102,7 @@ export function StyleTab({ style, palette, onChange, onReset, onCopy, onPaste, c
   }, []);
   const group = (title: string) => ({
     title,
+    width: groupWidth,
     open: section === title,
     onOpenChange: (open: boolean) => {
       if (editing) { set({ [editing.target]: editing.previous }); setEditing(null); }
@@ -122,7 +127,7 @@ export function StyleTab({ style, palette, onChange, onReset, onCopy, onPaste, c
     </ScrollView>
   );
   return (
-    <View style={styles.tab}>
+    <View style={styles.tab} onLayout={(event) => setTabWidth(event.nativeEvent.layout.width)}>
       <Group {...group("Background")}>
         <ColorRow palette={palette} label="Background" value={style.backgroundColor} defaults={[{ label: "None", value: "transparent" }, { label: "Theme", value: null }]} themeKeys={BACKGROUND_THEME_SWATCHES} fixed={BACKGROUND_FIXED_SWATCHES} onChange={(backgroundColor) => set(backgroundColor === "transparent" ? { backgroundColor, cardShadow: false } : { backgroundColor })} {...customRow("backgroundColor")} />
         <SelectRow label="Gradient" value={style.gradientColor ? "on" : "none"} options={[{ value: "none", label: "None" }, { value: "on", label: "On" }]} onChange={(value) => set({ gradientColor: value === "on" ? themeColorRef("accent") : null, ...(value === "on" && style.backgroundColor === "transparent" ? { backgroundColor: null } : {}) })} />
