@@ -914,6 +914,16 @@ test("mergeWorks refuses an unknown, merged or keyed source, an unknown target a
   assert.deepEqual(snapshot(), before);
 });
 
+test("a merge chain longer than one hop is refused rather than followed", () => {
+  const { db, repo } = freshRepo();
+  const a = repo.createBook({ title: "A", author: "X", isbn: "9789720000001" }, ["isbn:9789720000001"], NOW);
+  const b = repo.createBook({ title: "B", author: "X", isbn: "9789720000002" }, ["isbn:9789720000002"], NOW);
+  const c = repo.createBook({ title: "C", author: "X", isbn: "9789720000003" }, ["isbn:9789720000003"], NOW);
+  db.prepare("UPDATE works SET merged_into = ? WHERE id = ?").run(b.work_id, a.work_id);
+  db.prepare("UPDATE works SET merged_into = ? WHERE id = ?").run(c.work_id, b.work_id);
+  assert.throws(() => repo.workPageRows(a.work_id!), /one hop/);
+});
+
 test("an edition leaving a grouped work through setWorkKey repoints the works merged into it", () => {
   const { db, repo } = freshRepo();
   const keyed = repo.createBook({ title: "Os Maias", author: "Eça de Queirós", isbn: "9789725681367", workKey: "OL846513W" }, ["isbn:9789725681367"], NOW);
