@@ -3,7 +3,7 @@ import type { PublicReaderCard } from "../library/readerIdentity.js";
 import type { Counter } from "./counters.js";
 import { fitLine, textWidth, wrapLines } from "./fit.js";
 import { PLATES, type IdentityKey } from "./plates.js";
-import type { ReaderCardInput } from "./render.js";
+import type { ReaderCardBase, ReaderCardInput } from "./render.js";
 import type { Layout, ReaderCardChosen } from "./style.js";
 import { rule, svgText } from "./svgText.js";
 
@@ -205,4 +205,27 @@ export function mergedBody(input: ReaderCardInput): string {
     y = 52;
   }
   return out + rule(y, 0.9) + rule(y + 2.5, 0.4) + rowsSvg(recordRows(input, true), y + 18, 284, 7) + coverageLines(input.card.coverage);
+}
+
+export function readerCardSummary(input: ReaderCardBase): string[] {
+  const { card } = input;
+  const plate = card.identity && card.state !== "unwritten" ? PLATES.find((item) => item.key === card.identity) : undefined;
+  const lines = [plate ? `${card.state === "leaning" ? "Leaning toward the" : "The"} ${plate.name}, plate ${plate.numeral}: ${plate.epithet}.` : "An unwritten reader card."];
+  const second = card.state === "unwritten" ? null : card.streak ?? null;
+  if (second) lines.push(`With a streak of the ${nameOf(second)}.`);
+  if (card.signal) lines.push(`${card.signal.label}.`);
+  const segments = card.dial?.segments ?? [];
+  if (card.facts) {
+    const groups = segments.map((segment) => `${segment.books} ${GROUP_LABELS[segment.group].toLowerCase()}`).join(", ");
+    const marked = segments.reduce((sum, segment) => sum + segment.marked, 0);
+    lines.push(`${card.facts.finished} finished ${card.facts.finished === 1 ? "book" : "books"}${groups ? `: ${groups}` : ""}. ${marked} with highlights.`);
+  }
+  const { signature, highlight } = card.chosen ?? {};
+  if (signature) lines.push(`Signature book: ${signature.title} by ${signature.author}${signature.note ? `, “${signature.note}”` : ""}.`);
+  if (highlight) lines.push(`Highlight: “${highlight.text}”, ${highlight.author}, ${highlight.title}.`);
+  if (input.view === "owner") {
+    if (input.leaders?.length) lines.push(`Only you see: ${input.leaders.map((leader) => `${leader.label} (${leader.count})`).join(", ")}.`);
+    if (card.state === "leaning" && input.missing) lines.push(`Only you see: ${input.missing}.`);
+  }
+  return [...lines, ...card.coverage];
 }
