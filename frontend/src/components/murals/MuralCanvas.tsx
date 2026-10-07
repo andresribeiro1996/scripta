@@ -9,7 +9,7 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
 import { BLOCK_PAD_SCALE, blockFinishImage, blockFontFamilyCss, resolveBlockStyle, resolveBorderColor } from "../../lib/libraryStyle";
-import { GRID_COLUMNS, muralThemeId, type BlockLayout, type Mural, type MuralBlock, type ReaderProfile, type ShelfTheme } from "../../lib/murals";
+import { GRID_COLUMNS, isConfigurable, muralThemeId, type BlockLayout, type Mural, type MuralBlock, type ReaderProfile, type ShelfTheme } from "../../lib/murals";
 import { useMuralBookMetadata } from "../../hooks/useMuralBookMetadata";
 import { muralThemeStyle } from "../../lib/theme";
 import { OptionsMenu } from "../OptionsMenu";
@@ -204,7 +204,7 @@ export function MuralCanvas({
                   title="Block settings"
                   items={[
                     { label: "Style", onClick: () => onStyleBlock?.(originalBlock(block)) },
-                    { label: "Configure", onClick: () => onConfigureBlock?.(originalBlock(block)) },
+                    ...(isConfigurable(block.type) ? [{ label: "Configure", onClick: () => onConfigureBlock?.(originalBlock(block)) }] : []),
                     { label: "Duplicate", onClick: () => onDuplicateBlock?.(block.id) },
                     { label: "Delete", onClick: () => onDeleteBlock?.(block.id), danger: true }
                   ]}
