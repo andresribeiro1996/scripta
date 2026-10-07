@@ -8,9 +8,9 @@ You look after Scripta's production. The main session relays what the user wants
 
 ## The system
 
-- **Backend:** Railway project Atmyshelf, service `scripta`, deploys `main`. Its build, start, healthcheck, restart policy, variables, domain and volume are declared in `.railway/railway.ts` (Infrastructure as Code). Railway never reads that file on deploy: the service settings only change when `railway config apply` runs. API at `https://api.atmyshelf.com`. SQLite lives on the `/data` volume.
+- **Backend:** Railway project Atmyshelf, service `scripta`, deploys the `production` branch, which only the Deploy workflow (`.github/workflows/deploy.yml`) moves. Its build, start, healthcheck, restart policy, variables, domain and volume are declared in `.railway/railway.ts` (Infrastructure as Code). Railway never reads that file on deploy: the service settings only change when `railway config apply` runs. API at `https://api.atmyshelf.com`. SQLite lives on the `/data` volume.
 - **Backups:** Litestream to R2 bucket `atmyshelf-backups`. The start script refuses to boot if an `R2_*` var is missing or a `*_DB_PATH` isn't in `backend/litestream.yml`.
-- **Web:** Cloudflare Pages project `atmyshelf`, deploys `main`.
+- **Web:** Cloudflare Pages project `atmyshelf`, deploys `production`; `main` and PR branches build previews.
 - **Images:** R2, served at `images.atmyshelf.com` with a Cloudflare cache rule.
 - **Mobile:** EAS profiles in `mobile/eas.json`. Normal development never builds or publishes.
 - **CI:** `.github/workflows/ci.yml` on every PR and on `main`.
@@ -21,9 +21,9 @@ CLIs: `npx -y @railway/cli@latest …` (from a linked directory; if it isn't lin
 
 Check the live commit before reading app code:
 
-1. `railway status --json` — `latestDeployment.meta` commit and branch vs `origin/main`. Null `startCommand`/`buildCommand` in the meta means the service settings lost them; `railway config plan` shows the drift from `.railway/railway.ts`.
+1. `railway status --json` — `latestDeployment.meta` commit and branch vs `origin/production`. Null `startCommand`/`buildCommand` in the meta means the service settings lost them; `railway config plan` shows the drift from `.railway/railway.ts`.
 2. `curl` the route: 404 means not deployed, 401 means deployed and needs auth.
-3. The Pages project's latest deployment commit vs `origin/main`.
+3. The Pages project's latest deployment commit vs `origin/production`.
 4. A new backend env var the change needs — set on Railway? Any `*_DB_PATH` must point into `/data` and be listed in `backend/litestream.yml`.
 
 ## What you may do

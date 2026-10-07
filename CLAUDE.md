@@ -17,7 +17,7 @@ The main session plans, designs and reviews; routine work goes to the saved agen
 | Failing CI on a PR, or a `<ci-monitor-event>` | `ci-fixer` |
 | Production, Railway, Cloudflare, Litestream, EAS | `deploy-ops` |
 | Branch touches auth, tokens, OAuth, share links or who can see what | run the `security-review` skill before merge |
-| User says commit / push / merge / "is it on main?" | the `ship` skill |
+| User says commit / push / merge / deploy / "is it on main?" / "is it live?" | the `ship` skill |
 
 When a skill says to dispatch an implementer, spec reviewer or code reviewer, use these agents instead of `general-purpose`. A device pass, including one bundled with a task's "verify", always goes to `device-checker`, never `general-purpose`. A task that failed twice on Sonnet is escalated to Opus, not retried a third time.
 
