@@ -24,7 +24,7 @@ import {
 } from "./domain/errors.js";
 import type { ArenaRepository } from "./domain/ports.js";
 import type { DuelRow, SeedPreview, TournamentRow, TournamentSlotRow, VoteRow } from "./domain/types.js";
-import type { DuelView } from "./service.js";
+import type { Duel } from "./service.js";
 
 const scratch = mkdtempSync(join(tmpdir(), "arena-service-test-"));
 process.env.AUTH_DB_PATH = join(scratch, "auth.sqlite");
@@ -313,7 +313,7 @@ test("a full round of voting settles duels and advances to the next round, endin
   assert.equal(view?.duels.length, 2);
   assert.equal(view?.status, "active");
 
-  const [duelA, duelB] = view!.duels as [DuelView, DuelView];
+  const [duelA, duelB] = view!.duels as [Duel, Duel];
   service.vote(tournament.id, duelA.id, "voter-1", "w1");
   service.vote(tournament.id, duelA.id, "voter-2", "w1");
   service.vote(tournament.id, duelA.id, "voter-3", "w2");

@@ -14,7 +14,7 @@ import {
   TournamentNotFoundError
 } from "./domain/errors.js";
 import { knownWorkIds, UnknownWorkError, WorkResolutionError } from "../library/index.js";
-import type { ArenaService } from "./service.js";
+import type { ArenaService, Tournament } from "./service.js";
 import { summariesForWire, tournamentForWire } from "./wire.js";
 
 function statusForArenaError(err: ArenaError): number {
@@ -69,7 +69,7 @@ export function buildArenaRoutes(service: ArenaService) {
       if (!parsed.success) return reply.code(400).send({ error: "Expected {name, bracketSize, roundDurationMinutes}." });
       try {
         const tournament = service.createTournament(request.user.id, parsed.data);
-        return reply.code(201).send({ tournament });
+        return reply.code(201).send({ tournament: tournament satisfies Tournament });
       } catch (err) {
         if (err instanceof ArenaError) return reply.code(statusForArenaError(err)).send({ error: err.message });
         throw err;
