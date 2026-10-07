@@ -33,11 +33,23 @@ export interface TournamentSummary {
   viewerVoted?: boolean;
 }
 
-export type PublishedContent = TierlistSummary | TournamentSummary;
+export interface QuizSummary {
+  kind: "quiz";
+  id: string;
+  voteCode: string;
+  name: string;
+  questionCount: number;
+  playCount: number;
+  playOpen: boolean;
+  covers: string[];
+  viewerVoted?: boolean;
+}
 
-export type CommunityEventType = "tierlist_published" | "tournament_published";
+export type PublishedContent = TierlistSummary | TournamentSummary | QuizSummary;
 
-export type DiscoverType = "all" | "tierlist" | "tournament";
+export type CommunityEventType = "tierlist_published" | "tournament_published" | "quiz_published";
+
+export type DiscoverType = "all" | "tierlist" | "tournament" | "quiz";
 
 export interface FeedItem {
   id: string;

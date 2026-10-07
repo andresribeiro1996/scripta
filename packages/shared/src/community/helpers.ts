@@ -10,40 +10,80 @@ import type {
   SuggestedReader
 } from "./types.js";
 
+const CONTENT_KINDS: Record<PublishedContent["kind"], true> = { tierlist: true, tournament: true, quiz: true };
+
+export function isKnownContent(content: PublishedContent): boolean {
+  return CONTENT_KINDS[content?.kind] === true;
+}
+
 export function contentKindLabel(content: PublishedContent): string {
-  return content.kind === "tierlist" ? "Tier list" : "Tournament";
+  switch (content.kind) {
+    case "tierlist":
+      return "Tier list";
+    case "tournament":
+      return "Tournament";
+    case "quiz":
+      return "Quiz";
+  }
 }
 
 export function contentDetail(content: PublishedContent): string {
-  if (content.kind === "tierlist") {
-    return `${content.poolSize} books · ${content.ballotCount} ballots${content.promotedAt ? " · permanent reference" : content.votingOpen ? "" : " · closed"}`;
+  switch (content.kind) {
+    case "tierlist":
+      return `${content.poolSize} books · ${content.ballotCount} ballots${content.promotedAt ? " · permanent reference" : content.votingOpen ? "" : " · closed"}`;
+    case "tournament":
+      return `${content.bracketSize}-book bracket · ${content.status}`;
+    case "quiz":
+      return `${content.questionCount} questions · ${content.playCount} plays${content.playOpen ? "" : " · closed"}`;
   }
-  return `${content.bracketSize}-book bracket · ${content.status}`;
 }
 
 export type ContentTone = "neutral" | "accent" | "info" | "success" | "reference";
 
 export function contentStatus(content: PublishedContent): { label: string; tone: ContentTone; votedBadge?: boolean } {
-  if (content.kind === "tournament") {
-    const base = content.status === "active" ? { label: "In progress", tone: "info" as const } : { label: "Completed", tone: "success" as const };
-    // Tier lists fold the vote into the status itself ("Voted"); a tournament's
-    // status still matters after voting, so it travels as a second badge.
-    return content.viewerVoted ? { ...base, votedBadge: true } : base;
+  switch (content.kind) {
+    case "tournament": {
+      const base = content.status === "active" ? { label: "In progress", tone: "info" as const } : { label: "Completed", tone: "success" as const };
+      // Tier lists fold the vote into the status itself ("Voted"); a tournament's
+      // status still matters after voting, so it travels as a second badge.
+      return content.viewerVoted ? { ...base, votedBadge: true } : base;
+    }
+    case "tierlist":
+      if (content.promotedAt) return { label: "Reference", tone: "reference" };
+      if (content.votingOpen && content.viewerVoted) return { label: "Voted", tone: "info" };
+      return content.votingOpen ? { label: "Voting open", tone: "accent" } : { label: "Closed", tone: "neutral" };
+    case "quiz":
+      if (content.playOpen && content.viewerVoted) return { label: "Played", tone: "info" };
+      return content.playOpen ? { label: "Open", tone: "accent" } : { label: "Closed", tone: "neutral" };
   }
-  if (content.promotedAt) return { label: "Reference", tone: "reference" };
-  if (content.votingOpen && content.viewerVoted) return { label: "Voted", tone: "info" };
-  return content.votingOpen ? { label: "Voting open", tone: "accent" } : { label: "Closed", tone: "neutral" };
 }
 
 export function contentStats(content: PublishedContent): Array<{ value: number; label: string }> {
-  const books = content.kind === "tierlist" ? content.poolSize : content.bracketSize;
-  const stats = [{ value: books, label: books === 1 ? "book" : "books" }];
-  if (content.kind === "tierlist") stats.push({ value: content.ballotCount, label: content.ballotCount === 1 ? "ballot" : "ballots" });
-  return stats;
+  switch (content.kind) {
+    case "tierlist":
+      return [
+        { value: content.poolSize, label: content.poolSize === 1 ? "book" : "books" },
+        { value: content.ballotCount, label: content.ballotCount === 1 ? "ballot" : "ballots" }
+      ];
+    case "tournament":
+      return [{ value: content.bracketSize, label: content.bracketSize === 1 ? "book" : "books" }];
+    case "quiz":
+      return [
+        { value: content.questionCount, label: content.questionCount === 1 ? "question" : "questions" },
+        { value: content.playCount, label: content.playCount === 1 ? "play" : "plays" }
+      ];
+  }
 }
 
 export function contentTarget(content: PublishedContent): string {
-  return content.kind === "tierlist" ? `/vote/${content.voteCode}` : `/arena/${content.id}`;
+  switch (content.kind) {
+    case "tierlist":
+      return `/vote/${content.voteCode}`;
+    case "tournament":
+      return `/arena/${content.id}`;
+    case "quiz":
+      return `/play/${content.voteCode}`;
+  }
 }
 
 export function feedTarget(item: FeedItem): string {
@@ -51,8 +91,14 @@ export function feedTarget(item: FeedItem): string {
 }
 
 export function feedAction(item: FeedItem): string {
-  const noun = item.content.kind === "tierlist" ? "tier list" : "tournament";
-  return `published a ${noun}`;
+  switch (item.content.kind) {
+    case "tierlist":
+      return "published a tier list";
+    case "tournament":
+      return "published a tournament";
+    case "quiz":
+      return "published a quiz";
+  }
 }
 
 export function feedHeading(item: FeedItem): string {
@@ -107,7 +153,7 @@ function covers(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((cover): cover is string => typeof cover === "string" && cover.length > 0).slice(0, 3) : [];
 }
 
-export function activityRow(item: ActivityItem): ActivityRow {
+export function activityRow(item: ActivityItem): ActivityRow | null {
   const p = item.payload;
   const base = { covers: covers(p.covers), href: text(p.href) || null, username: null, workId: null };
   switch (item.type) {
@@ -115,6 +161,8 @@ export function activityRow(item: ActivityItem): ActivityRow {
       return { ...base, kind: "publication", label: "Published a tier list", tone: "accent", title: text(p.name), meta: text(p.detail) };
     case "tournament_published":
       return { ...base, kind: "publication", label: "Started a tournament", tone: "accent", title: text(p.name), meta: text(p.detail) };
+    case "quiz_published":
+      return { ...base, kind: "publication", label: "Published a quiz", tone: "accent", title: text(p.name), meta: text(p.detail) };
     case "book_added": {
       const cover = text(p.coverUrl);
       return { ...base, kind: "reading", label: "Added to library", tone: "dim", title: text(p.title), meta: [text(p.author), statusLabel(Number(p.status ?? 0))].filter(Boolean).join(" · "), covers: cover ? [cover] : [], workId: text(p.workId) || null };
@@ -128,7 +176,9 @@ export function activityRow(item: ActivityItem): ActivityRow {
     case "mural_published":
       return { ...base, kind: "mural", label: "Updated profile", tone: "accent", title: "Published a new profile mural", meta: "" };
     case "voted_on":
-      return { ...base, kind: "vote", label: p.game === "tierlist" ? "Ranked a tier list" : "Voted in a tournament", tone: "accent", title: text(p.name), meta: "" };
+      return { ...base, kind: "vote", label: p.game === "tierlist" ? "Ranked a tier list" : p.game === "quiz" ? "Played a quiz" : "Voted in a tournament", tone: "accent", title: text(p.name), meta: "" };
+    default:
+      return null;
   }
 }
 

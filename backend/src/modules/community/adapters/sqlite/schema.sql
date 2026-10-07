@@ -28,9 +28,9 @@ CREATE TABLE IF NOT EXISTS events (
 );
 CREATE INDEX IF NOT EXISTS idx_events_user_time ON events(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_events_time ON events(created_at DESC);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_events_publication_ref
+CREATE UNIQUE INDEX IF NOT EXISTS idx_events_publication_ref_v2
   ON events(ref_type, ref_id)
-  WHERE type IN ('tierlist_published', 'tournament_published');
+  WHERE type IN ('tierlist_published', 'tournament_published', 'quiz_published');
 CREATE UNIQUE INDEX IF NOT EXISTS idx_events_user_type_ref
   ON events(user_id, type, ref_id)
   WHERE type IN ('voted_on', 'following', 'mural_published');

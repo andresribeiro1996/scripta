@@ -188,7 +188,6 @@ export function buildPublicQuizRoutes(service: QuizzesService) {
       if (!params.success) return reply.code(404).send({ error: "No quiz at that link." });
       const board = service.getPlayBoard(params.data.code);
       if (!board) return reply.code(404).send({ error: "No quiz at that link." });
-      if (!board.playOpen) return reply.code(403).send({ error: "This quiz isn't open for play." });
       return reply.send({ board });
     });
 

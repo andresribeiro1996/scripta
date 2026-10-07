@@ -2,9 +2,9 @@
 // this module that knows SQL — service.ts only ever sees the port.
 
 import type { DatabaseSync } from "node:sqlite";
-import type { QuestionStat } from "@scripta/shared";
+import { normalizeWords, type QuestionStat } from "@scripta/shared";
 import type { QuizzesRepository } from "../../domain/ports.js";
-import type { AnswerRow, PlayRow, QuizGameRow, QuizRow } from "../../domain/types.js";
+import type { AnswerRow, PlayRow, QuizDiscoverRow, QuizGameRow, QuizRow } from "../../domain/types.js";
 
 export function createSqliteQuizzesRepository(db: DatabaseSync): QuizzesRepository {
   const insertStmt = db.prepare(`
@@ -25,6 +25,16 @@ export function createSqliteQuizzesRepository(db: DatabaseSync): QuizzesReposito
     FROM quiz_works w JOIN quizzes q ON q.id = w.quiz_id
     WHERE w.work_id IN (SELECT value FROM json_each(?)) AND q.vote_code IS NOT NULL
     ORDER BY q.created_at DESC LIMIT ?
+  `);
+  const getPublicByIdStmt = db.prepare(`SELECT * FROM quizzes WHERE id = ? AND vote_code IS NOT NULL`);
+  const listPublicByUserStmt = db.prepare(`SELECT * FROM quizzes WHERE owner_user_id = ? AND vote_code IS NOT NULL ORDER BY created_at DESC`);
+  const listPublicByIdsStmt = db.prepare(`SELECT * FROM quizzes WHERE vote_code IS NOT NULL AND id IN (SELECT value FROM json_each(?))`);
+  const discoverStmt = db.prepare(`SELECT id, name, created_at, owner_user_id FROM quizzes WHERE vote_code IS NOT NULL ORDER BY created_at DESC`);
+  const playCountsForStmt = db.prepare(`SELECT quiz_id, COUNT(*) AS n FROM quiz_plays WHERE quiz_id IN (SELECT value FROM json_each(?)) GROUP BY quiz_id`);
+  const votedAmongStmt = db.prepare(`
+    SELECT q.id FROM quizzes q
+    WHERE q.vote_code IS NOT NULL AND q.id IN (SELECT value FROM json_each(?))
+      AND EXISTS (SELECT 1 FROM quiz_plays p WHERE p.quiz_id = q.id AND p.voter_user_id = ?)
   `);
   const getByVoteCodeStmt = db.prepare(`SELECT * FROM quizzes WHERE vote_code = ?`);
   const publishStmt = db.prepare(`UPDATE quizzes SET data = ?, vote_code = ?, play_open = 1, updated_at = ? WHERE id = ? AND owner_user_id = ? AND vote_code IS NULL`);
@@ -247,6 +257,35 @@ export function createSqliteQuizzesRepository(db: DatabaseSync): QuizzesReposito
     listPublishedByWorks(workIds, limit) {
       if (workIds.length === 0) return [];
       return listPublishedByWorksStmt.all(JSON.stringify(workIds), limit) as unknown as QuizGameRow[];
+    },
+
+    getPublicById(id) {
+      return getPublicByIdStmt.get(id) as QuizRow | undefined;
+    },
+
+    listPublicByUser(ownerUserId) {
+      return listPublicByUserStmt.all(ownerUserId) as unknown as QuizRow[];
+    },
+
+    listPublicByIds(ids) {
+      return listPublicByIdsStmt.all(JSON.stringify(ids)) as unknown as QuizRow[];
+    },
+
+    discoverWindow(needle, limit) {
+      const rows = discoverStmt.all() as unknown as Array<QuizDiscoverRow & { name: string }>;
+      return rows
+        .filter((row) => normalizeWords(row.name).includes(needle))
+        .slice(0, limit)
+        .map(({ id, created_at, owner_user_id }) => ({ id, created_at, owner_user_id }));
+    },
+
+    playCountsFor(ids) {
+      const rows = playCountsForStmt.all(JSON.stringify(ids)) as unknown as Array<{ quiz_id: string; n: number }>;
+      return new Map(rows.map((r) => [r.quiz_id, Number(r.n)]));
+    },
+
+    votedAmong(viewerUserId, ids) {
+      return (votedAmongStmt.all(JSON.stringify(ids), viewerUserId) as unknown as Array<{ id: string }>).map((r) => r.id);
     },
 
     listParticipation(ownerUserId, since) {

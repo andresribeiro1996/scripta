@@ -11,11 +11,13 @@ import type {
   PersonResult,
   PublishedProfile,
   PublishProfileInput,
+  QuizSummary,
   SuggestedReader,
   TierlistSummary,
   TournamentSummary,
 } from "@scripta/shared/community";
 import { apiClient } from "../../core/api";
+import { renderableDiscover } from "./communityHome";
 import type { PublicBookData, PublicHighlight } from "../public/api";
 
 export interface CommunityProfileView {
@@ -34,7 +36,7 @@ export interface CommunityProfileView {
     imageUrls: Record<string, string | null>;
     tierlists: Record<string, ResolvedTierlist>;
   } | null;
-  published: { tierlists: TierlistSummary[]; tournaments: TournamentSummary[] };
+  published: { tierlists: TierlistSummary[]; tournaments: TournamentSummary[]; quizzes: QuizSummary[] };
   feedSettings?: FeedSettings;
 }
 
@@ -50,7 +52,8 @@ export function markDashboardSeen() {
 
 export async function fetchDiscover(type: DiscoverType, q: string, offset: number, signedIn: boolean) {
   const params = new URLSearchParams({ type, q, offset: String(offset) });
-  return apiClient.request<{ items: DiscoverItem[]; nextOffset: number | null }>(`/community/discover?${params}`, { auth: signedIn });
+  const page = await apiClient.request<{ items: DiscoverItem[]; nextOffset: number | null }>(`/community/discover?${params}`, { auth: signedIn });
+  return { ...page, items: renderableDiscover(page.items) };
 }
 
 export async function searchPeople(q: string) {

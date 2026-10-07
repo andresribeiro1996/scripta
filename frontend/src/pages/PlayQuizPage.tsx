@@ -11,6 +11,7 @@ import { useParams } from "react-router-dom";
 import type { PublicQuizQuestion } from "@scripta/shared";
 import { CoverImage } from "../components/BookCard";
 import { fetchPublicResultsApi, submitPlayApi, type PlayResponse } from "../api/quizzes";
+import { quizPlayStage } from "../lib/quizPlayStage";
 import { storePlayId, useQuizPlay } from "../hooks/useQuizPlay";
 
 function InfoScreen({ message }: { message: string }) {
@@ -99,10 +100,19 @@ export function PlayQuizPage() {
   if (board.isPending) return <InfoScreen message="Loading…" />;
   if (board.isError) return <InfoScreen message={board.error instanceof Error ? board.error.message : "No quiz at that link."} />;
   const playBoard = board.data;
-  if (!playBoard.playOpen) return <InfoScreen message="This quiz isn't open for play." />;
 
   const result = submitted ?? (ownPlay.data ?? null);
   const questions = playBoard.questions;
+  const stage = quizPlayStage({ playOpen: playBoard.playOpen, hasResult: result !== null, ownPlayPending: ownPlay.isPending });
+  if (stage === "loading") return <InfoScreen message="Loading…" />;
+  if (stage === "leaderboard") {
+    return (
+      <div className="mx-auto flex min-h-screen max-w-xl flex-col gap-6 px-5 py-8">
+        <p className="text-center text-(--color-text-dim)">This quiz is closed.</p>
+        <Leaderboard code={code ?? ""} />
+      </div>
+    );
+  }
 
   if (result) {
     return <ResultsView code={code ?? ""} result={result} questions={questions} copied={copied} setCopied={setCopied} alreadyPlayed={submitted === null} />;
@@ -198,7 +208,6 @@ function ResultsView({
   setCopied: (value: boolean) => void;
   alreadyPlayed: boolean;
 }) {
-  const leaderboard = useQuery({ queryKey: ["quizPublicResults", code], queryFn: () => fetchPublicResultsApi(code) });
   const shareLink = `${window.location.origin}/play/${code}`;
   const score = result.score;
 
@@ -237,22 +246,33 @@ function ResultsView({
         </button>
       </div>
 
-      {leaderboard.data && (
-        <div>
-          <h2 className="mb-2 text-lg font-bold">Leaderboard</h2>
-          <table className="w-full text-sm">
-            <tbody>
-              {leaderboard.data.plays.map((play, i) => (
-                <tr key={i} className="border-t border-(--color-border)">
-                  <td className="py-1.5 pr-3">{i + 1}</td>
-                  <td className="py-1.5 pr-3">{play.playerName ?? "Guest"}</td>
-                  <td className="py-1.5 pr-3">{play.score}/{leaderboard.data!.questionCount}</td>
-                  <td className="py-1.5">{(play.durationMs / 1000).toFixed(1)}s</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <Leaderboard code={code} />
+    </div>
+  );
+}
+
+function Leaderboard({ code }: { code: string }) {
+  const leaderboard = useQuery({ queryKey: ["quizPublicResults", code], queryFn: () => fetchPublicResultsApi(code) });
+  if (leaderboard.isError) return <p className="text-sm text-(--color-text-dim)">Couldn't load the leaderboard.</p>;
+  if (!leaderboard.data) return null;
+  return (
+    <div>
+      <h2 className="mb-2 text-lg font-bold">Leaderboard</h2>
+      {leaderboard.data.plays.length === 0 ? (
+        <p className="text-sm text-(--color-text-dim)">No plays yet.</p>
+      ) : (
+        <table className="w-full text-sm">
+          <tbody>
+            {leaderboard.data.plays.map((play, i) => (
+              <tr key={i} className="border-t border-(--color-border)">
+                <td className="py-1.5 pr-3">{i + 1}</td>
+                <td className="py-1.5 pr-3">{play.playerName ?? "Guest"}</td>
+                <td className="py-1.5 pr-3">{play.score}/{leaderboard.data.questionCount}</td>
+                <td className="py-1.5">{(play.durationMs / 1000).toFixed(1)}s</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
     </div>
   );

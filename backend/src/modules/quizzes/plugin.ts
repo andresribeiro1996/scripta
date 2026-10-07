@@ -7,13 +7,18 @@ import type { FastifyInstance } from "fastify";
 import { openQuizzesDb } from "./adapters/sqlite/connection.js";
 import { createSqliteQuizzesRepository } from "./adapters/sqlite/sqliteQuizzesRepository.js";
 import { buildPublicQuizRoutes, buildQuizRoutes } from "./routes.js";
-import type { QuizzesPublicApi } from "./service.js";
+import type { EmitPlayed, EmitPublished, QuizzesPublicApi } from "./service.js";
 import { createQuizzesPublicApi, createQuizzesService } from "./service.js";
 
-export async function quizzesPlugin(app: FastifyInstance) {
+export interface QuizzesPluginOptions {
+  emitPublished?: EmitPublished;
+  emitPlayed?: EmitPlayed;
+}
+
+export async function quizzesPlugin(app: FastifyInstance, opts: QuizzesPluginOptions = {}) {
   // --- composition: swap this one block to change storage technology ---
   const db = openQuizzesDb();
-  const quizzesService = createQuizzesService(createSqliteQuizzesRepository(db));
+  const quizzesService = createQuizzesService(createSqliteQuizzesRepository(db), opts.emitPublished, opts.emitPlayed);
   // -----------------------------------------------------------------------
 
   await app.register(buildQuizRoutes(quizzesService));

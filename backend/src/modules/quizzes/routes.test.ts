@@ -75,12 +75,21 @@ test("the public board never carries the answer key", async () => {
   }
 });
 
-test("a closed quiz is a 403 on both the board and play", async () => {
-  const { service, code } = publishedQuiz();
+test("a closed quiz still serves its board and a player's own play, but refuses new plays", async () => {
+  const { service, code, answerKey } = publishedQuiz();
+  const answers = answerKey.map((q) => ({ questionId: q.id, choiceIndex: q.answerIndex }));
+  const played = await call(service, { method: "POST", url: `/quizzes/voting/${code}/play`, body: { answers, durationMs: 1 } }, "u9");
+  assert.equal(played.status, 200);
   const owned = service.listQuizzes("u1")[0]!;
   service.setPlayState("u1", owned.id, false);
   const board = await call(service, { method: "GET", url: `/quizzes/voting/${code}` });
-  assert.equal(board.status, 403);
+  assert.equal(board.status, 200);
+  assert.equal((board.body.board as unknown as { playOpen: boolean }).playOpen, false);
+  const own = await call(service, { method: "GET", url: `/quizzes/voting/${code}/play` }, "u9");
+  assert.equal(own.status, 200);
+  assert.equal((own.body as unknown as { score: number }).score, answerKey.length);
+  const stranger = await call(service, { method: "GET", url: `/quizzes/voting/${code}/play` }, "u8");
+  assert.equal(stranger.status, 404);
   // Well-shaped body: the 403 must come from play_open, not from zod.
   const play = await call(service, { method: "POST", url: `/quizzes/voting/${code}/play`, body: { answers: [{ questionId: "q0", choiceIndex: 0 }], durationMs: 1 } });
   assert.equal(play.status, 403);
