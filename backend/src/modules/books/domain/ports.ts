@@ -1,11 +1,14 @@
 import type { BookMetadata, BookSearchResult, CatalogBookMetadata } from "@scripta/shared";
-import type { BookRow, CoverImageRow, CoverSourceName, CoverStatus, DataSource, NewBook, SummarySource, WorkView } from "./types.js";
+import type { BookRow, CoverImageRow, CoverSourceName, CoverStatus, DataSource, NewBook, SummarySource, WorkPageRows, WorkView } from "./types.js";
 
 export type MergeableDetails = Pick<BookMetadata, "summary" | "pages" | "year" | "publisher" | "translator">;
 
 export interface CoverBlobStore {
   save(id: string, extension: string, bytes: Buffer): Promise<void>;
 }
+
+export interface PageCursor { at: string; row: number }
+export interface IdPage { ids: string[]; next: PageCursor | null }
 
 export interface BooksRepository {
   transaction<T>(write: () => T): T;
@@ -27,7 +30,7 @@ export interface BooksRepository {
   markDetailsMissing(bookId: string, checkedAt: string): void;
   markDetailsAttempted(bookId: string, checkedAt: string): void;
   searchBooks(tokens: string[], limit: number): BookRow[];
-  listUncheckedCoverIds(): string[];
+  listUncheckedCoverIds(after: PageCursor | null, limit: number): IdPage;
   listUncheckedDetailIds(limit: number): string[];
   setUpgradeWanted(bookId: string, at: string | null): void;
   setAppleChecked(bookId: string, at: string): void;
@@ -42,13 +45,14 @@ export interface BooksRepository {
   detachEdition(bookId: string, at: string): string;
   resolveWorkId(id: string): string | null;
   getWorkView(id: string): WorkView | undefined;
+  workPageRows(id: string): WorkPageRows | undefined;
   assignWork(bookId: string): string;
   setWorkSummary(bookId: string, summary: string): void;
   getWorkSummary(bookId: string): { summary: string | null; olWorkKey: string | null } | undefined;
   canonicalWorkIds(ids: string[]): Map<string, string>;
   setLanguage(id: string, tag: string | null): void;
   setPublisherUrl(id: string, url: string): void;
-  listUpgradeWantedIds(): string[];
+  listUpgradeWantedIds(after: PageCursor | null, limit: number): IdPage;
 }
 
 export interface CoverCandidate {

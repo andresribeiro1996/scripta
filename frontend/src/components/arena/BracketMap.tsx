@@ -31,6 +31,7 @@
 
 import { duelWinner } from "@scripta/shared";
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import type { Duel, DuelSide, TournamentView } from "../../api/arena";
 import { CoverImage } from "../BookCard";
 import { Sheet } from "../Sheet";
@@ -170,6 +171,11 @@ function SheetSide({ side, duel }: { side: DuelSide; duel: Duel }) {
       </div>
       <p className="mt-1.5 line-clamp-2 text-xs font-semibold">{side.title}</p>
       <p className="mt-0.5 line-clamp-1 text-[11px] text-(--color-text-dim)">{side.author}</p>
+      {side.workId && (
+        <Link to={`/work/${side.workId}`} className="mt-1 text-[11px] font-semibold text-(--color-accent) hover:underline">
+          About this book
+        </Link>
+      )}
       <p className={`mt-1 text-sm font-semibold tabular-nums ${won ? "text-(--color-accent)" : ""}`}>
         {pct === null ? "–" : `${pct}%`}
       </p>

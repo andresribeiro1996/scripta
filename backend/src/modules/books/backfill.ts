@@ -47,10 +47,22 @@ interface WorksLog {
   error: (details: object, message: string) => void;
 }
 
+export const GROUPING_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
 export interface WorksSteps {
   assignMissingWorks: (limit: number) => number;
   fillTitleKeys: (limit: number) => number;
-  groupKeylessWorks: (limit: number) => number;
+}
+
+async function drainBatches(step: (limit: number) => number, signal: AbortSignal): Promise<number> {
+  let total = 0;
+  for (;;) {
+    await new Promise(setImmediate);
+    if (signal.aborted) return total;
+    const batch = step(WORKS_BATCH_SIZE);
+    total += batch;
+    if (batch < WORKS_BATCH_SIZE) return total;
+  }
 }
 
 export function startWorksBackfill(
@@ -61,23 +73,50 @@ export function startWorksBackfill(
 ): () => void {
   return startDetailsBackfill(
     async (signal) => {
-      const counts = { assigned: 0, titleKeyed: 0, grouped: 0 };
-      const drain = async (step: (limit: number) => number, field: keyof typeof counts) => {
-        for (;;) {
-          await new Promise(setImmediate);
-          if (signal.aborted) return;
-          const batch = step(WORKS_BATCH_SIZE);
-          counts[field] += batch;
-          if (batch < WORKS_BATCH_SIZE) return;
-        }
-      };
-      await drain(steps.assignMissingWorks, "assigned");
-      await drain(steps.fillTitleKeys, "titleKeyed");
-      await drain(steps.groupKeylessWorks, "grouped");
-      if (counts.assigned + counts.titleKeyed + counts.grouped > 0) log.info(counts, "updated works for existing editions");
+      const assigned = await drainBatches(steps.assignMissingWorks, signal);
+      const titleKeyed = await drainBatches(steps.fillTitleKeys, signal);
+      if (assigned + titleKeyed > 0) log.info({ assigned, titleKeyed }, "updated works for existing editions");
     },
     (error) => log.error({ err: error }, "works backfill failed"),
     intervalMs,
     timers
   );
+}
+
+export interface WorksGrouping {
+  runNow(): Promise<number | null>;
+  stop(): void;
+}
+
+export function startWorksGrouping(
+  groupKeylessWorks: (limit: number) => number,
+  log: WorksLog,
+  intervalMs: number = GROUPING_INTERVAL_MS,
+  timers?: Timers
+): WorksGrouping {
+  const controller = new AbortController();
+  let running = false;
+  async function runNow(): Promise<number | null> {
+    if (running) return null;
+    running = true;
+    try {
+      const grouped = await drainBatches(groupKeylessWorks, controller.signal);
+      if (grouped > 0) log.info({ grouped }, "grouped keyless works by title");
+      return grouped;
+    } finally {
+      running = false;
+    }
+  }
+  const tick = () => {
+    runNow().catch((error: unknown) => log.error({ err: error }, "works grouping failed"));
+  };
+  tick();
+  const stopTimer = startBackfill(tick, intervalMs, timers);
+  return {
+    runNow,
+    stop: () => {
+      controller.abort();
+      stopTimer();
+    }
+  };
 }

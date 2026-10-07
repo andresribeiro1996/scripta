@@ -5,7 +5,7 @@
 import { normalizeWords } from "@scripta/shared";
 import type { DatabaseSync } from "node:sqlite";
 import type { ArenaRepository } from "../../domain/ports.js";
-import type { DuelRow, SeedPreview, TournamentDiscoverRow, TournamentRow, TournamentSlotRow, VoteRow } from "../../domain/types.js";
+import type { DuelRow, SeedPreview, TournamentDiscoverRow, TournamentGameRow, TournamentRow, TournamentSlotRow, VoteRow } from "../../domain/types.js";
 
 export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
   const insertTournamentStmt = db.prepare(`
@@ -20,6 +20,12 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
   const discoverSearchStmt = db.prepare(
     `SELECT id, created_at, owner_user_id FROM tournaments WHERE status != 'seeding' AND name_key LIKE '%' || ? || '%' ORDER BY created_at DESC LIMIT ?`
   );
+  const listPublishedByWorksStmt = db.prepare(`
+    SELECT DISTINCT t.id, t.name, t.owner_user_id, t.created_at
+    FROM tournament_slots s JOIN tournaments t ON t.id = s.tournament_id
+    WHERE s.work_id IN (SELECT value FROM json_each(?)) AND t.status != 'seeding'
+    ORDER BY t.created_at DESC LIMIT ?
+  `);
   const listPublicByIdsStmt = db.prepare(`SELECT * FROM tournaments WHERE status != 'seeding' AND id IN (SELECT value FROM json_each(?))`);
   const updateStatusStmt = db.prepare(`
     UPDATE tournaments SET status = $status, current_round = $current_round, updated_at = $updated_at WHERE id = $id
@@ -176,6 +182,10 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
     discoverWindow(needle, limit) {
       const rows = needle ? discoverSearchStmt.all(needle, limit) : discoverWindowStmt.all(limit);
       return rows as unknown as TournamentDiscoverRow[];
+    },
+    listPublishedByWorks(workIds, limit) {
+      if (workIds.length === 0) return [];
+      return listPublishedByWorksStmt.all(JSON.stringify(workIds), limit) as unknown as TournamentGameRow[];
     },
     listPublicByIds(ids) {
       return listPublicByIdsStmt.all(JSON.stringify(ids)) as unknown as TournamentRow[];

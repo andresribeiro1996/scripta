@@ -118,9 +118,9 @@ test("the repository lists every stored address oldest first, normalised as the 
 });
 
 function recordingSender(fail = false) {
-  const sent: { to: string; subject: string; text: string }[] = [];
-  const sendEmail = async (to: string, subject: string, text: string) => {
-    sent.push({ to, subject, text });
+  const sent: { to: string; subject: string; text: string; html?: string }[] = [];
+  const sendEmail = async (to: string, subject: string, text: string, html?: string) => {
+    sent.push({ to, subject, text, html });
     if (fail) throw new Error("provider down");
   };
   return { sent, sendEmail };
@@ -141,6 +141,7 @@ test("a new address gets one confirmation email, and joining again sends none", 
     assert.equal(mail?.to, "confirm@example.com");
     assert.match(mail?.subject ?? "", /launch list/);
     assert.match(mail?.text ?? "", /confirm@example\.com/);
+    assert.match(mail?.html ?? "", /confirm@example\.com/);
   } finally {
     await app.close();
   }

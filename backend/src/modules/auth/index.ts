@@ -17,6 +17,7 @@
 export { authPlugin as registerAuthModule } from "./plugin.js";
 export { authGuard, getOptionalAuthenticatedUser, rateLimitKey } from "./guard.js";
 export { emailEnabled, sendAccountEmail } from "./email.js";
+export { renderEmail } from "./emailLayout.js";
 export type { AuthenticatedUser } from "./domain/types.js";
 export { EmailInUseError, InvalidCredentialsError } from "./domain/errors.js";
 export {

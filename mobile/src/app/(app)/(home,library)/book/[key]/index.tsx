@@ -7,7 +7,7 @@ import { ErrorState, Screen, Skeleton } from "@/ui";
 
 export default function BookDetailRoute() {
   const { key } = useLocalSearchParams<{ key: string }>();
-  const { book, loading } = useBook(key);
+  const { book, loading, workId } = useBook(key);
   const { setStatus, setRating, deleteNote } = useLibraryActions();
   const to = (suffix: string) => router.push(`/book/${encodeURIComponent(key ?? "")}/${suffix}` as never);
 
@@ -22,6 +22,7 @@ export default function BookDetailRoute() {
           book={book}
           onOpenStyle={() => to("style")}
           onOpenCoverPicker={() => to("cover")}
+          onOpenWork={workId ? () => router.push(`/work/${workId}` as never) : undefined}
           onSetStatus={async (current, status) => {
             const before = readSnapshot(current);
             const wasFinished = current.ReadStatus === 2;

@@ -867,3 +867,27 @@ test("unfollowing removes only the unfollower's inbox rows of that author", () =
   assert.deepEqual(inboxEventIds(db, "un-a"), []);
   assert.deepEqual(inboxEventIds(db, "un-b"), ["un-e1"]);
 });
+
+test("readers visible to a viewer follow publication, follows and reading sharing", () => {
+  const r = repo();
+  const at = "2026-09-10T00:00:00.000Z";
+  const off = { publications: false, reading: false, votes: false, follows: false };
+  r.upsertProfile({ user_id: "pub", published: 1, mural_id: null, published_at: at, updated_at: at, feed_settings: null });
+  r.updateFeedSettings("share", { ...off, reading: true });
+  r.updateFeedSettings("hidden", off);
+  r.upsertProfile({ user_id: "glyph", published: 1, mural_id: null, published_at: at, updated_at: at, feed_settings: null });
+  r.updateFeedSettings("glyph", { ...off, readerGlyph: true });
+  for (const followee of ["share", "hidden", "pub"]) r.insertFollow({ follower_id: "v", followee_id: followee, created_at: at });
+  const api = createCommunityPublicApi(r);
+
+  const signedIn = api.readerVisibility("v", ["pub", "share", "hidden", "glyph", "noprofile"]);
+  assert.deepEqual(Object.fromEntries(signedIn), {
+    pub: { followed: true, published: true, showGlyph: false },
+    share: { followed: true, published: false, showGlyph: false },
+    glyph: { followed: false, published: true, showGlyph: true }
+  });
+  const signedOut = api.readerVisibility(null, ["pub", "share", "hidden", "glyph"]);
+  assert.deepEqual([...signedOut.keys()].sort(), ["glyph", "pub"]);
+  assert.equal(signedOut.get("pub")!.followed, false);
+  assert.equal(api.readerVisibility("v", []).size, 0);
+});

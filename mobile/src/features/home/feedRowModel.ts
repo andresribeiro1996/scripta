@@ -88,5 +88,7 @@ export function feedRowModel(item: DigestItem): FeedRowModel {
 // dashboard's /dashboard/arena/<kind>/<id> to its own native screen.
 export function digestRoute(item: DigestItem): string {
   if (item.kind === "participation") return item.game.kind === "tournament" ? `/arena/${item.game.id}` : `/${item.game.kind}/${item.game.id}`;
-  return item.kind === "follow" || item.kind === "reading" ? `/u/${item.actor.username}` : digestTarget(item);
+  if (item.kind === "reading") return item.book.workId ? `/work/${item.book.workId}` : `/u/${item.actor.username}`;
+  if (item.kind === "follow") return `/u/${item.actor.username}`;
+  return digestTarget(item);
 }

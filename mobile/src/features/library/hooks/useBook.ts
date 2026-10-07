@@ -16,9 +16,11 @@ export function useBook(rawKey: string | undefined): {
   book: Record<string, unknown> | null;
   /** The style this book falls back to: library-wide, overlaid by its series. */
   seedStyle: LibraryStyleSettings;
+  inheritedFrom: string;
   /** False only while the library is still loading — distinguishes "not yet"
    *  from "no such book", which the routes report differently. */
   loading: boolean;
+  workId: string | null;
 } {
   const { data: library, isPending } = useLibrary();
   const key = rawKey ? decodeURIComponent(rawKey) : undefined;
@@ -32,7 +34,9 @@ export function useBook(rawKey: string | undefined): {
     return {
       book,
       seedStyle: effectiveCardStyle(libraryStyle, seriesGroup?.style),
+      inheritedFrom: seriesGroup?.style ? `series “${seriesGroup.name}”` : library?.data.name ? `library “${library.data.name}”` : "your library",
       loading: isPending,
+      workId: (key && library?.works?.[key]) || null,
     };
   }, [isPending, key, library]);
 }

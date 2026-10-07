@@ -97,7 +97,7 @@ test("saveLibrary emits book_added for books new since the previous save", () =>
       userId: "user-1",
       type: "book_added",
       refId: "k2",
-      payload: { title: "New Book", author: "Auth B", isbn: "9781111111111", coverUrl: "https://c/x.jpg", status: 0 }
+      payload: { title: "New Book", author: "Auth B", isbn: "9781111111111", coverUrl: "https://c/x.jpg", status: 0, workId: null }
     }
   ]);
   db.close();
@@ -1190,7 +1190,7 @@ test("applyChange emits book_finished for a status that reaches Finished and not
 
   service.applyChange("u1", { kind: "book", bookKey: keyOf(10), readStatus: 2, day: "2026-10-02" });
   assert.deepEqual(events, [
-    { userId: "u1", type: "book_finished", refId: "k10", payload: { title: "Book 10", author: "Author 10", isbn: null, coverUrl: null, status: 2 } }
+    { userId: "u1", type: "book_finished", refId: "k10", payload: { title: "Book 10", author: "Author 10", isbn: null, coverUrl: null, status: 2, workId: null } }
   ]);
   db.close();
 });
@@ -1958,6 +1958,60 @@ test("every library document answer carries each copy's canonical work", () => {
   assert.deepEqual(service.getLibraryText("u1")!.works, works);
   assert.deepEqual(service.getLibrary("u1")!.works, works);
   assert.deepEqual(service.share("u1").works, works);
+});
+
+function setupWithWorks() {
+  const events: RecordedEvent[] = [];
+  const service = createLibraryService(createSqliteLibraryRepository(memoryDb()), () => "", MAX_DOCUMENT_BYTES, (userId, batch) => {
+    events.push(...batch.map((event) => ({ userId, ...event })));
+  }, undefined, undefined, undefined, titleWorks, (ids) => new Map(ids.map((id) => [id, id === "w-Merged" ? "w-canon" : id])));
+  return { service, events };
+}
+
+test("saveLibrary stamps the new and finished books' events with the work the save just wrote", () => {
+  const { service, events } = setupWithWorks();
+  const first = service.saveLibrary("u1", { books: [{ ContentID: "k1", Title: "Reading", Attribution: "A", ReadStatus: 1 }] });
+  events.length = 0;
+
+  const added = { ContentID: "k2", Title: "Merged", Attribution: "B", ReadStatus: 0 };
+  service.saveLibrary("u1", { books: [{ ContentID: "k1", Title: "Reading", Attribution: "A", ReadStatus: 2 }, added] }, first.updatedAt);
+
+  const works = service.getLibrary("u1")!.works;
+  assert.deepEqual(events.map((event) => [event.type, event.refId, event.payload.workId]), [
+    ["book_finished", "k1", works[bookKey({ ContentID: "k1", Title: "Reading", Attribution: "A" })]],
+    ["book_added", "k2", "w-canon"]
+  ]);
+  assert.equal(events[0]?.payload.workId, "w-Reading");
+});
+
+test("saveLibrary reads the user's works once per save", () => {
+  const repo = createSqliteLibraryRepository(memoryDb());
+  let reads = 0;
+  const service = createLibraryService({ ...repo, workIds: (userId) => { reads++; return repo.workIds(userId); } }, () => "", MAX_DOCUMENT_BYTES, () => {}, undefined, undefined, undefined, titleWorks, (ids) => new Map(ids.map((id) => [id, id])));
+  const first = service.saveLibrary("u1", { books: [{ ContentID: "k1", Title: "Reading", Attribution: "A", ReadStatus: 1 }] });
+  reads = 0;
+
+  const saved = service.saveLibrary("u1", { books: [{ ContentID: "k1", Title: "Reading", Attribution: "A", ReadStatus: 2 }] }, first.updatedAt);
+
+  assert.equal(reads, 1);
+  assert.deepEqual(Object.values(saved.works), ["w-Reading"]);
+});
+
+test("a direct add and a re-shelved match carry the work id too", () => {
+  const { service, events } = setupWithWorks();
+  service.addBook("u1", { title: "Dune", author: "Frank Herbert", readStatus: 0 });
+  assert.deepEqual(Object.values(service.getLibrary("u1")!.works), ["w-Dune"]);
+  assert.equal(events[0]?.payload.workId, "w-Dune");
+  events.length = 0;
+
+  service.addBook("u1", { title: "Dune", author: "Frank Herbert", readStatus: 2 });
+  assert.deepEqual(events.map((event) => [event.type, event.payload.workId]), [["book_finished", "w-Dune"]]);
+});
+
+test("applyChange stamps an added book's event with its work", () => {
+  const { service, events } = setupWithWorks();
+  service.applyChange("u1", { kind: "add", book: { ContentID: "manual:n", Title: "Neuromancer", Attribution: "William Gibson", ReadStatus: 0 } });
+  assert.equal(events[0]?.payload.workId, "w-Neuromancer");
 });
 
 test("a catalog outage still answers the library with stored work ids and logs it", () => {

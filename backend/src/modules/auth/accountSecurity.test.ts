@@ -24,10 +24,10 @@ function setup(enabled = true) {
   const db = new DatabaseSync(":memory:");
   applyAuthMigrations(db);
   const repo = createSqliteAuthRepository(db);
-  const emails: { to: string; subject: string; text: string }[] = [];
+  const emails: { to: string; subject: string; text: string; html?: string }[] = [];
   const erased: string[] = [];
   let eraseFails = false;
-  const security = createAccountSecurity(repo, async (to, subject, text) => { emails.push({ to, subject, text }); }, "https://scripta.example", enabled, async (userId) => {
+  const security = createAccountSecurity(repo, async (to, subject, text, html) => { emails.push({ to, subject, text, html }); }, "https://scripta.example", enabled, async (userId) => {
     if (eraseFails) throw new Error("erase failed");
     erased.push(userId);
   });
@@ -159,6 +159,20 @@ test("changing password requires current credentials and revokes sessions", asyn
     await assert.rejects(auth.login("reader", "old password"));
     await assert.rejects(auth.refresh(session.tokens.refreshToken));
     await auth.login("reader", "new password");
+  } finally { db.close(); }
+});
+
+test("recovery and verification emails carry the link in both the text and html parts", async () => {
+  const { db, auth, security, emails } = setup();
+  try {
+    const session = await auth.signup("reader@example.com", "reader", "old password");
+    await security.requestVerification(session.user.id);
+    await security.forgotPassword("reader@example.com");
+    assert.equal(emails.length, 2);
+    for (const mail of emails) {
+      const link = mail.text.match(/https:\/\/\S+/)![0];
+      assert.ok(mail.html?.includes(`href="${link}"`));
+    }
   } finally { db.close(); }
 });
 

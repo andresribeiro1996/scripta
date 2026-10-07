@@ -6,7 +6,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { DEFAULT_TIER_PRESET } from "@scripta/shared";
 import type { GameParticipation } from "@scripta/shared/community";
 import type { TierlistsRepository } from "./domain/ports.js";
-import type { BallotRow, HistogramCell, Placement, Tierlist, TierlistRow, VoteAccess } from "./domain/types.js";
+import type { BallotRow, HistogramCell, Placement, Tierlist, TierlistGameRow, TierlistRow, VoteAccess } from "./domain/types.js";
 import { canonicalBoard } from "./wire.js";
 
 function toTierlist(row: TierlistRow): Tierlist {
@@ -80,6 +80,13 @@ export interface TierlistDiscoverRef {
   promotedAt: string | null;
 }
 
+export interface GameByWork {
+  id: string;
+  name: string;
+  path: string;
+  ownerUserId: string | null;
+}
+
 export interface TierlistsService {
   listTierlists(userId: string): Tierlist[];
   createTierlist(userId: string, name: string, data?: TierlistDocument, access?: VoteAccess, publicBooks?: unknown[]): Tierlist;
@@ -103,6 +110,7 @@ export interface TierlistsService {
   listPublicTierlists(limit: number, offset: number): PublicTierlistSummary[];
   discoverWindow(needle: string, limit: number): TierlistDiscoverRef[];
   getPublishedRefs(ids: string[]): PublishedTierlistRef[];
+  listPublishedByWorks(workIds: string[], limit: number): TierlistGameRow[];
   votedAmong(voterUserId: string, ids: string[]): string[];
   getPublishedRef(id: string): PublishedTierlistRef | undefined;
   listPublishedRefsByOwner(ownerUserId: string): PublishedTierlistRef[];
@@ -399,6 +407,8 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
       });
     },
 
+    listPublishedByWorks: (workIds, limit) => repo.listPublishedByWorks(workIds, limit),
+
     votedAmong(voterUserId, ids) {
       return repo.votedAmong(voterUserId, ids);
     },
@@ -453,6 +463,7 @@ export interface TierlistsPublicApi {
   discoverWindow(needle: string, limit: number): TierlistDiscoverRef[];
   getPublishedMany(ids: string[]): PublishedTierlistRef[];
   votedAmong(voterUserId: string, ids: string[]): string[];
+  publishedByWorks(workIds: string[], limit: number): GameByWork[];
   getPublished(id: string): PublishedTierlistRef | undefined;
   listPublishedByOwner(ownerUserId: string): PublishedTierlistRef[];
   participationByOwner(ownerUserId: string, since: string): GameParticipation[];
@@ -471,6 +482,13 @@ export function createTierlistsPublicApi(service: TierlistsService): TierlistsPu
     discoverWindow: (needle, limit) => service.discoverWindow(needle, limit),
     getPublishedMany: (ids) => service.getPublishedRefs(ids),
     votedAmong: (voterUserId, ids) => service.votedAmong(voterUserId, ids),
+    publishedByWorks: (workIds, limit) =>
+      service.listPublishedByWorks(workIds, limit).map((row) => ({
+        id: row.id,
+        name: row.name,
+        path: `/vote/${row.vote_code}`,
+        ownerUserId: row.owner_user_id === "__app__" ? null : row.origin_user_id
+      })),
     getPublished: (id) => service.getPublishedRef(id),
     listPublishedByOwner: (ownerUserId) => service.listPublishedRefsByOwner(ownerUserId),
     participationByOwner: (ownerUserId, since) => service.participationByOwner(ownerUserId, since)

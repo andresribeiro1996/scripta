@@ -6,6 +6,7 @@ import {
   addReaderNote,
   buildMergedLibrary,
   findDuplicates,
+  LIBRARY_CSV_TEMPLATE,
   newId,
   readSnapshot,
   removeReaderNote,
@@ -53,6 +54,14 @@ import { restoreDeletedBooks } from "../lib/restoreDeletedBooks";
 export function LibraryPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const csvTemplateUrl = `data:text/csv;charset=utf-8,${encodeURIComponent(LIBRARY_CSV_TEMPLATE)}`;
+
+  function downloadCsvTemplate() {
+    const link = document.createElement("a");
+    link.href = csvTemplateUrl;
+    link.download = "atmyshelf-library.csv";
+    link.click();
+  }
   const [searchParams, setSearchParams] = useSearchParams();
   const { scrubBooks } = useMurals();
   const saver = useLibrarySaver();
@@ -423,6 +432,7 @@ export function LibraryPage() {
     },
     { label: "Add book…", onClick: () => setAddingBook(true) },
     { label: "Sync Goodreads…", onClick: () => setSyncingGoodreads(true) },
+    { label: "Download CSV template", onClick: downloadCsvTemplate },
     ...(books.length > 0 ? [{ label: "Select…", onClick: handleToggleSelectionMode }] : []),
     // Moved out of the app nav: it styles this page's cards and canvas,
     // not the app, so it belongs with the other things you do to your
@@ -545,11 +555,14 @@ export function LibraryPage() {
             >
               {importing ? "Importing…" : books.length > 0 ? "Import more…" : "Import library…"}
             </button>
+            <a href={csvTemplateUrl} download="atmyshelf-library.csv" className="min-h-11 rounded-lg border border-(--color-border) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover)">
+              CSV template
+            </a>
           </div>
           <input
             ref={fileInputRef}
             type="file"
-            accept=".json,application/json,.sqlite,.db,.sqlite3,.csv,text/csv"
+            accept=".json,application/json,.sqlite,.db,.sqlite3,.csv,text/csv,.tsv,text/tab-separated-values"
             hidden
             onChange={(e) => {
               const file = e.target.files?.[0];
@@ -598,8 +611,11 @@ export function LibraryPage() {
             <>
               Import one of: a <code>library.json</code> from the exporter CLI, a <code>KoboReader.sqlite</code> straight
               off your device's USB drive, a Goodreads library CSV export (My Books → Tools → Import/Export → Export
-              Library), or a StoryGraph library CSV export (profile icon → Manage Your Account → Manage Your Data →
-              Export StoryGraph Library).
+              Library), a StoryGraph library CSV export (profile icon → Manage Your Account → Manage Your Data →
+              Export StoryGraph Library), a Calibre CSV catalog, a LibraryThing TSV export, a BookWyrm book-list CSV, or a spreadsheet CSV.
+              <span className="mt-2 block">LibraryThing: More → Import/Export → Tab-Delimited Text. BookWyrm: Settings → Export Book List → CSV.</span>
+              <span className="mt-2 block">For Calibre, export a CSV catalog with title and authors. For spreadsheets, Title and Author are required; other fields are optional. Status: to-read, reading, or read. Rating: 0–5. Dates: YYYY-MM-DD. Blank fields keep your saved values.</span>
+              <a href={csvTemplateUrl} download="atmyshelf-library.csv" className="mt-2 inline-block min-h-11 py-2.5 text-(--color-accent) underline">Download CSV template</a>
             </>
           }
           action={
@@ -698,6 +714,7 @@ export function LibraryPage() {
       {detailBook && (
         <BookDetailSheet
           book={detailBook}
+          workId={library?.works?.[bookKey(detailBook)]}
           onOpenStyle={(b) => setStyleBookKey(bookKey(b))}
           onOpenCoverPicker={(b) => setCoverBookKey(bookKey(b))}
           onSetStatus={async (b, status) => {

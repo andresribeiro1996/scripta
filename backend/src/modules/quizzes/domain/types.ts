@@ -3,6 +3,8 @@
 /** Row shape as stored — `data` is the quiz document (QuizData in
  *  @scripta/shared) as raw JSON text, kept opaque all the way down and
  *  parsed only at the service edges, same treatment as tierlists' `data`. */
+export type QuizGameRow = Pick<QuizRow, "id" | "name" | "vote_code" | "owner_user_id" | "created_at">;
+
 export interface QuizRow {
   id: string;
   owner_user_id: string;

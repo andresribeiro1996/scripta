@@ -4,15 +4,15 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Button, Icon } from "../../ui";
 import { Text } from "../../ui/Text";
-import { blockFontFamily } from "../../ui/libraryStyle";
+import { blockFontFamily, resolveBorderStyle } from "../../ui/libraryStyle";
 import { minimumTouchTarget, radii, spacing, typography, useTheme, type ThemeColors } from "../../ui/theme";
-import { SelectRow, SWATCHES } from "../library/components/StyleControls";
+import { Caption, Chip, PresetRow, SelectRow, SWATCHES, Tile } from "../library/components/StyleControls";
 import { ColorEditor } from "./ColorEditor";
 import { SavedLooks } from "./SavedLooks";
 import {
   BACKGROUND_FIXED_SWATCHES, BACKGROUND_THEME_SWATCHES, BORDER_SIDE_PRESETS, BORDER_STRENGTH_PRESETS, BORDER_STYLE_CHOICES, BORDER_THEME_SWATCHES,
   BORDER_WIDTH_PRESETS, COLOR_LOOKS, CORNER_PRESETS, FADE_PRESETS, FRAME_LOOKS, GRADIENT_DIRECTION_PRESETS, GRADIENT_STRENGTH_PRESETS, SHADOW_BLUR_PRESETS, SHADOW_DISTANCE_PRESETS, SHADOW_STRENGTH_PRESETS, SIZE_PRESETS, TEXT_THEME_SWATCHES,
-  applyLook, customColorStart, isHardToRead, matchPreset, matchSides, type CustomColorTarget, type Look, type Preset,
+  applyLook, customColorStart, isHardToRead, matchSides, type CustomColorTarget, type Look,
 } from "./blockStyleOptions";
 
 function Group({ title, open, onOpenChange, children }: { title: string; open: boolean; onOpenChange: (open: boolean) => void; children: ReactNode }) {
@@ -24,34 +24,6 @@ function Group({ title, open, onOpenChange, children }: { title: string; open: b
       </Collapsible>
     </Host>
   );
-}
-
-function Caption({ children }: { children: string }) {
-  const { colors } = useTheme();
-  return <Text style={[typography.caption, { color: colors.textDim }]}>{children}</Text>;
-}
-
-function Chip({ label, selected, onPress, fontFamily }: { label: string; selected: boolean; onPress: () => void; fontFamily?: string }) {
-  const { colors } = useTheme();
-  return (
-    <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected }} onPress={onPress} style={[styles.chip, { borderColor: selected ? colors.accent : colors.border, backgroundColor: selected ? colors.accentSoft : colors.surface }]}>
-      <Text style={{ color: selected ? colors.accent : colors.text, fontSize: 14, fontWeight: selected ? "700" : "500", fontFamily }}>{label}</Text>
-    </Pressable>
-  );
-}
-
-function Tile({ label, selected, onPress, children }: { label: string; selected: boolean; onPress: () => void; children: ReactNode }) {
-  const { colors } = useTheme();
-  return (
-    <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected }} onPress={onPress} style={styles.tileWrap}>
-      <View style={[styles.tile, { borderColor: selected ? colors.accent : colors.border, borderWidth: selected ? 2 : 1, backgroundColor: selected ? colors.accentSoft : colors.surface }]}>{children}</View>
-      <Text style={[typography.caption, { color: colors.textDim }]}>{label}</Text>
-    </Pressable>
-  );
-}
-
-function PresetRow({ label, presets, value, onChange }: { label: string; presets: readonly Preset<number>[]; value: number; onChange: (value: number) => void }) {
-  return <SelectRow label={label} value={matchPreset(presets, value)} options={presets.map((preset) => ({ value: preset.key, label: preset.label }))} onChange={(key) => onChange(presets.find((preset) => preset.key === key)!.value)} />;
 }
 
 function ColorRow({ label, palette, value, defaults, themeKeys, fixed, onChange, onCustom, editor }: {
@@ -189,7 +161,8 @@ export function StyleTab({ style, palette, onChange, onReset, onCopy, onPaste, c
         </View>
         <PresetRow label="Width" presets={BORDER_WIDTH_PRESETS} value={style.cardBorderWidth} onChange={(cardBorderWidth) => set({ cardBorderWidth })} />
         {style.cardBorderWidth > 0 ? <>
-          <SelectRow label="Style" value={BORDER_STYLE_CHOICES.some((choice) => choice.value === style.cardBorderStyle) ? style.cardBorderStyle : null} options={BORDER_STYLE_CHOICES} onChange={(cardBorderStyle) => set({ cardBorderStyle })} />
+          <SelectRow label="Style" value={resolveBorderStyle(style.cardBorderStyle)} options={BORDER_STYLE_CHOICES} onChange={(cardBorderStyle) => set({ cardBorderStyle })} />
+          {resolveBorderStyle(style.cardBorderStyle) !== style.cardBorderStyle ? <Caption>{`${style.cardBorderStyle[0].toUpperCase() + style.cardBorderStyle.slice(1)} is saved for web; displays as ${resolveBorderStyle(style.cardBorderStyle)} here.`}</Caption> : null}
           <PresetRow label="Strength" presets={BORDER_STRENGTH_PRESETS} value={style.cardBorderOpacity} onChange={(cardBorderOpacity) => set({ cardBorderOpacity })} />
           <Text style={[typography.body, styles.rowLabel, { color: colors.text }]}>Sides</Text>
           <View style={styles.wrap}>
@@ -240,9 +213,6 @@ const styles = StyleSheet.create({
   group: { gap: spacing.sm },
   rowLabel: { fontWeight: "600" },
   wrap: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  chip: { minHeight: minimumTouchTarget, justifyContent: "center", borderWidth: 1, borderRadius: radii.md, paddingHorizontal: spacing.md },
-  tileWrap: { alignItems: "center", gap: spacing.xs },
-  tile: { width: 64, height: 48, borderRadius: radii.md, alignItems: "center", justifyContent: "center" },
   corner: { width: 36, height: 26, borderTopWidth: 2, borderLeftWidth: 2 },
   sides: { width: 32, height: 22, borderWidth: 2 },
   colorRow: { gap: spacing.sm },
