@@ -2,7 +2,7 @@ import { router, Stack } from "expo-router";
 import { ImportForm } from "@/features/library/components/ImportForm";
 import { useLibrary } from "@/features/library/hooks/useLibrary";
 import { useLibraryActions } from "@/features/library/hooks/useLibraryActions";
-import { Screen } from "@/ui";
+import { Screen, SheetHeader } from "@/ui";
 
 export default function ImportRoute() {
   const { data: library } = useLibrary();
@@ -11,7 +11,8 @@ export default function ImportRoute() {
   const title = hasBooks ? "Import more / sync Goodreads" : "Import library";
   return (
     <Screen top={false}>
-      <Stack.Screen options={{ title }} />
+      <Stack.Screen options={{ title, headerShown: false }} />
+      <SheetHeader title={title} onClose={() => router.back()} />
       <ImportForm title={title} onMerge={merge} onClose={() => router.back()} />
     </Screen>
   );

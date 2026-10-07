@@ -346,6 +346,18 @@ type OverlayProps = {
   closeAccessibilityLabel?: string;
 };
 
+export function SheetHeader({ title, onClose }: { title: string; onClose: () => void }) {
+  const { colors } = useTheme();
+  return (
+    <View style={styles.overlayHeader}>
+      <Text accessibilityRole="header" {...dynamicType} style={[styles.overlayTitle, { color: colors.text }]}>{title}</Text>
+      <Pressable accessibilityLabel={`Close ${title}`} accessibilityRole="button" hitSlop={8} onPress={onClose} style={styles.closeButton}>
+        <Text {...dynamicType} style={[styles.closeText, { color: colors.textDim }]}>Close</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 function Overlay({ visible, title, children, onClose, closeAccessibilityLabel, sheet }: OverlayProps & { sheet: boolean }) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
@@ -375,12 +387,7 @@ function Overlay({ visible, title, children, onClose, closeAccessibilityLabel, s
             sheet ? { paddingBottom: insets.bottom + spacing.xl } : null,
           ]}
         >
-          <View style={styles.overlayHeader}>
-            <Text accessibilityRole="header" {...dynamicType} style={[styles.overlayTitle, { color: colors.text }]}>{title}</Text>
-            <Pressable accessibilityLabel={`Close ${title}`} accessibilityRole="button" hitSlop={8} onPress={onClose} style={styles.closeButton}>
-              <Text {...dynamicType} style={[styles.closeText, { color: colors.textDim }]}>Close</Text>
-            </Pressable>
-          </View>
+          <SheetHeader title={title} onClose={onClose} />
           {children}
         </View>
       </View>
