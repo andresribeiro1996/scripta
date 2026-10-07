@@ -245,6 +245,25 @@ test("a settled card with no second reading near the threshold has no streak", (
   assert.equal(result.streak, null);
 });
 
+const annotatorBehind = (marks: number[]) => {
+  const books = shelf(10, (i) => (i < marks.length ? { highlights: mark(marks[i]!) } : {}));
+  return readerIdentity(books, [series(books.slice(4, 8))]);
+};
+
+test("a second reading at strength 0.8 is a streak", () => {
+  const result = annotatorBehind([4, 4, 4, 4]);
+  assert.equal(result.state, "settled");
+  assert.equal(result.identity, "carto");
+  assert.equal(result.streak, "anno");
+});
+
+test("a second reading at strength 0.7 is not a streak", () => {
+  const result = annotatorBehind([4, 4, 3, 3]);
+  assert.equal(result.state, "settled");
+  assert.equal(result.identity, "carto");
+  assert.equal(result.streak, null);
+});
+
 test("a tied leaning card's streak is its runner-up", () => {
   const books = shelf(10, (i) => (i < 3 ? { highlights: mark(7) } : {}));
   const result = readerIdentity(books, [series(books.slice(3, 6))]);
