@@ -124,7 +124,9 @@ test("public mural payload carries the reader card without leaking titles or ser
       runnerUp: null,
       streak: null,
       signal: { counted: 3, of: 10, label: "3 of 10 finished books are in a series" },
-      coverage: ["genres known for 0 of 10 finished books"]
+      coverage: ["genres known for 0 of 10 finished books"],
+      style: { counter: "dial", trait: "both" },
+      chosen: {}
     });
     assert.ok(dial && facts);
     assert.equal(withCardBody.profile?.username, "cardOwner");
