@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../../ui/Text";
 import { FINISH_FEELINGS, type FinishRating } from "@scripta/shared";
-import { dynamicType, radii, spacing, typography, useTheme } from "../../../ui/theme";
+import { dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../../ui/theme";
 
 export function FeelingChips({ value, onChange }: { value: number | null; onChange: (rating: FinishRating) => void }) {
   const { colors } = useTheme();
@@ -27,6 +27,6 @@ export function FeelingChips({ value, onChange }: { value: number | null; onChan
 
 const styles = StyleSheet.create({
   row: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  chip: { minHeight: 36, paddingHorizontal: spacing.md, borderRadius: radii.full, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  chip: { minHeight: minimumTouchTarget, paddingHorizontal: spacing.md, borderRadius: radii.full, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   label: { fontWeight: "700" }
 });

@@ -62,6 +62,7 @@ export function OwnLibraryPane() {
                     accessibilityRole="button"
                     accessibilityState={{ selected }}
                     onPress={() => setStatus(option.value)}
+                    hitSlop={{ top: 6, bottom: 6 }}
                     style={[styles.chip, { borderColor: colors.border, backgroundColor: selected ? colors.accentSoft : colors.surface }]}
                   >
                     <Text {...dynamicType} numberOfLines={1} style={[typography.caption, styles.strong, { color: selected ? colors.accent : colors.text }]}>

@@ -1,8 +1,8 @@
 import { useCallback, useState } from "react";
-import { Alert, Pressable, StyleSheet, View } from "react-native";
+import { Alert, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { useFocusEffect } from "expo-router";
-import { Button, Input, Sheet } from "../../ui";
+import { Button, Input, Sheet, ToggleSwitch } from "../../ui";
 import { minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui/theme";
 import { startSocialConnect, type SocialProvider, type SocialStatus } from "./api";
 import { useSocials } from "./useSocials";
@@ -70,16 +70,12 @@ export function SocialsSection() {
             <Text style={[typography.body, { color: colors.text, fontWeight: "600" }]}>{LABELS[status.provider]}</Text>
             <Text style={[typography.caption, { color: colors.textDim }]}>{!status.enabled ? "Not configured on this server" : status.connected ? `Connected${status.handle ? ` as ${status.handle}` : ""}` : "Not connected"}</Text>
           </View>
-          <Pressable
+          <ToggleSwitch
             accessibilityLabel={LABELS[status.provider]}
-            accessibilityRole="switch"
-            accessibilityState={{ checked: status.connected, disabled: !status.enabled || busy === status.provider }}
+            value={status.connected}
             disabled={!status.enabled || busy === status.provider}
-            onPress={() => status.connected ? confirmDisconnect(status) : void enable(status.provider)}
-            style={[styles.switch, { backgroundColor: status.connected ? colors.accent : colors.border }]}
-          >
-            <View style={[styles.thumb, { alignSelf: status.connected ? "flex-end" : "flex-start" }]} />
-          </Pressable>
+            onValueChange={() => status.connected ? confirmDisconnect(status) : void enable(status.provider)}
+          />
         </View>
       ))}
       {error ? <Text accessibilityRole="alert" style={[typography.caption, { color: colors.danger }]}>{error}</Text> : null}
@@ -100,7 +96,5 @@ const styles = StyleSheet.create({
   heading: { ...typography.title, fontWeight: "700" },
   row: { flexDirection: "row", alignItems: "center", gap: spacing.md, minHeight: minimumTouchTarget },
   grow: { flex: 1 },
-  switch: { width: 48, height: 28, borderRadius: radii.full, padding: 3, justifyContent: "center" },
-  thumb: { width: 22, height: 22, borderRadius: radii.full, backgroundColor: "white" },
   form: { gap: spacing.md, paddingTop: spacing.sm },
 });
