@@ -13,7 +13,7 @@ const card = (fields: Partial<PublicReaderCard> = {}): PublicReaderCard => ({
   facts: { finished: 30, highlights: 40, series: 2, since: 2014, edition: 2026 },
   ...fields,
 });
-const render = (fields: Partial<PublicReaderCard> = {}, style: ReaderCardStyle = DEFAULT_READER_CARD_STYLE, print: "paper" | "reversed" = "paper") =>
+const render = (fields: Partial<PublicReaderCard> = {}, style: Pick<ReaderCardStyle, "counter" | "trait"> = DEFAULT_READER_CARD_STYLE, print: "paper" | "reversed" = "paper") =>
   renderReaderCard({ card: card(fields), style, readerName: "andre", print, label: "Reader card", seed: seedOf("andre") });
 const plain = renderPlate({ identity: "star", state: "settled", readerName: "andre", print: "paper", label: "Reader card" });
 

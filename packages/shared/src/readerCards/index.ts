@@ -2,5 +2,6 @@ export { PLATES as READER_PLATES, INKS as PLATE_INKS, PLATE_FONTS, type Identity
 export * from "./render.js";
 export * from "./card.js";
 export * from "./style.js";
+export * from "./api.js";
 export { COUNTERS, drawCounter, type Counter, type CounterLayer } from "./counters.js";
 export { seedOf } from "./seed.js";
