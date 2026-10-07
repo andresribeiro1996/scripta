@@ -903,8 +903,12 @@ test("raising the derived version re-derives every library at the next backfill"
     fileService.saveLibrary("bump-a", { books: [dune()] });
     fileService.saveLibrary("bump-b", { books: [emma] });
     fileDb.prepare(`UPDATE library_derived SET glyph = 'star' WHERE user_id IN ('bump-a', 'bump-b')`).run();
+    const { streak, dial, facts, ...oldShape } = JSON.parse(rowsInDb(fileDb, "bump-a").summary.reader_card as string);
+    assert.ok(dial && facts);
+    fileDb.prepare(`UPDATE library_summary SET reader_card = ? WHERE user_id = 'bump-a'`).run(JSON.stringify(oldShape));
     backfillLibraryDerived();
     assert.equal(storedGlyph(fileDb, "bump-a"), "star");
+    assert.equal("dial" in JSON.parse(rowsInDb(fileDb, "bump-a").summary.reader_card as string), false);
 
     applyLibrarySchema(fileDb, LIBRARY_DERIVED_VERSION + 1);
     assert.equal(storedGlyph(fileDb, "bump-a"), undefined);
@@ -914,6 +918,9 @@ test("raising the derived version re-derives every library at the next backfill"
     assert.equal(storedGlyph(fileDb, "bump-b"), null);
     assert.deepEqual(keyRows(fileDb, "bump-a").map((row) => row.key), ["isbn:9780441013593", "ta:dune|frank herbert"]);
     assert.deepEqual(keyRows(fileDb, "bump-b").map((row) => row.key), ["ta:emma|jane austen"]);
+    const rebuilt = JSON.parse(rowsInDb(fileDb, "bump-a").summary.reader_card as string);
+    assert.deepEqual(rebuilt.dial, { segments: [] });
+    assert.equal(rebuilt.facts.finished, 0);
   } finally {
     logged.mock.restore();
   }
