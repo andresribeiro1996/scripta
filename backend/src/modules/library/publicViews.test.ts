@@ -995,6 +995,29 @@ test("a chosen highlight whose book left the library drops out of the visitor's 
   assert.deepEqual(resolvePublicLibraryData(owner, cardRequest).readerCard?.chosen, {});
 });
 
+test("a chosen highlight whose text went blank drops out, and its annotation never leaves", () => {
+  const owner = "card-blank";
+  const first = service.saveLibrary(owner, { books: [earthsea], groups: [] });
+  service.patchReaderCardStyle(owner, { highlight: { bookKey: bookKey(earthsea), highlightId: "h1" } });
+  const blanked = { ...earthsea, highlights: [{ Type: "highlight", Text: "   ", Annotation: "annotation of a blanked passage", BookmarkID: "h1" }] };
+  service.saveLibrary(owner, { books: [blanked], groups: [] }, first.updatedAt);
+  const result = resolvePublicLibraryData(owner, cardRequest);
+  assert.doesNotMatch(JSON.stringify(result), /annotation of a blanked passage/);
+  assert.equal(result.readerCard?.chosen?.highlight, undefined);
+});
+
+test("a chosen highlight that left its book drops out while the chosen signature stays", () => {
+  const owner = "card-lost-highlight";
+  const first = service.saveLibrary(owner, { books: [earthsea], groups: [] });
+  service.patchReaderCardStyle(owner, { signature: { bookKey: bookKey(earthsea), note: "why" }, highlight: { bookKey: bookKey(earthsea), highlightId: "h1" } });
+  const trimmed = { ...earthsea, highlights: [{ Type: "highlight", Text: "Another line", BookmarkID: "h2" }] };
+  service.saveLibrary(owner, { books: [trimmed], groups: [] }, first.updatedAt);
+  const chosen = resolvePublicLibraryData(owner, cardRequest).readerCard?.chosen;
+  assert.equal(chosen?.signature?.title, "A Wizard of Earthsea");
+  assert.equal(chosen?.signature?.note, "why");
+  assert.equal(chosen?.highlight, undefined);
+});
+
 test("a reader who never styled their card gets the default public style and no choices", () => {
   const owner = "card-plain";
   service.saveLibrary(owner, { books: [earthsea], groups: [] });

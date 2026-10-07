@@ -179,7 +179,7 @@ function chosenOf(userId: string, style: ReaderCardStyle, byKey: Map<string, Boo
   const highlightRow = style.highlight ? byKey.get(style.highlight.bookKey) : undefined;
   if (style.highlight && highlightRow) {
     const found = getStatements().highlightStmt.get(userId, highlightRow.position, style.highlight.highlightId) as { text: string | null } | undefined;
-    if (found?.text) chosen.highlight = { text: found.text, title: highlightRow.title || "Untitled", author: highlightRow.author || "Unknown author" };
+    if (found?.text?.trim()) chosen.highlight = { text: found.text, title: highlightRow.title || "Untitled", author: highlightRow.author || "Unknown author" };
   }
   return chosen;
 }
