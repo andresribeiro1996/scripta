@@ -71,6 +71,6 @@ Merging does not deploy. The backend (Railway), the web app (Cloudflare Pages) a
 gh workflow run deploy.yml
 ```
 
-It deploys the newest `main` commit whose CI passed (`-f sha=<sha>` picks one), refuses anything not on `main` or not green, and lists the commits going out in the run summary. Never push to `production` any other way. Migrations run when the backend boots, so one deploy runs every migration merged since the last. If the user wants to know it is live, dispatch `deploy-ops`.
+It deploys the newest `main` commit whose CI passed (`-f sha=<sha>` picks one), refuses anything not on `main` or not green, and lists the commits going out in the run summary. Never push to `production` any other way. "Deploy" means this workflow: backend, web and the over-the-air JavaScript update. "Release" means only a new Android store build, built from `production` (see `mobile/AGENTS.md`); a deploy never starts one, and a release request is never a deploy. Migrations run when the backend boots, so one deploy runs every migration merged since the last. If the user wants to know it is live, dispatch `deploy-ops`.
 
 Report: the commit SHA, PR URL, merge state, whether the main checkout was updated, and, after a deploy, the Deploy run URL.
