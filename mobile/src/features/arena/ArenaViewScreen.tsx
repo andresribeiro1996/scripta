@@ -71,7 +71,7 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
     setError(null);
     try {
       await run();
-      await queryClient.invalidateQueries({ queryKey: ["arena", id] });
+      await queryClient.invalidateQueries({ queryKey: ["arena"] });
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "That action failed.");
     } finally {
