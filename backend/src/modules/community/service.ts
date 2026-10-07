@@ -48,7 +48,7 @@ async function inBatches(step: (batch: number) => number): Promise<number> {
   }
 }
 
-function newEvent(userId: string, type: ActivityEventType, refType: CommunityRefType, refId: string, payload?: Record<string, unknown>, now: () => number = Date.now): EventRow {
+function newEvent(userId: string, type: ActivityEventType, refType: CommunityRefType, refId: string, payload: Record<string, unknown> | undefined, now: () => number): EventRow {
   const trace = currentTrace();
   return { id: randomUUID(), user_id: userId, type, ref_type: refType, ref_id: refId, payload: payload ? JSON.stringify(payload) : null, created_at: new Date(now()).toISOString(), trace_id: trace?.traceId ?? null, source: trace?.source ?? null };
 }
@@ -67,7 +67,7 @@ export function createBestEffortRecorder(emit: CommunityPublicApi["emitEvent"], 
     try {
       emit(userId, type, refType, refId, payload);
     } catch (error) {
-      log.error({ err: error, type, refType, refId }, "failed to record community activity");
+      log.error({ err: error, userId, type, refType, refId }, "failed to record community activity");
     }
   };
 }

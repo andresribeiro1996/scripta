@@ -506,7 +506,7 @@ test("recording an event never throws out of the best-effort recorder, which log
 
   record("alice", "tierlist_published", "tierlist", "t1");
 
-  assert.deepEqual(logged, [{ context: { err: failure, type: "tierlist_published", refType: "tierlist", refId: "t1" }, message: "failed to record community activity" }]);
+  assert.deepEqual(logged, [{ context: { err: failure, userId: "alice", type: "tierlist_published", refType: "tierlist", refId: "t1" }, message: "failed to record community activity" }]);
 });
 
 const HOUR_MS = 60 * 60 * 1000;

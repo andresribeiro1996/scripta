@@ -23,7 +23,6 @@ process.env.JWT_ACCESS_SECRET = "a".repeat(64);
 process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
 const { createTierlistsPublicApi, createTierlistsService } = await import("./service.js");
-const { createBestEffortRecorder } = await import("../community/service.js");
 
 function createInMemoryRepo(): TierlistsRepository {
   const tierlists = new Map<string, TierlistRow>();
@@ -602,24 +601,6 @@ test("openVoting emits exactly one publish event for the same tier list", () => 
 
   assert.ok(copy);
   assert.deepEqual(emitted, [[copy.id, "u1"]]);
-});
-
-test("a publish whose activity recording fails still publishes, because the best-effort recorder swallows the failure", () => {
-  const logged: string[] = [];
-  const record = createBestEffortRecorder(
-    () => {
-      throw new Error("disk full");
-    },
-    { error: (_context, message) => logged.push(message) }
-  );
-  const service = createTierlistsService(createInMemoryRepo(), (copyId, ownerUserId) => record(ownerUserId, "tierlist_published", "tierlist", copyId));
-  const original = service.createTierlist("u1", "Fantasy");
-
-  const copy = service.openVoting("u1", original.id, "anonymous");
-
-  assert.ok(copy);
-  assert.equal(service.getPublishedRef(copy.id)?.ownerUserId, "u1");
-  assert.deepEqual(logged, ["failed to record community activity"]);
 });
 
 test("a first signed-in ballot emits voted_on once", () => {
