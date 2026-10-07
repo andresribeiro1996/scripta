@@ -18,6 +18,13 @@ export function bracketShape(bracketSize: number, duels: Duel[]): BracketSlot[][
   });
 }
 
+export function roundLabel(duelsInRound: number, roundNumber: number): string {
+  if (duelsInRound === 1) return "Final";
+  if (duelsInRound === 2) return "Semis";
+  if (duelsInRound === 4) return "Quarters";
+  return `Round ${roundNumber}`;
+}
+
 export function needsVote(duel: Duel): boolean {
   return duel.status === "active" && !duel.hasVoted;
 }

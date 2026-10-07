@@ -1,4 +1,4 @@
-import { bracketShape, countdownLabel, duelWinner, needsVote, type BracketSlot, type Duel, type DuelSide } from "@scripta/shared";
+import { bracketShape, countdownLabel, duelWinner, needsVote, roundLabel, type BracketSlot, type Duel, type DuelSide } from "@scripta/shared";
 import type { TournamentView } from "./api";
 
 const ALL_ARENA_VIEW_TABS = [
@@ -48,16 +48,6 @@ export function matchEmptyCopy(status: TournamentView["status"], hasDuels: boole
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-/** Named from the back of the draw, so the same round is "Quarters" in a
- *  16-book bracket and "Round 1" in an 8-book one. */
-export function roundLabel(byRound: BracketSlot[][], roundIdx: number): string {
-  const count = byRound[roundIdx]?.length ?? 0;
-  if (count === 1) return "Final";
-  if (count === 2) return "Semis";
-  if (count === 4) return "Quarters";
-  return `Round ${roundIdx + 1}`;
-}
-
 /** Where this round sits, how much of it is done, and when it closes — the
  *  three things the screen never said. Split in two because all of it on one
  *  line truncates at phone width.
@@ -67,7 +57,7 @@ export function roundLabel(byRound: BracketSlot[][], roundIdx: number): string {
  *  the last day the countdown is the useful form. */
 export function roundHeadline(byRound: BracketSlot[][], roundIdx: number, now = Date.now()): { title: string; status: string } {
   const slots = byRound[roundIdx] ?? [];
-  const name = roundLabel(byRound, roundIdx);
+  const name = roundLabel(slots.length, roundIdx + 1);
   const position = `Round ${roundIdx + 1} of ${byRound.length}`;
   const settled = slots.filter((duel) => duel?.status === "settled").length;
   const parts = [`${settled} of ${slots.length} settled`];

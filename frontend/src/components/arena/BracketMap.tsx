@@ -29,7 +29,7 @@
 // padding: with flexible cells, anything hanging past a cell's boundary
 // would overlap its neighbour instead of meeting it.
 
-import { duelWinner } from "@scripta/shared";
+import { duelWinner, roundLabel } from "@scripta/shared";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import type { Duel, DuelSide, TournamentView } from "../../api/arena";
@@ -391,10 +391,7 @@ export function BracketMap({
   const tileRatio = (cells: number) => cells / maxPerRow;
 
   function labelFor(roundIdx: number): string {
-    const perSide = top[roundIdx]!.length;
-    if (perSide === 1) return "Semis";
-    if (perSide === 2) return "Quarters";
-    return `Round ${roundNumbers[roundIdx]}`;
+    return roundLabel(top[roundIdx]!.length * 2, roundNumbers[roundIdx]!);
   }
 
   const finalDuel = hasCentre ? finalRound[0]! : null;
@@ -418,7 +415,7 @@ export function BracketMap({
 
       {finalDuel && (
         <div className="flex flex-col">
-          <p className="text-center text-[8.5px] font-semibold tracking-wide text-(--color-accent) uppercase sm:text-[10px]">Final</p>
+          <p className="text-center text-[8.5px] font-semibold tracking-wide text-(--color-accent) uppercase sm:text-[10px]">{roundLabel(1, byRound.length)}</p>
           <div className="relative flex w-full flex-col justify-center">
             {/* Receives from BOTH halves, so it takes a stub on each edge
                 — the only cell in the bracket that does. */}

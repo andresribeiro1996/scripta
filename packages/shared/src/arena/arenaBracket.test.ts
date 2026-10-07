@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { duelWinner } from "./arenaBracket.js";
+import { duelWinner, roundLabel } from "./arenaBracket.js";
 import type { Duel } from "./types.js";
 
 const duel = (over: Partial<Duel> = {}): Duel => ({
@@ -35,4 +35,17 @@ test("duelWinner never matches a null side to a null winner", () => {
 test("duelWinner gives a shared winning work to side A only", () => {
   const twin = { workId: "a", title: "Twin", author: "", cover: null, votes: 0 };
   assert.equal(duelWinner(duel({ winnerWorkId: "a", bookB: twin }))?.title, "A");
+});
+
+test("roundLabel names a round by its total duel count", () => {
+  for (const roundNumber of [1, 2, 3]) {
+    assert.equal(roundLabel(1, roundNumber), "Final");
+    assert.equal(roundLabel(2, roundNumber), "Semis");
+    assert.equal(roundLabel(4, roundNumber), "Quarters");
+  }
+});
+
+test("roundLabel falls back to the round number for other duel counts", () => {
+  assert.equal(roundLabel(8, 1), "Round 1");
+  assert.equal(roundLabel(3, 2), "Round 2");
 });

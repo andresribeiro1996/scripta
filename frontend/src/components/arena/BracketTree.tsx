@@ -21,6 +21,7 @@
 // lay duels out.
 
 import { useEffect, useState, type ReactNode } from "react";
+import { roundLabel } from "@scripta/shared";
 import type { TournamentView } from "../../api/arena";
 import { OptionSheet } from "../Sheet";
 
@@ -50,9 +51,8 @@ export function BracketTree({ tournament, renderDuel }: { tournament: Tournament
   const roundNumbers = [...rounds.keys()].sort((a, b) => a - b);
   const lastRoundNumber = roundNumbers.at(-1);
 
-  function roundLabel(roundNumber: number): string {
-    const duels = rounds.get(roundNumber);
-    return roundNumber === lastRoundNumber && duels?.length === 1 ? "Final" : `Round ${roundNumber}`;
+  function labelFor(roundNumber: number): string {
+    return roundLabel(rounds.get(roundNumber)?.length ?? 0, roundNumber);
   }
 
   // Opens on whichever round is actually live, not round 1 — that's the
@@ -116,10 +116,10 @@ export function BracketTree({ tournament, renderDuel }: { tournament: Tournament
 
           <button
             onClick={() => setPicking(true)}
-            aria-label={`Showing ${roundLabel(activeRound!)} — choose a round`}
+            aria-label={`Showing ${labelFor(activeRound!)} — choose a round`}
             className="flex min-h-11 min-w-0 flex-1 items-center justify-between gap-2 border-x border-(--color-border) px-3 text-sm font-semibold hover:bg-(--color-surface-hover)"
           >
-            <span className="truncate">{roundLabel(activeRound!)}</span>
+            <span className="truncate">{labelFor(activeRound!)}</span>
             <span className="flex shrink-0 items-center gap-2 text-xs font-normal text-(--color-text-dim)">
               {duelsIn(activeRound!).length} match{duelsIn(activeRound!).length === 1 ? "" : "es"}
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -150,7 +150,7 @@ export function BracketTree({ tournament, renderDuel }: { tournament: Tournament
         {roundNumbers.map((roundNumber) => (
           <div key={roundNumber} className="flex w-72 shrink-0 flex-col justify-around gap-6">
             <h3 className="text-center text-xs font-semibold tracking-wide text-(--color-text-dim) uppercase">
-              {roundLabel(roundNumber)}
+              {labelFor(roundNumber)}
             </h3>
             {duelsIn(roundNumber).map((duel) => (
               <div key={duel.id}>{renderDuel(duel.id)}</div>
@@ -168,7 +168,7 @@ export function BracketTree({ tournament, renderDuel }: { tournament: Tournament
           // without having to open them one by one.
           options={roundNumbers.map((n) => ({
             value: String(n),
-            label: `${roundLabel(n)} · ${rounds.get(n)!.length} match${rounds.get(n)!.length === 1 ? "" : "es"}`
+            label: `${labelFor(n)} · ${rounds.get(n)!.length} match${rounds.get(n)!.length === 1 ? "" : "es"}`
           }))}
           value={String(activeRound)}
           onSelect={(v) => setSelectedRound(Number(v))}
