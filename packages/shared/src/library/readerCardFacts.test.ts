@@ -1,0 +1,71 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import type { Group } from "./groups.js";
+import { bookKey } from "./merge.js";
+import { publicReaderCardOf, readerCardFacts } from "./readerCardFacts.js";
+
+type Book = Record<string, unknown>;
+const book = (i: number, fields: Book = {}): Book => ({ Title: `Book ${i}`, Attribution: `Author ${i}`, ReadStatus: 2, ...fields });
+const mark = (n: number, type = "highlight") => Array.from({ length: n }, (_, j) => ({ Type: type, Text: `line ${j}`, BookmarkID: `h${j}` }));
+const series = (books: Book[], id = "s"): Group => ({ id, type: "series", name: "S", bookKeys: books.map(bookKey), createdAt: "", updatedAt: "" });
+const NOW = new Date(2026, 9, 7);
+
+test("each finished book counts in one segment, the identity's group first", () => {
+  const books = [book(1, { _genres: ["Fantasy", "Mystery"] }), book(2, { _genres: ["Mystery"] }), book(3, { _genres: ["Romance"] }), book(4)];
+  assert.deepEqual(readerCardFacts(books, [], "star", NOW).dial.segments, [
+    { group: "star", books: 1, marked: 0 },
+    { group: "lamp", books: 1, marked: 0 },
+    { group: "other", books: 1, marked: 0 },
+    { group: "unknown", books: 1, marked: 0 },
+  ]);
+  assert.deepEqual(readerCardFacts(books, [], null, NOW).dial.segments.map((s) => [s.group, s.books]), [["lamp", 2], ["other", 1], ["unknown", 1]]);
+});
+
+test("marked counts finished books with a real Kobo highlight, and highlights counts the passages", () => {
+  const books = [
+    book(1, { highlights: mark(3) }),
+    book(2, { highlights: mark(2, "note") }),
+    book(3, { highlights: mark(1), ReadStatus: 1 }),
+    book(4, { highlights: [{ Type: "highlight", Text: "  ", BookmarkID: "x" }] }),
+  ];
+  const { dial, facts } = readerCardFacts(books, [], null, NOW);
+  assert.equal(facts.finished, 3);
+  assert.equal(facts.highlights, 3);
+  assert.deepEqual(dial.segments, [{ group: "unknown", books: 3, marked: 1 }]);
+});
+
+test("a duplicated book counts once", () => {
+  assert.equal(readerCardFacts([book(1), book(1), book(2)], [], null, NOW).facts.finished, 2);
+});
+
+test("series counts series groups holding a finished book", () => {
+  const finished = [book(1), book(2)];
+  const unread = book(3, { ReadStatus: 0 });
+  const collection: Group = { ...series([finished[0]!], "c"), type: "collection" };
+  assert.equal(readerCardFacts([...finished, unread], [series(finished, "a"), series([unread], "b"), collection], null, NOW).facts.series, 1);
+});
+
+test("since is the earliest year a finished book was last read, and edition is this year", () => {
+  const books = [book(1, { DateLastRead: "2019-05-02" }), book(2, { DateLastRead: "2016-03-01T10:00:00Z" }), book(3, { DateLastRead: "garbage" }), book(4, { DateLastRead: "2001-01-01", ReadStatus: 1 })];
+  const { facts } = readerCardFacts(books, [], null, NOW);
+  assert.equal(facts.since, 2016);
+  assert.equal(facts.edition, 2026);
+  assert.equal(readerCardFacts([book(1)], [], null, NOW).facts.since, null);
+});
+
+test("no finished books gives an empty dial", () => {
+  assert.deepEqual(readerCardFacts([book(1, { ReadStatus: 0 })], [], null, NOW), {
+    dial: { segments: [] },
+    facts: { finished: 0, highlights: 0, series: 0, since: null, edition: 2026 },
+  });
+});
+
+test("the public card carries the identity fields and the facts, never the leaders", () => {
+  const books = Array.from({ length: 6 }, (_, i) => book(i, { _genres: ["Fantasy"] }));
+  const card = publicReaderCardOf(books, [], NOW);
+  assert.equal(card.identity, "star");
+  assert.equal(card.facts?.finished, 6);
+  assert.deepEqual(card.dial?.segments, [{ group: "star", books: 6, marked: 0 }]);
+  assert.equal("leaders" in card, false);
+  assert.equal("missing" in card, false);
+});

@@ -2,8 +2,11 @@ import { READER_PLATES, type CardState, type IdentityKey } from "../readerCards/
 import { genresForBook, isFinishedBook, type BookGenre } from "./bookGenres.js";
 import type { Group } from "./groups.js";
 import { bookKey } from "./merge.js";
+import type { ReaderCardFacts } from "./readerCardFacts.js";
 
 type Book = Record<string, unknown>;
+
+export type GenreIdentity = "lamp" | "star" | "arch" | "corr";
 
 export interface ReaderSignal { counted: number; of: number; label: string }
 export interface ReaderLeader { label: string; count: number }
@@ -11,19 +14,20 @@ export interface ReaderIdentity {
   state: CardState;
   identity: IdentityKey | null;
   runnerUp: IdentityKey | null;
+  streak: IdentityKey | null;
   signal: ReaderSignal | null;
   leaders: ReaderLeader[];
   coverage: string[];
   missing: string | null;
 }
-export type PublicReaderCard = Pick<ReaderIdentity, "state" | "identity" | "runnerUp" | "signal" | "coverage">;
+export type PublicReaderCard = Pick<ReaderIdentity, "state" | "identity" | "runnerUp" | "signal" | "coverage"> & Partial<Pick<ReaderIdentity, "streak">> & Partial<ReaderCardFacts>;
 
 interface Candidate { key: IdentityKey; strength: number; signal: ReaderSignal; leaders: ReaderLeader[]; gap: string }
 
 const EPSILON = 1e-9;
 const MIN_BOOKS = 5;
 
-const GENRE_SIGNALS: Array<{ key: IdentityKey; genres: BookGenre[]; threshold: number; words: string }> = [
+export const GENRE_SIGNALS: Array<{ key: GenreIdentity; genres: BookGenre[]; threshold: number; words: string }> = [
   { key: "lamp", genres: ["Mystery", "Crime", "Thriller", "Horror"], threshold: 0.35, words: "mystery, crime, thriller or horror" },
   { key: "star", genres: ["Fantasy", "Science Fiction"], threshold: 0.4, words: "fantasy or science fiction" },
   { key: "arch", genres: ["History", "Biography & Memoir", "Politics"], threshold: 0.35, words: "history, biography or politics" },
@@ -53,20 +57,24 @@ function markCount(book: Book) {
   }).length;
 }
 
-export function readerIdentity(books: Book[], groups: Group[]): ReaderIdentity {
-  const seenKeys = new Set<string>();
-  const finished = books.filter(isFinishedBook).filter((book) => {
+export function uniqueFinished(books: Book[]): Book[] {
+  const seen = new Set<string>();
+  return books.filter(isFinishedBook).filter((book) => {
     const key = bookKey(book);
-    if (seenKeys.has(key)) return false;
-    seenKeys.add(key);
+    if (seen.has(key)) return false;
+    seen.add(key);
     return true;
   });
+}
+
+export function readerIdentity(books: Book[], groups: Group[]): ReaderIdentity {
+  const finished = uniqueFinished(books);
   const n = finished.length;
   const genresOf = new Map(finished.map((book) => [book, genresForBook(book)] as const));
   const known = finished.filter((book) => genresOf.get(book)!.length > 0);
   const coverage = [`genres known for ${known.length} of ${n} finished books`];
   if (finished.some((book) => /^(goodreads|storygraph):/.test(String(book.ContentID ?? "")))) coverage.push("series unknown for Goodreads and StoryGraph imports");
-  const unwritten = (missing: string): ReaderIdentity => ({ state: "unwritten", identity: null, runnerUp: null, signal: null, leaders: [], coverage, missing });
+  const unwritten = (missing: string): ReaderIdentity => ({ state: "unwritten", identity: null, runnerUp: null, streak: null, signal: null, leaders: [], coverage, missing });
   if (n < MIN_BOOKS) return unwritten(`Finish ${plural(MIN_BOOKS - n, "more book")}`);
 
   const candidates: Candidate[] = [];
@@ -154,7 +162,8 @@ export function readerIdentity(books: Book[], groups: Group[]): ReaderIdentity {
   }
   const clears = (candidate: Candidate | undefined) => Boolean(candidate && candidate.strength >= 1 - EPSILON);
   const tie = clears(best) && clears(second) && second!.strength >= best.strength * 0.95 - EPSILON;
-  const shared = { identity: best.key, signal: best.signal, leaders: best.leaders, coverage };
+  const streak = second && second.strength >= 0.75 - EPSILON ? second.key : null;
+  const shared = { identity: best.key, signal: best.signal, leaders: best.leaders, coverage, streak };
   if (clears(best) && !tie) return { state: "settled", runnerUp: null, missing: null, ...shared };
   return {
     state: "leaning",
@@ -164,6 +173,6 @@ export function readerIdentity(books: Book[], groups: Group[]): ReaderIdentity {
   };
 }
 
-export function publicReaderCard({ state, identity, runnerUp, signal, coverage }: ReaderIdentity): PublicReaderCard {
-  return { state, identity, runnerUp, signal, coverage };
+export function publicReaderCard({ state, identity, runnerUp, streak, signal, coverage }: ReaderIdentity): PublicReaderCard {
+  return { state, identity, runnerUp, streak, signal, coverage };
 }

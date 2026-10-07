@@ -60,6 +60,15 @@ export function localDay(now: Date = new Date()): string {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
+const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+export function parseBookDate(raw: unknown): Date | null {
+  if (typeof raw !== "string" || !raw) return null;
+  const dateOnly = DATE_ONLY.exec(raw);
+  const parsed = dateOnly ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3])) : new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 export function setReadStatus(book: LibraryBook, status: ReadStatus, day: string): LibraryBook {
   const current = book.ReadStatus === 1 || book.ReadStatus === 2 ? book.ReadStatus : 0;
   if (current === status) return book;

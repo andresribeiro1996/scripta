@@ -8,6 +8,7 @@
 // populate them, but neither is guaranteed present on every book (a
 // hand-merged/edited library, an older export, etc.).
 
+import { parseBookDate } from "../library/libraryView.js";
 import type { StatMetric } from "./murals.js";
 
 function isFinished(book: Record<string, unknown>): boolean {
@@ -18,17 +19,8 @@ function isInProgress(book: Record<string, unknown>): boolean {
   return book.ReadStatus === 1;
 }
 
-const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
-
 function finishedInYear(book: Record<string, unknown>, year: number): boolean {
-  if (!isFinished(book)) return false;
-  const raw = book.DateLastRead;
-  if (typeof raw !== "string" || !raw) return false;
-  const dateOnly = DATE_ONLY.exec(raw);
-  const parsed = dateOnly
-    ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
-    : new Date(raw);
-  return !Number.isNaN(parsed.getTime()) && parsed.getFullYear() === year;
+  return isFinished(book) && parseBookDate(book.DateLastRead)?.getFullYear() === year;
 }
 
 function highlightCount(book: Record<string, unknown>): number {

@@ -1,5 +1,4 @@
-const SERIF = "'Playfair Display', Georgia, 'Times New Roman', serif";
-const SANS = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+import { SANS, SERIF, composePlate } from "./compose.js";
 
 export const PLATE_FONTS = { serif: SERIF, sans: SANS };
 
@@ -377,24 +376,7 @@ interface PlateOptions {
 }
 
 export function plate({ key, emblem = key, name, eyebrow = "THE", epithet, numeral, reader = "EXAMPLE READER", width = 250, label }: PlateOptions): string {
-  const corners = [[16, 16], [234, 16], [16, 334], [234, 334]].map(([x, y]) => `M${x} ${y - 4.5}L${x + 4.5} ${y}L${x} ${y + 4.5}L${x - 4.5} ${y}Z`).join("");
-  return `<svg xmlns="http://www.w3.org/2000/svg" class="plate id-${key}" viewBox="0 0 250 350" width="${width}" height="${+(width * 1.4).toFixed(2)}" role="img" aria-label="${label ?? `${eyebrow.toLowerCase()} ${name} identity plate`}">
-<rect class="pg" width="250" height="350" rx="4"/>
-<rect class="pl" x="10" y="10" width="230" height="330" stroke-width="1.6"/>
-<rect class="pl" x="16" y="16" width="218" height="318" stroke-width=".6"/>
-<path class="pf" d="${corners}"/>
-<text class="pt" x="125" y="45" text-anchor="middle" font-size="8.5" letter-spacing="3.4" font-family="${SANS}" font-weight="600">EX LIBRIS</text>
-<circle class="pl" cx="125" cy="134" r="60" stroke-width="1.4"/>
-<circle class="pl" cx="125" cy="134" r="55" stroke-width=".6"/>
-${emblems[emblem]()}
-<text class="pt" x="125" y="220" text-anchor="middle" font-size="8" letter-spacing="3" font-family="${SANS}" font-weight="600">${eyebrow}</text>
-<text class="pt" x="125" y="247" text-anchor="middle" font-size="25" font-family="${SERIF}">${name}</text>
-<path class="pl" d="M82 263H117M133 263H168" stroke-width=".8"/><circle class="pf" cx="125" cy="263" r="2"/>
-<text class="pt" x="125" y="283" text-anchor="middle" font-size="11" font-style="italic" font-family="${SERIF}">${epithet}</text>
-<path class="pl" d="M30 305H220" stroke-width=".5"/>
-<text class="pt" x="30" y="321" font-size="7.5" letter-spacing="1.8" font-family="${SANS}" font-weight="600">PLATE ${numeral}</text>
-<text class="pt" x="220" y="321" text-anchor="end" font-size="7.5" letter-spacing="1.8" font-family="${SANS}" font-weight="600">${reader}</text>
-</svg>`;
+  return composePlate({ key, emblemSvg: emblems[emblem](), name, eyebrow, epithet, numeral, reader, width, label: label ?? `${eyebrow.toLowerCase()} ${name} identity plate` });
 }
 
 const glyphShapes: Record<IdentityKey, string> = {
@@ -408,6 +390,8 @@ const glyphShapes: Record<IdentityKey, string> = {
   loyal: `<g transform="translate(24 23.5) rotate(-22) scale(.36)"><path class="gg" d="M-18-5Q-12-30 12-44Q2-24-2-4ZM-18 5Q-12 30 12 44Q2 24-2 4ZM2-3L44-15L15 1L44 17L2 5ZM-40-1Q-20-9 6-3Q11 1 6 5Q-18 9-40 3Z"/><circle class="gg" cx="-35" cy="1" r="7"/></g>`,
 };
 
-export const glyph = (key: IdentityKey, size: number, extra = "") => `<svg xmlns="http://www.w3.org/2000/svg" class="glyph id-${key} ${extra}" viewBox="0 0 48 48" width="${size}" height="${size}" aria-hidden="true"><circle class="gd" cx="24" cy="24" r="23.5"/><circle class="gr" cx="24" cy="24" r="20.5" fill="none" stroke-width=".8"/>${glyphShapes[key]}</svg>`;
+export const glyphBody = (key: IdentityKey) => `<circle class="gd" cx="24" cy="24" r="23.5"/><circle class="gr" cx="24" cy="24" r="20.5" fill="none" stroke-width=".8"/>${glyphShapes[key]}`;
+
+export const glyph = (key: IdentityKey, size: number, extra = "") => `<svg xmlns="http://www.w3.org/2000/svg" class="glyph id-${key} ${extra}" viewBox="0 0 48 48" width="${size}" height="${size}" aria-hidden="true">${glyphBody(key)}</svg>`;
 
 export const printStyle = (ground: string, line: string) => `<style>.pg,.pgf,.gg{fill:${ground}}.pl{stroke:${line};fill:none}.pf,.pt,.gd,.gi{fill:${line}}.pgl{fill:${ground};stroke:${line}}.pgs,.gr,.gs{stroke:${ground};fill:none}.gk{stroke:${line};fill:none}</style>`;

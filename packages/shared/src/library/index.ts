@@ -31,4 +31,5 @@ export * from "./bookSearch.js";
 export * from "./bookGenres.js";
 export * from "./finish.js";
 export * from "./readerIdentity.js";
+export * from "./readerCardFacts.js";
 export * from "./saveFailure.js";

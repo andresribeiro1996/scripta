@@ -48,6 +48,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "sheet": "node --import tsx scripts/contact-sheet.ts",
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   }

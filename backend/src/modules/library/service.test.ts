@@ -876,14 +876,39 @@ test("the backfill stores an unparseable document without keys, says so, and doe
   }
 });
 
+test("the backfill stores the rows before the derived marker, so a failed rows write leaves the account stale for the next boot", () => {
+  fileService.saveLibrary("crash-user", { books: [dune()] });
+  fileDb.prepare(`DELETE FROM library_derived WHERE user_id = 'crash-user'`).run();
+  const staleIds = () => createSqliteLibraryRepository(fileDb).listStaleUserIds();
+  assert.ok(staleIds().includes("crash-user"));
+  fileDb.exec(`CREATE TRIGGER crash_summary_write BEFORE INSERT ON library_summary WHEN NEW.user_id = 'crash-user' BEGIN SELECT RAISE(ABORT, 'disk full'); END`);
+  try {
+    assert.throws(() => backfillLibraryDerived(), /disk full/);
+  } finally {
+    fileDb.exec(`DROP TRIGGER crash_summary_write`);
+  }
+
+  assert.equal(storedGlyph(fileDb, "crash-user"), undefined);
+  assert.ok(staleIds().includes("crash-user"));
+
+  backfillLibraryDerived();
+
+  assert.equal(storedGlyph(fileDb, "crash-user"), null);
+  assert.equal(staleIds().includes("crash-user"), false);
+});
+
 test("raising the derived version re-derives every library at the next backfill", () => {
   const logged = mock.method(console, "error", () => undefined);
   try {
     fileService.saveLibrary("bump-a", { books: [dune()] });
     fileService.saveLibrary("bump-b", { books: [emma] });
     fileDb.prepare(`UPDATE library_derived SET glyph = 'star' WHERE user_id IN ('bump-a', 'bump-b')`).run();
+    const { streak, dial, facts, ...oldShape } = JSON.parse(rowsInDb(fileDb, "bump-a").summary.reader_card as string);
+    assert.ok(dial && facts);
+    fileDb.prepare(`UPDATE library_summary SET reader_card = ? WHERE user_id = 'bump-a'`).run(JSON.stringify(oldShape));
     backfillLibraryDerived();
     assert.equal(storedGlyph(fileDb, "bump-a"), "star");
+    assert.equal("dial" in JSON.parse(rowsInDb(fileDb, "bump-a").summary.reader_card as string), false);
 
     applyLibrarySchema(fileDb, LIBRARY_DERIVED_VERSION + 1);
     assert.equal(storedGlyph(fileDb, "bump-a"), undefined);
@@ -893,6 +918,9 @@ test("raising the derived version re-derives every library at the next backfill"
     assert.equal(storedGlyph(fileDb, "bump-b"), null);
     assert.deepEqual(keyRows(fileDb, "bump-a").map((row) => row.key), ["isbn:9780441013593", "ta:dune|frank herbert"]);
     assert.deepEqual(keyRows(fileDb, "bump-b").map((row) => row.key), ["ta:emma|jane austen"]);
+    const rebuilt = JSON.parse(rowsInDb(fileDb, "bump-a").summary.reader_card as string);
+    assert.deepEqual(rebuilt.dial, { segments: [] });
+    assert.equal(rebuilt.facts.finished, 0);
   } finally {
     logged.mock.restore();
   }
@@ -2022,4 +2050,22 @@ test("a catalog outage still answers the library with stored work ids and logs i
   service.saveLibrary("u1", { books: [{ Title: "Dune", Attribution: "Frank Herbert" }] });
   assert.deepEqual(service.getLibrary("u1")!.works, { "ta:dune|frank herbert": "w-Dune" });
   assert.ok(logged.some((message) => message.includes("work canonical lookup failed for u1")));
+});
+
+test("a saved library's reader card carries the streak, the dial and the facts", () => {
+  const { db, service } = setup();
+  service.saveLibrary("u1", changeLibrary());
+  const card = JSON.parse(rowsInDb(db, "u1").summary.reader_card as string);
+  assert.equal(card.facts.finished, 10);
+  assert.equal(card.facts.series, 1);
+  assert.ok(Array.isArray(card.dial.segments));
+  assert.ok("streak" in card);
+  assert.equal("leaders" in card, false);
+});
+
+test("finishing or unfinishing a book recomputes the stored facts", () => {
+  const { db, service } = setup();
+  service.saveLibrary("u1", changeLibrary());
+  service.applyChange("u1", { kind: "book", bookKey: keyOf(3), readStatus: 0 });
+  assert.equal(JSON.parse(rowsInDb(db, "u1").summary.reader_card as string).facts.finished, 9);
 });

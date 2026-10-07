@@ -122,8 +122,8 @@ export function backfillLibraryDerived(rowsVersion = LIBRARY_ROWS_VERSION): void
       const row = repo.getDocument(userId);
       if (!row) continue;
       const parsed = parseStoredDocument(userId, row.data);
-      repo.setDerived(userId, deriveLibraryData(parsed), row.updated_at);
       repo.setRows(userId, deriveLibraryRows(parsed, (error, what) => console.error(`library backfill: ${userId}: ${what}`, error), rowsVersion), row.updated_at);
+      repo.setDerived(userId, deriveLibraryData(parsed), row.updated_at);
     }
     if (stale.length > 0) console.log(`library backfill: rebuilt ${stale.length} accounts in ${Math.round(performance.now() - started)} ms`);
   } finally {

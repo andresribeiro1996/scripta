@@ -121,7 +121,7 @@ test("Goodreads and StoryGraph imports add a series coverage line", () => {
 test("the public card carries no titles, authors, series or missing line", () => {
   const books = shelf(10, (i) => (i < 4 ? { Attribution: "Kazuo Ishiguro", Title: `Klara ${i}` } : {}));
   const card = publicReaderCard(readerIdentity(books, [series(books.slice(0, 2), "Secret Series")]));
-  assert.deepEqual(Object.keys(card).sort(), ["coverage", "identity", "runnerUp", "signal", "state"]);
+  assert.deepEqual(Object.keys(card).sort(), ["coverage", "identity", "runnerUp", "signal", "state", "streak"]);
   const text = JSON.stringify(card);
   for (const leak of ["Ishiguro", "Klara", "Secret Series", "Book 5"]) assert.ok(!text.includes(leak), leak);
 });
@@ -227,4 +227,53 @@ test("the sample library fixture leans Cartographer with 3 of 11 finished books 
   assert.equal(result.identity, "carto");
   assert.equal(result.state, "leaning");
   assert.deepEqual(result.signal, { counted: 3, of: 11, label: "3 of 11 finished books are in a series" });
+});
+
+test("a settled card names the second-strongest reading as its streak", () => {
+  const books = shelf(10, (i) => (i < 3 ? { highlights: mark(7) } : {}));
+  const result = readerIdentity(books, [series(books.slice(3, 7))]);
+  assert.equal(result.state, "settled");
+  assert.equal(result.identity, "carto");
+  assert.equal(result.runnerUp, null);
+  assert.equal(result.streak, "anno");
+});
+
+test("a settled card with no second reading near the threshold has no streak", () => {
+  const books = shelf(10);
+  const result = readerIdentity(books, [series(books.slice(0, 4))]);
+  assert.equal(result.state, "settled");
+  assert.equal(result.streak, null);
+});
+
+const annotatorBehind = (marks: number[]) => {
+  const books = shelf(10, (i) => (i < marks.length ? { highlights: mark(marks[i]!) } : {}));
+  return readerIdentity(books, [series(books.slice(4, 8))]);
+};
+
+test("a second reading at strength 0.8 is a streak", () => {
+  const result = annotatorBehind([4, 4, 4, 4]);
+  assert.equal(result.state, "settled");
+  assert.equal(result.identity, "carto");
+  assert.equal(result.streak, "anno");
+});
+
+test("a second reading at strength 0.7 is not a streak", () => {
+  const result = annotatorBehind([4, 4, 3, 3]);
+  assert.equal(result.state, "settled");
+  assert.equal(result.identity, "carto");
+  assert.equal(result.streak, null);
+});
+
+test("a tied leaning card's streak is its runner-up", () => {
+  const books = shelf(10, (i) => (i < 3 ? { highlights: mark(7) } : {}));
+  const result = readerIdentity(books, [series(books.slice(3, 6))]);
+  assert.equal(result.state, "leaning");
+  assert.equal(result.runnerUp, "anno");
+  assert.equal(result.streak, "anno");
+});
+
+test("an unwritten card has no streak, and the public card carries the streak", () => {
+  assert.equal(readerIdentity(shelf(3), []).streak, null);
+  const books = shelf(10, (i) => (i < 3 ? { highlights: mark(7) } : {}));
+  assert.equal(publicReaderCard(readerIdentity(books, [series(books.slice(3, 7))])).streak, "anno");
 });
