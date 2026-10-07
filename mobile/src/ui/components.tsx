@@ -406,6 +406,27 @@ export function Dialog(props: OverlayProps) {
 // The native segmented control — SwiftUI's segmented Picker on iOS, Compose's
 // SingleChoiceSegmentedButtonRow on Android. Replaces the pairs of Buttons that
 // were standing in for one.
+export function ToggleSwitch({ value, onValueChange, accessibilityLabel, disabled = false }: { value: boolean; onValueChange: () => void; accessibilityLabel: string; disabled?: boolean }) {
+  const { colors } = useTheme();
+  return (
+    <Pressable
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value, disabled }}
+      disabled={disabled}
+      onPress={onValueChange}
+      style={[toggleStyles.switch, { backgroundColor: value ? colors.accent : colors.border }]}
+    >
+      <View style={[toggleStyles.thumb, { alignSelf: value ? "flex-end" : "flex-start" }]} />
+    </Pressable>
+  );
+}
+
+const toggleStyles = StyleSheet.create({
+  switch: { width: 48, height: 28, borderRadius: radii.full, padding: 3, justifyContent: "center" },
+  thumb: { width: 22, height: 22, borderRadius: radii.full, backgroundColor: "white" },
+});
+
 export function Segmented<T extends string>({
   options,
   value,
