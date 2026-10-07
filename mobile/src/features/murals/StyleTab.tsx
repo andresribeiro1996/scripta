@@ -22,7 +22,7 @@ function Group({ title, open, onOpenChange, width, children }: { title: string; 
   return (
     <Host matchContents={{ vertical: true }} colorScheme={mode} seedColor={colors.accent}>
       <Collapsible label={title} labelStyle={{ color: colors.text, fontSize: 16, fontWeight: "600" }} isOpen={open} onOpenChange={onOpenChange}>
-        <RNHostView matchContents><View style={[styles.group, { width }]}>{children}</View></RNHostView>
+        <RNHostView matchContents><View style={[styles.group, { width }]}>{Platform.OS === "android" && width === undefined ? null : children}</View></RNHostView>
       </Collapsible>
     </Host>
   );

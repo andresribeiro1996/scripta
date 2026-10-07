@@ -142,7 +142,7 @@ function EmptyBlock({ message, style }: { message: string; style: StyleProp<Text
   return <View style={styles.emptyBlock}><Text style={style}>{message}</Text></View>;
 }
 
-const title = (book: Record<string, unknown> | undefined) => String(book?.Title ?? "Book unavailable");
+const title = (book: Record<string, unknown>) => String(book.Title ?? "Untitled");
 
 function CoverRow({ blockId, books, mode, caption, dim, accent, editable, onAssetReady }: { blockId: string; books: Array<Record<string, unknown>>; mode: "reading" | "shelf"; caption: ReturnType<typeof blockTextStyles>["caption"]; dim: { color: string }; accent: string; editable?: boolean; onAssetReady?: (key: string) => void }) {
   const { colors } = useTheme();
@@ -473,7 +473,7 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThe
     if (block.type === "image") { const image = images.find((item) => item.id === block.imageId); return image ? [`image:${block.id}:${image.url}`] : []; }
     if (block.type !== "spotlight" && block.type !== "shelf" && block.type !== "currentlyReading") return [];
     const selected = blockBooks(block, books);
-    return (block.type === "spotlight" ? selected.slice(0, 3) : selected).map((book) => `cover:${block.id}:${bookKey(book)}:${String(book._coverUrl ?? "")}`);
+    return selected.map((book) => `cover:${block.id}:${bookKey(book)}:${String(book._coverUrl ?? "")}`);
   });
   const imageReady = width > 0 && assetKeys.every((key) => readyAssets.has(key));
   useEffect(() => { onImageReadyChange?.(imageReady); }, [imageReady, onImageReadyChange]);
